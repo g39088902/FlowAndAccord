@@ -29,12 +29,15 @@ mod tests {
     }
 
     #[test]
-    fn test_doubled_poi_and_offroad_mechanics() {
+    fn test_unified_ecology_and_18_pois() {
         let mut world = World3DEngine::new(60, 764.0);
         world.seed_primitive_ecology(8);
 
-        // 验证 POI 概率提升 100% (总数从 10 增至 20 处)
-        assert_eq!(world.pois.len(), 20); // 6营地 + 6水泉 + 8浆果
+        // 验证 6营地 + 6水泉 + 6浆果 = 18 处 POI，单点上限均为 12.0
+        assert_eq!(world.pois.len(), 18);
+        for poi in &world.pois {
+            assert_eq!(poi.max_stock, 12.0);
+        }
         assert_eq!(world.agents.len(), 8);
 
         for _ in 0..200 {
@@ -42,7 +45,7 @@ mod tests {
         }
 
         let snapshot = world.generate_snapshot();
-        assert_eq!(snapshot.pois.len(), 20);
+        assert_eq!(snapshot.pois.len(), 18);
         assert!(!snapshot.agents.is_empty());
     }
 }

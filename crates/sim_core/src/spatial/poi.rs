@@ -1,63 +1,55 @@
 use serde::{Deserialize, Serialize};
-use crate::spatial::vec3::Vec3;
+use super::vec3::Vec3;
 
 pub type PoiId = u32;
 
-/// 原始生存兴趣点类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoiType {
-    Camp,        // 🏕️ 避风营地 / 火塘 (恢复体力、储粮、生育抚育)
-    WaterSource, // 💧 低洼清泉 / 水洼 (有限蓄水与涌出速率)
-    BerryBush,   // 🍒 野果浆果丛 (有限果实存量与再生速率)
+    Camp,        // 🏕️ 避风营地 (休眠恢复体力、饱暖受孕与分娩)
+    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限12单位，0.4单位/秒)
+    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限12单位，0.4单位/秒)
 }
 
-/// 原始地表有限资源地标
+/// 有限生态地标实体 (最大储量 12.0 单位，产出速率 0.4 单位/秒)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
-    pub current_stock: f32, // 当前可用资源存量
-    pub max_stock: f32,     // 资源最大存储上限 (有限)
-    pub regen_rate: f32,    // 资源有限产出/再生速率 (单位/秒)
+    pub current_stock: f32, // 当前可用储量 (0.0 ~ 12.0 单位)
+    pub max_stock: f32,     // 储量上限 (12.0 单位)
+    pub regen_rate: f32,    // 每秒自然再生速率 (0.4 单位/秒)
 }
 
 impl PrimitivePoi {
     pub fn new(id: PoiId, poi_type: PoiType, pos: Vec3) -> Self {
-        let (max_stock, regen_rate) = match poi_type {
-            PoiType::Camp => (150.0, 0.0),       // 营地自身不产粮，靠采集带回
-            PoiType::WaterSource => (60.0, 3.5), // 水坑上限 60.0，涌出速率 3.5/s
-            PoiType::BerryBush => (25.0, 1.2),   // 灌木上限 25.0 颗，生长速率 1.2/s
+        let (max_stock, regen_rate, initial_stock) = match poi_type {
+            PoiType::Camp => (12.0, 0.0, 12.0),
+            PoiType::WaterSource => (12.0, 0.4, 8.0),
+            PoiType::BerryBush => (12.0, 0.4, 8.0),
         };
+
         Self {
             id,
             poi_type,
             pos,
-            current_stock: max_stock * 0.75, // 初始 75% 存量
+            current_stock: initial_stock,
             max_stock,
             regen_rate,
         }
     }
 
-    /// 资源自然有限再生
+    /// 自然周期再生 Tick
     pub fn tick_regenerate(&mut self, dt: f32) {
         if self.regen_rate > 0.0 {
             self.current_stock = (self.current_stock + self.regen_rate * dt).min(self.max_stock);
         }
     }
 
-    /// 提取/采集资源 (受实际存量限制)
-    pub fn extract(&mut self, desired_amount: f32) -> f32 {
-        let actual = desired_amount.min(self.current_stock);
-        self.current_stock -= actual;
-        actual
-    }
-
-    /// 存放资源 (向营地存粮)
-    pub fn deposit(&mut self, amount: f32) -> f32 {
-        let space = (self.max_stock - self.current_stock).max(0.0);
-        let actual = amount.min(space);
-        self.current_stock += actual;
-        actual
+    /// 提取资源
+    pub fn extract(&mut self, amount: f32) -> f32 {
+        let available = self.current_stock.min(amount);
+        self.current_stock -= available;
+        available
     }
 }
