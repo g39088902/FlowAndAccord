@@ -17,16 +17,16 @@ pub enum PrimitiveActionState {
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (统一单位系统：最大 6.0 单位、10秒1单位消耗、60秒流产冷却、90秒孕期)
+/// 3D 动力学 Agent 实体 (统一单位系统：自身满足上限 10.0 单位、10秒1单位消耗、60秒流产冷却、90秒孕期)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
     pub state: PrimitiveActionState,
     pub is_alive: bool,
 
-    // 统一生理指标 (0.0 ~ 6.0 单位)
-    pub hunger: f32,          // 饱食度 (最大 6.0 单位)
-    pub thirst: f32,          // 水分值 (最大 6.0 单位)
+    // 统一生理指标 (0.0 ~ 10.0 单位)
+    pub hunger: f32,          // 饱食度 (最大 10.0 单位)
+    pub thirst: f32,          // 水分值 (最大 10.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
     pub home_camp_node: NodeId, // 所属归宿营地节点
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
@@ -66,8 +66,8 @@ impl Agent3D {
             id,
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
-            hunger: 5.2 + (id as f32 % 0.7), // 初始 5.2 ~ 5.9 单位 (满值 6.0)
-            thirst: 5.2 + (id as f32 % 0.7),
+            hunger: 8.5 + (id as f32 % 1.2), // 初始 8.5 ~ 9.7 单位 (满值 10.0)
+            thirst: 8.5 + (id as f32 % 1.2),
             stamina: 95.0,
             home_camp_node: home_camp,
             target_poi_node: None,
@@ -83,7 +83,7 @@ impl Agent3D {
             current_velocity: 0.0,
             max_desired_speed: doubled_speed,
             is_traveling_offroad: false,
-            route: Vec::new(),
+            route: Vec::new>,
             route_index: 0,
             is_covert,
             stealth_visibility: if is_covert { 0.25 } else { 1.0 },
@@ -133,23 +133,23 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (各指标 >= 80% 即 4.8 单位，且不在流产 60 秒冷却期内)
+        // 受孕判定 (各指标 >= 80% 即 8.0 单位，且不在流产 60 秒冷却期内)
         if self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
-            if self.hunger >= 4.8 && self.thirst >= 4.8 && self.stamina >= 80.0 {
+            if self.hunger >= 8.0 && self.thirst >= 8.0 && self.stamina >= 80.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
-                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健(≥4.8单位)，成功受孕进入90秒妊娠期 (代谢+50%)！", self.id));
+                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健(≥8.0单位)，成功受孕进入90秒妊娠期 (代谢+50%)！", self.id));
             }
         }
 
-        // 妊娠与流产判定 (孕期 90 秒，跌破 20% 即 1.2 单位触发流产并进入 60 秒冷却)
+        // 妊娠与流产判定 (孕期 90 秒，跌破 20% 即 2.0 单位触发流产并进入 60 秒冷却)
         if self.is_pregnant {
-            if self.hunger < 1.2 || self.thirst < 1.2 || self.stamina < 20.0 {
+            if self.hunger < 2.0 || self.thirst < 2.0 || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = 5.0;
                 self.miscarriage_cooldown_timer = 60.0; // 流产后 60 秒内禁止再次受孕
-                return Some(format!("🥀 痛惜！部落民 #{} 生存指标跌破 20%(<1.2单位)，导致流产 (60秒内休养不可受孕)！", self.id));
+                return Some(format!("🥀 痛惜！部落民 #{} 生存指标跌破 20%(<2.0单位)，导致流产 (60秒内休养不可受孕)！", self.id));
             }
 
             self.pregnancy_progress += dt / 90.0;
@@ -169,7 +169,7 @@ impl Agent3D {
         event_msg
     }
 
-    /// 3D 动力学移动与能耗结算 (无路时按 50% 移速越野，体力消耗减半)
+    /// 3D 动力学移动与能耗结算
     pub fn tick_movement(&mut self, dt: f32, road_network: &LaneGraph3D) {
         if !self.is_alive {
             self.current_velocity = 0.0;
@@ -196,7 +196,6 @@ impl Agent3D {
 
         let lane = &road_network.graph[*edge_idx];
 
-        // 检查是否为无路越野段 (若是越野土路/直连，速度乘数 0.5)
         let offroad_multiplier = if lane.road_class == crate::spatial::graph::RoadClass::DirtTrack && lane.is_hidden {
             0.5
         } else {

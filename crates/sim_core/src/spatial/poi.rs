@@ -5,28 +5,28 @@ pub type PoiId = u32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoiType {
-    Camp,        // 🏕️ 避风营地 (休眠恢复体力、饱暖受孕与分娩)
-    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限12单位，0.4单位/秒)
-    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限12单位，0.4单位/秒)
+    Camp,        // 🏕️ 避风营地 (无限储量与无限庇护，休眠恢复体力、饱暖受孕与分娩)
+    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限20.0单位，0.40单位/秒)
+    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限20.0单位，0.40单位/秒)
 }
 
-/// 有限生态地标实体 (最大储量 12.0 单位，产出速率 0.4 单位/秒)
+/// 有限生态地标实体 (清泉/浆果最大储量 20.0 单位，产出速率 0.4 单位/秒；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
-    pub current_stock: f32, // 当前可用储量 (0.0 ~ 12.0 单位)
-    pub max_stock: f32,     // 储量上限 (12.0 单位)
+    pub current_stock: f32, // 当前可用储量 (0.0 ~ 20.0 单位，营地为无限)
+    pub max_stock: f32,     // 储量上限 (20.0 单位，营地为无限)
     pub regen_rate: f32,    // 每秒自然再生速率 (0.4 单位/秒)
 }
 
 impl PrimitivePoi {
     pub fn new(id: PoiId, poi_type: PoiType, pos: Vec3) -> Self {
         let (max_stock, regen_rate, initial_stock) = match poi_type {
-            PoiType::Camp => (12.0, 0.0, 12.0),
-            PoiType::WaterSource => (12.0, 0.4, 8.0),
-            PoiType::BerryBush => (12.0, 0.4, 8.0),
+            PoiType::Camp => (f32::INFINITY, 0.0, f32::INFINITY),
+            PoiType::WaterSource => (20.0, 0.40, 15.0),
+            PoiType::BerryBush => (20.0, 0.40, 15.0),
         };
 
         Self {
@@ -41,13 +41,16 @@ impl PrimitivePoi {
 
     /// 自然周期再生 Tick
     pub fn tick_regenerate(&mut self, dt: f32) {
-        if self.regen_rate > 0.0 {
+        if self.regen_rate > 0.0 && self.current_stock.is_finite() {
             self.current_stock = (self.current_stock + self.regen_rate * dt).min(self.max_stock);
         }
     }
 
     /// 提取资源
     pub fn extract(&mut self, amount: f32) -> f32 {
+        if !self.current_stock.is_finite() {
+            return amount;
+        }
         let available = self.current_stock.min(amount);
         self.current_stock -= available;
         available

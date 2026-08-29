@@ -86,7 +86,7 @@
       color: #94a3b8;
     }
 
-    /* 全地图资源总览与产速控制面板 (左侧浮动) */
+    /* 全地图资源总览与产速控制面板 (左侧浮动，仅展示有限资源：水和食物) */
     .global-resource-panel {
       position: absolute;
       top: 88px; left: 16px;
@@ -434,7 +434,7 @@
   <div class="top-bar">
     <div class="brand-card">
       <div class="brand-title">🍼 Flow & Accord · 统一单位生态与繁衍演化</div>
-      <div class="brand-desc">自身满足上限 6.0 单位 × 10秒消耗1单位 × 6营/6泉/6粮(各12上限,产速0.4) × 90s孕期与60s流产冷却</div>
+      <div class="brand-desc">小人容量 10.0 单位 × 清泉/浆果上限 20.0 单位(产速0.4) × 营地无限 × 90s孕期与60s流产冷却</div>
     </div>
     <div class="stats-card">
       <div class="stat-item">
@@ -464,37 +464,29 @@
     </div>
   </div>
 
-  <!-- 左侧：全地图资源总览与产速调控窗口 -->
+  <!-- 左侧：全地图资源总览与产速调控窗口 (营地无限，仅统计有限水和野果) -->
   <div class="global-resource-panel">
     <div class="panel-header">
       <span>🌐 全图生态总余量大盘</span>
       <span id="global-eco-health" style="color:#10b981; font-size:10px;">资源丰盛</span>
     </div>
 
-    <!-- 全图资源剩余量仪表盘 (统一单位) -->
+    <!-- 全图资源剩余量仪表盘 (上限各 120.0 单位) -->
     <div class="res-meter-group">
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#38bdf8;">💧 全图清泉总水量 (6处)</span>
-          <span id="val-global-water" style="font-family:monospace; font-weight:700;">48.0 / 72.0 单位 (67%)</span>
+          <span id="val-global-water" style="font-family:monospace; font-weight:700;">90.0 / 120.0 单位 (75%)</span>
         </div>
-        <div class="meter-bg"><div class="meter-fill" id="fill-global-water" style="background:#38bdf8; width:67%;"></div></div>
+        <div class="meter-bg"><div class="meter-fill" id="fill-global-water" style="background:#38bdf8; width:75%;"></div></div>
       </div>
 
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#10b981;">🍒 全图成熟浆果量 (6处)</span>
-          <span id="val-global-berry" style="font-family:monospace; font-weight:700;">48.0 / 72.0 单位 (67%)</span>
+          <span id="val-global-berry" style="font-family:monospace; font-weight:700;">90.0 / 120.0 单位 (75%)</span>
         </div>
-        <div class="meter-bg"><div class="meter-fill" id="fill-global-berry" style="background:#10b981; width:67%;"></div></div>
-      </div>
-
-      <div class="meter-row">
-        <div class="meter-label">
-          <span style="color:#f59e0b;">🏕️ 部落营地总储量 (6处)</span>
-          <span id="val-global-camp" style="font-family:monospace; font-weight:700;">72.0 / 72.0 单位 (100%)</span>
-        </div>
-        <div class="meter-bg"><div class="meter-fill" id="fill-global-camp" style="background:#f59e0b; width:100%;"></div></div>
+        <div class="meter-bg"><div class="meter-fill" id="fill-global-berry" style="background:#10b981; width:75%;"></div></div>
       </div>
     </div>
 
@@ -526,11 +518,11 @@
   <div class="ecology-legend">
     <div class="legend-title">
       <span>🗺️ 统一生态地标与动线</span>
-      <span style="color:#10b981; font-size:10px;">18处 POI (各12上限)</span>
+      <span style="color:#10b981; font-size:10px;">18处 POI</span>
     </div>
-    <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图6处，休眠、受孕、分娩)</div>
-    <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 (全图6处，上限12单位，0.4/s)</div>
-    <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果丛 (全图6处，上限12单位，0.4/s)</div>
+    <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图6处，储量无限，休眠受孕)</div>
+    <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 (全图6处，上限20.0单位，0.4/s)</div>
+    <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果丛 (全图6处，上限20.0单位，0.4/s)</div>
     <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon" style="color:#38bdf8;">═</div> 现成修筑道路 (100% 满速行进)</div>
     <div class="legend-item"><div class="legend-icon" style="color:#94a3b8;">┄</div> 荒野直连越野 (50% 减速越野)</div>
     <div class="legend-item"><div class="legend-icon">🤰</div> 妊娠光环 (90s孕期，代谢0.15/s)</div>
@@ -546,12 +538,12 @@
 
     <div id="insp-agent-view">
       <div class="meter-row">
-        <div class="meter-label"><span>🍎 饱食度 (上限6.0单位)</span><span id="insp-hunger-val">5.2 / 6.0 单位 (87%)</span></div>
-        <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:87%;"></div></div>
+        <div class="meter-label"><span>🍎 饱食度 (上限10.0单位)</span><span id="insp-hunger-val">8.8 / 10.0 单位 (88%)</span></div>
+        <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:88%;"></div></div>
       </div>
       <div class="meter-row">
-        <div class="meter-label"><span>💧 水分值 (上限6.0单位)</span><span id="insp-thirst-val">5.0 / 6.0 单位 (83%)</span></div>
-        <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:83%;"></div></div>
+        <div class="meter-label"><span>💧 水分值 (上限10.0单位)</span><span id="insp-thirst-val">8.5 / 10.0 单位 (85%)</span></div>
+        <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:85%;"></div></div>
       </div>
       <div class="meter-row">
         <div class="meter-label"><span>⚡ 体力值</span><span id="insp-stamina-val">90%</span></div>
@@ -569,14 +561,14 @@
           <span id="insp-preg-val">45%</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
-        <div style="font-size:9px; color:#f472b6;">指标跌破 20% (1.2单位) 将流产并触发60秒冷却！</div>
+        <div style="font-size:9px; color:#f472b6;">指标跌破 20% (2.0单位) 将流产并触发60秒冷却！</div>
       </div>
     </div>
 
     <div id="insp-poi-view" style="display:none; flex-direction:column; gap:6px;">
-      <div class="meter-row">
-        <div class="meter-label"><span id="lbl-poi-stock-title">当前可用储量 (上限12.0)</span><span id="insp-poi-stock-val">8.5 / 12.0 单位</span></div>
-        <div class="meter-bg"><div class="meter-fill" id="insp-poi-stock-fill" style="background:#10b981; width:71%;"></div></div>
+      <div class="meter-row" id="insp-poi-stock-row">
+        <div class="meter-label"><span id="lbl-poi-stock-title">当前可用储量 (上限20.0)</span><span id="insp-poi-stock-val">15.0 / 20.0 单位</span></div>
+        <div class="meter-bg"><div class="meter-fill" id="insp-poi-stock-fill" style="background:#10b981; width:75%;"></div></div>
       </div>
       <div class="poi-info-badge">
         <div><strong>🌱 产出速率:</strong> <span id="insp-poi-regen">+0.40 单位/秒</span></div>
@@ -631,7 +623,7 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">统一单位系统就绪: 自身上限6单位，10s消耗1单位，18处POI(各12上限,产速0.4)，90s孕期，60s流产冷却！</div>
+      <div class="log-entry camp">生态规格更新: 小人容量提升至10单位，清泉/浆果上限提升至20单位，营地无限庇护！</div>
     </div>
   </div>
 
@@ -850,9 +842,9 @@
         this.state = 'RestingAtCamp';
         this.isAlive = true;
 
-        // 统一单位 (0.0 ~ 6.0 单位)
-        this.hunger = 5.2 + (id * 0.7) % 0.7;
-        this.thirst = 5.2 + (id * 0.7) % 0.7;
+        // 统一单位 (0.0 ~ 10.0 单位)
+        this.hunger = 8.5 + (id * 1.2) % 1.2;
+        this.thirst = 8.5 + (id * 1.2) % 1.2;
         this.stamina = 95;
 
         this.isPregnant = false;
@@ -860,7 +852,7 @@
         this.readyToBirth = false;
         this.isOffroad = false;
         this.miscarriageTimer = 0.0;
-        this.miscarriageCooldown = 0.0; // 60秒流产冷却
+        this.miscarriageCooldown = 0.0;
         this.deathDecayTimer = 12.0;
         this.deathCause = null;
 
@@ -890,8 +882,8 @@
         let eventMsg = null;
         const multiplier = this.isPregnant ? 1.5 : 1.0;
 
-        // 10秒消耗1单位 (未孕 0.1单位/秒，怀孕 0.15单位/秒)
-        const decayRate = 0.1 * multiplier;
+        // 10秒消耗1单位 (未孕 0.10单位/秒，怀孕 0.15单位/秒)
+        const decayRate = 0.10 * multiplier;
         this.hunger = Math.max(0, this.hunger - decayRate * dt);
         this.thirst = Math.max(0, this.thirst - decayRate * dt);
 
@@ -912,23 +904,23 @@
           return { type: 'death', text: `💀 部落民 #${this.id} 因严重脱水渴死！` };
         }
 
-        // 受孕判定 (各指标 >= 4.8 单位且不在 60s 冷却内)
+        // 受孕判定 (各指标 >= 8.0 单位即 80%，且不在 60s 冷却内)
         if (this.state === 'RestingAtCamp' && !this.isPregnant && this.miscarriageCooldown <= 0) {
-          if (this.hunger >= 4.8 && this.thirst >= 4.8 && this.stamina >= 80) {
+          if (this.hunger >= 8.0 && this.thirst >= 8.0 && this.stamina >= 80) {
             this.isPregnant = true;
             this.pregnancyProgress = 0.0;
-            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} 饱暖充盈(≥4.8单位)，成功受孕进入90秒妊娠期！` };
+            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} 饱暖充盈(≥8.0单位)，成功受孕进入90秒妊娠期！` };
           }
         }
 
-        // 90秒孕期与流产判定
+        // 90秒孕期与流产判定 (跌破 2.0 单位触发流产)
         if (this.isPregnant) {
-          if (this.hunger < 1.2 || this.thirst < 1.2 || this.stamina < 20) {
+          if (this.hunger < 2.0 || this.thirst < 2.0 || this.stamina < 20) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
             this.miscarriageTimer = 5.0;
-            this.miscarriageCooldown = 60.0; // 流产后 60 秒冷却
-            return { type: 'miscarry', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%(<1.2单位)，导致流产 (60秒内不可再受孕)！` };
+            this.miscarriageCooldown = 60.0;
+            return { type: 'miscarry', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%(<2.0单位)，导致流产 (60秒内不可再受孕)！` };
           }
 
           this.pregnancyProgress += dt / 90.0;
@@ -1008,7 +1000,7 @@
     }
 
     // ==========================================
-    // 原始生态有限资源与繁衍世界 (18 POI 各12上限, 0.4产速)
+    // 原始生态有限资源与繁衍世界 (清泉/浆果上限20.0，营地无限)
     // ==========================================
     class WorldSimulation {
       constructor() {
@@ -1050,7 +1042,7 @@
         const campNodes = [], waterNodes = [], foodNodes = [];
         const allNodeIds = [];
 
-        // 1. 避风营地 (6 处，上限 12.0 单位)
+        // 1. 避风营地 (6 处，储量无限)
         for (let i = 0; i < 6; i++) {
           const x = (Math.random() - 0.5) * half * 1.4;
           const y = (Math.random() - 0.5) * half * 1.4;
@@ -1058,10 +1050,10 @@
           const nid = this.network.addNode(x, y, elev, 'camp');
           campNodes.push(nid);
           allNodeIds.push(nid);
-          this.pois.push({ id: i + 1, type: 'Camp', pos: new Vec3(x, y, elev), name: `避风营地 #${i+1}`, currentStock: 12.0, maxStock: 12.0, baseRegenRate: 0, regenRate: 0 });
+          this.pois.push({ id: i + 1, type: 'Camp', pos: new Vec3(x, y, elev), name: `避风营地 #${i+1}`, currentStock: Infinity, maxStock: Infinity, baseRegenRate: 0, regenRate: 0 });
         }
 
-        // 2. 低洼清泉 (6 处，上限 12.0 单位，产速 0.4 单位/秒)
+        // 2. 低洼清泉 (6 处，上限 20.0 单位，产速 0.40 单位/秒)
         for (let i = 0; i < 6; i++) {
           let bestX = 0, bestY = 0, lowestZ = 999;
           for (let k = 0; k < 12; k++) {
@@ -1074,10 +1066,10 @@
           waterNodes.push(nid);
           allNodeIds.push(nid);
           const baseRate = 0.40;
-          this.pois.push({ id: i + 10, type: 'Water', pos: new Vec3(bestX, bestY, lowestZ), name: `低洼清泉 #${i+1}`, currentStock: 8.0, maxStock: 12.0, baseRegenRate: baseRate, regenRate: baseRate * this.waterRegenMultiplier });
+          this.pois.push({ id: i + 10, type: 'Water', pos: new Vec3(bestX, bestY, lowestZ), name: `低洼清泉 #${i+1}`, currentStock: 15.0, maxStock: 20.0, baseRegenRate: baseRate, regenRate: baseRate * this.waterRegenMultiplier });
         }
 
-        // 3. 缓坡浆果灌木 (6 处，上限 12.0 单位，产速 0.4 单位/秒)
+        // 3. 缓坡浆果灌木 (6 处，上限 20.0 单位，产速 0.40 单位/秒)
         for (let i = 0; i < 6; i++) {
           const x = (Math.random() - 0.5) * half * 1.6;
           const y = (Math.random() - 0.5) * half * 1.6;
@@ -1086,7 +1078,7 @@
           foodNodes.push(nid);
           allNodeIds.push(nid);
           const baseRate = 0.40;
-          this.pois.push({ id: i + 20, type: 'Berry', pos: new Vec3(x, y, elev), name: `浆果灌木丛 #${i+1}`, currentStock: 8.0, maxStock: 12.0, baseRegenRate: baseRate, regenRate: baseRate * this.berryRegenMultiplier });
+          this.pois.push({ id: i + 20, type: 'Berry', pos: new Vec3(x, y, elev), name: `浆果灌木丛 #${i+1}`, currentStock: 15.0, maxStock: 20.0, baseRegenRate: baseRate, regenRate: baseRate * this.berryRegenMultiplier });
         }
 
         // 4. 地形过渡节点
@@ -1117,7 +1109,7 @@
           }
         }
 
-        // 6. 注入部落民 (8 人)
+        // 6. 注入部落民 (8 人，自身容量 10.0 单位)
         for (let i = 0; i < agentCount; i++) {
           const homeCamp = campNodes[i % campNodes.length];
           const agentId = this.nextAgentId++;
@@ -1130,7 +1122,7 @@
         this.campNodes = campNodes;
         this.waterNodes = waterNodes;
         this.foodNodes = foodNodes;
-        this.logEvent(`🏕️ 统一单位系统就绪: 6营/6泉/6粮(各12上限,产速0.4)，自身上限6单位，10s消耗1单位，90s孕期！`, 'camp');
+        this.logEvent(`🏕️ 规格就绪: 小人容量10单位，清泉/浆果上限20单位，营地无限储量！`, 'camp');
       }
       setWaterRegenMultiplier(mult) {
         this.waterRegenMultiplier = mult;
@@ -1157,7 +1149,7 @@
           this.tickCount++;
 
           for (const poi of this.pois) {
-            if (poi.regenRate > 0) {
+            if (poi.regenRate > 0 && isFinite(poi.currentStock)) {
               poi.currentStock = Math.min(poi.maxStock, poi.currentStock + poi.regenRate * dt);
             }
           }
@@ -1175,18 +1167,18 @@
             if (agent.state === 'DrinkingAtWater') {
               const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 22);
               if (poi && poi.currentStock > 0.01) {
-                const need = Math.max(0, 6.0 - agent.thirst);
-                const extracted = Math.min(poi.currentStock, Math.min(need, 2.0 * dt));
+                const need = Math.max(0, 10.0 - agent.thirst);
+                const extracted = Math.min(poi.currentStock, Math.min(need, 2.5 * dt));
                 poi.currentStock -= extracted;
-                agent.thirst = Math.min(6.0, agent.thirst + extracted);
+                agent.thirst = Math.min(10.0, agent.thirst + extracted);
               }
             } else if (agent.state === 'ForagingFood') {
               const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 22);
               if (poi && poi.currentStock > 0.01) {
-                const need = Math.max(0, 6.0 - agent.hunger);
-                const extracted = Math.min(poi.currentStock, Math.min(need, 2.0 * dt));
+                const need = Math.max(0, 10.0 - agent.hunger);
+                const extracted = Math.min(poi.currentStock, Math.min(need, 2.5 * dt));
                 poi.currentStock -= extracted;
-                agent.hunger = Math.min(6.0, agent.hunger + extracted);
+                agent.hunger = Math.min(10.0, agent.hunger + extracted);
               }
             }
           }
@@ -1196,8 +1188,8 @@
             this.totalBirths++;
             const baby = new PrimitiveAgent(babyId, campNode, 16.0);
             baby.pos = this.network.nodes.get(campNode).pos;
-            baby.hunger = 5.6;
-            baby.thirst = 5.6;
+            baby.hunger = 9.5;
+            baby.thirst = 9.5;
             baby.stamina = 100;
             this.agents.push(baby);
             this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId})！部落薪火相传！`, 'birth');
@@ -1235,8 +1227,8 @@
           if (!agent.isAlive) continue;
 
           if (agent.state === 'RestingAtCamp') {
-            const thirstUrgency = agent.isPregnant ? 3.3 : 2.4; // 55% / 40% (满值 6.0)
-            const hungerUrgency = agent.isPregnant ? 3.6 : 2.8; // 60% / 48%
+            const thirstUrgency = agent.isPregnant ? 5.5 : 4.0; // 55% / 40% (满值 10.0)
+            const hungerUrgency = agent.isPregnant ? 6.0 : 4.8; // 60% / 48%
 
             if (agent.thirst < thirstUrgency && availableWaterNodes.length > 0) {
               const target = availableWaterNodes[Math.floor(Math.random() * availableWaterNodes.length)];
@@ -1260,7 +1252,7 @@
                 agent.currentLaneId = path[0];
                 agent.distAlongCurve = 0;
               }
-            } else if (agent.stamina >= 95 && agent.hunger < 5.0 && availableFoodNodes.length > 0 && Math.random() < 0.04) {
+            } else if (agent.stamina >= 95 && agent.hunger < 8.0 && availableFoodNodes.length > 0 && Math.random() < 0.04) {
               const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
@@ -1273,8 +1265,8 @@
               }
             }
           } else if (agent.state === 'DrinkingAtWater') {
-            if (agent.thirst >= 5.5) {
-              if (agent.hunger < 3.0 && availableFoodNodes.length > 0) {
+            if (agent.thirst >= 9.5) {
+              if (agent.hunger < 5.0 && availableFoodNodes.length > 0) {
                 const curr = agent.targetNode || agent.homeCampNode;
                 const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
                 const path = this.network.findPath(curr, target);
@@ -1300,7 +1292,7 @@
               }
             }
           } else if (agent.state === 'ForagingFood') {
-            if (agent.hunger >= 5.5) {
+            if (agent.hunger >= 9.5) {
               const curr = agent.targetNode || agent.homeCampNode;
               const path = this.network.findPath(curr, agent.homeCampNode);
               if (path && path.length > 0) {
@@ -1470,7 +1462,7 @@
         }
       }
 
-      // 2. 原始生态 POI 渲染与有限储量指示环 (18处 POI，各12上限)
+      // 2. 原始生态 POI 渲染与有限储量指示环
       for (const poi of sim.pois) {
         const p2D = project3D(poi.pos);
         const isSelectedPoi = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
@@ -1487,7 +1479,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🏕️', p2D.x, p2D.y + 4);
         } else if (poi.type === 'Water') {
-          const ratio = poi.currentStock / poi.maxStock;
+          const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom);
           grad.addColorStop(0, 'rgba(2, 132, 199, 0.9)');
           grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
@@ -1499,7 +1491,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('💧', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock) {
+          if (sim.showPoiStock && isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -1507,7 +1499,7 @@
             ctx.stroke();
           }
         } else if (poi.type === 'Berry') {
-          const ratio = poi.currentStock / poi.maxStock;
+          const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom);
           grad.addColorStop(0, 'rgba(16, 185, 129, 0.85)');
           grad.addColorStop(0.6, 'rgba(5, 150, 105, 0.4)');
@@ -1519,7 +1511,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🍒', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock) {
+          if (sim.showPoiStock && isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#10b981';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -1590,7 +1582,6 @@
         else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#10b981';
         else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
 
-        // 孕期粉红光环
         if (agent.isPregnant) {
           stateColor = '#ec4899';
           ctx.strokeStyle = '#ec4899';
@@ -1600,7 +1591,6 @@
           ctx.stroke();
         }
 
-        // 流产浮动提示
         if (agent.miscarriageTimer > 0) {
           const mAlpha = Math.max(0, Math.min(1.0, agent.miscarriageTimer / 2.0));
           const floatY = (5.0 - agent.miscarriageTimer) * 7.0;
@@ -1669,10 +1659,9 @@
       document.getElementById('stat-births').textContent = sim.totalBirths;
       document.getElementById('stat-deaths').textContent = sim.totalDeaths;
 
-      // 6. 实时汇总全地图资源大盘 (单位系统)
+      // 6. 实时汇总全地图资源大盘 (仅统计有限的清泉与浆果，上限各 120.0 单位)
       let totalWaterCur = 0, totalWaterMax = 0;
       let totalBerryCur = 0, totalBerryMax = 0;
-      let totalCampCur = 0, totalCampMax = 0;
 
       for (const p of sim.pois) {
         if (p.type === 'Water') {
@@ -1681,15 +1670,11 @@
         } else if (p.type === 'Berry') {
           totalBerryCur += p.currentStock;
           totalBerryMax += p.maxStock;
-        } else if (p.type === 'Camp') {
-          totalCampCur += p.currentStock;
-          totalCampMax += p.maxStock;
         }
       }
 
       const waterPct = Math.round((totalWaterCur / Math.max(1, totalWaterMax)) * 100);
       const berryPct = Math.round((totalBerryCur / Math.max(1, totalBerryMax)) * 100);
-      const campPct = Math.round((totalCampCur / Math.max(1, totalCampMax)) * 100);
 
       document.getElementById('val-global-water').textContent = `${totalWaterCur.toFixed(1)} / ${totalWaterMax.toFixed(1)} 单位 (${waterPct}%)`;
       document.getElementById('fill-global-water').style.width = `${waterPct}%`;
@@ -1698,9 +1683,6 @@
       document.getElementById('val-global-berry').textContent = `${totalBerryCur.toFixed(1)} / ${totalBerryMax.toFixed(1)} 单位 (${berryPct}%)`;
       document.getElementById('fill-global-berry').style.width = `${berryPct}%`;
       document.getElementById('fill-global-berry').style.background = berryPct < 25 ? '#ef4444' : '#10b981';
-
-      document.getElementById('val-global-camp').textContent = `${totalCampCur.toFixed(1)} / ${totalCampMax.toFixed(1)} 单位 (${campPct}%)`;
-      document.getElementById('fill-global-camp').style.width = `${campPct}%`;
 
       const ecoHealthBadge = document.getElementById('global-eco-health');
       if (waterPct < 20 || berryPct < 20) {
@@ -1727,22 +1709,33 @@
           document.getElementById('insp-title-name').textContent = `${poi.type === 'Camp' ? '🏕️' : (poi.type === 'Water' ? '💧' : '🍒')} ${poi.name}`;
           
           let stateBadge = '资源充足';
-          if (poi.currentStock < 1.0) stateBadge = '资源枯竭中';
-          else if (poi.currentStock < poi.maxStock * 0.4) stateBadge = '储量偏低';
+          if (!isFinite(poi.currentStock)) {
+            stateBadge = '无限庇护';
+          } else if (poi.currentStock < 2.0) {
+            stateBadge = '资源枯竭中';
+          } else if (poi.currentStock < poi.maxStock * 0.4) {
+            stateBadge = '储量偏低';
+          }
           document.getElementById('insp-title-state').textContent = stateBadge;
-          document.getElementById('insp-title-state').style.color = poi.currentStock < 1.0 ? '#ef4444' : '#10b981';
+          document.getElementById('insp-title-state').style.color = poi.currentStock < 2.0 ? '#ef4444' : '#10b981';
 
-          const ratio = Math.round((poi.currentStock / poi.maxStock) * 100);
-          document.getElementById('lbl-poi-stock-title').textContent = poi.type === 'Camp' ? '营地储粮 (上限12.0)' : (poi.type === 'Water' ? '清泉蓄水量 (上限12.0)' : '成熟浆果 (上限12.0)');
-          document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
-          document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
-          document.getElementById('insp-poi-stock-fill').style.background = poi.type === 'Water' ? '#38bdf8' : (poi.type === 'Berry' ? '#10b981' : '#f59e0b');
+          const stockRow = document.getElementById('insp-poi-stock-row');
+          if (poi.type === 'Camp') {
+            stockRow.style.display = 'none'; // 营地无限储量，不显示储量条
+          } else {
+            stockRow.style.display = 'flex';
+            const ratio = Math.round((poi.currentStock / poi.maxStock) * 100);
+            document.getElementById('lbl-poi-stock-title').textContent = poi.type === 'Water' ? '清泉蓄水量 (上限20.0)' : '成熟浆果 (上限20.0)';
+            document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
+            document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
+            document.getElementById('insp-poi-stock-fill').style.background = poi.type === 'Water' ? '#38bdf8' : '#10b981';
+          }
 
-          document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `0.0/s (休息点)`;
+          document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (避风营地)`;
           document.getElementById('insp-poi-elev').textContent = `Z = ${poi.pos.z.toFixed(1)}m (${poi.pos.z < -10 ? '低洼区' : (poi.pos.z > 10 ? '高台区' : '平缓中台')})`;
           document.getElementById('insp-poi-coord').textContent = `(X: ${Math.round(poi.pos.x)}m, Y: ${Math.round(poi.pos.y)}m)`;
           
-          document.getElementById('insp-detail-text').textContent = poi.type === 'Water' ? '低洼处天然地泉(上限12单位)，小人到泉直接饮水解渴。' : (poi.type === 'Berry' ? '向阳缓坡野生灌木(上限12单位)，小人到丛直接采食充饥。' : '避风篝火营地，小人在此休养回体、饱暖受孕与分娩新生儿。');
+          document.getElementById('insp-detail-text').textContent = poi.type === 'Water' ? '低洼处天然地泉(上限20单位)，小人到泉直接饮水解渴。' : (poi.type === 'Berry' ? '向阳缓坡野生灌木(上限20单位)，小人到丛直接采食充饥。' : '避风篝火营地(储量无限)，小人在此休养回体、饱暖受孕与分娩新生儿。');
         }
       } else {
         agentView.style.display = 'block';
@@ -1763,13 +1756,13 @@
             detailText = '前往水洼直接饮水解渴 (10秒消耗1单位)。';
           } else if (selAgent.state === 'DrinkingAtWater') {
             stateText = '💧 水洼痛饮中';
-            detailText = '在清泉处直接痛饮补充水分至 6.0 单位上限。';
+            detailText = '在清泉处直接痛饮补充水分至 10.0 单位上限。';
           } else if (selAgent.state === 'SeekingFood') {
             stateText = selAgent.isOffroad ? '🍒 荒野直连觅食 (50%移速)' : '🍒 沿道路前往果丛 (100%满速)';
             detailText = '前往浆果丛直接进食充饥。';
           } else if (selAgent.state === 'ForagingFood') {
             stateText = '🍒 正在就地进食';
-            detailText = '在灌木丛处直接采食充饥至 6.0 单位上限。';
+            detailText = '在灌木丛处直接采食充饥至 10.0 单位上限。';
           } else if (selAgent.state === 'ReturningToCamp') {
             stateText = selAgent.isOffroad ? '🏕️ 荒野越野归营 (50%移速)' : '🏕️ 沿道路返回营地 (100%满速)';
             detailText = '已完成现场补水与进食，返回避风营地。';
@@ -1778,19 +1771,18 @@
           document.getElementById('insp-title-state').textContent = stateText;
           document.getElementById('insp-title-state').style.color = '#f59e0b';
           
-          const hungerPct = Math.round((selAgent.hunger / 6.0) * 100);
-          document.getElementById('insp-hunger-val').textContent = `${selAgent.hunger.toFixed(1)} / 6.0 单位 (${hungerPct}%)`;
+          const hungerPct = Math.round((selAgent.hunger / 10.0) * 100);
+          document.getElementById('insp-hunger-val').textContent = `${selAgent.hunger.toFixed(1)} / 10.0 单位 (${hungerPct}%)`;
           document.getElementById('insp-hunger-fill').style.width = `${hungerPct}%`;
 
-          const thirstPct = Math.round((selAgent.thirst / 6.0) * 100);
-          document.getElementById('insp-thirst-val').textContent = `${selAgent.thirst.toFixed(1)} / 6.0 单位 (${thirstPct}%)`;
+          const thirstPct = Math.round((selAgent.thirst / 10.0) * 100);
+          document.getElementById('insp-thirst-val').textContent = `${selAgent.thirst.toFixed(1)} / 10.0 单位 (${thirstPct}%)`;
           document.getElementById('insp-thirst-fill').style.width = `${thirstPct}%`;
 
           document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;
           document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
           document.getElementById('insp-detail-text').textContent = detailText;
 
-          // 流产 60 秒冷却显示
           const cdBox = document.getElementById('insp-cooldown-box');
           if (selAgent.miscarriageCooldown > 0 && selAgent.isAlive && !selAgent.isPregnant) {
             cdBox.style.display = 'flex';
@@ -1799,7 +1791,6 @@
             cdBox.style.display = 'none';
           }
 
-          // 90 秒孕期进度显示
           const pregBox = document.getElementById('insp-preg-box');
           if (selAgent.isPregnant && selAgent.isAlive) {
             pregBox.style.display = 'flex';
@@ -1902,7 +1893,7 @@
       for (const p of sim.pois) {
         if (p.type === 'Berry') p.currentStock = p.maxStock;
       }
-      sim.logEvent(`🍒 浆果盛产: 全图浆果灌木已瞬间补满 12.0 单位储量！`, 'food');
+      sim.logEvent(`🍒 浆果盛产: 全图浆果灌木已瞬间补满 20.0 单位储量！`, 'food');
     });
 
     document.getElementById('chk-terrain').addEventListener('change', e => {

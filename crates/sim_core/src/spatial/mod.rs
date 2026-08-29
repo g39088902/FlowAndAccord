@@ -29,14 +29,18 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_ecology_and_18_pois() {
+    fn test_unified_ecology_and_20_capacity() {
         let mut world = World3DEngine::new(60, 764.0);
         world.seed_primitive_ecology(8);
 
-        // 验证 6营地 + 6水泉 + 6浆果 = 18 处 POI，单点上限均为 12.0
+        // 验证 6营地(无限) + 6水泉(上限20) + 6浆果(上限20) = 18 处 POI
         assert_eq!(world.pois.len(), 18);
         for poi in &world.pois {
-            assert_eq!(poi.max_stock, 12.0);
+            if poi.poi_type == PoiType::Camp {
+                assert!(!poi.max_stock.is_finite());
+            } else {
+                assert_eq!(poi.max_stock, 20.0);
+            }
         }
         assert_eq!(world.agents.len(), 8);
 
