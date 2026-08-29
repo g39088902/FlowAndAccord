@@ -14,17 +14,18 @@ pub enum Gender {
 /// 原始生存与繁衍行为状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
-    RestingAtCamp,      // 🏕️ 营地休息 (恢复体力、饱暖受孕、孕育新生命)
+    RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、孕育新生命)
     SeekingWater,       // 🚶 正在赶往水源
     DrinkingAtWater,    // 💧 正在水洼原位痛饮
     SeekingFood,        // 🚶 正在赶往采摘区
     ForagingFood,       // 🍒 正在果丛原位进食
-    ReturningToCamp,    // 🏕️ 饱腹/解渴返回营地
+    ReturningToCamp,    // 🏕️ 饱腹/解渴返回营地或私宅
+    ConstructingHouse,  // 🔨 正在投入工时自发营建房屋
     OffRoadDetour,      // ⚠️ 荒野越野寻路中
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (自身满足上限20.0、初始50%=10.0、120秒成年、男女二元性别只有女性可育、120秒孕期)
+/// 3D 动力学 Agent 实体 (自身满足上限25.0、初始50%=12.5、120秒成年、男女二元性别只有女性可育、120秒孕期)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
@@ -33,12 +34,20 @@ pub struct Agent3D {
     pub is_alive: bool,
     pub age: f32, // 年龄 (秒)，满 120 秒成年才具备生育能力
 
-    // 统一生理指标 (0.0 ~ 20.0 单位，初始 50% 即 10.0 单位)
-    pub hunger: f32,          // 饱食度 (最大 20.0 单位)
-    pub thirst: f32,          // 水分值 (最大 20.0 单位)
+    // 统一生理指标 (0.0 ~ 25.0 单位，初始 50% 即 12.5 单位)
+    pub hunger: f32,          // 饱食度 (最大 25.0 单位)
+    pub thirst: f32,          // 水分值 (最大 25.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
-    pub home_camp_node: NodeId, // 所属归宿营地节点
+    pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
+    pub home_house_id: Option<u32>,      // 拥有的私产房屋 ID
+    pub build_timer: f32,                // 筑屋劳作工时计时器
+
+    // 婚姻与家族血脉传承 (父系/母系、配偶与后代索引)
+    pub spouse_id: Option<AgentId>,
+    pub mother_id: Option<AgentId>,
+    pub father_id: Option<AgentId>,
+    pub children_ids: Vec<AgentId>,
 
     // 繁衍孕育系统 (120 秒孕期，流产后 60 秒再次受孕冷却，年满 120 秒成年女性可育)
     pub is_pregnant: bool,
@@ -77,11 +86,17 @@ impl Agent3D {
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
-            hunger: 10.0, // 初始 50% (满值 20.0)
-            thirst: 10.0, // 初始 50% (满值 20.0)
+            hunger: 12.5, // 初始 50% (满值 25.0)
+            thirst: 12.5, // 初始 50% (满值 25.0)
             stamina: 95.0,
             home_camp_node: home_camp,
             target_poi_node: None,
+            home_house_id: None,
+            build_timer: 0.0,
+            spouse_id: None,
+            mother_id: None,
+            father_id: None,
+            children_ids: Vec::new(),
             is_pregnant: false,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
@@ -104,7 +119,7 @@ impl Agent3D {
         }
     }
 
-    /// 核心生命代谢 Tick (10秒消耗1单位，只有女性年满120秒成年才能受孕，孕期120秒，代谢+50%)
+    /// 核心生命代谢 Tick (有房降耗40%，建房消耗体力，只有已婚女性年满120秒成年才能受孕，孕期120秒)
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
@@ -122,7 +137,14 @@ impl Agent3D {
         self.age += dt;
 
         let mut event_msg = None;
-        let metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
+        let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
+
+        // 房屋资本品收益：如果小人有房且在休息状态，静息代谢降耗 40%
+        if self.home_house_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp {
+            metabolic_multiplier *= 0.60;
+        } else if self.state == PrimitiveActionState::ConstructingHouse {
+            metabolic_multiplier *= 1.25; // 筑屋劳动轻微加速代谢
+        }
 
         // 统一需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒
         let decay_per_sec = 0.10 * metabolic_multiplier;
@@ -147,23 +169,25 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (必须为女性 ♀、年满 120 秒成年、各指标 >= 80% 即 16.0 单位，且不在流产 60 秒冷却期内)
-        if self.gender == Gender::Female && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
-            if self.age >= 120.0 && self.hunger >= 16.0 && self.thirst >= 16.0 && self.stamina >= 80.0 {
+        // 受孕判定 (必须为已婚女性 ♀、年满 120 秒成年、各指标 >= 75% 即 18.75 单位，且不在流产 60 秒冷却期内)
+        if self.gender == Gender::Female && self.spouse_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+            if self.age >= 120.0 && self.hunger >= 18.75 && self.thirst >= 18.75 && self.stamina >= 75.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
-                event_msg = Some(format!("🤰 女性部落民 #{} (年龄 {}s 已成年) 饱暖康健(≥16.0单位)，成功受孕进入120秒妊娠期 (代谢+50%)！", self.id, self.age.floor()));
+                let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
+                event_msg = Some(format!("🤰 已婚女性部落民 #{} ({}) 饱暖康健(≥18.75单位即75%)，成功受孕进入120秒妊娠期 (代谢+50%)！", self.id, spouse_str));
             }
         }
 
-        // 妊娠与流产判定 (孕期 120 秒，跌破 20% 即 4.0 单位触发流产并进入 60 秒冷却)
+        // 妊娠与流产判定 (孕期 120 秒；有房流产底线宽限至 15%=3.75单位，露天为 25%=6.25单位)
         if self.is_pregnant {
-            if self.hunger < 4.0 || self.thirst < 4.0 || self.stamina < 20.0 {
+            let miscarry_threshold = if self.home_house_id.is_some() { 3.75 } else { 6.25 };
+            if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = 5.0;
                 self.miscarriage_cooldown_timer = 60.0; // 流产后 60 秒内禁止再次受孕
-                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破 20%(<4.0单位)，导致流产 (60秒内休养不可受孕)！", self.id));
+                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破安全线(<{:.2}单位)，导致流产 (60秒内休养不可受孕)！", self.id, miscarry_threshold));
             }
 
             self.pregnancy_progress += dt / 120.0; // 孕期 120 秒
@@ -175,9 +199,12 @@ impl Agent3D {
             }
         }
 
-        // 营地休息恢复体力
+        // 休息与劳作状态体力结算
         if self.state == PrimitiveActionState::RestingAtCamp {
-            self.stamina = (self.stamina + 8.0 * dt).min(100.0);
+            let recovery_rate = if self.home_house_id.is_some() { 14.0 } else { 8.0 };
+            self.stamina = (self.stamina + recovery_rate * dt).min(100.0);
+        } else if self.state == PrimitiveActionState::ConstructingHouse {
+            self.stamina = (self.stamina - 3.5 * dt).max(5.0); // 筑屋劳动消耗体力
         }
 
         event_msg
@@ -214,22 +241,11 @@ impl Agent3D {
         let to_idx = road_network.node_map[&to_node];
         let rev_edge_idx = road_network.graph.find_edge(to_idx, from_idx);
 
-        // 踩踏拓路：按人数实时累加 (增加50%耗时：1级30s到达1.0、2级60s到达2.0、3级120s到达3.0)，双向往返共同加固
-        {
-            let edge = &mut road_network.graph[edge_idx];
-            let gain_rate = if edge.wear < 2.0 { 0.03333 } else { 0.01667 };
-            let new_wear = (edge.wear + gain_rate * dt).min(3.0);
-            edge.wear = new_wear;
-            if let Some(rev_idx) = rev_edge_idx {
-                road_network.graph[rev_idx].wear = new_wear;
-            }
-        }
-
         let lane = &road_network.graph[edge_idx];
         let wear = lane.wear;
 
-        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (30s土径 83%) -> 2.0 (60s夯土 117%) -> 3.0 (120s石道 150%)
-        let road_level_factor = (0.50 + 0.333 * wear).clamp(0.50, 1.50);
+        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (土径 83%) -> 2.0 (夯土 117%) -> 3.0 (石道 150%) -> 4.0 (石板 183%) -> 5.0 (极品大道 217%)
+        let road_level_factor = (0.50 + 0.333 * wear).clamp(0.50, 2.20);
         self.is_traveling_offroad = wear < 0.6;
 
         // 坡度体力能耗
@@ -246,6 +262,15 @@ impl Agent3D {
         self.distance_along_curve += self.current_velocity * dt;
 
         if self.distance_along_curve >= lane.curve.length {
+            // 踩踏拓路：按步行次数增加 (每次通行 +0.05，上限 5.0)，双向往返共同加固
+            {
+                let edge = &mut road_network.graph[edge_idx];
+                let new_wear = (edge.wear + 0.05).min(5.0);
+                edge.wear = new_wear;
+                if let Some(rev_idx) = rev_edge_idx {
+                    road_network.graph[rev_idx].wear = new_wear;
+                }
+            }
             self.advance_to_next_lane(road_network);
         } else {
             let t = (self.distance_along_curve / lane.curve.length).clamp(0.0, 1.0);

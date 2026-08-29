@@ -5,6 +5,7 @@ use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId, NodeType, RoadClass};
 use super::agent::{Agent3D, AgentId, Gender, PrimitiveActionState};
 use super::poi::{PrimitivePoi, PoiId, PoiType};
+use super::house::{House, HouseSnapshot, HouseTier};
 use crate::geo::terrain::TerrainMap;
 
 /// 外部渲染只读快照数据结构
@@ -18,6 +19,7 @@ pub struct WorldSnapshot3D {
     pub tilt_angle_rad: f32,
     pub tilt_magnitude: f32,
     pub pois: Vec<PoiSnapshot>,
+    pub houses: Vec<HouseSnapshot>,
     pub nodes: Vec<NodeSnapshot>,
     pub lanes: Vec<LaneSnapshot>,
     pub agents: Vec<AgentSnapshot>,
@@ -65,7 +67,7 @@ pub struct LaneSnapshot {
     pub p3: Vec3,
     pub road_class: String,
     pub speed_limit: f32,
-    pub wear: f32, // 踩踏等级连续浮点数 (0.0 ~ 3.0)
+    pub wear: f32, // 踩踏等级连续浮点数 (0.0 ~ 5.0)
     pub is_hidden: bool,
     pub concealment: f32,
 }
@@ -83,8 +85,8 @@ pub struct AgentSnapshot {
     pub velocity: f32,
     pub state: String,
     pub is_alive: bool,
-    pub hunger: f32, // 0.0 ~ 20.0 单位
-    pub thirst: f32, // 0.0 ~ 20.0 单位
+    pub hunger: f32, // 0.0 ~ 25.0 单位
+    pub thirst: f32, // 0.0 ~ 25.0 单位
     pub stamina: f32,
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
@@ -95,6 +97,11 @@ pub struct AgentSnapshot {
     pub death_cause: Option<String>,
     pub is_covert: bool,
     pub stealth_visibility: f32,
+    pub home_house_id: Option<u32>,
+    pub spouse_id: Option<AgentId>,
+    pub mother_id: Option<AgentId>,
+    pub father_id: Option<AgentId>,
+    pub children_ids: Vec<AgentId>,
 }
 
 /// 3D 空间世界与原始生态生存繁衍仿真管理器
@@ -102,8 +109,10 @@ pub struct World3DEngine {
     pub terrain: TerrainMap,
     pub network: LaneGraph3D,
     pub pois: Vec<PrimitivePoi>,
+    pub houses: Vec<House>,
     pub agents: Vec<Agent3D>,
     pub next_agent_id: AgentId,
+    pub next_house_id: u32,
     pub total_births: u32,
     pub total_deaths: u32,
     pub total_miscarriages: u32,
@@ -120,8 +129,10 @@ impl World3DEngine {
             terrain,
             network: LaneGraph3D::new(),
             pois: Vec::new(),
+            houses: Vec::new(),
             agents: Vec::new(),
             next_agent_id: 1,
+            next_house_id: 1,
             total_births: 0,
             total_deaths: 0,
             total_miscarriages: 0,
@@ -160,7 +171,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 1) as u32, PoiType::Camp, Vec3::new(x, y, elev)));
         }
 
-        // 2. 生成 6 处低洼清泉 (上限 40.0 单位，产速 1.00 单位/秒)
+        // 2. 生成 6 处低洼清泉 (上限 60.0 单位，产速 2.00 单位/秒)
         for i in 0..6 {
             let mut best_x = 0.0f32;
             let mut best_y = 0.0f32;
@@ -184,7 +195,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 10) as u32, PoiType::WaterSource, Vec3::new(best_x, best_y, lowest_z)));
         }
 
-        // 3. 生成 6 处缓坡浆果灌木 (上限 40.0 单位，产速 1.00 单位/秒)
+        // 3. 生成 6 处缓坡浆果灌木 (上限 60.0 单位，产速 2.00 单位/秒)
         for i in 0..6 {
             let x = rng.gen_range(-half_size * 0.80..half_size * 0.80);
             let y = rng.gen_range(-half_size * 0.80..half_size * 0.80);
@@ -226,7 +237,7 @@ impl World3DEngine {
             }
         }
 
-        // 6. 注入初始部落民 (固定 6 男 6 女共 12 人，年龄在 0~240s 随机，容量 20.0 单位，初始 50%=10.0)
+        // 6. 注入初始部落民 (固定 6 男 6 女共 12 人，年龄在 0~240s 随机，容量 25.0 单位，初始 50%=12.5)
         let total_initial = 12;
         for i in 0..total_initial {
             let home_camp = camp_nodes[i % camp_nodes.len()];
@@ -263,20 +274,20 @@ impl World3DEngine {
                 PrimitiveActionState::DrinkingAtWater => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (20.0 - agent.thirst).max(0.0);
+                        let need = (25.0 - agent.thirst).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
-                            agent.thirst = (agent.thirst + extracted).min(20.0);
+                            agent.thirst = (agent.thirst + extracted).min(25.0);
                         }
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (20.0 - agent.hunger).max(0.0);
+                        let need = (25.0 - agent.hunger).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
-                            agent.hunger = (agent.hunger + extracted).min(20.0);
+                            agent.hunger = (agent.hunger + extracted).min(25.0);
                         }
                     }
                 }
@@ -284,23 +295,40 @@ impl World3DEngine {
             }
         }
 
-        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位，男女各 50% 机率)！
+        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 12.5 单位，男女各 50% 机率)！
         for (mother_id, camp_node) in newborn_mothers {
             let baby_id = self.next_agent_id;
             self.next_agent_id += 1;
             self.total_births += 1;
             let baby_gender = if rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
-            let gender_str = match baby_gender { Gender::Female => "女婴 ♀", Gender::Male => "男婴 ♂" };
+            let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.spouse_id);
 
             let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false, 0.0, baby_gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&camp_node).unwrap()].pos;
             baby.world_pos = camp_pos;
-            baby.hunger = 10.0; // 50%
-            baby.thirst = 10.0; // 50%
+            baby.hunger = 12.5; // 50%
+            baby.thirst = 12.5; // 50%
             baby.stamina = 100.0;
+            baby.mother_id = Some(mother_id);
+            baby.father_id = father_id;
+
+            // 建立双亲与子女的亲缘血脉
+            if let Some(mother) = self.agents.iter_mut().find(|a| a.id == mother_id) {
+                mother.children_ids.push(baby_id);
+            }
+            if let Some(fid) = father_id {
+                if let Some(father) = self.agents.iter_mut().find(|a| a.id == fid) {
+                    father.children_ids.push(baby_id);
+                }
+            }
 
             self.agents.push(baby);
-            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的{} (Agent #{}，幼年0s，需成长120s)！", mother_id, gender_str, baby_id));
+            let parents_str = if let Some(fid) = father_id {
+                format!("母亲 #{} 与 父亲 #{}", mother_id, fid)
+            } else {
+                format!("母亲 #{}", mother_id)
+            };
+            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (Agent #{}，幼年0s，需成长120s)！", parents_str, gender_str, baby_id));
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
@@ -322,8 +350,8 @@ impl World3DEngine {
 
             match agent.state {
                 PrimitiveActionState::RestingAtCamp => {
-                    let thirst_urgency = if agent.is_pregnant { 11.0 } else { 8.0 }; // 55% / 40% (满值 20.0)
-                    let hunger_urgency = if agent.is_pregnant { 12.0 } else { 9.6 }; // 60% / 48%
+                    let thirst_urgency = if agent.is_pregnant { 13.75 } else { 10.0 }; // 55% / 40% (满值 25.0)
+                    let hunger_urgency = if agent.is_pregnant { 15.0 } else { 12.0 };  // 60% / 48% (满值 25.0)
 
                     if agent.thirst < thirst_urgency && !water_nodes.is_empty() {
                         let mut sorted_water = water_nodes.clone();
@@ -361,7 +389,7 @@ impl World3DEngine {
                                 agent.distance_along_curve = 0.0;
                             }
                         }
-                    } else if agent.stamina >= 95.0 && agent.hunger < 16.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
+                    } else if agent.stamina >= 95.0 && agent.hunger < 20.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
                         let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
@@ -376,8 +404,8 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::DrinkingAtWater => {
-                    if agent.thirst >= 19.0 {
-                        if agent.hunger < 10.0 && !food_nodes.is_empty() {
+                    if agent.thirst >= 24.0 {
+                        if agent.hunger < 12.5 && !food_nodes.is_empty() {
                             let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                             let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
@@ -408,7 +436,7 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
-                    if agent.hunger >= 19.0 {
+                    if agent.hunger >= 24.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         let nearest_camp = self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node);
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, nearest_camp, agent.is_covert) {
@@ -480,16 +508,206 @@ impl World3DEngine {
         // 3. POI 实际提取、分娩与死亡尸骸消逝
         self.tick_poi_interactions(dt);
 
+        // 4. 自发筑屋建造、私产确权、折旧与代际继承
+        self.tick_housing(dt);
+
         if self.tick_counter % 15 == 0 {
             self.tick_decisions();
         }
 
-        // 4. 道路自然杂草丛生与退化衰减
+        // 5. 道路自然杂草丛生与退化衰减
         self.network.tick_wear_decay(dt);
 
-        // 5. 动力学运动与踩踏拓路
+        // 6. 动力学运动与踩踏拓路
         for agent in &mut self.agents {
             agent.tick_movement(dt, &mut self.network);
+        }
+    }
+
+    /// 部落定居与自发筑屋演化 (空间地租竞标、耐用资本品折算、私产确权与代际继承、自动婚姻)
+    pub fn tick_housing(&mut self, dt: f32) {
+        let mut rng = rand::thread_rng();
+
+        // 1. 房屋自然风化与折旧，0耐久度彻底坍塌消亡
+        let mut collapsed_house_ids = Vec::new();
+        for house in &mut self.houses {
+            house.tick_depreciation(dt);
+            if house.durability <= 0.0 {
+                collapsed_house_ids.push(house.id);
+            }
+        }
+
+        if !collapsed_house_ids.is_empty() {
+            for agent in &mut self.agents {
+                if let Some(hid) = agent.home_house_id {
+                    if collapsed_house_ids.contains(&hid) {
+                        agent.home_house_id = None;
+                        if let Some(c_node) = self.find_nearest_node(agent.world_pos) {
+                            agent.home_camp_node = c_node;
+                        }
+                    }
+                }
+            }
+            for hid in &collapsed_house_ids {
+                self.last_event = Some(format!("🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！", hid));
+            }
+            self.houses.retain(|h| h.durability > 0.0);
+        }
+
+        // 2. 死亡族人伴侣解除婚姻 (重归单身/丧偶)
+        for i in 0..self.agents.len() {
+            if !self.agents[i].is_alive {
+                if let Some(sp_id) = self.agents[i].spouse_id {
+                    self.agents[i].spouse_id = None;
+                    if let Some(partner) = self.agents.iter_mut().find(|a| a.id == sp_id) {
+                        partner.spouse_id = None;
+                    }
+                }
+            }
+        }
+
+        // 3. 施工中的小人推进建造进度
+        let mut newly_built_houses = Vec::new();
+        for agent in &mut self.agents {
+            if !agent.is_alive {
+                continue;
+            }
+
+            if agent.state == PrimitiveActionState::ConstructingHouse {
+                agent.build_timer += dt;
+                // 30 秒完成工时投入与资本品转化 (建造成本翻倍)
+                if agent.build_timer >= 30.0 {
+                    agent.build_timer = 0.0;
+                    agent.state = PrimitiveActionState::RestingAtCamp;
+                    newly_built_houses.push((agent.id, agent.world_pos));
+                }
+            }
+        }
+
+        // 4. 竣工确权、内生路网接入与自动迎娶单身女性
+        for (owner_id, site_pos) in newly_built_houses {
+            let house_id = self.next_house_id;
+            self.next_house_id += 1;
+
+            // 在门前生成道路图节点
+            let door_node = self.network.add_node(site_pos, NodeType::GroundIntersection);
+            
+            // 寻找最近的既有路网节点连接支线便道
+            if let Some(nearest_node) = self.find_nearest_node(site_pos) {
+                if nearest_node != door_node {
+                    let _ = self.network.add_lane_with_options(door_node, nearest_node, None, RoadClass::DirtTrack, false, 1.0);
+                    let _ = self.network.add_lane_with_options(nearest_node, door_node, None, RoadClass::DirtTrack, false, 1.0);
+                }
+            }
+
+            let mut house = House::new(house_id, owner_id, site_pos, door_node, HouseTier::Tier1LeanTo);
+            house.construction_progress = 1.0;
+
+            // 户主定居迁入私宅
+            if let Some(agent) = self.agents.iter_mut().find(|a| a.id == owner_id) {
+                agent.home_house_id = Some(house_id);
+                agent.home_camp_node = door_node;
+            }
+
+            // 寻找在世且单身（未婚或离异/丧偶）的成年女性自动结为夫妻
+            let single_female_id = self.agents.iter()
+                .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= 120.0 && a.spouse_id.is_none())
+                .map(|a| a.id);
+
+            if let Some(female_id) = single_female_id {
+                if let Some(husband) = self.agents.iter_mut().find(|a| a.id == owner_id) {
+                    husband.spouse_id = Some(female_id);
+                }
+                if let Some(wife) = self.agents.iter_mut().find(|a| a.id == female_id) {
+                    wife.spouse_id = Some(owner_id);
+                    wife.home_house_id = Some(house_id);
+                    wife.home_camp_node = door_node;
+                }
+                house.spouse_id = Some(female_id);
+                self.last_event = Some(format!("💒 喜结连理！部落民 #{} ♂ 筑成新居，与单身女性 #{} ♀ 结为夫妻喜迁 #{} 号私宅！", owner_id, female_id, house_id));
+            } else {
+                self.last_event = Some(format!("🏡 部落民 #{} ♂ 耗费30s劳作工时，在路网旁成功筑造了第 #{} 号私产宅舍！", owner_id, house_id));
+            }
+
+            self.houses.push(house);
+        }
+
+        // 5. 自发选址评估 (只有男性 ♂ 可自发盖房，需成年饱暖富足)
+        if self.tick_counter % 30 == 0 {
+            for i in 0..self.agents.len() {
+                let agent = &self.agents[i];
+                if !agent.is_alive || agent.gender != Gender::Male || agent.home_house_id.is_some() || agent.state != PrimitiveActionState::RestingAtCamp {
+                    continue;
+                }
+
+                // 筑屋门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
+                if agent.age >= 120.0 && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 75.0 && rng.gen_bool(0.15) {
+                    let agent_id = agent.id;
+                    let agent_pos = agent.world_pos;
+
+                    // 空间选址：在当前营地附近 15m~45m 平坦区寻找最佳地块
+                    let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                    let dist = rng.gen_range(16.0..42.0);
+                    let cand_x = agent_pos.x + angle.cos() * dist;
+                    let cand_y = agent_pos.y + angle.sin() * dist;
+                    let cand_z = self.terrain.sample_elevation(cand_x, cand_y);
+
+                    // 确保不与其他房屋重叠 (间距 ≥ 14m)
+                    let cand_pos = Vec3::new(cand_x, cand_y, cand_z);
+                    let mut is_valid = true;
+                    for h in &self.houses {
+                        if h.pos.distance_to(&cand_pos) < 14.0 {
+                            is_valid = false;
+                            break;
+                        }
+                    }
+
+                    if is_valid {
+                        let agent_mut = &mut self.agents[i];
+                        agent_mut.state = PrimitiveActionState::ConstructingHouse;
+                        agent_mut.world_pos = cand_pos;
+                        agent_mut.build_timer = 0.0;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 6. 代际继承与无房族人转让处理
+        for house in &mut self.houses {
+            let owner_alive = self.agents.iter().any(|a| a.id == house.owner_id && a.is_alive);
+            if !owner_alive && !house.is_ruin {
+                let former_owner_id = house.owner_id;
+                // 第一顺位：寻找原户主在世且无房的直系后代
+                let descendant_heir = self.agents.iter_mut()
+                    .filter(|a| a.is_alive && a.home_house_id.is_none() && (a.mother_id == Some(former_owner_id) || a.father_id == Some(former_owner_id)))
+                    .max_by(|a, b| a.age.partial_cmp(&b.age).unwrap_or(std::cmp::Ordering::Equal));
+
+                if let Some(heir) = descendant_heir {
+                    house.owner_id = heir.id;
+                    house.generation += 1;
+                    heir.home_house_id = Some(house.id);
+                    heir.home_camp_node = house.door_node_id;
+                    self.last_event = Some(format!("📜 直系血脉继承: #{} 号宅舍由后代族人 Agent #{} 继承确权 (第{}代)！", house.id, heir.id, house.generation));
+                } else {
+                    // 第二顺位：若无后代或后代均已有房，转让给任意在世无房族人
+                    let fallback_heir = self.agents.iter_mut()
+                        .filter(|a| a.is_alive && a.home_house_id.is_none())
+                        .max_by(|a, b| a.age.partial_cmp(&b.age).unwrap_or(std::cmp::Ordering::Equal));
+
+                    if let Some(heir) = fallback_heir {
+                        house.owner_id = heir.id;
+                        house.generation += 1;
+                        heir.home_house_id = Some(house.id);
+                        heir.home_camp_node = house.door_node_id;
+                        self.last_event = Some(format!("🤝 氏族互助转让: #{} 号宅舍原户主无无房后代，转让给无房族人 Agent #{} (第{}任)！", house.id, heir.id, house.generation));
+                    } else {
+                        // 全族均已有房或无人能接管，沦为废墟
+                        house.is_ruin = true;
+                        self.last_event = Some(format!("🏚️ 悲鸣: #{} 号宅舍因户主故去且全族均已有房，成为无主废墟！", house.id));
+                    }
+                }
+            }
         }
     }
 
@@ -514,6 +732,27 @@ impl World3DEngine {
                 current_stock: p.current_stock,
                 max_stock: p.max_stock,
                 regen_rate: p.regen_rate,
+            });
+        }
+
+        let mut houses = Vec::new();
+        for h in &self.houses {
+            houses.push(HouseSnapshot {
+                id: h.id,
+                owner_id: h.owner_id,
+                spouse_id: h.spouse_id,
+                x: h.pos.x,
+                y: h.pos.y,
+                z: h.pos.z,
+                tier: format!("{:?}", h.tier),
+                durability: h.durability,
+                pantry_food: h.pantry_food,
+                pantry_water: h.pantry_water,
+                max_pantry_capacity: h.max_pantry_capacity,
+                age: h.age,
+                generation: h.generation,
+                is_ruin: h.is_ruin,
+                construction_progress: h.construction_progress,
             });
         }
 
@@ -574,6 +813,11 @@ impl World3DEngine {
                 death_cause: agent.death_cause.clone(),
                 is_covert: agent.is_covert,
                 stealth_visibility: agent.stealth_visibility,
+                home_house_id: agent.home_house_id,
+                spouse_id: agent.spouse_id,
+                mother_id: agent.mother_id,
+                father_id: agent.father_id,
+                children_ids: agent.children_ids.clone(),
             });
         }
 
@@ -586,6 +830,7 @@ impl World3DEngine {
             tilt_angle_rad: self.terrain.tilt_angle_rad,
             tilt_magnitude: self.terrain.tilt_magnitude,
             pois,
+            houses,
             nodes,
             lanes,
             agents,

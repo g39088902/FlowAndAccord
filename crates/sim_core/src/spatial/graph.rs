@@ -40,7 +40,7 @@ pub struct LaneEdge3D {
     pub speed_limit: f32, // 限速 (m/s)
     pub max_capacity: u32,// 理论承载力
     pub health: f32,      // 耐久度 0.0 ~ 100.0
-    pub wear: f32,        // 动态踩踏等级 (连续浮点数 0.0=荒野无路, 1.0=土径, 2.0=夯土道, 3.0=平整石道)
+    pub wear: f32,        // 动态踩踏等级 (连续浮点数 0.0=荒野无路, 1.0=土径, 2.0=夯土道, 3.0=平整石道, 4.0=石板通衢, 5.0=极品大道)
     pub is_hidden: bool,  // 是否为隐藏道路/走私密道
     pub concealment: f32, // 隐秘度 0.0 (完全公开) ~ 1.0 (深度隐藏)
 }
@@ -141,12 +141,15 @@ impl LaneGraph3D {
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减 (走的人少了，道路等级以 0.020/s 速率衰减，减半)
+    /// 道路自然杂草丛生与退化衰减 (固定百分比衰减率: 1/150 ≈ 0.667%/秒，当道路等级为 1.5 时衰减速度恰好为 0.010/s)
     pub fn tick_wear_decay(&mut self, dt: f32) {
+        let decay_rate_per_sec = 0.010 / 1.5; // 固定百分比衰减：1/150 ≈ 0.667%/s
         for edge in self.graph.edge_weights_mut() {
             if edge.wear > 0.0 {
-                // 每秒衰减 0.020 (闲置约 50s 退化一级，150s 完全退化为荒野)
-                edge.wear = (edge.wear - 0.020 * dt).max(0.0);
+                edge.wear = (edge.wear - edge.wear * decay_rate_per_sec * dt).max(0.0);
+                if edge.wear < 0.0001 {
+                    edge.wear = 0.0;
+                }
             }
         }
     }
@@ -195,6 +198,10 @@ impl LaneGraph3D {
                 let delta_z = edge.curve.p3.z - edge.curve.p0.z;
                 let grade_penalty = if delta_z > 0.0 { delta_z * 1.5 } else { 0.0 };
 
+                // 道路等级与动态踩踏度带来的实际速度倍率 (0.50x ~ 2.20x)
+                let road_level_factor = (0.50 + 0.333 * edge.wear).clamp(0.50, 2.20);
+                let effective_speed = edge.speed_limit * road_level_factor;
+
                 // 潜行特工偏好走隐藏暗道 (大幅降低暗道代价值)；普通市民避开暗道
                 let hidden_modifier = if prefer_hidden {
                     if edge.is_hidden { 0.4 } else { 1.2 }
@@ -202,11 +209,11 @@ impl LaneGraph3D {
                     if edge.is_hidden { 2.5 } else { 1.0 }
                 };
 
-                ((edge.curve.length / edge.speed_limit) + grade_penalty) * hidden_modifier
+                ((edge.curve.length / effective_speed) + grade_penalty) * hidden_modifier
             },
             |node_idx| {
                 let pos = self.graph[node_idx].pos;
-                pos.distance_to(&goal_pos) / 25.0
+                pos.distance_to(&goal_pos) / 80.0
             },
         )?;
 

@@ -6,27 +6,27 @@ pub type PoiId = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoiType {
     Camp,        // 🏕️ 避风营地 (无限储量与无限庇护，休眠恢复体力、饱暖受孕与分娩)
-    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限40.0单位，1.00单位/秒)
-    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限40.0单位，1.00单位/秒)
+    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限60.0单位，2.00单位/秒)
+    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限60.0单位，2.00单位/秒)
 }
 
-/// 有限生态地标实体 (清泉/浆果最大储量 40.0 单位，产出速率 1.0 单位/秒；营地无限)
+/// 有限生态地标实体 (清泉/浆果最大储量 60.0 单位，产出速率 2.0 单位/秒；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
-    pub current_stock: f32, // 当前可用储量 (0.0 ~ 40.0 单位，营地为无限)
-    pub max_stock: f32,     // 储量上限 (40.0 单位，营地为无限)
-    pub regen_rate: f32,    // 每秒自然再生速率 (1.00 单位/秒)
+    pub current_stock: f32, // 当前可用储量 (0.0 ~ 60.0 单位，营地为无限)
+    pub max_stock: f32,     // 储量上限 (60.0 单位，营地为无限)
+    pub regen_rate: f32,    // 每秒自然再生速率 (2.00 单位/秒)
 }
 
 impl PrimitivePoi {
     pub fn new(id: PoiId, poi_type: PoiType, pos: Vec3) -> Self {
         let (max_stock, regen_rate, initial_stock) = match poi_type {
             PoiType::Camp => (f32::INFINITY, 0.0, f32::INFINITY),
-            PoiType::WaterSource => (40.0, 1.00, 30.0),
-            PoiType::BerryBush => (40.0, 1.00, 30.0),
+            PoiType::WaterSource => (60.0, 2.00, 45.0),
+            PoiType::BerryBush => (60.0, 2.00, 45.0),
         };
 
         Self {
