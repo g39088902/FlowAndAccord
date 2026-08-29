@@ -681,13 +681,13 @@
       </div>
       <div class="legend-body" id="legend-body">
         <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图6处，储量无限，就近归宿)</div>
-        <div class="legend-item"><div class="legend-icon">🏡</div> 自建私产宅舍 (1~3级，代谢降耗40%·体力翻倍)</div>
+        <div class="legend-item"><div class="legend-icon">🏡</div> 自建私产宅舍 (成家立业之基，激活家庭受孕繁衍)</div>
         <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 (全图6处，上限60.0单位，2.0/s)</div>
         <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果丛 (全图6处，上限60.0单位，2.0/s)</div>
         <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon" style="color:#f59e0b;">═</div> 1~5级 踩踏道路 (上限5.0耐久度/悬浮查看)</div>
-        <div class="legend-item"><div class="legend-icon">👥</div> 男女二元分工 (固定6男6女，仅女性可育)</div>
+        <div class="legend-item"><div class="legend-icon">👥</div> 男女二元分工 (固定6男6女，男筑屋女育幼)</div>
         <div class="legend-item"><div class="legend-icon">⏳</div> 随机开局年龄 (0~240s随机，≥120s成年)</div>
-        <div class="legend-item"><div class="legend-icon">🤰</div> 120秒漫长孕期 (≥75%受孕，<25%流产)</div>
+        <div class="legend-item"><div class="legend-icon">🤰</div> 120秒漫长孕期 (有房已婚≥75%受孕，<25%流产)</div>
         <div class="legend-item"><div class="legend-icon">🥀</div> 流产休养冷却 (流产后60s内不可受孕)</div>
       </div>
     </div>
@@ -700,17 +700,16 @@
       </div>
 
       <div id="insp-agent-view">
-        <div class="age-badge" id="insp-age-row">
-          <span style="color:#94a3b8;">⏳ 年龄成长:</span>
-          <span id="insp-age-val" style="font-weight:700; color:#38bdf8;">120s (🧑 已成年可育)</span>
+        <div class="stat-line">
+          <span style="color:#94a3b8;">生命状态:</span>
+          <span id="insp-age-val" style="font-weight:600; color:#38bdf8;">120s (成年)</span>
         </div>
-
-        <div class="meter-row" style="margin-top:4px;">
-          <div class="meter-label"><span>🍎 饱食度 (上限25.0单位)</span><span id="insp-hunger-val">12.5 / 25.0 单位 (50%)</span></div>
+        <div class="meter-row">
+          <div class="meter-label"><span>🍖 饱食度</span><span id="insp-hunger-val">15.0 / 30.0 单位 (50%)</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:50%;"></div></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span>💧 水分值 (上限25.0单位)</span><span id="insp-thirst-val">12.5 / 25.0 单位 (50%)</span></div>
+          <div class="meter-label"><span>💧 水分值</span><span id="insp-thirst-val">15.0 / 30.0 单位 (50%)</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:50%;"></div></div>
         </div>
         <div class="meter-row">
@@ -729,7 +728,7 @@
             <span id="insp-preg-val">45%</span>
           </div>
           <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
-          <div style="font-size:9px; color:#f472b6;">指标跌破 25% (6.25单位) 将流产并触发60秒冷却！</div>
+          <div style="font-size:9px; color:#f472b6;">指标跌破 25% (7.5单位) 将流产并触发60秒冷却！</div>
         </div>
 
         <!-- 家族血脉族谱组件 (点击可追踪亲眷) -->
@@ -780,15 +779,20 @@
           <div class="meter-bg"><div class="meter-fill" id="insp-house-dur-fill" style="background:#f59e0b; width:100%;"></div></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#10b981;">📦 私有储物箱 (水/粮)</span><span id="insp-house-pantry-val">0.0 / 15.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-pantry-fill" style="background:#10b981; width:0%;"></div></div>
+          <div class="meter-label"><span style="color:#38bdf8;">💧 独立清泉储量 (水)</span><span id="insp-house-water-val">5.0 / 10.0 单位</span></div>
+          <div class="meter-bg"><div class="meter-fill" id="insp-house-water-fill" style="background:#38bdf8; width:50%;"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-label"><span style="color:#10b981;">🍒 独立粮食储量 (果)</span><span id="insp-house-food-val">5.0 / 10.0 单位</span></div>
+          <div class="meter-bg"><div class="meter-fill" id="insp-house-food-fill" style="background:#10b981; width:50%;"></div></div>
         </div>
         <div class="poi-info-badge">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <strong>👑 户主确权:</strong>
             <span id="insp-house-owner-btn" class="lineage-chip" title="点击直接追踪户主视角">Agent #1 (第1代祖屋) 🔍</span>
           </div>
-          <div><strong>🛡️ 资本效益:</strong> <span style="color:#10b981;">代谢-40% · 体力+75% · 流产减半</span></div>
+          <div><strong>🏛️ 建筑形态:</strong> <span id="insp-house-tier-desc" style="color:#f59e0b;">0级 仓库 (需填满水粮升级)</span></div>
+          <div><strong>👶 生育激活:</strong> <span id="insp-house-fertility-badge" style="color:#ef4444;">未激活 (需升级为1级房屋)</span></div>
           <div><strong>🗺️ 门前区位:</strong> <span id="insp-house-coord">(X: 20m, Y: 35m)</span></div>
         </div>
       </div>
@@ -1073,7 +1077,7 @@
     }
 
     class House {
-      constructor(id, ownerId, pos, doorNodeId, tier = 'Tier1LeanTo') {
+      constructor(id, ownerId, pos, doorNodeId, tier = 'Tier0Warehouse') {
         this.id = id;
         this.ownerId = ownerId;
         this.spouseId = null;
@@ -1081,13 +1085,57 @@
         this.doorNodeId = doorNodeId;
         this.tier = tier;
         this.durability = 100.0;
-        this.pantryFood = 0.0;
-        this.pantryWater = 0.0;
-        this.maxPantry = tier === 'Tier1LeanTo' ? 15.0 : (tier === 'Tier2ThatchedHut' ? 30.0 : 60.0);
+        
+        // 区分不同物品独立存储 (多级扩容：10/20/40/80/150)
+        const isWarehouse = tier === 'Tier0Warehouse';
+        this.pantryWater = isWarehouse ? 5.0 : 10.0;
+        this.pantryFood = isWarehouse ? 5.0 : 10.0;
+        this.maxPantryWater = isWarehouse ? 10.0 : (tier === 'Tier1LeanTo' ? 20.0 : (tier === 'Tier2ThatchedHut' ? 40.0 : (tier === 'Tier3Homestead' ? 80.0 : 150.0)));
+        this.maxPantryFood = isWarehouse ? 10.0 : (tier === 'Tier1LeanTo' ? 20.0 : (tier === 'Tier2ThatchedHut' ? 40.0 : (tier === 'Tier3Homestead' ? 80.0 : 150.0)));
+
         this.age = 0.0;
         this.generation = 1;
         this.isRuin = false;
-        this.constructionProgress = 1.0;
+        this.constructionProgress = isWarehouse ? 0.0 : 1.0;
+        this.isRepairing = false;
+      }
+      isFertilityActive() {
+        // 某项资源小于10时失去支持继续怀孕的能力
+        return this.tier !== 'Tier0Warehouse' && this.pantryWater >= 10.0 && this.pantryFood >= 10.0 && !this.isRuin;
+      }
+      isPantryFull() {
+        return this.pantryWater >= this.maxPantryWater && this.pantryFood >= this.maxPantryFood;
+      }
+      upgradeToNextTier() {
+        if (this.tier === 'Tier0Warehouse') {
+          this.tier = 'Tier1LeanTo';
+          this.maxPantryWater = 20.0;
+          this.maxPantryFood = 20.0;
+          this.constructionProgress = 1.0;
+          return true;
+        } else if (this.tier === 'Tier1LeanTo') {
+          this.tier = 'Tier2ThatchedHut';
+          this.maxPantryWater = 40.0;
+          this.maxPantryFood = 40.0;
+          this.constructionProgress = 1.0;
+          return true;
+        } else if (this.tier === 'Tier2ThatchedHut') {
+          this.tier = 'Tier3Homestead';
+          this.maxPantryWater = 80.0;
+          this.maxPantryFood = 80.0;
+          this.constructionProgress = 1.0;
+          return true;
+        } else if (this.tier === 'Tier3Homestead') {
+          this.tier = 'Tier4Manor';
+          this.maxPantryWater = 150.0;
+          this.maxPantryFood = 150.0;
+          this.constructionProgress = 1.0;
+          return true;
+        }
+        return false;
+      }
+      repair(amount) {
+        this.durability = Math.min(100.0, this.durability + amount);
       }
       tickDepreciation(dt) {
         this.age += dt;
@@ -1107,9 +1155,9 @@
         this.age = initialAge; // 年龄 (秒)
         this.gender = gender; // 'female' ♀ 或 'male' ♂ (只有女性能生育)
 
-        // 统一单位 (0.0 ~ 25.0 单位，初始 50% = 12.5 单位)
-        this.hunger = 12.5;
-        this.thirst = 12.5;
+        // 自身容量上限提升至 30.0 单位，初始 50% = 15.0 单位
+        this.hunger = 15.0;
+        this.thirst = 15.0;
         this.stamina = 95;
 
         this.homeHouseId = null; // 拥有的私产房屋 ID
@@ -1158,11 +1206,8 @@
         let eventMsg = null;
         let multiplier = this.isPregnant ? 1.5 : 1.0;
 
-        // 房屋资本品收益：如果小人有房且在休息状态，静息代谢降耗 40%
-        if (this.homeHouseId !== null && this.state === 'RestingAtCamp') {
-          multiplier *= 0.60;
-        } else if (this.state === 'ConstructingHouse') {
-          multiplier *= 1.25; // 筑屋劳动轻微加速代谢
+        if (this.state === 'ConstructingHouse' || this.state === 'RepairingHouse') {
+          multiplier *= 1.25; // 筑屋与修缮劳动轻微加速代谢
         }
 
         // 10秒消耗1单位 (未孕 0.10单位/秒，怀孕 0.15单位/秒)
@@ -1187,18 +1232,21 @@
           return { type: 'death', text: `💀 部落民 #${this.id} (${this.gender === 'female' ? '女' : '男'}) 因严重脱水渴死！` };
         }
 
-        // 受孕判定 (必须为已婚女性 ♀[spouseId !== null]、年满 120 秒成年、各指标 >= 18.75 单位即 75%，且不在 60s 冷却内)
-        if (this.gender === 'female' && this.spouseId !== null && this.state === 'RestingAtCamp' && !this.isPregnant && this.miscarriageCooldown <= 0) {
-          if (this.age >= 120.0 && this.hunger >= 18.75 && this.thirst >= 18.75 && this.stamina >= 75) {
-            this.isPregnant = true;
-            this.pregnancyProgress = 0.0;
-            eventMsg = { type: 'birth', text: `🤰 已婚女性部落民 #${this.id} (配偶 #${this.spouseId}) 饱暖充盈(≥18.75单位)，成功受孕进入120秒妊娠期！` };
+        // 受孕判定 (上限30.0单位，饱暖充盈≥22.5即75%，且私宅水粮充足≥10单位激活生育)
+        if (this.gender === 'female' && this.spouseId !== null && this.homeHouseId !== null && this.state === 'RestingAtCamp' && !this.isPregnant && this.miscarriageCooldown <= 0) {
+          if (this.age >= 120.0 && this.hunger >= 22.5 && this.thirst >= 22.5 && this.stamina >= 75) {
+            const myHouse = sim ? sim.houses.find(h => h.id === this.homeHouseId) : null;
+            if (myHouse && myHouse.isFertilityActive()) {
+              this.isPregnant = true;
+              this.pregnancyProgress = 0.0;
+              eventMsg = { type: 'birth', text: `🤰 女性部落民 #${this.id} (配偶 #${this.spouseId}) 在私宅中饱暖充盈(≥22.5单位，水粮≥10)，成功受孕进入120秒妊娠期！` };
+            }
           }
         }
 
-        // 120秒孕期与流产判定 (有房流产底线宽限至 15%=3.75单位，露天为 25%=6.25单位)
+        // 120秒孕期与流产判定 (统一基准流产底线 25%=7.5单位)
         if (this.isPregnant) {
-          const miscarryThreshold = this.homeHouseId !== null ? 3.75 : 6.25;
+          const miscarryThreshold = 7.5;
           if (this.hunger < miscarryThreshold || this.thirst < miscarryThreshold || this.stamina < 20) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
@@ -1216,11 +1264,14 @@
           }
         }
 
+        // 休息与劳作状态体力结算
         if (this.state === 'RestingAtCamp') {
-          const recoveryRate = this.homeHouseId !== null ? 14.0 : 8.0;
+          const recoveryRate = 8.0;
           this.stamina = Math.min(100, this.stamina + recoveryRate * dt);
         } else if (this.state === 'ConstructingHouse') {
           this.stamina = Math.max(5, this.stamina - 3.5 * dt); // 筑屋劳动消耗体力
+        } else if (this.state === 'RepairingHouse') {
+          this.stamina = Math.max(5, this.stamina - 2.5 * dt); // 修缮劳动消耗体力
         }
 
         return eventMsg;
@@ -1474,52 +1525,99 @@
             if (agent.state === 'DrinkingAtWater') {
               const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 22);
               if (poi && poi.currentStock > 0.01) {
-                const need = Math.max(0, 25.0 - agent.thirst);
+                const need = Math.max(0, 30.0 - agent.thirst);
                 const extracted = Math.min(poi.currentStock, Math.min(need, 4.0 * dt));
                 poi.currentStock -= extracted;
-                agent.thirst = Math.min(25.0, agent.thirst + extracted);
+                agent.thirst = Math.min(30.0, agent.thirst + extracted);
+
+                // 填补私宅仓储
+                if (agent.homeHouseId !== null) {
+                  const house = this.houses.find(h => h.id === agent.homeHouseId);
+                  if (house && house.pantryWater < house.maxPantryWater && poi.currentStock > 0.01) {
+                    const houseNeed = house.maxPantryWater - house.pantryWater;
+                    const stockExtracted = Math.min(poi.currentStock, Math.min(houseNeed, 4.0 * dt));
+                    poi.currentStock -= stockExtracted;
+                    house.pantryWater = Math.min(house.maxPantryWater, house.pantryWater + stockExtracted);
+                  }
+                }
               }
             } else if (agent.state === 'ForagingFood') {
               const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 22);
               if (poi && poi.currentStock > 0.01) {
-                const need = Math.max(0, 25.0 - agent.hunger);
+                const need = Math.max(0, 30.0 - agent.hunger);
                 const extracted = Math.min(poi.currentStock, Math.min(need, 4.0 * dt));
                 poi.currentStock -= extracted;
-                agent.hunger = Math.min(25.0, agent.hunger + extracted);
+                agent.hunger = Math.min(30.0, agent.hunger + extracted);
+
+                // 填补私宅仓储
+                if (agent.homeHouseId !== null) {
+                  const house = this.houses.find(h => h.id === agent.homeHouseId);
+                  if (house && house.pantryFood < house.maxPantryFood && poi.currentStock > 0.01) {
+                    const houseNeed = house.maxPantryFood - house.pantryFood;
+                    const stockExtracted = Math.min(poi.currentStock, Math.min(houseNeed, 4.0 * dt));
+                    poi.currentStock -= stockExtracted;
+                    house.pantryFood = Math.min(house.maxPantryFood, house.pantryFood + stockExtracted);
+                  }
+                }
+              }
+            } else if (agent.state === 'RestingAtCamp') {
+              // 当外部短缺或在私宅休息时，消耗房屋独立储备以维持水粮
+              if (agent.homeHouseId !== null) {
+                const house = this.houses.find(h => h.id === agent.homeHouseId);
+                if (house) {
+                  if (agent.thirst < 22.5 && house.pantryWater > 0.05) {
+                    const drink = Math.min(30.0 - agent.thirst, Math.min(house.pantryWater, 3.0 * dt));
+                    house.pantryWater = Math.max(0, house.pantryWater - drink);
+                    agent.thirst = Math.min(30.0, agent.thirst + drink);
+                  }
+                  if (agent.hunger < 22.5 && house.pantryFood > 0.05) {
+                    const eat = Math.min(30.0 - agent.hunger, Math.min(house.pantryFood, 3.0 * dt));
+                    house.pantryFood = Math.max(0, house.pantryFood - eat);
+                    agent.hunger = Math.min(30.0, agent.hunger + eat);
+                  }
+                }
               }
             }
           }
 
-          // 分娩新生儿 (年龄 0.0s，初始水粮 50% = 12.5 单位，建立家族世系与父母亲缘)
+          // 分娩新生儿 (年龄 0.0s，初始水粮 50% = 15.0 单位，入驻家庭私宅与父母共享水粮)
           for (const { motherId, campNode } of newborns) {
             const babyId = this.nextAgentId++;
             this.totalBirths++;
             const babyGender = Math.random() < 0.5 ? 'female' : 'male';
             const genderStr = babyGender === 'female' ? '女婴 ♀' : '男婴 ♂';
-            const baby = new PrimitiveAgent(babyId, campNode, 34.0, 0.0, babyGender);
-            baby.pos = this.network.nodes.get(campNode).pos;
-            baby.hunger = 12.5;
-            baby.thirst = 12.5;
-            baby.stamina = 100;
-            baby.motherId = motherId;
 
             const mother = this.agents.find(a => a.id === motherId);
             const fatherId = mother ? mother.spouseId : null;
+            const father = fatherId ? this.agents.find(a => a.id === fatherId) : null;
+            const familyHouseId = (mother && mother.homeHouseId !== null) ? mother.homeHouseId : (father ? father.homeHouseId : null);
+
+            let birthNode = campNode;
+            if (familyHouseId !== null) {
+              const house = this.houses.find(h => h.id === familyHouseId);
+              if (house) birthNode = house.doorNodeId;
+            }
+
+            const baby = new PrimitiveAgent(babyId, birthNode, 34.0, 0.0, babyGender);
+            baby.pos = this.network.nodes.get(birthNode).pos;
+            baby.hunger = 15.0; // 50% of 30.0
+            baby.thirst = 15.0; // 50% of 30.0
+            baby.stamina = 100;
+            baby.motherId = motherId;
             baby.fatherId = fatherId;
+            baby.homeHouseId = familyHouseId; // 未盖房小孩与父母共享私宅与水粮
 
             if (mother) {
               mother.children.push(babyId);
             }
-            if (fatherId) {
-              const father = this.agents.find(a => a.id === fatherId);
-              if (father) {
-                father.children.push(babyId);
-              }
+            if (fatherId && father) {
+              father.children.push(babyId);
             }
 
             this.agents.push(baby);
             const parentsDesc = fatherId ? `母亲 #${motherId} 与 父亲 #${fatherId}` : `母亲 #${motherId}`;
-            this.logEvent(`🍼 ${parentsDesc} 喜添${genderStr} (Agent #${babyId}，幼年0s，需成长120s)！`, 'birth');
+            const houseDesc = familyHouseId !== null ? `，入驻 #${familyHouseId} 号家庭私宅共享水粮` : '';
+            this.logEvent(`🍼 ${parentsDesc} 喜添${genderStr} (Agent #${babyId}${houseDesc}，幼年0s，需成长120s)！`, 'birth');
           }
 
           // 死亡族人伴侣解除婚姻 (重归单身/丧偶)
@@ -1544,7 +1642,7 @@
             }
           }
 
-          // 自发筑屋建造、确权与代际继承
+          // 自发筑屋建造、修缮、升级与代际继承
           this.tickHousing(dt);
 
           if (this.tickCount % 15 === 0) {
@@ -1582,7 +1680,37 @@
           }
         }
 
-        // 2. 施工中小人推进建造工时 (30s 建造成本翻倍)
+        // 2. 房屋劳作修缮机制 (小人可以劳动修缮房屋)
+        for (const house of this.houses) {
+          house.isRepairing = false;
+          if (house.durability < 85.0 && !house.isRuin) {
+            const ownerId = house.ownerId;
+            const spouseId = house.spouseId;
+            for (const agent of this.agents) {
+              if (agent.isAlive && (agent.id === ownerId || spouseId === agent.id)) {
+                if (agent.state === 'RestingAtCamp' && agent.stamina >= 35) {
+                  agent.state = 'RepairingHouse';
+                }
+                if (agent.state === 'RepairingHouse') {
+                  house.isRepairing = true;
+                  house.repair(8.0 * dt);
+                  if (house.durability >= 100.0) {
+                    agent.state = 'RestingAtCamp';
+                    this.logEvent(`🔧 部落民 #${agent.id} 劳作修缮了 #${house.id} 号房屋，耐久度已恢复至 100%！`, 'camp');
+                  }
+                }
+              }
+            }
+          } else {
+            for (const agent of this.agents) {
+              if (agent.state === 'RepairingHouse' && agent.homeHouseId === house.id) {
+                agent.state = 'RestingAtCamp';
+              }
+            }
+          }
+        }
+
+        // 3. 施工与多级房屋升级推进 (填满后继续投入劳力升级，奖励是储备空间增加)
         for (const agent of this.agents) {
           if (!agent.isAlive) continue;
           if (agent.state === 'ConstructingHouse') {
@@ -1590,44 +1718,54 @@
             if (agent.buildTimer >= 30.0) {
               agent.buildTimer = 0.0;
               agent.state = 'RestingAtCamp';
-              const houseId = this.nextHouseId++;
-              const doorNode = this.network.addNode(agent.pos.x, agent.pos.y, agent.pos.z, 'house');
               
-              // 自动向最近路网节点接入支线便道
-              const nearestCamp = this.findNearestCamp(agent.pos);
-              if (nearestCamp !== doorNode) {
-                this.network.addLane(doorNode, nearestCamp, 'dirt', false);
-                this.network.addLane(nearestCamp, doorNode, 'dirt', false);
+              if (agent.homeHouseId !== null) {
+                const house = this.houses.find(h => h.id === agent.homeHouseId);
+                if (house) {
+                  const prevTier = house.tier;
+                  const success = house.upgradeToNextTier();
+                  if (success) {
+                    if (prevTier === 'Tier0Warehouse') {
+                      // 0级升级为1级私宅：自动迎娶单身女性并激活生育
+                      const singleFemale = this.agents.find(a => a.isAlive && a.gender === 'female' && a.age >= 120.0 && a.spouseId === null);
+                      if (singleFemale) {
+                        agent.spouseId = singleFemale.id;
+                        singleFemale.spouseId = agent.id;
+                        singleFemale.homeHouseId = house.id;
+                        singleFemale.homeCampNode = house.doorNodeId;
+                        house.spouseId = singleFemale.id;
+                        this.logEvent(`🎉 0级仓库填满并升级为 1级私宅！迎娶单身女性 #${singleFemale.id} ♀ 结为夫妻，激活生育，仓储扩容至 20 单位！`, 'camp');
+                      } else {
+                        this.logEvent(`🎉 0级仓库填满并升级为 1级私宅！正式激活生育功能，仓储扩容至 20 单位！`, 'camp');
+                      }
+                    } else {
+                      this.logEvent(`🏰 房屋储备充盈并完成升级！第 #${house.id} 号房屋晋升为 ${house.tier}，水粮独立仓储扩容至 ${house.maxPantryWater.toFixed(0)} 单位！`, 'camp');
+                    }
+                  }
+                }
               }
-
-              const house = new House(houseId, agent.id, new Vec3(agent.pos.x, agent.pos.y, agent.pos.z), doorNode, 'Tier1LeanTo');
-              agent.homeHouseId = houseId;
-              agent.homeCampNode = doorNode;
-
-              // 寻找在世且单身（未婚或离异/丧偶）的成年女性自动结为夫妻
-              const singleFemale = this.agents.find(a => a.isAlive && a.gender === 'female' && a.age >= 120.0 && a.spouseId === null);
-              if (singleFemale) {
-                agent.spouseId = singleFemale.id;
-                singleFemale.spouseId = agent.id;
-                singleFemale.homeHouseId = houseId;
-                singleFemale.homeCampNode = doorNode;
-                house.spouseId = singleFemale.id;
-                this.logEvent(`💒 喜结连理！部落民 #${agent.id} ♂ 筑成新居，与单身女性 #${singleFemale.id} ♀ 结为夫妻喜迁 #${houseId} 号私宅！`, 'camp');
-              } else {
-                this.logEvent(`🏡 部落民 #${agent.id} ♂ 耗费30s劳作工时，在路网旁成功筑造了第 #${houseId} 号私产宅舍！`, 'camp');
-              }
-
-              this.houses.push(house);
             }
           }
         }
 
-        // 3. 自发选址评估 (只有男性 ♂ 可自发盖房，需年满120s成年、饱暖富足≥18.0、体力≥75%)
+        // 4. 检查房屋是否已填满水粮，若填满且主人在休息，自动启动多级升级
+        for (const house of this.houses) {
+          if (house.isPantryFull() && house.tier !== 'Tier4Manor') {
+            const owner = this.agents.find(a => a.id === house.ownerId && a.isAlive && a.state === 'RestingAtCamp');
+            if (owner) {
+              owner.state = 'ConstructingHouse';
+              owner.buildTimer = 0.0;
+            }
+          }
+        }
+
+        // 5. 自发选址设立 0级仓库 (男性 ♂ 年满 120s 成年饱暖即可立项，无需前期劳力，默认 5 水 5 粮)
         if (this.tickCount % 30 === 0) {
           for (const agent of this.agents) {
-            if (!agent.isAlive || agent.gender !== 'male' || agent.homeHouseId !== null || agent.state !== 'RestingAtCamp') continue;
+            const isAlreadyOwner = this.houses.some(h => h.ownerId === agent.id);
+            if (!agent.isAlive || agent.gender !== 'male' || isAlreadyOwner || agent.state !== 'RestingAtCamp') continue;
 
-            // 筑屋门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
+            // 设立仓库门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
             if (agent.age >= 120.0 && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 75.0 && Math.random() < 0.15) {
               const angle = Math.random() * Math.PI * 2;
               const dist = 16.0 + Math.random() * 26.0;
@@ -1645,16 +1783,29 @@
               }
 
               if (isValid) {
-                agent.state = 'ConstructingHouse';
+                const houseId = this.nextHouseId++;
+                const doorNode = this.network.addNode(candPos.x, candPos.y, candPos.z, 'house');
+                const nearestCamp = this.findNearestCamp(candPos);
+                if (nearestCamp !== doorNode) {
+                  this.network.addLane(doorNode, nearestCamp, 'dirt', false);
+                  this.network.addLane(nearestCamp, doorNode, 'dirt', false);
+                }
+
+                // 生成 0级仓库 (默认 5 水 5 粮，无需前期劳作投入)
+                const house = new House(houseId, agent.id, candPos, doorNode, 'Tier0Warehouse');
+                this.houses.push(house);
+
+                agent.homeHouseId = houseId;
+                agent.homeCampNode = doorNode;
                 agent.pos = candPos;
-                agent.buildTimer = 0.0;
+                this.logEvent(`📦 部落民 #${agent.id} ♂ 选址建立了第 #${houseId} 号 0级仓库 (初始自带5水5粮，无需劳力)，开始搬运备货！`, 'camp');
                 break;
               }
             }
           }
         }
 
-        // 4. 代际继承与无房族人转让处理
+        // 5. 代际继承与无房族人转让处理
         for (const house of this.houses) {
           const ownerAlive = this.agents.some(a => a.id === house.ownerId && a.isAlive);
           if (!ownerAlive && !house.isRuin) {
@@ -1754,7 +1905,45 @@
                 agent.currentLaneId = path[0];
                 agent.distAlongCurve = 0;
               }
-            } else if (agent.stamina >= 95 && agent.hunger < 20.0 && availableFoodNodes.length > 0 && Math.random() < 0.04) {
+            } else if (agent.stamina >= 65 && agent.homeHouseId !== null) {
+              // 备货与持续扩产升级动机：若房屋水或粮食未填满，主动前往采集补给以筹备填满升级
+              const myHouse = this.houses.find(h => h.id === agent.homeHouseId);
+              if (myHouse && !myHouse.isRuin) {
+                if (myHouse.pantryWater < myHouse.maxPantryWater && availableWaterNodes.length > 0 && Math.random() < 0.40) {
+                  const sortedWater = [...availableWaterNodes].sort((a, b) => {
+                    const posA = this.network.nodes.get(a).pos;
+                    const posB = this.network.nodes.get(b).pos;
+                    return posA.distanceTo(agent.pos) - posB.distanceTo(agent.pos);
+                  });
+                  const target = sortedWater[0];
+                  const path = this.network.findPath(agent.homeCampNode, target);
+                  if (path && path.length > 0) {
+                    agent.state = 'SeekingWater';
+                    agent.targetNode = target;
+                    agent.route = path;
+                    agent.routeIndex = 0;
+                    agent.currentLaneId = path[0];
+                    agent.distAlongCurve = 0;
+                  }
+                } else if (myHouse.pantryFood < myHouse.maxPantryFood && availableFoodNodes.length > 0 && Math.random() < 0.40) {
+                  const sortedFood = [...availableFoodNodes].sort((a, b) => {
+                    const posA = this.network.nodes.get(a).pos;
+                    const posB = this.network.nodes.get(b).pos;
+                    return posA.distanceTo(agent.pos) - posB.distanceTo(agent.pos);
+                  });
+                  const target = sortedFood[0];
+                  const path = this.network.findPath(agent.homeCampNode, target);
+                  if (path && path.length > 0) {
+                    agent.state = 'SeekingFood';
+                    agent.targetNode = target;
+                    agent.route = path;
+                    agent.routeIndex = 0;
+                    agent.currentLaneId = path[0];
+                    agent.distAlongCurve = 0;
+                  }
+                }
+              }
+            } else if (agent.stamina >= 95 && agent.hunger < 24.0 && availableFoodNodes.length > 0 && Math.random() < 0.04) {
               const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
@@ -1767,9 +1956,12 @@
               }
             }
           } else if (agent.state === 'DrinkingAtWater') {
-            if (agent.thirst >= 24.0) {
-              if (agent.hunger < 12.5 && availableFoodNodes.length > 0) {
-                const curr = agent.targetNode || agent.homeCampNode;
+            const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 22);
+            const isEmpty = !poi || poi.currentStock <= 0.05;
+
+            if (agent.thirst >= 29.0 || isEmpty) {
+              const curr = agent.targetNode || agent.homeCampNode;
+              if (agent.hunger < 15.0 && availableFoodNodes.length > 0) {
                 const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
                 const path = this.network.findPath(curr, target);
                 if (path && path.length > 0) {
@@ -1781,13 +1973,13 @@
                   agent.distAlongCurve = 0;
                 }
               } else {
-                const curr = agent.targetNode || agent.homeCampNode;
-                const nearestCamp = this.findNearestCamp(agent.pos);
-                const path = this.network.findPath(curr, nearestCamp);
+                // 外部水源枯竭或已解渴，优先回专属家宅避险，无私宅回营地
+                const targetHome = agent.homeHouseId !== null ? agent.homeCampNode : this.findNearestCamp(agent.pos);
+                const path = this.network.findPath(curr, targetHome);
                 if (path && path.length > 0) {
-                  agent.homeCampNode = nearestCamp; // 模式 A：动态迁入就近营地
+                  agent.homeCampNode = targetHome;
                   agent.state = 'ReturningToCamp';
-                  agent.targetNode = nearestCamp;
+                  agent.targetNode = targetHome;
                   agent.route = path;
                   agent.routeIndex = 0;
                   agent.currentLaneId = path[0];
@@ -1796,14 +1988,63 @@
               }
             }
           } else if (agent.state === 'ForagingFood') {
-            if (agent.hunger >= 24.0) {
+            const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 22);
+            const isEmpty = !poi || poi.currentStock <= 0.05;
+
+            if (agent.hunger >= 29.0 || isEmpty) {
               const curr = agent.targetNode || agent.homeCampNode;
-              const nearestCamp = this.findNearestCamp(agent.pos);
-              const path = this.network.findPath(curr, nearestCamp);
+              if (agent.thirst < 15.0 && availableWaterNodes.length > 0) {
+                const target = availableWaterNodes[Math.floor(Math.random() * availableWaterNodes.length)];
+                const path = this.network.findPath(curr, target);
+                if (path && path.length > 0) {
+                  agent.state = 'SeekingWater';
+                  agent.targetNode = target;
+                  agent.route = path;
+                  agent.routeIndex = 0;
+                  agent.currentLaneId = path[0];
+                  agent.distAlongCurve = 0;
+                }
+              } else {
+                // 外部浆果枯竭或已饱腹，优先回专属家宅避险，无私宅回营地
+                const targetHome = agent.homeHouseId !== null ? agent.homeCampNode : this.findNearestCamp(agent.pos);
+                const path = this.network.findPath(curr, targetHome);
+                if (path && path.length > 0) {
+                  agent.homeCampNode = targetHome;
+                  agent.state = 'ReturningToCamp';
+                  agent.targetNode = targetHome;
+                  agent.route = path;
+                  agent.routeIndex = 0;
+                  agent.currentLaneId = path[0];
+                  agent.distAlongCurve = 0;
+                }
+              }
+            }
+          } else if (agent.state === 'SeekingWater') {
+            // 赶往水源途中若外部已无水，紧急调头回家
+            if (availableWaterNodes.length === 0) {
+              const curr = agent.targetNode || agent.homeCampNode;
+              const targetHome = agent.homeHouseId !== null ? agent.homeCampNode : this.findNearestCamp(agent.pos);
+              const path = this.network.findPath(curr, targetHome);
               if (path && path.length > 0) {
-                agent.homeCampNode = nearestCamp; // 模式 A：动态迁入就近营地
+                agent.homeCampNode = targetHome;
                 agent.state = 'ReturningToCamp';
-                agent.targetNode = nearestCamp;
+                agent.targetNode = targetHome;
+                agent.route = path;
+                agent.routeIndex = 0;
+                agent.currentLaneId = path[0];
+                agent.distAlongCurve = 0;
+              }
+            }
+          } else if (agent.state === 'SeekingFood') {
+            // 赶往果丛途中若外部已无粮，紧急调头回家
+            if (availableFoodNodes.length === 0) {
+              const curr = agent.targetNode || agent.homeCampNode;
+              const targetHome = agent.homeHouseId !== null ? agent.homeCampNode : this.findNearestCamp(agent.pos);
+              const path = this.network.findPath(curr, targetHome);
+              if (path && path.length > 0) {
+                agent.homeCampNode = targetHome;
+                agent.state = 'ReturningToCamp';
+                agent.targetNode = targetHome;
                 agent.route = path;
                 agent.routeIndex = 0;
                 agent.currentLaneId = path[0];
@@ -2087,30 +2328,47 @@
         }
       }
 
-      // 2.5 自建私产宅舍渲染 (帐篷/茅草屋/石基大宅)
+      // 2.5 自建私产宅舍渲染 (0级仓库 📦 / 1级私宅 🏡 / 无主废墟 🏚️)
       for (const house of sim.houses) {
         const p2D = project3D(house.pos);
         const isSelectedHouse = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
+        const isWarehouse = house.tier === 'Tier0Warehouse';
+        let tierIcon = '📦';
+        let tierLabel = '仓';
+        if (house.tier === 'Tier1LeanTo') { tierIcon = '🏡'; tierLabel = '宅'; }
+        else if (house.tier === 'Tier2ThatchedHut') { tierIcon = '🛖'; tierLabel = '茅舍'; }
+        else if (house.tier === 'Tier3Homestead') { tierIcon = '🏛️'; tierLabel = '庄舍'; }
+        else if (house.tier === 'Tier4Manor') { tierIcon = '🏰'; tierLabel = '庄园'; }
 
         if (house.isRuin) {
           ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('🏚️', p2D.x, p2D.y + 4);
+          ctx.font = '9px sans-serif';
+          ctx.fillStyle = '#ef4444';
+          ctx.fillText(`#${house.id}废墟`, p2D.x, p2D.y + 16 * camera.zoom);
         } else {
+          // 居所光晕与图标
+          const glowColor = isWarehouse ? 'rgba(217, 119, 6, 0.45)' : (house.tier === 'Tier4Manor' ? 'rgba(168, 85, 247, 0.45)' : 'rgba(245, 158, 11, 0.45)');
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 18 * camera.zoom);
-          grad.addColorStop(0, 'rgba(245, 158, 11, 0.45)');
-          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          grad.addColorStop(0, glowColor);
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 18 * camera.zoom, 0, Math.PI * 2); ctx.fill();
 
           ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('🏡', p2D.x, p2D.y + 4);
+          ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
 
-          // 门牌与归属提示
-          ctx.font = '9px sans-serif';
-          ctx.fillStyle = '#fde68a';
-          ctx.fillText(`#${house.id}宅`, p2D.x, p2D.y + 16 * camera.zoom);
+          // 门牌与仓储数值提示
+          ctx.font = '8px sans-serif';
+          if (house.isRepairing) {
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillText(`🔧修缮(${Math.round(house.durability)}%)`, p2D.x, p2D.y + 16 * camera.zoom);
+          } else {
+            ctx.fillStyle = house.isFertilityActive() ? '#10b981' : '#fde68a';
+            ctx.fillText(`#${house.id}${tierLabel}(${Math.round(house.pantryWater)}💧/${Math.round(house.pantryFood)}🍒)`, p2D.x, p2D.y + 16 * camera.zoom);
+          }
         }
 
         if (isSelectedHouse) {
@@ -2490,19 +2748,65 @@
           houseView.style.display = 'flex';
           if (followBtn) followBtn.style.display = 'none';
 
-          document.getElementById('insp-title-name').textContent = `🏡 #${house.id} 号私产宅舍 (1级)`;
-          document.getElementById('insp-title-state').textContent = house.isRuin ? '🏚️ 无主废墟' : '🌿 私人居所';
-          document.getElementById('insp-title-state').style.color = house.isRuin ? '#ef4444' : '#10b981';
+          const isWarehouse = house.tier === 'Tier0Warehouse';
+          let tierTitle = '📦 0级 仓库';
+          if (house.tier === 'Tier1LeanTo') tierTitle = '🏡 1级 私宅';
+          else if (house.tier === 'Tier2ThatchedHut') tierTitle = '🛖 2级 茅草屋';
+          else if (house.tier === 'Tier3Homestead') tierTitle = '🏛️ 3级 庄舍';
+          else if (house.tier === 'Tier4Manor') tierTitle = '🏰 4级 家族大庄园';
+
+          document.getElementById('insp-title-name').textContent = `${tierTitle} #${house.id}`;
+          
+          let stateText = '🌿 私人居所';
+          if (house.isRuin) {
+            stateText = '💀 绝嗣废墟 (快速风化中)';
+          } else if (house.isRepairing) {
+            stateText = `🔧 族人劳作修缮中 (${Math.round(house.durability)}%)`;
+          } else if (house.durability < 85.0) {
+            stateText = `⚠️ 建筑磨损折旧 (${Math.round(house.durability)}% 待修缮)`;
+          } else if (house.isPantryFull()) {
+            stateText = house.tier === 'Tier4Manor' ? '🏰 终极庄园满仓' : '🔨 水粮已满仓 (升级扩容中)';
+          } else {
+            stateText = isWarehouse ? '📦 储备补给中 (需水粮各满10.0)' : '🌾 私产安居中 (持续储备扩产)';
+          }
+          document.getElementById('insp-title-state').textContent = stateText;
+          document.getElementById('insp-title-state').style.color = house.isRuin ? '#ef4444' : (house.isRepairing ? '#38bdf8' : (isWarehouse ? '#f59e0b' : '#10b981'));
 
           const durPct = Math.round(house.durability);
-          document.getElementById('insp-house-dur-val').textContent = `${durPct}% (${house.isRuin ? '加速风化中' : '稳固使用中'})`;
+          document.getElementById('insp-house-dur-val').textContent = `${durPct}% (${house.isRuin ? '加速风化中' : (house.isRepairing ? '族人修缮回血中' : (durPct < 85 ? '需修缮' : '稳固使用中'))})`;
           document.getElementById('insp-house-dur-fill').style.width = `${durPct}%`;
-          document.getElementById('insp-house-dur-fill').style.background = durPct < 30 ? '#ef4444' : '#f59e0b';
+          document.getElementById('insp-house-dur-fill').style.background = durPct < 30 ? '#ef4444' : (durPct < 85 ? '#f59e0b' : '#10b981');
 
-          const pantryTotal = house.pantryFood + house.pantryWater;
-          const pantryPct = Math.round((pantryTotal / house.maxPantry) * 100);
-          document.getElementById('insp-house-pantry-val').textContent = `${pantryTotal.toFixed(1)} / ${house.maxPantry.toFixed(1)} 单位`;
-          document.getElementById('insp-house-pantry-fill').style.width = `${pantryPct}%`;
+          // 独立清泉储量 (水)
+          const waterPct = Math.round((house.pantryWater / house.maxPantryWater) * 100);
+          document.getElementById('insp-house-water-val').textContent = `${house.pantryWater.toFixed(1)} / ${house.maxPantryWater.toFixed(1)} 单位 (${waterPct}%)`;
+          document.getElementById('insp-house-water-fill').style.width = `${waterPct}%`;
+
+          // 独立粮食储量 (果)
+          const foodPct = Math.round((house.pantryFood / house.maxPantryFood) * 100);
+          document.getElementById('insp-house-food-val').textContent = `${house.pantryFood.toFixed(1)} / ${house.maxPantryFood.toFixed(1)} 单位 (${foodPct}%)`;
+          document.getElementById('insp-house-food-fill').style.width = `${foodPct}%`;
+
+          // 建筑形态与生育激活描述
+          const tierDescElem = document.getElementById('insp-house-tier-desc');
+          if (tierDescElem) {
+            tierDescElem.textContent = isWarehouse ? '0级 仓库 (无劳力门槛，自带5水5粮，容量各10.0，满仓后投入30s升级)' : `${tierTitle} (仓储上限: 水粮各 ${house.maxPantryWater.toFixed(0)} 单位，满仓继续扩产升级)`;
+            tierDescElem.style.color = isWarehouse ? '#f59e0b' : '#10b981';
+          }
+
+          const fertilityBadge = document.getElementById('insp-house-fertility-badge');
+          if (fertilityBadge) {
+            if (isWarehouse) {
+              fertilityBadge.textContent = '🔒 未激活 (0级仓库不支持生育，需升级为1级私宅)';
+              fertilityBadge.style.color = '#ef4444';
+            } else if (house.pantryWater < 10.0 || house.pantryFood < 10.0) {
+              fertilityBadge.textContent = `⚠️ 失去支持 (水或粮<10单位: 💧${house.pantryWater.toFixed(1)}/🍒${house.pantryFood.toFixed(1)}，需补仓至≥10)`;
+              fertilityBadge.style.color = '#f59e0b';
+            } else {
+              fertilityBadge.textContent = '🟢 充盈激活 (水粮均≥10单位，支持夫妻受孕分娩)';
+              fertilityBadge.style.color = '#10b981';
+            }
+          }
 
           // 户主追踪按钮绑定
           const ownerAgent = sim.agents.find(a => a.id === house.ownerId);
@@ -2515,7 +2819,7 @@
           }
 
           document.getElementById('insp-house-coord').textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
-          document.getElementById('insp-detail-text').textContent = house.isRuin ? '户主去世且未有族人继承，房屋正处于风化瓦解状态。' : `属于族人 #${house.ownerId} 的私产空间。室内遮风避雨，享有静息代谢降耗 40%、体力恢复翻倍与孕育安全屏障。`;
+          document.getElementById('insp-detail-text').textContent = house.isRuin ? '户主去世且未有族人继承，房屋正处于风化瓦解状态。' : (isWarehouse ? '0级仓库无需前期劳工投入。默认配备 5 水 5 粮，需搬运填满至各 10.0 单位后，投入 30s 劳作升级为 1级私宅并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。夫妻与未盖房的子女均可在此安居并共享家宅水粮储备；满仓后族人继续投入劳作升级房屋以扩充空间；耐久折旧时小人可自发修缮。`);
         }
       } else if (sim.selectionType === 'poi' && sim.selectedPoiId !== null) {
         const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
@@ -2554,7 +2858,7 @@
           document.getElementById('insp-poi-elev').textContent = `Z = ${poi.pos.z.toFixed(1)}m (${poi.pos.z < -10 ? '低洼区' : (poi.pos.z > 10 ? '高台区' : '平缓中台')})`;
           document.getElementById('insp-poi-coord').textContent = `(X: ${Math.round(poi.pos.x)}m, Y: ${Math.round(poi.pos.y)}m)`;
           
-          document.getElementById('insp-detail-text').textContent = poi.type === 'Water' ? '低洼处天然地泉(上限60单位,产速2.0/s)，小人到泉直接饮水解渴。' : (poi.type === 'Berry' ? '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人到丛直接采食充饥。' : '避风篝火营地(储量无限)，小人在此休养回体、饱暖受孕与分娩新生儿。');
+          document.getElementById('insp-detail-text').textContent = poi.type === 'Water' ? '低洼处天然地泉(上限60单位,产速2.0/s)，小人到泉直接饮水解渴。' : (poi.type === 'Berry' ? '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人到丛直接采食充饥。' : '避风篝火营地(储量无限)，小人在此休养回体。');
         }
       } else {
         agentView.style.display = 'block';
@@ -2569,31 +2873,43 @@
           const isFemale = selAgent.gender === 'female';
           const genderBadge = isFemale ? '♀' : '♂';
           const roleIcon = selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼');
-          const homeTag = selAgent.homeHouseId ? `[🏡 #${selAgent.homeHouseId}私宅]` : `[🏕️ 营地]`;
+          
+          let homeTag = `[🏕️ 营地]`;
+          if (selAgent.homeHouseId !== null) {
+            const myHouse = sim.houses.find(h => h.id === selAgent.homeHouseId);
+            if (myHouse) {
+              if (myHouse.ownerId === selAgent.id) homeTag = `[🏡 #${selAgent.homeHouseId}私宅·户主]`;
+              else if (myHouse.spouseId === selAgent.id) homeTag = `[🏡 #${selAgent.homeHouseId}私宅·配偶]`;
+              else homeTag = `[🏡 #${selAgent.homeHouseId}私宅·子女]`;
+            }
+          }
           document.getElementById('insp-title-name').textContent = `部落民 #${selAgent.id} ${genderBadge} ${roleIcon} ${homeTag}`;
           
-          let stateText = selAgent.homeHouseId ? '🏡 私宅休养中' : '🏕️ 营地休息中';
-          let detailText = selAgent.homeHouseId ? '在专属私宅中休养(代谢降耗40%·体力恢复翻倍)，享有孕育安全保护。' : '在露天营地休眠恢复体力，并进行受孕与孕育。';
+          let stateText = selAgent.homeHouseId ? '🏡 私宅安居中' : '🏕️ 营地休息中';
+          let detailText = selAgent.homeHouseId ? '在专属私宅中安居，夫妻与未盖房子女共享私宅水粮储备，外部短缺时消耗家宅避险，满足饱暖可激活孕育。' : '在露天营地休息恢复体力，无私宅不可受孕。';
 
           if (!selAgent.isAlive) {
             stateText = '💀 已死亡';
             detailText = `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`;
           } else if (selAgent.state === 'ConstructingHouse') {
             const progPct = Math.round((selAgent.buildTimer / 30.0) * 100);
-            stateText = `🔨 自发筑造私宅 (${progPct}% - 30s工期)`;
-            detailText = '投入体力与工时自发营建第一所耐用私宅资本品(30s工期/成本翻倍)，完成后将永久降低日常代谢开销。';
+            stateText = `🔨 营建/升级房屋 (${progPct}% - 30s工期)`;
+            detailText = '投入体力与工时营建或升级私宅(30s工期)，完成后将扩容储备空间并激活/保障繁衍孕育。';
+          } else if (selAgent.state === 'RepairingHouse') {
+            stateText = '🔧 劳作修缮房屋中';
+            detailText = '投入体力劳作修缮专属私宅，恢复房屋耐久度至 100% 避免风化坍塌。';
           } else if (selAgent.state === 'SeekingWater') {
             stateText = selAgent.isOffroad ? '💧 荒野直连寻水 (50%移速)' : '💧 沿道路寻水 (100%满速)';
-            detailText = '前往水洼直接饮水解渴 (10秒消耗1单位)。';
+            detailText = '前往水洼直接饮水解渴并顺带补充私宅储备。';
           } else if (selAgent.state === 'DrinkingAtWater') {
             stateText = '💧 水洼痛饮中';
-            detailText = '在清泉处直接痛饮补充水分至 25.0 单位上限。';
+            detailText = '在清泉处直接痛饮补充水分至 30.0 单位上限并补给私宅。';
           } else if (selAgent.state === 'SeekingFood') {
             stateText = selAgent.isOffroad ? '🍒 荒野直连觅食 (50%移速)' : '🍒 沿道路前往果丛 (100%满速)';
-            detailText = '前往浆果丛直接进食充饥。';
+            detailText = '前往浆果丛直接进食充饥并顺带补充私宅储备。';
           } else if (selAgent.state === 'ForagingFood') {
             stateText = '🍒 正在就地进食';
-            detailText = '在灌木丛处直接采食充饥至 25.0 单位上限。';
+            detailText = '在灌木丛处直接采食充饥至 30.0 单位上限并补给私宅。';
           } else if (selAgent.state === 'ReturningToCamp') {
             stateText = selAgent.homeHouseId ? '🏡 返回私产宅舍' : '🏕️ 沿道路返回营地';
             detailText = '已完成现场补水与进食，返回专属归宿。';
@@ -2623,12 +2939,13 @@
             }
           }
 
-          const hungerPct = Math.round((selAgent.hunger / 25.0) * 100);
-          document.getElementById('insp-hunger-val').textContent = `${selAgent.hunger.toFixed(1)} / 25.0 单位 (${hungerPct}%)`;
+          const hungerPct = Math.round((selAgent.hunger / 30.0) * 100);
+          document.getElementById('insp-hunger-val').textContent = `${selAgent.hunger.toFixed(1)} / 30.0 单位 (${hungerPct}%)`;
           document.getElementById('insp-hunger-fill').style.width = `${hungerPct}%`;
 
-          const thirstPct = Math.round((selAgent.thirst / 25.0) * 100);
-          document.getElementById('insp-thirst-val').textContent = `${selAgent.thirst.toFixed(1)} / 25.0 单位 (${thirstPct}%)`;
+          const thirstPct = Math.round((selAgent.thirst / 30.0) * 100);
+          document.getElementById('insp-thirst-val').textContent = `${selAgent.thirst.toFixed(1)} / 30.0 单位 (${thirstPct}%)`;
+          document.getElementById('insp-thirst-fill').style.width = `${thirstPct}%`;
           document.getElementById('insp-thirst-fill').style.width = `${thirstPct}%`;
 
           document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;

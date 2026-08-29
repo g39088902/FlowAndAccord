@@ -14,18 +14,19 @@ pub enum Gender {
 /// 原始生存与繁衍行为状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
-    RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、孕育新生命)
+    RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、消耗家宅储备)
     SeekingWater,       // 🚶 正在赶往水源
-    DrinkingAtWater,    // 💧 正在水洼原位痛饮
+    DrinkingAtWater,    // 💧 正在水洼原位痛饮并补给家宅
     SeekingFood,        // 🚶 正在赶往采摘区
-    ForagingFood,       // 🍒 正在果丛原位进食
+    ForagingFood,       // 🍒 正在果丛原位进食并补给家宅
     ReturningToCamp,    // 🏕️ 饱腹/解渴返回营地或私宅
-    ConstructingHouse,  // 🔨 正在投入工时自发营建房屋
+    ConstructingHouse,  // 🔨 正在投入工时营建/升级房屋
+    RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
     OffRoadDetour,      // ⚠️ 荒野越野寻路中
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (自身满足上限25.0、初始50%=12.5、120秒成年、男女二元性别只有女性可育、120秒孕期)
+/// 3D 动力学 Agent 实体 (自身满足上限30.0、初始50%=15.0、120秒成年、男女二元性别只有女性可育、120秒孕期)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
@@ -34,9 +35,9 @@ pub struct Agent3D {
     pub is_alive: bool,
     pub age: f32, // 年龄 (秒)，满 120 秒成年才具备生育能力
 
-    // 统一生理指标 (0.0 ~ 25.0 单位，初始 50% 即 12.5 单位)
-    pub hunger: f32,          // 饱食度 (最大 25.0 单位)
-    pub thirst: f32,          // 水分值 (最大 25.0 单位)
+    // 统一生理指标 (0.0 ~ 30.0 单位，初始 50% 即 15.0 单位)
+    pub hunger: f32,          // 饱食度 (最大 30.0 单位)
+    pub thirst: f32,          // 水分值 (最大 30.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
     pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
@@ -86,8 +87,8 @@ impl Agent3D {
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
-            hunger: 12.5, // 初始 50% (满值 25.0)
-            thirst: 12.5, // 初始 50% (满值 25.0)
+            hunger: 15.0, // 初始 50% (满值 30.0)
+            thirst: 15.0, // 初始 50% (满值 30.0)
             stamina: 95.0,
             home_camp_node: home_camp,
             target_poi_node: None,
@@ -119,7 +120,7 @@ impl Agent3D {
         }
     }
 
-    /// 核心生命代谢 Tick (有房降耗40%，建房消耗体力，只有已婚女性年满120秒成年才能受孕，孕期120秒)
+    /// 核心生命代谢 Tick (上限30.0单位，房屋激活受孕繁衍)
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
@@ -139,11 +140,8 @@ impl Agent3D {
         let mut event_msg = None;
         let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
 
-        // 房屋资本品收益：如果小人有房且在休息状态，静息代谢降耗 40%
-        if self.home_house_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp {
-            metabolic_multiplier *= 0.60;
-        } else if self.state == PrimitiveActionState::ConstructingHouse {
-            metabolic_multiplier *= 1.25; // 筑屋劳动轻微加速代谢
+        if self.state == PrimitiveActionState::ConstructingHouse || self.state == PrimitiveActionState::RepairingHouse {
+            metabolic_multiplier *= 1.25; // 营建与修缮劳动轻微加速代谢
         }
 
         // 统一需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒
@@ -169,19 +167,19 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (必须为已婚女性 ♀、年满 120 秒成年、各指标 >= 75% 即 18.75 单位，且不在流产 60 秒冷却期内)
-        if self.gender == Gender::Female && self.spouse_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
-            if self.age >= 120.0 && self.hunger >= 18.75 && self.thirst >= 18.75 && self.stamina >= 75.0 {
+        // 受孕判定 (上限30.0，饱暖≥75%即22.5单位，且有家宅庇护)
+        if self.gender == Gender::Female && self.spouse_id.is_some() && self.home_house_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+            if self.age >= 120.0 && self.hunger >= 22.5 && self.thirst >= 22.5 && self.stamina >= 75.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
-                event_msg = Some(format!("🤰 已婚女性部落民 #{} ({}) 饱暖康健(≥18.75单位即75%)，成功受孕进入120秒妊娠期 (代谢+50%)！", self.id, spouse_str));
+                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥22.5单位)，成功受孕进入120秒妊娠期！", self.id, spouse_str));
             }
         }
 
-        // 妊娠与流产判定 (孕期 120 秒；有房流产底线宽限至 15%=3.75单位，露天为 25%=6.25单位)
+        // 妊娠与流产判定 (孕期 120 秒；统一基准流产底线 25%=7.5单位)
         if self.is_pregnant {
-            let miscarry_threshold = if self.home_house_id.is_some() { 3.75 } else { 6.25 };
+            let miscarry_threshold = 7.5;
             if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
@@ -199,12 +197,14 @@ impl Agent3D {
             }
         }
 
-        // 休息与劳作状态体力结算
+        // 休息、筑屋与修缮体力结算
         if self.state == PrimitiveActionState::RestingAtCamp {
-            let recovery_rate = if self.home_house_id.is_some() { 14.0 } else { 8.0 };
+            let recovery_rate = 8.0;
             self.stamina = (self.stamina + recovery_rate * dt).min(100.0);
         } else if self.state == PrimitiveActionState::ConstructingHouse {
-            self.stamina = (self.stamina - 3.5 * dt).max(5.0); // 筑屋劳动消耗体力
+            self.stamina = (self.stamina - 3.5 * dt).max(5.0);
+        } else if self.state == PrimitiveActionState::RepairingHouse {
+            self.stamina = (self.stamina - 2.5 * dt).max(5.0); // 修缮劳作消耗体力
         }
 
         event_msg

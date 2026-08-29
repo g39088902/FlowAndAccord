@@ -274,20 +274,37 @@ impl World3DEngine {
                 PrimitiveActionState::DrinkingAtWater => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (25.0 - agent.thirst).max(0.0);
+                        let need = (30.0 - agent.thirst).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
-                            agent.thirst = (agent.thirst + extracted).min(25.0);
+                            agent.thirst = (agent.thirst + extracted).min(30.0);
                         }
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (25.0 - agent.hunger).max(0.0);
+                        let need = (30.0 - agent.hunger).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
-                            agent.hunger = (agent.hunger + extracted).min(25.0);
+                            agent.hunger = (agent.hunger + extracted).min(30.0);
+                        }
+                    }
+                }
+                PrimitiveActionState::RestingAtCamp => {
+                    // 当外部短缺或在私宅休息时，优先消耗房屋独立储备以维持饱暖
+                    if let Some(hid) = agent.home_house_id {
+                        if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
+                            if agent.thirst < 20.0 && house.pantry_water > 0.05 {
+                                let drink_amount = (30.0 - agent.thirst).min(house.pantry_water).min(3.0 * dt);
+                                house.pantry_water = (house.pantry_water - drink_amount).max(0.0);
+                                agent.thirst = (agent.thirst + drink_amount).min(30.0);
+                            }
+                            if agent.hunger < 20.0 && house.pantry_food > 0.05 {
+                                let eat_amount = (30.0 - agent.hunger).min(house.pantry_food).min(3.0 * dt);
+                                house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
+                                agent.hunger = (agent.hunger + eat_amount).min(30.0);
+                            }
                         }
                     }
                 }
@@ -295,22 +312,35 @@ impl World3DEngine {
             }
         }
 
-        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 12.5 单位，男女各 50% 机率)！
+        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 15.0 单位，男女各 50% 机率)！
         for (mother_id, camp_node) in newborn_mothers {
             let baby_id = self.next_agent_id;
             self.next_agent_id += 1;
             self.total_births += 1;
             let baby_gender = if rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
+            let gender_str = if baby_gender == Gender::Female { "女婴 ♀" } else { "男婴 ♂" };
             let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.spouse_id);
 
-            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false, 0.0, baby_gender);
-            let camp_pos = self.network.graph[*self.network.node_map.get(&camp_node).unwrap()].pos;
+            // 确定家庭房屋归属 (优先继承母亲/父亲的私宅，未成年或未盖房的小孩共享家宅资源)
+            let mother_house_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.home_house_id);
+            let father_house_id = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid).and_then(|f| f.home_house_id));
+            let family_house_id = mother_house_id.or(father_house_id);
+
+            let birth_node = if let Some(hid) = family_house_id {
+                self.houses.iter().find(|h| h.id == hid).map(|h| h.door_node_id).unwrap_or(camp_node)
+            } else {
+                camp_node
+            };
+
+            let mut baby = Agent3D::new(baby_id, birth_node, 8.5, false, 0.0, baby_gender);
+            let camp_pos = self.network.graph[*self.network.node_map.get(&birth_node).unwrap()].pos;
             baby.world_pos = camp_pos;
-            baby.hunger = 12.5; // 50%
-            baby.thirst = 12.5; // 50%
+            baby.hunger = 15.0; // 50% of 30.0
+            baby.thirst = 15.0; // 50% of 30.0
             baby.stamina = 100.0;
             baby.mother_id = Some(mother_id);
             baby.father_id = father_id;
+            baby.home_house_id = family_house_id; // 未盖房小孩与父母共享私宅
 
             // 建立双亲与子女的亲缘血脉
             if let Some(mother) = self.agents.iter_mut().find(|a| a.id == mother_id) {
@@ -325,10 +355,8 @@ impl World3DEngine {
             self.agents.push(baby);
             let parents_str = if let Some(fid) = father_id {
                 format!("母亲 #{} 与 父亲 #{}", mother_id, fid)
-            } else {
-                format!("母亲 #{}", mother_id)
             };
-            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (Agent #{}，幼年0s，需成长120s)！", parents_str, gender_str, baby_id));
+            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (Agent #{}，幼年0s，入驻家庭私宅，需成长120s)！", parents_str, gender_str, baby_id));
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
@@ -404,9 +432,12 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::DrinkingAtWater => {
-                    if agent.thirst >= 24.0 {
-                        if agent.hunger < 12.5 && !food_nodes.is_empty() {
-                            let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                    let poi = self.pois.iter().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent.world_pos) < 22.0);
+                    let is_empty = poi.map(|p| p.current_stock <= 0.05).unwrap_or(true);
+
+                    if agent.thirst >= 29.0 || is_empty {
+                        let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                        if agent.hunger < 15.0 && !food_nodes.is_empty() {
                             let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
                                 if !path.is_empty() {
@@ -419,13 +450,17 @@ impl World3DEngine {
                                 }
                             }
                         } else {
-                            let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
-                            let nearest_camp = self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node);
-                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, nearest_camp, agent.is_covert) {
+                            // 外部无资源或已解渴，优先返回专属家宅；无家宅才退回最近营地
+                            let target_home = if agent.home_house_id.is_some() {
+                                agent.home_camp_node
+                            } else {
+                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            };
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
-                                    agent.home_camp_node = nearest_camp; // 模式 A：动态迁入就近营地
+                                    agent.home_camp_node = target_home;
                                     agent.state = PrimitiveActionState::ReturningToCamp;
-                                    agent.target_poi_node = Some(nearest_camp);
+                                    agent.target_poi_node = Some(target_home);
                                     agent.route = path.clone();
                                     agent.route_index = 0;
                                     agent.current_lane_id = Some(path[0]);
@@ -436,14 +471,80 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
-                    if agent.hunger >= 24.0 {
+                    let poi = self.pois.iter().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent.world_pos) < 22.0);
+                    let is_empty = poi.map(|p| p.current_stock <= 0.05).unwrap_or(true);
+
+                    if agent.hunger >= 29.0 || is_empty {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
-                        let nearest_camp = self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node);
-                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, nearest_camp, agent.is_covert) {
+                        if agent.thirst < 15.0 && !water_nodes.is_empty() {
+                            let target = water_nodes[rng.gen_range(0..water_nodes.len())];
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
+                                if !path.is_empty() {
+                                    agent.state = PrimitiveActionState::SeekingWater;
+                                    agent.target_poi_node = Some(target);
+                                    agent.route = path.clone();
+                                    agent.route_index = 0;
+                                    agent.current_lane_id = Some(path[0]);
+                                    agent.distance_along_curve = 0.0;
+                                }
+                            }
+                        } else {
+                            // 外部无资源或已饱腹，优先返回专属家宅；无家宅才退回最近营地
+                            let target_home = if agent.home_house_id.is_some() {
+                                agent.home_camp_node
+                            } else {
+                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            };
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
+                                if !path.is_empty() {
+                                    agent.home_camp_node = target_home;
+                                    agent.state = PrimitiveActionState::ReturningToCamp;
+                                    agent.target_poi_node = Some(target_home);
+                                    agent.route = path.clone();
+                                    agent.route_index = 0;
+                                    agent.current_lane_id = Some(path[0]);
+                                    agent.distance_along_curve = 0.0;
+                                }
+                            }
+                        }
+                    }
+                }
+                PrimitiveActionState::SeekingWater => {
+                    // 若外部水源全部枯竭，或家宅有水储备，紧急折返回家
+                    if water_nodes.is_empty() {
+                        let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                        let target_home = if agent.home_house_id.is_some() {
+                            agent.home_camp_node
+                        } else {
+                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                        };
+                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
-                                agent.home_camp_node = nearest_camp; // 模式 A：动态迁入就近营地
+                                agent.home_camp_node = target_home;
                                 agent.state = PrimitiveActionState::ReturningToCamp;
-                                agent.target_poi_node = Some(nearest_camp);
+                                agent.target_poi_node = Some(target_home);
+                                agent.route = path.clone();
+                                agent.route_index = 0;
+                                agent.current_lane_id = Some(path[0]);
+                                agent.distance_along_curve = 0.0;
+                            }
+                        }
+                    }
+                }
+                PrimitiveActionState::SeekingFood => {
+                    // 若外部浆果全部枯竭，或家宅有粮食储备，紧急折返回家
+                    if food_nodes.is_empty() {
+                        let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                        let target_home = if agent.home_house_id.is_some() {
+                            agent.home_camp_node
+                        } else {
+                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                        };
+                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
+                            if !path.is_empty() {
+                                agent.home_camp_node = target_home;
+                                agent.state = PrimitiveActionState::ReturningToCamp;
+                                agent.target_poi_node = Some(target_home);
                                 agent.route = path.clone();
                                 agent.route_index = 0;
                                 agent.current_lane_id = Some(path[0]);
@@ -566,8 +667,38 @@ impl World3DEngine {
             }
         }
 
-        // 3. 施工中的小人推进建造进度
-        let mut newly_built_houses = Vec::new();
+        // 3. 房屋劳作修缮机制 (耐久度<85%时，族人消耗体力进行修缮)
+        for house in &mut self.houses {
+            house.is_repairing = false;
+            if house.durability < 85.0 && !house.is_ruin {
+                let owner_id = house.owner_id;
+                let spouse_id = house.spouse_id;
+                for agent in &mut self.agents {
+                    if agent.is_alive && (agent.id == owner_id || spouse_id == Some(agent.id)) {
+                        if agent.state == PrimitiveActionState::RestingAtCamp && agent.stamina >= 35.0 {
+                            agent.state = PrimitiveActionState::RepairingHouse;
+                        }
+                        if agent.state == PrimitiveActionState::RepairingHouse {
+                            house.is_repairing = true;
+                            house.repair(8.0 * dt);
+                            if house.durability >= 100.0 {
+                                agent.state = PrimitiveActionState::RestingAtCamp;
+                                self.last_event = Some(format!("🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！", agent.id, house.id));
+                            }
+                        }
+                    }
+                }
+            } else {
+                for agent in &mut self.agents {
+                    if agent.state == PrimitiveActionState::RepairingHouse && agent.home_house_id == Some(house.id) {
+                        agent.state = PrimitiveActionState::RestingAtCamp;
+                    }
+                }
+            }
+        }
+
+        // 4. 施工与多级房屋升级推进 (填满后投入劳力升级，奖励是储备空间增加)
+        let mut upgraded_houses = Vec::new();
         for agent in &mut self.agents {
             if !agent.is_alive {
                 continue;
@@ -575,77 +706,77 @@ impl World3DEngine {
 
             if agent.state == PrimitiveActionState::ConstructingHouse {
                 agent.build_timer += dt;
-                // 30 秒完成工时投入与资本品转化 (建造成本翻倍)
-                if agent.build_timer >= 30.0 {
+                let required_time = 30.0;
+                if agent.build_timer >= required_time {
                     agent.build_timer = 0.0;
                     agent.state = PrimitiveActionState::RestingAtCamp;
-                    newly_built_houses.push((agent.id, agent.world_pos));
+                    if let Some(hid) = agent.home_house_id {
+                        upgraded_houses.push((agent.id, hid));
+                    }
                 }
             }
         }
 
-        // 4. 竣工确权、内生路网接入与自动迎娶单身女性
-        for (owner_id, site_pos) in newly_built_houses {
-            let house_id = self.next_house_id;
-            self.next_house_id += 1;
+        // 5. 升级竣工、扩容储量与激活生育/成婚
+        for (owner_id, house_id) in upgraded_houses {
+            if let Some(house) = self.houses.iter_mut().find(|h| h.id == house_id) {
+                let prev_tier = house.tier;
+                let success = house.upgrade_to_next_tier();
+                if success {
+                    let door_node = house.door_node_id;
 
-            // 在门前生成道路图节点
-            let door_node = self.network.add_node(site_pos, NodeType::GroundIntersection);
-            
-            // 寻找最近的既有路网节点连接支线便道
-            if let Some(nearest_node) = self.find_nearest_node(site_pos) {
-                if nearest_node != door_node {
-                    let _ = self.network.add_lane_with_options(door_node, nearest_node, None, RoadClass::DirtTrack, false, 1.0);
-                    let _ = self.network.add_lane_with_options(nearest_node, door_node, None, RoadClass::DirtTrack, false, 1.0);
+                    if prev_tier == HouseTier::Tier0Warehouse {
+                        // 0级升级为1级私宅：自动迎娶单身女性并激活生育
+                        let single_female_id = self.agents.iter()
+                            .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= 120.0 && a.spouse_id.is_none())
+                            .map(|a| a.id);
+
+                        if let Some(female_id) = single_female_id {
+                            if let Some(husband) = self.agents.iter_mut().find(|a| a.id == owner_id) {
+                                husband.spouse_id = Some(female_id);
+                            }
+                            if let Some(wife) = self.agents.iter_mut().find(|a| a.id == female_id) {
+                                wife.spouse_id = Some(owner_id);
+                                wife.home_house_id = Some(house_id);
+                                wife.home_camp_node = door_node;
+                            }
+                            house.spouse_id = Some(female_id);
+                            self.last_event = Some(format!("🎉 0级仓库填满并升级为 1级私宅！迎娶女性 #{} ♀ 结为夫妻，激活生育，仓储扩容至 20 单位！", female_id));
+                        } else {
+                            self.last_event = Some(format!("🎉 0级仓库填满并升级为 1级私宅！正式激活生育功能，仓储扩容至 20 单位！"));
+                        }
+                    } else {
+                        self.last_event = Some(format!("🏰 房屋储备充盈并完成升级！第 #{} 号房屋晋升为 {:?}，水粮仓储扩容至 {:.0} 单位！", house_id, house.tier, house.max_pantry_water));
+                    }
                 }
             }
-
-            let mut house = House::new(house_id, owner_id, site_pos, door_node, HouseTier::Tier1LeanTo);
-            house.construction_progress = 1.0;
-
-            // 户主定居迁入私宅
-            if let Some(agent) = self.agents.iter_mut().find(|a| a.id == owner_id) {
-                agent.home_house_id = Some(house_id);
-                agent.home_camp_node = door_node;
-            }
-
-            // 寻找在世且单身（未婚或离异/丧偶）的成年女性自动结为夫妻
-            let single_female_id = self.agents.iter()
-                .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= 120.0 && a.spouse_id.is_none())
-                .map(|a| a.id);
-
-            if let Some(female_id) = single_female_id {
-                if let Some(husband) = self.agents.iter_mut().find(|a| a.id == owner_id) {
-                    husband.spouse_id = Some(female_id);
-                }
-                if let Some(wife) = self.agents.iter_mut().find(|a| a.id == female_id) {
-                    wife.spouse_id = Some(owner_id);
-                    wife.home_house_id = Some(house_id);
-                    wife.home_camp_node = door_node;
-                }
-                house.spouse_id = Some(female_id);
-                self.last_event = Some(format!("💒 喜结连理！部落民 #{} ♂ 筑成新居，与单身女性 #{} ♀ 结为夫妻喜迁 #{} 号私宅！", owner_id, female_id, house_id));
-            } else {
-                self.last_event = Some(format!("🏡 部落民 #{} ♂ 耗费30s劳作工时，在路网旁成功筑造了第 #{} 号私产宅舍！", owner_id, house_id));
-            }
-
-            self.houses.push(house);
         }
 
-        // 5. 自发选址评估 (只有男性 ♂ 可自发盖房，需成年饱暖富足)
+        // 6. 检查房屋是否已填满水粮，若填满且有主人在家休息，自动启动升级
+        for house in &mut self.houses {
+            if house.is_pantry_full() && house.tier != HouseTier::Tier4Manor {
+                if let Some(owner) = self.agents.iter_mut().find(|a| a.id == house.owner_id && a.is_alive && a.state == PrimitiveActionState::RestingAtCamp) {
+                    owner.state = PrimitiveActionState::ConstructingHouse;
+                    owner.build_timer = 0.0;
+                }
+            }
+        }
+
+        // 6. 自发选址设立 0级仓库 (男性 ♂ 年满 120s 成年饱暖即可立项，无需前期劳力，默认 5 水 5 粮)
         if self.tick_counter % 30 == 0 {
             for i in 0..self.agents.len() {
                 let agent = &self.agents[i];
-                if !agent.is_alive || agent.gender != Gender::Male || agent.home_house_id.is_some() || agent.state != PrimitiveActionState::RestingAtCamp {
+                let is_already_owner = self.houses.iter().any(|h| h.owner_id == agent.id);
+                if !agent.is_alive || agent.gender != Gender::Male || is_already_owner || agent.state != PrimitiveActionState::RestingAtCamp {
                     continue;
                 }
 
-                // 筑屋门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
+                // 仓库设立门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
                 if agent.age >= 120.0 && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 75.0 && rng.gen_bool(0.15) {
                     let agent_id = agent.id;
                     let agent_pos = agent.world_pos;
 
-                    // 空间选址：在当前营地附近 15m~45m 平坦区寻找最佳地块
+                    // 空间选址：在当前营地附近 15m~45m 平坦区设立 0级仓库
                     let angle = rng.gen_range(0.0..std::f32::consts::TAU);
                     let dist = rng.gen_range(16.0..42.0);
                     let cand_x = agent_pos.x + angle.cos() * dist;
@@ -663,10 +794,27 @@ impl World3DEngine {
                     }
 
                     if is_valid {
+                        let house_id = self.next_house_id;
+                        self.next_house_id += 1;
+
+                        // 门前生成道路节点与支线连接
+                        let door_node = self.network.add_node(cand_pos, NodeType::GroundIntersection);
+                        if let Some(nearest_node) = self.find_nearest_node(cand_pos) {
+                            if nearest_node != door_node {
+                                let _ = self.network.add_lane_with_options(door_node, nearest_node, None, RoadClass::DirtTrack, false, 1.0);
+                                let _ = self.network.add_lane_with_options(nearest_node, door_node, None, RoadClass::DirtTrack, false, 1.0);
+                            }
+                        }
+
+                        // 生成 0级仓库 (默认 5 点水 5 点粮，无需劳动力投入)
+                        let house = House::new(house_id, agent_id, cand_pos, door_node, HouseTier::Tier0Warehouse);
+                        self.houses.push(house);
+
                         let agent_mut = &mut self.agents[i];
-                        agent_mut.state = PrimitiveActionState::ConstructingHouse;
+                        agent_mut.home_house_id = Some(house_id);
+                        agent_mut.home_camp_node = door_node;
                         agent_mut.world_pos = cand_pos;
-                        agent_mut.build_timer = 0.0;
+                        self.last_event = Some(format!("📦 部落民 #{} ♂ 选址建立了第 #{} 号 0级仓库 (初始自带5水5粮，无需劳力)，开始搬运备货！", agent_id, house_id));
                         break;
                     }
                 }
@@ -747,12 +895,15 @@ impl World3DEngine {
                 tier: format!("{:?}", h.tier),
                 durability: h.durability,
                 pantry_food: h.pantry_food,
+                max_pantry_food: h.max_pantry_food,
                 pantry_water: h.pantry_water,
-                max_pantry_capacity: h.max_pantry_capacity,
+                max_pantry_water: h.max_pantry_water,
                 age: h.age,
                 generation: h.generation,
                 is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
+                is_fertility_active: h.is_fertility_active(),
+                is_repairing: h.is_repairing,
             });
         }
 
