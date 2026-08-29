@@ -29,20 +29,23 @@ mod tests {
     }
 
     #[test]
-    fn test_unified_ecology_and_20_capacity() {
+    fn test_unified_ecology_and_40_capacity() {
         let mut world = World3DEngine::new(60, 764.0);
         world.seed_primitive_ecology(8);
 
-        // 验证 6营地(无限) + 6水泉(上限20) + 6浆果(上限20) = 18 处 POI
+        // 验证 6营地(无限) + 6水泉(上限40) + 6浆果(上限40) = 18 处 POI
         assert_eq!(world.pois.len(), 18);
         for poi in &world.pois {
             if poi.poi_type == PoiType::Camp {
                 assert!(!poi.max_stock.is_finite());
             } else {
-                assert_eq!(poi.max_stock, 20.0);
+                assert_eq!(poi.max_stock, 40.0);
+                assert_eq!(poi.regen_rate, 1.0);
             }
         }
         assert_eq!(world.agents.len(), 8);
+        assert_eq!(world.agents[0].hunger, 10.0); // 50% of 20.0
+        assert_eq!(world.agents[0].age, 120.0); // 成年
 
         for _ in 0..200 {
             world.tick(0.05);
@@ -51,5 +54,6 @@ mod tests {
         let snapshot = world.generate_snapshot();
         assert_eq!(snapshot.pois.len(), 18);
         assert!(!snapshot.agents.is_empty());
+        assert!(snapshot.agents[0].age > 120.0);
     }
 }

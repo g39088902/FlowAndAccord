@@ -74,13 +74,14 @@ pub struct AgentSnapshot {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+    pub age: f32, // 年龄 (秒)
     pub heading_rad: f32,
     pub pitch_rad: f32,
     pub velocity: f32,
     pub state: String,
     pub is_alive: bool,
-    pub hunger: f32, // 0.0 ~ 10.0 单位
-    pub thirst: f32, // 0.0 ~ 10.0 单位
+    pub hunger: f32, // 0.0 ~ 20.0 单位
+    pub thirst: f32, // 0.0 ~ 20.0 单位
     pub stamina: f32,
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
@@ -124,7 +125,7 @@ impl World3DEngine {
         }
     }
 
-    /// 构建生态：营地6处(无限)、水泉6处(上限20)、食物6处(上限20) 与全图直连动线
+    /// 构建生态：营地6处(无限)、水泉6处(上限40,产速1.0)、食物6处(上限40,产速1.0) 与全图直连动线
     pub fn seed_primitive_ecology(&mut self, agent_count: usize) {
         let mut rng = rand::thread_rng();
         let half_size = self.terrain.world_size / 2.0;
@@ -153,7 +154,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 1) as u32, PoiType::Camp, Vec3::new(x, y, elev)));
         }
 
-        // 2. 生成 6 处低洼清泉 (上限 20.0 单位，产速 0.40 单位/秒)
+        // 2. 生成 6 处低洼清泉 (上限 40.0 单位，产速 1.00 单位/秒)
         for i in 0..6 {
             let mut best_x = 0.0f32;
             let mut best_y = 0.0f32;
@@ -177,7 +178,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 10) as u32, PoiType::WaterSource, Vec3::new(best_x, best_y, lowest_z)));
         }
 
-        // 3. 生成 6 处缓坡浆果灌木 (上限 20.0 单位，产速 0.40 单位/秒)
+        // 3. 生成 6 处缓坡浆果灌木 (上限 40.0 单位，产速 1.00 单位/秒)
         for i in 0..6 {
             let x = rng.gen_range(-half_size * 0.80..half_size * 0.80);
             let y = rng.gen_range(-half_size * 0.80..half_size * 0.80);
@@ -219,20 +220,20 @@ impl World3DEngine {
             }
         }
 
-        // 6. 注入初始部落民 (8 人，自身容量上限 10.0 单位)
+        // 6. 注入初始部落民 (8 人，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 已成年)
         for i in 0..agent_count {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
 
-            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert);
+            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, 120.0);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 生态规格更新: 营地无限庇护，清泉/浆果储量上限提升至20.0单位，小人容量提升至10.0单位！".to_string());
+        self.last_event = Some("🏕️ 规格就绪: 小人容量20单位(初始50%=10)，年满120秒可育，清泉/浆果上限40(产速1.0/s)，营地无限庇护！".to_string());
     }
 
     /// 真实有限资源交互结算与分娩
@@ -253,20 +254,20 @@ impl World3DEngine {
                 PrimitiveActionState::DrinkingAtWater => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (10.0 - agent.thirst).max(0.0);
+                        let need = (20.0 - agent.thirst).max(0.0);
                         if need > 0.01 {
-                            let extracted = poi.extract(need.min(2.5 * dt));
-                            agent.thirst = (agent.thirst + extracted).min(10.0);
+                            let extracted = poi.extract(need.min(4.0 * dt));
+                            agent.thirst = (agent.thirst + extracted).min(20.0);
                         }
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (10.0 - agent.hunger).max(0.0);
+                        let need = (20.0 - agent.hunger).max(0.0);
                         if need > 0.01 {
-                            let extracted = poi.extract(need.min(2.5 * dt));
-                            agent.hunger = (agent.hunger + extracted).min(10.0);
+                            let extracted = poi.extract(need.min(4.0 * dt));
+                            agent.hunger = (agent.hunger + extracted).min(20.0);
                         }
                     }
                 }
@@ -274,21 +275,21 @@ impl World3DEngine {
             }
         }
 
-        // 分娩诞生新生儿！
+        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位)！
         for (mother_id, camp_node) in newborn_mothers {
             let baby_id = self.next_agent_id;
             self.next_agent_id += 1;
             self.total_births += 1;
 
-            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false);
+            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false, 0.0);
             let camp_pos = self.network.graph[*self.network.node_map.get(&camp_node).unwrap()].pos;
             baby.world_pos = camp_pos;
-            baby.hunger = 9.5; // 满值 10.0
-            baby.thirst = 9.5;
+            baby.hunger = 10.0; // 50%
+            baby.thirst = 10.0; // 50%
             baby.stamina = 100.0;
 
             self.agents.push(baby);
-            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{})！部落添丁！", mother_id, baby_id));
+            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{}，幼年0s，需成长120s)！", mother_id, baby_id));
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
@@ -310,8 +311,8 @@ impl World3DEngine {
 
             match agent.state {
                 PrimitiveActionState::RestingAtCamp => {
-                    let thirst_urgency = if agent.is_pregnant { 5.5 } else { 4.0 }; // 55% / 40% (满值 10.0)
-                    let hunger_urgency = if agent.is_pregnant { 6.0 } else { 4.8 }; // 60% / 48%
+                    let thirst_urgency = if agent.is_pregnant { 11.0 } else { 8.0 }; // 55% / 40% (满值 20.0)
+                    let hunger_urgency = if agent.is_pregnant { 12.0 } else { 9.6 }; // 60% / 48%
 
                     if agent.thirst < thirst_urgency && !water_nodes.is_empty() {
                         let target = water_nodes[rng.gen_range(0..water_nodes.len())];
@@ -337,7 +338,7 @@ impl World3DEngine {
                                 agent.distance_along_curve = 0.0;
                             }
                         }
-                    } else if agent.stamina >= 95.0 && agent.hunger < 8.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
+                    } else if agent.stamina >= 95.0 && agent.hunger < 16.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
                         let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
@@ -352,8 +353,8 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::DrinkingAtWater => {
-                    if agent.thirst >= 9.5 {
-                        if agent.hunger < 5.0 && !food_nodes.is_empty() {
+                    if agent.thirst >= 19.0 {
+                        if agent.hunger < 10.0 && !food_nodes.is_empty() {
                             let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                             let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
@@ -382,7 +383,7 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
-                    if agent.hunger >= 9.5 {
+                    if agent.hunger >= 19.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, agent.home_camp_node, agent.is_covert) {
                             if !path.is_empty() {
@@ -507,6 +508,7 @@ impl World3DEngine {
                 x: agent.world_pos.x,
                 y: agent.world_pos.y,
                 z: agent.world_pos.z,
+                age: agent.age,
                 heading_rad: agent.forward_heading_rad,
                 pitch_rad: agent.pitch_rad,
                 velocity: agent.current_velocity,
