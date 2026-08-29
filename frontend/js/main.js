@@ -1,0 +1,269 @@
+// === 全局初始化、相机控制与 UI 事件绑定 ===
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+    const sim = new WorldSimulation();
+
+    let camera = {
+      rotX: 1.05,
+      rotZ: 0.60,
+      zoom: 1.15,
+      panX: 0,
+      panY: 30
+    };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth * window.devicePixelRatio;
+      canvas.height = window.innerHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let isDragging = false, lastMouse = { x: 0, y: 0 }, isRightBtn = false;
+    let isCameraFollow = false;
+    let totalDragDist = 0;
+    let mousePos = { x: -1000, y: -1000 };
+    let hoveredLane = null;
+
+    canvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      isRightBtn = e.button === 2;
+      lastMouse = { x: e.clientX, y: e.clientY };
+      totalDragDist = 0;
+    });
+    window.addEventListener('mouseup', () => isDragging = false);
+    window.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('mousemove', e => {
+      mousePos.x = e.clientX;
+      mousePos.y = e.clientY;
+      if (!isDragging) return;
+      const dx = e.clientX - lastMouse.x;
+      const dy = e.clientY - lastMouse.y;
+      totalDragDist += Math.hypot(dx, dy);
+
+      if (isRightBtn || e.shiftKey) {
+        // 右键拖拽 / Shift+拖拽: 旋转 3D 视角
+        camera.rotZ += dx * 0.006;
+        camera.rotX = Math.max(0.15, Math.min(1.45, camera.rotX + dy * 0.006));
+      } else {
+        // 左键拖拽: 平移地图视角
+        camera.panX += dx;
+        camera.panY += dy;
+        if (Math.hypot(dx, dy) > 2) {
+          isCameraFollow = false;
+          if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+        }
+      }
+      lastMouse = { x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener('mouseleave', () => {
+      mousePos.x = -1000;
+      mousePos.y = -1000;
+      hoveredLane = null;
+      const tooltip = document.getElementById('road-hover-tooltip');
+      if (tooltip) tooltip.style.display = 'none';
+    });
+    canvas.addEventListener('wheel', e => {
+      camera.zoom = Math.max(0.35, Math.min(4.5, camera.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+    });
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const l2 = dx * dx + dy * dy;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function project3D(v3) {
+      const cx = window.innerWidth / 2 + camera.panX;
+      const cy = window.innerHeight / 2 + camera.panY;
+
+      const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+      const rx = v3.x * cosZ - v3.y * sinZ;
+      const ry = v3.x * sinZ + v3.y * cosZ;
+
+      const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+      const y2 = ry * cosX - v3.z * sinX;
+      const z2 = ry * sinX + v3.z * cosX;
+
+      const scale = camera.zoom;
+      return { x: cx + rx * scale, y: cy + y2 * scale, depth: z2 };
+    }
+
+    function getElevationColor(cell, minZ, maxZ) {
+      const { elev, dzdx, dzdy } = cell;
+      const range = Math.max(1, maxZ - minZ);
+      const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
+      const lightFactor = Math.max(0.70, Math.min(1.30, 1.0 + (-dzdx * 0.35 - dzdy * 0.35)));
+
+      let r, g, b;
+      if (normZ < 0.45) {
+        const t = normZ / 0.45;
+        r = Math.floor(16 + t * (40 - 16));
+        g = Math.floor(150 + t * (180 - 150));
+        b = Math.floor(100 + t * (70 - 100));
+      } else if (normZ < 0.75) {
+        const t = (normZ - 0.45) / 0.30;
+        r = Math.floor(40 + t * (190 - 40));
+        g = Math.floor(180 + t * (160 - 180));
+        b = Math.floor(70 + t * (40 - 70));
+      } else {
+        const t = (normZ - 0.75) / 0.25;
+        r = Math.floor(190 + t * (160 - 190));
+        g = Math.floor(160 + t * (165 - 160));
+        b = Math.floor(40 + t * (170 - 40));
+      }
+
+      return `rgba(${Math.floor(r * lightFactor)}, ${Math.floor(g * lightFactor)}, ${Math.floor(b * lightFactor)}, 0.55)`;
+    }
+
+
+    // ==========================================
+    // Inspector 监控面板点击穿梭与族谱跳转事件委托
+    // ==========================================
+    const inspectorCard = document.getElementById('inspector-card');
+    if (inspectorCard) {
+      inspectorCard.addEventListener('click', e => {
+        const chip = e.target.closest('[data-agent-id]');
+        if (chip) {
+          e.stopPropagation();
+          const targetId = parseInt(chip.getAttribute('data-agent-id'), 10);
+          if (!isNaN(targetId)) {
+            sim.selectionType = 'agent';
+            sim.selectedAgentId = targetId;
+            const targetAgent = sim.agents.find(a => a.id === targetId);
+            if (targetAgent) {
+              camera.panX = -targetAgent.pos.x;
+              camera.panY = -targetAgent.pos.y;
+            }
+          }
+        }
+      });
+    }
+
+    // ==========================================
+    // 玩家手动资源生成速率滑块绑定 (水/果/木/石)
+    // ==========================================
+    const sliderWater = document.getElementById('slider-water-rate');
+    const lblWaterRate = document.getElementById('lbl-water-rate');
+    sliderWater.addEventListener('input', e => {
+      const mult = parseFloat(e.target.value);
+      sim.setWaterRegenMultiplier(mult);
+      const actualRate = (2.00 * mult).toFixed(2);
+      lblWaterRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+    });
+
+    const sliderBerry = document.getElementById('slider-berry-rate');
+    const lblBerryRate = document.getElementById('lbl-berry-rate');
+    sliderBerry.addEventListener('input', e => {
+      const mult = parseFloat(e.target.value);
+      sim.setBerryRegenMultiplier(mult);
+      const actualRate = (2.00 * mult).toFixed(2);
+      lblBerryRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+    });
+
+    const sliderWood = document.getElementById('slider-wood-rate');
+    const lblWoodRate = document.getElementById('lbl-wood-rate');
+    sliderWood.addEventListener('input', e => {
+      const mult = parseFloat(e.target.value);
+      sim.setWoodRegenMultiplier(mult);
+      const actualRate = (2.00 * mult).toFixed(2);
+      lblWoodRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+    });
+
+    const sliderStone = document.getElementById('slider-stone-rate');
+    const lblStoneRate = document.getElementById('lbl-stone-rate');
+    sliderStone.addEventListener('input', e => {
+      const mult = parseFloat(e.target.value);
+      sim.setStoneRegenMultiplier(mult);
+      const actualRate = (1.50 * mult).toFixed(2);
+      lblStoneRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+    });
+
+    document.getElementById('btn-reset-rate').addEventListener('click', () => {
+      sliderWater.value = 1.0;
+      sliderBerry.value = 1.0;
+      sliderWood.value = 1.0;
+      sliderStone.value = 1.0;
+      sim.setWaterRegenMultiplier(1.0);
+      sim.setBerryRegenMultiplier(1.0);
+      sim.setWoodRegenMultiplier(1.0);
+      sim.setStoneRegenMultiplier(1.0);
+      lblWaterRate.textContent = `1.0x (2.00/s)`;
+      lblBerryRate.textContent = `1.0x (2.00/s)`;
+      lblWoodRate.textContent = `1.0x (2.00/s)`;
+      lblStoneRate.textContent = `1.0x (1.50/s)`;
+      sim.logEvent(`🔄 产速重置: 全局资源已恢复默认基准产率！`, 'water');
+    });
+
+    // ==========================================
+    // 镜头跟随小人功能绑定
+    // ==========================================
+    const btnFollow = document.getElementById('btn-toggle-follow');
+    function updateFollowBtnState() {
+      if (isCameraFollow) {
+        btnFollow.textContent = '🎥 正在跟随小人 (点击取消)';
+        btnFollow.style.borderColor = '#10b981';
+        btnFollow.style.color = '#10b981';
+        btnFollow.style.background = 'rgba(16, 185, 129, 0.18)';
+      } else {
+        btnFollow.textContent = '🎥 镜头跟随小人';
+        btnFollow.style.borderColor = '#38bdf8';
+        btnFollow.style.color = '#38bdf8';
+        btnFollow.style.background = 'rgba(56, 189, 248, 0.12)';
+      }
+    }
+    btnFollow.addEventListener('click', () => {
+      isCameraFollow = !isCameraFollow;
+      updateFollowBtnState();
+    });
+
+    // ==========================================
+    // 图例折叠 / 展开交互 (默认折叠)
+    // ==========================================
+    const legendEl = document.getElementById('ecology-legend');
+    const legendHeader = document.getElementById('legend-header');
+    const legendToggleIcon = document.getElementById('legend-toggle-icon');
+    let isLegendMinimized = true;
+
+    function toggleLegendMinimize() {
+      isLegendMinimized = !isLegendMinimized;
+      if (isLegendMinimized) {
+        legendEl.classList.add('minimized');
+        legendToggleIcon.textContent = '+';
+        legendHeader.title = '点击展开图例';
+      } else {
+        legendEl.classList.remove('minimized');
+        legendToggleIcon.textContent = '−';
+        legendHeader.title = '点击最小化图例';
+      }
+    }
+
+    legendHeader.addEventListener('click', () => {
+      toggleLegendMinimize();
+    });
+
+    // ==========================================
+    // UI 控制绑定
+    // ==========================================
+    const btnPause = document.getElementById('btn-pause');
+    btnPause.addEventListener('click', () => {
+      sim.isPaused = !sim.isPaused;
+      btnPause.textContent = sim.isPaused ? '▶️ 继续模拟' : '⏸️ 暂停模拟';
+    });
+
+    document.getElementById('btn-reroll-eco').addEventListener('click', () => {
+      sim.initEcology(12);
+      isCameraFollow = false;
+      updateFollowBtnState();
+    });
+
+    document.getElementById('chk-poi-stock').addEventListener('change', e => {
+      sim.showPoiStock = e.target.checked;
+    });
+    document.getElementById('sel-speed').addEventListener('change', e => {
+      sim.speedMult = parseInt(e.target.value, 10);
+    });
+  </script>

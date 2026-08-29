@@ -15,14 +15,14 @@ pub enum Gender {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
     RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、消耗家宅储备)
-    SeekingWater,       // 🚶 正在赶往水源
-    DrinkingAtWater,    // 💧 正在水洼原位痛饮并补给家宅
-    SeekingFood,        // 🚶 正在赶往采摘区
-    ForagingFood,       // 🍒 正在果丛原位进食并补给家宅
-    SeekingWood,        // 🚶 正在赶往林地伐木
+    SeekingWater,       // 🚶 正在赶往�    SeekingWood,        // 🚶 正在赶往林地伐木
     GatheringWood,      // 🌲 正在林地伐木并补给家宅
     SeekingStone,       // 🚶 正在赶往石矿采石
     MiningStone,        // 🪨 正在石矿采石并补给家宅
+    SeekingGold,        // 🚶 正在赶往金矿淘金
+    MiningGold,         // 🪙 正在金矿开采黄金(随身无限携带)
+    SeekingGold,        // 🚶 正在赶往金矿淘金
+    MiningGold,         // 🪙 正在金矿开采黄金(随身无限携带)
     ReturningToCamp,    // 🏕️ 饱腹/解渴/采收返回营地或私宅
     ConstructingHouse,  // 🔨 正在投入工时营建/升级房屋
     RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
@@ -30,7 +30,7 @@ pub enum PrimitiveActionState {
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (自身满足上限30.0、初始50%=15.0、120秒成年、男女二元性别只有女性可育、120秒孕期)
+/// 3D 动力学 Agent 实体 (自身满足上限50.0、初始50%=25.0、120秒成年、男女二元性别只有女性可育、120秒孕期)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
@@ -39,10 +39,11 @@ pub struct Agent3D {
     pub is_alive: bool,
     pub age: f32, // 年龄 (秒)，满 120 秒成年才具备生育能力
 
-    // 统一生理指标 (0.0 ~ 30.0 单位，初始 50% 即 15.0 单位)
-    pub hunger: f32,          // 饱食度 (最大 30.0 单位)
-    pub thirst: f32,          // 水分值 (最大 30.0 单位)
+    // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位)
+    pub hunger: f32,          // 饱食度 (最大 50.0 单位)
+    pub thirst: f32,          // 水分值 (最大 50.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
+    pub carried_gold: f32,    // 随身携带黄金数量 (无限容量，可随身常备或存入家宅升级庄园)
     pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     pub home_house_id: Option<u32>,      // 拥有的私产房屋 ID
@@ -94,6 +95,7 @@ impl Agent3D {
             hunger: 25.0, // 初始 50% (满值 50.0)
             thirst: 25.0, // 初始 50% (满值 50.0)
             stamina: 95.0,
+            carried_gold: 0.0,
             home_camp_node: home_camp,
             target_poi_node: None,
             home_house_id: None,
@@ -148,6 +150,32 @@ impl Agent3D {
             || self.state == PrimitiveActionState::RepairingHouse
             || self.state == PrimitiveActionState::GatheringWood
             || self.state == PrimitiveActionState::MiningStone
+            || self.state == PrimitiveActionState::MiningGold
+        {
+            metabolic_multiplier *= 1.25; // 营建、修缮与采矿劳动轻微加速代谢
+        } > 0.0 {
+            self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
+        }
+        if self.miscarriage_cooldown_timer > 0.0 {
+            self.miscarriage_cooldown_timer = (self.miscarriage_cooldown_timer - dt).max(0.0);
+        }
+
+        if !self.is_alive {
+            self.death_decay_timer = (self.death_decay_timer - dt).max(0.0);
+            return None;
+        }
+
+        // 年龄增长
+        self.age += dt;
+
+        let mut event_msg = None;
+        let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
+
+        if self.state == PrimitiveActionState::ConstructingHouse
+            || self.state == PrimitiveActionState::RepairingHouse
+            || self.state == PrimitiveActionState::GatheringWood
+            || self.state == PrimitiveActionState::MiningStone
+            || self.state == PrimitiveActionState::MiningGold
         {
             metabolic_multiplier *= 1.25; // 营建、修缮与采伐劳动轻微加速代谢
         }
@@ -233,6 +261,7 @@ impl Agent3D {
                 | PrimitiveActionState::SeekingFood
                 | PrimitiveActionState::SeekingWood
                 | PrimitiveActionState::SeekingStone
+                | PrimitiveActionState::SeekingGold
                 | PrimitiveActionState::ReturningToCamp
         );
 
@@ -322,6 +351,9 @@ impl Agent3D {
                 }
                 PrimitiveActionState::SeekingStone => {
                     self.state = PrimitiveActionState::MiningStone;
+                }
+                PrimitiveActionState::SeekingGold => {
+                    self.state = PrimitiveActionState::MiningGold;
                 }
                 PrimitiveActionState::ReturningToCamp => {
                     self.state = PrimitiveActionState::RestingAtCamp;

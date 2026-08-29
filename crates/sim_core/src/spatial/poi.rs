@@ -10,9 +10,10 @@ pub enum PoiType {
     BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限60.0单位，2.00单位/秒)
     WoodForest,  // 🌲 茂密林木 (产出木材资源，单点上限60.0单位，2.00单位/秒)
     StoneQuarry, // 🪨 嶙峋石矿 (产出石料资源，单点上限60.0单位，1.50单位/秒)
+    GoldMine,    // 🪙 璀璨金矿 (产出黄金资源，单点上限60.0单位，1.20单位/秒)
 }
 
-/// 有限生态地标实体 (清泉/浆果/林木/石矿最大储量 60.0 单位；营地无限)
+/// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿最大储量 60.0 单位；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
@@ -20,7 +21,7 @@ pub struct PrimitivePoi {
     pub pos: Vec3,
     pub current_stock: f32, // 当前可用储量 (0.0 ~ 60.0 单位，营地为无限)
     pub max_stock: f32,     // 储量上限 (60.0 单位，营地为无限)
-    pub regen_rate: f32,    // 每秒自然再生速率 (2.00 单位/秒)
+    pub regen_rate: f32,    // 每秒自然再生速率
 }
 
 impl PrimitivePoi {
@@ -31,6 +32,7 @@ impl PrimitivePoi {
             PoiType::BerryBush => (60.0, 2.00, 45.0),
             PoiType::WoodForest => (60.0, 2.00, 45.0),
             PoiType::StoneQuarry => (60.0, 1.50, 45.0),
+            PoiType::GoldMine => (60.0, 1.20, 45.0),
         };
 
         Self {

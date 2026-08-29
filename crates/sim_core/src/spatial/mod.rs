@@ -52,7 +52,7 @@ mod tests {
         }
 
         let snapshot = world.generate_snapshot();
-        assert_eq!(snapshot.pois.len(), 24);
+        assert_eq!(snapshot.pois.len(), 25);
         assert!(!snapshot.agents.is_empty());
     }
 }

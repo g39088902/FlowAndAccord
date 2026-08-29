@@ -396,6 +396,27 @@ impl World3DEngine {
                         }
                     }
                 }
+                PrimitiveActionState::MiningGold => {
+                    let agent_pos = agent.world_pos;
+                    let agent_hid = agent.home_house_id;
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::GoldMine && p.pos.distance_to(&agent_pos) < 22.0) {
+                        if poi.current_stock > 0.01 {
+                            // 小人随身携带无限黄金
+                            let extracted = poi.extract(3.0 * dt);
+                            agent.carried_gold += extracted;
+
+                            // 若家宅需要黄金升级，同时将黄金存入家宅金库
+                            if let Some(hid) = agent_hid {
+                                if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
+                                    if house.pantry_gold < house.max_pantry_gold {
+                                        let deposit = extracted.min(house.max_pantry_gold - house.pantry_gold);
+                                        house.pantry_gold = (house.pantry_gold + deposit).min(house.max_pantry_gold);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 PrimitiveActionState::RestingAtCamp => {
                     // 当外部短缺或在私宅休息时，优先消耗房屋独立储备以维持饱暖
                     if let Some(hid) = agent.home_house_id {
@@ -409,6 +430,10 @@ impl World3DEngine {
                                 let eat_amount = (50.0 - agent.hunger).min(house.pantry_food).min(3.0 * dt);
                                 house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
                                 agent.hunger = (agent.hunger + eat_amount).min(50.0);
+                            }
+                            if agent.carried_gold > 0.01 && house.pantry_gold < house.max_pantry_gold {
+                                let deposit = agent.carried_gold.min(house.max_pantry_gold - house.pantry_gold).min(5.0 * dt);
+                                house.pantry_gold = (house.pantry_gold + deposit).min(house.max_pantry_gold);
                             }
                         }
                     }
@@ -479,6 +504,8 @@ impl World3DEngine {
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
         let stone_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::StoneQuarry && p.current_stock > 0.5)
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
+        let gold_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::GoldMine && p.current_stock > 0.5)
+            .filter_map(|p| self.find_nearest_node(p.pos)).collect();
 
         for agent in &mut self.agents {
             if !agent.is_alive {
@@ -529,9 +556,9 @@ impl World3DEngine {
                     } else if agent.stamina >= 65.0 && agent.home_house_id.is_some() {
                         // 备货与持续扩产升级动机：若房屋水/粮/木/石未填满，主动前往采集补给以筹备填满升级
                         let house_info = agent.home_house_id.and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
-                            .map(|h| (h.tier, h.pantry_water < h.max_pantry_water, h.pantry_food < h.max_pantry_food, h.pantry_wood < h.max_pantry_wood, h.pantry_stone < h.max_pantry_stone));
+                            .map(|h| (h.tier, h.pantry_water < h.max_pantry_water, h.pantry_food < h.max_pantry_food, h.pantry_wood < h.max_pantry_wood, h.pantry_stone < h.max_pantry_stone, h.pantry_gold < h.max_pantry_gold));
 
-                        if let Some((tier, need_water, need_food, need_wood, need_stone)) = house_info {
+                        if let Some((tier, need_water, need_food, need_wood, need_stone, need_gold)) = house_info {
                             if need_water && !water_nodes.is_empty() && rng.gen_bool(0.40) {
                                 let mut sorted_water = water_nodes.clone();
                                 sorted_water.sort_by(|&a, &b| {
@@ -598,6 +625,25 @@ impl World3DEngine {
                                 if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingStone;
+                                        agent.target_poi_node = Some(target);
+                                        agent.route = path.clone();
+                                        agent.route_index = 0;
+                                        agent.current_lane_id = Some(path[0]);
+                                        agent.distance_along_curve = 0.0;
+                                    }
+                                }
+                            } else if (tier == HouseTier::Tier3Homestead) && need_gold && !gold_nodes.is_empty() && rng.gen_bool(0.40) {
+                                // 3级木石庄舍升级为最高级氏族大庄园需开采黄金
+                                let mut sorted_gold = gold_nodes.clone();
+                                sorted_gold.sort_by(|&a, &b| {
+                                    let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
+                                    let pos_b = self.network.graph[*self.network.node_map.get(&b).unwrap()].pos;
+                                    pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
+                                });
+                                let target = sorted_gold[0];
+                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                    if !path.is_empty() {
+                                        agent.state = PrimitiveActionState::SeekingGold;
                                         agent.target_poi_node = Some(target);
                                         agent.route = path.clone();
                                         agent.route_index = 0;
@@ -749,6 +795,32 @@ impl World3DEngine {
                         }
                     }
                 }
+                PrimitiveActionState::MiningGold => {
+                    let poi = self.pois.iter().find(|p| p.poi_type == PoiType::GoldMine && p.pos.distance_to(&agent.world_pos) < 22.0);
+                    let is_empty = poi.map(|p| p.current_stock <= 0.05).unwrap_or(true);
+                    let is_house_gold_full = agent.home_house_id.and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                        .map(|h| h.pantry_gold >= h.max_pantry_gold).unwrap_or(true);
+
+                    if is_empty || is_house_gold_full || agent.hunger < 20.0 || agent.thirst < 20.0 {
+                        let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                        let target_home = if agent.home_house_id.is_some() {
+                            agent.home_camp_node
+                        } else {
+                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                        };
+                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
+                            if !path.is_empty() {
+                                agent.home_camp_node = target_home;
+                                agent.state = PrimitiveActionState::ReturningToCamp;
+                                agent.target_poi_node = Some(target_home);
+                                agent.route = path.clone();
+                                agent.route_index = 0;
+                                agent.current_lane_id = Some(path[0]);
+                                agent.distance_along_curve = 0.0;
+                            }
+                        }
+                    }
+                }
                 PrimitiveActionState::SeekingWood => {
                     if wood_nodes.is_empty() || agent.hunger < 20.0 || agent.thirst < 20.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
@@ -798,6 +870,53 @@ impl World3DEngine {
                 }
                 PrimitiveActionState::SeekingStone => {
                     if stone_nodes.is_empty() || agent.hunger < 20.0 || agent.thirst < 20.0 {
+                        let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
+                        if agent.thirst < 20.0 && !water_nodes.is_empty() {
+                            let target = water_nodes[0];
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
+                                if !path.is_empty() {
+                                    agent.state = PrimitiveActionState::SeekingWater;
+                                    agent.target_poi_node = Some(target);
+                                    agent.route = path.clone();
+                                    agent.route_index = 0;
+                                    agent.current_lane_id = Some(path[0]);
+                                    agent.distance_along_curve = 0.0;
+                                }
+                            }
+                        } else if agent.hunger < 20.0 && !food_nodes.is_empty() {
+                            let target = food_nodes[0];
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
+                                if !path.is_empty() {
+                                    agent.state = PrimitiveActionState::SeekingFood;
+                                    agent.target_poi_node = Some(target);
+                                    agent.route = path.clone();
+                                    agent.route_index = 0;
+                                    agent.current_lane_id = Some(path[0]);
+                                    agent.distance_along_curve = 0.0;
+                                }
+                            }
+                        } else {
+                            let target_home = if agent.home_house_id.is_some() {
+                                agent.home_camp_node
+                            } else {
+                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            };
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
+                                if !path.is_empty() {
+                                    agent.home_camp_node = target_home;
+                                    agent.state = PrimitiveActionState::ReturningToCamp;
+                                    agent.target_poi_node = Some(target_home);
+                                    agent.route = path.clone();
+                                    agent.route_index = 0;
+                                    agent.current_lane_id = Some(path[0]);
+                                    agent.distance_along_curve = 0.0;
+                                }
+                            }
+                        }
+                    }
+                }
+                PrimitiveActionState::SeekingGold => {
+                    if gold_nodes.is_empty() || agent.hunger < 20.0 || agent.thirst < 20.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         if agent.thirst < 20.0 && !water_nodes.is_empty() {
                             let target = water_nodes[0];

@@ -31,6 +31,8 @@ pub struct House {
     pub max_pantry_wood: f32,               // 私有木材仓储上限 (单位)
     pub pantry_stone: f32,                  // 私有石料独立储备 (单位，仅用于盖房与高级升级)
     pub max_pantry_stone: f32,              // 私有石料仓储上限 (单位)
+    pub pantry_gold: f32,                   // 私有黄金独立储备 (单位，用于最高级大庄园升级与奢华贮藏)
+    pub max_pantry_gold: f32,               // 私有黄金仓储上限 (单位)
     pub age: f32,                           // 房龄 (秒)
     pub generation: u32,                    // 代际传承代数 (从第1代祖屋开始)
     pub is_ruin: bool,                      // 是否因户主绝嗣而成为无主废墟
@@ -40,12 +42,12 @@ pub struct House {
 
 impl House {
     pub fn new(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier) -> Self {
-        let (init_water, init_food, init_wood, init_stone, max_cap, init_prog) = match tier {
-            HouseTier::Tier0Warehouse => (5.0, 5.0, 5.0, 0.0, 10.0, 0.0), // 0级仓库自带 5 水 5 粮 5 木
-            HouseTier::Tier1ThatchedHut => (10.0, 10.0, 10.0, 0.0, 20.0, 1.0),
-            HouseTier::Tier2LeanTo => (20.0, 20.0, 20.0, 0.0, 40.0, 1.0),
-            HouseTier::Tier3Homestead => (40.0, 40.0, 40.0, 0.0, 80.0, 1.0),
-            HouseTier::Tier4Manor => (80.0, 80.0, 80.0, 0.0, 150.0, 1.0),
+        let (init_water, init_food, init_wood, init_stone, init_gold, max_cap, max_gold_cap, init_prog) = match tier {
+            HouseTier::Tier0Warehouse => (0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0), // 0级仓库不附赠任何初始资源，需自主搬运备货
+            HouseTier::Tier1ThatchedHut => (10.0, 10.0, 10.0, 0.0, 0.0, 20.0, 0.0, 1.0),
+            HouseTier::Tier2LeanTo => (20.0, 20.0, 20.0, 0.0, 0.0, 40.0, 0.0, 1.0),
+            HouseTier::Tier3Homestead => (40.0, 40.0, 40.0, 0.0, 0.0, 80.0, 40.0, 1.0),
+            HouseTier::Tier4Manor => (80.0, 80.0, 80.0, 0.0, 0.0, 150.0, 150.0, 1.0),
         };
 
         Self {
@@ -64,6 +66,8 @@ impl House {
             max_pantry_wood: max_cap,
             pantry_stone: init_stone,
             max_pantry_stone: max_cap,
+            pantry_gold: init_gold,
+            max_pantry_gold: max_gold_cap,
             age: 0.0,
             generation: 1,
             is_ruin: false,
@@ -85,7 +89,7 @@ impl House {
     /// 0级仓库升1级茅草房：需要水粮各满 10.0
     /// 1级茅草房升2级私宅：需要木材蓄满(20.0)，水粮保底充足
     /// 2级私宅升3级木石庄舍：需要石料蓄满(40.0)，木材水粮充足
-    /// 3级木石庄舍升4级庄园：需要石料蓄满(80.0)，木材水粮充足
+    /// 3级木石庄舍升4级大庄园：需要黄金蓄满(40.0)与石料蓄满(80.0)，木材水粮充足
     pub fn is_pantry_full(&self) -> bool {
         match self.tier {
             HouseTier::Tier0Warehouse => {
@@ -98,7 +102,7 @@ impl House {
                 self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 15.0 && self.pantry_water >= 15.0 && self.pantry_food >= 15.0
             }
             HouseTier::Tier3Homestead => {
-                self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 25.0 && self.pantry_water >= 25.0 && self.pantry_food >= 25.0
+                self.pantry_gold >= self.max_pantry_gold && self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 25.0 && self.pantry_water >= 25.0 && self.pantry_food >= 25.0
             }
             HouseTier::Tier4Manor => false,
         }
@@ -113,6 +117,7 @@ impl House {
                 self.max_pantry_food = 20.0;
                 self.max_pantry_wood = 20.0;
                 self.max_pantry_stone = 20.0;
+                self.max_pantry_gold = 0.0;
                 self.construction_progress = 1.0;
                 true
             }
@@ -122,6 +127,7 @@ impl House {
                 self.max_pantry_food = 40.0;
                 self.max_pantry_wood = 40.0;
                 self.max_pantry_stone = 40.0;
+                self.max_pantry_gold = 0.0;
                 self.construction_progress = 1.0;
                 true
             }
@@ -131,6 +137,7 @@ impl House {
                 self.max_pantry_food = 80.0;
                 self.max_pantry_wood = 80.0;
                 self.max_pantry_stone = 80.0;
+                self.max_pantry_gold = 40.0;
                 self.construction_progress = 1.0;
                 true
             }
@@ -140,6 +147,7 @@ impl House {
                 self.max_pantry_food = 150.0;
                 self.max_pantry_wood = 150.0;
                 self.max_pantry_stone = 150.0;
+                self.max_pantry_gold = 150.0;
                 self.construction_progress = 1.0;
                 true
             }
