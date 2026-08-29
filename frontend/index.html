@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flow & Accord - 3D 随机起伏与倾斜地势动线引擎</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #050a12;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      user-select: none;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      cursor: grab;
+    }
+    #canvas-container:active { cursor: grabbing; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* 顶部玻璃拟态信息栏 */
+    .top-bar {
+      position: absolute;
+      top: 16px; left: 16px; right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+    .brand-card {
+      background: rgba(10, 18, 30, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 12px 20px;
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #38bdf8, #34d399, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* 状态面板 */
+    .stats-card {
+      display: flex;
+      gap: 16px;
+      background: rgba(10, 18, 30, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 10px 18px;
+      border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-val {
+      font-size: 17px;
+      font-weight: 700;
+      color: #38bdf8;
+      font-family: monospace;
+    }
+    .stat-lbl {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    /* 地势高程图例 */
+    .elevation-legend {
+      position: absolute;
+      top: 88px; right: 16px;
+      background: rgba(10, 18, 30, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 12px 16px;
+      border-radius: 14px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      color: #cbd5e1;
+      pointer-events: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      width: 270px;
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .grad-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 6px;
+      background: linear-gradient(to right, #059669, #10b981, #eab308, #d97706, #94a3b8);
+      margin: 4px 0;
+    }
+    .grad-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    .legend-color { width: 14px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+    /* 控制面板 */
+    .control-panel {
+      position: absolute;
+      bottom: 20px; left: 20px;
+      background: rgba(10, 18, 30, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 16px;
+      border-radius: 16px;
+      width: 360px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    button {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+    button.primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border: none;
+    }
+    button.terrain-btn {
+      background: linear-gradient(135deg, #059669, #0284c7);
+      border: none;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    button.terrain-btn:hover {
+      background: linear-gradient(135deg, #047857, #0369a1);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+    }
+    button.covert-btn {
+      background: linear-gradient(135deg, #7e22ce, #c026d3);
+      border: none;
+      color: #ffffff;
+    }
+    button.danger {
+      background: #451a1a;
+      border-color: #7f1d1d;
+      color: #fca5a5;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* 事件日志播报栏 */
+    .event-log {
+      position: absolute;
+      bottom: 20px; right: 20px;
+      width: 420px;
+      max-height: 180px;
+      background: rgba(10, 18, 30, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 12px 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+      pointer-events: auto;
+    }
+    .log-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .log-list {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+      overflow-y: auto;
+      font-size: 11px;
+      font-family: monospace;
+    }
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.03);
+      border-left: 3px solid #38bdf8;
+      animation: fadeIn 0.3s ease;
+    }
+    .log-entry.warn { border-left-color: #ef4444; color: #fca5a5; }
+    .log-entry.geo { border-left-color: #10b981; color: #6ee7b7; }
+    .log-entry.covert { border-left-color: #c026d3; color: #f5d0fe; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="sim-canvas"></canvas>
+  </div>
+
+  <div class="top-bar">
+    <div class="brand-card">
+      <div class="brand-title">🌐 Flow & Accord · 倾斜地势(±30m)与起伏动线引擎</div>
+      <div class="brand-desc">全局倾斜大势 (±30m 落差) × 随机平滑起伏波浪 × 纯粹高程几何场</div>
+    </div>
+    <div class="stats-card">
+      <div class="stat-item">
+        <div class="stat-val" id="stat-fps">60</div>
+        <div class="stat-lbl">FPS</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="stat-tilt">↗ 45°</div>
+        <div class="stat-lbl">倾斜大势</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="stat-range" style="color:#f59e0b;">±30m</div>
+        <div class="stat-lbl">地势落差</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="stat-lanes">0</div>
+        <div class="stat-lbl">车道/高架</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-val" id="stat-agents">0</div>
+        <div class="stat-lbl">活动 Agent</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="elevation-legend">
+    <div class="legend-title">
+      <span>📐 地形高程与图层指示 (±30m)</span>
+      <span id="lbl-tilt-desc" style="color:#38bdf8; font-size:10px;">倾斜大势</span>
+    </div>
+    <div class="grad-bar"></div>
+    <div class="grad-labels">
+      <span id="lbl-min-z">低洼区 (-30m)</span>
+      <span>基准面 (0m)</span>
+      <span id="lbl-max-z">高台区 (+30m)</span>
+    </div>
+    <div class="legend-item" style="margin-top:4px;"><div class="legend-color" style="background:#38bdf8;"></div> 公共主干道 / 高架立交</div>
+    <div class="legend-item"><div class="legend-color" style="background:#c026d3; box-shadow:0 0 6px #c026d3;"></div> 🕶️ 隐藏走私便道</div>
+    <div class="legend-item"><div class="legend-color" style="background:#facc15; border-radius:50%;"></div> 市民车辆 Agent</div>
+    <div class="legend-item"><div class="legend-color" style="background:#f43f5e; box-shadow:0 0 6px #f43f5e; border-radius:50%;"></div> 🕵️ 潜行特工与密探</div>
+  </div>
+
+  <div class="control-panel">
+    <div class="panel-title">
+      <span>地势与动线控制台</span>
+      <span style="font-size: 11px; color: #38bdf8;">±30m 大倾斜</span>
+    </div>
+    <div class="btn-grid">
+      <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
+      <button class="terrain-btn" id="btn-reroll-terrain" style="grid-column: span 2;">🎲 重新生成随机倾斜 (±30m)</button>
+    </div>
+    <div class="btn-grid">
+      <button id="btn-spawn-civ">🚶 注入市民车辆</button>
+      <button class="covert-btn" id="btn-spawn-covert">🕵️ 注入潜行特工</button>
+    </div>
+    <div class="btn-grid">
+      <button id="btn-add-lane">✨ 随机筑路/高架</button>
+      <button class="danger" id="btn-remove-lane">⚠️ 随机拆路</button>
+    </div>
+    
+    <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
+      <span>显示 3D 地形起伏高程网格</span>
+      <input type="checkbox" id="chk-terrain" checked style="accent-color: #38bdf8; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span>显示公共道路与高架</span>
+      <input type="checkbox" id="chk-show-pub-lanes" checked style="accent-color: #38bdf8; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span style="color:#f5d0fe;">🕶️ 侦测透视隐藏走私便道</span>
+      <input type="checkbox" id="chk-show-hidden-lanes" checked style="accent-color: #c026d3; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span>显示市民与特工 Agent</span>
+      <input type="checkbox" id="chk-agents" checked style="accent-color: #38bdf8; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span>模拟速率</span>
+      <select id="sel-speed" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:2px 8px;">
+        <option value="1">1x (20Hz)</option>
+        <option value="2" selected>2x 快速</option>
+        <option value="4">4x 极速</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="event-log">
+    <div class="log-title">🛰️ 地势与交通演化播报</div>
+    <div class="log-list" id="log-list">
+      <div class="log-entry geo">地势生成就绪: 全局倾斜幅度已放大至 ±30m，起伏立体感增强！</div>
+    </div>
+  </div>
+
+  <script>
+    class Vec3 {
+      constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+      distanceTo(v) { return Math.hypot(this.x - v.x, this.y - v.y, this.z - v.z); }
+      static lerp(a, b, t) {
+        return new Vec3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
+      }
+    }
+
+    class Curve3D {
+      constructor(p0, p1, p2, p3) {
+        this.p0 = p0; this.p1 = p1; this.p2 = p2; this.p3 = p3;
+        this.length = this.calculateLength(16);
+      }
+      static straight(p0, p3) {
+        return new Curve3D(p0, Vec3.lerp(p0, p3, 0.333), Vec3.lerp(p0, p3, 0.666), p3);
+      }
+      calculateLength(segs) {
+        let len = 0, prev = this.evalPos(0);
+        for (let i = 1; i <= segs; i++) {
+          const curr = this.evalPos(i / segs);
+          len += prev.distanceTo(curr);
+          prev = curr;
+        }
+        return Math.max(len, 0.1);
+      }
+      evalPos(t) {
+        t = Math.max(0, Math.min(1, t));
+        const u = 1 - t, tt = t * t, uu = u * u;
+        const uuu = uu * u, ttt = tt * t;
+        return new Vec3(
+          uuu * this.p0.x + 3 * uu * t * this.p1.x + 3 * u * tt * this.p2.x + ttt * this.p3.x,
+          uuu * this.p0.y + 3 * uu * t * this.p1.y + 3 * u * tt * this.p2.y + ttt * this.p3.y,
+          uuu * this.p0.z + 3 * uu * t * this.p1.z + 3 * u * tt * this.p2.z + ttt * this.p3.z
+        );
+      }
+      evalTangent(t) {
+        t = Math.max(0, Math.min(1, t));
+        const u = 1 - t;
+        const dx = 3 * u * u * (this.p1.x - this.p0.x) + 6 * u * t * (this.p2.x - this.p1.x) + 3 * t * t * (this.p3.x - this.p2.x);
+        const dy = 3 * u * u * (this.p1.y - this.p0.y) + 6 * u * t * (this.p2.y - this.p1.y) + 3 * t * t * (this.p3.y - this.p2.y);
+        const dz = 3 * u * u * (this.p1.z - this.p0.z) + 6 * u * t * (this.p2.z - this.p1.z) + 3 * t * t * (this.p3.z - this.p2.z);
+        const mag = Math.hypot(dx, dy, dz) || 1e-6;
+        return new Vec3(dx / mag, dy / mag, dz / mag);
+      }
+    }
+
+    // ==========================================
+    // 纯粹倾斜(±30m)与起伏地貌系统
+    // ==========================================
+    class PureTiltedTerrain {
+      constructor(gridSize = 60, worldSize = 764) {
+        this.gridSize = gridSize;
+        this.worldSize = worldSize;
+        this.cells = [];
+        this.tiltAngle = 0;
+        this.tiltMagnitude = 60; // 总体倾斜落差约 60m (即 ±30m)
+        this.minZ = 0;
+        this.maxZ = 0;
+        this.generate();
+      }
+      generate() {
+        this.cells = [];
+        const half = this.worldSize / 2;
+
+        // 1. 随机全局地势倾斜方向与倾斜幅度 (落差约 60米 即 ±30m)
+        this.tiltAngle = Math.random() * Math.PI * 2;
+        this.tiltMagnitude = 56 + Math.random() * 10;
+        const tiltCos = Math.cos(this.tiltAngle);
+        const tiltSin = Math.sin(this.tiltAngle);
+
+        // 2. 随机起伏多尺度谐波参数
+        const p1x = Math.random() * 50, p1y = Math.random() * 50;
+        const p2x = Math.random() * 50, p2y = Math.random() * 50;
+
+        const rawElevs = [];
+        this.minZ = 999;
+        this.maxZ = -999;
+
+        for (let gy = 0; gy < this.gridSize; gy++) {
+          for (let gx = 0; gx < this.gridSize; gx++) {
+            const wx = (gx / (this.gridSize - 1)) * this.worldSize - half;
+            const wy = (gy / (this.gridSize - 1)) * this.worldSize - half;
+
+            // ① 全局线性倾斜大势 (范围约 -30m ~ +30m)
+            const proj = (wx * tiltCos + wy * tiltSin) / half;
+            const baseTilt = proj * (this.tiltMagnitude * 0.5);
+
+            // ② 平滑连续起伏波浪
+            const waveLarge = Math.sin(wx * 0.006 + p1x) * Math.cos(wy * 0.006 + p1y) * 5.0;
+            const waveMedium = (Math.cos(wx * 0.014 + p2x) + Math.sin(wy * 0.014 + p2y)) * 2.5;
+
+            const elev = baseTilt + waveLarge + waveMedium;
+            rawElevs.push(elev);
+            if (elev < this.minZ) this.minZ = elev;
+            if (elev > this.maxZ) this.maxZ = elev;
+          }
+        }
+
+        const step = this.worldSize / (this.gridSize - 1);
+        for (let gy = 0; gy < this.gridSize; gy++) {
+          for (let gx = 0; gx < this.gridSize; gx++) {
+            const idx = gy * this.gridSize + gx;
+            const wx = (gx / (this.gridSize - 1)) * this.worldSize - half;
+            const wy = (gy / (this.gridSize - 1)) * this.worldSize - half;
+            const elev = rawElevs[idx];
+
+            const dzdx = (gx > 0 && gx < this.gridSize - 1) ? (rawElevs[gy * this.gridSize + gx + 1] - rawElevs[gy * this.gridSize + gx - 1]) / (2 * step) : 0;
+            const dzdy = (gy > 0 && gy < this.gridSize - 1) ? (rawElevs[(gy + 1) * this.gridSize + gx] - rawElevs[(gy - 1) * this.gridSize + gx]) / (2 * step) : 0;
+            const slopeAngle = Math.atan(Math.hypot(dzdx, dzdy)) * 180 / Math.PI;
+
+            this.cells.push({ wx, wy, elev, slopeAngle, dzdx, dzdy });
+          }
+        }
+      }
+      sample(wx, wy) {
+        const half = this.worldSize / 2;
+        const nx = Math.max(0, Math.min(0.999, (wx + half) / this.worldSize));
+        const ny = Math.max(0, Math.min(0.999, (wy + half) / this.worldSize));
+        const gx = Math.floor(nx * this.gridSize);
+        const gy = Math.floor(ny * this.gridSize);
+        return this.cells[gy * this.gridSize + gx] || { elev: 0, slopeAngle: 0 };
+      }
+    }
+
+    class LaneGraph3D {
+      constructor() {
+        this.nodes = new Map();
+        this.lanes = new Map();
+        this.adjacency = new Map();
+        this.nextNodeId = 1;
+        this.nextLaneId = 1;
+      }
+      addNode(x, y, z, type = 'ground') {
+        const id = this.nextNodeId++;
+        this.nodes.set(id, { id, pos: new Vec3(x, y, z), type });
+        this.adjacency.set(id, []);
+        return id;
+      }
+      addLane(fromId, toId, roadClass = 'asphalt', isHidden = false) {
+        const fromNode = this.nodes.get(fromId);
+        const toNode = this.nodes.get(toId);
+        if (!fromNode || !toNode) return null;
+
+        const id = this.nextLaneId++;
+        let curve;
+        if (Math.abs(fromNode.pos.z - toNode.pos.z) > 4) {
+          const mid = Vec3.lerp(fromNode.pos, toNode.pos, 0.5);
+          const p1 = new Vec3(mid.x, mid.y, fromNode.pos.z);
+          const p2 = new Vec3(mid.x, mid.y, toNode.pos.z);
+          curve = new Curve3D(fromNode.pos, p1, p2, toNode.pos);
+        } else {
+          curve = Curve3D.straight(fromNode.pos, toNode.pos);
+        }
+
+        const speedLimit = roadClass === 'skyway' ? 24 : (roadClass === 'smuggler' ? 8 : (roadClass === 'dirt' ? 6 : 15));
+        const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit, isHidden };
+        this.lanes.set(id, lane);
+        this.adjacency.get(fromId).push(id);
+        return id;
+      }
+      removeLane(laneId) {
+        const lane = this.lanes.get(laneId);
+        if (!lane) return null;
+        this.lanes.delete(laneId);
+        const adj = this.adjacency.get(lane.from);
+        if (adj) {
+          const idx = adj.indexOf(laneId);
+          if (idx !== -1) adj.splice(idx, 1);
+        }
+        return lane;
+      }
+      findPath(startId, goalId, preferHidden = false) {
+        if (!this.nodes.has(startId) || !this.nodes.has(goalId)) return null;
+        if (startId === goalId) return [];
+
+        const frontier = [{ id: startId, cost: 0 }];
+        const cameFrom = new Map();
+        const costSoFar = new Map();
+        costSoFar.set(startId, 0);
+
+        while (frontier.length > 0) {
+          frontier.sort((a, b) => a.cost - b.cost);
+          const current = frontier.shift();
+          if (current.id === goalId) break;
+
+          const neighborLanes = this.adjacency.get(current.id) || [];
+          for (const laneId of neighborLanes) {
+            const lane = this.lanes.get(laneId);
+            if (!lane) continue;
+            const nextNode = lane.to;
+            const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
+            const gradeCost = deltaZ > 0 ? deltaZ * 1.5 : 0;
+            const hiddenFactor = preferHidden ? (lane.isHidden ? 0.35 : 1.2) : (lane.isHidden ? 2.5 : 1.0);
+            const newCost = costSoFar.get(current.id) + ((lane.curve.length / lane.speedLimit) + gradeCost) * hiddenFactor;
+
+            if (!costSoFar.has(nextNode) || newCost < costSoFar.get(nextNode)) {
+              costSoFar.set(nextNode, newCost);
+              const goalPos = this.nodes.get(goalId).pos;
+              const nextPos = this.nodes.get(nextNode).pos;
+              const h = nextPos.distanceTo(goalPos) / 25;
+              frontier.push({ id: nextNode, cost: newCost + h });
+              cameFrom.set(nextNode, { prevNode: current.id, laneId });
+            }
+          }
+        }
+
+        if (!cameFrom.has(goalId)) return null;
+
+        const path = [];
+        let curr = goalId;
+        while (curr !== startId) {
+          const step = cameFrom.get(curr);
+          path.unshift(step.laneId);
+          curr = step.prevNode;
+        }
+        return path;
+      }
+    }
+
+    class Agent3D {
+      constructor(id, origin, dest, maxSpeed = 12, isCovert = false) {
+        this.id = id;
+        this.origin = origin;
+        this.dest = dest;
+        this.maxSpeed = maxSpeed;
+        this.isCovert = isCovert;
+        this.stealthAlpha = isCovert ? 0.25 : 1.0;
+        this.currentVelocity = 0;
+        this.route = [];
+        this.routeIndex = 0;
+        this.currentLaneId = null;
+        this.distAlongCurve = 0;
+        this.pos = new Vec3();
+        this.yaw = 0;
+        this.pitch = 0;
+        this.state = isCovert ? 'Stealth' : 'Navigating';
+        this.colorHue = isCovert ? 330 : (id * 53) % 360;
+        this.trail = [];
+      }
+      tick(dt, network) {
+        if (this.state === 'Arrived' || this.state === 'Detour') return;
+        if (!this.currentLaneId) return;
+
+        const lane = network.lanes.get(this.currentLaneId);
+        if (!lane) {
+          this.state = 'Detour';
+          this.currentVelocity = 0;
+          this.route = [];
+          this.currentLaneId = null;
+          return;
+        }
+
+        if (lane.isHidden || this.isCovert) {
+          this.stealthAlpha = Math.max(0.2, this.stealthAlpha - 1.5 * dt);
+        } else {
+          this.stealthAlpha = Math.min(1.0, this.stealthAlpha + 1.0 * dt);
+        }
+
+        const targetSpeed = Math.min(this.maxSpeed, lane.speedLimit);
+        this.currentVelocity += (targetSpeed - this.currentVelocity) * 3 * dt;
+        this.distAlongCurve += this.currentVelocity * dt;
+
+        if (this.distAlongCurve >= lane.curve.length) {
+          this.routeIndex++;
+          if (this.routeIndex < this.route.length) {
+            const nextLane = this.route[this.routeIndex];
+            if (network.lanes.has(nextLane)) {
+              this.currentLaneId = nextLane;
+              this.distAlongCurve = 0;
+            } else {
+              this.state = 'Detour';
+              this.currentVelocity = 0;
+            }
+          } else {
+            this.state = 'Arrived';
+            this.currentVelocity = 0;
+          }
+        } else {
+          const t = this.distAlongCurve / lane.curve.length;
+          this.pos = lane.curve.evalPos(t);
+          const tan = lane.curve.evalTangent(t);
+          this.yaw = Math.atan2(tan.y, tan.x);
+          const hLen = Math.hypot(tan.x, tan.y);
+          this.pitch = Math.atan2(tan.z, hLen);
+
+          this.trail.push(new Vec3(this.pos.x, this.pos.y, this.pos.z));
+          if (this.trail.length > (this.isCovert ? 12 : 8)) this.trail.shift();
+        }
+      }
+    }
+
+    class WorldSimulation {
+      constructor() {
+        this.terrain = new PureTiltedTerrain(60, 764);
+        this.network = new LaneGraph3D();
+        this.agents = [];
+        this.tickCount = 0;
+        this.isPaused = false;
+        this.autoMutate = true;
+        this.speedMult = 2;
+
+        this.showTerrain = true;
+        this.showPubLanes = true;
+        this.showHiddenLanes = true;
+        this.showAgents = true;
+
+        this.initCity(38);
+      }
+      initCity(nodeCount) {
+        this.network = new LaneGraph3D();
+        this.agents = [];
+        this.tickCount = 0;
+
+        const half = this.terrain.worldSize / 2;
+        const nodeIds = [];
+
+        // 1. 生成吸附地表高程的节点
+        for (let i = 0; i < nodeCount; i++) {
+          const x = (Math.random() - 0.5) * (this.terrain.worldSize * 0.88);
+          const y = (Math.random() - 0.5) * (this.terrain.worldSize * 0.88);
+          let elev = this.terrain.sample(x, y).elev;
+
+          let nodeType = 'ground';
+          if (Math.random() < 0.15) {
+            elev += 12.0; // 高架立交
+            nodeType = 'skyway';
+          }
+
+          const id = this.network.addNode(x, y, elev, nodeType);
+          nodeIds.push(id);
+        }
+
+        // 2. 邻近连线
+        for (let i = 0; i < nodeIds.length; i++) {
+          for (let j = i + 1; j < nodeIds.length; j++) {
+            const idA = nodeIds[i], idB = nodeIds[j];
+            const posA = this.network.nodes.get(idA).pos;
+            const posB = this.network.nodes.get(idB).pos;
+            const dist = posA.distanceTo(posB);
+
+            if (dist < 195) {
+              const willBeHidden = Math.random() < 0.22;
+
+              let roadClass = 'asphalt';
+              if (willBeHidden) roadClass = 'smuggler';
+              else if (posA.z > 14 || posB.z > 14) roadClass = 'skyway';
+              else if (Math.abs(posA.z - posB.z) > 4) roadClass = 'cobble';
+              else if (Math.random() < 0.3) roadClass = 'dirt';
+
+              this.network.addLane(idA, idB, roadClass, willBeHidden);
+              this.network.addLane(idB, idA, roadClass, willBeHidden);
+            }
+          }
+        }
+
+        this.spawnAgents(30, false);
+        this.spawnAgents(12, true);
+
+        const tiltDeg = Math.round((this.terrain.tiltAngle * 180 / Math.PI) % 360);
+        this.logEvent(`🌐 随机倾斜地势(±30m)生成完成: 倾角 ${tiltDeg}°，落差范围 [${Math.round(this.terrain.minZ)}m ~ +${Math.round(this.terrain.maxZ)}m]。`, 'geo');
+      }
+      spawnAgents(count, isCovert = false) {
+        const nodeKeys = Array.from(this.network.nodes.keys());
+        if (nodeKeys.length < 2) return;
+
+        for (let i = 0; i < count; i++) {
+          const start = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+          let goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+          while (goal === start) goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+
+          const path = this.network.findPath(start, goal, isCovert);
+          if (path && path.length > 0) {
+            const agentId = this.agents.length + 1;
+            const speed = isCovert ? (14 + Math.random() * 8) : (10 + Math.random() * 10);
+            const agent = new Agent3D(agentId, start, goal, speed, isCovert);
+            agent.route = path;
+            agent.currentLaneId = path[0];
+            agent.pos = this.network.nodes.get(start).pos;
+            this.agents.push(agent);
+          }
+        }
+      }
+      refreshAgents() {
+        const nodeKeys = Array.from(this.network.nodes.keys());
+        if (nodeKeys.length < 2) return;
+
+        for (const agent of this.agents) {
+          if (agent.state === 'Arrived' || agent.state === 'Detour') {
+            const start = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+            let goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+            while (goal === start) goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+
+            const path = this.network.findPath(start, goal, agent.isCovert);
+            if (path && path.length > 0) {
+              agent.state = agent.isCovert ? 'Stealth' : 'Navigating';
+              agent.origin = start;
+              agent.dest = goal;
+              agent.route = path;
+              agent.routeIndex = 0;
+              agent.currentLaneId = path[0];
+              agent.distAlongCurve = 0;
+              agent.pos = this.network.nodes.get(start).pos;
+            }
+          }
+        }
+      }
+      mutateAddLane() {
+        const nodeKeys = Array.from(this.network.nodes.keys());
+        if (nodeKeys.length < 2) return;
+        const idA = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+        const idB = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
+        if (idA !== idB) {
+          const isHidden = Math.random() < 0.25;
+          const roadClass = isHidden ? 'smuggler' : 'asphalt';
+          const laneId = this.network.addLane(idA, idB, roadClass, isHidden);
+          if (laneId) {
+            this.logEvent(`✨ 拓扑自发生长: 新建车道 #${laneId} (${isHidden ? '走私便道' : '公共公路'})`, isHidden ? 'covert' : '');
+          }
+        }
+      }
+      mutateRemoveLane() {
+        const laneKeys = Array.from(this.network.lanes.keys());
+        if (laneKeys.length > 8) {
+          const target = laneKeys[Math.floor(Math.random() * laneKeys.length)];
+          const removed = this.network.removeLane(target);
+          if (removed) {
+            this.logEvent(`⚠️ 道路折损: 车道 #${target} 已拆除`, 'warn');
+          }
+        }
+      }
+      logEvent(msg, type = '') {
+        const list = document.getElementById('log-list');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        entry.textContent = `[Tick ${this.tickCount}] ${msg}`;
+        list.appendChild(entry);
+        while (list.children.length > 8) list.removeChild(list.firstChild);
+      }
+      tick() {
+        if (this.isPaused) return;
+
+        for (let step = 0; step < this.speedMult; step++) {
+          this.tickCount++;
+
+          if (this.autoMutate && this.tickCount % 120 === 0) {
+            if (Math.random() < 0.5) this.mutateAddLane();
+            else this.mutateRemoveLane();
+          }
+
+          if (this.tickCount % 40 === 0) {
+            this.refreshAgents();
+          }
+
+          for (const agent of this.agents) {
+            agent.tick(0.05, this.network);
+          }
+        }
+      }
+    }
+
+    const canvas = document.getElementById('sim-canvas');
+    const ctx = canvas.getContext('2d');
+    const sim = new WorldSimulation();
+
+    let camera = {
+      rotX: 1.05,
+      rotZ: 0.60,
+      zoom: 1.15,
+      panX: 0,
+      panY: 30
+    };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth * window.devicePixelRatio;
+      canvas.height = window.innerHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let isDragging = false, lastMouse = { x: 0, y: 0 }, isRightBtn = false;
+    canvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      isRightBtn = e.button === 2;
+      lastMouse = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('mouseup', () => isDragging = false);
+    window.addEventListener('contextmenu', e => e.preventDefault());
+    canvas.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      const dx = e.clientX - lastMouse.x;
+      const dy = e.clientY - lastMouse.y;
+      if (isRightBtn || e.shiftKey) {
+        camera.panX += dx;
+        camera.panY += dy;
+      } else {
+        camera.rotZ += dx * 0.006;
+        camera.rotX = Math.max(0.15, Math.min(1.45, camera.rotX + dy * 0.006));
+      }
+      lastMouse = { x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener('wheel', e => {
+      camera.zoom = Math.max(0.35, Math.min(4.5, camera.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+    });
+
+    function project3D(v3) {
+      const cx = window.innerWidth / 2 + camera.panX;
+      const cy = window.innerHeight / 2 + camera.panY;
+
+      const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+      const rx = v3.x * cosZ - v3.y * sinZ;
+      const ry = v3.x * sinZ + v3.y * cosZ;
+
+      const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+      const y2 = ry * cosX - v3.z * sinX;
+      const z2 = ry * sinX + v3.z * cosX;
+
+      const scale = camera.zoom;
+      return { x: cx + rx * scale, y: cy + y2 * scale, depth: z2 };
+    }
+
+    // 基于高程与坡度光照的连续平滑着色器 (无地貌分类，纯几何渐变)
+    function getElevationColor(cell, minZ, maxZ) {
+      const { elev, dzdx, dzdy } = cell;
+      const range = Math.max(1, maxZ - minZ);
+      const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
+
+      const lightFactor = Math.max(0.70, Math.min(1.30, 1.0 + (-dzdx * 0.35 - dzdy * 0.35)));
+
+      let r, g, b;
+      if (normZ < 0.45) {
+        const t = normZ / 0.45;
+        r = Math.floor(16 + t * (40 - 16));
+        g = Math.floor(150 + t * (180 - 150));
+        b = Math.floor(100 + t * (70 - 100));
+      } else if (normZ < 0.75) {
+        const t = (normZ - 0.45) / 0.30;
+        r = Math.floor(40 + t * (190 - 40));
+        g = Math.floor(180 + t * (160 - 180));
+        b = Math.floor(70 + t * (40 - 70));
+      } else {
+        const t = (normZ - 0.75) / 0.25;
+        r = Math.floor(190 + t * (160 - 190));
+        g = Math.floor(160 + t * (165 - 160));
+        b = Math.floor(40 + t * (170 - 40));
+      }
+
+      return `rgba(${Math.floor(r * lightFactor)}, ${Math.floor(g * lightFactor)}, ${Math.floor(b * lightFactor)}, 0.55)`;
+    }
+
+    let frameCount = 0, lastFpsUpdate = performance.now();
+
+    function render() {
+      sim.tick();
+
+      const w = window.innerWidth, h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. 3D 随机起伏地形网格渲染 (60x60)
+      if (sim.showTerrain) {
+        const gSize = sim.terrain.gridSize;
+        const minZ = sim.terrain.minZ, maxZ = sim.terrain.maxZ;
+
+        for (let gy = 0; gy < gSize - 1; gy++) {
+          for (let gx = 0; gx < gSize - 1; gx++) {
+            const c00 = sim.terrain.cells[gy * gSize + gx];
+            const c10 = sim.terrain.cells[gy * gSize + (gx + 1)];
+            const c11 = sim.terrain.cells[(gy + 1) * gSize + (gx + 1)];
+            const c01 = sim.terrain.cells[(gy + 1) * gSize + gx];
+
+            const p00 = project3D(new Vec3(c00.wx, c00.wy, c00.elev));
+            const p10 = project3D(new Vec3(c10.wx, c10.wy, c10.elev));
+            const p11 = project3D(new Vec3(c11.wx, c11.wy, c11.elev));
+            const p01 = project3D(new Vec3(c01.wx, c01.wy, c01.elev));
+
+            ctx.fillStyle = getElevationColor(c00, minZ, maxZ);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+            ctx.lineWidth = 0.4;
+
+            ctx.beginPath();
+            ctx.moveTo(p00.x, p00.y);
+            ctx.lineTo(p10.x, p10.y);
+            ctx.lineTo(p11.x, p11.y);
+            ctx.lineTo(p01.x, p01.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 2. 高架立柱
+      for (const node of sim.network.nodes.values()) {
+        const sample = sim.terrain.sample(node.pos.x, node.pos.y);
+        if (node.pos.z > sample.elev + 3 && sim.showPubLanes) {
+          const top = project3D(node.pos);
+          const btm = project3D(new Vec3(node.pos.x, node.pos.y, sample.elev));
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+          ctx.lineWidth = 2.8 * camera.zoom;
+          ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(btm.x, btm.y); ctx.stroke();
+        }
+      }
+
+      // 3. 3D 贝塞尔车道
+      for (const lane of sim.network.lanes.values()) {
+        if (lane.isHidden && !sim.showHiddenLanes) continue;
+        if (!lane.isHidden && !sim.showPubLanes) continue;
+
+        let strokeColor = 'rgba(148, 163, 184, 0.7)';
+        let lineWidth = 3.2 * camera.zoom;
+        let isDashed = false;
+
+        if (lane.isHidden) {
+          strokeColor = 'rgba(192, 38, 211, 0.9)';
+          lineWidth = 3.6 * camera.zoom;
+          isDashed = true;
+        } else if (lane.roadClass === 'skyway') {
+          strokeColor = 'rgba(56, 189, 248, 0.95)';
+          lineWidth = 5.0 * camera.zoom;
+        } else if (lane.roadClass === 'cobble') {
+          strokeColor = 'rgba(251, 191, 36, 0.8)';
+        } else if (lane.roadClass === 'dirt') {
+          strokeColor = 'rgba(217, 119, 6, 0.65)';
+          isDashed = true;
+        }
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth;
+        if (isDashed) {
+          ctx.shadowColor = lane.isHidden ? '#c026d3' : 'transparent';
+          ctx.shadowBlur = lane.isHidden ? 8 : 0;
+          ctx.setLineDash([5, 4]);
+        } else {
+          ctx.setLineDash([]);
+        }
+
+        ctx.beginPath();
+        const segs = 16;
+        for (let i = 0; i <= segs; i++) {
+          const pt3D = lane.curve.evalPos(i / segs);
+          const p2D = project3D(pt3D);
+          if (i === 0) ctx.moveTo(p2D.x, p2D.y);
+          else ctx.lineTo(p2D.x, p2D.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+      }
+
+      // 4. 节点
+      for (const node of sim.network.nodes.values()) {
+        const isHiddenNode = node.type === 'cave_portal';
+        if (isHiddenNode && !sim.showHiddenLanes) continue;
+        if (!isHiddenNode && !sim.showPubLanes) continue;
+
+        const p2D = project3D(node.pos);
+        ctx.fillStyle = node.pos.z > 10 ? '#38bdf8' : '#cbd5e1';
+        ctx.beginPath();
+        ctx.arc(p2D.x, p2D.y, (node.pos.z > 10 ? 4.5 : 3.0) * camera.zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 5. 3D Agent 车辆渲染
+      if (sim.showAgents) {
+        for (const agent of sim.agents) {
+          if (agent.state === 'Arrived' || agent.state === 'Detour') continue;
+
+          const p2D = project3D(agent.pos);
+
+          if (agent.trail.length > 1) {
+            const trailAlpha = agent.isCovert ? (agent.stealthAlpha * 0.5) : 0.45;
+            ctx.strokeStyle = agent.isCovert ? `rgba(244, 63, 94, ${trailAlpha})` : `hsla(${agent.colorHue}, 95%, 65%, ${trailAlpha})`;
+            ctx.lineWidth = (agent.isCovert ? 2.5 : 2) * camera.zoom;
+            ctx.beginPath();
+            for (let i = 0; i < agent.trail.length; i++) {
+              const tp = project3D(agent.trail[i]);
+              if (i === 0) ctx.moveTo(tp.x, tp.y);
+              else ctx.lineTo(tp.x, tp.y);
+            }
+            ctx.stroke();
+          }
+
+          if (agent.isCovert) {
+            const pulse = (Math.sin(performance.now() * 0.008 + agent.id) + 1) * 0.5;
+            ctx.strokeStyle = `rgba(244, 63, 94, ${0.4 * pulse})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(p2D.x, p2D.y, (8 + pulse * 12) * camera.zoom, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          const radius = (agent.isCovert ? 4.5 : 3.5) * camera.zoom;
+          const fillAlpha = agent.isCovert ? agent.stealthAlpha : 1.0;
+          ctx.fillStyle = agent.isCovert ? `rgba(244, 63, 94, ${fillAlpha})` : `hsla(${agent.colorHue}, 95%, 60%, ${fillAlpha})`;
+          ctx.shadowColor = agent.isCovert ? '#f43f5e' : `hsl(${agent.colorHue}, 95%, 60%)`;
+          ctx.shadowBlur = agent.isCovert ? 12 : 6;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      // HUD 指标更新
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsUpdate >= 500) {
+        document.getElementById('stat-fps').textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      const tiltDeg = Math.round((sim.terrain.tiltAngle * 180 / Math.PI) % 360);
+      const tiltArrows = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'];
+      const arrowIdx = Math.floor(((tiltDeg + 22.5) % 360) / 45);
+
+      document.getElementById('stat-tilt').textContent = `${tiltArrows[arrowIdx]} ${tiltDeg}°`;
+      document.getElementById('stat-range').textContent = `${Math.round(sim.terrain.minZ)}m ~ +${Math.round(sim.terrain.maxZ)}m`;
+      document.getElementById('lbl-min-z').textContent = `最低点 (${Math.round(sim.terrain.minZ)}m)`;
+      document.getElementById('lbl-max-z').textContent = `最高点 (+${Math.round(sim.terrain.maxZ)}m)`;
+      document.getElementById('stat-lanes').textContent = sim.network.lanes.size;
+      document.getElementById('stat-agents').textContent = sim.agents.filter(a => a.state !== 'Arrived' && a.state !== 'Detour').length;
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // ==========================================
+    // UI 控制绑定
+    // ==========================================
+    const btnPause = document.getElementById('btn-pause');
+    btnPause.addEventListener('click', () => {
+      sim.isPaused = !sim.isPaused;
+      btnPause.textContent = sim.isPaused ? '▶️ 继续模拟' : '⏸️ 暂停模拟';
+    });
+
+    document.getElementById('btn-reroll-terrain').addEventListener('click', () => {
+      sim.terrain.generate();
+      sim.initCity(38);
+    });
+
+    document.getElementById('btn-spawn-civ').addEventListener('click', () => {
+      sim.spawnAgents(20, false);
+      sim.logEvent('🚶 注入 +20 常规市民车辆');
+    });
+    document.getElementById('btn-spawn-covert').addEventListener('click', () => {
+      sim.spawnAgents(10, true);
+      sim.logEvent('🕵️ 注入 +10 潜行特工与密探', 'covert');
+    });
+
+    document.getElementById('btn-add-lane').addEventListener('click', () => sim.mutateAddLane());
+    document.getElementById('btn-remove-lane').addEventListener('click', () => sim.mutateRemoveLane());
+
+    document.getElementById('chk-terrain').addEventListener('change', e => {
+      sim.showTerrain = e.target.checked;
+    });
+    document.getElementById('chk-show-pub-lanes').addEventListener('change', e => {
+      sim.showPubLanes = e.target.checked;
+    });
+    document.getElementById('chk-show-hidden-lanes').addEventListener('change', e => {
+      sim.showHiddenLanes = e.target.checked;
+    });
+    document.getElementById('chk-agents').addEventListener('change', e => {
+      sim.showAgents = e.target.checked;
+    });
+    document.getElementById('sel-speed').addEventListener('change', e => {
+      sim.speedMult = parseInt(e.target.value, 10);
+    });
+  </script>
+</body>
+</html>
