@@ -996,8 +996,8 @@
           return;
         }
 
-        // 踩踏拓路：行进时增加该车道踩踏度 (上限 3.0)
-        lane.wear = Math.min(3.0, (lane.wear || 0.0) + 0.40 * dt);
+        // 踩踏拓路：行进时增加该车道踩踏度 (放慢至 33%，即 0.132/s，上限 3.0)
+        lane.wear = Math.min(3.0, (lane.wear || 0.0) + 0.132 * dt);
 
         const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
         const uphill = deltaZ > 0 ? deltaZ / lane.curve.length : 0;

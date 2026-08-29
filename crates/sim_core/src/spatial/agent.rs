@@ -208,10 +208,10 @@ impl Agent3D {
             return;
         };
 
-        // 踩踏拓路：行进时增加该车道及反向车道的踩踏度
+        // 踩踏拓路：行进时增加该车道踩踏度 (放慢至 33%，即 0.132/s)
         {
             let edge = &mut road_network.graph[edge_idx];
-            edge.wear = (edge.wear + 0.40 * dt).min(3.0);
+            edge.wear = (edge.wear + 0.132 * dt).min(3.0);
         }
 
         let lane = &road_network.graph[edge_idx];
