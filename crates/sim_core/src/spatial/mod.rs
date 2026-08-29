@@ -4,6 +4,10 @@ pub mod graph;
 pub mod poi;
 pub mod house;
 pub mod agent;
+pub mod snapshot;
+pub mod ecology;
+pub mod decisions;
+pub mod housing_system;
 pub mod world;
 
 pub use vec3::Vec3;
@@ -12,7 +16,8 @@ pub use graph::{LaneGraph3D, LaneNode3D, LaneEdge3D, NodeType, RoadClass, NodeId
 pub use poi::{PrimitivePoi, PoiType, PoiId};
 pub use house::{House, HouseTier, HouseSnapshot};
 pub use agent::{Agent3D, PrimitiveActionState, AgentId, Gender};
-pub use world::{World3DEngine, WorldSnapshot3D, Season, PoiSnapshot, NodeSnapshot, LaneSnapshot, AgentSnapshot};
+pub use snapshot::{WorldSnapshot3D, Season, PoiSnapshot, NodeSnapshot, LaneSnapshot, AgentSnapshot, GeoCellSnapshot};
+pub use world::World3DEngine;
 
 #[cfg(test)]
 mod tests {
@@ -35,8 +40,8 @@ mod tests {
         let mut world = World3DEngine::new(60, 764.0);
         world.seed_primitive_ecology(12);
 
-        // 验证 6营地(无限) + 6水泉(上限60) + 6浆果(上限60) + 6林木(上限60) + 4石矿(上限60) = 28 处 POI
-        assert_eq!(world.pois.len(), 28);
+        // 验证 6营地(无限) + 6水泉(上限60) + 6浆果(上限60) + 4林木(上限60) + 2石矿(上限60) + 1金矿(上限60) = 25 处 POI
+        assert_eq!(world.pois.len(), 25);
         for poi in &world.pois {
             if poi.poi_type == PoiType::Camp {
                 assert!(!poi.max_stock.is_finite());
@@ -45,7 +50,7 @@ mod tests {
             }
         }
         assert_eq!(world.agents.len(), 12);
-        assert_eq!(world.agents[0].hunger, 25.0); // 50% of 50.0
+        assert_eq!(world.agents[0].hunger, 25.0);
 
         for _ in 0..200 {
             world.tick(0.05);
