@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flow & Accord - 3D 随机起伏与倾斜地势动线引擎</title>
+  <title>Flow & Accord - 原始生态生理代谢与生存动线引擎</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -45,7 +45,7 @@
       font-size: 16px;
       font-weight: 700;
       letter-spacing: 0.5px;
-      background: linear-gradient(135deg, #38bdf8, #34d399, #f59e0b);
+      background: linear-gradient(135deg, #f59e0b, #10b981, #38bdf8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       display: flex;
@@ -58,7 +58,7 @@
       margin-top: 4px;
     }
 
-    /* 状态面板 */
+    /* 全局生命体征状态栏 */
     .stats-card {
       display: flex;
       gap: 16px;
@@ -86,8 +86,8 @@
       color: #94a3b8;
     }
 
-    /* 地势高程图例 */
-    .elevation-legend {
+    /* 原始生态图例 */
+    .ecology-legend {
       position: absolute;
       top: 88px; right: 16px;
       background: rgba(10, 18, 30, 0.92);
@@ -115,21 +115,55 @@
       display: flex;
       justify-content: space-between;
     }
-    .grad-bar {
-      width: 100%;
-      height: 12px;
-      border-radius: 6px;
-      background: linear-gradient(to right, #059669, #10b981, #eab308, #d97706, #94a3b8);
-      margin: 4px 0;
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    .legend-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+
+    /* 选中的 Agent 生理状态监控面板 */
+    .agent-inspector {
+      position: absolute;
+      top: 280px; right: 16px;
+      background: rgba(10, 18, 30, 0.94);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 14px 16px;
+      border-radius: 14px;
+      width: 270px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11px;
     }
-    .grad-labels {
+    .inspector-title {
+      font-weight: 700;
+      color: #38bdf8;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 4px;
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
+    }
+    .meter-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
       color: #94a3b8;
     }
-    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-    .legend-color { width: 14px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .meter-bg {
+      width: 100%;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.2s ease;
+    }
 
     /* 控制面板 */
     .control-panel {
@@ -187,25 +221,15 @@
       background: linear-gradient(135deg, #0284c7, #2563eb);
       border: none;
     }
-    button.terrain-btn {
-      background: linear-gradient(135deg, #059669, #0284c7);
+    button.ecology-btn {
+      background: linear-gradient(135deg, #d97706, #059669);
       border: none;
       color: #ffffff;
       font-weight: 600;
     }
-    button.terrain-btn:hover {
-      background: linear-gradient(135deg, #047857, #0369a1);
-      box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
-    }
-    button.covert-btn {
-      background: linear-gradient(135deg, #7e22ce, #c026d3);
-      border: none;
-      color: #ffffff;
-    }
-    button.danger {
-      background: #451a1a;
-      border-color: #7f1d1d;
-      color: #fca5a5;
+    button.ecology-btn:hover {
+      background: linear-gradient(135deg, #b45309, #047857);
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
     }
     .toggle-row {
       display: flex;
@@ -256,9 +280,9 @@
       border-left: 3px solid #38bdf8;
       animation: fadeIn 0.3s ease;
     }
-    .log-entry.warn { border-left-color: #ef4444; color: #fca5a5; }
-    .log-entry.geo { border-left-color: #10b981; color: #6ee7b7; }
-    .log-entry.covert { border-left-color: #c026d3; color: #f5d0fe; }
+    .log-entry.food { border-left-color: #10b981; color: #6ee7b7; }
+    .log-entry.water { border-left-color: #0284c7; color: #7dd3fc; }
+    .log-entry.camp { border-left-color: #f59e0b; color: #fde68a; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
@@ -272,8 +296,8 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🌐 Flow & Accord · 倾斜地势(±30m)与起伏动线引擎</div>
-      <div class="brand-desc">全局倾斜大势 (±30m 落差) × 随机平滑起伏波浪 × 纯粹高程几何场</div>
+      <div class="brand-title">🏕️ Flow & Accord · 原生生理代谢与生存动线系统</div>
+      <div class="brand-desc">无科技原始状态 × 饱食/水分/体力稳态循环 × 避风营地/低洼清泉/缓坡浆果</div>
     </div>
     <div class="stats-card">
       <div class="stat-item">
@@ -281,57 +305,72 @@
         <div class="stat-lbl">FPS</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-tilt">↗ 45°</div>
-        <div class="stat-lbl">倾斜大势</div>
+        <div class="stat-val" id="stat-pop">24</div>
+        <div class="stat-lbl">存活部落民</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-range" style="color:#f59e0b;">±30m</div>
-        <div class="stat-lbl">地势落差</div>
+        <div class="stat-val" id="stat-avg-hunger" style="color:#10b981;">82%</div>
+        <div class="stat-lbl">平均饱食度</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-lanes">0</div>
-        <div class="stat-lbl">车道/高架</div>
+        <div class="stat-val" id="stat-avg-thirst" style="color:#38bdf8;">76%</div>
+        <div class="stat-lbl">平均水分值</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-agents">0</div>
-        <div class="stat-lbl">活动 Agent</div>
+        <div class="stat-val" id="stat-avg-stamina" style="color:#f59e0b;">88%</div>
+        <div class="stat-lbl">平均体力值</div>
       </div>
     </div>
   </div>
 
-  <div class="elevation-legend">
+  <div class="ecology-legend">
     <div class="legend-title">
-      <span>📐 地形高程与图层指示 (±30m)</span>
-      <span id="lbl-tilt-desc" style="color:#38bdf8; font-size:10px;">倾斜大势</span>
+      <span>🗺️ 原始三大生存地标</span>
+      <span style="color:#38bdf8; font-size:10px;">资源生态</span>
     </div>
-    <div class="grad-bar"></div>
-    <div class="grad-labels">
-      <span id="lbl-min-z">低洼区 (-30m)</span>
-      <span>基准面 (0m)</span>
-      <span id="lbl-max-z">高台区 (+30m)</span>
+    <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 / 火塘 (恢复体力、存粮进食)</div>
+    <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 / 水洼 (地势最低处，解渴饮水)</div>
+    <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果灌木 (向阳斜坡，采摘食物)</div>
+    <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;"><div class="legend-icon">🚶</div> 原始兽径/步行步道 (受坡度能耗影响)</div>
+  </div>
+
+  <div class="agent-inspector" id="agent-inspector">
+    <div class="inspector-title">
+      <span id="insp-name">Agent #1 (部落民)</span>
+      <span id="insp-state" style="color:#f59e0b;">营地休眠中</span>
     </div>
-    <div class="legend-item" style="margin-top:4px;"><div class="legend-color" style="background:#38bdf8;"></div> 公共主干道 / 高架立交</div>
-    <div class="legend-item"><div class="legend-color" style="background:#c026d3; box-shadow:0 0 6px #c026d3;"></div> 🕶️ 隐藏走私便道</div>
-    <div class="legend-item"><div class="legend-color" style="background:#facc15; border-radius:50%;"></div> 市民车辆 Agent</div>
-    <div class="legend-item"><div class="legend-color" style="background:#f43f5e; box-shadow:0 0 6px #f43f5e; border-radius:50%;"></div> 🕵️ 潜行特工与密探</div>
+    <div class="meter-row">
+      <div class="meter-label"><span>🍎 饱食度</span><span id="insp-hunger-val">85%</span></div>
+      <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:85%;"></div></div>
+    </div>
+    <div class="meter-row">
+      <div class="meter-label"><span>💧 水分值</span><span id="insp-thirst-val">80%</span></div>
+      <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:80%;"></div></div>
+    </div>
+    <div class="meter-row">
+      <div class="meter-label"><span>⚡ 体力值 (上坡剧耗)</span><span id="insp-stamina-val">90%</span></div>
+      <div class="meter-bg"><div class="meter-fill" id="insp-stamina-fill" style="background:#f59e0b; width:90%;"></div></div>
+    </div>
+    <div class="meter-row">
+      <div class="meter-label"><span>🍒 携带野果</span><span id="insp-inv-val">1.2 / 4.0 颗</span></div>
+    </div>
+    <div style="font-size:10px; color:#64748b; margin-top:2px;" id="insp-detail">
+      当前位于营地，体力与精力正在快速恢复。
+    </div>
   </div>
 
   <div class="control-panel">
     <div class="panel-title">
-      <span>地势与动线控制台</span>
-      <span style="font-size: 11px; color: #38bdf8;">±30m 大倾斜</span>
+      <span>原始生态与动线控制台</span>
+      <span style="font-size: 11px; color: #f59e0b;">生态自洽</span>
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
-      <button class="terrain-btn" id="btn-reroll-terrain" style="grid-column: span 2;">🎲 重新生成随机倾斜 (±30m)</button>
+      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演原始生态 (地势±30m & POI)</button>
     </div>
     <div class="btn-grid">
-      <button id="btn-spawn-civ">🚶 注入市民车辆</button>
-      <button class="covert-btn" id="btn-spawn-covert">🕵️ 注入潜行特工</button>
-    </div>
-    <div class="btn-grid">
-      <button id="btn-add-lane">✨ 随机筑路/高架</button>
-      <button class="danger" id="btn-remove-lane">⚠️ 随机拆路</button>
+      <button id="btn-spawn-civ">🚶 注入 +8 部落民</button>
+      <button id="btn-add-food">🍒 催生野果浆果</button>
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
@@ -339,31 +378,27 @@
       <input type="checkbox" id="chk-terrain" checked style="accent-color: #38bdf8; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span>显示公共道路与高架</span>
-      <input type="checkbox" id="chk-show-pub-lanes" checked style="accent-color: #38bdf8; cursor: pointer;">
+      <span>显示步行步道与兽径</span>
+      <input type="checkbox" id="chk-lanes" checked style="accent-color: #38bdf8; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span style="color:#f5d0fe;">🕶️ 侦测透视隐藏走私便道</span>
-      <input type="checkbox" id="chk-show-hidden-lanes" checked style="accent-color: #c026d3; cursor: pointer;">
+      <span>显示生存状态光环</span>
+      <input type="checkbox" id="chk-aura" checked style="accent-color: #f59e0b; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span>显示市民与特工 Agent</span>
-      <input type="checkbox" id="chk-agents" checked style="accent-color: #38bdf8; cursor: pointer;">
-    </div>
-    <div class="toggle-row">
-      <span>模拟速率</span>
+      <span>模拟推进速率</span>
       <select id="sel-speed" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:2px 8px;">
-        <option value="1">1x (20Hz)</option>
-        <option value="2" selected>2x 快速</option>
+        <option value="1">1x 真实代谢</option>
+        <option value="2" selected>2x 快速演化</option>
         <option value="4">4x 极速</option>
       </select>
     </div>
   </div>
 
   <div class="event-log">
-    <div class="log-title">🛰️ 地势与交通演化播报</div>
+    <div class="log-title">🛰️ 部落生存与动线事件</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry geo">地势生成就绪: 全局倾斜幅度已放大至 ±30m，起伏立体感增强！</div>
+      <div class="log-entry camp">部落营地建立: 部落民在避风高地扎营，低洼清泉与缓坡浆果已散布。</div>
     </div>
   </div>
 
@@ -415,7 +450,7 @@
     }
 
     // ==========================================
-    // 纯粹倾斜(±30m)与起伏地貌系统
+    // 纯粹自然地形 (±30m 倾斜起伏)
     // ==========================================
     class PureTiltedTerrain {
       constructor(gridSize = 60, worldSize = 764) {
@@ -423,7 +458,7 @@
         this.worldSize = worldSize;
         this.cells = [];
         this.tiltAngle = 0;
-        this.tiltMagnitude = 60; // 总体倾斜落差约 60m (即 ±30m)
+        this.tiltMagnitude = 60;
         this.minZ = 0;
         this.maxZ = 0;
         this.generate();
@@ -432,13 +467,11 @@
         this.cells = [];
         const half = this.worldSize / 2;
 
-        // 1. 随机全局地势倾斜方向与倾斜幅度 (落差约 60米 即 ±30m)
         this.tiltAngle = Math.random() * Math.PI * 2;
-        this.tiltMagnitude = 56 + Math.random() * 10;
+        this.tiltMagnitude = 56 + Math.random() * 8;
         const tiltCos = Math.cos(this.tiltAngle);
         const tiltSin = Math.sin(this.tiltAngle);
 
-        // 2. 随机起伏多尺度谐波参数
         const p1x = Math.random() * 50, p1y = Math.random() * 50;
         const p2x = Math.random() * 50, p2y = Math.random() * 50;
 
@@ -451,11 +484,9 @@
             const wx = (gx / (this.gridSize - 1)) * this.worldSize - half;
             const wy = (gy / (this.gridSize - 1)) * this.worldSize - half;
 
-            // ① 全局线性倾斜大势 (范围约 -30m ~ +30m)
             const proj = (wx * tiltCos + wy * tiltSin) / half;
             const baseTilt = proj * (this.tiltMagnitude * 0.5);
 
-            // ② 平滑连续起伏波浪
             const waveLarge = Math.sin(wx * 0.006 + p1x) * Math.cos(wy * 0.006 + p1y) * 5.0;
             const waveMedium = (Math.cos(wx * 0.014 + p2x) + Math.sin(wy * 0.014 + p2y)) * 2.5;
 
@@ -492,6 +523,9 @@
       }
     }
 
+    // ==========================================
+    // 原始生态 POI 与路网
+    // ==========================================
     class LaneGraph3D {
       constructor() {
         this.nodes = new Map();
@@ -506,7 +540,7 @@
         this.adjacency.set(id, []);
         return id;
       }
-      addLane(fromId, toId, roadClass = 'asphalt', isHidden = false) {
+      addLane(fromId, toId, roadClass = 'dirt', isHidden = false) {
         const fromNode = this.nodes.get(fromId);
         const toNode = this.nodes.get(toId);
         if (!fromNode || !toNode) return null;
@@ -522,24 +556,13 @@
           curve = Curve3D.straight(fromNode.pos, toNode.pos);
         }
 
-        const speedLimit = roadClass === 'skyway' ? 24 : (roadClass === 'smuggler' ? 8 : (roadClass === 'dirt' ? 6 : 15));
+        const speedLimit = roadClass === 'cobble' ? 10 : (roadClass === 'smuggler' ? 8 : 6);
         const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit, isHidden };
         this.lanes.set(id, lane);
         this.adjacency.get(fromId).push(id);
         return id;
       }
-      removeLane(laneId) {
-        const lane = this.lanes.get(laneId);
-        if (!lane) return null;
-        this.lanes.delete(laneId);
-        const adj = this.adjacency.get(lane.from);
-        if (adj) {
-          const idx = adj.indexOf(laneId);
-          if (idx !== -1) adj.splice(idx, 1);
-        }
-        return lane;
-      }
-      findPath(startId, goalId, preferHidden = false) {
+      findPath(startId, goalId) {
         if (!this.nodes.has(startId) || !this.nodes.has(goalId)) return null;
         if (startId === goalId) return [];
 
@@ -559,15 +582,14 @@
             if (!lane) continue;
             const nextNode = lane.to;
             const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
-            const gradeCost = deltaZ > 0 ? deltaZ * 1.5 : 0;
-            const hiddenFactor = preferHidden ? (lane.isHidden ? 0.35 : 1.2) : (lane.isHidden ? 2.5 : 1.0);
-            const newCost = costSoFar.get(current.id) + ((lane.curve.length / lane.speedLimit) + gradeCost) * hiddenFactor;
+            const gradeCost = deltaZ > 0 ? (deltaZ / lane.curve.length) * 2.0 : 0;
+            const newCost = costSoFar.get(current.id) + (lane.curve.length / lane.speedLimit) + gradeCost;
 
             if (!costSoFar.has(nextNode) || newCost < costSoFar.get(nextNode)) {
               costSoFar.set(nextNode, newCost);
               const goalPos = this.nodes.get(goalId).pos;
               const nextPos = this.nodes.get(nextNode).pos;
-              const h = nextPos.distanceTo(goalPos) / 25;
+              const h = nextPos.distanceTo(goalPos) / 15;
               frontier.push({ id: nextNode, cost: newCost + h });
               cameFrom.set(nextNode, { prevNode: current.id, laneId });
             }
@@ -587,46 +609,73 @@
       }
     }
 
-    class Agent3D {
-      constructor(id, origin, dest, maxSpeed = 12, isCovert = false) {
+    // ==========================================
+    // 原始生存 Agent (饱食、水分、体力与坡度能耗)
+    // ==========================================
+    class PrimitiveAgent {
+      constructor(id, homeCampNode, maxSpeed = 8.5) {
         this.id = id;
-        this.origin = origin;
-        this.dest = dest;
+        this.homeCampNode = homeCampNode;
         this.maxSpeed = maxSpeed;
-        this.isCovert = isCovert;
-        this.stealthAlpha = isCovert ? 0.25 : 1.0;
+        this.state = 'RestingAtCamp';
+
+        this.hunger = 80 + (id * 13) % 20;
+        this.thirst = 75 + (id * 17) % 25;
+        this.stamina = 90;
+        this.inventoryFood = 1.0;
+
+        this.targetNode = null;
+        this.currentLaneId = null;
+        this.distAlongCurve = 0;
         this.currentVelocity = 0;
         this.route = [];
         this.routeIndex = 0;
-        this.currentLaneId = null;
-        this.distAlongCurve = 0;
+
         this.pos = new Vec3();
-        this.yaw = 0;
-        this.pitch = 0;
-        this.state = isCovert ? 'Stealth' : 'Navigating';
-        this.colorHue = isCovert ? 330 : (id * 53) % 360;
         this.trail = [];
       }
-      tick(dt, network) {
-        if (this.state === 'Arrived' || this.state === 'Detour') return;
-        if (!this.currentLaneId) return;
+      tickMetabolism(dt) {
+        // 自然代谢消耗
+        this.hunger = Math.max(0, this.hunger - 0.4 * dt);
+        this.thirst = Math.max(0, this.thirst - 0.8 * dt);
 
-        const lane = network.lanes.get(this.currentLaneId);
-        if (!lane) {
-          this.state = 'Detour';
+        if (this.state === 'RestingAtCamp') {
+          this.stamina = Math.min(100, this.stamina + 8.0 * dt);
+          if (this.hunger < 70 && this.inventoryFood > 0.1) {
+            const eat = Math.min(this.inventoryFood, 1.5 * dt);
+            this.inventoryFood -= eat;
+            this.hunger = Math.min(100, this.hunger + eat * 25);
+          }
+        } else if (this.state === 'DrinkingAtWater') {
+          this.thirst = Math.min(100, this.thirst + 35.0 * dt);
+        } else if (this.state === 'ForagingFood') {
+          if (this.inventoryFood < 4.0) this.inventoryFood = Math.min(4.0, this.inventoryFood + 1.2 * dt);
+          if (this.hunger < 90) this.hunger = Math.min(100, this.hunger + 15.0 * dt);
+        }
+      }
+      tickMovement(dt, network) {
+        const isMoving = this.state === 'SeekingWater' || this.state === 'SeekingFood' || this.state === 'ReturningToCamp';
+        if (!isMoving) {
           this.currentVelocity = 0;
-          this.route = [];
-          this.currentLaneId = null;
           return;
         }
 
-        if (lane.isHidden || this.isCovert) {
-          this.stealthAlpha = Math.max(0.2, this.stealthAlpha - 1.5 * dt);
-        } else {
-          this.stealthAlpha = Math.min(1.0, this.stealthAlpha + 1.0 * dt);
+        if (!this.currentLaneId) return;
+        const lane = network.lanes.get(this.currentLaneId);
+        if (!lane) {
+          this.state = 'RestingAtCamp';
+          return;
         }
 
-        const targetSpeed = Math.min(this.maxSpeed, lane.speedLimit);
+        // 坡度能耗计算
+        const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
+        const uphill = deltaZ > 0 ? deltaZ / lane.curve.length : 0;
+        const staminaBurn = 1.0 * (1.0 + uphill * 3.5);
+        this.stamina = Math.max(0, this.stamina - staminaBurn * dt);
+
+        const staminaFactor = Math.max(0.25, Math.min(1.0, this.stamina / 30.0));
+        const targetSpeed = Math.min(this.maxSpeed, lane.speedLimit) * staminaFactor;
+
         this.currentVelocity += (targetSpeed - this.currentVelocity) * 3 * dt;
         this.distAlongCurve += this.currentVelocity * dt;
 
@@ -638,163 +687,217 @@
               this.currentLaneId = nextLane;
               this.distAlongCurve = 0;
             } else {
-              this.state = 'Detour';
-              this.currentVelocity = 0;
+              this.state = 'RestingAtCamp';
             }
           } else {
-            this.state = 'Arrived';
+            // 到达目的地，转入原位交互
             this.currentVelocity = 0;
+            this.currentLaneId = null;
+            if (this.state === 'SeekingWater') this.state = 'DrinkingAtWater';
+            else if (this.state === 'SeekingFood') this.state = 'ForagingFood';
+            else if (this.state === 'ReturningToCamp') this.state = 'RestingAtCamp';
           }
         } else {
           const t = this.distAlongCurve / lane.curve.length;
           this.pos = lane.curve.evalPos(t);
-          const tan = lane.curve.evalTangent(t);
-          this.yaw = Math.atan2(tan.y, tan.x);
-          const hLen = Math.hypot(tan.x, tan.y);
-          this.pitch = Math.atan2(tan.z, hLen);
 
           this.trail.push(new Vec3(this.pos.x, this.pos.y, this.pos.z));
-          if (this.trail.length > (this.isCovert ? 12 : 8)) this.trail.shift();
+          if (this.trail.length > 8) this.trail.shift();
         }
       }
     }
 
+    // ==========================================
+    // 原始生态与动线仿真世界
+    // ==========================================
     class WorldSimulation {
       constructor() {
         this.terrain = new PureTiltedTerrain(60, 764);
         this.network = new LaneGraph3D();
+        this.pois = [];
         this.agents = [];
         this.tickCount = 0;
         this.isPaused = false;
-        this.autoMutate = true;
         this.speedMult = 2;
 
         this.showTerrain = true;
-        this.showPubLanes = true;
-        this.showHiddenLanes = true;
-        this.showAgents = true;
+        this.showLanes = true;
+        this.showAura = true;
 
-        this.initCity(38);
+        this.selectedAgentIndex = 0;
+        this.initEcology(24);
       }
-      initCity(nodeCount) {
+      initEcology(agentCount) {
+        this.terrain.generate();
         this.network = new LaneGraph3D();
+        this.pois = [];
         this.agents = [];
         this.tickCount = 0;
 
         const half = this.terrain.worldSize / 2;
-        const nodeIds = [];
+        const campNodes = [], waterNodes = [], foodNodes = [];
+        const allNodeIds = [];
 
-        // 1. 生成吸附地表高程的节点
-        for (let i = 0; i < nodeCount; i++) {
-          const x = (Math.random() - 0.5) * (this.terrain.worldSize * 0.88);
-          const y = (Math.random() - 0.5) * (this.terrain.worldSize * 0.88);
-          let elev = this.terrain.sample(x, y).elev;
-
-          let nodeType = 'ground';
-          if (Math.random() < 0.15) {
-            elev += 12.0; // 高架立交
-            nodeType = 'skyway';
-          }
-
-          const id = this.network.addNode(x, y, elev, nodeType);
-          nodeIds.push(id);
+        // 1. 避风高台营地 (3 处, Z ≈ -5m ~ 15m)
+        for (let i = 0; i < 3; i++) {
+          const x = (Math.random() - 0.5) * half * 1.3;
+          const y = (Math.random() - 0.5) * half * 1.3;
+          const elev = this.terrain.sample(x, y).elev + 0.5;
+          const nid = this.network.addNode(x, y, elev, 'camp');
+          campNodes.push(nid);
+          allNodeIds.push(nid);
+          this.pois.push({ id: i + 1, type: 'Camp', pos: new Vec3(x, y, elev), name: `营地 #${i+1}` });
         }
 
-        // 2. 邻近连线
-        for (let i = 0; i < nodeIds.length; i++) {
-          for (let j = i + 1; j < nodeIds.length; j++) {
-            const idA = nodeIds[i], idB = nodeIds[j];
+        // 2. 低洼清泉水洼 (3 处，寻找地势极低洼点)
+        for (let i = 0; i < 3; i++) {
+          let bestX = 0, bestY = 0, lowestZ = 999;
+          for (let k = 0; k < 12; k++) {
+            const rx = (Math.random() - 0.5) * half * 1.7;
+            const ry = (Math.random() - 0.5) * half * 1.7;
+            const rz = this.terrain.sample(rx, ry).elev;
+            if (rz < lowestZ) { lowestZ = rz; bestX = rx; bestY = ry; }
+          }
+          const nid = this.network.addNode(bestX, bestY, lowestZ, 'water');
+          waterNodes.push(nid);
+          allNodeIds.push(nid);
+          this.pois.push({ id: i + 10, type: 'Water', pos: new Vec3(bestX, bestY, lowestZ), name: `低洼清泉 #${i+1}` });
+        }
+
+        // 3. 缓坡浆果丛 (4 处)
+        for (let i = 0; i < 4; i++) {
+          const x = (Math.random() - 0.5) * half * 1.5;
+          const y = (Math.random() - 0.5) * half * 1.5;
+          const elev = this.terrain.sample(x, y).elev;
+          const nid = this.network.addNode(x, y, elev, 'food');
+          foodNodes.push(nid);
+          allNodeIds.push(nid);
+          this.pois.push({ id: i + 20, type: 'Berry', pos: new Vec3(x, y, elev), name: `浆果丛 #${i+1}` });
+        }
+
+        // 4. 中间过渡地形步道节点
+        for (let i = 0; i < 18; i++) {
+          const x = (Math.random() - 0.5) * half * 1.7;
+          const y = (Math.random() - 0.5) * half * 1.7;
+          const elev = this.terrain.sample(x, y).elev;
+          allNodeIds.push(this.network.addNode(x, y, elev, 'ground'));
+        }
+
+        // 5. 铺设初级步行道 (Cobble 盘山道 / Dirt 泥路)
+        for (let i = 0; i < allNodeIds.length; i++) {
+          for (let j = i + 1; j < allNodeIds.length; j++) {
+            const idA = allNodeIds[i], idB = allNodeIds[j];
             const posA = this.network.nodes.get(idA).pos;
             const posB = this.network.nodes.get(idB).pos;
             const dist = posA.distanceTo(posB);
 
-            if (dist < 195) {
-              const willBeHidden = Math.random() < 0.22;
-
-              let roadClass = 'asphalt';
-              if (willBeHidden) roadClass = 'smuggler';
-              else if (posA.z > 14 || posB.z > 14) roadClass = 'skyway';
-              else if (Math.abs(posA.z - posB.z) > 4) roadClass = 'cobble';
-              else if (Math.random() < 0.3) roadClass = 'dirt';
-
-              this.network.addLane(idA, idB, roadClass, willBeHidden);
-              this.network.addLane(idB, idA, roadClass, willBeHidden);
+            if (dist < 190) {
+              const deltaZ = Math.abs(posA.z - posB.z);
+              const roadClass = deltaZ > 8 ? 'cobble' : 'dirt';
+              this.network.addLane(idA, idB, roadClass);
+              this.network.addLane(idB, idA, roadClass);
             }
           }
         }
 
-        this.spawnAgents(30, false);
-        this.spawnAgents(12, true);
-
-        const tiltDeg = Math.round((this.terrain.tiltAngle * 180 / Math.PI) % 360);
-        this.logEvent(`🌐 随机倾斜地势(±30m)生成完成: 倾角 ${tiltDeg}°，落差范围 [${Math.round(this.terrain.minZ)}m ~ +${Math.round(this.terrain.maxZ)}m]。`, 'geo');
-      }
-      spawnAgents(count, isCovert = false) {
-        const nodeKeys = Array.from(this.network.nodes.keys());
-        if (nodeKeys.length < 2) return;
-
-        for (let i = 0; i < count; i++) {
-          const start = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-          let goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-          while (goal === start) goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-
-          const path = this.network.findPath(start, goal, isCovert);
-          if (path && path.length > 0) {
-            const agentId = this.agents.length + 1;
-            const speed = isCovert ? (14 + Math.random() * 8) : (10 + Math.random() * 10);
-            const agent = new Agent3D(agentId, start, goal, speed, isCovert);
-            agent.route = path;
-            agent.currentLaneId = path[0];
-            agent.pos = this.network.nodes.get(start).pos;
-            this.agents.push(agent);
-          }
+        // 6. 注入部落民
+        for (let i = 0; i < agentCount; i++) {
+          const homeCamp = campNodes[i % campNodes.len ? i % campNodes.length : 0];
+          const agent = new PrimitiveAgent(i + 1, homeCamp, 8.0 + (i % 4));
+          agent.pos = this.network.nodes.get(homeCamp).pos;
+          this.agents.push(agent);
         }
-      }
-      refreshAgents() {
-        const nodeKeys = Array.from(this.network.nodes.keys());
-        if (nodeKeys.length < 2) return;
 
+        this.campNodes = campNodes;
+        this.waterNodes = waterNodes;
+        this.foodNodes = foodNodes;
+        this.logEvent(`🏕️ 原始生态演化完成: 包含 3 处避风营地、3 处低洼清泉与 4 处浆果丛。`, 'camp');
+      }
+      tickDecisions() {
         for (const agent of this.agents) {
-          if (agent.state === 'Arrived' || agent.state === 'Detour') {
-            const start = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-            let goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-            while (goal === start) goal = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-
-            const path = this.network.findPath(start, goal, agent.isCovert);
-            if (path && path.length > 0) {
-              agent.state = agent.isCovert ? 'Stealth' : 'Navigating';
-              agent.origin = start;
-              agent.dest = goal;
-              agent.route = path;
-              agent.routeIndex = 0;
-              agent.currentLaneId = path[0];
-              agent.distAlongCurve = 0;
-              agent.pos = this.network.nodes.get(start).pos;
+          if (agent.state === 'RestingAtCamp') {
+            // 口渴优先
+            if (agent.thirst < 40 && this.waterNodes.length > 0) {
+              const target = this.waterNodes[Math.floor(Math.random() * this.waterNodes.length)];
+              const path = this.network.findPath(agent.homeCampNode, target);
+              if (path && path.length > 0) {
+                agent.state = 'SeekingWater';
+                agent.targetNode = target;
+                agent.route = path;
+                agent.routeIndex = 0;
+                agent.currentLaneId = path[0];
+                agent.distAlongCurve = 0;
+                this.logEvent(`💧 部落民 #${agent.id} 口渴难耐，出发前往低洼清泉解渴...`, 'water');
+              }
+            } else if ((agent.hunger < 50 || agent.inventoryFood < 0.5) && this.foodNodes.length > 0) {
+              // 饥饿或储粮不足时外出采野果
+              const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+              const path = this.network.findPath(agent.homeCampNode, target);
+              if (path && path.length > 0) {
+                agent.state = 'SeekingFood';
+                agent.targetNode = target;
+                agent.route = path;
+                agent.routeIndex = 0;
+                agent.currentLaneId = path[0];
+                agent.distAlongCurve = 0;
+                this.logEvent(`🍒 部落民 #${agent.id} 肚子咕咕叫，前往缓坡采摘野果...`, 'food');
+              }
+            } else if (agent.stamina >= 95 && agent.hunger > 60 && Math.random() < 0.04) {
+              // 精力充沛时外出采果储粮
+              const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+              const path = this.network.findPath(agent.homeCampNode, target);
+              if (path && path.length > 0) {
+                agent.state = 'SeekingFood';
+                agent.targetNode = target;
+                agent.route = path;
+                agent.routeIndex = 0;
+                agent.currentLaneId = path[0];
+                agent.distAlongCurve = 0;
+              }
             }
-          }
-        }
-      }
-      mutateAddLane() {
-        const nodeKeys = Array.from(this.network.nodes.keys());
-        if (nodeKeys.length < 2) return;
-        const idA = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-        const idB = nodeKeys[Math.floor(Math.random() * nodeKeys.length)];
-        if (idA !== idB) {
-          const isHidden = Math.random() < 0.25;
-          const roadClass = isHidden ? 'smuggler' : 'asphalt';
-          const laneId = this.network.addLane(idA, idB, roadClass, isHidden);
-          if (laneId) {
-            this.logEvent(`✨ 拓扑自发生长: 新建车道 #${laneId} (${isHidden ? '走私便道' : '公共公路'})`, isHidden ? 'covert' : '');
-          }
-        }
-      }
-      mutateRemoveLane() {
-        const laneKeys = Array.from(this.network.lanes.keys());
-        if (laneKeys.length > 8) {
-          const target = laneKeys[Math.floor(Math.random() * laneKeys.length)];
-          const removed = this.network.removeLane(target);
-          if (removed) {
-            this.logEvent(`⚠️ 道路折损: 车道 #${target} 已拆除`, 'warn');
+          } else if (agent.state === 'DrinkingAtWater') {
+            if (agent.thirst >= 90) {
+              if (agent.hunger < 50 && this.foodNodes.length > 0) {
+                const curr = agent.targetNode || agent.homeCampNode;
+                const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+                const path = this.network.findPath(curr, target);
+                if (path && path.length > 0) {
+                  agent.state = 'SeekingFood';
+                  agent.targetNode = target;
+                  agent.route = path;
+                  agent.routeIndex = 0;
+                  agent.currentLaneId = path[0];
+                  agent.distAlongCurve = 0;
+                }
+              } else {
+                // 喝饱回营
+                const curr = agent.targetNode || agent.homeCampNode;
+                const path = this.network.findPath(curr, agent.homeCampNode);
+                if (path && path.length > 0) {
+                  agent.state = 'ReturningToCamp';
+                  agent.targetNode = agent.homeCampNode;
+                  agent.route = path;
+                  agent.routeIndex = 0;
+                  agent.currentLaneId = path[0];
+                  agent.distAlongCurve = 0;
+                  this.logEvent(`🏕️ 部落民 #${agent.id} 已痛饮解渴，正在沿山路返回营地。`, 'camp');
+                }
+              }
+            }
+          } else if (agent.state === 'ForagingFood') {
+            if (agent.hunger >= 85 && agent.inventoryFood >= 2.5) {
+              const curr = agent.targetNode || agent.homeCampNode;
+              const path = this.network.findPath(curr, agent.homeCampNode);
+              if (path && path.length > 0) {
+                agent.state = 'ReturningToCamp';
+                agent.targetNode = agent.homeCampNode;
+                agent.route = path;
+                agent.routeIndex = 0;
+                agent.currentLaneId = path[0];
+                agent.distAlongCurve = 0;
+                this.logEvent(`🍒 部落民 #${agent.id} 采得满兜浆果，满载返回营地！`, 'food');
+              }
+            }
           }
         }
       }
@@ -812,17 +915,16 @@
         for (let step = 0; step < this.speedMult; step++) {
           this.tickCount++;
 
-          if (this.autoMutate && this.tickCount % 120 === 0) {
-            if (Math.random() < 0.5) this.mutateAddLane();
-            else this.mutateRemoveLane();
+          for (const agent of this.agents) {
+            agent.tickMetabolism(0.05);
           }
 
-          if (this.tickCount % 40 === 0) {
-            this.refreshAgents();
+          if (this.tickCount % 20 === 0) {
+            this.tickDecisions();
           }
 
           for (const agent of this.agents) {
-            agent.tick(0.05, this.network);
+            agent.tickMovement(0.05, this.network);
           }
         }
       }
@@ -889,12 +991,10 @@
       return { x: cx + rx * scale, y: cy + y2 * scale, depth: z2 };
     }
 
-    // 基于高程与坡度光照的连续平滑着色器 (无地貌分类，纯几何渐变)
     function getElevationColor(cell, minZ, maxZ) {
       const { elev, dzdx, dzdy } = cell;
       const range = Math.max(1, maxZ - minZ);
       const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
-
       const lightFactor = Math.max(0.70, Math.min(1.30, 1.0 + (-dzdx * 0.35 - dzdy * 0.35)));
 
       let r, g, b;
@@ -926,7 +1026,7 @@
       const w = window.innerWidth, h = window.innerHeight;
       ctx.clearRect(0, 0, w, h);
 
-      // 1. 3D 随机起伏地形网格渲染 (60x60)
+      // 1. 3D 地形网格渲染 (±30m 倾斜起伏)
       if (sim.showTerrain) {
         const gSize = sim.terrain.gridSize;
         const minZ = sim.terrain.minZ, maxZ = sim.terrain.maxZ;
@@ -959,119 +1059,116 @@
         }
       }
 
-      // 2. 高架立柱
-      for (const node of sim.network.nodes.values()) {
-        const sample = sim.terrain.sample(node.pos.x, node.pos.y);
-        if (node.pos.z > sample.elev + 3 && sim.showPubLanes) {
-          const top = project3D(node.pos);
-          const btm = project3D(new Vec3(node.pos.x, node.pos.y, sample.elev));
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
-          ctx.lineWidth = 2.8 * camera.zoom;
-          ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(btm.x, btm.y); ctx.stroke();
+      // 2. 原始生态三大地标 POI 渲染
+      for (const poi of sim.pois) {
+        const p2D = project3D(poi.pos);
+
+        if (poi.type === 'Camp') {
+          // 🏕️ 篝火营地光晕
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 28 * camera.zoom);
+          grad.addColorStop(0, 'rgba(245, 158, 11, 0.85)');
+          grad.addColorStop(0.4, 'rgba(239, 68, 68, 0.45)');
+          grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 28 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+
+          ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('🏕️', p2D.x, p2D.y + 4);
+        } else if (poi.type === 'Water') {
+          // 💧 低洼清泉涟漪
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 24 * camera.zoom);
+          grad.addColorStop(0, 'rgba(2, 132, 199, 0.9)');
+          grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
+          grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 24 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+
+          ctx.font = `${Math.floor(15 * camera.zoom)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('💧', p2D.x, p2D.y + 4);
+        } else if (poi.type === 'Berry') {
+          // 🍒 浆果灌木
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 20 * camera.zoom);
+          grad.addColorStop(0, 'rgba(16, 185, 129, 0.85)');
+          grad.addColorStop(0.6, 'rgba(5, 150, 105, 0.4)');
+          grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 20 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+
+          ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('🍒', p2D.x, p2D.y + 4);
         }
       }
 
-      // 3. 3D 贝塞尔车道
-      for (const lane of sim.network.lanes.values()) {
-        if (lane.isHidden && !sim.showHiddenLanes) continue;
-        if (!lane.isHidden && !sim.showPubLanes) continue;
+      // 3. 原始兽径与步行道
+      if (sim.showLanes) {
+        for (const lane of sim.network.lanes.values()) {
+          const isCobble = lane.roadClass === 'cobble';
+          ctx.strokeStyle = isCobble ? 'rgba(251, 191, 36, 0.65)' : 'rgba(217, 119, 6, 0.55)';
+          ctx.lineWidth = (isCobble ? 3.0 : 2.0) * camera.zoom;
+          ctx.setLineDash([4, 4]);
 
-        let strokeColor = 'rgba(148, 163, 184, 0.7)';
-        let lineWidth = 3.2 * camera.zoom;
-        let isDashed = false;
-
-        if (lane.isHidden) {
-          strokeColor = 'rgba(192, 38, 211, 0.9)';
-          lineWidth = 3.6 * camera.zoom;
-          isDashed = true;
-        } else if (lane.roadClass === 'skyway') {
-          strokeColor = 'rgba(56, 189, 248, 0.95)';
-          lineWidth = 5.0 * camera.zoom;
-        } else if (lane.roadClass === 'cobble') {
-          strokeColor = 'rgba(251, 191, 36, 0.8)';
-        } else if (lane.roadClass === 'dirt') {
-          strokeColor = 'rgba(217, 119, 6, 0.65)';
-          isDashed = true;
-        }
-
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = lineWidth;
-        if (isDashed) {
-          ctx.shadowColor = lane.isHidden ? '#c026d3' : 'transparent';
-          ctx.shadowBlur = lane.isHidden ? 8 : 0;
-          ctx.setLineDash([5, 4]);
-        } else {
+          ctx.beginPath();
+          const segs = 16;
+          for (let i = 0; i <= segs; i++) {
+            const pt3D = lane.curve.evalPos(i / segs);
+            const p2D = project3D(pt3D);
+            if (i === 0) ctx.moveTo(p2D.x, p2D.y);
+            else ctx.lineTo(p2D.x, p2D.y);
+          }
+          ctx.stroke();
           ctx.setLineDash([]);
         }
-
-        ctx.beginPath();
-        const segs = 16;
-        for (let i = 0; i <= segs; i++) {
-          const pt3D = lane.curve.evalPos(i / segs);
-          const p2D = project3D(pt3D);
-          if (i === 0) ctx.moveTo(p2D.x, p2D.y);
-          else ctx.lineTo(p2D.x, p2D.y);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.shadowBlur = 0;
       }
 
-      // 4. 节点
-      for (const node of sim.network.nodes.values()) {
-        const isHiddenNode = node.type === 'cave_portal';
-        if (isHiddenNode && !sim.showHiddenLanes) continue;
-        if (!isHiddenNode && !sim.showPubLanes) continue;
+      // 4. 部落民 Agent 渲染 (带状态色彩与生命光晕)
+      for (let i = 0; i < sim.agents.length; i++) {
+        const agent = sim.agents[i];
+        const p2D = project3D(agent.pos);
 
-        const p2D = project3D(node.pos);
-        ctx.fillStyle = node.pos.z > 10 ? '#38bdf8' : '#cbd5e1';
-        ctx.beginPath();
-        ctx.arc(p2D.x, p2D.y, (node.pos.z > 10 ? 4.5 : 3.0) * camera.zoom, 0, Math.PI * 2);
-        ctx.fill();
-      }
+        // 状态色彩
+        let stateColor = '#facc15';
+        if (agent.state === 'SeekingWater' || agent.state === 'DrinkingAtWater') stateColor = '#38bdf8';
+        else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#10b981';
+        else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
 
-      // 5. 3D Agent 车辆渲染
-      if (sim.showAgents) {
-        for (const agent of sim.agents) {
-          if (agent.state === 'Arrived' || agent.state === 'Detour') continue;
-
-          const p2D = project3D(agent.pos);
-
-          if (agent.trail.length > 1) {
-            const trailAlpha = agent.isCovert ? (agent.stealthAlpha * 0.5) : 0.45;
-            ctx.strokeStyle = agent.isCovert ? `rgba(244, 63, 94, ${trailAlpha})` : `hsla(${agent.colorHue}, 95%, 65%, ${trailAlpha})`;
-            ctx.lineWidth = (agent.isCovert ? 2.5 : 2) * camera.zoom;
-            ctx.beginPath();
-            for (let i = 0; i < agent.trail.length; i++) {
-              const tp = project3D(agent.trail[i]);
-              if (i === 0) ctx.moveTo(tp.x, tp.y);
-              else ctx.lineTo(tp.x, tp.y);
-            }
-            ctx.stroke();
-          }
-
-          if (agent.isCovert) {
-            const pulse = (Math.sin(performance.now() * 0.008 + agent.id) + 1) * 0.5;
-            ctx.strokeStyle = `rgba(244, 63, 94, ${0.4 * pulse})`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(p2D.x, p2D.y, (8 + pulse * 12) * camera.zoom, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-
-          const radius = (agent.isCovert ? 4.5 : 3.5) * camera.zoom;
-          const fillAlpha = agent.isCovert ? agent.stealthAlpha : 1.0;
-          ctx.fillStyle = agent.isCovert ? `rgba(244, 63, 94, ${fillAlpha})` : `hsla(${agent.colorHue}, 95%, 60%, ${fillAlpha})`;
-          ctx.shadowColor = agent.isCovert ? '#f43f5e' : `hsl(${agent.colorHue}, 95%, 60%)`;
-          ctx.shadowBlur = agent.isCovert ? 12 : 6;
+        // 尾迹
+        if (agent.trail.length > 1) {
+          ctx.strokeStyle = stateColor;
+          ctx.lineWidth = 1.8 * camera.zoom;
           ctx.beginPath();
-          ctx.arc(p2D.x, p2D.y, radius, 0, Math.PI * 2);
+          for (let t = 0; t < agent.trail.length; t++) {
+            const tp = project3D(agent.trail[t]);
+            if (t === 0) ctx.moveTo(tp.x, tp.y);
+            else ctx.lineTo(tp.x, tp.y);
+          }
+          ctx.stroke();
+        }
+
+        // 光晕指示
+        if (sim.showAura) {
+          ctx.fillStyle = stateColor;
+          ctx.shadowColor = stateColor;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, 4.0 * camera.zoom, 0, Math.PI * 2);
           ctx.fill();
           ctx.shadowBlur = 0;
         }
+
+        // 选中高亮
+        if (i === sim.selectedAgentIndex) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, 9.0 * camera.zoom, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
-      // HUD 指标更新
+      // 5. 更新监控面板与统计
       frameCount++;
       const now = performance.now();
       if (now - lastFpsUpdate >= 500) {
@@ -1080,20 +1177,72 @@
         lastFpsUpdate = now;
       }
 
-      const tiltDeg = Math.round((sim.terrain.tiltAngle * 180 / Math.PI) % 360);
-      const tiltArrows = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'];
-      const arrowIdx = Math.floor(((tiltDeg + 22.5) % 360) / 45);
+      let totalH = 0, totalT = 0, totalS = 0;
+      for (const a of sim.agents) {
+        totalH += a.hunger; totalT += a.thirst; totalS += a.stamina;
+      }
+      const count = sim.agents.length || 1;
+      document.getElementById('stat-pop').textContent = sim.agents.length;
+      document.getElementById('stat-avg-hunger').textContent = `${Math.round(totalH / count)}%`;
+      document.getElementById('stat-avg-thirst').textContent = `${Math.round(totalT / count)}%`;
+      document.getElementById('stat-avg-stamina').textContent = `${Math.round(totalS / count)}%`;
 
-      document.getElementById('stat-tilt').textContent = `${tiltArrows[arrowIdx]} ${tiltDeg}°`;
-      document.getElementById('stat-range').textContent = `${Math.round(sim.terrain.minZ)}m ~ +${Math.round(sim.terrain.maxZ)}m`;
-      document.getElementById('lbl-min-z').textContent = `最低点 (${Math.round(sim.terrain.minZ)}m)`;
-      document.getElementById('lbl-max-z').textContent = `最高点 (+${Math.round(sim.terrain.maxZ)}m)`;
-      document.getElementById('stat-lanes').textContent = sim.network.lanes.size;
-      document.getElementById('stat-agents').textContent = sim.agents.filter(a => a.state !== 'Arrived' && a.state !== 'Detour').length;
+      // 选中的 Agent 实时指标刷新
+      const selAgent = sim.agents[sim.selectedAgentIndex] || sim.agents[0];
+      if (selAgent) {
+        document.getElementById('insp-name').textContent = `部落民 #${selAgent.id}`;
+        
+        let stateText = '🏕️ 营地休息中';
+        let detailText = '在营地休眠恢复体力，并消耗背包中的野果充饥。';
+        if (selAgent.state === 'SeekingWater') {
+          stateText = '💧 赶往低洼清泉';
+          detailText = '水分值告急，正前往地势低处水洼寻水 (下坡省力)。';
+        } else if (selAgent.state === 'DrinkingAtWater') {
+          stateText = '💧 水洼痛饮解渴';
+          detailText = '正在低洼清泉处补充水分。';
+        } else if (selAgent.state === 'SeekingFood') {
+          stateText = '🍒 前往采摘浆果';
+          detailText = '饱食度偏低，前往缓坡浆果丛采摘。';
+        } else if (selAgent.state === 'ForagingFood') {
+          stateText = '🍒 正在采摘浆果';
+          detailText = '正在灌木丛中采摘成熟野果并装入行囊。';
+        } else if (selAgent.state === 'ReturningToCamp') {
+          stateText = '🏕️ 负重返回营地';
+          detailText = '已完成采集与补水，沿山路上坡返回避风营地 (上坡体力消耗加剧)。';
+        }
+
+        document.getElementById('insp-state').textContent = stateText;
+        document.getElementById('insp-hunger-val').textContent = `${Math.round(selAgent.hunger)}%`;
+        document.getElementById('insp-hunger-fill').style.width = `${selAgent.hunger}%`;
+        document.getElementById('insp-thirst-val').textContent = `${Math.round(selAgent.thirst)}%`;
+        document.getElementById('insp-thirst-fill').style.width = `${selAgent.thirst}%`;
+        document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;
+        document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
+        document.getElementById('insp-inv-val').textContent = `${selAgent.inventoryFood.toFixed(1)} / 4.0 颗`;
+        document.getElementById('insp-detail').textContent = detailText;
+      }
 
       requestAnimationFrame(render);
     }
     requestAnimationFrame(render);
+
+    // 鼠标点击拾取 Agent
+    canvas.addEventListener('click', e => {
+      const clickX = e.clientX, clickY = e.clientY;
+      let closestIdx = -1, minDist = 25;
+
+      for (let i = 0; i < sim.agents.length; i++) {
+        const p2D = project3D(sim.agents[i].pos);
+        const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
+        if (d < minDist) {
+          minDist = d;
+          closestIdx = i;
+        }
+      }
+      if (closestIdx !== -1) {
+        sim.selectedAgentIndex = closestIdx;
+      }
+    });
 
     // ==========================================
     // UI 控制绑定
@@ -1104,34 +1253,36 @@
       btnPause.textContent = sim.isPaused ? '▶️ 继续模拟' : '⏸️ 暂停模拟';
     });
 
-    document.getElementById('btn-reroll-terrain').addEventListener('click', () => {
-      sim.terrain.generate();
-      sim.initCity(38);
+    document.getElementById('btn-reroll-eco').addEventListener('click', () => {
+      sim.initEcology(24);
     });
 
     document.getElementById('btn-spawn-civ').addEventListener('click', () => {
-      sim.spawnAgents(20, false);
-      sim.logEvent('🚶 注入 +20 常规市民车辆');
-    });
-    document.getElementById('btn-spawn-covert').addEventListener('click', () => {
-      sim.spawnAgents(10, true);
-      sim.logEvent('🕵️ 注入 +10 潜行特工与密探', 'covert');
+      const homeCamp = sim.campNodes[0];
+      const startId = sim.agents.length + 1;
+      for (let i = 0; i < 8; i++) {
+        const a = new PrimitiveAgent(startId + i, homeCamp, 8.0 + (i % 3));
+        a.pos = sim.network.nodes.get(homeCamp).pos;
+        sim.agents.push(a);
+      }
+      sim.logEvent(`🚶 繁衍新生: 部落新增 +8 名部落民！`, 'camp');
     });
 
-    document.getElementById('btn-add-lane').addEventListener('click', () => sim.mutateAddLane());
-    document.getElementById('btn-remove-lane').addEventListener('click', () => sim.mutateRemoveLane());
+    document.getElementById('btn-add-food').addEventListener('click', () => {
+      for (const a of sim.agents) {
+        if (a.state === 'RestingAtCamp') a.inventoryFood = Math.min(4.0, a.inventoryFood + 2.0);
+      }
+      sim.logEvent(`🍒 丰收采风: 部落营地补给 +2.0 浆果储量！`, 'food');
+    });
 
     document.getElementById('chk-terrain').addEventListener('change', e => {
       sim.showTerrain = e.target.checked;
     });
-    document.getElementById('chk-show-pub-lanes').addEventListener('change', e => {
-      sim.showPubLanes = e.target.checked;
+    document.getElementById('chk-lanes').addEventListener('change', e => {
+      sim.showLanes = e.target.checked;
     });
-    document.getElementById('chk-show-hidden-lanes').addEventListener('change', e => {
-      sim.showHiddenLanes = e.target.checked;
-    });
-    document.getElementById('chk-agents').addEventListener('change', e => {
-      sim.showAgents = e.target.checked;
+    document.getElementById('chk-aura').addEventListener('change', e => {
+      sim.showAura = e.target.checked;
     });
     document.getElementById('sel-speed').addEventListener('change', e => {
       sim.speedMult = parseInt(e.target.value, 10);
