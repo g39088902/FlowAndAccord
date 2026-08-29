@@ -8,9 +8,11 @@ pub enum PoiType {
     Camp,        // 🏕️ 避风营地 (无限储量与无限庇护，休眠恢复体力、饱暖受孕与分娩)
     WaterSource, // 💧 低洼清泉 (产出水资源，单点上限60.0单位，2.00单位/秒)
     BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限60.0单位，2.00单位/秒)
+    WoodForest,  // 🌲 茂密林木 (产出木材资源，单点上限60.0单位，2.00单位/秒)
+    StoneQuarry, // 🪨 嶙峋石矿 (产出石料资源，单点上限60.0单位，1.50单位/秒)
 }
 
-/// 有限生态地标实体 (清泉/浆果最大储量 60.0 单位，产出速率 2.0 单位/秒；营地无限)
+/// 有限生态地标实体 (清泉/浆果/林木/石矿最大储量 60.0 单位；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
@@ -27,6 +29,8 @@ impl PrimitivePoi {
             PoiType::Camp => (f32::INFINITY, 0.0, f32::INFINITY),
             PoiType::WaterSource => (60.0, 2.00, 45.0),
             PoiType::BerryBush => (60.0, 2.00, 45.0),
+            PoiType::WoodForest => (60.0, 2.00, 45.0),
+            PoiType::StoneQuarry => (60.0, 1.50, 45.0),
         };
 
         Self {

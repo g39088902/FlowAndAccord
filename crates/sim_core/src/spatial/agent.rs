@@ -19,7 +19,11 @@ pub enum PrimitiveActionState {
     DrinkingAtWater,    // 💧 正在水洼原位痛饮并补给家宅
     SeekingFood,        // 🚶 正在赶往采摘区
     ForagingFood,       // 🍒 正在果丛原位进食并补给家宅
-    ReturningToCamp,    // 🏕️ 饱腹/解渴返回营地或私宅
+    SeekingWood,        // 🚶 正在赶往林地伐木
+    GatheringWood,      // 🌲 正在林地伐木并补给家宅
+    SeekingStone,       // 🚶 正在赶往石矿采石
+    MiningStone,        // 🪨 正在石矿采石并补给家宅
+    ReturningToCamp,    // 🏕️ 饱腹/解渴/采收返回营地或私宅
     ConstructingHouse,  // 🔨 正在投入工时营建/升级房屋
     RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
     OffRoadDetour,      // ⚠️ 荒野越野寻路中
@@ -87,8 +91,8 @@ impl Agent3D {
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
-            hunger: 15.0, // 初始 50% (满值 30.0)
-            thirst: 15.0, // 初始 50% (满值 30.0)
+            hunger: 25.0, // 初始 50% (满值 50.0)
+            thirst: 25.0, // 初始 50% (满值 50.0)
             stamina: 95.0,
             home_camp_node: home_camp,
             target_poi_node: None,
@@ -120,7 +124,7 @@ impl Agent3D {
         }
     }
 
-    /// 核心生命代谢 Tick (上限30.0单位，房屋激活受孕繁衍)
+    /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
@@ -140,8 +144,12 @@ impl Agent3D {
         let mut event_msg = None;
         let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
 
-        if self.state == PrimitiveActionState::ConstructingHouse || self.state == PrimitiveActionState::RepairingHouse {
-            metabolic_multiplier *= 1.25; // 营建与修缮劳动轻微加速代谢
+        if self.state == PrimitiveActionState::ConstructingHouse
+            || self.state == PrimitiveActionState::RepairingHouse
+            || self.state == PrimitiveActionState::GatheringWood
+            || self.state == PrimitiveActionState::MiningStone
+        {
+            metabolic_multiplier *= 1.25; // 营建、修缮与采伐劳动轻微加速代谢
         }
 
         // 统一需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒
@@ -167,13 +175,13 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (上限30.0，饱暖≥75%即22.5单位，且有家宅庇护)
+        // 受孕判定 (上限50.0，饱暖≥75%即37.5单位，且有家宅庇护)
         if self.gender == Gender::Female && self.spouse_id.is_some() && self.home_house_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
-            if self.age >= 120.0 && self.hunger >= 22.5 && self.thirst >= 22.5 && self.stamina >= 75.0 {
+            if self.age >= 120.0 && self.hunger >= 37.5 && self.thirst >= 37.5 && self.stamina >= 75.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
-                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥22.5单位)，成功受孕进入120秒妊娠期！", self.id, spouse_str));
+                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥37.5单位)，成功受孕进入120秒妊娠期！", self.id, spouse_str));
             }
         }
 
@@ -205,6 +213,8 @@ impl Agent3D {
             self.stamina = (self.stamina - 3.5 * dt).max(5.0);
         } else if self.state == PrimitiveActionState::RepairingHouse {
             self.stamina = (self.stamina - 2.5 * dt).max(5.0); // 修缮劳作消耗体力
+        } else if self.state == PrimitiveActionState::GatheringWood || self.state == PrimitiveActionState::MiningStone {
+            self.stamina = (self.stamina - 2.0 * dt).max(5.0); // 伐木采石消耗体力
         }
 
         event_msg
@@ -221,6 +231,8 @@ impl Agent3D {
             self.state,
             PrimitiveActionState::SeekingWater
                 | PrimitiveActionState::SeekingFood
+                | PrimitiveActionState::SeekingWood
+                | PrimitiveActionState::SeekingStone
                 | PrimitiveActionState::ReturningToCamp
         );
 
@@ -304,6 +316,12 @@ impl Agent3D {
                 }
                 PrimitiveActionState::SeekingFood => {
                     self.state = PrimitiveActionState::ForagingFood;
+                }
+                PrimitiveActionState::SeekingWood => {
+                    self.state = PrimitiveActionState::GatheringWood;
+                }
+                PrimitiveActionState::SeekingStone => {
+                    self.state = PrimitiveActionState::MiningStone;
                 }
                 PrimitiveActionState::ReturningToCamp => {
                     self.state = PrimitiveActionState::RestingAtCamp;

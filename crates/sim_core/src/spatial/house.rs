@@ -6,11 +6,11 @@ use super::agent::AgentId;
 /// 房屋建筑等级 (多级资本积累与仓储扩容)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HouseTier {
-    Tier0Warehouse,   // 0级 仓库 (无劳动力门槛，容量各 10.0，满仓后投入30s升级)
-    Tier1LeanTo,      // 1级 私宅 (容量各 20.0，水粮≥10激活生育，满仓后投入40s升级)
-    Tier2ThatchedHut, // 2级 夯土茅草屋 (容量各 40.0，满仓后投入50s升级)
-    Tier3Homestead,   // 3级 木构石基宅舍 (容量各 80.0，满仓后投入60s升级)
-    Tier4Manor,       // 4级 氏族大庄园 (容量各 150.0，终极仓储大屋)
+    Tier0Warehouse,   // 0级 仓库 (无劳动力门槛，容量各 10.0，满水粮后投入30s升级)
+    Tier1ThatchedHut, // 1级 茅草房 (容量各 20.0，迎娶结发，水粮木≥10激活生育，满木材升级私宅)
+    Tier2LeanTo,      // 2级 私宅 (容量各 40.0，私产大屋，升级庄舍需储备石头)
+    Tier3Homestead,   // 3级 木石庄舍 (容量各 80.0，升级庄园需储备石头)
+    Tier4Manor,       // 4级 氏族大庄园 (容量各 150.0，终极聚落大屋)
 }
 
 /// 房屋实体 (耐用资本品、独立分品类仓储、修缮维护与家庭避风港)
@@ -27,6 +27,10 @@ pub struct House {
     pub max_pantry_food: f32,               // 私有食物仓储上限 (单位)
     pub pantry_water: f32,                  // 私有水资源独立储备 (单位)
     pub max_pantry_water: f32,              // 私有水资源仓储上限 (单位)
+    pub pantry_wood: f32,                   // 私有木材独立储备 (单位，用于冬季取暖与升级私宅)
+    pub max_pantry_wood: f32,               // 私有木材仓储上限 (单位)
+    pub pantry_stone: f32,                  // 私有石料独立储备 (单位，仅用于盖房与高级升级)
+    pub max_pantry_stone: f32,              // 私有石料仓储上限 (单位)
     pub age: f32,                           // 房龄 (秒)
     pub generation: u32,                    // 代际传承代数 (从第1代祖屋开始)
     pub is_ruin: bool,                      // 是否因户主绝嗣而成为无主废墟
@@ -36,12 +40,12 @@ pub struct House {
 
 impl House {
     pub fn new(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier) -> Self {
-        let (init_water, init_food, max_cap, init_prog) = match tier {
-            HouseTier::Tier0Warehouse => (5.0, 5.0, 10.0, 0.0), // 0级仓库自带 5 水 5 粮
-            HouseTier::Tier1LeanTo => (10.0, 10.0, 20.0, 1.0),
-            HouseTier::Tier2ThatchedHut => (20.0, 20.0, 40.0, 1.0),
-            HouseTier::Tier3Homestead => (40.0, 40.0, 80.0, 1.0),
-            HouseTier::Tier4Manor => (80.0, 80.0, 150.0, 1.0),
+        let (init_water, init_food, init_wood, init_stone, max_cap, init_prog) = match tier {
+            HouseTier::Tier0Warehouse => (5.0, 5.0, 5.0, 0.0, 10.0, 0.0), // 0级仓库自带 5 水 5 粮 5 木
+            HouseTier::Tier1ThatchedHut => (10.0, 10.0, 10.0, 0.0, 20.0, 1.0),
+            HouseTier::Tier2LeanTo => (20.0, 20.0, 20.0, 0.0, 40.0, 1.0),
+            HouseTier::Tier3Homestead => (40.0, 40.0, 40.0, 0.0, 80.0, 1.0),
+            HouseTier::Tier4Manor => (80.0, 80.0, 80.0, 0.0, 150.0, 1.0),
         };
 
         Self {
@@ -56,6 +60,10 @@ impl House {
             max_pantry_food: max_cap,
             pantry_water: init_water,
             max_pantry_water: max_cap,
+            pantry_wood: init_wood,
+            max_pantry_wood: max_cap,
+            pantry_stone: init_stone,
+            max_pantry_stone: max_cap,
             age: 0.0,
             generation: 1,
             is_ruin: false,
@@ -64,37 +72,65 @@ impl House {
         }
     }
 
-    /// 是否支持继续怀孕/激活生育 (必须是非0级仓库且水粮均≥10.0单位，某项<10失去生育支持)
+    /// 是否支持继续怀孕/激活生育 (必须是非0级仓库且水粮木均≥10.0单位；木材<10无法保障过冬取暖，失去生育支持)
     pub fn is_fertility_active(&self) -> bool {
-        self.tier != HouseTier::Tier0Warehouse && self.pantry_water >= 10.0 && self.pantry_food >= 10.0 && !self.is_ruin
+        self.tier != HouseTier::Tier0Warehouse
+            && self.pantry_water >= 10.0
+            && self.pantry_food >= 10.0
+            && self.pantry_wood >= 10.0
+            && !self.is_ruin
     }
 
-    /// 仓库是否已填满 (水粮均达到上限)
+    /// 仓库是否已达到升级所需物资要求
+    /// 0级仓库升1级茅草房：需要水粮各满 10.0
+    /// 1级茅草房升2级私宅：需要木材蓄满(20.0)，水粮保底充足
+    /// 2级私宅升3级木石庄舍：需要石料蓄满(40.0)，木材水粮充足
+    /// 3级木石庄舍升4级庄园：需要石料蓄满(80.0)，木材水粮充足
     pub fn is_pantry_full(&self) -> bool {
-        self.pantry_water >= self.max_pantry_water && self.pantry_food >= self.max_pantry_food
+        match self.tier {
+            HouseTier::Tier0Warehouse => {
+                self.pantry_water >= self.max_pantry_water && self.pantry_food >= self.max_pantry_food
+            }
+            HouseTier::Tier1ThatchedHut => {
+                self.pantry_wood >= self.max_pantry_wood && self.pantry_water >= 10.0 && self.pantry_food >= 10.0
+            }
+            HouseTier::Tier2LeanTo => {
+                self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 15.0 && self.pantry_water >= 15.0 && self.pantry_food >= 15.0
+            }
+            HouseTier::Tier3Homestead => {
+                self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 25.0 && self.pantry_water >= 25.0 && self.pantry_food >= 25.0
+            }
+            HouseTier::Tier4Manor => false,
+        }
     }
 
     /// 晋升下一级房屋 (大幅扩容储备空间)
     pub fn upgrade_to_next_tier(&mut self) -> bool {
         match self.tier {
             HouseTier::Tier0Warehouse => {
-                self.tier = HouseTier::Tier1LeanTo;
+                self.tier = HouseTier::Tier1ThatchedHut;
                 self.max_pantry_water = 20.0;
                 self.max_pantry_food = 20.0;
+                self.max_pantry_wood = 20.0;
+                self.max_pantry_stone = 20.0;
                 self.construction_progress = 1.0;
                 true
             }
-            HouseTier::Tier1LeanTo => {
-                self.tier = HouseTier::Tier2ThatchedHut;
+            HouseTier::Tier1ThatchedHut => {
+                self.tier = HouseTier::Tier2LeanTo;
                 self.max_pantry_water = 40.0;
                 self.max_pantry_food = 40.0;
+                self.max_pantry_wood = 40.0;
+                self.max_pantry_stone = 40.0;
                 self.construction_progress = 1.0;
                 true
             }
-            HouseTier::Tier2ThatchedHut => {
+            HouseTier::Tier2LeanTo => {
                 self.tier = HouseTier::Tier3Homestead;
                 self.max_pantry_water = 80.0;
                 self.max_pantry_food = 80.0;
+                self.max_pantry_wood = 80.0;
+                self.max_pantry_stone = 80.0;
                 self.construction_progress = 1.0;
                 true
             }
@@ -102,6 +138,8 @@ impl House {
                 self.tier = HouseTier::Tier4Manor;
                 self.max_pantry_water = 150.0;
                 self.max_pantry_food = 150.0;
+                self.max_pantry_wood = 150.0;
+                self.max_pantry_stone = 150.0;
                 self.construction_progress = 1.0;
                 true
             }
@@ -137,6 +175,10 @@ pub struct HouseSnapshot {
     pub max_pantry_food: f32,
     pub pantry_water: f32,
     pub max_pantry_water: f32,
+    pub pantry_wood: f32,
+    pub max_pantry_wood: f32,
+    pub pantry_stone: f32,
+    pub max_pantry_stone: f32,
     pub age: f32,
     pub generation: u32,
     pub is_ruin: bool,
