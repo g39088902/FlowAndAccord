@@ -65,6 +65,7 @@ pub struct LaneSnapshot {
     pub p3: Vec3,
     pub road_class: String,
     pub speed_limit: f32,
+    pub wear: f32, // 踩踏等级连续浮点数 (0.0 ~ 3.0)
     pub is_hidden: bool,
     pub concealment: f32,
 }
@@ -225,21 +226,23 @@ impl World3DEngine {
             }
         }
 
-        // 6. 注入初始部落民 (8 人，男女各半 4男4女，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 已成年)
-        for i in 0..agent_count {
+        // 6. 注入初始部落民 (固定 6 男 6 女共 12 人，年龄在 0~240s 随机，容量 20.0 单位，初始 50%=10.0)
+        let total_initial = 12;
+        for i in 0..total_initial {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
-            let gender = if i % 2 == 0 { Gender::Female } else { Gender::Male };
+            let gender = if i < 6 { Gender::Female } else { Gender::Male };
+            let initial_age = rng.gen_range(0.0..240.0);
 
-            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, 120.0, gender);
+            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 规格就绪: 男女二元性别(仅女性可育)，120s孕期，小人容量20单位(初始50%=10)，清泉/浆果上限40(产速1.0/s)！".to_string());
+        self.last_event = Some("🏕️ 规格就绪: 固定6男6女开局(年龄0~240s随机)，初始全图无路(踩踏拓路升级/闲置衰减)，男女分工！".to_string());
     }
 
     /// 真实有限资源交互结算与分娩
@@ -481,9 +484,12 @@ impl World3DEngine {
             self.tick_decisions();
         }
 
-        // 4. 动力学运动
+        // 4. 道路自然杂草丛生与退化衰减
+        self.network.tick_wear_decay(dt);
+
+        // 5. 动力学运动与踩踏拓路
         for agent in &mut self.agents {
-            agent.tick_movement(dt, &self.network);
+            agent.tick_movement(dt, &mut self.network);
         }
     }
 
@@ -536,6 +542,7 @@ impl World3DEngine {
                 p3: lane.curve.p3,
                 road_class: format!("{:?}", lane.road_class),
                 speed_limit: lane.speed_limit,
+                wear: lane.wear,
                 is_hidden: lane.is_hidden,
                 concealment: lane.concealment,
             });

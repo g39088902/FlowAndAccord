@@ -40,6 +40,7 @@ pub struct LaneEdge3D {
     pub speed_limit: f32, // 限速 (m/s)
     pub max_capacity: u32,// 理论承载力
     pub health: f32,      // 耐久度 0.0 ~ 100.0
+    pub wear: f32,        // 动态踩踏等级 (连续浮点数 0.0=荒野无路, 1.0=土径, 2.0=夯土道, 3.0=平整石道)
     pub is_hidden: bool,  // 是否为隐藏道路/走私密道
     pub concealment: f32, // 隐秘度 0.0 (完全公开) ~ 1.0 (深度隐藏)
 }
@@ -130,6 +131,7 @@ impl LaneGraph3D {
             speed_limit,
             max_capacity: 100,
             health: 100.0,
+            wear: 0.0, // 初始地图完全无路 (wear = 0.0)
             is_hidden: is_hidden || road_class == RoadClass::SmugglerTrail,
             concealment: if is_hidden { concealment.max(0.7) } else { concealment },
         };
@@ -137,6 +139,16 @@ impl LaneGraph3D {
         let edge_idx = self.graph.add_edge(from_idx, to_idx, edge_data);
         self.edge_map.insert(lane_id, edge_idx);
         Ok(lane_id)
+    }
+
+    /// 道路自然杂草丛生与退化衰减 (走的人少了，道路等级随时间衰减)
+    pub fn tick_wear_decay(&mut self, dt: f32) {
+        for edge in self.graph.edge_weights_mut() {
+            if edge.wear > 0.0 {
+                // 每秒衰减 0.012 (约 80 秒无踩踏从 1.0 兽径退化为原始荒野)
+                edge.wear = (edge.wear - 0.012 * dt).max(0.0);
+            }
+        }
     }
 
     /// 动态删除车道

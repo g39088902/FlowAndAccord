@@ -183,8 +183,8 @@ impl Agent3D {
         event_msg
     }
 
-    /// 3D 动力学移动与能耗结算
-    pub fn tick_movement(&mut self, dt: f32, road_network: &LaneGraph3D) {
+    /// 3D 动力学移动与踩踏拓路 (走的人多了踩踏等级提升，移动速度连续浮点加快)
+    pub fn tick_movement(&mut self, dt: f32, road_network: &mut LaneGraph3D) {
         if !self.is_alive {
             self.current_velocity = 0.0;
             return;
@@ -203,19 +203,23 @@ impl Agent3D {
         }
 
         let Some(lane_id) = self.current_lane_id else { return };
-        let Some(edge_idx) = road_network.edge_map.get(&lane_id) else {
+        let Some(edge_idx) = road_network.edge_map.get(&lane_id).copied() else {
             self.state = PrimitiveActionState::OffRoadDetour;
             return;
         };
 
-        let lane = &road_network.graph[*edge_idx];
+        // 踩踏拓路：行进时增加该车道及反向车道的踩踏度
+        {
+            let edge = &mut road_network.graph[edge_idx];
+            edge.wear = (edge.wear + 0.40 * dt).min(3.0);
+        }
 
-        let offroad_multiplier = if lane.road_class == crate::spatial::graph::RoadClass::DirtTrack && lane.is_hidden {
-            0.5
-        } else {
-            1.0
-        };
-        self.is_traveling_offroad = offroad_multiplier < 0.9;
+        let lane = &road_network.graph[edge_idx];
+        let wear = lane.wear;
+
+        // 连续浮点道路速度因子：0.0 (荒野) => 0.50x, 1.0 (土径) => 0.85x, 2.0 (夯土道) => 1.20x, 3.0 (石道) => 1.55x
+        let road_level_factor = (0.50 + 0.35 * wear).clamp(0.50, 1.60);
+        self.is_traveling_offroad = wear < 0.6;
 
         // 坡度体力能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
@@ -224,7 +228,7 @@ impl Agent3D {
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
         let stamina_factor = (self.stamina / 25.0).clamp(0.2, 1.0);
-        let target_speed = self.max_desired_speed.min(lane.speed_limit) * offroad_multiplier * stamina_factor;
+        let target_speed = self.max_desired_speed * road_level_factor * stamina_factor;
 
         let accel = (target_speed - self.current_velocity) * 4.0;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);
