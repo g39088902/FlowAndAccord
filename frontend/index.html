@@ -188,26 +188,25 @@
       transform: scale(1.2);
       background: #7dd3fc;
     }
-    .preset-btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr;
-      gap: 4px;
+    .reset-btn-row {
+      display: flex;
+      justify-content: flex-end;
       margin-top: 2px;
     }
-    .preset-btn {
+    .reset-rate-btn {
       background: #1e293b;
       color: #94a3b8;
       border: 1px solid rgba(255,255,255,0.08);
-      padding: 4px 0;
+      padding: 4px 10px;
       border-radius: 6px;
       font-size: 10px;
       cursor: pointer;
       text-align: center;
       transition: all 0.2s ease;
     }
-    .preset-btn:hover {
+    .reset-rate-btn:hover {
       background: #334155;
-      color: #ffffff;
+      color: #38bdf8;
       border-color: #38bdf8;
     }
 
@@ -458,7 +457,7 @@
   <div class="global-resource-panel">
     <div class="panel-header">
       <span>🌐 全图生态总余量大盘</span>
-      <span id="global-eco-health" style="color:#10b981; font-size:10px;">生态健康</span>
+      <span id="global-eco-health" style="color:#10b981; font-size:10px;">资源丰盛</span>
     </div>
 
     <!-- 全图资源剩余量仪表盘 -->
@@ -506,11 +505,8 @@
         <input type="range" id="slider-berry-rate" min="0" max="5.0" step="0.1" value="1.0">
       </div>
 
-      <div class="preset-btn-row">
-        <button class="preset-btn" id="btn-env-normal">☀️ 常规生态</button>
-        <button class="preset-btn" id="btn-env-drought" style="color:#fca5a5;">🏜️ 旱季 (0x水)</button>
-        <button class="preset-btn" id="btn-env-winter" style="color:#fde68a;">❄️ 荒年 (0x果)</button>
-        <button class="preset-btn" id="btn-env-bounty" style="color:#6ee7b7;">🌧️ 丰登 (3x速)</button>
+      <div class="reset-btn-row">
+        <button class="reset-rate-btn" id="btn-reset-rate">🔄 重置为默认产速 (1.0x)</button>
       </div>
     </div>
   </div>
@@ -619,7 +615,7 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">生态系统就绪: 左侧已开放全图资源大盘与手动产速调节！</div>
+      <div class="log-entry camp">生态大盘就绪: 实时监控全图总余量，支持玩家自由调节水泉与野果产出速率！</div>
     </div>
   </div>
 
@@ -663,7 +659,7 @@
         t = Math.max(0, Math.min(1, t));
         const u = 1 - t;
         const dx = 3 * u * u * (this.p1.x - this.p0.x) + 6 * u * t * (this.p2.x - this.p1.x) + 3 * t * t * (this.p3.x - this.p2.x);
-        const dy = 3 * u * u * (this.p1.y - this.p0.y) + 6 * u * t * (this.p2.y - this.p1.y) + 3 * t * t * (this.p3.y - this.p2.y);
+        const dy = 3 * u * u * (this.p1.y - this.p0.y) + 6 * u * t * (this.p2.y - this.p1.y) + 3 * t * t * (this.p3.x - this.p2.x);
         const dz = 3 * u * u * (this.p1.z - this.p0.z) + 6 * u * t * (this.p2.z - this.p1.z) + 3 * t * t * (this.p3.z - this.p2.z);
         const mag = Math.hypot(dx, dy, dz) || 1e-6;
         return new Vec3(dx / mag, dy / mag, dz / mag);
@@ -992,7 +988,7 @@
     }
 
     // ==========================================
-    // 原始生态有限资源与繁衍世界 (支持全图大盘监控与动态产速调节)
+    // 原始生态有限资源与繁衍世界
     // ==========================================
     class WorldSimulation {
       constructor() {
@@ -1007,7 +1003,6 @@
         this.isPaused = false;
         this.speedMult = 2;
 
-        // 玩家动态调节的产出倍率
         this.waterRegenMultiplier = 1.0;
         this.berryRegenMultiplier = 1.0;
 
@@ -1141,7 +1136,6 @@
         for (let step = 0; step < this.speedMult; step++) {
           this.tickCount++;
 
-          // POI 产出与消耗
           for (const poi of this.pois) {
             if (poi.regenRate > 0) {
               poi.currentStock = Math.min(poi.maxStock, poi.currentStock + poi.regenRate * dt);
@@ -1813,7 +1807,7 @@
     });
 
     // ==========================================
-    // 玩家手动资源生成速率滑块与预设绑定
+    // 玩家手动资源生成速率滑块绑定
     // ==========================================
     const sliderWater = document.getElementById('slider-water-rate');
     const lblWaterRate = document.getElementById('lbl-water-rate');
@@ -1833,27 +1827,14 @@
       lblBerryRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
     });
 
-    function setRateControls(waterM, berryM, envDesc) {
-      sliderWater.value = waterM;
-      sliderBerry.value = berryM;
-      sim.setWaterRegenMultiplier(waterM);
-      sim.setBerryRegenMultiplier(berryM);
-      lblWaterRate.textContent = `${waterM.toFixed(1)}x (${(3.5 * waterM).toFixed(1)}/s)`;
-      lblBerryRate.textContent = `${berryM.toFixed(1)}x (${(1.2 * berryM).toFixed(1)}/s)`;
-      sim.logEvent(`🌦️ 环境气候调节: ${envDesc} (水泉 ${waterM}x, 浆果 ${berryM}x)`, 'water');
-    }
-
-    document.getElementById('btn-env-normal').addEventListener('click', () => {
-      setRateControls(1.0, 1.0, '恢复风调雨顺常规生态');
-    });
-    document.getElementById('btn-env-drought').addEventListener('click', () => {
-      setRateControls(0.0, 0.8, '极端旱季降临！全图泉眼断流枯竭！');
-    });
-    document.getElementById('btn-env-winter').addEventListener('click', () => {
-      setRateControls(0.8, 0.0, '严冬荒年！浆果灌木完全停止生长！');
-    });
-    document.getElementById('btn-env-bounty').addEventListener('click', () => {
-      setRateControls(3.0, 3.0, '天降甘霖！泉涌与野果以 3 倍速超量迸发！');
+    document.getElementById('btn-reset-rate').addEventListener('click', () => {
+      sliderWater.value = 1.0;
+      sliderBerry.value = 1.0;
+      sim.setWaterRegenMultiplier(1.0);
+      sim.setBerryRegenMultiplier(1.0);
+      lblWaterRate.textContent = `1.0x (3.5/s)`;
+      lblBerryRate.textContent = `1.0x (1.2/s)`;
+      sim.logEvent(`🔄 产速重置: 水泉与野果已恢复默认 1.0x 基准产率！`, 'water');
     });
 
     // ==========================================
