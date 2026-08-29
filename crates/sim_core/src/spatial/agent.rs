@@ -13,11 +13,11 @@ pub enum PrimitiveActionState {
     SeekingFood,        // 🚶 正在赶往采摘区
     ForagingFood,       // 🍒 正在采摘浆果
     ReturningToCamp,    // 🏕️ 负重/疲惫返回营地
-    OffRoadDetour,      // ⚠️ 寻路脱困中
+    OffRoadDetour,      // ⚠️ 荒野越野寻路中
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (延长3倍妊娠期、死亡图标定时消失、流产显性提示)
+/// 3D 动力学 Agent 实体 (生理消耗减半、全图任意直连与无路50%越野降速)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
@@ -32,19 +32,20 @@ pub struct Agent3D {
     pub home_camp_node: NodeId, // 所属归宿营地节点
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
 
-    // 繁衍孕育系统 (Pregnancy Lifecycle: 延长3倍至 54 秒)
-    pub is_pregnant: bool,        // 是否怀孕
-    pub pregnancy_progress: f32,  // 孕育进度 0.0 ~ 1.0 (需 54 秒)
-    pub ready_to_birth: bool,     // 是否临盆待产
-    pub miscarriage_alert_timer: f32, // 流产提示图标倒计时 (秒)
-    pub death_decay_timer: f32,   // 死亡遗体消逝倒计时 (秒)
+    // 繁衍孕育系统 (54 秒孕期)
+    pub is_pregnant: bool,
+    pub pregnancy_progress: f32,
+    pub ready_to_birth: bool,
+    pub miscarriage_alert_timer: f32,
+    pub death_decay_timer: f32,
     pub death_cause: Option<String>,
 
-    // 空间运动参数 (标准移速 16~22 m/s)
+    // 空间运动与越野参数
     pub current_lane_id: Option<LaneId>,
     pub distance_along_curve: f32,
     pub current_velocity: f32,
-    pub max_desired_speed: f32,
+    pub max_desired_speed: f32, // 基准公路移速 (16~22 m/s)
+    pub is_traveling_offroad: bool, // 是否正在无路荒野越野 (速度为 50%)
     pub route: Vec<LaneId>,
     pub route_index: usize,
 
@@ -81,6 +82,7 @@ impl Agent3D {
             distance_along_curve: 0.0,
             current_velocity: 0.0,
             max_desired_speed: doubled_speed,
+            is_traveling_offroad: false,
             route: Vec::new(),
             route_index: 0,
             is_covert,
@@ -91,28 +93,25 @@ impl Agent3D {
         }
     }
 
-    /// 核心生命代谢与受孕繁衍 Tick
+    /// 核心生命代谢 Tick (所有需求消耗速度减半！)
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
-        // 流产浮动提示计时衰减
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
         }
 
         if !self.is_alive {
-            // 死亡遗骸计时衰减 (12秒后彻底消失)
             self.death_decay_timer = (self.death_decay_timer - dt).max(0.0);
             return None;
         }
 
         let mut event_msg = None;
-
-        // 1. 怀孕代谢倍率 (怀孕期间需求消耗加速 50%)
         let metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
 
-        self.hunger = (self.hunger - 0.45 * metabolic_multiplier * dt).max(0.0);
-        self.thirst = (self.thirst - 0.85 * metabolic_multiplier * dt).max(0.0);
+        // 需求消耗速度全面减半：饱食消耗 0.45->0.225/s，水分消耗 0.85->0.425/s
+        self.hunger = (self.hunger - 0.225 * metabolic_multiplier * dt).max(0.0);
+        self.thirst = (self.thirst - 0.425 * metabolic_multiplier * dt).max(0.0);
 
-        // 2. 死亡判定规则
+        // 死亡判定
         if self.hunger <= 0.0 {
             self.is_alive = false;
             self.state = PrimitiveActionState::Dead;
@@ -130,36 +129,34 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 3. 受孕判定：在营地休息且所有需求均达到 80%+
+        // 受孕判定 (80%+)
         if self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant {
             if self.hunger >= 80.0 && self.thirst >= 80.0 && self.stamina >= 80.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
-                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健，成功受孕进入妊娠期 (耗时延长3倍至54s，代谢+50%)！", self.id));
+                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健，成功受孕进入妊娠期 (代谢+50%)！", self.id));
             }
         }
 
-        // 4. 妊娠期孕育与流产监控 (时间延长3倍至 54秒)
+        // 妊娠与流产判定 (54s)
         if self.is_pregnant {
-            // 流产判定：若任何一条需求跌破 20%，发生流产！
             if self.hunger < 20.0 || self.thirst < 20.0 || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
-                self.miscarriage_alert_timer = 5.0; // 开启 5 秒流产图标提示
+                self.miscarriage_alert_timer = 5.0;
                 return Some(format!("🥀 痛惜！部落民 #{} 生存指标跌破 20% 安全线，体力虚脱导致流产！", self.id));
             }
 
-            // 孕育进度推进 (54秒完成全孕期)
             self.pregnancy_progress += dt / 54.0;
             if self.pregnancy_progress >= 1.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.ready_to_birth = true;
-                return Some(format!("🍼 喜讯！部落民 #{} 历经艰辛顺利产下一名健康的部落新生儿！", self.id));
+                return Some(format!("🍼 喜讯！部落民 #{} 历经漫长孕期，顺利产下一名健康的新生儿！", self.id));
             }
         }
 
-        // 5. 营地休养进食
+        // 营地进食
         if self.state == PrimitiveActionState::RestingAtCamp {
             self.stamina = (self.stamina + 8.0 * dt).min(100.0);
             if self.hunger < 75.0 && self.inventory_food > 0.1 {
@@ -172,7 +169,7 @@ impl Agent3D {
         event_msg
     }
 
-    /// 3D 动力学移动与坡度能耗结算
+    /// 3D 动力学移动与能耗结算 (无路时按 50% 移速越野，体力消耗减半)
     pub fn tick_movement(&mut self, dt: f32, road_network: &LaneGraph3D) {
         if !self.is_alive {
             self.current_velocity = 0.0;
@@ -199,14 +196,22 @@ impl Agent3D {
 
         let lane = &road_network.graph[*edge_idx];
 
+        // 检查是否为无路越野段 (若是越野土路/直连，速度乘数 0.5)
+        let offroad_multiplier = if lane.road_class == crate::spatial::graph::RoadClass::DirtTrack && lane.is_hidden {
+            0.5 // 无路直连越野：50% 移速
+        } else {
+            1.0 // 道路正常移速
+        };
+        self.is_traveling_offroad = offroad_multiplier < 0.9;
+
+        // 体力消耗减半 (0.6 基础消耗)
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
         let uphill_penalty = if delta_z > 0.0 { (delta_z / lane.curve.length).max(0.0) } else { 0.0 };
-
-        let stamina_burn = (1.2 + if self.is_pregnant { 0.6 } else { 0.0 }) * (1.0 + uphill_penalty * 3.5);
+        let stamina_burn = (0.6 + if self.is_pregnant { 0.3 } else { 0.0 }) * (1.0 + uphill_penalty * 3.5);
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
         let stamina_factor = (self.stamina / 25.0).clamp(0.2, 1.0);
-        let target_speed = self.max_desired_speed.min(lane.speed_limit) * stamina_factor;
+        let target_speed = self.max_desired_speed.min(lane.speed_limit) * offroad_multiplier * stamina_factor;
 
         let accel = (target_speed - self.current_velocity) * 4.0;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);
@@ -239,6 +244,7 @@ impl Agent3D {
         } else {
             self.current_velocity = 0.0;
             self.current_lane_id = None;
+            self.is_traveling_offroad = false;
             match self.state {
                 PrimitiveActionState::SeekingWater => {
                     self.state = PrimitiveActionState::DrinkingAtWater;

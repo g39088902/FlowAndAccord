@@ -84,6 +84,7 @@ pub struct AgentSnapshot {
     pub inventory_food: f32,
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
+    pub is_offroad: bool,
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,
@@ -122,7 +123,7 @@ impl World3DEngine {
         }
     }
 
-    /// 构建有限资源 POI 与部落生态 (初始 8 人)
+    /// 构建有限资源 POI (+100% 概率翻倍) 与全图直连动线
     pub fn seed_primitive_ecology(&mut self, agent_count: usize) {
         let mut rng = rand::thread_rng();
         let half_size = self.terrain.world_size / 2.0;
@@ -139,10 +140,10 @@ impl World3DEngine {
         let mut food_nodes = Vec::new();
         let mut all_node_ids = Vec::new();
 
-        // 1. 生成 3 处避风营地
-        for i in 0..3 {
-            let x = rng.gen_range(-half_size * 0.65..half_size * 0.65);
-            let y = rng.gen_range(-half_size * 0.65..half_size * 0.65);
+        // 1. 生成 6 处避风营地 (+100% 翻倍)
+        for i in 0..6 {
+            let x = rng.gen_range(-half_size * 0.70..half_size * 0.70);
+            let y = rng.gen_range(-half_size * 0.70..half_size * 0.70);
             let elev = self.terrain.sample_elevation(x, y) + 0.5;
             let node_id = self.network.add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
             camp_nodes.push(node_id);
@@ -151,8 +152,8 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 1) as u32, PoiType::Camp, Vec3::new(x, y, elev)));
         }
 
-        // 2. 生成 3 处有限产出低洼清泉
-        for i in 0..3 {
+        // 2. 生成 6 处低洼清泉 (+100% 翻倍)
+        for i in 0..6 {
             let mut best_x = 0.0f32;
             let mut best_y = 0.0f32;
             let mut lowest_z = 999.0f32;
@@ -175,10 +176,10 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 10) as u32, PoiType::WaterSource, Vec3::new(best_x, best_y, lowest_z)));
         }
 
-        // 3. 生成 4 处有限产出浆果灌木
-        for i in 0..4 {
-            let x = rng.gen_range(-half_size * 0.75..half_size * 0.75);
-            let y = rng.gen_range(-half_size * 0.75..half_size * 0.75);
+        // 3. 生成 8 处缓坡浆果灌木 (+100% 翻倍)
+        for i in 0..8 {
+            let x = rng.gen_range(-half_size * 0.80..half_size * 0.80);
+            let y = rng.gen_range(-half_size * 0.80..half_size * 0.80);
             let elev = self.terrain.sample_elevation(x, y);
             let node_id = self.network.add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
             food_nodes.push(node_id);
@@ -187,8 +188,8 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 20) as u32, PoiType::BerryBush, Vec3::new(x, y, elev)));
         }
 
-        // 4. 地形路口节点
-        for _ in 0..18 {
+        // 4. 地形过渡节点
+        for _ in 0..16 {
             let x = rng.gen_range(-half_size * 0.85..half_size * 0.85);
             let y = rng.gen_range(-half_size * 0.85..half_size * 0.85);
             let elev = self.terrain.sample_elevation(x, y);
@@ -196,25 +197,30 @@ impl World3DEngine {
             all_node_ids.push(node_id);
         }
 
-        // 5. 铺设初级步行道
+        // 5. 全图任意点直连路网 (已修筑道路100%移速，其余直连越野50%移速)
         for i in 0..all_node_ids.len() {
             for j in (i + 1)..all_node_ids.len() {
                 let id_a = all_node_ids[i];
                 let id_b = all_node_ids[j];
                 let pos_a = self.network.graph[*self.network.node_map.get(&id_a).unwrap()].pos;
                 let pos_b = self.network.graph[*self.network.node_map.get(&id_b).unwrap()].pos;
-
                 let dist = pos_a.distanceTo(&pos_b);
-                if dist < 190.0 {
+
+                // 近距离有现成修筑道路 (100% 速度)，中远距离有直连越野便道 (50% 速度)
+                if dist < 175.0 {
                     let delta_z = (pos_a.z - pos_b.z).abs();
                     let road_class = if delta_z > 8.0 { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
                     let _ = self.network.add_lane(id_a, id_b, road_class);
                     let _ = self.network.add_lane(id_b, id_a, road_class);
+                } else if dist < 360.0 {
+                    // 直连荒野越野路径 (is_hidden = true 标识越野，移速降为 50%)
+                    let _ = self.network.add_lane_with_options(id_a, id_b, None, RoadClass::DirtTrack, true, 0.9);
+                    let _ = self.network.add_lane_with_options(id_b, id_a, None, RoadClass::DirtTrack, true, 0.9);
                 }
             }
         }
 
-        // 6. 注入初始部落民
+        // 6. 注入初始部落民 (8 人)
         for i in 0..agent_count {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
@@ -227,7 +233,7 @@ impl World3DEngine {
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 有限资源生态建立: 孕期延长3倍至54s，死亡遗骸消逝与流产提示已激活！".to_string());
+        self.last_event = Some("🏕️ 生态繁盛升级: POI数量翻倍至20处，消耗减半，支持全图直连越野！".to_string());
     }
 
     /// 真实有限资源交互结算与分娩
@@ -247,14 +253,14 @@ impl World3DEngine {
             match agent.state {
                 PrimitiveActionState::DrinkingAtWater => {
                     let agent_pos = agent.world_pos;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 18.0) {
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
                         let extracted = poi.extract(30.0 * dt);
                         agent.thirst = (agent.thirst + extracted * 1.2).min(100.0);
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
                     let agent_pos = agent.world_pos;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 18.0) {
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
                         if agent.inventory_food < 4.0 {
                             let extracted = poi.extract(1.2 * dt);
                             agent.inventory_food = (agent.inventory_food + extracted).min(4.0);
@@ -284,7 +290,6 @@ impl World3DEngine {
             self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{})！部落添丁！", mother_id, baby_id));
         }
 
-        // 清理消逝超时的死亡墓冢 (12秒后遗骸回归自然)
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
     }
 
@@ -511,6 +516,7 @@ impl World3DEngine {
                 inventory_food: agent.inventory_food,
                 is_pregnant: agent.is_pregnant,
                 pregnancy_progress: agent.pregnancy_progress,
+                is_offroad: agent.is_traveling_offroad,
                 miscarriage_alert: agent.miscarriage_alert_timer > 0.0,
                 death_decay_timer: agent.death_decay_timer,
                 death_cause: agent.death_cause.clone(),

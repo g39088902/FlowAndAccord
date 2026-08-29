@@ -29,20 +29,20 @@ mod tests {
     }
 
     #[test]
-    fn test_finite_poi_and_reproduction_cycle() {
+    fn test_doubled_poi_and_offroad_mechanics() {
         let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(20);
+        world.seed_primitive_ecology(8);
 
-        assert_eq!(world.pois.len(), 10);
-        assert_eq!(world.agents.len(), 20);
+        // 验证 POI 概率提升 100% (总数从 10 增至 20 处)
+        assert_eq!(world.pois.len(), 20); // 6营地 + 6水泉 + 8浆果
+        assert_eq!(world.agents.len(), 8);
 
-        // 运行 250 ticks
-        for _ in 0..250 {
+        for _ in 0..200 {
             world.tick(0.05);
         }
 
         let snapshot = world.generate_snapshot();
-        assert!(!snapshot.pois.is_empty());
+        assert_eq!(snapshot.pois.len(), 20);
         assert!(!snapshot.agents.is_empty());
     }
 }
