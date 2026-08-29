@@ -471,6 +471,10 @@
         <div class="stat-val" id="stat-deaths" style="color:#ef4444;">0</div>
         <div class="stat-lbl">💀 死亡数</div>
       </div>
+      <div class="stat-item">
+        <div class="stat-val" id="stat-miscarriages" style="color:#f43f5e;">0</div>
+        <div class="stat-lbl">🥀 流产数</div>
+      </div>
     </div>
   </div>
 
@@ -1030,6 +1034,7 @@
         this.nextAgentId = 1;
         this.totalBirths = 0;
         this.totalDeaths = 0;
+        this.totalMiscarriages = 0;
         this.tickCount = 0;
         this.isPaused = false;
         this.speedMult = 2;
@@ -1055,6 +1060,7 @@
         this.nextAgentId = 1;
         this.totalBirths = 0;
         this.totalDeaths = 0;
+        this.totalMiscarriages = 0;
         this.tickCount = 0;
 
         const half = this.terrain.worldSize / 2;
@@ -1221,6 +1227,7 @@
             const ev = agent.tickMetabolism(dt);
             if (ev) {
               if (ev.type === 'death') this.totalDeaths++;
+              if (ev.type === 'miscarry') this.totalMiscarriages++;
               this.logEvent(ev.text, ev.type);
             }
           }
@@ -1683,6 +1690,7 @@
       document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
       document.getElementById('stat-births').textContent = sim.totalBirths;
       document.getElementById('stat-deaths').textContent = sim.totalDeaths;
+      document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
 
       // 6. 实时汇总全地图资源大盘 (清泉与浆果上限各 240.0 单位)
       let totalWaterCur = 0, totalWaterMax = 0;

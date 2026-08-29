@@ -23,6 +23,7 @@ pub struct WorldSnapshot3D {
     pub agents: Vec<AgentSnapshot>,
     pub total_births: u32,
     pub total_deaths: u32,
+    pub total_miscarriages: u32,
     pub last_mutation_event: Option<String>,
 }
 
@@ -103,6 +104,7 @@ pub struct World3DEngine {
     pub next_agent_id: AgentId,
     pub total_births: u32,
     pub total_deaths: u32,
+    pub total_miscarriages: u32,
     pub tick_counter: u64,
     pub last_event: Option<String>,
 }
@@ -120,6 +122,7 @@ impl World3DEngine {
             next_agent_id: 1,
             total_births: 0,
             total_deaths: 0,
+            total_miscarriages: 0,
             tick_counter: 0,
             last_event: None,
         }
@@ -135,6 +138,7 @@ impl World3DEngine {
         self.agents.clear();
         self.total_births = 0;
         self.total_deaths = 0;
+        self.total_miscarriages = 0;
         self.next_agent_id = 1;
 
         let mut camp_nodes = Vec::new();
@@ -430,6 +434,9 @@ impl World3DEngine {
                 if !agent.is_alive {
                     self.total_deaths += 1;
                 }
+                if event.contains("流产") {
+                    self.total_miscarriages += 1;
+                }
                 self.last_event = Some(event);
             }
         }
@@ -543,6 +550,7 @@ impl World3DEngine {
             agents,
             total_births: self.total_births,
             total_deaths: self.total_deaths,
+            total_miscarriages: self.total_miscarriages,
             last_mutation_event: self.last_event.clone(),
         }
     }
