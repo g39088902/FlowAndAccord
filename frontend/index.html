@@ -317,7 +317,7 @@
         <div class="stat-lbl">FPS</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-pop">20</div>
+        <div class="stat-val" id="stat-pop">8</div>
         <div class="stat-lbl">活体人口</div>
       </div>
       <div class="stat-item">
@@ -799,7 +799,7 @@
         this.showPoiStock = true;
 
         this.selectedAgentIndex = 0;
-        this.initEcology(20);
+        this.initEcology(8);
       }
       initEcology(agentCount) {
         this.terrain.generate();
@@ -1434,7 +1434,7 @@
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {
-      sim.initEcology(20);
+      sim.initEcology(8);
     });
 
     document.getElementById('btn-spawn-civ').addEventListener('click', () => {
