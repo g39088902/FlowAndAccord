@@ -807,6 +807,17 @@
         const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit, isOffroad, wear: 0.0 };
         this.lanes.set(id, lane);
         this.adjacency.get(fromId).push(id);
+
+        // 双向往返车道互联 (走的人不论去程返程，共同踩踏加固两点之间的物理通道)
+        const revLanes = this.adjacency.get(toId) || [];
+        for (const rId of revLanes) {
+          const rLane = this.lanes.get(rId);
+          if (rLane && rLane.to === fromId) {
+            lane.reverseId = rId;
+            rLane.reverseId = id;
+            break;
+          }
+        }
         return id;
       }
       tickWearDecay(dt) {
@@ -996,9 +1007,13 @@
           return;
         }
 
-        // 踩踏拓路：1级(20s累计到达 1.0)、2级(40s累计到达 2.0)、3级(80s累计到达 3.0)
+        // 踩踏拓路：按人数实时累加 (1级20s、2级40s、3级80s)，双向往返共同加固
         const gainRate = (lane.wear || 0) < 2.0 ? 0.050 : 0.025;
-        lane.wear = Math.min(3.0, (lane.wear || 0.0) + gainRate * dt);
+        const newWear = Math.min(3.0, (lane.wear || 0.0) + gainRate * dt);
+        lane.wear = newWear;
+        if (lane.reverseId && network.lanes.has(lane.reverseId)) {
+          network.lanes.get(lane.reverseId).wear = newWear;
+        }
 
         const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
         const uphill = deltaZ > 0 ? deltaZ / lane.curve.length : 0;

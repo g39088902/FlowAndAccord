@@ -208,11 +208,21 @@ impl Agent3D {
             return;
         };
 
-        // 踩踏拓路：1级(20s累计到达 1.0)、2级(40s累计到达 2.0)、3级(80s累计到达 3.0)
+        let from_node = road_network.graph[edge_idx].from_node;
+        let to_node = road_network.graph[edge_idx].to_node;
+        let from_idx = road_network.node_map[&from_node];
+        let to_idx = road_network.node_map[&to_node];
+        let rev_edge_idx = road_network.graph.find_edge(to_idx, from_idx);
+
+        // 踩踏拓路：按人数实时累加 (1级20s、2级40s、3级80s)，双向往返共同加固
         {
             let edge = &mut road_network.graph[edge_idx];
             let gain_rate = if edge.wear < 2.0 { 0.050 } else { 0.025 };
-            edge.wear = (edge.wear + gain_rate * dt).min(3.0);
+            let new_wear = (edge.wear + gain_rate * dt).min(3.0);
+            edge.wear = new_wear;
+            if let Some(rev_idx) = rev_edge_idx {
+                road_network.graph[rev_idx].wear = new_wear;
+            }
         }
 
         let lane = &road_network.graph[edge_idx];
