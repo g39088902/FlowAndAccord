@@ -121,7 +121,7 @@
     /* 选中的 Agent 生理与孕育状态监控面板 */
     .agent-inspector {
       position: absolute;
-      top: 300px; right: 16px;
+      top: 320px; right: 16px;
       background: rgba(10, 18, 30, 0.94);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(236, 72, 153, 0.3);
@@ -295,6 +295,7 @@
     .log-entry.camp { border-left-color: #f59e0b; color: #fde68a; }
     .log-entry.birth { border-left-color: #ec4899; color: #fbcfe8; }
     .log-entry.death { border-left-color: #ef4444; color: #fca5a5; }
+    .log-entry.miscarry { border-left-color: #dc2626; color: #fca5a5; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
@@ -309,7 +310,7 @@
   <div class="top-bar">
     <div class="brand-card">
       <div class="brand-title">🍼 Flow & Accord · 原始生态经济与繁衍生死循环</div>
-      <div class="brand-desc">双倍移速 × 有限资源再生池 × 80%+受孕妊娠(+50%代谢) × 20%流产与分娩生死</div>
+      <div class="brand-desc">双倍移速 × 孕期延长3倍(54s) × 遗骸消逝 × 🥀流产提示与繁衍循环</div>
     </div>
     <div class="stats-card">
       <div class="stat-item">
@@ -343,8 +344,9 @@
     <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (恢复体力、80%+受孕、分娩)</div>
     <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 (有限蓄水 60.0，涌出 3.5/s)</div>
     <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果丛 (有限存量 25.0，生长 1.2/s)</div>
-    <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon">🤰</div> 妊娠光环 (代谢+50%，<20%流产)</div>
-    <div class="legend-item"><div class="legend-icon">💀</div> 饿殍/渴死 (需求归零死亡)</div>
+    <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon">🤰</div> 妊娠光环 (孕期54s，代谢+50%)</div>
+    <div class="legend-item"><div class="legend-icon">🥀</div> 胎停流产提示 (需求跌破20%)</div>
+    <div class="legend-item"><div class="legend-icon">💀</div> 遗体墓标 (12秒后消逝回归自然)</div>
   </div>
 
   <div class="agent-inspector" id="agent-inspector">
@@ -369,11 +371,11 @@
     </div>
     <div class="preg-container" id="insp-preg-box" style="display:none;">
       <div class="meter-label" style="color:#ec4899; font-weight:600;">
-        <span>🤰 妊娠孕育中 (消耗 +50%)</span>
+        <span>🤰 妊娠孕育中 (孕期54s, 代谢+50%)</span>
         <span id="insp-preg-val">45%</span>
       </div>
       <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
-      <div style="font-size:9px; color:#f472b6;">提示：任何需求指标跌破 20% 将导致流产！</div>
+      <div style="font-size:9px; color:#f472b6;">提示：任何需求指标跌破 20% 将触发 🥀 流产！</div>
     </div>
     <div style="font-size:10px; color:#94a3b8; margin-top:2px;" id="insp-detail">
       当前状态良好。
@@ -387,10 +389,10 @@
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
-      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演生态 (有限资源 & 部落)</button>
+      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演生态 (8人开局)</button>
     </div>
     <div class="btn-grid">
-      <button id="btn-spawn-civ">🚶 注入 +6 部落民</button>
+      <button id="btn-spawn-civ">🚶 注入 +4 部落民</button>
       <button id="btn-add-food">🍒 催生野果浆果</button>
     </div>
     
@@ -419,7 +421,7 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">有限资源生态就绪: 饱暖80%受孕、跌破20%流产与归零死亡机制已激活！</div>
+      <div class="log-entry camp">生态就绪: 孕期已延长3倍至54秒，死亡遗骸12秒消逝，🥀流产图标提示已上线！</div>
     </div>
   </div>
 
@@ -571,7 +573,6 @@
           curve = Curve3D.straight(fromNode.pos, toNode.pos);
         }
 
-        // 双倍移速环境下的限速
         const speedLimit = roadClass === 'cobble' ? 22 : 18;
         const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit };
         this.lanes.set(id, lane);
@@ -626,13 +627,13 @@
     }
 
     // ==========================================
-    // 原始生存、繁衍与死亡 Agent (双倍移速)
+    // 原始生存 Agent (孕期54s、遗骸消逝、流产提示)
     // ==========================================
     class PrimitiveAgent {
       constructor(id, homeCampNode, maxSpeed = 17.0) {
         this.id = id;
         this.homeCampNode = homeCampNode;
-        this.maxSpeed = maxSpeed; // 双倍标准移速
+        this.maxSpeed = maxSpeed;
         this.state = 'RestingAtCamp';
         this.isAlive = true;
 
@@ -644,6 +645,8 @@
         this.isPregnant = false;
         this.pregnancyProgress = 0.0;
         this.readyToBirth = false;
+        this.miscarriageTimer = 0.0;
+        this.deathDecayTimer = 12.0; // 死亡后遗骸留存 12 秒
         this.deathCause = null;
 
         this.targetNode = null;
@@ -657,7 +660,14 @@
         this.trail = [];
       }
       tickMetabolism(dt) {
-        if (!this.isAlive) return null;
+        if (this.miscarriageTimer > 0) {
+          this.miscarriageTimer = Math.max(0, this.miscarriageTimer - dt);
+        }
+
+        if (!this.isAlive) {
+          this.deathDecayTimer = Math.max(0, this.deathDecayTimer - dt);
+          return null;
+        }
 
         let eventMsg = null;
         const multiplier = this.isPregnant ? 1.5 : 1.0;
@@ -672,13 +682,15 @@
           this.state = 'Dead';
           this.deathCause = '饥荒饿死';
           this.isPregnant = false;
-          return { type: 'death', text: `💀 部落民 #${this.id} 因长期饥荒饿死在荒野中！` };
+          this.deathDecayTimer = 12.0;
+          return { type: 'death', text: `💀 部落民 #${this.id} 因长期饥荒不幸饿死！` };
         }
         if (this.thirst <= 0.0) {
           this.isAlive = false;
           this.state = 'Dead';
           this.deathCause = '严重脱水';
           this.isPregnant = false;
+          this.deathDecayTimer = 12.0;
           return { type: 'death', text: `💀 部落民 #${this.id} 因严重脱水渴死！` };
         }
 
@@ -687,24 +699,25 @@
           if (this.hunger >= 80 && this.thirst >= 80 && this.stamina >= 80) {
             this.isPregnant = true;
             this.pregnancyProgress = 0.0;
-            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} 饱暖康健，成功受孕进入妊娠期 (代谢+50%)！` };
+            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} 饱暖康健，成功受孕进入妊娠期 (孕期54s，代谢+50%)！` };
           }
         }
 
-        // 3. 妊娠期维护与流产判定
+        // 3. 妊娠期维护与流产判定 (孕期延长3倍至 54秒)
         if (this.isPregnant) {
           if (this.hunger < 20 || this.thirst < 20 || this.stamina < 20) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
-            return { type: 'death', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%，体力虚脱导致流产！` };
+            this.miscarriageTimer = 5.0; // 开启 5 秒流产悬浮图标
+            return { type: 'miscarry', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%，体力虚脱导致流产！` };
           }
 
-          this.pregnancyProgress += dt / 18.0;
+          this.pregnancyProgress += dt / 54.0;
           if (this.pregnancyProgress >= 1.0) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
             this.readyToBirth = true;
-            return { type: 'birth', text: `🍼 喜讯！部落民 #${this.id} 顺利产下一名健康的新生儿！` };
+            return { type: 'birth', text: `🍼 喜讯！部落民 #${this.id} 历经漫长妊娠，顺利产下一名健康新生儿！` };
           }
         }
 
@@ -877,7 +890,7 @@
           }
         }
 
-        // 6. 注入部落民
+        // 6. 注入部落民 (8 人开局)
         for (let i = 0; i < agentCount; i++) {
           const homeCamp = campNodes[i % campNodes.length];
           const agentId = this.nextAgentId++;
@@ -889,7 +902,7 @@
         this.campNodes = campNodes;
         this.waterNodes = waterNodes;
         this.foodNodes = foodNodes;
-        this.logEvent(`🏕️ 有限生态就绪: 包含有限储量泉眼与果丛，双倍移速与繁衍死亡已激活。`, 'camp');
+        this.logEvent(`🏕️ 有限生态就绪: 8人开局，孕期延长3倍(54s)，遗骸12秒消逝，🥀流产提示已激活。`, 'camp');
       }
       tickPoiInteractions(dt) {
         // POI 自然再生
@@ -940,6 +953,9 @@
           this.agents.push(baby);
           this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId})！部落薪火相传！`, 'birth');
         }
+
+        // 遗骸完全消逝清理
+        this.agents = this.agents.filter(a => a.isAlive || a.deathDecayTimer > 0);
       }
       tickDecisions() {
         const availableWaterNodes = this.pois.filter(p => p.type === 'Water' && p.currentStock > 1.0)
@@ -1226,7 +1242,6 @@
           ctx.textAlign = 'center';
           ctx.fillText('💧', p2D.x, p2D.y + 4);
 
-          // 储量环
           if (sim.showPoiStock) {
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 2.0;
@@ -1283,11 +1298,15 @@
         const agent = sim.agents[i];
         const p2D = project3D(agent.pos);
 
+        // 死亡遗骸 (消逝淡出)
         if (!agent.isAlive) {
-          // 💀 死亡墓标
+          const deathAlpha = Math.max(0, Math.min(1.0, agent.deathDecayTimer / 4.0));
+          ctx.save();
+          ctx.globalAlpha = deathAlpha;
           ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('💀', p2D.x, p2D.y);
+          ctx.restore();
           continue;
         }
 
@@ -1296,7 +1315,7 @@
         else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#10b981';
         else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
 
-        // 孕妇粉红光晕
+        // 孕妇粉红光晕 (54s 孕期)
         if (agent.isPregnant) {
           stateColor = '#ec4899';
           ctx.strokeStyle = '#ec4899';
@@ -1306,7 +1325,19 @@
           ctx.stroke();
         }
 
-        // 尾迹 (快速移动)
+        // 流产显性图标提示 (悬浮上升淡出)
+        if (agent.miscarriageTimer > 0) {
+          const mAlpha = Math.max(0, Math.min(1.0, agent.miscarriageTimer / 2.0));
+          const floatY = (5.0 - agent.miscarriageTimer) * 7.0;
+          ctx.save();
+          ctx.globalAlpha = mAlpha;
+          ctx.font = `${Math.floor(15 * camera.zoom)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('🥀', p2D.x, p2D.y - 12 * camera.zoom - floatY);
+          ctx.restore();
+        }
+
+        // 尾迹
         if (agent.trail.length > 1) {
           ctx.strokeStyle = stateColor;
           ctx.lineWidth = 2.0 * camera.zoom;
@@ -1363,7 +1394,7 @@
         let detailText = '在营地休眠恢复体力，并消耗背包中的野果充饥。';
         if (!selAgent.isAlive) {
           stateText = '💀 已死亡';
-          detailText = `死因: ${selAgent.deathCause || '未知饥荒'}`;
+          detailText = `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`;
         } else if (selAgent.state === 'SeekingWater') {
           stateText = '💧 赶往低洼清泉';
           detailText = '水分值告急，正前往地势低处水洼寻水 (双倍移速)。';
@@ -1439,13 +1470,13 @@
 
     document.getElementById('btn-spawn-civ').addEventListener('click', () => {
       const homeCamp = sim.campNodes[0];
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const babyId = sim.nextAgentId++;
         const a = new PrimitiveAgent(babyId, homeCamp, 16.0);
         a.pos = sim.network.nodes.get(homeCamp).pos;
         sim.agents.push(a);
       }
-      sim.logEvent(`🚶 游民迁入: 部落新增 +6 名成年部落民！`, 'camp');
+      sim.logEvent(`🚶 游民迁入: 部落新增 +4 名成年部落民！`, 'camp');
     });
 
     document.getElementById('btn-add-food').addEventListener('click', () => {

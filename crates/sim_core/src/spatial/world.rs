@@ -7,7 +7,7 @@ use super::agent::{Agent3D, AgentId, PrimitiveActionState};
 use super::poi::{PrimitivePoi, PoiId, PoiType};
 use crate::geo::terrain::TerrainMap;
 
-/// 外部渲染只读快照数据结构 (包含有限资源 POI 与生命周期繁衍体征)
+/// 外部渲染只读快照数据结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldSnapshot3D {
     pub tick: u64,
@@ -84,6 +84,8 @@ pub struct AgentSnapshot {
     pub inventory_food: f32,
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
+    pub miscarriage_alert: bool,
+    pub death_decay_timer: f32,
     pub death_cause: Option<String>,
     pub is_covert: bool,
     pub stealth_visibility: f32,
@@ -120,7 +122,7 @@ impl World3DEngine {
         }
     }
 
-    /// 构建有限资源 POI 与部落生态
+    /// 构建有限资源 POI 与部落生态 (初始 8 人)
     pub fn seed_primitive_ecology(&mut self, agent_count: usize) {
         let mut rng = rand::thread_rng();
         let half_size = self.terrain.world_size / 2.0;
@@ -212,7 +214,7 @@ impl World3DEngine {
             }
         }
 
-        // 6. 注入初始部落民 (双倍标准移速)
+        // 6. 注入初始部落民
         for i in 0..agent_count {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
@@ -225,7 +227,7 @@ impl World3DEngine {
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 有限资源生态建立: 包含有限储量泉眼与果丛，繁衍与死亡机制已激活！".to_string());
+        self.last_event = Some("🏕️ 有限资源生态建立: 孕期延长3倍至54s，死亡遗骸消逝与流产提示已激活！".to_string());
     }
 
     /// 真实有限资源交互结算与分娩
@@ -237,16 +239,13 @@ impl World3DEngine {
                 continue;
             }
 
-            // 检查分娩
             if agent.ready_to_birth {
                 agent.ready_to_birth = false;
                 newborn_mothers.push((agent.id, agent.home_camp_node));
             }
 
-            // 检查与 POI 原位交互
             match agent.state {
                 PrimitiveActionState::DrinkingAtWater => {
-                    // 寻获最近的水源 POI
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 18.0) {
                         let extracted = poi.extract(30.0 * dt);
@@ -254,7 +253,6 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
-                    // 寻获最近的浆果丛 POI
                     let agent_pos = agent.world_pos;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 18.0) {
                         if agent.inventory_food < 4.0 {
@@ -285,6 +283,9 @@ impl World3DEngine {
             self.agents.push(baby);
             self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{})！部落添丁！", mother_id, baby_id));
         }
+
+        // 清理消逝超时的死亡墓冢 (12秒后遗骸回归自然)
+        self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
     }
 
     /// 生存决策调度
@@ -303,7 +304,6 @@ impl World3DEngine {
 
             match agent.state {
                 PrimitiveActionState::RestingAtCamp => {
-                    // 怀孕期或者饥渴急迫
                     let thirst_urgency = if agent.is_pregnant { 55.0 } else { 40.0 };
                     let hunger_urgency = if agent.is_pregnant { 60.0 } else { 48.0 };
 
@@ -412,12 +412,12 @@ impl World3DEngine {
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
 
-        // 1. POI 有限资源自然恢复
+        // 1. POI 自然恢复
         for poi in &mut self.pois {
             poi.tick_regenerate(dt);
         }
 
-        // 2. 生理代谢与死亡/受孕/流产/分娩
+        // 2. 代谢与繁衍
         for agent in &mut self.agents {
             if let Some(event) = agent.tick_metabolism(dt) {
                 if !agent.is_alive {
@@ -427,20 +427,20 @@ impl World3DEngine {
             }
         }
 
-        // 3. POI 实际有限提取与新生儿落地
+        // 3. POI 实际提取、分娩与死亡尸骸消逝
         self.tick_poi_interactions(dt);
 
         if self.tick_counter % 15 == 0 {
             self.tick_decisions();
         }
 
-        // 4. 动力学运动与能耗
+        // 4. 动力学运动
         for agent in &mut self.agents {
             agent.tick_movement(dt, &self.network);
         }
     }
 
-    /// 导出包含有限 POI 存量与繁衍体征的快照
+    /// 导出快照
     pub fn generate_snapshot(&self) -> WorldSnapshot3D {
         let mut terrain_cells = Vec::with_capacity(self.terrain.cells.len());
         for cell in &self.terrain.cells {
@@ -511,6 +511,8 @@ impl World3DEngine {
                 inventory_food: agent.inventory_food,
                 is_pregnant: agent.is_pregnant,
                 pregnancy_progress: agent.pregnancy_progress,
+                miscarriage_alert: agent.miscarriage_alert_timer > 0.0,
+                death_decay_timer: agent.death_decay_timer,
                 death_cause: agent.death_cause.clone(),
                 is_covert: agent.is_covert,
                 stealth_visibility: agent.stealth_visibility,

@@ -17,7 +17,7 @@ pub enum PrimitiveActionState {
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (具备移动提速、归零死亡、受孕怀胎与流产/生育机制)
+/// 3D 动力学 Agent 实体 (延长3倍妊娠期、死亡图标定时消失、流产显性提示)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
@@ -32,13 +32,15 @@ pub struct Agent3D {
     pub home_camp_node: NodeId, // 所属归宿营地节点
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
 
-    // 繁衍孕育系统 (Pregnancy Lifecycle)
+    // 繁衍孕育系统 (Pregnancy Lifecycle: 延长3倍至 54 秒)
     pub is_pregnant: bool,        // 是否怀孕
-    pub pregnancy_progress: f32,  // 孕育进度 0.0 ~ 1.0 (约需 18 秒)
-    pub ready_to_birth: bool,     // 是否临盆待产 (准备生成新生儿)
+    pub pregnancy_progress: f32,  // 孕育进度 0.0 ~ 1.0 (需 54 秒)
+    pub ready_to_birth: bool,     // 是否临盆待产
+    pub miscarriage_alert_timer: f32, // 流产提示图标倒计时 (秒)
+    pub death_decay_timer: f32,   // 死亡遗体消逝倒计时 (秒)
     pub death_cause: Option<String>,
 
-    // 空间运动参数 (标准移速翻倍至 16~22 m/s)
+    // 空间运动参数 (标准移速 16~22 m/s)
     pub current_lane_id: Option<LaneId>,
     pub distance_along_curve: f32,
     pub current_velocity: f32,
@@ -58,7 +60,6 @@ pub struct Agent3D {
 
 impl Agent3D {
     pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool) -> Self {
-        // 移速翻倍 (基准 16.0 ~ 22.0 m/s)
         let doubled_speed = max_speed * 2.0;
         Self {
             id,
@@ -73,6 +74,8 @@ impl Agent3D {
             is_pregnant: false,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
+            miscarriage_alert_timer: 0.0,
+            death_decay_timer: 12.0,
             death_cause: None,
             current_lane_id: None,
             distance_along_curve: 0.0,
@@ -90,25 +93,32 @@ impl Agent3D {
 
     /// 核心生命代谢与受孕繁衍 Tick
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
+        // 流产浮动提示计时衰减
+        if self.miscarriage_alert_timer > 0.0 {
+            self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
+        }
+
         if !self.is_alive {
+            // 死亡遗骸计时衰减 (12秒后彻底消失)
+            self.death_decay_timer = (self.death_decay_timer - dt).max(0.0);
             return None;
         }
 
         let mut event_msg = None;
 
-        // 1. 怀孕代谢压力倍率 (怀孕期间需求消耗速率增长 50%，即 1.5x)
+        // 1. 怀孕代谢倍率 (怀孕期间需求消耗加速 50%)
         let metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
 
-        // 基础代谢衰减
         self.hunger = (self.hunger - 0.45 * metabolic_multiplier * dt).max(0.0);
         self.thirst = (self.thirst - 0.85 * metabolic_multiplier * dt).max(0.0);
 
-        // 2. 死亡判定规则：任意需求指标归零即告死亡
+        // 2. 死亡判定规则
         if self.hunger <= 0.0 {
             self.is_alive = false;
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("饥荒饿死".to_string());
             self.is_pregnant = false;
+            self.death_decay_timer = 12.0;
             return Some(format!("💀 部落民 #{} 因长期饥荒极度营养不良不幸饿死！", self.id));
         }
         if self.thirst <= 0.0 {
@@ -116,54 +126,53 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("脱水渴死".to_string());
             self.is_pregnant = false;
+            self.death_decay_timer = 12.0;
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 3. 受孕机制：在营地休息且所有需求均达到 80%+ 时进入怀孕
+        // 3. 受孕判定：在营地休息且所有需求均达到 80%+
         if self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant {
             if self.hunger >= 80.0 && self.thirst >= 80.0 && self.stamina >= 80.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
-                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健，成功受孕进入妊娠期 (代谢消耗 +50%)！", self.id));
+                event_msg = Some(format!("🤰 部落民 #{} 饱暖康健，成功受孕进入妊娠期 (耗时延长3倍至54s，代谢+50%)！", self.id));
             }
         }
 
-        // 4. 妊娠期孕育与流产监控
+        // 4. 妊娠期孕育与流产监控 (时间延长3倍至 54秒)
         if self.is_pregnant {
             // 流产判定：若任何一条需求跌破 20%，发生流产！
             if self.hunger < 20.0 || self.thirst < 20.0 || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
+                self.miscarriage_alert_timer = 5.0; // 开启 5 秒流产图标提示
                 return Some(format!("🥀 痛惜！部落民 #{} 生存指标跌破 20% 安全线，体力虚脱导致流产！", self.id));
             }
 
-            // 孕育进度推进 (18秒完成全孕期)
-            self.pregnancy_progress += dt / 18.0;
+            // 孕育进度推进 (54秒完成全孕期)
+            self.pregnancy_progress += dt / 54.0;
             if self.pregnancy_progress >= 1.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
-                self.ready_to_birth = true; // 触发分娩新生儿
+                self.ready_to_birth = true;
                 return Some(format!("🍼 喜讯！部落民 #{} 历经艰辛顺利产下一名健康的部落新生儿！", self.id));
             }
         }
 
-        // 5. 营地休养状态下的行为收益
-        match self.state {
-            PrimitiveActionState::RestingAtCamp => {
-                self.stamina = (self.stamina + 8.0 * dt).min(100.0);
-                if self.hunger < 75.0 && self.inventory_food > 0.1 {
-                    let eat = (1.5 * dt).min(self.inventory_food);
-                    self.inventory_food -= eat;
-                    self.hunger = (self.hunger + eat * 25.0).min(100.0);
-                }
+        // 5. 营地休养进食
+        if self.state == PrimitiveActionState::RestingAtCamp {
+            self.stamina = (self.stamina + 8.0 * dt).min(100.0);
+            if self.hunger < 75.0 && self.inventory_food > 0.1 {
+                let eat = (1.5 * dt).min(self.inventory_food);
+                self.inventory_food -= eat;
+                self.hunger = (self.hunger + eat * 25.0).min(100.0);
             }
-            _ => {}
         }
 
         event_msg
     }
 
-    /// 3D 动力学移动与坡度能耗结算 (翻倍移速)
+    /// 3D 动力学移动与坡度能耗结算
     pub fn tick_movement(&mut self, dt: f32, road_network: &LaneGraph3D) {
         if !self.is_alive {
             self.current_velocity = 0.0;
@@ -190,14 +199,12 @@ impl Agent3D {
 
         let lane = &road_network.graph[*edge_idx];
 
-        // 坡度能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
         let uphill_penalty = if delta_z > 0.0 { (delta_z / lane.curve.length).max(0.0) } else { 0.0 };
 
         let stamina_burn = (1.2 + if self.is_pregnant { 0.6 } else { 0.0 }) * (1.0 + uphill_penalty * 3.5);
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
-        // 体力归零时极度迟缓但不会立即暴毙 (直到饿死或渴死)
         let stamina_factor = (self.stamina / 25.0).clamp(0.2, 1.0);
         let target_speed = self.max_desired_speed.min(lane.speed_limit) * stamina_factor;
 
