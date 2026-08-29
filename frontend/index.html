@@ -823,8 +823,8 @@
       tickWearDecay(dt) {
         for (const lane of this.lanes.values()) {
           if (lane.wear > 0) {
-            // 每秒衰减 0.040 (闲置约 25s 退化一级，75s 完全退化为荒野)
-            lane.wear = Math.max(0, lane.wear - 0.040 * dt);
+            // 每秒衰减 0.020 (衰减减半，闲置约 50s 退化一级，150s 完全退化为荒野)
+            lane.wear = Math.max(0, lane.wear - 0.020 * dt);
           }
         }
       }
@@ -1007,8 +1007,8 @@
           return;
         }
 
-        // 踩踏拓路：按人数实时累加 (1级20s、2级40s、3级80s)，双向往返共同加固
-        const gainRate = (lane.wear || 0) < 2.0 ? 0.050 : 0.025;
+        // 踩踏拓路：按人数实时累加 (增加50%耗时：1级30s到达1.0、2级60s到达2.0、3级120s到达3.0)，双向往返共同加固
+        const gainRate = (lane.wear || 0) < 2.0 ? 0.03333 : 0.01667;
         const newWear = Math.min(3.0, (lane.wear || 0.0) + gainRate * dt);
         lane.wear = newWear;
         if (lane.reverseId && network.lanes.has(lane.reverseId)) {

@@ -214,10 +214,10 @@ impl Agent3D {
         let to_idx = road_network.node_map[&to_node];
         let rev_edge_idx = road_network.graph.find_edge(to_idx, from_idx);
 
-        // 踩踏拓路：按人数实时累加 (1级20s、2级40s、3级80s)，双向往返共同加固
+        // 踩踏拓路：按人数实时累加 (增加50%耗时：1级30s到达1.0、2级60s到达2.0、3级120s到达3.0)，双向往返共同加固
         {
             let edge = &mut road_network.graph[edge_idx];
-            let gain_rate = if edge.wear < 2.0 { 0.050 } else { 0.025 };
+            let gain_rate = if edge.wear < 2.0 { 0.03333 } else { 0.01667 };
             let new_wear = (edge.wear + gain_rate * dt).min(3.0);
             edge.wear = new_wear;
             if let Some(rev_idx) = rev_edge_idx {
@@ -228,7 +228,7 @@ impl Agent3D {
         let lane = &road_network.graph[edge_idx];
         let wear = lane.wear;
 
-        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (20s土径 83%) -> 2.0 (40s夯土 117%) -> 3.0 (80s石道 150%)
+        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (30s土径 83%) -> 2.0 (60s夯土 117%) -> 3.0 (120s石道 150%)
         let road_level_factor = (0.50 + 0.333 * wear).clamp(0.50, 1.50);
         self.is_traveling_offroad = wear < 0.6;
 
