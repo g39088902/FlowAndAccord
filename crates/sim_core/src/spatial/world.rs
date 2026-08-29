@@ -7,7 +7,7 @@ use super::agent::{Agent3D, AgentId, PrimitiveActionState};
 use super::poi::{PrimitivePoi, PoiId, PoiType};
 use crate::geo::terrain::TerrainMap;
 
-/// 外部渲染只读快照数据结构 (包含原始生态 POI 与 Agent 生命体征)
+/// 外部渲染只读快照数据结构 (包含有限资源 POI 与生命周期繁衍体征)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldSnapshot3D {
     pub tick: u64,
@@ -21,6 +21,8 @@ pub struct WorldSnapshot3D {
     pub nodes: Vec<NodeSnapshot>,
     pub lanes: Vec<LaneSnapshot>,
     pub agents: Vec<AgentSnapshot>,
+    pub total_births: u32,
+    pub total_deaths: u32,
     pub last_mutation_event: Option<String>,
 }
 
@@ -37,8 +39,8 @@ pub struct PoiSnapshot {
     pub x: f32,
     pub y: f32,
     pub z: f32,
-    pub resource_amount: f32,
-    pub max_capacity: f32,
+    pub current_stock: f32,
+    pub max_stock: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,20 +77,27 @@ pub struct AgentSnapshot {
     pub pitch_rad: f32,
     pub velocity: f32,
     pub state: String,
+    pub is_alive: bool,
     pub hunger: f32,
     pub thirst: f32,
     pub stamina: f32,
     pub inventory_food: f32,
+    pub is_pregnant: bool,
+    pub pregnancy_progress: f32,
+    pub death_cause: Option<String>,
     pub is_covert: bool,
     pub stealth_visibility: f32,
 }
 
-/// 3D 空间世界与原始生态生存仿真管理器
+/// 3D 空间世界与原始生态生存繁衍仿真管理器
 pub struct World3DEngine {
     pub terrain: TerrainMap,
     pub network: LaneGraph3D,
     pub pois: Vec<PrimitivePoi>,
     pub agents: Vec<Agent3D>,
+    pub next_agent_id: AgentId,
+    pub total_births: u32,
+    pub total_deaths: u32,
     pub tick_counter: u64,
     pub last_event: Option<String>,
 }
@@ -103,12 +112,15 @@ impl World3DEngine {
             network: LaneGraph3D::new(),
             pois: Vec::new(),
             agents: Vec::new(),
+            next_agent_id: 1,
+            total_births: 0,
+            total_deaths: 0,
             tick_counter: 0,
             last_event: None,
         }
     }
 
-    /// 根据地形高程生成原始三大生态 POI (营地、水坑、浆果丛) 与自然步道
+    /// 构建有限资源 POI 与部落生态
     pub fn seed_primitive_ecology(&mut self, agent_count: usize) {
         let mut rng = rand::thread_rng();
         let half_size = self.terrain.world_size / 2.0;
@@ -116,13 +128,16 @@ impl World3DEngine {
         self.pois.clear();
         self.network = LaneGraph3D::new();
         self.agents.clear();
+        self.total_births = 0;
+        self.total_deaths = 0;
+        self.next_agent_id = 1;
 
         let mut camp_nodes = Vec::new();
         let mut water_nodes = Vec::new();
         let mut food_nodes = Vec::new();
         let mut all_node_ids = Vec::new();
 
-        // 1. 生成 3 处避风高台营地 (Camp: 位于中高地台 Z ∈ [-5m, 15m])
+        // 1. 生成 3 处避风营地
         for i in 0..3 {
             let x = rng.gen_range(-half_size * 0.65..half_size * 0.65);
             let y = rng.gen_range(-half_size * 0.65..half_size * 0.65);
@@ -134,7 +149,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 1) as u32, PoiType::Camp, Vec3::new(x, y, elev)));
         }
 
-        // 2. 生成 3 处低洼水源地 (WaterSource: 探寻地势最低洼处)
+        // 2. 生成 3 处有限产出低洼清泉
         for i in 0..3 {
             let mut best_x = 0.0f32;
             let mut best_y = 0.0f32;
@@ -158,7 +173,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 10) as u32, PoiType::WaterSource, Vec3::new(best_x, best_y, lowest_z)));
         }
 
-        // 3. 生成 4 处缓坡浆果丛 (BerryBush: 散布在缓坡向阳面)
+        // 3. 生成 4 处有限产出浆果灌木
         for i in 0..4 {
             let x = rng.gen_range(-half_size * 0.75..half_size * 0.75);
             let y = rng.gen_range(-half_size * 0.75..half_size * 0.75);
@@ -170,7 +185,7 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 20) as u32, PoiType::BerryBush, Vec3::new(x, y, elev)));
         }
 
-        // 4. 生成若干中间地形路口过渡节点
+        // 4. 地形路口节点
         for _ in 0..18 {
             let x = rng.gen_range(-half_size * 0.85..half_size * 0.85);
             let y = rng.gen_range(-half_size * 0.85..half_size * 0.85);
@@ -179,7 +194,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
         }
 
-        // 5. 在营地、水源与浆果丛之间铺设初级步行道 (DirtTrack / Cobblestone)
+        // 5. 铺设初级步行道
         for i in 0..all_node_ids.len() {
             for j in (i + 1)..all_node_ids.len() {
                 let id_a = all_node_ids[i];
@@ -190,48 +205,109 @@ impl World3DEngine {
                 let dist = pos_a.distanceTo(&pos_b);
                 if dist < 190.0 {
                     let delta_z = (pos_a.z - pos_b.z).abs();
-                    let road_class = if delta_z > 8.0 {
-                        RoadClass::Cobblestone // 盘坡石子路
-                    } else if rng.gen_bool(0.2) {
-                        RoadClass::SmugglerTrail // 隐秘小径
-                    } else {
-                        RoadClass::DirtTrack // 泥泞步行土路
-                    };
-
-                    let is_hidden = road_class == RoadClass::SmugglerTrail;
-                    let _ = self.network.add_lane_with_options(id_a, id_b, None, road_class, is_hidden, if is_hidden { 0.85 } else { 0.0 });
-                    let _ = self.network.add_lane_with_options(id_b, id_a, None, road_class, is_hidden, if is_hidden { 0.85 } else { 0.0 });
+                    let road_class = if delta_z > 8.0 { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
+                    let _ = self.network.add_lane(id_a, id_b, road_class);
+                    let _ = self.network.add_lane(id_b, id_a, road_class);
                 }
             }
         }
 
-        // 6. 注入原始 Agent，并分配归宿营地
+        // 6. 注入初始部落民 (双倍标准移速)
         for i in 0..agent_count {
             let home_camp = camp_nodes[i % camp_nodes.len()];
-            let is_covert = i % 4 == 0; // 每4个中有一个敏锐猎人/特工
-            let mut agent = Agent3D::new((i + 1) as u32, home_camp, 9.0 + (i as f32 % 5.0), is_covert);
+            let is_covert = i % 4 == 0;
+            let agent_id = self.next_agent_id;
+            self.next_agent_id += 1;
+
+            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 原始生态建立: 包含 3 处避风营地、3 处低洼清泉与 4 处浆果丛。".to_string());
+        self.last_event = Some("🏕️ 有限资源生态建立: 包含有限储量泉眼与果丛，繁衍与死亡机制已激活！".to_string());
     }
 
-    /// 决策与生存状态机调度循环
+    /// 真实有限资源交互结算与分娩
+    pub fn tick_poi_interactions(&mut self, dt: f32) {
+        let mut newborn_mothers = Vec::new();
+
+        for agent in &mut self.agents {
+            if !agent.is_alive {
+                continue;
+            }
+
+            // 检查分娩
+            if agent.ready_to_birth {
+                agent.ready_to_birth = false;
+                newborn_mothers.push((agent.id, agent.home_camp_node));
+            }
+
+            // 检查与 POI 原位交互
+            match agent.state {
+                PrimitiveActionState::DrinkingAtWater => {
+                    // 寻获最近的水源 POI
+                    let agent_pos = agent.world_pos;
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 18.0) {
+                        let extracted = poi.extract(30.0 * dt);
+                        agent.thirst = (agent.thirst + extracted * 1.2).min(100.0);
+                    }
+                }
+                PrimitiveActionState::ForagingFood => {
+                    // 寻获最近的浆果丛 POI
+                    let agent_pos = agent.world_pos;
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 18.0) {
+                        if agent.inventory_food < 4.0 {
+                            let extracted = poi.extract(1.2 * dt);
+                            agent.inventory_food = (agent.inventory_food + extracted).min(4.0);
+                            agent.hunger = (agent.hunger + extracted * 20.0).min(100.0);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // 分娩诞生新生儿！
+        for (mother_id, camp_node) in newborn_mothers {
+            let baby_id = self.next_agent_id;
+            self.next_agent_id += 1;
+            self.total_births += 1;
+
+            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false);
+            let camp_pos = self.network.graph[*self.network.node_map.get(&camp_node).unwrap()].pos;
+            baby.world_pos = camp_pos;
+            baby.hunger = 95.0;
+            baby.thirst = 95.0;
+            baby.stamina = 100.0;
+            baby.inventory_food = 0.5;
+
+            self.agents.push(baby);
+            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{})！部落添丁！", mother_id, baby_id));
+        }
+    }
+
+    /// 生存决策调度
     pub fn tick_decisions(&mut self) {
         let mut rng = rand::thread_rng();
 
-        let water_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::WaterSource)
+        let water_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::WaterSource && p.current_stock > 1.0)
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
-        let food_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::BerryBush)
+        let food_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::BerryBush && p.current_stock > 1.0)
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
 
         for agent in &mut self.agents {
+            if !agent.is_alive {
+                continue;
+            }
+
             match agent.state {
                 PrimitiveActionState::RestingAtCamp => {
-                    // 在营地休息时根据紧迫度发起行动
-                    if agent.thirst < 40.0 && !water_nodes.is_empty() {
+                    // 怀孕期或者饥渴急迫
+                    let thirst_urgency = if agent.is_pregnant { 55.0 } else { 40.0 };
+                    let hunger_urgency = if agent.is_pregnant { 60.0 } else { 48.0 };
+
+                    if agent.thirst < thirst_urgency && !water_nodes.is_empty() {
                         let target = water_nodes[rng.gen_range(0..water_nodes.len())];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
@@ -243,7 +319,7 @@ impl World3DEngine {
                                 agent.distance_along_curve = 0.0;
                             }
                         }
-                    } else if (agent.hunger < 50.0 || agent.inventory_food < 0.5) && !food_nodes.is_empty() {
+                    } else if (agent.hunger < hunger_urgency || agent.inventory_food < 0.5) && !food_nodes.is_empty() {
                         let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
@@ -255,8 +331,7 @@ impl World3DEngine {
                                 agent.distance_along_curve = 0.0;
                             }
                         }
-                    } else if agent.stamina >= 95.0 && agent.hunger > 60.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
-                        // 精力充沛时外出采果储备
+                    } else if agent.stamina >= 95.0 && agent.hunger > 65.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
                         let target = food_nodes[rng.gen_range(0..food_nodes.len())];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
@@ -271,7 +346,6 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::DrinkingAtWater => {
-                    // 水喝饱后决定下一步
                     if agent.thirst >= 90.0 {
                         if agent.hunger < 50.0 && !food_nodes.is_empty() {
                             let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
@@ -287,7 +361,6 @@ impl World3DEngine {
                                 }
                             }
                         } else {
-                            // 喝饱回营地
                             let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, agent.home_camp_node, agent.is_covert) {
                                 if !path.is_empty() {
@@ -303,26 +376,9 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::ForagingFood => {
-                    // 采满野果或吃饱后返回营地
                     if agent.hunger >= 85.0 && agent.inventory_food >= 2.5 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, agent.home_camp_node, agent.is_covert) {
-                            if !path.is_empty() {
-                                agent.state = PrimitiveActionState::ReturningToCamp;
-                                agent.target_poi_node = Some(agent.home_camp_node);
-                                agent.route = path.clone();
-                                agent.route_index = 0;
-                                agent.current_lane_id = Some(path[0]);
-                                agent.distance_along_curve = 0.0;
-                            }
-                        }
-                    }
-                }
-                PrimitiveActionState::OffRoadDetour => {
-                    // 迷路脱困直接搜寻返回营地
-                    let curr_pos = agent.world_pos;
-                    if let Some(near_node) = self.find_nearest_node(curr_pos) {
-                        if let Some(path) = self.network.find_path_3d_with_preference(near_node, agent.home_camp_node, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::ReturningToCamp;
                                 agent.target_poi_node = Some(agent.home_camp_node);
@@ -356,27 +412,35 @@ impl World3DEngine {
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
 
-        // 1. POI 资源再生
+        // 1. POI 有限资源自然恢复
         for poi in &mut self.pois {
             poi.tick_regenerate(dt);
         }
 
-        // 2. 生理代谢与决策调度
+        // 2. 生理代谢与死亡/受孕/流产/分娩
         for agent in &mut self.agents {
-            agent.tick_metabolism(dt);
+            if let Some(event) = agent.tick_metabolism(dt) {
+                if !agent.is_alive {
+                    self.total_deaths += 1;
+                }
+                self.last_event = Some(event);
+            }
         }
 
-        if self.tick_counter % 20 == 0 {
+        // 3. POI 实际有限提取与新生儿落地
+        self.tick_poi_interactions(dt);
+
+        if self.tick_counter % 15 == 0 {
             self.tick_decisions();
         }
 
-        // 3. 动力学运动与坡度能耗
+        // 4. 动力学运动与能耗
         for agent in &mut self.agents {
             agent.tick_movement(dt, &self.network);
         }
     }
 
-    /// 导出包含 POI 与生存体征的完整渲染快照
+    /// 导出包含有限 POI 存量与繁衍体征的快照
     pub fn generate_snapshot(&self) -> WorldSnapshot3D {
         let mut terrain_cells = Vec::with_capacity(self.terrain.cells.len());
         for cell in &self.terrain.cells {
@@ -394,8 +458,8 @@ impl World3DEngine {
                 x: p.pos.x,
                 y: p.pos.y,
                 z: p.pos.z,
-                resource_amount: p.resource_amount,
-                max_capacity: p.max_capacity,
+                current_stock: p.current_stock,
+                max_stock: p.max_stock,
             });
         }
 
@@ -440,10 +504,14 @@ impl World3DEngine {
                 pitch_rad: agent.pitch_rad,
                 velocity: agent.current_velocity,
                 state: format!("{:?}", agent.state),
+                is_alive: agent.is_alive,
                 hunger: agent.hunger,
                 thirst: agent.thirst,
                 stamina: agent.stamina,
                 inventory_food: agent.inventory_food,
+                is_pregnant: agent.is_pregnant,
+                pregnancy_progress: agent.pregnancy_progress,
+                death_cause: agent.death_cause.clone(),
                 is_covert: agent.is_covert,
                 stealth_visibility: agent.stealth_visibility,
             });
@@ -461,6 +529,8 @@ impl World3DEngine {
             nodes,
             lanes,
             agents,
+            total_births: self.total_births,
+            total_deaths: self.total_deaths,
             last_mutation_event: self.last_event.clone(),
         }
     }

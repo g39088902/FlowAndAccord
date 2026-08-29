@@ -29,20 +29,20 @@ mod tests {
     }
 
     #[test]
-    fn test_primitive_survival_ecology() {
+    fn test_finite_poi_and_reproduction_cycle() {
         let mut world = World3DEngine::new(60, 764.0);
         world.seed_primitive_ecology(20);
 
-        assert_eq!(world.pois.len(), 10); // 3营地 + 3水源 + 4浆果丛
+        assert_eq!(world.pois.len(), 10);
         assert_eq!(world.agents.len(), 20);
 
-        // 运行 200 ticks 验证代谢衰减与状态机轮转
-        for _ in 0..200 {
+        // 运行 250 ticks
+        for _ in 0..250 {
             world.tick(0.05);
         }
 
         let snapshot = world.generate_snapshot();
-        assert_eq!(snapshot.agents.len(), 20);
-        assert_eq!(snapshot.pois.len(), 10);
+        assert!(!snapshot.pois.is_empty());
+        assert!(!snapshot.agents.is_empty());
     }
 }

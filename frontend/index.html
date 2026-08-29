@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flow & Accord - 原始生态生理代谢与生存动线引擎</title>
+  <title>Flow & Accord - 原始生态经济与繁衍生死循环</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -45,7 +45,7 @@
       font-size: 16px;
       font-weight: 700;
       letter-spacing: 0.5px;
-      background: linear-gradient(135deg, #f59e0b, #10b981, #38bdf8);
+      background: linear-gradient(135deg, #f59e0b, #ec4899, #10b981, #38bdf8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       display: flex;
@@ -118,13 +118,13 @@
     .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
     .legend-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 
-    /* 选中的 Agent 生理状态监控面板 */
+    /* 选中的 Agent 生理与孕育状态监控面板 */
     .agent-inspector {
       position: absolute;
-      top: 280px; right: 16px;
+      top: 300px; right: 16px;
       background: rgba(10, 18, 30, 0.94);
       backdrop-filter: blur(16px);
-      border: 1px solid rgba(56, 189, 248, 0.25);
+      border: 1px solid rgba(236, 72, 153, 0.3);
       padding: 14px 16px;
       border-radius: 14px;
       width: 270px;
@@ -141,6 +141,7 @@
       padding-bottom: 4px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
     .meter-row {
       display: flex;
@@ -163,6 +164,15 @@
       height: 100%;
       border-radius: 3px;
       transition: width 0.2s ease;
+    }
+    .preg-container {
+      background: rgba(236, 72, 153, 0.1);
+      border: 1px solid rgba(236, 72, 153, 0.35);
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     /* 控制面板 */
@@ -243,7 +253,7 @@
     .event-log {
       position: absolute;
       bottom: 20px; right: 20px;
-      width: 420px;
+      width: 440px;
       max-height: 180px;
       background: rgba(10, 18, 30, 0.92);
       backdrop-filter: blur(14px);
@@ -283,6 +293,8 @@
     .log-entry.food { border-left-color: #10b981; color: #6ee7b7; }
     .log-entry.water { border-left-color: #0284c7; color: #7dd3fc; }
     .log-entry.camp { border-left-color: #f59e0b; color: #fde68a; }
+    .log-entry.birth { border-left-color: #ec4899; color: #fbcfe8; }
+    .log-entry.death { border-left-color: #ef4444; color: #fca5a5; }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
@@ -296,8 +308,8 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🏕️ Flow & Accord · 原生生理代谢与生存动线系统</div>
-      <div class="brand-desc">无科技原始状态 × 饱食/水分/体力稳态循环 × 避风营地/低洼清泉/缓坡浆果</div>
+      <div class="brand-title">🍼 Flow & Accord · 原始生态经济与繁衍生死循环</div>
+      <div class="brand-desc">双倍移速 × 有限资源再生池 × 80%+受孕妊娠(+50%代谢) × 20%流产与分娩生死</div>
     </div>
     <div class="stats-card">
       <div class="stat-item">
@@ -305,33 +317,34 @@
         <div class="stat-lbl">FPS</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-pop">24</div>
-        <div class="stat-lbl">存活部落民</div>
+        <div class="stat-val" id="stat-pop">20</div>
+        <div class="stat-lbl">活体人口</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-avg-hunger" style="color:#10b981;">82%</div>
-        <div class="stat-lbl">平均饱食度</div>
+        <div class="stat-val" id="stat-pregnant" style="color:#ec4899;">0</div>
+        <div class="stat-lbl">🤰 孕妇数</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-avg-thirst" style="color:#38bdf8;">76%</div>
-        <div class="stat-lbl">平均水分值</div>
+        <div class="stat-val" id="stat-births" style="color:#10b981;">0</div>
+        <div class="stat-lbl">👶 出生总数</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-avg-stamina" style="color:#f59e0b;">88%</div>
-        <div class="stat-lbl">平均体力值</div>
+        <div class="stat-val" id="stat-deaths" style="color:#ef4444;">0</div>
+        <div class="stat-lbl">💀 饥荒死亡</div>
       </div>
     </div>
   </div>
 
   <div class="ecology-legend">
     <div class="legend-title">
-      <span>🗺️ 原始三大生存地标</span>
-      <span style="color:#38bdf8; font-size:10px;">资源生态</span>
+      <span>🗺️ 有限生态地标与生命状态</span>
+      <span style="color:#ec4899; font-size:10px;">繁衍机制</span>
     </div>
-    <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 / 火塘 (恢复体力、存粮进食)</div>
-    <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 / 水洼 (地势最低处，解渴饮水)</div>
-    <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果灌木 (向阳斜坡，采摘食物)</div>
-    <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;"><div class="legend-icon">🚶</div> 原始兽径/步行步道 (受坡度能耗影响)</div>
+    <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (恢复体力、80%+受孕、分娩)</div>
+    <div class="legend-item"><div class="legend-icon">💧</div> 低洼清泉 (有限蓄水 60.0，涌出 3.5/s)</div>
+    <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果丛 (有限存量 25.0，生长 1.2/s)</div>
+    <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon">🤰</div> 妊娠光环 (代谢+50%，<20%流产)</div>
+    <div class="legend-item"><div class="legend-icon">💀</div> 饿殍/渴死 (需求归零死亡)</div>
   </div>
 
   <div class="agent-inspector" id="agent-inspector">
@@ -352,29 +365,37 @@
       <div class="meter-bg"><div class="meter-fill" id="insp-stamina-fill" style="background:#f59e0b; width:90%;"></div></div>
     </div>
     <div class="meter-row">
-      <div class="meter-label"><span>🍒 携带野果</span><span id="insp-inv-val">1.2 / 4.0 颗</span></div>
+      <div class="meter-label"><span>🎒 携带野果</span><span id="insp-inv-val">1.2 / 4.0 颗</span></div>
     </div>
-    <div style="font-size:10px; color:#64748b; margin-top:2px;" id="insp-detail">
-      当前位于营地，体力与精力正在快速恢复。
+    <div class="preg-container" id="insp-preg-box" style="display:none;">
+      <div class="meter-label" style="color:#ec4899; font-weight:600;">
+        <span>🤰 妊娠孕育中 (消耗 +50%)</span>
+        <span id="insp-preg-val">45%</span>
+      </div>
+      <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
+      <div style="font-size:9px; color:#f472b6;">提示：任何需求指标跌破 20% 将导致流产！</div>
+    </div>
+    <div style="font-size:10px; color:#94a3b8; margin-top:2px;" id="insp-detail">
+      当前状态良好。
     </div>
   </div>
 
   <div class="control-panel">
     <div class="panel-title">
-      <span>原始生态与动线控制台</span>
-      <span style="font-size: 11px; color: #f59e0b;">生态自洽</span>
+      <span>生态经济与繁衍控制台</span>
+      <span style="font-size: 11px; color: #ec4899;">生命循环</span>
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
-      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演原始生态 (地势±30m & POI)</button>
+      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演生态 (有限资源 & 部落)</button>
     </div>
     <div class="btn-grid">
-      <button id="btn-spawn-civ">🚶 注入 +8 部落民</button>
+      <button id="btn-spawn-civ">🚶 注入 +6 部落民</button>
       <button id="btn-add-food">🍒 催生野果浆果</button>
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-      <span>显示 3D 地形起伏高程网格</span>
+      <span>显示 3D 地形高程网格</span>
       <input type="checkbox" id="chk-terrain" checked style="accent-color: #38bdf8; cursor: pointer;">
     </div>
     <div class="toggle-row">
@@ -382,8 +403,8 @@
       <input type="checkbox" id="chk-lanes" checked style="accent-color: #38bdf8; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span>显示生存状态光环</span>
-      <input type="checkbox" id="chk-aura" checked style="accent-color: #f59e0b; cursor: pointer;">
+      <span>显示 POI 有限储量指示环</span>
+      <input type="checkbox" id="chk-poi-stock" checked style="accent-color: #10b981; cursor: pointer;">
     </div>
     <div class="toggle-row">
       <span>模拟推进速率</span>
@@ -396,9 +417,9 @@
   </div>
 
   <div class="event-log">
-    <div class="log-title">🛰️ 部落生存与动线事件</div>
+    <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">部落营地建立: 部落民在避风高地扎营，低洼清泉与缓坡浆果已散布。</div>
+      <div class="log-entry camp">有限资源生态就绪: 饱暖80%受孕、跌破20%流产与归零死亡机制已激活！</div>
     </div>
   </div>
 
@@ -449,9 +470,6 @@
       }
     }
 
-    // ==========================================
-    // 纯粹自然地形 (±30m 倾斜起伏)
-    // ==========================================
     class PureTiltedTerrain {
       constructor(gridSize = 60, worldSize = 764) {
         this.gridSize = gridSize;
@@ -523,9 +541,6 @@
       }
     }
 
-    // ==========================================
-    // 原始生态 POI 与路网
-    // ==========================================
     class LaneGraph3D {
       constructor() {
         this.nodes = new Map();
@@ -540,7 +555,7 @@
         this.adjacency.set(id, []);
         return id;
       }
-      addLane(fromId, toId, roadClass = 'dirt', isHidden = false) {
+      addLane(fromId, toId, roadClass = 'dirt') {
         const fromNode = this.nodes.get(fromId);
         const toNode = this.nodes.get(toId);
         if (!fromNode || !toNode) return null;
@@ -556,8 +571,9 @@
           curve = Curve3D.straight(fromNode.pos, toNode.pos);
         }
 
-        const speedLimit = roadClass === 'cobble' ? 10 : (roadClass === 'smuggler' ? 8 : 6);
-        const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit, isHidden };
+        // 双倍移速环境下的限速
+        const speedLimit = roadClass === 'cobble' ? 22 : 18;
+        const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit };
         this.lanes.set(id, lane);
         this.adjacency.get(fromId).push(id);
         return id;
@@ -589,7 +605,7 @@
               costSoFar.set(nextNode, newCost);
               const goalPos = this.nodes.get(goalId).pos;
               const nextPos = this.nodes.get(nextNode).pos;
-              const h = nextPos.distanceTo(goalPos) / 15;
+              const h = nextPos.distanceTo(goalPos) / 25;
               frontier.push({ id: nextNode, cost: newCost + h });
               cameFrom.set(nextNode, { prevNode: current.id, laneId });
             }
@@ -610,19 +626,25 @@
     }
 
     // ==========================================
-    // 原始生存 Agent (饱食、水分、体力与坡度能耗)
+    // 原始生存、繁衍与死亡 Agent (双倍移速)
     // ==========================================
     class PrimitiveAgent {
-      constructor(id, homeCampNode, maxSpeed = 8.5) {
+      constructor(id, homeCampNode, maxSpeed = 17.0) {
         this.id = id;
         this.homeCampNode = homeCampNode;
-        this.maxSpeed = maxSpeed;
+        this.maxSpeed = maxSpeed; // 双倍标准移速
         this.state = 'RestingAtCamp';
+        this.isAlive = true;
 
         this.hunger = 80 + (id * 13) % 20;
-        this.thirst = 75 + (id * 17) % 25;
-        this.stamina = 90;
+        this.thirst = 80 + (id * 17) % 20;
+        this.stamina = 95;
         this.inventoryFood = 1.0;
+
+        this.isPregnant = false;
+        this.pregnancyProgress = 0.0;
+        this.readyToBirth = false;
+        this.deathCause = null;
 
         this.targetNode = null;
         this.currentLaneId = null;
@@ -635,25 +657,75 @@
         this.trail = [];
       }
       tickMetabolism(dt) {
-        // 自然代谢消耗
-        this.hunger = Math.max(0, this.hunger - 0.4 * dt);
-        this.thirst = Math.max(0, this.thirst - 0.8 * dt);
+        if (!this.isAlive) return null;
 
+        let eventMsg = null;
+        const multiplier = this.isPregnant ? 1.5 : 1.0;
+
+        // 自然代谢衰减
+        this.hunger = Math.max(0, this.hunger - 0.45 * multiplier * dt);
+        this.thirst = Math.max(0, this.thirst - 0.85 * multiplier * dt);
+
+        // 1. 归零死亡判定
+        if (this.hunger <= 0.0) {
+          this.isAlive = false;
+          this.state = 'Dead';
+          this.deathCause = '饥荒饿死';
+          this.isPregnant = false;
+          return { type: 'death', text: `💀 部落民 #${this.id} 因长期饥荒饿死在荒野中！` };
+        }
+        if (this.thirst <= 0.0) {
+          this.isAlive = false;
+          this.state = 'Dead';
+          this.deathCause = '严重脱水';
+          this.isPregnant = false;
+          return { type: 'death', text: `💀 部落民 #${this.id} 因严重脱水渴死！` };
+        }
+
+        // 2. 80%+ 受孕判定
+        if (this.state === 'RestingAtCamp' && !this.isPregnant) {
+          if (this.hunger >= 80 && this.thirst >= 80 && this.stamina >= 80) {
+            this.isPregnant = true;
+            this.pregnancyProgress = 0.0;
+            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} 饱暖康健，成功受孕进入妊娠期 (代谢+50%)！` };
+          }
+        }
+
+        // 3. 妊娠期维护与流产判定
+        if (this.isPregnant) {
+          if (this.hunger < 20 || this.thirst < 20 || this.stamina < 20) {
+            this.isPregnant = false;
+            this.pregnancyProgress = 0.0;
+            return { type: 'death', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%，体力虚脱导致流产！` };
+          }
+
+          this.pregnancyProgress += dt / 18.0;
+          if (this.pregnancyProgress >= 1.0) {
+            this.isPregnant = false;
+            this.pregnancyProgress = 0.0;
+            this.readyToBirth = true;
+            return { type: 'birth', text: `🍼 喜讯！部落民 #${this.id} 顺利产下一名健康的新生儿！` };
+          }
+        }
+
+        // 4. 营地休养进食
         if (this.state === 'RestingAtCamp') {
           this.stamina = Math.min(100, this.stamina + 8.0 * dt);
-          if (this.hunger < 70 && this.inventoryFood > 0.1) {
+          if (this.hunger < 75 && this.inventoryFood > 0.1) {
             const eat = Math.min(this.inventoryFood, 1.5 * dt);
             this.inventoryFood -= eat;
             this.hunger = Math.min(100, this.hunger + eat * 25);
           }
-        } else if (this.state === 'DrinkingAtWater') {
-          this.thirst = Math.min(100, this.thirst + 35.0 * dt);
-        } else if (this.state === 'ForagingFood') {
-          if (this.inventoryFood < 4.0) this.inventoryFood = Math.min(4.0, this.inventoryFood + 1.2 * dt);
-          if (this.hunger < 90) this.hunger = Math.min(100, this.hunger + 15.0 * dt);
         }
+
+        return eventMsg;
       }
       tickMovement(dt, network) {
+        if (!this.isAlive) {
+          this.currentVelocity = 0;
+          return;
+        }
+
         const isMoving = this.state === 'SeekingWater' || this.state === 'SeekingFood' || this.state === 'ReturningToCamp';
         if (!isMoving) {
           this.currentVelocity = 0;
@@ -667,16 +739,16 @@
           return;
         }
 
-        // 坡度能耗计算
+        // 坡度能耗
         const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
         const uphill = deltaZ > 0 ? deltaZ / lane.curve.length : 0;
-        const staminaBurn = 1.0 * (1.0 + uphill * 3.5);
+        const staminaBurn = (1.2 + (this.isPregnant ? 0.6 : 0.0)) * (1.0 + uphill * 3.5);
         this.stamina = Math.max(0, this.stamina - staminaBurn * dt);
 
-        const staminaFactor = Math.max(0.25, Math.min(1.0, this.stamina / 30.0));
+        const staminaFactor = Math.max(0.2, Math.min(1.0, this.stamina / 25.0));
         const targetSpeed = Math.min(this.maxSpeed, lane.speedLimit) * staminaFactor;
 
-        this.currentVelocity += (targetSpeed - this.currentVelocity) * 3 * dt;
+        this.currentVelocity += (targetSpeed - this.currentVelocity) * 4 * dt;
         this.distAlongCurve += this.currentVelocity * dt;
 
         if (this.distAlongCurve >= lane.curve.length) {
@@ -690,7 +762,6 @@
               this.state = 'RestingAtCamp';
             }
           } else {
-            // 到达目的地，转入原位交互
             this.currentVelocity = 0;
             this.currentLaneId = null;
             if (this.state === 'SeekingWater') this.state = 'DrinkingAtWater';
@@ -708,7 +779,7 @@
     }
 
     // ==========================================
-    // 原始生态与动线仿真世界
+    // 原始生态有限资源与繁衍世界
     // ==========================================
     class WorldSimulation {
       constructor() {
@@ -716,29 +787,35 @@
         this.network = new LaneGraph3D();
         this.pois = [];
         this.agents = [];
+        this.nextAgentId = 1;
+        this.totalBirths = 0;
+        this.totalDeaths = 0;
         this.tickCount = 0;
         this.isPaused = false;
         this.speedMult = 2;
 
         this.showTerrain = true;
         this.showLanes = true;
-        this.showAura = true;
+        this.showPoiStock = true;
 
         this.selectedAgentIndex = 0;
-        this.initEcology(24);
+        this.initEcology(20);
       }
       initEcology(agentCount) {
         this.terrain.generate();
         this.network = new LaneGraph3D();
         this.pois = [];
         this.agents = [];
+        this.nextAgentId = 1;
+        this.totalBirths = 0;
+        this.totalDeaths = 0;
         this.tickCount = 0;
 
         const half = this.terrain.worldSize / 2;
         const campNodes = [], waterNodes = [], foodNodes = [];
         const allNodeIds = [];
 
-        // 1. 避风高台营地 (3 处, Z ≈ -5m ~ 15m)
+        // 1. 避风营地 (3 处)
         for (let i = 0; i < 3; i++) {
           const x = (Math.random() - 0.5) * half * 1.3;
           const y = (Math.random() - 0.5) * half * 1.3;
@@ -746,10 +823,10 @@
           const nid = this.network.addNode(x, y, elev, 'camp');
           campNodes.push(nid);
           allNodeIds.push(nid);
-          this.pois.push({ id: i + 1, type: 'Camp', pos: new Vec3(x, y, elev), name: `营地 #${i+1}` });
+          this.pois.push({ id: i + 1, type: 'Camp', pos: new Vec3(x, y, elev), currentStock: 100, maxStock: 150, regenRate: 0 });
         }
 
-        // 2. 低洼清泉水洼 (3 处，寻找地势极低洼点)
+        // 2. 有限产出低洼清泉 (3 处, 蓄水 60.0, 涌出 3.5/s)
         for (let i = 0; i < 3; i++) {
           let bestX = 0, bestY = 0, lowestZ = 999;
           for (let k = 0; k < 12; k++) {
@@ -761,10 +838,10 @@
           const nid = this.network.addNode(bestX, bestY, lowestZ, 'water');
           waterNodes.push(nid);
           allNodeIds.push(nid);
-          this.pois.push({ id: i + 10, type: 'Water', pos: new Vec3(bestX, bestY, lowestZ), name: `低洼清泉 #${i+1}` });
+          this.pois.push({ id: i + 10, type: 'Water', pos: new Vec3(bestX, bestY, lowestZ), currentStock: 45, maxStock: 60, regenRate: 3.5 });
         }
 
-        // 3. 缓坡浆果丛 (4 处)
+        // 3. 有限产出浆果灌木 (4 处, 存量 25.0, 生长 1.2/s)
         for (let i = 0; i < 4; i++) {
           const x = (Math.random() - 0.5) * half * 1.5;
           const y = (Math.random() - 0.5) * half * 1.5;
@@ -772,10 +849,10 @@
           const nid = this.network.addNode(x, y, elev, 'food');
           foodNodes.push(nid);
           allNodeIds.push(nid);
-          this.pois.push({ id: i + 20, type: 'Berry', pos: new Vec3(x, y, elev), name: `浆果丛 #${i+1}` });
+          this.pois.push({ id: i + 20, type: 'Berry', pos: new Vec3(x, y, elev), currentStock: 18, maxStock: 25, regenRate: 1.2 });
         }
 
-        // 4. 中间过渡地形步道节点
+        // 4. 地形过渡节点
         for (let i = 0; i < 18; i++) {
           const x = (Math.random() - 0.5) * half * 1.7;
           const y = (Math.random() - 0.5) * half * 1.7;
@@ -783,7 +860,7 @@
           allNodeIds.push(this.network.addNode(x, y, elev, 'ground'));
         }
 
-        // 5. 铺设初级步行道 (Cobble 盘山道 / Dirt 泥路)
+        // 5. 初级步行道
         for (let i = 0; i < allNodeIds.length; i++) {
           for (let j = i + 1; j < allNodeIds.length; j++) {
             const idA = allNodeIds[i], idB = allNodeIds[j];
@@ -802,8 +879,9 @@
 
         // 6. 注入部落民
         for (let i = 0; i < agentCount; i++) {
-          const homeCamp = campNodes[i % campNodes.len ? i % campNodes.length : 0];
-          const agent = new PrimitiveAgent(i + 1, homeCamp, 8.0 + (i % 4));
+          const homeCamp = campNodes[i % campNodes.length];
+          const agentId = this.nextAgentId++;
+          const agent = new PrimitiveAgent(agentId, homeCamp, 16.0 + (i % 4));
           agent.pos = this.network.nodes.get(homeCamp).pos;
           this.agents.push(agent);
         }
@@ -811,14 +889,76 @@
         this.campNodes = campNodes;
         this.waterNodes = waterNodes;
         this.foodNodes = foodNodes;
-        this.logEvent(`🏕️ 原始生态演化完成: 包含 3 处避风营地、3 处低洼清泉与 4 处浆果丛。`, 'camp');
+        this.logEvent(`🏕️ 有限生态就绪: 包含有限储量泉眼与果丛，双倍移速与繁衍死亡已激活。`, 'camp');
+      }
+      tickPoiInteractions(dt) {
+        // POI 自然再生
+        for (const poi of this.pois) {
+          if (poi.regenRate > 0) {
+            poi.currentStock = Math.min(poi.maxStock, poi.currentStock + poi.regenRate * dt);
+          }
+        }
+
+        const newborns = [];
+
+        // Agent 原位有限采集/饮水/分娩
+        for (const agent of this.agents) {
+          if (!agent.isAlive) continue;
+
+          if (agent.readyToBirth) {
+            agent.readyToBirth = false;
+            newborns.push(agent.homeCampNode);
+          }
+
+          if (agent.state === 'DrinkingAtWater') {
+            const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 18);
+            if (poi && poi.currentStock > 0.1) {
+              const extracted = Math.min(poi.currentStock, 30.0 * dt);
+              poi.currentStock -= extracted;
+              agent.thirst = Math.min(100, agent.thirst + extracted * 1.2);
+            }
+          } else if (agent.state === 'ForagingFood') {
+            const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 18);
+            if (poi && poi.currentStock > 0.1) {
+              const extracted = Math.min(poi.currentStock, 1.2 * dt);
+              poi.currentStock -= extracted;
+              if (agent.inventoryFood < 4.0) agent.inventoryFood = Math.min(4.0, agent.inventoryFood + extracted);
+              agent.hunger = Math.min(100, agent.hunger + extracted * 20.0);
+            }
+          }
+        }
+
+        // 新生儿诞生
+        for (const campNode of newborns) {
+          const babyId = this.nextAgentId++;
+          this.totalBirths++;
+          const baby = new PrimitiveAgent(babyId, campNode, 16.0);
+          baby.pos = this.network.nodes.get(campNode).pos;
+          baby.hunger = 95;
+          baby.thirst = 95;
+          baby.stamina = 100;
+          this.agents.push(baby);
+          this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId})！部落薪火相传！`, 'birth');
+        }
       }
       tickDecisions() {
+        const availableWaterNodes = this.pois.filter(p => p.type === 'Water' && p.currentStock > 1.0)
+          .map(p => this.network.nodes.get(this.waterNodes.find(nid => this.network.nodes.get(nid).pos.distanceTo(p.pos) < 5)))
+          .filter(Boolean).map(n => n.id);
+
+        const availableFoodNodes = this.pois.filter(p => p.type === 'Berry' && p.currentStock > 1.0)
+          .map(p => this.network.nodes.get(this.foodNodes.find(nid => this.network.nodes.get(nid).pos.distanceTo(p.pos) < 5)))
+          .filter(Boolean).map(n => n.id);
+
         for (const agent of this.agents) {
+          if (!agent.isAlive) continue;
+
           if (agent.state === 'RestingAtCamp') {
-            // 口渴优先
-            if (agent.thirst < 40 && this.waterNodes.length > 0) {
-              const target = this.waterNodes[Math.floor(Math.random() * this.waterNodes.length)];
+            const thirstUrgency = agent.isPregnant ? 55 : 40;
+            const hungerUrgency = agent.isPregnant ? 60 : 48;
+
+            if (agent.thirst < thirstUrgency && availableWaterNodes.length > 0) {
+              const target = availableWaterNodes[Math.floor(Math.random() * availableWaterNodes.length)];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
                 agent.state = 'SeekingWater';
@@ -827,11 +967,9 @@
                 agent.routeIndex = 0;
                 agent.currentLaneId = path[0];
                 agent.distAlongCurve = 0;
-                this.logEvent(`💧 部落民 #${agent.id} 口渴难耐，出发前往低洼清泉解渴...`, 'water');
               }
-            } else if ((agent.hunger < 50 || agent.inventoryFood < 0.5) && this.foodNodes.length > 0) {
-              // 饥饿或储粮不足时外出采野果
-              const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+            } else if ((agent.hunger < hungerUrgency || agent.inventoryFood < 0.5) && availableFoodNodes.length > 0) {
+              const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
                 agent.state = 'SeekingFood';
@@ -840,11 +978,9 @@
                 agent.routeIndex = 0;
                 agent.currentLaneId = path[0];
                 agent.distAlongCurve = 0;
-                this.logEvent(`🍒 部落民 #${agent.id} 肚子咕咕叫，前往缓坡采摘野果...`, 'food');
               }
-            } else if (agent.stamina >= 95 && agent.hunger > 60 && Math.random() < 0.04) {
-              // 精力充沛时外出采果储粮
-              const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+            } else if (agent.stamina >= 95 && agent.hunger > 65 && availableFoodNodes.length > 0 && Math.random() < 0.04) {
+              const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
                 agent.state = 'SeekingFood';
@@ -857,9 +993,9 @@
             }
           } else if (agent.state === 'DrinkingAtWater') {
             if (agent.thirst >= 90) {
-              if (agent.hunger < 50 && this.foodNodes.length > 0) {
+              if (agent.hunger < 50 && availableFoodNodes.length > 0) {
                 const curr = agent.targetNode || agent.homeCampNode;
-                const target = this.foodNodes[Math.floor(Math.random() * this.foodNodes.length)];
+                const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
                 const path = this.network.findPath(curr, target);
                 if (path && path.length > 0) {
                   agent.state = 'SeekingFood';
@@ -870,7 +1006,6 @@
                   agent.distAlongCurve = 0;
                 }
               } else {
-                // 喝饱回营
                 const curr = agent.targetNode || agent.homeCampNode;
                 const path = this.network.findPath(curr, agent.homeCampNode);
                 if (path && path.length > 0) {
@@ -880,7 +1015,6 @@
                   agent.routeIndex = 0;
                   agent.currentLaneId = path[0];
                   agent.distAlongCurve = 0;
-                  this.logEvent(`🏕️ 部落民 #${agent.id} 已痛饮解渴，正在沿山路返回营地。`, 'camp');
                 }
               }
             }
@@ -895,7 +1029,6 @@
                 agent.routeIndex = 0;
                 agent.currentLaneId = path[0];
                 agent.distAlongCurve = 0;
-                this.logEvent(`🍒 部落民 #${agent.id} 采得满兜浆果，满载返回营地！`, 'food');
               }
             }
           }
@@ -915,11 +1048,17 @@
         for (let step = 0; step < this.speedMult; step++) {
           this.tickCount++;
 
+          this.tickPoiInteractions(0.05);
+
           for (const agent of this.agents) {
-            agent.tickMetabolism(0.05);
+            const ev = agent.tickMetabolism(0.05);
+            if (ev) {
+              if (ev.type === 'death') this.totalDeaths++;
+              this.logEvent(ev.text, ev.type);
+            }
           }
 
-          if (this.tickCount % 20 === 0) {
+          if (this.tickCount % 15 === 0) {
             this.tickDecisions();
           }
 
@@ -1059,12 +1198,11 @@
         }
       }
 
-      // 2. 原始生态三大地标 POI 渲染
+      // 2. 原始生态 POI 渲染与有限储量指示环
       for (const poi of sim.pois) {
         const p2D = project3D(poi.pos);
 
         if (poi.type === 'Camp') {
-          // 🏕️ 篝火营地光晕
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 28 * camera.zoom);
           grad.addColorStop(0, 'rgba(245, 158, 11, 0.85)');
           grad.addColorStop(0.4, 'rgba(239, 68, 68, 0.45)');
@@ -1076,29 +1214,46 @@
           ctx.textAlign = 'center';
           ctx.fillText('🏕️', p2D.x, p2D.y + 4);
         } else if (poi.type === 'Water') {
-          // 💧 低洼清泉涟漪
-          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 24 * camera.zoom);
+          const ratio = poi.currentStock / poi.maxStock;
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom);
           grad.addColorStop(0, 'rgba(2, 132, 199, 0.9)');
           grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
           grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
           ctx.fillStyle = grad;
-          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 24 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom, 0, Math.PI * 2); ctx.fill();
 
           ctx.font = `${Math.floor(15 * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('💧', p2D.x, p2D.y + 4);
+
+          // 储量环
+          if (sim.showPoiStock) {
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            ctx.arc(p2D.x, p2D.y, 18 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
+            ctx.stroke();
+          }
         } else if (poi.type === 'Berry') {
-          // 🍒 浆果灌木
-          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 20 * camera.zoom);
+          const ratio = poi.currentStock / poi.maxStock;
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom);
           grad.addColorStop(0, 'rgba(16, 185, 129, 0.85)');
           grad.addColorStop(0.6, 'rgba(5, 150, 105, 0.4)');
           grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
           ctx.fillStyle = grad;
-          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 20 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom, 0, Math.PI * 2); ctx.fill();
 
           ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('🍒', p2D.x, p2D.y + 4);
+
+          if (sim.showPoiStock) {
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
+            ctx.stroke();
+          }
         }
       }
 
@@ -1123,21 +1278,38 @@
         }
       }
 
-      // 4. 部落民 Agent 渲染 (带状态色彩与生命光晕)
+      // 4. 部落民 Agent 渲染
       for (let i = 0; i < sim.agents.length; i++) {
         const agent = sim.agents[i];
         const p2D = project3D(agent.pos);
 
-        // 状态色彩
+        if (!agent.isAlive) {
+          // 💀 死亡墓标
+          ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('💀', p2D.x, p2D.y);
+          continue;
+        }
+
         let stateColor = '#facc15';
         if (agent.state === 'SeekingWater' || agent.state === 'DrinkingAtWater') stateColor = '#38bdf8';
         else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#10b981';
         else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
 
-        // 尾迹
+        // 孕妇粉红光晕
+        if (agent.isPregnant) {
+          stateColor = '#ec4899';
+          ctx.strokeStyle = '#ec4899';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, (8 + agent.pregnancyProgress * 6) * camera.zoom, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 尾迹 (快速移动)
         if (agent.trail.length > 1) {
           ctx.strokeStyle = stateColor;
-          ctx.lineWidth = 1.8 * camera.zoom;
+          ctx.lineWidth = 2.0 * camera.zoom;
           ctx.beginPath();
           for (let t = 0; t < agent.trail.length; t++) {
             const tp = project3D(agent.trail[t]);
@@ -1147,23 +1319,20 @@
           ctx.stroke();
         }
 
-        // 光晕指示
-        if (sim.showAura) {
-          ctx.fillStyle = stateColor;
-          ctx.shadowColor = stateColor;
-          ctx.shadowBlur = 8;
-          ctx.beginPath();
-          ctx.arc(p2D.x, p2D.y, 4.0 * camera.zoom, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
+        ctx.fillStyle = stateColor;
+        ctx.shadowColor = stateColor;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p2D.x, p2D.y, 4.2 * camera.zoom, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
 
         // 选中高亮
         if (i === sim.selectedAgentIndex) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.arc(p2D.x, p2D.y, 9.0 * camera.zoom, 0, Math.PI * 2);
+          ctx.arc(p2D.x, p2D.y, 9.5 * camera.zoom, 0, Math.PI * 2);
           ctx.stroke();
         }
       }
@@ -1177,38 +1346,39 @@
         lastFpsUpdate = now;
       }
 
-      let totalH = 0, totalT = 0, totalS = 0;
-      for (const a of sim.agents) {
-        totalH += a.hunger; totalT += a.thirst; totalS += a.stamina;
-      }
-      const count = sim.agents.length || 1;
-      document.getElementById('stat-pop').textContent = sim.agents.length;
-      document.getElementById('stat-avg-hunger').textContent = `${Math.round(totalH / count)}%`;
-      document.getElementById('stat-avg-thirst').textContent = `${Math.round(totalT / count)}%`;
-      document.getElementById('stat-avg-stamina').textContent = `${Math.round(totalS / count)}%`;
+      const aliveAgents = sim.agents.filter(a => a.isAlive);
+      const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
+
+      document.getElementById('stat-pop').textContent = aliveAgents.length;
+      document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
+      document.getElementById('stat-births').textContent = sim.totalBirths;
+      document.getElementById('stat-deaths').textContent = sim.totalDeaths;
 
       // 选中的 Agent 实时指标刷新
-      const selAgent = sim.agents[sim.selectedAgentIndex] || sim.agents[0];
+      const selAgent = sim.agents[sim.selectedAgentIndex] || aliveAgents[0];
       if (selAgent) {
-        document.getElementById('insp-name').textContent = `部落民 #${selAgent.id}`;
+        document.getElementById('insp-name').textContent = `部落民 #${selAgent.id} ${selAgent.isPregnant ? '🤰' : ''}`;
         
         let stateText = '🏕️ 营地休息中';
         let detailText = '在营地休眠恢复体力，并消耗背包中的野果充饥。';
-        if (selAgent.state === 'SeekingWater') {
+        if (!selAgent.isAlive) {
+          stateText = '💀 已死亡';
+          detailText = `死因: ${selAgent.deathCause || '未知饥荒'}`;
+        } else if (selAgent.state === 'SeekingWater') {
           stateText = '💧 赶往低洼清泉';
-          detailText = '水分值告急，正前往地势低处水洼寻水 (下坡省力)。';
+          detailText = '水分值告急，正前往地势低处水洼寻水 (双倍移速)。';
         } else if (selAgent.state === 'DrinkingAtWater') {
           stateText = '💧 水洼痛饮解渴';
-          detailText = '正在低洼清泉处补充水分。';
+          detailText = '正在低洼清泉处补充水分 (消耗泉眼有限储量)。';
         } else if (selAgent.state === 'SeekingFood') {
           stateText = '🍒 前往采摘浆果';
           detailText = '饱食度偏低，前往缓坡浆果丛采摘。';
         } else if (selAgent.state === 'ForagingFood') {
           stateText = '🍒 正在采摘浆果';
-          detailText = '正在灌木丛中采摘成熟野果并装入行囊。';
+          detailText = '正在灌木丛中采摘成熟野果 (消耗果丛有限储量)。';
         } else if (selAgent.state === 'ReturningToCamp') {
           stateText = '🏕️ 负重返回营地';
-          detailText = '已完成采集与补水，沿山路上坡返回避风营地 (上坡体力消耗加剧)。';
+          detailText = '已完成采集与补水，沿山路快速返回避风营地。';
         }
 
         document.getElementById('insp-state').textContent = stateText;
@@ -1220,6 +1390,16 @@
         document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
         document.getElementById('insp-inv-val').textContent = `${selAgent.inventoryFood.toFixed(1)} / 4.0 颗`;
         document.getElementById('insp-detail').textContent = detailText;
+
+        const pregBox = document.getElementById('insp-preg-box');
+        if (selAgent.isPregnant && selAgent.isAlive) {
+          pregBox.style.display = 'flex';
+          const pVal = Math.round(selAgent.pregnancyProgress * 100);
+          document.getElementById('insp-preg-val').textContent = `${pVal}%`;
+          document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
+        } else {
+          pregBox.style.display = 'none';
+        }
       }
 
       requestAnimationFrame(render);
@@ -1254,25 +1434,25 @@
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {
-      sim.initEcology(24);
+      sim.initEcology(20);
     });
 
     document.getElementById('btn-spawn-civ').addEventListener('click', () => {
       const homeCamp = sim.campNodes[0];
-      const startId = sim.agents.length + 1;
-      for (let i = 0; i < 8; i++) {
-        const a = new PrimitiveAgent(startId + i, homeCamp, 8.0 + (i % 3));
+      for (let i = 0; i < 6; i++) {
+        const babyId = sim.nextAgentId++;
+        const a = new PrimitiveAgent(babyId, homeCamp, 16.0);
         a.pos = sim.network.nodes.get(homeCamp).pos;
         sim.agents.push(a);
       }
-      sim.logEvent(`🚶 繁衍新生: 部落新增 +8 名部落民！`, 'camp');
+      sim.logEvent(`🚶 游民迁入: 部落新增 +6 名成年部落民！`, 'camp');
     });
 
     document.getElementById('btn-add-food').addEventListener('click', () => {
-      for (const a of sim.agents) {
-        if (a.state === 'RestingAtCamp') a.inventoryFood = Math.min(4.0, a.inventoryFood + 2.0);
+      for (const p of sim.pois) {
+        if (p.type === 'Berry') p.currentStock = p.maxStock;
       }
-      sim.logEvent(`🍒 丰收采风: 部落营地补给 +2.0 浆果储量！`, 'food');
+      sim.logEvent(`🍒 浆果盛产: 全图浆果灌木已瞬间结满果实！`, 'food');
     });
 
     document.getElementById('chk-terrain').addEventListener('change', e => {
@@ -1281,8 +1461,8 @@
     document.getElementById('chk-lanes').addEventListener('change', e => {
       sim.showLanes = e.target.checked;
     });
-    document.getElementById('chk-aura').addEventListener('change', e => {
-      sim.showAura = e.target.checked;
+    document.getElementById('chk-poi-stock').addEventListener('change', e => {
+      sim.showPoiStock = e.target.checked;
     });
     document.getElementById('sel-speed').addEventListener('change', e => {
       sim.speedMult = parseInt(e.target.value, 10);
