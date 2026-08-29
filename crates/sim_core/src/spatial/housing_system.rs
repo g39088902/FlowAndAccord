@@ -10,11 +10,12 @@ impl World3DEngine {
     pub fn tick_housing(&mut self, dt: f32) {
         
 
-        // 0. 四季更迭与环境温度计算 (240秒一年，每季60秒)
+        // 0. 四季更迭与环境温度计算 (240秒一年，每季60秒；季节以夏至/冬至为中点：夏季围绕最热、冬季围绕最冷)
         self.season_timer += dt;
         let year_length = 240.0;
         let season_time = self.season_timer % year_length;
-        let season_idx = (season_time / 60.0) as usize;
+        // 边界前移 30 秒 (90° 相位)：夏至(60s 最热31°C)为夏季中点、冬至(180s 最冷-3°C)为冬季中点
+        let season_idx = (((season_time + 30.0) / 60.0) as usize) % 4;
         let prev_season = self.current_season;
         self.current_season = match season_idx {
             0 => Season::Spring,

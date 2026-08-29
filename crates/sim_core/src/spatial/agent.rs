@@ -129,7 +129,7 @@ impl Agent3D {
     }
 
     /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
-    pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
+    pub fn tick_metabolism(&mut self, dt: f32, fertility_active: bool) -> Option<String> {
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
         }
@@ -180,8 +180,8 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (上限50.0，饱暖≥75%即37.5单位，且有家宅庇护)
-        if self.gender == Gender::Female && self.spouse_id.is_some() && self.home_house_id.is_some() && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+        // 受孕判定 (上限50.0，饱暖≥75%即37.5单位，且房屋有生育支持：非0级、未成废墟、水粮木均≥10，即is_fertility_active)
+        if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
             if self.age >= 120.0 && self.hunger >= 37.5 && self.thirst >= 37.5 && self.stamina >= 75.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;

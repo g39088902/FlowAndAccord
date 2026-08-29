@@ -1,4 +1,4 @@
-﻿use crate::rng::WorldRng;
+use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
@@ -115,7 +115,11 @@ impl World3DEngine {
 
         // 2. 代谢与繁衍
         for agent in &mut self.agents {
-            if let Some(event) = agent.tick_metabolism(dt) {
+            let fertility_active = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.is_fertility_active())
+                .unwrap_or(false);
+            if let Some(event) = agent.tick_metabolism(dt, fertility_active) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
                 }
@@ -272,7 +276,7 @@ impl World3DEngine {
             Season::Autumn => "Autumn",
             Season::Winter => "Winter",
         };
-        let season_progress = (self.season_timer % 60.0) / 60.0;
+        let season_progress = ((self.season_timer + 30.0) % 60.0) / 60.0;
 
         WorldSnapshot3D {
             tick: self.tick_counter,
