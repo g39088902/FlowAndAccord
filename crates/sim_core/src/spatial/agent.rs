@@ -62,7 +62,7 @@ pub struct Agent3D {
 
 impl Agent3D {
     pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32) -> Self {
-        let doubled_speed = max_speed * 2.0;
+        let quadrupled_speed = max_speed * 4.0;
         Self {
             id,
             state: PrimitiveActionState::RestingAtCamp,
@@ -83,7 +83,7 @@ impl Agent3D {
             current_lane_id: None,
             distance_along_curve: 0.0,
             current_velocity: 0.0,
-            max_desired_speed: doubled_speed,
+            max_desired_speed: quadrupled_speed,
             is_traveling_offroad: false,
             route: Vec::new(),
             route_index: 0,

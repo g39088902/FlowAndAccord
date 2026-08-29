@@ -114,11 +114,11 @@ impl LaneGraph3D {
         self.next_lane_id += 1;
 
         let speed_limit = match road_class {
-            RoadClass::DirtTrack => 6.0,
-            RoadClass::Cobblestone => 10.0,
-            RoadClass::AsphaltUrban => 15.0,
-            RoadClass::SkywayElevated => 24.0,
-            RoadClass::SmugglerTrail => 8.0,
+            RoadClass::DirtTrack => 36.0,
+            RoadClass::Cobblestone => 44.0,
+            RoadClass::AsphaltUrban => 60.0,
+            RoadClass::SkywayElevated => 96.0,
+            RoadClass::SmugglerTrail => 40.0,
         };
 
         let edge_data = LaneEdge3D {

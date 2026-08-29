@@ -791,7 +791,7 @@
           curve = Curve3D.straight(fromNode.pos, toNode.pos);
         }
 
-        const baseSpeed = roadClass === 'cobble' ? 22 : 18;
+        const baseSpeed = roadClass === 'cobble' ? 44 : 36;
         const speedLimit = isOffroad ? baseSpeed * 0.5 : baseSpeed;
         const lane = { id, from: fromId, to: toId, curve, roadClass, speedLimit, isOffroad };
         this.lanes.set(id, lane);
@@ -851,7 +851,7 @@
     }
 
     class PrimitiveAgent {
-      constructor(id, homeCampNode, maxSpeed = 17.0, initialAge = 120.0) {
+      constructor(id, homeCampNode, maxSpeed = 34.0, initialAge = 120.0) {
         this.id = id;
         this.homeCampNode = homeCampNode;
         this.maxSpeed = maxSpeed;
@@ -1132,7 +1132,7 @@
         for (let i = 0; i < agentCount; i++) {
           const homeCamp = campNodes[i % campNodes.length];
           const agentId = this.nextAgentId++;
-          const agent = new PrimitiveAgent(agentId, homeCamp, 16.0 + (i % 4), 120.0);
+          const agent = new PrimitiveAgent(agentId, homeCamp, 34.0 + (i % 4) * 2, 120.0);
           agent.pos = this.network.nodes.get(homeCamp).pos;
           this.agents.push(agent);
         }
@@ -1206,7 +1206,7 @@
           for (const campNode of newborns) {
             const babyId = this.nextAgentId++;
             this.totalBirths++;
-            const baby = new PrimitiveAgent(babyId, campNode, 16.0, 0.0);
+            const baby = new PrimitiveAgent(babyId, campNode, 34.0, 0.0);
             baby.pos = this.network.nodes.get(campNode).pos;
             baby.hunger = 10.0;
             baby.thirst = 10.0;
@@ -1919,7 +1919,7 @@
       const homeCamp = sim.campNodes[0];
       for (let i = 0; i < 4; i++) {
         const babyId = sim.nextAgentId++;
-        const a = new PrimitiveAgent(babyId, homeCamp, 16.0, 120.0);
+        const a = new PrimitiveAgent(babyId, homeCamp, 34.0, 120.0);
         a.pos = sim.network.nodes.get(homeCamp).pos;
         sim.agents.push(a);
       }
