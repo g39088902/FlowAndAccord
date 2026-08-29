@@ -4,6 +4,13 @@ use super::graph::{LaneGraph3D, LaneId, NodeId};
 
 pub type AgentId = u32;
 
+/// 性别系统
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Gender {
+    Male,   // ♂ 男性
+    Female, // ♀ 女性 (只有女性能受孕与分娩)
+}
+
 /// 原始生存与繁衍行为状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
@@ -17,10 +24,11 @@ pub enum PrimitiveActionState {
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
-/// 3D 动力学 Agent 实体 (统一单位系统：自身满足上限 20.0 单位、初始 50%=10.0、120秒成年才能生育、10秒1单位消耗、60秒流产冷却、90秒孕期)
+/// 3D 动力学 Agent 实体 (自身满足上限20.0、初始50%=10.0、120秒成年、男女二元性别只有女性可育、120秒孕期)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent3D {
     pub id: AgentId,
+    pub gender: Gender, // 性别 (Male / Female)
     pub state: PrimitiveActionState,
     pub is_alive: bool,
     pub age: f32, // 年龄 (秒)，满 120 秒成年才具备生育能力
@@ -32,7 +40,7 @@ pub struct Agent3D {
     pub home_camp_node: NodeId, // 所属归宿营地节点
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
 
-    // 繁衍孕育系统 (90 秒孕期，流产后 60 秒再次受孕冷却，年满 120 秒成年)
+    // 繁衍孕育系统 (120 秒孕期，流产后 60 秒再次受孕冷却，年满 120 秒成年女性可育)
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
     pub ready_to_birth: bool,
@@ -45,7 +53,7 @@ pub struct Agent3D {
     pub current_lane_id: Option<LaneId>,
     pub distance_along_curve: f32,
     pub current_velocity: f32,
-    pub max_desired_speed: f32, // 基准公路移速 (16~22 m/s)
+    pub max_desired_speed: f32, // 基准公路移速
     pub is_traveling_offroad: bool, // 是否正在无路荒野越野 (速度为 50%)
     pub route: Vec<LaneId>,
     pub route_index: usize,
@@ -61,10 +69,11 @@ pub struct Agent3D {
 }
 
 impl Agent3D {
-    pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32) -> Self {
+    pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32, gender: Gender) -> Self {
         let quadrupled_speed = max_speed * 4.0;
         Self {
             id,
+            gender,
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
@@ -95,7 +104,7 @@ impl Agent3D {
         }
     }
 
-    /// 核心生命代谢 Tick (10秒消耗1单位，年满120秒成年才能受孕，怀孕期消耗+50%即0.15单位/秒，90秒孕期，60秒流产保护冷却)
+    /// 核心生命代谢 Tick (10秒消耗1单位，只有女性年满120秒成年才能受孕，孕期120秒，代谢+50%)
     pub fn tick_metabolism(&mut self, dt: f32) -> Option<String> {
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
@@ -127,7 +136,7 @@ impl Agent3D {
             self.death_cause = Some("饥荒饿死".to_string());
             self.is_pregnant = false;
             self.death_decay_timer = 12.0;
-            return Some(format!("💀 部落民 #{} 因长期饥荒极度营养不良不幸饿死！", self.id));
+            return Some(format!("💀 部落民 #{} 因长期饥荒不幸饿死！", self.id));
         }
         if self.thirst <= 0.0 {
             self.is_alive = false;
@@ -138,31 +147,31 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
 
-        // 受孕判定 (必须年满 120 秒成年、各指标 >= 80% 即 16.0 单位，且不在流产 60 秒冷却期内)
-        if self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+        // 受孕判定 (必须为女性 ♀、年满 120 秒成年、各指标 >= 80% 即 16.0 单位，且不在流产 60 秒冷却期内)
+        if self.gender == Gender::Female && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
             if self.age >= 120.0 && self.hunger >= 16.0 && self.thirst >= 16.0 && self.stamina >= 80.0 {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
-                event_msg = Some(format!("🤰 部落民 #{} (年龄 {}s 已成年) 饱暖康健(≥16.0单位)，成功受孕进入90秒妊娠期 (代谢+50%)！", self.id, self.age.floor()));
+                event_msg = Some(format!("🤰 女性部落民 #{} (年龄 {}s 已成年) 饱暖康健(≥16.0单位)，成功受孕进入120秒妊娠期 (代谢+50%)！", self.id, self.age.floor()));
             }
         }
 
-        // 妊娠与流产判定 (孕期 90 秒，跌破 20% 即 4.0 单位触发流产并进入 60 秒冷却)
+        // 妊娠与流产判定 (孕期 120 秒，跌破 20% 即 4.0 单位触发流产并进入 60 秒冷却)
         if self.is_pregnant {
             if self.hunger < 4.0 || self.thirst < 4.0 || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = 5.0;
                 self.miscarriage_cooldown_timer = 60.0; // 流产后 60 秒内禁止再次受孕
-                return Some(format!("🥀 痛惜！部落民 #{} 生存指标跌破 20%(<4.0单位)，导致流产 (60秒内休养不可受孕)！", self.id));
+                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破 20%(<4.0单位)，导致流产 (60秒内休养不可受孕)！", self.id));
             }
 
-            self.pregnancy_progress += dt / 90.0;
+            self.pregnancy_progress += dt / 120.0; // 孕期 120 秒
             if self.pregnancy_progress >= 1.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.ready_to_birth = true;
-                return Some(format!("🍼 喜讯！部落民 #{} 历经90秒漫长孕期，顺利产下一名健康的新生儿！", self.id));
+                return Some(format!("🍼 喜讯！女性部落民 #{} 历经120秒漫长孕期，顺利产下一名健康的新生儿！", self.id));
             }
         }
 

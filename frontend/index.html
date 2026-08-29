@@ -855,13 +855,14 @@
     }
 
     class PrimitiveAgent {
-      constructor(id, homeCampNode, maxSpeed = 34.0, initialAge = 120.0) {
+      constructor(id, homeCampNode, maxSpeed = 34.0, initialAge = 120.0, gender = 'female') {
         this.id = id;
         this.homeCampNode = homeCampNode;
         this.maxSpeed = maxSpeed;
         this.state = 'RestingAtCamp';
         this.isAlive = true;
         this.age = initialAge; // 年龄 (秒)
+        this.gender = gender; // 'female' ♀ 或 'male' ♂ (只有女性能生育)
 
         // 统一单位 (0.0 ~ 20.0 单位，初始 50% = 10.0 单位)
         this.hunger = 10.0;
@@ -916,7 +917,7 @@
           this.deathCause = '饥荒饿死';
           this.isPregnant = false;
           this.deathDecayTimer = 12.0;
-          return { type: 'death', text: `💀 部落民 #${this.id} 因长期饥荒不幸饿死！` };
+          return { type: 'death', text: `💀 部落民 #${this.id} (${this.gender === 'female' ? '女' : '男'}) 因长期饥荒不幸饿死！` };
         }
         if (this.thirst <= 0.0) {
           this.isAlive = false;
@@ -924,34 +925,34 @@
           this.deathCause = '严重脱水';
           this.isPregnant = false;
           this.deathDecayTimer = 12.0;
-          return { type: 'death', text: `💀 部落民 #${this.id} 因严重脱水渴死！` };
+          return { type: 'death', text: `💀 部落民 #${this.id} (${this.gender === 'female' ? '女' : '男'}) 因严重脱水渴死！` };
         }
 
-        // 受孕判定 (必须年满 120 秒、各指标 >= 16.0 单位即 80%，且不在 60s 冷却内)
-        if (this.state === 'RestingAtCamp' && !this.isPregnant && this.miscarriageCooldown <= 0) {
+        // 受孕判定 (必须为女性 ♀、年满 120 秒、各指标 >= 16.0 单位即 80%，且不在 60s 冷却内)
+        if (this.gender === 'female' && this.state === 'RestingAtCamp' && !this.isPregnant && this.miscarriageCooldown <= 0) {
           if (this.age >= 120.0 && this.hunger >= 16.0 && this.thirst >= 16.0 && this.stamina >= 80) {
             this.isPregnant = true;
             this.pregnancyProgress = 0.0;
-            eventMsg = { type: 'birth', text: `🤰 部落民 #${this.id} (年龄 ${Math.floor(this.age)}s 已成年) 饱暖充盈(≥16单位)，成功受孕进入90秒妊娠期！` };
+            eventMsg = { type: 'birth', text: `🤰 女性部落民 #${this.id} (年龄 ${Math.floor(this.age)}s 已成年) 饱暖充盈(≥16单位)，成功受孕进入120秒妊娠期！` };
           }
         }
 
-        // 90秒孕期与流产判定 (跌破 4.0 单位触发流产)
+        // 120秒孕期与流产判定 (跌破 4.0 单位触发流产)
         if (this.isPregnant) {
           if (this.hunger < 4.0 || this.thirst < 4.0 || this.stamina < 20) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
             this.miscarriageTimer = 5.0;
             this.miscarriageCooldown = 60.0;
-            return { type: 'miscarry', text: `🥀 痛惜！部落民 #${this.id} 生存指标跌破 20%(<4.0单位)，导致流产 (60秒内不可再受孕)！` };
+            return { type: 'miscarry', text: `🥀 痛惜！女性部落民 #${this.id} 生存指标跌破 20%(<4.0单位)，导致流产 (60秒内不可再受孕)！` };
           }
 
-          this.pregnancyProgress += dt / 90.0;
+          this.pregnancyProgress += dt / 120.0;
           if (this.pregnancyProgress >= 1.0) {
             this.isPregnant = false;
             this.pregnancyProgress = 0.0;
             this.readyToBirth = true;
-            return { type: 'birth', text: `🍼 喜讯！部落民 #${this.id} 历经90秒漫长孕期，顺利产下一名健康的新生儿！` };
+            return { type: 'birth', text: `🍼 喜讯！女性部落民 #${this.id} 历经120秒漫长孕期，顺利产下一名健康的新生儿！` };
           }
         }
 
@@ -1134,11 +1135,12 @@
           }
         }
 
-        // 6. 注入部落民 (8 人，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 成年)
+        // 6. 注入部落民 (8 人，男女各半 4男4女，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 成年)
         for (let i = 0; i < agentCount; i++) {
           const homeCamp = campNodes[i % campNodes.length];
           const agentId = this.nextAgentId++;
-          const agent = new PrimitiveAgent(agentId, homeCamp, 34.0 + (i % 4) * 2, 120.0);
+          const gender = i % 2 === 0 ? 'female' : 'male';
+          const agent = new PrimitiveAgent(agentId, homeCamp, 34.0 + (i % 4) * 2, 120.0, gender);
           agent.pos = this.network.nodes.get(homeCamp).pos;
           this.agents.push(agent);
         }
@@ -1208,17 +1210,19 @@
             }
           }
 
-          // 分娩新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位)
+          // 分娩新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位，男女各 50% 机率)
           for (const campNode of newborns) {
             const babyId = this.nextAgentId++;
             this.totalBirths++;
-            const baby = new PrimitiveAgent(babyId, campNode, 34.0, 0.0);
+            const babyGender = Math.random() < 0.5 ? 'female' : 'male';
+            const genderStr = babyGender === 'female' ? '女婴 ♀' : '男婴 ♂';
+            const baby = new PrimitiveAgent(babyId, campNode, 34.0, 0.0, babyGender);
             baby.pos = this.network.nodes.get(campNode).pos;
             baby.hunger = 10.0;
             baby.thirst = 10.0;
             baby.stamina = 100;
             this.agents.push(baby);
-            this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId}，幼年0s，需成长120s)！`, 'birth');
+            this.logEvent(`🍼 部落喜添${genderStr} (Agent #${babyId}，幼年0s，需成长120s)！`, 'birth');
           }
 
           this.agents = this.agents.filter(a => a.isAlive || a.deathDecayTimer > 0);
@@ -1807,7 +1811,10 @@
         if (selAgent) {
           sim.selectedAgentId = selAgent.id;
           const isAdult = selAgent.age >= 120.0;
-          document.getElementById('insp-title-name').textContent = `部落民 #${selAgent.id} ${selAgent.isPregnant ? '🤰' : (isAdult ? '🧑' : '🍼')} ${selAgent.isOffroad ? '(越野中)' : ''}`;
+          const isFemale = selAgent.gender === 'female';
+          const genderBadge = isFemale ? '♀' : '♂';
+          const roleIcon = selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼');
+          document.getElementById('insp-title-name').textContent = `部落民 #${selAgent.id} ${genderBadge} ${roleIcon} ${selAgent.isOffroad ? '(越野中)' : ''}`;
           
           let stateText = '🏕️ 营地休息中';
           let detailText = '在营地休眠恢复体力，并进行受孕与孕育。';
@@ -1828,21 +1835,31 @@
             detailText = '在灌木丛处直接采食充饥至 20.0 单位上限。';
           } else if (selAgent.state === 'ReturningToCamp') {
             stateText = selAgent.isOffroad ? '🏕️ 荒野越野归营 (50%移速)' : '🏕️ 沿道路返回营地 (100%满速)';
-            detailText = '已完成现场补水与进食，返回避风营地。';
+            detailText = '已完成现场补水与进食，返回就近避风营地。';
           }
 
           document.getElementById('insp-title-state').textContent = stateText;
           document.getElementById('insp-title-state').style.color = '#f59e0b';
           
-          // 年龄与生育状态展示
+          // 年龄与性别生育状态展示
           const ageValElem = document.getElementById('insp-age-val');
           if (isAdult) {
-            ageValElem.textContent = `${Math.floor(selAgent.age)}s (🧑 已成年，具备生育能力)`;
-            ageValElem.style.color = '#10b981';
+            if (isFemale) {
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s (👩 ♀ 女性·已成年可孕育)`;
+              ageValElem.style.color = '#ec4899';
+            } else {
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s (👨 ♂ 男性·已成年)`;
+              ageValElem.style.color = '#38bdf8';
+            }
           } else {
             const needGrow = Math.ceil(120.0 - selAgent.age);
-            ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 幼年期，还需成长 ${needGrow}s)`;
-            ageValElem.style.color = '#38bdf8';
+            if (isFemale) {
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♀ 女童·还需成长 ${needGrow}s)`;
+              ageValElem.style.color = '#f472b6';
+            } else {
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♂ 男童·还需成长 ${needGrow}s)`;
+              ageValElem.style.color = '#7dd3fc';
+            }
           }
 
           const hungerPct = Math.round((selAgent.hunger / 20.0) * 100);
@@ -1869,7 +1886,7 @@
           if (selAgent.isPregnant && selAgent.isAlive) {
             pregBox.style.display = 'flex';
             const pVal = Math.round(selAgent.pregnancyProgress * 100);
-            document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 90)}s / 90s)`;
+            document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 120)}s / 120s)`;
             document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
           } else {
             pregBox.style.display = 'none';

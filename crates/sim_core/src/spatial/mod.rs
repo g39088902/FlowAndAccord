@@ -9,7 +9,7 @@ pub use vec3::Vec3;
 pub use curve::Curve3D;
 pub use graph::{LaneGraph3D, LaneNode3D, LaneEdge3D, NodeType, RoadClass, NodeId, LaneId};
 pub use poi::{PrimitivePoi, PoiType, PoiId};
-pub use agent::{Agent3D, PrimitiveActionState, AgentId};
+pub use agent::{Agent3D, PrimitiveActionState, AgentId, Gender};
 pub use world::{World3DEngine, WorldSnapshot3D, PoiSnapshot, NodeSnapshot, LaneSnapshot, AgentSnapshot};
 
 #[cfg(test)]

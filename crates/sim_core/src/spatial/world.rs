@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId, NodeType, RoadClass};
-use super::agent::{Agent3D, AgentId, PrimitiveActionState};
+use super::agent::{Agent3D, AgentId, Gender, PrimitiveActionState};
 use super::poi::{PrimitivePoi, PoiId, PoiType};
 use crate::geo::terrain::TerrainMap;
 
@@ -72,6 +72,7 @@ pub struct LaneSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSnapshot {
     pub id: AgentId,
+    pub gender: String, // "Female" / "Male"
     pub x: f32,
     pub y: f32,
     pub z: f32,
@@ -224,20 +225,21 @@ impl World3DEngine {
             }
         }
 
-        // 6. 注入初始部落民 (8 人，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 已成年)
+        // 6. 注入初始部落民 (8 人，男女各半 4男4女，自身容量 20.0 单位，初始 50%=10.0，年龄 120s 已成年)
         for i in 0..agent_count {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
+            let gender = if i % 2 == 0 { Gender::Female } else { Gender::Male };
 
-            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, 120.0);
+            let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, 120.0, gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 规格就绪: 小人容量20单位(初始50%=10)，年满120秒可育，清泉/浆果上限40(产速1.0/s)，营地无限庇护！".to_string());
+        self.last_event = Some("🏕️ 规格就绪: 男女二元性别(仅女性可育)，120s孕期，小人容量20单位(初始50%=10)，清泉/浆果上限40(产速1.0/s)！".to_string());
     }
 
     /// 真实有限资源交互结算与分娩
@@ -279,13 +281,15 @@ impl World3DEngine {
             }
         }
 
-        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位)！
+        // 分娩诞生新生儿 (年龄 0.0s，初始水粮 50% = 10.0 单位，男女各 50% 机率)！
         for (mother_id, camp_node) in newborn_mothers {
             let baby_id = self.next_agent_id;
             self.next_agent_id += 1;
             self.total_births += 1;
+            let baby_gender = if rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
+            let gender_str = match baby_gender { Gender::Female => "女婴 ♀", Gender::Male => "男婴 ♂" };
 
-            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false, 0.0);
+            let mut baby = Agent3D::new(baby_id, camp_node, 8.5, false, 0.0, baby_gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&camp_node).unwrap()].pos;
             baby.world_pos = camp_pos;
             baby.hunger = 10.0; // 50%
@@ -293,7 +297,7 @@ impl World3DEngine {
             baby.stamina = 100.0;
 
             self.agents.push(baby);
-            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的新生儿 (Agent #{}，幼年0s，需成长120s)！", mother_id, baby_id));
+            self.last_event = Some(format!("🍼 母亲 #{} 顺利产下一名健康的{} (Agent #{}，幼年0s，需成长120s)！", mother_id, gender_str, baby_id));
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
@@ -541,6 +545,7 @@ impl World3DEngine {
         for agent in &self.agents {
             agents.push(AgentSnapshot {
                 id: agent.id,
+                gender: format!("{:?}", agent.gender),
                 x: agent.world_pos.x,
                 y: agent.world_pos.y,
                 z: agent.world_pos.z,
