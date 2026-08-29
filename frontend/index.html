@@ -1241,6 +1241,21 @@
           }
         }
       }
+      findNearestCamp(pos) {
+        let bestNode = this.campNodes[0];
+        let minDist = Infinity;
+        for (const nid of this.campNodes) {
+          const node = this.network.nodes.get(nid);
+          if (node) {
+            const d = node.pos.distanceTo(pos);
+            if (d < minDist) {
+              minDist = d;
+              bestNode = nid;
+            }
+          }
+        }
+        return bestNode;
+      }
       tickDecisions() {
         const availableWaterNodes = this.pois.filter(p => p.type === 'Water' && p.currentStock > 0.5)
           .map(p => this.network.nodes.get(this.waterNodes.find(nid => this.network.nodes.get(nid).pos.distanceTo(p.pos) < 5)))
@@ -1258,7 +1273,12 @@
             const hungerUrgency = agent.isPregnant ? 12.0 : 9.6; // 60% / 48%
 
             if (agent.thirst < thirstUrgency && availableWaterNodes.length > 0) {
-              const target = availableWaterNodes[Math.floor(Math.random() * availableWaterNodes.length)];
+              const sortedWater = [...availableWaterNodes].sort((a, b) => {
+                const posA = this.network.nodes.get(a).pos;
+                const posB = this.network.nodes.get(b).pos;
+                return posA.distanceTo(agent.pos) - posB.distanceTo(agent.pos);
+              });
+              const target = sortedWater[0];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
                 agent.state = 'SeekingWater';
@@ -1269,7 +1289,12 @@
                 agent.distAlongCurve = 0;
               }
             } else if (agent.hunger < hungerUrgency && availableFoodNodes.length > 0) {
-              const target = availableFoodNodes[Math.floor(Math.random() * availableFoodNodes.length)];
+              const sortedFood = [...availableFoodNodes].sort((a, b) => {
+                const posA = this.network.nodes.get(a).pos;
+                const posB = this.network.nodes.get(b).pos;
+                return posA.distanceTo(agent.pos) - posB.distanceTo(agent.pos);
+              });
+              const target = sortedFood[0];
               const path = this.network.findPath(agent.homeCampNode, target);
               if (path && path.length > 0) {
                 agent.state = 'SeekingFood';
@@ -1307,10 +1332,12 @@
                 }
               } else {
                 const curr = agent.targetNode || agent.homeCampNode;
-                const path = this.network.findPath(curr, agent.homeCampNode);
+                const nearestCamp = this.findNearestCamp(agent.pos);
+                const path = this.network.findPath(curr, nearestCamp);
                 if (path && path.length > 0) {
+                  agent.homeCampNode = nearestCamp; // 模式 A：动态迁入就近营地
                   agent.state = 'ReturningToCamp';
-                  agent.targetNode = agent.homeCampNode;
+                  agent.targetNode = nearestCamp;
                   agent.route = path;
                   agent.routeIndex = 0;
                   agent.currentLaneId = path[0];
@@ -1321,10 +1348,12 @@
           } else if (agent.state === 'ForagingFood') {
             if (agent.hunger >= 19.0) {
               const curr = agent.targetNode || agent.homeCampNode;
-              const path = this.network.findPath(curr, agent.homeCampNode);
+              const nearestCamp = this.findNearestCamp(agent.pos);
+              const path = this.network.findPath(curr, nearestCamp);
               if (path && path.length > 0) {
+                agent.homeCampNode = nearestCamp; // 模式 A：动态迁入就近营地
                 agent.state = 'ReturningToCamp';
-                agent.targetNode = agent.homeCampNode;
+                agent.targetNode = nearestCamp;
                 agent.route = path;
                 agent.routeIndex = 0;
                 agent.currentLaneId = path[0];

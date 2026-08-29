@@ -299,7 +299,7 @@ impl World3DEngine {
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
     }
 
-    /// 生存决策调度
+    /// 生存决策调度 (模式 A: 完全就近归宿与就近觅食寻水)
     pub fn tick_decisions(&mut self) {
         let mut rng = rand::thread_rng();
 
@@ -319,7 +319,13 @@ impl World3DEngine {
                     let hunger_urgency = if agent.is_pregnant { 12.0 } else { 9.6 }; // 60% / 48%
 
                     if agent.thirst < thirst_urgency && !water_nodes.is_empty() {
-                        let target = water_nodes[rng.gen_range(0..water_nodes.len())];
+                        let mut sorted_water = water_nodes.clone();
+                        sorted_water.sort_by(|&a, &b| {
+                            let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
+                            let pos_b = self.network.graph[*self.network.node_map.get(&b).unwrap()].pos;
+                            pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
+                        });
+                        let target = sorted_water[0];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::SeekingWater;
@@ -331,7 +337,13 @@ impl World3DEngine {
                             }
                         }
                     } else if agent.hunger < hunger_urgency && !food_nodes.is_empty() {
-                        let target = food_nodes[rng.gen_range(0..food_nodes.len())];
+                        let mut sorted_food = food_nodes.clone();
+                        sorted_food.sort_by(|&a, &b| {
+                            let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
+                            let pos_b = self.network.graph[*self.network.node_map.get(&b).unwrap()].pos;
+                            pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
+                        });
+                        let target = sorted_food[0];
                         if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::SeekingFood;
@@ -373,10 +385,12 @@ impl World3DEngine {
                             }
                         } else {
                             let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
-                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, agent.home_camp_node, agent.is_covert) {
+                            let nearest_camp = self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node);
+                            if let Some(path) = self.network.find_path_3d_with_preference(curr_node, nearest_camp, agent.is_covert) {
                                 if !path.is_empty() {
+                                    agent.home_camp_node = nearest_camp; // 模式 A：动态迁入就近营地
                                     agent.state = PrimitiveActionState::ReturningToCamp;
-                                    agent.target_poi_node = Some(agent.home_camp_node);
+                                    agent.target_poi_node = Some(nearest_camp);
                                     agent.route = path.clone();
                                     agent.route_index = 0;
                                     agent.current_lane_id = Some(path[0]);
@@ -389,10 +403,12 @@ impl World3DEngine {
                 PrimitiveActionState::ForagingFood => {
                     if agent.hunger >= 19.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
-                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, agent.home_camp_node, agent.is_covert) {
+                        let nearest_camp = self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node);
+                        if let Some(path) = self.network.find_path_3d_with_preference(curr_node, nearest_camp, agent.is_covert) {
                             if !path.is_empty() {
+                                agent.home_camp_node = nearest_camp; // 模式 A：动态迁入就近营地
                                 agent.state = PrimitiveActionState::ReturningToCamp;
-                                agent.target_poi_node = Some(agent.home_camp_node);
+                                agent.target_poi_node = Some(nearest_camp);
                                 agent.route = path.clone();
                                 agent.route_index = 0;
                                 agent.current_lane_id = Some(path[0]);
@@ -404,6 +420,19 @@ impl World3DEngine {
                 _ => {}
             }
         }
+    }
+
+    fn find_nearest_camp_node(&self, pos: Vec3) -> Option<NodeId> {
+        let mut best_id = None;
+        let mut min_dist = f32::MAX;
+        for p in self.pois.iter().filter(|p| p.poi_type == PoiType::Camp) {
+            let d = p.pos.distance_to(&pos);
+            if d < min_dist {
+                min_dist = d;
+                best_id = self.find_nearest_node(p.pos);
+            }
+        }
+        best_id
     }
 
     fn find_nearest_node(&self, pos: Vec3) -> Option<NodeId> {
