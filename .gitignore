@@ -1,1 +1,7 @@
 .idea
+# 本机工具链与缓存 (Node 下载安装，见 tools/)
+.toolchain/
+.rust-dist/
+.cargo-home/
+.vendor/
+target/

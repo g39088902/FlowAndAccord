@@ -68,7 +68,7 @@
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#38bdf8;">💧 全图清泉总水量 (6处)</span>
-          <span id="val-global-water" style="font-family:monospace; font-weight:700;">270.0 / 360.0 单位 (75%)</span>
+          <span id="val-global-water" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-water" style="background:#38bdf8; width:75%;"></div></div>
       </div>
@@ -76,25 +76,33 @@
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#10b981;">🍒 全图成熟浆果量 (6处)</span>
-          <span id="val-global-berry" style="font-family:monospace; font-weight:700;">270.0 / 360.0 单位 (75%)</span>
+          <span id="val-global-berry" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-berry" style="background:#10b981; width:75%;"></div></div>
       </div>
 
       <div class="meter-row">
         <div class="meter-label">
-          <span style="color:#eab308;">🌲 全图林木木材量 (4处)</span>
-          <span id="val-global-wood" style="font-family:monospace; font-weight:700;">180.0 / 240.0 单位 (75%)</span>
+          <span style="color:#d97706;">🌲 全图林木木材量 (4处)</span>
+          <span id="val-global-wood" class="mono-num" style="font-weight:700;">180.0 / 240.0 单位 (75%)</span>
         </div>
-        <div class="meter-bg"><div class="meter-fill" id="fill-global-wood" style="background:#eab308; width:75%;"></div></div>
+        <div class="meter-bg"><div class="meter-fill" id="fill-global-wood" style="background:#d97706; width:75%;"></div></div>
       </div>
 
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#94a3b8;">🪨 全图石矿石料量 (2处)</span>
-          <span id="val-global-stone" style="font-family:monospace; font-weight:700;">90.0 / 120.0 单位 (75%)</span>
+          <span id="val-global-stone" class="mono-num" style="font-weight:700;">90.0 / 120.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-stone" style="background:#94a3b8; width:75%;"></div></div>
+      </div>
+
+      <div class="meter-row">
+        <div class="meter-label">
+          <span style="color:#fbbf24;">🪙 全图金矿黄金量 (1处)</span>
+          <span id="val-global-gold" class="mono-num" style="font-weight:700;">45.0 / 60.0 单位 (75%)</span>
+        </div>
+        <div class="meter-bg"><div class="meter-fill" id="fill-global-gold" style="background:#fbbf24; width:75%;"></div></div>
       </div>
     </div>
 
@@ -103,7 +111,7 @@
       <div class="slider-item">
         <div class="slider-header">
           <span style="font-weight:600; color:#38bdf8;">💧 清泉涌出 (基准2.0/s):</span>
-          <span id="lbl-water-rate" style="color:#38bdf8; font-family:monospace; font-weight:700;">1.0x (2.00/s)</span>
+          <span id="lbl-water-rate" class="mono-num" style="color:#38bdf8; font-weight:700;">1.0x (2.00/s)</span>
         </div>
         <input type="range" id="slider-water-rate" min="0" max="5.0" step="0.1" value="1.0">
       </div>
@@ -111,25 +119,33 @@
       <div class="slider-item">
         <div class="slider-header">
           <span style="font-weight:600; color:#10b981;">🍒 浆果生长 (基准2.0/s):</span>
-          <span id="lbl-berry-rate" style="color:#10b981; font-family:monospace; font-weight:700;">1.0x (2.00/s)</span>
+          <span id="lbl-berry-rate" class="mono-num" style="color:#10b981; font-weight:700;">1.0x (2.00/s)</span>
         </div>
         <input type="range" id="slider-berry-rate" min="0" max="5.0" step="0.1" value="1.0">
       </div>
 
       <div class="slider-item">
         <div class="slider-header">
-          <span style="font-weight:600; color:#eab308;">🌲 林木成材 (基准2.0/s):</span>
-          <span id="lbl-wood-rate" style="color:#eab308; font-family:monospace; font-weight:700;">1.0x (2.00/s)</span>
+          <span style="font-weight:600; color:#d97706;">🌲 林木成材 (基准2.0/s):</span>
+          <span id="lbl-wood-rate" class="mono-num" style="color:#d97706; font-weight:700;">1.0x (2.00/s)</span>
         </div>
         <input type="range" id="slider-wood-rate" min="0" max="5.0" step="0.1" value="1.0">
       </div>
 
       <div class="slider-item">
         <div class="slider-header">
-          <span style="font-weight:600; color:#94a3b8;">🪨 矿脉沉积 (基准1.5/s):</span>
-          <span id="lbl-stone-rate" style="color:#94a3b8; font-family:monospace; font-weight:700;">1.0x (1.50/s)</span>
+          <span style="font-weight:600; color:#94a3b8;">🪨 矿脉沉积 (基准2.0/s):</span>
+          <span id="lbl-stone-rate" class="mono-num" style="color:#94a3b8; font-weight:700;">1.0x (2.00/s)</span>
         </div>
         <input type="range" id="slider-stone-rate" min="0" max="5.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-item">
+        <div class="slider-header">
+          <span style="font-weight:600; color:#fbbf24;">🪙 黄金淘洗 (基准1.8/s):</span>
+          <span id="lbl-gold-rate" class="mono-num" style="color:#fbbf24; font-weight:700;">1.0x (1.80/s)</span>
+        </div>
+        <input type="range" id="slider-gold-rate" min="0" max="5.0" step="0.1" value="1.0">
       </div>
 
       <div class="reset-btn-row">
@@ -336,12 +352,8 @@
 
 
   <script src="js/math.js"></script>
-  <script src="js/terrain.js"></script>
-  <script src="js/graph.js"></script>
-  <script src="js/house.js"></script>
-  <script src="js/agent.js"></script>
-  <script src="js/simulation.js"></script>
-  <script src="js/render.js"></script>
+  <script src="js/rustworld.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/render.js"></script>
 </body>
 </html>

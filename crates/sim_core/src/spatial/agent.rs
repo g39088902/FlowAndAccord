@@ -15,12 +15,14 @@ pub enum Gender {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
     RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、消耗家宅储备)
-    SeekingWater,       // 🚶 正在赶往�    SeekingWood,        // 🚶 正在赶往林地伐木
+    SeekingWater,       // 🚶 正在赶往水源
+    SeekingFood,        // 🍒 正在赶往浆果丛觅食
+    DrinkingAtWater,    // 💧 正在水泉边痛饮
+    ForagingFood,       // 🍒 正在浆果丛觅食
+    SeekingWood,        // 🚶 正在赶往林地伐木
     GatheringWood,      // 🌲 正在林地伐木并补给家宅
     SeekingStone,       // 🚶 正在赶往石矿采石
     MiningStone,        // 🪨 正在石矿采石并补给家宅
-    SeekingGold,        // 🚶 正在赶往金矿淘金
-    MiningGold,         // 🪙 正在金矿开采黄金(随身无限携带)
     SeekingGold,        // 🚶 正在赶往金矿淘金
     MiningGold,         // 🪙 正在金矿开采黄金(随身无限携带)
     ReturningToCamp,    // 🏕️ 饱腹/解渴/采收返回营地或私宅
@@ -153,31 +155,6 @@ impl Agent3D {
             || self.state == PrimitiveActionState::MiningGold
         {
             metabolic_multiplier *= 1.25; // 营建、修缮与采矿劳动轻微加速代谢
-        } > 0.0 {
-            self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
-        }
-        if self.miscarriage_cooldown_timer > 0.0 {
-            self.miscarriage_cooldown_timer = (self.miscarriage_cooldown_timer - dt).max(0.0);
-        }
-
-        if !self.is_alive {
-            self.death_decay_timer = (self.death_decay_timer - dt).max(0.0);
-            return None;
-        }
-
-        // 年龄增长
-        self.age += dt;
-
-        let mut event_msg = None;
-        let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
-
-        if self.state == PrimitiveActionState::ConstructingHouse
-            || self.state == PrimitiveActionState::RepairingHouse
-            || self.state == PrimitiveActionState::GatheringWood
-            || self.state == PrimitiveActionState::MiningStone
-            || self.state == PrimitiveActionState::MiningGold
-        {
-            metabolic_multiplier *= 1.25; // 营建、修缮与采伐劳动轻微加速代谢
         }
 
         // 统一需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒

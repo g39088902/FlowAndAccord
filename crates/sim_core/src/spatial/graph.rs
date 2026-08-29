@@ -46,7 +46,7 @@ pub struct LaneEdge3D {
 }
 
 /// 3D 路网拓扑有向图管理器
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct LaneGraph3D {
     pub graph: DiGraph<LaneNode3D, LaneEdge3D>,
     pub node_map: HashMap<NodeId, NodeIndex>,

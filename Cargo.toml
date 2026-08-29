@@ -2,4 +2,11 @@
 resolver = "2"
 members = [
     "crates/sim_core",
+    "crates/sim_wasm",
 ]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

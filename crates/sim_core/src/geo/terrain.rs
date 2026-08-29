@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use crate::rng::WorldRng;
 use serde::{Deserialize, Serialize};
 use super::biome::GeoCell;
 
@@ -35,20 +35,20 @@ impl TerrainMap {
     /// 生成全局大势倾斜 (±30m) 与随机平滑起伏
     pub fn generate_natural_landscape(&mut self, seed: u64) {
         self.seed = seed;
-        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        let mut rng = WorldRng::new(seed);
         let half_size = self.world_size / 2.0;
 
         // 1. 随机确定地图全局高低大势方向与倾斜幅度 (基准 ±30m)
-        self.tilt_angle_rad = rng.gen_range(0.0..std::f32::consts::TAU);
-        self.tilt_magnitude = rng.gen_range(54.0..66.0); // 总倾斜落差约 60米 (即 ±27m ~ ±33m)
+        self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
+        self.tilt_magnitude = rng.gen_range(54.0, 66.0); // 总倾斜落差约 60米 (即 ±27m ~ ±33m)
         let tilt_cos = self.tilt_angle_rad.cos();
         let tilt_sin = self.tilt_angle_rad.sin();
 
         // 2. 随机起伏多尺度谐波相位与频率
-        let p1_x: f32 = rng.gen_range(0.0..100.0);
-        let p1_y: f32 = rng.gen_range(0.0..100.0);
-        let p2_x: f32 = rng.gen_range(0.0..100.0);
-        let p2_y: f32 = rng.gen_range(0.0..100.0);
+        let p1_x: f32 = rng.gen_range(0.0, 100.0);
+        let p1_y: f32 = rng.gen_range(0.0, 100.0);
+        let p2_x: f32 = rng.gen_range(0.0, 100.0);
+        let p2_y: f32 = rng.gen_range(0.0, 100.0);
 
         let cell_step = self.world_size / (self.grid_width - 1) as f32;
         let mut raw_elevations = vec![0.0f32; self.grid_width * self.grid_height];

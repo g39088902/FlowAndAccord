@@ -1,7 +1,7 @@
 // === 全局初始化、相机控制与 UI 事件绑定 ===
     const canvas = document.getElementById('sim-canvas');
     const ctx = canvas.getContext('2d');
-    const sim = new WorldSimulation();
+    const sim = new RustWorld();
 
     let camera = {
       rotX: 1.05,
@@ -175,26 +175,42 @@
 
     const sliderStone = document.getElementById('slider-stone-rate');
     const lblStoneRate = document.getElementById('lbl-stone-rate');
-    sliderStone.addEventListener('input', e => {
-      const mult = parseFloat(e.target.value);
-      sim.setStoneRegenMultiplier(mult);
-      const actualRate = (1.50 * mult).toFixed(2);
-      lblStoneRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
-    });
+    if (sliderStone && lblStoneRate) {
+      sliderStone.addEventListener('input', e => {
+        const mult = parseFloat(e.target.value);
+        sim.setStoneRegenMultiplier(mult);
+        const actualRate = (2.00 * mult).toFixed(2);
+        lblStoneRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+      });
+    }
+
+    const sliderGold = document.getElementById('slider-gold-rate');
+    const lblGoldRate = document.getElementById('lbl-gold-rate');
+    if (sliderGold && lblGoldRate) {
+      sliderGold.addEventListener('input', e => {
+        const mult = parseFloat(e.target.value);
+        sim.setGoldRegenMultiplier(mult);
+        const actualRate = (1.80 * mult).toFixed(2);
+        lblGoldRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+      });
+    }
 
     document.getElementById('btn-reset-rate').addEventListener('click', () => {
       sliderWater.value = 1.0;
       sliderBerry.value = 1.0;
       sliderWood.value = 1.0;
-      sliderStone.value = 1.0;
+      if (sliderStone) sliderStone.value = 1.0;
+      if (sliderGold) sliderGold.value = 1.0;
       sim.setWaterRegenMultiplier(1.0);
       sim.setBerryRegenMultiplier(1.0);
       sim.setWoodRegenMultiplier(1.0);
       sim.setStoneRegenMultiplier(1.0);
+      sim.setGoldRegenMultiplier(1.0);
       lblWaterRate.textContent = `1.0x (2.00/s)`;
       lblBerryRate.textContent = `1.0x (2.00/s)`;
       lblWoodRate.textContent = `1.0x (2.00/s)`;
-      lblStoneRate.textContent = `1.0x (1.50/s)`;
+      if (lblStoneRate) lblStoneRate.textContent = `1.0x (2.00/s)`;
+      if (lblGoldRate) lblGoldRate.textContent = `1.0x (1.80/s)`;
       sim.logEvent(`🔄 产速重置: 全局资源已恢复默认基准产率！`, 'water');
     });
 
@@ -246,7 +262,7 @@
     });
 
     // ==========================================
-    // UI 控制绑定
+    // UI 控制绑定与倍速本地记忆
     // ==========================================
     const btnPause = document.getElementById('btn-pause');
     btnPause.addEventListener('click', () => {
@@ -263,7 +279,19 @@
     document.getElementById('chk-poi-stock').addEventListener('change', e => {
       sim.showPoiStock = e.target.checked;
     });
-    document.getElementById('sel-speed').addEventListener('change', e => {
-      sim.speedMult = parseInt(e.target.value, 10);
+
+    const selSpeed = document.getElementById('sel-speed');
+    const savedSpeed = localStorage.getItem('flow_sim_speed');
+    if (savedSpeed) {
+      selSpeed.value = savedSpeed;
+      sim.speedMult = parseInt(savedSpeed, 10) || 2;
+    } else {
+      sim.speedMult = parseInt(selSpeed.value, 10) || 2;
+    }
+    selSpeed.addEventListener('change', e => {
+      const val = parseInt(e.target.value, 10);
+      sim.speedMult = val;
+      try {
+        localStorage.setItem('flow_sim_speed', val.toString());
+      } catch (_) {}
     });
-  </script>

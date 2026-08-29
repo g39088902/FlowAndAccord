@@ -12,6 +12,7 @@ const MIME_TYPES = {
   '.js': 'text/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
+  '.wasm': 'application/wasm',
   '.png': 'image/png',
   '.svg': 'image/svg+xml'
 };
@@ -37,6 +38,22 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Flow & Accord 3D Visualizer running at: http://localhost:${PORT}`);
+const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3000;
+
+function startServer(port) {
+  server.listen(port, () => {
+    console.log(`🚀 Flow & Accord 3D Visualizer running at: http://localhost:${port}`);
+  });
+}
+
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    const nextPort = server.address() ? server.address().port + 1 : (parseInt(process.env.PORT, 10) || 3000) + 1;
+    console.log(`⚠️ Port ${e.port || 3000} is in use, trying port ${nextPort}...`);
+    setTimeout(() => startServer(nextPort), 200);
+  } else {
+    console.error('Server error:', e);
+  }
 });
+
+startServer(DEFAULT_PORT);

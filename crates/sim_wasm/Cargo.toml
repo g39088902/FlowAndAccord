@@ -1,0 +1,12 @@
+[package]
+name = "sim_wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm bridge: Flow & Accord headless sim core (raw wasm32, no wasm-bindgen)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sim_core = { path = "../sim_core" }
+serde_json = "1.0"

@@ -41,7 +41,7 @@
       ctx.clearRect(0, 0, w, h);
 
       // 1. 3D 地形网格渲染
-      if (sim.showTerrain) {
+      if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
         const gSize = sim.terrain.gridSize;
         const minZ = sim.terrain.minZ, maxZ = sim.terrain.maxZ;
 
@@ -132,18 +132,18 @@
         } else if (poi.type === 'Wood') {
           const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (11 + ratio * 13) * camera.zoom);
-          grad.addColorStop(0, 'rgba(234, 179, 8, 0.85)');
-          grad.addColorStop(0.6, 'rgba(202, 138, 4, 0.4)');
-          grad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+          grad.addColorStop(0, 'rgba(180, 83, 9, 0.90)');
+          grad.addColorStop(0.6, 'rgba(146, 64, 14, 0.45)');
+          grad.addColorStop(1, 'rgba(120, 53, 15, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (11 + ratio * 13) * camera.zoom, 0, Math.PI * 2); ctx.fill();
 
-          ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
+          ctx.font = `${Math.floor(13 * camera.zoom)}px -apple-system, "Segoe UI", sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText('🌲', p2D.x, p2D.y + 4);
 
           if (sim.showPoiStock && isFinite(poi.maxStock)) {
-            ctx.strokeStyle = '#eab308';
+            ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
             ctx.arc(p2D.x, p2D.y, 15 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
@@ -519,15 +519,21 @@
         }
 
         if (agent.trail.length > 1) {
-          ctx.strokeStyle = stateColor;
-          ctx.lineWidth = 2.0 * camera.zoom;
-          ctx.beginPath();
-          for (let t = 0; t < agent.trail.length; t++) {
-            const tp = project3D(agent.trail[t]);
-            if (t === 0) ctx.moveTo(tp.x, tp.y);
-            else ctx.lineTo(tp.x, tp.y);
+          ctx.save();
+          ctx.lineWidth = 1.4 * camera.zoom;
+          ctx.lineCap = 'round';
+          for (let t = 0; t < agent.trail.length - 1; t++) {
+            const pA = project3D(agent.trail[t]);
+            const pB = project3D(agent.trail[t + 1]);
+            const alpha = ((t + 1) / agent.trail.length) * 0.45;
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = stateColor;
+            ctx.beginPath();
+            ctx.moveTo(pA.x, pA.y);
+            ctx.lineTo(pB.x, pB.y);
+            ctx.stroke();
           }
-          ctx.stroke();
+          ctx.restore();
         }
 
         // 幼体稍小 (3.0px)，成体标准 (4.5px)
@@ -582,6 +588,7 @@
       let totalBerryCur = 0, totalBerryMax = 0;
       let totalWoodCur = 0, totalWoodMax = 0;
       let totalStoneCur = 0, totalStoneMax = 0;
+      let totalGoldCur = 0, totalGoldMax = 0;
 
       for (const p of sim.pois) {
         if (p.type === 'Water') {
@@ -596,6 +603,9 @@
         } else if (p.type === 'Stone') {
           totalStoneCur += p.currentStock;
           totalStoneMax += p.maxStock;
+        } else if (p.type === 'Gold') {
+          totalGoldCur += p.currentStock;
+          totalGoldMax += p.maxStock;
         }
       }
 
@@ -603,6 +613,7 @@
       const berryPct = Math.round((totalBerryCur / Math.max(1, totalBerryMax)) * 100);
       const woodPct = Math.round((totalWoodCur / Math.max(1, totalWoodMax)) * 100);
       const stonePct = Math.round((totalStoneCur / Math.max(1, totalStoneMax)) * 100);
+      const goldPct = Math.round((totalGoldCur / Math.max(1, totalGoldMax)) * 100);
 
       document.getElementById('val-global-water').textContent = `${totalWaterCur.toFixed(1)} / ${totalWaterMax.toFixed(1)} 单位 (${waterPct}%)`;
       document.getElementById('fill-global-water').style.width = `${waterPct}%`;
@@ -614,11 +625,19 @@
 
       document.getElementById('val-global-wood').textContent = `${totalWoodCur.toFixed(1)} / ${totalWoodMax.toFixed(1)} 单位 (${woodPct}%)`;
       document.getElementById('fill-global-wood').style.width = `${woodPct}%`;
-      document.getElementById('fill-global-wood').style.background = woodPct < 25 ? '#ef4444' : '#eab308';
+      document.getElementById('fill-global-wood').style.background = woodPct < 25 ? '#ef4444' : '#d97706';
 
       document.getElementById('val-global-stone').textContent = `${totalStoneCur.toFixed(1)} / ${totalStoneMax.toFixed(1)} 单位 (${stonePct}%)`;
       document.getElementById('fill-global-stone').style.width = `${stonePct}%`;
       document.getElementById('fill-global-stone').style.background = stonePct < 25 ? '#ef4444' : '#94a3b8';
+
+      const valGoldEl = document.getElementById('val-global-gold');
+      const fillGoldEl = document.getElementById('fill-global-gold');
+      if (valGoldEl && fillGoldEl) {
+        valGoldEl.textContent = `${totalGoldCur.toFixed(1)} / ${totalGoldMax.toFixed(1)} 单位 (${goldPct}%)`;
+        fillGoldEl.style.width = `${goldPct}%`;
+        fillGoldEl.style.background = goldPct < 25 ? '#ef4444' : '#fbbf24';
+      }
 
       const ecoHealthBadge = document.getElementById('global-eco-health');
       if (waterPct < 20 || berryPct < 20 || woodPct < 20) {
@@ -746,19 +765,26 @@
           poiView.style.display = 'flex';
           if (followBtn) followBtn.style.display = 'none';
 
-          const poiIcon = poi.type === 'Camp' ? '🏕️' : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : '🪨')));
+          const poiIcon = poi.type === 'Camp' ? '🏕️' : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨'))));
           document.getElementById('insp-title-name').textContent = `${poiIcon} ${poi.name}`;
           
           let stateBadge = '资源充足';
-          if (!isFinite(poi.currentStock)) {
-            stateBadge = '无限庇护';
+          let badgeColor = '#10b981';
+          if (poi.type === 'Camp') {
+            stateBadge = '无限公共庇护';
+            badgeColor = '#f59e0b';
+          } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
+            stateBadge = '无限供应';
+            badgeColor = '#f59e0b';
           } else if (poi.currentStock < 4.0) {
             stateBadge = '资源枯竭中';
+            badgeColor = '#ef4444';
           } else if (poi.currentStock < poi.maxStock * 0.4) {
             stateBadge = '储量偏低';
+            badgeColor = '#f59e0b';
           }
           document.getElementById('insp-title-state').textContent = stateBadge;
-          document.getElementById('insp-title-state').style.color = poi.currentStock < 4.0 ? '#ef4444' : '#10b981';
+          document.getElementById('insp-title-state').style.color = badgeColor;
 
           const stockRow = document.getElementById('insp-poi-stock-row');
           if (poi.type === 'Camp') {
@@ -774,7 +800,7 @@
               document.getElementById('insp-poi-stock-fill').style.background = '#10b981';
             } else if (poi.type === 'Wood') {
               document.getElementById('lbl-poi-stock-title').textContent = '林木木材 (上限60.0)';
-              document.getElementById('insp-poi-stock-fill').style.background = '#eab308';
+              document.getElementById('insp-poi-stock-fill').style.background = '#b45309';
             } else if (poi.type === 'Stone') {
               document.getElementById('lbl-poi-stock-title').textContent = '石矿石料 (上限60.0)';
               document.getElementById('insp-poi-stock-fill').style.background = '#94a3b8';

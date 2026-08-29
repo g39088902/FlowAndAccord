@@ -99,10 +99,10 @@ impl House {
                 self.pantry_wood >= self.max_pantry_wood && self.pantry_water >= 10.0 && self.pantry_food >= 10.0
             }
             HouseTier::Tier2LeanTo => {
-                self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 15.0 && self.pantry_water >= 15.0 && self.pantry_food >= 15.0
+                self.pantry_stone >= 30.0 && self.pantry_wood >= 12.0 && self.pantry_water >= 12.0 && self.pantry_food >= 12.0
             }
             HouseTier::Tier3Homestead => {
-                self.pantry_gold >= self.max_pantry_gold && self.pantry_stone >= self.max_pantry_stone && self.pantry_wood >= 25.0 && self.pantry_water >= 25.0 && self.pantry_food >= 25.0
+                self.pantry_gold >= 25.0 && self.pantry_stone >= 50.0 && self.pantry_wood >= 15.0 && self.pantry_water >= 15.0 && self.pantry_food >= 15.0
             }
             HouseTier::Tier4Manor => false,
         }
@@ -192,5 +192,6 @@ pub struct HouseSnapshot {
     pub is_ruin: bool,
     pub construction_progress: f32,
     pub is_fertility_active: bool,
+    pub is_pantry_full: bool,
     pub is_repairing: bool,
 }

@@ -1,0 +1,5 @@
+# 临时启用网络以便 cargo fetch 下载依赖
+# fetch 完成后切回 vendor 模式
+
+[net]
+offline = false

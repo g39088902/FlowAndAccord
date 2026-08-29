@@ -1,4 +1,4 @@
-use rand::Rng;
+use crate::rng::WorldRng;
 use serde::{Deserialize, Serialize};
 
 use super::vec3::Vec3;
@@ -95,6 +95,9 @@ pub struct AgentSnapshot {
     pub heading_rad: f32,
     pub pitch_rad: f32,
     pub velocity: f32,
+    pub carried_gold: f32,
+    pub build_timer: f32,
+    pub miscarriage_alert_timer: f32,
     pub state: String,
     pub is_alive: bool,
     pub hunger: f32, // 0.0 ~ 25.0 单位
@@ -131,14 +134,25 @@ pub struct World3DEngine {
     pub season_timer: f32,
     pub current_season: Season,
     pub temperature: f32,
+    pub rng: WorldRng,
+    pub water_regen_multiplier: f32,
+    pub berry_regen_multiplier: f32,
+    pub wood_regen_multiplier: f32,
+    pub stone_regen_multiplier: f32,
+    pub gold_regen_multiplier: f32,
     pub tick_counter: u64,
     pub last_event: Option<String>,
 }
 
 impl World3DEngine {
     pub fn new(grid_res: usize, world_size: f32) -> Self {
+        Self::new_seeded(grid_res, world_size, 42)
+    }
+
+    /// 指定种子的确定性世界构建 (wasm 桥接与 SL 复现使用)
+    pub fn new_seeded(grid_res: usize, world_size: f32, seed: u64) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_natural_landscape(42);
+        terrain.generate_natural_landscape(seed);
 
         Self {
             terrain,
@@ -154,14 +168,33 @@ impl World3DEngine {
             season_timer: 0.0,
             current_season: Season::Spring,
             temperature: 20.0,
+            rng: WorldRng::new(seed),
+            water_regen_multiplier: 1.0,
+            berry_regen_multiplier: 1.0,
+            wood_regen_multiplier: 1.0,
+            stone_regen_multiplier: 1.0,
+            gold_regen_multiplier: 1.0,
             tick_counter: 0,
             last_event: None,
         }
     }
 
+    /// 设置某类 POI 的自然再生倍率 (0=水泉, 1=浆果, 2=林木, 3=石矿, 4=金矿)
+    pub fn set_regen_multiplier(&mut self, which: u8, mult: f32) {
+        let mult = mult.max(0.0);
+        match which {
+            0 => self.water_regen_multiplier = mult,
+            1 => self.berry_regen_multiplier = mult,
+            2 => self.wood_regen_multiplier = mult,
+            3 => self.stone_regen_multiplier = mult,
+            4 => self.gold_regen_multiplier = mult,
+            _ => {}
+        }
+    }
+
     /// 构建生态：营地6处(无限)、水泉6处(上限40,产速1.0)、食物6处(上限40,产速1.0) 与全图直连动线
     pub fn seed_primitive_ecology(&mut self, agent_count: usize) {
-        let mut rng = rand::thread_rng();
+        
         let half_size = self.terrain.world_size / 2.0;
 
         self.pois.clear();
@@ -177,15 +210,16 @@ impl World3DEngine {
         let mut food_nodes = Vec::new();
         let mut wood_nodes = Vec::new();
         let mut stone_nodes = Vec::new();
+        let mut gold_nodes = Vec::new();
         let mut all_node_ids = Vec::new();
 
         let mut poi_positions: Vec<Vec3> = Vec::new();
         let min_poi_distance = 68.0f32;
 
-        let mut find_spaced_pos = |rng: &mut rand::rngs::ThreadRng, terrain: &crate::geo::TerrainMap, radius_ratio: f32| -> Vec3 {
+        let mut find_spaced_pos = |rng: &mut WorldRng, terrain: &crate::geo::TerrainMap, radius_ratio: f32| -> Vec3 {
             for _ in 0..100 {
-                let x = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
-                let y = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
+                let x = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
+                let y = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
                 let elev = terrain.sample_elevation(x, y);
                 let cand = Vec3::new(x, y, elev);
                 if poi_positions.iter().all(|p| p.distance_to(&cand) >= min_poi_distance) {
@@ -195,8 +229,8 @@ impl World3DEngine {
             }
             // Fallback with looser distance if tight
             for _ in 0..50 {
-                let x = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
-                let y = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
+                let x = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
+                let y = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
                 let elev = terrain.sample_elevation(x, y);
                 let cand = Vec3::new(x, y, elev);
                 if poi_positions.iter().all(|p| p.distance_to(&cand) >= min_poi_distance * 0.6) {
@@ -204,8 +238,8 @@ impl World3DEngine {
                     return cand;
                 }
             }
-            let x = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
-            let y = rng.gen_range(-half_size * radius_ratio..half_size * radius_ratio);
+            let x = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
+            let y = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
             let cand = Vec3::new(x, y, terrain.sample_elevation(x, y));
             poi_positions.push(cand);
             cand
@@ -213,7 +247,7 @@ impl World3DEngine {
 
         // 1. 生成 6 处避风营地 (无限储量，保持间距)
         for i in 0..6 {
-            let mut pos = find_spaced_pos(&mut rng, &self.terrain, 0.70);
+            let mut pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.70);
             pos.z += 0.5;
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             camp_nodes.push(node_id);
@@ -224,7 +258,7 @@ impl World3DEngine {
 
         // 2. 生成 6 处随机分布水源 (上限 60.0 单位，产速 2.00 单位/秒，全图随机分布且保持间距)
         for i in 0..6 {
-            let pos = find_spaced_pos(&mut rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             water_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -234,7 +268,7 @@ impl World3DEngine {
 
         // 3. 生成 6 处缓坡浆果灌木 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
         for i in 0..6 {
-            let pos = find_spaced_pos(&mut rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             food_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -244,7 +278,7 @@ impl World3DEngine {
 
         // 4. 生成 4 处茂密林木 (缩减为4个，上限 60.0 单位，产速 2.00 单位/秒，保持间距)
         for i in 0..4 {
-            let pos = find_spaced_pos(&mut rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             wood_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -252,9 +286,9 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 30) as u32, PoiType::WoodForest, pos));
         }
 
-        // 5. 生成 2 处嶙峋采石场 (缩减为2个，上限 60.0 单位，产速 1.50 单位/秒，保持间距)
+        // 5. 生成 2 处嶙峋采石场 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
         for i in 0..2 {
-            let pos = find_spaced_pos(&mut rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             stone_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -262,10 +296,20 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 40) as u32, PoiType::StoneQuarry, pos));
         }
 
-        // 6. 地形过渡节点
-        for _ in 0..16 {
-            let x = rng.gen_range(-half_size * 0.85..half_size * 0.85);
-            let y = rng.gen_range(-half_size * 0.85..half_size * 0.85);
+        // 6. 生成 1 处璀璨金矿 (上限 60.0 单位，产速 1.80 单位/秒，用于顶级庄园升级)
+        for i in 0..1 {
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
+            gold_nodes.push(node_id);
+            all_node_ids.push(node_id);
+
+            self.pois.push(PrimitivePoi::new((i + 50) as u32, PoiType::GoldMine, pos));
+        }
+
+        // 7. 地形过渡节点
+        for _ in 0..17 {
+            let x = self.rng.gen_range(-half_size * 0.85, half_size * 0.85);
+            let y = self.rng.gen_range(-half_size * 0.85, half_size * 0.85);
             let elev = self.terrain.sample_elevation(x, y);
             let node_id = self.network.add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
             all_node_ids.push(node_id);
@@ -278,13 +322,13 @@ impl World3DEngine {
                 let id_b = all_node_ids[j];
                 let pos_a = self.network.graph[*self.network.node_map.get(&id_a).unwrap()].pos;
                 let pos_b = self.network.graph[*self.network.node_map.get(&id_b).unwrap()].pos;
-                let dist = pos_a.distanceTo(&pos_b);
+                let dist = pos_a.distance_to(&pos_b);
 
                 if dist < 175.0 {
                     let delta_z = (pos_a.z - pos_b.z).abs();
                     let road_class = if delta_z > 8.0 { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
-                    let _ = self.network.add_lane(id_a, id_b, road_class);
-                    let _ = self.network.add_lane(id_b, id_a, road_class);
+                    let _ = self.network.add_lane(id_a, id_b, None, road_class);
+                    let _ = self.network.add_lane(id_b, id_a, None, road_class);
                 } else if dist < 360.0 {
                     let _ = self.network.add_lane_with_options(id_a, id_b, None, RoadClass::DirtTrack, true, 0.9);
                     let _ = self.network.add_lane_with_options(id_b, id_a, None, RoadClass::DirtTrack, true, 0.9);
@@ -300,7 +344,7 @@ impl World3DEngine {
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
             let gender = if i < 6 { Gender::Female } else { Gender::Male };
-            let initial_age = rng.gen_range(0.0..240.0);
+            let initial_age = self.rng.gen_range(0.0, 240.0);
 
             let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
@@ -447,7 +491,7 @@ impl World3DEngine {
             let baby_id = self.next_agent_id;
             self.next_agent_id += 1;
             self.total_births += 1;
-            let baby_gender = if rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
+            let baby_gender = if self.rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
             let gender_str = if baby_gender == Gender::Female { "女婴 ♀" } else { "男婴 ♂" };
             let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.spouse_id);
 
@@ -485,6 +529,8 @@ impl World3DEngine {
             self.agents.push(baby);
             let parents_str = if let Some(fid) = father_id {
                 format!("母亲 #{} 与 父亲 #{}", mother_id, fid)
+            } else {
+                format!("母亲 #{}", mother_id)
             };
             self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (Agent #{}，幼年0s，入驻家庭私宅，需成长120s)！", parents_str, gender_str, baby_id));
         }
@@ -494,7 +540,7 @@ impl World3DEngine {
 
     /// 生存决策调度 (模式 A: 完全就近归宿与就近觅食寻水/伐木采石)
     pub fn tick_decisions(&mut self) {
-        let mut rng = rand::thread_rng();
+        
 
         let water_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::WaterSource && p.current_stock > 0.5)
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
@@ -507,6 +553,34 @@ impl World3DEngine {
         let gold_nodes: Vec<NodeId> = self.pois.iter().filter(|p| p.poi_type == PoiType::GoldMine && p.current_stock > 0.5)
             .filter_map(|p| self.find_nearest_node(p.pos)).collect();
 
+        let camp_node_positions: Vec<(NodeId, Vec3)> = self.pois.iter()
+            .filter(|p| p.poi_type == PoiType::Camp)
+            .filter_map(|p| {
+                let pos = p.pos;
+                let mut best_id = None;
+                let mut min_dist = f32::MAX;
+                for node in self.network.graph.node_weights() {
+                    let d = node.pos.distance_to(&pos);
+                    if d < min_dist {
+                        min_dist = d;
+                        best_id = Some(node.id);
+                    }
+                }
+                best_id.map(|nid| (nid, pos))
+            })
+            .collect();
+        let find_nearest_camp = |pos: Vec3| -> Option<NodeId> {
+            camp_node_positions.iter()
+                .min_by(|(_, a), (_, b)| a.distance_to(&pos).partial_cmp(&b.distance_to(&pos)).unwrap())
+                .map(|(nid, _)| *nid)
+        };
+        let find_start_node = |pos: Vec3, default_node: NodeId| -> NodeId {
+            self.network.graph.node_weights()
+                .min_by(|a, b| a.pos.distance_to(&pos).partial_cmp(&b.pos.distance_to(&pos)).unwrap())
+                .map(|n| n.id)
+                .unwrap_or(default_node)
+        };
+
         for agent in &mut self.agents {
             if !agent.is_alive {
                 continue;
@@ -516,6 +590,7 @@ impl World3DEngine {
                 PrimitiveActionState::RestingAtCamp => {
                     let thirst_urgency = if agent.is_pregnant { 27.5 } else { 20.0 }; // (满值 50.0)
                     let hunger_urgency = if agent.is_pregnant { 30.0 } else { 24.0 };  // (满值 50.0)
+                    let start_node = find_start_node(agent.world_pos, agent.home_camp_node);
 
                     if agent.thirst < thirst_urgency && !water_nodes.is_empty() {
                         let mut sorted_water = water_nodes.clone();
@@ -525,7 +600,7 @@ impl World3DEngine {
                             pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                         });
                         let target = sorted_water[0];
-                        if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                        if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::SeekingWater;
                                 agent.target_poi_node = Some(target);
@@ -543,7 +618,7 @@ impl World3DEngine {
                             pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                         });
                         let target = sorted_food[0];
-                        if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                        if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::SeekingFood;
                                 agent.target_poi_node = Some(target);
@@ -553,13 +628,27 @@ impl World3DEngine {
                                 agent.distance_along_curve = 0.0;
                             }
                         }
-                    } else if agent.stamina >= 65.0 && agent.home_house_id.is_some() {
-                        // 备货与持续扩产升级动机：若房屋水/粮/木/石未填满，主动前往采集补给以筹备填满升级
+                    } else if agent.stamina >= 60.0 && agent.home_house_id.is_some() {
+                        // 备货与持续扩产升级动机：根据房屋当前等级精准识别真正急需的物资
                         let house_info = agent.home_house_id.and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
-                            .map(|h| (h.tier, h.pantry_water < h.max_pantry_water, h.pantry_food < h.max_pantry_food, h.pantry_wood < h.max_pantry_wood, h.pantry_stone < h.max_pantry_stone, h.pantry_gold < h.max_pantry_gold));
+                            .map(|h| {
+                                let (target_wood, need_stone, need_gold) = match h.tier {
+                                    HouseTier::Tier0Warehouse => (0.0, false, false), // 0级仓库只缺水和粮，不需要木材
+                                    HouseTier::Tier1ThatchedHut => (h.max_pantry_wood, false, false), // 1级茅草房升级私宅需要木材满20
+                                    HouseTier::Tier2LeanTo => (16.0, h.pantry_stone < h.max_pantry_stone, false), // 2级私宅木材保底16过冬，核心需要采石满40升级庄舍
+                                    HouseTier::Tier3Homestead => (20.0, h.pantry_stone < h.max_pantry_stone, h.pantry_gold < h.max_pantry_gold), // 3级庄舍木材保底20，核心采石80与淘金40
+                                    HouseTier::Tier4Manor => (25.0, false, false), // 4级大庄园木材保底25用于冬季取暖
+                                };
+                                let need_water = h.pantry_water < h.max_pantry_water;
+                                let need_food = h.pantry_food < h.max_pantry_food;
+                                let need_wood = h.pantry_wood < target_wood;
+                                (h.tier, need_water, need_food, need_wood, need_stone, need_gold)
+                            });
 
                         if let Some((tier, need_water, need_food, need_wood, need_stone, need_gold)) = house_info {
-                            if need_water && !water_nodes.is_empty() && rng.gen_bool(0.40) {
+                            let is_female = agent.gender == Gender::Female;
+                            // 女性优先负责运水和采摘浆果；男性兼顾建材 (木石金)
+                            if (need_water || (is_female && need_water)) && !water_nodes.is_empty() && self.rng.gen_bool(if is_female { 0.60 } else { 0.35 }) {
                                 let mut sorted_water = water_nodes.clone();
                                 sorted_water.sort_by(|&a, &b| {
                                     let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
@@ -567,7 +656,7 @@ impl World3DEngine {
                                     pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                                 });
                                 let target = sorted_water[0];
-                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingWater;
                                         agent.target_poi_node = Some(target);
@@ -577,7 +666,7 @@ impl World3DEngine {
                                         agent.distance_along_curve = 0.0;
                                     }
                                 }
-                            } else if need_food && !food_nodes.is_empty() && rng.gen_bool(0.40) {
+                            } else if (need_food || (is_female && need_food)) && !food_nodes.is_empty() && self.rng.gen_bool(if is_female { 0.60 } else { 0.35 }) {
                                 let mut sorted_food = food_nodes.clone();
                                 sorted_food.sort_by(|&a, &b| {
                                     let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
@@ -585,7 +674,7 @@ impl World3DEngine {
                                     pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                                 });
                                 let target = sorted_food[0];
-                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingFood;
                                         agent.target_poi_node = Some(target);
@@ -595,7 +684,7 @@ impl World3DEngine {
                                         agent.distance_along_curve = 0.0;
                                     }
                                 }
-                            } else if need_wood && !wood_nodes.is_empty() && rng.gen_bool(0.40) {
+                            } else if need_wood && !wood_nodes.is_empty() && self.rng.gen_bool(0.40) {
                                 let mut sorted_wood = wood_nodes.clone();
                                 sorted_wood.sort_by(|&a, &b| {
                                     let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
@@ -603,7 +692,7 @@ impl World3DEngine {
                                     pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                                 });
                                 let target = sorted_wood[0];
-                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingWood;
                                         agent.target_poi_node = Some(target);
@@ -613,8 +702,7 @@ impl World3DEngine {
                                         agent.distance_along_curve = 0.0;
                                     }
                                 }
-                            } else if (tier != HouseTier::Tier0Warehouse && tier != HouseTier::Tier1ThatchedHut) && need_stone && !stone_nodes.is_empty() && rng.gen_bool(0.40) {
-                                // 石头只有盖房子的作用：2级私宅及以上为升级庄舍才去采石
+                            } else if need_stone && !stone_nodes.is_empty() && self.rng.gen_bool(0.45) {
                                 let mut sorted_stone = stone_nodes.clone();
                                 sorted_stone.sort_by(|&a, &b| {
                                     let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
@@ -622,7 +710,7 @@ impl World3DEngine {
                                     pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                                 });
                                 let target = sorted_stone[0];
-                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingStone;
                                         agent.target_poi_node = Some(target);
@@ -632,8 +720,7 @@ impl World3DEngine {
                                         agent.distance_along_curve = 0.0;
                                     }
                                 }
-                            } else if (tier == HouseTier::Tier3Homestead) && need_gold && !gold_nodes.is_empty() && rng.gen_bool(0.40) {
-                                // 3级木石庄舍升级为最高级氏族大庄园需开采黄金
+                            } else if need_gold && !gold_nodes.is_empty() && self.rng.gen_bool(0.45) {
                                 let mut sorted_gold = gold_nodes.clone();
                                 sorted_gold.sort_by(|&a, &b| {
                                     let pos_a = self.network.graph[*self.network.node_map.get(&a).unwrap()].pos;
@@ -641,7 +728,7 @@ impl World3DEngine {
                                     pos_a.distance_to(&agent.world_pos).partial_cmp(&pos_b.distance_to(&agent.world_pos)).unwrap()
                                 });
                                 let target = sorted_gold[0];
-                                if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                                if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                                     if !path.is_empty() {
                                         agent.state = PrimitiveActionState::SeekingGold;
                                         agent.target_poi_node = Some(target);
@@ -653,9 +740,9 @@ impl World3DEngine {
                                 }
                             }
                         }
-                    } else if agent.stamina >= 95.0 && agent.hunger < 35.0 && !food_nodes.is_empty() && rng.gen_bool(0.04) {
-                        let target = food_nodes[rng.gen_range(0..food_nodes.len())];
-                        if let Some(path) = self.network.find_path_3d_with_preference(agent.home_camp_node, target, agent.is_covert) {
+                    } else if agent.stamina >= 95.0 && agent.hunger < 35.0 && !food_nodes.is_empty() && self.rng.gen_bool(0.04) {
+                        let target = food_nodes[self.rng.gen_range_usize(0, food_nodes.len())];
+                        if let Some(path) = self.network.find_path_3d_with_preference(start_node, target, agent.is_covert) {
                             if !path.is_empty() {
                                 agent.state = PrimitiveActionState::SeekingFood;
                                 agent.target_poi_node = Some(target);
@@ -674,7 +761,7 @@ impl World3DEngine {
                     if agent.thirst >= 48.0 || is_empty {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         if agent.hunger < 25.0 && !food_nodes.is_empty() {
-                            let target = food_nodes[rng.gen_range(0..food_nodes.len())];
+                            let target = food_nodes[self.rng.gen_range_usize(0, food_nodes.len())];
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
                                 if !path.is_empty() {
                                     agent.state = PrimitiveActionState::SeekingFood;
@@ -689,7 +776,7 @@ impl World3DEngine {
                             let target_home = if agent.home_house_id.is_some() {
                                 agent.home_camp_node
                             } else {
-                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                                find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                             };
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
@@ -712,7 +799,7 @@ impl World3DEngine {
                     if agent.hunger >= 48.0 || is_empty {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         if agent.thirst < 25.0 && !water_nodes.is_empty() {
-                            let target = water_nodes[rng.gen_range(0..water_nodes.len())];
+                            let target = water_nodes[self.rng.gen_range_usize(0, water_nodes.len())];
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target, agent.is_covert) {
                                 if !path.is_empty() {
                                     agent.state = PrimitiveActionState::SeekingWater;
@@ -727,7 +814,7 @@ impl World3DEngine {
                             let target_home = if agent.home_house_id.is_some() {
                                 agent.home_camp_node
                             } else {
-                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                                find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                             };
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
@@ -747,14 +834,23 @@ impl World3DEngine {
                     let poi = self.pois.iter().find(|p| p.poi_type == PoiType::WoodForest && p.pos.distance_to(&agent.world_pos) < 22.0);
                     let is_empty = poi.map(|p| p.current_stock <= 0.05).unwrap_or(true);
                     let is_house_wood_full = agent.home_house_id.and_then(|hid| self.houses.iter().find(|h| h.id == hid))
-                        .map(|h| h.pantry_wood >= h.max_pantry_wood).unwrap_or(true);
+                        .map(|h| {
+                            let target_wood = match h.tier {
+                                HouseTier::Tier0Warehouse => 0.0,
+                                HouseTier::Tier1ThatchedHut => h.max_pantry_wood,
+                                HouseTier::Tier2LeanTo => 16.0,
+                                HouseTier::Tier3Homestead => 20.0,
+                                HouseTier::Tier4Manor => 25.0,
+                            };
+                            h.pantry_wood >= target_wood
+                        }).unwrap_or(true);
 
                     if is_empty || is_house_wood_full || agent.hunger < 20.0 || agent.thirst < 20.0 {
                         let curr_node = agent.target_poi_node.unwrap_or(agent.home_camp_node);
                         let target_home = if agent.home_house_id.is_some() {
                             agent.home_camp_node
                         } else {
-                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                         };
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
@@ -780,7 +876,7 @@ impl World3DEngine {
                         let target_home = if agent.home_house_id.is_some() {
                             agent.home_camp_node
                         } else {
-                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                         };
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
@@ -806,7 +902,7 @@ impl World3DEngine {
                         let target_home = if agent.home_house_id.is_some() {
                             agent.home_camp_node
                         } else {
-                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                         };
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
@@ -852,7 +948,7 @@ impl World3DEngine {
                             let target_home = if agent.home_house_id.is_some() {
                                 agent.home_camp_node
                             } else {
-                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                                find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                             };
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
@@ -899,7 +995,7 @@ impl World3DEngine {
                             let target_home = if agent.home_house_id.is_some() {
                                 agent.home_camp_node
                             } else {
-                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                                find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                             };
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
@@ -946,7 +1042,7 @@ impl World3DEngine {
                             let target_home = if agent.home_house_id.is_some() {
                                 agent.home_camp_node
                             } else {
-                                self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                                find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                             };
                             if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                                 if !path.is_empty() {
@@ -969,7 +1065,7 @@ impl World3DEngine {
                         let target_home = if agent.home_house_id.is_some() {
                             agent.home_camp_node
                         } else {
-                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                         };
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
@@ -991,7 +1087,7 @@ impl World3DEngine {
                         let target_home = if agent.home_house_id.is_some() {
                             agent.home_camp_node
                         } else {
-                            self.find_nearest_camp_node(agent.world_pos).unwrap_or(agent.home_camp_node)
+                            find_nearest_camp(agent.world_pos).unwrap_or(agent.home_camp_node)
                         };
                         if let Some(path) = self.network.find_path_3d_with_preference(curr_node, target_home, agent.is_covert) {
                             if !path.is_empty() {
@@ -1041,9 +1137,17 @@ impl World3DEngine {
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
 
-        // 1. POI 自然恢复
+        // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
         for poi in &mut self.pois {
-            poi.tick_regenerate(dt);
+            let mult = match poi.poi_type {
+                PoiType::WaterSource => self.water_regen_multiplier,
+                PoiType::BerryBush => self.berry_regen_multiplier,
+                PoiType::WoodForest => self.wood_regen_multiplier,
+                PoiType::StoneQuarry => self.stone_regen_multiplier,
+                PoiType::GoldMine => self.gold_regen_multiplier,
+                _ => 1.0,
+            };
+            poi.tick_regenerate(dt * mult);
         }
 
         // 2. 代谢与繁衍
@@ -1080,7 +1184,7 @@ impl World3DEngine {
 
     /// 部落定居与自发筑屋演化 (四季更迭、冬季取暖、多级营建扩容、私产确权与代际继承、自动婚姻)
     pub fn tick_housing(&mut self, dt: f32) {
-        let mut rng = rand::thread_rng();
+        
 
         // 0. 四季更迭与环境温度计算 (240秒一年，每季60秒)
         self.season_timer += dt;
@@ -1128,15 +1232,21 @@ impl World3DEngine {
         }
 
         if !collapsed_house_ids.is_empty() {
-            for agent in &mut self.agents {
-                if let Some(hid) = agent.home_house_id {
-                    if collapsed_house_ids.contains(&hid) {
-                        agent.home_house_id = None;
-                        if let Some(c_node) = self.find_nearest_node(agent.world_pos) {
-                            agent.home_camp_node = c_node;
+            let updates: Vec<(usize, NodeId)> = self.agents.iter().enumerate()
+                .filter_map(|(i, agent)| {
+                    if let Some(hid) = agent.home_house_id {
+                        if collapsed_house_ids.contains(&hid) {
+                            let c_node = self.find_nearest_node(agent.world_pos)?;
+                            return Some((i, c_node));
                         }
                     }
-                }
+                    None
+                })
+                .collect();
+
+            for (i, c_node) in updates {
+                self.agents[i].home_house_id = None;
+                self.agents[i].home_camp_node = c_node;
             }
             for hid in &collapsed_house_ids {
                 self.last_event = Some(format!("🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！", hid));
@@ -1265,13 +1375,13 @@ impl World3DEngine {
                 }
 
                 // 仓库设立门槛：男性 ♂、年满 120s 成年、饱暖富足(≥18.0单位)、体力≥75%
-                if agent.age >= 120.0 && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 75.0 && rng.gen_bool(0.15) {
+                if agent.age >= 120.0 && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 75.0 && self.rng.gen_bool(0.15) {
                     let agent_id = agent.id;
                     let agent_pos = agent.world_pos;
 
                     // 空间选址：在当前营地附近 15m~45m 平坦区设立 0级仓库
-                    let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-                    let dist = rng.gen_range(16.0..42.0);
+                    let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);
+                    let dist = self.rng.gen_range(16.0, 42.0);
                     let cand_x = agent_pos.x + angle.cos() * dist;
                     let cand_y = agent_pos.y + angle.sin() * dist;
                     let cand_z = self.terrain.sample_elevation(cand_x, cand_y);
@@ -1290,13 +1400,17 @@ impl World3DEngine {
                         let house_id = self.next_house_id;
                         self.next_house_id += 1;
 
-                        // 门前生成道路节点与支线连接
+                        // 先找出全图已有的最近节点（按距离排序）
+                        let mut sorted_nearby_nodes: Vec<(NodeId, f32)> = self.network.graph.node_weights()
+                            .map(|n| (n.id, n.pos.distance_to(&cand_pos)))
+                            .collect();
+                        sorted_nearby_nodes.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+                        // 门前生成道路节点并与最近的 3 个路网节点双向连通
                         let door_node = self.network.add_node(cand_pos, NodeType::GroundIntersection);
-                        if let Some(nearest_node) = self.find_nearest_node(cand_pos) {
-                            if nearest_node != door_node {
-                                let _ = self.network.add_lane_with_options(door_node, nearest_node, None, RoadClass::DirtTrack, false, 1.0);
-                                let _ = self.network.add_lane_with_options(nearest_node, door_node, None, RoadClass::DirtTrack, false, 1.0);
-                            }
+                        for &(near_id, _) in sorted_nearby_nodes.iter().take(3) {
+                            let _ = self.network.add_lane_with_options(door_node, near_id, None, RoadClass::DirtTrack, false, 1.0);
+                            let _ = self.network.add_lane_with_options(near_id, door_node, None, RoadClass::DirtTrack, false, 1.0);
                         }
 
                         // 生成 0级仓库 (默认 5 水 5 粮 5 木，无需劳动力投入)
@@ -1400,6 +1514,7 @@ impl World3DEngine {
                 is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
                 is_fertility_active: h.is_fertility_active(),
+                is_pantry_full: h.is_pantry_full(),
                 is_repairing: h.is_repairing,
             });
         }
@@ -1447,6 +1562,9 @@ impl World3DEngine {
                 heading_rad: agent.forward_heading_rad,
                 pitch_rad: agent.pitch_rad,
                 velocity: agent.current_velocity,
+                carried_gold: agent.carried_gold,
+                build_timer: agent.build_timer,
+                miscarriage_alert_timer: agent.miscarriage_alert_timer,
                 state: format!("{:?}", agent.state),
                 is_alive: agent.is_alive,
                 hunger: agent.hunger,
