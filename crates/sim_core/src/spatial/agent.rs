@@ -208,17 +208,18 @@ impl Agent3D {
             return;
         };
 
-        // 踩踏拓路：行进时增加该车道踩踏度 (放慢至 33%，即 0.132/s)
+        // 踩踏拓路：1级(20s累计到达 1.0)、2级(40s累计到达 2.0)、3级(80s累计到达 3.0)
         {
             let edge = &mut road_network.graph[edge_idx];
-            edge.wear = (edge.wear + 0.132 * dt).min(3.0);
+            let gain_rate = if edge.wear < 2.0 { 0.050 } else { 0.025 };
+            edge.wear = (edge.wear + gain_rate * dt).min(3.0);
         }
 
         let lane = &road_network.graph[edge_idx];
         let wear = lane.wear;
 
-        // 连续浮点道路速度因子：0.0 (荒野) => 0.50x, 1.0 (土径) => 0.85x, 2.0 (夯土道) => 1.20x, 3.0 (石道) => 1.55x
-        let road_level_factor = (0.50 + 0.35 * wear).clamp(0.50, 1.60);
+        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (20s土径 83%) -> 2.0 (40s夯土 117%) -> 3.0 (80s石道 150%)
+        let road_level_factor = (0.50 + 0.333 * wear).clamp(0.50, 1.50);
         self.is_traveling_offroad = wear < 0.6;
 
         // 坡度体力能耗

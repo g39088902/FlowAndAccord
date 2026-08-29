@@ -812,8 +812,8 @@
       tickWearDecay(dt) {
         for (const lane of this.lanes.values()) {
           if (lane.wear > 0) {
-            // 每秒衰减 0.012 (约 80 秒无人走从 1.0 兽径退化为原始荒野)
-            lane.wear = Math.max(0, lane.wear - 0.012 * dt);
+            // 每秒衰减 0.040 (闲置约 25s 退化一级，75s 完全退化为荒野)
+            lane.wear = Math.max(0, lane.wear - 0.040 * dt);
           }
         }
       }
@@ -996,8 +996,9 @@
           return;
         }
 
-        // 踩踏拓路：行进时增加该车道踩踏度 (放慢至 33%，即 0.132/s，上限 3.0)
-        lane.wear = Math.min(3.0, (lane.wear || 0.0) + 0.132 * dt);
+        // 踩踏拓路：1级(20s累计到达 1.0)、2级(40s累计到达 2.0)、3级(80s累计到达 3.0)
+        const gainRate = (lane.wear || 0) < 2.0 ? 0.050 : 0.025;
+        lane.wear = Math.min(3.0, (lane.wear || 0.0) + gainRate * dt);
 
         const deltaZ = lane.curve.p3.z - lane.curve.p0.z;
         const uphill = deltaZ > 0 ? deltaZ / lane.curve.length : 0;
@@ -1005,8 +1006,8 @@
         this.stamina = Math.max(0, this.stamina - staminaBurn * dt);
 
         const staminaFactor = Math.max(0.2, Math.min(1.0, this.stamina / 25.0));
-        // 连续浮点道路速度因子：0.0 (荒野) => 0.50x, 1.0 (土径) => 0.85x, 2.0 (夯土道) => 1.20x, 3.0 (石道) => 1.55x
-        const roadLevelFactor = Math.min(1.60, Math.max(0.50, 0.50 + 0.35 * lane.wear));
+        // 连续浮点道路速度因子：0.0 (荒野 50%) -> 1.0 (20s土径 83%) -> 2.0 (40s夯土 117%) -> 3.0 (80s石道 150%)
+        const roadLevelFactor = Math.min(1.50, Math.max(0.50, 0.50 + 0.333 * lane.wear));
         this.isOffroad = lane.wear < 0.6;
         const targetSpeed = this.maxSpeed * roadLevelFactor * staminaFactor;
 

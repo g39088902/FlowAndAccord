@@ -141,12 +141,12 @@ impl LaneGraph3D {
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减 (走的人少了，道路等级随时间衰减)
+    /// 道路自然杂草丛生与退化衰减 (走的人少了，道路等级以 0.04/s 速率衰减)
     pub fn tick_wear_decay(&mut self, dt: f32) {
         for edge in self.graph.edge_weights_mut() {
             if edge.wear > 0.0 {
-                // 每秒衰减 0.012 (约 80 秒无踩踏从 1.0 兽径退化为原始荒野)
-                edge.wear = (edge.wear - 0.012 * dt).max(0.0);
+                // 每秒衰减 0.040
+                edge.wear = (edge.wear - 0.040 * dt).max(0.0);
             }
         }
     }
