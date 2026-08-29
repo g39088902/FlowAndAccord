@@ -118,7 +118,7 @@
     .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
     .legend-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 
-    /* 选中的 Inspector 监控面板 (支持 Agent 与 POI 双模式透视) */
+    /* 选中的 Inspector 监控面板 */
     .inspector-card {
       position: absolute;
       top: 330px; right: 16px;
@@ -320,13 +320,13 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 原始生态经济与全图直连动线</div>
-      <div class="brand-desc">固定唯一ID锁定追踪 × 点击POI透视存量与产速 × 20处生态POI</div>
+      <div class="brand-title">🍼 Flow & Accord · 30 FPS 真实时间时钟</div>
+      <div class="brand-desc">帧率锁定 30 FPS × 1x倍速(1s=1s) × 1x/2x/4x/8x/16x 倍速阶梯</div>
     </div>
     <div class="stats-card">
       <div class="stat-item">
-        <div class="stat-val" id="stat-fps">60</div>
-        <div class="stat-lbl">FPS</div>
+        <div class="stat-val" id="stat-fps" style="color:#facc15;">30</div>
+        <div class="stat-lbl">锁定帧率</div>
       </div>
       <div class="stat-item">
         <div class="stat-val" id="stat-pop">8</div>
@@ -364,14 +364,13 @@
     <div class="legend-item"><div class="legend-icon">🤰</div> 妊娠光环 (54s孕期，代谢+50%)</div>
   </div>
 
-  <!-- 动态 Inspector 面板 (Agent / POI 双模式透视) -->
+  <!-- 动态 Inspector 面板 -->
   <div class="inspector-card" id="inspector-card">
     <div class="inspector-title">
       <span id="insp-title-name">Agent #1 (部落民)</span>
       <span id="insp-title-state" style="color:#f59e0b;">营地休眠中</span>
     </div>
 
-    <!-- Agent 透视内容 -->
     <div id="insp-agent-view">
       <div class="meter-row">
         <div class="meter-label"><span>🍎 饱食度</span><span id="insp-hunger-val">85%</span></div>
@@ -397,7 +396,6 @@
       </div>
     </div>
 
-    <!-- POI 透视内容 -->
     <div id="insp-poi-view" style="display:none; flex-direction:column; gap:6px;">
       <div class="meter-row">
         <div class="meter-label"><span id="lbl-poi-stock-title">当前可用储量</span><span id="insp-poi-stock-val">18.5 / 25.0</span></div>
@@ -417,12 +415,12 @@
 
   <div class="control-panel">
     <div class="panel-title">
-      <span>生态经济与全图动线控制台</span>
-      <span style="font-size: 11px; color: #10b981;">固定ID锁定</span>
+      <span>生态时钟与倍速控制台</span>
+      <span style="font-size: 11px; color: #facc15;">30 FPS (1s=1s)</span>
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
-      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演生态 (20 POI & 直连)</button>
+      <button class="ecology-btn" id="btn-reroll-eco" style="grid-column: span 2;">🏕️ 重演生态 (8人开局)</button>
     </div>
     <div class="btn-grid">
       <button id="btn-spawn-civ">🚶 注入 +4 部落民</button>
@@ -442,11 +440,13 @@
       <input type="checkbox" id="chk-poi-stock" checked style="accent-color: #10b981; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span>模拟推进速率</span>
-      <select id="sel-speed" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155; border-radius:6px; padding:2px 8px;">
-        <option value="1">1x 真实代谢</option>
+      <span style="font-weight:600; color:#facc15;">⚡ 模拟演化倍速</span>
+      <select id="sel-speed" style="background:#1e293b; color:#facc15; font-weight:600; border:1px solid #f59e0b; border-radius:6px; padding:3px 8px; cursor:pointer;">
+        <option value="1">1x 真实时间 (1s=1s)</option>
         <option value="2" selected>2x 快速演化</option>
-        <option value="4">4x 极速</option>
+        <option value="4">4x 极速演化</option>
+        <option value="8">8x 飞速演化</option>
+        <option value="16">16x 超速演化</option>
       </select>
     </div>
   </div>
@@ -454,7 +454,7 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">生态就绪: 点击部落民或地标可锁定透视详细存量与生理体征！</div>
+      <div class="log-entry camp">时钟重定就绪: 帧率锁定30FPS，1x倍速1秒完全等于现实1秒，支持1x~16x！</div>
     </div>
   </div>
 
@@ -827,7 +827,7 @@
     }
 
     // ==========================================
-    // 原始生态有限资源与繁衍世界
+    // 原始生态有限资源与繁衍世界 (30 FPS基准，1s=1s)
     // ==========================================
     class WorldSimulation {
       constructor() {
@@ -840,14 +840,13 @@
         this.totalDeaths = 0;
         this.tickCount = 0;
         this.isPaused = false;
-        this.speedMult = 2;
+        this.speedMult = 2; // 默认 2x 快速演化
 
         this.showTerrain = true;
         this.showLanes = true;
         this.showPoiStock = true;
 
-        // 统一固定 ID 选中系统 (彻底杜绝跳变！)
-        this.selectionType = 'agent'; // 'agent' | 'poi'
+        this.selectionType = 'agent';
         this.selectedAgentId = 1;
         this.selectedPoiId = null;
 
@@ -945,56 +944,86 @@
         this.campNodes = campNodes;
         this.waterNodes = waterNodes;
         this.foodNodes = foodNodes;
-        this.logEvent(`🏕️ 生态繁盛就绪: 20处POI，消耗减半，支持全图直连越野！`, 'camp');
+        this.logEvent(`🏕️ 30 FPS基准时钟就绪: 1x倍速1秒严格等于现实1秒，支持1x~16x！`, 'camp');
       }
-      tickPoiInteractions(dt) {
-        for (const poi of this.pois) {
-          if (poi.regenRate > 0) {
-            poi.currentStock = Math.min(poi.maxStock, poi.currentStock + poi.regenRate * dt);
-          }
-        }
+      tick() {
+        if (this.isPaused) return;
 
-        const newborns = [];
+        // 30 FPS 物理基准步长 dt = 1/30s ≈ 0.03333s
+        const dt = 1.0 / 30.0;
 
-        for (const agent of this.agents) {
-          if (!agent.isAlive) continue;
+        // 根据 speedMult 执行对应倍数的离散步进
+        for (let step = 0; step < this.speedMult; step++) {
+          this.tickCount++;
 
-          if (agent.readyToBirth) {
-            agent.readyToBirth = false;
-            newborns.push(agent.homeCampNode);
-          }
-
-          if (agent.state === 'DrinkingAtWater') {
-            const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 22);
-            if (poi && poi.currentStock > 0.1) {
-              const extracted = Math.min(poi.currentStock, 30.0 * dt);
-              poi.currentStock -= extracted;
-              agent.thirst = Math.min(100, agent.thirst + extracted * 1.2);
-            }
-          } else if (agent.state === 'ForagingFood') {
-            const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 22);
-            if (poi && poi.currentStock > 0.1) {
-              const extracted = Math.min(poi.currentStock, 1.2 * dt);
-              poi.currentStock -= extracted;
-              if (agent.inventoryFood < 4.0) agent.inventoryFood = Math.min(4.0, agent.inventoryFood + extracted);
-              agent.hunger = Math.min(100, agent.hunger + extracted * 20.0);
+          // POI 产出与消耗
+          for (const poi of this.pois) {
+            if (poi.regenRate > 0) {
+              poi.currentStock = Math.min(poi.maxStock, poi.currentStock + poi.regenRate * dt);
             }
           }
-        }
 
-        for (const campNode of newborns) {
-          const babyId = this.nextAgentId++;
-          this.totalBirths++;
-          const baby = new PrimitiveAgent(babyId, campNode, 16.0);
-          baby.pos = this.network.nodes.get(campNode).pos;
-          baby.hunger = 95;
-          baby.thirst = 95;
-          baby.stamina = 100;
-          this.agents.push(baby);
-          this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId})！部落薪火相传！`, 'birth');
-        }
+          const newborns = [];
 
-        this.agents = this.agents.filter(a => a.isAlive || a.deathDecayTimer > 0);
+          for (const agent of this.agents) {
+            if (!agent.isAlive) continue;
+
+            if (agent.readyToBirth) {
+              agent.readyToBirth = false;
+              newborns.push(agent.homeCampNode);
+            }
+
+            if (agent.state === 'DrinkingAtWater') {
+              const poi = this.pois.find(p => p.type === 'Water' && p.pos.distanceTo(agent.pos) < 22);
+              if (poi && poi.currentStock > 0.1) {
+                const extracted = Math.min(poi.currentStock, 30.0 * dt);
+                poi.currentStock -= extracted;
+                agent.thirst = Math.min(100, agent.thirst + extracted * 1.2);
+              }
+            } else if (agent.state === 'ForagingFood') {
+              const poi = this.pois.find(p => p.type === 'Berry' && p.pos.distanceTo(agent.pos) < 22);
+              if (poi && poi.currentStock > 0.1) {
+                const extracted = Math.min(poi.currentStock, 1.2 * dt);
+                poi.currentStock -= extracted;
+                if (agent.inventoryFood < 4.0) agent.inventoryFood = Math.min(4.0, agent.inventoryFood + extracted);
+                agent.hunger = Math.min(100, agent.hunger + extracted * 20.0);
+              }
+            }
+          }
+
+          for (const campNode of newborns) {
+            const babyId = this.nextAgentId++;
+            this.totalBirths++;
+            const baby = new PrimitiveAgent(babyId, campNode, 16.0);
+            baby.pos = this.network.nodes.get(campNode).pos;
+            baby.hunger = 95;
+            baby.thirst = 95;
+            baby.stamina = 100;
+            this.agents.push(baby);
+            this.logEvent(`🍼 部落喜添新生儿 (Agent #${babyId})！部落薪火相传！`, 'birth');
+          }
+
+          this.agents = this.agents.filter(a => a.isAlive || a.deathDecayTimer > 0);
+
+          // 生理代谢
+          for (const agent of this.agents) {
+            const ev = agent.tickMetabolism(dt);
+            if (ev) {
+              if (ev.type === 'death') this.totalDeaths++;
+              this.logEvent(ev.text, ev.type);
+            }
+          }
+
+          // 决策循环
+          if (this.tickCount % 15 === 0) {
+            this.tickDecisions();
+          }
+
+          // 空间动力学移动
+          for (const agent of this.agents) {
+            agent.tickMovement(dt, this.network);
+          }
+        }
       }
       tickDecisions() {
         const availableWaterNodes = this.pois.filter(p => p.type === 'Water' && p.currentStock > 1.0)
@@ -1097,31 +1126,6 @@
         list.appendChild(entry);
         while (list.children.length > 8) list.removeChild(list.firstChild);
       }
-      tick() {
-        if (this.isPaused) return;
-
-        for (let step = 0; step < this.speedMult; step++) {
-          this.tickCount++;
-
-          this.tickPoiInteractions(0.05);
-
-          for (const agent of this.agents) {
-            const ev = agent.tickMetabolism(0.05);
-            if (ev) {
-              if (ev.type === 'death') this.totalDeaths++;
-              this.logEvent(ev.text, ev.type);
-            }
-          }
-
-          if (this.tickCount % 15 === 0) {
-            this.tickDecisions();
-          }
-
-          for (const agent of this.agents) {
-            agent.tickMovement(0.05, this.network);
-          }
-        }
-      }
     }
 
     const canvas = document.getElementById('sim-canvas');
@@ -1212,9 +1216,26 @@
       return `rgba(${Math.floor(r * lightFactor)}, ${Math.floor(g * lightFactor)}, ${Math.floor(b * lightFactor)}, 0.55)`;
     }
 
+    // ==========================================
+    // 30 FPS 帧率限制与渲染主循环 (1s = 1s)
+    // ==========================================
     let frameCount = 0, lastFpsUpdate = performance.now();
+    let lastRenderTime = performance.now();
+    const TARGET_FPS = 30;
+    const FRAME_INTERVAL = 1000 / TARGET_FPS; // 33.33ms
 
-    function render() {
+    function render(now) {
+      requestAnimationFrame(render);
+
+      if (!now) now = performance.now();
+      const elapsed = now - lastRenderTime;
+
+      // 帧率节流：未达到 33.33ms 间隔则跳过渲染，确保恒定锁定 30 FPS
+      if (elapsed < FRAME_INTERVAL - 1.5) {
+        return;
+      }
+      lastRenderTime = now - (elapsed % FRAME_INTERVAL);
+
       sim.tick();
 
       const w = window.innerWidth, h = window.innerHeight;
@@ -1311,7 +1332,6 @@
           }
         }
 
-        // 选中 POI 高亮光环
         if (isSelectedPoi) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2.2;
@@ -1422,7 +1442,6 @@
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // 选中高亮 (按固定 ID 精准匹配，永不跳变)
         if (isSelectedAgent) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1.8;
@@ -1435,9 +1454,8 @@
         }
       }
 
-      // 5. 更新顶栏指标
+      // 5. 更新顶栏 FPS 与统计
       frameCount++;
-      const now = performance.now();
       if (now - lastFpsUpdate >= 500) {
         document.getElementById('stat-fps').textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
         frameCount = 0;
@@ -1453,7 +1471,7 @@
       document.getElementById('stat-births').textContent = sim.totalBirths;
       document.getElementById('stat-deaths').textContent = sim.totalDeaths;
 
-      // 6. 刷新动态 Inspector 面板 (Agent / POI)
+      // 6. 刷新动态 Inspector 面板
       const agentView = document.getElementById('insp-agent-view');
       const poiView = document.getElementById('insp-poi-view');
 
@@ -1484,7 +1502,6 @@
           document.getElementById('insp-detail-text').textContent = poi.type === 'Water' ? '低洼处天然地泉，部落民口渴时前往饮水。' : (poi.type === 'Berry' ? '向阳缓坡野生灌木，果实成熟后部落民前来采摘。' : '避风篝火高台，部落民在此休眠回体、饱暖受孕与分娩新生儿。');
         }
       } else {
-        // Agent 模式
         agentView.style.display = 'block';
         poiView.style.display = 'none';
 
@@ -1537,16 +1554,13 @@
           }
         }
       }
-
-      requestAnimationFrame(render);
     }
     requestAnimationFrame(render);
 
-    // 智能点击拾取 (优先拾取地标 POI，其次拾取部落民 Agent，按唯一 ID 精准锁定)
+    // 智能点击拾取
     canvas.addEventListener('click', e => {
       const clickX = e.clientX, clickY = e.clientY;
 
-      // 1. 优先检查 POI 拾取
       for (const poi of sim.pois) {
         const p2D = project3D(poi.pos);
         if (Math.hypot(clickX - p2D.x, clickY - p2D.y) < 26) {
@@ -1556,7 +1570,6 @@
         }
       }
 
-      // 2. 检查 Agent 拾取 (锁定唯一 agent.id，永不跳动)
       let closestAgent = null, minDist = 25;
       for (const agent of sim.agents) {
         const p2D = project3D(agent.pos);
