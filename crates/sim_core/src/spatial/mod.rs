@@ -50,7 +50,7 @@ mod tests {
             }
         }
         assert_eq!(world.agents.len(), 12);
-        assert_eq!(world.agents[0].hunger, 25.0);
+        assert!(world.agents[0].hunger >= 10.0 && world.agents[0].hunger <= 45.0);
 
         for _ in 0..200 {
             world.tick(0.05);

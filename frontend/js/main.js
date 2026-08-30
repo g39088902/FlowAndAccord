@@ -135,8 +135,16 @@
             sim.selectedAgentId = targetId;
             const targetAgent = sim.agents.find(a => a.id === targetId);
             if (targetAgent) {
-              camera.panX = -targetAgent.pos.x;
-              camera.panY = -targetAgent.pos.y;
+              const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+              const rx = targetAgent.pos.x * cosZ - targetAgent.pos.y * sinZ;
+              const ry = targetAgent.pos.x * sinZ + targetAgent.pos.y * cosZ;
+              const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+              const y2 = ry * cosX - (targetAgent.pos.z || 0) * sinX;
+
+              camera.panX = -rx * camera.zoom;
+              camera.panY = -y2 * camera.zoom;
+              isCameraFollow = true;
+              if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
             }
           }
         }
@@ -261,13 +269,24 @@
       toggleLegendMinimize();
     });
 
+
     // ==========================================
-    // UI 控制绑定与倍速本地记忆
+    // UI 控制绑定与倍速本地记忆 (空格键暂停/继续)
     // ==========================================
     const btnPause = document.getElementById('btn-pause');
-    btnPause.addEventListener('click', () => {
+    function togglePause() {
       sim.isPaused = !sim.isPaused;
-      btnPause.textContent = sim.isPaused ? '▶️ 继续模拟' : '⏸️ 暂停模拟';
+      btnPause.textContent = sim.isPaused ? '▶️ 继续模拟 (空格)' : '⏸️ 暂停模拟 (空格)';
+    }
+    btnPause.addEventListener('click', togglePause);
+
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.key === ' ') {
+        const targetTag = e.target.tagName;
+        if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') return;
+        e.preventDefault();
+        togglePause();
+      }
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {

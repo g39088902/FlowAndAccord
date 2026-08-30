@@ -260,6 +260,7 @@ impl World3DEngine {
                 miscarriage_alert: agent.miscarriage_alert_timer > 0.0,
                 death_decay_timer: agent.death_decay_timer,
                 death_cause: agent.death_cause.clone(),
+                current_need: agent.current_need.clone(),
                 is_covert: agent.is_covert,
                 stealth_visibility: agent.stealth_visibility,
                 home_house_id: agent.home_house_id,

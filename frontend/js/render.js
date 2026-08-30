@@ -7,6 +7,100 @@
     const TARGET_FPS = 30;
     const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
+    // ==========================================
+    // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
+    // ==========================================
+    const MASLOW_STYLE = {
+      Physiological:     { level: 1, icon: '💧', name: '生理需求', color: '#38bdf8', desc: '生存底线：口渴饮水 / 饥饿进食 / 体力<50% 归巢休养' },
+      Safety:            { level: 2, icon: '🏠', name: '安全需求', color: '#f59e0b', desc: '家宅安全：私宅水粮木储备填满 / 房屋耐久<50%修缮至100%' },
+      Belonging:         { level: 3, icon: '👪', name: '归属与爱', color: '#ec4899', desc: '成家立业：0级仓库水粮填满升级成婚 / 家庭生存纽带' },
+      Esteem:            { level: 4, icon: '🏛️', name: '尊重需求', color: '#a78bfa', desc: '阶层跃升：建材采石 / 盖房淘金(45s冷却) / 房屋施工扩建' },
+      SelfActualization: { level: 5, icon: '👑', name: '自我实现', color: '#fbbf24', desc: '终极奢华：4级大庄园竣工后的娱乐淘金(180s冷却)' },
+    };
+    const NEED_KIND_LABEL = {
+      QuenchThirst: '口渴饮水',
+      SateHunger: '饥饿进食',
+      ForageSurplus: '富余觅食',
+      Rest: '休养生息',
+      ReturnHome: '送货回家',       // 专属标签: 安全需求 · 送货回家
+      StockWater: '仓库储水',
+      StockFood: '仓库储粮',
+      StockWood: '过冬木柴',
+      StockStone: '采石建材',
+      StockGold: '盖房淘金',       // 专属标签: ④ 尊重需求 · 盖房淘金 (45s冷却)
+      GoldWealth: '娱乐淘金',      // 专属标签: ⑤ 自我实现 · 娱乐淘金 (180s冷却)
+      RepairHouse: '修缮房屋',
+      BuildHouse: '施工建房',
+      Detour: '越野寻路',
+    };
+    const NEED_KIND_REASON = {
+      QuenchThirst: '自身水分告急(<25.0)，前往水泉痛饮至满值并回填家宅水库。',
+      SateHunger: '自身饱食告急(<25.0)，前往浆果丛采食至满值并回填家宅粮仓。',
+      ForageSurplus: '体力充沛且微饥，低概率外出就近采食成熟浆果。',
+      Rest: '正在归宿静坐休养，体力快速恢复中(+8.0%/s)，充盈至 100% 满值后方可结束。',
+      ReturnHome: '现场采收或搬运完成，折返回家将物资存入私宅仓库（安全需求）。',
+      RepairHouse: '房屋耐久跌破50%，正在投入体力劳作修缮至100%避免风化坍塌。',
+      StockWater: '私宅水库蓄水不足50%，优先外出运水保障家庭基础生存（安全需求，优先于建房）。',
+      StockFood: '私宅粮仓储粮不足50%，优先外出采粮保障家庭基础生存（安全需求，优先于建房）。',
+      StockWood: '私宅木料储备不足50%容量，优先外出伐木并一路补满至100%满仓（安全需求，优先于建房）。',
+      BuildHouse: '建材已齐备，正在投入体力与30s工时营建或扩建升级私宅（消耗体力）。',
+      StockStone: '拥有2~3级私宅且石料不足，前往石矿采石用于升级木石庄舍与大庄园。',
+      StockGold: '拥有3级木石庄舍且金库缺金，外出采金备料用于升级4级大庄园(尊重需求，冷却45s)。',
+      GoldWealth: '4级大庄园已竣工且物资充沛，闲暇无事外出娱乐性淘金积累随身财富(冷却180s)。',
+      Detour: '车道临时受阻，正在荒野中越野寻路。',
+    };
+    const LEVEL_NUMERALS = ['①', '②', '③', '④', '⑤'];
+
+    // 解析 Rust 侧 current_need 字符串 (如 "Physiological·QuenchThirst" -> 层级元数据)
+    function parseMaslowNeed(needStr, agent) {
+      if (agent) {
+        if (agent.state === 'ConstructingHouse') {
+          const myHouse = sim.houses && sim.houses.find(h => h.id === agent.homeHouseId);
+          const isTier0 = myHouse && (myHouse.tier === 'Tier0Warehouse' || myHouse.tier === 0);
+          needStr = isTier0 ? 'Belonging·BuildHouse' : 'Esteem·BuildHouse';
+        } else if (agent.state === 'RepairingHouse') {
+          needStr = 'Safety·RepairHouse';
+        } else if (agent.state === 'ReturningToCamp') {
+          if (agent.stamina >= 50.0) {
+            needStr = 'Safety·ReturnHome';
+          } else {
+            needStr = 'Physiological·Rest';
+          }
+        } else if (agent.state === 'SeekingGold' || agent.state === 'MiningGold') {
+          const myHouse = sim.houses && sim.houses.find(h => h.id === agent.homeHouseId);
+          const isTier4 = myHouse && (myHouse.tier === 'Tier4Manor' || myHouse.tier === 4);
+          if (isTier4) {
+            needStr = 'SelfActualization·GoldWealth';
+          } else {
+            // 房屋未达4级大庄园，所有的淘金行为均为建房备料（④ 尊重需求 · 盖房淘金）
+            needStr = 'Esteem·StockGold';
+          }
+        }
+      }
+      if (!needStr) return null;
+      const idx = needStr.indexOf('·');
+      let levelKey = idx > 0 ? needStr.slice(0, idx) : needStr;
+      let kindKey = idx > 0 ? needStr.slice(idx + 1) : '';
+
+      // 强校验：StockGold 恒定属于 ④ 尊重需求，GoldWealth 恒定属于 ⑤ 自我实现
+      if (kindKey === 'StockGold') {
+        levelKey = 'Esteem';
+      } else if (kindKey === 'GoldWealth') {
+        levelKey = 'SelfActualization';
+      }
+
+      const style = MASLOW_STYLE[levelKey];
+      if (!style) return null;
+      return {
+        levelKey,
+        kindKey,
+        kindLabel: NEED_KIND_LABEL[kindKey] || kindKey || '休憩满足',
+        reason: NEED_KIND_REASON[kindKey] || style.desc,
+        numeral: LEVEL_NUMERALS[style.level - 1],
+        ...style,
+      };
+    }
+
     function render(now) {
       requestAnimationFrame(render);
 
@@ -556,6 +650,28 @@
           ctx.stroke();
           ctx.shadowBlur = 0;
         }
+
+        // 选中小人头顶显示完整需求标签 (层级名 · 具体需求)
+        const need = parseMaslowNeed(agent.currentNeed, agent);
+        if (isSelectedAgent && need) {
+          const label = `${need.icon} ${need.name} · ${need.kindLabel}`;
+          ctx.font = `${Math.max(8, Math.floor(10 * camera.zoom))}px sans-serif`;
+          ctx.textAlign = 'center';
+          const tw = ctx.measureText(label).width;
+          const pillH = 14 * camera.zoom;
+          const pillY = p2D.y - 14 * camera.zoom - pillH;
+          const bx = p2D.x - tw / 2 - 5 * camera.zoom;
+          const bw = tw + 10 * camera.zoom;
+          ctx.fillStyle = 'rgba(5, 10, 18, 0.88)';
+          ctx.strokeStyle = need.color;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.roundRect(bx, pillY, bw, pillH, 4 * camera.zoom);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = need.color;
+          ctx.fillText(label, p2D.x, pillY + pillH * 0.72);
+        }
       }
 
       // 5. 更新顶栏统计
@@ -714,32 +830,42 @@
           document.getElementById('insp-house-stone-val').textContent = `${house.pantryStone.toFixed(1)} / ${house.maxPantryStone.toFixed(1)} 单位 (${stonePct}%)`;
           document.getElementById('insp-house-stone-fill').style.width = `${stonePct}%`;
 
+          // 独立黄金储量 (金)
+          const goldPct = Math.round((house.pantryGold / Math.max(1, house.maxPantryGold)) * 100);
+          const goldValEl = document.getElementById('insp-house-gold-val');
+          const goldFillEl = document.getElementById('insp-house-gold-fill');
+          if (goldValEl && goldFillEl) {
+            goldValEl.textContent = `${house.pantryGold.toFixed(1)} / ${house.maxPantryGold.toFixed(1)} 单位 (${goldPct}%)`;
+            goldFillEl.style.width = `${goldPct}%`;
+          }
+
           // 建筑形态与升级要求
           const tierDescElem = document.getElementById('insp-house-tier-desc');
           if (tierDescElem) {
             let upgradeCondition = '';
-            if (isWarehouse) upgradeCondition = '0级 仓库 (需搬运水粮各满10单位升级为1级茅草房)';
-            else if (house.tier === 'Tier1ThatchedHut') upgradeCondition = `1级 茅草房 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级2级私宅需木材20单位)`;
-            else if (house.tier === 'Tier2LeanTo') upgradeCondition = `2级 私宅 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级3级庄舍需石头40单位)`;
-            else if (house.tier === 'Tier3Homestead') upgradeCondition = `3级 木石庄舍 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级4级庄园需石头80单位)`;
-            else upgradeCondition = `4级 家族大庄园 (终极形态，仓储上限 150 单位)`;
+            if (isWarehouse) upgradeCondition = `0级 仓库 (需搬运水粮各满 ${(house.maxPantryWater * 0.9).toFixed(0)}单位升级为1级茅草房)`;
+            else if (house.tier === 'Tier1ThatchedHut') upgradeCondition = `1级 茅草房 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级2级私宅需木材 ${(house.maxPantryWood * 0.85).toFixed(0)}单位)`;
+            else if (house.tier === 'Tier2LeanTo') upgradeCondition = `2级 私宅 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级3级庄舍需石头 ${(house.maxPantryStone * 0.85).toFixed(0)}单位)`;
+            else if (house.tier === 'Tier3Homestead') upgradeCondition = `3级 木石庄舍 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级4级庄园需金石建材)`;
+            else upgradeCondition = `4级 家族大庄园 (终极形态，仓储上限 160 单位)`;
             tierDescElem.textContent = upgradeCondition;
             tierDescElem.style.color = isWarehouse ? '#f59e0b' : '#10b981';
           }
 
           const fertilityBadge = document.getElementById('insp-house-fertility-badge');
           if (fertilityBadge) {
+            const reqCap = (house.maxPantryWater * 0.5).toFixed(0);
             if (isWarehouse) {
               fertilityBadge.textContent = '🔒 未激活 (0级仓库不支持生育，需升级为1级茅草房)';
               fertilityBadge.style.color = '#ef4444';
-            } else if (house.pantryWood < 10.0) {
-              fertilityBadge.textContent = `⚠️ 失去支持 (木材不足10单位无法保障冬季取暖: 🌲${house.pantryWood.toFixed(1)}/10.0)`;
+            } else if (house.pantryWood < house.maxPantryWood * 0.5) {
+              fertilityBadge.textContent = `⚠️ 失去支持 (木材不足50%无法保障冬季取暖: 🌲${house.pantryWood.toFixed(1)}/${reqCap})`;
               fertilityBadge.style.color = '#ef4444';
-            } else if (house.pantryWater < 10.0 || house.pantryFood < 10.0) {
-              fertilityBadge.textContent = `⚠️ 失去支持 (水或粮<10单位: 💧${house.pantryWater.toFixed(1)}/🍒${house.pantryFood.toFixed(1)})`;
+            } else if (house.pantryWater < house.maxPantryWater * 0.5 || house.pantryFood < house.maxPantryFood * 0.5) {
+              fertilityBadge.textContent = `⚠️ 失去支持 (水粮不足50%: 💧${house.pantryWater.toFixed(1)}/🍒${house.pantryFood.toFixed(1)}，需各≥${reqCap})`;
               fertilityBadge.style.color = '#f59e0b';
             } else {
-              fertilityBadge.textContent = '🟢 充盈激活 (水粮木均≥10单位，保障过冬取暖与夫妻受孕)';
+              fertilityBadge.textContent = `🟢 充盈激活 (水粮木均≥50%即${reqCap}单位，保障过冬取暖与夫妻受孕)`;
               fertilityBadge.style.color = '#10b981';
             }
           }
@@ -849,10 +975,18 @@
           }
           document.getElementById('insp-title-name').textContent = `部落民 #${selAgent.id} ${genderBadge} ${roleIcon} ${homeTag}`;
           
-          let stateText = selAgent.homeHouseId ? '🏡 私宅安居中' : '🏕️ 营地休息中';
-          let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息恢复体力，无私宅不可受孕。';
+          let stateText = selAgent.homeHouseId ? '🏡 私宅安居中' : '🏕️ 营地驻留中';
+          let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息，无私宅不可受孕。';
 
-          if (!selAgent.isAlive) {
+          if (selAgent.state === 'RestingAtCamp') {
+            if (selAgent.stamina < 99.5) {
+              stateText = selAgent.homeHouseId ? '🏡 私宅休养生息 (+8%/s)' : '🏕️ 营地休养生息 (+8%/s)';
+              detailText = '正在家宅/营地静坐休养，体力快速恢复中(+8.0%/s)，恢复至 100% 满值后方可开展后续工作。';
+            } else {
+              stateText = selAgent.homeHouseId ? '🏡 私宅安居中 (体力100%)' : '🏕️ 营地驻留中 (体力100%)';
+              detailText = '体力充盈至 100% 且温饱无虞，安居静候下一个生活/营建需求。';
+            }
+          } else if (!selAgent.isAlive) {
             stateText = '💀 已死亡';
             detailText = `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`;
           } else if (selAgent.state === 'ConstructingHouse') {
@@ -863,17 +997,41 @@
             stateText = '🔧 劳作修缮房屋中';
             detailText = '投入体力劳作修缮专属私宅，恢复房屋耐久度至 100% 避免风化坍塌。';
           } else if (selAgent.state === 'SeekingWater') {
-            stateText = selAgent.isOffroad ? '💧 荒野直连寻水 (50%移速)' : '💧 沿道路寻水 (100%满速)';
-            detailText = '前往水洼直接饮水解渴并顺带补充私宅储备。';
+            const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockWater') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
+            if (isStocking && selAgent.thirst >= 25.0) {
+              stateText = selAgent.isOffroad ? '💧 荒野运水补给仓库 (50%移速)' : '💧 沿路运水补给仓库 (100%满速)';
+              detailText = '前往水源采集清泉运回私宅仓库（安全需求，家庭生存储备）。';
+            } else {
+              stateText = selAgent.isOffroad ? '💧 荒野直连寻水 (50%移速)' : '💧 沿道路寻水 (100%满速)';
+              detailText = '自身口渴难耐，前往水源直接饮水解渴。';
+            }
           } else if (selAgent.state === 'DrinkingAtWater') {
-            stateText = '💧 水洼痛饮中';
-            detailText = '在清泉处直接痛饮补充水分至 50.0 单位上限并补给私宅。';
+            const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockWater') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
+            if (isStocking && selAgent.thirst >= 45.0) {
+              stateText = '💧 水源采水存仓中';
+              detailText = '在水泉处持续汲水填满私宅水库，保障家庭基础生存（安全需求）。';
+            } else {
+              stateText = '💧 水洼痛饮中';
+              detailText = '在清泉处直接痛饮补充水分至 50.0 单位上限。';
+            }
           } else if (selAgent.state === 'SeekingFood') {
-            stateText = selAgent.isOffroad ? '🍒 荒野直连觅食 (50%移速)' : '🍒 沿道路前往果丛 (100%满速)';
-            detailText = '前往浆果丛直接进食充饥并顺带补充私宅储备。';
+            const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockFood') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
+            if (isStocking && selAgent.hunger >= 25.0) {
+              stateText = selAgent.isOffroad ? '🍒 荒野采粮补给仓库 (50%移速)' : '🍒 沿路采粮补给仓库 (100%满速)';
+              detailText = '前往浆果丛采集野果运回私宅粮仓（安全需求，家庭生存储备）。';
+            } else {
+              stateText = selAgent.isOffroad ? '🍒 荒野直连觅食 (50%移速)' : '🍒 沿道路前往果丛 (100%满速)';
+              detailText = '自身饥肠辘辘，前往浆果丛直接进食充饥。';
+            }
           } else if (selAgent.state === 'ForagingFood') {
-            stateText = '🍒 正在就地进食';
-            detailText = '在灌木丛处直接采食充饥至 50.0 单位上限并补给私宅。';
+            const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockFood') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
+            if (isStocking && selAgent.hunger >= 45.0) {
+              stateText = '🍒 浆果采集存仓中';
+              detailText = '在灌木丛持续采摘浆果填满私宅粮仓，保障家庭基础生存（安全需求）。';
+            } else {
+              stateText = '🍒 正在就地进食';
+              detailText = '在灌木丛处直接采食充饥至 50.0 单位上限。';
+            }
           } else if (selAgent.state === 'SeekingWood') {
             stateText = '🌲 正在前往林地伐木';
             detailText = '前往森林伐木获取木材，搬运回私宅用于冬季供暖与升级。';
@@ -888,13 +1046,18 @@
             detailText = '正在采石场开采石料并运回私宅石料仓(石头仅用于盖房)。';
           } else if (selAgent.state === 'SeekingGold') {
             stateText = '🪙 正在前往金矿淘金';
-            detailText = '前往璀璨金矿开采黄金(随身无限携带)，运回私宅用于升级最高级氏族大庄园。';
+            detailText = '前往璀璨金矿开采黄金并随身装载(上限20单位)，运回私宅金库用于升级与财富贮藏。';
           } else if (selAgent.state === 'MiningGold') {
             stateText = '🪙 金矿开采淘金中';
-            detailText = '正在金矿开采黄金并随身装载(无限容量)，源源不断存入家宅金库。';
+            detailText = '正在金矿开采黄金并装入行囊(随身收集)，装满后送回私宅金库储存。';
           } else if (selAgent.state === 'ReturningToCamp') {
-            stateText = selAgent.homeHouseId ? '🏡 返回私产宅舍' : '🏕️ 沿道路返回营地';
-            detailText = '已完成现场采集，返回专属归宿。';
+            if (selAgent.stamina >= 50.0) {
+              stateText = selAgent.homeHouseId ? '🏡 运货归家存仓' : '🏕️ 运货返回营地';
+              detailText = '已完成现场采收或搬运，正常折返回家将物资存入仓库（安全需求，体力充沛）。';
+            } else {
+              stateText = selAgent.homeHouseId ? '🚶 疲惫返巢途中 (回宿休养)' : '🚶 赶往营地途中 (回宿休养)';
+              detailText = '体力耗竭跌破50%，正在沿路返回专属私宅/营地；步行赶路中消耗体力，到达归宿后就地休养至100%满值。';
+            }
           }
 
           document.getElementById('insp-title-state').textContent = stateText;
@@ -918,6 +1081,33 @@
             } else {
               ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♂ 男童·还需成长 ${needGrow}s)`;
               ageValElem.style.color = '#7dd3fc';
+            }
+          }
+
+          // 马斯洛当前主导需求与决策逻辑卡片更新
+          const maslowBox = document.getElementById('insp-maslow-box');
+          const maslowBadge = document.getElementById('insp-maslow-badge');
+          const maslowReason = document.getElementById('insp-maslow-reason');
+          if (maslowBox && maslowBadge && maslowReason) {
+            const need = parseMaslowNeed(selAgent.currentNeed, selAgent);
+            if (need) {
+              maslowBox.style.display = 'block';
+              maslowBox.style.borderColor = need.color + '66';
+              maslowBadge.textContent = `${need.icon} ${need.numeral} ${need.name} · ${need.kindLabel}`;
+              maslowBadge.style.color = need.color;
+              maslowBadge.style.borderColor = need.color;
+              maslowBadge.style.background = need.color + '1a';
+              maslowReason.textContent = need.reason;
+            } else if (selAgent.state === 'RestingAtCamp') {
+              maslowBox.style.display = 'block';
+              maslowBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+              maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急迫需求';
+              maslowBadge.style.color = '#10b981';
+              maslowBadge.style.borderColor = '#10b981';
+              maslowBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+              maslowReason.textContent = `体力充沛(${Math.round(selAgent.stamina)}% >= 50%)且温饱与家宅需求均满足，安居休养中。`;
+            } else {
+              maslowBox.style.display = 'none';
             }
           }
 

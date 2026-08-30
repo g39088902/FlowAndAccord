@@ -3,6 +3,7 @@ use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState};
 use super::poi::{PrimitivePoi, PoiType};
+use super::house::HouseTier;
 use super::world::World3DEngine;
 
 impl World3DEngine {
@@ -162,6 +163,15 @@ impl World3DEngine {
             let mut agent = Agent3D::new(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender);
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
+
+            // 开局状态正负 10.0 随机微调，离散化个体需求，避免全员开局步调一致集中干同一件事
+            let hunger_jitter = self.rng.gen_range(-10.0, 10.0);
+            let thirst_jitter = self.rng.gen_range(-10.0, 10.0);
+            let stamina_jitter = self.rng.gen_range(-10.0, 10.0);
+            agent.hunger = (25.0 + hunger_jitter).clamp(10.0, 45.0);
+            agent.thirst = (25.0 + thirst_jitter).clamp(10.0, 45.0);
+            agent.stamina = (90.0 + stamina_jitter).clamp(55.0, 100.0);
+
             self.agents.push(agent);
         }
 
@@ -255,39 +265,33 @@ impl World3DEngine {
                 }
                 PrimitiveActionState::MiningGold => {
                     let agent_pos = agent.world_pos;
-                    let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::GoldMine && p.pos.distance_to(&agent_pos) < 22.0) {
                         if poi.current_stock > 0.01 {
                             let extracted = poi.extract(3.0 * dt);
                             agent.carried_gold += extracted;
-
-                            if let Some(hid) = agent_hid {
-                                if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                                    if house.pantry_gold < house.max_pantry_gold {
-                                        let deposit = extracted.min(house.max_pantry_gold - house.pantry_gold);
-                                        house.pantry_gold = (house.pantry_gold + deposit).min(house.max_pantry_gold);
-                                    }
-                                }
-                            }
                         }
                     }
                 }
                 PrimitiveActionState::RestingAtCamp => {
                     if let Some(hid) = agent.home_house_id {
                         if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                            if agent.thirst < 35.0 && house.pantry_water > 0.05 {
-                                let drink_amount = (50.0 - agent.thirst).min(house.pantry_water).min(3.0 * dt);
-                                house.pantry_water = (house.pantry_water - drink_amount).max(0.0);
-                                agent.thirst = (agent.thirst + drink_amount).min(50.0);
-                            }
-                            if agent.hunger < 35.0 && house.pantry_food > 0.05 {
-                                let eat_amount = (50.0 - agent.hunger).min(house.pantry_food).min(3.0 * dt);
-                                house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
-                                agent.hunger = (agent.hunger + eat_amount).min(50.0);
+                            // 0级仓库仅为建材储备，未成住宅前不扣减生活水粮
+                            if house.tier != HouseTier::Tier0Warehouse {
+                                if agent.thirst < 50.0 && house.pantry_water > 0.05 {
+                                    let drink_amount = (50.0 - agent.thirst).min(house.pantry_water).min(3.0 * dt);
+                                    house.pantry_water = (house.pantry_water - drink_amount).max(0.0);
+                                    agent.thirst = (agent.thirst + drink_amount).min(50.0);
+                                }
+                                if agent.hunger < 50.0 && house.pantry_food > 0.05 {
+                                    let eat_amount = (50.0 - agent.hunger).min(house.pantry_food).min(3.0 * dt);
+                                    house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
+                                    agent.hunger = (agent.hunger + eat_amount).min(50.0);
+                                }
                             }
                             if agent.carried_gold > 0.01 && house.pantry_gold < house.max_pantry_gold {
                                 let deposit = agent.carried_gold.min(house.max_pantry_gold - house.pantry_gold).min(5.0 * dt);
                                 house.pantry_gold = (house.pantry_gold + deposit).min(house.max_pantry_gold);
+                                agent.carried_gold = (agent.carried_gold - deposit).max(0.0);
                             }
                         }
                     }

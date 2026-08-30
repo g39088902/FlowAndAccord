@@ -50,6 +50,7 @@ pub struct Agent3D {
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     pub home_house_id: Option<u32>,      // 拥有的私产房屋 ID
     pub build_timer: f32,                // 筑屋劳作工时计时器
+    pub gold_mining_cooldown: f32,       // 每次试图采金后 120 秒冷却计时器
 
     // 婚姻与家族血脉传承 (父系/母系、配偶与后代索引)
     pub spouse_id: Option<AgentId>,
@@ -75,6 +76,9 @@ pub struct Agent3D {
     pub route: Vec<LaneId>,
     pub route_index: usize,
 
+    // 马斯洛需求层次驱动的当前主导需求 (调试/前端观察用)
+    #[serde(default)]
+    pub current_need: Option<String>, // 当前驱动行动的需求标签 (如 "Physiological·QuenchThirst")
     // 隐秘特性
     pub is_covert: bool,
     pub stealth_visibility: f32,
@@ -102,6 +106,7 @@ impl Agent3D {
             target_poi_node: None,
             home_house_id: None,
             build_timer: 0.0,
+            gold_mining_cooldown: 0.0,
             spouse_id: None,
             mother_id: None,
             father_id: None,
@@ -122,6 +127,7 @@ impl Agent3D {
             route_index: 0,
             is_covert,
             stealth_visibility: if is_covert { 0.25 } else { 1.0 },
+            current_need: None,
             world_pos: Vec3::ZERO,
             forward_heading_rad: 0.0,
             pitch_rad: 0.0,
@@ -130,6 +136,9 @@ impl Agent3D {
 
     /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
     pub fn tick_metabolism(&mut self, dt: f32, fertility_active: bool) -> Option<String> {
+        if self.gold_mining_cooldown > 0.0 {
+            self.gold_mining_cooldown = (self.gold_mining_cooldown - dt).max(0.0);
+        }
         if self.miscarriage_alert_timer > 0.0 {
             self.miscarriage_alert_timer = (self.miscarriage_alert_timer - dt).max(0.0);
         }
@@ -190,15 +199,15 @@ impl Agent3D {
             }
         }
 
-        // 妊娠与流产判定 (孕期 120 秒；统一基准流产底线 25%=7.5单位)
+        // 妊娠与流产判定 (孕期 120 秒；统一基准流产底线 20% = 10.0单位水粮 / 20%体力)
         if self.is_pregnant {
-            let miscarry_threshold = 7.5;
+            let miscarry_threshold = 10.0; // 20% of 50.0
             if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < 20.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = 5.0;
                 self.miscarriage_cooldown_timer = 60.0; // 流产后 60 秒内禁止再次受孕
-                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破安全线(<{:.2}单位)，导致流产 (60秒内休养不可受孕)！", self.id, miscarry_threshold));
+                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 (60秒内休养不可受孕)！", self.id, miscarry_threshold));
             }
 
             self.pregnancy_progress += dt / 120.0; // 孕期 120 秒

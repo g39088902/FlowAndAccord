@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 年龄成长与宏量生态演化</div>
+      <div class="brand-title">🍼 Flow & Accord · 年龄成长与宏量生态演化 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.2</span></div>
       <div class="brand-desc">自身容量 25.0 单位 (初始50%) × 满120s成年可育 × 清泉/浆果储量 60.0 (产速2.0/s) × 营地无限</div>
     </div>
     <div class="stats-card">
@@ -157,7 +157,7 @@
   <!-- 道路悬浮提示 Tooltip -->
   <div class="road-tooltip" id="road-hover-tooltip"></div>
 
-  <!-- 右侧面板容器：生态图例与 Inspector -->
+  <!-- 右侧面板容器：生态图例 / Inspector -->
   <div class="right-panel-stack">
     <!-- 图例窗口 (支持最小化，默认折叠) -->
     <div class="ecology-legend minimized" id="ecology-legend">
@@ -192,10 +192,24 @@
       </div>
 
       <div id="insp-agent-view">
+
         <div class="stat-line">
           <span style="color:#94a3b8;">生命状态:</span>
           <span id="insp-age-val" style="font-weight:600; color:#38bdf8;">120s (成年)</span>
         </div>
+
+        <!-- 马斯洛当前需求层级与决策逻辑卡片 -->
+        <div class="maslow-card" id="insp-maslow-box" style="margin: 6px 0; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 6px 8px; font-size: 10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; color:#94a3b8;">🧠 当前主导需求:</span>
+            <span id="insp-maslow-badge" style="font-weight:700; padding:2px 6px; border-radius:4px; font-size:10px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid #38bdf8;">💧 ① 生理需求 · 口渴饮水</span>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:4px; color:#cbd5e1;">
+            <span style="color:#94a3b8; min-width:48px;">决策逻辑:</span>
+            <span id="insp-maslow-reason" style="font-size:9.5px; color:#e2e8f0; line-height:1.35; flex:1;">自身水分告急(<25.0)，前往水源痛饮并回填家宅</span>
+          </div>
+        </div>
+
         <div class="meter-row">
           <div class="meter-label"><span>🍖 饱食度</span><span id="insp-hunger-val">25.0 / 50.0 单位 (50%)</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:50%;"></div></div>
@@ -223,7 +237,7 @@
             <span id="insp-preg-val">45%</span>
           </div>
           <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
-          <div style="font-size:9px; color:#f472b6;">指标跌破 25% (7.5单位) 将流产并触发60秒冷却！</div>
+          <div style="font-size:9px; color:#f472b6;">指标跌破 20% (10.0单位水粮/20%体力) 将流产并触发60秒冷却！</div>
         </div>
 
         <!-- 家族血脉族谱组件 (点击可追踪亲眷) -->
@@ -323,7 +337,7 @@
       <span style="font-size: 11px; color: #facc15;">30 FPS (1s=1s)</span>
     </div>
     <div class="btn-grid">
-      <button class="primary" id="btn-pause">⏸️ 暂停模拟</button>
+      <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
       <button class="ecology-btn" id="btn-reroll-eco">🏕️ 重演生态 (12人·6男6女)</button>
     </div>
     

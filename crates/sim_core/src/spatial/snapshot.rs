@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use super::vec3::Vec3;
 use super::graph::{LaneId, NodeId};
 use super::agent::AgentId;
@@ -107,6 +107,7 @@ pub struct AgentSnapshot {
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,
+    pub current_need: Option<String>, // 马斯洛需求标签
     pub is_covert: bool,
     pub stealth_visibility: f32,
     pub home_house_id: Option<u32>,

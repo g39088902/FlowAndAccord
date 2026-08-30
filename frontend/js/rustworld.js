@@ -188,6 +188,7 @@
             pantryFood: h.pantry_food, maxPantryFood: h.max_pantry_food,
             pantryWood: h.pantry_wood, maxPantryWood: h.max_pantry_wood,
             pantryStone: h.pantry_stone, maxPantryStone: h.max_pantry_stone,
+            pantryGold: h.pantry_gold || 0.0, maxPantryGold: h.max_pantry_gold || 0.0,
             age: h.age,
             generation: h.generation,
             constructionProgress: h.construction_progress,
@@ -254,6 +255,7 @@
             pos,
             age: a.age,
             state: a.state,
+            currentNeed: a.current_need, // 马斯洛需求层级·种类 (如 Physiological·QuenchThirst)
             isAlive: a.is_alive,
             hunger: a.hunger,
             thirst: a.thirst,
