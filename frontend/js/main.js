@@ -303,6 +303,31 @@
     }
     btnPause.addEventListener('click', togglePause);
 
+    // ==========================================
+    // 🧠 无头模式: 只推进模拟、跳过画布渲染 (长程快速演化)
+    // ==========================================
+    const btnHeadless = document.getElementById('btn-headless');
+    function updateHeadlessBtnState() {
+      if (sim.headless) {
+        btnHeadless.textContent = '🧠 无头模式运行中… (点击退出)';
+        btnHeadless.style.borderColor = '#a78bfa';
+        btnHeadless.style.color = '#a78bfa';
+        btnHeadless.style.background = 'rgba(167, 139, 250, 0.15)';
+      } else {
+        btnHeadless.textContent = '🧠 无头模式 (只运行不渲染)';
+        btnHeadless.style.borderColor = '#f59e0b';
+        btnHeadless.style.color = '#f59e0b';
+        btnHeadless.style.background = 'rgba(245, 158, 11, 0.12)';
+      }
+    }
+    btnHeadless.addEventListener('click', () => {
+      sim.headless = !sim.headless;
+      updateHeadlessBtnState();
+      sim.logEvent(sim.headless
+        ? '🧠 已进入无头模式: 只推进模拟，暂停画布渲染 (可配合32x倍速长程演化)！'
+        : '🎨 已退出无头模式: 恢复画布渲染！', 'camp');
+    });
+
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.key === ' ') {
         const targetTag = e.target.tagName;

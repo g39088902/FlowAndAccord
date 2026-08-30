@@ -7,7 +7,7 @@ use super::house::HouseTier;
 use super::world::World3DEngine;
 
 impl World3DEngine {
-    /// 构建生态：营地6处(无限)、水泉6处(上限60,产速2.0)、食物6处(上限60,产速2.0)、木材4处、石料2处、金矿1处与全图直连动线
+    /// 构建生态：营地5处(无限)、水泉5处(上限60,产速2.0)、食物5处(上限60,产速2.0)、木材3处、石料2处、金矿1处与全图直连动线
     pub fn seed_primitive_ecology(&mut self, _agent_count: usize) {
         let half_size = self.terrain.world_size / 2.0;
 
@@ -59,8 +59,8 @@ impl World3DEngine {
             cand
         };
 
-        // 1. 生成 6 处避风营地 (无限储量，保持间距)
-        for i in 0..6 {
+        // 1. 生成 5 处避风营地 (无限储量，保持间距)
+        for i in 0..5 {
             let mut pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.70);
             pos.z += 0.5;
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
@@ -70,8 +70,8 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 1) as u32, PoiType::Camp, pos));
         }
 
-        // 2. 生成 6 处随机分布水源 (上限 60.0 单位，产速 2.00 单位/秒，全图随机分布且保持间距)
-        for i in 0..6 {
+        // 2. 生成 5 处随机分布水源 (上限 60.0 单位，产速 2.00 单位/秒，全图随机分布且保持间距)
+        for i in 0..5 {
             let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             water_nodes.push(node_id);
@@ -80,8 +80,8 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 10) as u32, PoiType::WaterSource, pos));
         }
 
-        // 3. 生成 6 处缓坡浆果灌木 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
-        for i in 0..6 {
+        // 3. 生成 5 处缓坡浆果灌木 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
+        for i in 0..5 {
             let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             food_nodes.push(node_id);
@@ -90,8 +90,8 @@ impl World3DEngine {
             self.pois.push(PrimitivePoi::new((i + 20) as u32, PoiType::BerryBush, pos));
         }
 
-        // 4. 生成 4 处茂密林木 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
-        for i in 0..4 {
+        // 4. 生成 3 处茂密林木 (上限 60.0 单位，产速 2.00 单位/秒，保持间距)
+        for i in 0..3 {
             let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             wood_nodes.push(node_id);

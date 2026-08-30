@@ -588,6 +588,22 @@
       background: linear-gradient(135deg, #b45309, #047857);
       box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
     }
+    /* 🧠 无头模式按钮 (独占一行) */
+    button.headless-btn {
+      grid-column: 1 / -1;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid #f59e0b;
+      color: #f59e0b;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.3px;
+    }
+    button.headless-btn:hover {
+      background: rgba(167, 139, 250, 0.25);
+      border-color: #a78bfa;
+      color: #c4b5fd;
+      box-shadow: 0 0 14px rgba(167, 139, 250, 0.4);
+    }
     .toggle-row {
       display: flex;
       justify-content: space-between;

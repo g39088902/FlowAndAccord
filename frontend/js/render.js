@@ -114,6 +114,11 @@
 
       sim.tick();
 
+      // 🧠 无头模式: 只推进模拟，跳过全部画布渲染与 DOM 刷新
+      if (sim.headless) {
+        return;
+      }
+
       // 0. 镜头跟随选中小人
       if (isCameraFollow && sim.selectionType === 'agent') {
         const selAgent = sim.agents.find(a => a.id === sim.selectedAgentId && a.isAlive);

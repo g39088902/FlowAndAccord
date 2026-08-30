@@ -5,6 +5,7 @@
       constructor() {
         // 前端展示与交互状态 (与原 JS 引擎同构)
         this.isPaused = false;
+        this.headless = false; // 🧠 无头模式: 只推进模拟、跳过画布渲染
         this.speedMult = 2;
         this.showTerrain = true;
         this.showLanes = true;
