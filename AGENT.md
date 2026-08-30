@@ -14,7 +14,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.2)"]
+    E --> F["浏览器 UI (版本: v0.9.3)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（马斯洛需求层级）、有限生态（水/粮/木/石/金）、空间路网寻路、私宅营建与升级演化；
@@ -71,7 +71,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`（或 `http://localhost:3001`）；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.2`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.3`**。
 
 ---
 

@@ -152,6 +152,29 @@
     }
 
     // ==========================================
+    // Inspector 关闭按钮 (✕) 与 Esc 快捷键 (关闭 agent/poi/house 选中窗口)
+    // ==========================================
+    function closeInspector() {
+      sim.deselect();
+      isCameraFollow = false;
+      if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+    }
+    const closeInspBtn = document.getElementById('insp-close-btn');
+    if (closeInspBtn) {
+      closeInspBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        closeInspector();
+      });
+    }
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        closeInspector();
+      }
+    });
+
+    // ==========================================
     // 玩家手动资源生成速率滑块绑定 (水/果/木/石)
     // ==========================================
     const sliderWater = document.getElementById('slider-water-rate');

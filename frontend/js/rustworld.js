@@ -58,6 +58,14 @@
         }
       }
 
+      // 清空当前选中 (agent / poi / house)，关闭 Inspector 面板
+      deselect() {
+        this.selectionType = null;
+        this.selectedAgentId = null;
+        this.selectedPoiId = null;
+        this.selectedHouseId = null;
+      }
+
       // ============ 引擎驱动 ============
       tick() {
         if (!this._ready || this.isPaused) return;

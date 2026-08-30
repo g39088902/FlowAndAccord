@@ -768,10 +768,22 @@
       }
 
       // 7. 刷新动态 Inspector 面板
+      const inspectorCard = document.getElementById('inspector-card');
       const agentView = document.getElementById('insp-agent-view');
       const poiView = document.getElementById('insp-poi-view');
       const houseView = document.getElementById('insp-house-view');
       const followBtn = document.getElementById('insp-agent-actions');
+
+      // 关闭状态 (点击 ✕ 或按 Esc): 无选中时整体隐藏 Inspector 面板
+      if (!sim.selectionType) {
+        agentView.style.display = 'none';
+        poiView.style.display = 'none';
+        houseView.style.display = 'none';
+        if (followBtn) followBtn.style.display = 'none';
+        if (inspectorCard) inspectorCard.style.display = 'none';
+        return;
+      }
+      if (inspectorCard) inspectorCard.style.display = 'flex';
 
       if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const house = sim.houses.find(h => h.id === sim.selectedHouseId);
@@ -947,7 +959,7 @@
           else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
           else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
           else if (poi.type === 'Stone') desc = '嶙峋高地石矿(上限60单位,产速1.5/s)，采石仅用于私宅升级木石庄舍与大庄园。';
-          else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金随身无限携带，存入私宅用于晋升最高级氏族大庄园。';
+          else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(容量上限20.0单位)，存入私宅金库用于晋升最高级氏族大庄园。';
           document.getElementById('insp-detail-text').textContent = desc;
         }
       } else {
@@ -1121,8 +1133,85 @@
 
           document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;
           document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
-          const goldValEl = document.getElementById('insp-gold-val');
-          if (goldValEl) goldValEl.textContent = `${(selAgent.carriedGold || 0.0).toFixed(1)} 单位`;
+
+          // 🎒 随身行囊: 展示随身携带的物品与容量上限 (容量 20.0 = sim_core decisions.rs 淘金满载阈值 carried_gold >= 20.0)
+          const CARRY_CAPACITY = 20.0;
+          const carryUsed = Math.min(CARRY_CAPACITY, selAgent.carriedGold || 0.0);
+          const carryPct = Math.round((carryUsed / CARRY_CAPACITY) * 100);
+          const carryCapEl = document.getElementById('insp-carry-cap');
+          const carryFillEl = document.getElementById('insp-carry-fill');
+          const carryGoldEl = document.getElementById('insp-carry-gold');
+          const carryHintEl = document.getElementById('insp-carry-hint');
+          if (carryCapEl) carryCapEl.textContent = `${carryUsed.toFixed(1)} / ${CARRY_CAPACITY.toFixed(1)} 单位`;
+          if (carryFillEl) carryFillEl.style.width = `${carryPct}%`;
+          if (carryGoldEl) carryGoldEl.textContent = `${(selAgent.carriedGold || 0.0).toFixed(1)} 单位`;
+          if (carryHintEl) {
+            if (!selAgent.isAlive) {
+              carryHintEl.textContent = '💀 遗骸随身黄金将随遗体风化消散。';
+            } else if (selAgent.state === 'MiningGold') {
+              carryHintEl.textContent = '⛏️ 正在金矿淘金，黄金装入行囊，满载 (≥20.0) 后自动回宅存入金库。';
+            } else if (carryUsed >= CARRY_CAPACITY - 0.01) {
+              carryHintEl.textContent = '🎒 行囊已满 (20.0 单位)，正在折返家宅将黄金存入金库。';
+            } else if (carryUsed > 0.01) {
+              carryHintEl.textContent = '🏠 随身携金，返回家宅后将存入私宅金库用于升级/贮藏。';
+            } else {
+              carryHintEl.textContent = '行囊空空，淘金后随身携带的黄金将在此显示。';
+            }
+          }
+
+          // 🚚 搬运去向: 水/粮/木/石在资源点即时计入家宅仓库 (无随身携带)，仅黄金随身装入行囊后返家存入金库
+          const haulBox = document.getElementById('insp-carry-haul');
+          const haulTextEl = document.getElementById('insp-carry-haul-text');
+          if (haulBox && haulTextEl) {
+            let haulText = '';
+            let haulColor = '#e2e8f0';
+            const myHouse = selAgent.homeHouseId !== null ? sim.houses.find(h => h.id === selAgent.homeHouseId) : null;
+            const houseTag = myHouse ? `家宅 #${myHouse.id}` : '营地';
+            const pantry = (v, m) => `${v.toFixed(1)}/${m.toFixed(1)}`;
+            if (selAgent.isAlive) {
+              if (selAgent.state === 'SeekingWater' || selAgent.state === 'DrinkingAtWater') {
+                if (myHouse && myHouse.pantryWater < myHouse.maxPantryWater - 0.05) {
+                  haulText = `💧 清水 → ${houseTag} (仓库 ${pantry(myHouse.pantryWater, myHouse.maxPantryWater)})`;
+                  haulColor = '#38bdf8';
+                }
+              } else if (selAgent.state === 'SeekingFood' || selAgent.state === 'ForagingFood') {
+                if (myHouse && myHouse.pantryFood < myHouse.maxPantryFood - 0.05) {
+                  haulText = `🍒 食物 → ${houseTag} (粮仓 ${pantry(myHouse.pantryFood, myHouse.maxPantryFood)})`;
+                  haulColor = '#10b981';
+                }
+              } else if (selAgent.state === 'SeekingWood' || selAgent.state === 'GatheringWood') {
+                if (myHouse && myHouse.pantryWood < myHouse.maxPantryWood - 0.05) {
+                  haulText = `🌲 木材 → ${houseTag} (木仓 ${pantry(myHouse.pantryWood, myHouse.maxPantryWood)})`;
+                  haulColor = '#d97706';
+                }
+              } else if (selAgent.state === 'SeekingStone' || selAgent.state === 'MiningStone') {
+                if (myHouse && myHouse.pantryStone < myHouse.maxPantryStone - 0.05) {
+                  haulText = `🪨 石料 → ${houseTag} (石仓 ${pantry(myHouse.pantryStone, myHouse.maxPantryStone)})`;
+                  haulColor = '#94a3b8';
+                }
+              } else if (selAgent.state === 'SeekingGold' || selAgent.state === 'MiningGold') {
+                const goldCarried = (selAgent.carriedGold || 0.0).toFixed(1);
+                haulText = myHouse
+                  ? `🪙 黄金 → ${houseTag} (行囊 ${goldCarried}/20.0 · 金库 ${pantry(myHouse.pantryGold, myHouse.maxPantryGold)})`
+                  : `🪙 黄金 → 随身携带 (行囊 ${goldCarried}/20.0)`;
+                haulColor = '#fbbf24';
+              } else if (selAgent.state === 'ReturningToCamp') {
+                if ((selAgent.carriedGold || 0.0) > 0.01) {
+                  haulText = myHouse
+                    ? `🪙 携金返程 → ${houseTag} 金库 (行囊 ${(selAgent.carriedGold || 0.0).toFixed(1)}/20.0)`
+                    : `🪙 携金返程 (行囊 ${(selAgent.carriedGold || 0.0).toFixed(1)}/20.0)`;
+                  haulColor = '#fbbf24';
+                } else if (myHouse) {
+                  haulText = `🏠 返程中，水/粮/木/石已即时计入${houseTag}仓库`;
+                  haulColor = '#94a3b8';
+                }
+              }
+            }
+            haulBox.style.display = haulText ? 'flex' : 'none';
+            haulTextEl.textContent = haulText;
+            haulTextEl.style.color = haulColor;
+          }
+
           document.getElementById('insp-detail-text').textContent = detailText;
 
           // 家族血脉与世系族谱渲染 (兼容父亲、母亲、配偶与子嗣)
@@ -1197,41 +1286,57 @@
     }
     requestAnimationFrame(render);
 
-    // 智能点击拾取 (排除拖拽平移)
+    // 智能点击拾取 (排除拖拽平移) —— 多个元素 (agent/house/poi) 重叠时，连续点击同一位置循环切换到其他元素
+    let clickCycle = null; // { x, y } 上一次循环切换的点击位置
     canvas.addEventListener('click', e => {
       if (totalDragDist > 8) return;
       const clickX = e.clientX, clickY = e.clientY;
 
+      // 收集光标下所有可选中元素，按渲染层级自上而下排序: agent (就近优先) -> house -> poi
+      const targets = [];
+      const agentHits = [];
+      for (const agent of sim.agents) {
+        const p2D = project3D(agent.pos);
+        const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
+        if (d <= 25) agentHits.push({ type: 'agent', id: agent.id, dist: d });
+      }
+      agentHits.sort((a, b) => a.dist - b.dist);
+      for (const t of agentHits) targets.push(t);
+
       for (const h of sim.houses) {
         const p2D = project3D(h.pos);
-        if (Math.hypot(clickX - p2D.x, clickY - p2D.y) < 24) {
-          sim.selectionType = 'house';
-          sim.selectedHouseId = h.id;
-          return;
-        }
+        const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
+        if (d <= 24) targets.push({ type: 'house', id: h.id, dist: d });
       }
 
       for (const poi of sim.pois) {
         const p2D = project3D(poi.pos);
-        if (Math.hypot(clickX - p2D.x, clickY - p2D.y) < 26) {
-          sim.selectionType = 'poi';
-          sim.selectedPoiId = poi.id;
-          return;
-        }
-      }
-
-      let closestAgent = null, minDist = 25;
-      for (const agent of sim.agents) {
-        const p2D = project3D(agent.pos);
         const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
-        if (d < minDist) {
-          minDist = d;
-          closestAgent = agent;
-        }
+        if (d <= 26) targets.push({ type: 'poi', id: poi.id, dist: d });
       }
 
-      if (closestAgent) {
-        sim.selectionType = 'agent';
-        sim.selectedAgentId = closestAgent.id;
+      if (targets.length === 0) {
+        clickCycle = null; // 点击空白处: 保持当前选中不变
+        return;
       }
+
+      // 当前选中项在目标列表中的位置
+      let curType = sim.selectionType, curId = null;
+      if (curType === 'agent') curId = sim.selectedAgentId;
+      else if (curType === 'house') curId = sim.selectedHouseId;
+      else if (curType === 'poi') curId = sim.selectedPoiId;
+
+      let startIdx = 0;
+      // 连续点击同一位置且当前选中仍在光标下时，切换到列表中的下一个元素 (循环)
+      if (clickCycle && Math.hypot(clickX - clickCycle.x, clickY - clickCycle.y) <= 16) {
+        const curIdx = targets.findIndex(t => t.type === curType && t.id === curId);
+        if (curIdx >= 0) startIdx = (curIdx + 1) % targets.length;
+      }
+
+      const chosen = targets[startIdx];
+      sim.selectionType = chosen.type;
+      if (chosen.type === 'agent') sim.selectedAgentId = chosen.id;
+      else if (chosen.type === 'house') sim.selectedHouseId = chosen.id;
+      else sim.selectedPoiId = chosen.id;
+      clickCycle = { x: clickX, y: clickY };
     });
