@@ -1,7 +1,7 @@
 use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
-use super::agent::{Agent3D, Gender, PrimitiveActionState, CARRY_CAPACITY_RESOURCE};
+use super::agent::{Agent3D, Gender, PrimitiveActionState, CARRY_CAPACITY_RESOURCE, COMMON_SURNAMES};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::HouseTier;
 use super::world::World3DEngine;
@@ -188,6 +188,11 @@ impl World3DEngine {
             agent.life_expectancy = roll_trait(&mut self.rng);
             agent.max_health = agent.life_expectancy;
             agent.health = (agent.life_expectancy - initial_age * crate::config::AGENT_HEALTH_DECAY_PER_SEC).max(10.0);
+
+            // 随机赋予始祖姓氏 (从 COMMON_SURNAMES 中随机取一个)
+            let surname_idx = self.rng.gen_range(0.0, COMMON_SURNAMES.len() as f32) as usize;
+            let surname_idx = surname_idx.min(COMMON_SURNAMES.len() - 1);
+            agent.surname = COMMON_SURNAMES[surname_idx].to_string();
 
             self.agents.push(agent);
         }
@@ -385,6 +390,14 @@ impl World3DEngine {
             baby.health = baby.life_expectancy;
             baby.max_health = baby.life_expectancy;
 
+            // 姓氏继承：优先取父亲姓氏，无父则随母亲姓氏
+            let baby_surname = {
+                let father_surname = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid)).map(|a| a.surname.clone());
+                let mother_surname = self.agents.iter().find(|a| a.id == mother_id).map(|a| a.surname.clone());
+                father_surname.unwrap_or_else(|| mother_surname.unwrap_or_default())
+            };
+            baby.surname = baby_surname.clone();
+
             if let Some(mother) = self.agents.iter_mut().find(|a| a.id == mother_id) {
                 mother.children_ids.push(baby_id);
                 mother.pregnancy_father_id = None;
@@ -401,7 +414,7 @@ impl World3DEngine {
             } else {
                 format!("母亲 #{}", mother_id)
             };
-            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (Agent #{}，第{}代，幼年0s，入驻家庭私宅，需成长1800s)！", parents_str, gender_str, baby_id, baby_gen));
+            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (【{}】氏 Agent #{}，第{}代，幼年0s，入驻家庭私宅，需成长1800s)！", parents_str, gender_str, baby_surname, baby_id, baby_gen));
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);

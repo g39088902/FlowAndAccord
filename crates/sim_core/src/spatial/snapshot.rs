@@ -133,4 +133,7 @@ pub struct AgentSnapshot {
     pub libido: f32,
     pub sleep_efficiency: f32,
     pub life_expectancy: f32,
+    // 姓氏宗族与声望
+    pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
+    pub prestige: u32,     // 声望值 (当前 = 子女数量，未来可叠加多项)
 }

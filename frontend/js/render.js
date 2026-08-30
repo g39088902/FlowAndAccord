@@ -96,12 +96,14 @@
 
       const style = MASLOW_STYLE[levelKey];
       if (!style) return null;
+      const kindLabel = NEED_KIND_LABEL[kindKey] || kindKey || '休憩满足';
       return {
         levelKey,
         kindKey,
-        kindLabel: NEED_KIND_LABEL[kindKey] || kindKey || '休憩满足',
+        kindLabel,
         reason: NEED_KIND_REASON[kindKey] || style.desc,
         numeral: LEVEL_NUMERALS[style.level - 1],
+        badgeText: `${style.icon} ${style.name} · ${kindLabel}`,
         ...style,
       };
     }
@@ -1097,18 +1099,22 @@
           const genderBadge = isFemale ? '♀' : '♂';
           const roleIcon = !selAgent.isAlive ? '💀' : (selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼'));
           
-          let homeTag = `[🏕️ 营地]`;
+          let homeTag = `🏕️ 露天营地`;
           if (selAgent.homeHouseId !== null) {
             const myHouse = sim.houses.find(h => h.id === selAgent.homeHouseId);
             if (myHouse) {
-              if (myHouse.ownerId === selAgent.id) homeTag = `[🏡 #${selAgent.homeHouseId}家·户主]`;
-              else if (myHouse.spouseId === selAgent.id) homeTag = `[🏡 #${selAgent.homeHouseId}家·配偶]`;
-              else homeTag = `[🏡 #${selAgent.homeHouseId}家·子女]`;
+              if (myHouse.ownerId === selAgent.id) homeTag = `🏡 #${selAgent.homeHouseId}家·户主`;
+              else if (myHouse.spouseId === selAgent.id) homeTag = `🏡 #${selAgent.homeHouseId}家·配偶`;
+              else homeTag = `🏡 #${selAgent.homeHouseId}家·子女`;
             }
           }
-          document.getElementById('insp-title-name').textContent = `部落民 #${selAgent.id} ${genderBadge} ${roleIcon} ${homeTag}`;
+          const surnameBadge = selAgent.surname ? `【${selAgent.surname}】` : '';
+          document.getElementById('insp-title-name').textContent = `${surnameBadge}部落民 #${selAgent.id} ${genderBadge} ${roleIcon}`;
           
-          let stateText = selAgent.homeHouseId ? '🏡 私宅安居中' : '🏕️ 营地驻留中';
+          const homeBadgeEl = document.getElementById('insp-home-badge');
+          if (homeBadgeEl) homeBadgeEl.textContent = homeTag;
+          
+          let stateText = selAgent.homeHouseId ? '🏡 私宅安居' : '🏕️ 营地驻留';
           let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息，无私宅不可受孕。';
 
           if (!selAgent.isAlive) {
@@ -1120,80 +1126,60 @@
           } else if (selAgent.state === 'RestingAtCamp') {
             if (selAgent.stamina < 99.5) {
               const restRate = (8.0 * (selAgent.sleepEfficiency || 100) / 100).toFixed(1);
-              stateText = (selAgent.homeHouseId ? '🏡 私宅休养生息' : '🏕️ 营地休养生息') + ' (+' + restRate + '%/s)';
+              stateText = (selAgent.homeHouseId ? '🏡 私宅休养' : '🏕️ 营地休养') + ' (+' + restRate + '%/s)';
               detailText = '正在家宅/营地静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100 (' + restRate + '%/s)，睡眠效率越高休息越快，恢复至 100% 满值后方可开展后续工作。';
             } else {
-              stateText = selAgent.homeHouseId ? '🏡 私宅安居中 (体力100%)' : '🏕️ 营地驻留中 (体力100%)';
+              stateText = selAgent.homeHouseId ? '🏡 私宅安居' : '🏕️ 营地驻留';
               detailText = '体力充盈至 100% 且温饱无虞，安居静候下一个生活/营建需求。';
             }
           } else if (selAgent.state === 'ConstructingHouse') {
             const progPct = Math.round((selAgent.buildTimer / 30.0) * 100);
-            stateText = `🔨 营建/升级房屋 (${progPct}% - 30s工期)`;
+            stateText = `🔨 营建中 (${progPct}%)`;
             detailText = '投入体力与工时营建或升级私宅(30s工期)，完成后将扩容储备空间并激活/保障繁衍孕育。';
           } else if (selAgent.state === 'RepairingHouse') {
-            stateText = '🔧 劳作修缮房屋中';
+            stateText = '🔧 房屋修缮中';
             detailText = '投入体力劳作修缮专属私宅，恢复房屋耐久度至 100% 避免风化坍塌。';
           } else if (selAgent.state === 'SeekingWater') {
             const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockWater') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
-            if (isStocking && selAgent.thirst >= 25.0) {
-              stateText = selAgent.isOffroad ? '💧 荒野运水补给仓库 (50%移速)' : '💧 沿路运水补给仓库 (100%满速)';
-              detailText = '前往水源采集清泉运回私宅仓库（安全需求，家庭生存储备）。';
-            } else {
-              stateText = selAgent.isOffroad ? '💧 荒野直连寻水 (50%移速)' : '💧 沿道路寻水 (100%满速)';
-              detailText = '自身口渴难耐，前往水源直接饮水解渴。';
-            }
+            stateText = isStocking ? '💧 前往运水' : '💧 前往饮水';
+            detailText = isStocking ? '前往水源采集清泉运回私宅仓库（安全需求，家庭生存储备）。' : '自身口渴难耐，前往水源直接饮水解渴。';
           } else if (selAgent.state === 'DrinkingAtWater') {
             const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockWater') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
-            if (isStocking && selAgent.thirst >= 45.0) {
-              stateText = '💧 水源采水存仓中';
-              detailText = '在水泉处持续汲水填满私宅水库，保障家庭基础生存（安全需求）。';
-            } else {
-              stateText = '💧 水洼痛饮中';
-              detailText = '在清泉处直接痛饮补充水分至 50.0 单位上限。';
-            }
+            stateText = isStocking ? '💧 采水存仓中' : '💧 清泉痛饮中';
+            detailText = isStocking ? '在水泉处持续汲水填满私宅水库，保障家庭基础生存。' : '在清泉处直接痛饮补充水分至 50.0 单位上限。';
           } else if (selAgent.state === 'SeekingFood') {
             const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockFood') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
-            if (isStocking && selAgent.hunger >= 25.0) {
-              stateText = selAgent.isOffroad ? '🍒 荒野采粮补给仓库 (50%移速)' : '🍒 沿路采粮补给仓库 (100%满速)';
-              detailText = '前往浆果丛采集野果运回私宅粮仓（安全需求，家庭生存储备）。';
-            } else {
-              stateText = selAgent.isOffroad ? '🍒 荒野直连觅食 (50%移速)' : '🍒 沿道路前往果丛 (100%满速)';
-              detailText = '自身饥肠辘辘，前往浆果丛直接进食充饥。';
-            }
+            stateText = isStocking ? '🍒 前往采粮' : '🍒 前往觅食';
+            detailText = isStocking ? '前往浆果丛采集野果运回私宅粮仓（安全需求，家庭生存储备）。' : '自身饥肠辘辘，前往浆果丛直接进食充饥。';
           } else if (selAgent.state === 'ForagingFood') {
             const isStocking = selAgent.currentNeed && (selAgent.currentNeed.includes('StockFood') || selAgent.currentNeed.includes('Safety') || selAgent.currentNeed.includes('Belonging'));
-            if (isStocking && selAgent.hunger >= 45.0) {
-              stateText = '🍒 浆果采集存仓中';
-              detailText = '在灌木丛持续采摘浆果填满私宅粮仓，保障家庭基础生存（安全需求）。';
-            } else {
-              stateText = '🍒 正在就地进食';
-              detailText = '在灌木丛处直接采食充饥至 50.0 单位上限。';
-            }
+            stateText = isStocking ? '🍒 采摘存仓中' : '🍒 进食充饥中';
+            detailText = isStocking ? '在灌木丛持续采摘浆果填满私宅粮仓，保障家庭基础生存。' : '在灌木丛处直接采食充饥至 50.0 单位上限。';
           } else if (selAgent.state === 'SeekingWood') {
-            stateText = '🌲 正在前往林地伐木';
+            stateText = '🌲 前往伐木';
             detailText = '前往森林伐木获取木材，搬运回私宅用于冬季供暖与升级。';
           } else if (selAgent.state === 'GatheringWood') {
-            stateText = '🌲 森林伐木采伐中';
+            stateText = '🌲 森林采伐中';
             detailText = '正在林区砍伐木材并持续运往私宅木料仓。';
           } else if (selAgent.state === 'SeekingStone') {
-            stateText = '🪨 正在前往石矿采石';
+            stateText = '🪨 前往采石';
             detailText = '前往嶙峋石矿开采石料，用于私宅升级木石庄舍与大庄园。';
           } else if (selAgent.state === 'MiningStone') {
-            stateText = '🪨 矿区开采石料中';
+            stateText = '🪨 石矿开采中';
             detailText = '正在采石场开采石料并运回私宅石料仓(石头仅用于盖房)。';
           } else if (selAgent.state === 'SeekingGold') {
-            stateText = '🪙 正在前往金矿淘金';
+            stateText = '🪙 前往淘金';
             detailText = '前往璀璨金矿开采黄金并随身装载(黄金无限容量)，单趟运满20后回宅存入私宅金库用于升级与财富贮藏。';
           } else if (selAgent.state === 'MiningGold') {
-            stateText = '🪙 金矿开采淘金中';
+            stateText = '🪙 淘金采矿中';
             detailText = '正在金矿开采黄金装入随身行囊(黄金无限容量)，单趟运满20后送回私宅金库储存。';
           } else if (selAgent.state === 'ReturningToCamp') {
             if (selAgent.stamina >= 50.0) {
-              stateText = selAgent.homeHouseId ? '🏡 运货归家存仓' : '🏕️ 运货返回营地';
+              stateText = selAgent.homeHouseId ? '🏡 携货返家' : '🏕️ 携货返营';
               detailText = '已完成现场采收或搬运，正常折返回家将物资存入仓库（安全需求，体力充沛）。';
             } else {
-              stateText = selAgent.homeHouseId ? '🚶 疲惫返巢途中 (回宿休养)' : '🚶 赶往营地途中 (回宿休养)';
-              detailText = '体力耗竭跌破50%，正在沿路返回专属私宅/营地；步行赶路中消耗体力，到达归宿后就地休养至100%满值。';
+              stateText = '🚶 疲惫返巢';
+              detailText = '体力耗竭跌破50%，正在沿路返回专属私宅/营地；到达归宿后就地休养至100%满值。';
             }
           }
 
@@ -1202,22 +1188,14 @@
           
           // 年龄与性别生育状态展示
           const ageValElem = document.getElementById('insp-age-val');
-          if (isAdult) {
-            if (isFemale) {
-              ageValElem.textContent = `${Math.floor(selAgent.age)}s (👩 ♀ 女性·已成年可孕育)`;
-              ageValElem.style.color = '#ec4899';
+          if (ageValElem) {
+            if (isAdult) {
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s · ${isFemale ? '已成年♀' : '已成年♂'}`;
+              ageValElem.style.color = isFemale ? '#ec4899' : '#38bdf8';
             } else {
-              ageValElem.textContent = `${Math.floor(selAgent.age)}s (👨 ♂ 男性·已成年)`;
-              ageValElem.style.color = '#38bdf8';
-            }
-          } else {
-            const needGrow = Math.ceil(1800.0 - selAgent.age);
-            if (isFemale) {
-              ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♀ 女童·还需成长 ${needGrow}s)`;
-              ageValElem.style.color = '#f472b6';
-            } else {
-              ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♂ 男童·还需成长 ${needGrow}s)`;
-              ageValElem.style.color = '#7dd3fc';
+              const needGrow = Math.ceil(1800.0 - selAgent.age);
+              ageValElem.textContent = `${Math.floor(selAgent.age)}s · 🍼幼年(需${needGrow}s)`;
+              ageValElem.style.color = '#a78bfa';
             }
           }
 
@@ -1241,107 +1219,116 @@
               } else if (selAgent.state === 'RestingAtCamp') {
                 maslowBox.style.display = 'block';
                 maslowBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急迫需求';
+                maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急需';
                 maslowBadge.style.color = '#10b981';
                 maslowBadge.style.borderColor = '#10b981';
                 maslowBadge.style.background = 'rgba(16, 185, 129, 0.12)';
-                maslowReason.textContent = `体力充沛(${Math.round(selAgent.stamina)}% >= 50%)且温饱与家宅需求均满足，安居休养中。`;
+                maslowReason.textContent = `体力充沛(${Math.round(selAgent.stamina)}%)且温饱与家宅需求均满足，安居休养中。`;
               } else {
                 maslowBox.style.display = 'none';
               }
             }
           }
 
+          // 2x2 生存健康指标
           const maxHealth = selAgent.maxHealth || selAgent.lifeExpectancy || 100.0;
           const curHealth = selAgent.health !== undefined ? selAgent.health : maxHealth;
           const healthPct = Math.max(0, Math.min(100, Math.round((curHealth / maxHealth) * 100)));
-          if (document.getElementById('insp-health-val')) {
-            document.getElementById('insp-health-val').textContent = `${curHealth.toFixed(1)} / ${maxHealth.toFixed(1)} 单位 (${healthPct}%)`;
-          }
-          if (document.getElementById('insp-health-fill')) {
-            document.getElementById('insp-health-fill').style.width = `${healthPct}%`;
-          }
+          const healthValEl = document.getElementById('insp-health-val');
+          if (healthValEl) healthValEl.textContent = `${curHealth.toFixed(1)}/${maxHealth.toFixed(0)}`;
+          const healthFillEl = document.getElementById('insp-health-fill');
+          if (healthFillEl) healthFillEl.style.width = `${healthPct}%`;
 
-          const hungerPct = Math.round((selAgent.hunger / 50.0) * 100);
-          document.getElementById('insp-hunger-val').textContent = `${selAgent.hunger.toFixed(1)} / 50.0 单位 (${hungerPct}%)`;
-          document.getElementById('insp-hunger-fill').style.width = `${hungerPct}%`;
+          const stamValEl = document.getElementById('insp-stamina-val');
+          if (stamValEl) stamValEl.textContent = `${Math.round(selAgent.stamina)}%`;
+          const stamFillEl = document.getElementById('insp-stamina-fill');
+          if (stamFillEl) stamFillEl.style.width = `${selAgent.stamina}%`;
 
-          const thirstPct = Math.round((selAgent.thirst / 50.0) * 100);
-          document.getElementById('insp-thirst-val').textContent = `${selAgent.thirst.toFixed(1)} / 50.0 单位 (${thirstPct}%)`;
-          document.getElementById('insp-thirst-fill').style.width = `${thirstPct}%`;
+          const hungerValEl = document.getElementById('insp-hunger-val');
+          if (hungerValEl) hungerValEl.textContent = `${selAgent.hunger.toFixed(1)}/50`;
+          const hungerFillEl = document.getElementById('insp-hunger-fill');
+          if (hungerFillEl) hungerFillEl.style.width = `${Math.round((selAgent.hunger / 50.0) * 100)}%`;
 
-          document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;
-          document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
+          const thirstValEl = document.getElementById('insp-thirst-val');
+          if (thirstValEl) thirstValEl.textContent = `${selAgent.thirst.toFixed(1)}/50`;
+          const thirstFillEl = document.getElementById('insp-thirst-fill');
+          if (thirstFillEl) thirstFillEl.style.width = `${Math.round((selAgent.thirst / 50.0) * 100)}%`;
 
-          // 🎒 随身行囊: 展示随身搬运的物品 (水/粮/木/石 每类独立容量 50.0 互不共享，黄金无限容量)
-          const CARRY_CAP_PER_ITEM = 50.0;   // 与 sim_core agent.rs CARRY_CAPACITY_RESOURCE 一致
-          const CARRY_TOTAL_CAP = 200.0;     // 水+粮+木+石 总容量 (黄金不计入)
-          const GOLD_TRIP_THRESHOLD = 20.0;  // 与 sim_core decisions.rs 淘金单趟运量阈值一致 (容量无限)
+          // 🎒 随身行囊 (紧凑胶囊网格)
+          const CARRY_TOTAL_CAP = 200.0;
           const cWater = selAgent.carriedWater || 0.0;
           const cFood = selAgent.carriedFood || 0.0;
           const cWood = selAgent.carriedWood || 0.0;
           const cStone = selAgent.carriedStone || 0.0;
           const cGold = selAgent.carriedGold || 0.0;
           const carryUsed = Math.min(CARRY_TOTAL_CAP, cWater + cFood + cWood + cStone);
+          const totalCargo = carryUsed + cGold;
           const carryPct = Math.round((carryUsed / CARRY_TOTAL_CAP) * 100);
-          const setCarryEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-          setCarryEl('insp-carry-cap', `${carryUsed.toFixed(1)} / ${CARRY_TOTAL_CAP.toFixed(1)} 单位`);
+
+          const carryCapEl = document.getElementById('insp-carry-cap');
+          if (carryCapEl) carryCapEl.textContent = `${carryUsed.toFixed(1)} / ${CARRY_TOTAL_CAP.toFixed(0)}`;
           const carryFillEl = document.getElementById('insp-carry-fill');
           if (carryFillEl) carryFillEl.style.width = `${carryPct}%`;
-          setCarryEl('insp-carry-water', `${cWater.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
-          setCarryEl('insp-carry-food', `${cFood.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
-          setCarryEl('insp-carry-wood', `${cWood.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
-          setCarryEl('insp-carry-stone', `${cStone.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
-          setCarryEl('insp-carry-gold', `${cGold.toFixed(1)} 单位`);
+
+          const updateChip = (chipId, numId, val) => {
+            const chip = document.getElementById(chipId);
+            const num = document.getElementById(numId);
+            if (num) num.textContent = val > 0.01 ? val.toFixed(1) : '0';
+            if (chip) {
+              if (val > 0.01) chip.classList.add('active');
+              else chip.classList.remove('active');
+            }
+          };
+          updateChip('chip-water', 'insp-carry-water', cWater);
+          updateChip('chip-food', 'insp-carry-food', cFood);
+          updateChip('chip-wood', 'insp-carry-wood', cWood);
+          updateChip('chip-stone', 'insp-carry-stone', cStone);
+          updateChip('chip-gold', 'insp-carry-gold', cGold);
+
           const carryHintEl = document.getElementById('insp-carry-hint');
           if (carryHintEl) {
             if (!selAgent.isAlive) {
-              carryHintEl.textContent = '💀 遗骸随身携带的物资将随遗体风化消散。';
-            } else if (selAgent.state === 'MiningGold') {
-              carryHintEl.textContent = '⛏️ 正在金矿淘金，黄金无限容量装入行囊，单趟运满 20.0 后回宅存入金库。';
+              carryHintEl.textContent = '💀 遗骸物资将随遗体风化消散。';
+            } else if (totalCargo <= 0.01) {
+              carryHintEl.textContent = '行囊空空 (物资将在现场采收后装入)';
             } else if (carryUsed >= CARRY_TOTAL_CAP - 0.01) {
-              carryHintEl.textContent = '🎒 行囊满载 (水粮木石各 50.0)，正在折返家宅卸货入库。';
-            } else if (carryUsed > 0.01 || cGold > 0.01) {
-              carryHintEl.textContent = '🏠 随身携货，返回家宅后卸货存入私宅仓库。';
+              carryHintEl.textContent = '🎒 行囊已满载，正在返家卸货入库。';
             } else {
-              carryHintEl.textContent = '行囊空空，在资源点搬运物资后将在此显示随身携带物。';
+              carryHintEl.textContent = '🏠 随身携货，返回家宅后卸货存入私宅仓库。';
             }
           }
 
-          // 🚚 搬运去向: 水/粮/木/石在资源点装入随身行囊 (每类 50.0)，回家卸货入库；黄金无限容量随身携带
+          // 🚚 搬运去向
           const haulBox = document.getElementById('insp-carry-haul');
           const haulTextEl = document.getElementById('insp-carry-haul-text');
           if (haulBox && haulTextEl) {
             let haulText = '';
             let haulColor = '#e2e8f0';
             const myHouse = selAgent.homeHouseId !== null ? sim.houses.find(h => h.id === selAgent.homeHouseId) : null;
-            const houseTag = myHouse ? `家宅 #${myHouse.id}` : '营地';
-            const pantry = (v, m) => `${v.toFixed(1)}/${m.toFixed(1)}`;
+            const houseTag = myHouse ? `私宅 #${myHouse.id}` : '营地';
             if (selAgent.isAlive) {
               if (selAgent.state === 'SeekingWater' || selAgent.state === 'DrinkingAtWater') {
-                if (myHouse && cWater < CARRY_CAP_PER_ITEM - 0.05) {
-                  haulText = `💧 汲水入囊 → ${houseTag} (行囊 ${cWater.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
+                if (myHouse && cWater < 49.95) {
+                  haulText = `💧 汲水入囊 → ${houseTag}`;
                   haulColor = '#38bdf8';
                 }
               } else if (selAgent.state === 'SeekingFood' || selAgent.state === 'ForagingFood') {
-                if (myHouse && cFood < CARRY_CAP_PER_ITEM - 0.05) {
-                  haulText = `🍒 采食入囊 → ${houseTag} (行囊 ${cFood.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
+                if (myHouse && cFood < 49.95) {
+                  haulText = `🍒 采食入囊 → ${houseTag}`;
                   haulColor = '#10b981';
                 }
               } else if (selAgent.state === 'SeekingWood' || selAgent.state === 'GatheringWood') {
-                if (myHouse && cWood < CARRY_CAP_PER_ITEM - 0.05) {
-                  haulText = `🌲 伐木入囊 → ${houseTag} (行囊 ${cWood.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
+                if (myHouse && cWood < 49.95) {
+                  haulText = `🌲 伐木入囊 → ${houseTag}`;
                   haulColor = '#d97706';
                 }
               } else if (selAgent.state === 'SeekingStone' || selAgent.state === 'MiningStone') {
-                if (myHouse && cStone < CARRY_CAP_PER_ITEM - 0.05) {
-                  haulText = `🪨 采石入囊 → ${houseTag} (行囊 ${cStone.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
+                if (myHouse && cStone < 49.95) {
+                  haulText = `🪨 采石入囊 → ${houseTag}`;
                   haulColor = '#94a3b8';
                 }
               } else if (selAgent.state === 'SeekingGold' || selAgent.state === 'MiningGold') {
-                haulText = myHouse
-                  ? `🪙 淘金入囊 → ${houseTag} (行囊 ${cGold.toFixed(1)}/∞ · 金库 ${pantry(myHouse.pantryGold, myHouse.maxPantryGold)})`
-                  : `🪙 淘金入囊 (行囊 ${cGold.toFixed(1)}/∞)`;
+                haulText = `🪙 淘金入囊 → ${houseTag}`;
                 haulColor = '#fbbf24';
               } else if (selAgent.state === 'ReturningToCamp') {
                 const packList = [];
@@ -1351,10 +1338,10 @@
                 if (cStone > 0.01) packList.push(`🪨${cStone.toFixed(1)}`);
                 if (cGold > 0.01) packList.push(`🪙${cGold.toFixed(1)}`);
                 if (packList.length > 0) {
-                  haulText = `🏠 携货返程 → ${myHouse ? houseTag + ' 卸货入库' : '随身'} (行囊 ${packList.join(' ')})`;
+                  haulText = `🏠 返程卸货 → ${houseTag} (${packList.join(' ')})`;
                   haulColor = '#94a3b8';
                 } else if (myHouse) {
-                  haulText = `🏠 返程中`;
+                  haulText = `🏠 返程中 → ${houseTag}`;
                   haulColor = '#94a3b8';
                 }
               }
@@ -1362,6 +1349,18 @@
             haulBox.style.display = haulText ? 'flex' : 'none';
             haulTextEl.textContent = haulText;
             haulTextEl.style.color = haulColor;
+          }
+
+          // 🏠 传送到私宅按钮状态切换
+          const teleportBtn = document.getElementById('btn-teleport-house');
+          if (teleportBtn) {
+            if (selAgent.homeHouseId !== null && selAgent.homeHouseId !== undefined) {
+              teleportBtn.style.display = 'inline-flex';
+              teleportBtn.textContent = `🏠 私宅 #${selAgent.homeHouseId}`;
+              teleportBtn.title = `聚焦并传送到所属私宅 #${selAgent.homeHouseId}`;
+            } else {
+              teleportBtn.style.display = 'none';
+            }
           }
 
           document.getElementById('insp-detail-text').textContent = detailText;
@@ -1439,7 +1438,8 @@
                 const cAlive = cAgent && cAgent.isAlive;
                 const isFem = cAgent && cAgent.gender === 'female';
                 const cGen = cAgent ? (cAgent.generation || (selAgent.generation ? selAgent.generation + 1 : 2)) : (selAgent.generation ? selAgent.generation + 1 : 2);
-                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪第${cGen}代子嗣 #${cId}">${isFem ? '👧' : '👦'} #${cId} (第${cGen}代) ${cAlive ? '🟢' : '💀'}</span>`;
+                const cSurname = cAgent && cAgent.surname ? `【${cAgent.surname}】` : '';
+                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪第${cGen}代子嗣 #${cId}">${isFem ? '👧' : '👦'} ${cSurname}#${cId} (第${cGen}代) ${cAlive ? '🟢' : '💀'}</span>`;
               }
               if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
               if (childrenCountElem) childrenCountElem.textContent = `共 ${selAgent.children.length} 位后代`;
@@ -1450,16 +1450,28 @@
             }
           }
 
+          // 🌟 声望值展示（= 子女数量）
+          const prestigeElem = document.getElementById('insp-prestige-val');
+          if (prestigeElem) {
+            const prestige = selAgent.prestige || 0;
+            prestigeElem.textContent = prestige > 0
+              ? `🌟 声望 ${prestige} · 育有 ${prestige} 位子嗣`
+              : '暂无声望 (尚未育有子女)';
+            prestigeElem.style.color = prestige >= 5 ? '#fbbf24' : (prestige > 0 ? '#a78bfa' : '#64748b');
+          }
+
           // 弹窗头部与自身卡片更新
           const modalTitle = document.getElementById('lineage-modal-title');
           if (modalTitle) {
             const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
-            modalTitle.textContent = `部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '♀' : '♂'}) 世系族谱`;
+            const clanPrefix = selAgent.surname ? `${selAgent.surname}氏 · ` : '';
+            modalTitle.textContent = `${clanPrefix}部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '♀' : '♂'}) 详细档案与族谱`;
           }
           const selfName = document.getElementById('lineage-self-name');
           if (selfName) {
             const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
-            selfName.textContent = `部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
+            const clanLabel = selAgent.surname ? `【${selAgent.surname}】氏 ` : '';
+            selfName.textContent = `${clanLabel}部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
           }
           const selfAvatar = document.getElementById('lineage-self-avatar');
           if (selfAvatar) {
@@ -1477,12 +1489,28 @@
           }
           const selfNeedBadge = document.getElementById('lineage-self-need-badge');
           if (selfNeedBadge) {
-            const parsed = parseMaslowNeed(selAgent.currentNeed, selAgent);
-            selfNeedBadge.textContent = parsed ? parsed.badgeText : (selAgent.isAlive ? '活跃中' : '已故');
-            if (parsed) {
-              selfNeedBadge.style.color = parsed.color;
-              selfNeedBadge.style.borderColor = `${parsed.color}55`;
-              selfNeedBadge.style.background = `${parsed.color}1f`;
+            if (!selAgent.isAlive) {
+              const cause = selAgent.deathCause || '寿终正寝';
+              selfNeedBadge.textContent = `💀 已故 · ${cause}`;
+              selfNeedBadge.style.color = '#94a3b8';
+              selfNeedBadge.style.borderColor = 'rgba(148, 163, 184, 0.35)';
+              selfNeedBadge.style.background = 'rgba(148, 163, 184, 0.12)';
+            } else {
+              const parsed = parseMaslowNeed(selAgent.currentNeed, selAgent);
+              if (parsed) {
+                selfNeedBadge.textContent = parsed.badgeText || `${parsed.icon} ${parsed.name} · ${parsed.kindLabel}`;
+                selfNeedBadge.style.color = parsed.color;
+                selfNeedBadge.style.borderColor = `${parsed.color}55`;
+                selfNeedBadge.style.background = `${parsed.color}1f`;
+              } else {
+                const restText = selAgent.state === 'RestingAtCamp'
+                  ? (selAgent.homeHouseId ? '🏡 闲适安居' : '🏕️ 营地休养')
+                  : '🟢 活跃中';
+                selfNeedBadge.textContent = restText;
+                selfNeedBadge.style.color = '#10b981';
+                selfNeedBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                selfNeedBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+              }
             }
           }
 

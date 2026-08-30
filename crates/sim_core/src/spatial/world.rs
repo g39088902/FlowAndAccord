@@ -141,6 +141,9 @@ impl World3DEngine {
             }
         }
 
+        // 2.5 金币遗产继承结算 (死者金币平分给在世子一代子女)
+        self.settle_gold_inheritance();
+
         // 3. POI 实际提取、分娩与死亡尸骸消逝
         self.tick_poi_interactions(dt);
 
@@ -296,6 +299,8 @@ impl World3DEngine {
                 libido: agent.libido,
                 sleep_efficiency: agent.sleep_efficiency,
                 life_expectancy: agent.life_expectancy,
+                surname: agent.surname.clone(),
+                prestige: agent.children_ids.len() as u32,
             });
         }
 
@@ -328,5 +333,161 @@ impl World3DEngine {
             season_progress,
             last_mutation_event: self.last_event.clone(),
         }
+    }
+
+    /// 结算已故族人的金币遗产：某人死后随身金币平分给所有在世的子一代子女
+    pub fn settle_gold_inheritance(&mut self) {
+        loop {
+            let deceased_info = self.agents.iter_mut()
+                .find(|a| !a.is_alive && a.carried_gold > 0.0001)
+                .map(|a| {
+                    let gold = a.carried_gold;
+                    a.carried_gold = 0.0;
+                    (a.id, gold)
+                });
+
+            match deceased_info {
+                Some((deceased_id, gold)) => {
+                    let living_children_ids: Vec<AgentId> = self.agents.iter()
+                        .filter(|a| a.is_alive && (a.father_id == Some(deceased_id) || a.mother_id == Some(deceased_id)))
+                        .map(|a| a.id)
+                        .collect();
+
+                    if !living_children_ids.is_empty() {
+                        let count = living_children_ids.len();
+                        let share = gold / (count as f32);
+                        for cid in &living_children_ids {
+                            if let Some(child) = self.agents.iter_mut().find(|a| a.id == *cid) {
+                                child.carried_gold += share;
+                            }
+                        }
+                        self.last_event = Some(format!(
+                            "💰 遗产继承: 逝者 Agent #{} 遗留 {:.1} 黄金，由在世的 {} 位子女平分 (每人继承 {:.1} 黄金)！",
+                            deceased_id, gold, count, share
+                        ));
+                    }
+                }
+                None => break,
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spatial::agent::Gender;
+
+    /// 测试金币遗产平分给所有在世子一代子女 (男女均分)
+    #[test]
+    fn test_gold_inheritance_split_equally_among_living_children() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let camp_node = world.agents[0].home_camp_node;
+        let father_id = 100;
+        let son_id = 101;
+        let daughter_id = 102;
+        let third_child_id = 103;
+
+        let mut father = Agent3D::new(father_id, camp_node, 10.0, false, 2000.0, Gender::Male);
+        father.carried_gold = 30.0;
+        father.children_ids = vec![son_id, daughter_id, third_child_id];
+
+        let mut son = Agent3D::new(son_id, camp_node, 10.0, false, 500.0, Gender::Male);
+        son.father_id = Some(father_id);
+        son.carried_gold = 5.0;
+
+        let mut daughter = Agent3D::new(daughter_id, camp_node, 10.0, false, 400.0, Gender::Female);
+        daughter.father_id = Some(father_id);
+        daughter.carried_gold = 0.0;
+
+        let mut third_child = Agent3D::new(third_child_id, camp_node, 10.0, false, 300.0, Gender::Male);
+        third_child.father_id = Some(father_id);
+        third_child.carried_gold = 10.0;
+
+        world.agents = vec![father, son, daughter, third_child];
+
+        // 父亲去世
+        world.agents[0].is_alive = false;
+
+        // 执行遗产结算
+        world.settle_gold_inheritance();
+
+        let f = &world.agents[0];
+        assert_eq!(f.carried_gold, 0.0, "死者金币已被清零分发");
+
+        let s = &world.agents[1];
+        assert_eq!(s.carried_gold, 15.0, "儿子应分得 10.0 黄金，加上原有 5.0 共 15.0");
+
+        let d = &world.agents[2];
+        assert_eq!(d.carried_gold, 10.0, "女儿应分得 10.0 黄金，原有 0.0 共 10.0");
+
+        let t = &world.agents[3];
+        assert_eq!(t.carried_gold, 20.0, "幼子应分得 10.0 黄金，加上原有 10.0 共 20.0");
+
+        assert!(world.last_event.as_ref().unwrap().contains("💰 遗产继承"));
+        assert!(world.last_event.as_ref().unwrap().contains("3 位子女平分"));
+    }
+
+    /// 测试金币遗产仅分配给在世子一代子女 (排除已故子女与孙辈)
+    #[test]
+    fn test_gold_inheritance_ignores_dead_children_and_grandchildren() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let camp_node = world.agents[0].home_camp_node;
+        let mother_id = 200;
+        let dead_child_id = 201;
+        let living_child_id = 202;
+        let grandchild_id = 203;
+
+        let mut mother = Agent3D::new(mother_id, camp_node, 10.0, false, 2000.0, Gender::Female);
+        mother.carried_gold = 20.0;
+        mother.children_ids = vec![dead_child_id, living_child_id];
+
+        let mut dead_child = Agent3D::new(dead_child_id, camp_node, 10.0, false, 600.0, Gender::Female);
+        dead_child.mother_id = Some(mother_id);
+        dead_child.is_alive = false; // 已故
+        dead_child.carried_gold = 0.0;
+        dead_child.children_ids = vec![grandchild_id];
+
+        let mut living_child = Agent3D::new(living_child_id, camp_node, 10.0, false, 500.0, Gender::Male);
+        living_child.mother_id = Some(mother_id);
+        living_child.carried_gold = 0.0;
+
+        let mut grandchild = Agent3D::new(grandchild_id, camp_node, 10.0, false, 100.0, Gender::Male);
+        grandchild.mother_id = Some(dead_child_id);
+        grandchild.carried_gold = 0.0;
+
+        world.agents = vec![mother, dead_child, living_child, grandchild];
+
+        // 母亲去世
+        world.agents[0].is_alive = false;
+
+        world.settle_gold_inheritance();
+
+        assert_eq!(world.agents[0].carried_gold, 0.0, "死者金币已被清零");
+        assert_eq!(world.agents[1].carried_gold, 0.0, "已故子嗣不参与分金");
+        assert_eq!(world.agents[2].carried_gold, 20.0, "唯一定居在世的子一代子女独得全部 20.0 黄金");
+        assert_eq!(world.agents[3].carried_gold, 0.0, "孙辈不直接参与子一代平分");
+    }
+
+    /// 测试无在世子女时死者金币安全清零不崩溃
+    #[test]
+    fn test_gold_inheritance_no_living_children() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let camp_node = world.agents[0].home_camp_node;
+        let mut bachelor = Agent3D::new(300, camp_node, 10.0, false, 2000.0, Gender::Male);
+        bachelor.carried_gold = 50.0;
+        bachelor.is_alive = false;
+
+        world.agents = vec![bachelor];
+
+        world.settle_gold_inheritance();
+
+        assert_eq!(world.agents[0].carried_gold, 0.0, "无后代继承人时金币归零");
     }
 }

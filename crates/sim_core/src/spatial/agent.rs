@@ -8,6 +8,16 @@ pub type AgentId = u32;
 // Re-export for external and internal callers
 pub use crate::config::CARRY_CAPACITY_RESOURCE;
 
+/// 常用百家姓（60个），用于始祖随机赋姓
+pub const COMMON_SURNAMES: &[&str] = &[
+    "赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈",
+    "褚", "卫", "蒋", "沈", "韩", "杨", "朱", "秦", "尤", "许",
+    "何", "吕", "施", "张", "孔", "曹", "严", "华", "金", "魏",
+    "陶", "姜", "戚", "谢", "邹", "柏", "章", "云", "苏", "潘",
+    "葛", "范", "彭", "鲁", "韦", "马", "苗", "方", "任", "袁",
+    "柳", "史", "唐", "费", "廉", "岑", "薛", "雷", "贺", "倪",
+];
+
 /// 性别系统
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Gender {
@@ -69,6 +79,7 @@ pub struct Agent3D {
     pub mother_id: Option<AgentId>,
     pub father_id: Option<AgentId>,
     pub children_ids: Vec<AgentId>,
+    pub surname: String, // 姓氏 (始祖随机赋予，后代父系继承；无父则随母)
 
     // 先天禀赋属性: 消化效率参与进食结算、睡眠效率参与休息体力恢复
     // 始祖代按 N(100, 20) 正态分布 roll；后代取父母均值 ±10×线性随机数
@@ -140,6 +151,7 @@ impl Agent3D {
             mother_id: None,
             father_id: None,
             children_ids: Vec::new(),
+            surname: String::new(), // 由调用方（ecology.rs）赋值
             intelligence: TRAIT_DEFAULT_MEAN,
             strength: TRAIT_DEFAULT_MEAN,
             digestion_efficiency: TRAIT_DEFAULT_MEAN,

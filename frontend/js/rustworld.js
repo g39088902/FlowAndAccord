@@ -313,6 +313,8 @@
             libido: a.libido,
             sleepEfficiency: a.sleep_efficiency,
             lifeExpectancy: a.life_expectancy,
+            surname: a.surname || '',
+            prestige: a.prestige || 0,
             trail
           };
         });

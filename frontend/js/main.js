@@ -328,26 +328,55 @@
     });
 
     // ==========================================
-    // 镜头跟随小人功能绑定
+    // 镜头跟随小人与传送至私宅功能绑定
     // ==========================================
     const btnFollow = document.getElementById('btn-toggle-follow');
+    const btnTeleportHouse = document.getElementById('btn-teleport-house');
+
     function updateFollowBtnState() {
+      if (!btnFollow) return;
       if (isCameraFollow) {
-        btnFollow.textContent = '🎥 正在跟随小人 (点击取消)';
-        btnFollow.style.borderColor = '#10b981';
-        btnFollow.style.color = '#10b981';
-        btnFollow.style.background = 'rgba(16, 185, 129, 0.18)';
+        btnFollow.textContent = '🎥 跟随中';
+        btnFollow.classList.add('following');
       } else {
-        btnFollow.textContent = '🎥 镜头跟随小人';
-        btnFollow.style.borderColor = '#38bdf8';
-        btnFollow.style.color = '#38bdf8';
-        btnFollow.style.background = 'rgba(56, 189, 248, 0.12)';
+        btnFollow.textContent = '🎥 跟随';
+        btnFollow.classList.remove('following');
       }
     }
-    btnFollow.addEventListener('click', () => {
-      isCameraFollow = !isCameraFollow;
-      updateFollowBtnState();
-    });
+    if (btnFollow) {
+      btnFollow.addEventListener('click', () => {
+        isCameraFollow = !isCameraFollow;
+        updateFollowBtnState();
+      });
+    }
+
+    if (btnTeleportHouse) {
+      btnTeleportHouse.addEventListener('click', e => {
+        e.stopPropagation();
+        if (sim.selectionType === 'agent' && sim.selectedAgentId !== null) {
+          const selAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(sim.selectedAgentId) : sim.agents.find(a => a.id === sim.selectedAgentId);
+          if (selAgent && selAgent.homeHouseId) {
+            const targetHouse = sim.houses.find(h => h.id === selAgent.homeHouseId);
+            if (targetHouse) {
+              sim.selectionType = 'house';
+              sim.selectedHouseId = targetHouse.id;
+              isCameraFollow = false;
+
+              // 相机平移聚焦到私宅坐标
+              const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+              const rx = targetHouse.pos.x * cosZ - targetHouse.pos.y * sinZ;
+              const ry = targetHouse.pos.x * sinZ + targetHouse.pos.y * cosZ;
+              const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+              const y2 = ry * cosX - (targetHouse.pos.z || 0) * sinX;
+
+              camera.panX = -rx * camera.zoom;
+              camera.panY = -y2 * camera.zoom;
+              updateFollowBtnState();
+            }
+          }
+        }
+      });
+    }
 
     // ==========================================
     // 全局活人属性均值卡片折叠 / 展开交互 (默认折叠)

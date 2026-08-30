@@ -410,6 +410,9 @@ impl World3DEngine {
             }
         }
 
+        // 8.5 金币遗产继承机制 (族人死后随身金币平分给所有在世的子一代子女)
+        self.settle_gold_inheritance();
+
         // 9. 统计各营地绑定的有效房屋数量并执行行政区阶梯升级 (以6, 12, 18, 24间房为界限)
         for poi in &mut self.pois {
             if poi.poi_type == PoiType::Camp {
@@ -787,5 +790,3 @@ mod tests {
         assert_eq!(w_after.spouse_id, Some(bachelor_id), "改嫁后与新户主结为夫妻");
     }
 }
-
-

@@ -37,9 +37,11 @@
       pointer-events: none;
     }
     .brand-card {
+      width: 385px;
+      box-sizing: border-box;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.14);
-      padding: 12px 20px;
+      padding: 12px 18px;
       border-radius: 14px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
       pointer-events: auto;
@@ -89,10 +91,12 @@
       color: #94a3b8;
     }
 
-    /* 全地图资源总览与产速控制面板 (左侧浮动，仅展示有限资源：水和食物，上限各 360.0 单位) */
+    /* 全地图资源总览与产速控制面板 (左侧浮动，与顶部 brand-card 完全等宽 385px 对齐) */
     .global-resource-panel {
       position: absolute;
       top: 88px; left: 16px;
+      width: 385px;
+      box-sizing: border-box;
       background: rgba(10, 18, 30, 0.96);
       border: 1px solid rgba(56, 189, 248, 0.35);
       padding: 14px 16px;
@@ -214,8 +218,8 @@
     /* 右侧面板容器 */
     .right-panel-stack {
       position: absolute;
-      top: 88px; right: 16px;
-      width: 280px;
+      top: 88px; right: 20px;
+      width: 350px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -224,6 +228,7 @@
     }
     /* 全局活人属性平均值面板 (右侧 - 支持最小化折叠) */
     .global-averages-card {
+      width: 100%;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(56, 189, 248, 0.28);
       padding: 12px 16px;
@@ -325,6 +330,7 @@
 
     /* 原始生态图例 (右侧 - 支持最小化) */
     .ecology-legend {
+      width: 100%;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.12);
       padding: 12px 16px;
@@ -440,45 +446,103 @@
 
     /* 选中的 Inspector 监控面板 */
     .inspector-card {
+      width: 100%;
       background: rgba(10, 18, 30, 0.96);
       border: 1px solid rgba(56, 189, 248, 0.35);
-      padding: 14px 16px;
+      padding: 12px 14px;
       border-radius: 14px;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.65);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 7px;
       font-size: 11px;
       pointer-events: auto;
-      transition: all 0.25s ease;
+      transition: all 0.2s ease;
     }
     .inspector-title {
       font-weight: 700;
       color: #38bdf8;
       border-bottom: 1px solid rgba(255,255,255,0.08);
-      padding-bottom: 4px;
+      padding-bottom: 5px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 6px;
+    }
+    .insp-title-left {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .insp-title-left #insp-title-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #f8fafc;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .inspector-title-right {
       display: flex;
       align-items: center;
-      gap: 8px;
-      min-width: 0;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .state-badge {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: rgba(245, 158, 11, 0.12);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .insp-subbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: #94a3b8;
+      padding: 0 1px;
+    }
+    .insp-home-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.1);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      font-size: 9.5px;
+      font-weight: 600;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .insp-close-btn {
-      width: 20px;
-      height: 20px;
-      flex: 0 0 20px;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       background: rgba(239, 68, 68, 0.15);
       border: 1px solid rgba(239, 68, 68, 0.4);
       color: #fca5a5;
-      border-radius: 6px;
-      font-size: 11px;
+      border-radius: 5px;
+      font-size: 10px;
       line-height: 1;
       cursor: pointer;
       padding: 0;
@@ -490,12 +554,44 @@
       border-color: #ef4444;
       transform: scale(1.12);
     }
-    /* 🎒 随身行囊 (携带物与容量上限) */
-    .carry-card {
-      background: rgba(251, 191, 36, 0.08);
-      border: 1px solid rgba(251, 191, 36, 0.28);
+    
+    /* 2x2 紧凑型生存指标网格 */
+    .vital-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 8px;
       padding: 6px 8px;
+    }
+    .vital-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .vital-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9.5px;
+      color: #94a3b8;
+    }
+    .vital-header span:first-child {
+      font-weight: 600;
+    }
+    .vital-header span:last-child {
+      font-weight: 700;
+      color: #e2e8f0;
+      font-size: 9.5px;
+    }
+    
+    /* 🎒 随身行囊 (紧凑胶囊网格) */
+    .carry-card {
+      background: rgba(251, 191, 36, 0.06);
+      border: 1px solid rgba(251, 191, 36, 0.22);
+      border-radius: 8px;
+      padding: 5px 7px;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -506,64 +602,74 @@
       align-items: center;
       color: #fde68a;
       font-weight: 700;
-      font-size: 10.5px;
+      font-size: 10px;
     }
-    .carry-items {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .carry-chips-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px;
       margin-top: 1px;
     }
-    .carry-item {
+    .carry-chip {
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
       align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      padding: 2px 1px;
+      font-size: 8.5px;
+      color: #94a3b8;
+      transition: all 0.2s ease;
+    }
+    .carry-chip.active {
+      background: rgba(251, 191, 36, 0.15);
+      border-color: rgba(251, 191, 36, 0.4);
+      color: #fde68a;
+      font-weight: 700;
+    }
+    .carry-chip .chip-icon {
       font-size: 10px;
-      color: #e2e8f0;
+      line-height: 1.1;
+    }
+    .carry-chip .chip-num {
+      font-family: monospace;
+      font-size: 9px;
     }
     .carry-hint {
       font-size: 9px;
       color: #94a3b8;
-      line-height: 1.35;
+      line-height: 1.25;
     }
-    /* 🚚 搬运去向: 展示正在搬运的资源与目标家宅仓库 */
+    /* 🚚 搬运去向 */
     .carry-haul {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       background: rgba(56, 189, 248, 0.06);
       border: 1px solid rgba(56, 189, 248, 0.18);
-      border-radius: 6px;
-      padding: 3px 6px;
-      font-size: 9.5px;
-    }
-    .age-badge {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 10px;
+      border-radius: 5px;
+      padding: 2px 5px;
+      font-size: 9px;
     }
     .preg-container {
       background: rgba(236, 72, 153, 0.1);
       border: 1px solid rgba(236, 72, 153, 0.35);
-      border-radius: 8px;
-      padding: 6px 8px;
+      border-radius: 7px;
+      padding: 5px 7px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
     .cooldown-badge {
       background: rgba(239, 68, 68, 0.12);
       border: 1px solid rgba(239, 68, 68, 0.35);
-      border-radius: 6px;
-      padding: 4px 6px;
+      border-radius: 5px;
+      padding: 3px 5px;
       color: #fca5a5;
-      font-size: 10px;
+      font-size: 9.5px;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -571,7 +677,7 @@
     .poi-info-badge {
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 6px 10px;
+      padding: 6px 8px;
       border-radius: 8px;
       color: #6ee7b7;
       display: flex;
@@ -613,10 +719,57 @@
       border-color: rgba(148, 163, 184, 0.3);
       color: #94a3b8;
     }
-    .lineage-toggle-btn:hover {
-      background: rgba(56, 189, 248, 0.22) !important;
-      border-color: #38bdf8 !important;
+
+    /* 底部操作按钮栅格 */
+    .insp-action-grid {
+      display: flex;
+      gap: 5px;
+      margin-top: 3px;
+    }
+    .insp-btn {
+      flex: 1;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: 7px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .insp-btn:hover {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: #38bdf8;
       transform: translateY(-1px);
+    }
+    .insp-btn.house-btn {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #facc15;
+    }
+    .insp-btn.house-btn:hover {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: #facc15;
+    }
+    .insp-btn.detail-btn {
+      background: rgba(167, 139, 250, 0.12);
+      border-color: rgba(167, 139, 250, 0.35);
+      color: #c4b5fd;
+    }
+    .insp-btn.detail-btn:hover {
+      background: rgba(167, 139, 250, 0.25);
+      border-color: #a78bfa;
+    }
+    .insp-btn.following {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: #10b981;
+      color: #34d399;
     }
     .lineage-modal-overlay {
       position: fixed;
@@ -744,15 +897,18 @@
     .control-panel {
       position: absolute;
       bottom: 20px; left: 20px;
+      width: 360px;
+      height: 216px;
+      box-sizing: border-box;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.14);
       padding: 16px;
       border-radius: 16px;
-      width: 360px;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      justify-content: space-between;
+      gap: 8px;
       z-index: 10;
     }
     .panel-title {
@@ -829,16 +985,18 @@
       color: #94a3b8;
     }
 
-    /* 事件日志播报栏 */
+    /* 事件日志播报栏 (与控制台完全等高 216px) */
     .event-log {
       position: absolute;
-      bottom: 20px; left: 390px;
-      width: 440px;
-      max-height: 180px;
+      bottom: 20px; left: 396px;
+      width: 480px;
+      max-width: calc(100vw - 420px);
+      height: 216px;
+      box-sizing: border-box;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 16px;
-      padding: 12px 16px;
+      padding: 14px 16px;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       display: flex;
       flex-direction: column;
@@ -856,6 +1014,8 @@
       margin-bottom: 2px;
     }
     .log-list {
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column-reverse;
       gap: 4px;
@@ -1019,6 +1179,8 @@
       top: 0; left: 0;
       cursor: grab;
       overflow: hidden;
+      touch-action: none;
+      user-select: none;
     }
     .dag-viewport-container:active {
       cursor: grabbing;
@@ -1028,6 +1190,7 @@
       top: 0; left: 0;
       transform-origin: 0 0;
       will-change: transform;
+      pointer-events: none;
     }
     .dag-svg-layer {
       position: absolute;
@@ -1036,33 +1199,48 @@
     }
     .dag-edge {
       fill: none;
-      stroke: rgba(148, 163, 184, 0.35);
+      stroke: rgba(148, 163, 184, 0.4);
       stroke-width: 2;
       transition: stroke 0.2s, stroke-width 0.2s;
     }
+    .dag-edge.father-edge {
+      stroke: #38bdf8;
+      stroke-width: 2.2;
+    }
+    .dag-edge.mother-edge {
+      stroke: #f472b6;
+      stroke-width: 2.2;
+    }
     .dag-edge.ancestor {
       stroke: #fbbf24;
-      stroke-width: 3;
+      stroke-width: 2.8;
       filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
     }
-    .dag-edge.descendant {
+    .dag-edge.descendant.father-edge {
       stroke: #38bdf8;
-      stroke-width: 3;
+      stroke-width: 2.8;
       filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
     }
-    .dag-spouse-edge {
+    .dag-edge.descendant.mother-edge {
       stroke: #ec4899;
+      stroke-width: 2.8;
+      filter: drop-shadow(0 0 4px rgba(236, 72, 153, 0.6));
+    }
+    .dag-spouse-edge {
+      stroke: #f43f5e;
       stroke-dasharray: 4 4;
-      stroke-width: 1.5;
+      stroke-width: 1.8;
+      opacity: 0.85;
     }
     .dag-node {
       position: absolute;
-      width: 180px;
-      height: 76px;
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      width: 184px;
+      height: 80px;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       border-radius: 10px;
       padding: 8px 10px;
+      pointer-events: auto;
       display: flex;
       flex-direction: column;
       justify-content: space-between;

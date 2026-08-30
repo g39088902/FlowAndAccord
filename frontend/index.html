@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.21</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.29</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -263,107 +263,104 @@
     <!-- 动态 Inspector 面板 -->
     <div class="inspector-card" id="inspector-card">
       <div class="inspector-title">
-        <span id="insp-title-name">Agent #1 (部落民)</span>
+        <div class="insp-title-left">
+          <span id="insp-title-name">Agent #1</span>
+        </div>
         <div class="inspector-title-right">
-          <span id="insp-title-state" style="color:#f59e0b;">营地休眠中</span>
-          <button id="insp-close-btn" class="insp-close-btn" title="关闭选中窗口 (Esc)" aria-label="关闭选中窗口">✕</button>
+          <span id="insp-title-state" class="state-badge">营地休养</span>
+          <button id="insp-close-btn" class="insp-close-btn" title="关闭窗口 (Esc)" aria-label="关闭选中窗口">✕</button>
         </div>
       </div>
 
-      <div id="insp-agent-view">
-
-        <div class="stat-line">
-          <span style="color:#94a3b8;">生命状态:</span>
+      <div id="insp-agent-view" style="display:flex; flex-direction:column; gap:6px;">
+        <!-- 归宿与生命状态副栏 -->
+        <div class="insp-subbar">
+          <span id="insp-home-badge" class="insp-home-chip">🏕️ 营地</span>
           <span id="insp-age-val" style="font-weight:600; color:#38bdf8;">1800s (成年)</span>
         </div>
 
         <!-- 马斯洛当前需求层级与决策逻辑卡片 -->
-        <div class="maslow-card" id="insp-maslow-box" style="margin: 6px 0; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 6px 8px; font-size: 10px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-weight:700; color:#94a3b8;">🧠 当前主导需求:</span>
-            <span id="insp-maslow-badge" style="font-weight:700; padding:2px 6px; border-radius:4px; font-size:10px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid #38bdf8;">💧 ① 生理需求 · 口渴饮水</span>
+        <div class="maslow-card" id="insp-maslow-box" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 7px; padding: 5px 7px; font-size: 9.5px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+            <span style="font-weight:700; color:#94a3b8;">🧠 当前意图:</span>
+            <span id="insp-maslow-badge" style="font-weight:700; padding:1px 5px; border-radius:4px; font-size:9px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid #38bdf8;">💧 ① 生理需求 · 口渴饮水</span>
           </div>
           <div style="display:flex; align-items:flex-start; gap:4px; color:#cbd5e1;">
-            <span style="color:#94a3b8; min-width:48px;">决策逻辑:</span>
-            <span id="insp-maslow-reason" style="font-size:9.5px; color:#e2e8f0; line-height:1.35; flex:1;">自身水分告急(<25.0)，前往水源痛饮并回填家宅</span>
+            <span style="color:#94a3b8; min-width:44px;">决策动因:</span>
+            <span id="insp-maslow-reason" style="font-size:9px; color:#e2e8f0; line-height:1.3; flex:1;">前往水源痛饮并回填家宅</span>
           </div>
         </div>
 
-        <div class="meter-row">
-          <div class="meter-label"><span>❤️ 健康度</span><span id="insp-health-val">100.0 / 100.0 单位 (100%)</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-health-fill" style="background:#ef4444; width:100%;"></div></div>
+        <!-- 2x2 紧凑型生存健康指标网格 -->
+        <div class="vital-grid">
+          <div class="vital-item">
+            <div class="vital-header"><span>❤️ 健康</span><span id="insp-health-val" class="mono-num">100/100</span></div>
+            <div class="meter-bg"><div class="meter-fill" id="insp-health-fill" style="background:#ef4444; width:100%;"></div></div>
+          </div>
+          <div class="vital-item">
+            <div class="vital-header"><span>⚡ 体力</span><span id="insp-stamina-val" class="mono-num">90%</span></div>
+            <div class="meter-bg"><div class="meter-fill" id="insp-stamina-fill" style="background:#f59e0b; width:90%;"></div></div>
+          </div>
+          <div class="vital-item">
+            <div class="vital-header"><span>🍖 饱食</span><span id="insp-hunger-val" class="mono-num">25/50</span></div>
+            <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:50%;"></div></div>
+          </div>
+          <div class="vital-item">
+            <div class="vital-header"><span>💧 水分</span><span id="insp-thirst-val" class="mono-num">25/50</span></div>
+            <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:50%;"></div></div>
+          </div>
         </div>
-        <div class="meter-row">
-          <div class="meter-label"><span>🍖 饱食度</span><span id="insp-hunger-val">25.0 / 50.0 单位 (50%)</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-hunger-fill" style="background:#10b981; width:50%;"></div></div>
-        </div>
-        <div class="meter-row">
-          <div class="meter-label"><span>💧 水分值</span><span id="insp-thirst-val">25.0 / 50.0 单位 (50%)</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-thirst-fill" style="background:#38bdf8; width:50%;"></div></div>
-        </div>
-        <div class="meter-row">
-          <div class="meter-label"><span>⚡ 体力值</span><span id="insp-stamina-val">90%</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-stamina-fill" style="background:#f59e0b; width:90%;"></div></div>
-        </div>
-        <!-- 🎒 随身行囊: 展示 agent 当前随身搬运的物品 (水/粮/木/石 每类独立容量 50.0 互不共享，黄金无限容量) -->
+
+        <!-- 🎒 随身行囊: 紧凑胶囊展示 -->
         <div class="carry-card" id="insp-carry-box">
           <div class="carry-header">
-            <span>🎒 随身行囊 (搬运物)</span>
-            <span id="insp-carry-cap" class="mono-num" style="font-weight:700; color:#fbbf24;">0.0 / 200.0 单位</span>
+            <span>🎒 随身行囊</span>
+            <span id="insp-carry-cap" class="mono-num" style="font-weight:700; color:#fbbf24;">0.0 / 200.0</span>
           </div>
           <div class="meter-bg"><div class="meter-fill" id="insp-carry-fill" style="background:#fbbf24; width:0%;"></div></div>
-          <div class="carry-items" id="insp-carry-items">
-            <div class="carry-item">
-              <span style="color:#38bdf8;">💧 清水</span>
-              <span id="insp-carry-water" style="color:#38bdf8; font-weight:700;">0.0 / 50.0</span>
-            </div>
-            <div class="carry-item">
-              <span style="color:#10b981;">🍒 食物</span>
-              <span id="insp-carry-food" style="color:#10b981; font-weight:700;">0.0 / 50.0</span>
-            </div>
-            <div class="carry-item">
-              <span style="color:#d97706;">🌲 木材</span>
-              <span id="insp-carry-wood" style="color:#d97706; font-weight:700;">0.0 / 50.0</span>
-            </div>
-            <div class="carry-item">
-              <span style="color:#94a3b8;">🪨 石料</span>
-              <span id="insp-carry-stone" style="color:#94a3b8; font-weight:700;">0.0 / 50.0</span>
-            </div>
-            <div class="carry-item">
-              <span style="color:#fbbf24;">🪙 黄金 (无限)</span>
-              <span id="insp-carry-gold" style="color:#fbbf24; font-weight:700;">0.0</span>
-            </div>
+          <div class="carry-chips-grid" id="insp-carry-items">
+            <div class="carry-chip" id="chip-water"><span class="chip-icon">💧</span><span class="chip-num" id="insp-carry-water">0.0</span></div>
+            <div class="carry-chip" id="chip-food"><span class="chip-icon">🍒</span><span class="chip-num" id="insp-carry-food">0.0</span></div>
+            <div class="carry-chip" id="chip-wood"><span class="chip-icon">🌲</span><span class="chip-num" id="insp-carry-wood">0.0</span></div>
+            <div class="carry-chip" id="chip-stone"><span class="chip-icon">🪨</span><span class="chip-num" id="insp-carry-stone">0.0</span></div>
+            <div class="carry-chip" id="chip-gold"><span class="chip-icon">🪙</span><span class="chip-num" id="insp-carry-gold">0.0</span></div>
           </div>
-          <div class="carry-hint" id="insp-carry-hint">行囊空空，搬运物资后将在此显示随身携带物。</div>
-          <!-- 🚚 搬运去向: 水/粮/木/石在资源点即时计入家宅仓库，黄金随身携带；此行走时显示 -->
+          <div class="carry-hint" id="insp-carry-hint">行囊空空</div>
           <div class="carry-haul" id="insp-carry-haul" style="display:none;">
-            <span style="color:#94a3b8;">🚚 搬运去向:</span>
+            <span style="color:#94a3b8;">🚚 动向:</span>
             <span id="insp-carry-haul-text" style="font-weight:600; color:#e2e8f0;">—</span>
           </div>
         </div>
         
-        <div class="cooldown-badge" id="insp-cooldown-box" style="display:none; margin-top:4px;">
+        <div class="cooldown-badge" id="insp-cooldown-box" style="display:none;">
           <span>🥀 流产调养中: </span>
           <span id="insp-cooldown-val" style="font-weight:700;">剩余 48s 可受孕</span>
         </div>
 
-        <div class="preg-container" id="insp-preg-box" style="display:none; margin-top:4px;">
-          <div class="meter-label" style="color:#ec4899; font-weight:600;">
+        <div class="preg-container" id="insp-preg-box" style="display:none;">
+          <div class="meter-label" style="color:#ec4899; font-weight:600; font-size:9.5px;">
             <span>🤰 妊娠孕育中 (900s 孕期)</span>
             <span id="insp-preg-val">45%</span>
           </div>
           <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
-          <div style="font-size:9px; color:#f472b6;">指标跌破 20% (10.0单位水粮/20%体力) 将流产并触发600秒冷却！</div>
         </div>
 
-        <!-- 家族血脉族谱入口按钮 (点击弹出模态弹窗) -->
-        <button id="btn-open-lineage-modal" class="lineage-toggle-btn" style="margin-top:8px; width:100%; display:flex; align-items:center; justify-content:space-between; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.35); border-radius:8px; padding:7px 10px; font-size:11px; font-weight:600; color:#38bdf8; cursor:pointer; transition:all 0.2s ease;">
-          <span style="display:flex; align-items:center; gap:6px;">
-            <span>🌳</span>
-            <span>家族世系族谱</span>
-          </span>
-          <span id="insp-lineage-btn-badge" style="font-size:10px; background:rgba(56,189,248,0.2); padding:1px 6px; border-radius:4px; color:#bae6fd;">展开族谱 ↗</span>
-        </button>
+        <div style="font-size:9.5px; color:#94a3b8; line-height:1.35;" id="insp-detail-text">
+          当前状态良好。
+        </div>
+
+        <!-- 底部快捷操作栏: 镜头跟随 + 前往私宅 + 详情 -->
+        <div id="insp-agent-actions" class="insp-action-grid">
+          <button id="btn-toggle-follow" class="insp-btn" title="锁定视口跟随小人移动">
+            🎥 跟随
+          </button>
+          <button id="btn-teleport-house" class="insp-btn house-btn" style="display:none;" title="查看并传送到族人所属私宅">
+            🏠 私宅
+          </button>
+          <button id="btn-open-lineage-modal" class="insp-btn detail-btn" title="查看族人完整世系族谱与先天禀赋档案">
+            📜 详情 ↗
+          </button>
+        </div>
       </div>
 
       <div id="insp-poi-view" style="display:none; flex-direction:column; gap:6px;">
@@ -417,17 +414,6 @@
           <div><strong>🏛️ 建筑形态:</strong> <span id="insp-house-tier-desc" style="color:#f59e0b;">0级 仓库 (需填满水粮升级)</span></div>
           <div><strong>👶 生育激活:</strong> <span id="insp-house-fertility-badge" style="color:#ef4444;">未激活 (需升级为1级房屋)</span></div>
         </div>
-      </div>
-
-      <div style="font-size:10px; color:#94a3b8; margin-top:2px;" id="insp-detail-text">
-        当前状态良好。
-      </div>
-
-      <!-- 镜头跟随小人功能按钮 -->
-      <div id="insp-agent-actions" style="margin-top:6px;">
-        <button id="btn-toggle-follow" style="width:100%; font-size:11px; font-weight:600; padding:6px 10px; border-radius:8px; background:rgba(56, 189, 248, 0.12); border:1px solid #38bdf8; color:#38bdf8; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition: all 0.2s ease;">
-          🎥 镜头跟随小人
-        </button>
       </div>
     </div>
   </div>
@@ -550,31 +536,35 @@
               </div>
             </div>
           </div>
+          <!-- 声望值展示行 -->
+          <div class="lineage-section" style="grid-column: 1 / -1;">
+            <div class="lineage-section-title">🌟 宗族声望</div>
+            <div class="lineage-section-content" style="padding-top:4px;">
+              <span id="insp-prestige-val" style="font-size:12px; color:#64748b;">暂无声望 (尚未育有子女)</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 完整血脉拓扑 DAG 全景模态弹窗 -->
+  <!-- 直系血脉拓扑 DAG 完整族谱模态弹窗 -->
   <div id="full-dag-modal" class="dag-modal-overlay" style="display:none;">
     <div class="dag-modal-window">
       <div class="dag-modal-header">
         <div style="display:flex; align-items:center; gap:10px;">
-          <span style="font-size:22px;">🌐</span>
+          <span style="font-size:22px;">🌳</span>
           <div>
-            <div id="dag-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">完整血脉拓扑 DAG 全景</div>
-            <div style="font-size:10px; color:#94a3b8;">家族世代传承 · 祖先后代全景拓扑 · 拖拽平移与滚轮缩放</div>
+            <div id="dag-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">直系血脉拓扑 DAG 族谱</div>
+            <div style="font-size:10px; color:#94a3b8;">直系世代传承 (父母/祖父母 ⇄ 子女/孙子女) · 排除叔伯姨姑旁系 · 拖拽平移与滚轮缩放</div>
           </div>
         </div>
         <div class="dag-modal-tools">
-          <div class="dag-filter-group">
-            <button id="dag-btn-mode-focus" class="dag-tool-btn active" title="仅展示当前族人的所有祖先与后代分支">🔍 聚焦血脉</button>
-            <button id="dag-btn-mode-all" class="dag-tool-btn" title="展示全村所有家族全部世系">🌐 全族谱系</button>
-          </div>
+          <span class="dag-stats-badge" style="font-size:11px; padding:3px 8px; border-radius:6px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">✨ 纯净直系血脉</span>
           <button id="dag-btn-center" class="dag-tool-btn" title="居中聚焦到当前族人">🎯 居中定位</button>
           <button id="dag-btn-reset-zoom" class="dag-tool-btn" title="重置缩放视角">🔍 100%</button>
-          <button id="dag-btn-new-tab" class="dag-tool-btn primary" title="在新标签页中独立打开完整 DAG 页面">在新标签页打开 ↗</button>
-          <button id="dag-btn-close" class="dag-modal-close" title="关闭全景族谱 (Esc)">✕</button>
+          <button id="dag-btn-new-tab" class="dag-tool-btn primary" title="在新标签页中独立打开完整直系 DAG 族谱">在新标签页打开 ↗</button>
+          <button id="dag-btn-close" class="dag-modal-close" title="关闭族谱 (Esc)">✕</button>
         </div>
       </div>
       <div class="dag-modal-body">
@@ -584,7 +574,7 @@
           <div id="dag-insp-header" class="dag-insp-header"></div>
           <div id="dag-insp-content" class="dag-insp-body"></div>
         </div>
-        <div class="dag-help-tip">🖱️ 拖拽画布平移 · 滚轮缩放 · 点击卡片切换焦点并高亮血脉</div>
+        <div class="dag-help-tip">🖱️ 拖拽画布平移 · 滚轮缩放 · 仅展示直系血亲（父母/祖父母 ⇄ 子女/孙子女）</div>
       </div>
     </div>
   </div>
