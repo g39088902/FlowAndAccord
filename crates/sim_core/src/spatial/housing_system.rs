@@ -174,9 +174,9 @@ impl World3DEngine {
                     let door_node = house.door_node_id;
 
                     if prev_tier == HouseTier::Tier0Warehouse {
-                        // 0级升级为1级茅草房：自动迎娶单身女性并激活生育
+                        // 0级升级为1级茅草房：自动迎娶单身且未受孕女性并激活生育
                         let single_female_id = self.agents.iter()
-                            .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= AGENT_ADULT_AGE && a.spouse_id.is_none())
+                            .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= AGENT_ADULT_AGE && a.spouse_id.is_none() && !a.is_pregnant)
                             .map(|a| a.id);
 
                         if let Some(female_id) = single_female_id {
@@ -204,7 +204,7 @@ impl World3DEngine {
             }
         }
 
-        // 5.5 自动成婚与单身女性改嫁机制 (成年男性户主若丧偶/单身，且拥有 1 级以上私宅，可迎娶营地中的成年单身女性)
+        // 5.5 自动成婚与单身女性改嫁机制 (成年男性户主若丧偶/单身，且拥有 1 级以上私宅，可迎娶营地中的成年单身且未受孕女性)
         for h_idx in 0..self.houses.len() {
             let (can_marry, house_id, owner_id, owner_pos, door_node) = {
                 let h = &self.houses[h_idx];
@@ -217,7 +217,7 @@ impl World3DEngine {
 
                 if owner_eligible {
                     let candidate_female_id = self.agents.iter()
-                        .filter(|a| a.is_alive && a.gender == Gender::Female && a.age >= AGENT_ADULT_AGE && a.spouse_id.is_none())
+                        .filter(|a| a.is_alive && a.gender == Gender::Female && a.age >= AGENT_ADULT_AGE && a.spouse_id.is_none() && !a.is_pregnant)
                         .min_by(|a, b| {
                             let dist_a = a.world_pos.distance_to(&owner_pos);
                             let dist_b = b.world_pos.distance_to(&owner_pos);
@@ -702,5 +702,90 @@ mod tests {
         assert_eq!(w.home_house_id, Some(2), "改嫁女性入驻新家庭房屋");
         assert_eq!(w.spouse_id, Some(bachelor_id), "改嫁与新户主结为夫妻");
     }
+
+    /// 测试怀孕女性丧偶后在妊娠期内绝不改嫁，生完小孩后方可改嫁，且新生儿继承真实生父 ID
+    #[test]
+    fn test_pregnant_woman_does_not_remarry_until_childbirth() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let dead_father_id = 100;
+        let pregnant_widow_id = 101;
+        let bachelor_id = 102;
+        let camp_node = world.agents[0].home_camp_node;
+        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+
+        // 1 号房原属于 dead_father
+        let mut house1 = House::new(1, dead_father_id, camp_pos, camp_node, HouseTier::Tier2LeanTo, 1);
+        house1.spouse_id = Some(pregnant_widow_id);
+        world.houses.push(house1);
+
+        // 2 号房属于单身汉 bachelor
+        let house2 = House::new(2, bachelor_id, camp_pos, camp_node, HouseTier::Tier2LeanTo, 1);
+        world.houses.push(house2);
+
+        let mut dead_father = crate::spatial::agent::Agent3D::new(dead_father_id, camp_node, 10.0, false, 2000.0, Gender::Male);
+        dead_father.home_house_id = Some(1);
+        dead_father.spouse_id = Some(pregnant_widow_id);
+        dead_father.is_alive = false; // 已故
+
+        let mut pregnant_widow = crate::spatial::agent::Agent3D::new(pregnant_widow_id, camp_node, 10.0, false, 1900.0, Gender::Female);
+        pregnant_widow.home_house_id = Some(1);
+        pregnant_widow.spouse_id = Some(dead_father_id);
+        pregnant_widow.is_pregnant = true;
+        pregnant_widow.pregnancy_father_id = Some(dead_father_id); // 怀有 dead_father 的孩子
+        pregnant_widow.pregnancy_progress = 0.5;
+
+        let mut bachelor = crate::spatial::agent::Agent3D::new(bachelor_id, camp_node, 10.0, false, 1950.0, Gender::Male);
+        bachelor.home_house_id = Some(2);
+        bachelor.spouse_id = None;
+
+        world.agents = vec![dead_father, pregnant_widow, bachelor];
+
+        // 1) 步进 housing: 1 号房因户主故去沦为废墟，遗孀回归营地；但因为正在怀孕，绝不能改嫁给 bachelor！
+        world.tick_housing(1.0 / 30.0);
+
+        let h2 = world.houses.iter().find(|h| h.id == 2).unwrap();
+        assert_eq!(h2.spouse_id, None, "怀孕女性不可改嫁，2号房仍保持无女主人");
+
+        let w = world.agents.iter().find(|a| a.id == pregnant_widow_id).unwrap();
+        assert_eq!(w.spouse_id, None, "原丈夫去世，婚姻解绑");
+        assert_eq!(w.is_pregnant, true, "保持妊娠状态");
+        assert_eq!(w.pregnancy_father_id, Some(dead_father_id), "生父记录得以完整保留");
+
+        // 2) 模拟分娩：孕期结束，触发分娩
+        let mut newborn_mothers = Vec::new();
+        if let Some(m) = world.agents.iter_mut().find(|a| a.id == pregnant_widow_id) {
+            m.is_pregnant = false;
+            m.ready_to_birth = true;
+            newborn_mothers.push((pregnant_widow_id, camp_node));
+        }
+
+        // 分娩诞生新生儿 (ecology.rs 内部结算逻辑)
+        let baby_id = world.next_agent_id;
+        world.next_agent_id += 1;
+        let father_id = world.agents.iter().find(|a| a.id == pregnant_widow_id).and_then(|m| m.pregnancy_father_id.or(m.spouse_id));
+        assert_eq!(father_id, Some(dead_father_id), "新生儿应准确随已故生父姓氏/ID");
+
+        let mut baby = crate::spatial::agent::Agent3D::new(baby_id, camp_node, 8.5, false, 0.0, Gender::Male);
+        baby.mother_id = Some(pregnant_widow_id);
+        baby.father_id = father_id;
+        world.agents.push(baby);
+
+        if let Some(m) = world.agents.iter_mut().find(|a| a.id == pregnant_widow_id) {
+            m.children_ids.push(baby_id);
+            m.pregnancy_father_id = None;
+        }
+
+        // 3) 分娩完成后，再次步进 housing：此时母亲已非怀孕状态（!is_pregnant），正式激活改嫁给 bachelor
+        world.tick_housing(1.0 / 30.0);
+
+        let h2_after = world.houses.iter().find(|h| h.id == 2).unwrap();
+        assert_eq!(h2_after.spouse_id, Some(pregnant_widow_id), "分娩完成后方可正式改嫁入驻2号房");
+
+        let w_after = world.agents.iter().find(|a| a.id == pregnant_widow_id).unwrap();
+        assert_eq!(w_after.spouse_id, Some(bachelor_id), "改嫁后与新户主结为夫妻");
+    }
 }
+
 

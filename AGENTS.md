@@ -31,7 +31,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.20)"]
+    E --> F["浏览器 UI (版本: v0.9.21)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system.rs`）；
@@ -66,7 +66,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 无需启动浏览器，通过原生单元测试与 Node.js 端到端测试双重校验：
 
 ```powershell
-# 1. 运行 Rust 原生内核 26 项单元测试
+# 1. 运行 Rust 原生内核 27 项单元测试
 cargo test --lib
 
 # 2. 运行 WASM 导出、确定性及长程稳定性验证
@@ -91,7 +91,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.20`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.21`**。
 
 ---
 

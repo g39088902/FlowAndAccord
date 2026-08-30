@@ -337,7 +337,7 @@ impl World3DEngine {
             self.total_births += 1;
             let baby_gender = if self.rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
             let gender_str = if baby_gender == Gender::Female { "女婴 ♀" } else { "男婴 ♂" };
-            let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.spouse_id);
+            let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.pregnancy_father_id.or(m.spouse_id));
 
             let mother_house_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.home_house_id);
             let father_house_id = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid).and_then(|f| f.home_house_id));
@@ -387,6 +387,7 @@ impl World3DEngine {
 
             if let Some(mother) = self.agents.iter_mut().find(|a| a.id == mother_id) {
                 mother.children_ids.push(baby_id);
+                mother.pregnancy_father_id = None;
             }
             if let Some(fid) = father_id {
                 if let Some(father) = self.agents.iter_mut().find(|a| a.id == fid) {

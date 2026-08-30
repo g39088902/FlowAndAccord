@@ -81,6 +81,7 @@ pub struct Agent3D {
 
     // 繁衍孕育系统 (120 秒孕期，流产后 60 秒再次受孕冷却，年满 120 秒成年女性可育)
     pub is_pregnant: bool,
+    pub pregnancy_father_id: Option<AgentId>, // 生父 ID (记录受孕时的生父，保障孕期丧偶不改嫁且出生准确随父姓)
     pub pregnancy_progress: f32,
     pub ready_to_birth: bool,
     pub miscarriage_alert_timer: f32,
@@ -146,6 +147,7 @@ impl Agent3D {
             sleep_efficiency: TRAIT_DEFAULT_MEAN,
             life_expectancy: TRAIT_DEFAULT_MEAN,
             is_pregnant: false,
+            pregnancy_father_id: None,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,
@@ -221,6 +223,7 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("饥荒饿死".to_string());
             self.is_pregnant = false;
+            self.pregnancy_father_id = None;
             self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
             return Some(format!("💀 部落民 #{} 因长期饥荒不幸饿死！", self.id));
         }
@@ -229,6 +232,7 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("脱水渴死".to_string());
             self.is_pregnant = false;
+            self.pregnancy_father_id = None;
             self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
@@ -237,6 +241,7 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("寿终正寝".to_string());
             self.is_pregnant = false;
+            self.pregnancy_father_id = None;
             self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
         }
@@ -245,6 +250,7 @@ impl Agent3D {
         if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
             if self.age >= AGENT_ADULT_AGE && self.hunger >= AGENT_CONCEPTION_HUNGER_MIN && self.thirst >= AGENT_CONCEPTION_THIRST_MIN && self.stamina >= AGENT_CONCEPTION_STAMINA_MIN {
                 self.is_pregnant = true;
+                self.pregnancy_father_id = self.spouse_id;
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
                 event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, AGENT_CONCEPTION_HUNGER_MIN, AGENT_PREGNANCY_DURATION));
@@ -256,6 +262,7 @@ impl Agent3D {
             let miscarry_threshold = AGENT_MISCARRIAGE_THRESHOLD;
             if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < AGENT_MISCARRIAGE_STAMINA_THRESHOLD {
                 self.is_pregnant = false;
+                self.pregnancy_father_id = None;
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = AGENT_MISCARRIAGE_ALERT_DURATION;
                 self.miscarriage_cooldown_timer = AGENT_MISCARRIAGE_COOLDOWN; // 流产后 600 秒内禁止再次受孕
