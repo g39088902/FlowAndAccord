@@ -209,6 +209,16 @@
       });
     }
 
+    const openFullDagBtn = document.getElementById('btn-open-full-dag');
+    if (openFullDagBtn) {
+      openFullDagBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (window.FlowDag) {
+          window.FlowDag.openInNewTab(sim.selectedAgentId, sim, 'focus');
+        }
+      });
+    }
+
     // ==========================================
     // Inspector 关闭按钮 (✕) 与 Esc 快捷键 (关闭 agent/poi/house 选中窗口)
     // ==========================================
@@ -216,6 +226,8 @@
       sim.deselect();
       isCameraFollow = false;
       closeLineageModal();
+      const fullDagModal = document.getElementById('full-dag-modal');
+      if (fullDagModal) fullDagModal.style.display = 'none';
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
       const card = document.getElementById('inspector-card');
       if (card) card.style.display = 'none';
@@ -231,6 +243,11 @@
       if (e.key === 'Escape' || e.key === 'Esc') {
         const tag = e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        const fullDagModal = document.getElementById('full-dag-modal');
+        if (fullDagModal && fullDagModal.style.display === 'flex') {
+          fullDagModal.style.display = 'none';
+          return;
+        }
         if (lineageModal && lineageModal.style.display === 'flex') {
           closeLineageModal();
           return;

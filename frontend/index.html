@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.19</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.20</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -481,7 +481,10 @@
             <div style="font-size:10px; color:#94a3b8;">家族世代传承与血脉谱系 · 点击亲眷名字可直接切换并追踪视角</div>
           </div>
         </div>
-        <button id="btn-close-lineage-modal" class="lineage-modal-close" title="关闭族谱 (Esc)">✕</button>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button id="btn-open-full-dag" class="lineage-header-action-btn" title="查看完整血脉拓扑 DAG 图谱（含全部祖先与后代）">🌐 完整族谱</button>
+          <button id="btn-close-lineage-modal" class="lineage-modal-close" title="关闭族谱 (Esc)">✕</button>
+        </div>
       </div>
       <div class="lineage-modal-body">
         <!-- 当前部落民核心属性卡片 -->
@@ -552,8 +555,43 @@
     </div>
   </div>
 
+  <!-- 完整血脉拓扑 DAG 全景模态弹窗 -->
+  <div id="full-dag-modal" class="dag-modal-overlay" style="display:none;">
+    <div class="dag-modal-window">
+      <div class="dag-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">🌐</span>
+          <div>
+            <div id="dag-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">完整血脉拓扑 DAG 全景</div>
+            <div style="font-size:10px; color:#94a3b8;">家族世代传承 · 祖先后代全景拓扑 · 拖拽平移与滚轮缩放</div>
+          </div>
+        </div>
+        <div class="dag-modal-tools">
+          <div class="dag-filter-group">
+            <button id="dag-btn-mode-focus" class="dag-tool-btn active" title="仅展示当前族人的所有祖先与后代分支">🔍 聚焦血脉</button>
+            <button id="dag-btn-mode-all" class="dag-tool-btn" title="展示全村所有家族全部世系">🌐 全族谱系</button>
+          </div>
+          <button id="dag-btn-center" class="dag-tool-btn" title="居中聚焦到当前族人">🎯 居中定位</button>
+          <button id="dag-btn-reset-zoom" class="dag-tool-btn" title="重置缩放视角">🔍 100%</button>
+          <button id="dag-btn-new-tab" class="dag-tool-btn primary" title="在新标签页中独立打开完整 DAG 页面">在新标签页打开 ↗</button>
+          <button id="dag-btn-close" class="dag-modal-close" title="关闭全景族谱 (Esc)">✕</button>
+        </div>
+      </div>
+      <div class="dag-modal-body">
+        <div id="dag-graph-container" class="dag-viewport-container"></div>
+        <!-- 侧边浮层详情面板 -->
+        <div id="dag-inspector-panel" class="dag-floating-inspector" style="display:none;">
+          <div id="dag-insp-header" class="dag-insp-header"></div>
+          <div id="dag-insp-content" class="dag-insp-body"></div>
+        </div>
+        <div class="dag-help-tip">🖱️ 拖拽画布平移 · 滚轮缩放 · 点击卡片切换焦点并高亮血脉</div>
+      </div>
+    </div>
+  </div>
+
   <script src="js/math.js"></script>
   <script src="js/rustworld.js"></script>
+  <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
   <script src="js/render.js"></script>
 </body>
