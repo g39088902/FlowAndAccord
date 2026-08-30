@@ -134,7 +134,7 @@ fn test_warehouse_stocking_precedes_building_house() {
     world.seed_primitive_ecology(12);
     let camp_node = world.agents[0].home_camp_node;
     let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut);
+    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
     house.pantry_water = 2.0;
     house.pantry_food = 2.0;
     house.pantry_wood = house.max_pantry_wood;
@@ -157,7 +157,7 @@ fn test_building_gold_mining_cooldown_45s() {
     world.seed_primitive_ecology(12);
     let camp_node = world.agents[0].home_camp_node;
     let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier3Homestead);
+    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier3Homestead, 1);
     house.pantry_water = house.max_pantry_water;
     house.pantry_food = house.max_pantry_food;
     house.pantry_wood = house.max_pantry_wood;
@@ -184,7 +184,7 @@ fn test_recreational_gold_mining_cooldown_180s() {
     world.seed_primitive_ecology(12);
     let camp_node = world.agents[0].home_camp_node;
     let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier4Manor);
+    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier4Manor, 1);
     house.durability = 100.0;
     house.pantry_water = house.max_pantry_water;
     house.pantry_food = house.max_pantry_food;
@@ -235,7 +235,7 @@ fn test_resting_must_reach_100_percent_stamina() {
     world.seed_primitive_ecology(12);
     let camp_node = world.agents[0].home_camp_node;
     let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut);
+    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
     house.pantry_water = 2.0;
     house.pantry_food = 2.0;
     world.houses.push(house);
@@ -253,4 +253,136 @@ fn test_resting_must_reach_100_percent_stamina() {
     world.agents[0].stamina = 100.0;
     decide_now(&mut world);
     assert_ne!(world.agents[0].state, PrimitiveActionState::RestingAtCamp);
+}
+
+/// 途中发现目标 POI 余额小于 10% 时，若全图存在其他未枯竭 POI，平滑掉头并重定向至就近可用 POI
+#[test]
+fn test_reroute_to_next_poi_when_target_depleted() {
+    let mut world = World3DEngine::new(60, 764.0);
+    world.seed_primitive_ecology(12);
+    let camp_node = world.agents[0].home_camp_node;
+    let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+
+    // 清空其他林木，只保留两个林地: wood1 (即将枯竭) 和 wood2 (储量充沛)
+    world.pois.retain(|p| p.poi_type != PoiType::WoodForest);
+    let wood_pos1 = Vec3::new(camp_pos.x + 20.0, camp_pos.y, camp_pos.z);
+    let wood_node1 = world.network.add_node(wood_pos1, NodeType::GroundIntersection);
+    let lane_go1 = world.network.add_lane(camp_node, wood_node1, None, RoadClass::DirtTrack).unwrap();
+    let _lane_back1 = world.network.add_lane(wood_node1, camp_node, None, RoadClass::DirtTrack).unwrap();
+    let mut wood_poi1 = PrimitivePoi::new(881, PoiType::WoodForest, wood_pos1);
+    wood_poi1.current_stock = 5.0; // 5.0 / 60.0 = 8.3% (< 10%)
+    world.pois.push(wood_poi1);
+
+    let wood_pos2 = Vec3::new(camp_pos.x - 30.0, camp_pos.y, camp_pos.z);
+    let wood_node2 = world.network.add_node(wood_pos2, NodeType::GroundIntersection);
+    let _ = world.network.add_lane(camp_node, wood_node2, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(wood_node2, camp_node, None, RoadClass::DirtTrack);
+    let mut wood_poi2 = PrimitivePoi::new(882, PoiType::WoodForest, wood_pos2);
+    wood_poi2.current_stock = 50.0; // 充沛 (> 30%)
+    world.pois.push(wood_poi2);
+
+    // 设置 agent 正在赶往 wood1，途中位于 lane_go1 8.0m 处
+    world.agents[0].state = PrimitiveActionState::SeekingWood;
+    world.agents[0].target_poi_node = Some(wood_node1);
+    world.agents[0].current_lane_id = Some(lane_go1);
+    world.agents[0].distance_along_curve = 8.0;
+    world.agents[0].world_pos = Vec3::new(camp_pos.x + 8.0, camp_pos.y, camp_pos.z);
+    world.agents[0].thirst = 50.0;
+    world.agents[0].hunger = 50.0;
+    world.agents[0].stamina = 100.0;
+    decide_now(&mut world);
+
+    // 发现目标点1跌破10%，但备用点2充沛，成功重路由至 wood_node2 继续 SeekingWood
+    assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingWood);
+    assert_eq!(world.agents[0].target_poi_node, Some(wood_node2));
+}
+
+/// 采收现场资源枯竭但随身背包未满且家宅仍需时，小人继续寻找下一个同类 POI 而不直接送货回家
+#[test]
+fn test_continue_seeking_next_poi_when_harvest_source_empty_and_not_full() {
+    let mut world = World3DEngine::new(60, 764.0);
+    world.seed_primitive_ecology(12);
+    let camp_node = world.agents[0].home_camp_node;
+    let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+
+    // 清空其他林木，保留两个林地: wood1 (空) 和 wood2 (充沛)
+    world.pois.retain(|p| p.poi_type != PoiType::WoodForest);
+    let wood_pos1 = Vec3::new(camp_pos.x + 10.0, camp_pos.y, camp_pos.z);
+    let wood_node1 = world.network.add_node(wood_pos1, NodeType::GroundIntersection);
+    let _ = world.network.add_lane(camp_node, wood_node1, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(wood_node1, camp_node, None, RoadClass::DirtTrack);
+    let mut wood_poi1 = PrimitivePoi::new(881, PoiType::WoodForest, wood_pos1);
+    wood_poi1.current_stock = 0.0; // 枯竭
+    world.pois.push(wood_poi1);
+
+    let wood_pos2 = Vec3::new(camp_pos.x - 20.0, camp_pos.y, camp_pos.z);
+    let wood_node2 = world.network.add_node(wood_pos2, NodeType::GroundIntersection);
+    let _ = world.network.add_lane(camp_node, wood_node2, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(wood_node2, camp_node, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(wood_node1, wood_node2, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(wood_node2, wood_node1, None, RoadClass::DirtTrack);
+    let mut wood_poi2 = PrimitivePoi::new(882, PoiType::WoodForest, wood_pos2);
+    wood_poi2.current_stock = 50.0;
+    world.pois.push(wood_poi2);
+
+    // 家宅需要木材
+    let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
+    house.pantry_wood = 0.0;
+    house.pantry_water = house.max_pantry_water;
+    house.pantry_food = house.max_pantry_food;
+    world.houses.push(house);
+
+    world.agents[0].home_house_id = Some(1);
+    world.agents[0].home_camp_node = camp_node;
+    world.agents[0].world_pos = wood_pos1;
+    world.agents[0].state = PrimitiveActionState::GatheringWood;
+    world.agents[0].carried_wood = 15.0; // 未满 (上限 50.0)
+    world.agents[0].thirst = 50.0;
+    world.agents[0].hunger = 50.0;
+    world.agents[0].stamina = 100.0;
+    decide_now(&mut world);
+
+    // 采伐点1已空且背包未满，自动前往 wood_node2 采伐
+    assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingWood);
+    assert_eq!(world.agents[0].target_poi_node, Some(wood_node2));
+}
+
+/// 进食现场食物枯竭但自身仍未吃饱时，小人继续寻找下一个食物 POI 而不直接折返回家
+#[test]
+fn test_continue_seeking_next_food_when_foraging_source_empty_and_not_full() {
+    let mut world = World3DEngine::new(60, 764.0);
+    world.seed_primitive_ecology(12);
+    let camp_node = world.agents[0].home_camp_node;
+    let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+
+    // 清空其他食物，保留两个浆果丛: berry1 (空) 和 berry2 (充沛)
+    world.pois.retain(|p| p.poi_type != PoiType::BerryBush);
+    let berry_pos1 = Vec3::new(camp_pos.x + 10.0, camp_pos.y, camp_pos.z);
+    let berry_node1 = world.network.add_node(berry_pos1, NodeType::GroundIntersection);
+    let _ = world.network.add_lane(camp_node, berry_node1, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(berry_node1, camp_node, None, RoadClass::DirtTrack);
+    let mut berry_poi1 = PrimitivePoi::new(771, PoiType::BerryBush, berry_pos1);
+    berry_poi1.current_stock = 0.0; // 枯竭
+    world.pois.push(berry_poi1);
+
+    let berry_pos2 = Vec3::new(camp_pos.x - 20.0, camp_pos.y, camp_pos.z);
+    let berry_node2 = world.network.add_node(berry_pos2, NodeType::GroundIntersection);
+    let _ = world.network.add_lane(camp_node, berry_node2, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(berry_node2, camp_node, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(berry_node1, berry_node2, None, RoadClass::DirtTrack);
+    let _ = world.network.add_lane(berry_node2, berry_node1, None, RoadClass::DirtTrack);
+    let mut berry_poi2 = PrimitivePoi::new(772, PoiType::BerryBush, berry_pos2);
+    berry_poi2.current_stock = 50.0;
+    world.pois.push(berry_poi2);
+
+    world.agents[0].world_pos = berry_pos1;
+    world.agents[0].state = PrimitiveActionState::ForagingFood;
+    world.agents[0].hunger = 20.0; // 还没吃饱 (< 49.9)
+    world.agents[0].thirst = 50.0;
+    world.agents[0].stamina = 100.0;
+    decide_now(&mut world);
+
+    // 浆果1已空且自己没吃饱，自动前往 berry_node2 继续寻找食物
+    assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingFood);
+    assert_eq!(world.agents[0].target_poi_node, Some(berry_node2));
 }

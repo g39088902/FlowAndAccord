@@ -12,9 +12,10 @@
     };
 
     function resizeCanvas() {
-      canvas.width = window.innerWidth * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -133,7 +134,7 @@
           if (!isNaN(targetId)) {
             sim.selectionType = 'agent';
             sim.selectedAgentId = targetId;
-            const targetAgent = sim.agents.find(a => a.id === targetId);
+            const targetAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(targetId) : sim.agents.find(a => a.id === targetId);
             if (targetAgent) {
               const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
               const rx = targetAgent.pos.x * cosZ - targetAgent.pos.y * sinZ;
@@ -143,7 +144,7 @@
 
               camera.panX = -rx * camera.zoom;
               camera.panY = -y2 * camera.zoom;
-              isCameraFollow = true;
+              isCameraFollow = !!targetAgent.isAlive;
               if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
             }
           }
@@ -190,7 +191,7 @@
           if (!isNaN(targetId)) {
             sim.selectionType = 'agent';
             sim.selectedAgentId = targetId;
-            const targetAgent = sim.agents.find(a => a.id === targetId);
+            const targetAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(targetId) : sim.agents.find(a => a.id === targetId);
             if (targetAgent) {
               const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
               const rx = targetAgent.pos.x * cosZ - targetAgent.pos.y * sinZ;
@@ -200,7 +201,7 @@
 
               camera.panX = -rx * camera.zoom;
               camera.panY = -y2 * camera.zoom;
-              isCameraFollow = true;
+              isCameraFollow = !!targetAgent.isAlive;
               if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
             }
           }
@@ -216,6 +217,8 @@
       isCameraFollow = false;
       closeLineageModal();
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+      const card = document.getElementById('inspector-card');
+      if (card) card.style.display = 'none';
     }
     const closeInspBtn = document.getElementById('insp-close-btn');
     if (closeInspBtn) {
@@ -272,7 +275,7 @@
       sliderStone.addEventListener('input', e => {
         const mult = parseFloat(e.target.value);
         sim.setStoneRegenMultiplier(mult);
-        const actualRate = (2.00 * mult).toFixed(2);
+        const actualRate = (1.50 * mult).toFixed(2);
         lblStoneRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
       });
     }
@@ -283,7 +286,7 @@
       sliderGold.addEventListener('input', e => {
         const mult = parseFloat(e.target.value);
         sim.setGoldRegenMultiplier(mult);
-        const actualRate = (1.80 * mult).toFixed(2);
+        const actualRate = (1.20 * mult).toFixed(2);
         lblGoldRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
       });
     }
@@ -302,8 +305,8 @@
       lblWaterRate.textContent = `1.0x (2.00/s)`;
       lblBerryRate.textContent = `1.0x (2.00/s)`;
       lblWoodRate.textContent = `1.0x (2.00/s)`;
-      if (lblStoneRate) lblStoneRate.textContent = `1.0x (2.00/s)`;
-      if (lblGoldRate) lblGoldRate.textContent = `1.0x (1.80/s)`;
+      if (lblStoneRate) lblStoneRate.textContent = `1.0x (1.50/s)`;
+      if (lblGoldRate) lblGoldRate.textContent = `1.0x (1.20/s)`;
       sim.logEvent(`🔄 产速重置: 全局资源已恢复默认基准产率！`, 'water');
     });
 
@@ -328,6 +331,33 @@
       isCameraFollow = !isCameraFollow;
       updateFollowBtnState();
     });
+
+    // ==========================================
+    // 全局活人属性均值卡片折叠 / 展开交互 (默认折叠)
+    // ==========================================
+    const avgCardEl = document.getElementById('global-averages-card');
+    const avgCardHeader = document.getElementById('avg-card-header');
+    const avgToggleIcon = document.getElementById('avg-toggle-icon');
+    let isAvgCardMinimized = true;
+
+    function toggleAvgCardMinimize() {
+      isAvgCardMinimized = !isAvgCardMinimized;
+      if (isAvgCardMinimized) {
+        avgCardEl.classList.add('minimized');
+        avgToggleIcon.textContent = '+';
+        avgCardHeader.title = '点击展开全局活人属性均值';
+      } else {
+        avgCardEl.classList.remove('minimized');
+        avgToggleIcon.textContent = '−';
+        avgCardHeader.title = '点击折叠全局活人属性均值';
+      }
+    }
+
+    if (avgCardHeader) {
+      avgCardHeader.addEventListener('click', () => {
+        toggleAvgCardMinimize();
+      });
+    }
 
     // ==========================================
     // 图例折叠 / 展开交互 (默认折叠)

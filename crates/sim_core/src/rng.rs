@@ -49,4 +49,14 @@ impl WorldRng {
         }
         low + (self.next_u64() % (high - low) as u64) as usize
     }
+
+    /// 标准正态分布随机数 (Box-Muller 变换，均值 0、标准差 1)，每次消耗 2 个均匀随机数
+    ///
+    /// 用于生成族人的先天禀赋属性: 属性值 = 100 + 20 * gen_normal() 即 N(100, 20)，
+    /// 保证约 95% 族人落在 60 ~ 140 区间 (均值 100 ± 1.96×20)。
+    pub fn gen_normal(&mut self) -> f32 {
+        let u1 = self.gen_f32().max(1e-7); // 避免 ln(0) 产生 -inf
+        let u2 = self.gen_f32();
+        (-2.0 * u1.ln()).sqrt() * (std::f32::consts::TAU * u2).cos()
+    }
 }

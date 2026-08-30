@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::vec3::Vec3;
 use super::curve::Curve3D;
+use crate::config::*;
 
 pub type NodeId = u32;
 pub type LaneId = u32;
@@ -115,11 +116,11 @@ impl LaneGraph3D {
         self.next_lane_id += 1;
 
         let speed_limit = match road_class {
-            RoadClass::DirtTrack => 36.0,
-            RoadClass::Cobblestone => 44.0,
-            RoadClass::AsphaltUrban => 60.0,
-            RoadClass::SkywayElevated => 96.0,
-            RoadClass::SmugglerTrail => 40.0,
+            RoadClass::DirtTrack => ROAD_SPEED_DIRT_TRACK,
+            RoadClass::Cobblestone => ROAD_SPEED_COBBLESTONE,
+            RoadClass::AsphaltUrban => ROAD_SPEED_ASPHALT_URBAN,
+            RoadClass::SkywayElevated => ROAD_SPEED_SKYWAY_ELEVATED,
+            RoadClass::SmugglerTrail => ROAD_SPEED_SMUGGLER_TRAIL,
         };
 
         let edge_data = LaneEdge3D {

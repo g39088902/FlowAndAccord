@@ -31,7 +31,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.3)"]
+    E --> F["浏览器 UI (版本: v0.9.19)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system.rs`）；
@@ -66,7 +66,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 无需启动浏览器，通过原生单元测试与 Node.js 端到端测试双重校验：
 
 ```powershell
-# 1. 运行 Rust 原生内核 15 项单元测试
+# 1. 运行 Rust 原生内核 26 项单元测试
 cargo test --lib
 
 # 2. 运行 WASM 导出、确定性及长程稳定性验证
@@ -91,7 +91,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.3`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.19`**。
 
 ---
 
@@ -120,14 +120,16 @@ node frontend/server.js
 - **不要用 wasm 字节数判断是否更新**：不同构建可能字节完全相同。以 `node tools/test-wasm.js` 的实际输出为准。
 - **前端是纯静态文件**（`index.html` + `style.css` + `js/*.js`），无前端构建步骤，改完刷新即生效。切勿用外部 vite/webpack 替代内置 `frontend/server.js`。
 
-### 4.2 🔴 寻路决策门槛与中途放弃熔断机制
+### 4.2 🔴 寻路决策门槛、连续采收与中途重路由机制
 
 - **启动寻路门槛（$\ge 30\%$）**：
   - 在 `decisions/evaluator.rs` 的 `build_decision_context()` 中，POI 当前储量 $< 30\%$（`current_stock < max_stock * 0.30`）时，将其排除在候选节点池外，**绝不启动对该点的寻路**。
-- **中途放弃熔断与平滑掉头（$< 10\%$）**：
-  - 在 `decide_seeking_material` 与 `decide_seeking_survival` 中，中途检测目标 POI 储量跌破 $< 10\%$ 时，**立即直接放弃寻路**；
-  - **严禁闪现瞬移**：中途放弃时通过 `turn_around_and_route_to` 在当前车道原地掉头（反向进度 `rev_len - distance_along_curve`），平滑从当前坐标沿原路往回走，保持坐标连续性。
-- **修改相关逻辑时**：必须同步更新 `decisions/tests.rs` 中的对应测试（`test_no_pathfinding_when_poi_below_30_percent` 与 `test_abandon_seeking_when_target_poi_below_10_percent`）。
+- **采收现场未满连续采收**：
+  - 族人在现场采收（水/粮/木/石/金）时，若当前 POI 枯竭（$\le 0.05$）但自身或背包未满且家宅仍需，自动就近寻路前往下一处储量充沛（$\ge 30\%$）的同类 POI 继续采收，避免提前送货回宅。
+- **中途断流熔断与平滑就近重路由（$< 10\%$）**：
+  - 在 `decide_seeking_material` 与 `decide_seeking_survival` 中，中途检测目标 POI 储量跌破 $< 10\%$ 时，若全图仍有其他 $\ge 30\%$ 的同类 POI，立即通过 `turn_around_and_route_to` 原地掉头并平滑重新规划路径赶往就近可用 POI；仅在全图无可用品或体力告警时才折返回家；
+  - **严禁闪现瞬移**：中途掉头时通过 `turn_around_and_route_to` 在当前车道原地掉头（反向进度 `rev_len - distance_along_curve`），平滑从当前坐标沿原路往回走，保持坐标连续性。
+- **修改相关逻辑时**：必须同步更新 `decisions/tests.rs` 中的对应测试（`test_no_pathfinding_when_poi_below_30_percent`、`test_abandon_seeking_when_target_poi_below_10_percent`、`test_reroute_to_next_poi_when_target_depleted` 等）。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
@@ -158,9 +160,10 @@ node frontend/server.js
 
 - **单文件严控在 800 行以内**：当模块功能膨胀时，应及时进行子目录模块化拆分（参考 `crates/sim_core/src/spatial/decisions/` 拆分为 `needs.rs`, `evaluator.rs`, `tests.rs`, `mod.rs` 的最佳实践）。
 
-### 4.7 🟡 POI 数量与 ID 段位
+### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
-- 当前生态共 **21 处**：营地 5 处 (1-5)、清泉 5 处 (10-14)、浆果 5 处 (20-24)、林木 3 处 (30-32)、石矿 2 处 (40-41)、金矿 1 处 (50)。空间排斥间距 $\text{min\_poi\_distance} = 68\text{m}$。
+- 当前生态共 **23 处**：营地 5 处 (1-5)、清泉 6 处 (10-15)、浆果 6 处 (20-25)、林木 3 处 (30-32)、石矿 2 处 (40-41)、金矿 1 处 (50)。空间排斥间距 $\text{min\_poi\_distance} = 70\text{m}$。
+- **营地县级行政区库与升级界限**：5 处营地在生成时从 `COUNTY_NAMES`（240+ 处真实古雅县名）随机 roll 出专属地名，并随辖内绑定的有效房屋数量自动升级：0~5 间为【营地】、6~11 间为【村】、12~17 间为【乡】、18~23 间为【镇】、24+ 间为【县】。
 - **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `mod.rs` 单元测试断言 $\rightarrow$ `index.html` 面板文案 $\rightarrow$ `CURRENT.md`。
 
 ### 4.8 🟡 行为与生理硬约束
@@ -174,3 +177,11 @@ node frontend/server.js
   - 3 级木石庄舍：需黄金 85% + 石料 85% + 木材水粮 50%。
 - **淘金纪律**：4 级大庄园完全竣工前绝不娱乐淘金（`GoldWealth` 冷却 180s）；盖房备料淘金 `StockGold` 冷却 45s。
 - **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector 窗口（✕ 或 Esc 键）时必须同时关闭跟随。
+
+### 4.9 🟢 版本号自增规范（每次 AI 修改代码必改）
+
+- **强制规则**：**每次 AI 修改代码（无论修改 Rust 内核、前端 JS/CSS/HTML 还是文档配置），都必须自增版本号**（例如从 `v0.9.3` $\rightarrow$ `v0.9.4`）。
+- **必须同步更新以下位置**：
+  1. `frontend/index.html` 顶部品牌卡片内的版本徽章 `<span class="version-tag">vX.Y.Z</span>`；
+  2. `AGENTS.md` 第 1 节 Mermaid 流程图节点 `浏览器 UI (版本: vX.Y.Z)` 及第 2 节步骤四 `版本确认：vX.Y.Z`；
+  3. 若改动了核心机制或新增了特性，同步在 `CURRENT.md` 中记录更新。

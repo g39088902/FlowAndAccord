@@ -44,3 +44,30 @@
         return new Vec3(dx / mag, dy / mag, dz / mag);
       }
     }
+
+    function computeElevationColor(cell, minZ, maxZ) {
+      const { elev, dzdx, dzdy } = cell;
+      const range = Math.max(1, maxZ - minZ);
+      const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
+      const lightFactor = Math.max(0.70, Math.min(1.30, 1.0 + (-dzdx * 0.35 - dzdy * 0.35)));
+
+      let r, g, b;
+      if (normZ < 0.45) {
+        const t = normZ / 0.45;
+        r = Math.floor(16 + t * (40 - 16));
+        g = Math.floor(150 + t * (180 - 150));
+        b = Math.floor(100 + t * (70 - 100));
+      } else if (normZ < 0.75) {
+        const t = (normZ - 0.45) / 0.30;
+        r = Math.floor(40 + t * (190 - 40));
+        g = Math.floor(180 + t * (160 - 180));
+        b = Math.floor(70 + t * (40 - 70));
+      } else {
+        const t = (normZ - 0.75) / 0.25;
+        r = Math.floor(190 + t * (160 - 190));
+        g = Math.floor(160 + t * (165 - 160));
+        b = Math.floor(40 + t * (170 - 40));
+      }
+
+      return `rgba(${Math.floor(r * lightFactor)}, ${Math.floor(g * lightFactor)}, ${Math.floor(b * lightFactor)}, 0.55)`;
+    }

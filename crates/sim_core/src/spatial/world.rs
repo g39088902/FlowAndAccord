@@ -96,6 +96,17 @@ impl World3DEngine {
         best_id
     }
 
+    pub fn find_nearest_camp_node(&self, pos: Vec3) -> NodeId {
+        let nearest_camp = self.pois.iter()
+            .filter(|p| p.poi_type == PoiType::Camp)
+            .min_by(|a, b| a.pos.distance_to(&pos).partial_cmp(&b.pos.distance_to(&pos)).unwrap());
+        if let Some(camp) = nearest_camp {
+            self.find_nearest_node(camp.pos).unwrap_or(1)
+        } else {
+            self.find_nearest_node(pos).unwrap_or(1)
+        }
+    }
+
     /// 确定性仿真 Tick
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
@@ -169,6 +180,10 @@ impl World3DEngine {
                 current_stock: p.current_stock,
                 max_stock: p.max_stock,
                 regen_rate: p.regen_rate,
+                name: p.name.clone(),
+                camp_title: p.camp_title(),
+                level: p.level,
+                bound_houses: p.bound_houses_count,
             });
         }
 
@@ -178,6 +193,7 @@ impl World3DEngine {
                 id: h.id,
                 owner_id: h.owner_id,
                 spouse_id: h.spouse_id,
+                camp_id: h.camp_id,
                 x: h.pos.x,
                 y: h.pos.y,
                 z: h.pos.z,
@@ -256,6 +272,8 @@ impl World3DEngine {
                 hunger: agent.hunger,
                 thirst: agent.thirst,
                 stamina: agent.stamina,
+                health: agent.health,
+                max_health: agent.max_health,
                 is_pregnant: agent.is_pregnant,
                 pregnancy_progress: agent.pregnancy_progress,
                 miscarriage_cooldown: agent.miscarriage_cooldown_timer,
@@ -267,10 +285,17 @@ impl World3DEngine {
                 is_covert: agent.is_covert,
                 stealth_visibility: agent.stealth_visibility,
                 home_house_id: agent.home_house_id,
+                generation: agent.generation,
                 spouse_id: agent.spouse_id,
                 mother_id: agent.mother_id,
                 father_id: agent.father_id,
                 children_ids: agent.children_ids.clone(),
+                intelligence: agent.intelligence,
+                strength: agent.strength,
+                digestion_efficiency: agent.digestion_efficiency,
+                libido: agent.libido,
+                sleep_efficiency: agent.sleep_efficiency,
+                life_expectancy: agent.life_expectancy,
             });
         }
 

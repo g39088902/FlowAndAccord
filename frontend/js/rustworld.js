@@ -17,6 +17,7 @@
 
         // 世界视图对象 (由快照映射而来)
         this.agents = [];
+        this.agentArchive = new Map(); // 族人全量生命周期档案库 (含已故先祖，保障断代/绝嗣穿梭不跳帧)
         this.houses = [];
         this.pois = [];
         this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
@@ -28,11 +29,11 @@
         this.temperature = 20.0;
         this.tickCount = 0;
 
-        // 引擎状态
+        // 引擎状态 (以页面打开时间 Date.now() 作为随机种子)
         this._wasm = null;
         this._memory = null;
         this._ready = false;
-        this._engineSeed = 42;
+        this._engineSeed = Date.now();
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
@@ -53,7 +54,7 @@
           this._ready = true;
           this._pullSnapshot(true);
           if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
-          console.info('[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动');
+          console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
         } catch (e) {
           console.error('[RustWorld] 无法加载 Rust 引擎 (请通过 HTTP 服务访问):', e);
         }
@@ -67,6 +68,14 @@
         this.selectedHouseId = null;
       }
 
+      // 获取族人对象 (优先活跃列表，若已故脱离活跃列表则从先祖档案库中检索)
+      getAgent(id) {
+        if (id === null || id === undefined) return null;
+        const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+        if (isNaN(numId)) return null;
+        return this.agents.find(a => a.id === numId) || this.agentArchive.get(numId) || null;
+      }
+
       // ============ 引擎驱动 ============
       tick() {
         if (!this._ready || this.isPaused) return;
@@ -76,10 +85,11 @@
       }
 
       initEcology(agentCount) {
-        this._engineSeed = ((Math.random() * 0x7fffffff) | 0) || 42;
+        this._engineSeed = Date.now();
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails.clear();
+        this.agentArchive.clear();
         if (this._ready) {
           this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 12);
           this._pullSnapshot(true);
@@ -163,6 +173,7 @@
               const eU = gy > 0 ? cells[(gy - 1) * w + gx].elev : cells[idx].elev;
               cells[idx].dzdx = (eR - eL) / (2 * step);
               cells[idx].dzdy = (eD - eU) / (2 * step);
+              cells[idx].color = computeElevationColor(cells[idx], minZ, maxZ);
             }
           }
           this.terrain = { gridSize: w, worldSize, minZ, maxZ, cells };
@@ -171,7 +182,6 @@
 
         // --- POI ---
         const poiTypeMap = { Camp: 'Camp', WaterSource: 'Water', BerryBush: 'Berry', WoodForest: 'Wood', StoneQuarry: 'Stone', GoldMine: 'Gold' };
-        const poiNameMap = { Camp: '避风营地', WaterSource: '天然清泉', BerryBush: '浆果灌木', WoodForest: '茂密林木', StoneQuarry: '嶙峋石矿', GoldMine: '璀璨金矿' };
         this.pois = snap.pois.map(p => ({
           id: p.id,
           type: poiTypeMap[p.poi_type] || p.poi_type,
@@ -179,7 +189,10 @@
           currentStock: p.current_stock,
           maxStock: p.max_stock,
           regenRate: p.regen_rate,
-          name: (poiNameMap[p.poi_type] || p.poi_type) + ' #' + p.id
+          name: p.name || (p.poi_type === 'Camp' ? '聚落 #' + p.id : (poiTypeMap[p.poi_type] || p.poi_type) + ' #' + p.id),
+          campTitle: p.camp_title || p.name || ('聚落 #' + p.id),
+          level: p.level || 0,
+          boundHouses: p.bound_houses || 0
         }));
 
         // --- 房屋 ---
@@ -190,6 +203,7 @@
             tier: h.tier,
             ownerId: h.owner_id,
             spouseId: h.spouse_id,
+            campId: h.camp_id,
             isRuin: h.is_ruin,
             isRepairing: h.is_repairing,
             durability: h.durability,
@@ -266,9 +280,12 @@
             state: a.state,
             currentNeed: a.current_need, // 马斯洛需求层级·种类 (如 Physiological·QuenchThirst)
             isAlive: a.is_alive,
+            velocity: a.velocity || 0,
             hunger: a.hunger,
             thirst: a.thirst,
             stamina: a.stamina,
+            health: a.health,
+            maxHealth: a.max_health,
             carriedWater: a.carried_water,
             carriedFood: a.carried_food,
             carriedWood: a.carried_wood,
@@ -285,13 +302,25 @@
             isCovert: a.is_covert,
             stealthVisibility: a.stealth_visibility,
             homeHouseId: a.home_house_id,
+            generation: a.generation || 1,
             spouseId: a.spouse_id,
             motherId: a.mother_id,
             fatherId: a.father_id,
             children: a.children_ids,
+            intelligence: a.intelligence,
+            strength: a.strength,
+            digestionEfficiency: a.digestion_efficiency,
+            libido: a.libido,
+            sleepEfficiency: a.sleep_efficiency,
+            lifeExpectancy: a.life_expectancy,
             trail
           };
         });
+
+        // 持续同步全量族人档案库 (保留已故先祖快照)
+        for (const ag of this.agents) {
+          this.agentArchive.set(ag.id, ag);
+        }
       }
     }
 

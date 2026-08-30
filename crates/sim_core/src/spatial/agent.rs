@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId};
+use crate::config::*;
 
 pub type AgentId = u32;
 
-/// 随身携带容量: 水/粮/木/石 每类独立上限 50.0 单位 (互不共享)，黄金可无限携带
-pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
+// Re-export for external and internal callers
+pub use crate::config::CARRY_CAPACITY_RESOURCE;
 
 /// 性别系统
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,10 +45,12 @@ pub struct Agent3D {
     pub is_alive: bool,
     pub age: f32, // 年龄 (秒)，满 120 秒成年才具备生育能力
 
-    // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位)
+    // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位；健康出生为寿命值，每秒衰减0.02不可补充)
     pub hunger: f32,          // 饱食度 (最大 50.0 单位)
     pub thirst: f32,          // 水分值 (最大 50.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
+    pub health: f32,          // ❤️ 健康需求值 (出生时为寿命属性值，每秒减少0.02，不可补充，归零即老死)
+    pub max_health: f32,      // 健康值基准上限 (出生时记录的初始寿命)
     // 随身行囊: 水/粮/木/石 每类独立容量 50.0 单位 (互不共享)，黄金无限容量
     pub carried_water: f32,   // 随身携带清水 (容量 50.0，资源点装入，回家卸货入库)
     pub carried_food: f32,    // 随身携带食物 (容量 50.0)
@@ -58,20 +61,30 @@ pub struct Agent3D {
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     pub home_house_id: Option<u32>,      // 拥有的私产房屋 ID
     pub build_timer: f32,                // 筑屋劳作工时计时器
-    pub gold_mining_cooldown: f32,       // 每次试图采金后 120 秒冷却计时器
+    pub gold_mining_cooldown: f32,       // 每次试图采金后冷却计时器
 
     // 婚姻与家族血脉传承 (父系/母系、配偶与后代索引)
+    pub generation: u32, // 代际数 (始祖为第1代，子嗣递增)
     pub spouse_id: Option<AgentId>,
     pub mother_id: Option<AgentId>,
     pub father_id: Option<AgentId>,
     pub children_ids: Vec<AgentId>,
+
+    // 先天禀赋属性: 消化效率参与进食结算、睡眠效率参与休息体力恢复
+    // 始祖代按 N(100, 20) 正态分布 roll；后代取父母均值 ±10×线性随机数
+    pub intelligence: f32,       // 🧠 智力
+    pub strength: f32,           // 💪 力量
+    pub libido: f32,             // ❤️ 魅力
+    pub digestion_efficiency: f32,   // 🍽️ 消化效率
+    pub sleep_efficiency: f32,   // 😴 睡眠效率
+    pub life_expectancy: f32,    // ⏳ 预期寿命
 
     // 繁衍孕育系统 (120 秒孕期，流产后 60 秒再次受孕冷却，年满 120 秒成年女性可育)
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
     pub ready_to_birth: bool,
     pub miscarriage_alert_timer: f32,
-    pub miscarriage_cooldown_timer: f32, // 流产后 60 秒冷却
+    pub miscarriage_cooldown_timer: f32, // 流产后冷却
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,
 
@@ -86,7 +99,7 @@ pub struct Agent3D {
 
     // 马斯洛需求层次驱动的当前主导需求 (调试/前端观察用)
     #[serde(default)]
-    pub current_need: Option<String>, // 当前驱动行动的需求标签 (如 "Physiological·QuenchThirst")
+    pub current_need: Option<String>, // 当前驱动行动的需求标签
     // 隐秘特性
     pub is_covert: bool,
     pub stealth_visibility: f32,
@@ -99,16 +112,18 @@ pub struct Agent3D {
 
 impl Agent3D {
     pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32, gender: Gender) -> Self {
-        let quadrupled_speed = max_speed * 4.0;
+        let quadrupled_speed = max_speed * AGENT_BASE_MOVE_SPEED_MULT;
         Self {
             id,
             gender,
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
-            hunger: 25.0, // 初始 50% (满值 50.0)
-            thirst: 25.0, // 初始 50% (满值 50.0)
-            stamina: 95.0,
+            hunger: AGENT_INITIAL_HUNGER,
+            thirst: AGENT_INITIAL_THIRST,
+            stamina: AGENT_INITIAL_STAMINA,
+            health: TRAIT_DEFAULT_MEAN,
+            max_health: TRAIT_DEFAULT_MEAN,
             carried_water: 0.0,
             carried_food: 0.0,
             carried_wood: 0.0,
@@ -119,16 +134,23 @@ impl Agent3D {
             home_house_id: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
+            generation: 1,
             spouse_id: None,
             mother_id: None,
             father_id: None,
             children_ids: Vec::new(),
+            intelligence: TRAIT_DEFAULT_MEAN,
+            strength: TRAIT_DEFAULT_MEAN,
+            digestion_efficiency: TRAIT_DEFAULT_MEAN,
+            libido: TRAIT_DEFAULT_MEAN,
+            sleep_efficiency: TRAIT_DEFAULT_MEAN,
+            life_expectancy: TRAIT_DEFAULT_MEAN,
             is_pregnant: false,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,
             miscarriage_cooldown_timer: 0.0,
-            death_decay_timer: 12.0,
+            death_decay_timer: AGENT_DEATH_DECAY_DURATION,
             death_cause: None,
             current_lane_id: None,
             distance_along_curve: 0.0,
@@ -138,7 +160,7 @@ impl Agent3D {
             route: Vec::new(),
             route_index: 0,
             is_covert,
-            stealth_visibility: if is_covert { 0.25 } else { 1.0 },
+            stealth_visibility: if is_covert { AGENT_STEALTH_VISIBILITY_COVERT } else { AGENT_STEALTH_VISIBILITY_NORMAL },
             current_need: None,
             world_pos: Vec3::ZERO,
             forward_heading_rad: 0.0,
@@ -172,7 +194,7 @@ impl Agent3D {
         self.age += dt;
 
         let mut event_msg = None;
-        let mut metabolic_multiplier = if self.is_pregnant { 1.5 } else { 1.0 };
+        let mut metabolic_multiplier = if self.is_pregnant { AGENT_PREGNANT_METABOLISM_MULT } else { 1.0 };
 
         if self.state == PrimitiveActionState::ConstructingHouse
             || self.state == PrimitiveActionState::RepairingHouse
@@ -180,13 +202,18 @@ impl Agent3D {
             || self.state == PrimitiveActionState::MiningStone
             || self.state == PrimitiveActionState::MiningGold
         {
-            metabolic_multiplier *= 1.25; // 营建、修缮与采矿劳动轻微加速代谢
+            metabolic_multiplier *= AGENT_WORK_METABOLISM_MULT; // 营建、修缮与采矿劳动轻微加速代谢
         }
 
-        // 统一需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒
-        let decay_per_sec = 0.10 * metabolic_multiplier;
-        self.hunger = (self.hunger - decay_per_sec * dt).max(0.0);
-        self.thirst = (self.thirst - decay_per_sec * dt).max(0.0);
+        // 统一生理需求消耗：未怀孕 10秒消耗1单位 (0.10单位/秒)，怀孕期为 0.15单位/秒
+        // 🍽️ 消化代谢效率: 消化效率高者(如125)能量利用充分、耗能更慢(0.10/1.25=0.08/s)，低者耗能更快，饥荒下高效者更抗饿
+        let dig_ratio = (self.digestion_efficiency / 100.0).clamp(0.2, 5.0);
+        let hunger_decay_per_sec = (AGENT_BASE_METABOLISM_DECAY * metabolic_multiplier) / dig_ratio;
+        let thirst_decay_per_sec = AGENT_BASE_METABOLISM_DECAY * metabolic_multiplier;
+        self.hunger = (self.hunger - hunger_decay_per_sec * dt).max(0.0);
+        self.thirst = (self.thirst - thirst_decay_per_sec * dt).max(0.0);
+        // 健康需求值自然衰减 (每秒 0.02 单位，不可补充，归零即老死)
+        self.health = (self.health - AGENT_HEALTH_DECAY_PER_SEC * dt).max(0.0);
 
         // 死亡判定 (归 0 即死亡)
         if self.hunger <= 0.0 {
@@ -194,7 +221,7 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("饥荒饿死".to_string());
             self.is_pregnant = false;
-            self.death_decay_timer = 12.0;
+            self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
             return Some(format!("💀 部落民 #{} 因长期饥荒不幸饿死！", self.id));
         }
         if self.thirst <= 0.0 {
@@ -202,43 +229,52 @@ impl Agent3D {
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("脱水渴死".to_string());
             self.is_pregnant = false;
-            self.death_decay_timer = 12.0;
+            self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
+        if self.health <= 0.0 {
+            self.is_alive = false;
+            self.state = PrimitiveActionState::Dead;
+            self.death_cause = Some("寿终正寝".to_string());
+            self.is_pregnant = false;
+            self.death_decay_timer = AGENT_DEATH_DECAY_DURATION;
+            return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
+        }
 
-        // 受孕判定 (上限50.0，饱暖≥75%即37.5单位，且房屋有生育支持：非0级、未成废墟、水粮木均≥10，即is_fertility_active)
+        // 受孕判定 (上限50.0，饱暖≥80%即40.0单位，且房屋有生育支持：非0级、未成废墟、水粮木均≥10，即is_fertility_active)
         if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
-            if self.age >= 120.0 && self.hunger >= 37.5 && self.thirst >= 37.5 && self.stamina >= 75.0 {
+            if self.age >= AGENT_ADULT_AGE && self.hunger >= AGENT_CONCEPTION_HUNGER_MIN && self.thirst >= AGENT_CONCEPTION_THIRST_MIN && self.stamina >= AGENT_CONCEPTION_STAMINA_MIN {
                 self.is_pregnant = true;
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
-                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥37.5单位)，成功受孕进入120秒妊娠期！", self.id, spouse_str));
+                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, AGENT_CONCEPTION_HUNGER_MIN, AGENT_PREGNANCY_DURATION));
             }
         }
 
-        // 妊娠与流产判定 (孕期 120 秒；统一基准流产底线 20% = 10.0单位水粮 / 20%体力)
+        // 妊娠与流产判定 (孕期 900 秒；统一基准流产底线 20% = 10.0单位水粮 / 20%体力)
         if self.is_pregnant {
-            let miscarry_threshold = 10.0; // 20% of 50.0
-            if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < 20.0 {
+            let miscarry_threshold = AGENT_MISCARRIAGE_THRESHOLD;
+            if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < AGENT_MISCARRIAGE_STAMINA_THRESHOLD {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
-                self.miscarriage_alert_timer = 5.0;
-                self.miscarriage_cooldown_timer = 60.0; // 流产后 60 秒内禁止再次受孕
-                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 (60秒内休养不可受孕)！", self.id, miscarry_threshold));
+                self.miscarriage_alert_timer = AGENT_MISCARRIAGE_ALERT_DURATION;
+                self.miscarriage_cooldown_timer = AGENT_MISCARRIAGE_COOLDOWN; // 流产后 600 秒内禁止再次受孕
+                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 ({:.0}秒内休养不可受孕)！", self.id, miscarry_threshold, AGENT_MISCARRIAGE_COOLDOWN));
             }
 
-            self.pregnancy_progress += dt / 120.0; // 孕期 120 秒
+            self.pregnancy_progress += dt / AGENT_PREGNANCY_DURATION; // 孕期 900 秒
             if self.pregnancy_progress >= 1.0 {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.ready_to_birth = true;
-                return Some(format!("🍼 喜讯！女性部落民 #{} 历经120秒漫长孕期，顺利产下一名健康的新生儿！", self.id));
+                return Some(format!("🍼 喜讯！女性部落民 #{} 历经{:.0}秒漫长孕期，顺利产下一名健康的新生儿！", self.id, AGENT_PREGNANCY_DURATION));
             }
         }
 
         // 休息、筑屋与修缮体力结算
         if self.state == PrimitiveActionState::RestingAtCamp {
-            let recovery_rate = 8.0;
+            // 休息体力恢复: 基准 8.0/s × 睡眠效率/100 —— 睡眠效率越高恢复越快，所需休息时间越短
+            let recovery_rate = 8.0 * (self.sleep_efficiency / 100.0);
             self.stamina = (self.stamina + recovery_rate * dt).min(100.0);
         } else if self.state == PrimitiveActionState::ConstructingHouse {
             self.stamina = (self.stamina - 3.5 * dt).max(5.0);

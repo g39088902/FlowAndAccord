@@ -4,8 +4,13 @@
     // ==========================================
     let frameCount = 0, lastFpsUpdate = performance.now();
     let lastRenderTime = performance.now();
+    let lastUiUpdate = performance.now();
     const TARGET_FPS = 30;
     const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+    // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
+    let terrainProjX = new Float32Array(3600);
+    let terrainProjY = new Float32Array(3600);
 
     // ==========================================
     // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
@@ -37,7 +42,7 @@
       QuenchThirst: '自身水分告急(<25.0)，前往水泉痛饮至满值并回填家宅水库。',
       SateHunger: '自身饱食告急(<25.0)，前往浆果丛采食至满值并回填家宅粮仓。',
       ForageSurplus: '体力充沛且微饥，低概率外出就近采食成熟浆果。',
-      Rest: '正在归宿静坐休养，体力快速恢复中(+8.0%/s)，充盈至 100% 满值后方可结束。',
+      Rest: '正在归宿静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100，属性越高休息越快，恢复至 100% 满值后方可结束。',
       ReturnHome: '现场采收或搬运完成，折返回家将物资存入私宅仓库（安全需求）。',
       RepairHouse: '房屋耐久跌破50%，正在投入体力劳作修缮至100%避免风化坍塌。',
       StockWater: '私宅水库蓄水不足50%，优先外出运水保障家庭基础生存（安全需求，优先于建房）。',
@@ -121,8 +126,8 @@
 
       // 0. 镜头跟随选中小人
       if (isCameraFollow && sim.selectionType === 'agent') {
-        const selAgent = sim.agents.find(a => a.id === sim.selectedAgentId && a.isAlive);
-        if (selAgent) {
+        const selAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(sim.selectedAgentId) : sim.agents.find(a => a.id === sim.selectedAgentId);
+        if (selAgent && selAgent.isAlive && selAgent.pos) {
           const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
           const rx = selAgent.pos.x * cosZ - selAgent.pos.y * sinZ;
           const ry = selAgent.pos.x * sinZ + selAgent.pos.y * cosZ;
@@ -139,37 +144,86 @@
       const w = window.innerWidth, h = window.innerHeight;
       ctx.clearRect(0, 0, w, h);
 
-      // 1. 3D 地形网格渲染
+      // 1. 3D 地形网格渲染 (顶点单次投影 + 颜色缓存 + 视口裁剪 + 批处理线框)
       if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
         const gSize = sim.terrain.gridSize;
-        const minZ = sim.terrain.minZ, maxZ = sim.terrain.maxZ;
+        const totalVertices = gSize * gSize;
+        if (terrainProjX.length !== totalVertices) {
+          terrainProjX = new Float32Array(totalVertices);
+          terrainProjY = new Float32Array(totalVertices);
+        }
 
+        const cx = w / 2 + camera.panX;
+        const cy = h / 2 + camera.panY;
+        const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+        const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+        const scale = camera.zoom;
+
+        // 单次全网格顶点投影 (3600 次 vs 原 13924 次)
+        for (let i = 0; i < totalVertices; i++) {
+          const c = sim.terrain.cells[i];
+          const rx = c.wx * cosZ - c.wy * sinZ;
+          const ry = c.wx * sinZ + c.wy * cosZ;
+          const y2 = ry * cosX - c.elev * sinX;
+          terrainProjX[i] = cx + rx * scale;
+          terrainProjY[i] = cy + y2 * scale;
+        }
+
+        // 视口裁剪绘制地形四边形
         for (let gy = 0; gy < gSize - 1; gy++) {
+          const rowOffset0 = gy * gSize;
+          const rowOffset1 = (gy + 1) * gSize;
           for (let gx = 0; gx < gSize - 1; gx++) {
-            const c00 = sim.terrain.cells[gy * gSize + gx];
-            const c10 = sim.terrain.cells[gy * gSize + (gx + 1)];
-            const c11 = sim.terrain.cells[(gy + 1) * gSize + (gx + 1)];
-            const c01 = sim.terrain.cells[(gy + 1) * gSize + gx];
+            const i00 = rowOffset0 + gx;
+            const i10 = rowOffset0 + (gx + 1);
+            const i11 = rowOffset1 + (gx + 1);
+            const i01 = rowOffset1 + gx;
 
-            const p00 = project3D(new Vec3(c00.wx, c00.wy, c00.elev));
-            const p10 = project3D(new Vec3(c10.wx, c10.wy, c10.elev));
-            const p11 = project3D(new Vec3(c11.wx, c11.wy, c11.elev));
-            const p01 = project3D(new Vec3(c01.wx, c01.wy, c01.elev));
+            const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
+            const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
+            const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
+            const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
 
-            ctx.fillStyle = getElevationColor(c00, minZ, maxZ);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
-            ctx.lineWidth = 0.4;
+            // 视口边界快速剔除
+            const minX = Math.min(p00x, p10x, p11x, p01x);
+            const maxX = Math.max(p00x, p10x, p11x, p01x);
+            const minY = Math.min(p00y, p10y, p11y, p01y);
+            const maxY = Math.max(p00y, p10y, p11y, p01y);
 
+            if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) {
+              continue;
+            }
+
+            const c00 = sim.terrain.cells[i00];
+            ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
             ctx.beginPath();
-            ctx.moveTo(p00.x, p00.y);
-            ctx.lineTo(p10.x, p10.y);
-            ctx.lineTo(p11.x, p11.y);
-            ctx.lineTo(p01.x, p01.y);
+            ctx.moveTo(p00x, p00y);
+            ctx.lineTo(p10x, p10y);
+            ctx.lineTo(p11x, p11y);
+            ctx.lineTo(p01x, p01y);
             ctx.closePath();
             ctx.fill();
-            ctx.stroke();
           }
         }
+
+        // 批处理绘制地形网格线 (1 次 GPU Stroke 替代原 3481 次独立 Stroke)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+        ctx.lineWidth = 0.4;
+        ctx.beginPath();
+        for (let gy = 0; gy < gSize; gy++) {
+          const rowOffset = gy * gSize;
+          ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
+          for (let gx = 1; gx < gSize; gx++) {
+            ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
+          }
+        }
+        for (let gx = 0; gx < gSize; gx++) {
+          ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
+          for (let gy = 1; gy < gSize; gy++) {
+            ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
+          }
+        }
+        ctx.stroke();
       }
 
       // 2. 原始生态 POI 渲染与有限储量指示环 (上限 40.0 单位)
@@ -178,16 +232,30 @@
         const isSelectedPoi = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
 
         if (poi.type === 'Camp') {
-          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 26 * camera.zoom);
-          grad.addColorStop(0, 'rgba(245, 158, 11, 0.85)');
-          grad.addColorStop(0.4, 'rgba(239, 68, 68, 0.45)');
+          const campRadius = (22 + (poi.level || 0) * 4) * camera.zoom;
+          const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, campRadius);
+          grad.addColorStop(0, 'rgba(245, 158, 11, 0.9)');
+          grad.addColorStop(0.45, 'rgba(239, 68, 68, 0.5)');
           grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
           ctx.fillStyle = grad;
-          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 26 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(p2D.x, p2D.y, campRadius, 0, Math.PI * 2); ctx.fill();
 
-          ctx.font = `${Math.floor(15 * camera.zoom)}px sans-serif`;
+          const campIcon = (poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️');
+          ctx.font = `${Math.floor((15 + (poi.level || 0) * 2) * camera.zoom)}px sans-serif`;
           ctx.textAlign = 'center';
-          ctx.fillText('🏕️', p2D.x, p2D.y + 4);
+          ctx.fillText(campIcon, p2D.x, p2D.y + 4);
+
+          // 营地地名与等级徽章标注 (随缩放自适应显示)
+          if (camera.zoom > 0.45) {
+            ctx.font = `bold ${Math.max(9, Math.floor(11 * camera.zoom))}px sans-serif`;
+            ctx.fillStyle = '#fef08a';
+            ctx.fillText(poi.campTitle || poi.name, p2D.x, p2D.y - (14 + (poi.level || 0) * 2) * camera.zoom);
+            if (poi.boundHouses > 0) {
+              ctx.font = `${Math.max(8, Math.floor(9 * camera.zoom))}px sans-serif`;
+              ctx.fillStyle = '#93c5fd';
+              ctx.fillText(`${poi.boundHouses}舍`, p2D.x, p2D.y + (16 + (poi.level || 0) * 2) * camera.zoom);
+            }
+          }
         } else if (poi.type === 'Water') {
           const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
           const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom);
@@ -291,14 +359,16 @@
         }
 
         if (isSelectedPoi) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.2;
-          ctx.shadowColor = '#38bdf8';
-          ctx.shadowBlur = 10;
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+          ctx.lineWidth = 4.0 * camera.zoom;
           ctx.beginPath();
           ctx.arc(p2D.x, p2D.y, 22 * camera.zoom, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.8 * camera.zoom;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, 22 * camera.zoom, 0, Math.PI * 2);
+          ctx.stroke();
         }
       }
 
@@ -346,14 +416,16 @@
         }
 
         if (isSelectedHouse) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.2;
-          ctx.shadowColor = '#f59e0b';
-          ctx.shadowBlur = 10;
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+          ctx.lineWidth = 4.0 * camera.zoom;
           ctx.beginPath();
           ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.8 * camera.zoom;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, 0, Math.PI * 2);
+          ctx.stroke();
         }
       }
 
@@ -424,11 +496,8 @@
 
           // 鼠标悬浮高亮光晕
           if (isHovered) {
-            ctx.save();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = lineWidth + 2.0 * camera.zoom;
-            ctx.shadowColor = '#38bdf8';
-            ctx.shadowBlur = 10 * camera.zoom;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+            ctx.lineWidth = lineWidth + 3.0 * camera.zoom;
             ctx.beginPath();
             const segs = 16;
             for (let i = 0; i <= segs; i++) {
@@ -438,25 +507,26 @@
               else ctx.lineTo(p2D.x, p2D.y);
             }
             ctx.stroke();
-            ctx.restore();
+          }
+
+          // 高等级大道外圈微光
+          if (wear >= 4.0) {
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+            ctx.lineWidth = lineWidth + 3.0 * camera.zoom;
+            ctx.beginPath();
+            const segs = 16;
+            for (let i = 0; i <= segs; i++) {
+              const pt3D = lane.curve.evalPos(i / segs);
+              const p2D = project3D(pt3D);
+              if (i === 0) ctx.moveTo(p2D.x, p2D.y);
+              else ctx.lineTo(p2D.x, p2D.y);
+            }
+            ctx.stroke();
           }
 
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
           ctx.setLineDash(lineDash);
-
-          // 高等级道路光晕外发光
-          if (wear >= 4.0) {
-            ctx.shadowColor = '#f59e0b';
-            ctx.shadowBlur = 10 * camera.zoom;
-          } else if (wear >= 3.0) {
-            ctx.shadowColor = '#38bdf8';
-            ctx.shadowBlur = 7 * camera.zoom;
-          } else if (wear >= 2.0) {
-            ctx.shadowColor = '#f59e0b';
-            ctx.shadowBlur = 5 * camera.zoom;
-          }
-
           ctx.beginPath();
           const segs = 16;
           for (let i = 0; i <= segs; i++) {
@@ -466,7 +536,6 @@
             else ctx.lineTo(p2D.x, p2D.y);
           }
           ctx.stroke();
-          ctx.shadowBlur = 0;
           ctx.setLineDash([]);
         }
 
@@ -572,8 +641,8 @@
         else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
         else if (agent.state === 'ConstructingHouse') stateColor = '#f59e0b';
 
-        // 幼年期标识 (未满 120s)
-        const isAdult = agent.age >= 120.0;
+        // 幼年期标识 (未满 1800s)
+        const isAdult = agent.age >= 1800.0;
 
         if (agent.state === 'ConstructingHouse') {
           // 绘制 🔨 施工标识与进度环 (30s 成本翻倍)
@@ -638,22 +707,21 @@
         // 幼体稍小 (3.0px)，成体标准 (4.5px)
         const agentRadius = (isAdult ? 4.5 : 3.2) * camera.zoom;
         ctx.fillStyle = stateColor;
-        ctx.shadowColor = stateColor;
-        ctx.shadowBlur = 8;
         ctx.beginPath();
         ctx.arc(p2D.x, p2D.y, agentRadius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         if (isSelectedAgent) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.8;
-          ctx.shadowColor = '#ffffff';
-          ctx.shadowBlur = 8;
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 3.5 * camera.zoom;
           ctx.beginPath();
           ctx.arc(p2D.x, p2D.y, 9.5 * camera.zoom, 0, Math.PI * 2);
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.6 * camera.zoom;
+          ctx.beginPath();
+          ctx.arc(p2D.x, p2D.y, 9.5 * camera.zoom, 0, Math.PI * 2);
+          ctx.stroke();
         }
 
         // 选中小人头顶显示完整需求标签 (层级名 · 具体需求)
@@ -679,97 +747,105 @@
         }
       }
 
-      // 5. 更新顶栏统计
+      // 5. 更新顶栏统计 (降频至 ~100ms 刷新一次，减少 DOM 重排重绘)
       frameCount++;
       if (now - lastFpsUpdate >= 500) {
-        document.getElementById('stat-fps').textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        const fpsEl = document.getElementById('stat-fps');
+        if (fpsEl) fpsEl.textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
         frameCount = 0;
         lastFpsUpdate = now;
       }
 
-      const aliveAgents = sim.agents.filter(a => a.isAlive);
-      const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
+      if (now - lastUiUpdate >= 100) {
+        lastUiUpdate = now;
 
-      document.getElementById('stat-pop').textContent = aliveAgents.length;
-      document.getElementById('stat-houses').textContent = sim.houses.filter(h => !h.isRuin).length;
-      document.getElementById('stat-pois').textContent = sim.pois.length;
-      document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
-      document.getElementById('stat-births').textContent = sim.totalBirths;
-      document.getElementById('stat-deaths').textContent = sim.totalDeaths;
-      document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
+        const aliveAgents = sim.agents.filter(a => a.isAlive);
+        const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
 
-      // 顶栏四季与气温展示
-      const seasonIcons = { 'Spring': '🌸 春季', 'Summer': '☀️ 夏季', 'Autumn': '🍂 秋季', 'Winter': '❄️ 冬季' };
-      document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
-      document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
-      document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
+        document.getElementById('stat-pop').textContent = aliveAgents.length;
+        document.getElementById('stat-houses').textContent = sim.houses.filter(h => !h.isRuin).length;
+        document.getElementById('stat-pois').textContent = sim.pois.length;
+        document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
+        document.getElementById('stat-births').textContent = sim.totalBirths;
+        document.getElementById('stat-deaths').textContent = sim.totalDeaths;
+        document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
 
-      // 6. 实时汇总全地图资源大盘 (水/果/木/石)
-      let totalWaterCur = 0, totalWaterMax = 0;
-      let totalBerryCur = 0, totalBerryMax = 0;
-      let totalWoodCur = 0, totalWoodMax = 0;
-      let totalStoneCur = 0, totalStoneMax = 0;
-      let totalGoldCur = 0, totalGoldMax = 0;
+        // 顶栏四季与气温展示
+        const seasonIcons = { 'Spring': '🌸 春季', 'Summer': '☀️ 夏季', 'Autumn': '🍂 秋季', 'Winter': '❄️ 冬季' };
+        document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
+        document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
+        document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
 
-      for (const p of sim.pois) {
-        if (p.type === 'Water') {
-          totalWaterCur += p.currentStock;
-          totalWaterMax += p.maxStock;
-        } else if (p.type === 'Berry') {
-          totalBerryCur += p.currentStock;
-          totalBerryMax += p.maxStock;
-        } else if (p.type === 'Wood') {
-          totalWoodCur += p.currentStock;
-          totalWoodMax += p.maxStock;
-        } else if (p.type === 'Stone') {
-          totalStoneCur += p.currentStock;
-          totalStoneMax += p.maxStock;
-        } else if (p.type === 'Gold') {
-          totalGoldCur += p.currentStock;
-          totalGoldMax += p.maxStock;
+        // 6. 实时汇总全地图资源大盘 (水/果/木/石/金)
+        let totalWaterCur = 0, totalWaterMax = 0;
+        let totalBerryCur = 0, totalBerryMax = 0;
+        let totalWoodCur = 0, totalWoodMax = 0;
+        let totalStoneCur = 0, totalStoneMax = 0;
+        let totalGoldCur = 0, totalGoldMax = 0;
+
+        for (const p of sim.pois) {
+          if (p.type === 'Water') {
+            totalWaterCur += p.currentStock;
+            totalWaterMax += p.maxStock;
+          } else if (p.type === 'Berry') {
+            totalBerryCur += p.currentStock;
+            totalBerryMax += p.maxStock;
+          } else if (p.type === 'Wood') {
+            totalWoodCur += p.currentStock;
+            totalWoodMax += p.maxStock;
+          } else if (p.type === 'Stone') {
+            totalStoneCur += p.currentStock;
+            totalStoneMax += p.maxStock;
+          } else if (p.type === 'Gold') {
+            totalGoldCur += p.currentStock;
+            totalGoldMax += p.maxStock;
+          }
         }
-      }
 
-      const waterPct = Math.round((totalWaterCur / Math.max(1, totalWaterMax)) * 100);
-      const berryPct = Math.round((totalBerryCur / Math.max(1, totalBerryMax)) * 100);
-      const woodPct = Math.round((totalWoodCur / Math.max(1, totalWoodMax)) * 100);
-      const stonePct = Math.round((totalStoneCur / Math.max(1, totalStoneMax)) * 100);
-      const goldPct = Math.round((totalGoldCur / Math.max(1, totalGoldMax)) * 100);
+        const waterPct = Math.round((totalWaterCur / Math.max(1, totalWaterMax)) * 100);
+        const berryPct = Math.round((totalBerryCur / Math.max(1, totalBerryMax)) * 100);
+        const woodPct = Math.round((totalWoodCur / Math.max(1, totalWoodMax)) * 100);
+        const stonePct = Math.round((totalStoneCur / Math.max(1, totalStoneMax)) * 100);
+        const goldPct = Math.round((totalGoldCur / Math.max(1, totalGoldMax)) * 100);
 
-      document.getElementById('val-global-water').textContent = `${totalWaterCur.toFixed(1)} / ${totalWaterMax.toFixed(1)} 单位 (${waterPct}%)`;
-      document.getElementById('fill-global-water').style.width = `${waterPct}%`;
-      document.getElementById('fill-global-water').style.background = waterPct < 25 ? '#ef4444' : '#38bdf8';
+        document.getElementById('val-global-water').textContent = `${totalWaterCur.toFixed(1)} / ${totalWaterMax.toFixed(1)} 单位 (${waterPct}%)`;
+        document.getElementById('fill-global-water').style.width = `${waterPct}%`;
+        document.getElementById('fill-global-water').style.background = waterPct < 25 ? '#ef4444' : '#38bdf8';
 
-      document.getElementById('val-global-berry').textContent = `${totalBerryCur.toFixed(1)} / ${totalBerryMax.toFixed(1)} 单位 (${berryPct}%)`;
-      document.getElementById('fill-global-berry').style.width = `${berryPct}%`;
-      document.getElementById('fill-global-berry').style.background = berryPct < 25 ? '#ef4444' : '#10b981';
+        document.getElementById('val-global-berry').textContent = `${totalBerryCur.toFixed(1)} / ${totalBerryMax.toFixed(1)} 单位 (${berryPct}%)`;
+        document.getElementById('fill-global-berry').style.width = `${berryPct}%`;
+        document.getElementById('fill-global-berry').style.background = berryPct < 25 ? '#ef4444' : '#10b981';
 
-      document.getElementById('val-global-wood').textContent = `${totalWoodCur.toFixed(1)} / ${totalWoodMax.toFixed(1)} 单位 (${woodPct}%)`;
-      document.getElementById('fill-global-wood').style.width = `${woodPct}%`;
-      document.getElementById('fill-global-wood').style.background = woodPct < 25 ? '#ef4444' : '#d97706';
+        document.getElementById('val-global-wood').textContent = `${totalWoodCur.toFixed(1)} / ${totalWoodMax.toFixed(1)} 单位 (${woodPct}%)`;
+        document.getElementById('fill-global-wood').style.width = `${woodPct}%`;
+        document.getElementById('fill-global-wood').style.background = woodPct < 25 ? '#ef4444' : '#d97706';
 
-      document.getElementById('val-global-stone').textContent = `${totalStoneCur.toFixed(1)} / ${totalStoneMax.toFixed(1)} 单位 (${stonePct}%)`;
-      document.getElementById('fill-global-stone').style.width = `${stonePct}%`;
-      document.getElementById('fill-global-stone').style.background = stonePct < 25 ? '#ef4444' : '#94a3b8';
+        document.getElementById('val-global-stone').textContent = `${totalStoneCur.toFixed(1)} / ${totalStoneMax.toFixed(1)} 单位 (${stonePct}%)`;
+        document.getElementById('fill-global-stone').style.width = `${stonePct}%`;
+        document.getElementById('fill-global-stone').style.background = stonePct < 25 ? '#ef4444' : '#94a3b8';
 
-      const valGoldEl = document.getElementById('val-global-gold');
-      const fillGoldEl = document.getElementById('fill-global-gold');
-      if (valGoldEl && fillGoldEl) {
-        valGoldEl.textContent = `${totalGoldCur.toFixed(1)} / ${totalGoldMax.toFixed(1)} 单位 (${goldPct}%)`;
-        fillGoldEl.style.width = `${goldPct}%`;
-        fillGoldEl.style.background = goldPct < 25 ? '#ef4444' : '#fbbf24';
-      }
+        const valGoldEl = document.getElementById('val-global-gold');
+        const fillGoldEl = document.getElementById('fill-global-gold');
+        if (valGoldEl && fillGoldEl) {
+          valGoldEl.textContent = `${totalGoldCur.toFixed(1)} / ${totalGoldMax.toFixed(1)} 单位 (${goldPct}%)`;
+          fillGoldEl.style.width = `${goldPct}%`;
+          fillGoldEl.style.background = goldPct < 25 ? '#ef4444' : '#fbbf24';
+        }
 
-      const ecoHealthBadge = document.getElementById('global-eco-health');
-      if (waterPct < 20 || berryPct < 20 || woodPct < 20) {
-        ecoHealthBadge.textContent = '⚠️ 资源枯竭危机';
-        ecoHealthBadge.style.color = '#ef4444';
-      } else if (waterPct < 45 || berryPct < 45 || woodPct < 45) {
-        ecoHealthBadge.textContent = '⚡ 储量紧俏';
-        ecoHealthBadge.style.color = '#f59e0b';
-      } else {
-        ecoHealthBadge.textContent = '🌿 资源丰盛';
-        ecoHealthBadge.style.color = '#10b981';
+        const ecoHealthBadge = document.getElementById('global-eco-health');
+        if (waterPct < 20 || berryPct < 20 || woodPct < 20) {
+          ecoHealthBadge.textContent = '⚠️ 资源枯竭危机';
+          ecoHealthBadge.style.color = '#ef4444';
+        } else if (waterPct < 45 || berryPct < 45 || woodPct < 45) {
+          ecoHealthBadge.textContent = '⚡ 储量紧俏';
+          ecoHealthBadge.style.color = '#f59e0b';
+        } else {
+          ecoHealthBadge.textContent = '🌿 资源丰盛';
+          ecoHealthBadge.style.color = '#10b981';
+        }
+
+        // 6.5. 实时汇总全图存活部落民属性平均值大盘
+        updateGlobalAverages(aliveAgents, sim.houses);
       }
 
       // 7. 刷新动态 Inspector 面板
@@ -888,7 +964,7 @@
           }
 
           // 户主追踪按钮绑定
-          const ownerAgent = sim.agents.find(a => a.id === house.ownerId);
+          const ownerAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : sim.agents.find(a => a.id === house.ownerId);
           const ownerAlive = ownerAgent && ownerAgent.isAlive;
           const ownerBtn = document.getElementById('insp-house-owner-btn');
           if (ownerBtn) {
@@ -897,7 +973,16 @@
             ownerBtn.setAttribute('data-agent-id', house.ownerId);
           }
 
-          document.getElementById('insp-house-coord').textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
+          // 所属聚落辖区绑定
+          const campPoi = sim.pois.find(p => p.id === house.campId);
+          const campTitle = campPoi ? campPoi.campTitle : `营地 #${house.campId || 1}`;
+          const houseCampElem = document.getElementById('insp-house-camp-name');
+          if (houseCampElem) {
+            houseCampElem.textContent = `🏕️ ${campTitle}`;
+          }
+
+          const houseCoordEl = document.getElementById('insp-house-coord');
+          if (houseCoordEl) houseCoordEl.textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
           document.getElementById('insp-detail-text').textContent = house.isRuin ? '户主去世且未有族人继承，房屋正处于风化瓦解状态。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
         }
       } else if (sim.selectionType === 'poi' && sim.selectedPoiId !== null) {
@@ -908,13 +993,14 @@
           poiView.style.display = 'flex';
           if (followBtn) followBtn.style.display = 'none';
 
-          const poiIcon = poi.type === 'Camp' ? '🏕️' : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨'))));
-          document.getElementById('insp-title-name').textContent = `${poiIcon} ${poi.name}`;
+          const poiIcon = poi.type === 'Camp' ? ((poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️')) : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨'))));
+          document.getElementById('insp-title-name').textContent = poi.type === 'Camp' ? `${poiIcon} ${poi.campTitle || poi.name}` : `${poiIcon} ${poi.name}`;
           
           let stateBadge = '资源充足';
           let badgeColor = '#10b981';
           if (poi.type === 'Camp') {
-            stateBadge = '无限公共庇护';
+            const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
+            stateBadge = `${lvlNames[poi.level || 0]} · 辖 ${poi.boundHouses || 0} 房`;
             badgeColor = '#f59e0b';
           } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
             stateBadge = '无限供应';
@@ -930,9 +1016,29 @@
           document.getElementById('insp-title-state').style.color = badgeColor;
 
           const stockRow = document.getElementById('insp-poi-stock-row');
+          const campUpgradeRow = document.getElementById('insp-camp-upgrade-row');
           if (poi.type === 'Camp') {
             stockRow.style.display = 'none';
+            if (campUpgradeRow) {
+              campUpgradeRow.style.display = 'flex';
+              const nextTarget = (poi.level || 0) === 0 ? 6 : ((poi.level || 0) === 1 ? 12 : ((poi.level || 0) === 2 ? 18 : 24));
+              const prevTarget = (poi.level || 0) === 0 ? 0 : ((poi.level || 0) === 1 ? 6 : ((poi.level || 0) === 2 ? 12 : 18));
+              const count = poi.boundHouses || 0;
+              const nextTitle = (poi.level || 0) === 0 ? '村落 (6房)' : ((poi.level || 0) === 1 ? '乡集 (12房)' : ((poi.level || 0) === 2 ? '集镇 (18房)' : '县邑 (24房)'));
+              
+              if ((poi.level || 0) >= 4) {
+                document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ 县级行政区 (已达最高级)`;
+                document.getElementById('insp-camp-upgrade-val').textContent = `${count} 间私宅`;
+                document.getElementById('insp-camp-upgrade-fill').style.width = '100%';
+              } else {
+                const ratio = Math.min(100, Math.round(((count - prevTarget) / (nextTarget - prevTarget)) * 100));
+                document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ 晋升 ${nextTitle}`;
+                document.getElementById('insp-camp-upgrade-val').textContent = `${count} / ${nextTarget} 间房`;
+                document.getElementById('insp-camp-upgrade-fill').style.width = `${Math.max(0, ratio)}%`;
+              }
+            }
           } else {
+            if (campUpgradeRow) campUpgradeRow.style.display = 'none';
             stockRow.style.display = 'flex';
             const ratio = Math.round((poi.currentStock / poi.maxStock) * 100);
             if (poi.type === 'Water') {
@@ -955,11 +1061,13 @@
             document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
           }
 
-          document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (避风营地)`;
-          document.getElementById('insp-poi-elev').textContent = `Z = ${poi.pos.z.toFixed(1)}m (${poi.pos.z < -10 ? '低洼区' : (poi.pos.z > 10 ? '高台区' : '平缓中台')})`;
-          document.getElementById('insp-poi-coord').textContent = `(X: ${Math.round(poi.pos.x)}m, Y: ${Math.round(poi.pos.y)}m)`;
+          document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (公共避风聚落)`;
+          const elevEl = document.getElementById('insp-poi-elev');
+          if (elevEl) elevEl.textContent = poi.pos.z < -10 ? '低洼谷地 (汇水充盈)' : (poi.pos.z > 10 ? '峻峭高台 (视野开阔)' : '平缓原野 (适宜定居)');
+          const poiCoordEl = document.getElementById('insp-poi-coord');
+          if (poiCoordEl) poiCoordEl.textContent = poi.type === 'Camp' ? '聚落中心' : (poi.campTitle ? `${poi.campTitle} 领地` : '荒原公域');
           
-          let desc = '避风篝火营地(储量无限)，小人在此休养回体。';
+          let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
           if (poi.type === 'Water') desc = '低洼处天然地泉(上限60单位,产速2.0/s)，小人饮水并补给家宅。';
           else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
           else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
@@ -973,13 +1081,21 @@
         houseView.style.display = 'none';
         if (followBtn) followBtn.style.display = 'block';
 
-        const selAgent = sim.agents.find(a => a.id === sim.selectedAgentId) || aliveAgents[0];
+        let selAgent = null;
+        if (sim.selectedAgentId !== null) {
+          selAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(sim.selectedAgentId) : sim.agents.find(a => a.id === sim.selectedAgentId);
+        }
+        if (!selAgent) {
+          selAgent = (sim.agents && sim.agents.length > 0)
+            ? (sim.agents.find(a => a.isAlive) || sim.agents[0])
+            : null;
+        }
         if (selAgent) {
           sim.selectedAgentId = selAgent.id;
-          const isAdult = selAgent.age >= 120.0;
+          const isAdult = selAgent.age >= 1800.0;
           const isFemale = selAgent.gender === 'female';
           const genderBadge = isFemale ? '♀' : '♂';
-          const roleIcon = selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼');
+          const roleIcon = !selAgent.isAlive ? '💀' : (selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼'));
           
           let homeTag = `[🏕️ 营地]`;
           if (selAgent.homeHouseId !== null) {
@@ -995,17 +1111,21 @@
           let stateText = selAgent.homeHouseId ? '🏡 私宅安居中' : '🏕️ 营地驻留中';
           let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息，无私宅不可受孕。';
 
-          if (selAgent.state === 'RestingAtCamp') {
+          if (!selAgent.isAlive) {
+            const isDecaying = typeof selAgent.deathDecayTimer === 'number' && selAgent.deathDecayTimer > 0;
+            stateText = isDecaying ? '💀 刚离世' : '💀 已故先祖';
+            detailText = isDecaying
+              ? `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`
+              : `死因: ${selAgent.deathCause || '寿终正寝/未知'} (已入土长眠，载入族谱先祖志)`;
+          } else if (selAgent.state === 'RestingAtCamp') {
             if (selAgent.stamina < 99.5) {
-              stateText = selAgent.homeHouseId ? '🏡 私宅休养生息 (+8%/s)' : '🏕️ 营地休养生息 (+8%/s)';
-              detailText = '正在家宅/营地静坐休养，体力快速恢复中(+8.0%/s)，恢复至 100% 满值后方可开展后续工作。';
+              const restRate = (8.0 * (selAgent.sleepEfficiency || 100) / 100).toFixed(1);
+              stateText = (selAgent.homeHouseId ? '🏡 私宅休养生息' : '🏕️ 营地休养生息') + ' (+' + restRate + '%/s)';
+              detailText = '正在家宅/营地静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100 (' + restRate + '%/s)，睡眠效率越高休息越快，恢复至 100% 满值后方可开展后续工作。';
             } else {
               stateText = selAgent.homeHouseId ? '🏡 私宅安居中 (体力100%)' : '🏕️ 营地驻留中 (体力100%)';
               detailText = '体力充盈至 100% 且温饱无虞，安居静候下一个生活/营建需求。';
             }
-          } else if (!selAgent.isAlive) {
-            stateText = '💀 已死亡';
-            detailText = `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`;
           } else if (selAgent.state === 'ConstructingHouse') {
             const progPct = Math.round((selAgent.buildTimer / 30.0) * 100);
             stateText = `🔨 营建/升级房屋 (${progPct}% - 30s工期)`;
@@ -1078,7 +1198,7 @@
           }
 
           document.getElementById('insp-title-state').textContent = stateText;
-          document.getElementById('insp-title-state').style.color = '#f59e0b';
+          document.getElementById('insp-title-state').style.color = !selAgent.isAlive ? '#ef4444' : '#f59e0b';
           
           // 年龄与性别生育状态展示
           const ageValElem = document.getElementById('insp-age-val');
@@ -1091,7 +1211,7 @@
               ageValElem.style.color = '#38bdf8';
             }
           } else {
-            const needGrow = Math.ceil(120.0 - selAgent.age);
+            const needGrow = Math.ceil(1800.0 - selAgent.age);
             if (isFemale) {
               ageValElem.textContent = `${Math.floor(selAgent.age)}s (🍼 ♀ 女童·还需成长 ${needGrow}s)`;
               ageValElem.style.color = '#f472b6';
@@ -1106,26 +1226,40 @@
           const maslowBadge = document.getElementById('insp-maslow-badge');
           const maslowReason = document.getElementById('insp-maslow-reason');
           if (maslowBox && maslowBadge && maslowReason) {
-            const need = parseMaslowNeed(selAgent.currentNeed, selAgent);
-            if (need) {
-              maslowBox.style.display = 'block';
-              maslowBox.style.borderColor = need.color + '66';
-              maslowBadge.textContent = `${need.icon} ${need.numeral} ${need.name} · ${need.kindLabel}`;
-              maslowBadge.style.color = need.color;
-              maslowBadge.style.borderColor = need.color;
-              maslowBadge.style.background = need.color + '1a';
-              maslowReason.textContent = need.reason;
-            } else if (selAgent.state === 'RestingAtCamp') {
-              maslowBox.style.display = 'block';
-              maslowBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-              maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急迫需求';
-              maslowBadge.style.color = '#10b981';
-              maslowBadge.style.borderColor = '#10b981';
-              maslowBadge.style.background = 'rgba(16, 185, 129, 0.12)';
-              maslowReason.textContent = `体力充沛(${Math.round(selAgent.stamina)}% >= 50%)且温饱与家宅需求均满足，安居休养中。`;
-            } else {
+            if (!selAgent.isAlive) {
               maslowBox.style.display = 'none';
+            } else {
+              const need = parseMaslowNeed(selAgent.currentNeed, selAgent);
+              if (need) {
+                maslowBox.style.display = 'block';
+                maslowBox.style.borderColor = need.color + '66';
+                maslowBadge.textContent = `${need.icon} ${need.numeral} ${need.name} · ${need.kindLabel}`;
+                maslowBadge.style.color = need.color;
+                maslowBadge.style.borderColor = need.color;
+                maslowBadge.style.background = need.color + '1a';
+                maslowReason.textContent = need.reason;
+              } else if (selAgent.state === 'RestingAtCamp') {
+                maslowBox.style.display = 'block';
+                maslowBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急迫需求';
+                maslowBadge.style.color = '#10b981';
+                maslowBadge.style.borderColor = '#10b981';
+                maslowBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+                maslowReason.textContent = `体力充沛(${Math.round(selAgent.stamina)}% >= 50%)且温饱与家宅需求均满足，安居休养中。`;
+              } else {
+                maslowBox.style.display = 'none';
+              }
             }
+          }
+
+          const maxHealth = selAgent.maxHealth || selAgent.lifeExpectancy || 100.0;
+          const curHealth = selAgent.health !== undefined ? selAgent.health : maxHealth;
+          const healthPct = Math.max(0, Math.min(100, Math.round((curHealth / maxHealth) * 100)));
+          if (document.getElementById('insp-health-val')) {
+            document.getElementById('insp-health-val').textContent = `${curHealth.toFixed(1)} / ${maxHealth.toFixed(1)} 单位 (${healthPct}%)`;
+          }
+          if (document.getElementById('insp-health-fill')) {
+            document.getElementById('insp-health-fill').style.width = `${healthPct}%`;
           }
 
           const hungerPct = Math.round((selAgent.hunger / 50.0) * 100);
@@ -1236,9 +1370,10 @@
           const fatherElem = document.getElementById('insp-lineage-father');
           if (fatherElem) {
             if (selAgent.fatherId) {
-              const fAgent = sim.agents.find(a => a.id === selAgent.fatherId);
+              const fAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(selAgent.fatherId) : sim.agents.find(a => a.id === selAgent.fatherId);
               const fAlive = fAgent && fAgent.isAlive;
-              const fHtml = `<span class="lineage-chip ${fAlive ? '' : 'dead'}" data-agent-id="${selAgent.fatherId}" title="点击追踪父亲视角">👨 父亲 #${selAgent.fatherId} ${fAlive ? '🟢' : '💀'}</span>`;
+              const fGen = fAgent ? (fAgent.generation || 1) : 1;
+              const fHtml = `<span class="lineage-chip ${fAlive ? '' : 'dead'}" data-agent-id="${selAgent.fatherId}" title="点击追踪父亲视角 (第${fGen}代)">👨 父亲 #${selAgent.fatherId} (第${fGen}代) ${fAlive ? '🟢' : '💀'}</span>`;
               if (fatherElem.innerHTML !== fHtml) fatherElem.innerHTML = fHtml;
             } else {
               const fHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
@@ -1249,9 +1384,10 @@
           const motherElem = document.getElementById('insp-lineage-mother');
           if (motherElem) {
             if (selAgent.motherId) {
-              const mAgent = sim.agents.find(a => a.id === selAgent.motherId);
+              const mAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(selAgent.motherId) : sim.agents.find(a => a.id === selAgent.motherId);
               const mAlive = mAgent && mAgent.isAlive;
-              const mHtml = `<span class="lineage-chip female ${mAlive ? '' : 'dead'}" data-agent-id="${selAgent.motherId}" title="点击追踪母亲视角">👩 母亲 #${selAgent.motherId} ${mAlive ? '🟢' : '💀'}</span>`;
+              const mGen = mAgent ? (mAgent.generation || 1) : 1;
+              const mHtml = `<span class="lineage-chip female ${mAlive ? '' : 'dead'}" data-agent-id="${selAgent.motherId}" title="点击追踪母亲视角 (第${mGen}代)">👩 母亲 #${selAgent.motherId} (第${mGen}代) ${mAlive ? '🟢' : '💀'}</span>`;
               if (motherElem.innerHTML !== mHtml) motherElem.innerHTML = mHtml;
             } else {
               const mHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
@@ -1262,10 +1398,11 @@
           const spouseElem = document.getElementById('insp-lineage-spouse');
           if (spouseElem) {
             if (selAgent.spouseId) {
-              const sAgent = sim.agents.find(a => a.id === selAgent.spouseId);
+              const sAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(selAgent.spouseId) : sim.agents.find(a => a.id === selAgent.spouseId);
               const sAlive = sAgent && sAgent.isAlive;
               const isHusband = sAgent && sAgent.gender === 'male';
-              const sHtml = `<span class="lineage-chip ${isHusband ? '' : 'female'} ${sAlive ? '' : 'dead'}" data-agent-id="${selAgent.spouseId}" title="点击追踪配偶视角">💍 ${isHusband ? '丈夫' : '妻子'} #${selAgent.spouseId} ${sAlive ? '🟢' : '💀'}</span>`;
+              const sGen = sAgent ? (sAgent.generation || 1) : 1;
+              const sHtml = `<span class="lineage-chip ${isHusband ? '' : 'female'} ${sAlive ? '' : 'dead'}" data-agent-id="${selAgent.spouseId}" title="点击追踪配偶视角 (第${sGen}代)">💍 ${isHusband ? '丈夫' : '妻子'} #${selAgent.spouseId} (第${sGen}代) ${sAlive ? '🟢' : '💀'}</span>`;
               if (spouseElem.innerHTML !== sHtml) spouseElem.innerHTML = sHtml;
             } else {
               const sHtml = `<span style="color:#64748b;">未婚单身</span>`;
@@ -1298,10 +1435,11 @@
             if (selAgent.children && selAgent.children.length > 0) {
               let cHtml = '';
               for (const cId of selAgent.children) {
-                const cAgent = sim.agents.find(a => a.id === cId);
+                const cAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(cId) : sim.agents.find(a => a.id === cId);
                 const cAlive = cAgent && cAgent.isAlive;
                 const isFem = cAgent && cAgent.gender === 'female';
-                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪子嗣 #${cId}">${isFem ? '👧' : '👦'} #${cId} ${cAlive ? '🟢' : '💀'}</span>`;
+                const cGen = cAgent ? (cAgent.generation || (selAgent.generation ? selAgent.generation + 1 : 2)) : (selAgent.generation ? selAgent.generation + 1 : 2);
+                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪第${cGen}代子嗣 #${cId}">${isFem ? '👧' : '👦'} #${cId} (第${cGen}代) ${cAlive ? '🟢' : '💀'}</span>`;
               }
               if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
               if (childrenCountElem) childrenCountElem.textContent = `共 ${selAgent.children.length} 位后代`;
@@ -1315,11 +1453,13 @@
           // 弹窗头部与自身卡片更新
           const modalTitle = document.getElementById('lineage-modal-title');
           if (modalTitle) {
-            modalTitle.textContent = `部落民 #${selAgent.id} (${selAgent.gender === 'female' ? '♀' : '♂'}) 世系族谱`;
+            const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
+            modalTitle.textContent = `部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '♀' : '♂'}) 世系族谱`;
           }
           const selfName = document.getElementById('lineage-self-name');
           if (selfName) {
-            selfName.textContent = `部落民 #${selAgent.id} (${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
+            const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
+            selfName.textContent = `部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
           }
           const selfAvatar = document.getElementById('lineage-self-avatar');
           if (selfAvatar) {
@@ -1327,16 +1467,51 @@
           }
           const selfGen = document.getElementById('lineage-self-gen');
           if (selfGen) {
-            const hasParents = selAgent.fatherId || selAgent.motherId;
-            selfGen.textContent = hasParents ? '后继代' : '始祖第1代';
+            const genNum = selAgent.generation && selAgent.generation >= 1 ? selAgent.generation : ((selAgent.fatherId || selAgent.motherId) ? 2 : 1);
+            selfGen.textContent = genNum === 1 ? '始祖第1代' : `第${genNum}代`;
           }
           const selfStatus = document.getElementById('lineage-self-status');
           if (selfStatus) {
-            selfStatus.textContent = `年龄 ${Math.floor(selAgent.age)}s · 饱食 ${Math.round(selAgent.hunger)} · 体力 ${Math.round(selAgent.stamina)}%`;
+            const hVal = selAgent.health !== undefined ? selAgent.health.toFixed(1) : '—';
+            selfStatus.textContent = `年龄 ${Math.floor(selAgent.age)}s · 健康 ${hVal} · 饱食 ${Math.round(selAgent.hunger)} · 体力 ${Math.round(selAgent.stamina)}%`;
           }
           const selfNeedBadge = document.getElementById('lineage-self-need-badge');
           if (selfNeedBadge) {
-            selfNeedBadge.textContent = selAgent.currentNeed || (selAgent.isAlive ? '活跃中' : '已故');
+            const parsed = parseMaslowNeed(selAgent.currentNeed, selAgent);
+            selfNeedBadge.textContent = parsed ? parsed.badgeText : (selAgent.isAlive ? '活跃中' : '已故');
+            if (parsed) {
+              selfNeedBadge.style.color = parsed.color;
+              selfNeedBadge.style.borderColor = `${parsed.color}55`;
+              selfNeedBadge.style.background = `${parsed.color}1f`;
+            }
+          }
+
+          // 🧬 先天禀赋属性 (族谱页 · 遗传记录仅展示): 始祖 N(100,20) 正态 / 后代父母均值±10
+          const traitsElem = document.getElementById('lineage-self-traits');
+          if (traitsElem && typeof selAgent.intelligence === 'number') {
+            const traitDefs = [
+              { label: '🧠 智力', key: 'intelligence', color: '#38bdf8' },
+              { label: '💪 力量', key: 'strength', color: '#ef4444' },
+              { label: '❤️‍🔥 魅力', key: 'libido', color: '#ec4899' },
+              { label: '🍽️ 消化效率', key: 'digestionEfficiency', color: '#f59e0b' },
+              { label: '😴 睡眠效率', key: 'sleepEfficiency', color: '#a78bfa' },
+              { label: '⏳ 预期寿命', key: 'lifeExpectancy', color: '#10b981' },
+            ];
+            let tHtml = '';
+            for (const t of traitDefs) {
+              const v = selAgent[t.key];
+              const pct = Math.max(0, Math.min(100, (v / 200) * 100)); // 10~190 映射 5%~95% 刻度
+              tHtml += `<div class="lineage-trait" title="${t.label} (遗传记录；消化效率/睡眠效率已参与行为结算)">
+                <div class="meter-label"><span>${t.label}</span><span style="color:${t.color}; font-weight:700;">${Math.round(v)}</span></div>
+                <div class="meter-bg"><div class="meter-fill" style="background:${t.color}; width:${pct}%;"></div></div>
+              </div>`;
+            }
+            if (traitsElem.innerHTML !== tHtml) traitsElem.innerHTML = tHtml;
+          }
+          const traitsSource = document.getElementById('lineage-traits-source');
+          if (traitsSource) {
+            const hasParents = selAgent.fatherId || selAgent.motherId;
+            traitsSource.textContent = hasParents ? '父母均值 ±10 遗传' : '始祖 N(100,20) 正态';
           }
 
           const cdBox = document.getElementById('insp-cooldown-box');
@@ -1351,7 +1526,7 @@
           if (selAgent.isPregnant && selAgent.isAlive) {
             pregBox.style.display = 'flex';
             const pVal = Math.round(selAgent.pregnancyProgress * 100);
-            document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 120)}s / 120s)`;
+            document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 900)}s / 900s)`;
             document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
           } else {
             pregBox.style.display = 'none';
@@ -1415,3 +1590,126 @@
       else sim.selectedPoiId = chosen.id;
       clickCycle = { x: clickX, y: clickY };
     });
+
+  // ==========================================
+  // 全局存活部落民属性均值大盘汇总计算与 DOM 渲染
+  // ==========================================
+  function updateGlobalAverages(aliveAgents, houses) {
+    const cardEl = document.getElementById('global-averages-card');
+    if (!cardEl) return;
+    const countEl = document.getElementById('avg-alive-count');
+    const n = aliveAgents ? aliveAgents.length : 0;
+    if (countEl) countEl.textContent = `${n}人存活`;
+
+    if (n === 0) {
+      const el = id => document.getElementById(id);
+      if (el('avg-health-val')) el('avg-health-val').textContent = '0.0 / 100.0 (0%)';
+      if (el('avg-health-fill')) el('avg-health-fill').style.width = '0%';
+      if (el('avg-hunger-val')) el('avg-hunger-val').textContent = '0.0 / 50.0 (0%)';
+      if (el('avg-hunger-fill')) el('avg-hunger-fill').style.width = '0%';
+      if (el('avg-thirst-val')) el('avg-thirst-val').textContent = '0.0 / 50.0 (0%)';
+      if (el('avg-thirst-fill')) el('avg-thirst-fill').style.width = '0%';
+      if (el('avg-stamina-val')) el('avg-stamina-val').textContent = '0.0%';
+      if (el('avg-stamina-fill')) el('avg-stamina-fill').style.width = '0%';
+      if (el('avg-age-val')) el('avg-age-val').textContent = '0.0s';
+      if (el('avg-speed-val')) el('avg-speed-val').textContent = '0.0 m/s';
+      if (el('avg-gender-val')) el('avg-gender-val').textContent = '0♂ / 0♀';
+      if (el('avg-house-val')) el('avg-house-val').textContent = '0% (0间)';
+      if (el('avg-single-val')) el('avg-single-val').textContent = '0♂ / 0♀';
+      if (el('avg-married-val')) el('avg-married-val').textContent = '0对 (0人)';
+      return;
+    }
+
+    let sumHunger = 0, sumThirst = 0, sumStamina = 0, sumHealth = 0, sumMaxHealth = 0, sumAge = 0, sumSpeed = 0;
+    let sumWater = 0, sumFood = 0, sumWood = 0, sumStone = 0, sumGold = 0;
+    let sumInt = 0, sumStr = 0, sumDig = 0, sumLib = 0, sumSlp = 0, sumLif = 0;
+    let males = 0, withHouse = 0;
+    let singleAdultMales = 0, singleAdultFemales = 0, marriedCount = 0;
+
+    for (let i = 0; i < n; i++) {
+      const a = aliveAgents[i];
+      sumHunger += a.hunger || 0;
+      sumThirst += a.thirst || 0;
+      sumStamina += a.stamina || 0;
+      const aMaxH = a.maxHealth || a.lifeExpectancy || 100.0;
+      sumHealth += a.health !== undefined ? a.health : aMaxH;
+      sumMaxHealth += aMaxH;
+      sumAge += a.age || 0;
+      sumSpeed += a.velocity || 0;
+
+      sumWater += a.carriedWater || 0;
+      sumFood += a.carriedFood || 0;
+      sumWood += a.carriedWood || 0;
+      sumStone += a.carriedStone || 0;
+      sumGold += a.carriedGold || 0;
+
+      sumInt += a.intelligence !== undefined ? a.intelligence : 100;
+      sumStr += a.strength !== undefined ? a.strength : 100;
+      sumDig += a.digestionEfficiency !== undefined ? a.digestionEfficiency : 100;
+      sumLib += a.libido !== undefined ? a.libido : 100;
+      sumSlp += a.sleepEfficiency !== undefined ? a.sleepEfficiency : 100;
+      sumLif += a.lifeExpectancy !== undefined ? a.lifeExpectancy : 100;
+
+      if (a.gender === 'male') males++;
+      if (a.homeHouseId !== null && a.homeHouseId !== undefined) withHouse++;
+
+      const isAdult = (a.age || 0) >= 1800.0;
+      const isSingle = !a.spouseId;
+      if (isSingle) {
+        if (isAdult) {
+          if (a.gender === 'male') singleAdultMales++;
+          else singleAdultFemales++;
+        }
+      } else {
+        marriedCount++;
+      }
+    }
+
+    const avgHunger = sumHunger / n;
+    const avgThirst = sumThirst / n;
+    const avgStamina = sumStamina / n;
+    const avgHealth = sumHealth / n;
+    const avgMaxHealth = sumMaxHealth / n || 100.0;
+    const avgAge = sumAge / n;
+    const avgSpeed = sumSpeed / n;
+
+    const healthPct = Math.round((avgHealth / avgMaxHealth) * 100);
+    const hungerPct = Math.round((avgHunger / 50.0) * 100);
+    const thirstPct = Math.round((avgThirst / 50.0) * 100);
+    const staminaPct = Math.round(avgStamina);
+
+    const females = n - males;
+    const housePct = Math.round((withHouse / n) * 100);
+    const validHousesCount = houses ? houses.filter(h => !h.isRuin).length : 0;
+    const marriedCouples = Math.floor(marriedCount / 2);
+
+    const el = id => document.getElementById(id);
+    if (el('avg-health-val')) el('avg-health-val').textContent = `${avgHealth.toFixed(1)} / ${avgMaxHealth.toFixed(1)} (${healthPct}%)`;
+    if (el('avg-health-fill')) el('avg-health-fill').style.width = `${Math.min(100, Math.max(0, healthPct))}%`;
+    if (el('avg-hunger-val')) el('avg-hunger-val').textContent = `${avgHunger.toFixed(1)} / 50.0 (${hungerPct}%)`;
+    if (el('avg-hunger-fill')) el('avg-hunger-fill').style.width = `${Math.min(100, Math.max(0, hungerPct))}%`;
+    if (el('avg-thirst-val')) el('avg-thirst-val').textContent = `${avgThirst.toFixed(1)} / 50.0 (${thirstPct}%)`;
+    if (el('avg-thirst-fill')) el('avg-thirst-fill').style.width = `${Math.min(100, Math.max(0, thirstPct))}%`;
+    if (el('avg-stamina-val')) el('avg-stamina-val').textContent = `${avgStamina.toFixed(1)}%`;
+    if (el('avg-stamina-fill')) el('avg-stamina-fill').style.width = `${Math.min(100, Math.max(0, staminaPct))}%`;
+
+    if (el('avg-age-val')) el('avg-age-val').textContent = `${avgAge.toFixed(1)}s`;
+    if (el('avg-speed-val')) el('avg-speed-val').textContent = `${avgSpeed.toFixed(1)} m/s`;
+    if (el('avg-gender-val')) el('avg-gender-val').textContent = `${males}♂ / ${females}♀`;
+    if (el('avg-house-val')) el('avg-house-val').textContent = `${housePct}% (${validHousesCount}间)`;
+    if (el('avg-single-val')) el('avg-single-val').textContent = `${singleAdultMales}♂ / ${singleAdultFemales}♀`;
+    if (el('avg-married-val')) el('avg-married-val').textContent = `${marriedCouples}对 (${marriedCount}人)`;
+
+    if (el('avg-carry-water')) el('avg-carry-water').textContent = (sumWater / n).toFixed(1);
+    if (el('avg-carry-food')) el('avg-carry-food').textContent = (sumFood / n).toFixed(1);
+    if (el('avg-carry-wood')) el('avg-carry-wood').textContent = (sumWood / n).toFixed(1);
+    if (el('avg-carry-stone')) el('avg-carry-stone').textContent = (sumStone / n).toFixed(1);
+    if (el('avg-carry-gold')) el('avg-carry-gold').textContent = (sumGold / n).toFixed(1);
+
+    if (el('avg-trait-int')) el('avg-trait-int').textContent = (sumInt / n).toFixed(1);
+    if (el('avg-trait-str')) el('avg-trait-str').textContent = (sumStr / n).toFixed(1);
+    if (el('avg-trait-dig')) el('avg-trait-dig').textContent = (sumDig / n).toFixed(1);
+    if (el('avg-trait-lib')) el('avg-trait-lib').textContent = (sumLib / n).toFixed(1);
+    if (el('avg-trait-slp')) el('avg-trait-slp').textContent = (sumSlp / n).toFixed(1);
+    if (el('avg-trait-lif')) el('avg-trait-lif').textContent = (sumLif / n).toFixed(1);
+  }

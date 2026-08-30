@@ -54,6 +54,10 @@ pub struct PoiSnapshot {
     pub current_stock: f32,
     pub max_stock: f32,
     pub regen_rate: f32,
+    pub name: String,
+    pub camp_title: String,
+    pub level: u8,
+    pub bound_houses: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +108,8 @@ pub struct AgentSnapshot {
     pub hunger: f32, // 0.0 ~ 25.0 单位
     pub thirst: f32, // 0.0 ~ 25.0 单位
     pub stamina: f32,
+    pub health: f32, // 健康需求值
+    pub max_health: f32, // 健康上限/寿命基准
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
     pub miscarriage_cooldown: f32,
@@ -115,8 +121,16 @@ pub struct AgentSnapshot {
     pub is_covert: bool,
     pub stealth_visibility: f32,
     pub home_house_id: Option<u32>,
+    pub generation: u32,
     pub spouse_id: Option<AgentId>,
     pub mother_id: Option<AgentId>,
     pub father_id: Option<AgentId>,
     pub children_ids: Vec<AgentId>,
+    // 先天禀赋属性: 始祖 N(100,20) 正态分布 / 后代父母均值±10×线性随机数
+    pub intelligence: f32,
+    pub strength: f32,
+    pub digestion_efficiency: f32,
+    pub libido: f32,
+    pub sleep_efficiency: f32,
+    pub life_expectancy: f32,
 }
