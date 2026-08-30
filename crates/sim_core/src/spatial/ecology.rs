@@ -1,7 +1,7 @@
 use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
-use super::agent::{Agent3D, Gender, PrimitiveActionState};
+use super::agent::{Agent3D, Gender, PrimitiveActionState, CARRY_CAPACITY_RESOURCE};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::HouseTier;
 use super::world::World3DEngine;
@@ -197,19 +197,17 @@ impl World3DEngine {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
+                        // 1) 自身解渴
                         let need = (50.0 - agent.thirst).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
                             agent.thirst = (agent.thirst + extracted).min(50.0);
                         }
-                        if let Some(hid) = agent_hid {
-                            if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                                if house.pantry_water < house.max_pantry_water && poi.current_stock > 0.01 {
-                                    let h_need = house.max_pantry_water - house.pantry_water;
-                                    let h_extracted = poi.extract(h_need.min(4.0 * dt));
-                                    house.pantry_water = (house.pantry_water + h_extracted).min(house.max_pantry_water);
-                                }
-                            }
+                        // 2) 有家宅时装入随身行囊 (每类容量 50.0)，回家后再卸货存入家宅水库
+                        if agent_hid.is_some() && agent.carried_water < CARRY_CAPACITY_RESOURCE && poi.current_stock > 0.01 {
+                            let load = (CARRY_CAPACITY_RESOURCE - agent.carried_water).min(4.0 * dt);
+                            let extracted = poi.extract(load);
+                            agent.carried_water = (agent.carried_water + extracted).min(CARRY_CAPACITY_RESOURCE);
                         }
                     }
                 }
@@ -217,19 +215,17 @@ impl World3DEngine {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
+                        // 1) 自身进食
                         let need = (50.0 - agent.hunger).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(4.0 * dt));
                             agent.hunger = (agent.hunger + extracted).min(50.0);
                         }
-                        if let Some(hid) = agent_hid {
-                            if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                                if house.pantry_food < house.max_pantry_food && poi.current_stock > 0.01 {
-                                    let h_need = house.max_pantry_food - house.pantry_food;
-                                    let h_extracted = poi.extract(h_need.min(4.0 * dt));
-                                    house.pantry_food = (house.pantry_food + h_extracted).min(house.max_pantry_food);
-                                }
-                            }
+                        // 2) 有家宅时装入随身行囊 (每类容量 50.0)，回家后再卸货存入家宅粮仓
+                        if agent_hid.is_some() && agent.carried_food < CARRY_CAPACITY_RESOURCE && poi.current_stock > 0.01 {
+                            let load = (CARRY_CAPACITY_RESOURCE - agent.carried_food).min(4.0 * dt);
+                            let extracted = poi.extract(load);
+                            agent.carried_food = (agent.carried_food + extracted).min(CARRY_CAPACITY_RESOURCE);
                         }
                     }
                 }
@@ -237,14 +233,11 @@ impl World3DEngine {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WoodForest && p.pos.distance_to(&agent_pos) < 22.0) {
-                        if let Some(hid) = agent_hid {
-                            if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                                if house.pantry_wood < house.max_pantry_wood && poi.current_stock > 0.01 {
-                                    let h_need = house.max_pantry_wood - house.pantry_wood;
-                                    let h_extracted = poi.extract(h_need.min(4.0 * dt));
-                                    house.pantry_wood = (house.pantry_wood + h_extracted).min(house.max_pantry_wood);
-                                }
-                            }
+                        // 伐木装入随身行囊 (每类容量 50.0)，回家卸货存入家宅木仓
+                        if agent_hid.is_some() && agent.carried_wood < CARRY_CAPACITY_RESOURCE && poi.current_stock > 0.01 {
+                            let load = (CARRY_CAPACITY_RESOURCE - agent.carried_wood).min(4.0 * dt);
+                            let extracted = poi.extract(load);
+                            agent.carried_wood = (agent.carried_wood + extracted).min(CARRY_CAPACITY_RESOURCE);
                         }
                     }
                 }
@@ -252,14 +245,11 @@ impl World3DEngine {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::StoneQuarry && p.pos.distance_to(&agent_pos) < 22.0) {
-                        if let Some(hid) = agent_hid {
-                            if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                                if house.pantry_stone < house.max_pantry_stone && poi.current_stock > 0.01 {
-                                    let h_need = house.max_pantry_stone - house.pantry_stone;
-                                    let h_extracted = poi.extract(h_need.min(3.0 * dt));
-                                    house.pantry_stone = (house.pantry_stone + h_extracted).min(house.max_pantry_stone);
-                                }
-                            }
+                        // 采石装入随身行囊 (每类容量 50.0)，回家卸货存入家宅石仓
+                        if agent_hid.is_some() && agent.carried_stone < CARRY_CAPACITY_RESOURCE && poi.current_stock > 0.01 {
+                            let load = (CARRY_CAPACITY_RESOURCE - agent.carried_stone).min(3.0 * dt);
+                            let extracted = poi.extract(load);
+                            agent.carried_stone = (agent.carried_stone + extracted).min(CARRY_CAPACITY_RESOURCE);
                         }
                     }
                 }
@@ -275,6 +265,28 @@ impl World3DEngine {
                 PrimitiveActionState::RestingAtCamp => {
                     if let Some(hid) = agent.home_house_id {
                         if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
+                            // 卸货: 将随身行囊中的水/粮/木/石存入家宅仓库 (10.0/s 卸货速率)
+                            let deposit_rate = 10.0 * dt;
+                            if agent.carried_water > 0.01 && house.pantry_water < house.max_pantry_water {
+                                let d = agent.carried_water.min(house.max_pantry_water - house.pantry_water).min(deposit_rate);
+                                house.pantry_water += d;
+                                agent.carried_water -= d;
+                            }
+                            if agent.carried_food > 0.01 && house.pantry_food < house.max_pantry_food {
+                                let d = agent.carried_food.min(house.max_pantry_food - house.pantry_food).min(deposit_rate);
+                                house.pantry_food += d;
+                                agent.carried_food -= d;
+                            }
+                            if agent.carried_wood > 0.01 && house.pantry_wood < house.max_pantry_wood {
+                                let d = agent.carried_wood.min(house.max_pantry_wood - house.pantry_wood).min(deposit_rate);
+                                house.pantry_wood += d;
+                                agent.carried_wood -= d;
+                            }
+                            if agent.carried_stone > 0.01 && house.pantry_stone < house.max_pantry_stone {
+                                let d = agent.carried_stone.min(house.max_pantry_stone - house.pantry_stone).min(deposit_rate);
+                                house.pantry_stone += d;
+                                agent.carried_stone -= d;
+                            }
                             // 0级仓库仅为建材储备，未成住宅前不扣减生活水粮
                             if house.tier != HouseTier::Tier0Warehouse {
                                 if agent.thirst < 50.0 && house.pantry_water > 0.05 {
@@ -348,5 +360,83 @@ impl World3DEngine {
         }
 
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::spatial::house::{House, HouseTier};
+    use crate::spatial::world::World3DEngine;
+
+    /// 真实随身搬运: 在资源点只把水装入行囊 (每类容量 50.0)，绝不直接写入家宅仓库
+    #[test]
+    fn test_carry_loads_into_backpack_not_pantry() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let water_pos = world.pois.iter().find(|p| p.poi_type == PoiType::WaterSource).unwrap().pos;
+        let camp_node = world.agents[0].home_camp_node;
+        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+        let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut);
+        house.pantry_water = 0.0;
+        world.houses.push(house);
+
+        {
+            let a = &mut world.agents[0];
+            a.world_pos = water_pos;
+            a.home_house_id = Some(1);
+            a.state = PrimitiveActionState::DrinkingAtWater;
+            a.thirst = 20.0;
+            a.hunger = 40.0;
+            a.stamina = 100.0;
+            a.carried_water = 0.0;
+        }
+
+        for _ in 0..60 {
+            world.tick_poi_interactions(1.0 / 30.0);
+        }
+
+        let a = &world.agents[0];
+        assert!(a.carried_water > 5.0, "行囊应装入清水, 实际 {}", a.carried_water);
+        assert!(a.carried_water <= CARRY_CAPACITY_RESOURCE + 0.01);
+        let h = world.houses.iter().find(|h| h.id == 1).unwrap();
+        assert_eq!(h.pantry_water, 0.0, "资源点期间水不得直接入仓");
+    }
+
+    #[test]
+    fn test_carry_deposits_into_pantry_at_home() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+
+        let camp_node = world.agents[0].home_camp_node;
+        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+        let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut);
+        house.pantry_water = 0.0;
+        world.houses.push(house);
+
+        {
+            let a = &mut world.agents[0];
+            a.world_pos = camp_pos;
+            a.home_house_id = Some(1);
+            a.state = PrimitiveActionState::RestingAtCamp;
+            a.thirst = 50.0;
+            a.hunger = 50.0;
+            a.stamina = 100.0;
+            a.carried_water = 30.0;
+            a.carried_food = 0.0;
+            a.carried_wood = 0.0;
+            a.carried_stone = 0.0;
+            a.carried_gold = 0.0;
+        }
+
+        for _ in 0..120 {
+            world.tick_poi_interactions(1.0 / 30.0);
+        }
+
+        let a = &world.agents[0];
+        let h = world.houses.iter().find(|h| h.id == 1).unwrap();
+        assert!(a.carried_water < 0.05, "行囊应已卸空, 实际 {}", a.carried_water);
+        assert!((h.pantry_water - 30.0).abs() < 0.5, "家宅水库应收到 30 单位, 实际 {}", h.pantry_water);
     }
 }

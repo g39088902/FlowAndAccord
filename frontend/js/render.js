@@ -959,7 +959,7 @@
           else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
           else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
           else if (poi.type === 'Stone') desc = '嶙峋高地石矿(上限60单位,产速1.5/s)，采石仅用于私宅升级木石庄舍与大庄园。';
-          else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(容量上限20.0单位)，存入私宅金库用于晋升最高级氏族大庄园。';
+          else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。';
           document.getElementById('insp-detail-text').textContent = desc;
         }
       } else {
@@ -1058,10 +1058,10 @@
             detailText = '正在采石场开采石料并运回私宅石料仓(石头仅用于盖房)。';
           } else if (selAgent.state === 'SeekingGold') {
             stateText = '🪙 正在前往金矿淘金';
-            detailText = '前往璀璨金矿开采黄金并随身装载(上限20单位)，运回私宅金库用于升级与财富贮藏。';
+            detailText = '前往璀璨金矿开采黄金并随身装载(黄金无限容量)，单趟运满20后回宅存入私宅金库用于升级与财富贮藏。';
           } else if (selAgent.state === 'MiningGold') {
             stateText = '🪙 金矿开采淘金中';
-            detailText = '正在金矿开采黄金并装入行囊(随身收集)，装满后送回私宅金库储存。';
+            detailText = '正在金矿开采黄金装入随身行囊(黄金无限容量)，单趟运满20后送回私宅金库储存。';
           } else if (selAgent.state === 'ReturningToCamp') {
             if (selAgent.stamina >= 50.0) {
               stateText = selAgent.homeHouseId ? '🏡 运货归家存仓' : '🏕️ 运货返回营地';
@@ -1134,32 +1134,42 @@
           document.getElementById('insp-stamina-val').textContent = `${Math.round(selAgent.stamina)}%`;
           document.getElementById('insp-stamina-fill').style.width = `${selAgent.stamina}%`;
 
-          // 🎒 随身行囊: 展示随身携带的物品与容量上限 (容量 20.0 = sim_core decisions.rs 淘金满载阈值 carried_gold >= 20.0)
-          const CARRY_CAPACITY = 20.0;
-          const carryUsed = Math.min(CARRY_CAPACITY, selAgent.carriedGold || 0.0);
-          const carryPct = Math.round((carryUsed / CARRY_CAPACITY) * 100);
-          const carryCapEl = document.getElementById('insp-carry-cap');
+          // 🎒 随身行囊: 展示随身搬运的物品 (水/粮/木/石 每类独立容量 50.0 互不共享，黄金无限容量)
+          const CARRY_CAP_PER_ITEM = 50.0;   // 与 sim_core agent.rs CARRY_CAPACITY_RESOURCE 一致
+          const CARRY_TOTAL_CAP = 200.0;     // 水+粮+木+石 总容量 (黄金不计入)
+          const GOLD_TRIP_THRESHOLD = 20.0;  // 与 sim_core decisions.rs 淘金单趟运量阈值一致 (容量无限)
+          const cWater = selAgent.carriedWater || 0.0;
+          const cFood = selAgent.carriedFood || 0.0;
+          const cWood = selAgent.carriedWood || 0.0;
+          const cStone = selAgent.carriedStone || 0.0;
+          const cGold = selAgent.carriedGold || 0.0;
+          const carryUsed = Math.min(CARRY_TOTAL_CAP, cWater + cFood + cWood + cStone);
+          const carryPct = Math.round((carryUsed / CARRY_TOTAL_CAP) * 100);
+          const setCarryEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+          setCarryEl('insp-carry-cap', `${carryUsed.toFixed(1)} / ${CARRY_TOTAL_CAP.toFixed(1)} 单位`);
           const carryFillEl = document.getElementById('insp-carry-fill');
-          const carryGoldEl = document.getElementById('insp-carry-gold');
-          const carryHintEl = document.getElementById('insp-carry-hint');
-          if (carryCapEl) carryCapEl.textContent = `${carryUsed.toFixed(1)} / ${CARRY_CAPACITY.toFixed(1)} 单位`;
           if (carryFillEl) carryFillEl.style.width = `${carryPct}%`;
-          if (carryGoldEl) carryGoldEl.textContent = `${(selAgent.carriedGold || 0.0).toFixed(1)} 单位`;
+          setCarryEl('insp-carry-water', `${cWater.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
+          setCarryEl('insp-carry-food', `${cFood.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
+          setCarryEl('insp-carry-wood', `${cWood.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
+          setCarryEl('insp-carry-stone', `${cStone.toFixed(1)} / ${CARRY_CAP_PER_ITEM.toFixed(1)}`);
+          setCarryEl('insp-carry-gold', `${cGold.toFixed(1)} 单位`);
+          const carryHintEl = document.getElementById('insp-carry-hint');
           if (carryHintEl) {
             if (!selAgent.isAlive) {
-              carryHintEl.textContent = '💀 遗骸随身黄金将随遗体风化消散。';
+              carryHintEl.textContent = '💀 遗骸随身携带的物资将随遗体风化消散。';
             } else if (selAgent.state === 'MiningGold') {
-              carryHintEl.textContent = '⛏️ 正在金矿淘金，黄金装入行囊，满载 (≥20.0) 后自动回宅存入金库。';
-            } else if (carryUsed >= CARRY_CAPACITY - 0.01) {
-              carryHintEl.textContent = '🎒 行囊已满 (20.0 单位)，正在折返家宅将黄金存入金库。';
-            } else if (carryUsed > 0.01) {
-              carryHintEl.textContent = '🏠 随身携金，返回家宅后将存入私宅金库用于升级/贮藏。';
+              carryHintEl.textContent = '⛏️ 正在金矿淘金，黄金无限容量装入行囊，单趟运满 20.0 后回宅存入金库。';
+            } else if (carryUsed >= CARRY_TOTAL_CAP - 0.01) {
+              carryHintEl.textContent = '🎒 行囊满载 (水粮木石各 50.0)，正在折返家宅卸货入库。';
+            } else if (carryUsed > 0.01 || cGold > 0.01) {
+              carryHintEl.textContent = '🏠 随身携货，返回家宅后卸货存入私宅仓库。';
             } else {
-              carryHintEl.textContent = '行囊空空，淘金后随身携带的黄金将在此显示。';
+              carryHintEl.textContent = '行囊空空，在资源点搬运物资后将在此显示随身携带物。';
             }
           }
 
-          // 🚚 搬运去向: 水/粮/木/石在资源点即时计入家宅仓库 (无随身携带)，仅黄金随身装入行囊后返家存入金库
+          // 🚚 搬运去向: 水/粮/木/石在资源点装入随身行囊 (每类 50.0)，回家卸货入库；黄金无限容量随身携带
           const haulBox = document.getElementById('insp-carry-haul');
           const haulTextEl = document.getElementById('insp-carry-haul-text');
           if (haulBox && haulTextEl) {
@@ -1170,39 +1180,42 @@
             const pantry = (v, m) => `${v.toFixed(1)}/${m.toFixed(1)}`;
             if (selAgent.isAlive) {
               if (selAgent.state === 'SeekingWater' || selAgent.state === 'DrinkingAtWater') {
-                if (myHouse && myHouse.pantryWater < myHouse.maxPantryWater - 0.05) {
-                  haulText = `💧 清水 → ${houseTag} (仓库 ${pantry(myHouse.pantryWater, myHouse.maxPantryWater)})`;
+                if (myHouse && cWater < CARRY_CAP_PER_ITEM - 0.05) {
+                  haulText = `💧 汲水入囊 → ${houseTag} (行囊 ${cWater.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
                   haulColor = '#38bdf8';
                 }
               } else if (selAgent.state === 'SeekingFood' || selAgent.state === 'ForagingFood') {
-                if (myHouse && myHouse.pantryFood < myHouse.maxPantryFood - 0.05) {
-                  haulText = `🍒 食物 → ${houseTag} (粮仓 ${pantry(myHouse.pantryFood, myHouse.maxPantryFood)})`;
+                if (myHouse && cFood < CARRY_CAP_PER_ITEM - 0.05) {
+                  haulText = `🍒 采食入囊 → ${houseTag} (行囊 ${cFood.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
                   haulColor = '#10b981';
                 }
               } else if (selAgent.state === 'SeekingWood' || selAgent.state === 'GatheringWood') {
-                if (myHouse && myHouse.pantryWood < myHouse.maxPantryWood - 0.05) {
-                  haulText = `🌲 木材 → ${houseTag} (木仓 ${pantry(myHouse.pantryWood, myHouse.maxPantryWood)})`;
+                if (myHouse && cWood < CARRY_CAP_PER_ITEM - 0.05) {
+                  haulText = `🌲 伐木入囊 → ${houseTag} (行囊 ${cWood.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
                   haulColor = '#d97706';
                 }
               } else if (selAgent.state === 'SeekingStone' || selAgent.state === 'MiningStone') {
-                if (myHouse && myHouse.pantryStone < myHouse.maxPantryStone - 0.05) {
-                  haulText = `🪨 石料 → ${houseTag} (石仓 ${pantry(myHouse.pantryStone, myHouse.maxPantryStone)})`;
+                if (myHouse && cStone < CARRY_CAP_PER_ITEM - 0.05) {
+                  haulText = `🪨 采石入囊 → ${houseTag} (行囊 ${cStone.toFixed(1)}/${CARRY_CAP_PER_ITEM.toFixed(1)})`;
                   haulColor = '#94a3b8';
                 }
               } else if (selAgent.state === 'SeekingGold' || selAgent.state === 'MiningGold') {
-                const goldCarried = (selAgent.carriedGold || 0.0).toFixed(1);
                 haulText = myHouse
-                  ? `🪙 黄金 → ${houseTag} (行囊 ${goldCarried}/20.0 · 金库 ${pantry(myHouse.pantryGold, myHouse.maxPantryGold)})`
-                  : `🪙 黄金 → 随身携带 (行囊 ${goldCarried}/20.0)`;
+                  ? `🪙 淘金入囊 → ${houseTag} (行囊 ${cGold.toFixed(1)}/∞ · 金库 ${pantry(myHouse.pantryGold, myHouse.maxPantryGold)})`
+                  : `🪙 淘金入囊 (行囊 ${cGold.toFixed(1)}/∞)`;
                 haulColor = '#fbbf24';
               } else if (selAgent.state === 'ReturningToCamp') {
-                if ((selAgent.carriedGold || 0.0) > 0.01) {
-                  haulText = myHouse
-                    ? `🪙 携金返程 → ${houseTag} 金库 (行囊 ${(selAgent.carriedGold || 0.0).toFixed(1)}/20.0)`
-                    : `🪙 携金返程 (行囊 ${(selAgent.carriedGold || 0.0).toFixed(1)}/20.0)`;
-                  haulColor = '#fbbf24';
+                const packList = [];
+                if (cWater > 0.01) packList.push(`💧${cWater.toFixed(1)}`);
+                if (cFood > 0.01) packList.push(`🍒${cFood.toFixed(1)}`);
+                if (cWood > 0.01) packList.push(`🌲${cWood.toFixed(1)}`);
+                if (cStone > 0.01) packList.push(`🪨${cStone.toFixed(1)}`);
+                if (cGold > 0.01) packList.push(`🪙${cGold.toFixed(1)}`);
+                if (packList.length > 0) {
+                  haulText = `🏠 携货返程 → ${myHouse ? houseTag + ' 卸货入库' : '随身'} (行囊 ${packList.join(' ')})`;
+                  haulColor = '#94a3b8';
                 } else if (myHouse) {
-                  haulText = `🏠 返程中，水/粮/木/石已即时计入${houseTag}仓库`;
+                  haulText = `🏠 返程中`;
                   haulColor = '#94a3b8';
                 }
               }

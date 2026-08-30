@@ -1,6 +1,6 @@
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
-use super::agent::{Agent3D, Gender, PrimitiveActionState};
+use super::agent::{Agent3D, Gender, PrimitiveActionState, CARRY_CAPACITY_RESOURCE};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::{House, HouseTier};
 use super::world::World3DEngine;
@@ -474,14 +474,17 @@ impl<'a> Decisioner<'a> {
 
     // ---------- 执行中状态: 完成 / 金字塔降级回退 ----------
 
-    /// 喝水完成: 自身解渴(≥49.9)且家宅水库已满(或水源枯竭) → 若仍饥饿转觅食, 否则归巢休息
+    /// 喝水完成: 自身解渴(≥49.9)且家宅水库已满(或水源枯竭)，或随身行囊装水满载(50.0)必须返家卸货 → 若仍饥饿转觅食, 否则归巢休息
     fn decide_drinking(&mut self, agent: &mut Agent3D) {
+        let can_stock = agent.home_house_id.is_some();
         let house_water_full = agent.home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.pantry_water >= (h.max_pantry_water * 0.98))
             .unwrap_or(true);
         let self_satisfied = agent.thirst >= 49.9;
-        let finished = (self_satisfied && house_water_full) || self.source_empty(PoiType::WaterSource, agent.world_pos);
+        // 随身行囊装水满载 (50.0) 后必须返回家宅卸货入库
+        let carry_full = can_stock && agent.carried_water >= CARRY_CAPACITY_RESOURCE;
+        let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || self.source_empty(PoiType::WaterSource, agent.world_pos);
 
         if finished {
             if agent.hunger < 25.0 && !self.ctx.food_nodes.is_empty() {
@@ -496,14 +499,17 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 觅食完成: 自身吃饱(≥49.9)且家宅粮仓已满(或浆果枯竭) → 若仍口渴转饮水, 否则归巢休息
+    /// 觅食完成: 自身吃饱(≥49.9)且家宅粮仓已满(或浆果枯竭)，或随身行囊装粮满载(50.0)必须返家卸货 → 若仍口渴转饮水, 否则归巢休息
     fn decide_foraging(&mut self, agent: &mut Agent3D) {
+        let can_stock = agent.home_house_id.is_some();
         let house_food_full = agent.home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.pantry_food >= (h.max_pantry_food * 0.98))
             .unwrap_or(true);
         let self_satisfied = agent.hunger >= 49.9;
-        let finished = (self_satisfied && house_food_full) || self.source_empty(PoiType::BerryBush, agent.world_pos);
+        // 随身行囊装粮满载 (50.0) 后必须返回家宅卸货入库
+        let carry_full = can_stock && agent.carried_food >= CARRY_CAPACITY_RESOURCE;
+        let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || self.source_empty(PoiType::BerryBush, agent.world_pos);
 
         if finished {
             if agent.thirst < 25.0 && !self.ctx.water_nodes.is_empty() {
@@ -518,15 +524,21 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 采收完成: 采石伐木等非生理需求必须严格让位于生理需求 (资源枯竭 / 家宅已满 / 生理告急[饥渴<25 或 体力<50]) → 归巢
+    /// 采收完成: 采石伐木等非生理需求必须严格让位于生理需求 (资源枯竭 / 家宅已满 / 行囊装满 / 生理告急[饥渴<25 或 体力<50]) → 归巢卸货
     fn decide_harvest(&mut self, agent: &mut Agent3D, poi_type: PoiType, fully_stocked: bool) {
-        if self.source_empty(poi_type, agent.world_pos) || fully_stocked || agent.hunger < 25.0 || agent.thirst < 25.0 || agent.stamina < 50.0 {
+        // 随身行囊装满对应资源 (每类 50.0) 后必须返回家宅卸货入库
+        let carry_full = match poi_type {
+            PoiType::WoodForest => agent.carried_wood >= CARRY_CAPACITY_RESOURCE,
+            PoiType::StoneQuarry => agent.carried_stone >= CARRY_CAPACITY_RESOURCE,
+            _ => false,
+        };
+        if self.source_empty(poi_type, agent.world_pos) || fully_stocked || carry_full || agent.hunger < 25.0 || agent.thirst < 25.0 || agent.stamina < 50.0 {
             agent.current_need = Some(if agent.stamina < 50.0 { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);
         }
     }
 
-    /// 淘金持续作业: 随身收集金币，装载满(>=20)或金库补足或生理告急时优先送回房子
+    /// 淘金持续作业: 随身收集金币 (黄金容量无限，20.0 仅为单趟运量阈值)，或金库补足或生理告急时优先送回房子
     fn decide_mining_gold(&mut self, agent: &mut Agent3D) {
         let is_building_stock = agent.home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))

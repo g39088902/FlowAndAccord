@@ -4,6 +4,9 @@ use super::graph::{LaneGraph3D, LaneId, NodeId};
 
 pub type AgentId = u32;
 
+/// 随身携带容量: 水/粮/木/石 每类独立上限 50.0 单位 (互不共享)，黄金可无限携带
+pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
+
 /// 性别系统
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Gender {
@@ -45,7 +48,12 @@ pub struct Agent3D {
     pub hunger: f32,          // 饱食度 (最大 50.0 单位)
     pub thirst: f32,          // 水分值 (最大 50.0 单位)
     pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
-    pub carried_gold: f32,    // 随身携带黄金数量 (无限容量，可随身常备或存入家宅升级庄园)
+    // 随身行囊: 水/粮/木/石 每类独立容量 50.0 单位 (互不共享)，黄金无限容量
+    pub carried_water: f32,   // 随身携带清水 (容量 50.0，资源点装入，回家卸货入库)
+    pub carried_food: f32,    // 随身携带食物 (容量 50.0)
+    pub carried_wood: f32,    // 随身携带木材 (容量 50.0)
+    pub carried_stone: f32,   // 随身携带石料 (容量 50.0)
+    pub carried_gold: f32,    // 随身携带黄金 (无限容量，可随身常备或存入家宅升级庄园)
     pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     pub home_house_id: Option<u32>,      // 拥有的私产房屋 ID
@@ -101,6 +109,10 @@ impl Agent3D {
             hunger: 25.0, // 初始 50% (满值 50.0)
             thirst: 25.0, // 初始 50% (满值 50.0)
             stamina: 95.0,
+            carried_water: 0.0,
+            carried_food: 0.0,
+            carried_wood: 0.0,
+            carried_stone: 0.0,
             carried_gold: 0.0,
             home_camp_node: home_camp,
             target_poi_node: None,
@@ -132,6 +144,11 @@ impl Agent3D {
             forward_heading_rad: 0.0,
             pitch_rad: 0.0,
         }
+    }
+
+    /// 随身行囊当前总装载量 (水+粮+木+石，黄金不计入容量)
+    pub fn carried_load(&self) -> f32 {
+        self.carried_water + self.carried_food + self.carried_wood + self.carried_stone
     }
 
     /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
