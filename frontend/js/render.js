@@ -1234,52 +1234,109 @@
 
           // 家族血脉与世系族谱渲染 (兼容父亲、母亲、配偶与子嗣)
           const fatherElem = document.getElementById('insp-lineage-father');
-          if (selAgent.fatherId) {
-            const fAgent = sim.agents.find(a => a.id === selAgent.fatherId);
-            const fAlive = fAgent && fAgent.isAlive;
-            const fHtml = `<span class="lineage-chip ${fAlive ? '' : 'dead'}" data-agent-id="${selAgent.fatherId}" title="点击追踪父亲视角">👨 父亲 #${selAgent.fatherId} ${fAlive ? '🟢' : '💀'}</span>`;
-            if (fatherElem.innerHTML !== fHtml) fatherElem.innerHTML = fHtml;
-          } else {
-            const fHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
-            if (fatherElem.innerHTML !== fHtml) fatherElem.innerHTML = fHtml;
+          if (fatherElem) {
+            if (selAgent.fatherId) {
+              const fAgent = sim.agents.find(a => a.id === selAgent.fatherId);
+              const fAlive = fAgent && fAgent.isAlive;
+              const fHtml = `<span class="lineage-chip ${fAlive ? '' : 'dead'}" data-agent-id="${selAgent.fatherId}" title="点击追踪父亲视角">👨 父亲 #${selAgent.fatherId} ${fAlive ? '🟢' : '💀'}</span>`;
+              if (fatherElem.innerHTML !== fHtml) fatherElem.innerHTML = fHtml;
+            } else {
+              const fHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
+              if (fatherElem.innerHTML !== fHtml) fatherElem.innerHTML = fHtml;
+            }
           }
 
           const motherElem = document.getElementById('insp-lineage-mother');
-          if (selAgent.motherId) {
-            const mAgent = sim.agents.find(a => a.id === selAgent.motherId);
-            const mAlive = mAgent && mAgent.isAlive;
-            const mHtml = `<span class="lineage-chip female ${mAlive ? '' : 'dead'}" data-agent-id="${selAgent.motherId}" title="点击追踪母亲视角">👩 母亲 #${selAgent.motherId} ${mAlive ? '🟢' : '💀'}</span>`;
-            if (motherElem.innerHTML !== mHtml) motherElem.innerHTML = mHtml;
-          } else {
-            const mHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
-            if (motherElem.innerHTML !== mHtml) motherElem.innerHTML = mHtml;
+          if (motherElem) {
+            if (selAgent.motherId) {
+              const mAgent = sim.agents.find(a => a.id === selAgent.motherId);
+              const mAlive = mAgent && mAgent.isAlive;
+              const mHtml = `<span class="lineage-chip female ${mAlive ? '' : 'dead'}" data-agent-id="${selAgent.motherId}" title="点击追踪母亲视角">👩 母亲 #${selAgent.motherId} ${mAlive ? '🟢' : '💀'}</span>`;
+              if (motherElem.innerHTML !== mHtml) motherElem.innerHTML = mHtml;
+            } else {
+              const mHtml = `<span style="color:#64748b;">— (开局始祖代)</span>`;
+              if (motherElem.innerHTML !== mHtml) motherElem.innerHTML = mHtml;
+            }
           }
 
           const spouseElem = document.getElementById('insp-lineage-spouse');
-          if (selAgent.spouseId) {
-            const sAgent = sim.agents.find(a => a.id === selAgent.spouseId);
-            const sAlive = sAgent && sAgent.isAlive;
-            const isHusband = sAgent && sAgent.gender === 'male';
-            const sHtml = `<span class="lineage-chip ${isHusband ? '' : 'female'} ${sAlive ? '' : 'dead'}" data-agent-id="${selAgent.spouseId}" title="点击追踪配偶视角">💍 ${isHusband ? '丈夫' : '妻子'} #${selAgent.spouseId} ${sAlive ? '🟢' : '💀'}</span>`;
-            if (spouseElem.innerHTML !== sHtml) spouseElem.innerHTML = sHtml;
-          } else {
-            const sHtml = `<span style="color:#64748b;">未婚单身</span>`;
-            if (spouseElem.innerHTML !== sHtml) spouseElem.innerHTML = sHtml;
+          if (spouseElem) {
+            if (selAgent.spouseId) {
+              const sAgent = sim.agents.find(a => a.id === selAgent.spouseId);
+              const sAlive = sAgent && sAgent.isAlive;
+              const isHusband = sAgent && sAgent.gender === 'male';
+              const sHtml = `<span class="lineage-chip ${isHusband ? '' : 'female'} ${sAlive ? '' : 'dead'}" data-agent-id="${selAgent.spouseId}" title="点击追踪配偶视角">💍 ${isHusband ? '丈夫' : '妻子'} #${selAgent.spouseId} ${sAlive ? '🟢' : '💀'}</span>`;
+              if (spouseElem.innerHTML !== sHtml) spouseElem.innerHTML = sHtml;
+            } else {
+              const sHtml = `<span style="color:#64748b;">未婚单身</span>`;
+              if (spouseElem.innerHTML !== sHtml) spouseElem.innerHTML = sHtml;
+            }
+          }
+
+          const houseElem = document.getElementById('insp-lineage-house');
+          if (houseElem) {
+            if (selAgent.homeHouseId) {
+              const myH = sim.houses.find(h => h.id === selAgent.homeHouseId);
+              const tierName = myH ? ({
+                'Tier0Warehouse': '0级仓库',
+                'Tier1ThatchedHut': '1级茅草房',
+                'Tier2LeanTo': '2级半棚屋',
+                'Tier3Homestead': '3级木石庄舍',
+                'Tier4Manor': '4级大庄园'
+              }[myH.tier] || '私宅') : '私宅';
+              const hHtml = `<span style="color:#38bdf8; font-weight:600;">🏠 #${selAgent.homeHouseId} (${tierName})</span>`;
+              if (houseElem.innerHTML !== hHtml) houseElem.innerHTML = hHtml;
+            } else {
+              const hHtml = `<span style="color:#64748b;">居于营地 (无私宅)</span>`;
+              if (houseElem.innerHTML !== hHtml) houseElem.innerHTML = hHtml;
+            }
           }
 
           const childrenElem = document.getElementById('insp-lineage-children');
-          if (selAgent.children && selAgent.children.length > 0) {
-            let cHtml = '';
-            for (const cId of selAgent.children) {
-              const cAgent = sim.agents.find(a => a.id === cId);
-              const cAlive = cAgent && cAgent.isAlive;
-              const isFem = cAgent && cAgent.gender === 'female';
-              cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪子嗣 #${cId}">${isFem ? '👧' : '👦'} #${cId} ${cAlive ? '🟢' : '💀'}</span>`;
+          const childrenCountElem = document.getElementById('insp-lineage-children-count');
+          if (childrenElem) {
+            if (selAgent.children && selAgent.children.length > 0) {
+              let cHtml = '';
+              for (const cId of selAgent.children) {
+                const cAgent = sim.agents.find(a => a.id === cId);
+                const cAlive = cAgent && cAgent.isAlive;
+                const isFem = cAgent && cAgent.gender === 'female';
+                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪子嗣 #${cId}">${isFem ? '👧' : '👦'} #${cId} ${cAlive ? '🟢' : '💀'}</span>`;
+              }
+              if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
+              if (childrenCountElem) childrenCountElem.textContent = `共 ${selAgent.children.length} 位后代`;
+            } else {
+              const cHtml = `<span style="color:#64748b;">暂无子女</span>`;
+              if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
+              if (childrenCountElem) childrenCountElem.textContent = `0 位后代`;
             }
-            if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
-          } else {
-            const cHtml = `<span style="color:#64748b;">暂无子女</span>`;
-            if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
+          }
+
+          // 弹窗头部与自身卡片更新
+          const modalTitle = document.getElementById('lineage-modal-title');
+          if (modalTitle) {
+            modalTitle.textContent = `部落民 #${selAgent.id} (${selAgent.gender === 'female' ? '♀' : '♂'}) 世系族谱`;
+          }
+          const selfName = document.getElementById('lineage-self-name');
+          if (selfName) {
+            selfName.textContent = `部落民 #${selAgent.id} (${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
+          }
+          const selfAvatar = document.getElementById('lineage-self-avatar');
+          if (selfAvatar) {
+            selfAvatar.textContent = !selAgent.isAlive ? '💀' : (selAgent.gender === 'female' ? (selAgent.isPregnant ? '🤰' : '👩') : '👦');
+          }
+          const selfGen = document.getElementById('lineage-self-gen');
+          if (selfGen) {
+            const hasParents = selAgent.fatherId || selAgent.motherId;
+            selfGen.textContent = hasParents ? '后继代' : '始祖第1代';
+          }
+          const selfStatus = document.getElementById('lineage-self-status');
+          if (selfStatus) {
+            selfStatus.textContent = `年龄 ${Math.floor(selAgent.age)}s · 饱食 ${Math.round(selAgent.hunger)} · 体力 ${Math.round(selAgent.stamina)}%`;
+          }
+          const selfNeedBadge = document.getElementById('lineage-self-need-badge');
+          if (selfNeedBadge) {
+            selfNeedBadge.textContent = selAgent.currentNeed || (selAgent.isAlive ? '活跃中' : '已故');
           }
 
           const cdBox = document.getElementById('insp-cooldown-box');

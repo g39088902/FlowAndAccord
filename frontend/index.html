@@ -276,33 +276,14 @@
           <div style="font-size:9px; color:#f472b6;">指标跌破 20% (10.0单位水粮/20%体力) 将流产并触发60秒冷却！</div>
         </div>
 
-        <!-- 家族血脉族谱组件 (点击可追踪亲眷) -->
-        <div class="lineage-card" id="insp-lineage-box" style="margin-top:6px; background:rgba(15, 23, 42, 0.7); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 8px; font-size:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-weight:700; color:#38bdf8;">
-            <span>🌳 家族血脉与世系族谱</span>
-            <span style="font-size:9px; color:#94a3b8;">点击亲眷名字直接追踪</span>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="color:#94a3b8; min-width:42px;">👨 父亲:</span>
-              <span id="insp-lineage-father"><span style="color:#64748b;">— (开局始祖代)</span></span>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="color:#94a3b8; min-width:42px;">👩 母亲:</span>
-              <span id="insp-lineage-mother"><span style="color:#64748b;">— (开局始祖代)</span></span>
-            </div>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="color:#94a3b8; min-width:42px;">💍 配偶:</span>
-              <span id="insp-lineage-spouse"><span style="color:#64748b;">未婚单身</span></span>
-            </div>
-            <div style="display:flex; align-items:flex-start; gap:4px;">
-              <span style="color:#94a3b8; min-width:42px;">👶 子嗣:</span>
-              <div id="insp-lineage-children" style="display:flex; flex-wrap:wrap; gap:4px; flex:1;">
-                <span style="color:#64748b;">暂无子女</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- 家族血脉族谱入口按钮 (点击弹出模态弹窗) -->
+        <button id="btn-open-lineage-modal" class="lineage-toggle-btn" style="margin-top:8px; width:100%; display:flex; align-items:center; justify-content:space-between; background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.35); border-radius:8px; padding:7px 10px; font-size:11px; font-weight:600; color:#38bdf8; cursor:pointer; transition:all 0.2s ease;">
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span>🌳</span>
+            <span>家族世系族谱</span>
+          </span>
+          <span id="insp-lineage-btn-badge" style="font-size:10px; background:rgba(56,189,248,0.2); padding:1px 6px; border-radius:4px; color:#bae6fd;">展开族谱 ↗</span>
+        </button>
       </div>
 
       <div id="insp-poi-view" style="display:none; flex-direction:column; gap:6px;">
@@ -402,6 +383,79 @@
     </div>
   </div>
 
+
+  <!-- 家族世系族谱模态弹窗 -->
+  <div id="lineage-modal" class="lineage-modal-overlay" style="display:none;">
+    <div class="lineage-modal-card">
+      <div class="lineage-modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">🌳</span>
+          <div>
+            <div id="lineage-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">部落民 #1 世系族谱</div>
+            <div style="font-size:10px; color:#94a3b8;">家族世代传承与血脉谱系 · 点击亲眷名字可直接切换并追踪视角</div>
+          </div>
+        </div>
+        <button id="btn-close-lineage-modal" class="lineage-modal-close" title="关闭族谱 (Esc)">✕</button>
+      </div>
+      <div class="lineage-modal-body">
+        <!-- 当前部落民核心属性卡片 -->
+        <div id="lineage-modal-self-card" class="lineage-self-card">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div id="lineage-self-avatar" style="font-size:22px;">👦</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span id="lineage-self-name" style="font-size:13px; font-weight:700; color:#f8fafc;">部落民 #1</span>
+                <span id="lineage-self-gen" style="font-size:9px; background:#334155; color:#cbd5e1; padding:1px 5px; border-radius:4px;">始祖第1代</span>
+              </div>
+              <div id="lineage-self-status" style="font-size:10px; color:#94a3b8; margin-top:2px;">年龄 120s · 饱食 50 · 体力 100%</div>
+            </div>
+          </div>
+          <div id="lineage-self-need-badge" style="font-size:10px; padding:3px 8px; border-radius:6px; background:rgba(16,185,129,0.15); color:#6ee7b7; border:1px solid rgba(16,185,129,0.3);">
+            Physiological·Rest
+          </div>
+        </div>
+
+        <!-- 关系网四宫格 -->
+        <div class="lineage-modal-grid">
+          <div class="lineage-section">
+            <div class="lineage-section-title">👴 父亲 (Father)</div>
+            <div class="lineage-section-content" style="padding-top:4px;">
+              <span id="insp-lineage-father"><span style="color:#64748b;">— (开局始祖代)</span></span>
+            </div>
+          </div>
+          <div class="lineage-section">
+            <div class="lineage-section-title">👩 母亲 (Mother)</div>
+            <div class="lineage-section-content" style="padding-top:4px;">
+              <span id="insp-lineage-mother"><span style="color:#64748b;">— (开局始祖代)</span></span>
+            </div>
+          </div>
+          <div class="lineage-section">
+            <div class="lineage-section-title">💍 配偶眷属 (Spouse)</div>
+            <div class="lineage-section-content" style="padding-top:4px;">
+              <span id="insp-lineage-spouse"><span style="color:#64748b;">未婚单身</span></span>
+            </div>
+          </div>
+          <div class="lineage-section">
+            <div class="lineage-section-title">🏠 私宅归属 (House)</div>
+            <div class="lineage-section-content" style="padding-top:4px;">
+              <span id="insp-lineage-house"><span style="color:#64748b;">居于营地 (无私宅)</span></span>
+            </div>
+          </div>
+          <div class="lineage-section" style="grid-column: 1 / -1;">
+            <div class="lineage-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>👶 后代子嗣 (Children)</span>
+              <span id="insp-lineage-children-count" style="font-size:10px; color:#94a3b8; font-weight:normal;">0 位后代</span>
+            </div>
+            <div class="lineage-section-content" style="padding-top:6px;">
+              <div id="insp-lineage-children" style="display:flex; flex-wrap:wrap; gap:6px;">
+                <span style="color:#64748b;">暂无子女</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="js/math.js"></script>
   <script src="js/rustworld.js"></script>

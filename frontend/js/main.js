@@ -152,11 +152,69 @@
     }
 
     // ==========================================
+    // 家族世系族谱模态弹窗打开/关闭与穿梭跳转
+    // ==========================================
+    const lineageModal = document.getElementById('lineage-modal');
+    const openLineageBtn = document.getElementById('btn-open-lineage-modal');
+    const closeLineageBtn = document.getElementById('btn-close-lineage-modal');
+
+    function openLineageModal() {
+      if (lineageModal) lineageModal.style.display = 'flex';
+    }
+    function closeLineageModal() {
+      if (lineageModal) lineageModal.style.display = 'none';
+    }
+
+    if (openLineageBtn) {
+      openLineageBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        openLineageModal();
+      });
+    }
+    if (closeLineageBtn) {
+      closeLineageBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        closeLineageModal();
+      });
+    }
+    if (lineageModal) {
+      lineageModal.addEventListener('click', e => {
+        if (e.target === lineageModal) {
+          closeLineageModal();
+          return;
+        }
+        const chip = e.target.closest('[data-agent-id]');
+        if (chip) {
+          e.stopPropagation();
+          const targetId = parseInt(chip.getAttribute('data-agent-id'), 10);
+          if (!isNaN(targetId)) {
+            sim.selectionType = 'agent';
+            sim.selectedAgentId = targetId;
+            const targetAgent = sim.agents.find(a => a.id === targetId);
+            if (targetAgent) {
+              const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+              const rx = targetAgent.pos.x * cosZ - targetAgent.pos.y * sinZ;
+              const ry = targetAgent.pos.x * sinZ + targetAgent.pos.y * cosZ;
+              const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+              const y2 = ry * cosX - (targetAgent.pos.z || 0) * sinX;
+
+              camera.panX = -rx * camera.zoom;
+              camera.panY = -y2 * camera.zoom;
+              isCameraFollow = true;
+              if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+            }
+          }
+        }
+      });
+    }
+
+    // ==========================================
     // Inspector 关闭按钮 (✕) 与 Esc 快捷键 (关闭 agent/poi/house 选中窗口)
     // ==========================================
     function closeInspector() {
       sim.deselect();
       isCameraFollow = false;
+      closeLineageModal();
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
     }
     const closeInspBtn = document.getElementById('insp-close-btn');
@@ -170,6 +228,10 @@
       if (e.key === 'Escape' || e.key === 'Esc') {
         const tag = e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (lineageModal && lineageModal.style.display === 'flex') {
+          closeLineageModal();
+          return;
+        }
         closeInspector();
       }
     });
