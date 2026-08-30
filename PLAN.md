@@ -1,7 +1,12 @@
-# 🌊 Flow & Accord（动线与协约）项目计划书
+﻿# 🌊 Flow & Accord（动线与协约）项目计划书
 > **原项目代号**：Project OmnisCity  
 > **核心定位**：社区尺度空间自发生长 × 微观动线与动态专利经济 × 现代混合政体光谱（兼具民主/技术/寡头/军阀/宗法/霸权复合形态） × 具身认知与生成式社交恋爱引擎  
 > **架构范式**：纯数据无头核心（Headless Core） + 表现层完全解耦 + 确定性 Tick 驱动 + 异步认知大模型驱动  
+
+> ⚠️ **项目计划定位与现状说明（愿景 vs 现状）**：  
+> 本文档记录了项目的**宏观愿景、政治学/认知科学理论框架与 16 周长程演进排期规划**。  
+> - **当前实际落地状态**：项目已完成确定性 Rust 原始生态演化引擎（30Hz 物理步进、(tick_counter + agent.id) % 15 == 0 错峰决策、21 处有限生态 POI、5 阶私宅进阶、随身行囊真实搬运与代际继承大闭环），详见 [CURRENT.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/CURRENT.md) 与 [AGENTS.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/AGENTS.md)。  
+> - **本文档内容（混合政体、六维政治资本、LLM 希腊合唱队、动态专利经济等）均为长程演进愿景**，请勿将规划特性误认为当前已有功能。
 
 ---
 
