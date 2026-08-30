@@ -612,7 +612,8 @@ impl<'a> Decisioner<'a> {
 }
 
 impl World3DEngine {
-    /// 生存决策调度: 马斯洛需求层次驱动 (世界 tick 每 15 步全族人评估一次)
+    /// 错峰决策调度: 每 tick 调用一次；每个 agent 仅在 (tick + id) % 15 的相位上决策
+    /// (每位小人平均仍每 15 tick 决策一次，但相位按 id 错开，消除全员同 tick 齐步走)
     pub fn tick_decisions(&mut self) {
         let ctx = self.build_decision_context();
         let mut decisioner = Decisioner {
@@ -623,7 +624,8 @@ impl World3DEngine {
             rng: &mut self.rng,
         };
         for agent in &mut self.agents {
-            if agent.is_alive {
+            // 相位过滤: 每个 agent 在 (tick_counter + agent.id) % 15 == 0 时决策
+            if agent.is_alive && (self.tick_counter + agent.id as u64) % 15 == 0 {
                 decisioner.decide(agent);
             }
         }
@@ -679,6 +681,46 @@ mod tests {
     use crate::spatial::poi::PrimitivePoi;
     use crate::spatial::{NodeType, RoadClass};
 
+    /// 测试辅助: 将世界时钟拨到 agent[0] (id=1) 的决策相位 (tick=14 => (14+1)%15==0)，确保错峰决策能驱动目标 agent
+    fn decide_now(world: &mut World3DEngine) {
+        world.tick_counter = 14;
+        world.tick_decisions();
+    }
+
+    /// 错峰决策: 不同 id 的 agent 在不同 tick 相位上决策，而非全员同 tick 齐步走
+    #[test]
+    fn test_staggered_decision_offsets() {
+        let mut world = World3DEngine::new(60, 764.0);
+        world.seed_primitive_ecology(12);
+        let camp_node = world.agents[0].home_camp_node;
+        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
+        let water_pos = Vec3::new(camp_pos.x + 10.0, camp_pos.y, camp_pos.z);
+        let water_node = world.network.add_node(water_pos, NodeType::GroundIntersection);
+        let _ = world.network.add_lane(camp_node, water_node, None, RoadClass::DirtTrack);
+        let _ = world.network.add_lane(water_node, camp_node, None, RoadClass::DirtTrack);
+        world.pois.push(PrimitivePoi::new(999, PoiType::WaterSource, water_pos));
+
+        // 给前两个 agent (id=1, id=2) 都制造严重口渴
+        for a in world.agents.iter_mut().take(2) {
+            a.world_pos = camp_pos;
+            a.state = PrimitiveActionState::RestingAtCamp;
+            a.thirst = 5.0;
+            a.hunger = 45.0;
+            a.stamina = 100.0;
+        }
+
+        // tick=13: 仅 id=2 (agent[1]) 相位命中 ((13+2)%15==0)，id=1 (agent[0]) 不命中
+        world.tick_counter = 13;
+        world.tick_decisions();
+        assert_eq!(world.agents[0].state, PrimitiveActionState::RestingAtCamp, "id=1 的相位不应在 tick=13 决策");
+        assert_eq!(world.agents[1].state, PrimitiveActionState::SeekingWater, "id=2 的相位应在 tick=13 决策");
+
+        // tick=14: 轮到 id=1 (agent[0]) 决策 ((14+1)%15==0)
+        world.tick_counter = 14;
+        world.tick_decisions();
+        assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingWater, "id=1 的相位应在 tick=14 决策");
+    }
+
     #[test]
     fn test_thirst_need_drives_seeking_water() {
         let mut world = World3DEngine::new(60, 764.0);
@@ -695,7 +737,7 @@ mod tests {
         world.agents[0].thirst = 5.0;  // 严重口渴
         world.agents[0].hunger = 45.0;
         world.agents[0].stamina = 100.0;
-        world.tick_decisions();
+        decide_now(&mut world);
 
         assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingWater);
         assert_eq!(world.agents[0].target_poi_node, Some(water_node));
@@ -720,7 +762,7 @@ mod tests {
         world.agents[0].thirst = 50.0;
         world.agents[0].hunger = 50.0;
         world.agents[0].stamina = 100.0;
-        world.tick_decisions();
+        decide_now(&mut world);
 
         // 仓库未填满时，优先出发运水/运粮补齐仓库（安全需求），绝不直接施工建房
         assert!(world.agents[0].state == PrimitiveActionState::SeekingWater || world.agents[0].state == PrimitiveActionState::SeekingFood);
@@ -747,7 +789,7 @@ mod tests {
         world.agents[0].hunger = 50.0;
         world.agents[0].stamina = 100.0;
         world.agents[0].gold_mining_cooldown = 0.0;
-        world.tick_decisions();
+        decide_now(&mut world);
 
         assert_eq!(world.agents[0].state, PrimitiveActionState::SeekingGold);
         assert_eq!(world.agents[0].gold_mining_cooldown, 45.0);
@@ -776,7 +818,7 @@ mod tests {
         for _ in 0..30 {
             world.agents[0].state = PrimitiveActionState::RestingAtCamp;
             world.agents[0].gold_mining_cooldown = 0.0;
-            world.tick_decisions();
+            decide_now(&mut world);
             if world.agents[0].state == PrimitiveActionState::SeekingGold {
                 gold_dispatched = true;
                 break;
@@ -796,11 +838,11 @@ mod tests {
         world.agents[0].thirst = 50.0;
         world.agents[0].hunger = 50.0;
         world.agents[0].stamina = 100.0;
-        world.tick_decisions();
+        decide_now(&mut world);
         assert_eq!(world.agents[0].state, PrimitiveActionState::MiningGold);
 
         world.agents[0].stamina = 49.0;
-        world.tick_decisions();
+        decide_now(&mut world);
         assert_eq!(world.agents[0].state, PrimitiveActionState::ReturningToCamp);
     }
 
@@ -821,12 +863,12 @@ mod tests {
         world.agents[0].thirst = 50.0;
         world.agents[0].hunger = 50.0;
         world.agents[0].stamina = 75.0;
-        world.tick_decisions();
+        decide_now(&mut world);
         assert_eq!(world.agents[0].state, PrimitiveActionState::RestingAtCamp);
         assert_eq!(world.agents[0].current_need.as_deref(), Some("Physiological·Rest"));
 
         world.agents[0].stamina = 100.0;
-        world.tick_decisions();
+        decide_now(&mut world);
         assert_ne!(world.agents[0].state, PrimitiveActionState::RestingAtCamp);
     }
 }

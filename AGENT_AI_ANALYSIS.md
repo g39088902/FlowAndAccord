@@ -30,7 +30,7 @@ flowchart TD
     end
 
     subgraph D["② 动机决策层 (世界仲裁)"]
-        D1["tick_decisions: 层次化动机仲裁<br>生理急迫 > 备货 > 随机觅食<br>每 15 Tick 执行一次"]
+        D1["tick_decisions: 层次化动机仲裁<br>生理急迫 > 备货 > 随机觅食<br>错峰: 每 agent 按 (tick+id)%15 相位决策"]
     end
 
     subgraph N["③ 路径规划层 (A*)"]
@@ -83,7 +83,7 @@ RestingAtCamp --备料完成--> ConstructingHouse --30s--> RestingAtCamp (升级
 
 ## 4. 动机决策层：层次化仲裁（AI 的核心算法）
 
-`tick_decisions()` 每 **15 个 Tick** 执行一次（Rust 20Hz→每 0.75s；JS 30Hz→每 0.5s），**优先级从高到低**：
+`tick_decisions()` 采用**错峰调度**：每 tick 调用一次，但每个 agent 仅在 `(tick + id) % 15 == 0` 的相位上决策（每位小人平均仍每 15 Tick = 0.5s@30Hz 决策一次，但相位按 id 错开，消除全员同 tick 齐步走），**优先级从高到低**：
 
 ### 4.1 生理急迫第一原则（最高优先级）
 仅当处于 `RestingAtCamp` 时：
@@ -174,7 +174,7 @@ tick()
  ├─ ② 代谢与繁衍 (tick_metabolism: 饥饿/脱水死亡、受孕/流产/分娩)
  ├─ ③ POI 提取/回填家宅 + 分娩出生 + 尸骸风化 (tick_poi_interactions)
  ├─ ④ 房屋系统 (tick_housing: 季节/取暖/折旧/修缮/施工/升级/建仓/继承)
- ├─ ⑤ 决策调度 (每 15 Tick: tick_decisions)          ← AI 大脑，低频
+ ├─ ⑤ 决策调度 (每 Tick 调度, 按 (tick+id)%15 相位错峰)  ← AI 大脑，低频
  ├─ ⑥ 道路退化衰减 (tick_wear_decay)
  └─ ⑦ 动力学运动 (tick_movement)                     ← AI 躯体，高频
 ```
@@ -205,9 +205,9 @@ tick()
    - 修复方向：以 `frontend/js/agent.js` 为参照回填枚举与函数体（两版逻辑一致）。
 2. **🔴 cargo 未安装或不在 PATH**：无法执行 `cargo check` 验证（`where.exe cargo` 与用户目录搜索均未找到）。
 3. **🟠 确定性缺口**：`thread_rng()` 未种子化，同参数重跑结果不同，与"确定性核心"目标冲突；JS 版用 `Math.random()`，双轨不可对齐。
-4. **🟠 双轨节流不一致**：决策每 15 Tick，Rust 20Hz=0.75s vs JS 30Hz=0.5s，同一逻辑在两端行为节奏漂移。
+4. **🟠 双轨节流不一致**：决策相位 (tick+id)%15，Rust 20Hz=0.75s vs JS 30Hz=0.5s，同一逻辑在两端行为节奏漂移。
 5. **🟡 代码重复**：水/粮/木/石/金五个资源分支各复制一份"排序+寻路+状态迁移"（world.rs 约 8 处、simulation.js 20+ 处），宜抽象为数据驱动的资源表。
-6. **🟡 性能**：寻路每 15 Tick 全量重算 + 每帧全量遍历，Agent 数量增大后无空间索引/寻路缓存。
+6. **🟡 性能**：决策触发的寻路按 agent 相位错峰重算 + 每帧全量遍历，Agent 数量增大后无空间索引/寻路缓存。
 
 ---
 

@@ -136,9 +136,8 @@ impl World3DEngine {
         // 4. 自发筑屋建造、私产确权、折旧与代际继承
         self.tick_housing(dt);
 
-        if self.tick_counter % 15 == 0 {
-            self.tick_decisions();
-        }
+        // 错峰决策: 每个 agent 在自己 (tick + id) % 15 的相位上决策 (每 tick 调度一次，内部按相位过滤)
+        self.tick_decisions();
 
         // 5. 道路自然杂草丛生与退化衰减
         self.network.tick_wear_decay(dt);
