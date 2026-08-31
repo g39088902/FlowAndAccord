@@ -30,6 +30,15 @@ FlowAndAccord/
 │   ├── server.js           # 静态文件开发服务器 (内置 .wasm MIME 支持)
 │   ├── style.css           # 现代玻璃拟态样式与无衬线字体族
 │   └── index.html          # 前端入口 (引入 config.js)
+├── AGENTS.md                # 智能体操作指南 (唯一保留在根目录的文档)
+├── docs/                    # 📚 全部项目文档
+│   ├── CURRENT.md           # 已实现功能「索引入口」(模块导航表)
+│   ├── BUILD_GUIDE.md       # [本文档] 编译与运行深度指南
+│   ├── AGENT_AI_ANALYSIS.md # 部落民 AI 决策系统深度拆解
+│   ├── ARCHITECTURE.md      # 宏观技术架构设计愿景书
+│   ├── PLAN.md              # 项目长期规划书
+│   ├── TODO.md              # 待办事项清单
+│   └── current/             # 已实现功能分模块文档 (01~11)
 └── tools/
     └── test-wasm.js        # Node.js WASM 自动化回归测试套件
 ```
@@ -173,4 +182,4 @@ window.SIM_CONFIG = {
    * 嶙峋石矿 2 处（ID 40-41，储量 60.0，产速 1.5/s）
    * 璀璨金矿 1 处（ID 50，储量 60.0，产速 1.2/s）
 5. **版本号规范**：
-   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.54`），在 `index.html`、`AGENTS.md` 与根 `CURRENT.md` 索引入口同步更新，并在 [`docs/current/11-changelog.md`](./docs/current/11-changelog.md) 追加版本演进条目。
+   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.55`），在 `index.html`、`AGENTS.md` 与 `docs/CURRENT.md` 索引入口同步更新，并在 [`current/11-changelog.md`](./current/11-changelog.md) 追加版本演进条目。

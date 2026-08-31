@@ -1,6 +1,6 @@
 # 7. 🎨 交互式表现层与控制台 (`frontend`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md) · 主要源码：`frontend/js/render.js`、`frontend/js/main.js`、`frontend/index.html`
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`frontend/js/render.js`、`frontend/js/main.js`、`frontend/index.html`
 
 ---
 

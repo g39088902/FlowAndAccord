@@ -1,6 +1,6 @@
 # 2. 🌲 全局有限生态与 POI 资源体系 (`poi`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
 
 ---
 

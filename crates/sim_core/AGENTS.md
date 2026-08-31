@@ -58,7 +58,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 新增 agent/house/poi 字段：① `snapshot.rs` 结构体定义；② `world.rs::generate_snapshot()` 赋值；③ 前端 `rustworld.js::_applySnapshot()` 映射。三处缺一不可。
 
 ### 5.4 常量双轨制
-每个 `SimConfig` 字段必须与同名模块级 const 值一致（`Default` 是唯一接线点）；改常量须同步改 `Default`。**config.rs 是本 crate 数值的唯一真相源**，根文档/CURRENT.md 中的旧数值可能滞后（如 POI 储量上限 config 为 100、ecology 播撒时以 `stock_max_*` 覆盖为 100 且初始 75）。
+每个 `SimConfig` 字段必须与同名模块级 const 值一致（`Default` 是唯一接线点）；改常量须同步改 `Default`。**config.rs 是本 crate 数值的唯一真相源**，根 AGENTS.md / docs/CURRENT.md 中的旧数值可能滞后（如 POI 储量上限 config 为 100、ecology 播撒时以 `stock_max_*` 覆盖为 100 且初始 75）。
 
 ### 5.5 行为硬约束速查（详见根 AGENTS.md §4.8）
 - `SIMULATION_DT = 1/30` 严禁修改；倍速走 `world_tick_steps`。

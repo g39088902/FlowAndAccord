@@ -1,6 +1,6 @@
 # 5. 🏡 多级私产房屋与建材升级体系 (`house`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（5 子模块）  
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（5 子模块）  
 > **版本演进记录**：见 [11-changelog.md](./11-changelog.md)
 
 ---

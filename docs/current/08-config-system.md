@@ -1,6 +1,6 @@
 # 8. ⚙️ JavaScript 动态数值配置系统 (`config.js`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md) · 主要源码：`frontend/js/config.js`、`frontend/js/rustworld.js`
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`frontend/js/config.js`、`frontend/js/rustworld.js`
 
 ---
 

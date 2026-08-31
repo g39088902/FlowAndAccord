@@ -1,6 +1,6 @@
 # 9. 📂 核心代码目录与模块映射
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md)
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
 
 ---
 
@@ -41,8 +41,13 @@ FlowAndAccord/
 │   │   └── main.js                       # 页面交互与控制
 │   ├── server.js                         # 静态文件开发服务器
 │   └── index.html                        # 完整单页可视化仿真系统
-├── BUILD_GUIDE.md                        # 跨平台 (macOS/Linux/Windows) 编译运行与调参指南
-├── ARCHITECTURE.md                       # 系统技术架构设计说明书
-├── PLAN.md                               # 项目总体愿景与宏观政治/经济规划书
-└── docs/current/                         # [当前目录] 已实现功能按模块拆分文档 (根 CURRENT.md 为索引)
+├── AGENTS.md                              # 智能体操作指南 (唯一保留在根目录的文档)
+└── docs/                                  # 📚 全部项目文档
+    ├── CURRENT.md                         # 已实现功能「索引入口」(模块导航表)
+    ├── BUILD_GUIDE.md                     # 跨平台 (macOS/Linux/Windows) 编译运行与调参指南
+    ├── AGENT_AI_ANALYSIS.md               # 部落民 AI 决策系统深度拆解
+    ├── ARCHITECTURE.md                    # 系统技术架构设计说明书
+    ├── PLAN.md                            # 项目总体愿景与宏观政治/经济规划书
+    ├── TODO.md                            # 待办事项清单
+    └── current/                           # [当前目录] 已实现功能按模块拆分文档 (docs/CURRENT.md 为索引)
 ```

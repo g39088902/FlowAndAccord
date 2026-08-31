@@ -2,7 +2,7 @@
 
 > **分析对象**：`FlowAndAccord` 中"部落民 (Agent)"的全部 AI 逻辑  
 > **分析范围**：Rust 确定性内核 `crates/sim_core/src/spatial/` 与 WebAssembly 桥接层 `crates/sim_wasm/`  
-> **结论先行**：当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + A* 加权寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM/神经网络/学习成分**（ARCHITECTURE.md 中规划的 LLM 认知层为愿景设计）。Rust 内核 `crates/sim_core` 编译正常并通过 WASM 回归测试，是**唯一真实仿真实现**；前端 `frontend/js/` 仅为表现与交互层（`math.js`、`rustworld.js`、`render.js`、`main.js`），不存在独立 JS 移植版仿真逻辑。
+> **结论先行**：当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + A* 加权寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM/神经网络/学习成分**（docs/ARCHITECTURE.md 中规划的 LLM 认知层为愿景设计）。Rust 内核 `crates/sim_core` 编译正常并通过 WASM 回归测试，是**唯一真实仿真实现**；前端 `frontend/js/` 仅为表现与交互层（`math.js`、`rustworld.js`、`render.js`、`main.js`），不存在独立 JS 移植版仿真逻辑。
 
 ---
 
@@ -179,7 +179,7 @@ tick()
 
 ## 9. 现状与长程愿景对比
 
-| 模块维度 | 当前实际落地状态 (Current) | 宏观规划愿景 (Vision - ARCHITECTURE.md / PLAN.md) |
+| 模块维度 | 当前实际落地状态 (Current) | 宏观规划愿景 (Vision - docs/ARCHITECTURE.md / docs/PLAN.md) |
 | :--- | :--- | :--- |
 | **内核架构** | 确定性 Rust 核心 (`Vec<Agent3D>` + 空间调度) | 20Hz Headless ECS (`hecs`/`bevy_ecs`) |
 | **WASM 桥接** | `sim_wasm` 零依赖 C-ABI 导出，线性内存 JSON 快照 | 零拷贝双缓冲共享内存快照 + Hermite 时间戳插值 |

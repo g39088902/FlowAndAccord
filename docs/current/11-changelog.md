@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.54)**。
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.55)**。
 
 ---
 
@@ -100,3 +100,9 @@
   - **版本演进记录独立**：原散落在「多级私产房屋体系」章节内的 v0.9.24 ~ v0.9.53 各版本核心改动条目，统一汇集至 `docs/current/11-changelog.md`（按版本号正序排列）；
   - **AGENTS.md 文档地图同步**：§0 文档地图表更新 `CURRENT.md` 角色为「索引入口」，并新增 `docs/current/` 各文件职责说明；§4.7 / §4.9 中指向具体记录的维护指引改为指向对应模块文件；`BUILD_GUIDE.md` 版本号同步规范更新为「在 `docs/current/11-changelog.md` 中记录」；
   - 纯文档重组，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.53 → v0.9.54。
+- **📁 文档目录整合：非 AGENTS.md 文档全部移入 `docs/` (v0.9.55)**：
+  - **目录重组**：根目录除 `AGENTS.md`（保留原位）外，`CURRENT.md`、`BUILD_GUIDE.md`、`AGENT_AI_ANALYSIS.md`、`ARCHITECTURE.md`、`PLAN.md`、`TODO.md` 全部移入 `docs/` 目录（`git mv` 保留历史），与既有 `docs/current/` 分模块文档合并为统一文档库；
+  - **引用路径全量修正**：`docs/current/` 各模块文档「返回 CURRENT.md 全景索引」链接由 `../../CURRENT.md` 改为 `../CURRENT.md`；`docs/CURRENT.md` 索引入口内部链接由 `./docs/current/` 改为 `./current/`、指向根目录 `AGENTS.md` 的链接改为 `../AGENTS.md`；`PLAN.md` / `ARCHITECTURE.md` 中指向 CURRENT.md 的绝对路径同步更新；`BUILD_GUIDE.md` 与 `docs/current/09-code-map.md` 的源码树结构图更新为 `docs/` 新布局；
+  - **AGENTS.md §0 文档地图同步**：文档地图表各文件标注 `docs/` 前缀并新增 `TODO.md` 行；`crates/sim_core/AGENTS.md` 中「根文档/CURRENT.md」表述同步更新；
+  - **超长文档拆分检查**：逐一统计全仓 `.md` 行数，当前最大文件为 `docs/PLAN.md`（463 行），**未超 500 行阈值，暂无拆分对象**（§4.6 阈值规则持续生效）；
+  - 纯文档重组，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.54 → v0.9.55。

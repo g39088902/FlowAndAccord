@@ -1,6 +1,6 @@
 # 1. 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/graph.rs`
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/graph.rs`
 
 ---
 

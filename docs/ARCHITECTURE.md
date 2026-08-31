@@ -2,7 +2,7 @@
 
 > ⚠️ **重要架构说明（愿景 vs 现状）**：  
 > 本文档记录了系统的**宏观目标架构设计说明（v1.0.0-Draft 愿景）**。  
-> - **当前实际状态（已落地实现）**：基于 Rust 确定性核心（`crates/sim_core`）与 WebAssembly 桥接（`crates/sim_wasm`），采用 **30Hz 固定步进（`dt = 1/30` 模拟秒）**、`(tick_counter + agent.id) % 15 == 0` 错峰决策、21 处有限生态 POI、5 阶私宅演进、随身行囊真实搬运与家宅卸货，详见 [CURRENT.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/CURRENT.md) 与 [AGENTS.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/AGENTS.md)。  
+> - **当前实际状态（已落地实现）**：基于 Rust 确定性核心（`crates/sim_core`）与 WebAssembly 桥接（`crates/sim_wasm`），采用 **30Hz 固定步进（`dt = 1/30` 模拟秒）**、`(tick_counter + agent.id) % 15 == 0` 错峰决策、21 处有限生态 POI、5 阶私宅演进、随身行囊真实搬运与家宅卸货，详见 [CURRENT.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/docs/CURRENT.md) 与 [AGENTS.md](file:///c:/Users/Lima/RustroverProjects/FlowAndAccord/AGENTS.md)。  
 > - **愿景模块（后续阶段规划）**：下述 20Hz Headless ECS 内核、LLM 异步认知与叙事总线（希腊合唱队/议会大辩论/心声日记）、六维政治资本（民意/技术/资本/强制/宗法/霸权）、双轨金库与动态专利经济均为**长程演进愿景**，请勿将愿景设计当作当前已有功能。
 
 ---
