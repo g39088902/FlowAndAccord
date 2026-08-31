@@ -159,10 +159,10 @@ window.SIM_CONFIG = {
   decisionFoundHomeStaminaMin: 60.0,
   /** 立宅候选点数量: 自主选址时在自身周围掷出的候选点数 (12) */
   decisionFoundHomeCandidates: 12,
-  /** 立宅候选点最小距离 (16.0) */
-  decisionFoundHomeDistMin: 16.0,
-  /** 立宅候选点最大距离 (42.0) */
-  decisionFoundHomeDistMax: 42.0,
+  /** 立宅候选点最小距离 */
+  decisionFoundHomeDistMin: 24.0,
+  /** 立宅候选点最大距离 */
+  decisionFoundHomeDistMax: 80.0,
 
   // ==========================================================================
   // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -215,7 +215,9 @@ window.SIM_CONFIG = {
   /** 低温触发取暖气温阈值 (°C) */
   houseWinterColdTemp: 5.0,
   /** 立宅最小房屋间距: 新宅与现有房屋的水平距离须 ≥ 此值 */
-  houseMinSpacing: 24.0,
+  houseMinSpacing: 20.0,
+  /** 空置节点复用检索半径: 候选宅址此半径内若有空置路网节点(废墟遗留孤儿门/无主路口)则直接复用，不再新建节点 */
+  houseNodeReuseRadius: 20.0,
 
   // ==========================================================================
   // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)

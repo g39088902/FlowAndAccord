@@ -121,6 +121,10 @@ pub const HOUSE_FERTILITY_STOCK_RATIO: f32 = 0.50;
 pub const HOUSE_WINTER_WOOD_BURN_RATE: f32 = 0.12;
 pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
 pub const HOUSE_MIN_SPACING: f32 = 24.0;
+/// 立宅时优先复用空置路网节点的检索半径 (m)：候选宅址此半径内若存在空置节点则直接复用，不再新建节点
+pub const HOUSE_NODE_REUSE_RADIUS: f32 = 20.0;
+/// 判定节点被 POI 自身占用的贴合半径 (m)：小于此距离视为该 POI 的接驳节点，不可当作空置节点复用
+pub const HOUSE_NODE_POI_OCCUPY_RADIUS: f32 = 1.5;
 
 // ============================================================================
 // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)
@@ -252,6 +256,7 @@ pub struct SimConfig {
     pub house_winter_wood_burn_rate: f32,
     pub house_winter_cold_temp: f32,
     pub house_min_spacing: f32,
+    pub house_node_reuse_radius: f32,
 
     // 7. 四季更迭与宏观气候
     pub season_year_length: f32,
@@ -375,6 +380,7 @@ impl Default for SimConfig {
             house_winter_wood_burn_rate: HOUSE_WINTER_WOOD_BURN_RATE,
             house_winter_cold_temp: HOUSE_WINTER_COLD_TEMP,
             house_min_spacing: HOUSE_MIN_SPACING,
+            house_node_reuse_radius: HOUSE_NODE_REUSE_RADIUS,
 
             // 7. 四季更迭与宏观气候
             season_year_length: SEASON_YEAR_LENGTH,

@@ -184,6 +184,14 @@
   - **倍速控制台扩展**：模拟演化倍速下拉框新增 **256x、512x 与 1024x** 超高倍速选项（`frontend/index.html`），方便快速推进上万 tick 长程社会演化；
   - **房屋建设最小间距翻倍**：建房最小间距由 $14.0\text{m}$ 翻倍调整为 **$28.0\text{m}$**（`crates/sim_core/src/config.rs` `HOUSE_MIN_SPACING` 及前端 `frontend/js/config.js` `houseMinSpacing`），并修复 `settlement.rs::materialize_founded_houses` 硬编码，统一读取 `self.config.house_min_spacing`；
   - 版本号自增 v0.9.46 → v0.9.47。
+- **♻️ 立宅优先复用空置路网节点 (v0.9.48)**：
+  - **背景**：路网 `LaneGraph3D` 从不删除节点/车道，房屋绝嗣沦为废墟（`is_ruin`）并最终风化坍塌被 `houses.retain` 移除后，其大门节点与 3 对双向泥泞小径会**永久残留**在图中，导致节点随代际更替单调膨胀（拖慢 A*、`find_nearest_node` 全扫描与快照序列化）；
+  - **新机制**：`settlement.rs::materialize_founded_houses` 改为**先复用、后新建**——先用 `find_vacant_node_near` 在候选宅址 `houseNodeReuseRadius`(默认 20m) 半径内检索最近的**空置节点**（非任何现存房屋/废墟的大门、且不在任何 POI 1.5m 贴合半径内），命中即直接以该节点为大门、房屋落点取节点坐标，不再新建节点与车道；仅当半径内无空置节点时才走原新建路径（`add_node` + 双向接入最近 3 节点）；
+  - **安全兜底**：复用节点若已无任何出边（`ensure_node_connected`）自动补建接入；复用候选在检索阶段即通过 `is_house_site_valid`（≥ `houseMinSpacing`）校验；检索零 RNG 消耗、距离并列取节点 id 较小者，确定性不受影响；
+  - **新增参数**：`HOUSE_NODE_REUSE_RADIUS`(20.0) / `HOUSE_NODE_POI_OCCUPY_RADIUS`(1.5) → `SimConfig::house_node_reuse_radius` 与前端 `config.js` `houseNodeReuseRadius`（设为 0 即退回旧行为）；
+  - **实测效果**（强制加速风化的 A/B 对照，同种子 60000 tick）：复用开启时 112 次立宅仅新增 67 个节点（复用率约 40%），复用关闭时 133 次立宅新增 133 个节点（1:1 膨胀）；重合坐标节点 0 对、零长度车道 0 条、NaN 0；
+  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
+  - 版本号自增 v0.9.47 → v0.9.48。
 
 ---
 
