@@ -71,7 +71,6 @@ pub const REGEN_BASE_STONE: f32 = 2.0;
 pub const REGEN_BASE_GOLD: f32 = 1.8;
 pub const POI_INTERACTION_RATE_RESOURCE: f32 = 10.0;
 pub const POI_INTERACTION_RATE_GOLD: f32 = 5.0;
-pub const CAMP_REST_STAMINA_RECOVERY_RATE: f32 = 20.0;
 pub const POI_UNLOAD_RATE_RESOURCE: f32 = 10.0;
 pub const POI_UNLOAD_RATE_GOLD: f32 = 5.0;
 
@@ -201,7 +200,6 @@ pub struct SimConfig {
     pub regen_base_gold: f32,
     pub poi_interaction_rate_resource: f32,
     pub poi_interaction_rate_gold: f32,
-    pub camp_rest_stamina_recovery_rate: f32,
     pub poi_unload_rate_resource: f32,
     pub poi_unload_rate_gold: f32,
 
@@ -319,7 +317,6 @@ impl Default for SimConfig {
             regen_base_gold: REGEN_BASE_GOLD,
             poi_interaction_rate_resource: POI_INTERACTION_RATE_RESOURCE,
             poi_interaction_rate_gold: POI_INTERACTION_RATE_GOLD,
-            camp_rest_stamina_recovery_rate: CAMP_REST_STAMINA_RECOVERY_RATE,
             poi_unload_rate_resource: POI_UNLOAD_RATE_RESOURCE,
             poi_unload_rate_gold: POI_UNLOAD_RATE_GOLD,
 

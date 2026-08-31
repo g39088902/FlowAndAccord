@@ -160,6 +160,12 @@
   - 开局始祖由 12 名扩容为 **20 名（10男10女）**：Rust 内核 `ecology.rs` 初始播撒改为 20 人（`total_initial = 20`，前 10 女后 10 男，每 4 人 1 名隐秘特工），前端 `rustworld.js` / `main.js` / `index.html` 面板文案与重演生态按钮同步更新；
   - **百家姓库由 60 姓扩充至 150 姓**（`agent.rs` `COMMON_SURNAMES` 采用《百家姓》经典序前 150 单姓，原 60 姓全部保留并顺延至经典序位），始祖随机赋姓池更广，宗族姓氏多样性显著提升；
   - 版本号自增 v0.9.41 → v0.9.42。
+- **🏠 建房/升级/修缮全流程回归 Agent 自主决策 (v0.9.43)**：
+  - **废除系统发房**：删除 `settlement.rs::tick_warehouse_founding`（原每 15 tick 扫描"符合条件的男人"直接送 0 级仓库）。新增 `NeedKind::FoundHome` 归属层需求：**无家成年男性**在自身决策相位、饥渴 ≥ 20 且体力 ≥ 60 时**必然触发**（无概率、无系统指挥），由 agent 自己在营地周边掷 12 个候选点自主选址（与现有房屋 ≥14m）；系统仅在 `materialize_founded_houses` 阶段执行放置校验、路网接入与房产绑定（`pending_house_pos` 为 agent 内暂存字段，不入快照）；
+  - **升级施工回归 agent 决策**：删除 `construction.rs::check_start_house_upgrades`（原每 tick 扫描房屋强制户主开工）。仓满 + 男户主在家满体力时，由 `evaluate_needs` 既有 `BuildHouse` 需求在户主自身决策相位自主触发施工；
+  - **修缮回归 agent 决策**：删除 `maintenance.rs` 中"扫描 + 强制切换 `RepairingHouse`"块，触发完全交给 `evaluate_needs` 既有 `RepairHouse` 需求（耐久 < 50%），系统仅结算修缮进度；
+  - **设计原则落地**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"由 agent 的马斯洛状态机自主决定，符合混沌系统涌现定位；
+  - 版本号自增 v0.9.42 → v0.9.43。
 
 ---
 

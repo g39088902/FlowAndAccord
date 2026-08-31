@@ -310,6 +310,20 @@ impl<'a> Decisioner<'a> {
                 return None;
             }
         } else {
+            // 无家可归：成年男性在生理稳定（饥渴 ≥ 20、体力 ≥ 60）时自主“自立门户”，
+            // 必然触发选址立宅（无概率、无系统指挥，由本 Agent 决策相位自行决定）。
+            if agent.gender == Gender::Male
+                && agent.age >= self.config.agent_adult_age
+                && agent.hunger >= 20.0
+                && agent.thirst >= 20.0
+                && agent.stamina >= 60.0
+            {
+                return Some(Need {
+                    level: MaslowLevel::Belonging,
+                    kind: NeedKind::FoundHome,
+                    target_state: PrimitiveActionState::RestingAtCamp,
+                });
+            }
             return None;
         }
 
@@ -334,6 +348,31 @@ impl<'a> Decisioner<'a> {
             agent.build_timer = 0.0;
             return;
         }
+        if need.kind == NeedKind::FoundHome {
+            // 自主选址：本 Agent 在自身周围掷 12 个候选点，取第一个与现有房屋保持 ≥14m 的位置；
+            // 系统仅在实体化阶段执行放置校验与路网接入（见 materialize_founded_houses）。
+            for _ in 0..12 {
+                let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);
+                let dist = self.rng.gen_range(16.0, 42.0);
+                let cand = Vec3::new(
+                    agent.world_pos.x + angle.cos() * dist,
+                    agent.world_pos.y + angle.sin() * dist,
+                    agent.world_pos.z,
+                );
+                let is_valid = self.houses.iter().all(|h| {
+                    let dx = h.pos.x - cand.x;
+                    let dy = h.pos.y - cand.y;
+                    (dx * dx + dy * dy).sqrt() >= 14.0
+                });
+                if is_valid {
+                    agent.pending_house_pos = Some(cand);
+                    agent.current_need = Some("Belonging·FoundHome".to_string());
+                    return;
+                }
+            }
+            agent.current_need = Some("Belonging·FoundHome".to_string());
+            return;
+        }
         if need.kind == NeedKind::StockGold {
             agent.gold_mining_cooldown = self.config.decision_stock_gold_cooldown;
         } else if need.kind == NeedKind::GoldWealth {
@@ -352,7 +391,7 @@ impl<'a> Decisioner<'a> {
                 if nodes.is_empty() { return; }
                 Some(nodes[self.rng.gen_range_usize(0, nodes.len())])
             }
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);
@@ -599,6 +638,9 @@ impl World3DEngine {
                 decisioner.decide(agent);
             }
         }
+        drop(decisioner);
+        // 实体化登记：将本拍内 agent 自主选定的宅址落地为 0 级仓库（放置校验/路网接入/房产绑定）
+        self.materialize_founded_houses();
     }
 
     /// 收集全图资源节点与营地坐标；每名 Agent 会用自己的触发器过滤候选。

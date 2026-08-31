@@ -1,4 +1,3 @@
-use crate::spatial::agent::{Gender, PrimitiveActionState};
 use crate::spatial::graph::{NodeId, NodeType, RoadClass};
 use crate::spatial::house::{House, HouseTier};
 use crate::spatial::poi::PoiType;
@@ -6,66 +5,67 @@ use crate::spatial::vec3::Vec3;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
-    /// 自发选址设立 0级仓库 与路网拓扑接入
-    pub(crate) fn tick_warehouse_founding(&mut self) {
-        if self.tick_counter % 15 != 0 {
+    /// 实体化登记：将本拍决策阶段由 agent 自主选定的宅址（pending_house_pos）落地为 0 级仓库。
+    /// 系统在此仅执行物理规则与基础设施——放置校验（≥14m）、路网接入、房产绑定，
+    /// 不再有任何“指挥 agent 建房”的主动扫描；是否自立门户完全由 agent 自己的需求决定。
+    pub(crate) fn materialize_founded_houses(&mut self) {
+        let mut pending: Vec<(usize, Vec3)> = Vec::new();
+        for (i, agent) in self.agents.iter().enumerate() {
+            if agent.is_alive && agent.home_house_id.is_none() {
+                if let Some(pos) = agent.pending_house_pos {
+                    pending.push((i, pos));
+                }
+            }
+        }
+        if pending.is_empty() {
             return;
         }
+        // 先统一清空待办，避免失败后残留；失败的 agent 会在下一拍决策时重新自选。
+        for (i, _) in &pending {
+            self.agents[*i].pending_house_pos = None;
+        }
 
-        for i in 0..self.agents.len() {
-            let agent = &self.agents[i];
-            let is_already_owner = self.houses.iter().any(|h| h.owner_id == agent.id && !h.is_ruin);
-            if !agent.is_alive || agent.gender != Gender::Male || is_already_owner || agent.state != PrimitiveActionState::RestingAtCamp {
+        for (i, chosen) in pending {
+            let cand_pos = Vec3::new(chosen.x, chosen.y, self.terrain.sample_elevation(chosen.x, chosen.y));
+            // 实体化时重新校验（同拍内其他 agent 可能已抢占该址），2D 距离与决策阶段口径一致
+            let is_valid = self.houses.iter().all(|h| {
+                let dx = h.pos.x - cand_pos.x;
+                let dy = h.pos.y - cand_pos.y;
+                (dx * dx + dy * dy).sqrt() >= 14.0
+            });
+            if !is_valid {
                 continue;
             }
 
-            if agent.age >= self.config.agent_adult_age && agent.hunger >= 18.0 && agent.thirst >= 18.0 && agent.stamina >= 100.0 {
-                let agent_id = agent.id;
-                let agent_pos = agent.world_pos;
+            let house_id = self.next_house_id;
+            self.next_house_id += 1;
 
-                for _ in 0..12 {
-                    let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);
-                    let dist = self.rng.gen_range(16.0, 42.0);
-                    let cand_x = agent_pos.x + angle.cos() * dist;
-                    let cand_y = agent_pos.y + angle.sin() * dist;
-                    let cand_z = self.terrain.sample_elevation(cand_x, cand_y);
+            let mut sorted_nearby_nodes: Vec<(NodeId, f32)> = self.network.graph.node_weights()
+                .map(|n| (n.id, n.pos.distance_to(&cand_pos)))
+                .collect();
+            sorted_nearby_nodes.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-                    let cand_pos = Vec3::new(cand_x, cand_y, cand_z);
-                    let is_valid = self.houses.iter().all(|h| h.pos.distance_to(&cand_pos) >= 14.0);
-
-                    if is_valid {
-                        let house_id = self.next_house_id;
-                        self.next_house_id += 1;
-
-                        let mut sorted_nearby_nodes: Vec<(NodeId, f32)> = self.network.graph.node_weights()
-                            .map(|n| (n.id, n.pos.distance_to(&cand_pos)))
-                            .collect();
-                        sorted_nearby_nodes.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-
-                        let door_node = self.network.add_node(cand_pos, NodeType::GroundIntersection);
-                        for &(near_id, _) in sorted_nearby_nodes.iter().take(3) {
-                            let _ = self.network.add_lane_with_options(door_node, near_id, None, RoadClass::DirtTrack, false, 1.0);
-                            let _ = self.network.add_lane_with_options(near_id, door_node, None, RoadClass::DirtTrack, false, 1.0);
-                        }
-
-                        let nearest_camp = self.pois.iter()
-                            .filter(|p| p.poi_type == PoiType::Camp)
-                            .min_by(|a, b| a.pos.distance_to(&cand_pos).partial_cmp(&b.pos.distance_to(&cand_pos)).unwrap());
-                        let camp_id = nearest_camp.map(|p| p.id).unwrap_or(1);
-                        let camp_name = nearest_camp.map(|p| p.camp_title()).unwrap_or_else(|| "营地".to_string());
-
-                        let house = House::new_with_config(house_id, agent_id, cand_pos, door_node, HouseTier::Tier0Warehouse, camp_id, &self.config);
-                        self.houses.push(house);
-
-                        let agent_mut = &mut self.agents[i];
-                        agent_mut.home_house_id = Some(house_id);
-                        agent_mut.home_camp_node = door_node;
-                        agent_mut.world_pos = cand_pos;
-                        self.last_event = Some(format!("📦 部落民 #{} ♂ 于【{}】管辖区选址建立了第 #{} 号 0级仓库，开始搬运备货！", agent_id, camp_name, house_id));
-                        break;
-                    }
-                }
+            let door_node = self.network.add_node(cand_pos, NodeType::GroundIntersection);
+            for &(near_id, _) in sorted_nearby_nodes.iter().take(3) {
+                let _ = self.network.add_lane_with_options(door_node, near_id, None, RoadClass::DirtTrack, false, 1.0);
+                let _ = self.network.add_lane_with_options(near_id, door_node, None, RoadClass::DirtTrack, false, 1.0);
             }
+
+            let nearest_camp = self.pois.iter()
+                .filter(|p| p.poi_type == PoiType::Camp)
+                .min_by(|a, b| a.pos.distance_to(&cand_pos).partial_cmp(&b.pos.distance_to(&cand_pos)).unwrap());
+            let camp_id = nearest_camp.map(|p| p.id).unwrap_or(1);
+            let camp_name = nearest_camp.map(|p| p.camp_title()).unwrap_or_else(|| "营地".to_string());
+
+            let owner_id = self.agents[i].id;
+            let house = House::new_with_config(house_id, owner_id, cand_pos, door_node, HouseTier::Tier0Warehouse, camp_id, &self.config);
+            self.houses.push(house);
+
+            let agent = &mut self.agents[i];
+            agent.home_house_id = Some(house_id);
+            agent.home_camp_node = door_node;
+            agent.world_pos = cand_pos;
+            self.last_event = Some(format!("📦 部落民 #{} ♂ 自主选址，于【{}】管辖区建立了第 #{} 号 0级仓库，开始搬运备货！", owner_id, camp_name, house_id));
         }
     }
 

@@ -26,6 +26,7 @@ pub enum NeedKind {
     StockFood,      // 安全: 家宅储粮 (家庭生存储备，填满粮仓)
     StockWood,      // 安全: 过冬木柴 / 私宅基础木料 (填满木仓)
     BuildHouse,     // 归属/尊重: 材料备齐后施工升级房屋
+    FoundHome,      // 归属: 无家成年男性自主“自立门户”选址立宅 (0级仓库)
     StockStone,     // 尊重: 采石建材 (庄舍/庄园升级储备)
     StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)

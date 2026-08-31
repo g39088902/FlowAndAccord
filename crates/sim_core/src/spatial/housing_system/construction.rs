@@ -1,4 +1,4 @@
-use crate::spatial::agent::{Gender, PrimitiveActionState};
+use crate::spatial::agent::PrimitiveActionState;
 use crate::spatial::house::HouseTier;
 use crate::spatial::world::World3DEngine;
 
@@ -51,20 +51,4 @@ impl World3DEngine {
         }
     }
 
-    /// 检查房屋是否已备齐升级材料，若备齐且有成年男性主人在家休息，自动启动施工
-    pub(crate) fn check_start_house_upgrades(&mut self) {
-        for house in &mut self.houses {
-            if house.is_pantry_full(&self.config) && house.tier != HouseTier::Tier4Manor {
-                if let Some(owner) = self.agents.iter_mut().find(|a| a.id == house.owner_id && a.is_alive && a.gender == Gender::Male && a.age >= self.config.agent_adult_age && a.state == PrimitiveActionState::RestingAtCamp && a.stamina >= 100.0) {
-                    owner.state = PrimitiveActionState::ConstructingHouse;
-                    owner.build_timer = 0.0;
-                    owner.current_need = Some(if house.tier == HouseTier::Tier0Warehouse {
-                        "Belonging·BuildHouse".to_string()
-                    } else {
-                        "Esteem·BuildHouse".to_string()
-                    });
-                }
-            }
-        }
-    }
 }

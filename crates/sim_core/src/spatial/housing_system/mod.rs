@@ -28,13 +28,9 @@ impl World3DEngine {
         // 5.5 自动成婚与单身女性改嫁机制
         self.tick_marriage_and_remarriage();
 
-        // 6. 检查房屋是否已备齐升级材料，若备齐且有成年男性主人在家休息，自动启动升级
-        self.check_start_house_upgrades();
+        // 6. 房屋升级/自立门户的启动均由 agent 自主决策触发（BuildHouse / FoundHome 需求），系统不再扫描指挥
 
-        // 7. 自发选址设立 0级仓库 与路网拓扑接入
-        self.tick_warehouse_founding();
-
-        // 8. 父系房产代际确权继承机制与绝嗣废墟演化
+        // 7. 父系房产代际确权继承机制与绝嗣废墟演化
         self.tick_patrilineal_inheritance();
 
         // 8.5 金币遗产继承机制 (死者金币平分给在世子一代子女)

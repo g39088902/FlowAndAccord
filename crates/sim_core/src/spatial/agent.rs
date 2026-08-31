@@ -109,6 +109,8 @@ pub struct Agent3D {
     /// 对各 POI 的私有可派遣性记忆；仅在本 Agent 的决策相位刷新。
     pub poi_seekability: BTreeMap<PoiId, StockSchmittTrigger>,
     pub home_house_id: Option<u32>, // 绑定的私宅/大庄园 ID (若有)
+    /// 自主“自立门户”决策选定的宅址候选 (待系统实体化登记为 0 级仓库)
+    pub pending_house_pos: Option<Vec3>,
     pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
@@ -187,6 +189,7 @@ impl Agent3D {
             target_poi_node: None,
             poi_seekability: BTreeMap::new(),
             home_house_id: None,
+            pending_house_pos: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
             generation: 1,

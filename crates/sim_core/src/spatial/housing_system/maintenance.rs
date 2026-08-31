@@ -51,7 +51,7 @@ impl World3DEngine {
         }
     }
 
-    /// 房屋劳作修缮机制 (耐久度跌破 50% 安排修缮, 一旦开工修满至 100%)
+    /// 房屋劳作修缮结算 (修缮由 agent 自主决策的 RepairHouse 需求触发, 系统仅推进进度, 不再扫描指挥)
     pub(crate) fn tick_house_repair(&mut self, dt: f32) {
         for house in &mut self.houses {
             house.is_repairing = false;
@@ -60,13 +60,6 @@ impl World3DEngine {
                 let spouse_id = house.spouse_id;
                 for agent in &mut self.agents {
                     if agent.is_alive && (agent.id == owner_id || spouse_id == Some(agent.id)) {
-                        if agent.state == PrimitiveActionState::RestingAtCamp
-                            && agent.stamina >= 100.0
-                            && house.durability < self.config.decision_house_repair_need_threshold
-                        {
-                            agent.state = PrimitiveActionState::RepairingHouse;
-                            agent.current_need = Some("Safety·RepairHouse".to_string());
-                        }
                         if agent.state == PrimitiveActionState::RepairingHouse {
                             house.is_repairing = true;
                             house.repair(self.config.house_repair_speed * dt, &self.config);
