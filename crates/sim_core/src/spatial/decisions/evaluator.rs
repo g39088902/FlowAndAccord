@@ -1,7 +1,7 @@
 use super::super::vec3::Vec3;
 use super::super::graph::{LaneGraph3D, NodeId};
-use super::super::agent::{Agent3D, Gender, PrimitiveActionState, CARRY_CAPACITY_RESOURCE};
-use super::super::poi::{PrimitivePoi, PoiType};
+use super::super::agent::{Agent3D, Gender, PrimitiveActionState};
+use super::super::poi::PoiType;
 use super::super::house::{House, HouseTier};
 use super::super::world::World3DEngine;
 use super::needs::*;
@@ -13,8 +13,8 @@ pub struct Decisioner<'a> {
     pub ctx: &'a DecisionContext,
     pub network: &'a LaneGraph3D,
     pub houses: &'a [House],
-    pub pois: &'a [PrimitivePoi],
     pub rng: &'a mut WorldRng,
+    pub config: &'a SimConfig,
 }
 
 impl<'a> Decisioner<'a> {
@@ -22,8 +22,19 @@ impl<'a> Decisioner<'a> {
         self.network.graph[*self.network.node_map.get(&node).unwrap()].pos
     }
 
-    pub fn nearest_of(&self, pool: NodePool, pos: Vec3) -> Option<NodeId> {
-        pool.nodes(self.ctx).iter().copied().min_by(|&a, &b| {
+    pub fn available_nodes(&self, agent: &Agent3D, pool: NodePool) -> Vec<NodeId> {
+        pool.nodes(self.ctx).iter()
+            .filter(|target| agent.poi_is_seekable(target.poi_id))
+            .map(|target| target.node)
+            .collect()
+    }
+
+    pub fn has_available_node(&self, agent: &Agent3D, pool: NodePool) -> bool {
+        pool.nodes(self.ctx).iter().any(|target| agent.poi_is_seekable(target.poi_id))
+    }
+
+    pub fn nearest_of(&self, agent: &Agent3D, pool: NodePool, pos: Vec3) -> Option<NodeId> {
+        self.available_nodes(agent, pool).into_iter().min_by(|&a, &b| {
             self.node_pos(a).distance_to(&pos)
                 .partial_cmp(&self.node_pos(b).distance_to(&pos))
                 .unwrap()
@@ -126,80 +137,129 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    pub fn source_empty(&self, poi_type: PoiType, pos: Vec3) -> bool {
-        self.pois.iter()
-            .find(|p| p.poi_type == poi_type && p.pos.distance_to(&pos) < 22.0)
-            .map(|p| p.current_stock <= 0.05)
-            .unwrap_or(true)
-    }
-
-    /// 检查 Agent 正在赶往的目标 POI 是否已跌破 10% 储量 (若跌破则中途直接放弃)
-    pub fn is_target_poi_depleted_below_10(&self, agent: &Agent3D, poi_type: PoiType) -> bool {
+    /// 查询本 Agent 对当前目标 POI 的私有施密特触发器结论。
+    pub fn is_target_poi_unavailable(&self, agent: &Agent3D, poi_type: PoiType) -> bool {
         if let Some(target_node) = agent.target_poi_node {
-            if let Some(&node_idx) = self.network.node_map.get(&target_node) {
-                let target_pos = self.network.graph[node_idx].pos;
-                if let Some(poi) = self.pois.iter().find(|p| p.poi_type == poi_type && p.pos.distance_to(&target_pos) < 30.0) {
-                    return poi.current_stock < (poi.max_stock * DECISION_POI_ABANDON_STOCK_RATIO);
-                }
+            let pool = match poi_type {
+                PoiType::WaterSource => NodePool::Water,
+                PoiType::BerryBush => NodePool::Food,
+                PoiType::WoodForest => NodePool::Wood,
+                PoiType::StoneQuarry => NodePool::Stone,
+                PoiType::GoldMine => NodePool::Gold,
+                PoiType::Camp => return false,
+            };
+            if let Some(target) = pool.nodes(self.ctx).iter().find(|target| target.node == target_node) {
+                return !agent.poi_is_seekable(target.poi_id);
             }
         }
-        self.pois.iter()
-            .filter(|p| p.poi_type == poi_type)
-            .all(|p| p.current_stock < (p.max_stock * DECISION_POI_ABANDON_STOCK_RATIO))
+        !self.has_available_node(agent, match poi_type {
+            PoiType::WaterSource => NodePool::Water,
+            PoiType::BerryBush => NodePool::Food,
+            PoiType::WoodForest => NodePool::Wood,
+            PoiType::StoneQuarry => NodePool::Stone,
+            PoiType::GoldMine => NodePool::Gold,
+            PoiType::Camp => return false,
+        })
     }
 
+    /// 核心决策调度
     pub fn decide(&mut self, agent: &mut Agent3D) {
-        if agent.state == PrimitiveActionState::RestingAtCamp {
-            self.decide_resting(agent);
+        if !agent.is_alive {
+            agent.current_need = None;
             return;
         }
-        if agent.current_need.is_none()
-            || agent.state == PrimitiveActionState::ReturningToCamp
-            || agent.state == PrimitiveActionState::ConstructingHouse
-            || agent.state == PrimitiveActionState::RepairingHouse
-        {
-            agent.current_need = state_need_label_with_agent(agent.state, agent, self.houses).map(|(l, k)| format!("{}·{}", l, k));
-        }
+
         match agent.state {
-            PrimitiveActionState::DrinkingAtWater => self.decide_drinking(agent),
-            PrimitiveActionState::ForagingFood => self.decide_foraging(agent),
-            PrimitiveActionState::GatheringWood => self.decide_harvest(agent, PoiType::WoodForest, self.wood_fully_stocked(agent)),
-            PrimitiveActionState::MiningStone => self.decide_harvest(agent, PoiType::StoneQuarry, self.stone_fully_stocked(agent)),
-            PrimitiveActionState::MiningGold => self.decide_mining_gold(agent),
-            PrimitiveActionState::SeekingWood => self.decide_seeking_material(agent, NodePool::Wood, PoiType::WoodForest),
-            PrimitiveActionState::SeekingStone => self.decide_seeking_material(agent, NodePool::Stone, PoiType::StoneQuarry),
-            PrimitiveActionState::SeekingGold => self.decide_seeking_material(agent, NodePool::Gold, PoiType::GoldMine),
-            PrimitiveActionState::SeekingWater => self.decide_seeking_survival(agent, NodePool::Water, PoiType::WaterSource),
-            PrimitiveActionState::SeekingFood => self.decide_seeking_survival(agent, NodePool::Food, PoiType::BerryBush),
+            PrimitiveActionState::RestingAtCamp => {
+                if let Some(need) = self.evaluate_needs(agent) {
+                    agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses)
+                        .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                    self.fulfill_resting_need(agent, need);
+                } else {
+                    agent.current_need = Some("Physiological·Rest".to_string());
+                }
+            }
+            PrimitiveActionState::SeekingWater => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingWater, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_seeking_survival(agent, NodePool::Water, PoiType::WaterSource);
+            }
+            PrimitiveActionState::SeekingFood => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingFood, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_seeking_survival(agent, NodePool::Food, PoiType::BerryBush);
+            }
+            PrimitiveActionState::SeekingWood => {
+                agent.current_need = Some("Safety·StockWood".to_string());
+                self.decide_seeking_material(agent, NodePool::Wood, PoiType::WoodForest);
+            }
+            PrimitiveActionState::SeekingStone => {
+                agent.current_need = Some("Esteem·StockStone".to_string());
+                self.decide_seeking_material(agent, NodePool::Stone, PoiType::StoneQuarry);
+            }
+            PrimitiveActionState::SeekingGold => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingGold, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_seeking_material(agent, NodePool::Gold, PoiType::GoldMine);
+            }
+            PrimitiveActionState::DrinkingAtWater => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::DrinkingAtWater, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_drinking(agent);
+            }
+            PrimitiveActionState::ForagingFood => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ForagingFood, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_foraging(agent);
+            }
+            PrimitiveActionState::GatheringWood => {
+                agent.current_need = Some("Safety·StockWood".to_string());
+                let stocked = self.wood_fully_stocked(agent);
+                self.decide_harvest(agent, PoiType::WoodForest, stocked);
+            }
+            PrimitiveActionState::MiningStone => {
+                agent.current_need = Some("Esteem·StockStone".to_string());
+                let stocked = self.stone_fully_stocked(agent);
+                self.decide_harvest(agent, PoiType::StoneQuarry, stocked);
+            }
+            PrimitiveActionState::MiningGold => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::MiningGold, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_mining_gold(agent);
+            }
+            PrimitiveActionState::ConstructingHouse => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ConstructingHouse, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+            }
+            PrimitiveActionState::RepairingHouse => {
+                agent.current_need = Some("Safety·RepairHouse".to_string());
+            }
+            PrimitiveActionState::ReturningToCamp => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ReturningToCamp, agent, self.houses)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+            }
             _ => {}
         }
     }
 
-    pub fn decide_resting(&mut self, agent: &mut Agent3D) {
-        let need = self.evaluate_resting_need(agent);
-        agent.current_need = need.map(|n| format!("{:?}·{:?}", n.level, n.kind));
-        if let Some(need) = need {
-            self.fulfill_resting_need(agent, need);
-        }
-    }
-
-    pub fn evaluate_resting_need(&mut self, agent: &Agent3D) -> Option<Need> {
-        let thirst_urgency = if agent.is_pregnant { 24.5 } else { 20.0 };
-        let hunger_urgency = if agent.is_pregnant { 24.5 } else { 20.0 };
-        if agent.thirst < thirst_urgency && !self.ctx.water_nodes.is_empty() {
+    /// 马斯洛需求层级逐层评估
+    pub fn evaluate_needs(&mut self, agent: &Agent3D) -> Option<Need> {
+        let thirst_urgency = if agent.is_pregnant { self.config.decision_critical_thirst } else { self.config.decision_critical_thirst * 0.8 };
+        let hunger_urgency = if agent.is_pregnant { self.config.decision_critical_hunger } else { self.config.decision_critical_hunger * 0.8 };
+        if agent.thirst < thirst_urgency && self.has_available_node(agent, NodePool::Water) {
             return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::QuenchThirst, target_state: PrimitiveActionState::SeekingWater });
         }
-        if agent.hunger < hunger_urgency && !self.ctx.food_nodes.is_empty() {
+        if agent.hunger < hunger_urgency && self.has_available_node(agent, NodePool::Food) {
             return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SateHunger, target_state: PrimitiveActionState::SeekingFood });
         }
 
-        if agent.stamina < 100.0 {
+        if agent.stamina < self.config.decision_rest_stamina_target {
             return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::Rest, target_state: PrimitiveActionState::RestingAtCamp });
         }
 
         if let Some(house) = agent.home_house_id.and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin)) {
             let is_house_member = house.owner_id == agent.id || house.spouse_id == Some(agent.id);
-            let needs = house_stock_needs(house);
+            let needs = house_stock_needs(house, self.config);
 
             if needs.need_repair && is_house_member {
                 return Some(Need { level: MaslowLevel::Safety, kind: NeedKind::RepairHouse, target_state: PrimitiveActionState::RepairingHouse });
@@ -212,29 +272,29 @@ impl<'a> Decisioner<'a> {
                 MaslowLevel::Safety
             };
 
-            if needs.need_water && !self.ctx.water_nodes.is_empty() && self.rng.gen_bool(female_bias) {
+            if needs.need_water && self.has_available_node(agent, NodePool::Water) && self.rng.gen_bool(female_bias) {
                 return Some(Need { level: family_level, kind: NeedKind::StockWater, target_state: PrimitiveActionState::SeekingWater });
             }
-            if needs.need_food && !self.ctx.food_nodes.is_empty() && self.rng.gen_bool(female_bias) {
+            if needs.need_food && self.has_available_node(agent, NodePool::Food) && self.rng.gen_bool(female_bias) {
                 return Some(Need { level: family_level, kind: NeedKind::StockFood, target_state: PrimitiveActionState::SeekingFood });
             }
-            if needs.need_wood && !self.ctx.wood_nodes.is_empty() {
+            if needs.need_wood && self.has_available_node(agent, NodePool::Wood) {
                 return Some(Need { level: family_level, kind: NeedKind::StockWood, target_state: PrimitiveActionState::SeekingWood });
             }
 
-            if house.tier == HouseTier::Tier0Warehouse && house.is_pantry_full() && is_house_member && agent.gender == Gender::Male && agent.age >= AGENT_ADULT_AGE {
+            if house.tier == HouseTier::Tier0Warehouse && house.is_pantry_full(self.config) && is_house_member && agent.gender == Gender::Male && agent.age >= self.config.agent_adult_age {
                 return Some(Need { level: MaslowLevel::Belonging, kind: NeedKind::BuildHouse, target_state: PrimitiveActionState::ConstructingHouse });
             }
 
-            if needs.need_stone && !self.ctx.stone_nodes.is_empty() {
+            if needs.need_stone && self.has_available_node(agent, NodePool::Stone) {
                 return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::StockStone, target_state: PrimitiveActionState::SeekingStone });
             }
 
-            if needs.need_gold && !self.ctx.gold_nodes.is_empty() && !self.ctx.gold_depleted && agent.gold_mining_cooldown <= 0.0 {
+            if needs.need_gold && self.has_available_node(agent, NodePool::Gold) && agent.gold_mining_cooldown <= 0.0 {
                 return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::StockGold, target_state: PrimitiveActionState::SeekingGold });
             }
 
-            if house.is_pantry_full() && house.tier != HouseTier::Tier4Manor && is_house_member && agent.gender == Gender::Male && agent.age >= AGENT_ADULT_AGE {
+            if house.is_pantry_full(self.config) && house.tier != HouseTier::Tier4Manor && is_house_member && agent.gender == Gender::Male && agent.age >= self.config.agent_adult_age {
                 return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::BuildHouse, target_state: PrimitiveActionState::ConstructingHouse });
             }
 
@@ -245,7 +305,7 @@ impl<'a> Decisioner<'a> {
                 || needs.need_gold
                 || needs.need_water
                 || needs.need_food
-                || house.is_pantry_full()
+                || house.is_pantry_full(self.config)
             {
                 return None;
             }
@@ -253,11 +313,11 @@ impl<'a> Decisioner<'a> {
             return None;
         }
 
-        if agent.hunger < 25.0 && !self.ctx.food_nodes.is_empty() && self.rng.gen_bool(0.04) {
+        if agent.hunger < self.config.decision_critical_hunger && self.has_available_node(agent, NodePool::Food) && self.rng.gen_bool(self.config.decision_forage_surplus_chance * 0.5) {
             return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::ForageSurplus, target_state: PrimitiveActionState::SeekingFood });
         }
 
-        if !self.ctx.gold_nodes.is_empty() && !self.ctx.gold_depleted && agent.gold_mining_cooldown <= 0.0 && self.rng.gen_bool(0.40) {
+        if self.has_available_node(agent, NodePool::Gold) && agent.gold_mining_cooldown <= 0.0 && self.rng.gen_bool(0.40) {
             return Some(Need { level: MaslowLevel::SelfActualization, kind: NeedKind::GoldWealth, target_state: PrimitiveActionState::SeekingGold });
         }
         None
@@ -275,22 +335,22 @@ impl<'a> Decisioner<'a> {
             return;
         }
         if need.kind == NeedKind::StockGold {
-            agent.gold_mining_cooldown = 45.0;
+            agent.gold_mining_cooldown = self.config.decision_stock_gold_cooldown;
         } else if need.kind == NeedKind::GoldWealth {
-            agent.gold_mining_cooldown = 180.0;
+            agent.gold_mining_cooldown = self.config.decision_gold_wealth_cooldown;
         }
 
         let start = self.start_node(agent);
         let target = match need.kind {
-            NeedKind::QuenchThirst | NeedKind::StockWater => self.nearest_of(NodePool::Water, agent.world_pos),
-            NeedKind::SateHunger | NeedKind::StockFood => self.nearest_of(NodePool::Food, agent.world_pos),
-            NeedKind::StockWood => self.nearest_of(NodePool::Wood, agent.world_pos),
-            NeedKind::StockStone => self.nearest_of(NodePool::Stone, agent.world_pos),
-            NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(NodePool::Gold, agent.world_pos),
+            NeedKind::QuenchThirst | NeedKind::StockWater => self.nearest_of(agent, NodePool::Water, agent.world_pos),
+            NeedKind::SateHunger | NeedKind::StockFood => self.nearest_of(agent, NodePool::Food, agent.world_pos),
+            NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
+            NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
+            NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
             NeedKind::ForageSurplus => {
-                let len = self.ctx.food_nodes.len();
-                if len == 0 { return; }
-                Some(self.ctx.food_nodes[self.rng.gen_range_usize(0, len)])
+                let nodes = self.available_nodes(agent, NodePool::Food);
+                if nodes.is_empty() { return; }
+                Some(nodes[self.rng.gen_range_usize(0, nodes.len())])
             }
             NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse => None,
         };
@@ -306,13 +366,12 @@ impl<'a> Decisioner<'a> {
             .map(|h| h.pantry_water >= (h.max_pantry_water * 0.98))
             .unwrap_or(true);
         let self_satisfied = agent.thirst >= 49.9;
-        let carry_full = can_stock && agent.carried_water >= CARRY_CAPACITY_RESOURCE;
-        let empty = self.source_empty(PoiType::WaterSource, agent.world_pos);
+        let carry_full = can_stock && agent.carried_water >= self.config.carry_capacity_resource;
+        let unavailable = self.is_target_poi_unavailable(agent, PoiType::WaterSource);
 
-        // 如果自身尚未喝饱 或 家宅需要且背包未满，且体力健康，当前水源枯竭时尝试前往下一处未枯竭水源
         let needs_more_water = !self_satisfied || (can_stock && !house_water_full && !carry_full);
-        if empty && needs_more_water && agent.stamina >= 50.0 {
-            if let Some(next_target) = self.nearest_of(NodePool::Water, agent.world_pos) {
+        if unavailable && needs_more_water && agent.stamina >= 50.0 {
+            if let Some(next_target) = self.nearest_of(agent, NodePool::Water, agent.world_pos) {
                 let curr_node = self.start_node(agent);
                 if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingWater) {
                     return;
@@ -320,11 +379,12 @@ impl<'a> Decisioner<'a> {
             }
         }
 
-        let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || empty;
+        let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || unavailable;
 
         if finished {
-            if agent.hunger < 25.0 && !self.ctx.food_nodes.is_empty() {
-                let target = self.ctx.food_nodes[self.rng.gen_range_usize(0, self.ctx.food_nodes.len())];
+            if agent.hunger < self.config.decision_critical_hunger && self.has_available_node(agent, NodePool::Food) {
+                let nodes = self.available_nodes(agent, NodePool::Food);
+                let target = nodes[self.rng.gen_range_usize(0, nodes.len())];
                 let curr_node = self.start_node(agent);
                 agent.current_need = Some("Physiological·SateHunger".to_string());
                 self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingFood);
@@ -342,13 +402,12 @@ impl<'a> Decisioner<'a> {
             .map(|h| h.pantry_food >= (h.max_pantry_food * 0.98))
             .unwrap_or(true);
         let self_satisfied = agent.hunger >= 49.9;
-        let carry_full = can_stock && agent.carried_food >= CARRY_CAPACITY_RESOURCE;
-        let empty = self.source_empty(PoiType::BerryBush, agent.world_pos);
+        let carry_full = can_stock && agent.carried_food >= self.config.carry_capacity_resource;
+        let unavailable = self.is_target_poi_unavailable(agent, PoiType::BerryBush);
 
-        // 如果自身尚未吃饱 或 家宅需要且背包未满，且体力健康，当前灌木枯竭时尝试前往下一处未枯竭食物点
         let needs_more_food = !self_satisfied || (can_stock && !house_food_full && !carry_full);
-        if empty && needs_more_food && agent.stamina >= 50.0 {
-            if let Some(next_target) = self.nearest_of(NodePool::Food, agent.world_pos) {
+        if unavailable && needs_more_food && agent.stamina >= 50.0 {
+            if let Some(next_target) = self.nearest_of(agent, NodePool::Food, agent.world_pos) {
                 let curr_node = self.start_node(agent);
                 if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingFood) {
                     return;
@@ -356,11 +415,12 @@ impl<'a> Decisioner<'a> {
             }
         }
 
-        let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || empty;
+        let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || unavailable;
 
         if finished {
-            if agent.thirst < 25.0 && !self.ctx.water_nodes.is_empty() {
-                let target = self.ctx.water_nodes[self.rng.gen_range_usize(0, self.ctx.water_nodes.len())];
+            if agent.thirst < self.config.decision_critical_thirst && self.has_available_node(agent, NodePool::Water) {
+                let nodes = self.available_nodes(agent, NodePool::Water);
+                let target = nodes[self.rng.gen_range_usize(0, nodes.len())];
                 let curr_node = self.start_node(agent);
                 agent.current_need = Some("Physiological·QuenchThirst".to_string());
                 self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingWater);
@@ -373,15 +433,14 @@ impl<'a> Decisioner<'a> {
 
     pub fn decide_harvest(&mut self, agent: &mut Agent3D, poi_type: PoiType, fully_stocked: bool) {
         let (pool, state, carry_full) = match poi_type {
-            PoiType::WoodForest => (NodePool::Wood, PrimitiveActionState::SeekingWood, agent.carried_wood >= CARRY_CAPACITY_RESOURCE),
-            PoiType::StoneQuarry => (NodePool::Stone, PrimitiveActionState::SeekingStone, agent.carried_stone >= CARRY_CAPACITY_RESOURCE),
+            PoiType::WoodForest => (NodePool::Wood, PrimitiveActionState::SeekingWood, agent.carried_wood >= self.config.carry_capacity_resource),
+            PoiType::StoneQuarry => (NodePool::Stone, PrimitiveActionState::SeekingStone, agent.carried_stone >= self.config.carry_capacity_resource),
             _ => (NodePool::Wood, PrimitiveActionState::SeekingWood, false),
         };
-        let empty = self.source_empty(poi_type, agent.world_pos);
+        let unavailable = self.is_target_poi_unavailable(agent, poi_type);
 
-        // 如果当前采集点枯竭，但背包未满、家宅未满且体力和水粮健康，尝试就近前往下一个该类资源点
-        if empty && !fully_stocked && !carry_full && agent.hunger >= 25.0 && agent.thirst >= 25.0 && agent.stamina >= 50.0 {
-            if let Some(next_target) = self.nearest_of(pool, agent.world_pos) {
+        if unavailable && !fully_stocked && !carry_full && agent.hunger >= self.config.decision_critical_hunger && agent.thirst >= self.config.decision_critical_thirst && agent.stamina >= 50.0 {
+            if let Some(next_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 let curr_node = self.start_node(agent);
                 if self.dispatch(agent, curr_node, next_target, state) {
                     return;
@@ -389,7 +448,7 @@ impl<'a> Decisioner<'a> {
             }
         }
 
-        if empty || fully_stocked || carry_full || agent.hunger < 25.0 || agent.thirst < 25.0 || agent.stamina < 50.0 {
+        if unavailable || fully_stocked || carry_full || agent.hunger < self.config.decision_critical_hunger || agent.thirst < self.config.decision_critical_thirst || agent.stamina < 50.0 {
             agent.current_need = Some(if agent.stamina < 50.0 { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);
         }
@@ -400,15 +459,15 @@ impl<'a> Decisioner<'a> {
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.tier == HouseTier::Tier3Homestead && h.pantry_gold < h.max_pantry_gold)
             .unwrap_or(false);
-        let gold_load_full = agent.carried_gold >= 20.0;
+        let gold_load_full = agent.carried_gold >= self.config.agent_gold_load_full;
         let house_gold_full = agent.home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.pantry_gold >= (h.max_pantry_gold * 0.98))
             .unwrap_or(false);
-        let empty = self.source_empty(PoiType::GoldMine, agent.world_pos);
+        let unavailable = self.is_target_poi_unavailable(agent, PoiType::GoldMine);
 
-        if empty && !gold_load_full && !(is_building_stock && house_gold_full) && agent.hunger >= 25.0 && agent.thirst >= 25.0 && agent.stamina >= 50.0 {
-            if let Some(next_target) = self.nearest_of(NodePool::Gold, agent.world_pos) {
+        if unavailable && !gold_load_full && !(is_building_stock && house_gold_full) && agent.hunger >= self.config.decision_critical_hunger && agent.thirst >= self.config.decision_critical_thirst && agent.stamina >= 50.0 {
+            if let Some(next_target) = self.nearest_of(agent, NodePool::Gold, agent.world_pos) {
                 let curr_node = self.start_node(agent);
                 if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingGold) {
                     return;
@@ -418,55 +477,37 @@ impl<'a> Decisioner<'a> {
 
         if gold_load_full
             || (is_building_stock && house_gold_full)
-            || empty
-            || agent.hunger < 25.0
-            || agent.thirst < 25.0
+            || unavailable
+            || agent.hunger < self.config.decision_critical_hunger
+            || agent.thirst < self.config.decision_critical_thirst
             || agent.stamina < 50.0
         {
-            agent.gold_mining_cooldown = if is_building_stock { 45.0 } else { 180.0 };
+            agent.gold_mining_cooldown = if is_building_stock { self.config.decision_stock_gold_cooldown } else { self.config.decision_gold_wealth_cooldown };
             agent.current_need = Some(if agent.stamina < 50.0 { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);
         }
     }
 
-    /// 建材途中转向与余额不足检查 (中途目标 POI < 10% 就近重新寻路或放弃)
+    /// 建材途中转向与可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
     pub fn decide_seeking_material(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
-        let target_depleted = self.is_target_poi_depleted_below_10(agent, poi_type);
-        let gold_interrupted = pool == NodePool::Gold && (self.ctx.gold_depleted || target_depleted);
+        let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
+        let gold_interrupted = pool == NodePool::Gold && (!self.has_available_node(agent, NodePool::Gold) || target_unavailable);
 
-        // 紧急生理需求或体力耗尽优先打断
-        if agent.thirst < 25.0 && !self.ctx.water_nodes.is_empty() {
-            let target = self.nearest_of(NodePool::Water, agent.world_pos).unwrap_or(self.ctx.water_nodes[0]);
-            if !self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingWater) {
-                let curr_node = self.start_node(agent);
-                self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingWater);
-            }
-            return;
-        }
-        if agent.hunger < 25.0 && !self.ctx.food_nodes.is_empty() {
-            let target = self.nearest_of(NodePool::Food, agent.world_pos).unwrap_or(self.ctx.food_nodes[0]);
-            if !self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingFood) {
-                let curr_node = self.start_node(agent);
-                self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingFood);
-            }
-            return;
-        }
-        if agent.stamina < 50.0 {
-            agent.current_need = Some("Physiological·Rest".to_string());
-            self.return_home(agent);
-            return;
-        }
-
-        // 目标 POI 枯竭时，尝试就近前往同类未枯竭 POI
-        if target_depleted || gold_interrupted || pool.nodes(self.ctx).is_empty() {
-            if pool == NodePool::Gold {
+        if agent.stamina < 50.0 || gold_interrupted {
+            if gold_interrupted {
                 let is_building_stock = agent.home_house_id
                     .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                     .map(|h| h.tier == HouseTier::Tier3Homestead && h.pantry_gold < h.max_pantry_gold)
                     .unwrap_or(false);
-                agent.gold_mining_cooldown = if is_building_stock { 45.0 } else { 180.0 };
+                agent.gold_mining_cooldown = if is_building_stock { self.config.decision_stock_gold_cooldown } else { self.config.decision_gold_wealth_cooldown };
             }
-            if let Some(new_target) = self.nearest_of(pool, agent.world_pos) {
+            agent.current_need = Some(if agent.stamina < 50.0 { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            self.return_home(agent);
+            return;
+        }
+
+        if !self.has_available_node(agent, pool) || target_unavailable {
+            if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {
                         PoiType::WoodForest => PrimitiveActionState::SeekingWood,
@@ -488,9 +529,9 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 生存资源途中余额不足检查 (中途目标 POI < 10% 就近重新寻路或放弃)
+    /// 生存资源途中可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
     pub fn decide_seeking_survival(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
-        let target_depleted = self.is_target_poi_depleted_below_10(agent, poi_type);
+        let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
 
         if agent.stamina < 50.0 {
             agent.current_need = Some("Physiological·Rest".to_string());
@@ -498,9 +539,8 @@ impl<'a> Decisioner<'a> {
             return;
         }
 
-        if pool.nodes(self.ctx).is_empty() || target_depleted {
-            // 目标 POI 枯竭或不可用，尝试就近前往其他未枯竭的同类生存 POI
-            if let Some(new_target) = self.nearest_of(pool, agent.world_pos) {
+        if !self.has_available_node(agent, pool) || target_unavailable {
+            if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {
                         PoiType::WaterSource => PrimitiveActionState::SeekingWater,
@@ -537,24 +577,31 @@ impl<'a> Decisioner<'a> {
 }
 
 impl World3DEngine {
-    /// 错峰决策调度: 每 tick 调用一次；每个 agent 仅在 (tick + id) % 30 的相位上决策
+    /// 错峰决策调度: 每 tick 调用一次；每个 agent 仅在 (tick + id) % AGENT_DECISION_INTERVAL_TICKS 的相位上决策
     pub fn tick_decisions(&mut self) {
         let ctx = self.build_decision_context();
+        let poi_stock_observations: Vec<_> = self.pois.iter()
+            .filter(|poi| poi.poi_type != PoiType::Camp)
+            .map(|poi| (poi.id, poi.current_stock, poi.max_stock))
+            .collect();
         let mut decisioner = Decisioner {
             ctx: &ctx,
             network: &self.network,
             houses: &self.houses,
-            pois: &self.pois,
             rng: &mut self.rng,
+            config: &self.config,
         };
         for agent in &mut self.agents {
-            if agent.is_alive && (self.tick_counter + agent.id as u64) % AGENT_DECISION_INTERVAL_TICKS == 0 {
+            if agent.is_alive && (self.tick_counter + agent.id as u64) % self.config.agent_decision_interval_ticks == 0 {
+                for &(poi_id, current_stock, max_stock) in &poi_stock_observations {
+                    agent.observe_poi_stock_with_config(poi_id, current_stock, max_stock, &self.config);
+                }
                 decisioner.decide(agent);
             }
         }
     }
 
-    /// 收集全图储量充足 (≥30%) 的资源节点池与营地坐标
+    /// 收集全图资源节点与营地坐标；每名 Agent 会用自己的触发器过滤候选。
     pub fn build_decision_context(&self) -> DecisionContext {
         let mut water_nodes = Vec::new();
         let mut food_nodes = Vec::new();
@@ -563,28 +610,15 @@ impl World3DEngine {
         let mut gold_nodes = Vec::new();
         let mut camp_positions = Vec::new();
 
-        let mut total_gold_cur = 0.0f32;
-        let mut total_gold_max = 0.0f32;
         for poi in &self.pois {
-            if poi.poi_type == PoiType::GoldMine {
-                total_gold_cur += poi.current_stock;
-                total_gold_max += poi.max_stock;
-            }
-        }
-        let gold_depleted = total_gold_max > 0.0 && (total_gold_cur / total_gold_max) < DECISION_POI_SEEK_MIN_STOCK_RATIO;
-
-        for poi in &self.pois {
-            // POI 储量低于 30% 则不启动对该点的寻路决策 (营地无限储量除外)
-            if poi.poi_type != PoiType::Camp && poi.current_stock < (poi.max_stock * DECISION_POI_SEEK_MIN_STOCK_RATIO) {
-                continue;
-            }
             let Some(node) = self.find_nearest_node(poi.pos) else { continue };
+            let target = ResourceNode { poi_id: poi.id, node };
             match poi.poi_type {
-                PoiType::WaterSource => water_nodes.push(node),
-                PoiType::BerryBush => food_nodes.push(node),
-                PoiType::WoodForest => wood_nodes.push(node),
-                PoiType::StoneQuarry => stone_nodes.push(node),
-                PoiType::GoldMine => { if !gold_depleted { gold_nodes.push(node); } }
+                PoiType::WaterSource => water_nodes.push(target),
+                PoiType::BerryBush => food_nodes.push(target),
+                PoiType::WoodForest => wood_nodes.push(target),
+                PoiType::StoneQuarry => stone_nodes.push(target),
+                PoiType::GoldMine => gold_nodes.push(target),
                 PoiType::Camp => camp_positions.push((node, poi.pos)),
             }
         }
@@ -596,7 +630,6 @@ impl World3DEngine {
             stone_nodes,
             gold_nodes,
             camp_positions,
-            gold_depleted,
         }
     }
 }

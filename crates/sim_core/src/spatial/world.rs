@@ -1,4 +1,5 @@
 use crate::rng::WorldRng;
+use crate::config::SimConfig;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
@@ -33,6 +34,7 @@ pub struct World3DEngine {
     pub gold_regen_multiplier: f32,
     pub tick_counter: u64,
     pub last_event: Option<String>,
+    pub config: SimConfig,
 }
 
 impl World3DEngine {
@@ -42,6 +44,11 @@ impl World3DEngine {
 
     /// 指定种子的确定性世界构建 (wasm 桥接与 SL 复现使用)
     pub fn new_seeded(grid_res: usize, world_size: f32, seed: u64) -> Self {
+        Self::new_seeded_with_config(grid_res, world_size, seed, SimConfig::default())
+    }
+
+    /// 指定种子和自定义配置的确定性世界构建
+    pub fn new_seeded_with_config(grid_res: usize, world_size: f32, seed: u64, config: SimConfig) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
         terrain.generate_natural_landscape(seed);
 
@@ -67,6 +74,31 @@ impl World3DEngine {
             gold_regen_multiplier: 1.0,
             tick_counter: 0,
             last_event: None,
+            config,
+        }
+    }
+
+    /// 从 JSON 字符串解析并应用动态仿真配置
+    pub fn apply_config_json(&mut self, json_str: &str) -> Result<(), String> {
+        let cfg: SimConfig = serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+        self.apply_config(cfg);
+        Ok(())
+    }
+
+    /// 应用动态仿真配置
+    pub fn apply_config(&mut self, config: SimConfig) {
+        self.config = config;
+        // 同步刷新所有现有 POI 的产速基准
+        for poi in &mut self.pois {
+            let base_regen = match poi.poi_type {
+                PoiType::WaterSource => self.config.regen_base_water,
+                PoiType::BerryBush => self.config.regen_base_berry,
+                PoiType::WoodForest => self.config.regen_base_wood,
+                PoiType::StoneQuarry => self.config.regen_base_stone,
+                PoiType::GoldMine => self.config.regen_base_gold,
+                _ => poi.regen_rate,
+            };
+            poi.regen_rate = base_regen;
         }
     }
 
@@ -113,6 +145,15 @@ impl World3DEngine {
 
         // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
         for poi in &mut self.pois {
+            let base_regen = match poi.poi_type {
+                PoiType::WaterSource => self.config.regen_base_water,
+                PoiType::BerryBush => self.config.regen_base_berry,
+                PoiType::WoodForest => self.config.regen_base_wood,
+                PoiType::StoneQuarry => self.config.regen_base_stone,
+                PoiType::GoldMine => self.config.regen_base_gold,
+                _ => 1.0,
+            };
+            poi.regen_rate = base_regen;
             let mult = match poi.poi_type {
                 PoiType::WaterSource => self.water_regen_multiplier,
                 PoiType::BerryBush => self.berry_regen_multiplier,
@@ -128,9 +169,9 @@ impl World3DEngine {
         for agent in &mut self.agents {
             let fertility_active = agent.home_house_id
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
-                .map(|h| h.is_fertility_active())
+                .map(|h| h.is_fertility_active(&self.config))
                 .unwrap_or(false);
-            if let Some(event) = agent.tick_metabolism(dt, fertility_active) {
+            if let Some(event) = agent.tick_metabolism(dt, fertility_active, &self.config) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
                 }
@@ -150,11 +191,11 @@ impl World3DEngine {
         // 4. 自发筑屋建造、私产确权、折旧与代际继承
         self.tick_housing(dt);
 
-        // 错峰决策: 每个 agent 在自己 (tick + id) % 15 的相位上决策 (每 tick 调度一次，内部按相位过滤)
+        // 错峰决策
         self.tick_decisions();
 
         // 5. 道路自然杂草丛生与退化衰减
-        self.network.tick_wear_decay(dt);
+        self.network.tick_wear_decay(dt, &self.config);
 
         // 6. 动力学运动与踩踏拓路
         for agent in &mut self.agents {
@@ -214,8 +255,8 @@ impl World3DEngine {
                 generation: h.generation,
                 is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
-                is_fertility_active: h.is_fertility_active(),
-                is_pantry_full: h.is_pantry_full(),
+                is_fertility_active: h.is_fertility_active(&self.config),
+                is_pantry_full: h.is_pantry_full(&self.config),
                 is_repairing: h.is_repairing,
             });
         }
@@ -310,7 +351,8 @@ impl World3DEngine {
             Season::Autumn => "Autumn",
             Season::Winter => "Winter",
         };
-        let season_progress = ((self.season_timer + 30.0) % 60.0) / 60.0;
+        let quarter_length = self.config.season_quarter_length;
+        let season_progress = ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
 
         WorldSnapshot3D {
             tick: self.tick_counter,
@@ -378,7 +420,6 @@ mod tests {
     use super::*;
     use crate::spatial::agent::Gender;
 
-    /// 测试金币遗产平分给所有在世子一代子女 (男女均分)
     #[test]
     fn test_gold_inheritance_split_equally_among_living_children() {
         let mut world = World3DEngine::new(60, 764.0);
@@ -408,29 +449,25 @@ mod tests {
 
         world.agents = vec![father, son, daughter, third_child];
 
-        // 父亲去世
         world.agents[0].is_alive = false;
-
-        // 执行遗产结算
         world.settle_gold_inheritance();
 
         let f = &world.agents[0];
-        assert_eq!(f.carried_gold, 0.0, "死者金币已被清零分发");
+        assert_eq!(f.carried_gold, 0.0);
 
         let s = &world.agents[1];
-        assert_eq!(s.carried_gold, 15.0, "儿子应分得 10.0 黄金，加上原有 5.0 共 15.0");
+        assert_eq!(s.carried_gold, 15.0);
 
         let d = &world.agents[2];
-        assert_eq!(d.carried_gold, 10.0, "女儿应分得 10.0 黄金，原有 0.0 共 10.0");
+        assert_eq!(d.carried_gold, 10.0);
 
         let t = &world.agents[3];
-        assert_eq!(t.carried_gold, 20.0, "幼子应分得 10.0 黄金，加上原有 10.0 共 20.0");
+        assert_eq!(t.carried_gold, 20.0);
 
         assert!(world.last_event.as_ref().unwrap().contains("💰 遗产继承"));
         assert!(world.last_event.as_ref().unwrap().contains("3 位子女平分"));
     }
 
-    /// 测试金币遗产仅分配给在世子一代子女 (排除已故子女与孙辈)
     #[test]
     fn test_gold_inheritance_ignores_dead_children_and_grandchildren() {
         let mut world = World3DEngine::new(60, 764.0);
@@ -448,7 +485,7 @@ mod tests {
 
         let mut dead_child = Agent3D::new(dead_child_id, camp_node, 10.0, false, 600.0, Gender::Female);
         dead_child.mother_id = Some(mother_id);
-        dead_child.is_alive = false; // 已故
+        dead_child.is_alive = false;
         dead_child.carried_gold = 0.0;
         dead_child.children_ids = vec![grandchild_id];
 
@@ -462,18 +499,15 @@ mod tests {
 
         world.agents = vec![mother, dead_child, living_child, grandchild];
 
-        // 母亲去世
         world.agents[0].is_alive = false;
-
         world.settle_gold_inheritance();
 
-        assert_eq!(world.agents[0].carried_gold, 0.0, "死者金币已被清零");
-        assert_eq!(world.agents[1].carried_gold, 0.0, "已故子嗣不参与分金");
-        assert_eq!(world.agents[2].carried_gold, 20.0, "唯一定居在世的子一代子女独得全部 20.0 黄金");
-        assert_eq!(world.agents[3].carried_gold, 0.0, "孙辈不直接参与子一代平分");
+        assert_eq!(world.agents[0].carried_gold, 0.0);
+        assert_eq!(world.agents[1].carried_gold, 0.0);
+        assert_eq!(world.agents[2].carried_gold, 20.0);
+        assert_eq!(world.agents[3].carried_gold, 0.0);
     }
 
-    /// 测试无在世子女时死者金币安全清零不崩溃
     #[test]
     fn test_gold_inheritance_no_living_children() {
         let mut world = World3DEngine::new(60, 764.0);
@@ -485,9 +519,8 @@ mod tests {
         bachelor.is_alive = false;
 
         world.agents = vec![bachelor];
-
         world.settle_gold_inheritance();
 
-        assert_eq!(world.agents[0].carried_gold, 0.0, "无后代继承人时金币归零");
+        assert_eq!(world.agents[0].carried_gold, 0.0);
     }
 }

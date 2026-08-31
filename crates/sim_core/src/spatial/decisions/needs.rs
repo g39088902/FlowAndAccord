@@ -2,6 +2,7 @@ use super::super::vec3::Vec3;
 use super::super::graph::NodeId;
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
+use super::super::poi::PoiId;
 use crate::config::*;
 
 /// 马斯洛需求层次 (低 → 高，低层绝对优先)
@@ -50,7 +51,7 @@ pub enum NodePool {
 }
 
 impl NodePool {
-    pub fn nodes(self, ctx: &DecisionContext) -> &[NodeId] {
+    pub fn nodes(self, ctx: &DecisionContext) -> &[ResourceNode] {
         match self {
             NodePool::Water => &ctx.water_nodes,
             NodePool::Food => &ctx.food_nodes,
@@ -61,15 +62,21 @@ impl NodePool {
     }
 }
 
-/// 决策上下文: 仅收集全图储量充足 (≥30%) 的资源节点池与营地坐标
+/// 一处资源 POI 与它邻近的路网节点。
+#[derive(Debug, Clone, Copy)]
+pub struct ResourceNode {
+    pub poi_id: PoiId,
+    pub node: NodeId,
+}
+
+/// 决策上下文：收集资源节点；是否可用由每个 Agent 的私有触发器决定。
 pub struct DecisionContext {
-    pub water_nodes: Vec<NodeId>,
-    pub food_nodes: Vec<NodeId>,
-    pub wood_nodes: Vec<NodeId>,
-    pub stone_nodes: Vec<NodeId>,
-    pub gold_nodes: Vec<NodeId>,
+    pub water_nodes: Vec<ResourceNode>,
+    pub food_nodes: Vec<ResourceNode>,
+    pub wood_nodes: Vec<ResourceNode>,
+    pub stone_nodes: Vec<ResourceNode>,
+    pub gold_nodes: Vec<ResourceNode>,
     pub camp_positions: Vec<(NodeId, Vec3)>,
-    pub gold_depleted: bool,
 }
 
 /// 家宅物资与修缮缺口 (按房屋等级与耐久度计算)
@@ -82,42 +89,42 @@ pub struct HouseStockNeeds {
     pub need_gold: bool,
 }
 
-pub fn house_stock_needs(house: &House) -> HouseStockNeeds {
+pub fn house_stock_needs(house: &House, config: &SimConfig) -> HouseStockNeeds {
     let (need_water, need_food, need_wood, need_stone, need_gold) = match house.tier {
         HouseTier::Tier0Warehouse => (
-            house.pantry_water < (house.max_pantry_water * HOUSE_UPGRADE_TIER0_WATER_RATIO),
-            house.pantry_food < (house.max_pantry_food * HOUSE_UPGRADE_TIER0_FOOD_RATIO),
+            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier0_water_ratio),
+            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier0_food_ratio),
             false, false, false,
         ),
         HouseTier::Tier1ThatchedHut => (
-            house.pantry_water < (house.max_pantry_water * HOUSE_UPGRADE_TIER1_FOOD_WATER_RATIO),
-            house.pantry_food < (house.max_pantry_food * HOUSE_UPGRADE_TIER1_FOOD_WATER_RATIO),
-            house.pantry_wood < (house.max_pantry_wood * HOUSE_UPGRADE_TIER1_WOOD_RATIO),
+            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier1_food_water_ratio),
+            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier1_food_water_ratio),
+            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier1_wood_ratio),
             false, false,
         ),
         HouseTier::Tier2LeanTo => (
-            house.pantry_water < (house.max_pantry_water * HOUSE_UPGRADE_TIER2_OTHER_RATIO),
-            house.pantry_food < (house.max_pantry_food * HOUSE_UPGRADE_TIER2_OTHER_RATIO),
-            house.pantry_wood < (house.max_pantry_wood * HOUSE_UPGRADE_TIER2_OTHER_RATIO),
-            house.pantry_stone < (house.max_pantry_stone * HOUSE_UPGRADE_TIER2_STONE_RATIO),
+            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier2_other_ratio),
+            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier2_other_ratio),
+            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier2_other_ratio),
+            house.pantry_stone < (house.max_pantry_stone * config.house_upgrade_tier2_stone_ratio),
             false,
         ),
         HouseTier::Tier3Homestead => (
-            house.pantry_water < (house.max_pantry_water * HOUSE_UPGRADE_TIER3_OTHER_RATIO),
-            house.pantry_food < (house.max_pantry_food * HOUSE_UPGRADE_TIER3_OTHER_RATIO),
-            house.pantry_wood < (house.max_pantry_wood * HOUSE_UPGRADE_TIER3_OTHER_RATIO),
-            house.pantry_stone < (house.max_pantry_stone * HOUSE_UPGRADE_TIER3_GOLD_STONE_RATIO),
-            house.pantry_gold < (house.max_pantry_gold * HOUSE_UPGRADE_TIER3_GOLD_STONE_RATIO),
+            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier3_other_ratio),
+            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier3_other_ratio),
+            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier3_other_ratio),
+            house.pantry_stone < (house.max_pantry_stone * config.house_upgrade_tier3_gold_stone_ratio),
+            house.pantry_gold < (house.max_pantry_gold * config.house_upgrade_tier3_gold_stone_ratio),
         ),
         HouseTier::Tier4Manor => (
-            house.pantry_water < (house.max_pantry_water * HOUSE_FERTILITY_STOCK_RATIO),
-            house.pantry_food < (house.max_pantry_food * HOUSE_FERTILITY_STOCK_RATIO),
-            house.pantry_wood < (house.max_pantry_wood * HOUSE_FERTILITY_STOCK_RATIO),
+            house.pantry_water < (house.max_pantry_water * config.house_fertility_stock_ratio),
+            house.pantry_food < (house.max_pantry_food * config.house_fertility_stock_ratio),
+            house.pantry_wood < (house.max_pantry_wood * config.house_fertility_stock_ratio),
             false, false,
         ),
     };
     HouseStockNeeds {
-        need_repair: house.durability < DECISION_HOUSE_REPAIR_NEED_THRESHOLD && !house.is_ruin,
+        need_repair: house.durability < config.decision_house_repair_need_threshold && !house.is_ruin,
         need_water, need_food, need_wood, need_stone, need_gold,
     }
 }

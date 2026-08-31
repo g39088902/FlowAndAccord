@@ -52,12 +52,41 @@
           this._memory = this._wasm.memory;
           this._wasm.world_create(60, 764.0, this._engineSeed, 12);
           this._ready = true;
+          if (window.SIM_CONFIG) {
+            this.applyConfig(window.SIM_CONFIG);
+          }
           this._pullSnapshot(true);
           if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
           console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
         } catch (e) {
           console.error('[RustWorld] 无法加载 Rust 引擎 (请通过 HTTP 服务访问):', e);
         }
+      }
+
+      // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
+      applyConfig(cfg) {
+        if (!this._ready) return false;
+        const configObj = cfg || window.SIM_CONFIG;
+        if (!configObj) return false;
+        try {
+          const jsonStr = JSON.stringify(configObj);
+          const encoded = new TextEncoder().encode(jsonStr);
+          if (typeof this._wasm.world_config_buf_ptr === 'function' && typeof this._wasm.world_apply_config_buf === 'function') {
+            const ptr = this._wasm.world_config_buf_ptr(encoded.length);
+            new Uint8Array(this._memory.buffer, ptr, encoded.length).set(encoded);
+            const res = this._wasm.world_apply_config_buf(encoded.length);
+            if (res === 0) {
+              console.info('[RustWorld] 已成功同步并应用 JS 动态配置至 WASM 内核');
+              return true;
+            } else {
+              console.warn('[RustWorld] 应用 JS 动态配置失败，状态码:', res);
+              return false;
+            }
+          }
+        } catch (e) {
+          console.error('[RustWorld] 序列化/发送配置至 WASM 失败:', e);
+        }
+        return false;
       }
 
       // 清空当前选中 (agent / poi / house)，关闭 Inspector 面板
@@ -92,6 +121,9 @@
         this.agentArchive.clear();
         if (this._ready) {
           this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 12);
+          if (window.SIM_CONFIG) {
+            this.applyConfig(window.SIM_CONFIG);
+          }
           this._pullSnapshot(true);
           if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
         }

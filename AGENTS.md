@@ -29,14 +29,14 @@
 graph TD
     A["crates/sim_core (Rust 确定性内核)"] -->|编译| B["crates/sim_wasm (wasm32)"]
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
-    C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层)"]
+    C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.29)"]
+    E --> F["浏览器 UI (版本: v0.9.32)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system.rs`）；
-- **`crates/sim_wasm`**：零依赖 WASM 导出层，负责线性内存 JSON 序列化与 tick 步进；
-- **`frontend/`**：原生静态前端（`math.js` / `rustworld.js` / `render.js` / `main.js`），内置轻量开发服务器 `frontend/server.js`。
+- **`crates/sim_wasm`**：零依赖 WASM 导出层，负责线性内存 JSON 序列化、tick 步进与 JS 动态配置注入；
+- **`frontend/`**：原生静态前端（`config.js` / `math.js` / `rustworld.js` / `render.js` / `main.js`），内置轻量开发服务器 `frontend/server.js`。数字配置抽离在 `config.js` 中，无需重新编译即可调参。
 
 ---
 
@@ -91,7 +91,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.29`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.32`**。
 
 ---
 
@@ -122,14 +122,14 @@ node frontend/server.js
 
 ### 4.2 🔴 寻路决策门槛、连续采收与中途重路由机制
 
-- **启动寻路门槛（$\ge 30\%$）**：
-  - 在 `decisions/evaluator.rs` 的 `build_decision_context()` 中，POI 当前储量 $< 30\%$（`current_stock < max_stock * 0.30`）时，将其排除在候选节点池外，**绝不启动对该点的寻路**。
+- **Agent 私有 POI 施密特触发器（开启 $\ge 30\%$ / 关闭 $< 10\%$）**：
+  - 每名 Agent 在自身决策相位观察 POI 库存，并在 `Agent3D::poi_seekability` 中维护私有锁存状态：库存升至 $\ge30\%$ 才开放；已开放点仅在跌破 $<10\%$ 时关闭；在 $10\%\sim30\%$ 中间带保持自身前态。相同 POI 可被不同 Agent 判为不同可用性；`evaluator.rs` 的路由与重路由只读取 Agent 的触发器结论。
 - **采收现场未满连续采收**：
-  - 族人在现场采收（水/粮/木/石/金）时，若当前 POI 枯竭（$\le 0.05$）但自身或背包未满且家宅仍需，自动就近寻路前往下一处储量充沛（$\ge 30\%$）的同类 POI 继续采收，避免提前送货回宅。
+  - 族人在现场采收（水/粮/木/石/金）时，若自己的目标触发器已关闭但自身或背包未满且家宅仍需，自动就近寻路前往下一处**自身触发器已开放**的同类 POI 继续采收，避免提前送货回宅。
 - **中途断流熔断与平滑就近重路由（$< 10\%$）**：
-  - 在 `decide_seeking_material` 与 `decide_seeking_survival` 中，中途检测目标 POI 储量跌破 $< 10\%$ 时，若全图仍有其他 $\ge 30\%$ 的同类 POI，立即通过 `turn_around_and_route_to` 原地掉头并平滑重新规划路径赶往就近可用 POI；仅在全图无可用品或体力告警时才折返回家；
+  - 在 `decide_seeking_material` 与 `decide_seeking_survival` 中，中途检测**自身对目标**的施密特触发器关闭（观察到跌破 $<10\%$）时，若自身仍有其他已开放同类 POI，立即通过 `turn_around_and_route_to` 原地掉头并平滑重新规划路径赶往就近可用 POI；仅在自身无可用品或体力告警时才折返回家；
   - **严禁闪现瞬移**：中途掉头时通过 `turn_around_and_route_to` 在当前车道原地掉头（反向进度 `rev_len - distance_along_curve`），平滑从当前坐标沿原路往回走，保持坐标连续性。
-- **修改相关逻辑时**：必须同步更新 `decisions/tests.rs` 中的对应测试（`test_no_pathfinding_when_poi_below_30_percent`、`test_abandon_seeking_when_target_poi_below_10_percent`、`test_reroute_to_next_poi_when_target_depleted` 等）。
+- **修改相关逻辑时**：必须同步更新 `agent.rs` 与 `decisions/tests.rs` 中的对应测试（Agent 私有施密特中间带保持状态、`test_poi_seekability_is_private_to_each_agent`、`test_abandon_seeking_when_target_poi_below_10_percent`、`test_reroute_to_next_poi_when_target_depleted` 等）。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 

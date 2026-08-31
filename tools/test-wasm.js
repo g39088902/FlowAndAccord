@@ -74,5 +74,19 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   console.log('long-run: agents=' + s3.agents.length + ' houses=' + s3.houses.length +
     ' births=' + s3.total_births + ' deaths=' + s3.total_deaths);
 
+  // === Test 6: 动态 JS Config 注入验证 (免重编译) ===
+  if (typeof ex.world_config_buf_ptr === 'function' && typeof ex.world_apply_config_buf === 'function') {
+    const customConfig = {
+      tempBaseMid: 35.0,
+      seasonQuarterLength: 100.0,
+    };
+    const encoded = new TextEncoder().encode(JSON.stringify(customConfig));
+    const ptr = ex.world_config_buf_ptr(encoded.length);
+    new Uint8Array(ex.memory.buffer, ptr, encoded.length).set(encoded);
+    const res = ex.world_apply_config_buf(encoded.length);
+    console.log('dynamic JS config injection:', res === 0 ? 'success' : 'failed (' + res + ')');
+    if (res !== 0) throw new Error('CONFIG INJECTION FAILED: ' + res);
+  }
+
   console.log('ALL_TESTS_DONE');
 })().catch(e => { console.error('TEST_FAIL', e); process.exit(1); });

@@ -80,7 +80,7 @@ RestingAtCamp          --备料充足--> ConstructingHouse --30s--> RestingAtCam
 
 ## 4. 动机决策层：马斯洛需求层次化仲裁
 
-`tick_decisions()` 采用**错峰调度**：每 tick (1/30 模拟秒) 调用一次，但每个 agent 仅在 `(tick_counter + agent.id) % 15 == 0` 的相位上决策（每位小人平均每 15 Tick = 0.5s@30Hz 决策一次，但相位按 id 错开，消除全员同 tick 齐步走与计算尖峰），**优先级从高到低**：
+`tick_decisions()` 采用**错峰调度**：每 tick (1/30 模拟秒) 调用一次，但每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策，**优先级从高到低**：
 
 ### 4.1 生理急迫第一原则（最高优先级，第 ① 层）
 处于 `RestingAtCamp` 时若体力或水粮告急：

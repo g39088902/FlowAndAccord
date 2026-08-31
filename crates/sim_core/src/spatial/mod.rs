@@ -12,7 +12,7 @@ pub mod world;
 
 pub use vec3::Vec3;
 pub use curve::Curve3D;
-pub use graph::{LaneGraph3D, LaneNode3D, LaneEdge3D, NodeType, RoadClass, NodeId, LaneId};
+pub use graph::{LaneGraph3D, LaneNode3D, NodeData, LaneEdge3D, NodeType, RoadClass, NodeId, LaneId};
 pub use poi::{PrimitivePoi, PoiType, PoiId};
 pub use house::{House, HouseTier, HouseSnapshot};
 pub use agent::{Agent3D, PrimitiveActionState, AgentId, Gender};

@@ -23,11 +23,11 @@ pub enum NodeType {
 /// 道路等级
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoadClass {
-    DirtTrack,      // 泥泞小径 (限速 6m/s)
-    Cobblestone,    // 碎石盘山道 (限速 10m/s)
-    AsphaltUrban,   // 沥青主干道 (限速 15m/s)
-    SkywayElevated, // 悬空高架快速路 (限速 24m/s)
-    SmugglerTrail,  // 走私暗道/避税密道 (限速 8m/s，隐秘性极高)
+    DirtTrack,      // 泥泞小径
+    Cobblestone,    // 碎石盘山道
+    AsphaltUrban,   // 沥青主干道
+    SkywayElevated, // 悬空高架快速路
+    SmugglerTrail,  // 走私暗道/避税密道
 }
 
 /// 3D 有向车道边 (包含隐秘属性)
@@ -49,7 +49,7 @@ pub struct LaneEdge3D {
 /// 3D 路网拓扑有向图管理器
 #[derive(Debug, Clone)]
 pub struct LaneGraph3D {
-    pub graph: DiGraph<LaneNode3D, LaneEdge3D>,
+    pub graph: DiGraph<NodeData, LaneEdge3D>,
     pub node_map: HashMap<NodeId, NodeIndex>,
     pub edge_map: HashMap<LaneId, EdgeIndex>,
     pub next_node_id: NodeId,
@@ -57,11 +57,13 @@ pub struct LaneGraph3D {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LaneNode3D {
+pub struct NodeData {
     pub id: NodeId,
     pub pos: Vec3,
     pub node_type: NodeType,
 }
+
+pub type LaneNode3D = NodeData;
 
 impl LaneGraph3D {
     pub fn new() -> Self {
@@ -74,17 +76,14 @@ impl LaneGraph3D {
         }
     }
 
-    /// 动态添加 3D 节点
     pub fn add_node(&mut self, pos: Vec3, node_type: NodeType) -> NodeId {
         let id = self.next_node_id;
         self.next_node_id += 1;
-        let node_data = LaneNode3D { id, pos, node_type };
-        let idx = self.graph.add_node(node_data);
+        let idx = self.graph.add_node(NodeData { id, pos, node_type });
         self.node_map.insert(id, idx);
         id
     }
 
-    /// 动态添加 3D 车道 (支持普通道路与隐藏密道)
     pub fn add_lane(
         &mut self,
         from: NodeId,
@@ -95,7 +94,6 @@ impl LaneGraph3D {
         self.add_lane_with_options(from, to, curve, road_class, false, 0.0)
     }
 
-    /// 动态添加带有隐秘属性的车道
     pub fn add_lane_with_options(
         &mut self,
         from: NodeId,
@@ -105,8 +103,8 @@ impl LaneGraph3D {
         is_hidden: bool,
         concealment: f32,
     ) -> Result<LaneId, &'static str> {
-        let from_idx = *self.node_map.get(&from).ok_or("From node not found")?;
-        let to_idx = *self.node_map.get(&to).ok_or("To node not found")?;
+        let from_idx = *self.node_map.get(&from).ok_or("起始节点不存在")?;
+        let to_idx = *self.node_map.get(&to).ok_or("目标节点不存在")?;
 
         let p0 = self.graph[from_idx].pos;
         let p3 = self.graph[to_idx].pos;
@@ -142,52 +140,26 @@ impl LaneGraph3D {
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减 (固定百分比衰减率: 1/150 ≈ 0.667%/秒，当道路等级为 1.5 时衰减速度恰好为 0.010/s)
-    pub fn tick_wear_decay(&mut self, dt: f32) {
-        let decay_rate_per_sec = 0.010 / 1.5; // 固定百分比衰减：1/150 ≈ 0.667%/s
+    /// 道路自然杂草丛生与退化衰减
+    pub fn tick_wear_decay(&mut self, dt: f32, config: &SimConfig) {
         for edge in self.graph.edge_weights_mut() {
-            if edge.wear > 0.0 {
-                edge.wear = (edge.wear - edge.wear * decay_rate_per_sec * dt).max(0.0);
-                if edge.wear < 0.0001 {
-                    edge.wear = 0.0;
-                }
-            }
+            edge.wear = (edge.wear - config.road_wear_decay_rate * dt).max(0.0);
         }
     }
 
-    /// 动态删除车道
-    pub fn remove_lane(&mut self, lane_id: LaneId) -> Option<LaneEdge3D> {
-        if let Some(edge_idx) = self.edge_map.remove(&lane_id) {
-            let edge_data = self.graph.remove_edge(edge_idx);
-            self.rebuild_edge_map();
-            edge_data
-        } else {
-            None
-        }
+    pub fn tick_wear_decay_default(&mut self, dt: f32) {
+        self.tick_wear_decay(dt, &SimConfig::default());
     }
 
-    fn rebuild_edge_map(&mut self) {
-        self.edge_map.clear();
-        for edge_idx in self.graph.edge_indices() {
-            let edge = &self.graph[edge_idx];
-            self.edge_map.insert(edge.id, edge_idx);
-        }
+    /// 3D 拓扑加权 A* 寻路
+    pub fn find_path_3d(&self, start: NodeId, goal: NodeId) -> Option<Vec<LaneId>> {
+        self.find_path_3d_with_preference(start, goal, false)
     }
 
-    /// 3D A* 寻路 (支持隐秘偏好：走私者优先走隐藏暗道，平民避开高隐秘暗道)
-    pub fn find_path_3d(&self, start_node: NodeId, goal_node: NodeId) -> Option<Vec<LaneId>> {
-        self.find_path_3d_with_preference(start_node, goal_node, false)
-    }
-
-    /// 考虑走私潜行偏好的 3D 寻路
-    pub fn find_path_3d_with_preference(
-        &self,
-        start_node: NodeId,
-        goal_node: NodeId,
-        prefer_hidden: bool,
-    ) -> Option<Vec<LaneId>> {
-        let start_idx = *self.node_map.get(&start_node)?;
-        let goal_idx = *self.node_map.get(&goal_node)?;
+    /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路
+    pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool) -> Option<Vec<LaneId>> {
+        let start_idx = *self.node_map.get(&start)?;
+        let goal_idx = *self.node_map.get(&goal)?;
         let goal_pos = self.graph[goal_idx].pos;
 
         let path = astar(
@@ -196,14 +168,12 @@ impl LaneGraph3D {
             |finish| finish == goal_idx,
             |edge_ref| {
                 let edge = edge_ref.weight();
-                let delta_z = edge.curve.p3.z - edge.curve.p0.z;
+                let delta_z = (edge.curve.p3.z - edge.curve.p0.z).max(0.0);
                 let grade_penalty = if delta_z > 0.0 { delta_z * 1.5 } else { 0.0 };
 
-                // 道路等级与动态踩踏度带来的实际速度倍率 (0.50x ~ 2.20x)
                 let road_level_factor = (0.50 + 0.333 * edge.wear).clamp(0.50, 2.20);
                 let effective_speed = edge.speed_limit * road_level_factor;
 
-                // 潜行特工偏好走隐藏暗道 (大幅降低暗道代价值)；普通市民避开暗道
                 let hidden_modifier = if prefer_hidden {
                     if edge.is_hidden { 0.4 } else { 1.2 }
                 } else {

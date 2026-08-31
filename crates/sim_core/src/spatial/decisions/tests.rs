@@ -65,21 +65,21 @@ fn test_thirst_need_drives_seeking_water() {
     assert_eq!(world.agents[0].current_need.as_deref(), Some("Physiological·QuenchThirst"));
 }
 
-/// POI 余额小于 30% 时，不启动对该 POI 的寻路决策
+/// 首次观察到处于中间带的 POI 时，触发器默认关闭，不会启动寻路。
 #[test]
-fn test_no_pathfinding_when_poi_below_30_percent() {
+fn test_unobserved_midband_poi_is_not_seekable_until_it_recovers_to_30_percent() {
     let mut world = World3DEngine::new(60, 764.0);
     world.seed_primitive_ecology(12);
     let camp_node = world.agents[0].home_camp_node;
     let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
 
-    // 清空其他水源，只保留一个储量 25% (< 30%) 的水泉
+    // 清空其他水源，只保留一个首次被观察到时处于 25% 中间带的水泉。
     world.pois.retain(|p| p.poi_type != PoiType::WaterSource);
     let water_pos = Vec3::new(camp_pos.x + 10.0, camp_pos.y, camp_pos.z);
     let water_node = world.network.add_node(water_pos, NodeType::GroundIntersection);
     let _ = world.network.add_lane(camp_node, water_node, None, RoadClass::DirtTrack);
     let mut low_water = PrimitivePoi::new(999, PoiType::WaterSource, water_pos);
-    low_water.current_stock = 15.0; // 15.0 / 60.0 = 25% (< 30%)
+    low_water.current_stock = 15.0; // 25%，无既有开放记忆时保持关闭。
     world.pois.push(low_water);
 
     world.agents[0].state = PrimitiveActionState::RestingAtCamp;
@@ -90,6 +90,26 @@ fn test_no_pathfinding_when_poi_below_30_percent() {
 
     assert_ne!(world.agents[0].state, PrimitiveActionState::SeekingWater);
     assert_eq!(world.agents[0].state, PrimitiveActionState::RestingAtCamp);
+}
+
+#[test]
+fn test_poi_seekability_is_private_to_each_agent() {
+    let mut world = World3DEngine::new(60, 764.0);
+    world.seed_primitive_ecology(12);
+    let (water_id, water_max_stock) = world.pois.iter()
+        .find(|poi| poi.poi_type == PoiType::WaterSource)
+        .map(|poi| (poi.id, poi.max_stock))
+        .unwrap();
+
+    // Agent #1 曾在资源充足时观察过它，因此 25% 中间带仍判为可用。
+    world.agents[0].observe_poi_stock(water_id, 45.0, water_max_stock);
+    world.agents[0].observe_poi_stock(water_id, 15.0, water_max_stock);
+
+    // Agent #2 首次看到的就是 25%，没有“已开放”记忆，判为不可用。
+    world.agents[1].observe_poi_stock(water_id, 15.0, water_max_stock);
+
+    assert!(world.agents[0].poi_is_seekable(water_id));
+    assert!(!world.agents[1].poi_is_seekable(water_id));
 }
 
 /// 中途发现目标 POI 余额小于 10% 时，直接放弃寻路并原地掉头沿原路折返，不发生瞬移
@@ -336,6 +356,7 @@ fn test_continue_seeking_next_poi_when_harvest_source_empty_and_not_full() {
     world.agents[0].home_camp_node = camp_node;
     world.agents[0].world_pos = wood_pos1;
     world.agents[0].state = PrimitiveActionState::GatheringWood;
+    world.agents[0].target_poi_node = Some(wood_node1);
     world.agents[0].carried_wood = 15.0; // 未满 (上限 50.0)
     world.agents[0].thirst = 50.0;
     world.agents[0].hunger = 50.0;
@@ -377,6 +398,7 @@ fn test_continue_seeking_next_food_when_foraging_source_empty_and_not_full() {
 
     world.agents[0].world_pos = berry_pos1;
     world.agents[0].state = PrimitiveActionState::ForagingFood;
+    world.agents[0].target_poi_node = Some(berry_node1);
     world.agents[0].hunger = 20.0; // 还没吃饱 (< 49.9)
     world.agents[0].thirst = 50.0;
     world.agents[0].stamina = 100.0;

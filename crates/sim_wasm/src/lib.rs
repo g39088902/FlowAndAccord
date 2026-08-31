@@ -8,6 +8,7 @@ use sim_core::spatial::World3DEngine;
 
 static mut WORLD: Option<World3DEngine> = None;
 static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
+static mut CONFIG_BUF: Vec<u8> = Vec::new();
 
 /// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=12)
 #[no_mangle]
@@ -18,6 +19,54 @@ pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_
         WORLD = Some(w);
     }
     0
+}
+
+/// 准备写入 Config JSON 的内部缓冲区，返回起始指针
+#[no_mangle]
+pub extern "C" fn world_config_buf_ptr(len: u32) -> u32 {
+    unsafe {
+        CONFIG_BUF.resize(len as usize, 0);
+        CONFIG_BUF.as_mut_ptr() as u32
+    }
+}
+
+/// 解析并应用 Config 内部缓冲区中的 JSON 数据 (返回 0 表示成功)
+#[no_mangle]
+pub extern "C" fn world_apply_config_buf(len: u32) -> i32 {
+    unsafe {
+        if let Some(w) = WORLD.as_mut() {
+            let len = len as usize;
+            if len > CONFIG_BUF.len() {
+                return -1;
+            }
+            if let Ok(json_str) = std::str::from_utf8(&CONFIG_BUF[..len]) {
+                if w.apply_config_json(json_str).is_ok() {
+                    return 0;
+                }
+                return -2;
+            }
+            return -3;
+        }
+        -4
+    }
+}
+
+/// 直接从线性内存指针和长度应用 Config JSON
+#[no_mangle]
+pub extern "C" fn world_set_config(ptr: u32, len: u32) -> i32 {
+    unsafe {
+        if let Some(w) = WORLD.as_mut() {
+            let slice = std::slice::from_raw_parts(ptr as *const u8, len as usize);
+            if let Ok(json_str) = std::str::from_utf8(slice) {
+                if w.apply_config_json(json_str).is_ok() {
+                    return 0;
+                }
+                return -2;
+            }
+            return -3;
+        }
+        -4
+    }
 }
 
 /// 推进一个确定性仿真步 (dt 秒)
@@ -38,7 +87,7 @@ pub extern "C" fn world_tick_steps(steps: u32, dt: f32) {
     }
 }
 
-/// 设置某类 POI 再生倍率 (0=水 1=果 2=木 3=石)
+/// 设置某类 POI 再生倍率 (0=水 1=果 2=木 3=石 4=金)
 #[no_mangle]
 pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
     unsafe {
