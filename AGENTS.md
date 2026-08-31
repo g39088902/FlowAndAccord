@@ -31,7 +31,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.39)"]
+    E --> F["浏览器 UI (版本: v0.9.42)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -91,7 +91,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.39`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.42`**。
 
 ---
 
@@ -104,7 +104,7 @@ node frontend/server.js
 | **鼠标左键点击房屋** | 查看私宅等级、耐久度、私有水/粮/木/石/金仓储及家庭成员 |
 | **鼠标左键点击地标** | 查看清泉/果丛/森林/采石场/金矿的当前储量与实时产速 |
 | **鼠标滚轮 / 右键拖拽** | 缩放与平移地图画布视口 |
-| **重置模拟 (顶部按钮)** | 重新播撒 12 名初始族人（带 $\pm 10$ 随机离散状态） |
+| **重置模拟 (顶部按钮)** | 重新播撒 20 名初始族人（10男10女，带 $\pm 10$ 随机离散状态） |
 
 ---
 

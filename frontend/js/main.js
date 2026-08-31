@@ -476,7 +476,7 @@
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {
-      sim.initEcology(12);
+      sim.initEcology(20);
       isCameraFollow = false;
       updateFollowBtnState();
     });

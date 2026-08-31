@@ -174,14 +174,15 @@ impl World3DEngine {
             }
         }
 
-        // 9. 播撒初始 12 名原始小人
-        let total_initial = 12;
+        // 9. 播撒初始 20 名原始小人 (10男10女)
+        let total_initial = 20;
+        let female_count = total_initial / 2;
         for i in 0..total_initial {
             let home_camp = camp_nodes[i % camp_nodes.len()];
             let is_covert = i % 4 == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
-            let gender = if i < 6 { Gender::Female } else { Gender::Male };
+            let gender = if i < female_count { Gender::Female } else { Gender::Male };
             let initial_age = self.config.agent_adult_age;
 
             let mut agent = Agent3D::new_with_config(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender, &self.config);
@@ -214,7 +215,7 @@ impl World3DEngine {
             self.agents.push(agent);
         }
 
-        self.last_event = Some("🏕️ 生态初始：12 位始祖族人成家配对，踏路筑室，社会演化开启！".to_string());
+        self.last_event = Some("🏕️ 生态初始：20 位始祖族人（10男10女）成家配对，踏路筑室，社会演化开启！".to_string());
         // 初始化索引，使 agent_by_id 在本次 tick 后立即可用
         self.rebuild_agent_index();
     }

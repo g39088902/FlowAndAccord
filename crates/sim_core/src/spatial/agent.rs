@@ -36,14 +36,23 @@ impl StockSchmittTrigger {
     pub fn is_active(&self) -> bool { self.active }
 }
 
-/// 常用百家姓（60个），用于始祖随机赋姓
+/// 百家姓（前150姓），用于始祖随机赋姓
 pub const COMMON_SURNAMES: &[&str] = &[
     "赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈",
     "褚", "卫", "蒋", "沈", "韩", "杨", "朱", "秦", "尤", "许",
     "何", "吕", "施", "张", "孔", "曹", "严", "华", "金", "魏",
-    "陶", "姜", "戚", "谢", "邹", "柏", "章", "云", "苏", "潘",
-    "葛", "范", "彭", "鲁", "韦", "马", "苗", "方", "任", "袁",
-    "柳", "史", "唐", "费", "廉", "岑", "薛", "雷", "贺", "倪",
+    "陶", "姜", "戚", "谢", "邹", "喻", "柏", "水", "窦", "章",
+    "云", "苏", "潘", "葛", "奚", "范", "彭", "郎", "鲁", "韦",
+    "昌", "马", "苗", "凤", "花", "方", "俞", "任", "袁", "柳",
+    "酆", "鲍", "史", "唐", "费", "廉", "岑", "薛", "雷", "贺",
+    "倪", "汤", "滕", "殷", "罗", "毕", "郝", "邬", "安", "常",
+    "乐", "于", "时", "傅", "皮", "卞", "齐", "康", "伍", "余",
+    "元", "卜", "顾", "孟", "平", "黄", "和", "穆", "萧", "尹",
+    "姚", "邵", "湛", "汪", "祁", "毛", "禹", "狄", "米", "贝",
+    "明", "臧", "计", "伏", "成", "戴", "谈", "宋", "茅", "庞",
+    "熊", "纪", "舒", "屈", "项", "祝", "董", "梁", "杜", "阮",
+    "蓝", "闵", "席", "季", "麻", "强", "贾", "路", "娄", "危",
+    "江", "童", "颜", "郭", "梅", "盛", "林", "刁", "钟", "徐",
 ];
 
 /// 性别系统
@@ -311,14 +320,14 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
         }
 
-        // 受孕判定
-        if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && self.state == PrimitiveActionState::RestingAtCamp && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+        // 受孕判定：不再要求必须在家休息，执行任意任务期间满足门槛即可受孕
+        if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
             if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
                 self.is_pregnant = true;
                 self.pregnancy_father_id = self.spouse_id;
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
-                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 在私宅中饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, config.agent_conception_hunger_min, config.agent_pregnancy_duration));
+                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, config.agent_conception_hunger_min, config.agent_pregnancy_duration));
             }
         }
 

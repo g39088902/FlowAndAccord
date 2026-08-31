@@ -10,7 +10,7 @@ static mut WORLD: Option<World3DEngine> = None;
 static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
 static mut CONFIG_BUF: Vec<u8> = Vec::new();
 
-/// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=12)
+/// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
 #[no_mangle]
 pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_count: u32) -> i32 {
     unsafe {

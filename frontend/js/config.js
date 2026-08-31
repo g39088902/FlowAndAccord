@@ -49,8 +49,8 @@ window.SIM_CONFIG = {
   agentMiscarriageThreshold: 10.0,
   /** 妊娠流产体力危险线: 体力跌破此百分比即发生流产 (20.0%) */
   agentMiscarriageStaminaThreshold: 20.0,
-  /** 流产后休养冷却时长 (秒，期间禁止再次受孕，600 秒休养) */
-  agentMiscarriageCooldown: 600.0,
+  /** 流产后休养冷却时长 (秒，期间禁止再次受孕，450 秒休养) */
+  agentMiscarriageCooldown: 450.0,
   /** 流产警告警报留存显示时长 (秒) */
   agentMiscarriageAlertDuration: 5.0,
   /** 受孕门槛: 女性饱食度最低要求 (≥80% = 40.0 单位) */

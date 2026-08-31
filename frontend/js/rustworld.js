@@ -50,7 +50,7 @@
           const result = await WebAssembly.instantiate(bytes, {});
           this._wasm = result.instance.exports;
           this._memory = this._wasm.memory;
-          this._wasm.world_create(60, 764.0, this._engineSeed, 12);
+          this._wasm.world_create(60, 764.0, this._engineSeed, 20);
           this._ready = true;
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
@@ -120,7 +120,7 @@
         this._trails.clear();
         this.agentArchive.clear();
         if (this._ready) {
-          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 12);
+          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20);
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }
