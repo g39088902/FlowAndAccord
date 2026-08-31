@@ -339,6 +339,7 @@
             gender: a.gender === 'Female' ? 'female' : 'male',
             pos,
             age: a.age,
+            birthTick: a.birth_tick || 0,  // 出生时刻 tick (始祖=0, 后代=分娩时 tick_counter)
             state: a.state,
             currentNeed: a.current_need, // 马斯洛需求层级·种类 (如 Physiological·QuenchThirst)
             isAlive: a.is_alive,

@@ -13,128 +13,103 @@
   const SIBLING_GAP = 32;
   const SPOUSE_GAP = 20;
 
-  // 1. 提取与构建真实 DAG 数据 (纯净直系血亲：父母/父母之父母，子女/子女之子女，排除叔伯姨姑旁系)
+  // =========================================================================
+  // 1. 直系血脉图谱数据构建 (仅收录焦点的父/母递归祖先链 + 子女递归后代链)
+  //    不再做全量旁系录入：只有从焦点沿 fatherId/motherId 向上递归可达的祖先，
+  //    以及沿 children 向下递归可达的后代，才会进入图谱。
+  // =========================================================================
   function buildLineageDAG(focusId, sim) {
-    const allMap = new Map();
-    // 汇整当前活跃族人与先祖档案库
+    // 临时全量映射仅用于解析父子链路 (不用于最终入图)
+    const lookup = new Map();
     if (sim && sim.agentArchive) {
       for (const [id, ag] of sim.agentArchive) {
-        allMap.set(id, ag);
+        lookup.set(id, ag);
       }
     }
     if (sim && sim.agents) {
       for (const ag of sim.agents) {
-        allMap.set(ag.id, ag);
+        lookup.set(ag.id, ag);
       }
     }
 
-    if (!focusId || !allMap.has(focusId)) {
-      if (allMap.size > 0) focusId = allMap.keys().next().value;
+    // 焦点校正：默认取编号最小且存活的族人
+    if (!focusId || !lookup.has(focusId)) {
+      const ids = Array.from(lookup.keys()).sort((a, b) => a - b);
+      focusId = ids.find(id => lookup.get(id) && lookup.get(id).isAlive) || ids[0] || 1;
     }
 
-    const relevantIds = new Set();
+    // 依据焦点 BFS 递归收集直系血脉 ID 集合
+    //   ancestors: 焦点的父/母递归向上链 (不含焦点本身)
+    //   descendants: 焦点的子女递归向下链 (不含焦点本身)
+    //   lineageIds: 三者并集 = 最终入图节点 (焦点 + 祖先链 + 后代链)
     const ancestors = new Set();
     const descendants = new Set();
-    const directSpouses = new Set();
-
-    if (focusId && allMap.has(focusId)) {
-      relevantIds.add(focusId);
-
-      // 1. 向上溯源纯净直系祖先 (仅双亲，不检索父母兄弟姐妹即叔伯姑舅姨)
-      const aQueue = [focusId];
-      while (aQueue.length > 0) {
-        const currId = aQueue.shift();
-        const ag = allMap.get(currId);
-        if (!ag) continue;
-        if (ag.fatherId && allMap.has(ag.fatherId)) {
-          if (!ancestors.has(ag.fatherId)) {
-            ancestors.add(ag.fatherId);
-            relevantIds.add(ag.fatherId);
-            aQueue.push(ag.fatherId);
-          }
-        }
-        if (ag.motherId && allMap.has(ag.motherId)) {
-          if (!ancestors.has(ag.motherId)) {
-            ancestors.add(ag.motherId);
-            relevantIds.add(ag.motherId);
-            aQueue.push(ag.motherId);
+    const lineageIds = new Set();
+    if (focusId && lookup.has(focusId)) {
+      lineageIds.add(focusId);
+      // 向上递归祖先
+      const aq = [focusId];
+      while (aq.length > 0) {
+        const cur = lookup.get(aq.shift());
+        if (!cur) continue;
+        for (const pId of [cur.fatherId, cur.motherId]) {
+          if (pId && lookup.has(pId) && !ancestors.has(pId)) {
+            ancestors.add(pId);
+            lineageIds.add(pId);
+            aq.push(pId);
           }
         }
       }
-
-      // 2. 向下追溯纯净直系后代 (仅亲生子女，不检索叔伯姨姑的堂表后代)
-      const dQueue = [focusId];
-      while (dQueue.length > 0) {
-        const currId = dQueue.shift();
-        const ag = allMap.get(currId);
-        if (!ag) continue;
-        if (ag.children && Array.isArray(ag.children)) {
-          for (const cId of ag.children) {
-            if (allMap.has(cId) && !descendants.has(cId)) {
-              descendants.add(cId);
-              relevantIds.add(cId);
-              dQueue.push(cId);
-            }
-          }
-        }
-      }
-
-      // 3. 关联直系核心配偶 (焦点族人配偶，以及后代各代双亲配偶，保障育儿双亲完整，不含祖先再婚旁支)
-      const focusAg = allMap.get(focusId);
-      if (focusAg && focusAg.spouseId && allMap.has(focusAg.spouseId)) {
-        directSpouses.add(focusAg.spouseId);
-        relevantIds.add(focusAg.spouseId);
-      }
-      for (const dId of descendants) {
-        const dAg = allMap.get(dId);
-        if (dAg) {
-          if (dAg.spouseId && allMap.has(dAg.spouseId)) {
-            directSpouses.add(dAg.spouseId);
-            relevantIds.add(dAg.spouseId);
-          }
-          if (dAg.fatherId && allMap.has(dAg.fatherId) && !ancestors.has(dAg.fatherId) && dAg.fatherId !== focusId) {
-            directSpouses.add(dAg.fatherId);
-            relevantIds.add(dAg.fatherId);
-          }
-          if (dAg.motherId && allMap.has(dAg.motherId) && !ancestors.has(dAg.motherId) && dAg.motherId !== focusId) {
-            directSpouses.add(dAg.motherId);
-            relevantIds.add(dAg.motherId);
+      // 向下递归后代
+      const dq = [focusId];
+      while (dq.length > 0) {
+        const cur = lookup.get(dq.shift());
+        if (!cur || !Array.isArray(cur.children)) continue;
+        for (const cId of cur.children) {
+          if (lookup.has(cId) && !descendants.has(cId)) {
+            descendants.add(cId);
+            lineageIds.add(cId);
+            dq.push(cId);
           }
         }
       }
     }
 
-    const currentTick = (sim && sim.worldTick !== undefined) ? sim.worldTick : ((sim && sim.worldSnapshot && sim.worldSnapshot.tick) || 0);
+    // 只把直系血脉人物录入 allMap (旁系亲属不进图)
+    const allMap = new Map();
+    for (const id of lineageIds) {
+      const ag = lookup.get(id);
+      if (ag) allMap.set(id, ag);
+    }
 
-    // 格式化节点数据并精确计算出生时间 (birthSec)
+    // 直系血脉节点格式化
+    // 注: agent.birthTick 由 Rust 内核在出生时记录 (始祖=0, 后代=分娩时的 tick_counter),
+    // 严格反映出生时序. 用于播种时分配纵向带 (越晚出生越靠下),
+    // 形成"上=祖先 / 下=后代"的天然代际纵向分层.
+    const ticks = Array.from(allMap.values())
+      .map(ag => ag && ag.birthTick !== undefined ? ag.birthTick : 0)
+      .filter(t => typeof t === 'number' && !isNaN(t));
+    const tickMin = ticks.length > 0 ? Math.min(...ticks) : 0;
+    const tickMax = ticks.length > 0 ? Math.max(...ticks) : 0;
+    const tickRange = Math.max(1, tickMax - tickMin);
+
     const nodes = [];
     const nodeMap = new Map();
-    for (const id of relevantIds) {
-      const ag = allMap.get(id);
-      if (!ag) continue;
+    for (const ag of allMap.values()) {
+      if (!ag || ag.id === undefined || ag.id === null) continue;
       const gen = ag.generation && ag.generation >= 1 ? ag.generation : ((ag.fatherId || ag.motherId) ? 2 : 1);
-      
-      // 出生时间计算：始祖按初始年龄/ID排列于负数年代，后代按出生tick与ID单调递增
-      let birthSec = 0;
-      if (gen === 1 || (!ag.fatherId && !ag.motherId)) {
-        birthSec = -2000 + (ag.id * 8);
-      } else {
-        const ageSec = ag.age || 0;
-        birthSec = Math.max(0, (currentTick / 30) - ageSec);
-        if (birthSec === 0) birthSec = (gen - 1) * 300 + ag.id * 10;
-      }
 
       const nodeObj = {
         id: ag.id,
         gender: ag.gender || (ag.id % 2 === 1 ? 'male' : 'female'),
         generation: gen,
-        birthSec,
         isAlive: !!ag.isAlive,
         isPregnant: !!ag.isPregnant,
         age: Math.floor(ag.age || 0),
+        birthTick: ag.birthTick !== undefined ? ag.birthTick : 0,
         hunger: Math.round(ag.hunger || 0),
         stamina: Math.round(ag.stamina || 0),
-        health: ag.health !== undefined ? ag.health.toFixed(1) : '100',
+        health: ag.health !== undefined ? Number(ag.health).toFixed(1) : '100',
         currentNeed: ag.currentNeed || '',
         deathCause: ag.deathCause || null,
         fatherId: ag.fatherId || null,
@@ -151,178 +126,267 @@
         isAncestor: ancestors.has(ag.id),
         isDescendant: descendants.has(ag.id),
         isFocus: ag.id === focusId,
-        isDirectSpouse: directSpouses.has(ag.id)
+        // 出生时序归一化: 0=最早 (tick 最小, 始祖), 1=最晚 (tick 最大, 最新生新生儿)
+        birthRank: Math.max(0, Math.min(1, ((ag.birthTick !== undefined ? ag.birthTick : 0) - tickMin) / tickRange)),
+        x: 0, y: 0, vx: 0, vy: 0
       };
       nodes.push(nodeObj);
       nodeMap.set(ag.id, nodeObj);
     }
 
-    // 拓扑层级计算 (Topological Generation Depth)
-    for (const n of nodes) {
-      n.depth = Math.max(0, n.generation - 1);
-    }
-
-    // 按代际深度分组并按出生时间排序
-    const depthGroups = new Map();
-    for (const n of nodes) {
-      if (!depthGroups.has(n.depth)) depthGroups.set(n.depth, []);
-      depthGroups.get(n.depth).push(n);
-    }
-
-    const sortedDepths = Array.from(depthGroups.keys()).sort((a, b) => a - b);
-    let maxRowW = 800;
-    const paddingX = 80;
-    const paddingY = 80;
-
-    // 每一代根据出生时间与配偶对排布 X 与出生时间微阶梯 Y 坐标
-    for (const depth of sortedDepths) {
-      const rowNodes = depthGroups.get(depth);
-      // 同层按出生时间先后排序
-      rowNodes.sort((a, b) => a.birthSec - b.birthSec);
-
-      const orderedRow = [];
-      const visitedInRow = new Set();
-
-      for (const n of rowNodes) {
-        if (visitedInRow.has(n.id)) continue;
-        visitedInRow.add(n.id);
-        orderedRow.push(n);
-        // 如果有配偶且在同层，紧随其后排列
-        if (n.spouseId && nodeMap.has(n.spouseId) && nodeMap.get(n.spouseId).depth === depth) {
-          if (!visitedInRow.has(n.spouseId)) {
-            visitedInRow.add(n.spouseId);
-            orderedRow.push(nodeMap.get(n.spouseId));
-          }
-        }
-      }
-
-      let currX = paddingX;
-      for (let i = 0; i < orderedRow.length; i++) {
-        const n = orderedRow[i];
-        n.x = currX;
-
-        // Y 轴位置：按出生时间平滑阶梯排布，先出生者在上，后出生者在下
-        const birthOffsetInRow = (i % 2 === 1 && orderedRow[i - 1].spouseId === n.id)
-          ? (orderedRow[i - 1].yOffset || 0)
-          : ((n.birthSec > 0 ? (n.birthSec % 40) : (i * 10)));
-        n.yOffset = Math.min(36, birthOffsetInRow);
-        n.y = paddingY + depth * LEVEL_H + n.yOffset;
-
-        const isSpouseNext = (i + 1 < orderedRow.length) && (orderedRow[i + 1].id === n.spouseId);
-        currX += NODE_W + (isSpouseNext ? SPOUSE_GAP : SIBLING_GAP);
-      }
-      if (currX > maxRowW) maxRowW = currX;
-    }
-
-    // DAG 拓扑硬约束：子代的 Y 必须严格大于双亲的 Y 底部
-    for (const n of nodes) {
-      let minParentY = -1;
-      if (n.fatherId && nodeMap.has(n.fatherId)) {
-        minParentY = Math.max(minParentY, nodeMap.get(n.fatherId).y + NODE_H + 36);
-      }
-      if (n.motherId && nodeMap.has(n.motherId)) {
-        minParentY = Math.max(minParentY, nodeMap.get(n.motherId).y + NODE_H + 36);
-      }
-      if (minParentY > n.y) {
-        n.y = minParentY;
-      }
-    }
-
-    let maxY = 0;
-    for (const n of nodes) {
-      if (n.y + NODE_H > maxY) maxY = n.y + NODE_H;
-    }
-
-    const totalH = Math.max(760, maxY + paddingY);
-    const totalW = Math.max(1050, maxRowW + paddingX);
-
-    // 构建真实 DAG 连线数据：双亲各自一条独立有向边 (Father & Mother Directed Edges with Arrows)
+    // 亲子有向边 —— 仅父子/母子两条，不生成夫妻边
     const edges = [];
-    const spouseEdges = [];
-    const processedSpousePairs = new Set();
-
     for (const n of nodes) {
-      // 夫妻横向关联虚线
-      if (n.spouseId && nodeMap.has(n.spouseId)) {
-        const pairKey = [n.id, n.spouseId].sort().join('-');
-        if (!processedSpousePairs.has(pairKey)) {
-          processedSpousePairs.add(pairKey);
-          const sp = nodeMap.get(n.spouseId);
-          spouseEdges.push({
-            from: n,
-            to: sp,
-            x1: Math.min(n.x, sp.x) + NODE_W,
-            y1: n.y + NODE_H / 2,
-            x2: Math.max(n.x, sp.x),
-            y2: sp.y + NODE_H / 2
-          });
-        }
-      }
-
-      // 父亲 -> 子女 独立有向边 (DAG 边 1: 父亲出发，蓝色箭头指向子代左肩)
       if (n.fatherId && nodeMap.has(n.fatherId)) {
-        const f = nodeMap.get(n.fatherId);
-        const startX = f.x + NODE_W * 0.38;
-        const startY = f.y + NODE_H;
-        const endX = n.x + NODE_W * 0.32;
-        const endY = n.y;
-        const midY = startY + Math.max(20, (endY - startY) * 0.5);
-
-        edges.push({
-          childId: n.id,
-          parentId: f.id,
-          parentType: 'father',
-          markerId: (n.isAncestor || n.isFocus) ? 'arrow-ancestor' : 'arrow-father',
-          isAncestorLine: n.isAncestor || n.isFocus,
-          isDescendantLine: n.isDescendant || n.isFocus,
-          d: `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`
-        });
+        edges.push({ parent: nodeMap.get(n.fatherId), child: n, parentType: 'father' });
       }
-
-      // 母亲 -> 子女 独立有向边 (DAG 边 2: 母亲出发，粉色箭头指向子代右肩)
       if (n.motherId && nodeMap.has(n.motherId)) {
-        const m = nodeMap.get(n.motherId);
-        const startX = m.x + NODE_W * 0.62;
-        const startY = m.y + NODE_H;
-        const endX = n.x + NODE_W * 0.68;
-        const endY = n.y;
-        const midY = startY + Math.max(20, (endY - startY) * 0.5);
-
-        edges.push({
-          childId: n.id,
-          parentId: m.id,
-          parentType: 'mother',
-          markerId: (n.isAncestor || n.isFocus) ? 'arrow-ancestor' : 'arrow-mother',
-          isAncestorLine: n.isAncestor || n.isFocus,
-          isDescendantLine: n.isDescendant || n.isFocus,
-          d: `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`
-        });
+        edges.push({ parent: nodeMap.get(n.motherId), child: n, parentType: 'mother' });
       }
     }
 
+    // 预置宽松画布尺寸 (与播种时使用的 xRange/layerSpan 一致, 让初始播种点都在画布内)
+    const initialSpan = Math.sqrt(nodes.length) * 600;
+    const width = Math.max(1600, initialSpan);
+    const height = Math.max(1100, initialSpan);
+
+    // 力导向播种 + 同步预热收敛 (首帧即接近稳定，动画阶段仅做精致抛光)
+    initForceLayout(nodes, width, height);
+    const warmSteps = nodes.length > 700 ? 60 : 160;
+    for (let k = 0; k < warmSteps; k++) {
+      stepForceSimulation(nodes, edges, width, height);
+    }
+
+    // 平移至正坐标区域并计算画布尺寸
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of nodes) {
+      if (n.x < minX) minX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y > maxY) maxY = n.y;
+    }
+    const pad = 180;
+    const ox = pad - minX;
+    const oy = pad - minY;
+    if (ox !== 0 || oy !== 0) {
+      for (const n of nodes) {
+        n.x += ox;
+        n.y += oy;
+      }
+    }
+    const totalW = Math.max(1400, maxX - minX + pad * 2);
+    const totalH = Math.max(1000, maxY - minY + pad * 2);
+
+    return { focusId, width: totalW, height: totalH, nodes, edges, nodeMap };
+  }
+
+  // =========================================================================
+  // 🔧 力导向布局引擎 (纯力学自动布局 · 软截止全对斥力 · 软边界兜底 · 无惯性松弛收敛)
+  //   随距离单调递减且带软截止的全对斥力(cutoff 外无作用)主导节点自然稀疏;
+  //   亲子弹簧仅做轻量血缘聚类; 软边界把整图约束在 √n·400 的圆域内防无限散开;
+  //   无惯性松弛位移积分(位移 = 合力 × 温度冷却曲线)保证快速收敛停稳。
+  //   无任何排名/代数分层约束。
+  //   注意：以下四个函数均为自包含实现，不引用模块级变量 (edgePath 仅依赖
+  //   NODE_W/NODE_H，standalone 页内已先行声明)；generateStandaloneDagHtml
+  //   通过 Function.prototype.toString() 将源码内嵌新标签页，二者严格同源。
+  // =========================================================================
+  function initForceLayout(nodes, width, height) {
+    // 出生时序播种 (分层唯一来源): Y 轴按 birthRank 直接分配纵向带状位置
+    // (rank=0 始祖在最上, rank=1 最新生在最下); X 轴在画布水平范围内确定性伪随机散布.
+    // 后续力学迭代 (斥力/弹簧/X 软边界) 仅在各自纵向带内做局部调整, 不做任何 Y 向回拉,
+    // 代际分层秩序由播种一次性确定并保持.
+    const rand = (seed) => {
+      let h = (seed ^ 0x9E3779B9) >>> 0;
+      h = Math.imul(h ^ (h >>> 16), 0x21f0aaad);
+      h = Math.imul(h ^ (h >>> 15), 0x735a2d97);
+      h = h ^ (h >>> 15);
+      return (h >>> 0) / 4294967296;
+    };
+    const cx = width / 2;
+    const cy = height / 2;
+    // 纵向跨度匹配软边界直径, 让分层有足够空间
+    const layerSpan = Math.sqrt(nodes.length) * 600;
+    // 水平散布范围与纵向跨度相当, 让整图保持方形
+    const xRange = Math.sqrt(nodes.length) * 600;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const rank = n.birthRank !== undefined ? n.birthRank : 0.5;
+      // X: 确定性伪随机散布在 [cx - xRange/2, cx + xRange/2] 范围内
+      const u = rand(n.id * 131 + 7);
+      n.x = cx + (u - 0.5) * xRange;
+      // Y: 直接按 birthRank 线性映射到 [cy - layerSpan/2, cy + layerSpan/2]
+      // (rank=0 始祖在最上, rank=1 新生儿在最下)
+      n.y = cy + (rank - 0.5) * layerSpan;
+      n.vx = 0;
+      n.vy = 0;
+    }
+    nodes._step = 0; // 温度冷却步数清零 (重新播种/重新布局时重置降温曲线)
+  }
+
+  function stepForceSimulation(nodes, edges, width, height) {
+    const n = nodes.length;
+    const P = {
+      repulsion: 2000,  // 斥力系数 (F = (k/d)·(1−d/cutoff): 随距离单调递减, cutoff 外为 0)
+      cutoff: 700,      // 斥力软截止半径: 覆盖数个近邻, 远距对无相互作用 → 边缘净推力有限, 稳定收敛
+      spring: 0.003,    // 亲子弹簧刚度 (F = k·(d − rest), 弱于斥力, 仅凝聚血缘聚类)
+      rest: 300,        // 弹簧自然中心距 (与目标近邻间距接近, 避免边把节点压出重叠)
+      boundary: 0.35,   // 软边界回拉刚度 (X 超界后线性拉回, 防过度稀疏/漂移)
+      maxDisp: 4,       // 单步位移钳制上限 (位移上限随温度冷却同步收缩)
+      minDist: 190,     // 节点卡片最小间距 (卡片 184×80, 任意方向排列均不叠压)
+      collide: 1.0,     // 近距线性推挤刚度 (minDist 内按重叠量果断分开, 无惯性松弛下不振荡)
+    };
+    // 温度冷却: 指数降温曲线 (数组级步数计数, 播种时置 0; 布局引擎每步递增),
+    // 布局主体在前 ~100 步完成 (temp > 0.2), 之后温度渐缓 → 位移上限同步收缩, 保证最终冻结收敛
+    if (nodes._step === undefined) nodes._step = 0;
+    nodes._step++;
+    const temp = Math.exp(-nodes._step / 70); // 温度: 0 步→1.0, 70 步→0.37, 140 步→0.14, 300 步→0.014
+    let maxMove = 0;
+    // 每步实时计算图质心 (软边界回拉与整图漂移锚定)
+    let cgx = 0, cgy = 0;
+    for (const nd of nodes) { cgx += nd.x; cgy += nd.y; }
+    cgx /= n; cgy /= n;
+
+    // 1. 全节点两两斥力 —— 随距离单调递减且带软截止:
+    //    近距离推力强 → 节点相互散开(自然稀疏)；超过 cutoff 的远距对无相互作用,
+    //    边缘节点受到的净推力有限, 由软边界兜住整图 —— 既不会挤成一团, 也不会松散到无边无际。
+    for (let i = 0; i < nodes.length; i++) {
+      const a = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const b = nodes[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1) {
+          dx = ((a.id + i) % 7) - 3;
+          dy = ((b.id + j) % 7) - 3;
+          d2 = 1;
+        }
+        const d = Math.sqrt(d2);
+        if (d >= P.cutoff) continue; // 软截止: 远距对无斥力
+        let f;
+        if (d < P.minDist) {
+          // 近距线性推挤: 重叠越深推力越大, 确保卡片间距, 严防叠压
+          f = (P.minDist - d) * P.collide;
+        } else {
+          // 随距离单调递减 (在 cutoff 处平滑归零)
+          f = P.repulsion / d * (1 - d / P.cutoff);
+        }
+        const fx = (dx / d) * f;
+        const fy = (dy / d) * f;
+        a.vx -= fx;
+        a.vy -= fy;
+        b.vx += fx;
+        b.vy += fy;
+      }
+    }
+
+    // 2. 亲子弹簧牵引: 有边节点相互靠近, 血缘关系自然凝聚为聚类
+    for (let k = 0; k < edges.length; k++) {
+      const a = edges[k].parent;
+      const b = edges[k].child;
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+      const f = P.spring * (d - P.rest);
+      const fx = (dx / d) * f;
+      const fy = (dy / d) * f;
+      a.vx += fx;
+      a.vy += fy;
+      b.vx -= fx;
+      b.vy -= fy;
+    }
+
+    // 3. 软边界回拉: 仅 X 方向约束在水平边界内 (避免整图横向无限散开);
+    //    Y 方向不做任何回拉 —— 纵向代际分层由播种 (initForceLayout 按 birthRank
+    //    分配初始 Y) 一次性确定, 力学迭代仅在各自纵向带内做局部调整, 不再受中心力干扰.
+    const R_MAX_X = Math.sqrt(n) * 400;
+    for (const nd of nodes) {
+      const dx = nd.x - cgx;
+      const adx = Math.abs(dx);
+      if (adx > R_MAX_X) {
+        const over = adx - R_MAX_X;
+        const f = Math.min(over * P.boundary, 80);
+        nd.vx += (dx > 0 ? f : -f);
+      }
+    }
+
+    // 4. 无惯性松弛位移积分: 位移 = 合力 × 温度 (位移上限随温度同步收缩),
+    //    合力在平衡位形自然趋零 → 完全静止; 温度冷却兜底, 任何残余力也会被冷却冻结
+    for (const n of nodes) {
+      const cap = P.maxDisp * temp;
+      const mx = Math.max(-cap, Math.min(cap, n.vx * temp));
+      const my = Math.max(-cap, Math.min(cap, n.vy * temp));
+      n.x += mx;
+      n.y += my;
+      n.vx = 0; // 合力累加器清零 (无惯性: 每步从零重新累加, 杜绝速度放大)
+      n.vy = 0;
+      const m = Math.abs(mx) > Math.abs(my) ? Math.abs(mx) : Math.abs(my);
+      if (m > maxMove) maxMove = m;
+    }
+
+    return maxMove;
+  }
+
+  // 亲子边 Bezier 路径 (父下缘 → 子上缘，垂直中点控制，正反方向均平滑)
+  function edgePath(e, offsetX, offsetY) {
+    const a = e.parent;
+    const b = e.child;
+    const startX = a.x + offsetX + NODE_W * (e.parentType === 'father' ? 0.34 : 0.66);
+    const startY = a.y + offsetY + NODE_H;
+    const endX = b.x + offsetX + NODE_W * (e.parentType === 'father' ? 0.32 : 0.68);
+    const endY = b.y + offsetY;
+    const midY = (startY + endY) * 0.5;
+    return 'M ' + startX + ' ' + startY + ' C ' + startX + ' ' + midY + ', ' + endX + ' ' + midY + ', ' + endX + ' ' + endY;
+  }
+
+  // 力导向动画驱动: 每帧若干物理子步 + 刷新渲染，收敛 (maxMove < 0.3) 即停稳
+  function animateForceLayout(dag, refreshFn, onSettle) {
+    const maxSteps = dag.nodes.length > 700 ? 160 : 300;
+    let step = 0;
+    let raf = 0;
+    function frame() {
+      let moved = Infinity;
+      for (let k = 0; k < 4 && step < maxSteps; k++) {
+        moved = stepForceSimulation(dag.nodes, dag.edges, dag.width, dag.height);
+        step++;
+      }
+      if (refreshFn) refreshFn();
+      if (moved >= 0.3 && step < maxSteps) {
+        raf = requestAnimationFrame(frame);
+      } else if (onSettle) {
+        onSettle();
+      }
+    }
+    frame();
     return {
-      focusId,
-      width: totalW,
-      height: totalH,
-      sortedGens: sortedDepths.map(d => d + 1),
-      nodes,
-      edges,
-      spouseEdges,
-      nodeMap
+      stop() { cancelAnimationFrame(raf); }
     };
   }
 
-  // 2. 生成完全独立的单文件 HTML 字符串 (支持打开新标签页独立运行)
+  // 物理引擎源码单源 (standalone 新标签页内嵌此源码，复用同一套布局算法)
+  const FORCE_SIM_SRC = [initForceLayout, stepForceSimulation, edgePath, animateForceLayout]
+    .map(fn => fn.toString())
+    .join('\n\n');
+
+  // 2. 生成完全独立的单文件 HTML 字符串 (支持打开新标签页独立运行 · 力导向自动布局)
   function generateStandaloneDagHtml(focusId, sim) {
     const dag = buildLineageDAG(focusId, sim);
-    const dagJson = JSON.stringify(dag);
+    // 紧凑序列化：边仅携带 id，反序列化后重建对象引用，避免 JSON 体积随边数膨胀
+    const ser = {
+      focusId: dag.focusId,
+      width: dag.width,
+      height: dag.height,
+      nodes: dag.nodes,
+      edges: dag.edges.map(e => ({ parentId: e.parent.id, childId: e.child.id, parentType: e.parentType }))
+    };
+    const dagJson = JSON.stringify(ser);
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flow & Accord · 直系血脉 DAG 完整族谱</title>
+  <title>Flow & Accord · 直系血脉拓扑族谱</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body {
@@ -428,11 +492,6 @@
       stroke: #f472b6;
       stroke-width: 2.2;
     }
-    .dag-edge.ancestor {
-      stroke: #fbbf24;
-      stroke-width: 2.8;
-      filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-    }
     .dag-edge.descendant.father-edge {
       stroke: #38bdf8;
       stroke-width: 2.8;
@@ -442,12 +501,6 @@
       stroke: #ec4899;
       stroke-width: 2.8;
       filter: drop-shadow(0 0 4px rgba(236, 72, 153, 0.6));
-    }
-    .dag-spouse-edge {
-      stroke: #f43f5e;
-      stroke-dasharray: 4 4;
-      stroke-width: 1.8;
-      opacity: 0.85;
     }
     .dag-node {
       position: absolute;
@@ -472,9 +525,9 @@
       z-index: 10;
     }
     .dag-node.focus {
-      border: 2px solid #38bdf8;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), 0 8px 24px rgba(0,0,0,0.6);
-      background: rgba(14, 30, 56, 0.98);
+      border: 2px solid #ef4444;
+      box-shadow: 0 0 22px rgba(239, 68, 68, 0.55), 0 8px 24px rgba(0,0,0,0.6);
+      background: rgba(48, 14, 18, 0.98);
       z-index: 20;
     }
     .dag-node.ancestor {
@@ -564,8 +617,8 @@
 <body>
   <div class="dag-topbar">
     <div class="dag-brand">
-      <div class="dag-title">🌳 Flow & Accord · 直系血脉 DAG 完整族谱</div>
-      <div class="dag-stats-badge" id="topbar-stats">直系世代数: 1 · 直系族人: 0 (纯净直系血亲)</div>
+      <div class="dag-title">🌳 Flow & Accord · 直系血脉拓扑族谱</div>
+      <div class="dag-stats-badge" id="topbar-stats">直系族人: 0 · 亲子边: 0 (力导向自动布局)</div>
     </div>
     <div class="dag-actions">
       <button class="dag-btn" id="btn-focus-center">🎯 居中定位</button>
@@ -590,7 +643,7 @@
       </svg>
       <div id="nodesLayer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
     </div>
-    <div class="dag-help-bar">🖱️ 拖拽画布平移 · 滚轮缩放 · 双亲独立有向边 (蓝👨父 / 粉👩母) · Y轴按出生时间排序</div>
+    <div class="dag-help-bar">🖱️ 拖拽画布平移 · 滚轮缩放 · 纯力学自动布局: 亲子弹簧牵引 + 距离斥力自然舒展 · 蓝👨父 / 粉👩母</div>
     <div class="dag-sidebar" id="sidebar" style="display:none;">
       <div class="dag-sidebar-title">
         <span id="side-title">族人档案</span>
@@ -602,6 +655,28 @@
 
   <script>
     let DAG = ${dagJson};
+    // 节点尺寸与布局常量：standalone 独立作用域必须自带定义
+    // (与 dag.js 模块级常量保持一致，否则 centerOnNode 等会抛 ReferenceError，导致 setupEvents 永不执行、画布无法拖动)
+    const NODE_W = 184;
+    const NODE_H = 80;
+    const LEVEL_H = 160;
+    const SIBLING_GAP = 32;
+    const SPOUSE_GAP = 20;
+    const PAD = 180;
+
+    // 力导向物理引擎 (与 dag.js 严格同源：经 Function.prototype.toString() 内嵌)
+    ${FORCE_SIM_SRC}
+
+    // 重建亲子边对象引用 (JSON 仅序列化紧凑 id，反序列化后回填 parent/child 对象)
+    (function () {
+      const nmap = new Map(DAG.nodes.map(n => [n.id, n]));
+      DAG.edges = DAG.edges.map(e => ({
+        parent: nmap.get(e.parentId),
+        child: nmap.get(e.childId),
+        parentType: e.parentType
+      }));
+    })();
+
     let scale = 1.0;
     let panX = 40;
     let panY = 40;
@@ -609,7 +684,11 @@
     let startX = 0, startY = 0;
     let startPanX = 0, startPanY = 0;
     let isMoved = false;
+    let userPanned = false;
     let currentFocus = DAG.focusId;
+    let layoutOx = 0, layoutOy = 0;
+    let edgeEls = [];
+    let nodeEls = [];
 
     const workspace = document.getElementById('workspace');
     const viewport = document.getElementById('viewport');
@@ -621,46 +700,40 @@
     const topStats = document.getElementById('topbar-stats');
 
     function init() {
-      topStats.textContent = '直系世代数: ' + (DAG.sortedGens.length || 1) + ' · 直系族人: ' + DAG.nodes.length + ' (纯净直系血亲)';
-      renderGraph();
-      centerOnNode(currentFocus);
+      topStats.textContent = '直系族人: ' + DAG.nodes.length + ' · 亲子边: ' + DAG.edges.length + ' (力导向自动布局)';
+      buildDom();
+      refreshLayout();
+      centerAll();
+      animateForceLayout(DAG, refreshLayout, () => {
+        if (!userPanned) centerAll();
+      });
       setupEvents();
     }
 
-    function renderGraph() {
+    function buildDom() {
       svgLayer.setAttribute('width', DAG.width);
       svgLayer.setAttribute('height', DAG.height);
-      
+
       // 保留 defs
       const defs = svgLayer.querySelector('defs');
       svgLayer.innerHTML = '';
       if (defs) svgLayer.appendChild(defs);
-
       nodesLayer.innerHTML = '';
+      edgeEls = [];
+      nodeEls = [];
 
-      // 夫妻连线
-      DAG.spouseEdges.forEach(sp => {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', sp.x1);
-        line.setAttribute('y1', sp.y1);
-        line.setAttribute('x2', sp.x2);
-        line.setAttribute('y2', sp.y2);
-        line.setAttribute('class', 'dag-spouse-edge');
-        svgLayer.appendChild(line);
-      });
-
-      // 双亲各自独立有向边 (DAG Edges)
+      // 亲子独立有向边 (仅父子/母子，不绘制夫妻线)
       DAG.edges.forEach(e => {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', e.d);
         let cls = 'dag-edge';
         if (e.parentType === 'father') cls += ' father-edge';
         else if (e.parentType === 'mother') cls += ' mother-edge';
-        if (e.isAncestorLine) cls += ' ancestor';
-        if (e.isDescendantLine) cls += ' descendant';
+        if (e.child.isDescendant || e.child.isFocus) cls += ' descendant';
         path.setAttribute('class', cls);
-        path.setAttribute('marker-end', 'url(#' + e.markerId + ')');
+        const markerId = (e.parentType === 'father' ? 'arrow-father' : 'arrow-mother');
+        path.setAttribute('marker-end', 'url(#' + markerId + ')');
         svgLayer.appendChild(path);
+        edgeEls.push({ el: path, e });
       });
 
       // 渲染节点卡片
@@ -673,8 +746,9 @@
         if (!n.isAlive) cls += ' dead';
 
         card.className = cls;
-        card.style.left = n.x + 'px';
-        card.style.top = n.y + 'px';
+        card.style.width = NODE_W + 'px';
+        card.style.height = NODE_H + 'px';
+        card.style.position = 'absolute';
 
         const avatar = !n.isAlive ? '💀' : (n.gender === 'female' ? (n.isPregnant ? '🤰' : '👩') : '👦');
         const genText = n.generation === 1 ? '始祖' : 'G' + n.generation;
@@ -703,13 +777,42 @@
         card.onclick = (e) => {
           if (isMoved) return;
           e.stopPropagation();
+          // 轻量聚焦：仅切换高亮与浮动档案，不整图重建 (不打断力导向收敛)
+          currentFocus = n.id;
+          nodeEls.forEach(item => item.el.classList.remove('focus'));
+          card.classList.add('focus');
           inspectNode(n);
         };
 
         nodesLayer.appendChild(card);
+        nodeEls.push({ el: card, n });
       });
+    }
 
-      updateTransform();
+    // 力导向每帧布局刷新：自适应画布尺寸 + 更新边路径与节点坐标
+    function refreshLayout() {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of DAG.nodes) {
+        if (n.x < minX) minX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y > maxY) maxY = n.y;
+      }
+      DAG.width = Math.max(1400, maxX - minX + PAD * 2);
+      DAG.height = Math.max(1000, maxY - minY + PAD * 2);
+      svgLayer.setAttribute('width', DAG.width);
+      svgLayer.setAttribute('height', DAG.height);
+      const ox = PAD - minX;
+      const oy = PAD - minY;
+      layoutOx = ox;
+      layoutOy = oy;
+      for (let i = 0; i < edgeEls.length; i++) {
+        edgeEls[i].el.setAttribute('d', edgePath(edgeEls[i].e, ox, oy));
+      }
+      for (let i = 0; i < nodeEls.length; i++) {
+        nodeEls[i].el.style.left = (nodeEls[i].n.x + ox) + 'px';
+        nodeEls[i].el.style.top = (nodeEls[i].n.y + oy) + 'px';
+      }
     }
 
     function inspectNode(n) {
@@ -732,15 +835,32 @@
         </div>
       \`;
       sidebar.style.display = 'flex';
-      renderGraph();
+    }
+
+    // 整图自适应居中
+    function centerAll() {
+      if (!DAG.nodes.length) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of DAG.nodes) {
+        const rx = n.x + layoutOx;
+        const ry = n.y + layoutOy;
+        if (rx < minX) minX = rx;
+        if (ry < minY) minY = ry;
+        if (rx > maxX) maxX = rx;
+        if (ry > maxY) maxY = ry;
+      }
+      const wRect = workspace.getBoundingClientRect();
+      panX = wRect.width / 2 - ((minX + maxX) / 2) * scale;
+      panY = wRect.height / 2 - ((minY + maxY) / 2) * scale;
+      updateTransform();
     }
 
     function centerOnNode(id) {
       const n = DAG.nodes.find(node => node.id === id);
       if (!n) return;
       const wRect = workspace.getBoundingClientRect();
-      panX = wRect.width / 2 - (n.x + NODE_W / 2) * scale;
-      panY = wRect.height / 2 - (n.y + NODE_H / 2) * scale;
+      panX = wRect.width / 2 - (n.x + layoutOx + NODE_W / 2) * scale;
+      panY = wRect.height / 2 - (n.y + layoutOy + NODE_H / 2) * scale;
       updateTransform();
     }
 
@@ -765,7 +885,10 @@
         if (!isDragging) return;
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) isMoved = true;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+          isMoved = true;
+          userPanned = true;
+        }
         panX = startPanX + dx;
         panY = startPanY + dy;
         updateTransform();
@@ -786,6 +909,7 @@
 
       workspace.onwheel = e => {
         e.preventDefault();
+        userPanned = true;
         const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
         const newScale = Math.max(0.2, Math.min(3.0, scale * zoomFactor));
         const rect = workspace.getBoundingClientRect();
@@ -800,7 +924,7 @@
       document.getElementById('btn-focus-center').onclick = () => centerOnNode(currentFocus);
       document.getElementById('btn-reset-view').onclick = () => {
         scale = 1.0;
-        centerOnNode(currentFocus);
+        centerAll();
       };
       document.getElementById('side-close').onclick = () => { sidebar.style.display = 'none'; };
     }
@@ -811,7 +935,7 @@
 </html>`;
   }
 
-  // 3. 在当前页面内全屏渲染 DAG 模态组件 (纯净直系血脉 DAG · 出生时间 Y 轴排布 · 双亲独立有向边)
+  // 3. 在当前页面内全屏渲染 DAG 模态组件 (直系血脉单图 · 力导向自动布局 · 仅父子/母子边)
   let currentInPageDag = null;
   let inPageScale = 1.0;
   let inPagePanX = 50;
@@ -820,12 +944,23 @@
   let inPageStartX = 0, inPageStartY = 0;
   let inPageStartPanX = 0, inPageStartPanY = 0;
   let inPageMoved = false;
+  let inPageUserPanned = false;
   let inPageFocusId = 1;
+  let inPageAnim = null;
+  let inPageEdgeEls = [];
+  let inPageNodeEls = [];
+  let inPageOx = 0, inPageOy = 0;
+  const INPAGE_PAD = 180;
 
   function renderInPageDag(sim, containerEl) {
     if (!containerEl) return;
+    if (inPageAnim) inPageAnim.stop();
     const dag = buildLineageDAG(inPageFocusId, sim);
     currentInPageDag = dag;
+    inPageEdgeEls = [];
+    inPageNodeEls = [];
+    inPageOx = 0;
+    inPageOy = 0;
 
     containerEl.innerHTML = `
       <div class="dag-viewport" id="inpage-dag-viewport">
@@ -849,31 +984,19 @@
     const svgLayer = document.getElementById('inpage-dag-svg');
     const nodesLayer = document.getElementById('inpage-dag-nodes');
 
-    // 夫妻横向虚线连线
-    dag.spouseEdges.forEach(sp => {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', sp.x1);
-      line.setAttribute('y1', sp.y1);
-      line.setAttribute('x2', sp.x2);
-      line.setAttribute('y2', sp.y2);
-      line.setAttribute('class', 'dag-spouse-edge');
-      svgLayer.appendChild(line);
-    });
-
-    // 双亲各自独立有向 Bezier 连线 (DAG Edges with Markers)
+    // 亲子独立有向 Bezier 连线 (仅父子/母子，不绘制夫妻线)
     dag.edges.forEach(e => {
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', e.d);
       let cls = 'dag-edge';
       if (e.parentType === 'father') cls += ' father-edge';
       else if (e.parentType === 'mother') cls += ' mother-edge';
-      if (e.isAncestorLine) cls += ' ancestor';
-      if (e.isDescendantLine) cls += ' descendant';
+      if (e.child.isDescendant || e.child.isFocus) cls += ' descendant';
       path.setAttribute('class', cls);
       
-      const markerId = e.isAncestorLine ? 'inpage-arrow-ancestor' : (e.parentType === 'father' ? 'inpage-arrow-father' : 'inpage-arrow-mother');
+      const markerId = (e.parentType === 'father' ? 'inpage-arrow-father' : 'inpage-arrow-mother');
       path.setAttribute('marker-end', 'url(#' + markerId + ')');
       svgLayer.appendChild(path);
+      inPageEdgeEls.push({ el: path, e });
     });
 
     // 节点卡片
@@ -886,8 +1009,9 @@
       if (!n.isAlive) cls += ' dead';
 
       card.className = cls;
-      card.style.left = n.x + 'px';
-      card.style.top = n.y + 'px';
+      card.style.width = NODE_W + 'px';
+      card.style.height = NODE_H + 'px';
+      card.style.position = 'absolute';
 
       const avatar = !n.isAlive ? '💀' : (n.gender === 'female' ? (n.isPregnant ? '🤰' : '👩') : '👦');
       const genText = n.generation === 1 ? '始祖' : 'G' + n.generation;
@@ -916,14 +1040,75 @@
       card.onclick = (e) => {
         if (inPageMoved) return;
         e.stopPropagation();
+        // 轻量聚焦：仅切换高亮与浮动档案，不整图重建 (不打断力导向收敛)
         inPageFocusId = n.id;
+        inPageNodeEls.forEach(item => item.el.classList.remove('focus'));
+        card.classList.add('focus');
         showInPageInspector(n, sim);
-        renderInPageDag(sim, containerEl);
       };
 
       nodesLayer.appendChild(card);
+      inPageNodeEls.push({ el: card, n });
     });
 
+    // 力导向每帧布局刷新：自适应画布尺寸 + 更新边路径与节点坐标
+    function refreshLayout() {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of dag.nodes) {
+        if (n.x < minX) minX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y > maxY) maxY = n.y;
+      }
+      dag.width = Math.max(1400, maxX - minX + INPAGE_PAD * 2);
+      dag.height = Math.max(1000, maxY - minY + INPAGE_PAD * 2);
+      svgLayer.setAttribute('width', dag.width);
+      svgLayer.setAttribute('height', dag.height);
+      nodesLayer.style.width = dag.width + 'px';
+      nodesLayer.style.height = dag.height + 'px';
+      const ox = INPAGE_PAD - minX;
+      const oy = INPAGE_PAD - minY;
+      inPageOx = ox;
+      inPageOy = oy;
+      for (let i = 0; i < inPageEdgeEls.length; i++) {
+        inPageEdgeEls[i].el.setAttribute('d', edgePath(inPageEdgeEls[i].e, ox, oy));
+      }
+      for (let i = 0; i < inPageNodeEls.length; i++) {
+        inPageNodeEls[i].el.style.left = (inPageNodeEls[i].n.x + ox) + 'px';
+        inPageNodeEls[i].el.style.top = (inPageNodeEls[i].n.y + oy) + 'px';
+      }
+    }
+
+    refreshLayout();
+
+    // 启动力导向动画 (预热已完成，此处仅做收敛抛光，收敛后自动停稳)
+    inPageAnim = animateForceLayout(dag, refreshLayout, () => {
+      if (!inPageUserPanned) centerInPageAll(containerEl);
+    });
+
+    updateInPageTransform();
+  }
+
+  // 整图自适应居中 (含力导向布局偏移量)
+  function centerInPageAll(containerEl) {
+    const dag = currentInPageDag;
+    if (!dag || !dag.nodes.length || !containerEl) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of dag.nodes) {
+      const rx = n.x + inPageOx;
+      const ry = n.y + inPageOy;
+      if (rx < minX) minX = rx;
+      if (ry < minY) minY = ry;
+      if (rx > maxX) maxX = rx;
+      if (ry > maxY) maxY = ry;
+    }
+    const rect = containerEl.getBoundingClientRect();
+    inPageScale = Math.min(1.0, Math.max(0.3, Math.min(
+      rect.width / (maxX - minX + INPAGE_PAD),
+      rect.height / (maxY - minY + INPAGE_PAD)
+    )));
+    inPagePanX = rect.width / 2 - ((minX + maxX) / 2) * inPageScale;
+    inPagePanY = rect.height / 2 - ((minY + maxY) / 2) * inPageScale;
     updateInPageTransform();
   }
 
@@ -1000,8 +1185,8 @@
     const n = currentInPageDag.nodes.find(node => node.id === id);
     if (!n || !containerEl) return;
     const rect = containerEl.getBoundingClientRect();
-    inPagePanX = rect.width / 2 - (n.x + NODE_W / 2) * inPageScale;
-    inPagePanY = rect.height / 2 - (n.y + NODE_H / 2) * inPageScale;
+    inPagePanX = rect.width / 2 - (n.x + inPageOx + NODE_W / 2) * inPageScale;
+    inPagePanY = rect.height / 2 - (n.y + inPageOy + NODE_H / 2) * inPageScale;
     updateInPageTransform();
   }
 
@@ -1009,6 +1194,7 @@
   window.FlowDag = {
     buildLineageDAG,
     generateStandaloneDagHtml,
+    _stepForce: stepForceSimulation, // 调试用: 单步力模拟
     openInNewTab(focusId, sim) {
       const win = window.open('', '_blank');
       if (!win) {
@@ -1028,10 +1214,11 @@
 
       inPageFocusId = focusId || (sim && sim.selectedAgentId) || 1;
       inPageScale = 1.0;
+      inPageUserPanned = false;
 
       modal.style.display = 'flex';
       renderInPageDag(sim, container);
-      centerInPageNode(inPageFocusId, container);
+      centerInPageAll(container);
 
       // 绑定 Pointer 拖拽与缩放事件
       container.style.touchAction = 'none';
@@ -1051,7 +1238,7 @@
         if (!inPageDragging) return;
         const dx = e.clientX - inPageStartX;
         const dy = e.clientY - inPageStartY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) inPageMoved = true;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) { inPageMoved = true; inPageUserPanned = true; }
         inPagePanX = inPageStartPanX + dx;
         inPagePanY = inPageStartPanY + dy;
         updateInPageTransform();
@@ -1072,6 +1259,7 @@
 
       container.onwheel = e => {
         e.preventDefault();
+        inPageUserPanned = true;
         const factor = e.deltaY < 0 ? 1.12 : 0.89;
         const newScale = Math.max(0.2, Math.min(3.0, inPageScale * factor));
         const rect = container.getBoundingClientRect();
@@ -1084,11 +1272,15 @@
       };
 
       const btnCenter = document.getElementById('dag-btn-center');
-      if (btnCenter) btnCenter.onclick = () => centerInPageNode(inPageFocusId, container);
+      if (btnCenter) btnCenter.onclick = () => {
+        inPageUserPanned = true;
+        centerInPageAll(container);
+      };
 
       const btnReset = document.getElementById('dag-btn-reset-zoom');
       if (btnReset) {
         btnReset.onclick = () => {
+          inPageUserPanned = true;
           inPageScale = 1.0;
           centerInPageNode(inPageFocusId, container);
         };
@@ -1103,7 +1295,10 @@
 
       const btnClose = document.getElementById('dag-btn-close');
       if (btnClose) {
-        btnClose.onclick = () => { modal.style.display = 'none'; };
+        btnClose.onclick = () => {
+          if (inPageAnim) inPageAnim.stop();
+          modal.style.display = 'none';
+        };
       }
     }
   };

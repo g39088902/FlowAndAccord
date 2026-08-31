@@ -319,6 +319,7 @@ impl World3DEngine {
                 y: agent.world_pos.y,
                 z: agent.world_pos.z,
                 age: agent.age,
+                birth_tick: agent.birth_tick,
                 heading_rad: agent.forward_heading_rad,
                 pitch_rad: agent.pitch_rad,
                 velocity: agent.current_velocity,

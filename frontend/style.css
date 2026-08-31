@@ -1112,7 +1112,7 @@
     }
 
     /* =========================================================================
-       🌳 完整族谱 DAG 全景模态弹窗与画布组件样式
+       🌳 直系血脉 DAG 族谱模态弹窗与画布组件样式
        ========================================================================= */
     .dag-modal-overlay {
       position: fixed;
@@ -1258,11 +1258,6 @@
       stroke: #f472b6;
       stroke-width: 2.2;
     }
-    .dag-edge.ancestor {
-      stroke: #fbbf24;
-      stroke-width: 2.8;
-      filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-    }
     .dag-edge.descendant.father-edge {
       stroke: #38bdf8;
       stroke-width: 2.8;
@@ -1272,12 +1267,6 @@
       stroke: #ec4899;
       stroke-width: 2.8;
       filter: drop-shadow(0 0 4px rgba(236, 72, 153, 0.6));
-    }
-    .dag-spouse-edge {
-      stroke: #f43f5e;
-      stroke-dasharray: 4 4;
-      stroke-width: 1.8;
-      opacity: 0.85;
     }
     .dag-node {
       position: absolute;
@@ -1302,9 +1291,9 @@
       z-index: 10;
     }
     .dag-node.focus {
-      border: 2px solid #38bdf8;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), 0 8px 24px rgba(0,0,0,0.6);
-      background: rgba(14, 30, 56, 0.95);
+      border: 2px solid #ef4444;
+      box-shadow: 0 0 22px rgba(239, 68, 68, 0.55), 0 8px 24px rgba(0,0,0,0.6);
+      background: rgba(48, 14, 18, 0.98);
       z-index: 20;
     }
     .dag-node.ancestor {

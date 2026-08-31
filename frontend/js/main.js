@@ -480,8 +480,15 @@
 
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.key === ' ') {
-        const targetTag = e.target.tagName;
-        if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT') return;
+        const t = e.target;
+        const tag = t.tagName;
+        // 仅在真正的文本输入场景保留空格键原始输入；
+        // 其余控件（按钮/滑块/下拉菜单/勾选框等）操作结束后按空格统一表示「暂停/继续」，
+        // 避免焦点残留在 web 控件上导致空格键被控件消费掉。
+        const isTextEntry = (tag === 'TEXTAREA')
+          || (tag === 'INPUT' && /^(text|search|password|email|number|tel|url)$/i.test(t.type || ''))
+          || (t.isContentEditable === true);
+        if (isTextEntry) return;
         e.preventDefault();
         togglePause();
       }

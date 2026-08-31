@@ -88,6 +88,8 @@ impl World3DEngine {
             let mut baby = Agent3D::new_with_config(
                 baby_id, birth_node, 8.5, false, 0.0, baby_gender, &self.config,
             );
+            // 记录婴儿出生时刻 (当前世界 tick 数), 供前端族谱按出生时序施加纵向重力
+            baby.birth_tick = self.tick_counter;
             let camp_pos = self.network.graph[*self.network.node_map.get(&birth_node).unwrap()].pos;
             baby.world_pos = camp_pos;
             baby.hunger = 25.0;

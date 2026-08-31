@@ -95,6 +95,9 @@ pub struct AgentSnapshot {
     pub y: f32,
     pub z: f32,
     pub age: f32, // 年龄 (秒)
+    /// 出生时刻的世界 tick 数 (始祖=0, 后代=分娩时的 tick_counter)
+    /// 供前端族谱按出生时序排序与施加纵向重力
+    pub birth_tick: u64,
     pub heading_rad: f32,
     pub pitch_rad: f32,
     pub velocity: f32,

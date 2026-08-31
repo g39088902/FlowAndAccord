@@ -5,6 +5,7 @@
     let frameCount = 0, lastFpsUpdate = performance.now();
     let lastRenderTime = performance.now();
     let lastUiUpdate = performance.now();
+    let lastTopBarUpdate = performance.now(); // 📊 顶栏数据栏独立节流 (无头模式下同样刷新)
     const TARGET_FPS = 30;
     const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
@@ -12,6 +13,7 @@
     // 🐞 调试模式: 帧耗时 / FPS / 内存采样与 HUD 刷新
     // ==========================================
     let dbgRenderMs = 0, dbgFrameMs = 0, dbgCurrentFps = 0, dbgHudUpdate = performance.now();
+    let dbgLastTick = 0, dbgLastTickSec = performance.now(); // ⚡ 每秒真实 Tick 速率采样基准
     const dbgElCache = {};
 
     function dbgEl(id) {
@@ -31,7 +33,16 @@
       dbgHudUpdate = now;
       if (typeof sim.getDebugStats !== 'function') return;
       const s = sim.getDebugStats();
+
+      // ⚡ 现实世界每秒实际推进的模拟 Tick 数 (含倍速加成)
+      const realNow = performance.now();
+      const dtSec = Math.max(0.001, (realNow - dbgLastTickSec) / 1000);
+      const tickRate = Math.max(0, (s.tick - dbgLastTick) / dtSec);
+      dbgLastTick = s.tick;
+      dbgLastTickSec = realNow;
+
       dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
+      dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
       dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
       dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
       dbgSetText('dbg-snap-ms', s.snapMs.toFixed(2) + ' ms');
@@ -42,6 +53,33 @@
       dbgSetText('dbg-wasm-mem', fmtMB(s.wasmBytes));
       const tip = dbgEl('dbg-mem-tip');
       if (tip) tip.style.display = s.memSupported ? 'none' : 'block';
+    }
+
+    // ==========================================
+    // 📊 顶栏数据栏刷新 (节流 ~100ms; 独立于画布渲染，无头模式下同样更新，保证长程演化数据实时可见)
+    // ==========================================
+    function updateTopBarStats(now) {
+      if (now - lastTopBarUpdate < 100) return;
+      lastTopBarUpdate = now;
+
+      const aliveAgents = sim.agents.filter(a => a.isAlive);
+      const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
+
+      document.getElementById('stat-pop').textContent = aliveAgents.length;
+      document.getElementById('stat-houses').textContent = sim.houses.filter(h => !h.isRuin).length;
+      document.getElementById('stat-pois').textContent = sim.pois.length;
+      document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
+      document.getElementById('stat-births').textContent = sim.totalBirths;
+      document.getElementById('stat-deaths').textContent = sim.totalDeaths;
+      document.getElementById('stat-deaths-natural').textContent = sim.totalDeathsNatural;
+      document.getElementById('stat-deaths-unnatural').textContent = sim.totalDeathsUnnatural;
+      document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
+
+      // 顶栏四季与气温展示
+      const seasonIcons = { 'Spring': '🌸 春季', 'Summer': '☀️ 夏季', 'Autumn': '🍂 秋季', 'Winter': '❄️ 冬季' };
+      document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
+      document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
+      document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
     }
 
     // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
@@ -159,6 +197,9 @@
 
       // 🐞 调试 HUD 刷新 (置于无头模式 return 之前，保证无头长程演化依旧可监视)
       updateDebugHud(now);
+
+      // 📊 顶栏数据栏刷新 (置于无头模式 return 之前，无头模式下同样实时更新人口/宅舍/季节等数据)
+      updateTopBarStats(now);
 
       // 🧠 无头模式: 只推进模拟，跳过全部画布渲染与 DOM 刷新
       if (sim.headless) {
@@ -805,23 +846,6 @@
         lastUiUpdate = now;
 
         const aliveAgents = sim.agents.filter(a => a.isAlive);
-        const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
-
-        document.getElementById('stat-pop').textContent = aliveAgents.length;
-        document.getElementById('stat-houses').textContent = sim.houses.filter(h => !h.isRuin).length;
-        document.getElementById('stat-pois').textContent = sim.pois.length;
-        document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
-        document.getElementById('stat-births').textContent = sim.totalBirths;
-        document.getElementById('stat-deaths').textContent = sim.totalDeaths;
-        document.getElementById('stat-deaths-natural').textContent = sim.totalDeathsNatural;
-        document.getElementById('stat-deaths-unnatural').textContent = sim.totalDeathsUnnatural;
-        document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
-
-        // 顶栏四季与气温展示
-        const seasonIcons = { 'Spring': '🌸 春季', 'Summer': '☀️ 夏季', 'Autumn': '🍂 秋季', 'Winter': '❄️ 冬季' };
-        document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
-        document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
-        document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
 
         // 6. 实时汇总全地图资源大盘 (水/果/木/石/金)
         let totalWaterCur = 0, totalWaterMax = 0;

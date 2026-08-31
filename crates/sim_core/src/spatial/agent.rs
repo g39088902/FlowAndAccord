@@ -91,6 +91,9 @@ pub struct Agent3D {
     pub state: PrimitiveActionState,
     pub is_alive: bool,
     pub age: f32,
+    /// 出生时刻的世界 tick 数 (始祖在初始化时记录, 后代在分娩时记录)
+    /// 用于前端族谱按出生时序施加纵向重力: 越晚出生的越靠下.
+    pub birth_tick: u64,
 
     // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位)
     pub hunger: f32,          // 饱食度 (最大 50.0 单位)
@@ -176,6 +179,7 @@ impl Agent3D {
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
+            birth_tick: 0, // 默认 0; 由调用方 (ecology.rs 始祖初始化 / birth.rs 分娩) 覆写为当前 tick_counter
             hunger: config.agent_initial_hunger,
             thirst: config.agent_initial_thirst,
             stamina: config.agent_initial_stamina,

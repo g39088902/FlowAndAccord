@@ -188,6 +188,8 @@ impl World3DEngine {
             let initial_age = self.config.agent_adult_age;
 
             let mut agent = Agent3D::new_with_config(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender, &self.config);
+            // 始祖在初始化阶段 (tick_counter=0) 出生, 显式置 0 以便族谱按出生时序排序
+            agent.birth_tick = 0;
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
 
