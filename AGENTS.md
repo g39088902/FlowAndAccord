@@ -31,10 +31,10 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.36)"]
+    E --> F["浏览器 UI (版本: v0.9.39)"]
 ```
 
-- **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system.rs`）；
+- **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，负责线性内存 JSON 序列化、tick 步进与 JS 动态配置注入；
 - **`frontend/`**：原生静态前端（`config.js` / `math.js` / `rustworld.js` / `render.js` / `main.js`），内置轻量开发服务器 `frontend/server.js`。数字配置抽离在 `config.js` 中，无需重新编译即可调参。
 
@@ -66,7 +66,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 无需启动浏览器，通过原生单元测试与 Node.js 端到端测试双重校验：
 
 ```powershell
-# 1. 运行 Rust 原生内核 27 项单元测试
+# 1. 运行 Rust 原生内核编译与测试（当前源码未内置单元测试用例，命令通过即代表编译无误）
 cargo test --lib
 
 # 2. 运行 WASM 导出、确定性及长程稳定性验证
@@ -91,7 +91,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.36`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.39`**。
 
 ---
 
@@ -129,7 +129,7 @@ node frontend/server.js
 - **中途断流熔断与平滑就近重路由（$< 10\%$）**：
   - 在 `decide_seeking_material` 与 `decide_seeking_survival` 中，中途检测**自身对目标**的施密特触发器关闭（观察到跌破 $<10\%$）时，若自身仍有其他已开放同类 POI，立即通过 `turn_around_and_route_to` 原地掉头并平滑重新规划路径赶往就近可用 POI；仅在自身无可用品或体力告警时才折返回家；
   - **严禁闪现瞬移**：中途掉头时通过 `turn_around_and_route_to` 在当前车道原地掉头（反向进度 `rev_len - distance_along_curve`），平滑从当前坐标沿原路往回走，保持坐标连续性。
-- **修改相关逻辑时**：必须同步更新 `agent.rs` 与 `decisions/tests.rs` 中的对应测试（Agent 私有施密特中间带保持状态、`test_poi_seekability_is_private_to_each_agent`、`test_abandon_seeking_when_target_poi_below_10_percent`、`test_reroute_to_next_poi_when_target_depleted` 等）。
+- **修改相关逻辑时**：自动化验证以 `node tools/test-wasm.js` 的 WASM 回归为准；若临时编写 Rust 单元测试验证（提交前须删除，见 §4.10），需覆盖 Agent 私有施密特中间带保持状态、`test_poi_seekability_is_private_to_each_agent`、`test_abandon_seeking_when_target_poi_below_10_percent`、`test_reroute_to_next_poi_when_target_depleted` 等场景。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
@@ -158,17 +158,17 @@ node frontend/server.js
 
 ### 4.6 🟠 模块粒度与单文件行数规范
 
-- **单文件严控在 800 行以内**：当模块功能膨胀时，应及时进行子目录模块化拆分（参考 `crates/sim_core/src/spatial/decisions/` 拆分为 `needs.rs`, `evaluator.rs`, `tests.rs`, `mod.rs` 的最佳实践）。
+- **单文件严控在 800 行以内**：当模块功能膨胀时，应及时进行子目录模块化拆分（参考 `crates/sim_core/src/spatial/decisions/` 拆分为 `needs.rs`, `evaluator.rs`, `mod.rs`，以及 `crates/sim_core/src/spatial/housing_system/` 拆分为 5 个单一职责子模块的最佳实践）。
 
 ### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
 - 当前生态共 **23 处**：营地 5 处 (1-5)、清泉 6 处 (10-15)、浆果 6 处 (20-25)、林木 3 处 (30-32)、石矿 2 处 (40-41)、金矿 1 处 (50)。空间排斥间距 $\text{min\_poi\_distance} = 70\text{m}$。
 - **营地县级行政区库与升级界限**：5 处营地在生成时从 `COUNTY_NAMES`（240+ 处真实古雅县名）随机 roll 出专属地名，并随辖内绑定的有效房屋数量自动升级：0~5 间为【营地】、6~11 间为【村】、12~17 间为【乡】、18~23 间为【镇】、24+ 间为【县】。
-- **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `mod.rs` 单元测试断言 $\rightarrow$ `index.html` 面板文案 $\rightarrow$ `CURRENT.md`。
+- **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `index.html` 面板文案 $\rightarrow$ `CURRENT.md`。
 
 ### 4.8 🟡 行为与生理硬约束
 
-- **冬季供暖**：冬季或气温 $< 5^\circ\text{C}$ 时，非 0 级有主房屋每秒消耗 0.12 木材（`housing_system.rs`）；家宅木材 $< 10$ 时禁孕。
+- **冬季供暖**：冬季或气温 $< 5^\circ\text{C}$ 时，非 0 级有主房屋每秒消耗 0.12 木材（`housing_system/maintenance.rs`）；家宅木材 $< 10$ 时禁孕。
 - **0 级仓库不扣生活水粮**（`ecology.rs` 中只有 `tier != Tier0Warehouse` 才允许族人从仓库吃喝消耗）。
 - **房屋升级材料门槛**：`house.rs` `is_pantry_full()`：
   - 0 级仓库：需水粮各 90%；
@@ -185,3 +185,10 @@ node frontend/server.js
   1. `frontend/index.html` 顶部品牌卡片内的版本徽章 `<span class="version-tag">vX.Y.Z</span>`；
   2. `AGENTS.md` 第 1 节 Mermaid 流程图节点 `浏览器 UI (版本: vX.Y.Z)` 及第 2 节步骤四 `版本确认：vX.Y.Z`；
   3. 若改动了核心机制或新增了特性，同步在 `CURRENT.md` 中记录更新。
+
+### 4.10 🟢 混沌系统定位与测试策略（持久化测试禁令）
+
+- **项目定位**：本项目旨在搭建**混沌系统**——确定性内核驱动多智能体在代际、社会、经济维度上涌现不可预测的长期演化。因此**短期单元测试无法评价功能正确性**：固定断言既测不出涌现行为，还可能误锁死演化的多样性，与项目目标相悖。
+- **持久化测试禁令**：**此后不再持久化保存任何单元测试脚本**（`#[cfg(test)]` / `tests.rs` 等一律不进入提交）。当前仓库源码中无任何测试用例，即为这一策略的有意结果，非缺失。
+- **临时验证流程**：每次开发新功能时，可**临时编写**单元测试/调试断言跑一遍，目的仅是**确认功能不跑不通**（能正常运行、无崩溃、核心数值合理）；验证通过后，在**提交前删除临时测试脚本**，保持仓库清洁。
+- **长期验证职责**：行为与确定性的持续保障由 `node tools/test-wasm.js`（WASM 回归：同种子逐字节一致性、防越界、防 NaN、长程稳定）承担，该脚本是唯一长期保留的自动化验证。

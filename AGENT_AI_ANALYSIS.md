@@ -2,7 +2,7 @@
 
 > **分析对象**：`FlowAndAccord` 中"部落民 (Agent)"的全部 AI 逻辑  
 > **分析范围**：Rust 确定性内核 `crates/sim_core/src/spatial/` 与 WebAssembly 桥接层 `crates/sim_wasm/`  
-> **结论先行**：当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + A* 加权寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM/神经网络/学习成分**（ARCHITECTURE.md 中规划的 LLM 认知层为愿景设计）。Rust 内核 `crates/sim_core` 编译正常并通过全部单元测试与 WASM 回归测试，是**唯一真实仿真实现**；前端 `frontend/js/` 仅为表现与交互层（`math.js`、`rustworld.js`、`render.js`、`main.js`），不存在独立 JS 移植版仿真逻辑。
+> **结论先行**：当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + A* 加权寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM/神经网络/学习成分**（ARCHITECTURE.md 中规划的 LLM 认知层为愿景设计）。Rust 内核 `crates/sim_core` 编译正常并通过 WASM 回归测试，是**唯一真实仿真实现**；前端 `frontend/js/` 仅为表现与交互层（`math.js`、`rustworld.js`、`render.js`、`main.js`），不存在独立 JS 移植版仿真逻辑。
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 层次 | 模块位置 | 职责与状态 |
 | :--- | :--- | :--- |
-| **Rust 确定性内核** | `crates/sim_core/src/spatial/{agent,world,decisions,ecology,housing_system,graph,house,poi}.rs` | ✅ 纯 Rust 实现，状态机、A* 寻路、生态流转、全量单元测试通过 |
+| **Rust 确定性内核** | `crates/sim_core/src/spatial/{agent,world,decisions,ecology,housing_system,graph,house,poi}.rs` | ✅ 纯 Rust 实现，状态机、A* 寻路、生态流转，WASM 回归测试通过 |
 | **WASM 桥接层** | `crates/sim_wasm/src/lib.rs` $\rightarrow$ `frontend/rust/sim_wasm.wasm` | ✅ 零依赖 C-ABI 导出，线性内存 JSON 快照与多步 tick 调度 |
 | **前端表现/适配层** | `frontend/js/{math,rustworld,render,main}.js` | ✅ Canvas 2D/3D 投影渲染、Inspector 监控与视口交互，无重复业务逻辑 |
 
@@ -144,7 +144,7 @@ accel             = (target_speed − velocity) × 4.0           // 一阶平滑
 
 ---
 
-## 7. 家庭 / 房屋 / 社会层规则（`housing_system.rs`）
+## 7. 家庭 / 房屋 / 社会层规则（`housing_system/`）
 
 | 行为 | 触发条件 | 效果 |
 | :--- | :--- | :--- |
@@ -193,7 +193,7 @@ tick()
 ## 10. 验证与工程规范
 
 1. **测试双保险**：
-   - 原生 Rust 单元测试：`cargo test -p sim_core`（13 项单元测试覆盖动机、错峰、行囊搬运、淘金冷却、供暖修缮等）；
+   - 原生 Rust 内核编译校验：`cargo test -p sim_core`（当前源码未内置单元测试用例，命令通过即代表编译无误）；
    - WASM 端到端自动化回归测试：`node tools/test-wasm.js`（验证 WASM 导出、种子一致性、防 NaN、防越界）。
 2. **确定性约束**：
    - 依赖 `WorldRng`（基于固定种子 PRNG），所有随机消耗顺序确定，禁止使用未种子化的 `thread_rng()` 或前端 `Math.random()` 扰动模拟核心。

@@ -53,10 +53,11 @@ source "$HOME/.cargo/env"
 rustup target add wasm32-unknown-unknown
 ```
 
-#### 🍎 步骤二：运行 Rust 原生内核单元测试
+#### 🍎 步骤二：运行 Rust 原生内核编译与测试
 ```bash
 cargo test --lib
 ```
+> 注：当前源码未内置单元测试用例，命令通过即代表编译无误（自动化行为验证以步骤四的 WASM 回归为准）。
 
 #### 🍎 步骤三：编译 Release 级 WebAssembly 并同步至前端双目录
 ```bash
@@ -87,7 +88,7 @@ node frontend/server.js
 
 本项目在根目录 `.toolchain/` 下内置了便携式 Rust 工具链，并在 `.cargo-home/` 中缓存了离线依赖。
 
-#### 🪟 步骤一：注入便携工具链环境变量并运行原生单元测试
+#### 🪟 步骤一：注入便携工具链环境变量并运行原生编译测试（当前源码未内置单元测试用例，通过即代表编译无误）
 ```powershell
 $env:PATH = "$PWD\.toolchain\cargo\bin;$PWD\.toolchain\rustc\bin;$env:PATH"
 $env:CARGO_HOME = "$PWD\.cargo-home"
@@ -172,4 +173,4 @@ window.SIM_CONFIG = {
    * 嶙峋石矿 2 处（ID 40-41，储量 60.0，产速 1.5/s）
    * 璀璨金矿 1 处（ID 50，储量 60.0，产速 1.2/s）
 5. **版本号规范**：
-   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.35`），并在 `index.html`、`AGENTS.md` 和 `CURRENT.md` 中同步更新。
+   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.39`），并在 `index.html`、`AGENTS.md` 和 `CURRENT.md` 中同步更新。

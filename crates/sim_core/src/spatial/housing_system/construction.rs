@@ -3,7 +3,7 @@ use crate::spatial::house::HouseTier;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
-    /// 施工计时与多级房屋升级推进、竣工仓储扩容与初次成婚激活
+    /// 施工计时与多级房屋升级推进、竣工仓储扩容与生育激活 (成婚由 marriage.rs 持续扫描自动匹配)
     pub(crate) fn tick_house_construction(&mut self, dt: f32) {
         let mut upgraded_houses = Vec::new();
         for agent in &mut self.agents {
@@ -31,33 +31,14 @@ impl World3DEngine {
             }
         }
 
-        // 升级竣工、扩容储量与激活生育/成婚
-        for (owner_id, house_id) in upgraded_houses {
+        // 升级竣工、扩容储量与激活生育 (成婚由 marriage.rs 每 tick 持续扫描自动匹配，不在此事件钩子中处理)
+        for (_, house_id) in upgraded_houses {
             if let Some(house) = self.houses.iter_mut().find(|h| h.id == house_id) {
                 let prev_tier = house.tier;
                 let success = house.upgrade_to_next_tier(&self.config);
                 if success {
-                    let door_node = house.door_node_id;
-
                     if prev_tier == HouseTier::Tier0Warehouse {
-                        let single_female_id = self.agents.iter()
-                            .find(|a| a.is_alive && a.gender == Gender::Female && a.age >= self.config.agent_adult_age && a.spouse_id.is_none() && !a.is_pregnant)
-                            .map(|a| a.id);
-
-                        if let Some(female_id) = single_female_id {
-                            if let Some(husband) = self.agents.iter_mut().find(|a| a.id == owner_id) {
-                                husband.spouse_id = Some(female_id);
-                            }
-                            if let Some(wife) = self.agents.iter_mut().find(|a| a.id == female_id) {
-                                wife.spouse_id = Some(owner_id);
-                                wife.home_house_id = Some(house_id);
-                                wife.home_camp_node = door_node;
-                            }
-                            house.spouse_id = Some(female_id);
-                            self.last_event = Some(format!("🎉 0级仓库满水粮并升级为 1级茅草房！迎娶女性 #{} ♀ 结为夫妻，激活生育！", female_id));
-                        } else {
-                            self.last_event = Some(format!("🎉 0级仓库升级为 1级茅草房！正式激活生育功能，仓储扩容至 40 单位！"));
-                        }
+                        self.last_event = Some(format!("🎉 0级仓库升级为 1级茅草房！正式激活生育功能，仓储扩容至 40 单位！"));
                     } else if prev_tier == HouseTier::Tier1ThatchedHut {
                         self.last_event = Some(format!("🏡 1级茅草房消耗木材完成升级！第 #{} 号房屋晋升为 2级私宅，仓储扩容至 80 单位！", house_id));
                     } else if prev_tier == HouseTier::Tier2LeanTo {
