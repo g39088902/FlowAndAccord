@@ -157,6 +157,7 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
                 .unwrap_or(false);
             if is_tier0 { ("Belonging", "BuildHouse") } else { ("Esteem", "BuildHouse") }
         }
+        PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest"),
         PrimitiveActionState::OffRoadDetour => ("Safety", "Detour"),
         _ => return None,
     })

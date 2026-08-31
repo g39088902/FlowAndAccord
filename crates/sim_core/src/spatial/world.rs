@@ -1,5 +1,6 @@
 use crate::rng::WorldRng;
 use crate::config::SimConfig;
+use std::collections::HashMap;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
@@ -35,6 +36,8 @@ pub struct World3DEngine {
     pub tick_counter: u64,
     pub last_event: Option<String>,
     pub config: SimConfig,
+    /// AgentId → agents Vec 下标的快速查找索引；Vec 结构变更后需调用 rebuild_agent_index() 刷新
+    pub agent_index: HashMap<AgentId, usize>,
 }
 
 impl World3DEngine {
@@ -75,6 +78,7 @@ impl World3DEngine {
             tick_counter: 0,
             last_event: None,
             config,
+            agent_index: HashMap::new(),
         }
     }
 
@@ -142,6 +146,9 @@ impl World3DEngine {
     /// 确定性仿真 Tick
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
+
+        // 0. 四季更迭与宏观环境温度演化 (正弦周期拟合)
+        self.tick_season(dt);
 
         // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
         for poi in &mut self.pois {
@@ -351,7 +358,7 @@ impl World3DEngine {
             Season::Autumn => "Autumn",
             Season::Winter => "Winter",
         };
-        let quarter_length = self.config.season_quarter_length;
+        let quarter_length = self.config.season_quarter_length();
         let season_progress = ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
 
         WorldSnapshot3D {
@@ -375,6 +382,35 @@ impl World3DEngine {
             season_progress,
             last_mutation_event: self.last_event.clone(),
         }
+    }
+
+    /// 四季更迭与宏观环境温度演化 (正弦周期拟合)
+    pub fn tick_season(&mut self, dt: f32) {
+        self.season_timer += dt;
+        let year_length = self.config.season_year_length;
+        let quarter_length = self.config.season_quarter_length();
+        let season_time = self.season_timer % year_length;
+        let season_idx = (((season_time + quarter_length * 0.5) / quarter_length) as usize) % 4;
+        let prev_season = self.current_season;
+        self.current_season = match season_idx {
+            0 => Season::Spring,
+            1 => Season::Summer,
+            2 => Season::Autumn,
+            _ => Season::Winter,
+        };
+
+        if self.current_season != prev_season {
+            let (icon, name) = match self.current_season {
+                Season::Spring => ("🌸", "春季 (大地回春，气候温和)"),
+                Season::Summer => ("☀️", "夏季 (炎炎夏日，草木茂盛)"),
+                Season::Autumn => ("🍂", "秋季 (秋风送爽，抓紧备柴过冬)"),
+                Season::Winter => ("❄️", "冬季 (严寒降临，房屋消耗木头取暖)"),
+            };
+            self.last_event = Some(format!("{} 季节轮转: 步入 {}！", icon, name));
+        }
+
+        let angle = (season_time / year_length) * std::f32::consts::TAU;
+        self.temperature = self.config.temp_base_mid + self.config.temp_amplitude * angle.sin();
     }
 
     /// 结算已故族人的金币遗产：某人死后随身金币平分给所有在世的子一代子女
@@ -413,114 +449,24 @@ impl World3DEngine {
             }
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::spatial::agent::Gender;
-
-    #[test]
-    fn test_gold_inheritance_split_equally_among_living_children() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let camp_node = world.agents[0].home_camp_node;
-        let father_id = 100;
-        let son_id = 101;
-        let daughter_id = 102;
-        let third_child_id = 103;
-
-        let mut father = Agent3D::new(father_id, camp_node, 10.0, false, 2000.0, Gender::Male);
-        father.carried_gold = 30.0;
-        father.children_ids = vec![son_id, daughter_id, third_child_id];
-
-        let mut son = Agent3D::new(son_id, camp_node, 10.0, false, 500.0, Gender::Male);
-        son.father_id = Some(father_id);
-        son.carried_gold = 5.0;
-
-        let mut daughter = Agent3D::new(daughter_id, camp_node, 10.0, false, 400.0, Gender::Female);
-        daughter.father_id = Some(father_id);
-        daughter.carried_gold = 0.0;
-
-        let mut third_child = Agent3D::new(third_child_id, camp_node, 10.0, false, 300.0, Gender::Male);
-        third_child.father_id = Some(father_id);
-        third_child.carried_gold = 10.0;
-
-        world.agents = vec![father, son, daughter, third_child];
-
-        world.agents[0].is_alive = false;
-        world.settle_gold_inheritance();
-
-        let f = &world.agents[0];
-        assert_eq!(f.carried_gold, 0.0);
-
-        let s = &world.agents[1];
-        assert_eq!(s.carried_gold, 15.0);
-
-        let d = &world.agents[2];
-        assert_eq!(d.carried_gold, 10.0);
-
-        let t = &world.agents[3];
-        assert_eq!(t.carried_gold, 20.0);
-
-        assert!(world.last_event.as_ref().unwrap().contains("💰 遗产继承"));
-        assert!(world.last_event.as_ref().unwrap().contains("3 位子女平分"));
+    /// 全量重建 agent_index。在 agents Vec 结构发生变化（push 新 agent 或 retain 后）必须调用。
+    pub fn rebuild_agent_index(&mut self) {
+        self.agent_index.clear();
+        for (i, agent) in self.agents.iter().enumerate() {
+            self.agent_index.insert(agent.id, i);
+        }
     }
 
-    #[test]
-    fn test_gold_inheritance_ignores_dead_children_and_grandchildren() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let camp_node = world.agents[0].home_camp_node;
-        let mother_id = 200;
-        let dead_child_id = 201;
-        let living_child_id = 202;
-        let grandchild_id = 203;
-
-        let mut mother = Agent3D::new(mother_id, camp_node, 10.0, false, 2000.0, Gender::Female);
-        mother.carried_gold = 20.0;
-        mother.children_ids = vec![dead_child_id, living_child_id];
-
-        let mut dead_child = Agent3D::new(dead_child_id, camp_node, 10.0, false, 600.0, Gender::Female);
-        dead_child.mother_id = Some(mother_id);
-        dead_child.is_alive = false;
-        dead_child.carried_gold = 0.0;
-        dead_child.children_ids = vec![grandchild_id];
-
-        let mut living_child = Agent3D::new(living_child_id, camp_node, 10.0, false, 500.0, Gender::Male);
-        living_child.mother_id = Some(mother_id);
-        living_child.carried_gold = 0.0;
-
-        let mut grandchild = Agent3D::new(grandchild_id, camp_node, 10.0, false, 100.0, Gender::Male);
-        grandchild.mother_id = Some(dead_child_id);
-        grandchild.carried_gold = 0.0;
-
-        world.agents = vec![mother, dead_child, living_child, grandchild];
-
-        world.agents[0].is_alive = false;
-        world.settle_gold_inheritance();
-
-        assert_eq!(world.agents[0].carried_gold, 0.0);
-        assert_eq!(world.agents[1].carried_gold, 0.0);
-        assert_eq!(world.agents[2].carried_gold, 20.0);
-        assert_eq!(world.agents[3].carried_gold, 0.0);
+    /// 按 AgentId O(1) 不可变查找
+    pub fn agent_by_id(&self, id: AgentId) -> Option<&Agent3D> {
+        let idx = *self.agent_index.get(&id)?;
+        self.agents.get(idx)
     }
 
-    #[test]
-    fn test_gold_inheritance_no_living_children() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let camp_node = world.agents[0].home_camp_node;
-        let mut bachelor = Agent3D::new(300, camp_node, 10.0, false, 2000.0, Gender::Male);
-        bachelor.carried_gold = 50.0;
-        bachelor.is_alive = false;
-
-        world.agents = vec![bachelor];
-        world.settle_gold_inheritance();
-
-        assert_eq!(world.agents[0].carried_gold, 0.0);
+    /// 按 AgentId O(1) 可变查找
+    pub fn agent_by_id_mut(&mut self, id: AgentId) -> Option<&mut Agent3D> {
+        let idx = *self.agent_index.get(&id)?;
+        self.agents.get_mut(idx)
     }
 }

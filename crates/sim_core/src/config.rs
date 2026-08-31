@@ -121,7 +121,6 @@ pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
 // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)
 // ============================================================================
 pub const SEASON_YEAR_LENGTH: f32 = 240.0;
-pub const SEASON_QUARTER_LENGTH: f32 = 60.0;
 pub const TEMP_BASE_MID: f32 = 14.0;
 pub const TEMP_AMPLITUDE: f32 = 17.0;
 
@@ -246,7 +245,6 @@ pub struct SimConfig {
 
     // 7. 四季更迭与宏观气候
     pub season_year_length: f32,
-    pub season_quarter_length: f32,
     pub temp_base_mid: f32,
     pub temp_amplitude: f32,
 
@@ -365,7 +363,6 @@ impl Default for SimConfig {
 
             // 7. 四季更迭与宏观气候
             season_year_length: SEASON_YEAR_LENGTH,
-            season_quarter_length: SEASON_QUARTER_LENGTH,
             temp_base_mid: TEMP_BASE_MID,
             temp_amplitude: TEMP_AMPLITUDE,
 
@@ -379,5 +376,13 @@ impl Default for SimConfig {
             road_speed_skyway_elevated: ROAD_SPEED_SKYWAY_ELEVATED,
             road_speed_smuggler_trail: ROAD_SPEED_SMUGGLER_TRAIL,
         }
+    }
+}
+
+impl SimConfig {
+    /// 一年固定四季，单季长度自动由年轮总时长 1/4 计算派生
+    #[inline]
+    pub fn season_quarter_length(&self) -> f32 {
+        self.season_year_length * 0.25
     }
 }

@@ -5,7 +5,6 @@ use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::HouseTier;
 use super::world::World3DEngine;
-use crate::config::*;
 
 impl World3DEngine {
     /// 构建生态：营地5处(无限)、水泉6处、食物6处、木材3处、石料2处、金矿1处与全图直连动线
@@ -216,6 +215,8 @@ impl World3DEngine {
         }
 
         self.last_event = Some("🏕️ 生态初始：12 位始祖族人成家配对，踏路筑室，社会演化开启！".to_string());
+        // 初始化索引，使 agent_by_id 在本次 tick 后立即可用
+        self.rebuild_agent_index();
     }
 
     /// 真实有限资源交互结算与分娩
@@ -349,246 +350,12 @@ impl World3DEngine {
             }
         }
 
-        for (mother_id, camp_node) in newborn_mothers {
-            let baby_id = self.next_agent_id;
-            self.next_agent_id += 1;
-            self.total_births += 1;
-            let baby_gender = if self.rng.gen_bool(0.5) { Gender::Female } else { Gender::Male };
-            let gender_str = if baby_gender == Gender::Female { "女婴 ♀" } else { "男婴 ♂" };
-            let father_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.pregnancy_father_id.or(m.spouse_id));
+        // 出生结算委托给 birth.rs（内部使用 agent_index O(1) 查找，并增量更新索引）
+        self.resolve_newborns(newborn_mothers);
 
-            let mother_house_id = self.agents.iter().find(|a| a.id == mother_id).and_then(|m| m.home_house_id);
-            let father_house_id = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid).and_then(|f| f.home_house_id));
-            let family_house_id = mother_house_id.or(father_house_id);
-
-            let birth_node = if let Some(hid) = family_house_id {
-                self.houses.iter().find(|h| h.id == hid).map(|h| h.door_node_id).unwrap_or(camp_node)
-            } else {
-                camp_node
-            };
-
-            let mut baby = Agent3D::new_with_config(baby_id, birth_node, 8.5, false, 0.0, baby_gender, &self.config);
-            let camp_pos = self.network.graph[*self.network.node_map.get(&birth_node).unwrap()].pos;
-            baby.world_pos = camp_pos;
-            baby.hunger = 25.0;
-            baby.thirst = 25.0;
-            baby.stamina = 100.0;
-            baby.mother_id = Some(mother_id);
-            baby.father_id = father_id;
-            let m_gen = self.agents.iter().find(|a| a.id == mother_id).map(|a| a.generation).unwrap_or(1);
-            let f_gen = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid)).map(|a| a.generation).unwrap_or(1);
-            let baby_gen = m_gen.max(f_gen) + 1;
-            baby.generation = baby_gen;
-
-            let m_traits = self.agents.iter().find(|a| a.id == mother_id).map(|a| {
-                (a.intelligence, a.strength, a.digestion_efficiency, a.libido, a.sleep_efficiency, a.life_expectancy)
-            });
-            let f_traits = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid)).map(|a| {
-                (a.intelligence, a.strength, a.digestion_efficiency, a.libido, a.sleep_efficiency, a.life_expectancy)
-            });
-            let delta = self.config.trait_mutation_delta;
-            if let Some(mt) = m_traits {
-                let ft = f_traits.unwrap_or(mt);
-                let inherit = |mv: f32, fv: f32, rng: &mut WorldRng| -> f32 {
-                    ((mv + fv) * 0.5 + rng.gen_range(-delta, delta)).clamp(10.0, 190.0)
-                };
-                baby.intelligence = inherit(mt.0, ft.0, &mut self.rng);
-                baby.strength = inherit(mt.1, ft.1, &mut self.rng);
-                baby.digestion_efficiency = inherit(mt.2, ft.2, &mut self.rng);
-                baby.libido = inherit(mt.3, ft.3, &mut self.rng);
-                baby.sleep_efficiency = inherit(mt.4, ft.4, &mut self.rng);
-                baby.life_expectancy = inherit(mt.5, ft.5, &mut self.rng);
-            }
-            baby.health = baby.life_expectancy;
-            baby.max_health = baby.life_expectancy;
-
-            let baby_surname = {
-                let father_surname = father_id.and_then(|fid| self.agents.iter().find(|a| a.id == fid)).map(|a| a.surname.clone());
-                let mother_surname = self.agents.iter().find(|a| a.id == mother_id).map(|a| a.surname.clone());
-                father_surname.unwrap_or_else(|| mother_surname.unwrap_or_default())
-            };
-            baby.surname = baby_surname.clone();
-
-            if let Some(mother) = self.agents.iter_mut().find(|a| a.id == mother_id) {
-                mother.children_ids.push(baby_id);
-                mother.pregnancy_father_id = None;
-            }
-            if let Some(fid) = father_id {
-                if let Some(father) = self.agents.iter_mut().find(|a| a.id == fid) {
-                    father.children_ids.push(baby_id);
-                }
-            }
-
-            self.agents.push(baby);
-            let parents_str = if let Some(fid) = father_id {
-                format!("母亲 #{} 与 父亲 #{}", mother_id, fid)
-            } else {
-                format!("母亲 #{}", mother_id)
-            };
-            self.last_event = Some(format!("🍼 {} 顺利产下一名健康的{} (【{}】氏 Agent #{}，第{}代，幼年0s，入驻家庭私宅，需成长{:.0}s)！", parents_str, gender_str, baby_surname, baby_id, baby_gen, self.config.agent_adult_age));
-        }
-
+        // 清理已彻底消逝的尸骸，之后全量重建索引（retain 会改变所有幸存者下标）
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
+        self.rebuild_agent_index();
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::spatial::house::{House, HouseTier};
-    use crate::spatial::world::World3DEngine;
-
-    #[test]
-    fn test_carry_loads_into_backpack_not_pantry() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let water_pos = world.pois.iter().find(|p| p.poi_type == PoiType::WaterSource).unwrap().pos;
-        let camp_node = world.agents[0].home_camp_node;
-        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-        let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
-        house.pantry_water = 0.0;
-        world.houses.push(house);
-
-        {
-            let a = &mut world.agents[0];
-            a.world_pos = water_pos;
-            a.home_house_id = Some(1);
-            a.state = PrimitiveActionState::DrinkingAtWater;
-            a.thirst = 20.0;
-            a.hunger = 40.0;
-            a.stamina = 100.0;
-        }
-
-        world.tick_poi_interactions(1.0 / 30.0);
-
-        let a = &world.agents[0];
-        let h = world.houses.iter().find(|h| h.id == 1).unwrap();
-        assert!(a.carried_water > 0.0, "水应装入小人随身行囊, 实际 {}", a.carried_water);
-        assert_eq!(h.pantry_water, 0.0, "家宅水库在小人未回家前应保持为 0.0");
-    }
-
-    #[test]
-    fn test_unload_from_backpack_into_home_pantry_on_rest() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let camp_node = world.agents[0].home_camp_node;
-        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-        let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
-        house.pantry_wood = 0.0;
-        house.pantry_stone = 0.0;
-        world.houses.push(house);
-
-        {
-            let a = &mut world.agents[0];
-            a.world_pos = camp_pos;
-            a.home_house_id = Some(1);
-            a.state = PrimitiveActionState::RestingAtCamp;
-            a.carried_wood = 20.0;
-            a.carried_stone = 10.0;
-            a.thirst = 50.0;
-            a.hunger = 50.0;
-            a.stamina = 50.0;
-        }
-
-        world.tick_poi_interactions(1.0);
-
-        let a = &world.agents[0];
-        let h = world.houses.iter().find(|h| h.id == 1).unwrap();
-        assert_eq!(h.pantry_wood, 10.0, "1秒内以 10.0/s 速率卸货木材存入家宅");
-        assert_eq!(a.carried_wood, 10.0, "随身木材相应减少 10.0");
-        assert_eq!(h.pantry_stone, 10.0, "随身10.0石料刚好全部卸货入库");
-        assert_eq!(a.carried_stone, 0.0, "行囊石料清空");
-    }
-
-    #[test]
-    fn test_digestion_efficiency_scales_metabolic_hunger_decay() {
-        let config = SimConfig::default();
-        let mut agent_high = Agent3D::new(1, 1, 8.5, false, 20.0, Gender::Male);
-        agent_high.hunger = 40.0;
-        agent_high.digestion_efficiency = 200.0;
-
-        let mut agent_low = Agent3D::new(2, 1, 8.5, false, 20.0, Gender::Male);
-        agent_low.hunger = 40.0;
-        agent_low.digestion_efficiency = 50.0;
-
-        agent_high.tick_metabolism(10.0, false, &config);
-        agent_low.tick_metabolism(10.0, false, &config);
-
-        assert!((agent_high.hunger - (40.0 - 0.05 * 10.0)).abs() < 1e-4);
-        assert!((agent_low.hunger - (40.0 - 0.20 * 10.0)).abs() < 1e-4);
-        assert!(agent_high.hunger > agent_low.hunger);
-    }
-
-    #[test]
-    fn test_sleep_efficiency_scales_rest_recovery() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        {
-            let a = &mut world.agents[0];
-            a.state = PrimitiveActionState::RestingAtCamp;
-            a.stamina = 50.0;
-            a.sleep_efficiency = 150.0;
-        }
-        let config = world.config.clone();
-        world.agents[0].tick_metabolism(1.0, false, &config);
-
-        let gained = world.agents[0].stamina - 50.0;
-        assert!((gained - 8.0 * 1.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_home_pantry_eating_applies_digestion_efficiency() {
-        let mut world = World3DEngine::new(60, 764.0);
-        world.seed_primitive_ecology(12);
-
-        let camp_node = world.agents[0].home_camp_node;
-        let camp_pos = world.network.graph[*world.network.node_map.get(&camp_node).unwrap()].pos;
-        let mut house = House::new(1, world.agents[0].id, camp_pos, camp_node, HouseTier::Tier1ThatchedHut, 1);
-        house.pantry_water = 0.0;
-        house.pantry_food = 80.0;
-        world.houses.push(house);
-
-        {
-            let a = &mut world.agents[0];
-            a.world_pos = camp_pos;
-            a.home_house_id = Some(1);
-            a.state = PrimitiveActionState::RestingAtCamp;
-            a.thirst = 50.0;
-            a.hunger = 20.0;
-            a.stamina = 100.0;
-            a.digestion_efficiency = 50.0;
-        }
-
-        world.tick_poi_interactions(1.0 / 30.0);
-
-        let a = &world.agents[0];
-        let h = world.houses.iter().find(|h| h.id == 1).unwrap();
-        let consumed = 80.0 - h.pantry_food;
-        let gained = a.hunger - 20.0;
-        assert!(consumed > 0.0);
-        assert!((gained - consumed).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_health_decay_and_death_when_zero() {
-        let config = SimConfig::default();
-        let mut agent = Agent3D::new(1, 1, 8.5, false, 20.0, Gender::Male);
-        agent.life_expectancy = 120.0;
-        agent.health = 120.0;
-        agent.max_health = 120.0;
-
-        agent.tick_metabolism(10.0, false, &config);
-        assert!((agent.health - (120.0 - config.agent_health_decay_per_sec * 10.0)).abs() < 1e-5);
-        assert!(agent.is_alive);
-
-        agent.health = 0.01;
-        let event = agent.tick_metabolism(1.0, false, &config);
-        assert!(!agent.is_alive);
-        assert_eq!(agent.state, PrimitiveActionState::Dead);
-        assert_eq!(agent.death_cause.as_deref(), Some("寿终正寝"));
-        assert!(event.unwrap().contains("寿终正寝"));
-    }
-}

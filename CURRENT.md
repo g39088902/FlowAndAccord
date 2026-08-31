@@ -141,6 +141,11 @@
   - 族人（无论男女）故去后，其随身携带的全部黄金 (`carried_gold`) 将自动平分给其所有在世的直接子一代子女（男女子女均可继承）；
   - 排除已故子女与隔代孙辈，若无在世子女则金币安全清零消散；
   - 继承所得金币即时计入在世子女随身行囊 (`carried_gold`)，并在全景控制台滚动广播重大历史事件。
+- **🧩 房屋系统与世界环境模块化解耦 (v0.9.34)**：
+  - 四季更迭与宏观气温系统（`tick_season`）正本清源回归世界内核系统（`world.rs`）；
+  - `housing_system` 彻底拆分为 6 个专注于私宅全生命周期的单一职责子模块 (`maintenance`, `construction`, `marriage`, `settlement`, `inheritance`, `tests`)，单文件均严格控制在 100 行内，管线职责清晰解耦。
+- **🍂 简化四季参数模型 (v0.9.35)**：
+  - 废除冗余的 `season_quarter_length` 配置项，由全年总时长 `season_year_length` 严格派生各季长度（$\text{quarter\_length} = \text{year\_length} \times 0.25$），消除多余维度。
 
 ---
 
