@@ -6,10 +6,13 @@
         // 前端展示与交互状态 (与原 JS 引擎同构)
         this.isPaused = false;
         this.headless = false; // 🧠 无头模式: 只推进模拟、跳过画布渲染
+        this.debugMode = false; // 🐞 调试模式: 展示 Tick / CPU 耗时 / 内存占用
+        this.tickMs = 0; // 内核步进耗时 (EMA 平滑, ms)
+        this.snapMs = 0; // 快照解析耗时 (EMA 平滑, ms)
         this.speedMult = 2;
         this.showTerrain = true;
-        this.showLanes = true;
-        this.showPoiStock = true;
+        this.showLanes = true;   // 🛣️ 路网显隐 (false = 隐藏全部车道与悬浮提示)
+        this.showAgents = true;  // 👤 部落民显隐 (false = 隐藏全部族人，且不再参与点击拾取)
         this.selectionType = 'agent';
         this.selectedAgentId = 1;
         this.selectedPoiId = null;
@@ -24,6 +27,8 @@
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
         this.totalDeaths = 0;
+        this.totalDeathsNatural = 0;   // ☘️ 自然死亡 (寿终正寝 / 寿命耗尽)
+        this.totalDeathsUnnatural = 0; // ⚡ 非自然死亡 (饥荒饿死 / 脱水渴死)
         this.totalMiscarriages = 0;
         this.currentSeason = 'Spring';
         this.temperature = 20.0;
@@ -109,8 +114,31 @@
       tick() {
         if (!this._ready || this.isPaused) return;
         const dt = 1.0 / 30.0;
+        const t0 = performance.now();
         this._wasm.world_tick_steps(Math.max(1, this.speedMult | 0), dt);
+        const t1 = performance.now();
         this._pullSnapshot(false);
+        const t2 = performance.now();
+        // 指数移动平均平滑，避免 HUD 数值抖动 (仅在调试模式下采样)
+        if (this.debugMode) {
+          this.tickMs += ((t1 - t0) - this.tickMs) * 0.15;
+          this.snapMs += ((t2 - t1) - this.snapMs) * 0.15;
+        }
+      }
+
+      // ============ 🐞 调试统计 ============
+      getDebugStats() {
+        const wasmBytes = (this._memory && this._memory.buffer) ? this._memory.buffer.byteLength : 0;
+        const mem = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
+        return {
+          tick: this.tickCount,
+          tickMs: this.tickMs,
+          snapMs: this.snapMs,
+          wasmBytes,
+          jsHeapUsed: mem ? mem.usedJSHeapSize : 0,
+          jsHeapLimit: mem ? mem.jsHeapSizeLimit : 0,
+          memSupported: !!mem,
+        };
       }
 
       initEcology(agentCount) {
@@ -165,6 +193,8 @@
       _applySnapshot(snap, forceTerrain) {
         this.totalBirths = snap.total_births;
         this.totalDeaths = snap.total_deaths;
+        this.totalDeathsNatural = snap.total_deaths_natural || 0;
+        this.totalDeathsUnnatural = snap.total_deaths_unnatural || 0;
         this.totalMiscarriages = snap.total_miscarriages;
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;

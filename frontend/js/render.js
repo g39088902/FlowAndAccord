@@ -8,6 +8,42 @@
     const TARGET_FPS = 30;
     const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
+    // ==========================================
+    // 🐞 调试模式: 帧耗时 / FPS / 内存采样与 HUD 刷新
+    // ==========================================
+    let dbgRenderMs = 0, dbgFrameMs = 0, dbgCurrentFps = 0, dbgHudUpdate = performance.now();
+    const dbgElCache = {};
+
+    function dbgEl(id) {
+      if (dbgElCache[id] === undefined) dbgElCache[id] = document.getElementById(id);
+      return dbgElCache[id];
+    }
+    function fmtMB(bytes) {
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+    function dbgSetText(id, text) {
+      const el = dbgEl(id);
+      if (el) el.textContent = text;
+    }
+    // 刷新调试 HUD (节流 ~200ms; 于无头模式提前 return 之前调用，保证长程演化仍可监视)
+    function updateDebugHud(now) {
+      if (!sim.debugMode || now - dbgHudUpdate < 200) return;
+      dbgHudUpdate = now;
+      if (typeof sim.getDebugStats !== 'function') return;
+      const s = sim.getDebugStats();
+      dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
+      dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
+      dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
+      dbgSetText('dbg-snap-ms', s.snapMs.toFixed(2) + ' ms');
+      dbgSetText('dbg-render-ms', dbgRenderMs.toFixed(2) + ' ms');
+      dbgSetText('dbg-frame-ms', dbgFrameMs.toFixed(2) + ' ms');
+      dbgSetText('dbg-cpu', Math.min(100, (dbgFrameMs / FRAME_INTERVAL) * 100).toFixed(1) + '%');
+      dbgSetText('dbg-js-heap', s.memSupported ? `${fmtMB(s.jsHeapUsed)} / ${fmtMB(s.jsHeapLimit)}` : '浏览器不支持');
+      dbgSetText('dbg-wasm-mem', fmtMB(s.wasmBytes));
+      const tip = dbgEl('dbg-mem-tip');
+      if (tip) tip.style.display = s.memSupported ? 'none' : 'block';
+    }
+
     // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
     let terrainProjX = new Float32Array(3600);
     let terrainProjY = new Float32Array(3600);
@@ -117,10 +153,17 @@
       }
       lastRenderTime = now - (elapsed % FRAME_INTERVAL);
 
+      const frameStart = performance.now();
       sim.tick();
+      const tickEnd = performance.now();
+
+      // 🐞 调试 HUD 刷新 (置于无头模式 return 之前，保证无头长程演化依旧可监视)
+      updateDebugHud(now);
 
       // 🧠 无头模式: 只推进模拟，跳过全部画布渲染与 DOM 刷新
       if (sim.headless) {
+        dbgRenderMs = 0;
+        if (sim.debugMode) dbgFrameMs += ((performance.now() - frameStart) - dbgFrameMs) * 0.15;
         return;
       }
 
@@ -269,7 +312,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('💧', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock && isFinite(poi.maxStock)) {
+          if (isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -289,7 +332,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🍒', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock && isFinite(poi.maxStock)) {
+          if (isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#10b981';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -309,7 +352,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🌲', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock && isFinite(poi.maxStock)) {
+          if (isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#b45309';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -329,7 +372,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🪨', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock && isFinite(poi.maxStock)) {
+          if (isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#94a3b8';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -349,7 +392,7 @@
           ctx.textAlign = 'center';
           ctx.fillText('🪙', p2D.x, p2D.y + 4);
 
-          if (sim.showPoiStock && isFinite(poi.maxStock)) {
+          if (isFinite(poi.maxStock)) {
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 1.8;
             ctx.beginPath();
@@ -616,8 +659,9 @@
         if (roadTooltip) roadTooltip.style.display = 'none';
       }
 
-      // 4. 部落民 Agent 渲染
-      for (const agent of sim.agents) {
+      // 4. 部落民 Agent 渲染 (受「👤 隐藏部落民」开关控制)
+      const agentsToRender = sim.showAgents ? sim.agents : [];
+      for (const agent of agentsToRender) {
         const p2D = project3D(agent.pos);
         const isSelectedAgent = sim.selectionType === 'agent' && sim.selectedAgentId === agent.id;
 
@@ -750,8 +794,9 @@
       // 5. 更新顶栏统计 (降频至 ~100ms 刷新一次，减少 DOM 重排重绘)
       frameCount++;
       if (now - lastFpsUpdate >= 500) {
+        dbgCurrentFps = (frameCount * 1000) / (now - lastFpsUpdate);
         const fpsEl = document.getElementById('stat-fps');
-        if (fpsEl) fpsEl.textContent = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        if (fpsEl) fpsEl.textContent = Math.round(dbgCurrentFps);
         frameCount = 0;
         lastFpsUpdate = now;
       }
@@ -768,6 +813,8 @@
         document.getElementById('stat-pregnant').textContent = pregnantAgents.length;
         document.getElementById('stat-births').textContent = sim.totalBirths;
         document.getElementById('stat-deaths').textContent = sim.totalDeaths;
+        document.getElementById('stat-deaths-natural').textContent = sim.totalDeathsNatural;
+        document.getElementById('stat-deaths-unnatural').textContent = sim.totalDeathsUnnatural;
         document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
 
         // 顶栏四季与气温展示
@@ -1559,6 +1606,13 @@
           }
         }
       }
+
+      // 🐞 采样本帧「渲染 + UI」耗时与整帧耗时 (调试模式下)
+      if (sim.debugMode) {
+        const frameEnd = performance.now();
+        dbgRenderMs += ((frameEnd - tickEnd) - dbgRenderMs) * 0.15;
+        dbgFrameMs += ((frameEnd - frameStart) - dbgFrameMs) * 0.15;
+      }
     }
     requestAnimationFrame(render);
 
@@ -1571,7 +1625,8 @@
       // 收集光标下所有可选中元素，按渲染层级自上而下排序: agent (就近优先) -> house -> poi
       const targets = [];
       const agentHits = [];
-      for (const agent of sim.agents) {
+      // 隐藏部落民时，族人不再参与点击拾取 (避免"看不见却点得中")
+      for (const agent of (sim.showAgents ? sim.agents : [])) {
         const p2D = project3D(agent.pos);
         const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
         if (d <= 25) agentHits.push({ type: 'agent', id: agent.id, dist: d });

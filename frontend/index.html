@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.48</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.54</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -41,9 +41,9 @@
         <div class="stat-val" id="stat-births" style="color:#38bdf8;">0</div>
         <div class="stat-lbl">👶 出生数</div>
       </div>
-      <div class="stat-item">
+      <div class="stat-item" title="死亡总数 · ☘️绿色 = 自然死亡 (寿终正寝) / ⚡红色 = 非自然死亡 (饥荒饿死 · 脱水渴死)">
         <div class="stat-val" id="stat-deaths" style="color:#ef4444;">0</div>
-        <div class="stat-lbl">💀 死亡数</div>
+        <div class="stat-lbl">💀 死亡 <span id="stat-deaths-natural" style="color:#4ade80; font-weight:700;">0</span>☘️ / <span id="stat-deaths-unnatural" style="color:#f87171; font-weight:700;">0</span>⚡</div>
       </div>
       <div class="stat-item">
         <div class="stat-val" id="stat-miscarriages" style="color:#f43f5e;">0</div>
@@ -430,8 +430,16 @@
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-      <span>显示 POI 有限储量指示环</span>
-      <input type="checkbox" id="chk-poi-stock" checked style="accent-color: #10b981; cursor: pointer;">
+      <span style="font-weight:600; color:#f472b6;">👤 隐藏部落民 (仅留地图与建筑)</span>
+      <input type="checkbox" id="chk-hide-agents" style="accent-color: #f472b6; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span style="font-weight:600; color:#a3e635;">🛣️ 隐藏路网 (仅显示地表与地标)</span>
+      <input type="checkbox" id="chk-hide-lanes" style="accent-color: #a3e635; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span style="font-weight:600; color:#a78bfa;">🐞 调试模式 (Tick / CPU / 内存)</span>
+      <input type="checkbox" id="chk-debug-mode" style="accent-color: #a78bfa; cursor: pointer;">
     </div>
     <div class="toggle-row">
       <span style="font-weight:600; color:#facc15;">⚡ 模拟演化倍速</span>
@@ -449,6 +457,24 @@
         <option value="1024">1024x</option>
       </select>
     </div>
+  </div>
+
+  <!-- 🐞 调试监视器浮窗: 模拟 Tick / CPU 耗时 / 内存占用 -->
+  <div class="debug-hud" id="debug-hud" style="display:none;">
+    <div class="debug-hud-title">
+      <span>🐞 调试监视器</span>
+      <span style="color:#64748b; font-weight:normal; font-size:9.5px;">Tick / CPU / 内存</span>
+    </div>
+    <div class="debug-row"><span>⏱️ 模拟 Tick</span><span id="dbg-tick" class="mono-num">0</span></div>
+    <div class="debug-row"><span>🖼️ 渲染 FPS</span><span id="dbg-fps" class="mono-num">0</span></div>
+    <div class="debug-row"><span>⚙️ 内核步进</span><span id="dbg-tick-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>📦 快照解析</span><span id="dbg-snap-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>🎨 渲染 + UI</span><span id="dbg-render-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>🧮 整帧耗时</span><span id="dbg-frame-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>🔥 CPU 占用</span><span id="dbg-cpu" class="mono-num">0%</span></div>
+    <div class="debug-row"><span>🧠 JS 堆内存</span><span id="dbg-js-heap" class="mono-num">—</span></div>
+    <div class="debug-row"><span>🧬 WASM 内存</span><span id="dbg-wasm-mem" class="mono-num">0.00 MB</span></div>
+    <div class="debug-hud-tip" id="dbg-mem-tip" style="display:none;">⚠️ 当前浏览器不支持 performance.memory，JS 堆数据不可用</div>
   </div>
 
   <div class="event-log">

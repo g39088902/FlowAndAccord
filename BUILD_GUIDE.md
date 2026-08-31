@@ -173,4 +173,4 @@ window.SIM_CONFIG = {
    * 嶙峋石矿 2 处（ID 40-41，储量 60.0，产速 1.5/s）
    * 璀璨金矿 1 处（ID 50，储量 60.0，产速 1.2/s）
 5. **版本号规范**：
-   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.39`），并在 `index.html`、`AGENTS.md` 和 `CURRENT.md` 中同步更新。
+   * 每次 AI 修改代码后必须自增版本号（当前版本：`v0.9.54`），在 `index.html`、`AGENTS.md` 与根 `CURRENT.md` 索引入口同步更新，并在 [`docs/current/11-changelog.md`](./docs/current/11-changelog.md) 追加版本演进条目。

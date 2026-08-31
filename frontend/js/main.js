@@ -466,6 +466,18 @@
         : '🎨 已退出无头模式: 恢复画布渲染！', 'camp');
     });
 
+    // ==========================================
+    // 🐞 调试模式: Tick / CPU 耗时 / 内存占用监视器
+    // ==========================================
+    const chkDebugMode = document.getElementById('chk-debug-mode');
+    const debugHudEl = document.getElementById('debug-hud');
+    if (chkDebugMode) {
+      chkDebugMode.addEventListener('change', e => {
+        sim.debugMode = e.target.checked;
+        if (debugHudEl) debugHudEl.style.display = sim.debugMode ? 'flex' : 'none';
+      });
+    }
+
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.key === ' ') {
         const targetTag = e.target.tagName;
@@ -481,9 +493,21 @@
       updateFollowBtnState();
     });
 
-    document.getElementById('chk-poi-stock').addEventListener('change', e => {
-      sim.showPoiStock = e.target.checked;
-    });
+    // ==========================================
+    // 视图显隐开关: 隐藏部落民 / 隐藏路网
+    // ==========================================
+    const chkHideAgents = document.getElementById('chk-hide-agents');
+    if (chkHideAgents) {
+      chkHideAgents.addEventListener('change', e => {
+        sim.showAgents = !e.target.checked;
+      });
+    }
+    const chkHideLanes = document.getElementById('chk-hide-lanes');
+    if (chkHideLanes) {
+      chkHideLanes.addEventListener('change', e => {
+        sim.showLanes = !e.target.checked;
+      });
+    }
 
     const selSpeed = document.getElementById('sel-speed');
     const savedSpeed = localStorage.getItem('flow_sim_speed');

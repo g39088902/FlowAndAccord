@@ -31,6 +31,8 @@ pub struct WorldSnapshot3D {
     pub agents: Vec<AgentSnapshot>,
     pub total_births: u32,
     pub total_deaths: u32,
+    pub total_deaths_natural: u32,
+    pub total_deaths_unnatural: u32,
     pub total_miscarriages: u32,
     pub season: String,
     pub temperature: f32,

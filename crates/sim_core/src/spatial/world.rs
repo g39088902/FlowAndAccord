@@ -23,6 +23,10 @@ pub struct World3DEngine {
     pub next_house_id: u32,
     pub total_births: u32,
     pub total_deaths: u32,
+    /// 自然死亡计数 (寿终正寝 / 寿命耗尽)
+    pub total_deaths_natural: u32,
+    /// 非自然死亡计数 (饥荒饿死 / 脱水渴死等外部原因)
+    pub total_deaths_unnatural: u32,
     pub total_miscarriages: u32,
     pub season_timer: f32,
     pub current_season: Season,
@@ -65,6 +69,8 @@ impl World3DEngine {
             next_house_id: 1,
             total_births: 0,
             total_deaths: 0,
+            total_deaths_natural: 0,
+            total_deaths_unnatural: 0,
             total_miscarriages: 0,
             season_timer: 0.0,
             current_season: Season::Spring,
@@ -181,6 +187,11 @@ impl World3DEngine {
             if let Some(event) = agent.tick_metabolism(dt, fertility_active, &self.config) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
+                    if agent.death_is_natural {
+                        self.total_deaths_natural += 1;
+                    } else {
+                        self.total_deaths_unnatural += 1;
+                    }
                 }
                 if event.contains("流产") {
                     self.total_miscarriages += 1;
@@ -203,7 +214,7 @@ impl World3DEngine {
 
         // 6. 动力学运动与踩踏拓路
         for agent in &mut self.agents {
-            agent.tick_movement(dt, &mut self.network);
+            agent.tick_movement(dt, &mut self.network, &self.config);
         }
 
         // 错峰决策
@@ -376,6 +387,8 @@ impl World3DEngine {
             agents,
             total_births: self.total_births,
             total_deaths: self.total_deaths,
+            total_deaths_natural: self.total_deaths_natural,
+            total_deaths_unnatural: self.total_deaths_unnatural,
             total_miscarriages: self.total_miscarriages,
             season: season_str.to_string(),
             temperature: self.temperature,

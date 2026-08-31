@@ -139,6 +139,7 @@ pub struct Agent3D {
     pub miscarriage_cooldown_timer: f32, // 流产后不可受孕的休养冷却计时器 (秒)
     pub death_decay_timer: f32,      // 死亡尸骸消逝倒计时 (秒)
     pub death_cause: Option<String>, // 死亡原因
+    pub death_is_natural: bool,      // 是否自然死亡 (寿终正寝=true；饥荒/脱水等非自然死亡=false)
 
     // 3D 动力学运动与路网循迹
     pub current_lane_id: Option<LaneId>,
@@ -212,6 +213,7 @@ impl Agent3D {
             miscarriage_cooldown_timer: 0.0,
             death_decay_timer: config.agent_death_decay_duration,
             death_cause: None,
+            death_is_natural: false,
             current_lane_id: None,
             distance_along_curve: 0.0,
             current_velocity: 0.0,
@@ -299,6 +301,7 @@ impl Agent3D {
             self.is_alive = false;
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("饥荒饿死".to_string());
+            self.death_is_natural = false;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
@@ -308,6 +311,7 @@ impl Agent3D {
             self.is_alive = false;
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("脱水渴死".to_string());
+            self.death_is_natural = false;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
@@ -317,6 +321,7 @@ impl Agent3D {
             self.is_alive = false;
             self.state = PrimitiveActionState::Dead;
             self.death_cause = Some("寿终正寝".to_string());
+            self.death_is_natural = true;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
@@ -371,7 +376,7 @@ impl Agent3D {
     }
 
     /// 3D 动力学移动与踩踏拓路 (走的人多了踩踏等级提升，移动速度连续浮点加快)
-    pub fn tick_movement(&mut self, dt: f32, road_network: &mut LaneGraph3D) {
+    pub fn tick_movement(&mut self, dt: f32, road_network: &mut LaneGraph3D, config: &SimConfig) {
         if !self.is_alive {
             self.current_velocity = 0.0;
             return;
@@ -417,7 +422,12 @@ impl Agent3D {
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
         let stamina_factor = (self.stamina / 25.0).clamp(0.2, 1.0);
-        let target_speed = self.max_desired_speed * road_level_factor * stamina_factor;
+        // 💪 力量禀赋加成: 以禀赋基准均值为中轴，力量越高者步履越矫健，越低者步履蹒跚 (上下限保护避免极端个体失衡)
+        let strength_factor = (1.0
+            + (self.strength - config.trait_default_mean) / config.trait_default_mean
+                * config.agent_strength_speed_bonus)
+            .clamp(config.agent_strength_speed_min, config.agent_strength_speed_max);
+        let target_speed = self.max_desired_speed * road_level_factor * stamina_factor * strength_factor;
 
         let accel = (target_speed - self.current_velocity) * 4.0;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);

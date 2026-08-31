@@ -39,6 +39,12 @@ pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
 pub const AGENT_GOLD_LOAD_FULL: f32 = 20.0;
 pub const AGENT_OFFROAD_SPEED_FACTOR: f32 = 0.50;
 pub const AGENT_BASE_MOVE_SPEED_MULT: f32 = 4.0;
+/// 💪 力量禀赋对步行速度的加成系数: 力量每偏离基准均值 ±100 点，移速相应增减该比例
+pub const AGENT_STRENGTH_SPEED_BONUS: f32 = 0.40;
+/// 💪 力量移速加成下限倍率 (力量极低者步履蹒跚，最低降至基准速度的 70%)
+pub const AGENT_STRENGTH_SPEED_MIN: f32 = 0.70;
+/// 💪 力量移速加成上限倍率 (力量极高者健步如飞，最高提升至基准速度的 130%)
+pub const AGENT_STRENGTH_SPEED_MAX: f32 = 1.30;
 pub const AGENT_STEALTH_VISIBILITY_COVERT: f32 = 0.25;
 pub const AGENT_STEALTH_VISIBILITY_NORMAL: f32 = 1.0;
 
@@ -136,7 +142,8 @@ pub const TEMP_AMPLITUDE: f32 = 17.0;
 // ============================================================================
 // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
 // ============================================================================
-pub const ROAD_WEAR_DECAY_RATE: f32 = 0.0005;
+/// 道路自然杂草丛生衰减速率 (等级/秒)：已翻倍加速退化，人迹罕至的荒径会更快被植被吞没
+pub const ROAD_WEAR_DECAY_RATE: f32 = 0.0010;
 pub const ROAD_WEAR_STEP_INC: f32 = 0.005;
 pub const ROAD_MAX_WEAR: f32 = 5.0;
 pub const ROAD_SPEED_DIRT_TRACK: f32 = 36.0;
@@ -182,6 +189,9 @@ pub struct SimConfig {
     pub agent_gold_load_full: f32,
     pub agent_offroad_speed_factor: f32,
     pub agent_base_move_speed_mult: f32,
+    pub agent_strength_speed_bonus: f32,
+    pub agent_strength_speed_min: f32,
+    pub agent_strength_speed_max: f32,
     pub agent_stealth_visibility_covert: f32,
     pub agent_stealth_visibility_normal: f32,
 
@@ -306,6 +316,9 @@ impl Default for SimConfig {
             agent_gold_load_full: AGENT_GOLD_LOAD_FULL,
             agent_offroad_speed_factor: AGENT_OFFROAD_SPEED_FACTOR,
             agent_base_move_speed_mult: AGENT_BASE_MOVE_SPEED_MULT,
+            agent_strength_speed_bonus: AGENT_STRENGTH_SPEED_BONUS,
+            agent_strength_speed_min: AGENT_STRENGTH_SPEED_MIN,
+            agent_strength_speed_max: AGENT_STRENGTH_SPEED_MAX,
             agent_stealth_visibility_covert: AGENT_STEALTH_VISIBILITY_COVERT,
             agent_stealth_visibility_normal: AGENT_STEALTH_VISIBILITY_NORMAL,
 

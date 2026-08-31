@@ -16,6 +16,8 @@ impl World3DEngine {
         self.agents.clear();
         self.total_births = 0;
         self.total_deaths = 0;
+        self.total_deaths_natural = 0;
+        self.total_deaths_unnatural = 0;
         self.total_miscarriages = 0;
         self.next_agent_id = 1;
 

@@ -8,12 +8,12 @@
 
 ## 0. 📚 项目文档地图与定位
 
-项目根目录核心文档各司其职，**以 CURRENT.md 描述"现状"，PLAN.md / ARCHITECTURE.md 描述"愿景"**：
+项目根目录核心文档各司其职，**以 CURRENT.md（索引入口）+ `docs/current/` 分模块文档描述"现状"，PLAN.md / ARCHITECTURE.md 描述"愿景"**：
 
 | 文件 | 定位 | 何时阅读 / 维护 |
 | :--- | :--- | :--- |
 | **AGENTS.md**（本文档） | 智能体操作指南：架构概述、编译步骤、快捷键 + 第 4 节易踩坑清单 | **改任何代码前必读**；新增机制或踩了新坑必须补充 |
-| **CURRENT.md** | **已实现功能全景清单（当前实际状态）**：生态/四季/代谢/房屋/决策/前端特性全收录 | 快速了解"当前现状"时查阅；**改动机制后必须同步更新** |
+| **CURRENT.md** | **已实现功能「索引入口」**：全局架构速览 + 模块导航表；各模块详述拆分至 `docs/current/`（`01` 空间路网 / `02` 生态POI / `03` 四季 / `04` 代谢繁衍 / `05` 房屋 / `06` 决策AI / `07` 前端表现 / `08` 配置 / `09` 代码地图 / `10` 快速启动 / `11` 版本演进） | 快速了解"现状"时查索引；**改动机制须同步更新对应 `docs/current/0X-*.md` 模块文档并在 `11-changelog.md` 追加版本条目** |
 | **BUILD_GUIDE.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试用例与故障排查 | 深入构建与环境排障时参考 |
 | **AGENT_AI_ANALYSIS.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机、寻路与代际演化逻辑时查阅 |
 | **ARCHITECTURE.md** | 宏观技术架构设计愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（大部分前沿特性为规划态） |
@@ -44,7 +44,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.48)"]
+    E --> F["浏览器 UI (版本: v0.9.54)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -104,7 +104,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.48`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.54`**。
 
 ---
 
@@ -177,7 +177,7 @@ node frontend/server.js
 
 - 当前生态共 **23 处**：营地 5 处 (1-5)、清泉 6 处 (10-15)、浆果 6 处 (20-25)、林木 3 处 (30-32)、石矿 2 处 (40-41)、金矿 1 处 (50)。空间排斥间距 $\text{min\_poi\_distance} = 70\text{m}$。
 - **营地县级行政区库与升级界限**：5 处营地在生成时从 `COUNTY_NAMES`（240+ 处真实古雅县名）随机 roll 出专属地名，并随辖内绑定的有效房屋数量自动升级：0~5 间为【营地】、6~11 间为【村】、12~17 间为【乡】、18~23 间为【镇】、24+ 间为【县】。
-- **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `index.html` 面板文案 $\rightarrow$ `CURRENT.md`。
+- **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `index.html` 面板文案 $\rightarrow$ [`docs/current/02-ecology-poi.md`](./docs/current/02-ecology-poi.md)。
 
 ### 4.8 🟡 行为与生理硬约束
 
@@ -197,7 +197,7 @@ node frontend/server.js
 - **必须同步更新以下位置**：
   1. `frontend/index.html` 顶部品牌卡片内的版本徽章 `<span class="version-tag">vX.Y.Z</span>`；
   2. `AGENTS.md` 第 1 节 Mermaid 流程图节点 `浏览器 UI (版本: vX.Y.Z)` 及第 2 节步骤四 `版本确认：vX.Y.Z`；
-  3. 若改动了核心机制或新增了特性，同步在 `CURRENT.md` 中记录更新。
+  3. 若改动了核心机制或新增了特性，在 `docs/current/` 对应模块文件中更新功能描述，并在 [`docs/current/11-changelog.md`](./docs/current/11-changelog.md) 追加版本条目（本索引与 Changelog 顶部版本号同步自增）。
 
 ### 4.10 🟢 混沌系统定位与测试策略（持久化测试禁令）
 

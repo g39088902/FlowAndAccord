@@ -1,0 +1,102 @@
+# 📜 版本演进记录 (Changelog)
+
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../../CURRENT.md)
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.54)**。
+
+---
+
+- **💰 随身金币遗产继承机制 (v0.9.24)**：
+  - 族人（无论男女）故去后，其随身携带的全部黄金 (`carried_gold`) 将自动平分给其所有在世的直接子一代子女（男女子女均可继承）；
+  - 排除已故子女与隔代孙辈，若无在世子女则金币安全清零消散；
+  - 继承所得金币即时计入在世子女随身行囊 (`carried_gold`)，并在全景控制台滚动广播重大历史事件。
+- **🧩 房屋系统与世界环境模块化解耦 (v0.9.34)**：
+  - 四季更迭与宏观气温系统（`tick_season`）正本清源回归世界内核系统（`world.rs`）；
+  - `housing_system` 彻底拆分为 5 个专注于私宅全生命周期的单一职责子模块 (`maintenance`, `construction`, `marriage`, `settlement`, `inheritance`)，单文件均严格控制在 100 行内，管线职责清晰解耦。
+- **🍂 简化四季参数模型 (v0.9.35)**：
+  - 废除冗余的 `season_quarter_length` 配置项，由全年总时长 `season_year_length` 严格派生各季长度（$\text{quarter\_length} = \text{year\_length} \times 0.25$），消除多余维度。
+- **💍 婚姻系统与建房事件解耦 (v0.9.37)**：
+  - 移除 `construction.rs` 中 0级→1级仓库升级竣工瞬间的即时迎娶 eager 钩子，成婚统一由 `marriage.rs` 每 tick 持续扫描承担（升级后 ≤1 tick 内自动匹配，无功能延迟）；
+  - 择偶规则统一为**距离最近**的成年单身非孕期女性（原 eager 钩子取 agents 列表第一个，两处规则不一致已消除）；
+  - 升级播报与婚姻播报拆分为独立事件（🎉 升级激活生育 → 💍 喜结连理）。
+- **📝 文档偏差修复 (v0.9.38)**：
+  - 修正 AGENTS.md / CURRENT.md / BUILD_GUIDE.md / AGENT_AI_ANALYSIS.md / ARCHITECTURE.md 中与现状不符的描述（已移除的 `decisions/tests.rs`、`housing_system/tests.rs` 子模块引用、27 项/13 项单元测试数量、"全量自动化测试"等过时表述，以及 `housing_system.rs` 单文件路径 → 目录）；
+  - 纯文档修订，未触碰任何功能代码与 WASM 产物。
+- **🧪 混沌系统测试策略落地 (v0.9.39)**：
+  - AGENTS.md 新增 §4.10「混沌系统定位与测试策略（持久化测试禁令）」：项目定位为混沌系统，短期单元测试无法评价涌现功能，此后**不再持久化保存单元测试脚本**（`#[cfg(test)]` / `tests.rs` 一律不进入提交）；
+  - 开发新功能时仅临时编写测试确认"不跑不通"，验证通过后提交前删除；长期确定性验证由 `node tools/test-wasm.js`（WASM 回归）承担。
+- **👥 开局人口扩容与百家姓扩充 (v0.9.42)**：
+  - 开局始祖由 12 名扩容为 **20 名（10男10女）**：Rust 内核 `ecology.rs` 初始播撒改为 20 人（`total_initial = 20`，前 10 女后 10 男，每 4 人 1 名隐秘特工），前端 `rustworld.js` / `main.js` / `index.html` 面板文案与重演生态按钮同步更新；
+  - **百家姓库由 60 姓扩充至 150 姓**（`agent.rs` `COMMON_SURNAMES` 采用《百家姓》经典序前 150 单姓，原 60 姓全部保留并顺延至经典序位），始祖随机赋姓池更广，宗族姓氏多样性显著提升；
+  - 版本号自增 v0.9.41 → v0.9.42。
+- **🏠 建房/升级/修缮全流程回归 Agent 自主决策 (v0.9.43)**：
+  - **废除系统发房**：删除 `settlement.rs::tick_warehouse_founding`（原每 15 tick 扫描"符合条件的男人"直接送 0 级仓库）。新增 `NeedKind::FoundHome` 归属层需求：**无家成年男性**在自身决策相位、饥渴 ≥ 20 且体力 ≥ 60 时**必然触发**（无概率、无系统指挥），由 agent 自己在营地周边掷 12 个候选点自主选址（与现有房屋 ≥14m）；系统仅在 `materialize_founded_houses` 阶段执行放置校验、路网接入与房产绑定（`pending_house_pos` 为 agent 内暂存字段，不入快照）；
+  - **升级施工回归 agent 决策**：删除 `construction.rs::check_start_house_upgrades`（原每 tick 扫描房屋强制户主开工）。仓满 + 男户主在家满体力时，由 `evaluate_needs` 既有 `BuildHouse` 需求在户主自身决策相位自主触发施工；
+  - **修缮回归 agent 决策**：删除 `maintenance.rs` 中"扫描 + 强制切换 `RepairingHouse`"块，触发完全交给 `evaluate_needs` 既有 `RepairHouse` 需求（耐久 < 50%），系统仅结算修缮进度；
+  - **设计原则落地**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"由 agent 的马斯洛状态机自主决定，符合混沌系统涌现定位；
+  - 版本号自增 v0.9.42 → v0.9.43。
+- **🎲 决策概率全部收敛为确定性执行 + 遗留超参数入公共参数表 (v0.9.44)**：
+  - **决策概率/折扣全部删除（必然执行）**：孕期与非孕期统一使用 `decisionCriticalThirst/Hunger` 满值临界阈值（删除非孕期 ×0.8 折扣）；私宅囤水/囤粮不再受性别偏向概率（女 0.70 / 男 0.45）约束，家宅需要且资源可用即必然执行；删除 `ForageSurplus` 富余觅食需求（含 `decisionForageSurplusChance` 配置）；娱乐淘金 `GoldWealth` 不再掷 0.40 概率——金矿可用且冷却结束即必然触发；
+  - **立宅（FoundHome）选址参数全部提取至公共参数表**：饥渴/口渴/体力门槛（20/20/60）、候选点数（12）、候选距离（16~42m）、最小房屋间距（≥14m）→ `SimConfig`（`decisionFoundHome*` / `houseMinSpacing`），前端 `config.js` 可直接调参；
+  - **体力作业门槛 50.0 提取为 `decisionWorkStaminaThreshold`**：evaluator.rs 13 处 + needs.rs 1 处硬编码统一收敛；同步修正 needs.rs 标签判定的硬编码 25.0 饥渴/口渴阈值改为引用 `decisionCriticalThirst/Hunger`；
+  - **死配置清理**：删除 Rust 内核从未被读取的 `decisionCriticalStamina`（30.0）与富余觅食相关残留；
+  - 版本号自增 v0.9.43 → v0.9.44。
+- **📐 决策模块子目录化拆分 (v0.9.45)**：
+  - `decisions/evaluator.rs`（665 行）按职责拆分为 6 个子模块：`routing.rs`（导航/寻路/原地掉头/返家/POI 触发器可用性）、`evaluate.rs`（`Decisioner` 结构体 + `decide`/`evaluate_needs`/`fulfill_resting_need`）、`harvest.rs`（现场采收判定 + 仓储满额查询）、`seeking.rs`（途中熔断与平滑重路由，§4.2 核心）、`scheduler.rs`（`World3DEngine::tick_decisions` / `build_decision_context`），`needs.rs` 保持不变；
+  - 纯结构性重组，逻辑零改动：`cargo check` 无警告，release WASM 产物与重构前**字节完全一致**，`tools/test-wasm.js` 回归 `ALL_TESTS_DONE`；
+  - 版本号自增 v0.9.44 → v0.9.45。
+- **📑 嵌套 AGENTS.md 目录级操作指南 (v0.9.46)**：
+  - 为 `crates/sim_core/`、`crates/sim_wasm/`、`src/spatial/decisions/`、`src/spatial/housing_system/` 四个 Rust 代码目录各新增一份局部 `AGENTS.md`（职责边界/文件清单/关键结构/局部易踩坑），根 `AGENTS.md` 新增 §0.1「嵌套 AGENTS.md 地图」登记覆盖范围与维护规则；
+  - 纯文档新增，未触碰任何功能代码与 WASM 产物；
+  - 版本号自增 v0.9.45 → v0.9.46。
+- **⚡ 超高倍速支持与建房间距翻倍 (v0.9.47)**：
+  - **倍速控制台扩展**：模拟演化倍速下拉框新增 **256x、512x 与 1024x** 超高倍速选项（`frontend/index.html`），方便快速推进上万 tick 长程社会演化；
+  - **房屋建设最小间距翻倍**：建房最小间距由 $14.0\text{m}$ 翻倍调整为 **$28.0\text{m}$**（`crates/sim_core/src/config.rs` `HOUSE_MIN_SPACING` 及前端 `frontend/js/config.js` `houseMinSpacing`），并修复 `settlement.rs::materialize_founded_houses` 硬编码，统一读取 `self.config.house_min_spacing`；
+  - 版本号自增 v0.9.46 → v0.9.47。
+- **♻️ 立宅优先复用空置路网节点 (v0.9.48)**：
+  - **背景**：路网 `LaneGraph3D` 从不删除节点/车道，房屋绝嗣沦为废墟（`is_ruin`）并最终风化坍塌被 `houses.retain` 移除后，其大门节点与 3 对双向泥泞小径会**永久残留**在图中，导致节点随代际更替单调膨胀（拖慢 A*、`find_nearest_node` 全扫描与快照序列化）；
+  - **新机制**：`settlement.rs::materialize_founded_houses` 改为**先复用、后新建**——先用 `find_vacant_node_near` 在候选宅址 `houseNodeReuseRadius`(默认 20m) 半径内检索最近的**空置节点**（非任何现存房屋/废墟的大门、且不在任何 POI 1.5m 贴合半径内），命中即直接以该节点为大门、房屋落点取节点坐标，不再新建节点与车道；仅当半径内无空置节点时才走原新建路径（`add_node` + 双向接入最近 3 节点）；
+  - **安全兜底**：复用节点若已无任何出边（`ensure_node_connected`）自动补建接入；复用候选在检索阶段即通过 `is_house_site_valid`（≥ `houseMinSpacing`）校验；检索零 RNG 消耗、距离并列取节点 id 较小者，确定性不受影响；
+  - **新增参数**：`HOUSE_NODE_REUSE_RADIUS`(20.0) / `HOUSE_NODE_POI_OCCUPY_RADIUS`(1.5) → `SimConfig::house_node_reuse_radius` 与前端 `config.js` `houseNodeReuseRadius`（设为 0 即退回旧行为）；
+  - **实测效果**（强制加速风化的 A/B 对照，同种子 60000 tick）：复用开启时 112 次立宅仅新增 67 个节点（复用率约 40%），复用关闭时 133 次立宅新增 133 个节点（1:1 膨胀）；重合坐标节点 0 对、零长度车道 0 条、NaN 0；
+  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
+  - 版本号自增 v0.9.47 → v0.9.48。
+- **🐞 调试模式监视器 · Tick / CPU / 内存 (v0.9.49)**：
+  - **新增入口**：生态时钟控制台新增「🐞 调试模式 (Tick / CPU / 内存)」开关（`chk-debug-mode`），开启后于控制台正上方弹出 `#debug-hud` 监视器浮窗（控制台面板高度 216px → 240px 以容纳新开关行）；
+  - **九项指标**：⏱️ 模拟 Tick、🖼️ 渲染 FPS、⚙️ 内核步进 (ms)、📦 快照解析 (ms)、🎨 渲染+UI (ms)、🧮 整帧耗时 (ms)、🔥 CPU 占用 (%)、🧠 JS 堆内存 (used/limit)、🧬 WASM 线性内存；
+  - **插桩方式**：`rustworld.js::tick()` 以 `performance.now()` 分段测量「内核步进」与「快照解析」，`render.js` 主循环测量「渲染+UI」与「整帧」耗时，四者均取 EMA(α=0.15) 平滑；**仅在调试模式开启时采样**，关闭后零额外开销；新增 `RustWorld::getDebugStats()` 统一导出 Tick / 耗时 / 内存数据；
+  - **CPU 口径**：整帧耗时 ÷ 30FPS 帧预算 (33.33ms) × 100%；HUD 每 200ms 节流刷新；**无头模式下依旧刷新**（渲染项归零），可配合超高倍速监视长程演化的性能与内存曲线；
+  - **兼容性**：JS 堆依赖 `performance.memory`（Chromium 系可用），不支持时该项显示「浏览器不支持」并亮出提示行；WASM 内存走 `memory.buffer.byteLength`，全浏览器可用；
+  - 版本号自增 v0.9.48 → v0.9.49。
+- **🛤️ 道路衰减速度翻倍 (v0.9.50)**：
+  - **参数调整**：`ROAD_WEAR_DECAY_RATE` 由 `0.0005` 提升至 `0.0010` 等级/秒（`crates/sim_core/src/config.rs`），前端 `config.js::roadWearDecayRate` 同步调整；
+  - ⚠️ **双端同步要点**：`world.rs::tick()` 第 5 步读取的是 `self.config.road_wear_decay_rate`，而前端启动时会 `applyConfig(SIM_CONFIG)` **覆盖内核配置**，故 Rust 常量与前端 `config.js` 必须同步修改，否则前端注入的旧值会静默覆盖内核改动（改 Rust 不生效）；
+  - **效果**：荒废路径被杂草吞没的速度加倍——满级 5.0 的道路自然退化归零约需 5000 模拟秒（原约 10000 秒），人迹罕至的支路更快回归荒野，维持干道需更持续的人流踩踏；
+  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
+  - 版本号自增 v0.9.49 → v0.9.50。
+- **💪 步行速度受力量禀赋加成 (v0.9.51)**：
+  - **机制**：`agent.rs::tick_movement` 在既有「道路等级 × 体力」之外新增**力量因子**：`strength_factor = clamp(1 + (strength − 禀赋基准) / 禀赋基准 × bonus, min, max)`，乘入 `target_speed`；力量越高者步履矫健，越低者步履蹒跚；
+  - **新增参数**（`SimConfig` + 前端 `config.js` 同步，支持免编译热调）：`agentStrengthSpeedBonus`(0.40，力量每偏离基准 ±100 点的增减比例)、`agentStrengthSpeedMin`(0.70 下限)、`agentStrengthSpeedMax`(1.30 上限)；
+  - **实测 A/B 对照**（同种子 4242、各 5000 帧采样移动中个体）：`bonus=0.0` 关闭时力量-速度 Pearson r = **−0.029**、高低力量组速度比 **0.982**（基线无偏）；`bonus=2.0` 时 r = **0.444**、速度比 **1.443**；默认 `0.40` 下 r = **0.142**、速度比 **1.061**（温和可感）；
+  - **接口变更**：`Agent3D::tick_movement` 新增 `config: &SimConfig` 形参（`world.rs` 第 6 步调用处同步传入 `&self.config`）；
+  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
+  - 版本号自增 v0.9.50 → v0.9.51。
+- **👁️ 视图显隐改造: 新增隐藏部落民 / 隐藏路网，移除 POI 指示环开关 (v0.9.52)**：
+  - **新增开关**（生态时钟控制台，`main.js` 绑定）：`👤 隐藏部落民`（`chk-hide-agents`）与 `🛣️ 隐藏路网`（`chk-hide-lanes`）；语义为"勾选即隐藏"，落到 `RustWorld::showAgents` / `showLanes`（默认均为 `true`，即默认全显示）；
+  - **隐藏部落民**：`render.js` 第 4 步渲染改为 `sim.showAgents ? sim.agents : []`，隐藏时族人（含 💀 遗骸、选中高亮与需求标签）全部不绘制，且**点击拾取同步排除**族人（`agentHits` 收集处同样取空数组），杜绝"看不见却点得中"；
+  - **隐藏路网**：复用既有 `sim.showLanes` 分支，隐藏时全部车道不再绘制，道路悬浮 Tooltip 走 `else` 分支自动隐藏；
+  - **删除旧开关**：移除「显示 POI 有限储量指示环」选项（`index.html` 整行 + `main.js` 绑定 + `RustWorld::showPoiStock` 字段 + `render.js` 中 5 处判断），**指示环功能保留并恒显**（仅 `isFinite(poi.maxStock)` 判定）；
+  - **布局适配**：控制台面板高度 216px → 264px（容纳 3 个开关行）；调试监视器浮窗改锚定**屏幕右下角**（`bottom:20px; right:20px; width:320px`），避开增高后的控制台与左侧生态大盘；
+  - 版本号自增 v0.9.51 → v0.9.52。
+- **💀 死亡数区分自然死亡 / 非自然死亡 (v0.9.53)**：
+  - **分类口径**：☘️ **自然死亡** = 寿终正寝（健康值随寿命自然衰减归零）；⚡ **非自然死亡** = 饥荒饿死 / 脱水渴死（外部生存资源断绝致死）；
+  - **内核改造**：`Agent3D` 新增 `death_is_natural: bool` 字段，在三处死亡判定处显式赋值（饥荒/脱水 = `false`，寿终 = `true`）——**不依赖死因字符串匹配**，避免文案变动导致统计错位；`World3DEngine` 新增 `total_deaths_natural` / `total_deaths_unnatural` 计数器，在 `tick()` 第 2 步代谢结算处与 `total_deaths` 同步累加，并在 `ecology.rs::init_ecology` 随重演生态一并清零；
+  - **快照与前端三处同步**：`snapshot.rs` 新增 `total_deaths_natural` / `total_deaths_unnatural` → `world.rs::generate_snapshot()` 赋值 → `rustworld.js::_applySnapshot()` 映射（`totalDeathsNatural` / `totalDeathsUnnatural`）；
+  - **顶栏展示**：「💀 死亡数」指标卡改为 `💀 死亡 <绿>自然数</绿>☘️ / <红>非自然数</红>⚡`，上方大字仍为死亡总数，鼠标悬停显示分类口径说明；
+  - **实测验证**（临时脚本 A/B/C 对照，已删除）：基线短程 0 死亡；健康急速衰减场景 20 死 **全部计入自然**；代谢暴增 + 资源零断供场景 20 死 **全部计入非自然**；三个场景恒等式 `自然 + 非自然 == 总死亡` 均成立；
+  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`；
+  - 版本号自增 v0.9.52 → v0.9.53。
+- **📚 CURRENT.md 按功能模块拆分 (v0.9.54)**：
+  - **文档结构重组**：原单一 `CURRENT.md`（384 行）按功能模块拆分为「**根索引 + 分模块文档**」两级结构——根 `CURRENT.md` 精简为**索引入口**（定位说明 + 核心架构速览 + 模块导航表 + 维护指引），各模块详述迁移至 `docs/current/` 目录下独立文件（`01-spatial-network.md` ~ `11-changelog.md`），内容**零丢失**迁移；
+  - **版本演进记录独立**：原散落在「多级私产房屋体系」章节内的 v0.9.24 ~ v0.9.53 各版本核心改动条目，统一汇集至 `docs/current/11-changelog.md`（按版本号正序排列）；
+  - **AGENTS.md 文档地图同步**：§0 文档地图表更新 `CURRENT.md` 角色为「索引入口」，并新增 `docs/current/` 各文件职责说明；§4.7 / §4.9 中指向具体记录的维护指引改为指向对应模块文件；`BUILD_GUIDE.md` 版本号同步规范更新为「在 `docs/current/11-changelog.md` 中记录」；
+  - 纯文档重组，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.53 → v0.9.54。
