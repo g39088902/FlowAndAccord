@@ -1,4 +1,4 @@
-# 📋 Flow & Accord（动线与协约）已实现功能全景清单
+# 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：记录项目当前已落地实现的系统功能、数据架构、AI 状态机与前端表现层特性。  
 > **更新时间**：2026-08-31
@@ -180,6 +180,10 @@
   - 为 `crates/sim_core/`、`crates/sim_wasm/`、`src/spatial/decisions/`、`src/spatial/housing_system/` 四个 Rust 代码目录各新增一份局部 `AGENTS.md`（职责边界/文件清单/关键结构/局部易踩坑），根 `AGENTS.md` 新增 §0.1「嵌套 AGENTS.md 地图」登记覆盖范围与维护规则；
   - 纯文档新增，未触碰任何功能代码与 WASM 产物；
   - 版本号自增 v0.9.45 → v0.9.46。
+- **⚡ 超高倍速支持与建房间距翻倍 (v0.9.47)**：
+  - **倍速控制台扩展**：模拟演化倍速下拉框新增 **256x、512x 与 1024x** 超高倍速选项（`frontend/index.html`），方便快速推进上万 tick 长程社会演化；
+  - **房屋建设最小间距翻倍**：建房最小间距由 $14.0\text{m}$ 翻倍调整为 **$28.0\text{m}$**（`crates/sim_core/src/config.rs` `HOUSE_MIN_SPACING` 及前端 `frontend/js/config.js` `houseMinSpacing`），并修复 `settlement.rs::materialize_founded_houses` 硬编码，统一读取 `self.config.house_min_spacing`；
+  - 版本号自增 v0.9.46 → v0.9.47。
 
 ---
 

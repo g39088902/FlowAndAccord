@@ -44,7 +44,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.46)"]
+    E --> F["浏览器 UI (版本: v0.9.47)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -104,7 +104,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.46`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.47`**。
 
 ---
 
@@ -208,9 +208,9 @@ node frontend/server.js
 
 ### 4.11 🏠 建房/升级/修缮均为 Agent 自主决策（严禁系统扫描指挥）
 
-- **设计原则**：系统只当"物理规则执行者"（放置校验 ≥14m / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"必须来自 agent 自己的 `evaluate_needs` 输出；**严禁**再引入任何扫描全图并强制改写 `agent.state` 的"指挥式"逻辑。
+- **设计原则**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"必须来自 agent 自己的 `evaluate_needs` 输出；**严禁**再引入任何扫描全图并强制改写 `agent.state` 的"指挥式"逻辑。
 - **三条自主触发链路（v0.9.43 起，均为必然/确定性触发）**：
-  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ 20、体力 ≥ 60 时必然触发；agent 在自己决策相位掷 12 个候选点自主选址（与现有房屋 ≥14m），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；上述门槛/候选数/距离/间距均已入 `SimConfig`（`decision_found_home_*` / `house_min_spacing`，前端 `config.js` 可直接调参）；
+  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ 20、体力 ≥ 60 时必然触发；agent 在自己决策相位掷 12 个候选点自主选址（与现有房屋 ≥28m），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；上述门槛/候选数/距离/间距均已入 `SimConfig`（`decision_found_home_*` / `house_min_spacing`，前端 `config.js` 可直接调参）；
   - **升级施工**：`NeedKind::BuildHouse`——仓满（`is_pantry_full` 各等级门槛）+ 男户主在家休息满体力时，户主自身决策相位触发 `ConstructingHouse`；施工计时与竣工扩容由 `construction.rs::tick_house_construction` 结算；
   - **修缮**：`NeedKind::RepairHouse`——耐久 < 50% 时户主/配偶自身决策相位触发 `RepairingHouse`；`maintenance.rs::tick_house_repair` 仅结算修缮进度。
 - **已删除的旧扫描器（勿复活）**：`settlement.rs::tick_warehouse_founding`、`construction.rs::check_start_house_upgrades`、`maintenance.rs` 内强制切换修缮的扫描块。

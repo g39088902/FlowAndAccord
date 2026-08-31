@@ -47,7 +47,7 @@
 - 恢复现场：`dispatch` 成功才改写 `agent.state`/`route`/`current_lane_id` 等字段。
 
 ### 4.5 立宅自主选址（严禁系统指挥）
-- `FoundHome` 在 `fulfill_resting_need` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing`(14m) 自检，存 `pending_house_pos`；系统仅由 `settlement.rs::materialize_founded_houses` 实体化（放置校验/路网接入/绑定）。
+- `FoundHome` 在 `fulfill_resting_need` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing`自检，存 `pending_house_pos`；系统仅由 `settlement.rs::materialize_founded_houses` 实体化（放置校验/路网接入/绑定）。
 - 选址掷点消耗共享 RNG，改动候选数/距离/间距必须走 `SimConfig`（`decision_found_home_*`），前端 `config.js` 可调。
 
 ### 4.6 淘金纪律与冷却

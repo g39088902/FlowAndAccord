@@ -197,7 +197,6 @@ impl<'a> Decisioner<'a> {
             return;
         }
         if need.kind == NeedKind::FoundHome {
-            // 自主选址：本 Agent 在自身周围掷 12 个候选点，取第一个与现有房屋保持 ≥14m 的位置；
             // 系统仅在实体化阶段执行放置校验与路网接入（见 materialize_founded_houses）。
             for _ in 0..self.config.decision_found_home_candidates {
                 let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);

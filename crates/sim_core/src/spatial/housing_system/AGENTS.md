@@ -38,7 +38,7 @@
 ## 4. ⚠️ 本目录易踩坑
 
 - **严禁复活旧扫描器**：`tick_warehouse_founding`（settlement）、`check_start_house_upgrades`（construction）、修缮强制切换块（maintenance）均已删除，任何"系统主动派活"逻辑一律不得回归；`tick_house_repair`/`tick_house_construction` 只能**结算** agent 自己进入的 `RepairingHouse`/`ConstructingHouse` 状态。
-- **立宅实体化的双段校验**：`materialize_founded_houses` 是决策结果的"落地"环节——先清空全部 `pending_house_pos`（失败者下一拍决策重选），再逐点**重新**做 ≥14m 放置校验（同拍多人可能抢占；⚠️间距阈值在 `settlement.rs` 硬编码 `14.0`，与 `config.house_min_spacing` 并行存在，改配置需留意此处），通过后建门（`NodeType::GroundIntersection`）、双向接入最近 3 节点（`RoadClass::DirtTrack`）、绑定最近营地、创建 `Tier0Warehouse` 并写回 `home_house_id`/`home_camp_node`/`world_pos`。
+- **立宅实体化的双段校验**：`materialize_founded_houses` 是决策结果的"落地"环节——先清空全部 `pending_house_pos`（失败者下一拍决策重选），再逐点**重新**做 ≥28m 放置校验（同拍多人可能抢占；间距阈值读取 `self.config.house_min_spacing`），通过后建门（`NodeType::GroundIntersection`）、双向接入最近 3 节点（`RoadClass::DirtTrack`）、绑定最近营地、创建 `Tier0Warehouse` 并写回 `home_house_id`/`home_camp_node`/`world_pos`。
 - **冬季供暖只烧非 0 级有主房**：`tick_winter_heating` 跳过 `is_ruin` 与 `Tier0Warehouse`；家宅木材 < 10 时禁孕（§4.8，配合 `birth.rs`）。
 - **修缮口径**：耐久 < `house_durability_max` 才允许推进；agent 处于 `RepairingHouse` 时置 `house.is_repairing = true`（快照/前端展示用）；修满回 `RestingAtCamp`。
 - **成婚条件（勿遗漏）**：私宅 ≥1 级（`tier != Tier0Warehouse`）、无配偶、户主为成年单身男性、候选女性为成年单身**非孕期**；改嫁判定以女方是否有子女为准；孕期女性绝对不可改嫁（`agent.rs` 中 `pregnancy_father_id` 约束）。

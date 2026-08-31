@@ -120,7 +120,7 @@ pub const HOUSE_UPGRADE_TIER3_OTHER_RATIO: f32 = 0.50;
 pub const HOUSE_FERTILITY_STOCK_RATIO: f32 = 0.50;
 pub const HOUSE_WINTER_WOOD_BURN_RATE: f32 = 0.12;
 pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
-pub const HOUSE_MIN_SPACING: f32 = 14.0;
+pub const HOUSE_MIN_SPACING: f32 = 24.0;
 
 // ============================================================================
 // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)

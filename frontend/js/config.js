@@ -214,8 +214,8 @@ window.SIM_CONFIG = {
   houseWinterWoodBurnRate: 0.12,
   /** 低温触发取暖气温阈值 (°C) */
   houseWinterColdTemp: 5.0,
-  /** 立宅最小房屋间距: 新宅与现有房屋的水平距离须 ≥ 此值 (14.0) */
-  houseMinSpacing: 14.0,
+  /** 立宅最小房屋间距: 新宅与现有房屋的水平距离须 ≥ 此值 */
+  houseMinSpacing: 24.0,
 
   // ==========================================================================
   // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)

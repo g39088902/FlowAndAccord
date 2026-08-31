@@ -6,7 +6,7 @@ use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
     /// 实体化登记：将本拍决策阶段由 agent 自主选定的宅址（pending_house_pos）落地为 0 级仓库。
-    /// 系统在此仅执行物理规则与基础设施——放置校验（≥14m）、路网接入、房产绑定，
+    /// 系统在此仅执行物理规则与基础设施——放置校验（≥28m）、路网接入、房产绑定，
     /// 不再有任何“指挥 agent 建房”的主动扫描；是否自立门户完全由 agent 自己的需求决定。
     pub(crate) fn materialize_founded_houses(&mut self) {
         let mut pending: Vec<(usize, Vec3)> = Vec::new();
@@ -31,7 +31,7 @@ impl World3DEngine {
             let is_valid = self.houses.iter().all(|h| {
                 let dx = h.pos.x - cand_pos.x;
                 let dy = h.pos.y - cand_pos.y;
-                (dx * dx + dy * dy).sqrt() >= 14.0
+                (dx * dx + dy * dy).sqrt() >= self.config.house_min_spacing
             });
             if !is_valid {
                 continue;
