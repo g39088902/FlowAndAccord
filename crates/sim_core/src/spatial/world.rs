@@ -195,11 +195,8 @@ impl World3DEngine {
         // 3. POI 实际提取、分娩与死亡尸骸消逝
         self.tick_poi_interactions(dt);
 
-        // 4. 自发筑屋建造、私产确权、折旧与代际继承
+        // 4. 房屋折旧、消耗与代际继承
         self.tick_housing(dt);
-
-        // 错峰决策
-        self.tick_decisions();
 
         // 5. 道路自然杂草丛生与退化衰减
         self.network.tick_wear_decay(dt, &self.config);
@@ -208,6 +205,9 @@ impl World3DEngine {
         for agent in &mut self.agents {
             agent.tick_movement(dt, &mut self.network);
         }
+
+        // 错峰决策
+        self.tick_decisions();
     }
 
     /// 导出快照

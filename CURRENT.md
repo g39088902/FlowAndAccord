@@ -166,6 +166,20 @@
   - **修缮回归 agent 决策**：删除 `maintenance.rs` 中"扫描 + 强制切换 `RepairingHouse`"块，触发完全交给 `evaluate_needs` 既有 `RepairHouse` 需求（耐久 < 50%），系统仅结算修缮进度；
   - **设计原则落地**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"由 agent 的马斯洛状态机自主决定，符合混沌系统涌现定位；
   - 版本号自增 v0.9.42 → v0.9.43。
+- **🎲 决策概率全部收敛为确定性执行 + 遗留超参数入公共参数表 (v0.9.44)**：
+  - **决策概率/折扣全部删除（必然执行）**：孕期与非孕期统一使用 `decisionCriticalThirst/Hunger` 满值临界阈值（删除非孕期 ×0.8 折扣）；私宅囤水/囤粮不再受性别偏向概率（女 0.70 / 男 0.45）约束，家宅需要且资源可用即必然执行；删除 `ForageSurplus` 富余觅食需求（含 `decisionForageSurplusChance` 配置）；娱乐淘金 `GoldWealth` 不再掷 0.40 概率——金矿可用且冷却结束即必然触发；
+  - **立宅（FoundHome）选址参数全部提取至公共参数表**：饥渴/口渴/体力门槛（20/20/60）、候选点数（12）、候选距离（16~42m）、最小房屋间距（≥14m）→ `SimConfig`（`decisionFoundHome*` / `houseMinSpacing`），前端 `config.js` 可直接调参；
+  - **体力作业门槛 50.0 提取为 `decisionWorkStaminaThreshold`**：evaluator.rs 13 处 + needs.rs 1 处硬编码统一收敛；同步修正 needs.rs 标签判定的硬编码 25.0 饥渴/口渴阈值改为引用 `decisionCriticalThirst/Hunger`；
+  - **死配置清理**：删除 Rust 内核从未被读取的 `decisionCriticalStamina`（30.0）与富余觅食相关残留；
+  - 版本号自增 v0.9.43 → v0.9.44。
+- **📐 决策模块子目录化拆分 (v0.9.45)**：
+  - `decisions/evaluator.rs`（665 行）按职责拆分为 6 个子模块：`routing.rs`（导航/寻路/原地掉头/返家/POI 触发器可用性）、`evaluate.rs`（`Decisioner` 结构体 + `decide`/`evaluate_needs`/`fulfill_resting_need`）、`harvest.rs`（现场采收判定 + 仓储满额查询）、`seeking.rs`（途中熔断与平滑重路由，§4.2 核心）、`scheduler.rs`（`World3DEngine::tick_decisions` / `build_decision_context`），`needs.rs` 保持不变；
+  - 纯结构性重组，逻辑零改动：`cargo check` 无警告，release WASM 产物与重构前**字节完全一致**，`tools/test-wasm.js` 回归 `ALL_TESTS_DONE`；
+  - 版本号自增 v0.9.44 → v0.9.45。
+- **📑 嵌套 AGENTS.md 目录级操作指南 (v0.9.46)**：
+  - 为 `crates/sim_core/`、`crates/sim_wasm/`、`src/spatial/decisions/`、`src/spatial/housing_system/` 四个 Rust 代码目录各新增一份局部 `AGENTS.md`（职责边界/文件清单/关键结构/局部易踩坑），根 `AGENTS.md` 新增 §0.1「嵌套 AGENTS.md 地图」登记覆盖范围与维护规则；
+  - 纯文档新增，未触碰任何功能代码与 WASM 产物；
+  - 版本号自增 v0.9.45 → v0.9.46。
 
 ---
 

@@ -141,8 +141,8 @@ window.SIM_CONFIG = {
   decisionCriticalThirst: 25.0,
   /** 生理饥饿告急门槛: 饱食度低于此值触发觅食需求 (25.0 单位) */
   decisionCriticalHunger: 25.0,
-  /** 生理疲惫告急门槛: 体力低于此百分比触发归巢休整 (30.0%) */
-  decisionCriticalStamina: 30.0,
+  /** 外出作业体力门槛: 体力低于此百分比不再外出作业，立即归巢休整 (50.0%) */
+  decisionWorkStaminaThreshold: 50.0,
   /** 归巢休整目标: 一旦开始休息，必须充盈至此百分比方可解除休息 (100.0%) */
   decisionRestStaminaTarget: 100.0,
   /** 采金备料冷却时长 (秒，为3级庄舍升级大庄园备料) */
@@ -151,8 +151,18 @@ window.SIM_CONFIG = {
   decisionGoldWealthCooldown: 180.0,
   /** 房屋修缮需求门槛: 耐久度跌破此百分比产生修缮意愿 (50.0%) */
   decisionHouseRepairNeedThreshold: 50.0,
-  /** 体力充沛时的富余觅食概率 (8%) */
-  decisionForageSurplusChance: 0.08,
+  /** 自立门户饥渴门槛: 无家成年男性饥渴 ≥ 此值且体力 ≥ 阈值时必然触发立宅 (20.0) */
+  decisionFoundHomeHungerMin: 20.0,
+  /** 自立门户口渴门槛: 同上 (20.0) */
+  decisionFoundHomeThirstMin: 20.0,
+  /** 自立门户体力门槛: 同上 (60.0%) */
+  decisionFoundHomeStaminaMin: 60.0,
+  /** 立宅候选点数量: 自主选址时在自身周围掷出的候选点数 (12) */
+  decisionFoundHomeCandidates: 12,
+  /** 立宅候选点最小距离 (16.0) */
+  decisionFoundHomeDistMin: 16.0,
+  /** 立宅候选点最大距离 (42.0) */
+  decisionFoundHomeDistMax: 42.0,
 
   // ==========================================================================
   // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -204,6 +214,8 @@ window.SIM_CONFIG = {
   houseWinterWoodBurnRate: 0.12,
   /** 低温触发取暖气温阈值 (°C) */
   houseWinterColdTemp: 5.0,
+  /** 立宅最小房屋间距: 新宅与现有房屋的水平距离须 ≥ 此值 (14.0) */
+  houseMinSpacing: 14.0,
 
   // ==========================================================================
   // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)

@@ -81,12 +81,17 @@ pub const DECISION_POI_SEEK_MIN_STOCK_RATIO: f32 = 0.30;
 pub const DECISION_POI_ABANDON_STOCK_RATIO: f32 = 0.10;
 pub const DECISION_CRITICAL_THIRST: f32 = 25.0;
 pub const DECISION_CRITICAL_HUNGER: f32 = 25.0;
-pub const DECISION_CRITICAL_STAMINA: f32 = 30.0;
 pub const DECISION_REST_STAMINA_TARGET: f32 = 100.0;
 pub const DECISION_STOCK_GOLD_COOLDOWN: f32 = 45.0;
 pub const DECISION_GOLD_WEALTH_COOLDOWN: f32 = 180.0;
 pub const DECISION_HOUSE_REPAIR_NEED_THRESHOLD: f32 = 50.0;
-pub const DECISION_FORAGE_SURPLUS_CHANCE: f32 = 0.08;
+pub const DECISION_FOUND_HOME_HUNGER_MIN: f32 = 20.0;
+pub const DECISION_FOUND_HOME_THIRST_MIN: f32 = 20.0;
+pub const DECISION_FOUND_HOME_STAMINA_MIN: f32 = 60.0;
+pub const DECISION_FOUND_HOME_CANDIDATES: usize = 12;
+pub const DECISION_FOUND_HOME_DIST_MIN: f32 = 16.0;
+pub const DECISION_FOUND_HOME_DIST_MAX: f32 = 42.0;
+pub const DECISION_WORK_STAMINA_THRESHOLD: f32 = 50.0;
 
 // ============================================================================
 // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -115,6 +120,7 @@ pub const HOUSE_UPGRADE_TIER3_OTHER_RATIO: f32 = 0.50;
 pub const HOUSE_FERTILITY_STOCK_RATIO: f32 = 0.50;
 pub const HOUSE_WINTER_WOOD_BURN_RATE: f32 = 0.12;
 pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
+pub const HOUSE_MIN_SPACING: f32 = 14.0;
 
 // ============================================================================
 // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)
@@ -208,12 +214,17 @@ pub struct SimConfig {
     pub decision_poi_abandon_stock_ratio: f32,
     pub decision_critical_thirst: f32,
     pub decision_critical_hunger: f32,
-    pub decision_critical_stamina: f32,
     pub decision_rest_stamina_target: f32,
     pub decision_stock_gold_cooldown: f32,
     pub decision_gold_wealth_cooldown: f32,
     pub decision_house_repair_need_threshold: f32,
-    pub decision_forage_surplus_chance: f32,
+    pub decision_found_home_hunger_min: f32,
+    pub decision_found_home_thirst_min: f32,
+    pub decision_found_home_stamina_min: f32,
+    pub decision_found_home_candidates: usize,
+    pub decision_found_home_dist_min: f32,
+    pub decision_found_home_dist_max: f32,
+    pub decision_work_stamina_threshold: f32,
 
     // 6. 私宅营造、代际传承与升级
     pub house_durability_max: f32,
@@ -240,6 +251,7 @@ pub struct SimConfig {
     pub house_fertility_stock_ratio: f32,
     pub house_winter_wood_burn_rate: f32,
     pub house_winter_cold_temp: f32,
+    pub house_min_spacing: f32,
 
     // 7. 四季更迭与宏观气候
     pub season_year_length: f32,
@@ -325,12 +337,17 @@ impl Default for SimConfig {
             decision_poi_abandon_stock_ratio: DECISION_POI_ABANDON_STOCK_RATIO,
             decision_critical_thirst: DECISION_CRITICAL_THIRST,
             decision_critical_hunger: DECISION_CRITICAL_HUNGER,
-            decision_critical_stamina: DECISION_CRITICAL_STAMINA,
             decision_rest_stamina_target: DECISION_REST_STAMINA_TARGET,
             decision_stock_gold_cooldown: DECISION_STOCK_GOLD_COOLDOWN,
             decision_gold_wealth_cooldown: DECISION_GOLD_WEALTH_COOLDOWN,
             decision_house_repair_need_threshold: DECISION_HOUSE_REPAIR_NEED_THRESHOLD,
-            decision_forage_surplus_chance: DECISION_FORAGE_SURPLUS_CHANCE,
+            decision_found_home_hunger_min: DECISION_FOUND_HOME_HUNGER_MIN,
+            decision_found_home_thirst_min: DECISION_FOUND_HOME_THIRST_MIN,
+            decision_found_home_stamina_min: DECISION_FOUND_HOME_STAMINA_MIN,
+            decision_found_home_candidates: DECISION_FOUND_HOME_CANDIDATES,
+            decision_found_home_dist_min: DECISION_FOUND_HOME_DIST_MIN,
+            decision_found_home_dist_max: DECISION_FOUND_HOME_DIST_MAX,
+            decision_work_stamina_threshold: DECISION_WORK_STAMINA_THRESHOLD,
 
             // 6. 私宅营造、代际传承与升级
             house_durability_max: HOUSE_DURABILITY_MAX,
@@ -357,6 +374,7 @@ impl Default for SimConfig {
             house_fertility_stock_ratio: HOUSE_FERTILITY_STOCK_RATIO,
             house_winter_wood_burn_rate: HOUSE_WINTER_WOOD_BURN_RATE,
             house_winter_cold_temp: HOUSE_WINTER_COLD_TEMP,
+            house_min_spacing: HOUSE_MIN_SPACING,
 
             // 7. 四季更迭与宏观气候
             season_year_length: SEASON_YEAR_LENGTH,

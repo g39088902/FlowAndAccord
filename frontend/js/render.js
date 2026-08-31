@@ -25,7 +25,6 @@
     const NEED_KIND_LABEL = {
       QuenchThirst: '口渴饮水',
       SateHunger: '饥饿进食',
-      ForageSurplus: '富余觅食',
       Rest: '休养生息',
       ReturnHome: '送货回家',       // 专属标签: 安全需求 · 送货回家
       StockWater: '仓库储水',
@@ -41,7 +40,6 @@
     const NEED_KIND_REASON = {
       QuenchThirst: '自身水分告急(<25.0)，前往水泉痛饮至满值并回填家宅水库。',
       SateHunger: '自身饱食告急(<25.0)，前往浆果丛采食至满值并回填家宅粮仓。',
-      ForageSurplus: '体力充沛且微饥，低概率外出就近采食成熟浆果。',
       Rest: '正在归宿静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100，属性越高休息越快，恢复至 100% 满值后方可结束。',
       ReturnHome: '现场采收或搬运完成，折返回家将物资存入私宅仓库（安全需求）。',
       RepairHouse: '房屋耐久跌破50%，正在投入体力劳作修缮至100%避免风化坍塌。',

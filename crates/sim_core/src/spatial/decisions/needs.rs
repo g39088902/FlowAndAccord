@@ -30,7 +30,6 @@ pub enum NeedKind {
     StockStone,     // 尊重: 采石建材 (庄舍/庄园升级储备)
     StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
-    ForageSurplus,  // 生理: 体力充沛时的低概率富余觅食
 }
 
 /// 一条需求判定结论
@@ -130,13 +129,13 @@ pub fn house_stock_needs(house: &House, config: &SimConfig) -> HouseStockNeeds {
     }
 }
 
-pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House]) -> Option<(&'static str, &'static str)> {
+pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House], config: &SimConfig) -> Option<(&'static str, &'static str)> {
     Some(match state {
         PrimitiveActionState::SeekingWater | PrimitiveActionState::DrinkingAtWater => {
-            if agent.thirst < 25.0 { ("Physiological", "QuenchThirst") } else { ("Safety", "StockWater") }
+            if agent.thirst < config.decision_critical_thirst { ("Physiological", "QuenchThirst") } else { ("Safety", "StockWater") }
         }
         PrimitiveActionState::SeekingFood | PrimitiveActionState::ForagingFood => {
-            if agent.hunger < 25.0 { ("Physiological", "SateHunger") } else { ("Safety", "StockFood") }
+            if agent.hunger < config.decision_critical_hunger { ("Physiological", "SateHunger") } else { ("Safety", "StockFood") }
         }
         PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => ("Safety", "StockWood"),
         PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => ("Esteem", "StockStone"),
@@ -148,7 +147,7 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
             if is_building_stock { ("Esteem", "StockGold") } else { ("SelfActualization", "GoldWealth") }
         }
         PrimitiveActionState::ReturningToCamp => {
-            if agent.stamina < 50.0 { ("Physiological", "Rest") } else { ("Safety", "ReturnHome") }
+            if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest") } else { ("Safety", "ReturnHome") }
         }
         PrimitiveActionState::RepairingHouse => ("Safety", "RepairHouse"),
         PrimitiveActionState::ConstructingHouse => {

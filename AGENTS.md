@@ -19,6 +19,19 @@
 | **ARCHITECTURE.md** | 宏观技术架构设计愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（大部分前沿特性为规划态） |
 | **PLAN.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观发展方向（大部分内容为规划态） |
 
+### 0.1 📑 嵌套 AGENTS.md（目录级操作指南）
+
+除根 AGENTS.md 外，每个复杂 Rust 代码目录内还维护一份**局部 AGENTS.md**，聚焦该目录的职责边界、文件清单与局部易踩坑；**改哪个目录的代码，先读对应目录的局部 AGENTS.md**，全局规则仍以根 AGENTS.md 为准，两者表述冲突时以根文档为准：
+
+| 目录 | 局部 AGENTS.md | 覆盖范围 |
+| :--- | :--- | :--- |
+| `crates/sim_core/` | `crates/sim_core/AGENTS.md` | sim_core 内核：crate 布局、SimConfig 参数表、WorldRng 确定性、geo/spatial 模块地图 |
+| `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | WASM 导出层：导出函数清单、静态缓冲区、错误码、指针约定、双副本同步 |
+| `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
+| `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：5 个单一职责子模块、升级门槛、三条自主决策链路 |
+
+**维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用到的类型/方法改名后必须同步修订对应文档，避免文档与现状脱节。
+
 ---
 
 ## 1. 项目架构概述
@@ -31,7 +44,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.43)"]
+    E --> F["浏览器 UI (版本: v0.9.46)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -91,7 +104,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.43`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.46`**。
 
 ---
 
@@ -123,7 +136,7 @@ node frontend/server.js
 ### 4.2 🔴 寻路决策门槛、连续采收与中途重路由机制
 
 - **Agent 私有 POI 施密特触发器（开启 $\ge 30\%$ / 关闭 $< 10\%$）**：
-  - 每名 Agent 在自身决策相位观察 POI 库存，并在 `Agent3D::poi_seekability` 中维护私有锁存状态：库存升至 $\ge30\%$ 才开放；已开放点仅在跌破 $<10\%$ 时关闭；在 $10\%\sim30\%$ 中间带保持自身前态。相同 POI 可被不同 Agent 判为不同可用性；`evaluator.rs` 的路由与重路由只读取 Agent 的触发器结论。
+  - 每名 Agent 在自身决策相位观察 POI 库存，并在 `Agent3D::poi_seekability` 中维护私有锁存状态：库存升至 $\ge30\%$ 才开放；已开放点仅在跌破 $<10\%$ 时关闭；在 $10\%\sim30\%$ 中间带保持自身前态。相同 POI 可被不同 Agent 判为不同可用性；`decisions/routing.rs` 与 `decisions/seeking.rs` 的路由与重路由只读取 Agent 的触发器结论。
 - **采收现场未满连续采收**：
   - 族人在现场采收（水/粮/木/石/金）时，若自己的目标触发器已关闭但自身或背包未满且家宅仍需，自动就近寻路前往下一处**自身触发器已开放**的同类 POI 继续采收，避免提前送货回宅。
 - **中途断流熔断与平滑就近重路由（$< 10\%$）**：
@@ -158,7 +171,7 @@ node frontend/server.js
 
 ### 4.6 🟠 模块粒度与单文件行数规范
 
-- **单文件严控在 800 行以内**：当模块功能膨胀时，应及时进行子目录模块化拆分（参考 `crates/sim_core/src/spatial/decisions/` 拆分为 `needs.rs`, `evaluator.rs`, `mod.rs`，以及 `crates/sim_core/src/spatial/housing_system/` 拆分为 5 个单一职责子模块的最佳实践）。
+- **单文件严控在 800 行以内**：当模块功能膨胀时，应及时进行子目录模块化拆分（参考 `crates/sim_core/src/spatial/decisions/` 拆分为 `needs.rs`, `routing.rs`, `evaluate.rs`, `harvest.rs`, `seeking.rs`, `scheduler.rs`, `mod.rs`，以及 `crates/sim_core/src/spatial/housing_system/` 拆分为 5 个单一职责子模块的最佳实践）。
 
 ### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
@@ -197,7 +210,7 @@ node frontend/server.js
 
 - **设计原则**：系统只当"物理规则执行者"（放置校验 ≥14m / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"必须来自 agent 自己的 `evaluate_needs` 输出；**严禁**再引入任何扫描全图并强制改写 `agent.state` 的"指挥式"逻辑。
 - **三条自主触发链路（v0.9.43 起，均为必然/确定性触发）**：
-  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ 20、体力 ≥ 60 时必然触发；agent 在自己决策相位掷 12 个候选点自主选址（与现有房屋 ≥14m），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；
+  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ 20、体力 ≥ 60 时必然触发；agent 在自己决策相位掷 12 个候选点自主选址（与现有房屋 ≥14m），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；上述门槛/候选数/距离/间距均已入 `SimConfig`（`decision_found_home_*` / `house_min_spacing`，前端 `config.js` 可直接调参）；
   - **升级施工**：`NeedKind::BuildHouse`——仓满（`is_pantry_full` 各等级门槛）+ 男户主在家休息满体力时，户主自身决策相位触发 `ConstructingHouse`；施工计时与竣工扩容由 `construction.rs::tick_house_construction` 结算；
   - **修缮**：`NeedKind::RepairHouse`——耐久 < 50% 时户主/配偶自身决策相位触发 `RepairingHouse`；`maintenance.rs::tick_house_repair` 仅结算修缮进度。
 - **已删除的旧扫描器（勿复活）**：`settlement.rs::tick_warehouse_founding`、`construction.rs::check_start_house_upgrades`、`maintenance.rs` 内强制切换修缮的扫描块。
