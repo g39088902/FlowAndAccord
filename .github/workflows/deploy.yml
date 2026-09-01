@@ -106,8 +106,8 @@ jobs:
         run: |
           coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
           coscmd upload -rsy --delete frontend/ /
-          coscmd -f upload -H "Content-Type: application/wasm" frontend/rust/sim_wasm.wasm /rust/sim_wasm.wasm
-          coscmd -f upload -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim_wasm.wasm
+          coscmd upload -f -H "Content-Type: application/wasm" frontend/rust/sim_wasm.wasm /rust/sim_wasm.wasm
+          coscmd upload -f -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim_wasm.wasm
 
       - name: 部署摘要
         run: |

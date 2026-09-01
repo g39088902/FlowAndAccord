@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.69)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.70)**。
 
 ---
 
@@ -199,3 +199,9 @@
   - **Node 升级至 24**：build job 新增 `actions/setup-node@v4`（node-version: '24'）；
   - **`docs/cicd-guide.md` 同步**：Secrets 章节补充格式要求（全小写/勿带域名前缀/勿带空格引号），故障排查表收录 exit 253 与 DNS 解析失败两条实测案例；
   - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.68 → v0.9.69。
+
+- **🔧 CI/CD MIME 覆写命令修复：-f 参数位置归位 (v0.9.70)**：
+  - **实测问题**：v0.9.69 部署主上传已完全成功（15 files uploaded / 0 failed，sync delete 仅清理 js/ 与 rust/ 目录占位对象），但两条 wasm MIME 覆写命令误将 `-f` 写在全局参数位（`coscmd -f upload ...`），argparse 报 `unrecognized arguments: -f`（exit 2）导致 Content-Type 覆写未执行；
+  - **修复**：`-f`（强制覆盖同名对象，属 upload 子命令选项）移至 `upload` 之后：`coscmd upload -f -H "Content-Type: application/wasm" <file> <cospath>`，确保 `.wasm` 对象 MIME 覆写生效、浏览器可流式编译；
+  - **`docs/cicd-guide.md`**：排障表补充「unrecognized arguments: -f」踩坑案例（子命令选项与全局参数的位置区分）；
+  - 纯 CI 配置两行命令与文档改动；版本号自增 v0.9.69 → v0.9.70。

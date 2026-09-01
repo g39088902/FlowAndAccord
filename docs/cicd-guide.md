@@ -102,6 +102,7 @@ graph TD
 | `coscmd` 403 / 签名错误 | 检查 4 个 Secrets 是否齐全、密钥是否有效、子账号是否有该桶写权限、`COS_BUCKET` 是否为 `名称-APPID` 完整格式 |
 | **exit 253 + `please make sure [y/N]`**（实测 v0.9.68） | `coscmd upload --delete` 在删除远端多余文件前会交互确认，runner 无 stdin 导致失败；已在 workflow 的 upload 命令中加 `-y`（Skip confirmation）修复，勿移除 |
 | **`Failed to resolve *.cos.*.myqcloud.com`（DNS 解析失败）**（实测 v0.9.68） | 几乎必为 Secret 值格式错误（myqcloud.com 全球可解析），按序检查：① 桶名含大写字母/下划线；② 缺 `-APPID` 后缀或误填完整域名/https 前缀；③ 地域填了中文或错误码；④ 值首尾带空格/引号。v0.9.69 起流水线在上传前做「格式正则 + DNS 预解析」预检，失败时直接给出中文指引，无需等逐文件报错 |
+| **`coscmd: error: unrecognized arguments: -f`**（实测 v0.9.69） | `-f`（强制覆盖同名对象）是 `upload` **子命令**的选项，必须写在 `upload` 之后（如 `coscmd upload -f -H ...`），写在全局参数位会被 argparse 拒绝；注意 `-r/-b` 等全局参数才放在子命令之前 |
 | 页面 404 | 静态网站未开启，或索引文档未设为 `index.html` |
 | 页面能开但模拟器不运行（wasm 报错） | 见第 4 节 MIME 排障；另确认 `rust/sim_wasm.wasm` 已上传 |
 | 页面是旧版本 | 取消的并发部署可能未完成；在 Actions 页确认最新一次运行成功，浏览器强刷 |
