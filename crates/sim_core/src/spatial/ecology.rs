@@ -188,7 +188,7 @@ impl World3DEngine {
             let gender = if i < female_count { Gender::Female } else { Gender::Male };
             let initial_age = self.config.agent_adult_age;
 
-            let mut agent = Agent3D::new_with_config(agent_id, home_camp, self.config.agent_spawn_base_speed + (i as f32 % self.config.agent_spawn_speed_ring), is_covert, initial_age, gender, &self.config);
+            let mut agent = Agent3D::new_with_config(agent_id, home_camp, self.config.agent_spawn_base_speed, is_covert, initial_age, gender, &self.config);
             // 始祖在初始化阶段 (tick_counter=0) 出生, 显式置 0 以便族谱按出生时序排序
             agent.birth_tick = 0;
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
