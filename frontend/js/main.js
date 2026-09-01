@@ -214,7 +214,7 @@
       openFullDagBtn.addEventListener('click', e => {
         e.stopPropagation();
         if (window.FlowDag) {
-          window.FlowDag.openInNewTab(sim.selectedAgentId, sim, 'focus');
+          window.FlowDag.openInNewTab(sim.selectedAgentId, sim);
         }
       });
     }
@@ -226,8 +226,13 @@
       sim.deselect();
       isCameraFollow = false;
       closeLineageModal();
-      const fullDagModal = document.getElementById('full-dag-modal');
-      if (fullDagModal) fullDagModal.style.display = 'none';
+      // 走 FlowDag.closeModal() 以正确销毁视口虚拟化视图 (DOM 回收 + 事件解绑)
+      if (window.FlowDag && typeof window.FlowDag.closeModal === 'function') {
+        window.FlowDag.closeModal();
+      } else {
+        const fullDagModal = document.getElementById('full-dag-modal');
+        if (fullDagModal) fullDagModal.style.display = 'none';
+      }
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
       const card = document.getElementById('inspector-card');
       if (card) card.style.display = 'none';
@@ -245,7 +250,8 @@
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         const fullDagModal = document.getElementById('full-dag-modal');
         if (fullDagModal && fullDagModal.style.display === 'flex') {
-          fullDagModal.style.display = 'none';
+          if (window.FlowDag && typeof window.FlowDag.closeModal === 'function') window.FlowDag.closeModal();
+          else fullDagModal.style.display = 'none';
           return;
         }
         if (lineageModal && lineageModal.style.display === 'flex') {

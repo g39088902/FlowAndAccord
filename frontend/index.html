@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.63</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.64</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -578,22 +578,39 @@
     </div>
   </div>
 
-  <!-- 直系血脉拓扑 DAG 族谱模态弹窗 -->
+  <!-- 亲子边箭头 marker 定义 (族谱模态与独立标签页共用) -->
+  <svg width="0" height="0" style="position:absolute;" aria-hidden="true">
+    <defs>
+      <marker id="dag-arrow-father" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#38bdf8" />
+      </marker>
+      <marker id="dag-arrow-mother" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#f472b6" />
+      </marker>
+    </defs>
+  </svg>
+
+  <!-- 直系血脉时间轴族谱模态弹窗 -->
   <div id="full-dag-modal" class="dag-modal-overlay" style="display:none;">
     <div class="dag-modal-window">
       <div class="dag-modal-header">
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="font-size:22px;">🌳</span>
           <div>
-            <div id="dag-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">直系血脉拓扑 DAG 族谱</div>
-            <div style="font-size:10px; color:#94a3b8;">仅焦点的父/母递归祖先链 + 子女递归后代链 · 仅父子/母子有向边 · 纯力学自动布局 (弹簧+斥力自然舒展) · 拖拽平移与滚轮缩放</div>
+            <div id="dag-modal-title" style="font-size:14px; font-weight:700; color:#38bdf8;">直系血脉时间轴族谱</div>
+            <div style="font-size:10px; color:#94a3b8;">纵向 = 出生时刻 (上=先祖 / 下=后裔) · 横向 = 同代分支 · 仅父子/母子有向边 · 拖拽平移与滚轮缩放</div>
           </div>
         </div>
         <div class="dag-modal-tools">
-          <span class="dag-stats-badge" style="font-size:11px; padding:3px 8px; border-radius:6px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">✨ 直系血脉单图</span>
-          <button id="dag-btn-center" class="dag-tool-btn" title="自适应居中整图">🎯 居中定位</button>
-          <button id="dag-btn-reset-zoom" class="dag-tool-btn" title="重置缩放视角">🔍 100%</button>
-          <button id="dag-btn-new-tab" class="dag-tool-btn primary" title="在新标签页中独立打开直系血脉 DAG 族谱">在新标签页打开 ↗</button>
+          <span id="dag-modal-stats" class="dag-stats-badge" style="font-size:11px; padding:3px 8px; border-radius:6px; background:rgba(56,189,248,0.12); color:#38bdf8; border:1px solid rgba(56,189,248,0.25);">直系血脉单图</span>
+          <div class="dag-density" title="调节纵向时间密度：越大世代间隔越舒展，越小时序越紧凑">
+            <span style="font-size:11px; color:#94a3b8;">时间密度</span>
+            <input type="range" id="dag-density" min="0.25" max="4" step="0.05" value="1" />
+            <b id="dag-density-val" style="font-size:11px; color:#38bdf8; font-variant-numeric:tabular-nums; min-width:38px; display:inline-block;">1.00x</b>
+          </div>
+          <button id="dag-btn-center" class="dag-tool-btn" title="整图自适应居中">🎯 适应窗口</button>
+          <button id="dag-btn-reset-zoom" class="dag-tool-btn" title="以焦点为中心回到 100%">🔍 100%</button>
+          <button id="dag-btn-new-tab" class="dag-tool-btn primary" title="在新标签页中独立打开直系血脉时间轴族谱">在新标签页打开 ↗</button>
           <button id="dag-btn-close" class="dag-modal-close" title="关闭族谱 (Esc)">✕</button>
         </div>
       </div>
@@ -604,7 +621,7 @@
           <div id="dag-insp-header" class="dag-insp-header"></div>
           <div id="dag-insp-content" class="dag-insp-body"></div>
         </div>
-        <div class="dag-help-tip">🖱️ 拖拽画布平移 · 滚轮缩放 · 蓝👨父 / 粉👩母 · 纯力学自动布局: 亲子弹簧牵引 + 距离斥力自然舒展</div>
+        <div class="dag-help-tip">🖱️ 拖拽画布平移 · 滚轮缩放 · 蓝👨父 / 粉👩母 · 悬停仅高亮其父母与子女 · 左侧刻度尺为出生年代</div>
       </div>
     </div>
   </div>
@@ -612,6 +629,9 @@
   <script src="js/math.js"></script>
   <script src="js/config.js"></script>
   <script src="js/rustworld.js"></script>
+  <script src="js/dag-layout.js"></script>
+  <script src="js/dag-view.js"></script>
+  <script src="js/dag-standalone.js"></script>
   <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
   <script src="js/render.js"></script>
