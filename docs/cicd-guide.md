@@ -46,6 +46,12 @@ graph TD
 > - 不要使用主账号密钥，建议在 [CAM 子账号](https://console.cloud.tencent.com/cam) 创建专用子用户，仅授予该桶的 `cos:*`（或至少 `PutObject / DeleteObject / ListBucket`）权限；
 > - Secrets 在 Actions 日志中会被自动脱敏，但请勿将密钥写入代码、文档或本地提交。
 
+> ⚠️ **格式要求（实测踩坑）**：
+> - `COS_BUCKET` 必须为**全小写** `名称-APPID`（如 `flow-and-accord-1250000000`）——COS 访问域名仅支持小写字母/数字/连字符，**含大写字母的桶名会导致 DNS 解析失败**（`Failed to resolve ... myqcloud.com`）；
+> - 勿填完整域名或 `https://` 前缀，勿用下划线或中文；
+> - `COS_REGION` 填地域**简称**（如 `ap-guangzhou`），不是中文名（"华南"）；
+> - 所有值**首尾不要带空格或引号**（流水线预检步骤会自动去空白并做格式 + DNS 预解析校验，错误时秒级报出中文指引）。
+
 ### 可选：修改触发行为
 
 - 想改为「push test 也部署」：在 `deploy.yml` 的 `on.push.branches` 中加入 `test`；
@@ -94,6 +100,8 @@ graph TD
 | :--- | :--- |
 | `test-wasm.js` 门禁失败 | 确定性/越界/NaN 回归未通过，属代码问题，修复后再推送；日志中的 `DETERMINISM FAILED` / `NAN FOUND` 等关键词定位 |
 | `coscmd` 403 / 签名错误 | 检查 4 个 Secrets 是否齐全、密钥是否有效、子账号是否有该桶写权限、`COS_BUCKET` 是否为 `名称-APPID` 完整格式 |
+| **exit 253 + `please make sure [y/N]`**（实测 v0.9.68） | `coscmd upload --delete` 在删除远端多余文件前会交互确认，runner 无 stdin 导致失败；已在 workflow 的 upload 命令中加 `-y`（Skip confirmation）修复，勿移除 |
+| **`Failed to resolve *.cos.*.myqcloud.com`（DNS 解析失败）**（实测 v0.9.68） | 几乎必为 Secret 值格式错误（myqcloud.com 全球可解析），按序检查：① 桶名含大写字母/下划线；② 缺 `-APPID` 后缀或误填完整域名/https 前缀；③ 地域填了中文或错误码；④ 值首尾带空格/引号。v0.9.69 起流水线在上传前做「格式正则 + DNS 预解析」预检，失败时直接给出中文指引，无需等逐文件报错 |
 | 页面 404 | 静态网站未开启，或索引文档未设为 `index.html` |
 | 页面能开但模拟器不运行（wasm 报错） | 见第 4 节 MIME 排障；另确认 `rust/sim_wasm.wasm` 已上传 |
 | 页面是旧版本 | 取消的并发部署可能未完成；在 Actions 页确认最新一次运行成功，浏览器强刷 |

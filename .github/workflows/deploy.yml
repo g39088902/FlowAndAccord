@@ -20,6 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: 安装 Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: 安装 Rust 工具链 (stable + wasm32)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -63,18 +68,44 @@ jobs:
       - name: 安装 coscmd (腾讯云官方工具)
         run: pip install --quiet coscmd
 
-      # coscmd 增量同步整个 frontend/ 目录（--delete 清理远端多余文件）
+      # 预检 Secret 值格式并预解析桶域名：格式错误/DNS 不可解析时秒级终止，
+      # 避免 coscmd 上传到一半才逐文件报 DNS 错误（首次部署实测踩坑，详见 docs/cicd-guide.md）
+      - name: 预检 Secrets (格式校验 + DNS 预解析)
+        env:
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+        run: |
+          # 去除可能误粘贴的首尾空白，清洗后的值写入 GITHUB_ENV 供后续步骤使用
+          COS_BUCKET="$(printf '%s' "$COS_BUCKET" | tr -d ' \t\r\n')"
+          COS_REGION="$(printf '%s' "$COS_REGION" | tr -d ' \t\r\n')"
+          echo "COS_BUCKET=$COS_BUCKET" >> "$GITHUB_ENV"
+          echo "COS_REGION=$COS_REGION" >> "$GITHUB_ENV"
+
+          if ! printf '%s' "$COS_BUCKET" | grep -Eq '^[a-z0-9][a-z0-9-]{1,61}-[0-9]+$'; then
+            echo "::error::COS_BUCKET 格式错误！桶名必须为『全小写字母/数字/连字符-APPID』，如 flow-and-accord-1250000000；不能含大写字母、下划线、中文、https:// 前缀或完整域名"
+            exit 1
+          fi
+          if ! printf '%s' "$COS_REGION" | grep -Eq '^[a-z]{2}-[a-z]+(-[0-9]+)?$'; then
+            echo "::error::COS_REGION 格式错误！地域应为小写简称，如 ap-guangzhou / ap-shanghai / ap-chengdu-1；不能填中文（如\"华南\"）或大写"
+            exit 1
+          fi
+          DOMAIN="$COS_BUCKET.cos.$COS_REGION.myqcloud.com"
+          if ! python3 -c "import socket,sys; socket.gethostbyname(sys.argv[1])" "$DOMAIN" 2>/dev/null; then
+            echo "::error::域名无法解析（Name or service not known）！请逐项检查 GitHub Secrets 的值：① 桶名是否含大写字母/下划线（COS 访问域名仅支持小写）；② 是否缺 -APPID 后缀或误填完整域名/https:// 前缀；③ COS_REGION 是否为有效地域码（控制台桶概览页可见）；④ 值首尾是否误带空格或引号"
+            exit 1
+          fi
+
+      # coscmd 增量同步整个 frontend/ 目录（--delete 清理远端多余文件，-y 跳过交互确认——
+      # runner 无 stdin，不加 -y 会在 [y/N] 确认处 exit 253）
       # 随后对 .wasm 文件强制覆盖 Content-Type 为 application/wasm（部分环境 mimetypes 不识别 wasm 扩展名，
       # 若 MIME 缺失浏览器流式编译 WebAssembly 会失败，详见 docs/cicd-guide.md 排障章节）
       - name: 上传至 COS
         env:
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
-          COS_BUCKET: ${{ secrets.COS_BUCKET }}
-          COS_REGION: ${{ secrets.COS_REGION }}
         run: |
           coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "$COS_REGION"
-          coscmd upload -rs --delete frontend/ /
+          coscmd upload -rsy --delete frontend/ /
           coscmd -f upload -H "Content-Type: application/wasm" frontend/rust/sim_wasm.wasm /rust/sim_wasm.wasm
           coscmd -f upload -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim_wasm.wasm
 
@@ -85,6 +116,3 @@ jobs:
           echo "- 分支: \`${GITHUB_REF_NAME}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 桶: \`${COS_BUCKET}\` (地域 \`${COS_REGION}\`)" >> $GITHUB_STEP_SUMMARY
           echo "- 静态网站地址请见腾讯云控制台该桶的『基础配置 → 静态网站』域名" >> $GITHUB_STEP_SUMMARY
-        env:
-          COS_BUCKET: ${{ secrets.COS_BUCKET }}
-          COS_REGION: ${{ secrets.COS_REGION }}

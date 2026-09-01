@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.68)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.69)**。
 
 ---
 
@@ -192,3 +192,10 @@
   - **新增 `docs/cicd-guide.md`**：收录流水线架构图、需配置的 4 个 GitHub Secrets 清单（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`）、子账号最小权限建议、COS 静态网站开启步骤、`.wasm` MIME 排障与常见失败处理；
   - **AGENTS.md 同步**：文档地图登记 cicd-guide.md，新增 §4.13 CI/CD 坑点（工具链差异 / MIME / 密钥安全）；
   - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.67 → v0.9.68。
+
+- **🔧 CI/CD 首部署失败修复：免交互上传 + Secrets 预检 + Node 24 (v0.9.69)**：
+  - **exit 253 根因修复**：首次部署实测 `coscmd upload -rs --delete` 的 `--delete` 会触发 `input()` 交互确认（`WARN: you are deleting some files ... [y/N]`），GitHub runner 无 stdin 导致 15 个文件全部上传失败并以 253 退出；上传命令补 `-y`（Skip confirmation，coscmd 官方参数）实现全程免交互；
+  - **DNS 解析失败预检**：首次部署实测 `Failed to resolve *.cos.*.myqcloud.com`（Name or service not known），根因为 Secret 值格式错误（桶名大写/缺 APPID/地域码错误/首尾空格引号）；新增「预检 Secrets」步骤——先去除首尾空白写入 `GITHUB_ENV`，再对 `COS_BUCKET`/`COS_REGION` 做格式正则校验并用 `socket.gethostbyname` 预解析桶域名，任一失败即以 `::error::` 输出中文排障指引并秒级终止，不再等待逐文件 DNS 超时；
+  - **Node 升级至 24**：build job 新增 `actions/setup-node@v4`（node-version: '24'）；
+  - **`docs/cicd-guide.md` 同步**：Secrets 章节补充格式要求（全小写/勿带域名前缀/勿带空格引号），故障排查表收录 exit 253 与 DNS 解析失败两条实测案例；
+  - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.68 → v0.9.69。
