@@ -118,7 +118,6 @@ pub struct AgentSnapshot {
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
     pub miscarriage_cooldown: f32,
-    pub is_offroad: bool,
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,

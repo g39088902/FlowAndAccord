@@ -150,7 +150,7 @@ impl LaneGraph3D {
     /// 道路自然杂草丛生与退化衰减
     pub fn tick_wear_decay(&mut self, dt: f32, config: &SimConfig) {
         for edge in self.graph.edge_weights_mut() {
-            edge.wear = (edge.wear - config.road_wear_decay_rate * dt).max(0.0);
+            edge.wear = (edge.wear * (1.0 - config.road_wear_decay_rate * dt)).max(0.0);
         }
     }
 

@@ -149,7 +149,6 @@ pub struct Agent3D {
     pub distance_along_curve: f32,
     pub current_velocity: f32,
     pub max_desired_speed: f32,
-    pub is_traveling_offroad: bool,
     pub route: Vec<LaneId>,
     pub route_index: usize,
 
@@ -222,7 +221,6 @@ impl Agent3D {
             distance_along_curve: 0.0,
             current_velocity: 0.0,
             max_desired_speed: quadrupled_speed,
-            is_traveling_offroad: false,
             route: Vec::new(),
             route_index: 0,
             is_covert,
@@ -417,7 +415,6 @@ impl Agent3D {
         let wear = lane.wear;
 
         let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
-        self.is_traveling_offroad = wear < config.road_offroad_wear_threshold;
 
         // 坡度体力能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
@@ -425,13 +422,8 @@ impl Agent3D {
         let stamina_burn = (config.agent_move_stamina_base + if self.is_pregnant { config.agent_move_stamina_pregnant } else { 0.0 }) * (1.0 + uphill_penalty * config.agent_move_stamina_grade_coef);
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
-        let stamina_factor = (self.stamina / config.agent_stamina_factor_ref).clamp(config.agent_stamina_factor_min, config.agent_stamina_factor_max);
-        // 💪 力量禀赋加成: 以禀赋基准均值为中轴，力量越高者步履越矫健，越低者步履蹒跚 (上下限保护避免极端个体失衡)
-        let strength_factor = (1.0
-            + (self.strength - config.trait_default_mean) / config.trait_default_mean
-                * config.agent_strength_speed_bonus)
-            .clamp(config.agent_strength_speed_min, config.agent_strength_speed_max);
-        let target_speed = self.max_desired_speed * road_level_factor * stamina_factor * strength_factor;
+        // 💪 力量禀赋直接决定步速: 行走速度 = 默认速度 × 道路质量 × (力量/100)，全员共用默认速度、不受体力影响、不加 clamp
+        let target_speed = self.max_desired_speed * road_level_factor * (self.strength / 100.0);
 
         let accel = (target_speed - self.current_velocity) * config.agent_move_accel_coef;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);
@@ -473,7 +465,6 @@ impl Agent3D {
         } else {
             self.current_velocity = 0.0;
             self.current_lane_id = None;
-            self.is_traveling_offroad = false;
             match self.state {
                 PrimitiveActionState::SeekingWater => {
                     self.state = PrimitiveActionState::DrinkingAtWater;

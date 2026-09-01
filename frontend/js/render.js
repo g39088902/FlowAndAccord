@@ -625,9 +625,10 @@
 
         // 更新悬浮 Tooltip 提示
         const roadTooltip = document.getElementById('road-hover-tooltip');
+        const cfg = window.SIM_CONFIG || {};
         if (roadTooltip) {
           if (hoveredLane) {
-            const wear = Math.min(5.0, hoveredLane.wear || 0.0);
+            const wear = Math.min(cfg.roadMaxWear || 5.0, hoveredLane.wear || 0.0);
             let levelName = '1级 踩踏细径 (泥土小道)';
             let levelColor = '#b45309';
             let barColor = '#f59e0b';
@@ -655,10 +656,10 @@
               badgeText = '2级 夯土土路';
             }
 
-            const speedFactor = (0.50 + 0.333 * wear);
+            const speedFactor = (cfg.roadLevelFactorBase + cfg.roadLevelFactorWearCoef * wear);
             const speedBonusPct = Math.round((speedFactor - 1.0) * 100);
             const speedText = speedBonusPct >= 0 ? `+${speedBonusPct}%` : `${speedBonusPct}%`;
-            const wearPct = Math.round((wear / 5.0) * 100);
+            const wearPct = Math.round((wear / (cfg.roadMaxWear || 5.0)) * 100);
 
             roadTooltip.innerHTML = `
               <div class="road-tooltip-title">
@@ -667,7 +668,7 @@
               </div>
               <div style="display:flex; justify-content:space-between; margin-top:2px;">
                 <span style="color:#94a3b8;">耐久度 / 踩踏值:</span>
-                <span style="color:#f8fafc; font-weight:700; font-family:monospace;">${wear.toFixed(2)} / 5.00 (${wearPct}%)</span>
+                <span style="color:#f8fafc; font-weight:700; font-family:monospace;">${wear.toFixed(2)} / ${(cfg.roadMaxWear || 5.0).toFixed(2)} (${wearPct}%)</span>
               </div>
               <div class="road-tooltip-bar-bg">
                 <div class="road-tooltip-bar-fill" style="width:${wearPct}%; background:${barColor};"></div>
@@ -677,7 +678,7 @@
                 <span style="color:#38bdf8; font-weight:700; font-family:monospace;">${speedFactor.toFixed(2)}x (${speedText})</span>
               </div>
               <div style="font-size:10px; color:#64748b; margin-top:3px; border-top:1px solid rgba(255,255,255,0.06); padding-top:4px;">
-                👟 步行通行: <span style="color:#10b981;">+0.05/次</span> · 闲置自然衰减: <span style="color:#f87171;">-${(wear * (0.010 / 1.5)).toFixed(3)}/s (0.67%/s)</span>
+                👟 步行通行: <span style="color:#10b981;">+${cfg.roadWearStepInc || 0.05}/次</span> · 闲置自然衰减: <span style="color:#f87171;">-${(wear * (cfg.roadWearDecayRate || 0.0067)).toFixed(4)}/s (${((cfg.roadWearDecayRate || 0.0067) * 100).toFixed(2)}%/s)</span>
               </div>
             `;
 
@@ -761,14 +762,6 @@
           ctx.textAlign = 'center';
           ctx.fillText('🥀', p2D.x, p2D.y - 12 * camera.zoom - floatY);
           ctx.restore();
-        }
-
-        if (agent.isOffroad) {
-          ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
-          ctx.lineWidth = 1.0;
-          ctx.beginPath();
-          ctx.arc(p2D.x, p2D.y, 6.0 * camera.zoom, 0, Math.PI * 2);
-          ctx.stroke();
         }
 
         if (agent.trail.length > 1) {

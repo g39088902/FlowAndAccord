@@ -44,11 +44,7 @@ window.SIM_CONFIG = {
   agentConceptionStaminaMin: 80.0,// 受孕所需最低体力
   carryCapacityResource: 50.0,    // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
   agentGoldLoadFull: 20.0,        // 单趟淘金运满入库量
-  agentOffroadSpeedFactor: 0.50,  // 越野 (无路) 移速衰减系数
   agentBaseMoveSpeedMult: 4.0,    // 基础移动速度倍率
-  agentStrengthSpeedBonus: 0.40,  // 力量禀赋对移速的加成系数 (每 ±100 点)
-  agentStrengthSpeedMin: 0.70,    // 力量移速加成下限倍率
-  agentStrengthSpeedMax: 1.30,    // 力量移速加成上限倍率
   agentStaminaCapacity: 100.0,    // 体力值上限 (%)
   agentStealthVisibilityCovert: 0.25, // 隐秘特工可见度
   agentStealthVisibilityNormal: 1.0,  // 普通族人可见度
@@ -72,8 +68,7 @@ window.SIM_CONFIG = {
   agentSpawnStaminaBase: 90.0,     // 始祖初始体力抖动基线
   agentSpawnStaminaClampMin: 55.0, // 始祖初始体力夹取下限
   agentSpawnStaminaClampMax: 100.0,// 始祖初始体力夹取上限
-  agentSpawnBaseSpeed: 8.5,        // 始祖/新生儿基础最大移动速度
-  agentSpawnSpeedRing: 3.0,        // 始祖最大移速按序号离散的环形步长 (i % N)
+  agentSpawnBaseSpeed: 8.5,        // 所有 agent 共用的基础默认行走速度
 
   // ==========================================================================
   // 3. 先天禀赋与遗传演化 (Genetics & Inherited Traits)
@@ -179,7 +174,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
   // ==========================================================================
-  roadWearDecayRate: 0.0010,      // 道路自然杂草衰减速率 (等级/秒)
+  roadWearDecayRate: 0.0067,      // 道路自然杂草衰减速率 (%/秒,相对当前磨损比例衰减)
   roadWearStepInc: 0.05,          // 族人单次通行踩踏增量 (等级/次)
   roadMaxWear: 5.0,               // 道路磨损上限
   roadSpeedDirtTrack: 36.0,       // 泥泞小径限速
@@ -191,7 +186,6 @@ window.SIM_CONFIG = {
   roadLevelFactorWearCoef: 0.333, // 道路等级影响移速磨损系数
   roadLevelFactorMin: 0.50,       // 道路等级移速乘子下限
   roadLevelFactorMax: 2.20,       // 道路等级移速乘子上限
-  roadOffroadWearThreshold: 0.6,  // 越野判定阈值 (磨损低于此值视为荒野)
 
   // ==========================================================================
   // 9. 动力学移动与寻路权重 (Movement & Pathfinding)
@@ -199,9 +193,6 @@ window.SIM_CONFIG = {
   agentMoveStaminaBase: 0.6,      // 移动基础体力消耗 (每秒)
   agentMoveStaminaPregnant: 0.3,  // 孕期额外移动体力消耗 (每秒)
   agentMoveStaminaGradeCoef: 3.5, // 坡度对移动体力消耗加成系数
-  agentStaminaFactorRef: 25.0,    // 体力影响移速参考基准
-  agentStaminaFactorMin: 0.2,     // 体力移速乘子下限
-  agentStaminaFactorMax: 1.0,     // 体力移速乘子上限
   agentMoveAccelCoef: 4.0,        // 移动加速度收敛系数
   roadAstarGradePenaltyCoef: 1.5, // A* 坡度通行代价惩罚系数
   roadAstarHeuristicDivisor: 80.0,// A* 启发式距离除数

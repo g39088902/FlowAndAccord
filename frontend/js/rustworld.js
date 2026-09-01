@@ -359,7 +359,6 @@
             pregnancyProgress: a.pregnancy_progress,
             miscarriageCooldown: a.miscarriage_cooldown,
             miscarriageTimer: a.miscarriage_alert_timer,
-            isOffroad: a.is_offroad,
             deathDecayTimer: a.death_decay_timer,
             deathCause: a.death_cause,
             isCovert: a.is_covert,

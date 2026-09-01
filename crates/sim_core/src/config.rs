@@ -42,14 +42,7 @@ pub const AGENT_CONCEPTION_THIRST_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_STAMINA_MIN: f32 = 80.0;
 pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
 pub const AGENT_GOLD_LOAD_FULL: f32 = 20.0;
-pub const AGENT_OFFROAD_SPEED_FACTOR: f32 = 0.50;
 pub const AGENT_BASE_MOVE_SPEED_MULT: f32 = 4.0;
-/// 💪 力量禀赋对步行速度的加成系数: 力量每偏离基准均值 ±100 点，移速相应增减该比例
-pub const AGENT_STRENGTH_SPEED_BONUS: f32 = 0.40;
-/// 💪 力量移速加成下限倍率 (力量极低者步履蹒跚，最低降至基准速度的 70%)
-pub const AGENT_STRENGTH_SPEED_MIN: f32 = 0.70;
-/// 💪 力量移速加成上限倍率 (力量极高者健步如飞，最高提升至基准速度的 130%)
-pub const AGENT_STRENGTH_SPEED_MAX: f32 = 1.30;
 /// 体力值上限 (%，休息恢复与劳作消耗均 clamp 至此)
 pub const AGENT_STAMINA_CAPACITY: f32 = 100.0;
 pub const AGENT_STEALTH_VISIBILITY_COVERT: f32 = 0.25;
@@ -90,10 +83,8 @@ pub const AGENT_SPAWN_HUNGER_CLAMP_MAX: f32 = 45.0;
 pub const AGENT_SPAWN_STAMINA_BASE: f32 = 90.0;
 pub const AGENT_SPAWN_STAMINA_CLAMP_MIN: f32 = 55.0;
 pub const AGENT_SPAWN_STAMINA_CLAMP_MAX: f32 = 100.0;
-/// 始祖/新生儿基础最大移动速度（再叠加按序号的环形离散）
+/// 所有 agent 共用的基础默认行走速度（再乘以 agent_base_move_speed_mult 得到共享基准速度）
 pub const AGENT_SPAWN_BASE_SPEED: f32 = 8.5;
-/// 始祖最大移动速度按序号离散的环形步长（i % 此值）
-pub const AGENT_SPAWN_SPEED_RING: f32 = 3.0;
 
 // ============================================================================
 // 3. 先天禀赋与遗传演化 (Genetics & Inherited Traits)
@@ -213,8 +204,8 @@ pub const TEMP_AMPLITUDE: f32 = 17.0;
 // ============================================================================
 // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
 // ============================================================================
-/// 道路自然杂草丛生衰减速率 (等级/秒)
-pub const ROAD_WEAR_DECAY_RATE: f32 = 0.0010;
+/// 道路自然杂草丛生衰减速率 (%/秒,相对当前磨损的比例衰减)
+pub const ROAD_WEAR_DECAY_RATE: f32 = 0.0067;
 /// 族人单次通行踩踏增量 (等级/次)；注意：世界实际采用 0.05，const 须与此一致
 pub const ROAD_WEAR_STEP_INC: f32 = 0.05;
 pub const ROAD_MAX_WEAR: f32 = 5.0;
@@ -231,8 +222,6 @@ pub const ROAD_LEVEL_FACTOR_WEAR_COEF: f32 = 0.333;
 pub const ROAD_LEVEL_FACTOR_MIN: f32 = 0.50;
 /// 道路等级影响移速乘子的上限
 pub const ROAD_LEVEL_FACTOR_MAX: f32 = 2.20;
-/// 越野判定阈值：lane 磨损低于此值视为荒野越野（移速衰减）
-pub const ROAD_OFFROAD_WEAR_THRESHOLD: f32 = 0.6;
 
 // ============================================================================
 // 9. 动力学移动与寻路权重 (Movement & Pathfinding)
@@ -243,12 +232,6 @@ pub const AGENT_MOVE_STAMINA_BASE: f32 = 0.6;
 pub const AGENT_MOVE_STAMINA_PREGNANT: f32 = 0.3;
 /// 坡度对移动体力消耗的加成系数
 pub const AGENT_MOVE_STAMINA_GRADE_COEF: f32 = 3.5;
-/// 体力影响移速的参考基准（stamina / 此值 得到速度乘子）
-pub const AGENT_STAMINA_FACTOR_REF: f32 = 25.0;
-/// 体力影响移速乘子的下限
-pub const AGENT_STAMINA_FACTOR_MIN: f32 = 0.2;
-/// 体力影响移速乘子的上限
-pub const AGENT_STAMINA_FACTOR_MAX: f32 = 1.0;
 /// 移动加速度收敛系数（趋近目标速度的比例）
 pub const AGENT_MOVE_ACCEL_COEF: f32 = 4.0;
 /// A* 寻路中坡度对通行代价的惩罚系数
@@ -299,11 +282,7 @@ pub struct SimConfig {
     pub agent_conception_stamina_min: f32,
     pub carry_capacity_resource: f32,
     pub agent_gold_load_full: f32,
-    pub agent_offroad_speed_factor: f32,
     pub agent_base_move_speed_mult: f32,
-    pub agent_strength_speed_bonus: f32,
-    pub agent_strength_speed_min: f32,
-    pub agent_strength_speed_max: f32,
     pub agent_stamina_capacity: f32,
     pub agent_stealth_visibility_covert: f32,
     pub agent_stealth_visibility_normal: f32,
@@ -328,7 +307,6 @@ pub struct SimConfig {
     pub agent_spawn_stamina_clamp_min: f32,
     pub agent_spawn_stamina_clamp_max: f32,
     pub agent_spawn_base_speed: f32,
-    pub agent_spawn_speed_ring: f32,
 
     // 3. 先天禀赋与遗传演化
     pub trait_default_mean: f32,
@@ -434,15 +412,11 @@ pub struct SimConfig {
     pub road_level_factor_wear_coef: f32,
     pub road_level_factor_min: f32,
     pub road_level_factor_max: f32,
-    pub road_offroad_wear_threshold: f32,
 
     // 9. 动力学移动与寻路权重
     pub agent_move_stamina_base: f32,
     pub agent_move_stamina_pregnant: f32,
     pub agent_move_stamina_grade_coef: f32,
-    pub agent_stamina_factor_ref: f32,
-    pub agent_stamina_factor_min: f32,
-    pub agent_stamina_factor_max: f32,
     pub agent_move_accel_coef: f32,
     pub road_astar_grade_penalty_coef: f32,
     pub road_astar_heuristic_divisor: f32,
@@ -482,11 +456,7 @@ impl Default for SimConfig {
             agent_conception_stamina_min: AGENT_CONCEPTION_STAMINA_MIN,
             carry_capacity_resource: CARRY_CAPACITY_RESOURCE,
             agent_gold_load_full: AGENT_GOLD_LOAD_FULL,
-            agent_offroad_speed_factor: AGENT_OFFROAD_SPEED_FACTOR,
             agent_base_move_speed_mult: AGENT_BASE_MOVE_SPEED_MULT,
-            agent_strength_speed_bonus: AGENT_STRENGTH_SPEED_BONUS,
-            agent_strength_speed_min: AGENT_STRENGTH_SPEED_MIN,
-            agent_strength_speed_max: AGENT_STRENGTH_SPEED_MAX,
             agent_stamina_capacity: AGENT_STAMINA_CAPACITY,
             agent_stealth_visibility_covert: AGENT_STEALTH_VISIBILITY_COVERT,
             agent_stealth_visibility_normal: AGENT_STEALTH_VISIBILITY_NORMAL,
@@ -511,7 +481,6 @@ impl Default for SimConfig {
             agent_spawn_stamina_clamp_min: AGENT_SPAWN_STAMINA_CLAMP_MIN,
             agent_spawn_stamina_clamp_max: AGENT_SPAWN_STAMINA_CLAMP_MAX,
             agent_spawn_base_speed: AGENT_SPAWN_BASE_SPEED,
-            agent_spawn_speed_ring: AGENT_SPAWN_SPEED_RING,
 
             // 3. 先天禀赋与遗传演化
             trait_default_mean: TRAIT_DEFAULT_MEAN,
@@ -617,15 +586,11 @@ impl Default for SimConfig {
             road_level_factor_wear_coef: ROAD_LEVEL_FACTOR_WEAR_COEF,
             road_level_factor_min: ROAD_LEVEL_FACTOR_MIN,
             road_level_factor_max: ROAD_LEVEL_FACTOR_MAX,
-            road_offroad_wear_threshold: ROAD_OFFROAD_WEAR_THRESHOLD,
 
             // 9. 动力学移动与寻路权重
             agent_move_stamina_base: AGENT_MOVE_STAMINA_BASE,
             agent_move_stamina_pregnant: AGENT_MOVE_STAMINA_PREGNANT,
             agent_move_stamina_grade_coef: AGENT_MOVE_STAMINA_GRADE_COEF,
-            agent_stamina_factor_ref: AGENT_STAMINA_FACTOR_REF,
-            agent_stamina_factor_min: AGENT_STAMINA_FACTOR_MIN,
-            agent_stamina_factor_max: AGENT_STAMINA_FACTOR_MAX,
             agent_move_accel_coef: AGENT_MOVE_ACCEL_COEF,
             road_astar_grade_penalty_coef: ROAD_ASTAR_GRADE_PENALTY_COEF,
             road_astar_heuristic_divisor: ROAD_ASTAR_HEURISTIC_DIVISOR,

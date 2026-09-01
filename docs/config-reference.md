@@ -31,11 +31,7 @@
 | `agentConceptionStaminaMin` | f32 | 80 | 受孕所需最低体力 |
 | `carryCapacityResource` | f32 | 50 | 单类资源随身行囊容量 (水/粮/木/石 互不共享) |
 | `agentGoldLoadFull` | f32 | 20 | 单趟淘金运满入库量 |
-| `agentOffroadSpeedFactor` | f32 | 0.5 | 越野 (无路) 移速衰减系数 |
 | `agentBaseMoveSpeedMult` | f32 | 4 | 基础移动速度倍率 |
-| `agentStrengthSpeedBonus` | f32 | 0.4 | 力量禀赋对移速的加成系数 (每 ±100 点) |
-| `agentStrengthSpeedMin` | f32 | 0.7 | 力量移速加成下限倍率 |
-| `agentStrengthSpeedMax` | f32 | 1.3 | 力量移速加成上限倍率 |
 | `agentStaminaCapacity` | f32 | 100 | 体力值上限 (%) |
 | `agentStealthVisibilityCovert` | f32 | 0.25 | 隐秘特工可见度 |
 | `agentStealthVisibilityNormal` | f32 | 1 | 普通族人可见度 |
@@ -59,8 +55,7 @@
 | `agentSpawnStaminaBase` | f32 | 90 | 始祖初始体力抖动基线 |
 | `agentSpawnStaminaClampMin` | f32 | 55 | 始祖初始体力夹取下限 |
 | `agentSpawnStaminaClampMax` | f32 | 100 | 始祖初始体力夹取上限 |
-| `agentSpawnBaseSpeed` | f32 | 8.5 | 始祖/新生儿基础最大移动速度 |
-| `agentSpawnSpeedRing` | f32 | 3 | 始祖最大移速按序号离散的环形步长 (i % N) |
+| `agentSpawnBaseSpeed` | f32 | 8.5 | 所有 agent 共用的基础默认行走速度 |
 | `traitDefaultMean` | f32 | 100 | 禀赋基准均值 |
 | `traitInitialStdDev` | f32 | 20 | 始祖禀赋初始标准差 |
 | `traitMutationDelta` | f32 | 10 | 遗传突变偏移量 |
@@ -142,7 +137,7 @@
 | `seasonYearLength` | f32 | 240 | 一年 (四季) 总时长 (模拟秒) |
 | `tempBaseMid` | f32 | 14 | 年均基准温度 (℃) |
 | `tempAmplitude` | f32 | 17 | 季节温度振幅 (℃) |
-| `roadWearDecayRate` | f32 | 0.001 | 道路自然杂草衰减速率 (等级/秒) |
+| `roadWearDecayRate` | f32 | 0.0067 | 道路自然杂草衰减速率 (%/秒,相对当前磨损比例衰减) |
 | `roadWearStepInc` | f32 | 0.05 | 族人单次通行踩踏增量 (等级/次) |
 | `roadMaxWear` | f32 | 5 | 道路磨损上限 |
 | `roadSpeedDirtTrack` | f32 | 36 | 泥泞小径限速 |
@@ -154,13 +149,9 @@
 | `roadLevelFactorWearCoef` | f32 | 0.333 | 道路等级影响移速磨损系数 |
 | `roadLevelFactorMin` | f32 | 0.5 | 道路等级移速乘子下限 |
 | `roadLevelFactorMax` | f32 | 2.2 | 道路等级移速乘子上限 |
-| `roadOffroadWearThreshold` | f32 | 0.6 | 越野判定阈值 (磨损低于此值视为荒野) |
 | `agentMoveStaminaBase` | f32 | 0.6 | 移动基础体力消耗 (每秒) |
 | `agentMoveStaminaPregnant` | f32 | 0.3 | 孕期额外移动体力消耗 (每秒) |
 | `agentMoveStaminaGradeCoef` | f32 | 3.5 | 坡度对移动体力消耗加成系数 |
-| `agentStaminaFactorRef` | f32 | 25 | 体力影响移速参考基准 |
-| `agentStaminaFactorMin` | f32 | 0.2 | 体力移速乘子下限 |
-| `agentStaminaFactorMax` | f32 | 1 | 体力移速乘子上限 |
 | `agentMoveAccelCoef` | f32 | 4 | 移动加速度收敛系数 |
 | `roadAstarGradePenaltyCoef` | f32 | 1.5 | A* 坡度通行代价惩罚系数 |
 | `roadAstarHeuristicDivisor` | f32 | 80 | A* 启发式距离除数 |

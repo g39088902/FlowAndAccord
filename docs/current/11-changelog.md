@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.64)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.66)**。
 
 ---
 
@@ -169,3 +169,13 @@
   - **模块拆分与同源**：按 AGENTS §4.6 将 1306 行的 `dag.js` 拆为 `dag-layout.js`（纯布局数学，零 DOM，浏览器/Node 双端可加载）/ `dag-view.js`（虚拟化渲染+LOD+pan/zoom+刻度尺）/ `dag-standalone.js`（独立新标签页 HTML 模板）/ `dag.js`（数据构建+模态编排+Inspector，仅 300 余行）；standalone 经 `FlowDagLayout.SRC` + `FlowDagView.SRC`（`Function.prototype.toString()` 内嵌，含 `LAYOUT_CONST` 常量字面量）保持页内模态与独立标签页严格同源——**注意顺序**：布局 SRC 必须先于任何 `LAYOUT_CONST` 引用声明（否则 const 的 TDZ 会让 bootstrap 静默中断，正是本次调试中踩到的坑）。
   - **配套修正**：`index.html` 补齐亲子边箭头 marker 全局 `<defs>`（`dag-arrow-father`/`dag-arrow-mother`，页内模态与独立页共用）、新增时间密度滑块与统计徽章，脚本顺序改为 `dag-layout → dag-view → dag-standalone → dag`；`main.js` 去掉 `openInNewTab` 的无效第三参数，关闭族谱改走 `FlowDag.closeModal()` 以正确销毁虚拟化视图（DOM 回收与事件解绑）。
   - **验证**：新增 `tools/dag-shot.js`（零依赖，在 Node 中 eval 加载四个 dag 模块到 globalThis、走生产路径 `generateStandaloneDagHtml` 生成静态页，再用系统 Chrome headless 多档位截图）；实测焦点 #2（94 节点/103 边，压测）与 #311（27 节点，典型）在 fit / focus / detail / top / bottom 各档位均**零重叠**、主干红色骨干连续、年标与网格正确、LOD 分档切换自然。纯前端改动，未触碰 Rust 内核与 WASM 产物；版本号自增 v0.9.63 → v0.9.64。
+- **💪 行走速度力量加成重构：默认速度共用 + 强度直接乘率 (v0.9.65)**：
+  - **规格**：行走速度公式由 `默认速度 × 道路质量 × 体力乘子 × 力量加成(clamp 0.7~1.3)` 重构为 `默认速度 × 道路质量(road_level_factor) × (力量/100)`；**所有 agent 共用同一默认速度**（不再按始祖序号做环形离散），**速度不再受体力影响**，`strength/100` 不做任何 clamp（力量=100 时 1.0 倍、=0 时 0、负数经 `current_velocity.max(0.0)` 自然停步）。
+  - **改动点**：`agent.rs` 运动函数删除 `stamina_factor` 与旧 `strength_factor`，改为 `max_desired_speed * road_level_factor * (strength/100.0)`；`ecology.rs` 始祖初始化去除 `+ (i % agent_spawn_speed_ring)` 离散，全员基准速度统一为 `agent_spawn_base_speed * agent_base_move_speed_mult`；清理 7 个废弃超参（`agentStrengthSpeedBonus/Min/Max`、`agentStaminaFactorRef/Min/Max`、`agentSpawnSpeedRing`）及其 `SimConfig` 字段、`config.js` 映射与 `Default` 映射，`SimConfig` 字段由 161 降至 154（`docs/config-reference.md` 已重生成）。体力消耗（`stamina_burn`）与决策阈值仍保留、不受影响。
+  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过，WASM 双副本同步；`node tools/config-check.js` 输出「字段集、类型、默认值完全一致，无漂移」；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（同种子逐字节确定性、防越界、防 NaN 全通过）。RNG 消费顺序未变，行为确定。
+
+- **🛣️ 道路比例衰减 + 清理越野惩罚死机制 + 前端超参去硬编码 (v0.9.66)**：
+  - **道路衰减改比例模型**：`graph.rs::tick_wear_decay` 由线性 `wear - rate*dt` 改为比例 `wear * (1 - rate*dt)`（每秒衰减当前磨损的 `road_wear_decay_rate`）；`ROAD_WEAR_DECAY_RATE` 由 `0.0010`(等级/秒) 调整为 `0.0067`(即 0.67%/秒，相对当前磨损)，`config.js::roadWearDecayRate` 同步；纯数值运算，不引入 RNG 消耗，确定性不受影响。
+  - **清理越野惩罚死机制**：经核查内核 `agent_offroad_speed_factor` 从未参与 `target_speed` 计算、越野惩罚实际无效果；按"道路已提供速度加成，无需越野惩罚"清理整套死机制——删除 `is_traveling_offroad` 字段及两处赋值、`AGENT_OFFROAD_SPEED_FACTOR` / `ROAD_OFFROAD_WEAR_THRESHOLD` 两个 const 与其 `SimConfig` 字段及 `Default` 映射、快照 `is_offroad` 字段（`snapshot.rs` / `world.rs` / `rustworld.js` 三处同步删除）、前端 `agentOffroadSpeedFactor` / `roadOffroadWearThreshold` 配置项与 agent 越野绘制分支；保留 `OffRoadDetour` 寻路兜底状态。
+  - **前端超参去硬编码**：`render.js` 道路 tooltip 的 `0.50 + 0.333*wear`、`wear/5.0`、`5.00`、`+0.05/次`、`wear*(0.010/1.5)` 等全部改为读取 `window.SIM_CONFIG`（`roadLevelFactorBase` / `roadLevelFactorWearCoef` / `roadMaxWear` / `roadWearStepInc` / `roadWearDecayRate`），衰减百分比随配置准确显示。
+  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过，WASM 双副本同步；`node tools/config-check.js` 字段集/类型/默认值完全一致；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`；临时 Rust/Node 测试覆盖比例衰减与前端去硬编码，验证通过后删除（遵循 §4.10）。

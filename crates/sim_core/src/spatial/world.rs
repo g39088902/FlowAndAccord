@@ -340,7 +340,6 @@ impl World3DEngine {
                 is_pregnant: agent.is_pregnant,
                 pregnancy_progress: agent.pregnancy_progress,
                 miscarriage_cooldown: agent.miscarriage_cooldown_timer,
-                is_offroad: agent.is_traveling_offroad,
                 miscarriage_alert: agent.miscarriage_alert_timer > 0.0,
                 death_decay_timer: agent.death_decay_timer,
                 death_cause: agent.death_cause.clone(),
