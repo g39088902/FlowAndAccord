@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.66)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.68)**。
 
 ---
 
@@ -179,3 +179,16 @@
   - **清理越野惩罚死机制**：经核查内核 `agent_offroad_speed_factor` 从未参与 `target_speed` 计算、越野惩罚实际无效果；按"道路已提供速度加成，无需越野惩罚"清理整套死机制——删除 `is_traveling_offroad` 字段及两处赋值、`AGENT_OFFROAD_SPEED_FACTOR` / `ROAD_OFFROAD_WEAR_THRESHOLD` 两个 const 与其 `SimConfig` 字段及 `Default` 映射、快照 `is_offroad` 字段（`snapshot.rs` / `world.rs` / `rustworld.js` 三处同步删除）、前端 `agentOffroadSpeedFactor` / `roadOffroadWearThreshold` 配置项与 agent 越野绘制分支；保留 `OffRoadDetour` 寻路兜底状态。
   - **前端超参去硬编码**：`render.js` 道路 tooltip 的 `0.50 + 0.333*wear`、`wear/5.0`、`5.00`、`+0.05/次`、`wear*(0.010/1.5)` 等全部改为读取 `window.SIM_CONFIG`（`roadLevelFactorBase` / `roadLevelFactorWearCoef` / `roadMaxWear` / `roadWearStepInc` / `roadWearDecayRate`），衰减百分比随配置准确显示。
   - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过，WASM 双副本同步；`node tools/config-check.js` 字段集/类型/默认值完全一致；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`；临时 Rust/Node 测试覆盖比例衰减与前端去硬编码，验证通过后删除（遵循 §4.10）。
+
+- **🌐 浏览器自动化使用指南落库 (v0.9.67)**：
+  - **实机验证沉淀**：对 playwright-cli v0.1.18 驱动的 4 个浏览器引擎（Chromium / Firefox / WebKit / 系统 Chrome）逐一完成「打开 → 渲染校验（`document.title` + `h1`）→ 截图（`file` 确认有效 1280×720 PNG）」串行实测，**4/4 全部通过**，总耗时各 5~7s、零超时；产物与报告存 `~/Downloads/browser-verify/`。
+  - **新增 `docs/browser-guide.md`**：收录可驱动浏览器一览、用户级安装位置（`~/.local/pw-tools`，规避 `/usr/local` EACCES）、标准操作流程（独立命名会话 + finally 收尾）、防卡死策略（`pw-timeout.mjs` 限时包装器：SIGTERM → 3s 后 SIGKILL 进程组，`kill-all` / `pkill -f playwright` 兜底，单会话 90s 总预算）与 7 条踩坑清单（zsh 不分词、JCEF 误杀、snapshot 落盘等）。
+  - **AGENTS.md 同步**：第 0 节文档地图登记 `docs/browser-guide.md` 条目。
+  - 纯文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.66 → v0.9.67。
+
+- **🚀 CI/CD 自动部署流水线：GitHub Actions → 腾讯云 COS (v0.9.68)**：
+  - **新增 `.github/workflows/deploy.yml`**：仅 push `master`（或手动 `workflow_dispatch`）触发，同分支连续 push 自动取消旧部署（concurrency）；流程为 rustup 安装 stable + wasm32 target（`Swatinem/rust-cache` 缓存）→ `cargo build -p sim_wasm --release` → WASM 双副本同步至 `frontend/rust/` 与 `frontend/`（§4.1）→ `node tools/test-wasm.js` 回归门禁（不过不部署）→ 官方 `coscmd` `--delete` 增量上传 `frontend/` 整目录 → 强制覆写两个 `.wasm` 的 `Content-Type: application/wasm` → Job Summary 输出部署摘要；
+  - **工具链隔离**：CI 使用标准 rustup 与默认 `CARGO_HOME`，不触碰仓库内 Windows 便携缓存 `.toolchain/` / `.cargo-home`；使用官方 coscmd 而非第三方社区 Action，密钥仅经 GitHub Secrets 注入，降低供应链风险；
+  - **新增 `docs/cicd-guide.md`**：收录流水线架构图、需配置的 4 个 GitHub Secrets 清单（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`）、子账号最小权限建议、COS 静态网站开启步骤、`.wasm` MIME 排障与常见失败处理；
+  - **AGENTS.md 同步**：文档地图登记 cicd-guide.md，新增 §4.13 CI/CD 坑点（工具链差异 / MIME / 密钥安全）；
+  - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.67 → v0.9.68。

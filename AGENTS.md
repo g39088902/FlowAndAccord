@@ -15,6 +15,8 @@
 | **AGENTS.md**（本文档，根目录） | 智能体操作指南：架构概述、编译步骤、快捷键 + 第 4 节易踩坑清单 | **改任何代码前必读**；新增机制或踩了新坑必须补充 |
 | **docs/CURRENT.md** | **已实现功能「索引入口」**：全局架构速览 + 模块导航表；各模块详述拆分至 `docs/current/`（`01` 空间路网 / `02` 生态POI / `03` 四季 / `04` 代谢繁衍 / `05` 房屋 / `06` 决策AI / `07` 前端表现 / `08` 配置 / `09` 代码地图 / `10` 快速启动 / `11` 版本演进） | 快速了解"现状"时查索引；**改动机制须同步更新对应 `docs/current/0X-*.md` 模块文档并在 `11-changelog.md` 追加版本条目** |
 | **docs/BUILD_GUIDE.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试用例与故障排查 | 深入构建与环境排障时参考 |
+| **docs/browser-guide.md** | 浏览器自动化使用指南：playwright-cli 工具链、可驱动引擎一览（Chromium/Firefox/WebKit/Chrome，已实测 4/4 通过）、标准操作流程、防卡死限时策略与误杀 IDE 等踩坑清单 | 需要「打开页面/渲染校验/截图/自动化交互」时按此操作；新增浏览器工具或踩新坑必须同步修订 |
+| **docs/cicd-guide.md** | CI/CD 自动部署指南：GitHub Actions 流水线（push master → 编译 WASM → test-wasm.js 门禁 → coscmd 上传 COS）、需配置的 4 个 GitHub Secrets、COS 静态网站开启与 MIME 排障 | 需要调整部署流程、更换桶/地域或排查部署失败时查阅 |
 | **docs/AGENT_AI_ANALYSIS.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机、寻路与代际演化逻辑时查阅 |
 | **docs/ARCHITECTURE.md** | 宏观技术架构设计愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（大部分前沿特性为规划态） |
 | **docs/PLAN.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观发展方向（大部分内容为规划态） |
@@ -45,7 +47,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.66)"]
+    E --> F["浏览器 UI (版本: v0.9.68)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -105,7 +107,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.66`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.68`**。
 
 ---
 
@@ -224,3 +226,10 @@ node frontend/server.js
 - **一致性校验工具 `tools/config-check.js`**：零依赖纯 Node 脚本，交叉解析 `config.js` 与 `config.rs`，捕获四类问题并退出码报错——① 孤儿字段（前端有/Rust 无）、② 缺失字段（Rust 有/前端无）、③ 类型错配（`usize/u64` 与浮点）、④ 数值漂移（默认值不一致）。任一报错即说明前后端已失同步，须先修复再发布。
 - **参数速查表 `docs/config-reference.md`**：由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值与中文说明，是用户检索/核对参数的唯一权威入口（不要手工维护，改 `config.rs` 后重跑工具即可刷新）。
 - **防回归**：`config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致；`node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。
+
+### 4.13 🚀 CI/CD 流水线（GitHub Actions → 腾讯云 COS）
+
+- **触发与门禁**：`.github/workflows/deploy.yml` 仅在 **push `master`**（或手动 `workflow_dispatch`）时运行；流程为 编译 WASM → 双副本同步（§4.1）→ `node tools/test-wasm.js` 门禁 → `coscmd` 增量上传 `frontend/`；门禁不过不部署。详细说明见 [`docs/cicd-guide.md`](./docs/cicd-guide.md)。
+- **CI 工具链与本地 `.toolchain` 差异**：CI 使用标准 rustup（`dtolnay/rust-toolchain` + `Swatinem/rust-cache`），**严禁**在 workflow 中设置 `CARGO_HOME` 指向仓库 `.cargo-home` 或把 `.toolchain/` 加入 PATH——它们是 Windows 便携缓存，已被 gitignore 且与 ubuntu-latest 不兼容。
+- **wasm MIME**：`.wasm` 必须 `Content-Type: application/wasm`，否则浏览器流式编译失败；workflow 在上传后对双副本强制覆写 Header，修改上传逻辑时勿遗漏。
+- **密钥安全**：桶地址/密钥一律走 GitHub Secrets（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`），严禁写入代码、文档或 workflow 明文。

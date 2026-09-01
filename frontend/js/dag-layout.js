@@ -268,14 +268,17 @@
   }
 
   // ------------------------------------------------- 亲子边路径
+  // offsetX/offsetY 兼容历史调用签名 (缺省视为 0，避免产生 NaN 坐标导致 SVG 不渲染)
   function edgePathTimeline(e, offsetX, offsetY) {
     const C = LAYOUT_CONST;
     const a = e.parent;
     const b = e.child;
-    const startX = a.x + offsetX + C.NODE_W * (e.parentType === 'father' ? 0.34 : 0.66);
-    const startY = a.y + offsetY + C.NODE_H;
-    const endX = b.x + offsetX + C.NODE_W * (e.parentType === 'father' ? 0.32 : 0.68);
-    const endY = b.y + offsetY;
+    const ox = offsetX || 0;
+    const oy = offsetY || 0;
+    const startX = a.x + ox + C.NODE_W * (e.parentType === 'father' ? 0.34 : 0.66);
+    const startY = a.y + oy + C.NODE_H;
+    const endX = b.x + ox + C.NODE_W * (e.parentType === 'father' ? 0.32 : 0.68);
+    const endY = b.y + oy;
     const midY = (startY + endY) * 0.5;
     return 'M ' + startX + ' ' + startY + ' C ' + startX + ' ' + midY + ', ' + endX + ' ' + midY + ', ' + endX + ' ' + endY;
   }
@@ -285,10 +288,12 @@
     const C = LAYOUT_CONST;
     const a = e.parent;
     const b = e.child;
-    const startX = a.x + offsetX + C.NODE_W * 0.5;
-    const startY = a.y + offsetY + C.NODE_H;
-    const endX = b.x + offsetX + C.NODE_W * 0.5;
-    const endY = b.y + offsetY;
+    const ox = offsetX || 0;
+    const oy = offsetY || 0;
+    const startX = a.x + ox + C.NODE_W * 0.5;
+    const startY = a.y + oy + C.NODE_H;
+    const endX = b.x + ox + C.NODE_W * 0.5;
+    const endY = b.y + oy;
     return 'M ' + startX + ' ' + startY + ' L ' + endX + ' ' + endY;
   }
 

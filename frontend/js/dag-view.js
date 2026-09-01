@@ -224,10 +224,10 @@
         const key = e.__ix + '|' + lod + '|' + (relSet ? (rel ? 1 : 0) : 0);
         if (slot.key !== key) {
           if (lod === 'block') {
-            if (e.__flat === undefined) e.__flat = L.edgePathFlat(e);
+            if (e.__flat === undefined) e.__flat = L.edgePathFlat(e, 0, 0);
             slot.el.setAttribute('d', e.__flat);
           } else {
-            if (e.__curve === undefined) e.__curve = L.edgePathTimeline(e);
+            if (e.__curve === undefined) e.__curve = L.edgePathTimeline(e, 0, 0);
             slot.el.setAttribute('d', e.__curve);
           }
           let cls = 'dag-edge ' + (e.parentType === 'father' ? 'father-edge' : 'mother-edge');
