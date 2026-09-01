@@ -1,11 +1,12 @@
 use crate::rng::WorldRng;
-use crate::config::SimConfig;
+use crate::config::{SimConfig, LEDGER_JOURNAL_CAPACITY};
 use std::collections::HashMap;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::{House, HouseSnapshot};
+use super::ledger::{HouseholdRegistry, MarriageRegistry};
 use super::snapshot::{
     AgentSnapshot, GeoCellSnapshot, LaneSnapshot, NodeSnapshot, PoiSnapshot, Season,
     WorldSnapshot3D,
@@ -42,6 +43,10 @@ pub struct World3DEngine {
     pub config: SimConfig,
     /// AgentId → agents Vec 下标的快速查找索引；Vec 结构变更后需调用 rebuild_agent_index() 刷新
     pub agent_index: HashMap<AgentId, usize>,
+    /// ★ 婚姻登记簿（只记两性关系与历史；家庭账本不在婚姻下）
+    pub marriage_registry: MarriageRegistry,
+    /// ★ 家户登记簿（**家庭跟着男人走**：以男性户主为锚的家庭单元与账本）
+    pub household_registry: HouseholdRegistry,
 }
 
 impl World3DEngine {
@@ -85,7 +90,14 @@ impl World3DEngine {
             last_event: None,
             config,
             agent_index: HashMap::new(),
+            marriage_registry: MarriageRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            household_registry: HouseholdRegistry::new(LEDGER_JOURNAL_CAPACITY),
         }
+    }
+
+    /// 当前世界 tick 数（只读访问器：tick_counter 为私有字段，供 ledger / housing_system 钩子取时刻）
+    pub fn current_tick(&self) -> u64 {
+        self.tick_counter
     }
 
     /// 从 JSON 字符串解析并应用动态仿真配置
@@ -178,13 +190,14 @@ impl World3DEngine {
             poi.tick_regenerate(dt * mult);
         }
 
-        // 2. 代谢与繁衍
+        // 2. 代谢与繁衍（受孕瞬间需为胎儿占号，故将发号器取出循环外，循环结束回写）
+        let mut next_agent_id = self.next_agent_id;
         for agent in &mut self.agents {
             let fertility_active = agent.home_house_id
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| h.is_fertility_active(&self.config))
                 .unwrap_or(false);
-            if let Some(event) = agent.tick_metabolism(dt, fertility_active, &self.config) {
+            if let Some(event) = agent.tick_metabolism(dt, fertility_active, &self.config, &mut next_agent_id) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
                     if agent.death_is_natural {
@@ -199,6 +212,7 @@ impl World3DEngine {
                 self.last_event = Some(event);
             }
         }
+        self.next_agent_id = next_agent_id; // 回写发号器（受孕占号后递增）
 
         // 2.5 金币遗产继承结算 (死者金币平分给在世子一代子女)
         self.settle_gold_inheritance();

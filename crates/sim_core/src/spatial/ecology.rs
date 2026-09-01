@@ -20,6 +20,9 @@ impl World3DEngine {
         self.total_deaths_unnatural = 0;
         self.total_miscarriages = 0;
         self.next_agent_id = 1;
+        // ★ 世界重置：婚姻/家户登记簿与 agents 清空同步（账本重构 M1.7）
+        self.marriage_registry.clear();
+        self.household_registry.clear();
 
         let mut camp_nodes = Vec::new();
         let mut water_nodes = Vec::new();
@@ -218,6 +221,11 @@ impl World3DEngine {
             agent.surname = COMMON_SURNAMES[surname_idx].to_string();
 
             self.agents.push(agent);
+        }
+
+        // ★ 为每位始祖男性建家户（家庭跟着男人走；女性成婚后转入夫家，故暂不入户）
+        for agent in self.agents.iter().filter(|a| a.is_alive && a.gender == Gender::Male) {
+            self.household_registry.create(agent.id, None, 0);
         }
 
         self.last_event = Some("🏕️ 生态初始：20 位始祖族人（10男10女）成家配对，踏路筑室，社会演化开启！".to_string());

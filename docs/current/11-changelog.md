@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.71)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.72)**。
 
 ---
 
@@ -211,3 +211,13 @@
   - **修复**：木石庄舍图标统一改为 **🏯**（木石结构的东方庄阁，与 2级私宅 🏡、4级大庄园 🏰、县级行政区 🏛️ 四者互不重复）；
   - **同步五处**：`frontend/js/render.js`（地图宅舍图标 + Inspector 等级标题 + 注释）、`frontend/index.html`（图例面板）、`crates/sim_core/src/spatial/housing_system/construction.rs`（2级→3级竣工播报）、`docs/current/05-house-system.md`（等级图标表）、TODO 待办销项；
   - 涉及 Rust 事件文案改动，已重编译 WASM 并同步双副本；版本号自增 v0.9.70 → v0.9.71。
+
+- **📒 账本与婚姻登记系统奠基（M1，v0.9.72）**：
+  - **新模块 `crates/sim_core/src/spatial/ledger/`**：账本内核（`ResourceKind` / `Ledger` 分品类存量 + 双环形流水 / `TransferRecord` / `TransferReason` 含 `Split` 分家）+ `transfer()` 双向记账总线；与新房屋/仓库物理仓储**完全分离**（不改 `house.rs` pantry_*、`agent.rs` carried_*、`ecology.rs` 装卸逻辑），流水只记"归谁、谁付谁收"权责；
+  - **团体基类 `Group`**（`group.rs`）：领导 leader + 成员列表 members（含领导，BTreeSet 保序）+ 账本 ledger；成员/领导变动走 `add_member / remove_member / set_leader` 单点入口并留审计事件；
+  - **婚姻登记簿 `MarriageRegistry`**（`marriage.rs`）：一人终生多段婚姻全留痕（初婚/丧偶 `Bereaved` 封账/改嫁开新账），存续唯一性单点校验，`next_id` 确定性发号；`Agent3D.spouse_id` 降级为缓存，真实来源为登记簿；婚姻与房屋数据解耦（不持有 house_id）；
+  - **★ 家户体系 `HouseholdRegistry`**（`family.rs`）：**家庭跟着男人走**——家户以男性户主为锚，`by_agent` 唯一归属索引，改嫁先移后加；已婚女性随夫入家户；为 M2 分家（父权重2/子一代各1）与丧父继承（平分在世子女/绝嗣入公仓）预留 `parent_household` 血缘链；
+  - **★ 胎儿预分配 ID**：受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿占用 `AgentId`（`pregnancy_child_id`），分娩（`birth.rs`）复用该 ID——未出生孩子可计入分家权重与继承分配；发号不消耗 `WorldRng`；
+  - **生命周期挂钩**：`housing_system/marriage.rs` 成婚 → 登记簿注册 + 女方转入夫家家户；丧偶 → 封账归档；世界重置同步清空两登记簿、seed 为每位始祖男性建户；
+  - **超参**：新增 `ledgerJournalCapacity`（64），`config.rs` 三处 + `config.js` 同步，`config-check.js` 153/153 通过；
+  - 已重编译 WASM 并同步双副本，`test-wasm.js` 回归 `ALL_TESTS_DONE`（确定性逐字节一致，长程 0 越界 0 NaN）；版本号自增 v0.9.71 → v0.9.72。

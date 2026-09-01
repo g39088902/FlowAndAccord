@@ -200,4 +200,9 @@ window.SIM_CONFIG = {
   roadVisiblePreferModifier: 1.2, // A* 偏好隐秘时公开道路代价乘子
   roadHiddenAvoidModifier: 2.5,   // A* 非偏好隐秘时隐秘道路代价乘子
   roadVisibleAvoidModifier: 1.0,  // A* 非偏好隐秘时公开道路代价乘子
+
+  // ==========================================================================
+  // 10. 账本与婚姻登记子系统 (Ledger & Marriage Registry)
+  // ==========================================================================
+  ledgerJournalCapacity: 64,      // 账本流水环形缓冲容量 (每团体/家户，条)
 };

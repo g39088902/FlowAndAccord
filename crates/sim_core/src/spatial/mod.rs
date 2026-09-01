@@ -9,6 +9,7 @@ pub mod ecology;
 pub mod birth;
 pub mod decisions;
 pub mod housing_system;
+pub mod ledger;
 pub mod world;
 
 pub use vec3::Vec3;
@@ -18,5 +19,6 @@ pub use poi::{PrimitivePoi, PoiType, PoiId};
 pub use house::{House, HouseTier, HouseSnapshot};
 pub use agent::{Agent3D, PrimitiveActionState, AgentId, Gender};
 pub use snapshot::{WorldSnapshot3D, Season, PoiSnapshot, NodeSnapshot, LaneSnapshot, AgentSnapshot, GeoCellSnapshot};
+pub use ledger::{Group, GroupKind, Household, HouseholdRegistry, Ledger, LedgerRef, Marriage, MarriageRegistry, ResourceKind, TransferRecord};
 pub use world::World3DEngine;
 

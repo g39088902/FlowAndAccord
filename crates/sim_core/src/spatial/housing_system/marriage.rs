@@ -1,5 +1,6 @@
 use crate::spatial::agent::Gender;
 use crate::spatial::house::HouseTier;
+use crate::spatial::ledger::MarriageEndReason;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
@@ -9,13 +10,19 @@ impl World3DEngine {
         for i in 0..self.agents.len() {
             if !self.agents[i].is_alive {
                 if let Some(sp_id) = self.agents[i].spouse_id {
+                    let deceased_id = self.agents[i].id;
                     let deceased_gender = self.agents[i].gender;
                     self.agents[i].spouse_id = None;
-                    unmarry_list.push((sp_id, deceased_gender));
+                    unmarry_list.push((deceased_id, sp_id, deceased_gender));
                 }
             }
         }
-        for (sp_id, deceased_gender) in unmarry_list {
+        for (deceased_id, sp_id, deceased_gender) in unmarry_list {
+            // ★ 丧偶：婚姻登记簿封账归档（真实来源为登记簿，spouse_id 为缓存）
+            let tick = self.current_tick();
+            if let Some(mid) = self.marriage_registry.active_marriage_of(deceased_id) {
+                self.marriage_registry.close(mid, MarriageEndReason::Bereaved, tick);
+            }
             let partner_pos = self.agents.iter().find(|a| a.id == sp_id).map(|a| a.world_pos);
             if let Some(pos) = partner_pos {
                 let c_node = self.find_nearest_camp_node(pos);
@@ -53,6 +60,15 @@ impl World3DEngine {
                         .map(|a| a.id);
 
                     if let Some(female_id) = candidate_female_id {
+                        // ★ 先登记婚姻（登记簿单点校验存续唯一性；失败则不结婚，保证婚姻/家户/房屋三系统一致）
+                        let tick = self.current_tick();
+                        let Some(_marriage_id) = self.marriage_registry.register(owner_id, female_id, tick) else {
+                            continue;
+                        };
+                        // ★ 女方转入夫家家户（家庭跟着男人走：家庭账本与成员归属均在户主家户下）
+                        if let Some(hid) = self.household_registry.household_of(owner_id) {
+                            self.household_registry.transfer_member(female_id, hid, tick);
+                        }
                         if let Some(husband) = self.agents.iter_mut().find(|a| a.id == owner_id) {
                             husband.spouse_id = Some(female_id);
                         }

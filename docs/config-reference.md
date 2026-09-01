@@ -3,7 +3,7 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 9. 动力学移动与寻路权重
+## 10. 账本与婚姻登记子系统
 
 | 字段 (camelCase) | 类型 | 默认值 | 中文说明 |
 | :--- | :--- | :--- | :--- |
@@ -159,3 +159,4 @@
 | `roadVisiblePreferModifier` | f32 | 1.2 | A* 偏好隐秘时公开道路代价乘子 |
 | `roadHiddenAvoidModifier` | f32 | 2.5 | A* 非偏好隐秘时隐秘道路代价乘子 |
 | `roadVisibleAvoidModifier` | f32 | 1 | A* 非偏好隐秘时公开道路代价乘子 |
+| `ledgerJournalCapacity` | usize | 64 | 账本流水环形缓冲容量 (每团体/家户，条) |

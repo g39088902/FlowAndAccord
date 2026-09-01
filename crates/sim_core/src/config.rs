@@ -248,7 +248,13 @@ pub const ROAD_HIDDEN_AVOID_MODIFIER: f32 = 2.5;
 pub const ROAD_VISIBLE_AVOID_MODIFIER: f32 = 1.0;
 
 // ============================================================================
-// 10. 动态仿真配置结构体 (SimConfig)
+// 10. 账本与婚姻登记子系统 (Ledger & Marriage Registry)
+// ============================================================================
+/// 账本流水环形缓冲容量（每账本，条）：超容量淘汰最旧流水，防长程运行内存膨胀
+pub const LEDGER_JOURNAL_CAPACITY: usize = 64;
+
+// ============================================================================
+// 11. 动态仿真配置结构体 (SimConfig)
 // ============================================================================
 
 /// 统一动态超参数结构体，支持从前端 JSON 动态反序列化更新
@@ -424,6 +430,9 @@ pub struct SimConfig {
     pub road_visible_prefer_modifier: f32,
     pub road_hidden_avoid_modifier: f32,
     pub road_visible_avoid_modifier: f32,
+
+    // 10. 账本与婚姻登记子系统
+    pub ledger_journal_capacity: usize,
 }
 
 impl Default for SimConfig {
@@ -598,6 +607,9 @@ impl Default for SimConfig {
             road_visible_prefer_modifier: ROAD_VISIBLE_PREFER_MODIFIER,
             road_hidden_avoid_modifier: ROAD_HIDDEN_AVOID_MODIFIER,
             road_visible_avoid_modifier: ROAD_VISIBLE_AVOID_MODIFIER,
+
+            // 10. 账本与婚姻登记子系统
+            ledger_journal_capacity: LEDGER_JOURNAL_CAPACITY,
         }
     }
 }

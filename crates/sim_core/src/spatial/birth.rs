@@ -5,6 +5,8 @@ use super::world::World3DEngine;
 /// 用于在出生结算中暂存父/母方的遗传数据，避免重复搜索
 struct ParentSnapshot {
     pregnancy_father_id: Option<AgentId>,
+    /// ★ 受孕时预分配的胎儿 ID（分娩复用）
+    pregnancy_child_id: Option<AgentId>,
     spouse_id: Option<AgentId>,
     home_house_id: Option<u32>,
     generation: u32,
@@ -21,6 +23,7 @@ impl ParentSnapshot {
     fn from_agent(a: &Agent3D) -> Self {
         Self {
             pregnancy_father_id: a.pregnancy_father_id,
+            pregnancy_child_id: a.pregnancy_child_id,
             spouse_id: a.spouse_id,
             home_house_id: a.home_house_id,
             generation: a.generation,
@@ -69,9 +72,12 @@ impl World3DEngine {
                 camp_node
             };
 
-            // ── 4. 基础属性 ────────────────────────────────────────────────────
-            let baby_id = self.next_agent_id;
-            self.next_agent_id += 1;
+            // ── 4. 基础属性（★ 复用受孕时预分配的 ID：分家/继承需稳定胎儿身份） ──
+            let baby_id = mother_snap.pregnancy_child_id.unwrap_or_else(|| {
+                let id = self.next_agent_id;
+                self.next_agent_id += 1;
+                id
+            });
             self.total_births += 1;
 
             let baby_gender = if self.rng.gen_bool(0.5) {
@@ -129,6 +135,7 @@ impl World3DEngine {
             if let Some(mother) = self.agent_by_id_mut(mother_id) {
                 mother.children_ids.push(baby_id);
                 mother.pregnancy_father_id = None;
+                mother.pregnancy_child_id = None; // 胎儿 ID 已由新生儿实体继承
             }
             if let Some(fid) = father_id {
                 if let Some(father) = self.agent_by_id_mut(fid) {

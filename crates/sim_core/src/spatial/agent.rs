@@ -136,6 +136,9 @@ pub struct Agent3D {
     // 繁衍与生命周期
     pub is_pregnant: bool,
     pub pregnancy_father_id: Option<AgentId>, // 胎儿生父 ID
+    /// ★ 腹中胎儿已预分配的 AgentId（受孕瞬间即占号，分娩时复用该 ID）
+    /// 目的：分家权重与遗产继承需把"妈妈肚子里的孩子"计入子一代（账本重构 M1.6）
+    pub pregnancy_child_id: Option<AgentId>,
     pub pregnancy_progress: f32,     // 孕期进度 (0.0 ~ 1.0)
     pub ready_to_birth: bool,        // 孕期满是否准备分娩
     pub miscarriage_alert_timer: f32,// 流产警报留存显示计时器 (秒)
@@ -210,6 +213,7 @@ impl Agent3D {
             life_expectancy: config.trait_default_mean,
             is_pregnant: false,
             pregnancy_father_id: None,
+            pregnancy_child_id: None,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,
@@ -260,7 +264,18 @@ impl Agent3D {
     }
 
     /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
-    pub fn tick_metabolism(&mut self, dt: f32, fertility_active: bool, config: &SimConfig) -> Option<String> {
+    /// 代谢与繁衍结算。
+    ///
+    /// `next_agent_id` 为全局发号器的可变引用：**受孕瞬间**即为胎儿占号并写入
+    /// [`Self::pregnancy_child_id`]，使未出生的孩子能参与分家权重与遗产继承（账本重构 M1.6）。
+    /// 该发号不消耗 `WorldRng`，仅按调用顺序递增，确定性不受影响。
+    pub fn tick_metabolism(
+        &mut self,
+        dt: f32,
+        fertility_active: bool,
+        config: &SimConfig,
+        next_agent_id: &mut AgentId,
+    ) -> Option<String> {
         if self.gold_mining_cooldown > 0.0 {
             self.gold_mining_cooldown = (self.gold_mining_cooldown - dt).max(0.0);
         }
@@ -306,6 +321,7 @@ impl Agent3D {
             self.death_is_natural = false;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
+            self.pregnancy_child_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 因长期饥荒不幸饿死！", self.id));
         }
@@ -316,6 +332,7 @@ impl Agent3D {
             self.death_is_natural = false;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
+            self.pregnancy_child_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
@@ -326,6 +343,7 @@ impl Agent3D {
             self.death_is_natural = true;
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
+            self.pregnancy_child_id = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
         }
@@ -335,6 +353,10 @@ impl Agent3D {
             if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
                 self.is_pregnant = true;
                 self.pregnancy_father_id = self.spouse_id;
+                // ★ 受孕即为腹中胎儿占号（分家/继承需计入未出生的孩子）
+                let child_id = *next_agent_id;
+                *next_agent_id += 1;
+                self.pregnancy_child_id = Some(child_id);
                 self.pregnancy_progress = 0.0;
                 let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
                 event_msg = Some(format!("🤰 女性部落民 #{} ({}) 饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, config.agent_conception_hunger_min, config.agent_pregnancy_duration));
@@ -347,6 +369,7 @@ impl Agent3D {
             if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < config.agent_miscarriage_stamina_threshold {
                 self.is_pregnant = false;
                 self.pregnancy_father_id = None;
+                self.pregnancy_child_id = None; // 流产：释放胎儿占用的 ID
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = config.agent_miscarriage_alert_duration;
                 self.miscarriage_cooldown_timer = config.agent_miscarriage_cooldown;
