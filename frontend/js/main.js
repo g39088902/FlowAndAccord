@@ -436,6 +436,17 @@
       toggleLegendMinimize();
     });
 
+    // ★ 家户与账本大盘折叠/展开 (与图例/均值大盘一致：CSS 控制 body 显隐)
+    const _ledgerPanel = document.getElementById('ledger-panel');
+    const _ledgerToggleIcon = document.getElementById('ledger-toggle-icon');
+    const _ledgerPanelHeader = document.getElementById('ledger-panel-header');
+    if (_ledgerPanelHeader) {
+      _ledgerPanelHeader.addEventListener('click', () => {
+        const isMin = _ledgerPanel.classList.toggle('minimized');
+        if (_ledgerToggleIcon) _ledgerToggleIcon.textContent = isMin ? '+' : '−';
+      });
+    }
+
 
     // ==========================================
     // UI 控制绑定与倍速本地记忆 (空格键暂停/继续)
@@ -536,4 +547,26 @@
       try {
         localStorage.setItem('flow_sim_speed', val.toString());
       } catch (_) {}
-    });
+    
+
+  // ★ 家户大盘中点击户主/配偶追踪视角 (v0.9.72 M1)
+  document.addEventListener('click', function(e) {
+    const hhItem = e.target.closest('.ledger-hh-item');
+    const chip = e.target.closest('.lineage-chip[data-agent-id]');
+    let targetId = null;
+    if (chip && chip.getAttribute('data-agent-id')) {
+      targetId = parseInt(chip.getAttribute('data-agent-id'), 10);
+    } else if (hhItem && hhItem.getAttribute('data-agent-id')) {
+      targetId = parseInt(hhItem.getAttribute('data-agent-id'), 10);
+    }
+    if (targetId && typeof sim !== 'undefined' && sim.getAgent) {
+      const agent = sim.getAgent(targetId);
+      if (agent) {
+        sim.selectionType = 'agent';
+        sim.selectedAgentId = targetId;
+        if (typeof centerOnAgent === 'function') centerOnAgent(agent);
+      }
+    }
+  });
+
+});

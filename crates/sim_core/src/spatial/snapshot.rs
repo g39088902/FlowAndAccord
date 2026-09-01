@@ -29,6 +29,10 @@ pub struct WorldSnapshot3D {
     pub nodes: Vec<NodeSnapshot>,
     pub lanes: Vec<LaneSnapshot>,
     pub agents: Vec<AgentSnapshot>,
+    /// ★ 家户登记簿快照（家庭跟着男人走：以男性户主为锚的家庭单元与账本）
+    pub households: Vec<HouseholdSnapshot>,
+    /// ★ 婚姻登记簿快照（一人终生多段婚姻全留痕）
+    pub marriages: Vec<MarriageSnapshot>,
     pub total_births: u32,
     pub total_deaths: u32,
     pub total_deaths_natural: u32,
@@ -140,4 +144,53 @@ pub struct AgentSnapshot {
     // 姓氏宗族与声望
     pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
     pub prestige: u32,     // 声望值 (当前 = 子女数量，未来可叠加多项)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ★ 账本与家户/婚姻快照 (v0.9.72 M1 账本系统前端展示)
+// ═══════════════════════════════════════════════════════════════
+
+/// 单品类账面余额快照（制度账本层，与物理仓库分离）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerBalanceSnapshot {
+    /// 资源品类: "Water" / "Food" / "Wood" / "Stone" / "Gold"
+    pub resource: String,
+    /// 账面数量
+    pub amount: f32,
+}
+
+/// 家户快照（家庭跟着男人走：以男性户主为锚的家庭单元与账本）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HouseholdSnapshot {
+    pub id: u64,
+    /// 户主（必为男性）——家户存在即户主存在
+    pub head: AgentId,
+    /// 成员列表（含户主 + 妻子 + 未成年子女 + 腹中胎儿），按 AgentId 升序
+    pub members: Vec<AgentId>,
+    /// 账面余额（5种资源的制度账本，与房屋物理仓库分离）
+    pub balances: Vec<LedgerBalanceSnapshot>,
+    /// 分家来源家户（M2 分家抽资时记录血缘链）
+    pub parent_household: Option<u64>,
+    /// 家户成立时的世界 tick
+    pub founded_tick: u64,
+    /// 户主死亡清算后标记解散（流水只读归档）
+    pub is_dissolved: bool,
+    /// 最近团体事件（家户成立/成员加入/成员离开/领导更替等，最多取最近8条）
+    pub recent_events: Vec<String>,
+}
+
+/// 婚姻快照（一人终生多段婚姻全留痕，与房屋解耦）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarriageSnapshot {
+    pub id: u64,
+    pub husband_id: AgentId,
+    pub wife_id: AgentId,
+    /// 登记时的世界 tick
+    pub start_tick: u64,
+    /// 封账时刻（None = 存续中）
+    pub end_tick: Option<u64>,
+    /// 终止事由: "Bereaved"（丧偶）等
+    pub end_reason: Option<String>,
+    /// 是否存续中
+    pub is_active: bool,
 }

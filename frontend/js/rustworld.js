@@ -23,6 +23,9 @@
         this.agentArchive = new Map(); // 族人全量生命周期档案库 (含已故先祖，保障断代/绝嗣穿梭不跳帧)
         this.houses = [];
         this.pois = [];
+        // ★ 账本与家户/婚姻登记簿 (v0.9.72 M1 账本系统)
+        this.households = [];  // 家户列表（家庭跟着男人走：以男性户主为锚）
+        this.marriages = [];   // 婚姻列表（一人终生多段婚姻全留痕）
         this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
@@ -108,6 +111,27 @@
         const numId = typeof id === 'string' ? parseInt(id, 10) : id;
         if (isNaN(numId)) return null;
         return this.agents.find(a => a.id === numId) || this.agentArchive.get(numId) || null;
+      }
+
+      // ★ 获取某 agent 所属的家户（家庭跟着男人走）
+      getHouseholdOfAgent(agentId) {
+        if (agentId === null || agentId === undefined) return null;
+        const numId = typeof agentId === 'string' ? parseInt(agentId, 10) : agentId;
+        return this.households.find(h => h.members.includes(numId)) || null;
+      }
+
+      // ★ 获取某人当前存续婚姻
+      getActiveMarriageOf(agentId) {
+        if (agentId === null || agentId === undefined) return null;
+        const numId = typeof agentId === 'string' ? parseInt(agentId, 10) : agentId;
+        return this.marriages.find(m => m.isActive && (m.husbandId === numId || m.wifeId === numId)) || null;
+      }
+
+      // ★ 获取某人的全部婚姻历史（含已封账段）
+      getAllMarriagesOf(agentId) {
+        if (agentId === null || agentId === undefined) return [];
+        const numId = typeof agentId === 'string' ? parseInt(agentId, 10) : agentId;
+        return this.marriages.filter(m => m.husbandId === numId || m.wifeId === numId);
       }
 
       // ============ 引擎驱动 ============
@@ -385,6 +409,32 @@
         for (const ag of this.agents) {
           this.agentArchive.set(ag.id, ag);
         }
+
+        // ★ 家户登记簿快照映射（家庭跟着男人走）
+        this.households = (snap.households || []).map(h => ({
+          id: h.id,
+          head: h.head,              // 户主（男性）
+          members: h.members || [],   // 成员列表（含户主+妻子+未成年子女+腹中胎儿）
+          balances: (h.balances || []).reduce((acc, b) => {
+            acc[b.resource] = b.amount;
+            return acc;
+          }, {}),  // 账面余额：{ Water, Food, Wood, Stone, Gold }
+          parentHousehold: h.parent_household,
+          foundedTick: h.founded_tick,
+          isDissolved: h.is_dissolved,
+          recentEvents: h.recent_events || []  // 最近团体事件（从新到旧）
+        }));
+
+        // ★ 婚姻登记簿快照映射（一人终生多段婚姻全留痕）
+        this.marriages = (snap.marriages || []).map(m => ({
+          id: m.id,
+          husbandId: m.husband_id,
+          wifeId: m.wife_id,
+          startTick: m.start_tick,
+          endTick: m.end_tick,
+          endReason: m.end_reason,
+          isActive: m.is_active
+        }));
       }
     }
 

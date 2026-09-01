@@ -7,9 +7,10 @@ use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::{House, HouseSnapshot};
 use super::ledger::{HouseholdRegistry, MarriageRegistry};
+use super::ledger::journal::ResourceKind;
 use super::snapshot::{
-    AgentSnapshot, GeoCellSnapshot, LaneSnapshot, NodeSnapshot, PoiSnapshot, Season,
-    WorldSnapshot3D,
+    AgentSnapshot, GeoCellSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
+    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, WorldSnapshot3D,
 };
 use crate::geo::terrain::TerrainMap;
 
@@ -377,6 +378,49 @@ impl World3DEngine {
             });
         }
 
+        // ★ 家户登记簿快照（家庭跟着男人走）
+        let resource_kinds = [ResourceKind::Water, ResourceKind::Food, ResourceKind::Wood, ResourceKind::Stone, ResourceKind::Gold];
+        let mut households = Vec::new();
+        for (_hid, hh) in &self.household_registry.households {
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
+                LedgerBalanceSnapshot {
+                    resource: format!("{:?}", rk),
+                    amount: hh.group.ledger.balance(rk),
+                }
+            }).collect();
+            // 取最近8条团体事件（从新到旧；直接访问 VecDeque 字段以获得 DoubleEndedIterator）
+            let recent_events: Vec<String> = hh.group.ledger.events
+                .iter()
+                .rev()
+                .take(8)
+                .map(|e| e.note.clone())
+                .collect();
+            households.push(HouseholdSnapshot {
+                id: hh.id,
+                head: hh.head,
+                members: hh.group.members.iter().copied().collect(),
+                balances,
+                parent_household: hh.parent_household,
+                founded_tick: hh.founded_tick,
+                is_dissolved: hh.is_dissolved,
+                recent_events,
+            });
+        }
+
+        // ★ 婚姻登记簿快照
+        let mut marriages = Vec::new();
+        for (_mid, m) in &self.marriage_registry.marriages {
+            marriages.push(MarriageSnapshot {
+                id: m.id,
+                husband_id: m.husband_id,
+                wife_id: m.wife_id,
+                start_tick: m.start_tick,
+                end_tick: m.end_tick,
+                end_reason: m.end_reason.map(|r| format!("{:?}", r)),
+                is_active: m.is_active(),
+            });
+        }
+
         let season_str = match self.current_season {
             Season::Spring => "Spring",
             Season::Summer => "Summer",
@@ -399,6 +443,8 @@ impl World3DEngine {
             nodes,
             lanes,
             agents,
+            households,
+            marriages,
             total_births: self.total_births,
             total_deaths: self.total_deaths,
             total_deaths_natural: self.total_deaths_natural,

@@ -1,4 +1,4 @@
-# Flow & Accord · 智能体与模拟系统开发操作指南 (AGENTS.md)
+﻿# Flow & Accord · 智能体与模拟系统开发操作指南 (AGENTS.md)
 
 本文档记录了项目的工程架构、便携工具链配置、WASM 编译命令、测试套件验证与前端启动方法，并汇总了开发核心易踩坑清单。
 
@@ -48,7 +48,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.72)"]
+    E --> F["浏览器 UI (版本: v0.9.75)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -100,7 +100,9 @@ node tools/test-wasm.js
 ```powershell
 node frontend/server.js
 ```
-服务默认监听在 **`http://localhost:3000`**（若 3000 被占用会自动递增至 `3001`、`3002` 等）。
+服务默认监听在 **`http://localhost:3000`**。
+
+> ⚠️ **Agent 操作须知**：若 3000 端口已被占用，说明前端服务已由用户手动启动并正在运行，**Agent 无需再执行 `node frontend/server.js` 启动新实例**——直接访问 `http://localhost:3000` 即可。重复启动会触发 server.js 端口递增逻辑（3001 被占时存在无限重试的已知问题），导致进程卡死无响应。
 
 ---
 
@@ -108,7 +110,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.72`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.75`**。
 
 ---
 

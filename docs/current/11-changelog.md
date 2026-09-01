@@ -1,7 +1,7 @@
-# 📜 版本演进记录 (Changelog)
+﻿# 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.72)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.75)**。
 
 ---
 
@@ -221,3 +221,23 @@
   - **生命周期挂钩**：`housing_system/marriage.rs` 成婚 → 登记簿注册 + 女方转入夫家家户；丧偶 → 封账归档；世界重置同步清空两登记簿、seed 为每位始祖男性建户；
   - **超参**：新增 `ledgerJournalCapacity`（64），`config.rs` 三处 + `config.js` 同步，`config-check.js` 153/153 通过；
   - 已重编译 WASM 并同步双副本，`test-wasm.js` 回归 `ALL_TESTS_DONE`（确定性逐字节一致，长程 0 越界 0 NaN）；版本号自增 v0.9.71 → v0.9.72。
+
+- **📊 账本与家户/婚姻系统前端UI展示 (v0.9.73)**：
+  - **快照扩展**：snapshot.rs 新增 HouseholdSnapshot / MarriageSnapshot / LedgerBalanceSnapshot 三类快照结构，world.rs::generate_snapshot() 遍历家户登记簿与婚姻登记簿序列化（含账面5资源余额、最近8条团体事件、婚姻存续/封账状态）；
+  - **前端映射**：ustworld.js 新增 sim.households / sim.marriages 字段及 getHouseholdOfAgent() / getActiveMarriageOf() / getAllMarriagesOf() 三个查询辅助方法；
+  - **顶栏统计**：新增 🏠 存续家户数 / 💍 存续婚姻对数 两个实时统计指标；
+  - **Agent Inspector 增强**：新增「🏠 家户归属」卡片（家户ID/户主姓氏/成员数/角色徽章👑户主·💍配偶·👶子女/账面5资源/家户大事记）与「💍 婚姻登记」卡片（存续中·丧偶离异·未婚三态、婚龄、历史婚姻段列表）；
+  - **★ 家户与账本大盘面板**：右侧新增可折叠面板「📒 家户与账本大盘」，含概览统计行（存续/已解散家户、存续/累计婚姻）+ 家户列表（户主姓氏·成员数·账面资源·点击追踪户主视角）+ 婚姻登记簿列表（夫妻·婚龄·存续状态）；
+  - **样式**：style.css 新增账本系统专属样式（暗色卡片主题、等宽数字、资源色标、可滚动列表），与现有UI风格一致；
+  - 已重编译 WASM 并同步双副本，config-check.js 153/153 通过，	est-wasm.js 回归 ALL_TESTS_DONE（确定性逐字节一致，0越界0NaN），浏览器实测0控制台错误；版本号自增 v0.9.72 → v0.9.73。
+- **🔧 家户与账本大盘面板可点击性与样式修复 (v0.9.74)**：
+  - **根本原因**：右侧面板容器 .right-panel-stack 设了 pointer-events: none（让点击穿透到画布），其他卡片（全局均值大盘/图例窗口）均显式设了 pointer-events: auto，唯独 .ledger-panel 缺失该属性——导致面板标题无法被点击选中、折叠按钮无响应、点击直接穿透到下方画布；
+  - **CSS 重写**：.ledger-panel 补齐与 .global-averages-card / .ecology-legend 一致的完整基础样式（width:100% / display:flex / lex-direction:column / gap:8px / padding:12px 16px / order-radius:14px / ox-shadow / pointer-events:auto / 	ransition / color:#cbd5e1 / ont-size:11px），边框采用琥珀色 gba(245,158,11,0.28) 区分账本主题；新增 .ledger-panel.minimized 规则（padding/gap 收缩、body 隐藏、title 去边框），与其他卡片折叠行为一致；
+  - **HTML 清理**：移除 .ledger-panel-body 内联 style="display:none;"，改由 CSS .minimized 类统一控制显隐（与全局均值/图例面板模式一致）；
+  - **JS 简化**：事件绑定从「同时切换 class + 内联 display + 图标」简化为「classList.toggle('minimized') + 图标文字切换」，CSS 负责 body 显隐，逻辑更简洁且与其他面板统一；
+  - 浏览器实测：面板可正常点击选中、折叠/展开响应正常、样式与其他卡片视觉一致、0 控制台错误；版本号自增 v0.9.73 → v0.9.74。
+- **📝 文档：前端服务器端口占用说明 (v0.9.75)**：
+  - AGENTS.md 第 2 节步骤三新增「Agent 操作须知」：若 3000 端口已被占用，说明前端服务已由用户手动启动并正在运行，Agent 无需再执行 
+ode frontend/server.js 启动新实例，直接访问 http://localhost:3000 即可；
+  - 补充说明重复启动的风险：会触发 server.js 端口递增逻辑（3001 被占时存在无限重试的已知问题），导致进程卡死无响应；
+  - 纯文档修改，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.74 → v0.9.75。

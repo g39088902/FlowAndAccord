@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.72</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v0.9.75</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -28,6 +28,14 @@
       <div class="stat-item">
         <div class="stat-val" id="stat-pois" style="color:#10b981;">23</div>
         <div class="stat-lbl">生态地标</div>
+      </div>
+      <div class="stat-item" title="存续家户数（家庭跟着男人走：以男性户主为锚）">
+        <div class="stat-val" id="stat-households" style="color:#f59e0b;">0</div>
+        <div class="stat-lbl">🏠 存续家户</div>
+      </div>
+      <div class="stat-item" title="存续婚姻对数（一人终生多段婚姻全留痕）">
+        <div class="stat-val" id="stat-marriages" style="color:#ec4899;">0</div>
+        <div class="stat-lbl">💍 存续婚姻</div>
       </div>
       <div class="stat-item">
         <div class="stat-val" id="stat-pregnant" style="color:#ec4899;">0</div>
@@ -260,6 +268,34 @@
       </div>
     </div>
 
+    <!-- ★ 家户与账本大盘 (v0.9.72 M1 账本系统) -->
+    <div class="ledger-panel minimized" id="ledger-panel">
+      <div class="legend-title" id="ledger-panel-header" title="点击展开/折叠家户与账本大盘">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span>📒 家户与账本大盘</span>
+          <span id="ledger-panel-count" style="color:#f59e0b; font-size:10px; font-weight:700;">0户</span>
+        </div>
+        <button id="btn-toggle-ledger" class="legend-collapse-btn" aria-label="展开/折叠家户账本大盘" title="展开/折叠家户账本大盘">
+          <span id="ledger-toggle-icon">+</span>
+        </button>
+      </div>
+      <div class="ledger-panel-body" id="ledger-panel-body">
+        <!-- 概览统计行 -->
+        <div class="ledger-overview-row">
+          <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续家户</span><span class="ledger-ov-val" id="ledger-ov-active" style="color:#f59e0b;">0</span></div>
+          <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
+          <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
+          <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
+        </div>
+        <!-- 家户列表 -->
+        <div class="ledger-section-title">🏠 家户列表（点击户主追踪视角）</div>
+        <div class="ledger-household-list" id="ledger-household-list"></div>
+        <!-- 婚姻列表 -->
+        <div class="ledger-section-title" style="margin-top:6px;">💍 婚姻登记簿</div>
+        <div class="ledger-marriage-list" id="ledger-marriage-list"></div>
+      </div>
+    </div>
+
     <!-- 动态 Inspector 面板 -->
     <div class="inspector-card" id="inspector-card">
       <div class="inspector-title">
@@ -332,6 +368,54 @@
           </div>
         </div>
         
+        <!-- ★ 家户归属与账本 (v0.9.72 M1) -->
+        <div class="ledger-household-card" id="insp-household-box" style="display:none;">
+          <div class="ledger-card-title">
+            <span>🏠 家户归属</span>
+            <span id="insp-hh-role" class="ledger-role-badge">—</span>
+          </div>
+          <div class="ledger-hh-info">
+            <span>家户 #<b id="insp-hh-id">—</b></span>
+            <span>户主 <b id="insp-hh-head">—</b></span>
+            <span>成员 <b id="insp-hh-members">—</b>人</span>
+            <span id="insp-hh-parent" style="display:none;">分家自 #<b id="insp-hh-parent-id">—</b></span>
+          </div>
+          <div class="ledger-balances-title">📒 账面余额 (制度账本层，与物理仓库分离)</div>
+          <div class="ledger-balances-grid">
+            <div class="ledger-balance-chip"><span style="color:#38bdf8;">💧水</span><span class="mono-num" id="insp-hh-bal-water">0.0</span></div>
+            <div class="ledger-balance-chip"><span style="color:#10b981;">🍒食</span><span class="mono-num" id="insp-hh-bal-food">0.0</span></div>
+            <div class="ledger-balance-chip"><span style="color:#d97706;">🌲木</span><span class="mono-num" id="insp-hh-bal-wood">0.0</span></div>
+            <div class="ledger-balance-chip"><span style="color:#94a3b8;">🪨石</span><span class="mono-num" id="insp-hh-bal-stone">0.0</span></div>
+            <div class="ledger-balance-chip"><span style="color:#fbbf24;">🪙金</span><span class="mono-num" id="insp-hh-bal-gold">0.0</span></div>
+          </div>
+          <div class="ledger-events-title" id="insp-hh-events-title" style="display:none;">📜 家户大事记</div>
+          <div class="ledger-events-list" id="insp-hh-events" style="display:none;"></div>
+        </div>
+
+        <!-- ★ 婚姻登记 (v0.9.72 M1) -->
+        <div class="ledger-marriage-card" id="insp-marriage-box" style="display:none;">
+          <div class="ledger-card-title">
+            <span>💍 婚姻登记</span>
+            <span id="insp-mg-status" class="ledger-role-badge">—</span>
+          </div>
+          <div id="insp-mg-active" style="display:none;">
+            <div class="ledger-mg-row">
+              <span>婚姻 #<b id="insp-mg-id">—</b></span>
+              <span>夫 <b id="insp-mg-husband">—</b> ♂</span>
+              <span>妻 <b id="insp-mg-wife">—</b> ♀</span>
+            </div>
+            <div class="ledger-mg-row">
+              <span>婚龄 <b id="insp-mg-duration">—</b></span>
+              <span>登记于 tick <b id="insp-mg-start">—</b></span>
+            </div>
+          </div>
+          <div id="insp-mg-history" style="display:none;">
+            <div class="ledger-mg-history-title">历史婚姻 (<span id="insp-mg-history-count">0</span>段)</div>
+            <div class="ledger-mg-history-list" id="insp-mg-history-list"></div>
+          </div>
+          <div id="insp-mg-single" style="display:none; color:#64748b; font-size:10px; padding:2px 0;">未婚单身</div>
+        </div>
+
         <div class="cooldown-badge" id="insp-cooldown-box" style="display:none;">
           <span>🥀 流产调养中: </span>
           <span id="insp-cooldown-val" style="font-weight:700;">剩余 48s 可受孕</span>
