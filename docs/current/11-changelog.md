@@ -1,250 +1,56 @@
-﻿# 📜 版本演进记录 (Changelog)
+# 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v1.0.0)**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.0.1**。
+> 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
 
-- **💰 随身金币遗产继承机制 (v0.9.24)**：
-  - 族人（无论男女）故去后，其随身携带的全部黄金 (`carried_gold`) 将自动平分给其所有在世的直接子一代子女（男女子女均可继承）；
-  - 排除已故子女与隔代孙辈，若无在世子女则金币安全清零消散；
-  - 继承所得金币即时计入在世子女随身行囊 (`carried_gold`)，并在全景控制台滚动广播重大历史事件。
-- **🧩 房屋系统与世界环境模块化解耦 (v0.9.34)**：
-  - 四季更迭与宏观气温系统（`tick_season`）正本清源回归世界内核系统（`world.rs`）；
-  - `housing_system` 彻底拆分为 5 个专注于私宅全生命周期的单一职责子模块 (`maintenance`, `construction`, `marriage`, `settlement`, `inheritance`)，单文件均严格控制在 100 行内，管线职责清晰解耦。
-- **🍂 简化四季参数模型 (v0.9.35)**：
-  - 废除冗余的 `season_quarter_length` 配置项，由全年总时长 `season_year_length` 严格派生各季长度（$\text{quarter\_length} = \text{year\_length} \times 0.25$），消除多余维度。
-- **💍 婚姻系统与建房事件解耦 (v0.9.37)**：
-  - 移除 `construction.rs` 中 0级→1级仓库升级竣工瞬间的即时迎娶 eager 钩子，成婚统一由 `marriage.rs` 每 tick 持续扫描承担（升级后 ≤1 tick 内自动匹配，无功能延迟）；
-  - 择偶规则统一为**距离最近**的成年单身非孕期女性（原 eager 钩子取 agents 列表第一个，两处规则不一致已消除）；
-  - 升级播报与婚姻播报拆分为独立事件（🎉 升级激活生育 → 💍 喜结连理）。
-- **📝 文档偏差修复 (v0.9.38)**：
-  - 修正 AGENTS.md / CURRENT.md / BUILD_GUIDE.md / AGENT_AI_ANALYSIS.md / ARCHITECTURE.md 中与现状不符的描述（已移除的 `decisions/tests.rs`、`housing_system/tests.rs` 子模块引用、27 项/13 项单元测试数量、"全量自动化测试"等过时表述，以及 `housing_system.rs` 单文件路径 → 目录）；
-  - 纯文档修订，未触碰任何功能代码与 WASM 产物。
-- **🧪 混沌系统测试策略落地 (v0.9.39)**：
-  - AGENTS.md 新增 §4.10「混沌系统定位与测试策略（持久化测试禁令）」：项目定位为混沌系统，短期单元测试无法评价涌现功能，此后**不再持久化保存单元测试脚本**（`#[cfg(test)]` / `tests.rs` 一律不进入提交）；
-  - 开发新功能时仅临时编写测试确认"不跑不通"，验证通过后提交前删除；长期确定性验证由 `node tools/test-wasm.js`（WASM 回归）承担。
-- **👥 开局人口扩容与百家姓扩充 (v0.9.42)**：
-  - 开局始祖由 12 名扩容为 **20 名（10男10女）**：Rust 内核 `ecology.rs` 初始播撒改为 20 人（`total_initial = 20`，前 10 女后 10 男，每 4 人 1 名隐秘特工），前端 `rustworld.js` / `main.js` / `index.html` 面板文案与重演生态按钮同步更新；
-  - **百家姓库由 60 姓扩充至 150 姓**（`agent.rs` `COMMON_SURNAMES` 采用《百家姓》经典序前 150 单姓，原 60 姓全部保留并顺延至经典序位），始祖随机赋姓池更广，宗族姓氏多样性显著提升；
-  - 版本号自增 v0.9.41 → v0.9.42。
-- **🏠 建房/升级/修缮全流程回归 Agent 自主决策 (v0.9.43)**：
-  - **废除系统发房**：删除 `settlement.rs::tick_warehouse_founding`（原每 15 tick 扫描"符合条件的男人"直接送 0 级仓库）。新增 `NeedKind::FoundHome` 归属层需求：**无家成年男性**在自身决策相位、饥渴 ≥ 20 且体力 ≥ 60 时**必然触发**（无概率、无系统指挥），由 agent 自己在营地周边掷 12 个候选点自主选址（与现有房屋 ≥14m）；系统仅在 `materialize_founded_houses` 阶段执行放置校验、路网接入与房产绑定（`pending_house_pos` 为 agent 内暂存字段，不入快照）；
-  - **升级施工回归 agent 决策**：删除 `construction.rs::check_start_house_upgrades`（原每 tick 扫描房屋强制户主开工）。仓满 + 男户主在家满体力时，由 `evaluate_needs` 既有 `BuildHouse` 需求在户主自身决策相位自主触发施工；
-  - **修缮回归 agent 决策**：删除 `maintenance.rs` 中"扫描 + 强制切换 `RepairingHouse`"块，触发完全交给 `evaluate_needs` 既有 `RepairHouse` 需求（耐久 < 50%），系统仅结算修缮进度；
-  - **设计原则落地**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"由 agent 的马斯洛状态机自主决定，符合混沌系统涌现定位；
-  - 版本号自增 v0.9.42 → v0.9.43。
-- **🎲 决策概率全部收敛为确定性执行 + 遗留超参数入公共参数表 (v0.9.44)**：
-  - **决策概率/折扣全部删除（必然执行）**：孕期与非孕期统一使用 `decisionCriticalThirst/Hunger` 满值临界阈值（删除非孕期 ×0.8 折扣）；私宅囤水/囤粮不再受性别偏向概率（女 0.70 / 男 0.45）约束，家宅需要且资源可用即必然执行；删除 `ForageSurplus` 富余觅食需求（含 `decisionForageSurplusChance` 配置）；娱乐淘金 `GoldWealth` 不再掷 0.40 概率——金矿可用且冷却结束即必然触发；
-  - **立宅（FoundHome）选址参数全部提取至公共参数表**：饥渴/口渴/体力门槛（20/20/60）、候选点数（12）、候选距离（16~42m）、最小房屋间距（≥14m）→ `SimConfig`（`decisionFoundHome*` / `houseMinSpacing`），前端 `config.js` 可直接调参；
-  - **体力作业门槛 50.0 提取为 `decisionWorkStaminaThreshold`**：evaluator.rs 13 处 + needs.rs 1 处硬编码统一收敛；同步修正 needs.rs 标签判定的硬编码 25.0 饥渴/口渴阈值改为引用 `decisionCriticalThirst/Hunger`；
-  - **死配置清理**：删除 Rust 内核从未被读取的 `decisionCriticalStamina`（30.0）与富余觅食相关残留；
-  - 版本号自增 v0.9.43 → v0.9.44。
-- **📐 决策模块子目录化拆分 (v0.9.45)**：
-  - `decisions/evaluator.rs`（665 行）按职责拆分为 6 个子模块：`routing.rs`（导航/寻路/原地掉头/返家/POI 触发器可用性）、`evaluate.rs`（`Decisioner` 结构体 + `decide`/`evaluate_needs`/`fulfill_resting_need`）、`harvest.rs`（现场采收判定 + 仓储满额查询）、`seeking.rs`（途中熔断与平滑重路由，§4.2 核心）、`scheduler.rs`（`World3DEngine::tick_decisions` / `build_decision_context`），`needs.rs` 保持不变；
-  - 纯结构性重组，逻辑零改动：`cargo check` 无警告，release WASM 产物与重构前**字节完全一致**，`tools/test-wasm.js` 回归 `ALL_TESTS_DONE`；
-  - 版本号自增 v0.9.44 → v0.9.45。
-- **📑 嵌套 AGENTS.md 目录级操作指南 (v0.9.46)**：
-  - 为 `crates/sim_core/`、`crates/sim_wasm/`、`src/spatial/decisions/`、`src/spatial/housing_system/` 四个 Rust 代码目录各新增一份局部 `AGENTS.md`（职责边界/文件清单/关键结构/局部易踩坑），根 `AGENTS.md` 新增 §0.1「嵌套 AGENTS.md 地图」登记覆盖范围与维护规则；
-  - 纯文档新增，未触碰任何功能代码与 WASM 产物；
-  - 版本号自增 v0.9.45 → v0.9.46。
-- **⚡ 超高倍速支持与建房间距翻倍 (v0.9.47)**：
-  - **倍速控制台扩展**：模拟演化倍速下拉框新增 **256x、512x 与 1024x** 超高倍速选项（`frontend/index.html`），方便快速推进上万 tick 长程社会演化；
-  - **房屋建设最小间距翻倍**：建房最小间距由 $14.0\text{m}$ 翻倍调整为 **$28.0\text{m}$**（`crates/sim_core/src/config.rs` `HOUSE_MIN_SPACING` 及前端 `frontend/js/config.js` `houseMinSpacing`），并修复 `settlement.rs::materialize_founded_houses` 硬编码，统一读取 `self.config.house_min_spacing`；
-  - 版本号自增 v0.9.46 → v0.9.47。
-- **♻️ 立宅优先复用空置路网节点 (v0.9.48)**：
-  - **背景**：路网 `LaneGraph3D` 从不删除节点/车道，房屋绝嗣沦为废墟（`is_ruin`）并最终风化坍塌被 `houses.retain` 移除后，其大门节点与 3 对双向泥泞小径会**永久残留**在图中，导致节点随代际更替单调膨胀（拖慢 A*、`find_nearest_node` 全扫描与快照序列化）；
-  - **新机制**：`settlement.rs::materialize_founded_houses` 改为**先复用、后新建**——先用 `find_vacant_node_near` 在候选宅址 `houseNodeReuseRadius`(默认 20m) 半径内检索最近的**空置节点**（非任何现存房屋/废墟的大门、且不在任何 POI 1.5m 贴合半径内），命中即直接以该节点为大门、房屋落点取节点坐标，不再新建节点与车道；仅当半径内无空置节点时才走原新建路径（`add_node` + 双向接入最近 3 节点）；
-  - **安全兜底**：复用节点若已无任何出边（`ensure_node_connected`）自动补建接入；复用候选在检索阶段即通过 `is_house_site_valid`（≥ `houseMinSpacing`）校验；检索零 RNG 消耗、距离并列取节点 id 较小者，确定性不受影响；
-  - **新增参数**：`HOUSE_NODE_REUSE_RADIUS`(20.0) / `HOUSE_NODE_POI_OCCUPY_RADIUS`(1.5) → `SimConfig::house_node_reuse_radius` 与前端 `config.js` `houseNodeReuseRadius`（设为 0 即退回旧行为）；
-  - **实测效果**（强制加速风化的 A/B 对照，同种子 60000 tick）：复用开启时 112 次立宅仅新增 67 个节点（复用率约 40%），复用关闭时 133 次立宅新增 133 个节点（1:1 膨胀）；重合坐标节点 0 对、零长度车道 0 条、NaN 0；
-  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
-  - 版本号自增 v0.9.47 → v0.9.48。
-- **🐞 调试模式监视器 · Tick / CPU / 内存 (v0.9.49)**：
-  - **新增入口**：生态时钟控制台新增「🐞 调试模式 (Tick / CPU / 内存)」开关（`chk-debug-mode`），开启后于控制台正上方弹出 `#debug-hud` 监视器浮窗（控制台面板高度 216px → 240px 以容纳新开关行）；
-  - **九项指标**：⏱️ 模拟 Tick、🖼️ 渲染 FPS、⚙️ 内核步进 (ms)、📦 快照解析 (ms)、🎨 渲染+UI (ms)、🧮 整帧耗时 (ms)、🔥 CPU 占用 (%)、🧠 JS 堆内存 (used/limit)、🧬 WASM 线性内存；
-  - **插桩方式**：`rustworld.js::tick()` 以 `performance.now()` 分段测量「内核步进」与「快照解析」，`render.js` 主循环测量「渲染+UI」与「整帧」耗时，四者均取 EMA(α=0.15) 平滑；**仅在调试模式开启时采样**，关闭后零额外开销；新增 `RustWorld::getDebugStats()` 统一导出 Tick / 耗时 / 内存数据；
-  - **CPU 口径**：整帧耗时 ÷ 30FPS 帧预算 (33.33ms) × 100%；HUD 每 200ms 节流刷新；**无头模式下依旧刷新**（渲染项归零），可配合超高倍速监视长程演化的性能与内存曲线；
-  - **兼容性**：JS 堆依赖 `performance.memory`（Chromium 系可用），不支持时该项显示「浏览器不支持」并亮出提示行；WASM 内存走 `memory.buffer.byteLength`，全浏览器可用；
-  - 版本号自增 v0.9.48 → v0.9.49。
-- **🛤️ 道路衰减速度翻倍 (v0.9.50)**：
-  - **参数调整**：`ROAD_WEAR_DECAY_RATE` 由 `0.0005` 提升至 `0.0010` 等级/秒（`crates/sim_core/src/config.rs`），前端 `config.js::roadWearDecayRate` 同步调整；
-  - ⚠️ **双端同步要点**：`world.rs::tick()` 第 5 步读取的是 `self.config.road_wear_decay_rate`，而前端启动时会 `applyConfig(SIM_CONFIG)` **覆盖内核配置**，故 Rust 常量与前端 `config.js` 必须同步修改，否则前端注入的旧值会静默覆盖内核改动（改 Rust 不生效）；
-  - **效果**：荒废路径被杂草吞没的速度加倍——满级 5.0 的道路自然退化归零约需 5000 模拟秒（原约 10000 秒），人迹罕至的支路更快回归荒野，维持干道需更持续的人流踩踏；
-  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
-  - 版本号自增 v0.9.49 → v0.9.50。
-- **💪 步行速度受力量禀赋加成 (v0.9.51)**：
-  - **机制**：`agent.rs::tick_movement` 在既有「道路等级 × 体力」之外新增**力量因子**：`strength_factor = clamp(1 + (strength − 禀赋基准) / 禀赋基准 × bonus, min, max)`，乘入 `target_speed`；力量越高者步履矫健，越低者步履蹒跚；
-  - **新增参数**（`SimConfig` + 前端 `config.js` 同步，支持免编译热调）：`agentStrengthSpeedBonus`(0.40，力量每偏离基准 ±100 点的增减比例)、`agentStrengthSpeedMin`(0.70 下限)、`agentStrengthSpeedMax`(1.30 上限)；
-  - **实测 A/B 对照**（同种子 4242、各 5000 帧采样移动中个体）：`bonus=0.0` 关闭时力量-速度 Pearson r = **−0.029**、高低力量组速度比 **0.982**（基线无偏）；`bonus=2.0` 时 r = **0.444**、速度比 **1.443**；默认 `0.40` 下 r = **0.142**、速度比 **1.061**（温和可感）；
-  - **接口变更**：`Agent3D::tick_movement` 新增 `config: &SimConfig` 形参（`world.rs` 第 6 步调用处同步传入 `&self.config`）；
-  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`（同种子逐字节一致 / 无越界 / 无 NaN）；
-  - 版本号自增 v0.9.50 → v0.9.51。
-- **👁️ 视图显隐改造: 新增隐藏部落民 / 隐藏路网，移除 POI 指示环开关 (v0.9.52)**：
-  - **新增开关**（生态时钟控制台，`main.js` 绑定）：`👤 隐藏部落民`（`chk-hide-agents`）与 `🛣️ 隐藏路网`（`chk-hide-lanes`）；语义为"勾选即隐藏"，落到 `RustWorld::showAgents` / `showLanes`（默认均为 `true`，即默认全显示）；
-  - **隐藏部落民**：`render.js` 第 4 步渲染改为 `sim.showAgents ? sim.agents : []`，隐藏时族人（含 💀 遗骸、选中高亮与需求标签）全部不绘制，且**点击拾取同步排除**族人（`agentHits` 收集处同样取空数组），杜绝"看不见却点得中"；
-  - **隐藏路网**：复用既有 `sim.showLanes` 分支，隐藏时全部车道不再绘制，道路悬浮 Tooltip 走 `else` 分支自动隐藏；
-  - **删除旧开关**：移除「显示 POI 有限储量指示环」选项（`index.html` 整行 + `main.js` 绑定 + `RustWorld::showPoiStock` 字段 + `render.js` 中 5 处判断），**指示环功能保留并恒显**（仅 `isFinite(poi.maxStock)` 判定）；
-  - **布局适配**：控制台面板高度 216px → 264px（容纳 3 个开关行）；调试监视器浮窗改锚定**屏幕右下角**（`bottom:20px; right:20px; width:320px`），避开增高后的控制台与左侧生态大盘；
-  - 版本号自增 v0.9.51 → v0.9.52。
-- **💀 死亡数区分自然死亡 / 非自然死亡 (v0.9.53)**：
-  - **分类口径**：☘️ **自然死亡** = 寿终正寝（健康值随寿命自然衰减归零）；⚡ **非自然死亡** = 饥荒饿死 / 脱水渴死（外部生存资源断绝致死）；
-  - **内核改造**：`Agent3D` 新增 `death_is_natural: bool` 字段，在三处死亡判定处显式赋值（饥荒/脱水 = `false`，寿终 = `true`）——**不依赖死因字符串匹配**，避免文案变动导致统计错位；`World3DEngine` 新增 `total_deaths_natural` / `total_deaths_unnatural` 计数器，在 `tick()` 第 2 步代谢结算处与 `total_deaths` 同步累加，并在 `ecology.rs::init_ecology` 随重演生态一并清零；
-  - **快照与前端三处同步**：`snapshot.rs` 新增 `total_deaths_natural` / `total_deaths_unnatural` → `world.rs::generate_snapshot()` 赋值 → `rustworld.js::_applySnapshot()` 映射（`totalDeathsNatural` / `totalDeathsUnnatural`）；
-  - **顶栏展示**：「💀 死亡数」指标卡改为 `💀 死亡 <绿>自然数</绿>☘️ / <红>非自然数</红>⚡`，上方大字仍为死亡总数，鼠标悬停显示分类口径说明；
-  - **实测验证**（临时脚本 A/B/C 对照，已删除）：基线短程 0 死亡；健康急速衰减场景 20 死 **全部计入自然**；代谢暴增 + 资源零断供场景 20 死 **全部计入非自然**；三个场景恒等式 `自然 + 非自然 == 总死亡` 均成立；
-  - `node tools/test-wasm.js` 回归 `ALL_TESTS_DONE`；
-  - 版本号自增 v0.9.52 → v0.9.53。
-- **📚 CURRENT.md 按功能模块拆分 (v0.9.54)**：
-  - **文档结构重组**：原单一 `CURRENT.md`（384 行）按功能模块拆分为「**根索引 + 分模块文档**」两级结构——根 `CURRENT.md` 精简为**索引入口**（定位说明 + 核心架构速览 + 模块导航表 + 维护指引），各模块详述迁移至 `docs/current/` 目录下独立文件（`01-spatial-network.md` ~ `11-changelog.md`），内容**零丢失**迁移；
-  - **版本演进记录独立**：原散落在「多级私产房屋体系」章节内的 v0.9.24 ~ v0.9.53 各版本核心改动条目，统一汇集至 `docs/current/11-changelog.md`（按版本号正序排列）；
-  - **AGENTS.md 文档地图同步**：§0 文档地图表更新 `CURRENT.md` 角色为「索引入口」，并新增 `docs/current/` 各文件职责说明；§4.7 / §4.9 中指向具体记录的维护指引改为指向对应模块文件；`BUILD_GUIDE.md` 版本号同步规范更新为「在 `docs/current/11-changelog.md` 中记录」；
-  - 纯文档重组，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.53 → v0.9.54。
-- **📁 文档目录整合：非 AGENTS.md 文档全部移入 `docs/` (v0.9.55)**：
-  - **目录重组**：根目录除 `AGENTS.md`（保留原位）外，`CURRENT.md`、`BUILD_GUIDE.md`、`AGENT_AI_ANALYSIS.md`、`ARCHITECTURE.md`、`PLAN.md`、`TODO.md` 全部移入 `docs/` 目录（`git mv` 保留历史），与既有 `docs/current/` 分模块文档合并为统一文档库；
-  - **引用路径全量修正**：`docs/current/` 各模块文档「返回 CURRENT.md 全景索引」链接由 `../../CURRENT.md` 改为 `../CURRENT.md`；`docs/CURRENT.md` 索引入口内部链接由 `./docs/current/` 改为 `./current/`、指向根目录 `AGENTS.md` 的链接改为 `../AGENTS.md`；`PLAN.md` / `ARCHITECTURE.md` 中指向 CURRENT.md 的绝对路径同步更新；`BUILD_GUIDE.md` 与 `docs/current/09-code-map.md` 的源码树结构图更新为 `docs/` 新布局；
-  - **AGENTS.md §0 文档地图同步**：文档地图表各文件标注 `docs/` 前缀并新增 `TODO.md` 行；`crates/sim_core/AGENTS.md` 中「根文档/CURRENT.md」表述同步更新；
-  - **超长文档拆分检查**：逐一统计全仓 `.md` 行数，当前最大文件为 `docs/PLAN.md`（463 行），**未超 500 行阈值，暂无拆分对象**（§4.6 阈值规则持续生效）；
-  - 纯文档重组，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.54 → v0.9.55。
-- **🧩 无头模式顶栏常驻更新 + 每秒 Tick 监视 + 空格键全局暂停 + 族谱拖拽修复 (v0.9.56)**：
-  - **无头模式右上角数据栏实时更新**：`render.js` 将顶栏统计（活体人口/私产宅舍/生态地标/孕妇数/出生/死亡/流产/四季气温）提取为独立节流的 `updateTopBarStats()`（~100ms），置于无头模式 return 之前调用——长程加速演化时无需退出无头模式即可实时监视人口与经济指标，画布渲染与其余 DOM 刷新仍保持跳过（性能不受影响）；
-  - **调试监视器新增「⚡ 每秒 Tick」**：`index.html` 调试 HUD 新增一行，`render.js::updateDebugHud` 以 `getDebugStats().tick` 差分 ÷ 真实经过时间计算现实世界每秒实际推进的模拟 Tick 数（含倍速加成，暂停时归零），仅调试模式开启时采样；
-  - **空格键暂停不受 web 控件焦点残留影响**：`main.js` 全局空格键处理改为仅在真正的文本输入场景（TEXTAREA / 文本框类 INPUT / contenteditable）保留空格原始行为；焦点残留在按钮、滑块、下拉菜单、勾选框等控件上时，空格统一 `preventDefault` 并触发「暂停/继续」，避免控件消费掉空格键导致暂停失灵；
-  - **修复完整族谱页面无法拖动 bug**：`dag.js::generateStandaloneDagHtml` 生成的独立新标签页脚本缺失节点尺寸常量 `NODE_W/NODE_H`（`centerOnNode` 引用），`init()` 在 `setupEvents()` 之前抛 `ReferenceError`，导致拖拽/缩放事件从未绑定；已在 standalone 脚本注入 5 个布局常量（与模块级一致），浏览器实测拖拽平移、滚轮缩放、节点点击全部恢复正常；
-  - 版本号自增 v0.9.55 → v0.9.56。
-- **🌳 完整族谱重构：全量血脉单图 + 力导向自动布局 (v0.9.57)**：
-  - **全量收录单图**：废除"焦点直系裁剪"画法，改为把全体族人（当前活跃 `sim.agents` + 先祖档案库 `sim.agentArchive`）统一收进**一张 DAG 图**，完整呈现宗族全量血脉拓扑；
-  - **仅保留亲子有向边**：不再绘制夫妻关系连线，仅保留父子（蓝 👨）/母子（粉 👩）两条独立有向 Bezier 边，沿袭原有颜色表示法与祖先金黄/后代淡蓝高亮色系；
-  - **力导向自动布局**：新增 `initForceLayout` / `stepForceSimulation` / `animateForceLayout` 物理引擎——亲子边弹簧牵引 + **斥力截止半径 (480px) 防远场横带互斥撑图** + **近距线性碰撞推挤 (minDist 130 严防卡片叠压)** + 世代纵向纠正（父上子下）+ **出生排名纵向带锚定**（`birthRank` 0~1 计算各节点绝对目标 y，位置型引力 0.03 锁定出生带，出生越晚目标带越低） + 出生时间纵向重力 (`birthSec` 越晚向下重力越强 0.75) + 画布横向中心引力 + **孤立节点出生带强锚定** (无子女始祖 0.012 防被斥力推离图外) + 速度阻尼收敛；初始布局每代按 7 人/行紧凑网格换行防行宽爆炸；构建期同步预热 60~160 步使首帧即接近稳定，动画阶段仅做收敛抛光，收敛后自动停稳（实测 40 节点出生排序一致率 94.5%、代际 98.8%）；
-  - **双端一致**：页内全屏模态与独立新标签页 standalone 共用同一力导向引擎（`FORCE_SIM_SRC` 经 `Function.prototype.toString()` 内嵌，独立作用域自带布局常量与亲子边对象重建）；节点点击改为轻量聚焦（仅切换高亮与浮动档案，不整图重建、不打断力导向收敛）；用户拖拽/缩放后自动居中让位，收敛后自动居中仅在未手动操作画布时执行；
-  - 纯前端改动（`frontend/js/dag.js`），未触碰 WASM 产物；版本号自增 v0.9.56 → v0.9.57。
-- **🌳 完整族谱纯力学布局：废除排名与代数分层 + 随距离递减斥力 (v0.9.58)**：
-  - **废除出生排名与代数分层**：删除出生时间排名（`birthRank` 纵向带锚定 + 出生时间重力）与手动代数划分（`initForceLayout` 按 `generation` 分组 7 人/行网格排布、`genBias` 世代纵向纠正"父上子下"）——位置排布不再受任何人工分层/排名约束，初始播种改为全节点确定性伪随机圆盘散布；
-  - **纯力学位置决定**：节点最终位置完全由亲子弹簧牵引 + 全对斥力 + 画布中心引力三者的力学平衡自然决定，血缘聚类与整体形态均为涌现结果；
-  - **随距离递减斥力 (自然稀疏但不过疏)**：库仑平方斥力（带 480px 截止半径）改为 `F = k/d` 线性衰减且**无截止半径**——近距离推力强防卡片叠压、远距离推力弱但始终存在使整图自然舒展；叠加画布中心引力（x/y 全向）把推远的节点拉回，形成力学平衡半径，既不会挤成一团也不会松散到无边无际；
-  - **UI 文案同步**：`index.html` 页内模态与 standalone 新标签页帮助栏、模态标题副文案同步更新为"纯力学自动布局"描述；版本号自增 v0.9.57 → v0.9.58。
-  - 纯前端改动（`frontend/js/dag.js` / `frontend/index.html`），未触碰 WASM 产物。
+## 核心机制变更
 
-- **🆕 出生 tick 字段 + 族谱出生时序纵向重力 (v0.9.59)**：
-  - **Rust 内核新增 `birth_tick` 字段**：`Agent3D` 与 `AgentSnapshot` 同步加入 `birth_tick: u64`（始祖在 `ecology.rs` 初始化时显式置 0；新生儿在 `birth.rs::resolve_newborns` 中赋值为当前 `self.tick_counter`），并随快照序列化下发前端；
-  - **前端映射**：`rustworld.js::_applySnapshot` 将 `a.birth_tick` 映射为 agent 对象的 `birthTick` 字段，同步进入 `agentArchive`（已故先祖档案库）；
-  - **族谱出生时序重力**：`dag.js::buildLineageDAG` 收集全图节点 `birthTick` 范围 `[tickMin, tickMax]`，为每个节点计算归一化 `birthRank ∈ [0,1]`（0=始祖最早 / 1=最新生最晚）；`stepForceSimulation` 在软边界回拉之后追加"出生时序纵向重力"——按节点 `birthRank` 把目标 Y 拉到 `质心Y + (rank-0.5) × layerSpan`（`layerSpan = √n·200` 自适应族谱规模），刚度 `0.05`（弱于斥力/弹簧，仅做柔和分层引导，不破坏力学平衡），位移随温度同步收缩防后期抖动；最终形成"**上=祖先 / 下=后代**"的天然代际纵向分层，越晚出生的节点被自然拉向画布下方；
-  - **设计意图说明**：v0.9.58 曾废除出生排名与代数分层以追求"纯力学涌现"，但实际效果是后代与祖先混杂交织难以辨识代际关系；本版本有意重新引入基于 `birth_tick` 的纵向重力分层，但保留纯力学的斥力/弹簧/边界三力作为主体，时序重力仅作柔和引导（刚度 0.05），既还原代际可读性又不破坏力学自然性；
-  - **快照字段三处同步**（按 AGENTS.md §4.5）：`snapshot.rs` 结构体定义 → `world.rs::generate_snapshot` 赋值 → `rustworld.js::_applySnapshot` 映射，全链路打通；
-  - WASM 重新编译并复制到 `frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm`；`node tools/test-wasm.js` 回归通过（确定性 true / 无越界 / 无 NaN / `ALL_TESTS_DONE`）；版本号自增 v0.9.58 → v0.9.59。
-- **🌳 族谱力导向布局收敛重构：无惯性松弛 + 温度冷却 + 软截止斥力 (v0.9.60)**：
-  - **根因修复（惯性积分永不收敛）**：旧积分器"速度累加 × 阻尼"在保守力场下稳态速度被放大至 `力 × 1/(1−damping)`（damping 0.95 时放大 19 倍），任何微小不平衡力都会让节点以 `maxDisp` 满速持续运动，`moved ≥ 0.3` 收敛判定永远无法达成（实测 300 步后 `maxMove` 仍恒为 4.0）；
-  - **无惯性松弛位移积分**：位移 = 合力 × 温度（温度冷却曲线 `exp(−step/70)`，0 步→1.0、70 步→0.37、300 步→0.014），合力在平衡位形自然趋零即完全静止；每步合力累加器清零杜绝速度放大；位移上限随温度同步收缩，任何残余力也会被冷却冻结——实测 160 步内 `maxMove < 0.3` 收敛、300 步后 `maxMove ≈ 0.00`（完全静止）；
-  - **全对斥力改为软截止**：斥力 `F = k/d·(1−d/cutoff)`（`cutoff=700` 覆盖数个近邻），远距对无相互作用——边缘净推力有限，由软边界（`R_MAX_X=√n·400`，刚度 0.35，仅 X 向回拉，Y 向不回拉以保播种分层）兜住整图，既自然稀疏又不会无限散开；近距线性推挤 `minDist=190`（卡片 184×80 任意方向不叠压，实测 138~260 节点 `under150=0~2`）、collide 刚度 1.0；
-  - **亲子弹簧降为轻量聚类**：`spring=0.003 / rest=300` 远弱于斥力，仅轻微凝聚血缘聚类，不再把图整体拉塌（旧参数 0.015 曾使播种半径 7900 的图塌缩至 bbox ~4500）；
-  - **收敛验证数据**（真实 WASM 族谱，reload 后新参数）：n=138 → min=167 / nnAvg=327 / under150=0 / m300=0.006；n=260（800k tick）→ min=139 / nnAvg=332 / under150=2 / m300=0.006；各规模 nnAvg 稳定在 ~330 实现常数稀疏度；
-  - **删除出生时序纵向重力**：v0.9.59 引入的运行时出生时序重力（`stepForceSimulation` 第 3.5 步按 `birthRank` 拉向目标 Y）实测被斥力/弹簧压制效果不佳，改用"播种即分层"方案后（`initForceLayout` 直接按 `birthRank` 分配初始 Y 纵向带）重力不再必要——将 `gravK` 置 0 验证效果良好后整段删除；代际纵向分层（上=祖先/下=后代）完全由播种一次性确定，力学迭代仅在各自纵向带内做局部调整，软边界同步改为仅 X 向回拉（Y 向不回拉以保分层）；`birth_tick` 字段全链路（Rust → 快照 → 前端）保留，仍作为播种分层数据源；
-  - 纯前端改动（`frontend/js/dag.js`），未触碰 WASM 产物；版本号自增 v0.9.59 → v0.9.60。
-- **🌳 完整族谱改为直系血脉单图：仅收录焦点父/母递归祖先链 + 子女递归后代链 (v0.9.61)**：
-  - **改造动机**：v0.9.57 起的"完整族谱"页面把 `agentArchive` + `agents` 全量录入单张 DAG，长期演化后族人数百上千节点同图渲染，既卡顿也难辨识真正与焦点相关的直系血脉。本版本按用户要求裁剪为"焦点的父/母递归祖先链 + 子女递归后代链"——旁系亲属（兄弟姊妹及其后代、配偶的家族等）不再入图；
-  - **数据流改造**：`buildLineageDAG`（`frontend/js/dag.js`）原先把 `sim.agentArchive` 与 `sim.agents` 全部塞入 `allMap`，现在先用临时 `lookup` 映射解析父子链路，再以焦点为根做两次 BFS——向上沿 `fatherId/motherId` 递归收集 `ancestors`、向下沿 `children` 递归收集 `descendants`，三者并集 `lineageIds` 才会被录入 `allMap`；之后的节点格式化、边构建、力导向布局、高亮色系逻辑全部沿用原有代码无改动（`ancestors`/`descendants` 集合原本就为高亮而算，现在它们直接决定入图节点，语义自洽）；
-  - **文案同步**：`index.html` 模态标题改为"直系血脉拓扑 DAG 族谱"、副文案改为"仅焦点的父/母递归祖先链 + 子女递归后代链"、统计徽章改为"✨ 直系血脉单图"、按钮 tooltip 与"在新标签页打开"提示同步；`dag.js` standalone 新标签页标题、顶部品牌标题、统计徽章、`init()` 顶部统计文案全部同步；`style.css` 章节注释同步为"直系血脉 DAG 族谱模态弹窗"；
-  - 纯前端改动（`frontend/js/dag.js` + `frontend/index.html` + `frontend/style.css`），未触碰 WASM 产物；版本号自增 v0.9.60 → v0.9.61。
-- **🌳 族谱配色改造：焦点暗红卡片 + 祖父母废除金线改用红蓝 (v0.9.62)**：
-  - **改造动机**：v0.9.61 的直系族谱仍保留"祖先金线 + 金黄祖先链高亮"的视觉体系，与后代红蓝系割裂、且焦点同为蓝色卡片难以一眼定位；用户要求祖父母等祖先边不再用金色、改与后代一致的红蓝线条，焦点人物以暗红卡片突出。
-  - **边配色收敛为红蓝双色系**：移除 `.dag-edge.ancestor`（#fbbf24 金线 + 金色箭头 marker `arrow-ancestor`/`inpage-arrow-ancestor`）样式，并同步删除 standalone 内联 `<style>` 与新标签页同样的金色边定义；`buildDom()`（standalone）与 `renderInPageDag()`（页内模态）两处绘制边的逻辑中，去掉 `if (e.child.isAncestor || e.child.isFocus) cls += ' ancestor'` 与金色 `arrow-ancestor` marker 分支——此后所有亲子边一律按 `parentType` 着色：父亲蓝（#38bdf8）/ 母亲粉（#f472b6），后代子树沿用 `.dag-edge.descendant.*` 的加亮蓝/粉 + 红色光晕保持视觉层次；祖父母等祖先边因此回归与后代一致的红蓝系，不再出现金色。
-  - **焦点暗红卡片突出**：`.dag-node.focus`（standalone 内联 + 页内 `style.css`）由蓝色边框/底（#38bdf8 / rgba(14,30,56)）改为深红边框 `#ef4444` + 暗红底 `rgba(48,14,18)` + 红色光晕 `rgba(239,68,68,0.55)`，z-index 仍最高；节点 JS 逻辑仍给焦点加 `focus` class 不变，仅样式变暗红，确保一眼可辨。
-  - **祖先节点卡片保留金边**（`.dag-node.ancestor` 边框/底色未动）以区分代际，与"边线不用金色"的诉求互不冲突；SVG 中 `arrow-ancestor` / `inpage-arrow-ancestor` 的 `<defs>` 定义保留但已不再被任何边引用（无害）。
-  - 纯前端改动（`frontend/js/dag.js` + `frontend/style.css`），未触碰 WASM 产物；版本号自增 v0.9.61 → v0.9.62。
-- **🔧 全量消除 magic number，超参收口 config.js + 配置校验/速查表工具 (v0.9.63)**：
-  - **目标**：消除 Rust 逻辑层、注释与文档中散落的硬编码字面量，把所有可调超参统一收口到 `frontend/js/config.js`（经 `SimConfig` 热更新注入内核），并降低用户调参与检索参数的难度。
-  - **逻辑层字面量收口**：审计 `crates/sim_core/src/spatial/**` 全部 `.rs`，将 `agent.rs`/`ecology.rs`/`graph.rs`/`birth.rs`/`poi.rs`/`decisions/harvest.rs`/`housing_system/settlement.rs` 中的代谢/劳作体力消耗、移动与越野系数、道路等级移速乘子、A* 寻路权重与启发式、POI 撒点/路网接入阈值、始祖生成属性抖动、遗传夹取、自满足阈值、营地自饮自食速率等全部改为 `self.config.<字段>` 引用；道路限速常量（`roadSpeed*`）改为随 `SimConfig` 生效（新增 `add_lane`/`find_path_3d_with_preference` 的 `&SimConfig` 入参，将限速、等级乘子、隐秘偏好等彻底打通为可热配）。
-  - **字段漂移完全打通对齐**：补齐此前缺失字段（`houseNodePoiOccupyRadius`、`houseNodeReuseRadius`、`agentStaminaCapacity` 等），删除孤儿字段（前端 `campRestStaminaRecoveryRate` 与实际逻辑 `agentRestStaminaRecoveryRate` 不对应，已并入后者），并统一前后端不一致数值——`decisionFoundHomeDistMin` 24、`decisionFoundHomeDistMax` 80、`houseMinSpacing` 20、`roadWearStepInc` 0.05（修正此前 const 0.005 与逻辑 0.05 的静默分歧）。`SimConfig` 字段由约 110 扩至 **161** 个，覆盖全仿真动力学。
-  - **POI 兜底默认值命名化**：`poi.rs::new_with_name` 中 60.0/45.0/2.00/1.50/1.20 等兜底字面量抽取为 `POI_FALLBACK_*` 命名常量（实际仿真由 `seed_primitive_ecology` 以 `config.stock_max_*/regen_base_*` 覆盖），注释同步指向 config 字段。
-  - **配置校验/速查表小工具**：新增 `tools/config-check.js`（零依赖纯 Node），交叉解析 `config.js` 与 `config.rs`，校验「孤儿字段 / 缺失字段 / 类型错配 / 数值漂移」四类问题并退出码报错；同时自动生成 `docs/config-reference.md`——按分区罗列每个字段的 camelCase 名、类型、默认值与中文说明，作为用户调参的唯一检索入口。`config.js` 每个字段均补中文行内注释，刷新浏览器即生效，无需重编译。
-  - **文档同步**：`AGENTS.md` §4 各阈值（POI 施密特 0.30/0.10、时间基准 1/30、行囊容量 50、POI 数量与间距 70m、供暖 5℃/0.12、立宅门槛 20/60/12/24m 等）改为引用 `config.<字段>`；版本号自增 v0.9.62 → v0.9.63（含 `index.html` 徽章与本文末指针）。
-  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过；`node tools/config-check.js` 输出「字段集、类型、默认值完全一致，无漂移」；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（同种子逐字节确定性、坐标防越界、数值防 NaN 全部通过）。RNG 消费顺序未变，行为默认等价。
-- **🌳 族谱重构：Y 严格线性映射出生 tick + X 冲突横向扩展 + 虚拟化 LOD (v0.9.64)**：
-  - **动机**：族谱此前使用力导向布局（v0.9.58 起纯力学、v0.9.59 起 birthRank 播种），力的 Y 向松弛会让节点偏离其真实出生时序，出现「看似时间轴、实则漂移」，且长期演化后节点数上百时收敛慢、重叠与辨识困难。本次改为完全确定性的时间轴布局。
-  - **Y 严格线性时间轴**：`Y = (birthTick − tickMin) × PX_PER_TICK`，先出生者必在上方，**不引入任何排名/代数/力学修正**（废除 `birthRank` 归一化与 `initForceLayout` 的 `√n·600` 纵向带播种）；彻底删除 `initForceLayout` / `stepForceSimulation` / `animateForceLayout` / `FORCE_SIM_SRC` 及一切弹簧-斥力-软边界物理，首帧即终态、无收敛抖动。
-  - **X 冲突规避横向扩展**（`frontend/js/dag-layout.js` `packHorizontal`）：① **主干链优先落位**——焦点沿父系上溯至根、沿长子下溯至叶的主脉先全部锚定第 0 列，形成贯穿全图的垂直红色骨干（用户第一眼即可抓住「我从哪来、到哪去」）；② **核心家庭分组**——同父母子女按出生序整体居中于双亲中点，长幼自左向右；③ **整数列网格冲突探测**——纵向净距 < `VNEAR = NODE_H+GAP_Y = 114px` 即判定冲突，由理想列向两侧逐列探测最近无冲突列（按 y 分桶索引，只比较相邻 3 桶）；④ 两轮局部松弛（父向子女质心、子向双亲中点靠拢），仅在不冲突且亲属横向偏移代价下降时接受。全程无随机数、不依赖遍历顺序，同数据必得同结果。
-  - **Y 映射参数拟合**：新增 `tools/gen-dag-testdata.js`（零依赖 Node，直接驱动 `sim_wasm` 跑满 **50 万 tick**，周期性读快照累积「全量族人档案库」——快照只含存活者，故按拍入档、末次出现状态覆盖、消失即判定死亡），产出 `archive.json` / `lineage.json` / `stats.json`（亲子出生间隔分位数、同胞间隔、相邻出生间隔、代际深度、家庭子女数、人口曲线）。实测：333 人 / 313 次生育 / 6 代 / tick 0~499,635；**亲子出生间隔 min 30,885 / p50 153,058**，**同胞间隔 p50 27,007**，相邻出生间隔 p50=499（生育呈爆发式聚集）。据其扫描候选密度 (0.001~0.02 px/tick) 后定 **PX_PER_TICK = 0.004**：亲子最小间隔 → 124px ≥ 114px（任意亲子纵向不打架、连线基本垂直），同胞间隔 → 108px < 114px（同父母子女自然横向并排成「同代行」），整图约 2,000~2,400px 高、长宽比≈1.35，94 节点与 27 节点两档焦点的 fit 缩放均为最优值 (0.32~0.34)，且主干 100% 落在第 0 列。
-  - **视口虚拟化 + 缩放分层 LOD**（`frontend/js/dag-view.js`）：只挂载视口内（含 260px 缓冲）的卡片与亲子边——节点按 y 有序数组二分定位可见区间、DOM 池复用挂载/回收，边仅绘制至少一端落在扩展视口内的边；LOD 三档：概览档 (scale<0.45) 纯色块（性别蓝/粉、已故灰、主干红）+ 1.1px 直线边，简档 (0.45~0.75) 头像+#编号+世代徽章，全档 (>0.75) 完整卡片（状态行+六维禀赋+居所）；pan/zoom 走 rAF 节流 + 单元素 transform 合成层；DOM 数量恒定在「视口容量+缓冲」，彻底摆脱节点上千时的卡顿。
-  - **认知减负设计**：左侧常驻**时间刻度尺**（74px，不随横向平移），按缩放自适应粒度（季/年/5/10/25/50/100 年）标注「第N年」并配贯穿画布的年代分隔带背景线（1 tick = 1/30 秒，7,200 tick = 1 年）；顶栏**时间密度滑块**（0.25x~4x 实时 `relayout`），让用户自行权衡时间真实感与紧凑度；悬停卡片时**仅高亮其父母与子女**、其余降至 16% 透明度、无关边淡化至 12%，大幅压制密集图谱视觉噪声；主干/旁支以红色描边区分。
-  - **模块拆分与同源**：按 AGENTS §4.6 将 1306 行的 `dag.js` 拆为 `dag-layout.js`（纯布局数学，零 DOM，浏览器/Node 双端可加载）/ `dag-view.js`（虚拟化渲染+LOD+pan/zoom+刻度尺）/ `dag-standalone.js`（独立新标签页 HTML 模板）/ `dag.js`（数据构建+模态编排+Inspector，仅 300 余行）；standalone 经 `FlowDagLayout.SRC` + `FlowDagView.SRC`（`Function.prototype.toString()` 内嵌，含 `LAYOUT_CONST` 常量字面量）保持页内模态与独立标签页严格同源——**注意顺序**：布局 SRC 必须先于任何 `LAYOUT_CONST` 引用声明（否则 const 的 TDZ 会让 bootstrap 静默中断，正是本次调试中踩到的坑）。
-  - **配套修正**：`index.html` 补齐亲子边箭头 marker 全局 `<defs>`（`dag-arrow-father`/`dag-arrow-mother`，页内模态与独立页共用）、新增时间密度滑块与统计徽章，脚本顺序改为 `dag-layout → dag-view → dag-standalone → dag`；`main.js` 去掉 `openInNewTab` 的无效第三参数，关闭族谱改走 `FlowDag.closeModal()` 以正确销毁虚拟化视图（DOM 回收与事件解绑）。
-  - **验证**：新增 `tools/dag-shot.js`（零依赖，在 Node 中 eval 加载四个 dag 模块到 globalThis、走生产路径 `generateStandaloneDagHtml` 生成静态页，再用系统 Chrome headless 多档位截图）；实测焦点 #2（94 节点/103 边，压测）与 #311（27 节点，典型）在 fit / focus / detail / top / bottom 各档位均**零重叠**、主干红色骨干连续、年标与网格正确、LOD 分档切换自然。纯前端改动，未触碰 Rust 内核与 WASM 产物；版本号自增 v0.9.63 → v0.9.64。
-- **💪 行走速度力量加成重构：默认速度共用 + 强度直接乘率 (v0.9.65)**：
-  - **规格**：行走速度公式由 `默认速度 × 道路质量 × 体力乘子 × 力量加成(clamp 0.7~1.3)` 重构为 `默认速度 × 道路质量(road_level_factor) × (力量/100)`；**所有 agent 共用同一默认速度**（不再按始祖序号做环形离散），**速度不再受体力影响**，`strength/100` 不做任何 clamp（力量=100 时 1.0 倍、=0 时 0、负数经 `current_velocity.max(0.0)` 自然停步）。
-  - **改动点**：`agent.rs` 运动函数删除 `stamina_factor` 与旧 `strength_factor`，改为 `max_desired_speed * road_level_factor * (strength/100.0)`；`ecology.rs` 始祖初始化去除 `+ (i % agent_spawn_speed_ring)` 离散，全员基准速度统一为 `agent_spawn_base_speed * agent_base_move_speed_mult`；清理 7 个废弃超参（`agentStrengthSpeedBonus/Min/Max`、`agentStaminaFactorRef/Min/Max`、`agentSpawnSpeedRing`）及其 `SimConfig` 字段、`config.js` 映射与 `Default` 映射，`SimConfig` 字段由 161 降至 154（`docs/config-reference.md` 已重生成）。体力消耗（`stamina_burn`）与决策阈值仍保留、不受影响。
-  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过，WASM 双副本同步；`node tools/config-check.js` 输出「字段集、类型、默认值完全一致，无漂移」；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（同种子逐字节确定性、防越界、防 NaN 全通过）。RNG 消费顺序未变，行为确定。
+| 版本 | 核心变更 | 影响模块 |
+| :--- | :--- | :--- |
+| **v0.9.24** | 随身金币遗产继承：族人故去后 `carried_gold` 平分给在世子一代子女，无子女则清零 | agent / ecology |
+| **v0.9.34** | 房屋系统与世界环境模块化解耦：`housing_system` 拆为 5 个单一职责子模块，四季回归 `world.rs` | housing_system / world |
+| **v0.9.35** | 简化四季参数模型：废除 `season_quarter_length`，单季长度由 `year_length × 0.25` 派生 | config / world |
+| **v0.9.37** | 婚姻系统与建房事件解耦：移除升级竣工即时迎娶钩子，成婚统一由 `marriage.rs` 每 tick 扫描匹配 | housing_system/marriage |
+| **v0.9.39** | 混沌系统测试策略落地：不再持久化保存单元测试脚本，长期确定性验证由 `test-wasm.js` 承担 | 工程规范 |
+| **v0.9.42** | 开局人口 12→20（10男10女），百家姓库 60→150 | ecology / agent / frontend |
+| **v0.9.43** | 建房/升级/修缮全流程回归 Agent 自主决策：废除系统发房扫描器，新增 `FoundHome` 需求 | decisions / housing_system |
+| **v0.9.44** | 决策概率全部收敛为确定性执行（无掷骰），立宅选址参数全部入 `SimConfig` | decisions / config |
+| **v0.9.45** | 决策模块子目录化拆分：`evaluator.rs` 拆为 7 个子模块（needs/routing/evaluate/harvest/seeking/scheduler/mod） | decisions |
+| **v0.9.47** | 超高倍速支持（256x/512x/1024x），建房最小间距 14→28m | frontend / config |
+| **v0.9.48** | 立宅优先复用空置路网节点：候选宅址 20m 半径内若存在空置节点则直接复用，防止代际更替后节点膨胀 | housing_system/settlement / graph |
+| **v0.9.49** | 调试模式监视器：Tick/FPS/内核耗时/快照耗时/CPU/内存/WASM 内存九项指标，200ms 刷新 | frontend |
+| **v0.9.50** | 道路衰减速率翻倍（线性模型阶段参数调整，后于 v0.9.66 改为比例模型） | graph / config |
+| **v0.9.51** | 步行速度受力量禀赋加成（后于 v0.9.65 重构为力量直接乘率） | agent / config |
+| **v0.9.52** | 视图显隐改造：新增隐藏部落民/隐藏路网开关，移除 POI 指示环开关（改为恒显） | frontend |
+| **v0.9.53** | 死亡数区分自然死亡（寿终正寝）与非自然死亡（饿死/渴死），顶栏分列统计 | agent / snapshot / frontend |
+| **v0.9.56** | 无头模式顶栏常驻更新 + 每秒 Tick 监视 + 空格键全局暂停（不受控件焦点残留影响）+ 族谱拖拽修复 | frontend |
+| **v0.9.57 ~ v0.9.62** | 族谱系统迭代：全量血脉单图 → 力导向布局 → 纯力学布局 → 出生时序纵向重力 → 无惯性收敛 → 直系血脉裁剪（仅焦点祖先+后代链）→ 焦点暗红卡片配色（最终于 v0.9.64 被时间轴布局取代） | frontend/dag |
+| **v0.9.63** | 全量消除 magic number：161 个超参收口 `config.js`，新增 `config-check.js` 前后端一致性校验与 `config-reference.md` 自动生成速查表 | config / frontend / tools |
+| **v0.9.64** | 族谱时间轴布局重构：彻底废除力导向，Y 严格线性映射出生 tick + X 冲突横向扩展 + 视口虚拟化 LOD + 时间刻度尺，拆分为 `dag-layout/view/standalone/dag` 四模块 | frontend/dag |
+| **v0.9.65** | 行走速度重构：所有 agent 共用默认速度 + 力量直接乘率（无 clamp），速度不再受体力影响，清理 7 个废弃超参，`SimConfig` 161→154 | agent / config |
+| **v0.9.66** | 道路衰减改比例模型（`wear × (1 - rate×dt)`），清理越野惩罚死机制，前端道路 tooltip 全部去硬编码读 `SIM_CONFIG` | graph / frontend / config |
+| **v0.9.68 ~ v0.9.70** | CI/CD 自动部署流水线：GitHub Actions 编译 WASM → `test-wasm.js` 门禁 → 腾讯云 COS 增量上传，含 `.wasm` MIME 覆写、Secrets 格式预检与 DNS 预解析 | .github / docs |
+| **v0.9.71** | 3 级木石庄舍图标去重：🏛️→🏯，与营地县级行政区图标区分 | frontend / housing_system |
+| **v0.9.72** | **账本与婚姻登记系统 M1 奠基**：新增 `ledger/` 模块（Ledger 双环形流水 / Group 团体基类 / MarriageRegistry 婚姻登记簿 / HouseholdRegistry 家户体系），胎儿预分配 AgentId，与物理仓库完全分离 | ledger（新模块） |
+| **v0.9.73** | 账本前端 UI 展示：快照扩展 `HouseholdSnapshot`/`MarriageSnapshot`/`LedgerBalanceSnapshot`，顶栏存续家户/婚姻统计 + Inspector 家户归属与婚姻登记卡片 + 家户与账本大盘可折叠面板 | snapshot / frontend |
+| **v0.9.74** | 家户与账本大盘面板可点击性修复：补齐 `pointer-events:auto`，CSS 重写对齐全局均值大盘/图例窗口风格 | frontend |
+| **v1.0.0** | **里程碑：账本与家户/婚姻系统 M1 完成**，版本策略升级（M 里程碑递增次版本号，Bug 修复/文档更新递增修订号） | 全项目 |
+| **v1.0.1** | 全量文档重构精简：修复版本号/POI 数量/字段数等失同步，压缩 changelog（58KB→里程碑级）与规划文档，新增账本模块文档，统一文档分层放置策略 | docs |
 
-- **🛣️ 道路比例衰减 + 清理越野惩罚死机制 + 前端超参去硬编码 (v0.9.66)**：
-  - **道路衰减改比例模型**：`graph.rs::tick_wear_decay` 由线性 `wear - rate*dt` 改为比例 `wear * (1 - rate*dt)`（每秒衰减当前磨损的 `road_wear_decay_rate`）；`ROAD_WEAR_DECAY_RATE` 由 `0.0010`(等级/秒) 调整为 `0.0067`(即 0.67%/秒，相对当前磨损)，`config.js::roadWearDecayRate` 同步；纯数值运算，不引入 RNG 消耗，确定性不受影响。
-  - **清理越野惩罚死机制**：经核查内核 `agent_offroad_speed_factor` 从未参与 `target_speed` 计算、越野惩罚实际无效果；按"道路已提供速度加成，无需越野惩罚"清理整套死机制——删除 `is_traveling_offroad` 字段及两处赋值、`AGENT_OFFROAD_SPEED_FACTOR` / `ROAD_OFFROAD_WEAR_THRESHOLD` 两个 const 与其 `SimConfig` 字段及 `Default` 映射、快照 `is_offroad` 字段（`snapshot.rs` / `world.rs` / `rustworld.js` 三处同步删除）、前端 `agentOffroadSpeedFactor` / `roadOffroadWearThreshold` 配置项与 agent 越野绘制分支；保留 `OffRoadDetour` 寻路兜底状态。
-  - **前端超参去硬编码**：`render.js` 道路 tooltip 的 `0.50 + 0.333*wear`、`wear/5.0`、`5.00`、`+0.05/次`、`wear*(0.010/1.5)` 等全部改为读取 `window.SIM_CONFIG`（`roadLevelFactorBase` / `roadLevelFactorWearCoef` / `roadMaxWear` / `roadWearStepInc` / `roadWearDecayRate`），衰减百分比随配置准确显示。
-  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过，WASM 双副本同步；`node tools/config-check.js` 字段集/类型/默认值完全一致；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`；临时 Rust/Node 测试覆盖比例衰减与前端去硬编码，验证通过后删除（遵循 §4.10）。
+---
 
-- **🌐 浏览器自动化使用指南落库 (v0.9.67)**：
-  - **实机验证沉淀**：对 playwright-cli v0.1.18 驱动的 4 个浏览器引擎（Chromium / Firefox / WebKit / 系统 Chrome）逐一完成「打开 → 渲染校验（`document.title` + `h1`）→ 截图（`file` 确认有效 1280×720 PNG）」串行实测，**4/4 全部通过**，总耗时各 5~7s、零超时；产物与报告存 `~/Downloads/browser-verify/`。
-  - **新增 `docs/browser-guide.md`**：收录可驱动浏览器一览、用户级安装位置（`~/.local/pw-tools`，规避 `/usr/local` EACCES）、标准操作流程（独立命名会话 + finally 收尾）、防卡死策略（`pw-timeout.mjs` 限时包装器：SIGTERM → 3s 后 SIGKILL 进程组，`kill-all` / `pkill -f playwright` 兜底，单会话 90s 总预算）与 7 条踩坑清单（zsh 不分词、JCEF 误杀、snapshot 落盘等）。
-  - **AGENTS.md 同步**：第 0 节文档地图登记 `docs/browser-guide.md` 条目。
-  - 纯文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.66 → v0.9.67。
+## 文档与工程规范维护
 
-- **🚀 CI/CD 自动部署流水线：GitHub Actions → 腾讯云 COS (v0.9.68)**：
-  - **新增 `.github/workflows/deploy.yml`**：仅 push `master`（或手动 `workflow_dispatch`）触发，同分支连续 push 自动取消旧部署（concurrency）；流程为 rustup 安装 stable + wasm32 target（`Swatinem/rust-cache` 缓存）→ `cargo build -p sim_wasm --release` → WASM 双副本同步至 `frontend/rust/` 与 `frontend/`（§4.1）→ `node tools/test-wasm.js` 回归门禁（不过不部署）→ 官方 `coscmd` `--delete` 增量上传 `frontend/` 整目录 → 强制覆写两个 `.wasm` 的 `Content-Type: application/wasm` → Job Summary 输出部署摘要；
-  - **工具链隔离**：CI 使用标准 rustup 与默认 `CARGO_HOME`，不触碰仓库内 Windows 便携缓存 `.toolchain/` / `.cargo-home`；使用官方 coscmd 而非第三方社区 Action，密钥仅经 GitHub Secrets 注入，降低供应链风险；
-  - **新增 `docs/cicd-guide.md`**：收录流水线架构图、需配置的 4 个 GitHub Secrets 清单（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`）、子账号最小权限建议、COS 静态网站开启步骤、`.wasm` MIME 排障与常见失败处理；
-  - **AGENTS.md 同步**：文档地图登记 cicd-guide.md，新增 §4.13 CI/CD 坑点（工具链差异 / MIME / 密钥安全）；
-  - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.67 → v0.9.68。
+以下版本为纯文档/工具链维护，不涉及功能代码变更，合并记录：
 
-- **🔧 CI/CD 首部署失败修复：免交互上传 + Secrets 预检 + Node 24 (v0.9.69)**：
-  - **exit 253 根因修复**：首次部署实测 `coscmd upload -rs --delete` 的 `--delete` 会触发 `input()` 交互确认（`WARN: you are deleting some files ... [y/N]`），GitHub runner 无 stdin 导致 15 个文件全部上传失败并以 253 退出；上传命令补 `-y`（Skip confirmation，coscmd 官方参数）实现全程免交互；
-  - **DNS 解析失败预检**：首次部署实测 `Failed to resolve *.cos.*.myqcloud.com`（Name or service not known），根因为 Secret 值格式错误（桶名大写/缺 APPID/地域码错误/首尾空格引号）；新增「预检 Secrets」步骤——先去除首尾空白写入 `GITHUB_ENV`，再对 `COS_BUCKET`/`COS_REGION` 做格式正则校验并用 `socket.gethostbyname` 预解析桶域名，任一失败即以 `::error::` 输出中文排障指引并秒级终止，不再等待逐文件 DNS 超时；
-  - **Node 升级至 24**：build job 新增 `actions/setup-node@v4`（node-version: '24'）；
-  - **`docs/cicd-guide.md` 同步**：Secrets 章节补充格式要求（全小写/勿带域名前缀/勿带空格引号），故障排查表收录 exit 253 与 DNS 解析失败两条实测案例；
-  - 纯 CI 与文档改动，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.68 → v0.9.69。
-
-- **🔧 CI/CD MIME 覆写命令修复：-f 参数位置归位 (v0.9.70)**：
-  - **实测问题**：v0.9.69 部署主上传已完全成功（15 files uploaded / 0 failed，sync delete 仅清理 js/ 与 rust/ 目录占位对象），但两条 wasm MIME 覆写命令误将 `-f` 写在全局参数位（`coscmd -f upload ...`），argparse 报 `unrecognized arguments: -f`（exit 2）导致 Content-Type 覆写未执行；
-  - **修复**：`-f`（强制覆盖同名对象，属 upload 子命令选项）移至 `upload` 之后：`coscmd upload -f -H "Content-Type: application/wasm" <file> <cospath>`，确保 `.wasm` 对象 MIME 覆写生效、浏览器可流式编译；
-  - **`docs/cicd-guide.md`**：排障表补充「unrecognized arguments: -f」踩坑案例（子命令选项与全局参数的位置区分）；
-  - 纯 CI 配置两行命令与文档改动；版本号自增 v0.9.69 → v0.9.70。
-
-- **🏯 3级木石庄舍图标去重 (v0.9.71)**：
-  - **问题**：3级木石庄舍 (`Tier3Homestead`) 使用 🏛️，与营地第 5 阶【县级行政区】图标完全重复，地图上私宅与县衙无法区分；
-  - **修复**：木石庄舍图标统一改为 **🏯**（木石结构的东方庄阁，与 2级私宅 🏡、4级大庄园 🏰、县级行政区 🏛️ 四者互不重复）；
-  - **同步五处**：`frontend/js/render.js`（地图宅舍图标 + Inspector 等级标题 + 注释）、`frontend/index.html`（图例面板）、`crates/sim_core/src/spatial/housing_system/construction.rs`（2级→3级竣工播报）、`docs/current/05-house-system.md`（等级图标表）、TODO 待办销项；
-  - 涉及 Rust 事件文案改动，已重编译 WASM 并同步双副本；版本号自增 v0.9.70 → v0.9.71。
-
-- **📒 账本与婚姻登记系统奠基（M1，v0.9.72）**：
-  - **新模块 `crates/sim_core/src/spatial/ledger/`**：账本内核（`ResourceKind` / `Ledger` 分品类存量 + 双环形流水 / `TransferRecord` / `TransferReason` 含 `Split` 分家）+ `transfer()` 双向记账总线；与新房屋/仓库物理仓储**完全分离**（不改 `house.rs` pantry_*、`agent.rs` carried_*、`ecology.rs` 装卸逻辑），流水只记"归谁、谁付谁收"权责；
-  - **团体基类 `Group`**（`group.rs`）：领导 leader + 成员列表 members（含领导，BTreeSet 保序）+ 账本 ledger；成员/领导变动走 `add_member / remove_member / set_leader` 单点入口并留审计事件；
-  - **婚姻登记簿 `MarriageRegistry`**（`marriage.rs`）：一人终生多段婚姻全留痕（初婚/丧偶 `Bereaved` 封账/改嫁开新账），存续唯一性单点校验，`next_id` 确定性发号；`Agent3D.spouse_id` 降级为缓存，真实来源为登记簿；婚姻与房屋数据解耦（不持有 house_id）；
-  - **★ 家户体系 `HouseholdRegistry`**（`family.rs`）：**家庭跟着男人走**——家户以男性户主为锚，`by_agent` 唯一归属索引，改嫁先移后加；已婚女性随夫入家户；为 M2 分家（父权重2/子一代各1）与丧父继承（平分在世子女/绝嗣入公仓）预留 `parent_household` 血缘链；
-  - **★ 胎儿预分配 ID**：受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿占用 `AgentId`（`pregnancy_child_id`），分娩（`birth.rs`）复用该 ID——未出生孩子可计入分家权重与继承分配；发号不消耗 `WorldRng`；
-  - **生命周期挂钩**：`housing_system/marriage.rs` 成婚 → 登记簿注册 + 女方转入夫家家户；丧偶 → 封账归档；世界重置同步清空两登记簿、seed 为每位始祖男性建户；
-  - **超参**：新增 `ledgerJournalCapacity`（64），`config.rs` 三处 + `config.js` 同步，`config-check.js` 153/153 通过；
-  - 已重编译 WASM 并同步双副本，`test-wasm.js` 回归 `ALL_TESTS_DONE`（确定性逐字节一致，长程 0 越界 0 NaN）；版本号自增 v0.9.71 → v0.9.72。
-
-- **📊 账本与家户/婚姻系统前端UI展示 (v0.9.73)**：
-  - **快照扩展**：snapshot.rs 新增 HouseholdSnapshot / MarriageSnapshot / LedgerBalanceSnapshot 三类快照结构，world.rs::generate_snapshot() 遍历家户登记簿与婚姻登记簿序列化（含账面5资源余额、最近8条团体事件、婚姻存续/封账状态）；
-  - **前端映射**：ustworld.js 新增 sim.households / sim.marriages 字段及 getHouseholdOfAgent() / getActiveMarriageOf() / getAllMarriagesOf() 三个查询辅助方法；
-  - **顶栏统计**：新增 🏠 存续家户数 / 💍 存续婚姻对数 两个实时统计指标；
-  - **Agent Inspector 增强**：新增「🏠 家户归属」卡片（家户ID/户主姓氏/成员数/角色徽章👑户主·💍配偶·👶子女/账面5资源/家户大事记）与「💍 婚姻登记」卡片（存续中·丧偶离异·未婚三态、婚龄、历史婚姻段列表）；
-  - **★ 家户与账本大盘面板**：右侧新增可折叠面板「📒 家户与账本大盘」，含概览统计行（存续/已解散家户、存续/累计婚姻）+ 家户列表（户主姓氏·成员数·账面资源·点击追踪户主视角）+ 婚姻登记簿列表（夫妻·婚龄·存续状态）；
-  - **样式**：style.css 新增账本系统专属样式（暗色卡片主题、等宽数字、资源色标、可滚动列表），与现有UI风格一致；
-  - 已重编译 WASM 并同步双副本，config-check.js 153/153 通过，	est-wasm.js 回归 ALL_TESTS_DONE（确定性逐字节一致，0越界0NaN），浏览器实测0控制台错误；版本号自增 v0.9.72 → v0.9.73。
-- **🔧 家户与账本大盘面板可点击性与样式修复 (v0.9.74)**：
-  - **根本原因**：右侧面板容器 .right-panel-stack 设了 pointer-events: none（让点击穿透到画布），其他卡片（全局均值大盘/图例窗口）均显式设了 pointer-events: auto，唯独 .ledger-panel 缺失该属性——导致面板标题无法被点击选中、折叠按钮无响应、点击直接穿透到下方画布；
-  - **CSS 重写**：.ledger-panel 补齐与 .global-averages-card / .ecology-legend 一致的完整基础样式（width:100% / display:flex / lex-direction:column / gap:8px / padding:12px 16px / order-radius:14px / ox-shadow / pointer-events:auto / 	ransition / color:#cbd5e1 / ont-size:11px），边框采用琥珀色 gba(245,158,11,0.28) 区分账本主题；新增 .ledger-panel.minimized 规则（padding/gap 收缩、body 隐藏、title 去边框），与其他卡片折叠行为一致；
-  - **HTML 清理**：移除 .ledger-panel-body 内联 style="display:none;"，改由 CSS .minimized 类统一控制显隐（与全局均值/图例面板模式一致）；
-  - **JS 简化**：事件绑定从「同时切换 class + 内联 display + 图标」简化为「classList.toggle('minimized') + 图标文字切换」，CSS 负责 body 显隐，逻辑更简洁且与其他面板统一；
-  - 浏览器实测：面板可正常点击选中、折叠/展开响应正常、样式与其他卡片视觉一致、0 控制台错误；版本号自增 v0.9.73 → v0.9.74。
-- **📝 文档：前端服务器端口占用说明 (v0.9.75)**：
-  - AGENTS.md 第 2 节步骤三新增「Agent 操作须知」：若 3000 端口已被占用，说明前端服务已由用户手动启动并正在运行，Agent 无需再执行 
-ode frontend/server.js 启动新实例，直接访问 http://localhost:3000 即可；
-  - 补充说明重复启动的风险：会触发 server.js 端口递增逻辑（3001 被占时存在无限重试的已知问题），导致进程卡死无响应；
-  - 纯文档修改，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.74 → v0.9.75。
-- **🎉 里程碑：账本与家户/婚姻系统 M1 完成 + 版本策略升级 (v1.0.0)**：
-  - **M1 全部交付**：团体基类 Group（领导/成员/账本三要素）、婚姻登记簿 MarriageRegistry（终身多段婚姻全留痕、与房屋解耦）、家户体系 HouseholdRegistry（家庭跟着男人走、户主男性锚定）、胎儿预分配 ID（受孕即占号、分家/继承可计入未出生孩子）、家户初始化回填（每位始祖男性各建一户）、超参联动（ledgerJournalCapacity 入 config）；
-  - **前端UI展示**：快照扩展（HouseholdSnapshot/MarriageSnapshot/LedgerBalanceSnapshot）、顶栏统计（存续家户数/存续婚姻对数）、Agent Inspector 增强（家户归属卡片：户主/成员/角色徽章/账面5资源/大事记；婚姻登记卡片：存续/丧偶/未婚三态+历史段）、家户与账本大盘可折叠面板（概览统计+家户列表+婚姻列表，点击户主追踪视角）；
-  - **面板可点击性修复**：根因 .right-panel-stack { pointer-events:none } 导致 .ledger-panel 点击穿透画布；补齐 pointer-events:auto + CSS 重写对齐全局均值大盘/图例窗口（圆角14px/琥珀色边框/padding/box-shadow/transition），移除内联 display 改由 CSS .minimized 统一控制；
-  - **版本策略升级**：从 v0.9.x 跳跃至 **v1.0.0**，标志 M1 里程碑完成；此后中等功能更新（每个 M 里程碑核心特性落地）递增次版本号（M2→1.1.0、M3→1.2.0、M4→1.3.0、M5→1.4.0），Bug修复/文档更新递增修订号；
-  - **计划文档更新**：docs/PLAN_LEDGER_REFACTOR.md 删除 M1 已完成任务项，现状基线升至 v1.0.0，新增版本号策略说明，排期表标注已完成周次；
-  - 验收：config-check.js 153/153 通过 + 	est-wasm.js 确定性 true / 0 越界 / 0 NaN / ALL_TESTS_DONE；浏览器实测 0 控制台错误，面板可正常点击展开，样式与其他卡片一致。
+| 版本 | 内容 |
+| :--- | :--- |
+| **v0.9.38** | 文档偏差修复：修正 AGENTS.md / CURRENT.md / BUILD_GUIDE.md 等与现状不符的描述 |
+| **v0.9.46** | 嵌套 AGENTS.md：为 sim_core / sim_wasm / decisions / housing_system 四个目录新增局部操作指南 |
+| **v0.9.54** | CURRENT.md 按功能模块拆分：根索引 + `docs/current/` 分模块文档两级结构 |
+| **v0.9.55** | 文档目录整合：非 AGENTS.md 文档全部移入 `docs/` 目录，引用路径全量修正 |
+| **v0.9.67** | 浏览器自动化使用指南落库：`docs/browser-guide.md`，playwright-cli 4 引擎实测通过 |
+| **v0.9.75** | 前端服务器端口占用说明：AGENTS.md 补充 3000 端口已占用时无需重复启动 server.js |

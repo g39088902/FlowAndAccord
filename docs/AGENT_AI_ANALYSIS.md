@@ -1,207 +1,133 @@
-# 🤖 Agent AI 逻辑架构分析报告
+# 🤖 Agent AI 决策系统设计思路深度解析
 
-> **分析对象**：`FlowAndAccord` 中"部落民 (Agent)"的全部 AI 逻辑  
-> **分析范围**：Rust 确定性内核 `crates/sim_core/src/spatial/` 与 WebAssembly 桥接层 `crates/sim_wasm/`  
-> **结论先行**：当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + A* 加权寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM/神经网络/学习成分**（docs/ARCHITECTURE.md 中规划的 LLM 认知层为愿景设计）。Rust 内核 `crates/sim_core` 编译正常并通过 WASM 回归测试，是**唯一真实仿真实现**；前端 `frontend/js/` 仅为表现与交互层（`math.js`、`rustworld.js`、`render.js`、`main.js`），不存在独立 JS 移植版仿真逻辑。
+> **分析对象**：`FlowAndAccord` 中部落民 (Agent) 的全部 AI 决策逻辑
+> **源码位置**：`crates/sim_core/src/spatial/decisions/`（7 个文件：`mod.rs` + 6 子模块 `needs` / `evaluate` / `routing` / `harvest` / `seeking` / `scheduler`）
+> **本文定位**：**设计思路深度解析（为什么这么设计）**，与 [`docs/current/06-motivation-ai.md`](./current/06-motivation-ai.md) 形成互补——06 讲"机制是什么"，本文讲"为什么这么设计"。
+> **版本**：v1.0.1
 
 ---
 
-## 1. 全景：单轨 Rust 核心 + WebAssembly 快照导出
+## 1. 核心结论
 
-| 层次 | 模块位置 | 职责与状态 |
+当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + 加权 A* 寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM / 神经网络 / 学习成分**（[ARCHITECTURE.md](./ARCHITECTURE.md) 中规划的 LLM 认知层为愿景设计）。
+
+Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/test-wasm.js` 同种子逐字节一致性验证；前端 `frontend/js/` 仅为表现与交互层，不存在独立 JS 移植版仿真逻辑。
+
+---
+
+## 2. 为什么是马斯洛层次化 FSM，而非效用最大化或行为树
+
+### 2.1 设计选择：严格优先级的 5 层马斯洛
+
+`needs.rs` 定义了 `MaslowLevel`（5 层，低→高绝对优先）与 13 种 `NeedKind`：
+
+| 层级 | 需求种类 | 设计意图 |
 | :--- | :--- | :--- |
-| **Rust 确定性内核** | `crates/sim_core/src/spatial/{agent,world,decisions,ecology,housing_system,graph,house,poi}.rs` | ✅ 纯 Rust 实现，状态机、A* 寻路、生态流转，WASM 回归测试通过 |
-| **WASM 桥接层** | `crates/sim_wasm/src/lib.rs` $\rightarrow$ `frontend/rust/sim_wasm.wasm` | ✅ 零依赖 C-ABI 导出，线性内存 JSON 快照与多步 tick 调度 |
-| **前端表现/适配层** | `frontend/js/{math,rustworld,render,main}.js` | ✅ Canvas 2D/3D 投影渲染、Inspector 监控与视口交互，无重复业务逻辑 |
+| ① 生理 | `QuenchThirst` / `SateHunger` / `Rest` | 生存底线——饥渴/体力告急时压倒一切 |
+| ② 安全 | `RepairHouse` / `StockWater` / `StockFood` / `StockWood` | 家宅储备——仓库填满优先于盖房升级 |
+| ③ 归属 | `FoundHome` / `BuildHouse`(0级) | 成家立业——无家成年男性自立门户 |
+| ④ 尊重 | `BuildHouse`(1-4级) / `StockStone` / `StockGold`(45s冷却) | 建材储备与房屋升级 |
+| ⑤ 自我实现 | `GoldWealth`(180s冷却) | 4 级大庄园竣工后的娱乐淘金 |
+
+### 2.2 为什么不用效用最大化或行为树
+
+**效用最大化（Utility Maximization）** 需要为每个需求计算数值分数并比较，三个问题使其不适合本项目：
+1. **参数脆弱**：效用权重微调可能导致全局行为剧变，难以调参；
+2. **生存风险**：当"盖房"效用略高于"喝水"时，agent 可能渴死在工地——数值比较无法表达"生存底线不可逾越"；
+3. **不可解释**：效用分数是黑箱，玩家难以理解"这个小人为什么在做这件事"。
+
+**行为树（Behavior Tree）** 适合预设复杂条件分支，但本项目核心体验是**涌现**——agent 行为应由生理+环境+家宅状况的组合自然驱动，而非硬编码 if-else。马斯洛 FSM 让每个 agent 每拍只回答"我当前最迫切的需求是什么？"，执行层自动完成寻路→采收→返家闭环。
+
+马斯洛严格优先级用**序数而非基数**解决了这些问题：低层未满足时高层完全不被考虑，语义清晰、调参简单、行为可解释（Inspector 直接展示主导需求+决策原因）。
 
 ---
 
-## 2. 分层 AI 架构（四层 + 一个反馈环）
+## 3. 为什么是错峰决策，而非全员同拍
 
-```mermaid
-flowchart TD
-    subgraph P["① 感知层 (环境输入)"]
-        S1["生理指标 hunger/thirst/stamina/carried_*"]
-        S2["POI 储量 & 位置 (水/果/木/石/金, 共21处)"]
-        S3["家宅仓储 & 耐久 & 等级 (5级阶梯)"]
-        S4["路网 wear/限速/坡度/隐秘"]
-        S5["家庭关系 (配偶/子女/房屋归属)"]
-    end
+`scheduler.rs::tick_decisions()` 每 tick 被调用，但每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 相位上决策（30 tick = 1.0 模拟秒）。三个理由：
+1. **性能均摊**：20+ agent 同时决策会导致单 tick 耗时尖峰（A* 寻路是主要开销）；错峰后每 tick 仅约 1/30 agent 决策，帧率稳定；
+2. **避免共振**：全员同拍会导致"同步出发→同步到达→同步争抢同一 POI"；错峰让行为自然分散；
+3. **确定性保持**：相位由 `(tick_counter + agent.id) % 30` 确定性计算，不消耗 `WorldRng`。
 
-    subgraph D["② 动机决策层 (世界仲裁)"]
-        D1["tick_decisions: 层次化动机仲裁<br>生理急迫 > 安全备货 > 营建升级 > 娱乐淘金<br>错峰: 每 agent 按 (tick+id)%30 相位决策"]
-    end
+---
 
-    subgraph N["③ 路径规划层 (A*)"]
-        N1["find_path_3d_with_preference<br>代价 = 时间 + 坡度罚 + 隐秘偏好"]
-    end
+## 4. 为什么是 Agent 私有 POI 施密特触发器，而非全局共享阈值
 
-    subgraph M["④ 运动执行层 (FSM + IDM)"]
-        M1["PrimitiveActionState 状态机 (14态)"]
-        M2["tick_movement: 目标速度 -> 平滑加速<br>沿贝塞尔车道推进 -> 状态迁移"]
-    end
+### 4.1 设计选择：每个 agent 维护自己的 `poi_seekability`
 
-    P --> D --> N --> M
-    M -->|"踩踏 wear += 0.05/次"| S4
-    S4 -->|"路升级 -> 更快 -> 代价更低"| N
+`agent.rs::observe_poi_stock_with_config()` 在每个 agent 的决策相位更新私有触发器：
+- **开启**：POI 库存升至 ≥ `config.decisionPoiSeekMinStockRatio`（0.30）；
+- **关闭**：已开放点仅在跌破 < `config.decisionPoiAbandonStockRatio`（0.10）时关闭；
+- **中间带**（10%~30%）：保持该 agent 的前态。
+
+`routing.rs::available_nodes()` 和 `seeking.rs` 的路由/重路由只读取 agent 私有触发器结论，相同 POI 可被不同 agent 判为不同可用性。
+
+### 4.2 为什么不用全局阈值
+
+全局共享阈值会导致**雷鸣群集（Thundering Herd）**：POI 库存刚回到 30%，所有 agent 同时判定"可用"一窝蜂涌向同一点；到达后迅速采空，所有人同时放弃，形成"去→采空→走→再生→去"的振荡循环。
+
+私有施密特触发器让每个 agent 有自己的"开放/关闭"记忆：agent A 在 35% 时开放了某 POI，即使回落到 20%（中间带）仍认为可用继续前往；agent B 从未开放过该 POI，在 20% 时仍认为不可用而选择其他点。结果是 agent 自然分散到不同 POI，避免共振，且每个 agent 的行为具有**时间一致性**（不因库存微小波动反复切换目标）。
+
+### 4.3 中途熔断与平滑掉头
+
+`seeking.rs` 在赶往 POI 途中检测自身对目标的触发器关闭（跌破 <10%）时：若自身仍有其他已开放同类 POI → 通过 `turn_around_and_route_to` **原地掉头**（反向进度 `rev_len - distance_along_curve`）平滑重规划赶往就近可用 POI；仅在自身无可用品或体力告警时才折返回家。
+
+**原地掉头而非直接设新路径**：直接设新路径会导致 agent 从当前坐标"闪现"到新车道起点，破坏坐标连续性。原地掉头在当前车道反向推进，位置连续无瞬移。
+
+---
+
+## 5. 为什么是加权 A*，而非 Dijkstra 或贪心
+
+### 5.1 设计选择：`graph.rs::find_path_3d_with_preference()`
+
+```
+边代价 = (curve.length / effective_speed) + grade_penalty × hidden_modifier
 ```
 
-- **感知层**：数据全部挂在 `Agent3D` 结构体与全局 `World3DEngine` 上，无独立感知系统，属于"上帝视角直接读状态"。
-- **决策层**（AI 的"大脑"）：`crates/sim_core/src/spatial/decisions.rs::tick_decisions()`，详见 §4。
-- **规划层**（AI 的"导航"）：`crates/sim_core/src/spatial/graph.rs::find_path_3d_with_preference()`（基于 `petgraph` 的 `astar`），详见 §5。
-- **执行层**（AI 的"躯体"）：`crates/sim_core/src/spatial/agent.rs::tick_movement()` + 14 态 FSM，详见 §3/§6。
-- **涌现反馈环**：行走 $\rightarrow$ 道路踩踏升级（`wear += 0.05`）$\rightarrow$ 速度提升（$0.50\times \sim 2.20\times$）$\rightarrow$ 路径代价下降 $\rightarrow$ 更多人走该路（"踏路成道"正反馈）；闲置则退化衰减。
-
----
-
-## 3. 状态机：`PrimitiveActionState`（14 态）
-
-| 类别 | 状态 | 说明 |
-| :--- | :--- | :--- |
-| 静止态 | `RestingAtCamp` | 营地/家宅休息：回体力至 100%、从家宅取用水粮、家宅卸货、触发受孕 |
-| 出行态 | `SeekingWater / SeekingFood / SeekingWood / SeekingStone / SeekingGold` | 正在赶往目标 POI（沿 route 推进） |
-| 作业态 | `DrinkingAtWater / ForagingFood / GatheringWood / MiningStone / MiningGold` | 到达资源点后的持续采集/吃喝，并装载随身行囊（搬运） |
-| 归返态 | `ReturningToCamp` | 采集满载/生理告急/资源枯竭后返家卸货 |
-| 家宅态 | `ConstructingHouse / RepairingHouse` | 30s 施工升级 / 耐久 < 50% 修缮至 100% |
-| 异常态 | `OffRoadDetour / Dead` | 车道失效越野寻路 / 死亡（12s 风化消散） |
-
-核心迁移路径（作业态 $\times$ 到达）：
-
-```text
-SeekingWater           --到达--> DrinkingAtWater   --喝满/装满/枯竭--> ReturningToCamp --> RestingAtCamp (卸货存水)
-SeekingFood            --到达--> ForagingFood      --吃满/装满/枯竭--> (顺路补水)      --> ReturningToCamp --> RestingAtCamp (卸粮)
-SeekingWood/Stone/Gold --到达--> Gathering/Mining* --满载/枯竭/告急--> ReturningToCamp --> RestingAtCamp (卸货入库)
-RestingAtCamp          --触发决策--> Seeking*
-RestingAtCamp          --耐久<50%--> RepairingHouse --修至100%--> RestingAtCamp
-RestingAtCamp          --备料充足--> ConstructingHouse --30s--> RestingAtCamp (升级)
-```
-
----
-
-## 4. 动机决策层：马斯洛需求层次化仲裁
-
-`tick_decisions()` 采用**错峰调度**：每 tick (1/30 模拟秒) 调用一次，但每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策，**优先级从高到低**：
-
-### 4.1 生理急迫第一原则（最高优先级，第 ① 层）
-处于 `RestingAtCamp` 时若体力或水粮告急：
-- 体力恢复：若处于休息态，必须回满至 $100\%$ 才重新出门；体力 $\ge 50\%$ 前不主动休息。
-- `thirst < 20.0`（孕妇 27.5）$\rightarrow$ 就近清泉
-- `hunger < 24.0`（孕妇 30.0）$\rightarrow$ 就近浆果
-- 目标选择：按到 Agent 的**欧氏距离排序取最近**，然后 A* 寻路
-
-### 4.2 安全与家宅备货（第 ② 层，优先级次之）
-- **修缮私宅**：私宅耐久度 $< 50\%$ 时触发修缮，一旦动工修至 $100\%$。
-- **仓库水粮与过冬木柴保底**：私宅水、粮、木储量低于 $50\%$ 时优先外出搬运填满仓库，**绝对优先于升级建房**。
-
-### 4.3 营建升级与建材储备（第 ③/④ 层）
-- **0 级建仓**：成年单身男性且身体充沛时立项营建。
-- **采石备料 (`StockStone`)**：仅 2 级私宅且石料未满 85% 时采石。
-- **盖房淘金 (`StockGold`)**：3 级木石庄舍升 4 级大庄园的建材储备，冷却时间为 **45 秒**。
-
-### 4.4 娱乐淘金与闲暇富余（第 ⑤ 层）
-- **娱乐淘金 (`GoldWealth`)**：仅在 4 级氏族大庄园完全竣工后触发，冷却时间为 **180 秒**；未建至顶级大庄园前绝不娱乐淘金。
-
-### 4.5 POI 储量门槛与执行中自适应熔断
-各作业态与寻路每帧检查：
-- **启动寻路门槛（$\ge 30\%$）**：若某处 POI 储量 $< 30\%$，决策层不启动对该地标的寻路（排除在候选池外）；
-- **中途放弃熔断与平滑掉头（$< 10\%$）**：赶往 POI 途中若目标点储量跌破 $< 10\%$，立即直接放弃当前寻路；通过 `turn_around_and_route_to` 原地切换反向车道并继承平滑进度（$L - s$），**绝不发生节点瞬移闪现**，平滑往回走；
-- **生理熔断**：外出途中 `hunger < 20.0 || thirst < 20.0` 或体力 $< 50.0$ $\rightarrow$ 立即中断作业，降级折返就近补给或回家；
-- **满载/枯竭**：行囊装满（$\ge 50.0$）、POI 储量 $\le 0.05$、家宅该品仓储已满 $\rightarrow$ 折返回家（有房回房、无房回最近营地）；
-- **顺路补给**：`DrinkingAtWater` 喝饱后若饥饿则直接转 `SeekingFood`（同理觅食后转补水）。
-
----
-
-## 5. 路径规划层：加权 A*
-
-Rust 拓扑路网（`crates/sim_core/src/spatial/graph.rs`，基于 `petgraph::algo::astar`）：
-
-```text
-边代价 = (curve.length / effective_speed) + grade_penalty
-        × hidden_modifier
-```
-
-- `effective_speed = speed_limit × (0.50 + 0.333 × wear)`——道路等级（踩踏度）直接进入寻路代价，形成"走好路"的涌现偏好；
+- `effective_speed = speed_limit × (0.50 + 0.333 × wear)`——道路踩踏度直接进入代价，形成"走好路"的涌现偏好；
 - `grade_penalty = Δz × 1.5`（上坡惩罚）；
-- `hidden_modifier`：潜行特工偏好隐藏暗道 $\times 0.4$ / 避公开路 $\times 1.2$；普通市民避暗道 $\times 2.5$；
-- 启发式函数：欧氏距离 / 80（admissible，保证最短路性质）。
+- `hidden_modifier`：潜行偏好暗道 ×0.4 / 普通市民避暗道 ×2.5；
+- 启发式：欧氏距离 / 80（admissible，保证最短路性质）。
+
+### 5.2 为什么 A* 而非 Dijkstra，以及踩踏度为何进入代价
+
+Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离启发式（admissible，不高估实际代价）将搜索聚焦在目标方向附近，数百节点路网中毫秒级返回最优路径。
+
+踩踏度进入代价是**踏路成道（Stigmergy）正反馈**的关键：agent 走路 → `wear += 0.05` → 道路速度提升 → 寻路代价下降 → 更多 agent 选择这条路 → wear 进一步提升；闲置道路则自然衰减。结果是路网中自然形成"主干道"和"偏僻小径"，无需系统手动规划道路等级。
 
 ---
 
-## 6. 运动执行层：IDM 风格平滑加速 + 车道推进
+## 6. 为什么是 Agent 自主决策，而非系统扫描指挥
 
-`tick_movement(dt, network)`（非运动态速度为 0）：
+根 AGENTS.md §4.11 明确：系统只当"物理规则执行者"，一切"盖不盖、何时盖、在哪盖"来自 agent 自己的 `evaluate_needs` 输出。三条自主触发链路（立宅/升级/修缮）均为确定性触发，详细门槛见 [06-motivation-ai.md](./current/06-motivation-ai.md)。
 
-```text
-road_level_factor = clamp(0.50 + 0.333 × wear, 0.50, 2.20)   // 0.50x 荒野越野 ~ 2.20x 极品大道
-stamina_factor    = clamp(stamina / 25.0, 0.2, 1.0)           // 疲劳限速
-target_speed      = max_desired_speed × road_level_factor × stamina_factor
-accel             = (target_speed − velocity) × 4.0           // 一阶平滑逼近
+**禁止系统扫描指挥的三个理由**：
+1. **涌现性**：系统扫描会强制所有 agent 同步行为（如"所有仓满的房子同时升级"），破坏个体差异和时间分散；
+2. **可解释性**：agent 自主决策时 Inspector 可追溯个体动机；系统指挥则无法解释"为什么这个小人在做这件事"；
+3. **扩展性**：未来引入六维政治资本、LLM 认知层时，agent 需求评估是自然扩展点；系统扫描则需不断新增扫描器，代码膨胀。
+
+---
+
+## 7. 生命周期闭环：从求生到传承
+
+```
+个体求生（饥渴→就近POI→采收→行囊→回家卸货）
+  → 随身搬运（真实背包，非瞬移，容量约束）
+    → 筑巢成家（成年男性→FoundHome→自主选址→0级仓库→升级→成婚）
+      → 代际传承（受孕→胎儿预分配ID→出生→继承父亲家户→成年分家→下一代立宅）
+        → 踏路成道（行走→wear→道路升级→更多人走→主干道涌现）
 ```
 
-- 每帧扣除体力：`0.6 × (1 + 上坡比 × 3.5)`，孕妇 +0.3——体力枯竭会限速，形成疲劳约束；
-- 沿 `route`（车道 ID 数组）逐条推进，走完一条 $\rightarrow$ `wear += 0.05`（双向同步，上限 5.0）$\rightarrow$ 下一条；
-- 到达终点 $\rightarrow$ 状态迁移（§3）；车道失效 $\rightarrow$ `OffRoadDetour`。
+闭环中没有任何"系统目标"或"胜利条件"——每个 agent 只追求自己的马斯洛需求满足，但群体层面涌现出道路网络、聚落分布、代际家族树和资源流动模式。这正是**混沌系统**的核心体验：确定性规则驱动不可预测的长期演化。
 
 ---
 
-## 7. 家庭 / 房屋 / 社会层规则（`housing_system/`）
+## 8. 与愿景的差距
 
-| 行为 | 触发条件 | 效果 |
+| 维度 | 当前实现 | 愿景（[PLAN.md](./PLAN.md) M6/M7/M8） |
 | :--- | :--- | :--- |
-| 自发建 0级仓库 | 男性、成年($\ge 120\text{s}$)、饱暖$\ge 18$、体力$\ge 75$、15% 概率、空间不重叠 | 门前生成路网节点+支路，自主搬运建材 |
-| 自动婚姻 | 0$\rightarrow$1级升级竣工时 | 自动迎娶单身成年女性，激活生育 |
-| 受孕 | 已婚女性、任意任务期间（不要求在家）、水粮$\ge 40.0$、体力$\ge 80$、家宅水粮木$\ge 50\%$ 容量 | 900s 孕期，头顶展示孕育进度环 |
-| 流产保护 | 孕期水粮 $< 10.0$ 或体力 $< 20.0$ | 450s 调养冷却 |
-| 自动施工 | 家宅仓储满足升级门槛且主人在家休息 | 30s 施工后升级扩容 |
-| 自动修缮 | 耐久 $< 50\%$ 且主人/配偶在宅、体力充足 | 8.0/s 修复至 100% |
-| 冬季取暖 | Winter 或气温 $< 5^\circ\text{C}$ | 非 0 级房屋消耗 0.12 木材/s |
-| 代际继承 | 户主去世 | 直系无房后代(长者优先) $\rightarrow$ 无房族人 $\rightarrow$ 变废墟 |
-| 婚姻解除 | 配偶死亡 | 双方恢复单身 |
-
----
-
-## 8. 调度时序（30Hz 确定性 Tick 流水线）
-
-`world.rs::tick(dt)`（固定物理步长 `dt = 1.0 / 30.0`）：
-
-```text
-tick()
- ├─ ① POI 自然再生 (tick_regenerate: 水/粮/木/石/金 储量回补)
- ├─ ② 代谢与繁衍 (tick_metabolism: 饥渴消耗、受孕/流产/分娩、冻馁死亡)
- ├─ ③ POI 交互与装卸 (tick_poi_interactions: 采收装载行囊、在家卸货入库、遗骸风化)
- ├─ ④ 房屋系统 (tick_housing: 四季气温、冬季供暖、耐久折旧/修缮/施工/升级/代际继承)
- ├─ ⑤ 决策调度 (tick_decisions: 每 tick 调度, 按 (tick+id)%15 相位错峰)  ← AI 大脑
- ├─ ⑥ 道路退化衰减 (tick_wear_decay: 闲置道路自然衰减)
- └─ ⑦ 动力学运动 (tick_movement: IDM 目标速度平滑推进与踩踏加固)         ← AI 躯体
-```
-
----
-
-## 9. 现状与长程愿景对比
-
-| 模块维度 | 当前实际落地状态 (Current) | 宏观规划愿景 (Vision - docs/ARCHITECTURE.md / docs/PLAN.md) |
-| :--- | :--- | :--- |
-| **内核架构** | 确定性 Rust 核心 (`Vec<Agent3D>` + 空间调度) | 20Hz Headless ECS (`hecs`/`bevy_ecs`) |
-| **WASM 桥接** | `sim_wasm` 零依赖 C-ABI 导出，线性内存 JSON 快照 | 零拷贝双缓冲共享内存快照 + Hermite 时间戳插值 |
-| **AI 决策** | 马斯洛 5 层动机 FSM + (tick+id)%15 错峰决策 | 混合政体 6 维权力仲裁 + 异步 LLM 认知总线 |
-| **空间路网** | 贝塞尔曲线 3D 拓扑图 + A* 寻路 + 踩踏成道 | 欲望线热度场 (`DesireGrid`) + 时空冲突预约 FIFO |
-| **生态/经济** | 21 处 POI (水/粮/木/石/金) + 5 级房屋 + 随身行囊搬运 | 痛点动态专利 + 双轨金库 + 民间野生黑科技投机 |
-| **社会政治** | 婚姻/受孕/120s妊娠/血脉代际继承 | 六维权力光谱 (民意/技术/资本/强制/宗法/霸权) + 议会大辩论 |
-
----
-
-## 10. 验证与工程规范
-
-1. **测试双保险**：
-   - 原生 Rust 内核编译校验：`cargo test -p sim_core`（当前源码未内置单元测试用例，命令通过即代表编译无误）；
-   - WASM 端到端自动化回归测试：`node tools/test-wasm.js`（验证 WASM 导出、种子一致性、防 NaN、防越界）。
-2. **确定性约束**：
-   - 依赖 `WorldRng`（基于固定种子 PRNG），所有随机消耗顺序确定，禁止使用未种子化的 `thread_rng()` 或前端 `Math.random()` 扰动模拟核心。
-3. **物理步长铁律**：
-   - 固定 `dt = 1.0 / 30.0`，倍速通过 `world_tick_steps(N, 1/30)` 实现，禁止修改 `dt`。
-
----
-
-## 11. 结论
-
-当前 Agent AI 的"智能"来自**确定性规则的涌现组合**：**马斯洛优先级动机仲裁（决策）$\rightarrow$ 加权 A*（规划）$\rightarrow$ IDM 平滑运动（执行）**，叠加**踏路成道正反馈**与**家庭/房屋进阶规则**，构建了"个体求生 $\rightarrow$ 随身搬运 $\rightarrow$ 筑巢成家 $\rightarrow$ 代际传承"的自组织叙事闭环。Rust 内核是唯一真实实现并通过全部回归测试，为后续演进奠定了坚实基础。
+| 决策架构 | 马斯洛 5 层 FSM + 错峰调度 | 六维政治资本仲裁 + 异步 LLM 认知总线 |
+| 寻路 | 加权 A*（坡度/隐秘/踩踏度） | 欲望线热度场 + 时空冲突预约 FIFO |
+| 内核 | Rust 结构体数组（`Vec<Agent3D>`） | ECS（hecs/bevy_ecs）+ 确定性 Command Queue |
+| 快照 | JSON 序列化 | 零拷贝双缓冲共享内存 + Hermite 插值 |
+| 社会 | 婚姻/家户/代际继承（账本 M1） | 宗族/地区政体/国王夺位/专利经济/混合政体 |
