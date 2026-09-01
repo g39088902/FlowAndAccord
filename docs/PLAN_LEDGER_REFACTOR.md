@@ -1,10 +1,16 @@
 # 账本与仓库重构 · 开发计划 (Ledger · Group · Marriage Registry Refactor Plan)
 
 > **依据**：[docs/PLAN.md](./PLAN.md) §3.4「多级产权账本经济（Property Ledger Economy）」
-> **现状基线**：v0.9.71（确定性内核 + 5 阶私宅仓储 + 随身行囊搬运）
+> **现状基线**：**v1.0.0**（M1 已完成：确定性内核 + 团体基类 + 婚姻登记簿 + 家户体系 + 前端UI展示）
 > **核心理念**：账本即权力，资产负债表即社会结构快照 —— 资产归属于有管理者的账本主体，任何资源流动都是主体间的显式 Transfer（可审计、可追溯）。
 
-> **本计划修订原则（v4）**：
+> **版本号策略（v1.0.0 起生效）**：
+> - **主版本号（major）**：架构级重构或经济系统范式切换（如 1.x → 2.0.0）；
+> - **次版本号（minor）**：**中等功能更新**——每个 M 里程碑核心特性落地即 +1（M2→1.1.0、M3→1.2.0、M4→1.3.0、M5收尾→1.4.0）；
+> - **修订号（patch）**：Bug 修复、样式调整、文档更新等小改动 +1（如 1.0.1、1.0.2）；
+> - 版本号同步位置：`index.html` 徽章 + `AGENTS.md` 两处 + `docs/current/11-changelog.md` 追加条目（根 AGENTS.md §4.9）。
+
+> **本计划修订原则（v5）**：
 > 1. **新经济系统与现有房屋/仓库系统完全分离**——`House.pantry_*`、`Agent3D.carried_*`、`ecology.rs::tick_poi_interactions` 等既有物理仓储逻辑**一律不动、不做兼容层、不做行为等价迁移**；新账本体系作为独立子系统并行建设，通过旁路记账观测物理事件。
 > 2. **统一团体抽象（Group）**：家庭、宗族、地区居民本质都是**团体**——基类持有三要素：**领导（leader）、成员列表（含领导）、账本（仓库）**；各具体团体只是基类的不同实例化。
 > 3. **族长规则**：每个**姓氏**中年龄最大的在世男性即为族长，死亡自动顺位。
@@ -47,17 +53,17 @@
 
 ```
 crates/sim_core/src/spatial/
-├── ledger/            ← 【新增】独立经济与组织子系统（不 import 房屋仓储内部字段）
-│   ├── mod.rs            LedgerKind / Ledger / transfer() 总线
-│   ├── group.rs          ★ 团体基类 Group（领导 / 成员列表 / 账本）
-│   ├── marriage.rs       Marriage 实体 + 婚姻登记簿 MarriageRegistry（仅两性关系 + 历史）
-│   ├── family.rs         ★ 家户 Household（挂户主男性）+ 分家/继承规则 + HouseholdRegistry
-│   ├── clan.rs           宗族团体 + 族长顺位
-│   ├── region.rs         地区团体 + 政体 + 换届（国王 / 长子继承制）
-│   └── journal.rs        TransferRecord / TransferReason / 流水环形缓冲
+├── ledger/            ← 【M1 已完成】独立经济与组织子系统（不 import 房屋仓储内部字段）
+│   ├── mod.rs            LedgerKind / Ledger / transfer() 总线 ✅
+│   ├── group.rs          ★ 团体基类 Group（领导 / 成员列表 / 账本）✅
+│   ├── marriage.rs       Marriage 实体 + 婚姻登记簿 MarriageRegistry（仅两性关系 + 历史）✅
+│   ├── family.rs         ★ 家户 Household（挂户主男性）+ 分家/继承规则 + HouseholdRegistry ✅
+│   ├── clan.rs           宗族团体 + 族长顺位（M3）
+│   ├── region.rs         地区团体 + 政体 + 换届（国王 / 长子继承制）（M4）
+│   └── journal.rs        TransferRecord / TransferReason / 流水环形缓冲 ✅
 ├── house.rs           ← 不动（物理仓储继续按原逻辑运转）
 ├── agent.rs           ← 仅追加：arrival_tick / 家庭与婚姻只读接口
-├── birth.rs           ← ★ 唯一例外：受孕时为胎儿预分配 AgentId（分家/继承需要）
+├── birth.rs           ← ★ 唯一例外：受孕时为胎儿预分配 AgentId（分家/继承需要）✅
 ├── ecology.rs         ← 不动
 └── housing_system/    ← 不动（marriage.rs 成婚资格校验改为查询登记簿）
 ```
@@ -208,20 +214,12 @@ pub struct Region {
 
 ## 三、分阶段里程碑
 
-### M1 · 团体基类 + 婚姻登记 + 家户体系（地基）
-> 目标：建立 `Group` 基类、`MarriageRegistry`（两性关系记录）与 `HouseholdRegistry`（**家庭跟着男人走**）。
+### ✅ M1 · 团体基类 + 婚姻登记 + 家户体系 + 前端UI（已完成，v1.0.0）
+> 已交付：`Group` 基类、`MarriageRegistry`（两性关系记录）、`HouseholdRegistry`（家庭跟着男人走）、胎儿预分配 ID、家户初始化回填、超参联动、快照扩展、前端顶栏统计、Agent Inspector 家户/婚姻卡片、家户账本大盘面板。
+>
+> 验收：`cargo build` + `node tools/test-wasm.js` 全绿（确定性逐字节一致 / 0 越界 / 0 NaN）；`config-check.js` 153/153 通过；浏览器实测 0 控制台错误。
 
-- [ ] **M1.1** 新建 `spatial/ledger/` 模块骨架：`ResourceKind` / `Ledger` / `TransferRecord` / `TransferReason`（含 `Split` 分家）/ 环形流水缓冲。
-- [ ] **M1.2** `ledger/group.rs`：团体基类 `Group`（leader / members 含领导 / ledger）+ `add_member / remove_member / set_leader` 单点入口（成员变动记 `Membership` 事件流水）。
-- [ ] **M1.3** `ledger/marriage.rs`：`Marriage`（不持有 house_id、**不承载账本**）+ `MarriageRegistry`（多段婚姻索引 + 存续唯一性校验 + 确定性发号）。
-- [ ] **M1.4** ★ `ledger/family.rs`：**家户 `Household` 挂户主男性**——`Household { head(男), group(Group), parent_household, founded_tick, is_dissolved }` + `HouseholdRegistry`（`by_agent` 归属索引 + 确定性发号）；`GroupKind::Family(HouseholdId)`，领导者=户主。
-- [ ] **M1.5** 婚姻生命周期事件迁移到登记簿：`housing_system/marriage.rs` 自动成婚 → `marriage_registry.register(...)`（"男方有 ≥1 级私宅"资格校验原样保留）+ 女方转入男方家户；`tick_bereavement_unmarry` 丧偶 → 婚姻封账归档；改嫁 → 封旧 + 开新，全留痕。
-- [ ] **M1.6** ★ **胎儿预分配 ID**：受孕时（`birth.rs`）为胎儿分配 `AgentId` 并写入 `mother.pregnancy_child_id`，出生时复用；保证分家权重与继承可计入未出生孩子。
-- [ ] **M1.7** 家户初始化与存量回填：seed 阶段为每位始祖男性建家户（女性暂归营地基座、成婚后转入夫家）；世界重置（`seed_primitive_ecology`）同步清空两个登记簿。
-- [ ] **M1.8** 超参联动（§4.12）：`ledger_journal_capacity` 等入 `config.rs` 三处 + `config.js`，跑 `config-check.js`。
-- [ ] **M1.9** 验收：`cargo build` + `node tools/test-wasm.js` 全绿（胎儿 ID 会改变 ID 序列 → 快照基准需一次性更新）；临时单测覆盖"成婚登记 / 丧偶封账 / 改嫁开新账 / 存续唯一性 / Group 领导必在成员列表 / 家户归属与户主男性约束 / 胎儿预分配 ID"七场景后删除（§4.10）。
-
-### M2 · 家庭账本旁路记账 + 分家与继承清算（废除隐形经济）
+### M2 · 家庭账本旁路记账 + 分家与继承清算（废除隐形经济）→ **v1.1.0**
 > 目标：家庭收支逐笔留痕，并按 §2.4 落实**分家抽资**与**父亲死亡继承**。
 
 - [ ] **M2.1** `world.tick()` 尾段新增 `ledger::tick_bookkeeping()` 旁路登记：成员卸货 → `Personal → Family(户主家户)` 的 `Deposit`；家庭生活消耗/供暖 → `Consume/Heating`；成员死亡遗留 → `Inheritance`。
@@ -229,10 +227,10 @@ pub struct Region {
 - [ ] **M2.3** 工程/修缮走账：`ConstructingHouse` / `RepairingHouse` 开工记 `Family → Construction/Maintenance` 扣款流水（只记账不扣物理库存，物理消耗仍由旧逻辑结算）。
 - [ ] **M2.4** ★ **分家抽资**（§2.4 ③）：男人成年/丧父时建新家户，按"父亲权重 2、子一代（含胎儿）各权重 1"从旧家户每一类资源中分走 $1/(2+n)$，记 `Split` 流水。
 - [ ] **M2.5** ★ **父亲死亡继承**（§2.4 ④）：家户资源平分给在世子一代（不含配偶）；无在世子一代 → 全部交入公仓（M2 先落兜底公仓账本，M4 对接 `Region` 令牌）。
-- [ ] **M2.6** 流水落快照三处同步：`marriage_journal` + `household_journal` + `agent_marriage_history`；前端小人 Inspector 展示"婚姻履历 + 所属家户 + 家庭账本"。
-- [ ] **M2.7** 验收：test-wasm.js 全绿；前端可见多段婚姻时间线、家户成员与逐笔收支；临时单测覆盖"分家权重分割 / 丧父继承平分 / 绝嗣入公仓"三场景后删除。
+- [ ] **M2.6** 流水落快照三处同步：`marriage_journal` + `household_journal` + `agent_marriage_history`；前端小人 Inspector 展示"婚姻履历 + 所属家户 + 家庭账本流水"。
+- [ ] **M2.7** 验收：test-wasm.js 全绿；前端可见多段婚姻时间线、家户成员与逐笔收支；临时单测覆盖"分家权重分割 / 丧父继承平分 / 绝嗣入公仓"三场景后删除（§4.10）。
 
-### M3 · 宗族团体 + 族长制（按姓氏聚合）
+### M3 · 宗族团体 + 族长制（按姓氏聚合）→ **v1.2.0**
 > 目标：宗族作为 `GroupKind::Clan` 实例，族长 = 同姓最年长在世男性。
 
 - [ ] **M3.1** `ledger/clan.rs`：按 `Agent3D.surname` 自动聚合（不要求同营地，姓氏即宗族）；每族一册 `Group { leader, members, ledger }`。
@@ -242,7 +240,7 @@ pub struct Region {
 - [ ] **M3.5** 快照与前端：宗族面板（姓氏、族长、成员户数、族库余额、近期流水）。
 - [ ] **M3.6** 验收：test-wasm.js 全绿；临时单测验证族长顺位确定性后删除。
 
-### M4 · 地区团体 + 国王政体 + 夺位与换届（v3 新增核心）
+### M4 · 地区团体 + 国王政体 + 夺位与换届 → **v1.3.0**
 > 目标：地区居民成为 `GroupKind::Region` 团体，落地"政体 + 换届"第一版（国王 / 长子继承制），并实现**决策树最高优先级的夺位远征**。
 
 - [ ] **M4.1** `ledger/region.rs`：每营地一册地区团体 `Region { group, regime: Kingdom, succession: Primogeniture, arrival_order }`；成员 = 归属该营地（`home_camp_node` / 房屋 `camp_id`）的全部在世居民（含国王）。
@@ -264,7 +262,7 @@ pub struct Region {
 - [ ] **M4.8** 验收：test-wasm.js 全绿（确定性红线：换届/夺位判定不消耗 RNG）；临时单测覆盖"初王=最早到达男性 / 夺位最高优先级与最近无主营地选择 / 长子继承 / 绝嗣回落到先到者 / 无男空悬 / 争抢时先触发者登基"六场景后删除。
 - [ ] **M4.9** Corporate 预留：`GroupKind` 注释位 + `TransferReason` 预留 `Wage/Dividend/Investment`，不实现逻辑。
 
-### M5 · 收尾与文档（与各 M 并行滚动）
+### M5 · 收尾与文档（与各 M 并行滚动）→ **v1.4.0**
 - [ ] 各阶段完成即：自增版本号（index.html 徽章 + AGENTS.md 两处，§4.9）；更新 `docs/current/04-*.md` / `05-*.md` / `06-*.md` 与 `docs/current/11-changelog.md`。
 - [ ] 新目录补局部 `ledger/AGENTS.md`（重点：新旧分离、旁路记账、团体三要素、婚姻-房屋解耦、国王换届规则）并登记到根 AGENTS.md §0.1 表。
 - [ ] 最终验收门禁：`node tools/config-check.js` + `node tools/test-wasm.js` 双绿。
@@ -273,15 +271,15 @@ pub struct Region {
 
 ## 四、排期建议（按周）
 
-| 周 | 内容 | 交付物 |
-| :--- | :--- | :--- |
-| W1 | M1.1–M1.4（Group 基类 + Marriage 实体 + **家户 Household（挂户主男性）**） | 团体/婚姻/家户数据模型上线 |
-| W2 | M1.5–M1.9（婚姻登记簿迁移 + **胎儿预分配 ID** + 家户种子回填 + 回归） | 婚姻登记系统 + 家户归属 |
-| W3 | M2.1–M2.3（旁路记账 + 成员进出 + 工程走账） | 家庭流水全留痕 |
-| W4 | M2.4–M2.5（**分家权重抽资** + **丧父继承/绝嗣入公仓**） | 家族资源流转闭环 |
-| W5 | M2.6–M2.7 + M3.1–M3.2（家户/婚姻 UI + 宗族聚合/族长） | 家户账本 UI + 族长制 |
-| W6 | M3.3–M3.6 + M4.1–M4.3（族税互助 + 地区团体/时序/初王） | 宗族闭环 + 国王登基 |
-| W7 | M4.4–M4.9（夺位远征 + 长子继承换届 + 公仓税/救济 + 地区面板）+ M5 收尾 | 政体与夺位闭环 |
+| 周 | 内容 | 交付物 | 版本 |
+| :--- | :--- | :--- | :--- |
+| ~~W1~~ | ~~M1.1–M1.4（Group 基类 + Marriage 实体 + 家户 Household）~~ | ✅ 团体/婚姻/家户数据模型上线 | ~~v0.9.72~~ |
+| ~~W2~~ | ~~M1.5–M1.9（婚姻登记簿迁移 + 胎儿预分配 ID + 家户种子回填 + 前端UI）~~ | ✅ 婚姻登记系统 + 家户归属 + 前端展示 | ~~v1.0.0~~ |
+| W3 | M2.1–M2.3（旁路记账 + 成员进出 + 工程走账） | 家庭流水全留痕 | v1.1.0-dev |
+| W4 | M2.4–M2.5（分家权重抽资 + 丧父继承/绝嗣入公仓） | 家族资源流转闭环 | v1.1.0 |
+| W5 | M2.6–M2.7 + M3.1–M3.2（家户/婚姻流水UI + 宗族聚合/族长） | 家户账本流水UI + 族长制 | v1.2.0-dev |
+| W6 | M3.3–M3.6 + M4.1–M4.3（族税互助 + 地区团体/时序/初王） | 宗族闭环 + 国王登基 | v1.2.0 |
+| W7 | M4.4–M4.9（夺位远征 + 长子继承换届 + 公仓税/救济 + 地区面板）+ M5 收尾 | 政体与夺位闭环 | v1.3.0 → v1.4.0 |
 
 ---
 

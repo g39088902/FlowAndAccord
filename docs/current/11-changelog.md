@@ -1,7 +1,7 @@
 ﻿# 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.75)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v1.0.0)**。
 
 ---
 
@@ -241,3 +241,10 @@
 ode frontend/server.js 启动新实例，直接访问 http://localhost:3000 即可；
   - 补充说明重复启动的风险：会触发 server.js 端口递增逻辑（3001 被占时存在无限重试的已知问题），导致进程卡死无响应；
   - 纯文档修改，未触碰任何功能代码与 WASM 产物；版本号自增 v0.9.74 → v0.9.75。
+- **🎉 里程碑：账本与家户/婚姻系统 M1 完成 + 版本策略升级 (v1.0.0)**：
+  - **M1 全部交付**：团体基类 Group（领导/成员/账本三要素）、婚姻登记簿 MarriageRegistry（终身多段婚姻全留痕、与房屋解耦）、家户体系 HouseholdRegistry（家庭跟着男人走、户主男性锚定）、胎儿预分配 ID（受孕即占号、分家/继承可计入未出生孩子）、家户初始化回填（每位始祖男性各建一户）、超参联动（ledgerJournalCapacity 入 config）；
+  - **前端UI展示**：快照扩展（HouseholdSnapshot/MarriageSnapshot/LedgerBalanceSnapshot）、顶栏统计（存续家户数/存续婚姻对数）、Agent Inspector 增强（家户归属卡片：户主/成员/角色徽章/账面5资源/大事记；婚姻登记卡片：存续/丧偶/未婚三态+历史段）、家户与账本大盘可折叠面板（概览统计+家户列表+婚姻列表，点击户主追踪视角）；
+  - **面板可点击性修复**：根因 .right-panel-stack { pointer-events:none } 导致 .ledger-panel 点击穿透画布；补齐 pointer-events:auto + CSS 重写对齐全局均值大盘/图例窗口（圆角14px/琥珀色边框/padding/box-shadow/transition），移除内联 display 改由 CSS .minimized 统一控制；
+  - **版本策略升级**：从 v0.9.x 跳跃至 **v1.0.0**，标志 M1 里程碑完成；此后中等功能更新（每个 M 里程碑核心特性落地）递增次版本号（M2→1.1.0、M3→1.2.0、M4→1.3.0、M5→1.4.0），Bug修复/文档更新递增修订号；
+  - **计划文档更新**：docs/PLAN_LEDGER_REFACTOR.md 删除 M1 已完成任务项，现状基线升至 v1.0.0，新增版本号策略说明，排期表标注已完成周次；
+  - 验收：config-check.js 153/153 通过 + 	est-wasm.js 确定性 true / 0 越界 / 0 NaN / ALL_TESTS_DONE；浏览器实测 0 控制台错误，面板可正常点击展开，样式与其他卡片一致。
