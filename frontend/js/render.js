@@ -456,7 +456,7 @@
         }
       }
 
-      // 2.5 自建私产宅舍渲染 (0级仓库 📦 / 1级茅草房 🛖 / 2级私宅 🏡 / 3级庄舍 🏛️ / 4级庄园 🏰 / 无主废墟 🏚️)
+      // 2.5 自建私产宅舍渲染 (0级仓库 📦 / 1级茅草房 🛖 / 2级私宅 🏡 / 3级庄舍 🏯 / 4级庄园 🏰 / 无主废墟 🏚️)
       for (const house of sim.houses) {
         const p2D = project3D(house.pos);
         const isSelectedHouse = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
@@ -465,7 +465,7 @@
         let tierLabel = '仓';
         if (house.tier === 'Tier1ThatchedHut') { tierIcon = '🛖'; tierLabel = '茅'; }
         else if (house.tier === 'Tier2LeanTo') { tierIcon = '🏡'; tierLabel = '宅'; }
-        else if (house.tier === 'Tier3Homestead') { tierIcon = '🏛️'; tierLabel = '庄'; }
+        else if (house.tier === 'Tier3Homestead') { tierIcon = '🏯'; tierLabel = '庄'; }
         else if (house.tier === 'Tier4Manor') { tierIcon = '🏰'; tierLabel = '堡'; }
 
         if (house.isRuin) {
@@ -942,7 +942,7 @@
           let tierTitle = '📦 0级 仓库';
           if (house.tier === 'Tier1ThatchedHut') tierTitle = '🛖 1级 茅草房';
           else if (house.tier === 'Tier2LeanTo') tierTitle = '🏡 2级 私宅';
-          else if (house.tier === 'Tier3Homestead') tierTitle = '🏛️ 3级 木石庄舍';
+          else if (house.tier === 'Tier3Homestead') tierTitle = '🏯 3级 木石庄舍';
           else if (house.tier === 'Tier4Manor') tierTitle = '🏰 4级 家族大庄园';
 
           document.getElementById('insp-title-name').textContent = `${tierTitle} #${house.id}`;

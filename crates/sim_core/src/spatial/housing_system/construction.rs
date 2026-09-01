@@ -42,7 +42,7 @@ impl World3DEngine {
                     } else if prev_tier == HouseTier::Tier1ThatchedHut {
                         self.last_event = Some(format!("🏡 1级茅草房消耗木材完成升级！第 #{} 号房屋晋升为 2级私宅，仓储扩容至 80 单位！", house_id));
                     } else if prev_tier == HouseTier::Tier2LeanTo {
-                        self.last_event = Some(format!("🏛️ 2级私宅消耗石料完成升级！第 #{} 号房屋晋升为 3级木石庄舍，仓储扩容至 120 单位！", house_id));
+                        self.last_event = Some(format!("🏯 2级私宅消耗石料完成升级！第 #{} 号房屋晋升为 3级木石庄舍，仓储扩容至 120 单位！", house_id));
                     } else {
                         self.last_event = Some(format!("🏰 终极大庄园竣工！第 #{} 号房屋晋升为 4级氏族大庄园，仓储扩容至 160 单位！", house_id));
                     }

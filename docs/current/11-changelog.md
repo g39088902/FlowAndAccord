@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.70)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.71)**。
 
 ---
 
@@ -205,3 +205,9 @@
   - **修复**：`-f`（强制覆盖同名对象，属 upload 子命令选项）移至 `upload` 之后：`coscmd upload -f -H "Content-Type: application/wasm" <file> <cospath>`，确保 `.wasm` 对象 MIME 覆写生效、浏览器可流式编译；
   - **`docs/cicd-guide.md`**：排障表补充「unrecognized arguments: -f」踩坑案例（子命令选项与全局参数的位置区分）；
   - 纯 CI 配置两行命令与文档改动；版本号自增 v0.9.69 → v0.9.70。
+
+- **🏯 3级木石庄舍图标去重 (v0.9.71)**：
+  - **问题**：3级木石庄舍 (`Tier3Homestead`) 使用 🏛️，与营地第 5 阶【县级行政区】图标完全重复，地图上私宅与县衙无法区分；
+  - **修复**：木石庄舍图标统一改为 **🏯**（木石结构的东方庄阁，与 2级私宅 🏡、4级大庄园 🏰、县级行政区 🏛️ 四者互不重复）；
+  - **同步五处**：`frontend/js/render.js`（地图宅舍图标 + Inspector 等级标题 + 注释）、`frontend/index.html`（图例面板）、`crates/sim_core/src/spatial/housing_system/construction.rs`（2级→3级竣工播报）、`docs/current/05-house-system.md`（等级图标表）、TODO 待办销项；
+  - 涉及 Rust 事件文案改动，已重编译 WASM 并同步双副本；版本号自增 v0.9.70 → v0.9.71。

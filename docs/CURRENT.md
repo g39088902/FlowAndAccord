@@ -3,7 +3,7 @@
 > **文档定位**：本文件为**「已实现功能」的索引入口**。详细内容已按功能模块拆分至 [`docs/current/`](./current/) 目录下的独立文件，本文仅保留全局架构速览与模块导航，避免单文件过长。
 > **更新时间**：2026-08-31
 > **当前状态**：确定性生态模拟内核（Rust `sim_core`）与交互式可视化前端（Canvas 2D/3D）双端对齐就绪，支持完整的生态、四季、繁衍、采矿、多级房屋与世系传承大闭环。
-> **版本**：v0.9.63（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v0.9.71（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（161 个）统一由 `frontend/js/config.js` 驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验（改参后必跑）。
 
 ---
@@ -60,5 +60,5 @@
 ## 🛠️ 维护指引
 
 - **改动某项机制后**：在对应的模块文件（`docs/current/0X-*.md`）中更新功能描述；若改动构成新版本，**必须在 [docs/current/11-changelog.md](./current/11-changelog.md) 中追加版本条目**，并按 [AGENTS.md §4.9 版本号规范](../AGENTS.md) 自增版本号。
-- **版本号四处同步**：① `frontend/index.html` 版本徽章 ② `AGENTS.md` §1 Mermaid 节点 ③ `AGENTS.md` §2 步骤四 ④ 本索引顶部「版本」与 [Changelog](./current/11-changelog.md)（当前 v0.9.54）。
+- **版本号四处同步**：① `frontend/index.html` 版本徽章 ② `AGENTS.md` §1 Mermaid 节点 ③ `AGENTS.md` §2 步骤四 ④ 本索引顶部「版本」与 [Changelog](./current/11-changelog.md)（当前 v0.9.71）。
 - **新增功能模块**：在 `docs/current/` 下新建 `NN-*.md`（序号顺延），并在上方导航表登记。
