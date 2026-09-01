@@ -52,7 +52,7 @@ impl<'a> Decisioner<'a> {
     }
 
     pub fn dispatch(&self, agent: &mut Agent3D, start: NodeId, target: NodeId, state: PrimitiveActionState) -> bool {
-        if let Some(path) = self.network.find_path_3d_with_preference(start, target, agent.is_covert) {
+        if let Some(path) = self.network.find_path_3d_with_preference(start, target, agent.is_covert, self.config) {
             if !path.is_empty() {
                 agent.state = state;
                 agent.target_poi_node = Some(target);
@@ -83,7 +83,7 @@ impl<'a> Decisioner<'a> {
 
                     let route = if from_node == target_node {
                         vec![rev_lane_id]
-                    } else if let Some(remaining) = self.network.find_path_3d_with_preference(from_node, target_node, agent.is_covert) {
+                    } else if let Some(remaining) = self.network.find_path_3d_with_preference(from_node, target_node, agent.is_covert, self.config) {
                         let mut r = Vec::with_capacity(1 + remaining.len());
                         r.push(rev_lane_id);
                         r.extend(remaining);

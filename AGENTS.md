@@ -45,7 +45,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v0.9.62)"]
+    E --> F["浏览器 UI (版本: v0.9.63)"]
 ```
 
 - **`crates/sim_core`**：核心决策状态机（`spatial/decisions/`）、有限生态采收与随身搬运（`spatial/ecology.rs`）、空间拓扑路网寻路（`spatial/graph.rs`）、私宅营建与代际继承（`spatial/housing_system/`）；
@@ -105,7 +105,7 @@ node frontend/server.js
 
 1. 打开浏览器访问：`http://localhost:3000`；
 2. **强制刷新**：每次重新编译 WASM 后，在浏览器中按下 **`Ctrl + F5`** 强制刷新以清理 WebAssembly 缓存；
-3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.62`**。
+3. **版本确认**：页面顶部标题栏右侧显示版本徽章 **`v0.9.63`**。
 
 ---
 
@@ -137,7 +137,7 @@ node frontend/server.js
 ### 4.2 🔴 寻路决策门槛、连续采收与中途重路由机制
 
 - **Agent 私有 POI 施密特触发器（开启 $\ge 30\%$ / 关闭 $< 10\%$）**：
-  - 每名 Agent 在自身决策相位观察 POI 库存，并在 `Agent3D::poi_seekability` 中维护私有锁存状态：库存升至 $\ge30\%$ 才开放；已开放点仅在跌破 $<10\%$ 时关闭；在 $10\%\sim30\%$ 中间带保持自身前态。相同 POI 可被不同 Agent 判为不同可用性；`decisions/routing.rs` 与 `decisions/seeking.rs` 的路由与重路由只读取 Agent 的触发器结论。
+  - 每名 Agent 在自身决策相位观察 POI 库存，并在 `Agent3D::poi_seekability` 中维护私有锁存状态：库存升至 $\ge$ `config.decisionPoiSeekMinStockRatio`(0.30) 才开放；已开放点仅在跌破 $<$ `config.decisionPoiAbandonStockRatio`(0.10) 时关闭；在中间带保持自身前态。相同 POI 可被不同 Agent 判为不同可用性；`decisions/routing.rs` 与 `decisions/seeking.rs` 的路由与重路由只读取 Agent 的触发器结论。
 - **采收现场未满连续采收**：
   - 族人在现场采收（水/粮/木/石/金）时，若自己的目标触发器已关闭但自身或背包未满且家宅仍需，自动就近寻路前往下一处**自身触发器已开放**的同类 POI 继续采收，避免提前送货回宅。
 - **中途断流熔断与平滑就近重路由（$< 10\%$）**：
@@ -147,17 +147,17 @@ node frontend/server.js
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
-- **时间基准**：每个引擎 tick = 1/30 模拟秒，30 tick = 1 模拟秒；前端 30fps 每帧调一次 `sim.tick()`，1x 倍速下 1 模拟秒 = 1 现实秒。
+- **时间基准**：每个引擎 tick = `config.simulationDt`(1/30) 模拟秒，`config.agentDecisionIntervalTicks`(30) tick = 1 模拟秒；前端 30fps 每帧调一次 `sim.tick()`，1x 倍速下 1 模拟秒 = 1 现实秒。
 - **错峰决策**：`world.tick()` 每个 tick 内部调用 `tick_decisions()`；每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策（平均每 30 tick = 1.0 秒决策一次，全员相位均摊错开）。
   - **单元测试直接调 `tick_decisions()` 前必须先拨 `world.tick_counter = 29`**（使 ID=1 族人在 `(29+1)%30==0` 相位被调度），否则目标 agent 不在相位上不会决策。
-- **严禁修改 `dt = 1/30`**：倍速通过 `world_tick_steps(N, 1/30)` 同帧多步实现，改动 `dt` 会导致数值积分发散。
+- **严禁修改 `config.simulationDt` (= 1/30)**：倍速通过 `world_tick_steps(N, config.simulationDt)` 同帧多步实现，改动 `dt` 会导致数值积分发散。
 - **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货发生在决策**之前**，决策看到的是卸货后的仓库状态。
 - **共享 RNG 的确定性约束**：`WorldRng` 全局共享，按 agents 顺序依次消费。**新增任何随机消耗必须保持确定性**，否则 `tools/test-wasm.js` 的同种子逐字节一致性校验会失败。
 
 ### 4.4 🟠 随身搬运机制（真实背包，非瞬移）
 
 - **真实随身搬运**：
-  - 💧水/🍒食/🌲木/🪨石：在资源点**只装入随身行囊**（每类独立容量 50.0，常量 `CARRY_CAPACITY_RESOURCE`，**互不共享**），回家休整（`RestingAtCamp`）时按 **10/s** 卸货存入家宅仓库；行囊满（$\ge 50$）即返家。
+  - 💧水/🍒食/🌲木/🪨石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(50.0)，**互不共享**），回家休整（`RestingAtCamp`）时按 **`config.poiUnloadRateResource`/s(10)** 卸货存入家宅仓库；行囊满（$\ge$ `config.agentHungerCapacity`) 即返家。
   - 🪙金：**容量无限**，单趟运满 20（`gold_load_full`）回宅存入金库（5/s）。
   - **无家宅**（`home_house_id.is_none()`）的 agent 不装载行囊，只在现场就地自饮自食。
 - **改容量/装卸速率必须全链条联动**：`agent.rs` $\rightarrow$ `ecology.rs` $\rightarrow$ `decisions/` $\rightarrow$ `snapshot.rs` $\rightarrow$ `rustworld.js` $\rightarrow$ `render.js`。
@@ -176,13 +176,13 @@ node frontend/server.js
 
 ### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
-- 当前生态共 **23 处**：营地 5 处 (1-5)、清泉 6 处 (10-15)、浆果 6 处 (20-25)、林木 3 处 (30-32)、石矿 2 处 (40-41)、金矿 1 处 (50)。空间排斥间距 $\text{min\_poi\_distance} = 70\text{m}$。
+- 当前生态 POI 数量与 ID 段位由 `config.countCamps`(5)/`countWaterSources`(6)/`countBerryBushes`(6)/`countWoods`(3)/`countStoneMines`(2)/`countGoldMines`(1) 控制（共 23 处，营地 1-5 / 清泉 10-15 / 浆果 20-25 / 林木 30-32 / 石矿 40-41 / 金矿 50 段位）。空间排斥间距由 `config.poiMinDistance`(70m) 控制。
 - **营地县级行政区库与升级界限**：5 处营地在生成时从 `COUNTY_NAMES`（240+ 处真实古雅县名）随机 roll 出专属地名，并随辖内绑定的有效房屋数量自动升级：0~5 间为【营地】、6~11 间为【村】、12~17 间为【乡】、18~23 间为【镇】、24+ 间为【县】。
 - **改 POI 数量必须同步**：`ecology.rs` $\rightarrow$ `index.html` 面板文案 $\rightarrow$ [`docs/current/02-ecology-poi.md`](./docs/current/02-ecology-poi.md)。
 
 ### 4.8 🟡 行为与生理硬约束
 
-- **冬季供暖**：冬季或气温 $< 5^\circ\text{C}$ 时，非 0 级有主房屋每秒消耗 0.12 木材（`housing_system/maintenance.rs`）；家宅木材 $< 10$ 时禁孕。
+- **冬季供暖**：冬季或气温 $< $ `config.houseWinterColdTemp`(5℃) 时，非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材（`housing_system/maintenance.rs`）；家宅木材 $< 10$ 时禁孕。
 - **0 级仓库不扣生活水粮**（`ecology.rs` 中只有 `tier != Tier0Warehouse` 才允许族人从仓库吃喝消耗）。
 - **房屋升级材料门槛**：`house.rs` `is_pantry_full()`：
   - 0 级仓库：需水粮各 90%；
@@ -211,8 +211,16 @@ node frontend/server.js
 
 - **设计原则**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"必须来自 agent 自己的 `evaluate_needs` 输出；**严禁**再引入任何扫描全图并强制改写 `agent.state` 的"指挥式"逻辑。
 - **三条自主触发链路（v0.9.43 起，均为必然/确定性触发）**：
-  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ 20、体力 ≥ 60 时必然触发；agent 在自己决策相位掷 12 个候选点自主选址（与现有房屋 ≥28m），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；上述门槛/候选数/距离/间距均已入 `SimConfig`（`decision_found_home_*` / `house_min_spacing`，前端 `config.js` 可直接调参）；
+  - **立宅（0级仓库）**：`NeedKind::FoundHome`（归属层）——**无家成年男性**且饥渴 ≥ `config.decisionFoundHomeHungerMin`(20)、体力 ≥ `config.decisionFoundHomeStaminaMin`(60) 时必然触发；agent 在自己决策相位掷 `config.decisionFoundHomeCandidates`(12) 个候选点自主选址（与现有房屋 ≥ `config.houseMinSpacing`/`config.decisionFoundHomeDistMin`(20~24m)），存 `agent.pending_house_pos`；系统仅于 `settlement.rs::materialize_founded_houses`（每拍决策循环结束后执行）做放置校验、建门接入最近 3 节点、创建房屋并绑定 `home_house_id`；上述门槛/候选数/距离/间距均已入 `SimConfig`（`decision_found_home_*` / `house_min_spacing`，前端 `config.js` 可直接调参）；
   - **升级施工**：`NeedKind::BuildHouse`——仓满（`is_pantry_full` 各等级门槛）+ 男户主在家休息满体力时，户主自身决策相位触发 `ConstructingHouse`；施工计时与竣工扩容由 `construction.rs::tick_house_construction` 结算；
   - **修缮**：`NeedKind::RepairHouse`——耐久 < 50% 时户主/配偶自身决策相位触发 `RepairingHouse`；`maintenance.rs::tick_house_repair` 仅结算修缮进度。
 - **已删除的旧扫描器（勿复活）**：`settlement.rs::tick_warehouse_founding`、`construction.rs::check_start_house_upgrades`、`maintenance.rs` 内强制切换修缮的扫描块。
 - **改相关逻辑的验证**：以 `node tools/test-wasm.js` 回归为准；若临时写 Rust 测试验证（提交前须删除，见 §4.10），需覆盖：无家成年男性必然触发 FoundHome 且实体化绑定、仓满男户主自主开工升级、耐久 <50% 户主自主触发修缮。
+
+### 4.12 🔧 超参集中化、配置校验与速查表（降低调参检索难度）
+
+- **超参唯一入口**：v0.9.63 起，全部可调超参（共 **161** 个 `SimConfig` 字段）统一由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量或直引 `const`。新增超参须在 `crates/sim_core/src/config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **调参流程（无需重编译）**：直接编辑 `config.js` 任意字段（每项均带中文行内说明），浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。
+- **一致性校验工具 `tools/config-check.js`**：零依赖纯 Node 脚本，交叉解析 `config.js` 与 `config.rs`，捕获四类问题并退出码报错——① 孤儿字段（前端有/Rust 无）、② 缺失字段（Rust 有/前端无）、③ 类型错配（`usize/u64` 与浮点）、④ 数值漂移（默认值不一致）。任一报错即说明前后端已失同步，须先修复再发布。
+- **参数速查表 `docs/config-reference.md`**：由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值与中文说明，是用户检索/核对参数的唯一权威入口（不要手工维护，改 `config.rs` 后重跑工具即可刷新）。
+- **防回归**：`config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致；`node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

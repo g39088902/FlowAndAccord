@@ -10,6 +10,11 @@ use crate::config::*;
 pub type NodeId = u32;
 pub type LaneId = u32;
 
+/// 车道初始耐久（结构内部固定尺度，非用户超参）
+const LANE_HEALTH_DEFAULT: f32 = 100.0;
+/// 车道最大通行容量（结构内部固定尺度，非用户超参）
+const LANE_MAX_CAPACITY: u32 = 100;
+
 /// 3D 节点类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeType {
@@ -90,8 +95,9 @@ impl LaneGraph3D {
         to: NodeId,
         curve: Option<Curve3D>,
         road_class: RoadClass,
+        config: &SimConfig,
     ) -> Result<LaneId, &'static str> {
-        self.add_lane_with_options(from, to, curve, road_class, false, 0.0)
+        self.add_lane_with_options(from, to, curve, road_class, false, 0.0, config)
     }
 
     pub fn add_lane_with_options(
@@ -102,6 +108,7 @@ impl LaneGraph3D {
         road_class: RoadClass,
         is_hidden: bool,
         concealment: f32,
+        config: &SimConfig,
     ) -> Result<LaneId, &'static str> {
         let from_idx = *self.node_map.get(&from).ok_or("起始节点不存在")?;
         let to_idx = *self.node_map.get(&to).ok_or("目标节点不存在")?;
@@ -114,11 +121,11 @@ impl LaneGraph3D {
         self.next_lane_id += 1;
 
         let speed_limit = match road_class {
-            RoadClass::DirtTrack => ROAD_SPEED_DIRT_TRACK,
-            RoadClass::Cobblestone => ROAD_SPEED_COBBLESTONE,
-            RoadClass::AsphaltUrban => ROAD_SPEED_ASPHALT_URBAN,
-            RoadClass::SkywayElevated => ROAD_SPEED_SKYWAY_ELEVATED,
-            RoadClass::SmugglerTrail => ROAD_SPEED_SMUGGLER_TRAIL,
+            RoadClass::DirtTrack => config.road_speed_dirt_track,
+            RoadClass::Cobblestone => config.road_speed_cobblestone,
+            RoadClass::AsphaltUrban => config.road_speed_asphalt_urban,
+            RoadClass::SkywayElevated => config.road_speed_skyway_elevated,
+            RoadClass::SmugglerTrail => config.road_speed_smuggler_trail,
         };
 
         let edge_data = LaneEdge3D {
@@ -128,8 +135,8 @@ impl LaneGraph3D {
             curve: final_curve,
             road_class,
             speed_limit,
-            max_capacity: 100,
-            health: 100.0,
+            max_capacity: LANE_MAX_CAPACITY,
+            health: LANE_HEALTH_DEFAULT,
             wear: 0.0, // 初始地图完全无路 (wear = 0.0)
             is_hidden: is_hidden || road_class == RoadClass::SmugglerTrail,
             concealment: if is_hidden { concealment.max(0.7) } else { concealment },
@@ -152,12 +159,12 @@ impl LaneGraph3D {
     }
 
     /// 3D 拓扑加权 A* 寻路
-    pub fn find_path_3d(&self, start: NodeId, goal: NodeId) -> Option<Vec<LaneId>> {
-        self.find_path_3d_with_preference(start, goal, false)
+    pub fn find_path_3d(&self, start: NodeId, goal: NodeId, config: &SimConfig) -> Option<Vec<LaneId>> {
+        self.find_path_3d_with_preference(start, goal, false, config)
     }
 
     /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路
-    pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool) -> Option<Vec<LaneId>> {
+    pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
         let start_idx = *self.node_map.get(&start)?;
         let goal_idx = *self.node_map.get(&goal)?;
         let goal_pos = self.graph[goal_idx].pos;
@@ -169,22 +176,22 @@ impl LaneGraph3D {
             |edge_ref| {
                 let edge = edge_ref.weight();
                 let delta_z = (edge.curve.p3.z - edge.curve.p0.z).max(0.0);
-                let grade_penalty = if delta_z > 0.0 { delta_z * 1.5 } else { 0.0 };
+                let grade_penalty = if delta_z > 0.0 { delta_z * config.road_astar_grade_penalty_coef } else { 0.0 };
 
-                let road_level_factor = (0.50 + 0.333 * edge.wear).clamp(0.50, 2.20);
+                let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * edge.wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
                 let effective_speed = edge.speed_limit * road_level_factor;
 
                 let hidden_modifier = if prefer_hidden {
-                    if edge.is_hidden { 0.4 } else { 1.2 }
+                    if edge.is_hidden { config.road_hidden_prefer_modifier } else { config.road_visible_prefer_modifier }
                 } else {
-                    if edge.is_hidden { 2.5 } else { 1.0 }
+                    if edge.is_hidden { config.road_hidden_avoid_modifier } else { config.road_visible_avoid_modifier }
                 };
 
                 ((edge.curve.length / effective_speed) + grade_penalty) * hidden_modifier
             },
             |node_idx| {
                 let pos = self.graph[node_idx].pos;
-                pos.distance_to(&goal_pos) / 80.0
+                pos.distance_to(&goal_pos) / config.road_astar_heuristic_divisor
             },
         )?;
 

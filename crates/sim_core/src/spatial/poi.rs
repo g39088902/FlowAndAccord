@@ -3,14 +3,25 @@ use super::vec3::Vec3;
 
 pub type PoiId = u32;
 
+/// 未接入播撒种子的 POI 兜底默认储量上限（实际仿真由 seed_primitive_ecology 覆盖为 config.stock_max_*）
+pub const POI_FALLBACK_STOCK_MAX: f32 = 60.0;
+/// 兜底初始储量占上限比例（seed 时实际为 config.stock_max_* * 0.75）
+pub const POI_FALLBACK_INITIAL_RATIO: f32 = 0.75;
+/// 兜底各类型再生速率（实际仿真由 config.regen_base_* 覆盖）
+pub const POI_FALLBACK_REGEN_WATER: f32 = 2.00;
+pub const POI_FALLBACK_REGEN_BERRY: f32 = 2.00;
+pub const POI_FALLBACK_REGEN_WOOD: f32 = 2.00;
+pub const POI_FALLBACK_REGEN_STONE: f32 = 1.50;
+pub const POI_FALLBACK_REGEN_GOLD: f32 = 1.20;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoiType {
     Camp,        // 🏕️ 避风营地 (无限储量与无限庇护，休眠恢复体力、饱暖受孕与分娩)
-    WaterSource, // 💧 低洼清泉 (产出水资源，单点上限60.0单位，2.00单位/秒)
-    BerryBush,   // 🍒 缓坡浆果 (产出食物资源，单点上限60.0单位，2.00单位/秒)
-    WoodForest,  // 🌲 茂密林木 (产出木材资源，单点上限60.0单位，2.00单位/秒)
-    StoneQuarry, // 🪨 嶙峋石矿 (产出石料资源，单点上限60.0单位，1.50单位/秒)
-    GoldMine,    // 🪙 璀璨金矿 (产出黄金资源，单点上限60.0单位，1.20单位/秒)
+    WaterSource, // 💧 低洼清泉 (储量上限与产速由 config.stock_max_water / config.regen_base_water 控制)
+    BerryBush,   // 🍒 缓坡浆果 (储量上限与产速由 config.stock_max_berry / config.regen_base_berry 控制)
+    WoodForest,  // 🌲 茂密林木 (储量上限与产速由 config.stock_max_wood / config.regen_base_wood 控制)
+    StoneQuarry, // 🪨 嶙峋石矿 (储量上限与产速由 config.stock_max_stone / config.regen_base_stone 控制)
+    GoldMine,    // 🪙 璀璨金矿 (储量上限与产速由 config.stock_max_gold / config.regen_base_gold 控制)
 }
 
 /// 全国县级行政区地名库 (240+ 处真实古雅县级行政区地名，营地生成时随机挑选)
@@ -56,14 +67,14 @@ pub const COUNTY_NAMES: &[&str] = &[
     "镇安", "柞水", "商南", "山阳", "丹凤", "洛南", "旬阳", "白河", "平利", "镇坪"
 ];
 
-/// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿最大储量 60.0 单位；营地无限)
+/// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿的储量上限与产速均由 SimConfig 的 stock_max_* / regen_base_* 控制；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
-    pub current_stock: f32, // 当前可用储量 (0.0 ~ 60.0 单位，营地为无限)
-    pub max_stock: f32,     // 储量上限 (60.0 单位，营地为无限)
+    pub current_stock: f32, // 当前可用储量 (上限与产速由 config.stock_max_* / config.regen_base_* 控制，营地为无限)
+    pub max_stock: f32,     // 储量上限 (营地为无限)
     pub regen_rate: f32,    // 每秒自然再生速率
     pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
     pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
@@ -86,11 +97,11 @@ impl PrimitivePoi {
     pub fn new_with_name(id: PoiId, poi_type: PoiType, pos: Vec3, name: String) -> Self {
         let (max_stock, regen_rate, initial_stock) = match poi_type {
             PoiType::Camp => (f32::INFINITY, 0.0, f32::INFINITY),
-            PoiType::WaterSource => (60.0, 2.00, 45.0),
-            PoiType::BerryBush => (60.0, 2.00, 45.0),
-            PoiType::WoodForest => (60.0, 2.00, 45.0),
-            PoiType::StoneQuarry => (60.0, 1.50, 45.0),
-            PoiType::GoldMine => (60.0, 1.20, 45.0),
+            PoiType::WaterSource => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WATER, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::BerryBush => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_BERRY, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::WoodForest => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WOOD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::StoneQuarry => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_STONE, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::GoldMine => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_GOLD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
         };
 
         Self {

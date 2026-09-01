@@ -31,6 +31,7 @@ impl World3DEngine {
 
         let mut poi_positions: Vec<Vec3> = Vec::new();
         let min_poi_distance = self.config.poi_min_distance;
+        let poi_spawn_fallback_ratio = self.config.poi_spawn_fallback_ratio;
 
         let mut find_spaced_pos = |rng: &mut WorldRng, terrain: &crate::geo::TerrainMap, radius_ratio: f32| -> Vec3 {
             for _ in 0..100 {
@@ -49,7 +50,7 @@ impl World3DEngine {
                 let y = rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
                 let elev = terrain.sample_elevation(x, y);
                 let cand = Vec3::new(x, y, elev);
-                if poi_positions.iter().all(|p| p.distance_to(&cand) >= min_poi_distance * 0.6) {
+                if poi_positions.iter().all(|p| p.distance_to(&cand) >= min_poi_distance * poi_spawn_fallback_ratio) {
                     poi_positions.push(cand);
                     return cand;
                 }
@@ -64,7 +65,7 @@ impl World3DEngine {
         // 1. 生成避风营地
         let mut available_names = crate::spatial::poi::COUNTY_NAMES.to_vec();
         for i in 0..self.config.count_camps {
-            let mut pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.70);
+            let mut pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_camp);
             pos.z += 0.5;
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             camp_nodes.push(node_id);
@@ -78,7 +79,7 @@ impl World3DEngine {
 
         // 2. 生成清泉水源
         for i in 0..self.config.count_water_sources {
-            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             water_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -92,7 +93,7 @@ impl World3DEngine {
 
         // 3. 生成浆果灌木
         for i in 0..self.config.count_berry_bushes {
-            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             food_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -106,7 +107,7 @@ impl World3DEngine {
 
         // 4. 生成林木林地
         for i in 0..self.config.count_woods {
-            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             wood_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -120,7 +121,7 @@ impl World3DEngine {
 
         // 5. 生成石矿采石场
         for i in 0..self.config.count_stone_mines {
-            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             stone_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -134,7 +135,7 @@ impl World3DEngine {
 
         // 6. 生成璀璨金矿
         for i in 0..self.config.count_gold_mines {
-            let pos = find_spaced_pos(&mut self.rng, &self.terrain, 0.80);
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             gold_nodes.push(node_id);
             all_node_ids.push(node_id);
@@ -147,9 +148,9 @@ impl World3DEngine {
         }
 
         // 7. 地形过渡节点
-        for _ in 0..17 {
-            let x = self.rng.gen_range(-half_size * 0.85, half_size * 0.85);
-            let y = self.rng.gen_range(-half_size * 0.85, half_size * 0.85);
+        for _ in 0..self.config.count_terrain_transition_nodes {
+            let x = self.rng.gen_range(-half_size * self.config.poi_spawn_spread_ratio, half_size * self.config.poi_spawn_spread_ratio);
+            let y = self.rng.gen_range(-half_size * self.config.poi_spawn_spread_ratio, half_size * self.config.poi_spawn_spread_ratio);
             let elev = self.terrain.sample_elevation(x, y);
             let node_id = self.network.add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
             all_node_ids.push(node_id);
@@ -164,45 +165,45 @@ impl World3DEngine {
                 let pos_b = self.network.graph[*self.network.node_map.get(&id_b).unwrap()].pos;
                 let dist = pos_a.distance_to(&pos_b);
 
-                if dist < 175.0 {
+                if dist < self.config.road_connect_near_dist {
                     let delta_z = (pos_a.z - pos_b.z).abs();
-                    let road_class = if delta_z > 8.0 { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
-                    let _ = self.network.add_lane(id_a, id_b, None, road_class);
-                    let _ = self.network.add_lane(id_b, id_a, None, road_class);
-                } else if dist < 320.0 {
-                    let _ = self.network.add_lane(id_a, id_b, None, RoadClass::DirtTrack);
-                    let _ = self.network.add_lane(id_b, id_a, None, RoadClass::DirtTrack);
+                    let road_class = if delta_z > self.config.road_grade_pave_threshold { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
+                    let _ = self.network.add_lane(id_a, id_b, None, road_class, &self.config);
+                    let _ = self.network.add_lane(id_b, id_a, None, road_class, &self.config);
+                } else if dist < self.config.road_connect_far_dist {
+                    let _ = self.network.add_lane(id_a, id_b, None, RoadClass::DirtTrack, &self.config);
+                    let _ = self.network.add_lane(id_b, id_a, None, RoadClass::DirtTrack, &self.config);
                 }
             }
         }
 
         // 9. 播撒初始 20 名原始小人 (10男10女)
-        let total_initial = 20;
+        let total_initial = self.config.agent_spawn_count;
         let female_count = total_initial / 2;
         for i in 0..total_initial {
             let home_camp = camp_nodes[i % camp_nodes.len()];
-            let is_covert = i % 4 == 0;
+            let is_covert = i % self.config.agent_covert_every_n == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
             let gender = if i < female_count { Gender::Female } else { Gender::Male };
             let initial_age = self.config.agent_adult_age;
 
-            let mut agent = Agent3D::new_with_config(agent_id, home_camp, 8.5 + (i as f32 % 3.0), is_covert, initial_age, gender, &self.config);
+            let mut agent = Agent3D::new_with_config(agent_id, home_camp, self.config.agent_spawn_base_speed + (i as f32 % self.config.agent_spawn_speed_ring), is_covert, initial_age, gender, &self.config);
             // 始祖在初始化阶段 (tick_counter=0) 出生, 显式置 0 以便族谱按出生时序排序
             agent.birth_tick = 0;
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
 
-            let hunger_jitter = self.rng.gen_range(-10.0, 10.0);
-            let thirst_jitter = self.rng.gen_range(-10.0, 10.0);
-            let stamina_jitter = self.rng.gen_range(-10.0, 10.0);
-            agent.hunger = (25.0 + hunger_jitter).clamp(10.0, 45.0);
-            agent.thirst = (25.0 + thirst_jitter).clamp(10.0, 45.0);
-            agent.stamina = (90.0 + stamina_jitter).clamp(55.0, 100.0);
+            let hunger_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
+            let thirst_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
+            let stamina_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
+            agent.hunger = (self.config.agent_spawn_hunger_base + hunger_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
+            agent.thirst = (self.config.agent_spawn_hunger_base + thirst_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
+            agent.stamina = (self.config.agent_spawn_stamina_base + stamina_jitter).clamp(self.config.agent_spawn_stamina_clamp_min, self.config.agent_spawn_stamina_clamp_max);
 
             let mean = self.config.trait_default_mean;
             let std_dev = self.config.trait_initial_std_dev;
-            let roll_trait = |rng: &mut WorldRng| -> f32 { (mean + std_dev * rng.gen_normal()).clamp(10.0, 190.0) };
+            let roll_trait = |rng: &mut WorldRng| -> f32 { (mean + std_dev * rng.gen_normal()).clamp(self.config.trait_inherit_clamp_min, self.config.trait_inherit_clamp_max) };
             agent.intelligence = roll_trait(&mut self.rng);
             agent.strength = roll_trait(&mut self.rng);
             agent.digestion_efficiency = roll_trait(&mut self.rng);
@@ -247,11 +248,11 @@ impl World3DEngine {
                 PrimitiveActionState::DrinkingAtWater => {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (50.0 - agent.thirst).max(0.0);
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WaterSource && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
+                        let need = (self.config.agent_thirst_capacity - agent.thirst).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(rate_res * dt));
-                            agent.thirst = (agent.thirst + extracted).min(50.0);
+                            agent.thirst = (agent.thirst + extracted).min(self.config.agent_thirst_capacity);
                         }
                         if agent_hid.is_some() && agent.carried_water < carry_cap && poi.current_stock > 0.01 {
                             let load = (carry_cap - agent.carried_water).min(rate_res * dt);
@@ -263,11 +264,11 @@ impl World3DEngine {
                 PrimitiveActionState::ForagingFood => {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < 22.0) {
-                        let need = (50.0 - agent.hunger).max(0.0);
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::BerryBush && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
+                        let need = (self.config.agent_hunger_capacity - agent.hunger).max(0.0);
                         if need > 0.01 {
                             let extracted = poi.extract(need.min(rate_res * dt));
-                            agent.hunger = (agent.hunger + extracted).min(50.0);
+                            agent.hunger = (agent.hunger + extracted).min(self.config.agent_hunger_capacity);
                         }
                         if agent_hid.is_some() && agent.carried_food < carry_cap && poi.current_stock > 0.01 {
                             let load = (carry_cap - agent.carried_food).min(rate_res * dt);
@@ -279,7 +280,7 @@ impl World3DEngine {
                 PrimitiveActionState::GatheringWood => {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WoodForest && p.pos.distance_to(&agent_pos) < 22.0) {
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WoodForest && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
                         if agent_hid.is_some() && agent.carried_wood < carry_cap && poi.current_stock > 0.01 {
                             let load = (carry_cap - agent.carried_wood).min(rate_res * dt);
                             let extracted = poi.extract(load);
@@ -290,7 +291,7 @@ impl World3DEngine {
                 PrimitiveActionState::MiningStone => {
                     let agent_pos = agent.world_pos;
                     let agent_hid = agent.home_house_id;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::StoneQuarry && p.pos.distance_to(&agent_pos) < 22.0) {
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::StoneQuarry && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
                         if agent_hid.is_some() && agent.carried_stone < carry_cap && poi.current_stock > 0.01 {
                             let load = (carry_cap - agent.carried_stone).min(rate_res * dt);
                             let extracted = poi.extract(load);
@@ -300,7 +301,7 @@ impl World3DEngine {
                 }
                 PrimitiveActionState::MiningGold => {
                     let agent_pos = agent.world_pos;
-                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::GoldMine && p.pos.distance_to(&agent_pos) < 22.0) {
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::GoldMine && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
                         if poi.current_stock > 0.01 {
                             let extracted = poi.extract(rate_gold * dt);
                             agent.carried_gold += extracted;
@@ -332,15 +333,15 @@ impl World3DEngine {
                                 agent.carried_stone -= d;
                             }
                             if house.tier != HouseTier::Tier0Warehouse {
-                                if agent.thirst < 50.0 && house.pantry_water > 0.05 {
-                                    let drink_amount = (50.0 - agent.thirst).min(house.pantry_water).min(3.0 * dt);
+                                if agent.thirst < self.config.agent_thirst_capacity && house.pantry_water > 0.05 {
+                                    let drink_amount = (self.config.agent_thirst_capacity - agent.thirst).min(house.pantry_water).min(self.config.camp_home_consume_rate * dt);
                                     house.pantry_water = (house.pantry_water - drink_amount).max(0.0);
-                                    agent.thirst = (agent.thirst + drink_amount).min(50.0);
+                                    agent.thirst = (agent.thirst + drink_amount).min(self.config.agent_thirst_capacity);
                                 }
-                                if agent.hunger < 50.0 && house.pantry_food > 0.05 {
-                                    let eat_amount = (50.0 - agent.hunger).min(house.pantry_food).min(3.0 * dt);
+                                if agent.hunger < self.config.agent_hunger_capacity && house.pantry_food > 0.05 {
+                                    let eat_amount = (self.config.agent_hunger_capacity - agent.hunger).min(house.pantry_food).min(self.config.camp_home_consume_rate * dt);
                                     house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
-                                    agent.hunger = (agent.hunger + eat_amount).min(50.0);
+                                    agent.hunger = (agent.hunger + eat_amount).min(self.config.agent_hunger_capacity);
                                 }
                             }
                             if agent.carried_gold > 0.01 && house.pantry_gold < house.max_pantry_gold {

@@ -1,257 +1,212 @@
-// ============================================================================
-// Flow & Accord · 仿真超参数集中配置文件 (config.js)
-//
-// 本文件集中归档全系统所有动力学、生理代谢、生态演化、房屋营造、
-// 马斯洛决策门槛、四季环境与路网踩踏超参数。
-// 💡 修改本文件中的数值后，仅需刷新浏览器（或在控制台调用 sim.applyConfig()）即可生效，
-// 无需重新编译 Rust / WASM 内核！
-// ============================================================================
-
+/*
+ * Flow & Accord · 前端仿真超参数配置文件
+ * ============================================================================
+ * 本文件是全部可调超参数的唯一前端入口。每个字段均带中文说明，便于检索与调参。
+ *
+ * ⚠️ 一致性约束（由 tools/config-check.js 自动校验）：
+ *   1. 字段名采用 camelCase，必须与 Rust `crates/sim_core/src/config.rs` 中的
+ *      SimConfig 结构体字段一一对应（serde rename_all = "camelCase"）。
+ *   2. 字段数量、类型、默认值必须与 config.rs 的 const / Default 完全一致。
+ *   3. 缺失键会自动回落 config.rs 默认值；多写的键会被 serde 忽略（视为孤儿，报错）。
+ *
+ * 调参后无需重新编译 WASM，刷新浏览器即可生效（建议 Ctrl+F5 强刷清缓存）。
+ * ============================================================================
+ */
 window.SIM_CONFIG = {
   // ==========================================================================
   // 1. 引擎节拍与时间基准 (Simulation Time & Ticks)
   // ==========================================================================
-  /** 基础仿真时间微步步长 (秒)，对应 30 FPS 锁定帧率 (1/30 = 0.033333s) */
-  simulationDt: 1.0 / 30.0,
-  /** 每秒对应的引擎 Tick 步数 */
-  ticksPerSecond: 30,
-  /** 部落民错峰决策相位周期 (每 30 ticks = 1.0 秒决策一次) */
-  agentDecisionIntervalTicks: 30,
+  simulationDt: 1.0 / 30.0,        // 单个 tick 对应的模拟秒数 (1/30)
+  ticksPerSecond: 30,              // 每秒 tick 数（决定模拟实时倍速基准）
+  agentDecisionIntervalTicks: 30,  // 每个族人错峰决策间隔 (tick)，平均 1 秒决策一次
 
   // ==========================================================================
   // 2. 部落民生理、代谢与生命周期 (Agent Physiology & Lifecycle)
   // ==========================================================================
-  /** 部落民饱食度上限 (单位) */
-  agentHungerCapacity: 50.0,
-  /** 部落民水分值上限 (单位) */
-  agentThirstCapacity: 50.0,
-  /** 部落民初始饱食度 (初始 50% = 25.0 单位) */
-  agentInitialHunger: 25.0,
-  /** 部落民初始水分值 (初始 50% = 25.0 单位) */
-  agentInitialThirst: 25.0,
-  /** 部落民初始体力值 (%) */
-  agentInitialStamina: 95.0,
-  /** 部落民正常基准代谢消耗速率 (单位/秒，未怀孕状态下每10秒消耗1单位 = 0.10/s) */
-  agentBaseMetabolismDecay: 0.10,
-  /** 部落民健康值每秒自然衰减速率 (单位/秒，不可补充，归零即老死；0.01/s 对应约 5000s 寿命) */
-  agentHealthDecayPerSec: 0.01,
-  /** 孕期女性代谢加速倍率 (1.25x，即 0.125 单位/秒) */
-  agentPregnantMetabolismMult: 1.25,
-  /** 重体力劳动 (营建/修缮/采伐/挖矿) 代谢加速倍率 (1.0x) */
-  agentWorkMetabolismMult: 1.0,
-  /** 尸体在荒野中留存衰变时长 (秒) */
-  agentDeathDecayDuration: 12.0,
-  /** 部落民成年年龄门槛 (秒，年满 1800 秒方可结婚与受孕) */
-  agentAdultAge: 1800.0,
-  /** 女性妊娠孕期总时长 (秒，900 秒孕期) */
-  agentPregnancyDuration: 900.0,
-  /** 妊娠流产危险线: 饱食/水分指标跌破此值即发生流产 (20% 警戒线 = 10.0 单位) */
-  agentMiscarriageThreshold: 10.0,
-  /** 妊娠流产体力危险线: 体力跌破此百分比即发生流产 (20.0%) */
-  agentMiscarriageStaminaThreshold: 20.0,
-  /** 流产后休养冷却时长 (秒，期间禁止再次受孕，450 秒休养) */
-  agentMiscarriageCooldown: 450.0,
-  /** 流产警告警报留存显示时长 (秒) */
-  agentMiscarriageAlertDuration: 5.0,
-  /** 受孕门槛: 女性饱食度最低要求 (≥80% = 40.0 单位) */
-  agentConceptionHungerMin: 40.0,
-  /** 受孕门槛: 女性水分值最低要求 (≥80% = 40.0 单位) */
-  agentConceptionThirstMin: 40.0,
-  /** 受孕门槛: 女性体力值最低要求 (≥80.0%) */
-  agentConceptionStaminaMin: 80.0,
-  /** 随身行囊单品类独立容量上限 (水/粮/木/石 各 50.0 单位，互不共享) */
-  carryCapacityResource: 50.0,
-  /** 单趟淘金黄金满载运载量 (黄金随身无限容量，但达到 20.0 触发返家入库) */
-  agentGoldLoadFull: 20.0,
-  /** 荒野越野无路行走的移速衰减系数 (50%) */
-  agentOffroadSpeedFactor: 0.50,
-  /** 基础公路移速相对于默认基准的倍率 (4.0x) */
-  agentBaseMoveSpeedMult: 4.0,
-  /** 💪 力量禀赋对步行速度的加成系数: 力量每偏离基准均值 ±100 点，移速相应增减该比例 */
-  agentStrengthSpeedBonus: 0.40,
-  /** 💪 力量移速加成下限倍率 (力量极低者步履蹒跚，最低降至基准速度的 70%) */
-  agentStrengthSpeedMin: 0.70,
-  /** 💪 力量移速加成上限倍率 (力量极高者健步如飞，最高提升至基准速度的 130%) */
-  agentStrengthSpeedMax: 1.30,
-  /** 隐秘特工小人的能见度可见度系数 (0.25) */
-  agentStealthVisibilityCovert: 0.25,
-  /** 普通部落民的能见度可见度系数 (1.0) */
-  agentStealthVisibilityNormal: 1.0,
+  agentHungerCapacity: 50.0,       // 饱食度容量上限
+  agentThirstCapacity: 50.0,       // 水分容量上限
+  agentInitialHunger: 25.0,       // 始祖/新生儿初始饱食度
+  agentInitialThirst: 25.0,       // 始祖/新生儿初始水分
+  agentInitialStamina: 95.0,      // 始祖初始体力
+  agentBaseMetabolismDecay: 0.10, // 基础代谢消耗速率 (饱食/水分 每秒)
+  agentHealthDecayPerSec: 0.01,   // 濒死健康衰减速率 (每秒)
+  agentPregnantMetabolismMult: 1.25, // 孕期代谢消耗倍率
+  agentWorkMetabolismMult: 1.0,   // 劳作代谢消耗倍率
+  agentDeathDecayDuration: 12.0,  // 生命耗尽后彻底消亡的衰减时长 (秒)
+  agentAdultAge: 1800.0,          // 成年年龄阈值 (模拟秒，= 60 分钟)
+  agentPregnancyDuration: 900.0,  // 妊娠期时长 (模拟秒，= 30 分钟)
+  agentMiscarriageThreshold: 10.0,// 饥渴任一低于此值即触发流产风险
+  agentMiscarriageStaminaThreshold: 20.0, // 体力低于此值即触发流产风险
+  agentMiscarriageCooldown: 450.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
+  agentMiscarriageAlertDuration: 5.0, // 流产告警存续时长 (秒)
+  agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
+  agentConceptionThirstMin: 40.0, // 受孕所需最低水分
+  agentConceptionStaminaMin: 80.0,// 受孕所需最低体力
+  carryCapacityResource: 50.0,    // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
+  agentGoldLoadFull: 20.0,        // 单趟淘金运满入库量
+  agentOffroadSpeedFactor: 0.50,  // 越野 (无路) 移速衰减系数
+  agentBaseMoveSpeedMult: 4.0,    // 基础移动速度倍率
+  agentStrengthSpeedBonus: 0.40,  // 力量禀赋对移速的加成系数 (每 ±100 点)
+  agentStrengthSpeedMin: 0.70,    // 力量移速加成下限倍率
+  agentStrengthSpeedMax: 1.30,    // 力量移速加成上限倍率
+  agentStaminaCapacity: 100.0,    // 体力值上限 (%)
+  agentStealthVisibilityCovert: 0.25, // 隐秘特工可见度
+  agentStealthVisibilityNormal: 1.0,  // 普通族人可见度
+  agentRestStaminaRecoveryRate: 8.0,  // 营地/家宅休息时基础体力恢复速率 (每秒，乘睡眠效率)
+  agentConstructStaminaBurn: 3.5, // 营建/升级房屋体力消耗速率 (每秒)
+  agentRepairStaminaBurn: 2.5,    // 修缮房屋体力消耗速率 (每秒)
+  agentGatherStaminaBurn: 2.0,    // 伐木/采石/淘金体力消耗速率 (每秒)
+  agentLaborStaminaFloor: 5.0,    // 劳作体力消耗后的最低保留体力下限
+  agentDigestionRatioMin: 0.2,    // 消化效率影响代谢的系数下限
+  agentDigestionRatioMax: 5.0,    // 消化效率影响代谢的系数上限
+  agentSelfSatisfiedThreshold: 49.9, // 自饮自食「已满足」判定阈值 (≥ 视为饱腹/解渴)
+  agentNewbornHunger: 25.0,       // 新生儿初始饱食度
+  agentNewbornThirst: 25.0,       // 新生儿初始水分
+  agentNewbornStamina: 100.0,     // 新生儿初始体力 (%)
+  agentSpawnCount: 20,             // 每局播撒的初始始祖族人数量
+  agentCovertEveryN: 4,            // 每第 N 名始祖设为隐秘特工 (i % N == 0)
+  agentSpawnJitter: 10.0,          // 始祖初始属性随机抖动幅度 (±)
+  agentSpawnHungerBase: 25.0,      // 始祖初始饱食抖动基线
+  agentSpawnHungerClampMin: 10.0,  // 始祖初始饱食夹取下限
+  agentSpawnHungerClampMax: 45.0,  // 始祖初始饱食夹取上限
+  agentSpawnStaminaBase: 90.0,     // 始祖初始体力抖动基线
+  agentSpawnStaminaClampMin: 55.0, // 始祖初始体力夹取下限
+  agentSpawnStaminaClampMax: 100.0,// 始祖初始体力夹取上限
+  agentSpawnBaseSpeed: 8.5,        // 始祖/新生儿基础最大移动速度
+  agentSpawnSpeedRing: 3.0,        // 始祖最大移速按序号离散的环形步长 (i % N)
 
   // ==========================================================================
   // 3. 先天禀赋与遗传演化 (Genetics & Inherited Traits)
   // ==========================================================================
-  /** 始祖代先天禀赋均值 (智力/力量/魅力/消化/睡眠/寿命) */
-  traitDefaultMean: 100.0,
-  /** 始祖代先天禀赋正态分布标准差 (N(100, 20)，95% 族人落在 60~140) */
-  traitInitialStdDev: 20.0,
-  /** 后代继承变异扰动范围 (父母均值 ±10.0 × 线性随机数) */
-  traitMutationDelta: 10.0,
+  traitDefaultMean: 100.0,        // 禀赋基准均值
+  traitInitialStdDev: 20.0,       // 始祖禀赋初始标准差
+  traitMutationDelta: 10.0,       // 遗传突变偏移量
+  traitInheritClampMin: 10.0,     // 遗传继承单项禀赋夹取下限
+  traitInheritClampMax: 190.0,    // 遗传继承单项禀赋夹取上限
 
   // ==========================================================================
   // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
   // ==========================================================================
-  /** POI 地标空间排斥最小间距 (米) */
-  poiMinDistance: 70.0,
-  /** 全图避风营地数量 (处) */
-  countCamps: 5,
-  /** 全图清泉水源数量 (处) */
-  countWaterSources: 6,
-  /** 全图浆果灌木数量 (处) */
-  countBerryBushes: 6,
-  /** 全图林木林地数量 (处) */
-  countWoods: 3,
-  /** 全图嶙峋石矿数量 (处) */
-  countStoneMines: 2,
-  /** 全图璀璨金矿数量 (处) */
-  countGoldMines: 1,
-  /** 清泉水源最大可用储量上限 (单位) */
-  stockMaxWater: 100.0,
-  /** 浆果灌木最大可用储量上限 (单位) */
-  stockMaxBerry: 100.0,
-  /** 森林木材最大可用储量上限 (单位) */
-  stockMaxWood: 100.0,
-  /** 石矿石料最大可用储量上限 (单位) */
-  stockMaxStone: 100.0,
-  /** 金矿黄金最大可用储量上限 (单位) */
-  stockMaxGold: 100.0,
-  /** 清泉水源自然基准产出速率 (单位/秒) */
-  regenBaseWater: 2.0,
-  /** 浆果灌木自然基准生长速率 (单位/秒) */
-  regenBaseBerry: 2.0,
-  /** 林木成材自然基准生成速率 (单位/秒) */
-  regenBaseWood: 2.0,
-  /** 石矿矿脉自然基准沉积速率 (单位/秒) */
-  regenBaseStone: 2.0,
-  /** 金矿黄金自然基准淘洗速率 (单位/秒) */
-  regenBaseGold: 1.8,
-  /** 水/果/木/石现场采收与行囊装载速率 (单位/秒) */
-  poiInteractionRateResource: 10.0,
-  /** 金矿现场淘洗与装载速率 (单位/秒) */
-  poiInteractionRateGold: 5.0,
-  /** 营地/家宅休息时的体力恢复基础速率 (%/秒) */
-  campRestStaminaRecoveryRate: 20.0,
-  /** 随身物资回家卸货存入家宅仓库速率 (单位/秒) */
-  poiUnloadRateResource: 10.0,
-  /** 黄金回家卸货存入家宅金库速率 (单位/秒) */
-  poiUnloadRateGold: 5.0,
+  poiMinDistance: 70.0,           // POI 间最小排斥间距 (m)
+  countCamps: 5,                  // 营地数量
+  countWaterSources: 6,           // 清泉数量
+  countBerryBushes: 6,            // 浆果数量
+  countWoods: 3,                  // 林木数量
+  countStoneMines: 2,             // 石矿数量
+  countGoldMines: 1,              // 金矿数量
+  stockMaxWater: 100.0,           // 清泉储量上限
+  stockMaxBerry: 100.0,           // 浆果储量上限
+  stockMaxWood: 100.0,            // 林木储量上限
+  stockMaxStone: 100.0,           // 石矿储量上限
+  stockMaxGold: 100.0,            // 金矿储量上限
+  regenBaseWater: 2.0,            // 清泉基础再生速率 (单位/秒)
+  regenBaseBerry: 2.0,            // 浆果基础再生速率
+  regenBaseWood: 2.0,             // 林木基础再生速率
+  regenBaseStone: 2.0,            // 石矿基础再生速率
+  regenBaseGold: 1.8,             // 金矿基础再生速率
+  poiInteractionRateResource: 10.0, // 资源 POI 现场采收速率 (单位/秒)
+  poiInteractionRateGold: 5.0,    // 金矿现场采收速率 (单位/秒)
+  poiUnloadRateResource: 10.0,    // 资源入库卸货速率 (单位/秒)
+  poiUnloadRateGold: 5.0,         // 黄金入库卸货速率 (单位/秒)
+  poiSpawnRadiusCamp: 0.70,       // 营地撒点半径占半图比例
+  poiSpawnRadiusResource: 0.80,   // 资源 POI 撒点半径占半图比例
+  poiSpawnFallbackRatio: 0.6,     // 紧密撒点回退最小间距比例 (min_distance × N)
+  countTerrainTransitionNodes: 17,// 地形过渡节点数量 (路网骨架)
+  poiSpawnSpreadRatio: 0.85,      // 地形过渡节点散布范围占半图比例
+  roadConnectNearDist: 175.0,     // 路网直连近距阈值 (≤ 双向铺装)
+  roadConnectFarDist: 320.0,      // 路网直连远距阈值 (≤ 单向泥径)
+  roadGradePaveThreshold: 8.0,    // 坡度铺装阈值 (高差超过则盘山道，否则泥径)
+  poiInteractionRadius: 22.0,     // 采收现场「已抵达 POI」判定半径 (m)
+  campHomeConsumeRate: 3.0,       // 营地/家宅休息自饮自食消耗速率 (单位/秒)
 
   // ==========================================================================
   // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
   // ==========================================================================
-  /** 启动寻路门槛: POI 储量低于此比例时排除在候选池外，绝不前往 (≥30%) */
-  decisionPoiSeekMinStockRatio: 0.30,
-  /** 中途放弃熔断门槛: 赶路途中目标 POI 储量跌破此比例时立即掉头放弃 (<10%) */
-  decisionPoiAbandonStockRatio: 0.10,
-  /** 生理口渴告急门槛: 水分值低于此值触发饮水需求 (25.0 单位) */
-  decisionCriticalThirst: 25.0,
-  /** 生理饥饿告急门槛: 饱食度低于此值触发觅食需求 (25.0 单位) */
-  decisionCriticalHunger: 25.0,
-  /** 外出作业体力门槛: 体力低于此百分比不再外出作业，立即归巢休整 (50.0%) */
-  decisionWorkStaminaThreshold: 50.0,
-  /** 归巢休整目标: 一旦开始休息，必须充盈至此百分比方可解除休息 (100.0%) */
-  decisionRestStaminaTarget: 100.0,
-  /** 采金备料冷却时长 (秒，为3级庄舍升级大庄园备料) */
-  decisionStockGoldCooldown: 45.0,
-  /** 娱乐性淘金冷却时长 (秒，4级大庄园竣工后的自我实现娱乐) */
-  decisionGoldWealthCooldown: 180.0,
-  /** 房屋修缮需求门槛: 耐久度跌破此百分比产生修缮意愿 (50.0%) */
-  decisionHouseRepairNeedThreshold: 50.0,
-  /** 自立门户饥渴门槛: 无家成年男性饥渴 ≥ 此值且体力 ≥ 阈值时必然触发立宅 (20.0) */
-  decisionFoundHomeHungerMin: 20.0,
-  /** 自立门户口渴门槛: 同上 (20.0) */
-  decisionFoundHomeThirstMin: 20.0,
-  /** 自立门户体力门槛: 同上 (60.0%) */
-  decisionFoundHomeStaminaMin: 60.0,
-  /** 立宅候选点数量: 自主选址时在自身周围掷出的候选点数 (12) */
-  decisionFoundHomeCandidates: 12,
-  /** 立宅候选点最小距离 */
-  decisionFoundHomeDistMin: 24.0,
-  /** 立宅候选点最大距离 */
-  decisionFoundHomeDistMax: 80.0,
+  decisionPoiSeekMinStockRatio: 0.30, // POI 私有施密特触发器开启阈值 (库存 ≥ 此比例)
+  decisionPoiAbandonStockRatio: 0.10,// POI 私有施密特触发器关闭阈值 (库存 < 此比例)
+  decisionCriticalThirst: 25.0,   // 临界口渴阈值 (触发寻水)
+  decisionCriticalHunger: 25.0,   // 临界饥饿阈值 (触发觅食)
+  decisionRestStaminaTarget: 100.0, // 休息目标体力
+  decisionStockGoldCooldown: 45.0,// 盖房备料淘金冷却 (秒)
+  decisionGoldWealthCooldown: 180.0, // 4 级庄园竣工前娱乐淘金冷却 (秒)
+  decisionHouseRepairNeedThreshold: 50.0, // 房屋耐久低于此值触发修缮需求
+  decisionFoundHomeHungerMin: 20.0, // 立宅所需最低饱食度
+  decisionFoundHomeThirstMin: 20.0, // 立宅所需最低水分
+  decisionFoundHomeStaminaMin: 60.0, // 立宅所需最低体力
+  decisionFoundHomeCandidates: 12, // 立宅候选点数量
+  decisionFoundHomeDistMin: 24.0, // 立宅候选点与现有房屋的硬间距下限 (m)
+  decisionFoundHomeDistMax: 80.0, // 立宅候选点与营地的软间距上限 (m)
+  decisionWorkStaminaThreshold: 50.0, // 劳作所需最低体力 (低于则返家休息)
 
   // ==========================================================================
   // 6. 私宅营造、代际传承与升级 (Housing System)
   // ==========================================================================
-  /** 房屋耐久度满值 (100.0) */
-  houseDurabilityMax: 100.0,
-  /** 房屋自然风化折旧速率 (耐久度/秒) */
-  houseDepreciationRate: 0.02,
-  /** 房屋安排修缮开工门槛: 耐久度跌破此百分比安排户主/配偶修缮 (80.0%) */
-  houseRepairTriggerThreshold: 80.0,
-  /** 房屋修缮劳作回血速率 (耐久度/秒) */
-  houseRepairSpeed: 5.0,
-  /** 0级仓库升1级茅草房所需建造工时 (秒) */
-  houseBuildTimeTier0To1: 30.0,
-  /** 1级茅草房升2级私宅所需建造工时 (秒) */
-  houseBuildTimeTier1To2: 45.0,
-  /** 2级私宅升3级庄舍所需建造工时 (秒) */
-  houseBuildTimeTier2To3: 60.0,
-  /** 3级庄舍升4级大庄园所需建造工时 (秒) */
-  houseBuildTimeTier3To4: 90.0,
-  /** 0级仓库分品类仓储上限 (各 20.0 单位) */
-  houseCapacityTier0: 20.0,
-  /** 1级茅草房分品类仓储上限 (各 40.0 单位) */
-  houseCapacityTier1: 40.0,
-  /** 2级私宅分品类仓储上限 (各 80.0 单位) */
-  houseCapacityTier2: 80.0,
-  /** 3级庄舍分品类仓储上限 (各 120.0 单位) */
-  houseCapacityTier3: 120.0,
-  /** 4级大庄园分品类仓储上限 (各 160.0 单位) */
-  houseCapacityTier4: 160.0,
-  /** 0级仓库升级水粮储备比例要求 (各 90%) */
-  houseUpgradeTier0WaterRatio: 0.90,
-  houseUpgradeTier0FoodRatio: 0.90,
-  /** 1级茅草房升级木材储备比例要求 (85%) */
-  houseUpgradeTier1WoodRatio: 0.85,
-  /** 1级茅草房升级水粮保底储备比例要求 (50%) */
-  houseUpgradeTier1FoodWaterRatio: 0.50,
-  /** 2级私宅升级石料储备比例要求 (85%) */
-  houseUpgradeTier2StoneRatio: 0.85,
-  /** 2级私宅升级水粮木保底储备比例要求 (50%) */
-  houseUpgradeTier2OtherRatio: 0.50,
-  /** 3级庄舍升级黄金与石料储备比例要求 (各 85%) */
-  houseUpgradeTier3GoldStoneRatio: 0.85,
-  /** 3级庄舍升级水粮木保底储备比例要求 (50%) */
-  houseUpgradeTier3OtherRatio: 0.50,
-  /** 房屋激活生育支持所需物资比例 (水粮木均 ≥ 50%) */
-  houseFertilityStockRatio: 0.50,
-  /** 冬季房屋取暖木材燃烧速率 (单位/秒) */
-  houseWinterWoodBurnRate: 0.12,
-  /** 低温触发取暖气温阈值 (°C) */
-  houseWinterColdTemp: 5.0,
-  /** 立宅最小房屋间距: 新宅与现有房屋的水平距离须 ≥ 此值 */
-  houseMinSpacing: 20.0,
-  /** 空置节点复用检索半径: 候选宅址此半径内若有空置路网节点(废墟遗留孤儿门/无主路口)则直接复用，不再新建节点 */
-  houseNodeReuseRadius: 20.0,
+  houseDurabilityMax: 100.0,      // 房屋耐久上限
+  houseDepreciationRate: 0.02,    // 房屋耐久自然折旧速率 (每秒)
+  houseRepairTriggerThreshold: 80.0, // 耐久低于此值允许修缮
+  houseRepairSpeed: 5.0,          // 修缮进度速率 (每秒)
+  houseBuildTimeTier0To1: 30.0,   // 0→1 级建造时长 (秒)
+  houseBuildTimeTier1To2: 45.0,   // 1→2 级建造时长
+  houseBuildTimeTier2To3: 60.0,   // 2→3 级建造时长
+  houseBuildTimeTier3To4: 90.0,   // 3→4 级建造时长
+  houseCapacityTier0: 20.0,       // 0 级仓库仓储容量
+  houseCapacityTier1: 40.0,       // 1 级茅草房仓储容量
+  houseCapacityTier2: 80.0,       // 2 级半棚屋仓储容量
+  houseCapacityTier3: 120.0,      // 3 级木石庄舍仓储容量
+  houseCapacityTier4: 160.0,      // 4 级大庄园仓储容量
+  houseUpgradeTier0WaterRatio: 0.90, // 0 级升级所需水占比
+  houseUpgradeTier0FoodRatio: 0.90,  // 0 级升级所需粮占比
+  houseUpgradeTier1WoodRatio: 0.85,  // 1 级升级所需木占比
+  houseUpgradeTier1FoodWaterRatio: 0.50, // 1 级升级所需水粮占比
+  houseUpgradeTier2StoneRatio: 0.85, // 2 级升级所需石占比
+  houseUpgradeTier2OtherRatio: 0.50, // 2 级升级所需水粮木占比
+  houseUpgradeTier3GoldStoneRatio: 0.85, // 3 级升级所需金石占比
+  houseUpgradeTier3OtherRatio: 0.50, // 3 级升级所需水粮木占比
+  houseFertilityStockRatio: 0.50, // 户主受孕所需仓储充裕比例
+  houseWinterWoodBurnRate: 0.12,  // 冬季供暖木材消耗速率 (每秒)
+  houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
+  houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)
+  houseNodeReuseRadius: 20.0,     // 立宅优先复用空置路网节点检索半径 (m)
+  houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
   // ==========================================================================
   // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)
   // ==========================================================================
-  /** 完整年轮周期时长 (秒，240 秒一年，单季固定为 1/4 年) */
-  seasonYearLength: 240.0,
-  /** 年均气温基准中值 (°C) */
-  tempBaseMid: 14.0,
-  /** 季节气温波动正弦振幅 (°C，-3°C ~ 31°C) */
-  tempAmplitude: 17.0,
+  seasonYearLength: 240.0,        // 一年 (四季) 总时长 (模拟秒)
+  tempBaseMid: 14.0,              // 年均基准温度 (℃)
+  tempAmplitude: 17.0,            // 季节温度振幅 (℃)
 
   // ==========================================================================
   // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
   // ==========================================================================
-  /** 道路自然杂草丛生踩踏衰减速率 (等级/秒): 已翻倍加速退化，人迹罕至的荒径更快被植被吞没 */
-  roadWearDecayRate: 0.0010,
-  /** 族人单次通行踩踏增量 (等级/次) */
-  roadWearStepInc: 0.005,
-  /** 踩踏道路最高等级上限 (5.0) */
-  roadMaxWear: 5.0,
-  /** 泥泞小径基准限速 (m/s) */
-  roadSpeedDirtTrack: 36.0,
-  /** 碎石盘山道基准限速 (m/s) */
-  roadSpeedCobblestone: 44.0,
-  /** 沥青主干道基准限速 (m/s) */
-  roadSpeedAsphaltUrban: 60.0,
-  /** 悬空高架快速路基准限速 (m/s) */
-  roadSpeedSkywayElevated: 96.0,
-  /** 走私暗道基准限速 (m/s) */
-  roadSpeedSmugglerTrail: 40.0,
+  roadWearDecayRate: 0.0010,      // 道路自然杂草衰减速率 (等级/秒)
+  roadWearStepInc: 0.05,          // 族人单次通行踩踏增量 (等级/次)
+  roadMaxWear: 5.0,               // 道路磨损上限
+  roadSpeedDirtTrack: 36.0,       // 泥泞小径限速
+  roadSpeedCobblestone: 44.0,     // 碎石盘山道限速
+  roadSpeedAsphaltUrban: 60.0,    // 城镇大道限速
+  roadSpeedSkywayElevated: 96.0,  // 高架飞索限速
+  roadSpeedSmugglerTrail: 40.0,   // 私贩密径限速
+  roadLevelFactorBase: 0.50,      // 道路等级影响移速基准系数 (等级 0)
+  roadLevelFactorWearCoef: 0.333, // 道路等级影响移速磨损系数
+  roadLevelFactorMin: 0.50,       // 道路等级移速乘子下限
+  roadLevelFactorMax: 2.20,       // 道路等级移速乘子上限
+  roadOffroadWearThreshold: 0.6,  // 越野判定阈值 (磨损低于此值视为荒野)
+
+  // ==========================================================================
+  // 9. 动力学移动与寻路权重 (Movement & Pathfinding)
+  // ==========================================================================
+  agentMoveStaminaBase: 0.6,      // 移动基础体力消耗 (每秒)
+  agentMoveStaminaPregnant: 0.3,  // 孕期额外移动体力消耗 (每秒)
+  agentMoveStaminaGradeCoef: 3.5, // 坡度对移动体力消耗加成系数
+  agentStaminaFactorRef: 25.0,    // 体力影响移速参考基准
+  agentStaminaFactorMin: 0.2,     // 体力移速乘子下限
+  agentStaminaFactorMax: 1.0,     // 体力移速乘子上限
+  agentMoveAccelCoef: 4.0,        // 移动加速度收敛系数
+  roadAstarGradePenaltyCoef: 1.5, // A* 坡度通行代价惩罚系数
+  roadAstarHeuristicDivisor: 80.0,// A* 启发式距离除数
+  roadHiddenPreferModifier: 0.4,  // A* 偏好隐秘时隐秘道路代价乘子
+  roadVisiblePreferModifier: 1.2, // A* 偏好隐秘时公开道路代价乘子
+  roadHiddenAvoidModifier: 2.5,   // A* 非偏好隐秘时隐秘道路代价乘子
+  roadVisibleAvoidModifier: 1.0,  // A* 非偏好隐秘时公开道路代价乘子
 };

@@ -1,4 +1,3 @@
-use crate::config::HOUSE_NODE_POI_OCCUPY_RADIUS;
 use crate::spatial::graph::{NodeId, NodeType, RoadClass};
 use crate::spatial::house::{House, HouseTier};
 use crate::spatial::poi::PoiType;
@@ -21,7 +20,7 @@ impl World3DEngine {
         if self.houses.iter().any(|h| h.door_node_id == node_id) {
             return false;
         }
-        !self.pois.iter().any(|p| p.pos.distance_to(&node_pos) < HOUSE_NODE_POI_OCCUPY_RADIUS)
+        !self.pois.iter().any(|p| p.pos.distance_to(&node_pos) < self.config.house_node_poi_occupy_radius)
     }
 
     /// 在候选宅址的合法半径内检索最近的空置节点。返回值已同时通过房屋最小间距校验；
@@ -62,8 +61,8 @@ impl World3DEngine {
             a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0))
         });
         for &(near_id, _) in sorted_nearby_nodes.iter().take(count) {
-            let _ = self.network.add_lane_with_options(node_id, near_id, None, RoadClass::DirtTrack, false, 1.0);
-            let _ = self.network.add_lane_with_options(near_id, node_id, None, RoadClass::DirtTrack, false, 1.0);
+            let _ = self.network.add_lane_with_options(node_id, near_id, None, RoadClass::DirtTrack, false, 1.0, &self.config);
+            let _ = self.network.add_lane_with_options(near_id, node_id, None, RoadClass::DirtTrack, false, 1.0, &self.config);
         }
     }
 

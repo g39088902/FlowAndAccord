@@ -293,7 +293,7 @@ impl Agent3D {
             metabolic_multiplier *= config.agent_work_metabolism_mult; // 营建、修缮与采矿劳动代谢加速
         }
 
-        let dig_ratio = (self.digestion_efficiency / 100.0).clamp(0.2, 5.0);
+        let dig_ratio = (self.digestion_efficiency / 100.0).clamp(config.agent_digestion_ratio_min, config.agent_digestion_ratio_max);
         let hunger_decay_per_sec = (config.agent_base_metabolism_decay * metabolic_multiplier) / dig_ratio;
         let thirst_decay_per_sec = config.agent_base_metabolism_decay * metabolic_multiplier;
         self.hunger = (self.hunger - hunger_decay_per_sec * dt).max(0.0);
@@ -366,14 +366,14 @@ impl Agent3D {
 
         // 休息、筑屋与修缮体力结算
         if self.state == PrimitiveActionState::RestingAtCamp {
-            let recovery_rate = 8.0 * (self.sleep_efficiency / 100.0);
-            self.stamina = (self.stamina + recovery_rate * dt).min(100.0);
+            let recovery_rate = config.agent_rest_stamina_recovery_rate * (self.sleep_efficiency / 100.0);
+            self.stamina = (self.stamina + recovery_rate * dt).min(config.agent_stamina_capacity);
         } else if self.state == PrimitiveActionState::ConstructingHouse {
-            self.stamina = (self.stamina - 3.5 * dt).max(5.0);
+            self.stamina = (self.stamina - config.agent_construct_stamina_burn * dt).max(config.agent_labor_stamina_floor);
         } else if self.state == PrimitiveActionState::RepairingHouse {
-            self.stamina = (self.stamina - 2.5 * dt).max(5.0);
+            self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt).max(config.agent_labor_stamina_floor);
         } else if self.state == PrimitiveActionState::GatheringWood || self.state == PrimitiveActionState::MiningStone {
-            self.stamina = (self.stamina - 2.0 * dt).max(5.0);
+            self.stamina = (self.stamina - config.agent_gather_stamina_burn * dt).max(config.agent_labor_stamina_floor);
         }
 
         event_msg
@@ -416,16 +416,16 @@ impl Agent3D {
         let lane = &road_network.graph[edge_idx];
         let wear = lane.wear;
 
-        let road_level_factor = (0.50 + 0.333 * wear).clamp(0.50, 2.20);
-        self.is_traveling_offroad = wear < 0.6;
+        let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
+        self.is_traveling_offroad = wear < config.road_offroad_wear_threshold;
 
         // 坡度体力能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
         let uphill_penalty = if delta_z > 0.0 { (delta_z / lane.curve.length).max(0.0) } else { 0.0 };
-        let stamina_burn = (0.6 + if self.is_pregnant { 0.3 } else { 0.0 }) * (1.0 + uphill_penalty * 3.5);
+        let stamina_burn = (config.agent_move_stamina_base + if self.is_pregnant { config.agent_move_stamina_pregnant } else { 0.0 }) * (1.0 + uphill_penalty * config.agent_move_stamina_grade_coef);
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
-        let stamina_factor = (self.stamina / 25.0).clamp(0.2, 1.0);
+        let stamina_factor = (self.stamina / config.agent_stamina_factor_ref).clamp(config.agent_stamina_factor_min, config.agent_stamina_factor_max);
         // 💪 力量禀赋加成: 以禀赋基准均值为中轴，力量越高者步履越矫健，越低者步履蹒跚 (上下限保护避免极端个体失衡)
         let strength_factor = (1.0
             + (self.strength - config.trait_default_mean) / config.trait_default_mean
@@ -433,7 +433,7 @@ impl Agent3D {
             .clamp(config.agent_strength_speed_min, config.agent_strength_speed_max);
         let target_speed = self.max_desired_speed * road_level_factor * stamina_factor * strength_factor;
 
-        let accel = (target_speed - self.current_velocity) * 4.0;
+        let accel = (target_speed - self.current_velocity) * config.agent_move_accel_coef;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);
         self.distance_along_curve += self.current_velocity * dt;
 
@@ -441,7 +441,7 @@ impl Agent3D {
             // 踩踏拓路
             {
                 let edge = &mut road_network.graph[edge_idx];
-                let new_wear = (edge.wear + 0.05).min(5.0);
+                let new_wear = (edge.wear + config.road_wear_step_inc).min(config.road_max_wear);
                 edge.wear = new_wear;
                 if let Some(rev_idx) = rev_edge_idx {
                     road_network.graph[rev_idx].wear = new_wear;

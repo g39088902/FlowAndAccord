@@ -13,7 +13,7 @@ impl<'a> Decisioner<'a> {
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.pantry_water >= h.max_pantry_water)
             .unwrap_or(true);
-        let self_satisfied = agent.thirst >= 49.9;
+        let self_satisfied = agent.thirst >= self.config.agent_self_satisfied_threshold;
         let carry_full = can_stock && agent.carried_water >= self.config.carry_capacity_resource;
         let unavailable = self.is_target_poi_unavailable(agent, PoiType::WaterSource);
 
@@ -49,7 +49,7 @@ impl<'a> Decisioner<'a> {
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.pantry_food >= h.max_pantry_food)
             .unwrap_or(true);
-        let self_satisfied = agent.hunger >= 49.9;
+        let self_satisfied = agent.hunger >= self.config.agent_self_satisfied_threshold;
         let carry_full = can_stock && agent.carried_food >= self.config.carry_capacity_resource;
         let unavailable = self.is_target_poi_unavailable(agent, PoiType::BerryBush);
 

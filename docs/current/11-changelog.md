@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.62)**。
+> 本文件汇集各版本的核心机制改动。**按版本号正序排列，最新版本见文末 (v0.9.63)**。
 
 ---
 
@@ -151,3 +151,11 @@
   - **焦点暗红卡片突出**：`.dag-node.focus`（standalone 内联 + 页内 `style.css`）由蓝色边框/底（#38bdf8 / rgba(14,30,56)）改为深红边框 `#ef4444` + 暗红底 `rgba(48,14,18)` + 红色光晕 `rgba(239,68,68,0.55)`，z-index 仍最高；节点 JS 逻辑仍给焦点加 `focus` class 不变，仅样式变暗红，确保一眼可辨。
   - **祖先节点卡片保留金边**（`.dag-node.ancestor` 边框/底色未动）以区分代际，与"边线不用金色"的诉求互不冲突；SVG 中 `arrow-ancestor` / `inpage-arrow-ancestor` 的 `<defs>` 定义保留但已不再被任何边引用（无害）。
   - 纯前端改动（`frontend/js/dag.js` + `frontend/style.css`），未触碰 WASM 产物；版本号自增 v0.9.61 → v0.9.62。
+- **🔧 全量消除 magic number，超参收口 config.js + 配置校验/速查表工具 (v0.9.63)**：
+  - **目标**：消除 Rust 逻辑层、注释与文档中散落的硬编码字面量，把所有可调超参统一收口到 `frontend/js/config.js`（经 `SimConfig` 热更新注入内核），并降低用户调参与检索参数的难度。
+  - **逻辑层字面量收口**：审计 `crates/sim_core/src/spatial/**` 全部 `.rs`，将 `agent.rs`/`ecology.rs`/`graph.rs`/`birth.rs`/`poi.rs`/`decisions/harvest.rs`/`housing_system/settlement.rs` 中的代谢/劳作体力消耗、移动与越野系数、道路等级移速乘子、A* 寻路权重与启发式、POI 撒点/路网接入阈值、始祖生成属性抖动、遗传夹取、自满足阈值、营地自饮自食速率等全部改为 `self.config.<字段>` 引用；道路限速常量（`roadSpeed*`）改为随 `SimConfig` 生效（新增 `add_lane`/`find_path_3d_with_preference` 的 `&SimConfig` 入参，将限速、等级乘子、隐秘偏好等彻底打通为可热配）。
+  - **字段漂移完全打通对齐**：补齐此前缺失字段（`houseNodePoiOccupyRadius`、`houseNodeReuseRadius`、`agentStaminaCapacity` 等），删除孤儿字段（前端 `campRestStaminaRecoveryRate` 与实际逻辑 `agentRestStaminaRecoveryRate` 不对应，已并入后者），并统一前后端不一致数值——`decisionFoundHomeDistMin` 24、`decisionFoundHomeDistMax` 80、`houseMinSpacing` 20、`roadWearStepInc` 0.05（修正此前 const 0.005 与逻辑 0.05 的静默分歧）。`SimConfig` 字段由约 110 扩至 **161** 个，覆盖全仿真动力学。
+  - **POI 兜底默认值命名化**：`poi.rs::new_with_name` 中 60.0/45.0/2.00/1.50/1.20 等兜底字面量抽取为 `POI_FALLBACK_*` 命名常量（实际仿真由 `seed_primitive_ecology` 以 `config.stock_max_*/regen_base_*` 覆盖），注释同步指向 config 字段。
+  - **配置校验/速查表小工具**：新增 `tools/config-check.js`（零依赖纯 Node），交叉解析 `config.js` 与 `config.rs`，校验「孤儿字段 / 缺失字段 / 类型错配 / 数值漂移」四类问题并退出码报错；同时自动生成 `docs/config-reference.md`——按分区罗列每个字段的 camelCase 名、类型、默认值与中文说明，作为用户调参的唯一检索入口。`config.js` 每个字段均补中文行内注释，刷新浏览器即生效，无需重编译。
+  - **文档同步**：`AGENTS.md` §4 各阈值（POI 施密特 0.30/0.10、时间基准 1/30、行囊容量 50、POI 数量与间距 70m、供暖 5℃/0.12、立宅门槛 20/60/12/24m 等）改为引用 `config.<字段>`；版本号自增 v0.9.62 → v0.9.63（含 `index.html` 徽章与本文末指针）。
+  - **验证**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release` 通过；`node tools/config-check.js` 输出「字段集、类型、默认值完全一致，无漂移」；`node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（同种子逐字节确定性、坐标防越界、数值防 NaN 全部通过）。RNG 消费顺序未变，行为默认等价。
