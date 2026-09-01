@@ -1,7 +1,7 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.0.1（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v1.0.2（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（153 个）统一由 `frontend/js/config.js` 驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
@@ -51,11 +51,12 @@
 | 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、父系代际继承 |
 | 6 | 🧠 马斯洛需求层次与行动状态机 (Motivation AI) | [06-motivation-ai.md](./current/06-motivation-ai.md) | 5 层需求、私有触发器、连续采收与平滑重路由、错峰决策节拍 |
 | 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、Inspector、族谱时间轴、账本大盘、调试监视器 |
+| 7+ | 📐 UI 全景剖析、未实现设计与开发指南 | [UI_SPEC_AND_LEDGER_DESIGN.md](./UI_SPEC_AND_LEDGER_DESIGN.md) | UI 页面全景解剖、M2-M4 多标签页制度大盘设计、前端开发实施规范 |
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
 | 10 | 🚀 快速启动与体验 | [10-quickstart.md](./current/10-quickstart.md) | 浏览器 / Node 回归 / Rust 编译三种启动方式 |
 | 12 | 📒 账本与婚姻登记系统 (`ledger`) | [12-ledger-system.md](./current/12-ledger-system.md) | 团体账本内核、婚姻登记簿、家户体系、胎儿预分配 ID |
-| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.0.1 各版本核心机制改动 |
+| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.0.2 各版本核心机制改动 |
 
 ---
 

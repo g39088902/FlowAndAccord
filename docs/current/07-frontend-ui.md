@@ -1,6 +1,7 @@
 # 7. 🎨 交互式表现层与控制台 (`frontend`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`dag*.js`、`frontend/index.html`
+> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`dag*.js`、`frontend/index.html`  
+> **UI 深度解剖与未来设计指南**：详见 [docs/UI_SPEC_AND_LEDGER_DESIGN.md](../UI_SPEC_AND_LEDGER_DESIGN.md)（含当前页面全景拆解、M2-M4 多标签页制度大盘设计原型与前端开发指南）。
 
 ---
 
