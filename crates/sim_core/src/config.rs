@@ -36,6 +36,7 @@ pub const AGENT_PREGNANCY_DURATION: f32 = 900.0;
 pub const AGENT_MISCARRIAGE_THRESHOLD: f32 = 10.0;
 pub const AGENT_MISCARRIAGE_STAMINA_THRESHOLD: f32 = 20.0;
 pub const AGENT_MISCARRIAGE_COOLDOWN: f32 = 450.0; // 流产后休养冷却 (秒，期间禁止再次受孕)
+pub const AGENT_POSTPARTUM_COOLDOWN: f32 = 900.0; // 产后休养冷却 (秒，分娩后期间禁止再次受孕)
 pub const AGENT_MISCARRIAGE_ALERT_DURATION: f32 = 5.0;
 pub const AGENT_CONCEPTION_HUNGER_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_THIRST_MIN: f32 = 40.0;
@@ -329,6 +330,7 @@ pub struct SimConfig {
     pub agent_miscarriage_threshold: f32,
     pub agent_miscarriage_stamina_threshold: f32,
     pub agent_miscarriage_cooldown: f32,
+    pub agent_postpartum_cooldown: f32,
     pub agent_miscarriage_alert_duration: f32,
     pub agent_conception_hunger_min: f32,
     pub agent_conception_thirst_min: f32,
@@ -533,6 +535,7 @@ impl Default for SimConfig {
             agent_miscarriage_threshold: AGENT_MISCARRIAGE_THRESHOLD,
             agent_miscarriage_stamina_threshold: AGENT_MISCARRIAGE_STAMINA_THRESHOLD,
             agent_miscarriage_cooldown: AGENT_MISCARRIAGE_COOLDOWN,
+            agent_postpartum_cooldown: AGENT_POSTPARTUM_COOLDOWN,
             agent_miscarriage_alert_duration: AGENT_MISCARRIAGE_ALERT_DURATION,
             agent_conception_hunger_min: AGENT_CONCEPTION_HUNGER_MIN,
             agent_conception_thirst_min: AGENT_CONCEPTION_THIRST_MIN,

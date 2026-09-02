@@ -38,6 +38,7 @@ window.SIM_CONFIG = {
   agentMiscarriageThreshold: 10.0,// 饥渴任一低于此值即触发流产风险
   agentMiscarriageStaminaThreshold: 20.0, // 体力低于此值即触发流产风险
   agentMiscarriageCooldown: 450.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
+  agentPostpartumCooldown: 900.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
   agentMiscarriageAlertDuration: 5.0, // 流产告警存续时长 (秒)
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分

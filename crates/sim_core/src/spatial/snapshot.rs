@@ -132,6 +132,7 @@ pub struct AgentSnapshot {
     /// ★ M1.7 腹中胎儿标记（已获 agent 身份，但无地图实体、跳过决策/代谢/行动）
     pub is_fetus: bool,
     pub miscarriage_cooldown: f32,
+    pub postpartum_cooldown: f32,
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,

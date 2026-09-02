@@ -48,8 +48,6 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       stateText = '💀 绝嗣废墟 (快速风化中)';
     } else if (house.isRepairing) {
       stateText = `🔧 族人劳作修缮中 (${Math.round(house.durability)}%)`;
-    } else if (house.durability < 85.0) {
-      stateText = `⚠️ 建筑磨损折旧 (${Math.round(house.durability)}% 待修缮)`;
     } else {
       stateText = isWarehouse ? '🏠 起步营地' : (house.tier === 'Tier4Manor' ? '🏰 4级氏族大庄园' : '🏡 安居宅邸');
     }
@@ -693,9 +691,16 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     }
 
     const cdBox = document.getElementById('insp-cooldown-box');
-    if (selAgent.miscarriageCooldown > 0 && selAgent.isAlive && !selAgent.isPregnant) {
+    const cdPrefix = document.getElementById('insp-cooldown-prefix');
+    // ★ 冷却提示前缀随类型动态切换：正常生育显示「产后休养」，流产显示「流产调养」
+    const postpartumCd = selAgent.postpartumCooldown || 0;
+    const miscarriageCd = selAgent.miscarriageCooldown || 0;
+    if (selAgent.isAlive && !selAgent.isPregnant && (postpartumCd > 0 || miscarriageCd > 0)) {
       cdBox.style.display = 'flex';
-      document.getElementById('insp-cooldown-val').textContent = `调养剩余 ${Math.ceil(selAgent.miscarriageCooldown)}s 可受孕`;
+      const isPostpartum = postpartumCd > 0;
+      cdPrefix.textContent = isPostpartum ? '🤱 产后休养中: ' : '🥀 流产调养中: ';
+      const cd = isPostpartum ? postpartumCd : miscarriageCd;
+      document.getElementById('insp-cooldown-val').textContent = `剩余 ${Math.ceil(cd)}s 可受孕`;
     } else {
       cdBox.style.display = 'none';
     }

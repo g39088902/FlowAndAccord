@@ -51,7 +51,7 @@ World3DEngine
 | 社会制度 | `marriage_registry` / `household_registry` / `clan_registry` / `region_registry` / `public_granary` |
 | 冷却表 | `mutual_aid_cooldown` / `expedition_targets` / `relief_cooldown`（均 BTreeMap 保序） |
 
-每名 agent 的私有状态（`poi_seekability` 施密特触发器 / `family_stock_active` / `gold_mining_cooldown` / `miscarriage_cooldown_timer` / `route` 等）随 `Agent3D` 整体序列化，**无需单独处理**。
+每名 agent 的私有状态（`poi_seekability` 施密特触发器 / `family_stock_active` / `gold_mining_cooldown` / `miscarriage_cooldown_timer` / `postpartum_cooldown_timer` / `route` 等）随 `Agent3D` 整体序列化，**无需单独处理**。
 
 ### 2.2 显式排除的字段
 

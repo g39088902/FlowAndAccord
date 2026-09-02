@@ -28,6 +28,9 @@ const CORONATION_DURATION = 2000; // 登基礼花持续 2 秒
 let terrainProjX = new Float32Array(3600);
 let terrainProjY = new Float32Array(3600);
 
+// Canvas 视口尺寸（每帧在 render() 内更新；全局声明供 render_world/render_agents 等绘制函数共享）
+let w = window.innerWidth, h = window.innerHeight;
+
 // ==========================================
 // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
 // ==========================================
@@ -170,7 +173,8 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   }
 }
 
-const w = window.innerWidth, h = window.innerHeight;
+w = window.innerWidth;
+h = window.innerHeight;
 ctx.clearRect(0, 0, w, h);
   // 1. 3D 地形网格渲染
   drawTerrain();

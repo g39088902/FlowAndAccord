@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.7.1</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.8.5</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -470,7 +470,7 @@
         </div>
 
         <div class="cooldown-badge" id="insp-cooldown-box" style="display:none;">
-          <span>🥀 流产调养中: </span>
+          <span id="insp-cooldown-prefix">🥀 流产调养中: </span>
           <span id="insp-cooldown-val" style="font-weight:700;">剩余 48s 可受孕</span>
         </div>
 
@@ -561,7 +561,7 @@
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
       <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动需求判定卡调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
-      <button class="ecology-btn" id="btn-reroll-eco">🏕️ 重演生态 (20人·10男10女)</button>
+      <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
       <button class="headless-btn" id="btn-headless" title="🧠 无头模式: 只推进模拟、跳过画布渲染，适合长程快速演化">🧠 无头模式 (只运行不渲染)</button>
     </div>
     

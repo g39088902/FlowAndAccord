@@ -49,6 +49,7 @@ const IMPACT_PREFIX_RULES = [
   { prefix: 'agentConception', mod: 'agent.rs (受孕判定)' },
   { prefix: 'agentPregnan', mod: 'agent.rs (妊娠代谢)' },
   { prefix: 'agentMiscarriage', mod: 'agent.rs (流产判定)' },
+  { prefix: 'agentPostpartum', mod: 'agent.rs (产后休养冷却)' },
   { prefix: 'agentInitial', mod: 'agent.rs (初始属性)' },
   { prefix: 'agentRest', mod: 'agent.rs (休息恢复) / ecology.rs' },
   { prefix: 'agentRepair', mod: 'housing_system/maintenance.rs (修缮体力)' },

@@ -455,6 +455,7 @@
             pregnancyChildId: a.pregnancy_child_id != null ? a.pregnancy_child_id : null,
             isFetus: a.is_fetus || false,
             miscarriageCooldown: a.miscarriage_cooldown,
+            postpartumCooldown: a.postpartum_cooldown,
             miscarriageTimer: a.miscarriage_alert_timer,
             deathDecayTimer: a.death_decay_timer,
             deathCause: a.death_cause,

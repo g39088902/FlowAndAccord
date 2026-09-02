@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId};
@@ -160,6 +160,9 @@ pub struct Agent3D {
     pub ready_to_birth: bool,        // 孕期满是否准备分娩
     pub miscarriage_alert_timer: f32,// 流产警报留存显示计时器 (秒)
     pub miscarriage_cooldown_timer: f32, // 流产后不可受孕的休养冷却计时器 (秒)
+    /// ★ 产后休养冷却计时器 (秒)：分娩完成后置为 config.agent_postpartum_cooldown (900s)，期间禁止再次受孕
+    #[serde(default)]
+    pub postpartum_cooldown_timer: f32,
     pub death_decay_timer: f32,      // 死亡尸骸消逝倒计时 (秒)
     pub death_cause: Option<String>, // 死亡原因
     pub death_is_natural: bool,      // 是否自然死亡 (寿终正寝=true；饥荒/脱水等非自然死亡=false)
@@ -239,6 +242,7 @@ impl Agent3D {
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,
             miscarriage_cooldown_timer: 0.0,
+            postpartum_cooldown_timer: 0.0,
             death_decay_timer: config.agent_death_decay_duration,
             death_cause: None,
             death_is_natural: false,
@@ -308,6 +312,9 @@ impl Agent3D {
         if self.miscarriage_cooldown_timer > 0.0 {
             self.miscarriage_cooldown_timer = (self.miscarriage_cooldown_timer - dt).max(0.0);
         }
+        if self.postpartum_cooldown_timer > 0.0 {
+            self.postpartum_cooldown_timer = (self.postpartum_cooldown_timer - dt).max(0.0);
+        }
 
         if !self.is_alive {
             self.death_decay_timer = (self.death_decay_timer - dt).max(0.0);
@@ -372,7 +379,7 @@ impl Agent3D {
         }
 
         // 受孕判定：M6 去房屋化——已婚（无论是否有房）且指标达标即可受孕；执行任意任务期间均可
-        if self.gender == Gender::Female && self.spouse_id.is_some() && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+        if self.gender == Gender::Female && self.spouse_id.is_some() && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 && self.postpartum_cooldown_timer <= 0.0 {
             if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
                 self.is_pregnant = true;
                 self.pregnancy_father_id = self.spouse_id;
@@ -404,6 +411,8 @@ impl Agent3D {
                 self.is_pregnant = false;
                 self.pregnancy_progress = 0.0;
                 self.ready_to_birth = true;
+                // ★ 分娩后进入产后休养冷却：期间禁止再次受孕
+                self.postpartum_cooldown_timer = config.agent_postpartum_cooldown;
                 return Some(format!("🍼 喜讯！女性部落民 #{} 历经{:.0}秒漫长孕期，顺利产下一名健康的新生儿！", self.id, config.agent_pregnancy_duration));
             }
         }

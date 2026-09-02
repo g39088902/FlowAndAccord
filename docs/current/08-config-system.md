@@ -6,7 +6,7 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**168 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**169 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
@@ -56,7 +56,7 @@
 
 ### 参数速查表 `docs/config-reference.md`
 - 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值、**影响模块**（v1.7.1 起新增）与中文说明。
-- **影响模块列**：168 个字段全部标注改动后会影响哪些 Rust/前端模块，由 `IMPACT_OVERRIDES`（12 个特殊字段显式覆盖）+ `IMPACT_PREFIX_RULES`（60+ 前缀规则）自动推导。示例：`carryCapacityResource`→`agent.rs / ecology.rs / decisions/`、`decisionPoiSeekMinStockRatio`→`decisions/routing.rs / decisions/harvest.rs`、`houseWinterWoodBurnRate`→`housing_system/maintenance.rs`。
+- **影响模块列**：169 个字段全部标注改动后会影响哪些 Rust/前端模块，由 `IMPACT_OVERRIDES`（12 个特殊字段显式覆盖）+ `IMPACT_PREFIX_RULES`（60+ 前缀规则）自动推导。示例：`carryCapacityResource`→`agent.rs / ecology.rs / decisions/`、`decisionPoiSeekMinStockRatio`→`decisions/routing.rs / decisions/harvest.rs`、`houseWinterWoodBurnRate`→`housing_system/maintenance.rs`。
 - 是用户检索/核对参数的唯一权威入口，**不要手工维护**。
 - 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
 

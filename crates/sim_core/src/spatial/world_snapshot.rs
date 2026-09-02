@@ -129,6 +129,7 @@ impl World3DEngine {
                 pregnancy_child_id: agent.pregnancy_child_id,
                 is_fetus: agent.is_fetus,
                 miscarriage_cooldown: agent.miscarriage_cooldown_timer,
+                postpartum_cooldown: agent.postpartum_cooldown_timer,
                 miscarriage_alert: agent.miscarriage_alert_timer > 0.0,
                 death_decay_timer: agent.death_decay_timer,
                 death_cause: agent.death_cause.clone(),

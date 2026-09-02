@@ -950,7 +950,7 @@
       position: absolute;
       bottom: 20px; left: 20px;
       width: 360px;
-      height: 264px;
+      height: auto;
       box-sizing: border-box;
       background: rgba(10, 18, 30, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.14);
@@ -959,7 +959,7 @@
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 8px;
       z-index: 10;
     }
