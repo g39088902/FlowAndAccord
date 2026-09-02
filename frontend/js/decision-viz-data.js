@@ -51,6 +51,17 @@
     'ReturningToCamp', 'ConstructingHouse', 'RepairingHouse', 'OffRoadDetour'
   ];
 
+  // 行动状态中文描述（PrimitiveActionState 15 态 → 中文语义），决策卡 target 与状态机芯片共用
+  var FSM_STATE_ZH = {
+    RestingAtCamp: '营地休整', SeekingWater: '外出寻水', SeekingFood: '外出觅食',
+    SeekingWood: '外出寻木', SeekingStone: '外出寻石', SeekingGold: '外出寻金',
+    DrinkingAtWater: '清泉饮水', ForagingFood: '采食浆果', GatheringWood: '伐木取木',
+    MiningStone: '采石取石', MiningGold: '淘金取金', ReturningToCamp: '返家卸货',
+    ConstructingHouse: '建房施工', RepairingHouse: '房屋修缮', OffRoadDetour: '途中掉头重路由'
+  };
+  /** 英文状态码 → 中文语义；未知则原样返回 */
+  function zh(s) { return FSM_STATE_ZH[s] || s; }
+
   global.SIM_DECISION_VIZ_DATA = {
     LV: LV,
     BRANCHES: BRANCHES,
@@ -58,6 +69,7 @@
     ALL_IDS: ALL_IDS,
     DEFAULT_ORDER: DEFAULT_ORDER,
     DEFAULT_DIVGAPS: DEFAULT_DIVGAPS,
-    FSM_STATES: FSM_STATES
+    FSM_STATES: FSM_STATES,
+    zh: zh
   };
 })(window);

@@ -9,7 +9,8 @@
   'use strict';
 
   var D = global.SIM_DECISION_VIZ_DATA;
-  var NODE_W = 560, NODE_H = 80, GAP = 30, DIV_H = 24, COL_X = 30;
+  // GAP 加大为分界线让出空间；DIV_H 从 24 → 40，分界线热区显著增大（拖动更容易命中）
+  var NODE_W = 560, NODE_H = 80, GAP = 50, DIV_H = 40, COL_X = 30;
 
   var el = {};           // DOM 引用
   var st = null;         // { order:[], divGaps:[], levels:[] }（与控制器共享同一对象）
@@ -17,6 +18,12 @@
   var nodes = [], nodeMap = {}, nodeEls = {};
   var scale = 1, panX = 30, panY = 10, worldW = 640, worldH = 1400;
   var drag = null, pan = null, lastMoved = false, selected = null, layerFilter = 0;
+
+  /** 英文状态码 → 中文语义；若中英相同则只显示中文 */
+  function zhDisp(t) {
+    var z = D.zh(t);
+    return t === z ? z : z + ' <code>' + t + '</code>';
+  }
 
   function status(t, tone) {
     if (el.statusTip) el.statusTip.textContent = t;
@@ -30,7 +37,10 @@
     for (var j = 0; j < st.divGaps.length; j++) { if (st.divGaps[j] < p) lv++; }
     return lv;
   }
-  function levelAt(i) { return st.levels[i] || zoneOf(i + 1); }
+  // 显示层级 = 卡片当前位置所在的分区（始终实时计算）。
+  // 修复：此前用 st.levels[i] 优先——它是上一次 commit 的陈旧覆盖值，
+  // 拖动分界线时 levels 尚未重算，导致部分卡片颜色不随分界刷新。
+  function levelAt(i) { return zoneOf(i + 1); }
 
   function buildNodes() {
     var list = [{ id: 'eval', kind: 'eval', w: 260, h: 56, anchor: true }];
@@ -107,7 +117,7 @@
           + '<div class="dv-col">'
           + '<div class="dv-tag">命中 → 需求</div>'
           + '<div class="dv-result"></div>'
-          + '<div class="dv-tag dv-target">→ ' + bv.target + '</div>'
+          + '<div class="dv-tag dv-target">→ ' + zhDisp(bv.target) + '</div>'
           + '</div></div>';
       }
     } else if (n.kind === 'divider') {
@@ -122,7 +132,7 @@
       h += '<div class="dv-tag">⬡ decide 状态机 · ' + D.FSM_STATES.length + ' 态</div>'
         + '<div class="dv-title">PrimitiveActionState</div>'
         + '<div class="dv-sub" style="margin-bottom:2px">Resting→评估→dispatch→Seeking*/现场Harvest*→返家/续采；途中被触发器关闭→原地掉头</div>'
-        + '<div class="dv-chips">' + D.FSM_STATES.map(function (s) { return '<span class="dv-fsm">' + s + '</span>'; }).join('') + '</div>'
+        + '<div class="dv-chips">' + D.FSM_STATES.map(function (s) { return '<span class="dv-fsm" title="' + s + '">' + D.zh(s) + '<code>' + s + '</code></span>'; }).join('') + '</div>'
         + '<div class="dv-sub" style="margin-top:6px">源码：agent.rs::PrimitiveActionState · decisions/evaluate.rs::decide · seeking.rs · harvest.rs · routing.rs</div>';
     }
     return h;
@@ -168,7 +178,9 @@
     if (!el.layerNav) return;
     el.layerNav.querySelectorAll('.dv-lv-row').forEach(function (r) {
       var c = r.querySelector('.dv-lv-cnt');
-      if (c) c.textContent = counts[(+r.dataset.lv) - 1] + ' 项';
+      if (!c) return;
+      if (r.dataset.lv === '0') { c.textContent = st.order.length + ' 项'; return; }
+      c.textContent = counts[(+r.dataset.lv) - 1] + ' 项';
     });
   }
 
@@ -219,7 +231,10 @@
         swap(idx, idx + 1); swapped = true;
       }
       if (swapped) {
-        drag.startY = tops[st.order[st.order.indexOf(drag.id)]];
+        // 关键修复：此处不再改写 drag.startY。
+        // 原实现把 startY 重置为「换位前槽位」，而 desiredY = startY + 累计指针位移，
+        // 起点被抬高/压低一格导致每次越过相邻卡位移额外累加 → 越拖越快、瞬移到顶端。
+        // 保持 startY 恒为拖拽起点槽位，卡片持续「手指跟随」，松手后再吸附到最终槽位。
         syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels();
       }
       nodeEls[drag.id].style.top = desiredY + 'px';
@@ -274,7 +289,8 @@
   function showInspector(n) {
     var html = '';
     if (n.kind === 'eval') {
-      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:#38bdf8">调度层</span><b>evaluate_needs</b></div>'
+      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:#38bdf8">调度层</span>'
+        + '<div class="dv-insp-title"><b>evaluate_needs</b><span>评估入口 · 固定锚点</span></div></div>'
         + '<div class="dv-insp-body">'
         + '<div class="dv-row"><span class="dv-k">职责</span><span class="dv-v">按配置顺序逐条评估 13 个分支，返回第一个命中的 <code>Need{level,kind,target_state}</code></span></div>'
         + '<div class="dv-row"><span class="dv-k">顺序源</span><span class="dv-v"><code>config.decision-order.js</code>（拖动卡片即热更新）</span></div>'
@@ -284,25 +300,28 @@
       var b = D.BRANCH_MAP[n.bId] || {};
       var i = st.order.indexOf(n.bId);
       var lv = i >= 0 ? levelAt(i) : b.level;
-      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[lv].hex + '">第' + lv + '层 · ' + D.LV[lv].name + '</span><b>' + n.bId + '</b></div>'
+      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[lv].hex + '">第' + lv + '层</span>'
+        + '<div class="dv-insp-title"><b>' + n.bId + '</b><span>' + D.LV[lv].name + (st.levels[i] ? ' · 层级被强制覆盖' : ' · 0(代码动态默认)') + '</span></div></div>'
         + '<div class="dv-insp-body">'
         + '<div class="dv-row"><span class="dv-k">触发条件</span><span class="dv-v">' + b.cond + '</span></div>'
         + '<div class="dv-row"><span class="dv-k">需求结论</span><span class="dv-v"><b style="color:' + D.LV[lv].hex + '">' + b.need + '</b></span></div>'
-        + '<div class="dv-row"><span class="dv-k">目标状态</span><span class="dv-v">' + b.target + '</span></div>'
-        + '<div class="dv-row"><span class="dv-k">当前槽位</span><span class="dv-v">第 ' + (i + 1) + ' 位' + (st.levels[i] ? ' · 层级被强制覆盖' : ' · 0(代码动态默认)') + '</span></div>'
+        + '<div class="dv-row"><span class="dv-k">目标动作</span><span class="dv-v">' + zhDisp(b.target) + '</span></div>'
+        + '<div class="dv-row"><span class="dv-k">当前槽位</span><span class="dv-v">第 ' + (i + 1) + ' 位 · 第 ' + lv + ' 层</span></div>'
         + '<div class="dv-row"><span class="dv-k">源码锚点</span><span class="dv-v"><span class="dv-code">' + b.anchor + '</span></span></div>'
         + '<div class="dv-row"><span class="dv-k">config 键</span><span class="dv-v">' + (b.cfg || []).map(function (x) { return '<span class="dv-cfg">' + x + '</span>'; }).join('') + '</span></div>'
         + '<div class="dv-sub">命中后经 <code>fulfill_resting_need</code> 落地：寻路 dispatch → Seeking* 状态；途中目标被触发器关闭 → 原地掉头重路由。</div></div>';
     } else if (n.kind === 'divider') {
-      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[n.k].hex + '">分界线 ' + n.k + '</span><b>层级划分</b></div>'
+      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[n.k].hex + '">分界线 ' + n.k + '</span>'
+        + '<div class="dv-insp-title"><b>层级划分</b><span>' + D.LV[n.k].name + ' ｜ ' + D.LV[n.k + 1].name + '</span></div></div>'
         + '<div class="dv-insp-body">'
         + '<div class="dv-row"><span class="dv-k">划分</span><span class="dv-v">第' + n.k + '层（上方）｜第' + (n.k + 1) + '层（下方）</span></div>'
         + '<div class="dv-row"><span class="dv-k">当前位于</span><span class="dv-v">第 ' + n.g + ' 张需求卡之后</span></div>'
         + '<div class="dv-sub">拖动此分界线到任意两张需求卡之间可重新划分层级归属；每层至少保留 1 张卡。松手后层级覆盖随顺序一并落盘 <code>config.decision-order.js</code> 并热注入内核。</div></div>';
     } else if (n.kind === 'fsm') {
-      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:#38bdf8">调度层</span><b>PrimitiveActionState</b></div>'
+      html = '<div class="dv-insp-head"><span class="dv-chip" style="background:#38bdf8">调度层</span>'
+        + '<div class="dv-insp-title"><b>PrimitiveActionState</b><span>' + D.FSM_STATES.length + ' 个行动状态</span></div></div>'
         + '<div class="dv-insp-body">'
-        + '<div class="dv-row"><span class="dv-k">状态集</span><span class="dv-v">' + D.FSM_STATES.length + ' 个 PrimitiveActionState</span></div>'
+        + '<div class="dv-row"><span class="dv-k">状态集</span><span class="dv-v">' + D.FSM_STATES.map(function (s) { return D.zh(s); }).join('、') + '</span></div>'
         + '<div class="dv-row"><span class="dv-k">调度</span><span class="dv-v">decide() 按 state 分发：Resting→评估；Seeking→seeking.rs 熔断重路由；现场→harvest.rs 完成判定；Return→掉头返家</span></div>'
         + '<div class="dv-row"><span class="dv-k">源码</span><span class="dv-v"><span class="dv-code">agent.rs::PrimitiveActionState</span></span></div></div>';
     }
@@ -313,22 +332,43 @@
   function buildLayerNav() {
     if (!el.layerNav) return;
     el.layerNav.innerHTML = '';
+    // 「全部层级」行：点击清除过滤
+    var all = document.createElement('div');
+    all.className = 'dv-lv-row dv-lv-all';
+    all.dataset.lv = '0';
+    all.innerHTML = '<span class="dv-lv-bar dv-lv-bar-all"></span>'
+      + '<span class="dv-lv-idx">∞</span>'
+      + '<span class="dv-lv-name">全部层级</span><span class="dv-lv-cnt">' + st.order.length + ' 项</span>';
+    all.addEventListener('click', function () { if (layerFilter) toggleLayer(layerFilter); });
+    el.layerNav.appendChild(all);
+    // 5 个层级行：点击过滤 / 再点取消
     [5, 4, 3, 2, 1].forEach(function (lv) {
       var r = document.createElement('div');
       r.className = 'dv-lv-row';
       r.dataset.lv = lv;
-      r.innerHTML = '<span class="dv-lv-bar" style="background:' + D.LV[lv].hex + '"></span>'
+      r.innerHTML = '<span class="dv-lv-bar" style="background:' + D.LV[lv].hex + ';color:' + D.LV[lv].hex + '"></span>'
+        + '<span class="dv-lv-idx">' + lv + '</span>'
         + '<span class="dv-lv-name">' + D.LV[lv].name + '</span><span class="dv-lv-cnt">0 项</span>';
       r.addEventListener('click', function () { toggleLayer(lv); });
       el.layerNav.appendChild(r);
+    });
+    syncLayerActive();
+  }
+
+  function syncLayerActive() {
+    if (!el.layerNav) return;
+    el.layerNav.querySelectorAll('.dv-lv-row').forEach(function (r) {
+      var lv = +r.dataset.lv;
+      r.classList.toggle('dv-active', lv === 0 ? layerFilter === 0 : layerFilter === lv);
     });
   }
 
   function toggleLayer(lv) {
     layerFilter = (layerFilter === lv) ? 0 : lv;
     el.layerNav.querySelectorAll('.dv-lv-row').forEach(function (r) {
-      r.classList.toggle('dv-off', layerFilter && (+r.dataset.lv) !== layerFilter);
+      r.classList.toggle('dv-off', layerFilter && (+r.dataset.lv) !== 0 && (+r.dataset.lv) !== layerFilter);
     });
+    syncLayerActive();
     st.order.forEach(function (id, i) {
       var e = nodeEls[id];
       if (e) e.classList.toggle('dv-dim', !!layerFilter && levelAt(i) !== layerFilter);

@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.6</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.7</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -779,13 +779,45 @@
       </div>
       <div class="dviz-body">
         <aside class="dviz-left">
-          <div class="dviz-sec-title">层级 · 颜色归类</div>
-          <div id="dviz-layer-nav"></div>
-          <div class="dviz-sec-title">说明</div>
-          <div class="dviz-legend">
-            <div>◆ 评估入口 · ▢ 需求判定卡 · ⬡ 状态机 · ┄ 分界线</div>
-            <div style="margin-top:6px"><b>拖动卡片</b>调整评估顺序；<b>拖动分界线</b>重新划分需求所属马斯洛层级。松手后经 <code>applyConfig</code> 热注入 WASM 内核，并 POST 落盘 <code>js/config.decision-order.js</code>（静态部署无写文件能力时降级暂存本机）。</div>
-            <div style="margin-top:6px"><b>数据来源</b><br>decisions/branches.rs · evaluate.rs · needs.rs<br>routing.rs · seeking.rs · harvest.rs · scheduler.rs</div>
+          <div class="dviz-panel">
+            <div class="dviz-panel-head">
+              <span class="dviz-panel-title">🎨 层级图例</span>
+              <span class="dviz-panel-sub">点击过滤 · 再点取消</span>
+            </div>
+            <div id="dviz-layer-nav" class="dviz-layer-nav"></div>
+          </div>
+          <div class="dviz-panel">
+            <div class="dviz-panel-head">
+              <span class="dviz-panel-title">🕹️ 操作指引</span>
+            </div>
+            <div class="dviz-legend">
+              <div class="dviz-legend-item">
+                <span class="dviz-legend-ico" style="background:rgba(56,189,248,.14);color:#38bdf8">↕</span>
+                <div><b>拖动卡片 · 调序</b><span>调整 13 条需求判定的评估优先级，松手即热注入</span></div>
+              </div>
+              <div class="dviz-legend-item">
+                <span class="dviz-legend-ico" style="background:rgba(16,185,129,.14);color:#10b981">╌</span>
+                <div><b>拖动分界线 · 分层</b><span>重划需求所属马斯洛层级，每层至少保留 1 张卡</span></div>
+              </div>
+              <div class="dviz-legend-item">
+                <span class="dviz-legend-ico" style="background:rgba(245,158,11,.14);color:#f59e0b">👆</span>
+                <div><b>点击卡片 · 下钻</b><span>右侧查看触发条件 / 需求结论 / 源码锚点 / config 键</span></div>
+              </div>
+              <div class="dviz-legend-item">
+                <span class="dviz-legend-ico" style="background:rgba(167,139,250,.14);color:#a78bfa">🔍</span>
+                <div><b>滚轮缩放 · 空白平移</b><span>右键或空白处拖拽平移画布</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="dviz-panel">
+            <div class="dviz-panel-head">
+              <span class="dviz-panel-title">📦 数据来源</span>
+              <span class="dviz-panel-sub">decisions/</span>
+            </div>
+            <div class="dviz-src-list">
+              <code>branches.rs</code><code>evaluate.rs</code><code>needs.rs</code>
+              <code>routing.rs</code><code>seeking.rs</code><code>harvest.rs</code><code>scheduler.rs</code>
+            </div>
           </div>
         </aside>
 
@@ -802,8 +834,9 @@
 
         <aside class="dviz-right">
           <div id="dviz-insp-empty" class="dviz-empty">
-            👆 点击任意图元查看详情<br><br>
-            <span style="font-size:11px">拖动卡片换序、拖动分界线重分层、缩放平移、颜色过滤、点击下钻均已启用。</span>
+            <div class="dviz-empty-ico">🧠</div>
+            <div class="dviz-empty-title">尚未选中图元</div>
+            <div class="dviz-empty-sub">点击中央任意「需求判定卡 / 分界线 / 状态机」查看详情</div>
           </div>
           <div id="dviz-insp-card" class="dviz-insp-card" style="display:none"></div>
         </aside>
