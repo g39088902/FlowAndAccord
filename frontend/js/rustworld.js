@@ -21,6 +21,7 @@
         // 世界视图对象 (由快照映射而来)
         this.agents = [];
         this.agentArchive = new Map(); // 族人全量生命周期档案库 (含已故先祖，保障断代/绝嗣穿梭不跳帧)
+        this._consumedDeathIds = new Set(); // ★ v1.8.7 已消费的死亡/流产墓碑 id（防快照重复读档误处理）
         this.houses = [];
         this.pois = [];
         // ★ 账本与家户/婚姻登记簿 (v0.9.72 M1 账本系统)
@@ -180,6 +181,7 @@
         this._lastEvent = null;
         this._trails.clear();
         this.agentArchive.clear();
+        this._consumedDeathIds.clear();
         if (this._ready) {
           this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20);
           if (window.SIM_CONFIG) {
@@ -251,6 +253,7 @@
         // 内核世界已被替换，清空前端全部派生缓存并以 forceTerrain 重建
         this._trails.clear();
         this.agentArchive.clear();
+        this._consumedDeathIds.clear();
         this._lastEvent = null;
         this._terrainCached = false;
         this.deselect();
@@ -373,7 +376,9 @@
           durability: h.durability,
           age: h.age,
           generation: h.generation,
-          constructionProgress: h.construction_progress
+          constructionProgress: h.construction_progress,
+          builderId: h.builder_id,
+          lastUpgraderId: h.last_upgrader_id,
         };
         return view;
         });
@@ -491,6 +496,37 @@
         for (const ag of this.agents) {
           if (ag.isFetus) continue;
           this.agentArchive.set(ag.id, ag);
+        }
+
+        // ★ v1.8.7 消费死亡/流产墓碑（recent_deaths）：
+        //   · 高倍速单帧跨过衰减窗口时，强制把档案库滞留的"存活"副本补记为已故并写入死因（修复绝嗣废墟/卡片误判"健在"）；
+        //   · 流产/随母亡故的腹中胎儿以"已故子嗣"身份入档（族谱可见，死因=流产/随母亡故）。
+        const consumedDeaths = this._consumedDeathIds || (this._consumedDeathIds = new Set());
+        for (const d of (snap.recent_deaths || [])) {
+          if (consumedDeaths.has(d.id)) continue;
+          consumedDeaths.add(d.id);
+          let rec = this.agentArchive.get(d.id);
+          if (!rec) rec = prevAgents.get(d.id);   // 胎儿（未入档）从上一帧活跃列表取，保留血缘字段
+          if (rec) {
+            rec = Object.assign({}, rec);         // 克隆，避免污染 prevAgents 引用
+            rec.isAlive = false;
+            rec.deathCause = d.cause;
+            if (d.is_fetus) rec.isFetus = false;  // 流产胎儿以"已故子嗣"身份入档
+            // 血缘优先以墓碑为准（高倍速下胎儿可能无上一帧快照，prevAgents 取不到）
+            if (d.father_id !== undefined) rec.fatherId = d.father_id;
+            if (d.mother_id !== undefined) rec.motherId = d.mother_id;
+            this.agentArchive.set(d.id, rec);
+          } else {
+            // 兜底：墓碑字段建最小档案（血缘直接来自墓碑，不丢 parent 链接）
+            // 已故入档统一以"已故子嗣"身份（isFetus=false），与 prevAgents 分支一致
+            this.agentArchive.set(d.id, {
+              id: d.id, isAlive: false, deathCause: d.cause,
+              isFetus: false, age: 0, birthTick: 0,
+              fatherId: d.father_id !== undefined ? d.father_id : null,
+              motherId: d.mother_id !== undefined ? d.mother_id : null,
+              surname: '', gender: 'female'
+            });
+          }
         }
 
         // ★ 家户登记簿快照映射（家庭跟着男人走）

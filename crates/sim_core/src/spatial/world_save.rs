@@ -25,7 +25,7 @@ use super::snapshot::Season;
 use super::world::World3DEngine;
 
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
-pub const SAVE_FORMAT_VERSION: u32 = 1;
+pub const SAVE_FORMAT_VERSION: u32 = 2;
 /// 写入存档时附带的应用版本（仅供前端提示与人工排查，不作为加载门禁）
 pub const SAVE_APP_VERSION: &str = "1.7.0";
 
@@ -203,6 +203,8 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         gold_regen_multiplier: save.gold_regen_multiplier,
         tick_counter: save.tick_counter,
         last_event: save.last_event,
+        // ★ v1.8.7 死亡/流产墓碑为瞬态字段，不入存档；读档后从空累积
+        recent_deaths: Vec::new(),
         config: save.config,
         agent_index: std::collections::HashMap::new(),
         marriage_registry: save.marriage_registry,

@@ -48,6 +48,33 @@ pub struct WorldSnapshot3D {
     pub temperature: f32,
     pub season_progress: f32,
     pub last_mutation_event: Option<String>,
+    /// ★ v1.8.7 死亡/流产墓碑（滑动窗口保留，含本帧死亡与腹中胎儿流产/随母亡故）。
+    /// 供前端即使在高倍速单帧跨过整个衰减窗口时，也能强制把档案库对应条目补记为已故并保留死因。
+    pub recent_deaths: Vec<RecentDeathSnapshot>,
+}
+
+/// 死亡/流产墓碑记录（v1.8.7）
+///
+/// 每次 tick 内发生的**死亡**（饥荒饿死/脱水渴死/寿终正寝）与**腹中胎儿夭折**
+/// （流产 / 随母亡故）都会记入本结构，随快照输出。前端据此：
+/// - 对档案库中"滞留存活"的陈旧副本强制补记 `isAlive=false` 并写入死因；
+/// - 将流产/随母亡故的胎儿以"已故子嗣"身份写入档案库（族谱可见）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentDeathSnapshot {
+    /// 死者 AgentId（含腹中胎儿预分配 id）
+    pub id: AgentId,
+    /// 死亡原因："饥荒饿死" / "脱水渴死" / "寿终正寝" / "流产" / "随母亡故"
+    pub cause: String,
+    /// 是否自然死亡（寿终正寝=true；饥荒/脱水/流产等=false）
+    pub is_natural: bool,
+    /// 是否腹中胎儿（流产/随母亡故的胎儿=true）
+    pub is_fetus: bool,
+    /// 死者生父 AgentId（胎儿/成年人均携带，供前端族谱入档时保血缘）
+    pub father_id: Option<AgentId>,
+    /// 死者生母 AgentId（胎儿/成年人均携带，供前端族谱入档时保血缘）
+    pub mother_id: Option<AgentId>,
+    /// 死亡发生的世界 tick（供前端去重与族谱时间轴）
+    pub tick: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

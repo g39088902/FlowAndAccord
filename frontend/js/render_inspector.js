@@ -118,6 +118,13 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     }
 
     const houseCoordEl = document.getElementById('insp-house-coord');
+
+    // ★ 修建/升级者（历史确权：立宅修建者与最近升级者，均不随代际继承改变）
+    const builderVal = document.getElementById('insp-house-builder-val');
+    if (builderVal) {
+      const upgName = (house.lastUpgraderId == null) ? '—' : `Agent #${house.lastUpgraderId}`;
+      builderVal.textContent = `修建者 Agent #${house.builderId} · 最近升级 ${upgName}`;
+    }
     if (houseCoordEl) houseCoordEl.textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
     document.getElementById('insp-detail-text').textContent = house.isRuin ? '户主去世且未有族人继承，房屋正处于风化瓦解状态。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
   }

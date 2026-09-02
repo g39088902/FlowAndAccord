@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.8.5**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.8.7**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -54,6 +54,8 @@
 | **v1.8.3** | **产后休养冷却（分娩后 900s 禁孕）**：新增 `Agent3D.postpartum_cooldown_timer` 与超参 `agentPostpartumCooldown`(900s)——女性完成正常分娩（`pregnancy_progress≥1.0`）即进入 900s 产后休养冷却，`tick_metabolism` 受孕判定短路禁孕、冷却每秒递减归零后可再孕；与既有流产冷却（450s）按发生场景独立设置、互不干扰；快照三处同步新增 `postpartum_cooldown`，前端 Inspector 冷却框优先展示「产后休养剩余 Xs 可受孕」（无则退回流产「调养」文案）；config 字段 168→169，`test-wasm.js`/`config-check.js` 双绿 | agent / config / config.js / snapshot / world_snapshot / rustworld.js / render_inspector.js / config-check.js |
 | **v1.8.4** | 修复产后冷却提示文案：Inspector 冷却框前缀原为 HTML 写死的「🥀 流产调养中」，正常生育（产后休养 900s）后也会误显示为流产调养；改为前缀随冷却类型动态切换——正常生育显示「🤱 产后休养中」，流产显示「🥀 流产调养中」，纯前端改动无需重编译 WASM | frontend/index.html / render_inspector.js |
 | **v1.8.5** | 移除建筑卡片冗余状态标签：删除 Inspector 标题栏「⚠️ 建筑磨损折旧 (XX% 待修缮)」分支（耐久<85% 时展示），该信息与下方耐久度条（颜色渐变 +「需修缮」文字）重复；删除后耐久<85% 的非修缮房屋状态回落为常规「安居宅邸/起步营地」，耐久度条仍正常提示待修缮，纯前端改动 | frontend/js/render_inspector.js |
+| **v1.8.7** | **内核死亡/流产墓碑（recent_deaths）+ 前端档案库死因补记与流产胎儿入族谱**：修复高倍速（≥512x）下死亡族人档案库滞留"健在"、年龄冻结的陈旧 bug（死因丢失）——内核新增 `RecentDeathSnapshot`（id/cause/is_natural/is_fetus/father_id/mother_id/tick），`world_tick.rs` 在死亡结算处与 `tick_fetus_reconcile` 流产/随母亡故胎儿移除处写墓碑，`tick()` 末按 4096 tick 滑动窗口清理；快照三处同步（snapshot.rs / world_snapshot.rs / rustworld.js），墓碑随快照输出；前端 `_applySnapshot` 消费墓碑（`_consumedDeathIds` 幂等去重，init/load 时清空）：①对档案库滞留"存活"副本强制补记 `isAlive=false`+死因（修复 #249 饿死但卡片/族谱显示健在的根因）；②流产/随母亡故胎儿以"已故子嗣"身份入档（isFetus=false，血缘 fatherId/motherId 随墓碑携带——高倍速下胎儿整个生命周期可在单帧内，prevAgents 取不到，必须由墓碑保血缘），族谱可画"💀 死因: 流产"节点；recent_deaths 为瞬态不入存档（world_save.rs 读档补空 Vec，ecology.rs 世界重置清空）；版本号 v1.8.6→v1.8.7 | world_tick / snapshot / world_snapshot / world.rs / world_save.rs / ecology.rs / rustworld.js / dag.js / frontend/AGENTS.md / docs |
+| **v1.8.6** | **房屋新增「修建/升级者」历史确权字段（不随继承改变）**：① `House` 新增 `builder_id`（修建者=立宅人，`materialize_founded_houses` 立宅时以户主 ID 固定）与 `last_upgrader_id`（最近升级者，`try_instant_upgrade` 每次升级成功时更新，从未升级为 None）；**父系继承仅改 `owner_id`/`generation`/`spouse_id`，二者天然不受影响**——历史确权与现户主解耦；② 快照三处同步：`house.rs` HouseSnapshot、`world_snapshot.rs` 赋值、`rustworld.js` `_applySnapshot` 映射（`builderId`/`lastUpgraderId`）；③ 前端房屋 Inspector 新增「🧱 修建/升级者」行（修建者 Agent #X · 最近升级 Agent #Y / —）；④ 存档格式升级 `SAVE_FORMAT_VERSION` 1→2（Rust `world_save.rs` + 前端 `save-ui.js` 同步）：新增必填 `builder_id` 使 v1 旧档无法反序列化，按设计红线「版本不兼容即拒绝」干净拦截而非报缺字段；版本号 v1.8.5→v1.8.6 | house / world_snapshot / housing_system/construction / rustworld.js / render_inspector.js / index.html / world_save.rs / save-ui.js / docs |
 ---
 
 ## 文档与工程规范维护

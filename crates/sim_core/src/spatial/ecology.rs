@@ -29,6 +29,8 @@ impl World3DEngine {
         self.region_registry.clear();
         self.expedition_targets.clear();
         self.relief_cooldown.clear();
+        // ★ v1.8.7 死亡/流产墓碑同步清空（世界重置不留旧死亡记录）
+        self.recent_deaths.clear();
 
         let mut camp_nodes = Vec::new();
         let mut water_nodes = Vec::new();

@@ -7,6 +7,6 @@
 // decisionEvalLevels: 与顺序下标并行的层级覆盖，0=保留代码动态默认，1-5=强制马斯洛层级。
 // ==========================================================================
 window.SIM_DECISION_ORDER = {
-  decisionEvalOrder: ["b1", "b2", "b3", "b12", "b4", "b5", "b6", "b7", "b8", "b9", "b11", "b13", "b10"],
-  decisionEvalLevels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5],
+  decisionEvalOrder: ["b1", "b2", "b3", "b12", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b13"],
+  decisionEvalLevels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0],
 };

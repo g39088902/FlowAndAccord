@@ -9,7 +9,7 @@
   const STORAGE_NS = 'flowaccord.save.v1';
   const INDEX_KEY = STORAGE_NS + '.__index';
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
-  const SAVE_FORMAT_VERSION = 1;
+  const SAVE_FORMAT_VERSION = 2;
   const AUTO_SAVE_INTERVAL_MS = 60000;
 
   const SLOTS = [

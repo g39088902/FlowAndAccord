@@ -211,6 +211,8 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 **新增 agent 字段时**，除了快照三处同步，还须确认 `agentArchive` 的写入逻辑（在 `_applySnapshot` 中）是否正确归档新字段。
 
+**v1.8.7 墓碑补记**：`_applySnapshot` 消费 `snap.recent_deaths`（死亡/流产墓碑，`_consumedDeathIds` 幂等去重，`initEcology`/`loadWorld` 时清空）——①对档案库滞留"存活"的陈旧副本（高倍速 ≥512x 跨过衰减窗口所致）强制补记 `isAlive=false` + `deathCause`；②流产/随母亡故胎儿以"已故子嗣"身份入档（`isFetus=false`，血缘 `fatherId`/`motherId` 由墓碑携带——高倍速下胎儿整个生命周期可在单帧内，`prevAgents` 取不到，必须靠墓碑保血缘），族谱据此可画"💀 死因: 流产"节点。
+
 ### 5.5 镜头跟随与 Inspector 联动
 
 根 AGENTS.md §4.8：选中小人后 `isCameraFollow` 开启，**关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随**。此逻辑在 main.js 的 Esc 键绑定和 Inspector 关闭按钮中。

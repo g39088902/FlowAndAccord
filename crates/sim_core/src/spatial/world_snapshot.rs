@@ -63,6 +63,8 @@ impl World3DEngine {
                 is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
                 is_repairing: h.is_repairing,
+                builder_id: h.builder_id,
+                last_upgrader_id: h.last_upgrader_id,
             });
         }
 
@@ -409,6 +411,7 @@ impl World3DEngine {
             temperature: self.temperature,
             season_progress,
             last_mutation_event: self.last_event.clone(),
+            recent_deaths: self.recent_deaths.clone(),
         }
     }
 }

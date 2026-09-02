@@ -23,6 +23,18 @@
       for (const ag of sim.agents) lookup.set(ag.id, ag);
     }
 
+    // ★ v1.8.7 反查子女索引：档案库中任何留有 fatherId/motherId 的对象（含流产/随母亡故入档的胎儿）
+    //   都是对应父母的子女——即使父母 children_ids 已因流产被内核清理，族谱也能画出"死因: 流产"节点
+    const reverseChildren = new Map();
+    for (const [, ag] of lookup) {
+      if (!ag) continue;
+      for (const pId of [ag.fatherId, ag.motherId]) {
+        if (pId == null) continue;
+        if (!reverseChildren.has(pId)) reverseChildren.set(pId, []);
+        reverseChildren.get(pId).push(ag.id);
+      }
+    }
+
     // 焦点校正：默认取编号最小且存活的族人
     if (!focusId || !lookup.has(focusId)) {
       const ids = Array.from(lookup.keys()).sort((a, b) => a - b);
@@ -47,8 +59,11 @@
       const dq = [focusId];
       while (dq.length > 0) {
         const cur = lookup.get(dq.shift());
-        if (!cur || !Array.isArray(cur.children)) continue;
-        for (const cId of cur.children) {
+        if (!cur) continue;
+        const kids = new Set();
+        if (Array.isArray(cur.children)) for (const c of cur.children) kids.add(c);
+        if (reverseChildren.has(cur.id)) for (const c of reverseChildren.get(cur.id)) kids.add(c);
+        for (const cId of kids) {
           if (lookup.has(cId) && !descendants.has(cId)) {
             descendants.add(cId); lineageIds.add(cId); dq.push(cId);
           }

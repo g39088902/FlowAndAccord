@@ -30,6 +30,8 @@ pub struct House {
     pub is_ruin: bool,                      // 是否因户主绝嗣而成为无主废墟
     pub construction_progress: f32,         // 保留字段：历史施工进度（瞬时升级后恒为 1.0 由竣工置位，纯兼容保留）
     pub is_repairing: bool,                 // 当前是否正在被族人劳作修缮
+    pub builder_id: AgentId,                // 修建者（立宅人）：立宅时即固定，代际继承绝不改变
+    pub last_upgrader_id: Option<AgentId>,  // 最近升级者：每次升级时更新，继承不改；从未升级为 None
 }
 
 impl House {
@@ -52,6 +54,8 @@ impl House {
             is_ruin: false,
             construction_progress: 0.0,
             is_repairing: false,
+            builder_id: owner_id,
+            last_upgrader_id: None,
         }
     }
 
@@ -112,4 +116,6 @@ pub struct HouseSnapshot {
     pub is_ruin: bool,
     pub construction_progress: f32,
     pub is_repairing: bool,
+    pub builder_id: AgentId,
+    pub last_upgrader_id: Option<AgentId>,
 }

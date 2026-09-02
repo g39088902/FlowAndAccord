@@ -4,6 +4,10 @@ use super::graph::NodeId;
 use super::poi::PoiType;
 use super::vec3::Vec3;
 use super::world::World3DEngine;
+use super::snapshot::RecentDeathSnapshot;
+
+/// 死亡/流产墓碑滑动窗口（tick）：覆盖前端最高倍速(1024x)单帧推进与任意渲染间隙
+const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
 
 /// Tick 管线调度
 ///
@@ -62,6 +66,16 @@ impl World3DEngine {
                     } else {
                         self.total_deaths_unnatural += 1;
                     }
+                    // ★ v1.8.7 死亡墓碑：记录本 tick 刚死者的死因（前端即使高倍速跨过衰减窗口也不丢）
+                    self.recent_deaths.push(RecentDeathSnapshot {
+                        id: agent.id,
+                        cause: agent.death_cause.clone().unwrap_or_else(|| "未知死因".to_string()),
+                        is_natural: agent.death_is_natural,
+                        is_fetus: false,
+                        father_id: agent.father_id,
+                        mother_id: agent.mother_id,
+                        tick: self.tick_counter,
+                    });
                 }
                 if event.contains("流产") {
                     self.total_miscarriages += 1;
@@ -105,6 +119,10 @@ impl World3DEngine {
 
         // 9. M4 地区与王国系统（初王顺位 → 长子继承 → 公仓税 → 救济）
         self.tick_region(dt);
+
+        // ★ v1.8.7 墓碑滑动窗口清理：仅保留最近若干 tick 内的死亡/流产记录（覆盖 1024x 单帧推进与渲染间隙）
+        self.recent_deaths
+            .retain(|d| self.tick_counter.saturating_sub(d.tick) < RECENT_DEATH_RETAIN_TICKS);
     }
 
     /// 结算已故族人的金币遗产：某人死后随身金币平分给所有在世的子一代子女
@@ -183,6 +201,30 @@ impl World3DEngine {
 
         // ── WRITE：移除失效胎儿 ──
         if !to_remove.is_empty() {
+            // ★ v1.8.7 胎儿墓碑：区分"流产"（母在）与"随母亡故"（母已死）；
+            //   father_id/mother_id 随墓碑入档——高倍速下胎儿整个生命周期（受孕→流产）可能都在单帧内，
+            //   前端上一帧快照取不到该胎儿，血缘必须由墓碑携带，否则族谱节点画不出来。
+            for rid in &to_remove {
+                let (cause, father_id, mother_id) = self.agents.iter()
+                    .find(|a| a.id == *rid)
+                    .map(|f| {
+                        let cause = f.mother_id
+                            .and_then(|mid| self.agents.iter().find(|a| a.id == mid))
+                            .map(|m| if m.is_alive { "流产" } else { "随母亡故" })
+                            .unwrap_or("流产");
+                        (cause, f.father_id, f.mother_id)
+                    })
+                    .unwrap_or(("流产", None, None));
+                self.recent_deaths.push(RecentDeathSnapshot {
+                    id: *rid,
+                    cause: cause.to_string(),
+                    is_natural: false,
+                    is_fetus: true,
+                    father_id,
+                    mother_id,
+                    tick,
+                });
+            }
             self.agents.retain(|a| !to_remove.contains(&a.id));
             for rid in &to_remove {
                 // 清理父母 children_ids

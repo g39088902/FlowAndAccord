@@ -79,7 +79,11 @@ impl World3DEngine {
             .houses
             .iter_mut()
             .find(|h| h.id == house_id)
-            .map(|h| h.upgrade_to_next_tier(cfg))
+            .map(|h| {
+                // ★ 修建/升级者：记录本次主持升级的族人（立宅修建者见 builder_id，二者均不随继承改变）
+                h.last_upgrader_id = Some(agent_id);
+                h.upgrade_to_next_tier(cfg)
+            })
             .unwrap_or(false);
         if !succeeded {
             return;

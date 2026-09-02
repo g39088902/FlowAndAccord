@@ -7,7 +7,7 @@ use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::House;
 use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
-use super::snapshot::Season;
+use super::snapshot::{RecentDeathSnapshot, Season};
 use crate::geo::terrain::TerrainMap;
 
 /// 3D 空间世界与原始生态生存繁衍仿真管理器
@@ -44,6 +44,8 @@ pub struct World3DEngine {
     pub gold_regen_multiplier: f32,
     pub tick_counter: u64,
     pub last_event: Option<String>,
+    /// ★ v1.8.7 死亡/流产墓碑（滑动窗口，随快照输出；前端据此补记档案库死因/胎儿入档）
+    pub recent_deaths: Vec<RecentDeathSnapshot>,
     pub config: SimConfig,
     /// AgentId → agents Vec 下标的快速查找索引；Vec 结构变更后需调用 rebuild_agent_index() 刷新
     pub agent_index: HashMap<AgentId, usize>,
@@ -105,6 +107,7 @@ impl World3DEngine {
             gold_regen_multiplier: 1.0,
             tick_counter: 0,
             last_event: None,
+            recent_deaths: Vec::new(),
             config,
             agent_index: HashMap::new(),
             marriage_registry: MarriageRegistry::new(LEDGER_JOURNAL_CAPACITY),
