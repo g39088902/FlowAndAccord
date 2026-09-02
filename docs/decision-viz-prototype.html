@@ -44,6 +44,12 @@
   .legend b{color:var(--txt);}
   .legend .ln{border-bottom:1px dashed rgba(255,255,255,.18);}
   .legend .dn{border-bottom:1px dotted rgba(255,255,255,.3);}
+  .lv-row{display:flex; align-items:center; gap:8px; margin:5px 0; padding:5px 7px; border-radius:7px; cursor:pointer; user-select:none; border:1px solid transparent;}
+  .lv-row:hover{background:rgba(255,255,255,.06);}
+  .lv-row.off{opacity:.32;}
+  .lv-row .lv-bar{width:14px; height:14px; border-radius:4px; flex:0 0 auto;}
+  .lv-row .lv-name{font-weight:600; font-size:12px;}
+  .lv-row .lv-cnt{margin-left:auto; font-size:10px; color:var(--sub);}
   /* 中央画布 */
   section.canvas-wrap{flex:1; position:relative; min-width:0; display:flex; flex-direction:column;}
   .toolbar{display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); flex:0 0 auto; flex-wrap:wrap;}
@@ -57,15 +63,12 @@
       radial-gradient(900px 500px at 80% 80%, rgba(16,185,129,.04), transparent 60%), #070d17;}
   .viewport.dragging{cursor:grabbing;}
   .world{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;}
-  #edges{position:absolute; top:0; left:0; pointer-events:none; overflow:visible;}
-  #edges line, #edges path{stroke:rgba(255,255,255,.22); stroke-width:1.5; fill:none;}
-  #edges line.hot, #edges path.hot{stroke:var(--cyan); stroke-width:2.5;}
-  #edges line.dim, #edges path.dim{opacity:.12;}
   #nodes{position:absolute; top:0; left:0;}
   .node{position:absolute; border:1px solid var(--line); border-radius:10px; background:rgba(14,24,38,.95);
-        box-shadow:0 6px 18px rgba(0,0,0,.45); cursor:grab; user-select:none; padding:8px 10px; transition:box-shadow .15s;}
+        box-shadow:0 6px 18px rgba(0,0,0,.45); cursor:grab; user-select:none; padding:8px 10px; transition:top .16s ease, box-shadow .15s;}
   .node:hover{box-shadow:0 8px 24px rgba(0,0,0,.6);}
-  .node.dragging{cursor:grabbing; box-shadow:0 0 0 2px var(--cyan), 0 10px 28px rgba(0,0,0,.7); z-index:9;}
+  .node.dragging{cursor:grabbing; box-shadow:0 0 0 2px var(--cyan), 0 10px 28px rgba(0,0,0,.7); z-index:9; transition:none;}
+  .node.hl{box-shadow:0 0 0 2px var(--lc), 0 8px 24px rgba(0,0,0,.6);}
   .node.selected{box-shadow:0 0 0 2px var(--amber), 0 8px 24px rgba(0,0,0,.6);}
   .node.dim{opacity:.18; pointer-events:none;}
   .node.locked{cursor:default;}
@@ -81,6 +84,14 @@
   .node.kind-fsm .fsm-states{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
   .fsm-chip{font-size:10px; padding:3px 7px; border-radius:6px; border:1px solid var(--line); background:rgba(255,255,255,.04);}
   .fsm-chip.cur{border-color:var(--cyan); color:var(--cyan); background:rgba(56,189,248,.1);}
+  /* 分界线卡片（拖动能重新划分层级） */
+  .node.kind-divider{border:none; background:transparent; box-shadow:none; padding:0; cursor:grab;}
+  .node.kind-divider:hover{box-shadow:none;}
+  .node.kind-divider.drag-div{z-index:9;}
+  .dv-inner{display:flex; align-items:center; gap:8px; height:24px; width:100%; box-sizing:border-box;}
+  .dv-chip{font-size:10px; font-weight:700; color:#fff; padding:2px 8px; border-radius:5px; white-space:nowrap; line-height:16px;}
+  .dv-line{flex:1; border-top:2px dashed rgba(255,255,255,.30);}
+  .dv-grab{font-size:10px; color:var(--sub); white-space:nowrap; user-select:none;}
   /* 右侧检查器 */
   aside.right{width:280px; flex:0 0 auto; border-left:1px solid var(--line); padding:12px; overflow:auto;}
   #insp-empty{color:var(--sub); font-size:12px; line-height:1.8; margin-top:20px; text-align:center;}
@@ -138,42 +149,38 @@
 
 <header>
   <h1>🧠 马斯洛决策引擎 <small>Flow &amp; Accord · decisions/ 可视化</small></h1>
-  <span class="version-tag">v0.1 · 交互原型</span>
+  <span class="version-tag">v0.3 · 交互原型</span>
   <div class="tabs">
     <div class="tab on" data-tab="logic">🔬 逻辑引擎图</div>
     <div class="tab" data-tab="live">📡 实时监控</div>
   </div>
-  <div class="tip">🖱️ 拖动节点 · 滚轮缩放 · 空白拖拽平移 · 悬停高亮 · 点击下钻</div>
+  <div class="tip">🖱️ 拖卡片调顺序 · 拖分界线定层级 · 滚轮缩放 · 空白拖拽平移 · 点击下钻</div>
 </header>
 
 <main>
-  <!-- 左侧：层级导航 -->
+  <!-- 左侧：层级颜色归类 -->
   <aside class="left">
-    <div class="sec-title">马斯洛层级导航</div>
+    <div class="sec-title">层级 · 颜色归类</div>
     <div id="layerNav"></div>
-    <div class="sec-title">图例</div>
+    <div class="sec-title">说明</div>
     <div class="legend">
-      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px dashed rgba(255,255,255,.4)"></span> 需求→目标映射</div>
-      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px solid rgba(255,255,255,.4)"></span> 状态迁移/优先级链</div>
-      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px dotted rgba(255,255,255,.5)"></span> 源码锚点引用</div>
-      <div>◆ 评估判断 · ▢ 状态/动作 · ⬡ 调度/触发器</div>
+      <div>◆ 评估入口 · ▢ 需求判定卡 · ⬡ 状态机 · ┄ 分界线卡片</div>
+      <div style="margin-top:6px"><b>拖动卡片</b>调整评估顺序；<b>拖动分界线卡片</b>重新划分"哪些需求在哪些层次"（卡片层级 = 所在区间）。顺序与分界仅保存在本机浏览器（先不对接后端），「重置顺序」恢复代码默认。</div>
       <div style="margin-top:6px"><b>数据来源</b><br>needs.rs · evaluate.rs<br>routing.rs · seeking.rs · harvest.rs · scheduler.rs · agent.rs</div>
     </div>
   </aside>
 
-  <!-- 中央：决策图视口 -->
+  <!-- 中央：决策单列视口 -->
   <section class="canvas-wrap">
     <div class="toolbar">
       <button id="btnFit">🎯 适应窗口</button>
-      <button id="btnReset">↺ 重置布局</button>
-      <button id="btnSave">💾 保存布局</button>
-      <button id="btnRestore">📂 还原布局</button>
-      <button id="btnLock" class="primary">🔒 锁定主干</button>
+      <button id="btnReset">↺ 重置顺序</button>
+      <button id="btnSave">💾 保存顺序</button>
+      <button id="btnRestore">📂 还原顺序</button>
       <span class="hint" id="statusTip">就绪</span>
     </div>
     <div class="viewport" id="viewport">
       <div class="world" id="world">
-        <svg id="edges"></svg>
         <div id="nodes"></div>
       </div>
     </div>
@@ -183,7 +190,7 @@
   <aside class="right">
     <div id="insp-empty">
       👆 点击任意图元查看详情<br><br>
-      <span style="font-size:11px">原型演示：拖动节点、缩放平移、层级过滤、布局持久化均已启用。实时监控见底部「📡 实时监控」标签页。</span>
+      <span style="font-size:11px">原型演示：拖动卡片调整评估顺序、拖动分界线重新分层、缩放平移、颜色过滤、点击下钻均已启用。实时监控见底部「📡 实时监控」标签页。</span>
     </div>
     <div id="insp-card" class="insp-card" style="display:none"></div>
   </aside>
@@ -260,38 +267,95 @@ var FSM_STATES = ['RestingAtCamp','SeekingWater','SeekingFood','SeekingWood','Se
   'DrinkingAtWater','ForagingFood','GatheringWood','MiningStone','MiningGold',
   'ReturningToCamp','ConstructingHouse','RepairingHouse','OffRoadDetour'];
 
-/* 节点默认布局（world 坐标） */
-function defaultLayout(){
-  var nodes = [];
-  [5,4,3,2,1].forEach(function(lv,i){
-    nodes.push({id:'lv'+lv, kind:'level', level:lv, x:24, y:40+i*178, w:178, h:128, locked:true});
+/* ═══ 布局：一条纵列排序（顶部评估入口 → 13 张需求判定卡单列 → 底部状态机）═══ */
+/* 需求卡顺序可由前端拖拽变更，仅本地持久化（先不对接后端），key 带版本号 */
+var NODE_W=560, NODE_H=80, GAP=30, DIV_H=24, COL_X=30;
+var DEFAULT_ORDER=BRANCHES.map(function(b){ return b.id; }); // b1→b13 即代码严格优先级
+/* 4 条层级分界线：divider k 分隔「第k层 | 第k+1层」，位置 g=位于第 g 张需求卡之后（1..12，每层至少 1 张） */
+var DEFAULT_DIVGAPS=[3,7,8,11]; // 默认贴近原始层级：生理3 / 安全4 / 归属1 / 尊重3
+var STORE_KEY='decisionViz.order.v3';
+var PERSIST=loadPersist();
+var branchOrder=PERSIST.order;
+var divGaps=PERSIST.dividers;
+var scale=PERSIST.scale, panX=PERSIST.panX, panY=PERSIST.panY;
+var worldW=640, worldH=1400;
+
+/* 构建图元集：eval / 13 分支 / 4 条分界线 / fsm；层级由分界线区间动态决定 */
+function buildNodes(){
+  var list=[];
+  list.push({id:'eval', kind:'eval', level:0, w:260, h:56, anchor:true});
+  branchOrder.forEach(function(id,i){
+    var b=BRANCH_MAP[id];
+    list.push({id:id, kind:'branch', level:b.level, bId:id, w:NODE_W, h:NODE_H});
+    var p=i+1, di=divGaps.indexOf(p);
+    if(di>=0) list.push({id:'div'+(di+1), kind:'divider', k:di+1, g:p, w:NODE_W, h:DIV_H});
   });
-  nodes.push({id:'eval', kind:'eval', level:0, x:300, y:30, w:258, h:58, locked:true});
-  BRANCHES.forEach(function(b,i){
-    var col = i<7 ? 0 : 1;
-    var row = i<7 ? i : i-7;
-    nodes.push({id:b.id, kind:'branch', level:b.level, bId:b.id, x:300+col*330, y:120+row*86, w:290, h:78});
-  });
-  nodes.push({id:'fsm', kind:'fsm', level:0, x:1020, y:40, w:280, h:560, locked:true});
-  return nodes;
+  list.push({id:'fsm', kind:'fsm', level:0, w:NODE_W, h:200, anchor:true});
+  return list;
 }
 
-/* 边：优先级链 + 需求→行动 */
-function defaultEdges(){
-  var e = [];
-  e.push({from:'eval', to:'b1'});
-  for(var i=0;i<BRANCHES.length-1;i++) e.push({from:'b'+(i+1), to:'b'+(i+2)});
-  return e;
+/* 单列 Y 布局：需求卡按槽位堆叠；分界线定位于对应间隙中心（不占用卡片槽位） */
+function layoutNodes(list){
+  var y=24;
+  list.forEach(function(n){
+    n.x=COL_X;
+    if(n.kind==='divider'){
+      n.y=24+56+GAP+(n.g-1)*(NODE_H+GAP)+NODE_H+GAP/2-DIV_H/2;
+    }else{
+      n.y=y; y+=n.h+GAP;
+    }
+  });
+  return y;
+}
+
+/* 当前顺序下各分支槽位 top（供拖拽排序交换判定） */
+function branchSlotTops(){
+  var tops={}, y=24+nodeMap.eval.h+GAP;
+  branchOrder.forEach(function(id){ tops[id]=y; y+=NODE_H+GAP; });
+  return tops;
+}
+
+/* 14 个间隙中心 Y（g=0..13：第 g 张卡之后），供分界线吸附判定 */
+function gapCenters(){
+  var cs=[], base=24+56+GAP;
+  for(var g=0; g<=13; g++){
+    cs.push(base + (g-1)*(NODE_H+GAP) + NODE_H + GAP/2);
+  }
+  return cs;
+}
+
+/* 某张卡（1-based 位置 p）的当前层级 = 1 + 上方分界线数 */
+function currentLevelOf(p){
+  var lv=1;
+  for(var j=0;j<divGaps.length;j++){ if(divGaps[j]<p) lv++; }
+  return lv;
+}
+
+function applyNodePositions(){
+  nodes.forEach(function(n){
+    var el=nodeEls[n.id]; if(!el) return;
+    el.style.left=n.x+'px'; el.style.top=n.y+'px';
+  });
+}
+
+/* 使 nodes 数组顺序与 branchOrder + divGaps 保持一致（拖拽交换后调用） */
+function syncBranchOrder(){
+  var byId={}; nodes.forEach(function(n){ byId[n.id]=n; });
+  var list=[byId.eval];
+  branchOrder.forEach(function(id,i){
+    list.push(byId[id]);
+    var p=i+1, di=divGaps.indexOf(p);
+    if(di>=0){ var dn=byId['div'+(di+1)]; dn.g=p; list.push(dn); } // 同步分界线节点位置参数
+  });
+  list.push(byId.fsm);
+  nodes=list;
 }
 
 /* ═══════════════ 渲染引擎 ═══════════════ */
 var viewport=document.getElementById('viewport'), world=document.getElementById('world');
-var svg=document.getElementById('edges'), nodesLayer=document.getElementById('nodes');
-var scale=1, panX=30, panY=10, worldW=1400, worldH=1180;
-var nodes=defaultLayout(), edges=defaultEdges();
-var nodeMap={}, nodeEls={}, edgeEls=[], selected=null, lockBackbone=true, layerFilter=0;
-
-function nodeCenter(n){ return {x:n.x+n.w/2, y:n.y+n.h/2}; }
+var nodesLayer=document.getElementById('nodes');
+var nodes=buildNodes(), nodeMap={}, nodeEls={}, selected=null, layerFilter=0;
+worldH=layoutNodes(nodes);
 
 function applyTransform(){
   world.style.transform='translate('+panX+'px,'+panY+'px) scale('+scale+')';
@@ -311,11 +375,28 @@ function nodeHTML(n){
   }else if(n.kind==='branch'){
     var bv=BRANCH_MAP[n.bId];
     if(bv){
-      h='<div class="n-tag">第'+n.level+'层 · '+LV[n.level].name+'</div>'
-        +'<div class="n-sub">条件：'+bv.cond+'</div>'
-        +'<div class="n-result" style="color:'+lc+'">'+bv.need+'</div>'
-        +'<div class="n-tag">→ '+bv.target+'</div>';
+      h='<div style="display:flex;gap:10px;align-items:stretch;">'
+        +'<div style="flex:1 1 46%;min-width:0;border-right:1px solid rgba(255,255,255,.1);padding-right:10px;">'
+          +'<div class="n-tag">条件</div>'
+          +'<div class="n-sub" style="margin-top:2px">'+bv.cond+'</div>'
+          +'<div class="n-tag n-lvtag" style="margin-top:4px">第'+n.level+'层 · '+LV[n.level].name+'</div>'
+        +'</div>'
+        +'<div style="flex:1 1 54%;min-width:0;">'
+          +'<div class="n-tag">命中 → 需求</div>'
+          +'<div class="n-result" style="color:'+lc+'">'+bv.need+'</div>'
+          +'<div class="n-tag">→ '+bv.target+'</div>'
+        +'</div>'
+      +'</div>';
     }
+  }else if(n.kind==='divider'){
+    var lu=LV[n.k], ld=LV[n.k+1];
+    h='<div class="dv-inner">'
+      +'<span class="dv-chip" style="background:'+lu.hex+'">↑ 第'+n.k+'层 · '+lu.name+'</span>'
+      +'<span class="dv-line"></span>'
+      +'<span class="dv-grab">⋮⋮ 拖动分界</span>'
+      +'<span class="dv-line"></span>'
+      +'<span class="dv-chip" style="background:'+ld.hex+'">第'+(n.k+1)+'层 · '+ld.name+' ↓</span>'
+    +'</div>';
   }else if(n.kind==='fsm'){
     h='<div class="n-tag">⬡ decide 状态机 · 15 态</div>'
       +'<div class="n-title">PrimitiveActionState</div>'
@@ -344,57 +425,61 @@ function renderNodes(){
     nodesLayer.appendChild(el);
     nodeEls[n.id]=el; nodeMap[n.id]=n;
   });
-  renderEdges();
 }
 
-function renderEdges(){
-  svg.innerHTML='';
-  svg.setAttribute('width',worldW); svg.setAttribute('height',worldH);
-  edgeEls=[];
-  edges.forEach(function(e,i){
-    var a=nodeMap[e.from], b=nodeMap[e.to];
-    if(!a||!b) return;
-    var ac=nodeCenter(a), bc=nodeCenter(b);
-    var line=document.createElementNS('http://www.w3.org/2000/svg','line');
-    line.setAttribute('x1',ac.x); line.setAttribute('y1',ac.y);
-    line.setAttribute('x2',bc.x); line.setAttribute('y2',bc.y);
-    var m=(e.from==='eval'||e.to==='eval')?'dotted':'solid';
-    if(m==='dotted') line.setAttribute('stroke-dasharray','4 4');
-    line.setAttribute('data-e',i);
-    line.style.stroke='rgba(255,255,255,.22)';
-    svg.appendChild(line);
-    edgeEls.push({a:a.id,b:b.id,el:line});
-  });
-}
-
-function refreshEdges(){
-  edgeEls.forEach(function(e){
-    var a=nodeMap[e.a], b=nodeMap[e.b];
-    if(!a||!b) return;
-    var ac=nodeCenter(a), bc=nodeCenter(b);
-    e.el.setAttribute('x1',ac.x); e.el.setAttribute('y1',ac.y);
-    e.el.setAttribute('x2',bc.x); e.el.setAttribute('y2',bc.y);
-  });
-}
-
-/* ── 拖动节点 ── */
+/* ── 拖动卡片换序 / 拖动分界线重新分层（先不对接后端，仅本地持久化）── */
 var drag=null, lastMoved=false;
 function onNodeDown(ev,n,el){
   if(ev.button!==0 && ev.pointerType==='mouse') return;
   ev.stopPropagation();
-  if(n.locked && lockBackbone){ flashStatus('🔒 主干节点已锁定，点击「解锁主干」后可拖动'); return; }
-  el.setPointerCapture(ev.pointerId);
-  drag={id:n.id, sx:ev.clientX, sy:ev.clientY, nx:n.x, ny:n.y, moved:false};
+  try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+  if(n.kind==='divider'){
+    el.classList.add('drag-div');
+    drag={div:true, id:n.id, di:n.k-1, sy:ev.clientY, startY:n.y, moved:false};
+    lastMoved=false;
+    flashStatus('⤦ 拖动分界线到两张需求卡之间，重新划分上下方层级');
+    return;
+  }
+  if(n.anchor){ flashStatus('⛓️ 该卡片为固定锚点（评估入口/状态机），仅「需求判定卡」可拖动排序'); return; }
   el.classList.add('dragging');
+  drag={id:n.id, sy:ev.clientY, startY:n.y, moved:false};
+  lastMoved=false;
 }
 viewport.addEventListener('pointermove', function(ev){
   if(drag){
-    var n=nodeMap[drag.id];
-    var dx=(ev.clientX-drag.sx)/scale, dy=(ev.clientY-drag.sy)/scale;
-    n.x=Math.round(drag.nx+dx); n.y=Math.round(drag.ny+dy);
-    nodeEls[n.id].style.left=n.x+'px'; nodeEls[n.id].style.top=n.y+'px';
-    refreshEdges();
-    if(Math.abs(ev.clientX-drag.sx)+Math.abs(ev.clientY-drag.sy)>3) drag.moved=true;
+    if(drag.div){
+      /* 分界线：吸附到最近的间隙（保持顺序、每层至少 1 张） */
+      var py=drag.startY+(ev.clientY-drag.sy)/scale;
+      var centers=gapCenters(), best=0, bd=1e9;
+      for(var gi=0;gi<=13;gi++){ var dd=Math.abs(py-centers[gi]); if(dd<bd){bd=dd; best=gi;} }
+      var minG=(drag.di===0?1:divGaps[drag.di-1]+1);
+      var maxG=(drag.di===3?12:divGaps[drag.di+1]-1);
+      var g=Math.max(minG, Math.min(maxG, best));
+      if(g!==divGaps[drag.di]){
+        divGaps[drag.di]=g;
+        syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels();
+        flashStatus('⤦ 分界线移至第 '+g+' 张卡之后：第'+(drag.di+1)+'层 | 第'+(drag.di+2)+'层');
+      }
+      if(Math.abs(ev.clientY-drag.sy)>3) drag.moved=true;
+    }else{
+      var el=nodeEls[drag.id];
+      var dy=(ev.clientY-drag.sy)/scale;
+      var desiredY=drag.startY+dy;
+      if(Math.abs(ev.clientY-drag.sy)>3) drag.moved=true;
+      var idx=branchOrder.indexOf(drag.id);
+      var cy=desiredY+NODE_H/2;
+      var tops=branchSlotTops();
+      if(idx>0 && cy < tops[branchOrder[idx-1]]+NODE_H/2){
+        branchOrder.splice(idx,1); branchOrder.splice(idx-1,0,drag.id);
+        syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels();
+        flashStatus('↕ 顺序已交换（松手保存到 localStorage）');
+      }else if(idx<branchOrder.length-1 && cy > tops[branchOrder[idx+1]]+NODE_H/2){
+        branchOrder.splice(idx,1); branchOrder.splice(idx+1,0,drag.id);
+        syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels();
+        flashStatus('↕ 顺序已交换（松手保存到 localStorage）');
+      }
+      el.style.top=desiredY+'px'; // 拖动卡始终跟随指针
+    }
   }else if(pan){
     panX=pan.px+(ev.clientX-pan.sx); panY=pan.py+(ev.clientY-pan.sy);
     applyTransform();
@@ -402,10 +487,19 @@ viewport.addEventListener('pointermove', function(ev){
 });
 function endPointer(ev){
   if(drag){
-    var n=nodeMap[drag.id];
-    nodeEls[n.id].classList.remove('dragging');
-    lastMoved=drag.moved;
-    if(drag.moved){ saveLayout(); flashStatus('💾 布局已保存到 localStorage'); }
+    if(drag.div){
+      nodeEls[drag.id].classList.remove('drag-div');
+      if(drag.moved){ savePersist(); flashStatus('💾 分界与顺序已保存到 localStorage'); }
+    }else{
+      var el=nodeEls[drag.id];
+      el.classList.remove('dragging');
+      lastMoved=drag.moved;
+      if(drag.moved){
+        syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels(); // 松手吸附到槽位
+        savePersist();
+        flashStatus('💾 评估顺序已保存到 localStorage');
+      }
+    }
     drag=null;
   }
   if(pan){ pan=null; viewport.classList.remove('dragging'); }
@@ -416,7 +510,7 @@ viewport.addEventListener('pointercancel', endPointer);
 /* ── 画布平移 ── */
 var pan=null;
 viewport.addEventListener('pointerdown', function(ev){
-  if(ev.target===viewport || ev.target===world || ev.target===svg || ev.target.id==='edges'){
+  if(ev.target===viewport || ev.target===world){
     if(ev.button===2 || ev.pointerType==='mouse' && ev.button===0){
       viewport.setPointerCapture(ev.pointerId);
       pan={sx:ev.clientX, sy:ev.clientY, px:panX, py:panY};
@@ -438,19 +532,44 @@ viewport.addEventListener('wheel', function(ev){
   flashStatus('缩放 '+scale.toFixed(2)+'x');
 },{passive:false});
 
-/* ── 悬停高亮 ── */
+/* ── 悬停高亮（同层卡片） ── */
 function hoverNode(id,on){
-  if(!id) return;
-  edgeEls.forEach(function(e){
-    var rel=(e.a===id||e.b===id);
-    var d=(nodeEls[e.a]&&nodeEls[e.a].classList.contains('dim'))||(nodeEls[e.b]&&nodeEls[e.b].classList.contains('dim'));
+  var n=nodeMap[id]; if(!n||!n.level) return;
+  Object.keys(nodeEls).forEach(function(k){
+    var o=nodeMap[k]; if(!o.level){ nodeEls[k].classList.remove('hl'); return; }
     if(on){
-      e.el.classList.toggle('hot', rel);
-      if(!rel && !d) e.el.classList.add('dim');
+      nodeEls[k].classList.toggle('hl', o.level===n.level);
+      if(!layerFilter) nodeEls[k].classList.toggle('dim', o.level!==n.level);
     }else{
-      e.el.classList.remove('hot');
-      e.el.classList.remove('dim');
+      nodeEls[k].classList.remove('hl');
     }
+  });
+  if(!on) applyLayerFilter();
+}
+
+/* ── 层级重算：由分界线区间决定每张需求卡的当前层级 ── */
+function refreshLevels(){
+  branchOrder.forEach(function(id,i){
+    var p=i+1, lv=currentLevelOf(p), n=nodeMap[id];
+    if(!n) return;
+    n.level=lv;
+    var el=nodeEls[id]; if(!el) return;
+    el.style.setProperty('--lc', LV[lv].hex);
+    var tag=el.querySelector('.n-lvtag');
+    if(tag){
+      var bv=BRANCH_MAP[id];
+      tag.textContent='第'+lv+'层 · '+LV[lv].name+(bv.level!==lv?(' · 原:第'+bv.level+'层'):'');
+    }
+  });
+  updateLayerCounts();
+  applyLayerFilter();
+}
+function updateLayerCounts(){
+  var counts=[0,0,0,0,0];
+  branchOrder.forEach(function(id){ var n=nodeMap[id]; if(n) counts[n.level-1]++; });
+  document.querySelectorAll('.lv-row').forEach(function(r){
+    var lv=+r.dataset.lv, c=r.querySelector('.lv-cnt');
+    if(c) c.textContent=counts[lv-1]+' 项';
   });
 }
 
@@ -485,6 +604,10 @@ function showInspector(n){
       +'<div class="row"><span class="k">源码锚点</span><span class="v"><span class="anchor">'+b.anchor+'</span></span></div>'
       +'<div class="row"><span class="k">config 键</span><span class="v">'+b.cfg.map(function(x){return '<span class="cfg">'+x+'</span>';}).join('')+'</span></div>'
       +'<div class="insp-sub">命中后经 <code>fulfill_resting_need</code> 落地：<b>寻路 dispatch → Seeking* 状态</b>；若在途中目标被施密特触发器关闭 → <code>turn_around_and_route_to</code> 原地掉头重路由（routing.rs）。</div>';
+  }else if(n.kind==='divider'){
+    html+='<div class="row"><span class="k">分界线</span><span class="v">第'+n.k+'层（上方）｜第'+(n.k+1)+'层（下方）</span></div>'
+      +'<div class="row"><span class="k">当前位于</span><span class="v">第 '+n.g+' 张需求卡之后</span></div>'
+      +'<div class="insp-sub">拖动此分界线到任意两张需求卡之间，可重新划分上下方的层级归属；每层至少保留 1 张需求卡，分界线顺序不可颠倒。卡片层级 = 其所在区间。</div>';
   }else if(n.kind==='fsm'){
     html+='<div class="row"><span class="k">状态集</span><span class="v">'+FSM_STATES.length+' 个 PrimitiveActionState</span></div>'
       +'<div class="row"><span class="k">调度</span><span class="v">decide() 按 state 分发：Resting→评估；Seeking→seeking.rs 熔断重路由；现场→harvest.rs 完成判定；Return→掉头返家</span></div>'
@@ -494,14 +617,13 @@ function showInspector(n){
   card.innerHTML=html;
 }
 
-/* ── 层级过滤 ── */
+/* ── 层级颜色过滤 ── */
 function buildLayerNav(){
   var nav=document.getElementById('layerNav'); nav.innerHTML='';
   [5,4,3,2,1].forEach(function(lv){
     var d=document.createElement('div');
-    d.className='layer-card';
-    d.innerHTML='<div class="lrow"><span class="lvl-dot" style="background:'+LV[lv].hex+'"></span><span class="lname">'+LV[lv].name+'</span><span style="margin-left:auto;font-size:11px;color:var(--sub)">'+LV[lv].kinds.split('·').length+' 项</span></div>'
-      +'<div class="lkinds">'+LV[lv].kinds+'</div>';
+    d.className='lv-row';
+    d.innerHTML='<span class="lv-bar" style="background:'+LV[lv].hex+'"></span><span class="lv-name">'+LV[lv].name+'</span><span class="lv-cnt">'+LV[lv].kinds.split('·').length+' 项</span>';
     d.dataset.lv=lv;
     d.addEventListener('click', function(){ toggleLayer(lv); });
     nav.appendChild(d);
@@ -512,39 +634,61 @@ function applyLayerFilter(){
     var n=nodeMap[k];
     var dim = layerFilter && n.level && n.level!==layerFilter;
     nodeEls[k].classList.toggle('dim', !!dim);
-    nodeEls[k].classList.toggle('locked', false);
   });
-  refreshEdges();
 }
 function toggleLayer(lv){
   layerFilter = (layerFilter===lv)?0:lv;
-  var cards=document.querySelectorAll('.layer-card');
-  cards.forEach(function(cd){ cd.classList.toggle('off', layerFilter && +cd.dataset.lv!==layerFilter); });
+  document.querySelectorAll('.lv-row').forEach(function(r){ r.classList.toggle('off', layerFilter && +r.dataset.lv!==layerFilter); });
   applyLayerFilter();
   flashStatus(layerFilter?('高亮第 '+layerFilter+' 层'):'清除层级过滤');
 }
 
-/* ── 工具栏 ── */
+/* ── 工具栏与持久化 ── */
 function flashStatus(t){ document.getElementById('statusTip').textContent=t; }
-function saveLayout(){
-  try{ localStorage.setItem('decisionViz.layout.v1', JSON.stringify({nodes:nodes.map(function(n){return {id:n.id,x:n.x,y:n.y};}),scale:scale,panX:panX,panY:panY})); }catch(e){}
+function savePersist(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify({order:branchOrder, dividers:divGaps, scale:scale, panX:panX, panY:panY})); }catch(e){}
 }
-function restoreLayout(){
+function loadPersist(){
+  var d={order:DEFAULT_ORDER.slice(), dividers:DEFAULT_DIVGAPS.slice(), scale:1, panX:30, panY:10};
   try{
-    var raw=localStorage.getItem('decisionViz.layout.v1'); if(!raw) return false;
-    var d=JSON.parse(raw);
-    d.nodes.forEach(function(p){ if(nodeMap[p.id]){ nodeMap[p.id].x=p.x; nodeMap[p.id].y=p.y; } });
-    if(d.scale){ scale=d.scale; panX=d.panX; panY=d.panY; }
-    nodes.forEach(function(n){ var el=nodeEls[n.id]; if(el){ el.style.left=n.x+'px'; el.style.top=n.y+'px'; } });
-    refreshEdges(); applyTransform();
-    return true;
-  }catch(e){ return false; }
+    var raw=localStorage.getItem(STORE_KEY); if(!raw) return d;
+    var o=JSON.parse(raw);
+    if(Array.isArray(o.order)){
+      var valid=o.order.filter(function(id){return BRANCH_MAP[id];});
+      DEFAULT_ORDER.forEach(function(id){ if(valid.indexOf(id)<0) valid.push(id); });
+      d.order=valid;
+    }
+    if(Array.isArray(o.dividers) && o.dividers.length===4){
+      var dg=o.dividers.map(function(x){ return Math.max(1, Math.min(12, Math.round(Number(x)||0))); });
+      for(var i=1;i<4;i++){ if(dg[i]<=dg[i-1]) dg[i]=dg[i-1]+1; }
+      if(dg[3]<=12) d.dividers=dg;
+    }
+    if(typeof o.scale==='number') d.scale=o.scale;
+    if(typeof o.panX==='number') d.panX=o.panX;
+    if(typeof o.panY==='number') d.panY=o.panY;
+  }catch(e){}
+  return d;
 }
-function resetLayout(){
-  nodes=defaultLayout(); nodeMap={};
-  renderNodes(); applyTransform(); layerFilter=0;
-  document.querySelectorAll('.layer-card').forEach(function(cd){cd.classList.remove('off');});
-  flashStatus('↺ 已重置为默认确定性布局');
+function relayout(){
+  nodes=buildNodes();
+  worldH=layoutNodes(nodes);
+  renderNodes();
+  refreshLevels();
+}
+function resetOrder(){
+  branchOrder=DEFAULT_ORDER.slice();
+  divGaps=DEFAULT_DIVGAPS.slice();
+  localStorage.removeItem(STORE_KEY);
+  layerFilter=0;
+  document.querySelectorAll('.lv-row').forEach(function(r){r.classList.remove('off');});
+  relayout(); fit();
+  flashStatus('↺ 已重置为代码默认评估顺序与默认分界（b1→b13）');
+}
+function restoreOrder(){
+  var d=loadPersist();
+  branchOrder=d.order; divGaps=d.dividers; scale=d.scale; panX=d.panX; panY=d.panY;
+  relayout(); applyTransform();
+  flashStatus('📂 已还原保存的评估顺序、分界与视图');
 }
 function fit(){
   var rect=viewport.getBoundingClientRect();
@@ -554,16 +698,10 @@ function fit(){
   panX=(rect.width-worldW*scale)/2; panY=(rect.height-worldH*scale)/2;
   applyTransform(); flashStatus('🎯 已适应窗口');
 }
-document.getElementById('btnReset').addEventListener('click', resetLayout);
-document.getElementById('btnSave').addEventListener('click', function(){ saveLayout(); flashStatus('💾 布局已保存'); });
-document.getElementById('btnRestore').addEventListener('click', function(){ restoreLayout()?flashStatus('📂 已还原保存的布局'):flashStatus('无保存的布局'); });
+document.getElementById('btnReset').addEventListener('click', resetOrder);
+document.getElementById('btnSave').addEventListener('click', function(){ savePersist(); flashStatus('💾 评估顺序与视图已保存'); });
+document.getElementById('btnRestore').addEventListener('click', restoreOrder);
 document.getElementById('btnFit').addEventListener('click', fit);
-document.getElementById('btnLock').addEventListener('click', function(){
-  lockBackbone=!lockBackbone;
-  var b=document.getElementById('btnLock');
-  b.textContent=lockBackbone?'🔒 锁定主干':'🔓 解锁主干';
-  flashStatus(lockBackbone?'主干已锁定（分支节点仍可拖动）':'主干已解锁');
-});
 
 /* ── 标签页切换 ── */
 document.querySelectorAll('.tab').forEach(function(t){
@@ -701,10 +839,14 @@ document.getElementById('tStamina').addEventListener('input',function(e){ docume
 /* ═══════════════ 启动 ═══════════════ */
 function init(){
   buildLayerNav();
+  nodes=buildNodes();
+  worldH=layoutNodes(nodes);
   renderNodes();
+  refreshLevels();
   renderAgents();
   drawSchmitt();
-  if(!restoreLayout()) fit();
+  applyTransform();
+  flashStatus('就绪 · '+branchOrder.length+' 条需求判定 · 4 条分界线（拖分界线定义层级归属）');
 }
 window.addEventListener('resize', function(){ if(document.querySelector('.tab.on').dataset.tab==='logic') fit(); });
 init();
