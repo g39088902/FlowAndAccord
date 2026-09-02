@@ -36,7 +36,6 @@
 | `agentStealthVisibilityCovert` | f32 | 0.25 | 隐秘特工可见度 |
 | `agentStealthVisibilityNormal` | f32 | 1 | 普通族人可见度 |
 | `agentRestStaminaRecoveryRate` | f32 | 8 | 营地/家宅休息时基础体力恢复速率 (每秒，乘睡眠效率) |
-| `agentConstructStaminaBurn` | f32 | 3.5 | 营建/升级房屋体力消耗速率 (每秒) |
 | `agentRepairStaminaBurn` | f32 | 2.5 | 修缮房屋体力消耗速率 (每秒) |
 | `agentGatherStaminaBurn` | f32 | 2 | 伐木/采石/淘金体力消耗速率 (每秒) |
 | `agentLaborStaminaFloor` | f32 | 5 | 劳作体力消耗后的最低保留体力下限 |
@@ -107,28 +106,32 @@
 | `decisionFoundHomeDistMin` | f32 | 24 | 立宅候选点与现有房屋的硬间距下限 (m) |
 | `decisionFoundHomeDistMax` | f32 | 80 | 立宅候选点与营地的软间距上限 (m) |
 | `decisionWorkStaminaThreshold` | f32 | 50 | 劳作所需最低体力 (低于则返家休息) |
+| `decisionFamilyStockTriggerOn` | f32 | 100 | M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采 |
+| `decisionFamilyStockTriggerOff` | f32 | 200 | M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止 |
 | `houseDurabilityMax` | f32 | 100 | 房屋耐久上限 |
 | `houseDepreciationRate` | f32 | 0.02 | 房屋耐久自然折旧速率 (每秒) |
 | `houseRepairTriggerThreshold` | f32 | 80 | 耐久低于此值允许修缮 |
 | `houseRepairSpeed` | f32 | 5 | 修缮进度速率 (每秒) |
-| `houseBuildTimeTier0To1` | f32 | 30 | 0→1 级建造时长 (秒) |
-| `houseBuildTimeTier1To2` | f32 | 45 | 1→2 级建造时长 |
-| `houseBuildTimeTier2To3` | f32 | 60 | 2→3 级建造时长 |
-| `houseBuildTimeTier3To4` | f32 | 90 | 3→4 级建造时长 |
-| `houseCapacityTier0` | f32 | 20 | 0 级仓库仓储容量 |
-| `houseCapacityTier1` | f32 | 40 | 1 级茅草房仓储容量 |
-| `houseCapacityTier2` | f32 | 80 | 2 级半棚屋仓储容量 |
-| `houseCapacityTier3` | f32 | 120 | 3 级木石庄舍仓储容量 |
-| `houseCapacityTier4` | f32 | 160 | 4 级大庄园仓储容量 |
-| `houseUpgradeTier0WaterRatio` | f32 | 0.9 | 0 级升级所需水占比 |
-| `houseUpgradeTier0FoodRatio` | f32 | 0.9 | 0 级升级所需粮占比 |
-| `houseUpgradeTier1WoodRatio` | f32 | 0.85 | 1 级升级所需木占比 |
-| `houseUpgradeTier1FoodWaterRatio` | f32 | 0.5 | 1 级升级所需水粮占比 |
-| `houseUpgradeTier2StoneRatio` | f32 | 0.85 | 2 级升级所需石占比 |
-| `houseUpgradeTier2OtherRatio` | f32 | 0.5 | 2 级升级所需水粮木占比 |
-| `houseUpgradeTier3GoldStoneRatio` | f32 | 0.85 | 3 级升级所需金石占比 |
-| `houseUpgradeTier3OtherRatio` | f32 | 0.5 | 3 级升级所需水粮木占比 |
-| `houseFertilityStockRatio` | f32 | 0.5 | 户主受孕所需仓储充裕比例 |
+| `houseUpgradeCostTier1Water` | f32 | 50 | 升到 1 级：水 |
+| `houseUpgradeCostTier1Food` | f32 | 50 | 升到 1 级：粮 |
+| `houseUpgradeCostTier1Wood` | f32 | 0 | 升到 1 级：木（不消耗） |
+| `houseUpgradeCostTier1Stone` | f32 | 0 | 升到 1 级：石（不消耗） |
+| `houseUpgradeCostTier1Gold` | f32 | 0 | 升到 1 级：金（不消耗） |
+| `houseUpgradeCostTier2Water` | f32 | 75 | 升到 2 级：水 |
+| `houseUpgradeCostTier2Food` | f32 | 75 | 升到 2 级：粮 |
+| `houseUpgradeCostTier2Wood` | f32 | 75 | 升到 2 级：木 |
+| `houseUpgradeCostTier2Stone` | f32 | 0 | 升到 2 级：石（不消耗） |
+| `houseUpgradeCostTier2Gold` | f32 | 0 | 升到 2 级：金（不消耗） |
+| `houseUpgradeCostTier3Water` | f32 | 100 | 升到 3 级：水 |
+| `houseUpgradeCostTier3Food` | f32 | 100 | 升到 3 级：粮 |
+| `houseUpgradeCostTier3Wood` | f32 | 100 | 升到 3 级：木 |
+| `houseUpgradeCostTier3Stone` | f32 | 100 | 升到 3 级：石 |
+| `houseUpgradeCostTier3Gold` | f32 | 0 | 升到 3 级：金（不消耗） |
+| `houseUpgradeCostTier4Water` | f32 | 125 | 升到 4 级：水 |
+| `houseUpgradeCostTier4Food` | f32 | 125 | 升到 4 级：粮 |
+| `houseUpgradeCostTier4Wood` | f32 | 125 | 升到 4 级：木 |
+| `houseUpgradeCostTier4Stone` | f32 | 125 | 升到 4 级：石 |
+| `houseUpgradeCostTier4Gold` | f32 | 125 | 升到 4 级：金 |
 | `houseWinterWoodBurnRate` | f32 | 0.12 | 冬季供暖木材消耗速率 (每秒) |
 | `houseWinterColdTemp` | f32 | 5 | 低温供暖阈值 (℃) |
 | `houseMinSpacing` | f32 | 20 | 房屋间最小水平间距 (m) |

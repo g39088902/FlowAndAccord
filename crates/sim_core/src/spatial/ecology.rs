@@ -3,7 +3,7 @@ use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
 use super::poi::{PrimitivePoi, PoiType};
-use super::house::HouseTier;
+use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::world::World3DEngine;
 
 impl World3DEngine {
@@ -29,8 +29,6 @@ impl World3DEngine {
         self.region_registry.clear();
         self.expedition_targets.clear();
         self.relief_cooldown.clear();
-        // ★ M2 旁路记账缓存同步清空
-        self.prev_carried.clear();
 
         let mut camp_nodes = Vec::new();
         let mut water_nodes = Vec::new();
@@ -347,45 +345,87 @@ impl World3DEngine {
                     }
                 }
                 PrimitiveActionState::RestingAtCamp => {
-                    if let Some(hid) = agent.home_house_id {
-                        if let Some(house) = self.houses.iter_mut().find(|h| h.id == hid) {
-                            let deposit_rate = unload_res * dt;
-                            if agent.carried_water > 0.01 && house.pantry_water < house.max_pantry_water {
-                                let d = agent.carried_water.min(house.max_pantry_water - house.pantry_water).min(deposit_rate);
-                                house.pantry_water += d;
-                                agent.carried_water -= d;
-                            }
-                            if agent.carried_food > 0.01 && house.pantry_food < house.max_pantry_food {
-                                let d = agent.carried_food.min(house.max_pantry_food - house.pantry_food).min(deposit_rate);
-                                house.pantry_food += d;
-                                agent.carried_food -= d;
-                            }
-                            if agent.carried_wood > 0.01 && house.pantry_wood < house.max_pantry_wood {
-                                let d = agent.carried_wood.min(house.max_pantry_wood - house.pantry_wood).min(deposit_rate);
-                                house.pantry_wood += d;
-                                agent.carried_wood -= d;
-                            }
-                            if agent.carried_stone > 0.01 && house.pantry_stone < house.max_pantry_stone {
-                                let d = agent.carried_stone.min(house.max_pantry_stone - house.pantry_stone).min(deposit_rate);
-                                house.pantry_stone += d;
-                                agent.carried_stone -= d;
-                            }
-                            if house.tier != HouseTier::Tier0Warehouse {
-                                if agent.thirst < self.config.agent_thirst_capacity && house.pantry_water > 0.05 {
-                                    let drink_amount = (self.config.agent_thirst_capacity - agent.thirst).min(house.pantry_water).min(self.config.camp_home_consume_rate * dt);
-                                    house.pantry_water = (house.pantry_water - drink_amount).max(0.0);
-                                    agent.thirst = (agent.thirst + drink_amount).min(self.config.agent_thirst_capacity);
-                                }
-                                if agent.hunger < self.config.agent_hunger_capacity && house.pantry_food > 0.05 {
-                                    let eat_amount = (self.config.agent_hunger_capacity - agent.hunger).min(house.pantry_food).min(self.config.camp_home_consume_rate * dt);
-                                    house.pantry_food = (house.pantry_food - eat_amount).max(0.0);
-                                    agent.hunger = (agent.hunger + eat_amount).min(self.config.agent_hunger_capacity);
+                    // ★ M6 终态：家户账本 = 家庭物资唯一真相源。
+                    // 行囊按速率卸入「家户账本」（Deposit: Personal → Family）；
+                    // 吃喝从家户账本真实扣减（Consume: Family → Void）。
+                    // 房屋 pantry 已删除：无容量上限、无房屋等级/0 级门槛，凡有家户即享家庭储备。
+                    if let Some(hh_hid) = self.household_registry.household_of(agent.id) {
+                        let tick = self.tick_counter;
+                        let deposit_rate = unload_res * dt;
+                        // —— 卸货入账：水 ——
+                        if agent.carried_water > 0.01 {
+                            let d = agent.carried_water.min(deposit_rate);
+                            agent.carried_water -= d;
+                            if d > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.credit(ResourceKind::Water, d);
+                                    hh.group.ledger.push_transfer(TransferRecord { tick, from: LedgerRef::Personal(agent.id), to: LedgerRef::Family(hh_hid), resource: ResourceKind::Water, amount: d, reason: TransferReason::Deposit });
                                 }
                             }
-                            if agent.carried_gold > 0.01 && house.pantry_gold < house.max_pantry_gold {
-                                let deposit = agent.carried_gold.min(house.max_pantry_gold - house.pantry_gold).min(unload_gold * dt);
-                                house.pantry_gold = (house.pantry_gold + deposit).min(house.max_pantry_gold);
-                                agent.carried_gold = (agent.carried_gold - deposit).max(0.0);
+                        }
+                        // —— 卸货入账：粮 ——
+                        if agent.carried_food > 0.01 {
+                            let d = agent.carried_food.min(deposit_rate);
+                            agent.carried_food -= d;
+                            if d > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.credit(ResourceKind::Food, d);
+                                    hh.group.ledger.push_transfer(TransferRecord { tick, from: LedgerRef::Personal(agent.id), to: LedgerRef::Family(hh_hid), resource: ResourceKind::Food, amount: d, reason: TransferReason::Deposit });
+                                }
+                            }
+                        }
+                        // —— 卸货入账：木 ——
+                        if agent.carried_wood > 0.01 {
+                            let d = agent.carried_wood.min(deposit_rate);
+                            agent.carried_wood -= d;
+                            if d > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.credit(ResourceKind::Wood, d);
+                                    hh.group.ledger.push_transfer(TransferRecord { tick, from: LedgerRef::Personal(agent.id), to: LedgerRef::Family(hh_hid), resource: ResourceKind::Wood, amount: d, reason: TransferReason::Deposit });
+                                }
+                            }
+                        }
+                        // —— 卸货入账：石 ——
+                        if agent.carried_stone > 0.01 {
+                            let d = agent.carried_stone.min(deposit_rate);
+                            agent.carried_stone -= d;
+                            if d > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.credit(ResourceKind::Stone, d);
+                                    hh.group.ledger.push_transfer(TransferRecord { tick, from: LedgerRef::Personal(agent.id), to: LedgerRef::Family(hh_hid), resource: ResourceKind::Stone, amount: d, reason: TransferReason::Deposit });
+                                }
+                            }
+                        }
+                        // —— 卸货入账：金 ——
+                        if agent.carried_gold > 0.01 {
+                            let deposit = agent.carried_gold.min(unload_gold * dt);
+                            agent.carried_gold = (agent.carried_gold - deposit).max(0.0);
+                            if deposit > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.credit(ResourceKind::Gold, deposit);
+                                    hh.group.ledger.push_transfer(TransferRecord { tick, from: LedgerRef::Personal(agent.id), to: LedgerRef::Family(hh_hid), resource: ResourceKind::Gold, amount: deposit, reason: TransferReason::Deposit });
+                                }
+                            }
+                        }
+                        // —— 吃喝：从家户账本真实扣减 ——
+                        let ledger_water = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Water)).unwrap_or(0.0);
+                        if agent.thirst < self.config.agent_thirst_capacity && ledger_water > 0.05 {
+                            let drink_amount = (self.config.agent_thirst_capacity - agent.thirst).min(ledger_water).min(self.config.camp_home_consume_rate * dt);
+                            agent.thirst = (agent.thirst + drink_amount).min(self.config.agent_thirst_capacity);
+                            if drink_amount > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.record_consumption(LedgerRef::Family(hh_hid), ResourceKind::Water, drink_amount, TransferReason::Consume, tick);
+                                }
+                            }
+                        }
+                        let ledger_food = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Food)).unwrap_or(0.0);
+                        if agent.hunger < self.config.agent_hunger_capacity && ledger_food > 0.05 {
+                            let eat_amount = (self.config.agent_hunger_capacity - agent.hunger).min(ledger_food).min(self.config.camp_home_consume_rate * dt);
+                            agent.hunger = (agent.hunger + eat_amount).min(self.config.agent_hunger_capacity);
+                            if eat_amount > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                    hh.group.ledger.record_consumption(LedgerRef::Family(hh_hid), ResourceKind::Food, eat_amount, TransferReason::Consume, tick);
+                                }
                             }
                         }
                     }

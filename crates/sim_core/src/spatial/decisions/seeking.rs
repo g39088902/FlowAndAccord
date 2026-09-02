@@ -1,6 +1,6 @@
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
-use super::super::house::HouseTier;
+use super::super::ledger::journal::ResourceKind;
 use super::needs::*;
 use super::evaluate::Decisioner;
 
@@ -14,11 +14,12 @@ impl<'a> Decisioner<'a> {
 
         if agent.stamina < self.config.decision_work_stamina_threshold || gold_interrupted {
             if gold_interrupted {
-                let is_building_stock = agent.home_house_id
-                    .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
-                    .map(|h| h.tier == HouseTier::Tier3Homestead && h.pantry_gold < h.max_pantry_gold)
-                    .unwrap_or(false);
-                agent.gold_mining_cooldown = if is_building_stock { self.config.decision_stock_gold_cooldown } else { self.config.decision_gold_wealth_cooldown };
+                // ★ M7 冷却区分：家庭储备缺金（trigger ON）→ StockGold；已补足（4级庄园娱乐淘金）→ GoldWealth
+                agent.gold_mining_cooldown = if family_stock_on(agent, ResourceKind::Gold) {
+                    self.config.decision_stock_gold_cooldown
+                } else {
+                    self.config.decision_gold_wealth_cooldown
+                };
             }
             agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);

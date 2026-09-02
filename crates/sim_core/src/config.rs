@@ -49,9 +49,8 @@ pub const AGENT_STEALTH_VISIBILITY_COVERT: f32 = 0.25;
 pub const AGENT_STEALTH_VISIBILITY_NORMAL: f32 = 1.0;
 /// 营地/家宅休息时基础体力恢复速率 (单位/秒，乘以睡眠效率比例)
 pub const AGENT_REST_STAMINA_RECOVERY_RATE: f32 = 8.0;
-/// 营建/升级房屋时的体力消耗速率 (单位/秒)
-pub const AGENT_CONSTRUCT_STAMINA_BURN: f32 = 3.5;
 /// 修缮房屋时的体力消耗速率 (单位/秒)
+/// ★ M6 升级瞬时化：房屋升级不再消耗体力，已删除 agent_construct_stamina_burn
 pub const AGENT_REPAIR_STAMINA_BURN: f32 = 2.5;
 /// 伐木/采石/淘金时的体力消耗速率 (单位/秒)
 pub const AGENT_GATHER_STAMINA_BURN: f32 = 2.0;
@@ -160,6 +159,10 @@ pub const DECISION_FOUND_HOME_CANDIDATES: usize = 12;
 pub const DECISION_FOUND_HOME_DIST_MIN: f32 = 24.0;
 pub const DECISION_FOUND_HOME_DIST_MAX: f32 = 80.0;
 pub const DECISION_WORK_STAMINA_THRESHOLD: f32 = 50.0;
+/// M7 家庭库存施密特触发器：触发下限（家户账本余额低于此值 → 置 ON 去采）
+pub const DECISION_FAMILY_STOCK_TRIGGER_ON: f32 = 100.0;
+/// M7 家庭库存施密特触发器：结束上限（一旦 ON，余额 ≥ 此值 → 置 OFF 补足）
+pub const DECISION_FAMILY_STOCK_TRIGGER_OFF: f32 = 200.0;
 
 // ============================================================================
 // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -168,24 +171,43 @@ pub const HOUSE_DURABILITY_MAX: f32 = 100.0;
 pub const HOUSE_DEPRECIATION_RATE: f32 = 0.02;
 pub const HOUSE_REPAIR_TRIGGER_THRESHOLD: f32 = 80.0;
 pub const HOUSE_REPAIR_SPEED: f32 = 5.0;
-pub const HOUSE_BUILD_TIME_TIER0_TO_1: f32 = 30.0;
-pub const HOUSE_BUILD_TIME_TIER1_TO_2: f32 = 45.0;
-pub const HOUSE_BUILD_TIME_TIER2_TO_3: f32 = 60.0;
-pub const HOUSE_BUILD_TIME_TIER3_TO_4: f32 = 90.0;
-pub const HOUSE_CAPACITY_TIER0: f32 = 20.0;
-pub const HOUSE_CAPACITY_TIER1: f32 = 40.0;
-pub const HOUSE_CAPACITY_TIER2: f32 = 80.0;
-pub const HOUSE_CAPACITY_TIER3: f32 = 120.0;
-pub const HOUSE_CAPACITY_TIER4: f32 = 160.0;
-pub const HOUSE_UPGRADE_TIER0_WATER_RATIO: f32 = 0.90;
-pub const HOUSE_UPGRADE_TIER0_FOOD_RATIO: f32 = 0.90;
-pub const HOUSE_UPGRADE_TIER1_WOOD_RATIO: f32 = 0.85;
-pub const HOUSE_UPGRADE_TIER1_FOOD_WATER_RATIO: f32 = 0.50;
-pub const HOUSE_UPGRADE_TIER2_STONE_RATIO: f32 = 0.85;
-pub const HOUSE_UPGRADE_TIER2_OTHER_RATIO: f32 = 0.50;
-pub const HOUSE_UPGRADE_TIER3_GOLD_STONE_RATIO: f32 = 0.85;
-pub const HOUSE_UPGRADE_TIER3_OTHER_RATIO: f32 = 0.50;
-pub const HOUSE_FERTILITY_STOCK_RATIO: f32 = 0.50;
+/// ★ M6 房屋升级瞬时化：不再有施工工时，已删除 house_build_time_tier*_to_*
+/// ★ M8：以下 14 个字段已删除——升级成本改由下方「M8 材料成本矩阵」20 个字段直接承载，
+/// 不再需要 capacity（容量基准）× ratio（比率）推导：
+///   house_capacity_tier0..4、house_upgrade_tier{0..3}_*_ratio、house_fertility_stock_ratio
+
+// ----------------------------------------------------------------------------
+// ★ M8 房屋升级材料成本矩阵（4 级 × 5 资源，共 20 个超参）
+// 语义：`house_upgrade_cost_tierN_*` = 升到 N 级时，该品类一次性扣除的数量。
+// 该级不消耗的品类填 0.0（扣账时 `amt > 0.001` 守卫自动跳过；就绪判定 `balance >= amt - 1e-3` 恒成立）。
+// 单一真相源：同时供 construction.rs 一次性扣账 与 branches.rs b8/b11 升级就绪判定 使用。
+// 行数 = 目标等级：Tier1 行=升到1级(0→1)；Tier2 行=升到2级(1→2)；Tier3 行=升到3级(2→3)；Tier4 行=升到4级(3→4)。
+// ----------------------------------------------------------------------------
+// 升到 1 级（0→1）：水 50、粮 50（木/石/金不消耗）
+pub const HOUSE_UPGRADE_COST_TIER1_WATER: f32 = 50.0;
+pub const HOUSE_UPGRADE_COST_TIER1_FOOD: f32 = 50.0;
+pub const HOUSE_UPGRADE_COST_TIER1_WOOD: f32 = 0.0;
+pub const HOUSE_UPGRADE_COST_TIER1_STONE: f32 = 0.0;
+pub const HOUSE_UPGRADE_COST_TIER1_GOLD: f32 = 0.0;
+// 升到 2 级（1→2）：木 75、粮 75、水 75（石/金不消耗）
+pub const HOUSE_UPGRADE_COST_TIER2_WATER: f32 = 75.0;
+pub const HOUSE_UPGRADE_COST_TIER2_FOOD: f32 = 75.0;
+pub const HOUSE_UPGRADE_COST_TIER2_WOOD: f32 = 75.0;
+pub const HOUSE_UPGRADE_COST_TIER2_STONE: f32 = 0.0;
+pub const HOUSE_UPGRADE_COST_TIER2_GOLD: f32 = 0.0;
+// 升到 3 级（2→3）：石 100、木 100、粮 100、水 100（金不消耗）
+pub const HOUSE_UPGRADE_COST_TIER3_WATER: f32 = 100.0;
+pub const HOUSE_UPGRADE_COST_TIER3_FOOD: f32 = 100.0;
+pub const HOUSE_UPGRADE_COST_TIER3_WOOD: f32 = 100.0;
+pub const HOUSE_UPGRADE_COST_TIER3_STONE: f32 = 100.0;
+pub const HOUSE_UPGRADE_COST_TIER3_GOLD: f32 = 0.0;
+// 升到 4 级（3→4）：金 125、石 125、木 125、粮 125、水 125（全品类）
+pub const HOUSE_UPGRADE_COST_TIER4_WATER: f32 = 125.0;
+pub const HOUSE_UPGRADE_COST_TIER4_FOOD: f32 = 125.0;
+pub const HOUSE_UPGRADE_COST_TIER4_WOOD: f32 = 125.0;
+pub const HOUSE_UPGRADE_COST_TIER4_STONE: f32 = 125.0;
+pub const HOUSE_UPGRADE_COST_TIER4_GOLD: f32 = 125.0;
+
 pub const HOUSE_WINTER_WOOD_BURN_RATE: f32 = 0.12;
 pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
 pub const HOUSE_MIN_SPACING: f32 = 20.0;
@@ -318,7 +340,6 @@ pub struct SimConfig {
     pub agent_stealth_visibility_covert: f32,
     pub agent_stealth_visibility_normal: f32,
     pub agent_rest_stamina_recovery_rate: f32,
-    pub agent_construct_stamina_burn: f32,
     pub agent_repair_stamina_burn: f32,
     pub agent_gather_stamina_burn: f32,
     pub agent_labor_stamina_floor: f32,
@@ -395,6 +416,10 @@ pub struct SimConfig {
     pub decision_found_home_dist_min: f32,
     pub decision_found_home_dist_max: f32,
     pub decision_work_stamina_threshold: f32,
+    /// M7 家庭库存施密特触发下限（余额低于此 → 去采）
+    pub decision_family_stock_trigger_on: f32,
+    /// M7 家庭库存施密特结束上限（ON 后余额达此 → 补足停止）
+    pub decision_family_stock_trigger_off: f32,
     /// 决策分支评估顺序（13 个分支 ID，如 "b1".."b13"）。
     /// ⚠️ §4.12 三处规约的文档化例外：Rust 层**无策展顺序**，默认空 Vec = 未注入，
     /// 空/非法时按 branches.rs 声明序中性兜底；权威顺序在前端 `config.decision-order.js`。
@@ -408,24 +433,27 @@ pub struct SimConfig {
     pub house_depreciation_rate: f32,
     pub house_repair_trigger_threshold: f32,
     pub house_repair_speed: f32,
-    pub house_build_time_tier0_to_1: f32,
-    pub house_build_time_tier1_to_2: f32,
-    pub house_build_time_tier2_to_3: f32,
-    pub house_build_time_tier3_to_4: f32,
-    pub house_capacity_tier0: f32,
-    pub house_capacity_tier1: f32,
-    pub house_capacity_tier2: f32,
-    pub house_capacity_tier3: f32,
-    pub house_capacity_tier4: f32,
-    pub house_upgrade_tier0_water_ratio: f32,
-    pub house_upgrade_tier0_food_ratio: f32,
-    pub house_upgrade_tier1_wood_ratio: f32,
-    pub house_upgrade_tier1_food_water_ratio: f32,
-    pub house_upgrade_tier2_stone_ratio: f32,
-    pub house_upgrade_tier2_other_ratio: f32,
-    pub house_upgrade_tier3_gold_stone_ratio: f32,
-    pub house_upgrade_tier3_other_ratio: f32,
-    pub house_fertility_stock_ratio: f32,
+    // ★ M8 房屋升级材料成本矩阵（4 级 × 5 资源；升到 N 级时该品类一次性扣除量，不消耗填 0）
+    pub house_upgrade_cost_tier1_water: f32,
+    pub house_upgrade_cost_tier1_food: f32,
+    pub house_upgrade_cost_tier1_wood: f32,
+    pub house_upgrade_cost_tier1_stone: f32,
+    pub house_upgrade_cost_tier1_gold: f32,
+    pub house_upgrade_cost_tier2_water: f32,
+    pub house_upgrade_cost_tier2_food: f32,
+    pub house_upgrade_cost_tier2_wood: f32,
+    pub house_upgrade_cost_tier2_stone: f32,
+    pub house_upgrade_cost_tier2_gold: f32,
+    pub house_upgrade_cost_tier3_water: f32,
+    pub house_upgrade_cost_tier3_food: f32,
+    pub house_upgrade_cost_tier3_wood: f32,
+    pub house_upgrade_cost_tier3_stone: f32,
+    pub house_upgrade_cost_tier3_gold: f32,
+    pub house_upgrade_cost_tier4_water: f32,
+    pub house_upgrade_cost_tier4_food: f32,
+    pub house_upgrade_cost_tier4_wood: f32,
+    pub house_upgrade_cost_tier4_stone: f32,
+    pub house_upgrade_cost_tier4_gold: f32,
     pub house_winter_wood_burn_rate: f32,
     pub house_winter_cold_temp: f32,
     pub house_min_spacing: f32,
@@ -516,7 +544,6 @@ impl Default for SimConfig {
             agent_stealth_visibility_covert: AGENT_STEALTH_VISIBILITY_COVERT,
             agent_stealth_visibility_normal: AGENT_STEALTH_VISIBILITY_NORMAL,
             agent_rest_stamina_recovery_rate: AGENT_REST_STAMINA_RECOVERY_RATE,
-            agent_construct_stamina_burn: AGENT_CONSTRUCT_STAMINA_BURN,
             agent_repair_stamina_burn: AGENT_REPAIR_STAMINA_BURN,
             agent_gather_stamina_burn: AGENT_GATHER_STAMINA_BURN,
             agent_labor_stamina_floor: AGENT_LABOR_STAMINA_FLOOR,
@@ -593,6 +620,8 @@ impl Default for SimConfig {
             decision_found_home_dist_min: DECISION_FOUND_HOME_DIST_MIN,
             decision_found_home_dist_max: DECISION_FOUND_HOME_DIST_MAX,
             decision_work_stamina_threshold: DECISION_WORK_STAMINA_THRESHOLD,
+            decision_family_stock_trigger_on: DECISION_FAMILY_STOCK_TRIGGER_ON,
+            decision_family_stock_trigger_off: DECISION_FAMILY_STOCK_TRIGGER_OFF,
             // Rust 无策展顺序：空 = 未注入（中性兜底），权威值在前端 config.decision-order.js
             decision_eval_order: Vec::new(),
             decision_eval_levels: Vec::new(),
@@ -602,24 +631,26 @@ impl Default for SimConfig {
             house_depreciation_rate: HOUSE_DEPRECIATION_RATE,
             house_repair_trigger_threshold: HOUSE_REPAIR_TRIGGER_THRESHOLD,
             house_repair_speed: HOUSE_REPAIR_SPEED,
-            house_build_time_tier0_to_1: HOUSE_BUILD_TIME_TIER0_TO_1,
-            house_build_time_tier1_to_2: HOUSE_BUILD_TIME_TIER1_TO_2,
-            house_build_time_tier2_to_3: HOUSE_BUILD_TIME_TIER2_TO_3,
-            house_build_time_tier3_to_4: HOUSE_BUILD_TIME_TIER3_TO_4,
-            house_capacity_tier0: HOUSE_CAPACITY_TIER0,
-            house_capacity_tier1: HOUSE_CAPACITY_TIER1,
-            house_capacity_tier2: HOUSE_CAPACITY_TIER2,
-            house_capacity_tier3: HOUSE_CAPACITY_TIER3,
-            house_capacity_tier4: HOUSE_CAPACITY_TIER4,
-            house_upgrade_tier0_water_ratio: HOUSE_UPGRADE_TIER0_WATER_RATIO,
-            house_upgrade_tier0_food_ratio: HOUSE_UPGRADE_TIER0_FOOD_RATIO,
-            house_upgrade_tier1_wood_ratio: HOUSE_UPGRADE_TIER1_WOOD_RATIO,
-            house_upgrade_tier1_food_water_ratio: HOUSE_UPGRADE_TIER1_FOOD_WATER_RATIO,
-            house_upgrade_tier2_stone_ratio: HOUSE_UPGRADE_TIER2_STONE_RATIO,
-            house_upgrade_tier2_other_ratio: HOUSE_UPGRADE_TIER2_OTHER_RATIO,
-            house_upgrade_tier3_gold_stone_ratio: HOUSE_UPGRADE_TIER3_GOLD_STONE_RATIO,
-            house_upgrade_tier3_other_ratio: HOUSE_UPGRADE_TIER3_OTHER_RATIO,
-            house_fertility_stock_ratio: HOUSE_FERTILITY_STOCK_RATIO,
+            house_upgrade_cost_tier1_water: HOUSE_UPGRADE_COST_TIER1_WATER,
+            house_upgrade_cost_tier1_food: HOUSE_UPGRADE_COST_TIER1_FOOD,
+            house_upgrade_cost_tier1_wood: HOUSE_UPGRADE_COST_TIER1_WOOD,
+            house_upgrade_cost_tier1_stone: HOUSE_UPGRADE_COST_TIER1_STONE,
+            house_upgrade_cost_tier1_gold: HOUSE_UPGRADE_COST_TIER1_GOLD,
+            house_upgrade_cost_tier2_water: HOUSE_UPGRADE_COST_TIER2_WATER,
+            house_upgrade_cost_tier2_food: HOUSE_UPGRADE_COST_TIER2_FOOD,
+            house_upgrade_cost_tier2_wood: HOUSE_UPGRADE_COST_TIER2_WOOD,
+            house_upgrade_cost_tier2_stone: HOUSE_UPGRADE_COST_TIER2_STONE,
+            house_upgrade_cost_tier2_gold: HOUSE_UPGRADE_COST_TIER2_GOLD,
+            house_upgrade_cost_tier3_water: HOUSE_UPGRADE_COST_TIER3_WATER,
+            house_upgrade_cost_tier3_food: HOUSE_UPGRADE_COST_TIER3_FOOD,
+            house_upgrade_cost_tier3_wood: HOUSE_UPGRADE_COST_TIER3_WOOD,
+            house_upgrade_cost_tier3_stone: HOUSE_UPGRADE_COST_TIER3_STONE,
+            house_upgrade_cost_tier3_gold: HOUSE_UPGRADE_COST_TIER3_GOLD,
+            house_upgrade_cost_tier4_water: HOUSE_UPGRADE_COST_TIER4_WATER,
+            house_upgrade_cost_tier4_food: HOUSE_UPGRADE_COST_TIER4_FOOD,
+            house_upgrade_cost_tier4_wood: HOUSE_UPGRADE_COST_TIER4_WOOD,
+            house_upgrade_cost_tier4_stone: HOUSE_UPGRADE_COST_TIER4_STONE,
+            house_upgrade_cost_tier4_gold: HOUSE_UPGRADE_COST_TIER4_GOLD,
             house_winter_wood_burn_rate: HOUSE_WINTER_WOOD_BURN_RATE,
             house_winter_cold_temp: HOUSE_WINTER_COLD_TEMP,
             house_min_spacing: HOUSE_MIN_SPACING,

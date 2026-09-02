@@ -32,6 +32,13 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
       if (o && Array.isArray(o.decisionEvalOrder)) windowShim.SIM_CONFIG.decisionEvalOrder = o.decisionEvalOrder;
       if (o && Array.isArray(o.decisionEvalLevels)) windowShim.SIM_CONFIG.decisionEvalLevels = o.decisionEvalLevels;
     }
+    // ★ M8 升级材料成本矩阵拆分配置（config.house-upgrade-cost.js，20 字段）合并注入，
+    // 使 WASM 在真实成本值（50/75/100/125 矩阵）下运行而非 0 默认值。
+    const costPath = path.join(ROOT, 'frontend', 'js', 'config.house-upgrade-cost.js');
+    if (fs.existsSync(costPath)) {
+      new Function('window', fs.readFileSync(costPath, 'utf8'))(windowShim);
+      Object.assign(windowShim.SIM_CONFIG, windowShim.SIM_HOUSE_UPGRADE_COST || {});
+    }
     return windowShim.SIM_CONFIG;
   }
   function applyConfig(cfg) {

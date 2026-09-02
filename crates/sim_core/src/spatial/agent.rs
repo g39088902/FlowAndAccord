@@ -128,6 +128,14 @@ pub struct Agent3D {
     pub father_id: Option<AgentId>,  // 生父 ID
     pub children_ids: Vec<AgentId>,  // 子女列表
     pub surname: String,             // 传承氏族姓氏 (如 "李"、"张")
+    /// ★ M6 威望（所有影响因子的综合持久分，非"宗族声望"）：当前因子 = 子嗣（活产各 +1）
+    ///   + 宅邸（房屋每晋升一级 +1）。子女日后死亡不回减；随 agent 终身、不随房屋/家户转移。
+    pub prestige: u32,
+    /// ★ M7 家庭库存施密特触发器（五类，顺序固定 = 水/粮/木/石/金）：
+    /// 输入为家户账本余额；余额 < 100 → 置 ON（需要去采）；一旦 ON 须余额 ≥ 200 才置 OFF。
+    /// 每 agent 私有、带滞回、确定性；无房者由决策层 guard 短路，本值不直接参与行为。
+    #[serde(default)]
+    pub family_stock_active: [bool; 5],
 
     // 先天遗传基因指标 (禀赋均值 100.0，服从正态分布继承与变异)
     pub intelligence: f32,           // 智力: 决策理性与技能领悟
@@ -215,6 +223,8 @@ impl Agent3D {
             father_id: None,
             children_ids: Vec::new(),
             surname: String::new(), // 由调用方（ecology.rs）赋值
+            prestige: 0,
+            family_stock_active: [false; 5],
             intelligence: config.trait_default_mean,
             strength: config.trait_default_mean,
             digestion_efficiency: config.trait_default_mean,
@@ -280,10 +290,12 @@ impl Agent3D {
     /// `next_agent_id` 为全局发号器的可变引用：**受孕瞬间**即为胎儿占号并写入
     /// [`Self::pregnancy_child_id`]，使未出生的孩子能参与分家权重与遗产继承（账本重构 M1.6）。
     /// 该发号不消耗 `WorldRng`，仅按调用顺序递增，确定性不受影响。
+    ///
+    /// ★ M6 去房屋化生育：不再由外部传入 fertility_active（房屋等级/仓储备货门槛）——
+    /// 只要已婚且身体指标达标即可受孕，无房也可生育。
     pub fn tick_metabolism(
         &mut self,
         dt: f32,
-        fertility_active: bool,
         config: &SimConfig,
         next_agent_id: &mut AgentId,
     ) -> Option<String> {
@@ -308,13 +320,13 @@ impl Agent3D {
         let mut event_msg = None;
         let mut metabolic_multiplier = if self.is_pregnant { config.agent_pregnant_metabolism_mult } else { 1.0 };
 
-        if self.state == PrimitiveActionState::ConstructingHouse
-            || self.state == PrimitiveActionState::RepairingHouse
+        // ★ M6 升级瞬时化：ConstructingHouse 已无体力/工时投入，不再计入劳动代谢加速
+        if self.state == PrimitiveActionState::RepairingHouse
             || self.state == PrimitiveActionState::GatheringWood
             || self.state == PrimitiveActionState::MiningStone
             || self.state == PrimitiveActionState::MiningGold
         {
-            metabolic_multiplier *= config.agent_work_metabolism_mult; // 营建、修缮与采矿劳动代谢加速
+            metabolic_multiplier *= config.agent_work_metabolism_mult; // 修缮与采矿劳动代谢加速
         }
 
         let dig_ratio = (self.digestion_efficiency / 100.0).clamp(config.agent_digestion_ratio_min, config.agent_digestion_ratio_max);
@@ -359,8 +371,8 @@ impl Agent3D {
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
         }
 
-        // 受孕判定：不再要求必须在家休息，执行任意任务期间满足门槛即可受孕
-        if self.gender == Gender::Female && self.spouse_id.is_some() && fertility_active && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
+        // 受孕判定：M6 去房屋化——已婚（无论是否有房）且指标达标即可受孕；执行任意任务期间均可
+        if self.gender == Gender::Female && self.spouse_id.is_some() && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 {
             if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
                 self.is_pregnant = true;
                 self.pregnancy_father_id = self.spouse_id;
@@ -396,12 +408,10 @@ impl Agent3D {
             }
         }
 
-        // 休息、筑屋与修缮体力结算
+        // 休息、修缮与采集体力结算（★ M6 升级瞬时化：ConstructingHouse 不再消耗体力）
         if self.state == PrimitiveActionState::RestingAtCamp {
             let recovery_rate = config.agent_rest_stamina_recovery_rate * (self.sleep_efficiency / 100.0);
             self.stamina = (self.stamina + recovery_rate * dt).min(config.agent_stamina_capacity);
-        } else if self.state == PrimitiveActionState::ConstructingHouse {
-            self.stamina = (self.stamina - config.agent_construct_stamina_burn * dt).max(config.agent_labor_stamina_floor);
         } else if self.state == PrimitiveActionState::RepairingHouse {
             self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt).max(config.agent_labor_stamina_floor);
         } else if self.state == PrimitiveActionState::GatheringWood || self.state == PrimitiveActionState::MiningStone {

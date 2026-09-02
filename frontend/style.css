@@ -136,6 +136,11 @@
       justify-content: space-between;
       color: #94a3b8;
     }
+    /* M8 房屋储备改纯数值：label 独占一行，用内边距补齐原进度条占位高度 */
+    .meter-label.plain-stock {
+      padding: 4px 0;
+      line-height: 1.3;
+    }
     .meter-bg {
       width: 100%;
       height: 7px;

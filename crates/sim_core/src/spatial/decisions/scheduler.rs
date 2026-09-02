@@ -21,6 +21,7 @@ impl World3DEngine {
             ctx: &ctx,
             network: &self.network,
             houses: &self.houses,
+            households: &self.household_registry,
             rng: &mut self.rng,
             config: &self.config,
             branch_order: &branch_order,

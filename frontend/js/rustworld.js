@@ -78,8 +78,13 @@
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
       applyConfig(cfg) {
         if (!this._ready) return false;
-        const configObj = cfg || window.SIM_CONFIG;
+        const configObj = Object.assign({}, cfg || window.SIM_CONFIG);
         if (!configObj) return false;
+        // ★ M8 合并「升级材料成本矩阵」拆分配置（config.house-upgrade-cost.js，20 字段），
+        // 该文件已由 index.html 在本脚本之前加载；合并后随主配置一并注入 WASM 内核。
+        if (window.SIM_HOUSE_UPGRADE_COST) {
+          Object.assign(configObj, window.SIM_HOUSE_UPGRADE_COST);
+        }
         try {
           const jsonStr = JSON.stringify(configObj);
           const encoded = new TextEncoder().encode(jsonStr);
@@ -285,30 +290,23 @@
           boundHouses: p.bound_houses || 0
         }));
 
-        // --- 房屋 ---
+        // --- 房屋（M6 建筑化：不再携带任何资源存量；家庭物资展示读家户账本） ---
         this.houses = snap.houses.map(h => {
-          const view = {
-            id: h.id,
-            pos: { x: h.x, y: h.y, z: h.z },
-            tier: h.tier,
-            ownerId: h.owner_id,
-            spouseId: h.spouse_id,
-            campId: h.camp_id,
-            isRuin: h.is_ruin,
-            isRepairing: h.is_repairing,
-            durability: h.durability,
-            pantryWater: h.pantry_water, maxPantryWater: h.max_pantry_water,
-            pantryFood: h.pantry_food, maxPantryFood: h.max_pantry_food,
-            pantryWood: h.pantry_wood, maxPantryWood: h.max_pantry_wood,
-            pantryStone: h.pantry_stone, maxPantryStone: h.max_pantry_stone,
-            pantryGold: h.pantry_gold || 0.0, maxPantryGold: h.max_pantry_gold || 0.0,
-            age: h.age,
-            generation: h.generation,
-            constructionProgress: h.construction_progress,
-            isFertilityActive: () => h.is_fertility_active,
-            isPantryFull: () => h.is_pantry_full
-          };
-          return view;
+        const view = {
+          id: h.id,
+          pos: { x: h.x, y: h.y, z: h.z },
+          tier: h.tier,
+          ownerId: h.owner_id,
+          spouseId: h.spouse_id,
+          campId: h.camp_id,
+          isRuin: h.is_ruin,
+          isRepairing: h.is_repairing,
+          durability: h.durability,
+          age: h.age,
+          generation: h.generation,
+          constructionProgress: h.construction_progress
+        };
+        return view;
         });
 
         // --- 路网 (车道 + 节点) ---

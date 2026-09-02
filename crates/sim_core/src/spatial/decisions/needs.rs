@@ -2,6 +2,8 @@ use super::super::vec3::Vec3;
 use super::super::graph::NodeId;
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
+use super::super::ledger::family::HouseholdRegistry;
+use super::super::ledger::journal::ResourceKind;
 use super::super::poi::PoiId;
 use super::branches::BranchId;
 use crate::config::*;
@@ -105,57 +107,127 @@ pub struct DecisionContext {
     pub camp_positions: Vec<(NodeId, Vec3)>,
 }
 
-/// 家宅物资与修缮缺口 (按房屋等级与耐久度计算)
-pub struct HouseStockNeeds {
-    pub need_repair: bool,
-    pub need_water: bool,
-    pub need_food: bool,
-    pub need_wood: bool,
-    pub need_stone: bool,
-    pub need_gold: bool,
+/// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）
+pub fn ledger_balance_of(
+    households: &HouseholdRegistry,
+    agent: &Agent3D,
+    kind: ResourceKind,
+) -> f32 {
+    households
+        .household_of(agent.id)
+        .and_then(|hid| households.get(hid))
+        .map(|hh| hh.group.ledger.balance(kind))
+        .unwrap_or(0.0)
 }
 
-pub fn house_stock_needs(house: &House, config: &SimConfig) -> HouseStockNeeds {
-    let (need_water, need_food, need_wood, need_stone, need_gold) = match house.tier {
-        HouseTier::Tier0Warehouse => (
-            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier0_water_ratio),
-            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier0_food_ratio),
-            false, false, false,
-        ),
-        HouseTier::Tier1ThatchedHut => (
-            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier1_food_water_ratio),
-            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier1_food_water_ratio),
-            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier1_wood_ratio),
-            false, false,
-        ),
-        HouseTier::Tier2LeanTo => (
-            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier2_other_ratio),
-            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier2_other_ratio),
-            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier2_other_ratio),
-            house.pantry_stone < (house.max_pantry_stone * config.house_upgrade_tier2_stone_ratio),
-            false,
-        ),
-        HouseTier::Tier3Homestead => (
-            house.pantry_water < (house.max_pantry_water * config.house_upgrade_tier3_other_ratio),
-            house.pantry_food < (house.max_pantry_food * config.house_upgrade_tier3_other_ratio),
-            house.pantry_wood < (house.max_pantry_wood * config.house_upgrade_tier3_other_ratio),
-            house.pantry_stone < (house.max_pantry_stone * config.house_upgrade_tier3_gold_stone_ratio),
-            house.pantry_gold < (house.max_pantry_gold * config.house_upgrade_tier3_gold_stone_ratio),
-        ),
-        HouseTier::Tier4Manor => (
-            house.pantry_water < (house.max_pantry_water * config.house_fertility_stock_ratio),
-            house.pantry_food < (house.max_pantry_food * config.house_fertility_stock_ratio),
-            house.pantry_wood < (house.max_pantry_wood * config.house_fertility_stock_ratio),
-            false, false,
-        ),
-    };
-    HouseStockNeeds {
-        need_repair: house.durability < config.decision_house_repair_need_threshold && !house.is_ruin,
-        need_water, need_food, need_wood, need_stone, need_gold,
+// ════════════════════════════════════════════════════════════════
+// ★ M7 家庭库存施密特触发器（与房屋等级彻底脱钩）
+// ════════════════════════════════════════════════════════════════
+
+/// 五类家庭库存触发器的固定顺序（下标与 `Agent3D.family_stock_active` 对齐）
+pub const FAMILY_STOCK_ORDER: [ResourceKind; 5] = [
+    ResourceKind::Water,
+    ResourceKind::Food,
+    ResourceKind::Wood,
+    ResourceKind::Stone,
+    ResourceKind::Gold,
+];
+
+/// 品类 → 触发器下标
+pub fn family_stock_index(kind: ResourceKind) -> usize {
+    match kind {
+        ResourceKind::Water => 0,
+        ResourceKind::Food => 1,
+        ResourceKind::Wood => 2,
+        ResourceKind::Stone => 3,
+        ResourceKind::Gold => 4,
     }
 }
 
-pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House], config: &SimConfig) -> Option<(&'static str, &'static str)> {
+/// 读取该 agent 的某品类家庭库存触发器：true = 需要去采（家庭账本该资源未补足）
+pub fn family_stock_on(agent: &Agent3D, kind: ResourceKind) -> bool {
+    agent.family_stock_active[family_stock_index(kind)]
+}
+
+/// 施密特滞回状态转移：余额 < on → 开；已开则需余额 ≥ off 才关（中间带保持）
+pub fn family_stock_update(active: bool, balance: f32, on: f32, off: f32) -> bool {
+    if active {
+        !(balance >= off)
+    } else {
+        balance < on
+    }
+}
+
+/// 房屋某次升级需一次性扣除的材料成本（M7 起同时作为 b8/b11 就绪判据，
+/// 与 construction.rs::try_instant_upgrade 共用，杜绝公式漂移）
+///
+/// ★ M8 改为「4 级 × 5 资源」固定成本矩阵：入参 `tier` 是**当前等级**，
+/// 返回「升到下一级」所需的一次性扣除量（即取目标等级那一行）：
+/// - Tier0Warehouse（0→1）→ Tier1 行：水 50、粮 50（木/石/金为 0）
+/// - Tier1ThatchedHut（1→2）→ Tier2 行：木/粮/水 各 75（石/金为 0）
+/// - Tier2LeanTo（2→3）→ Tier3 行：石/木/粮/水 各 100（金为 0）
+/// - Tier3Homestead（3→4）→ Tier4 行：金/石/木/粮/水 各 125
+/// - Tier4Manor：已是顶级，返回空
+///
+/// 成本为 0 的品类：扣账侧 `amt > 0.001` 守卫自动跳过；就绪侧 `balance >= amt - 1e-3` 恒成立。
+/// 因此无需在此硬编码每级的品类集合，矩阵中保留 0 值即可自然表达并保留未来单独调参能力。
+pub fn upgrade_material_cost(tier: HouseTier, config: &SimConfig) -> Vec<(ResourceKind, f32)> {
+    let (w, f, wd, s, g) = match tier {
+        // 升到 1 级
+        HouseTier::Tier0Warehouse => (
+            config.house_upgrade_cost_tier1_water,
+            config.house_upgrade_cost_tier1_food,
+            config.house_upgrade_cost_tier1_wood,
+            config.house_upgrade_cost_tier1_stone,
+            config.house_upgrade_cost_tier1_gold,
+        ),
+        // 升到 2 级
+        HouseTier::Tier1ThatchedHut => (
+            config.house_upgrade_cost_tier2_water,
+            config.house_upgrade_cost_tier2_food,
+            config.house_upgrade_cost_tier2_wood,
+            config.house_upgrade_cost_tier2_stone,
+            config.house_upgrade_cost_tier2_gold,
+        ),
+        // 升到 3 级
+        HouseTier::Tier2LeanTo => (
+            config.house_upgrade_cost_tier3_water,
+            config.house_upgrade_cost_tier3_food,
+            config.house_upgrade_cost_tier3_wood,
+            config.house_upgrade_cost_tier3_stone,
+            config.house_upgrade_cost_tier3_gold,
+        ),
+        // 升到 4 级
+        HouseTier::Tier3Homestead => (
+            config.house_upgrade_cost_tier4_water,
+            config.house_upgrade_cost_tier4_food,
+            config.house_upgrade_cost_tier4_wood,
+            config.house_upgrade_cost_tier4_stone,
+            config.house_upgrade_cost_tier4_gold,
+        ),
+        HouseTier::Tier4Manor => return Vec::new(),
+    };
+    vec![
+        (ResourceKind::Water, w),
+        (ResourceKind::Food, f),
+        (ResourceKind::Wood, wd),
+        (ResourceKind::Stone, s),
+        (ResourceKind::Gold, g),
+    ]
+}
+
+/// 升级就绪：家户账本余额能覆盖该级所有材料成本（成本为 0 的品类不阻塞）
+pub fn upgrade_ready_by_cost(
+    tier: HouseTier,
+    config: &SimConfig,
+    balance: impl Fn(ResourceKind) -> f32,
+) -> bool {
+    upgrade_material_cost(tier, config)
+        .iter()
+        .all(|(rk, amt)| balance(*rk) >= *amt - 1e-3)
+}
+
+pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House], _households: &HouseholdRegistry, config: &SimConfig) -> Option<(&'static str, &'static str)> {
     // (层级, 需求名, 对应判定分支)；分支用于套用 decision_eval_levels 层级覆盖（与评估结论共用同一覆盖表）
     let (lvl, kind, branch) = match state {
         PrimitiveActionState::SeekingWater | PrimitiveActionState::DrinkingAtWater => {
@@ -167,11 +239,8 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
         PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => ("Safety", "StockWood", Some(BranchId::B7StockWood)),
         PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => ("Esteem", "StockStone", Some(BranchId::B9StockStone)),
         PrimitiveActionState::SeekingGold | PrimitiveActionState::MiningGold => {
-            let is_building_stock = agent.home_house_id
-                .and_then(|hid| houses.iter().find(|h| h.id == hid))
-                .map(|h| h.tier == HouseTier::Tier3Homestead && h.pantry_gold < h.max_pantry_gold)
-                .unwrap_or(false);
-            if is_building_stock { ("Esteem", "StockGold", Some(BranchId::B10StockGold)) } else { ("SelfActualization", "GoldWealth", Some(BranchId::B13GoldWealth)) }
+            // ★ M7 与房屋等级脱钩：家庭储备缺金（trigger ON）→ StockGold；已补足（4级庄园娱乐）→ GoldWealth
+            if family_stock_on(agent, ResourceKind::Gold) { ("Esteem", "StockGold", Some(BranchId::B10StockGold)) } else { ("SelfActualization", "GoldWealth", Some(BranchId::B13GoldWealth)) }
         }
         PrimitiveActionState::ReturningToCamp => {
             if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest", Some(BranchId::B3Rest)) } else { ("Safety", "ReturnHome", None) }

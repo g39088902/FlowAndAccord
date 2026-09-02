@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.7</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.6.1</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -264,7 +264,7 @@
         <div class="legend-item"><div class="legend-icon">🪙</div> 璀璨金矿 (全图1处，上限60.0单位，产金随身携带·行囊上限20.0/升级大庄园)</div>
         <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon" style="color:#f59e0b;">═</div> 1~5级 踩踏道路 (颜色表征等级/恒定宽度/悬浮查看)</div>
         <div class="legend-item"><div class="legend-icon">❄️</div> 冬季严寒供暖 (房屋消耗木头取暖，木材<10禁止怀孕)</div>
-        <div class="legend-item"><div class="legend-icon">🏗️</div> 升级材料要求 (茅草房升私宅需木，私宅升庄舍需石，庄舍升庄园需金石)</div>
+        <div class="legend-item"><div class="legend-icon">🏗️</div> 升级材料要求 (升1级水粮50 · 升2级木粮水75 · 升3级石木粮水100 · 升4级金石木粮水125)</div>
       </div>
     </div>
 
@@ -518,25 +518,21 @@
           <div class="meter-label"><span style="color:#f59e0b;">🏛️ 房屋耐久度</span><span id="insp-house-dur-val">100%</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-house-dur-fill" style="background:#f59e0b; width:100%;"></div></div>
         </div>
+        <div style="padding:2px 0 0 0; font-size:11px; color:#a78bfa;">🏠 家庭储备（家户账本 · 纯数值，无容量上限）</div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#38bdf8;">💧 独立清泉储量 (水)</span><span id="insp-house-water-val">5.0 / 10.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-water-fill" style="background:#38bdf8; width:50%;"></div></div>
+          <div class="meter-label plain-stock"><span style="color:#38bdf8;">💧 家户账本·水</span><span id="insp-house-water-val">0.0 单位</span></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#10b981;">🍒 独立粮食储量 (果)</span><span id="insp-house-food-val">5.0 / 10.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-food-fill" style="background:#10b981; width:50%;"></div></div>
+          <div class="meter-label plain-stock"><span style="color:#10b981;">🍒 家户账本·粮</span><span id="insp-house-food-val">0.0 单位</span></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#eab308;">🌲 独立木材储量 (取暖/升级)</span><span id="insp-house-wood-val">5.0 / 10.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-wood-fill" style="background:#eab308; width:50%;"></div></div>
+          <div class="meter-label plain-stock"><span style="color:#eab308;">🌲 家户账本·木</span><span id="insp-house-wood-val">0.0 单位</span></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#94a3b8;">🪨 独立石料储量 (仅盖房升级)</span><span id="insp-house-stone-val">0.0 / 10.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-stone-fill" style="background:#94a3b8; width:0%;"></div></div>
+          <div class="meter-label plain-stock"><span style="color:#94a3b8;">🪨 家户账本·石</span><span id="insp-house-stone-val">0.0 单位</span></div>
         </div>
         <div class="meter-row">
-          <div class="meter-label"><span style="color:#fbbf24;">🪙 独立黄金金库 (升级大庄园)</span><span id="insp-house-gold-val">0.0 / 0.0 单位</span></div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-house-gold-fill" style="background:#fbbf24; width:0%;"></div></div>
+          <div class="meter-label plain-stock"><span style="color:#fbbf24;">🪙 家户账本·金</span><span id="insp-house-gold-val">0.0 单位</span></div>
         </div>
         <div class="poi-info-badge">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -544,8 +540,8 @@
             <span id="insp-house-owner-btn" class="lineage-chip" title="点击直接追踪户主视角">Agent #1 (第1代祖屋) 🔍</span>
           </div>
           <div><strong>🏕️ 所属聚落:</strong> <span id="insp-house-camp-name" style="color:#38bdf8; font-weight:600;">—</span></div>
-          <div><strong>🏛️ 建筑形态:</strong> <span id="insp-house-tier-desc" style="color:#f59e0b;">0级 仓库 (需填满水粮升级)</span></div>
-          <div><strong>👶 生育激活:</strong> <span id="insp-house-fertility-badge" style="color:#ef4444;">未激活 (需升级为1级房屋)</span></div>
+          <div><strong>🏛️ 建筑形态:</strong> <span id="insp-house-tier-desc" style="color:#f59e0b;">0级 起步营地</span></div>
+          <div><strong>🍼 生育:</strong> <span id="insp-house-fertility-badge" style="color:#10b981;">已去房屋化：已婚达标即可受孕</span></div>
         </div>
       </div>
     </div>
@@ -700,11 +696,11 @@
               </div>
             </div>
           </div>
-          <!-- 声望值展示行 -->
+          <!-- 威望值展示行（综合影响因子集合体：子嗣 + 宅邸等级等） -->
           <div class="lineage-section" style="grid-column: 1 / -1;">
-            <div class="lineage-section-title">🌟 宗族声望</div>
+            <div class="lineage-section-title">🌟 威望</div>
             <div class="lineage-section-content" style="padding-top:4px;">
-              <span id="insp-prestige-val" style="font-size:12px; color:#64748b;">暂无声望 (尚未育有子女)</span>
+              <span id="insp-prestige-val" style="font-size:12px; color:#64748b;">暂无威望</span>
             </div>
           </div>
         </div>
@@ -847,6 +843,8 @@
   <script src="js/math.js"></script>
   <script src="js/config.js"></script>
   <script src="js/config.decision-order.js"></script>
+  <!-- M8 升级材料成本矩阵（20 字段）· 须早于 rustworld.js 首次 applyConfig -->
+  <script src="js/config.house-upgrade-cost.js"></script>
   <script src="js/decision-viz-data.js"></script>
   <script src="js/decision-viz-view.js"></script>
   <script src="js/decision-viz.js"></script>

@@ -151,9 +151,11 @@ pub struct AgentSnapshot {
     pub libido: f32,
     pub sleep_efficiency: f32,
     pub life_expectancy: f32,
-    // 姓氏宗族与声望
+    // 姓氏宗族与威望
     pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
-    pub prestige: u32,     // 声望值 (当前 = 子女数量，未来可叠加多项)
+    /// ★ M6 威望持久综合分值（所有影响因子集合体）：当前因子 = 子嗣活产 +1、宅邸每级 +1；
+    /// 子女日后死亡不回减；随 agent 终身、不随房屋/家户转移（非"宗族声望"）
+    pub prestige: u32,
     // ★ 婚姻与家户归属（M2 新增）
     /// 该 agent 的历史婚姻段数（含已封账各段）
     pub marriage_history_count: u32,

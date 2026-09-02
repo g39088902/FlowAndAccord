@@ -48,8 +48,7 @@ pub struct World3DEngine {
     pub marriage_registry: MarriageRegistry,
     /// ★ 家户登记簿（**家庭跟着男人走**：以男性户主为锚的家庭单元与账本）
     pub household_registry: HouseholdRegistry,
-    /// ★ M2 旁路记账：上一 tick 的行囊缓存（水/粮/木/石/金），用于 Deposit 增量观测
-    pub prev_carried: std::collections::HashMap<AgentId, (f32, f32, f32, f32, f32)>,
+
     /// ★ M2 公仓兜底账本（绝嗣家户资产归集，预留 M4 Region 对接）
     pub public_granary: Ledger,
     /// ★ M3 宗族登记簿（按姓氏聚合的宗族团体与账本）
@@ -107,7 +106,6 @@ impl World3DEngine {
             agent_index: HashMap::new(),
             marriage_registry: MarriageRegistry::new(LEDGER_JOURNAL_CAPACITY),
             household_registry: HouseholdRegistry::new(LEDGER_JOURNAL_CAPACITY),
-            prev_carried: std::collections::HashMap::new(),
             public_granary: Ledger::new(LEDGER_JOURNAL_CAPACITY),
             clan_registry: ClanRegistry::new(LEDGER_JOURNAL_CAPACITY),
             mutual_aid_cooldown: std::collections::BTreeMap::new(),
@@ -219,11 +217,8 @@ impl World3DEngine {
             if agent.is_fetus {
                 continue;
             }
-            let fertility_active = agent.home_house_id
-                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
-                .map(|h| h.is_fertility_active(&self.config))
-                .unwrap_or(false);
-            if let Some(event) = agent.tick_metabolism(dt, fertility_active, &self.config, &mut next_agent_id) {
+            // ★ M6 去房屋化生育：不再计算房屋/仓储 fertility_active 门禁，受孕条件见 agent.rs
+            if let Some(event) = agent.tick_metabolism(dt, &self.config, &mut next_agent_id) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
                     if agent.death_is_natural {
@@ -266,8 +261,8 @@ impl World3DEngine {
         // 错峰决策
         self.tick_decisions();
 
-        // 7. M2 旁路记账（Deposit/Consume/Heating + Inheritance + Split）
-        self.tick_bookkeeping(dt);
+        // 7. M2 家庭生命周期结算（继承清算 + 分家抽资；卸货/吃喝/烧柴已由生态/维护层真实收付账本）
+        self.tick_bookkeeping();
 
         // 8. M3 宗族系统（族长顺位 → 族税征收 → 族内互助）
         self.tick_clan(dt);
@@ -316,20 +311,10 @@ impl World3DEngine {
                 z: h.pos.z,
                 tier: format!("{:?}", h.tier),
                 durability: h.durability,
-                pantry_food: h.pantry_food,
-                max_pantry_food: h.max_pantry_food,
-                pantry_water: h.pantry_water,
-                max_pantry_water: h.max_pantry_water,
-                pantry_wood: h.pantry_wood,
-                max_pantry_wood: h.max_pantry_wood,
-                pantry_stone: h.pantry_stone,
-                max_pantry_stone: h.max_pantry_stone,
                 age: h.age,
                 generation: h.generation,
                 is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
-                is_fertility_active: h.is_fertility_active(&self.config),
-                is_pantry_full: h.is_pantry_full(&self.config),
                 is_repairing: h.is_repairing,
             });
         }
@@ -416,7 +401,8 @@ impl World3DEngine {
                 sleep_efficiency: agent.sleep_efficiency,
                 life_expectancy: agent.life_expectancy,
                 surname: agent.surname.clone(),
-                prestige: agent.children_ids.len() as u32,
+                // ★ M6 威望改为 Agent 持久综合分值（透传存储值，不再由子嗣数派生）
+                prestige: agent.prestige,
                 // ★ M2 婚姻与家户归属
                 marriage_history_count: self.marriage_registry.by_agent.get(&agent.id).map(|v| v.len() as u32).unwrap_or(0),
                 household_id: self.household_registry.household_of(agent.id),

@@ -26,12 +26,13 @@ const ORDER_JS = path.join(ROOT, 'frontend', 'js', 'config.decision-order.js');
 const OUT_MD = path.join(ROOT, 'docs', 'config-reference.md');
 
 // ---------------------------------------------------------------------------
-// 解析 frontend/js/config.js
+// 解析拆分配置 JS（config.js 或 config.house-upgrade-cost.js）
+//   - globalName: 顶层挂载的对象名（如 'SIM_CONFIG' / 'SIM_HOUSE_UPGRADE_COST'）
 //   - 提取每个键的值（含 `1.0/30.0` 这类表达式求值）与行内中文说明
 // ---------------------------------------------------------------------------
-function parseConfigJs(text) {
-  const objMatch = text.match(/window\.SIM_CONFIG\s*=\s*(\{[\s\S]*?\});/);
-  if (!objMatch) throw new Error('无法在 config.js 中定位 window.SIM_CONFIG 对象');
+function parseConfigJs(text, globalName = 'SIM_CONFIG') {
+  const objMatch = text.match(new RegExp('window\\.' + globalName + '\\s*=\\s*(\\{[\\s\\S]*?\\});'));
+  if (!objMatch) throw new Error(`无法在配置文件中定位 window.${globalName} 对象`);
   const body = objMatch[1];
   // 在受控作用域内求值对象字面量（允许 1.0/30.0 等表达式）
   const values = (function () { return eval('(' + body + ')'); })();
@@ -135,11 +136,25 @@ function main() {
   const js = parseConfigJs(jsText);
   const rs = parseConfigRs(rsText);
 
-  const rustFieldNames = new Set(rs.fields.map(f => f.name));
-  const jsFieldNames = new Set(Object.keys(js.values));
-
   const errors = [];
   const warnings = [];
+
+  // ★ M8 升级材料成本矩阵拆分配置（config.house-upgrade-cost.js，20 字段）纳入字段集/类型/数值比对：
+  // Rust 侧 20 个 house_upgrade_cost_tier{1..4}_* 的权威默认值在此文件，须在孤儿/缺失检查前并入前端字段集。
+  const COST_JS = path.join(ROOT, 'frontend', 'js', 'config.house-upgrade-cost.js');
+  if (!fs.existsSync(COST_JS)) {
+    errors.push('缺失拆分配置文件 config.house-upgrade-cost.js（Rust 侧 20 个 house_upgrade_cost_tier* 字段缺失权威默认值来源）');
+  } else {
+    const costText = fs.readFileSync(COST_JS, 'utf8');
+    const cost = parseConfigJs(costText, 'SIM_HOUSE_UPGRADE_COST');
+    for (const k of Object.keys(cost.values)) {
+      js.values[k] = cost.values[k];
+      js.descriptions[k] = cost.descriptions[k] || '';
+    }
+  }
+
+  const rustFieldNames = new Set(rs.fields.map(f => f.name));
+  const jsFieldNames = new Set(Object.keys(js.values));
 
   // 1) 孤儿字段：JS 有而 Rust 无
   for (const key of jsFieldNames) {

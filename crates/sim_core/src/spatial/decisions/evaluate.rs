@@ -3,6 +3,8 @@ use super::super::graph::LaneGraph3D;
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
 use super::super::house::House;
+use super::super::ledger::family::HouseholdRegistry;
+use super::super::ledger::journal::ResourceKind;
 use super::branches::{self, BranchId};
 use super::needs::*;
 use crate::config::*;
@@ -13,6 +15,8 @@ pub struct Decisioner<'a> {
     pub ctx: &'a DecisionContext,
     pub network: &'a LaneGraph3D,
     pub houses: &'a [House],
+    /// ★ M6 账本化：家户登记簿只读引用（家庭物资唯一真相源 = 家户账本余额）
+    pub households: &'a HouseholdRegistry,
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
@@ -20,17 +24,35 @@ pub struct Decisioner<'a> {
 }
 
 impl<'a> Decisioner<'a> {
+    /// ★ M6 账本化：读取 agent 所属家户账本的品类余额（无家户返回 0.0）
+    pub fn ledger_balance(&self, agent: &Agent3D, kind: ResourceKind) -> f32 {
+        ledger_balance_of(self.households, agent, kind)
+    }
+
+    /// ★ M7 每拍刷新五类家庭库存施密特触发器（输入 = 家户账本余额；滞回，不耗 RNG）。
+    /// 在 `decide()` 开头统一调用一次，保证本拍内各分支读取到一致状态。
+    pub fn refresh_family_stock(&mut self, agent: &mut Agent3D) {
+        let on = self.config.decision_family_stock_trigger_on;
+        let off = self.config.decision_family_stock_trigger_off;
+        for (i, &rk) in FAMILY_STOCK_ORDER.iter().enumerate() {
+            let bal = self.ledger_balance(agent, rk);
+            agent.family_stock_active[i] = family_stock_update(agent.family_stock_active[i], bal, on, off);
+        }
+    }
+
     /// 核心决策调度
     pub fn decide(&mut self, agent: &mut Agent3D) {
         if !agent.is_alive {
             agent.current_need = None;
             return;
         }
+        // ★ M7 先刷新家庭库存触发器（若该 agent 无家户/无房，分支层 guard 短路，不影响行为）
+        self.refresh_family_stock(agent);
 
         match agent.state {
             PrimitiveActionState::RestingAtCamp => {
                 if let Some(need) = self.evaluate_needs(agent) {
-                    agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.config)
+                    agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.households, self.config)
                         .map(|(lvl, k)| format!("{}·{}", lvl, k));
                     self.fulfill_resting_need(agent, need);
                 } else {
@@ -38,12 +60,12 @@ impl<'a> Decisioner<'a> {
                 }
             }
             PrimitiveActionState::SeekingWater => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingWater, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingWater, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_survival(agent, NodePool::Water, PoiType::WaterSource);
             }
             PrimitiveActionState::SeekingFood => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingFood, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingFood, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_survival(agent, NodePool::Food, PoiType::BerryBush);
             }
@@ -56,17 +78,17 @@ impl<'a> Decisioner<'a> {
                 self.decide_seeking_material(agent, NodePool::Stone, PoiType::StoneQuarry);
             }
             PrimitiveActionState::SeekingGold => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingGold, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingGold, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_material(agent, NodePool::Gold, PoiType::GoldMine);
             }
             PrimitiveActionState::DrinkingAtWater => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::DrinkingAtWater, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::DrinkingAtWater, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_drinking(agent);
             }
             PrimitiveActionState::ForagingFood => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ForagingFood, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ForagingFood, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_foraging(agent);
             }
@@ -81,19 +103,19 @@ impl<'a> Decisioner<'a> {
                 self.decide_harvest(agent, PoiType::StoneQuarry, stocked);
             }
             PrimitiveActionState::MiningGold => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::MiningGold, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::MiningGold, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_mining_gold(agent);
             }
             PrimitiveActionState::ConstructingHouse => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ConstructingHouse, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ConstructingHouse, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
             }
             PrimitiveActionState::RepairingHouse => {
                 agent.current_need = Some("Safety·RepairHouse".to_string());
             }
             PrimitiveActionState::ReturningToCamp => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ReturningToCamp, agent, self.houses, self.config)
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ReturningToCamp, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
             }
             _ => {}

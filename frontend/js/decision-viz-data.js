@@ -24,14 +24,14 @@
     { id: 'b3', cond: '体力 < 100', need: 'Physiological · Rest', target: 'RestingAtCamp', level: 1, cfg: ['decisionRestStaminaTarget=100.0'], anchor: 'branches.rs::B3Rest' },
     { id: 'b12', cond: '无家 + 成年男 + 饥渴体力达标', need: 'Physiological · FoundHome', target: '掷点→立宅', level: 1, cfg: ['decisionFoundHome{Min}=20/20/60', 'Candidates=12'], anchor: 'branches.rs::B12FoundHome' },
     { id: 'b4', cond: '有家宅 且 耐久 < 50%（成员）', need: 'Safety · RepairHouse', target: 'RepairingHouse', level: 2, cfg: ['decisionHouseRepairNeedThreshold=50.0'], anchor: 'branches.rs::B4RepairHouse' },
-    { id: 'b5', cond: '家缺水 且有水源（有家人→归属层）', need: 'Safety · StockWater', target: 'SeekingWater', level: 2, cfg: ['house_upgrade_tier*_water_ratio'], anchor: 'branches.rs::B5StockWater' },
-    { id: 'b6', cond: '家缺粮 且有粮源（有家人→归属层）', need: 'Safety · StockFood', target: 'SeekingFood', level: 2, cfg: ['house_upgrade_tier*_food_ratio'], anchor: 'branches.rs::B6StockFood' },
-    { id: 'b7', cond: '家缺木 且有木源（有家人→归属层）', need: 'Safety · StockWood', target: 'SeekingWood', level: 2, cfg: ['house_upgrade_tier*_wood_ratio'], anchor: 'branches.rs::B7StockWood' },
-    { id: 'b8', cond: '0级仓库仓满 + 成年男性成员', need: 'Belonging · BuildHouse(0级)', target: 'ConstructingHouse', level: 3, cfg: ['house.is_pantry_full()'], anchor: 'branches.rs::B8BuildHouseTier0' },
-    { id: 'b9', cond: '家缺石 且有石源', need: 'Esteem · StockStone', target: 'SeekingStone', level: 4, cfg: ['house_upgrade_tier*_stone_ratio'], anchor: 'branches.rs::B9StockStone' },
-    { id: 'b10', cond: '家缺金 且 淘金冷却≤0', need: 'Esteem · StockGold', target: 'SeekingGold', level: 4, cfg: ['decisionStockGoldCooldown=45.0'], anchor: 'branches.rs::B10StockGold' },
-    { id: 'b11', cond: '仓满 + 非庄园 + 成年男成员', need: 'Esteem · BuildHouse(1-4级)', target: 'ConstructingHouse', level: 4, cfg: ['house.is_pantry_full()'], anchor: 'branches.rs::B11BuildHouseUpgrade' },
-    { id: 'b13', cond: '有金源 且 冷却≤0（4级庄园万事俱备后）', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' }
+    { id: 'b5', cond: '有房(含0级) 且 家户账本水 <100', need: 'Safety · StockWater', target: 'SeekingWater', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B5StockWater' },
+    { id: 'b6', cond: '有房(含0级) 且 家户账本粮 <100', need: 'Safety · StockFood', target: 'SeekingFood', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B6StockFood' },
+    { id: 'b7', cond: '有房(含0级) 且 家户账本木 <100', need: 'Safety · StockWood', target: 'SeekingWood', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B7StockWood' },
+    { id: 'b8', cond: '0级宅 且账本水≥50粮≥50 + 成年男成员', need: 'Belonging · BuildHouse(0级)', target: '瞬发升级(1级)', level: 3, cfg: ['upgrade_material_cost(T0)=水50粮50'], anchor: 'branches.rs::B8BuildHouseTier0' },
+    { id: 'b9', cond: '有房(含0级) 且 家户账本石 <100', need: 'Safety · StockStone', target: 'SeekingStone', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B9StockStone' },
+    { id: 'b10', cond: '有房(含0级) 且 家户账本金 <100 且 淘金冷却≤0', need: 'Safety · StockGold', target: 'SeekingGold', level: 2, cfg: ['decisionStockGoldCooldown=45.0'], anchor: 'branches.rs::B10StockGold' },
+    { id: 'b11', cond: '账本可付本次材料(2级木粮水75/3级石木粮水100/4级金石木粮水125)', need: 'Esteem · BuildHouse(1-4级)', target: '瞬发升级(下一级)', level: 4, cfg: ['upgrade_material_cost(tier)'], anchor: 'branches.rs::B11BuildHouseUpgrade' },
+    { id: 'b13', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' }
   ];
 
   var BRANCH_MAP = {};

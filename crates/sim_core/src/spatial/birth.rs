@@ -139,6 +139,8 @@ impl World3DEngine {
                 if !mother.children_ids.contains(&baby_id) {
                     mother.children_ids.push(baby_id);
                 }
+                // ★ M6 威望·子嗣因子：平安诞下活产儿，母亲威望 +1（子女日后死亡不回减）
+                mother.prestige = mother.prestige.saturating_add(1);
                 mother.pregnancy_father_id = None;
                 mother.pregnancy_child_id = None; // 胎儿 ID 已由新生儿实体继承
             }
@@ -147,6 +149,8 @@ impl World3DEngine {
                     if !father.children_ids.contains(&baby_id) {
                         father.children_ids.push(baby_id);
                     }
+                    // ★ M6 威望·子嗣因子：父亲威望 +1
+                    father.prestige = father.prestige.saturating_add(1);
                 }
             }
 
