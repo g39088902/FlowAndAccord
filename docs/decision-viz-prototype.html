@@ -235,9 +235,9 @@
 'use strict';
 /* ═══════════════ 数据：图元（与 docs/DECISION_VIZ_DESIGN.md §3 一一对应）═══════════════ */
 var LV = {
-  1:{name:'生理需求', color:'var(--lv1)', hex:'#ef4444', kinds:'QuenchThirst · SateHunger · Rest'},
+  1:{name:'生理需求', color:'var(--lv1)', hex:'#ef4444', kinds:'QuenchThirst · SateHunger · Rest · FoundHome'},
   2:{name:'安全需求', color:'var(--lv2)', hex:'#38bdf8', kinds:'RepairHouse · StockWater · StockFood · StockWood'},
-  3:{name:'归属与爱', color:'var(--lv3)', hex:'#10b981', kinds:'FoundHome · BuildHouse(0级)'},
+  3:{name:'归属与爱', color:'var(--lv3)', hex:'#10b981', kinds:'BuildHouse(0级)'},
   4:{name:'尊重需求', color:'var(--lv4)', hex:'#f59e0b', kinds:'BuildHouse(1-4级) · StockStone · StockGold'},
   5:{name:'自我实现', color:'var(--lv5)', hex:'#a78bfa', kinds:'GoldWealth(冷却180s)'}
 };
@@ -247,16 +247,16 @@ var BRANCHES = [
   {id:'b1',  cond:'口渴 < 25 且有可用水源',       need:'Physiological · QuenchThirst', target:'SeekingWater',   level:1, cfg:['decisionCriticalThirst=25.0'], anchor:'evaluate.rs::evaluate_needs:102'},
   {id:'b2',  cond:'饥饿 < 25 且有可用粮源',       need:'Physiological · SateHunger',   target:'SeekingFood',    level:1, cfg:['decisionCriticalHunger=25.0'], anchor:'evaluate.rs::evaluate_needs:105'},
   {id:'b3',  cond:'体力 < 100',                   need:'Physiological · Rest',         target:'RestingAtCamp',  level:1, cfg:['decisionRestStaminaTarget=100.0'], anchor:'evaluate.rs::evaluate_needs:109'},
-  {id:'b4',  cond:'有家宅 且 耐久 < 50%（成员）',  need:'Safety · RepairHouse',         target:'RepairingHouse', level:2, cfg:['decisionHouseRepairNeedThreshold=50.0'], anchor:'evaluate.rs::evaluate_needs:117'},
-  {id:'b5',  cond:'家缺水 且有水源（有家人→归属层）', need:'Safety · StockWater',      target:'SeekingWater',   level:2, cfg:['house_upgrade_tier*_water_ratio'], anchor:'evaluate.rs::evaluate_needs:127'},
-  {id:'b6',  cond:'家缺粮 且有粮源（有家人→归属层）', need:'Safety · StockFood',       target:'SeekingFood',    level:2, cfg:['house_upgrade_tier*_food_ratio'], anchor:'evaluate.rs::evaluate_needs:130'},
-  {id:'b7',  cond:'家缺木 且有木源（有家人→归属层）', need:'Safety · StockWood',       target:'SeekingWood',    level:2, cfg:['house_upgrade_tier*_wood_ratio'], anchor:'evaluate.rs::evaluate_needs:133'},
-  {id:'b8',  cond:'0级仓库仓满 + 成年男性成员',     need:'Belonging · BuildHouse(0级)', target:'ConstructingHouse', level:3, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:137'},
-  {id:'b9',  cond:'家缺石 且有石源',               need:'Esteem · StockStone',         target:'SeekingStone',   level:4, cfg:['house_upgrade_tier*_stone_ratio'], anchor:'evaluate.rs::evaluate_needs:141'},
-  {id:'b10', cond:'家缺金 且 淘金冷却≤0',          need:'Esteem · StockGold',          target:'SeekingGold',    level:4, cfg:['decisionStockGoldCooldown=45.0'], anchor:'evaluate.rs::evaluate_needs:145'},
-  {id:'b11', cond:'仓满 + 非庄园 + 成年男成员',     need:'Esteem · BuildHouse(1-4级)',  target:'ConstructingHouse', level:4, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:149'},
-  {id:'b12', cond:'无家 + 成年男 + 饥渴体力达标',   need:'Belonging · FoundHome',      target:'掷点→立宅',     level:3, cfg:['decisionFoundHome{Min}=20/20/60','Candidates=12'], anchor:'evaluate.rs::evaluate_needs:167'},
-  {id:'b13', cond:'有金源 且 冷却≤0（4级庄园后）',  need:'SelfActualization · GoldWealth', target:'SeekingGold', level:5, cfg:['decisionGoldWealthCooldown=180.0'], anchor:'evaluate.rs::evaluate_needs:182'}
+  {id:'b12', cond:'无家 + 成年男 + 饥渴体力达标',   need:'Physiological · FoundHome',  target:'掷点→立宅',     level:1, cfg:['decisionFoundHome{Min}=20/20/60','Candidates=12'], anchor:'evaluate.rs::evaluate_needs:113'},
+  {id:'b4',  cond:'有家宅 且 耐久 < 50%（成员）',  need:'Safety · RepairHouse',         target:'RepairingHouse', level:2, cfg:['decisionHouseRepairNeedThreshold=50.0'], anchor:'evaluate.rs::evaluate_needs:137'},
+  {id:'b5',  cond:'家缺水 且有水源（有家人→归属层）', need:'Safety · StockWater',      target:'SeekingWater',   level:2, cfg:['house_upgrade_tier*_water_ratio'], anchor:'evaluate.rs::evaluate_needs:147'},
+  {id:'b6',  cond:'家缺粮 且有粮源（有家人→归属层）', need:'Safety · StockFood',       target:'SeekingFood',    level:2, cfg:['house_upgrade_tier*_food_ratio'], anchor:'evaluate.rs::evaluate_needs:150'},
+  {id:'b7',  cond:'家缺木 且有木源（有家人→归属层）', need:'Safety · StockWood',       target:'SeekingWood',    level:2, cfg:['house_upgrade_tier*_wood_ratio'], anchor:'evaluate.rs::evaluate_needs:153'},
+  {id:'b8',  cond:'0级仓库仓满 + 成年男性成员',     need:'Belonging · BuildHouse(0级)', target:'ConstructingHouse', level:3, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:157'},
+  {id:'b9',  cond:'家缺石 且有石源',               need:'Esteem · StockStone',         target:'SeekingStone',   level:4, cfg:['house_upgrade_tier*_stone_ratio'], anchor:'evaluate.rs::evaluate_needs:161'},
+  {id:'b10', cond:'家缺金 且 淘金冷却≤0',          need:'Esteem · StockGold',          target:'SeekingGold',    level:4, cfg:['decisionStockGoldCooldown=45.0'], anchor:'evaluate.rs::evaluate_needs:165'},
+  {id:'b11', cond:'仓满 + 非庄园 + 成年男成员',     need:'Esteem · BuildHouse(1-4级)',  target:'ConstructingHouse', level:4, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:169'},
+  {id:'b13', cond:'有金源 且 冷却≤0（4级庄园后）',  need:'SelfActualization · GoldWealth', target:'SeekingGold', level:5, cfg:['decisionGoldWealthCooldown=180.0'], anchor:'evaluate.rs::evaluate_needs:186'}
 ];
 
 /* id → 分支 映射（BRANCHES 是数组，需用对象按 id 取用） */
@@ -272,7 +272,7 @@ var FSM_STATES = ['RestingAtCamp','SeekingWater','SeekingFood','SeekingWood','Se
 var NODE_W=560, NODE_H=80, GAP=30, DIV_H=24, COL_X=30;
 var DEFAULT_ORDER=BRANCHES.map(function(b){ return b.id; }); // b1→b13 即代码严格优先级
 /* 4 条层级分界线：divider k 分隔「第k层 | 第k+1层」，位置 g=位于第 g 张需求卡之后（1..12，每层至少 1 张） */
-var DEFAULT_DIVGAPS=[3,7,8,11]; // 默认贴近原始层级：生理3 / 安全4 / 归属1 / 尊重3
+var DEFAULT_DIVGAPS=[4,8,9,12]; // 默认贴近原始层级：生理4 / 安全4 / 归属1 / 尊重3
 var STORE_KEY='decisionViz.order.v3';
 var PERSIST=loadPersist();
 var branchOrder=PERSIST.order;

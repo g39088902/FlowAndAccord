@@ -92,14 +92,15 @@
 
 ## 2. 现状盘点（可复用资产）
 
-### 2.1 决策代码面：`crates/sim_core/src/spatial/decisions/`（7 文件）
+### 2.1 决策代码面：`crates/sim_core/src/spatial/decisions/`（8 文件，v1.3.6 起含 `branches.rs`）
 
 
 
 | 文件             | 职责                                                                                                              | 可视化贡献                       |
 | -------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `branches.rs`  | `BranchId`(13 条 ↔ `"b1".."b13"`) / `ALL` 中性声明序 / 自包含条件函数 `evaluate` / `resolve_order` / `level_override_for` | **判定卡** 的数据源 + 顺序解析（v1.3.6 新增） |
 | `needs.rs`     | `MaslowLevel`(5 层) / `NeedKind`(13 种) / `Need` / `NodePool` / `HouseStockNeeds` / `state_need_label_with_agent` | **层级塔** + **需求→层级映射表** 的数据源 |
-| `evaluate.rs`  | `Decisioner` / `decide`(状态机调度) / `evaluate_needs`(逐层评估) / `fulfill_resting_need`(需求落地)                          | **决策树** + **落地链路** 的核心      |
+| `evaluate.rs`  | `Decisioner` / `decide`(状态机调度) / `evaluate_needs`(**数据驱动**：按注入顺序迭代注册表) / `fulfill_resting_need`(需求落地)                          | **决策树** + **落地链路** 的核心      |
 | `routing.rs`   | `dispatch` / `turn_around_and_route_to`(原地掉头) / `return_home` / POI 触发器可用性                                      | 执行层的 "导航" 节点                |
 | `seeking.rs`   | `decide_seeking_material/survival` 途中熔断与平滑重路由                                                                   | **重路由分支** 图元                |
 | `harvest.rs`   | 饮水 / 采食 / 伐木 / 采石 / 淘金完成判定 + 仓储满额查询                                                                             | **现场采收** 图元                 |
@@ -289,9 +290,9 @@ pub home\_house\_id / spouse\_id / children\_ids,
 
 | 层级     | 语义色         | 用例                                          |
 | ------ | ----------- | ------------------------------------------- |
-| ① 生理   | 红 `#ef4444` | QuenchThirst / SateHunger / Rest            |
+| ① 生理   | 红 `#ef4444` | QuenchThirst / SateHunger / Rest / FoundHome |
 | ② 安全   | 蓝 `#38bdf8` | StockWater/Food/Wood / RepairHouse          |
-| ③ 归属   | 绿 `#10b981` | FoundHome / BuildHouse (0 级)                |
+| ③ 归属   | 绿 `#10b981` | BuildHouse (0 级)                           |
 | ④ 尊重   | 金 `#f59e0b` | BuildHouse (1-4 级) / StockStone / StockGold |
 | ⑤ 自我实现 | 紫 `#a78bfa` | GoldWealth                                  |
 
@@ -412,6 +413,15 @@ sim.agents\[i].hunger/thirst/stamina
 | `frontend/js/decision-viz-standalone.js` | 独立标签页入口                        | \~120 |
 | `docs/decision-viz-prototype.html`       | 交互原型（本文档配套，已交付）                | —     |
 
+> ✅ **v1.3.6 实际落地形态（与原规划的差异，以实际为准）**：
+> - 计划中的 `decision-viz-layout.js` 合并进 `decision-viz-view.js`（布局仅约 60 行，无需独立文件）；
+> - 计划中的 `decision-viz-standalone.js`（独立标签页）改为 **index.html 内嵌覆层视图**
+>   （浏览器独立页面无法共享 WASM 线性内存，只有内嵌才能与运行中的模拟**共用同一引擎实例**、拖动即时生效）；
+> - 新增 `frontend/js/decision-viz.js` 集成层（启动合并顺序文件 → `SIM_CONFIG`；拖动结束 → `applyConfig` 热注入 + `POST /save-decision-order` 落盘；静态环境降级 localStorage）；
+> - 新增 `frontend/js/config.decision-order.js`（顺序唯一真相源）+ `server.js` 保存端点；
+> - 视图 B 实时监控（`decision-viz-live.js`）**未实现**，仍在规划；
+> - 内核侧新增 `decisions/branches.rs`（本设计原计划「不动 Rust 决策逻辑」，为支持真拖动改序已升级为数据驱动）。
+
 ### 8.2 修改既有文件（实现期）
 
 
@@ -446,11 +456,11 @@ graph LR
 | 阶段     | 内容                                            | 验收                                 |
 | ------ | --------------------------------------------- | ---------------------------------- |
 | **M1** | 视图 A 静态逻辑图（G1\~G9 全图元 + 源码锚点 + 阈值标注）          | 打开决策图页，无交互即可读懂 "什么条件做什么"；图元字段与代码一致 |
-| **M2** | 纵列拖拽排序 / **分界线卡片分层** / 顺序与分界持久化 / 缩放平移 / 检查器 / 分组折叠              | 拖拽换序与拖分界后刷新不丢；`localStorage` 保存恢复；固定锚点（评估入口/状态机）不可拖动；分界顺序递增、每层至少 1 张 |
+| **M2** | 纵列拖拽排序 / **分界线卡片分层** / 顺序与分界持久化 / 缩放平移 / 检查器 / 分组折叠              | ✅ **v1.3.6 已落地**：拖拽换序与拖分界后**热注入运行中内核**并落盘 `config.decision-order.js`（刷新后自动合并生效；静态部署降级 `localStorage`）；固定锚点（评估入口/状态机）不可拖动；分界顺序递增、每层至少 1 张 |
 | **M3** | 视图 B 实时监控 / 触发器滑块 / 决策原因链（可选 decision\_trace） | 暂停模拟下实况数据与内核一致；10FPS 节流无卡顿         |
 
 **每次提交前必检（对齐根 AGENTS.md §4.12/§4.13）**：
-1. `node tools/config-check.js` 163/163 全绿（若引入新阈值必须三处同步）；
+1. `node tools/config-check.js` 165/165 全绿（若引入新阈值必须三处同步）；
 2. `node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（内核未动也必须跑，防回归）；
 3. WASM 双副本同步（本方案不改内核，无需重编译，但改动任何 Rust 后必须同步）；
 4. 版本号自增（`index.html` / `AGENTS.md` / `11-changelog.md` 三处）。

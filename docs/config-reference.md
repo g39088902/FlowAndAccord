@@ -170,3 +170,10 @@
 | `ledgerReliefMinBalance` | f32 | 30 | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
 | `ledgerReliefFamilyThreshold` | f32 | 8 | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `ledgerReliefCooldownTicks` | u64 | 1200 | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
+
+## 5. 马斯洛需求与决策门槛
+
+| 字段 (camelCase) | 类型 | 默认值 | 中文说明 |
+| :--- | :--- | :--- | :--- |
+| `decisionEvalOrder` | Vec<String> | [] | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
+| `decisionEvalLevels` | Vec<u8> | [] | 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认） |

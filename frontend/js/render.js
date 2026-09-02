@@ -721,6 +721,8 @@
       // 4. 部落民 Agent 渲染 (受「👤 隐藏部落民」开关控制)
       const agentsToRender = sim.showAgents ? sim.agents : [];
       for (const agent of agentsToRender) {
+        // ★ M1.7 胎儿不设置地图实体：不在地图上渲染
+        if (agent.isFetus) continue;
         const p2D = project3D(agent.pos);
         const isSelectedAgent = sim.selectionType === 'agent' && sim.selectedAgentId === agent.id;
 
@@ -1255,7 +1257,7 @@
           const isAdult = selAgent.age >= 1800.0;
           const isFemale = selAgent.gender === 'female';
           const genderBadge = isFemale ? '♀' : '♂';
-          const roleIcon = !selAgent.isAlive ? '💀' : (selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼'));
+          const roleIcon = selAgent.isFetus ? '👶' : (!selAgent.isAlive ? '💀' : (selAgent.isPregnant ? '🤰' : (isAdult ? (isFemale ? '👩' : '👨') : '🍼')));
           
           let homeTag = `🏕️ 露天营地`;
           if (selAgent.homeHouseId !== null) {
@@ -1267,7 +1269,12 @@
             }
           }
           const surnameBadge = selAgent.surname ? `【${selAgent.surname}】` : '';
-          document.getElementById('insp-title-name').textContent = `${surnameBadge}部落民 #${selAgent.id} ${genderBadge} ${roleIcon}`;
+          if (selAgent.isFetus) {
+            // ★ M1.7 腹中胎儿卡片：无地图实体、跳过决策/代谢/行动
+            document.getElementById('insp-title-name').textContent = `${surnameBadge}腹中胎儿 #${selAgent.id} ${genderBadge} 👶`;
+          } else {
+            document.getElementById('insp-title-name').textContent = `${surnameBadge}部落民 #${selAgent.id} ${genderBadge} ${roleIcon}`;
+          }
           
           const homeBadgeEl = document.getElementById('insp-home-badge');
           if (homeBadgeEl) homeBadgeEl.textContent = homeTag;
@@ -1275,7 +1282,11 @@
           let stateText = selAgent.homeHouseId ? '🏡 私宅安居' : '🏕️ 营地驻留';
           let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息，无私宅不可受孕。';
 
-          if (!selAgent.isAlive) {
+          if (selAgent.isFetus) {
+            // ★ M1.7 腹中胎儿：已获 agent 身份，但不占地图实体、不行动、不消耗
+            stateText = '🤰 腹中孕育中';
+            detailText = '在母亲腹中孕育，尚未出生。已获完整 agent 身份（可继承、可被卡片追踪），但不设置地图实体、跳过行动决策，也不产生任何需求消耗。出生后将转为正常新生儿。';
+          } else if (!selAgent.isAlive) {
             const isDecaying = typeof selAgent.deathDecayTimer === 'number' && selAgent.deathDecayTimer > 0;
             stateText = isDecaying ? '💀 刚离世' : '💀 已故先祖';
             detailText = isDecaying
@@ -1347,7 +1358,10 @@
           // 年龄与性别生育状态展示
           const ageValElem = document.getElementById('insp-age-val');
           if (ageValElem) {
-            if (isAdult) {
+            if (selAgent.isFetus) {
+              ageValElem.textContent = '🤰 孕育中 (未出生)';
+              ageValElem.style.color = '#ec4899';
+            } else if (isAdult) {
               ageValElem.textContent = `${Math.floor(selAgent.age)}s · ${isFemale ? '已成年♀' : '已成年♂'}`;
               ageValElem.style.color = isFemale ? '#ec4899' : '#38bdf8';
             } else {
@@ -1595,9 +1609,11 @@
                 const cAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(cId) : sim.agents.find(a => a.id === cId);
                 const cAlive = cAgent && cAgent.isAlive;
                 const isFem = cAgent && cAgent.gender === 'female';
+                const isFetus = !!(cAgent && cAgent.isFetus);
                 const cGen = cAgent ? (cAgent.generation || (selAgent.generation ? selAgent.generation + 1 : 2)) : (selAgent.generation ? selAgent.generation + 1 : 2);
                 const cSurname = cAgent && cAgent.surname ? `【${cAgent.surname}】` : '';
-                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="点击追踪第${cGen}代子嗣 #${cId}">${isFem ? '👧' : '👦'} ${cSurname}#${cId} (第${cGen}代) ${cAlive ? '🟢' : '💀'}</span>`;
+                // ★ M1.7 腹中胎儿在子嗣栏中以 👶 标记
+                cHtml += `<span class="lineage-chip ${isFem ? 'female' : ''} ${cAlive ? '' : 'dead'}" data-agent-id="${cId}" title="${isFetus ? '腹中胎儿 · 点击查看胎儿卡片' : '点击追踪第' + cGen + '代子嗣 #' + cId}">${isFetus ? '👶' : (isFem ? '👧' : '👦')} ${cSurname}#${cId} ${isFetus ? '(腹中胎儿)' : '(第' + cGen + '代)'} ${cAlive ? '🟢' : '💀'}</span>`;
               }
               if (childrenElem.innerHTML !== cHtml) childrenElem.innerHTML = cHtml;
               if (childrenCountElem) childrenCountElem.textContent = `共 ${selAgent.children.length} 位后代`;
@@ -1714,6 +1730,17 @@
             const pVal = Math.round(selAgent.pregnancyProgress * 100);
             document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 900)}s / 900s)`;
             document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
+            // ★ M1.7 母亲卡片按钮 → 跳转胎儿卡片（data-agent-id 由 main.js 委托处理）
+            const pregFetusBtn = document.getElementById('insp-preg-fetus-btn');
+            if (pregFetusBtn) {
+              if (selAgent.pregnancyChildId != null) {
+                pregFetusBtn.style.display = 'inline-flex';
+                pregFetusBtn.setAttribute('data-agent-id', selAgent.pregnancyChildId);
+                pregFetusBtn.textContent = `👶 查看腹中胎儿 #${selAgent.pregnancyChildId}`;
+              } else {
+                pregFetusBtn.style.display = 'none';
+              }
+            }
           } else {
             pregBox.style.display = 'none';
           }
@@ -1740,6 +1767,8 @@
       const agentHits = [];
       // 隐藏部落民时，族人不再参与点击拾取 (避免"看不见却点得中")
       for (const agent of (sim.showAgents ? sim.agents : [])) {
+        // ★ M1.7 胎儿无地图实体：不可在地图上被点击（只能从母亲卡片跳转）
+        if (agent.isFetus) continue;
         const p2D = project3D(agent.pos);
         const d = Math.hypot(clickX - p2D.x, clickY - p2D.y);
         if (d <= 25) agentHits.push({ type: 'agent', id: agent.id, dist: d });

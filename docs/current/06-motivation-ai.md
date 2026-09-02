@@ -15,12 +15,12 @@
 ```
 ⑤ 自我实现 (大庄园备金/娱乐淘金)
 ④ 尊重需求 (建房施工/采石备料)
-③ 归属与爱 (建仓成家/家庭供给)
+③ 归属与爱 (0级仓库仓满升级成家/家庭供给)
 ② 安全需求 (房屋修缮/私宅水粮储备)
-① 生理需求 (解渴/觅食/体力休养)
+① 生理需求 (解渴/觅食/体力休养/末档立宅)
 ```
 
-低层级需求未满足时绝对阻断高层任务，严禁越级。
+低层级需求未满足时绝对阻断高层任务，严禁越级。生理层内部按「解渴 → 觅食 → 体力休养 → **立宅(末档)**」短路判定：无家成年男性在饥渴 ≥ 20、体力 ≥ 60 的生理稳定态下，将 `FoundHome` 作为生理层最后一档必然触发自立门户（归属层不再承载建仓，仅保留 0 级仓库升级成家）。
 
 > ⚔️ **★ M4 夺位远征（决策树最高优先级）**：在马斯洛评估**之前**先行处理——男性非国王且存在无主营地时，立即置 `SeekingThrone` 状态冲向最近无主营地登基（可中断施工/修缮，进度冻结不回滚），无需满足任何生理/安全前置；王位无主属社会结构级事件，压倒一切个人需求。
 
@@ -50,12 +50,22 @@
 - `world.tick()` 内部顺序：POI 再生 → 代谢/繁衍 → POI 交互(装卸) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货发生在决策之前，决策看到的是卸货后的仓库状态。
 - 详见根 AGENTS.md §4.3。
 
-### decisions 子模块（7 个）
+### 分支评估顺序（数据驱动，v1.3.6 起）
+- 13 条分支抽为 `branches.rs` 注册表（`BranchId::B1QuenchThirst .. B13GoldWealth` ↔ 字符串 ID `"b1".."b13"`），
+  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认全部内建），
+  因此任意排列都语义安全。
+- `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
+- **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`
+  声明序 b1→b13 中性兜底；策展优先级的唯一真相源是前端持久化文件 `frontend/js/config.decision-order.js`，
+  启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入（拖动决策卡后热注入 + 落盘，详见 §与其他模块接口）。
+
+### decisions 子模块（8 个）
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 决策子模块入口与重新导出 |
-| `needs.rs` | 需求定义（NeedKind）、节点池、家宅缺口计算 |
-| `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs/fulfill_resting_need |
+| `branches.rs` | 13 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
+| `needs.rs` | 需求定义（MaslowLevel/NeedKind）、节点池、家宅缺口计算、`state_need_label_with_agent` 层级覆盖 |
+| `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs（数据驱动）/fulfill_resting_need |
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
 | `harvest.rs` | 现场采收判定 + 仓储满额查询 |
 | `seeking.rs` | 途中熔断与平滑重路由 |
@@ -69,6 +79,8 @@
 - ★ M4 夺位远征优先于马斯洛评估，且不消耗 `WorldRng`；夺位者登基/放弃后恢复正常决策。
 
 ## 与其他模块接口
+- `frontend/js/decision-viz*.js` + `config.decision-order.js`：决策引擎可视化视图拖动卡片/分界线 →
+  POST 落盘顺序文件 → `rustWorld.applyConfig()` 热注入本模块 `decision_eval_order`（顺序+层级覆盖）。
 - `agent.rs`：读取生理指标与行囊状态，写入 agent.state（含 `SeekingThrone`）与路径。
 - `ecology.rs`：采收与卸货的物理执行。
 - `housing_system/`：FoundHome/BuildHouse/RepairHouse 的物理执行。

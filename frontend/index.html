@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.2</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.6</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -474,6 +474,8 @@
             <span id="insp-preg-val">45%</span>
           </div>
           <div class="meter-bg"><div class="meter-fill" id="insp-preg-fill" style="background:#ec4899; width:45%;"></div></div>
+          <!-- ★ M1.7 母亲卡片按钮 → 跳转胎儿卡片 -->
+          <button id="insp-preg-fetus-btn" class="insp-btn" data-agent-id="" style="display:none; margin-top:6px; padding:4px 10px; font-size:10px;">👶 查看腹中胎儿</button>
         </div>
 
         <div style="font-size:9.5px; color:#94a3b8; line-height:1.35;" id="insp-detail-text">
@@ -556,6 +558,7 @@
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
+      <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动需求判定卡调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
       <button class="ecology-btn" id="btn-reroll-eco">🏕️ 重演生态 (20人·10男10女)</button>
       <button class="headless-btn" id="btn-headless" title="🧠 无头模式: 只推进模拟、跳过画布渲染，适合长程快速演化">🧠 无头模式 (只运行不渲染)</button>
     </div>
@@ -757,8 +760,63 @@
     </div>
   </div>
 
+  <!-- 马斯洛决策引擎可视化（顺序真相源 config.decision-order.js 须早于 rustworld 首次 applyConfig） -->
+  <div id="decision-viz-overlay" class="dag-modal-overlay" style="display:none;">
+    <div class="dag-modal-window dviz-window">
+      <div class="dag-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">🧠</span>
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#38bdf8;">马斯洛决策引擎 · evaluate_needs</div>
+            <div style="font-size:10px; color:#94a3b8;">拖动需求判定卡调整评估顺序 · 拖动分界线重划层级 · 松手即热注入运行中的模拟并落盘 config.decision-order.js</div>
+          </div>
+        </div>
+        <div class="dag-modal-tools">
+          <button id="dviz-btn-fit" class="dag-tool-btn" title="整图自适应居中">🎯 适应窗口</button>
+          <button id="dviz-btn-reset" class="dag-tool-btn" title="恢复出厂策展顺序（b1→b13 原硬编码优先级）">↺ 重置顺序</button>
+          <button id="dviz-btn-close" class="dag-modal-close" title="关闭决策引擎 (Esc)">✕</button>
+        </div>
+      </div>
+      <div class="dviz-body">
+        <aside class="dviz-left">
+          <div class="dviz-sec-title">层级 · 颜色归类</div>
+          <div id="dviz-layer-nav"></div>
+          <div class="dviz-sec-title">说明</div>
+          <div class="dviz-legend">
+            <div>◆ 评估入口 · ▢ 需求判定卡 · ⬡ 状态机 · ┄ 分界线</div>
+            <div style="margin-top:6px"><b>拖动卡片</b>调整评估顺序；<b>拖动分界线</b>重新划分需求所属马斯洛层级。松手后经 <code>applyConfig</code> 热注入 WASM 内核，并 POST 落盘 <code>js/config.decision-order.js</code>（静态部署无写文件能力时降级暂存本机）。</div>
+            <div style="margin-top:6px"><b>数据来源</b><br>decisions/branches.rs · evaluate.rs · needs.rs<br>routing.rs · seeking.rs · harvest.rs · scheduler.rs</div>
+          </div>
+        </aside>
+
+        <section class="dviz-center">
+          <div class="dviz-toolbar">
+            <span id="dviz-status" class="dviz-status">就绪</span>
+          </div>
+          <div class="dviz-viewport" id="dviz-viewport">
+            <div class="dviz-world" id="dviz-world">
+              <div id="dviz-nodes"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="dviz-right">
+          <div id="dviz-insp-empty" class="dviz-empty">
+            👆 点击任意图元查看详情<br><br>
+            <span style="font-size:11px">拖动卡片换序、拖动分界线重分层、缩放平移、颜色过滤、点击下钻均已启用。</span>
+          </div>
+          <div id="dviz-insp-card" class="dviz-insp-card" style="display:none"></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
   <script src="js/math.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/config.decision-order.js"></script>
+  <script src="js/decision-viz-data.js"></script>
+  <script src="js/decision-viz-view.js"></script>
+  <script src="js/decision-viz.js"></script>
   <script src="js/rustworld.js"></script>
   <script src="js/dag-layout.js"></script>
   <script src="js/dag-view.js"></script>

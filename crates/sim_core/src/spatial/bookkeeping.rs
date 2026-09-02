@@ -308,7 +308,7 @@ impl World3DEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // Split：男子成年或丧父 → 从父亲家户分走 1/(2+n) 资源 → 立新户
+    // Split：男子成年（父在世 W=2+n）或丧父（父亡 W=n）→ 从父亲家户分走 1/W 资源 → 立新户
     // ══════════════════════════════════════════════════════════════
 
     fn tick_household_split(&mut self, tick: u64) {
@@ -324,7 +324,7 @@ impl World3DEngine {
         let mut candidates: Vec<SplitCandidate> = Vec::new();
 
         for agent in &self.agents {
-            if !agent.is_alive || agent.gender != Gender::Male {
+            if !agent.is_alive || agent.gender != Gender::Male || agent.is_fetus {
                 continue;
             }
 
@@ -359,27 +359,21 @@ impl World3DEngine {
                 continue;
             };
 
-            // 计算子一代数量 n：父亲 children_ids 长度 + 胎儿（若父亲配偶怀孕）
+            // 计算子一代数量 n：父亲 children_ids 长度
+            // ★ M1.7 受孕即建胎儿 agent 并加入父亲 children_ids，故不再单独 +1（否则重复计数）
             let mut n_children = 0usize;
             if let Some(father_head) = self.household_registry.get(old_hid).map(|h| h.head) {
                 if let Some(fidx) = self.agent_index.get(&father_head) {
                     if let Some(father) = self.agents.get(*fidx) {
                         n_children = father.children_ids.len();
-                        // 胎儿计入子一代（父亲配偶怀孕且已预分配 ID）
-                        if let Some(spouse) = father.spouse_id {
-                            if let Some(sidx) = self.agent_index.get(&spouse) {
-                                if let Some(spouse_agent) = self.agents.get(*sidx) {
-                                    if spouse_agent.is_pregnant && spouse_agent.pregnancy_child_id.is_some() {
-                                        n_children += 1;
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
 
-            let weight_total = 2.0 + n_children as f32; // 父权重2 + 子一代各1（含胎儿）
+            // 父权重仅在父亲在世时计入：成年分家 → W = 2(父) + n(子一代，含胎儿)；
+            // 丧父分家 → 亡父不占权重，W = n，资源在子一代间平分（与继承清算语义一致）。
+            let father_alive = !father_dead;
+            let weight_total = n_children as f32 + if father_alive { 2.0 } else { 0.0 };
             let split_ratio = 1.0 / weight_total;
 
             // 预先计算各品类分割金额（基于当前原始余额）

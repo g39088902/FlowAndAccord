@@ -23,9 +23,9 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 
 | 层级 | 需求种类 | 设计意图 |
 | :--- | :--- | :--- |
-| ① 生理 | `QuenchThirst` / `SateHunger` / `Rest` | 生存底线——饥渴/体力告急时压倒一切 |
+| ① 生理 | `QuenchThirst` / `SateHunger` / `Rest` / `FoundHome` | 生存底线——饥渴/体力告急时压倒一切；末档为无家男性自立门户 |
 | ② 安全 | `RepairHouse` / `StockWater` / `StockFood` / `StockWood` | 家宅储备——仓库填满优先于盖房升级 |
-| ③ 归属 | `FoundHome` / `BuildHouse`(0级) | 成家立业——无家成年男性自立门户 |
+| ③ 归属 | `BuildHouse`(0级) | 成家立业——0级仓库仓满后施工升级成家 |
 | ④ 尊重 | `BuildHouse`(1-4级) / `StockStone` / `StockGold`(45s冷却) | 建材储备与房屋升级 |
 | ⑤ 自我实现 | `GoldWealth`(180s冷却) | 4 级大庄园竣工后的娱乐淘金 |
 
@@ -116,7 +116,7 @@ Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离�
 个体求生（饥渴→就近POI→采收→行囊→回家卸货）
   → 随身搬运（真实背包，非瞬移，容量约束）
     → 筑巢成家（成年男性→FoundHome→自主选址→0级仓库→升级→成婚）
-      → 代际传承（受孕→胎儿预分配ID→出生→继承父亲家户→成年分家→下一代立宅）
+      → 代际传承（受孕→胎儿 agent 入世(v1.3.5)→出生→继承父亲家户→成年分家→下一代立宅）
         → 踏路成道（行走→wear→道路升级→更多人走→主干道涌现）
 ```
 

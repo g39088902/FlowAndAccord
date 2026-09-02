@@ -17,7 +17,70 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml'
 };
 
+// ── 决策顺序持久化：决策引擎视图拖动后落盘 config.decision-order.js ──
+const DECISION_ORDER_FILE = path.join(__dirname, 'js', 'config.decision-order.js');
+const VALID_BRANCH_ID = /^b(?:[1-9]|1[0-3])$/;
+const MAX_BODY_BYTES = 16 * 1024;
+
+function renderDecisionOrderFile(order, levels) {
+  return `// ==========================================================================
+// Flow & Accord · 决策分支评估顺序持久化配置 (config.decision-order.js)
+// ==========================================================================
+// 本文件由 server.js 的 POST /save-decision-order 端点原子重写（决策引擎视图拖动落盘），
+// 是 evaluate_needs 13 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
+// decisionEvalOrder: 13 个分支 ID（b1~b13），数组顺序即评估优先级（越靠前越优先）。
+// decisionEvalLevels: 与顺序下标并行的层级覆盖，0=保留代码动态默认，1-5=强制马斯洛层级。
+// ==========================================================================
+window.SIM_DECISION_ORDER = {
+  decisionEvalOrder: [${order.map(s => `"${s}"`).join(', ')}],
+  decisionEvalLevels: [${levels.join(', ')}],
+};
+`;
+}
+
+function handleSaveDecisionOrder(req, res) {
+  let body = '';
+  let tooLarge = false;
+  req.on('data', (chunk) => {
+    body += chunk;
+    if (body.length > MAX_BODY_BYTES) {
+      tooLarge = true;
+      req.destroy();
+    }
+  });
+  req.on('end', () => {
+    if (tooLarge) return;
+    try {
+      const payload = JSON.parse(body);
+      const order = payload.decisionEvalOrder;
+      const levels = payload.decisionEvalLevels;
+      const orderOk = Array.isArray(order) && order.length === 13
+        && new Set(order).size === 13 && order.every((s) => VALID_BRANCH_ID.test(s));
+      const levelsOk = Array.isArray(levels) && levels.length === 13
+        && levels.every((v) => Number.isInteger(v) && v >= 0 && v <= 5);
+      if (!orderOk || !levelsOk) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'invalid decisionEvalOrder/decisionEvalLevels' }));
+        return;
+      }
+      // 原子写：先写临时文件再 rename，防半截文件（忽略客户端任何路径，仅写固定文件）
+      const tmpFile = DECISION_ORDER_FILE + '.tmp';
+      fs.writeFileSync(tmpFile, renderDecisionOrderFile(order, levels), 'utf8');
+      fs.renameSync(tmpFile, DECISION_ORDER_FILE);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/save-decision-order') {
+    handleSaveDecisionOrder(req, res);
+    return;
+  }
   let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
   const extname = String(path.extname(filePath)).toLowerCase();
   const contentType = MIME_TYPES[extname] || 'application/octet-stream';

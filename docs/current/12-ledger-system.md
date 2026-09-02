@@ -61,9 +61,11 @@
 - **公仓税 Tax**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。
 
-### 胎儿预分配 ID
-- 受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿占用 `AgentId`（`pregnancy_child_id`），分娩（`birth.rs`）时复用该 ID。
-- 未出生孩子计入 M2 分家权重与继承分配。
+### 胎儿 Agent 身份（M1.7 受孕即建实体）
+- **受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿创建完整 Agent 实体**（`is_fetus=true`），而非仅预分配 ID：胎儿加入父母 `children_ids`、随父入父亲家户（`world.rs::tick_fetus_reconcile` 每 tick 对账）。
+- 未出生孩子计入 M2 分家权重（`W=2+n` 的 n）与**继承分配**（父亡清算不再把"仅有胎儿"误判绝嗣入公仓，而是为胎儿立户并转其份额）。
+- 胎儿**无需求消耗**（跳过代谢/年龄/死亡判定）、**无地图实体**（跳过运动/POI/渲染/点击拾取）、**跳过行动决策**；性别占位 Female，不被分家/婚姻/房产/王位继承当作男性处理。
+- 分娩（`birth.rs::resolve_newborns`）**原位复用胎儿 ID** 替换为新生儿（随身黄金随行转移）；流产/母亡时 `tick_fetus_reconcile` 移除胎儿实体并清理 `children_ids`/家户成员。
 - 发号不消耗 `WorldRng`，确定性可复现。
 
 ## 源码分布（ledger 7 子模块 + bookkeeping）
@@ -91,10 +93,11 @@
 - 一人同时只属于一个家户（`by_agent` 唯一索引）。
 - 一人同时只能有一段存续婚姻（存续唯一性校验）。
 - 婚姻记录不持有 `house_id`，与房产所有权解耦。
-- 胎儿在受孕时即预分配 AgentId，分娩复用，不消耗 RNG。
+- 胎儿在受孕时即建 agent 实体（`is_fetus=true`），分娩原位替换复用 ID，不消耗 RNG。
 - 账本流水环形缓冲容量固定（默认 64），超容量淘汰最旧记录。
 - 宗族/地区无主时账本冻结（只进不出）；族税/公仓税全局统一时点征收，保证确定性。
 - 分家/继承只记账本余额，不动物理库存；`Inheritance` 先于 `Split` 执行（Split 幂等跳过已立户者）。
+- 分家权重：父亲在世时 `W = 2 + n`（n 含胎儿）；**丧父分家时亡父不占权重，`W = n`**（子一代间平分）。
 
 ## 与其他模块接口
 
@@ -103,8 +106,9 @@
 | `housing_system/marriage.rs` | 成婚 → 登记簿注册 + 女方转入夫家家户；丧偶 → 封账归档 |
 | `housing_system/construction.rs` | ★ M2 升级竣工 → 按升级前等级从户主家户账本 `record_consumption` 扣建材（Construction 流水） |
 | `housing_system/maintenance.rs` | ★ M2 修缮完工 → 家户团体事件记录（纯审计） |
-| `agent.rs` | 受孕 → 预分配胎儿 AgentId；`spouse_id` 作为缓存从登记簿同步；`arrival_tick` 记录到达时刻 |
-| `birth.rs` | 分娩 → 复用预分配 ID；新生儿入父亲家户（M2）/随父姓入宗族（M3）/入父亲地区（M4） |
+| `agent.rs` | 受孕 → 预分配胎儿 ID 并标记 `is_fetus` 身份；`spouse_id` 作为缓存从登记簿同步；`arrival_tick` 记录到达时刻 |
+| `world.rs` | `tick_fetus_reconcile` 受孕即建胎儿实体 / 流产移除 / 位置随母；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
+| `birth.rs` | 分娩 → 原位复用胎儿 ID 替换为新生儿；新生儿入父亲家户（M2）/随父姓入宗族（M3）/入父亲地区（M4） |
 | `decisions/scheduler.rs` | ★ M4 夺位远征调度（`tick_conquest_expedition`）读写 `expedition_targets` 与 `SeekingThrone` 状态 |
 | `ecology.rs` | 始祖播撒 → 入宗族（M3）+ 入最近营地地区（M4）+ `arrival_tick=0` |
 | `world.rs` | 世界重置 → 清空各登记簿/缓存；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |

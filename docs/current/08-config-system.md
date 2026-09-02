@@ -38,12 +38,19 @@
 
 前端 `config.js` 同步添加对应 camelCase 字段与中文注释。
 
+### 数组类型字段与「Rust 无顺序」例外（v1.3.6 起）
+- `decisionEvalOrder: Vec<String>` / `decisionEvalLevels: Vec<u8>` 支持数组类型：**Rust 默认空 Vec**，
+  策展顺序的权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。
+  这是「命名 const 默认值」一项的**文档化例外**——内核不持有策展优先级，空/非法注入仅按分支声明序中性兜底。
+- 决策引擎视图拖动后经 `POST /save-decision-order`（`frontend/server.js` 端点，校验 + 原子写）重写该文件；
+  静态部署无写文件能力时降级暂存 localStorage。
+
 ### 配置校验工具 `tools/config-check.js`
-零依赖纯 Node 脚本，交叉解析 `config.js` 与 `config.rs`，捕获四类问题并以退出码报错：
+零依赖纯 Node 脚本，交叉解析 `config.js` 与 `config.rs`，捕获四类问题并以退出码报错（数组类型逐元素比对）：
 1. **孤儿字段**：前端有 / Rust 无
 2. **缺失字段**：Rust 有 / 前端无
-3. **类型错配**：`usize/u64` 与浮点
-4. **数值漂移**：默认值不一致
+3. **类型错配**：`usize/u64` 与浮点、`Vec<String>`/`Vec<u8>` 与非数组
+4. **数值漂移**：默认值不一致（数组按 JSON 序列化比对）
 
 任一报错即说明前后端已失同步，须先修复再发布。改参后必跑。
 
@@ -53,7 +60,7 @@
 - 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 字段数为 163（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5——以实际 `config.rs` 为准）。
+- `SimConfig` 字段数为 165（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2——以实际 `config.rs` 为准）。
 - 严禁在 Rust 逻辑层散落字面量或直引 `const`，一律通过 `self.config.<字段>` 引用。
 - `config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

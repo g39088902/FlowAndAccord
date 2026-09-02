@@ -140,9 +140,14 @@ pub struct Agent3D {
     // 繁衍与生命周期
     pub is_pregnant: bool,
     pub pregnancy_father_id: Option<AgentId>, // 胎儿生父 ID
-    /// ★ 腹中胎儿已预分配的 AgentId（受孕瞬间即占号，分娩时复用该 ID）
-    /// 目的：分家权重与遗产继承需把"妈妈肚子里的孩子"计入子一代（账本重构 M1.6）
+    /// ★ 腹中胎儿的 AgentId（受孕瞬间即占号；M1.7 起由 `world.tick_fetus_reconcile` 同步创建完整 agent 实体，分娩原位替换复用该 ID）
+    /// 目的：分家权重与遗产继承需把"妈妈肚子里的孩子"计入子一代（账本重构 M1.6/M1.7）
     pub pregnancy_child_id: Option<AgentId>,
+    /// ★ 腹中胎儿标记（M1.7 受孕即建 agent 身份）
+    /// 已获完整 Agent 实体：不设置地图实体、跳过决策/代谢/运动、无需求消耗；
+    /// 出生时在 birth.rs::resolve_newborns 原位替换为新生儿。默认 false。
+    #[serde(default)]
+    pub is_fetus: bool,
     pub pregnancy_progress: f32,     // 孕期进度 (0.0 ~ 1.0)
     pub ready_to_birth: bool,        // 孕期满是否准备分娩
     pub miscarriage_alert_timer: f32,// 流产警报留存显示计时器 (秒)
@@ -219,6 +224,7 @@ impl Agent3D {
             is_pregnant: false,
             pregnancy_father_id: None,
             pregnancy_child_id: None,
+            is_fetus: false,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,
@@ -358,7 +364,7 @@ impl Agent3D {
             if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
                 self.is_pregnant = true;
                 self.pregnancy_father_id = self.spouse_id;
-                // ★ 受孕即为腹中胎儿占号（分家/继承需计入未出生的孩子）
+                // ★ 受孕即为腹中胎儿占号（分家/继承需计入未出生的孩子；M1.7 起实体由 tick_fetus_reconcile 于世界 tick 创建）
                 let child_id = *next_agent_id;
                 *next_agent_id += 1;
                 self.pregnancy_child_id = Some(child_id);

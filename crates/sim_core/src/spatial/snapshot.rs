@@ -127,6 +127,10 @@ pub struct AgentSnapshot {
     pub max_health: f32, // 健康上限/寿命基准
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
+    /// ★ M1.7 腹中胎儿预分配 ID（母亲卡片按钮跳转胎儿卡片用）
+    pub pregnancy_child_id: Option<AgentId>,
+    /// ★ M1.7 腹中胎儿标记（已获 agent 身份，但无地图实体、跳过决策/代谢/行动）
+    pub is_fetus: bool,
     pub miscarriage_cooldown: f32,
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,

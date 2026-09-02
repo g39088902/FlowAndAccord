@@ -395,6 +395,13 @@ pub struct SimConfig {
     pub decision_found_home_dist_min: f32,
     pub decision_found_home_dist_max: f32,
     pub decision_work_stamina_threshold: f32,
+    /// 决策分支评估顺序（13 个分支 ID，如 "b1".."b13"）。
+    /// ⚠️ §4.12 三处规约的文档化例外：Rust 层**无策展顺序**，默认空 Vec = 未注入，
+    /// 空/非法时按 branches.rs 声明序中性兜底；权威顺序在前端 `config.decision-order.js`。
+    pub decision_eval_order: Vec<String>,
+    /// 分支层级覆盖（与 decision_eval_order 下标并行）：0=保留代码动态默认，1-5=强制马斯洛层级。
+    /// 默认空 Vec = 全部动态默认。
+    pub decision_eval_levels: Vec<u8>,
 
     // 6. 私宅营造、代际传承与升级
     pub house_durability_max: f32,
@@ -586,6 +593,9 @@ impl Default for SimConfig {
             decision_found_home_dist_min: DECISION_FOUND_HOME_DIST_MIN,
             decision_found_home_dist_max: DECISION_FOUND_HOME_DIST_MAX,
             decision_work_stamina_threshold: DECISION_WORK_STAMINA_THRESHOLD,
+            // Rust 无策展顺序：空 = 未注入（中性兜底），权威值在前端 config.decision-order.js
+            decision_eval_order: Vec::new(),
+            decision_eval_levels: Vec::new(),
 
             // 6. 私宅营造、代际传承与升级
             house_durability_max: HOUSE_DURABILITY_MAX,

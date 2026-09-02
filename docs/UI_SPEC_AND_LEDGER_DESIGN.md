@@ -191,7 +191,7 @@ graph TD
 
 # 2. 第二篇：制度大盘 UI 实现（M1~M4 全落地）
 
-在 [`docs/PLAN_LEDGER_REFACTOR.md`](./PLAN_LEDGER_REFACTOR.md) 中，M1~M4 已全部完成（M1 团体基类/婚姻登记/家户体系/胎儿预分配 ID → M4 地区王国）。本篇对 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 的 UI/UX 实现架构与视觉交互进行完整说明——以下界面均已落地于 `frontend/js/ledger-ui.js`。
+在 [`docs/PLAN_LEDGER_REFACTOR.md`](./PLAN_LEDGER_REFACTOR.md) 中，M1~M4 已全部完成（M1 团体基类/婚姻登记/家户体系/胎儿 Agent 身份 → M4 地区王国）。本篇对 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 的 UI/UX 实现架构与视觉交互进行完整说明——以下界面均已落地于 `frontend/js/ledger-ui.js`。
 
 ```mermaid
 graph LR

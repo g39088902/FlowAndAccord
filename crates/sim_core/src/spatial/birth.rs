@@ -133,22 +133,36 @@ impl World3DEngine {
                 .unwrap_or_else(|| mother_snap.surname.clone());
             baby.surname = baby_surname.clone();
 
-            // ── 7. 注册亲子关系（O(1) 可变查找） ─────────────────────────────
+            // ── 7. 注册亲子关系（O(1) 可变查找）
+            // ★ M1.7 胎儿已在受孕时加入父母 children_ids，此处仅在缺失时补录，避免重复
             if let Some(mother) = self.agent_by_id_mut(mother_id) {
-                mother.children_ids.push(baby_id);
+                if !mother.children_ids.contains(&baby_id) {
+                    mother.children_ids.push(baby_id);
+                }
                 mother.pregnancy_father_id = None;
                 mother.pregnancy_child_id = None; // 胎儿 ID 已由新生儿实体继承
             }
             if let Some(fid) = father_id {
                 if let Some(father) = self.agent_by_id_mut(fid) {
-                    father.children_ids.push(baby_id);
+                    if !father.children_ids.contains(&baby_id) {
+                        father.children_ids.push(baby_id);
+                    }
                 }
             }
 
-            // ── 8. 推入 agents 并增量更新索引 ─────────────────────────────────
-            let new_idx = self.agents.len();
-            self.agents.push(baby);
-            self.agent_index.insert(baby_id, new_idx);
+            // ── 8. 新生儿实体落位：受孕时已建胎儿 agent → 原位替换为新生儿；否则新建 ──
+            if let Some(fetus_idx) = self.agent_index.get(&baby_id).copied() {
+                // ★ M1.7 胎儿可能已通过金币继承携带随身黄金（father/mother 亡故清算），
+                // 出生时原位替换会丢弃胎儿实体字段，须先转移随身黄金给新生儿。
+                baby.carried_gold += self.agents[fetus_idx].carried_gold;
+                // 胎儿 agent 已在 agents 中（受孕即建）：用完整初始化的新生儿实体原位替换。
+                // 原位替换不改变其他 agent 下标，agent_index 条目（id→idx）保持有效。
+                self.agents[fetus_idx] = baby;
+            } else {
+                let new_idx = self.agents.len();
+                self.agents.push(baby);
+                self.agent_index.insert(baby_id, new_idx);
+            }
 
             // ── 8.5 M2 新生儿入父亲家户（家庭跟着男人走：未成年子女归父亲家户）──
             if let Some(fid) = father_id {

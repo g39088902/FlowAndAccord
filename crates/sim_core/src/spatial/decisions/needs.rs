@@ -3,6 +3,7 @@ use super::super::graph::NodeId;
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
 use super::super::poi::PoiId;
+use super::branches::BranchId;
 use crate::config::*;
 
 /// 马斯洛需求层次 (低 → 高，低层绝对优先)
@@ -13,6 +14,31 @@ pub enum MaslowLevel {
     Belonging,          // ③ 归属与爱 (0级仓库升级成婚 / 家庭纽带)
     Esteem,             // ④ 尊重需求 (建材储备 / 盖房淘金[45s] / 房屋施工升级)
     SelfActualization,  // ⑤ 自我实现 (4级大庄园竣工后的娱乐淘金[180s])
+}
+
+impl MaslowLevel {
+    /// 数字层级 (1-5) → 枚举；0 及非法值返回 None（0 语义 = 保留代码动态默认）
+    pub fn from_u8(v: u8) -> Option<MaslowLevel> {
+        Some(match v {
+            1 => MaslowLevel::Physiological,
+            2 => MaslowLevel::Safety,
+            3 => MaslowLevel::Belonging,
+            4 => MaslowLevel::Esteem,
+            5 => MaslowLevel::SelfActualization,
+            _ => return None,
+        })
+    }
+
+    /// 层级 → 前端标签字符串（与 current_need 标签格式一致）
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MaslowLevel::Physiological => "Physiological",
+            MaslowLevel::Safety => "Safety",
+            MaslowLevel::Belonging => "Belonging",
+            MaslowLevel::Esteem => "Esteem",
+            MaslowLevel::SelfActualization => "SelfActualization",
+        }
+    }
 }
 
 /// 具体需求种类 (对应可执行的动作)
@@ -26,7 +52,7 @@ pub enum NeedKind {
     StockFood,      // 安全: 家宅储粮 (家庭生存储备，填满粮仓)
     StockWood,      // 安全: 过冬木柴 / 私宅基础木料 (填满木仓)
     BuildHouse,     // 归属/尊重: 材料备齐后施工升级房屋
-    FoundHome,      // 归属: 无家成年男性自主“自立门户”选址立宅 (0级仓库)
+    FoundHome,      // 生理(末档): 无家成年男性自主“自立门户”选址立宅 (0级仓库)
     StockStone,     // 尊重: 采石建材 (庄舍/庄园升级储备)
     StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
@@ -130,35 +156,41 @@ pub fn house_stock_needs(house: &House, config: &SimConfig) -> HouseStockNeeds {
 }
 
 pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House], config: &SimConfig) -> Option<(&'static str, &'static str)> {
-    Some(match state {
+    // (层级, 需求名, 对应判定分支)；分支用于套用 decision_eval_levels 层级覆盖（与评估结论共用同一覆盖表）
+    let (lvl, kind, branch) = match state {
         PrimitiveActionState::SeekingWater | PrimitiveActionState::DrinkingAtWater => {
-            if agent.thirst < config.decision_critical_thirst { ("Physiological", "QuenchThirst") } else { ("Safety", "StockWater") }
+            if agent.thirst < config.decision_critical_thirst { ("Physiological", "QuenchThirst", Some(BranchId::B1QuenchThirst)) } else { ("Safety", "StockWater", Some(BranchId::B5StockWater)) }
         }
         PrimitiveActionState::SeekingFood | PrimitiveActionState::ForagingFood => {
-            if agent.hunger < config.decision_critical_hunger { ("Physiological", "SateHunger") } else { ("Safety", "StockFood") }
+            if agent.hunger < config.decision_critical_hunger { ("Physiological", "SateHunger", Some(BranchId::B2SateHunger)) } else { ("Safety", "StockFood", Some(BranchId::B6StockFood)) }
         }
-        PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => ("Safety", "StockWood"),
-        PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => ("Esteem", "StockStone"),
+        PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => ("Safety", "StockWood", Some(BranchId::B7StockWood)),
+        PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => ("Esteem", "StockStone", Some(BranchId::B9StockStone)),
         PrimitiveActionState::SeekingGold | PrimitiveActionState::MiningGold => {
             let is_building_stock = agent.home_house_id
                 .and_then(|hid| houses.iter().find(|h| h.id == hid))
                 .map(|h| h.tier == HouseTier::Tier3Homestead && h.pantry_gold < h.max_pantry_gold)
                 .unwrap_or(false);
-            if is_building_stock { ("Esteem", "StockGold") } else { ("SelfActualization", "GoldWealth") }
+            if is_building_stock { ("Esteem", "StockGold", Some(BranchId::B10StockGold)) } else { ("SelfActualization", "GoldWealth", Some(BranchId::B13GoldWealth)) }
         }
         PrimitiveActionState::ReturningToCamp => {
-            if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest") } else { ("Safety", "ReturnHome") }
+            if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest", Some(BranchId::B3Rest)) } else { ("Safety", "ReturnHome", None) }
         }
-        PrimitiveActionState::RepairingHouse => ("Safety", "RepairHouse"),
+        PrimitiveActionState::RepairingHouse => ("Safety", "RepairHouse", Some(BranchId::B4RepairHouse)),
         PrimitiveActionState::ConstructingHouse => {
             let is_tier0 = agent.home_house_id
                 .and_then(|hid| houses.iter().find(|h| h.id == hid))
                 .map(|h| h.tier == HouseTier::Tier0Warehouse)
                 .unwrap_or(false);
-            if is_tier0 { ("Belonging", "BuildHouse") } else { ("Esteem", "BuildHouse") }
+            if is_tier0 { ("Belonging", "BuildHouse", Some(BranchId::B8BuildHouseTier0)) } else { ("Esteem", "BuildHouse", Some(BranchId::B11BuildHouseUpgrade)) }
         }
-        PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest"),
-        PrimitiveActionState::OffRoadDetour => ("Safety", "Detour"),
+        PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest", Some(BranchId::B3Rest)),
+        PrimitiveActionState::OffRoadDetour => ("Safety", "Detour", None),
         _ => return None,
-    })
+    };
+    let lvl = branch
+        .and_then(|b| super::branches::level_override_for(config, b))
+        .map(|lv| lv.as_str())
+        .unwrap_or(lvl);
+    Some((lvl, kind))
 }

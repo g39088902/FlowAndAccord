@@ -2,6 +2,7 @@
     const canvas = document.getElementById('sim-canvas');
     const ctx = canvas.getContext('2d');
     const sim = new RustWorld();
+    window.rustWorldSim = sim; // 供 decision-viz.js 热注入决策顺序配置（共用同一引擎实例）
 
     let camera = {
       rotX: 1.05,
@@ -144,7 +145,8 @@
 
               camera.panX = -rx * camera.zoom;
               camera.panY = -y2 * camera.zoom;
-              isCameraFollow = !!targetAgent.isAlive;
+              // ★ M1.7 胎儿无地图实体：定位一次但不跟随
+              isCameraFollow = !!targetAgent.isAlive && !targetAgent.isFetus;
               if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
             }
           }
@@ -201,7 +203,8 @@
 
               camera.panX = -rx * camera.zoom;
               camera.panY = -y2 * camera.zoom;
-              isCameraFollow = !!targetAgent.isAlive;
+              // ★ M1.7 胎儿无地图实体：定位一次但不跟随
+              isCameraFollow = !!targetAgent.isAlive && !targetAgent.isFetus;
               if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
             }
           }

@@ -272,6 +272,10 @@ impl World3DEngine {
             if !agent.is_alive {
                 continue;
             }
+            // ★ 胎儿跳过 POI 交互：无地图实体、无携带装卸/进食饮水
+            if agent.is_fetus {
+                continue;
+            }
 
             if agent.ready_to_birth {
                 agent.ready_to_birth = false;

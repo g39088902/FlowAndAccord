@@ -61,6 +61,12 @@
 ### 图例窗口
 右侧面板默认折叠，展示 23 处 POI 类型、5 阶道路等级与建造升级规则，支持一键展开/收起。
 
+### 🧠 马斯洛决策引擎视图（v1.3.6）
+- 入口：底部控制台「🧠 决策引擎」按钮，打开全屏内嵌覆层（Esc 关闭）；**与运行中的模拟共用同一 WASM 引擎实例**。
+- 三栏布局：左侧层级颜色导航（点击过滤高亮）、中央单列画布（评估入口 → 13 张需求判定卡 → 4 条可拖分界线 → 15 态状态机卡）、右侧检查器（条件/需求结论/目标状态/源码锚点/config 键）。
+- **拖动即生效**：拖卡换序、拖分界线重划层级 → 松手写 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入内核 → `POST save-decision-order` 由 `server.js` 原子落盘 `js/config.decision-order.js`；静态部署无写能力时降级 localStorage（状态条琥珀提示「已热注入，未落盘」）。
+- 画布：滚轮以指针为中心缩放（0.35x~3.2x）、空白拖拽平移、悬停同层高亮其余压暗、适应窗口/重置顺序（恢复出厂策展序列）。
+
 ### 轻量化渲染优化
 - 地形网格批处理：单次顶点投影 + 静态高度颜色预缓存 + 视口边界裁剪 + 批处理线框渲染。
 - 零 Shader 开销光晕：移除 Canvas shadowBlur 与 CSS backdrop-filter，改用双层矢量描边与深色半透明底色。
@@ -68,10 +74,14 @@
 - DOM 统计节流：顶栏与大盘以 10 FPS 降频更新。
 - 族谱视口虚拟化：DOM 数量恒定在视口容量+缓冲。
 
-### frontend/js 文件清单（10 个）
+### frontend/js 文件清单（14 个）
 | 文件 | 职责 |
 | :--- | :--- |
 | `config.js` | 全局动态数值配置（window.SIM_CONFIG） |
+| `config.decision-order.js` | 决策分支评估顺序持久化配置（唯一真相源，拖动后由 server.js 重写） |
+| `decision-viz-data.js` | 决策引擎 13 条分支元数据（条件/需求/target/config 键/源码锚点） |
+| `decision-viz-view.js` | 决策引擎视图层：单列布局、拖拽换序、分界线吸附、缩放平移、检查器 |
+| `decision-viz.js` | 决策引擎集成层：启动合并顺序配置 → SIM_CONFIG；拖动热注入 + POST 落盘 + 降级 |
 | `math.js` | 3D 向量与投影变换 |
 | `rustworld.js` | WASM 桥接层、快照映射、Config 注入 |
 | `render.js` | Canvas 渲染、Inspector、顶栏、大盘、夺位特效 |

@@ -56,7 +56,7 @@
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
 | 10 | 🚀 快速启动与体验 | [10-quickstart.md](./current/10-quickstart.md) | 浏览器 / Node 回归 / Rust 编译三种启动方式 |
-| 12 | 📒 账本与社会经济制度系统 (`ledger`) | [12-ledger-system.md](./current/12-ledger-system.md) | 团体账本内核、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿预分配 ID |
+| 12 | 📒 账本与社会经济制度系统 (`ledger`) | [12-ledger-system.md](./current/12-ledger-system.md) | 团体账本内核、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份 |
 | — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.3.1 各版本核心机制改动 |
 
 ---

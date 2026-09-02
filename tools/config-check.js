@@ -22,6 +22,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const CONFIG_JS = path.join(ROOT, 'frontend', 'js', 'config.js');
 const CONFIG_RS = path.join(ROOT, 'crates', 'sim_core', 'src', 'config.rs');
+const ORDER_JS = path.join(ROOT, 'frontend', 'js', 'config.decision-order.js');
 const OUT_MD = path.join(ROOT, 'docs', 'config-reference.md');
 
 // ---------------------------------------------------------------------------
@@ -75,16 +76,21 @@ function parseConfigRs(text) {
     const sec = line.match(sectionRe);
     if (sec) currentSection = `${sec[1]}. ${sec[2].trim()}`;
 
-    // 结构体字段（仅捕获 `pub name: Type,`）
-    const f = line.match(/^\s*pub\s+(\w+)\s*:\s*([\w]+)\s*,/);
+    // 结构体字段（捕获 `pub name: Type,`，含 Vec<String>/Vec<u8> 泛型）
+    const f = line.match(/^\s*pub\s+(\w+)\s*:\s*([\w<>, ]+?)\s*,/);
     if (f) {
-      fields.push({ name: snakeToCamel(f[1]), rustName: f[1], type: f[2] });
+      fields.push({ name: snakeToCamel(f[1]), rustName: f[1], type: f[2], section: currentSection });
     }
 
     // Default 映射（仅捕获 `name: CONST,` 在 impl Default 块内）
     const d = line.match(/^\s*(\w+)\s*:\s*([A-Z_][A-Z0-9_]*)\s*,/);
     if (d && i >= defaultStartLine && i <= defaultEndLine) {
       defaults[snakeToCamel(d[1])] = d[2];
+    }
+    // Default 映射（`name: Vec::new(),` → 空数组默认）
+    const dv = line.match(/^\s*(\w+)\s*:\s*Vec::new\(\)\s*,/);
+    if (dv && i >= defaultStartLine && i <= defaultEndLine) {
+      defaults[snakeToCamel(dv[1])] = '__VEC_EMPTY__';
     }
   }
 
@@ -103,12 +109,15 @@ function parseConfigRs(text) {
   const fieldSections = {};
   for (const f of fields) {
     const constName = defaults[f.name];
-    if (constName && consts[constName]) {
+    if (constName === '__VEC_EMPTY__') {
+      fieldDefaults[f.name] = [];
+      fieldSections[f.name] = f.section;
+    } else if (constName && consts[constName]) {
       fieldDefaults[f.name] = consts[constName].value;
       fieldSections[f.name] = consts[constName].section;
     } else {
       fieldDefaults[f.name] = undefined;
-      fieldSections[f.name] = currentSection;
+      fieldSections[f.name] = f.section || currentSection;
     }
   }
   // 把 section 挂回 fields
@@ -151,6 +160,24 @@ function main() {
   for (const f of rs.fields) {
     if (!jsFieldNames.has(f.name)) continue;
     const jsVal = js.values[f.name];
+    // 数组类型字段（Vec<String>/Vec<u8>）：类型 + 逐元素比对
+    if (f.type.startsWith('Vec<')) {
+      if (!Array.isArray(jsVal)) {
+        errors.push(`类型错配: ${f.name} 在 Rust 为 ${f.type}，但前端值非数组`);
+        continue;
+      }
+      if (f.type === 'Vec<u8>' && !jsVal.every(v => Number.isInteger(v))) {
+        errors.push(`类型错配: ${f.name} 在 Rust 为 Vec<u8>，但前端数组含非整数元素`);
+      }
+      if (f.type === 'Vec<String>' && !jsVal.every(v => typeof v === 'string')) {
+        errors.push(`类型错配: ${f.name} 在 Rust 为 Vec<String>，但前端数组含非字符串元素`);
+      }
+      const rsArr = rs.fieldDefaults[f.name];
+      if (Array.isArray(rsArr) && JSON.stringify(rsArr) !== JSON.stringify(jsVal)) {
+        errors.push(`数值漂移: ${f.name} Rust 默认 ${JSON.stringify(rsArr)} ≠ 前端 ${JSON.stringify(jsVal)}`);
+      }
+      continue;
+    }
     // 类型校验
     if ((f.type === 'usize' || f.type === 'u64') && !Number.isInteger(jsVal)) {
       errors.push(`类型错配: ${f.name} 在 Rust 为 ${f.type}，但前端值为浮点 ${jsVal}`);
@@ -162,6 +189,30 @@ function main() {
         errors.push(`数值漂移: ${f.name} Rust 默认 ${rsVal} ≠ 前端 ${jsVal}`);
       }
     }
+  }
+
+  // 4) 决策顺序持久化文件（config.decision-order.js）词汇表轻校验
+  if (fs.existsSync(ORDER_JS)) {
+    const orderText = fs.readFileSync(ORDER_JS, 'utf8');
+    const om = orderText.match(/window\.SIM_DECISION_ORDER\s*=\s*(\{[\s\S]*?\});/);
+    if (!om) {
+      errors.push('config.decision-order.js: 无法定位 window.SIM_DECISION_ORDER 对象');
+    } else {
+      let o = null;
+      try { o = (function () { return eval('(' + om[1] + ')'); })(); } catch (e) { /* fallthrough */ }
+      if (!o) {
+        errors.push('config.decision-order.js: 对象字面量求值失败');
+      } else {
+        const ids = o.decisionEvalOrder, lv = o.decisionEvalLevels;
+        const idOk = Array.isArray(ids) && ids.length === 13 && new Set(ids).size === 13
+          && ids.every(s => /^b(?:[1-9]|1[0-3])$/.test(s));
+        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 13 个互不重复的 b1..b13');
+        const lvOk = Array.isArray(lv) && lv.length === 13 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 13 个 0-5 整数');
+      }
+    }
+  } else {
+    warnings.push('未找到 config.decision-order.js（拖动决策卡后由 server.js 生成落盘）');
   }
 
   // 输出报告
@@ -209,7 +260,7 @@ function generateReference(rs, js, errors) {
     for (const f of fields) {
       const def = rs.fieldDefaults[f.name];
       const desc = js.descriptions[f.name] || '';
-      const defStr = (typeof def === 'number') ? String(def) : String(def);
+      const defStr = Array.isArray(def) ? JSON.stringify(def) : String(def);
       lines.push(`| \`${f.name}\` | ${f.type} | ${defStr} | ${desc} |`);
     }
     lines.push('');

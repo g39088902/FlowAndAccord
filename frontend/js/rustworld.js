@@ -385,6 +385,8 @@
             buildTimer: a.build_timer,
             isPregnant: a.is_pregnant,
             pregnancyProgress: a.pregnancy_progress,
+            pregnancyChildId: a.pregnancy_child_id != null ? a.pregnancy_child_id : null,
+            isFetus: a.is_fetus || false,
             miscarriageCooldown: a.miscarriage_cooldown,
             miscarriageTimer: a.miscarriage_alert_timer,
             deathDecayTimer: a.death_decay_timer,
@@ -417,7 +419,9 @@
         });
 
         // 持续同步全量族人档案库 (保留已故先祖快照)
+        // ★ M1.7 腹中胎儿不入档案库：未出生即流产时不应残留为"存活"记录；出生后以新生儿身份入档
         for (const ag of this.agents) {
+          if (ag.isFetus) continue;
           this.agentArchive.set(ag.id, ag);
         }
 

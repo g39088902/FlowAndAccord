@@ -132,6 +132,8 @@ window.SIM_CONFIG = {
   decisionFoundHomeDistMin: 24.0, // 立宅候选点与现有房屋的硬间距下限 (m)
   decisionFoundHomeDistMax: 80.0, // 立宅候选点与营地的软间距上限 (m)
   decisionWorkStaminaThreshold: 50.0, // 劳作所需最低体力 (低于则返家休息)
+  decisionEvalOrder: [], // 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖）
+  decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认）
 
   // ==========================================================================
   // 6. 私宅营造、代际传承与升级 (Housing System)

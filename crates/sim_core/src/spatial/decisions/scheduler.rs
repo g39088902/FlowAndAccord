@@ -1,5 +1,6 @@
 use super::super::poi::PoiType;
 use super::super::world::World3DEngine;
+use super::branches;
 use super::needs::*;
 use super::evaluate::Decisioner;
 
@@ -14,15 +15,19 @@ impl World3DEngine {
             .filter(|poi| poi.poi_type != PoiType::Camp)
             .map(|poi| (poi.id, poi.current_stock, poi.max_stock))
             .collect();
+        // 每拍解析一次注入的分支评估顺序（空/非法→中性声明序），热路径零分配
+        let branch_order = branches::resolve_order(&self.config.decision_eval_order);
         let mut decisioner = Decisioner {
             ctx: &ctx,
             network: &self.network,
             houses: &self.houses,
             rng: &mut self.rng,
             config: &self.config,
+            branch_order: &branch_order,
         };
         for agent in &mut self.agents {
-            if agent.is_alive && (self.tick_counter + agent.id as u64) % self.config.agent_decision_interval_ticks == 0 {
+            // ★ 胎儿跳过行动决策：无地图实体、无自主行动
+            if agent.is_alive && !agent.is_fetus && (self.tick_counter + agent.id as u64) % self.config.agent_decision_interval_ticks == 0 {
                 for &(poi_id, current_stock, max_stock) in &poi_stock_observations {
                     agent.observe_poi_stock_with_config(poi_id, current_stock, max_stock, &self.config);
                 }
