@@ -26,6 +26,110 @@ const ORDER_JS = path.join(ROOT, 'frontend', 'js', 'config.decision-order.js');
 const OUT_MD = path.join(ROOT, 'docs', 'config-reference.md');
 
 // ---------------------------------------------------------------------------
+// 配置字段 → 影响模块映射 (v1.7.0 新增)
+//   基于字段名前缀推断，特殊字段显式覆盖。用于 config-reference.md 的「影响模块」列。
+//   改字段影响面时须同步更新此映射。
+// ---------------------------------------------------------------------------
+const IMPACT_OVERRIDES = {
+  simulationDt: 'world_tick.rs / sim_wasm (§4.3 严禁改)',
+  ticksPerSecond: 'world_tick.rs / rustworld.js',
+  agentDecisionIntervalTicks: 'decisions/scheduler.rs (§4.3 错峰相位)',
+  carryCapacityResource: 'agent.rs / ecology.rs / decisions/',
+  campHomeConsumeRate: 'ecology.rs (营地在家吃喝)',
+  agentSpawnBaseSpeed: 'agent.rs / graph.rs (寻路速度基准)',
+  decisionEvalOrder: 'decisions/branches.rs (前端拖动热注入)',
+  decisionEvalLevels: 'decisions/branches.rs (层级覆盖)',
+  ledgerJournalCapacity: 'ledger/ (所有账本容量)',
+};
+
+const IMPACT_PREFIX_RULES = [
+  { prefix: 'agentMove', mod: 'agent.rs (运动学) / graph.rs (寻路)' },
+  { prefix: 'agentSpawn', mod: 'ecology.rs (始祖播撒) / agent.rs' },
+  { prefix: 'agentNewborn', mod: 'birth.rs (新生儿属性) / agent.rs' },
+  { prefix: 'agentConception', mod: 'agent.rs (受孕判定)' },
+  { prefix: 'agentPregnan', mod: 'agent.rs (妊娠代谢)' },
+  { prefix: 'agentMiscarriage', mod: 'agent.rs (流产判定)' },
+  { prefix: 'agentInitial', mod: 'agent.rs (初始属性)' },
+  { prefix: 'agentRest', mod: 'agent.rs (休息恢复) / ecology.rs' },
+  { prefix: 'agentRepair', mod: 'housing_system/maintenance.rs (修缮体力)' },
+  { prefix: 'agentGather', mod: 'ecology.rs (采收体力)' },
+  { prefix: 'agentLabor', mod: 'agent.rs (劳作体力下限)' },
+  { prefix: 'agentWork', mod: 'agent.rs (劳作代谢)' },
+  { prefix: 'agentStealth', mod: 'agent.rs (隐秘可见度)' },
+  { prefix: 'agentCovert', mod: 'ecology.rs (始祖隐秘特工比例)' },
+  { prefix: 'agentDigestion', mod: 'agent.rs (消化效率代谢系数)' },
+  { prefix: 'agentSelfSatisfied', mod: 'ecology.rs (自饮自食阈值)' },
+  { prefix: 'agentGold', mod: 'agent.rs (淘金行囊) / ecology.rs' },
+  { prefix: 'agentAdult', mod: 'agent.rs (成年阈值) / decisions/' },
+  { prefix: 'agentDeath', mod: 'agent.rs (死亡衰减)' },
+  { prefix: 'agentHealth', mod: 'agent.rs (健康衰减)' },
+  { prefix: 'agentHunger', mod: 'agent.rs (饱食容量)' },
+  { prefix: 'agentThirst', mod: 'agent.rs (水分容量)' },
+  { prefix: 'agentStamina', mod: 'agent.rs (体力容量)' },
+  { prefix: 'agentBase', mod: 'agent.rs (基础代谢/速度)' },
+
+  { prefix: 'decisionFoundHome', mod: 'decisions/founding.rs (立宅选址)' },
+  { prefix: 'decisionFamilyStock', mod: 'decisions/ (家户补货滞回触发器 §4.8)' },
+  { prefix: 'decisionPoi', mod: 'decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2)' },
+  { prefix: 'decisionHouseRepair', mod: 'decisions/ (修缮触发) / housing_system/' },
+  { prefix: 'decisionCritical', mod: 'decisions/ (生理临界阈值)' },
+  { prefix: 'decisionRest', mod: 'decisions/ (休息目标体力)' },
+  { prefix: 'decisionWork', mod: 'decisions/ (劳作体力阈值)' },
+  { prefix: 'decisionGold', mod: 'decisions/ (淘金冷却 §4.8)' },
+  { prefix: 'decisionStock', mod: 'decisions/ (备料淘金冷却)' },
+  { prefix: 'decisionEval', mod: 'decisions/branches.rs (策展顺序/层级 §4.14)' },
+
+  { prefix: 'houseWinter', mod: 'housing_system/maintenance.rs (冬季供暖 §4.8)' },
+  { prefix: 'houseRepair', mod: 'housing_system/maintenance.rs (修缮)' },
+  { prefix: 'houseNode', mod: 'housing_system/founding.rs (立宅节点占用)' },
+  { prefix: 'houseMinSpacing', mod: 'housing_system/founding.rs (房屋间距)' },
+  { prefix: 'houseDepreciation', mod: 'housing_system/maintenance.rs (折旧)' },
+  { prefix: 'houseDurability', mod: 'housing_system/ (耐久度上限)' },
+  { prefix: 'houseUpgradeCost', mod: 'housing_system/upgrade.rs (升级成本矩阵 §4.8)' },
+
+  { prefix: 'poiInteraction', mod: 'ecology.rs (POI 交互采收/卸货)' },
+  { prefix: 'poiUnload', mod: 'ecology.rs (回家卸货入账速率 §4.4)' },
+  { prefix: 'poiSpawn', mod: 'ecology.rs (POI 初始化播撒布局)' },
+  { prefix: 'poiMinDistance', mod: 'ecology.rs (POI 空间排斥间距 §4.7)' },
+
+  { prefix: 'countTerrain', mod: 'ecology.rs (路网过渡节点)' },
+  { prefix: 'count', mod: 'ecology.rs (POI 数量 §4.7)' },
+
+  { prefix: 'regenBase', mod: 'ecology.rs / world_tick.rs (POI 再生速率)' },
+  { prefix: 'stockMax', mod: 'poi.rs / ecology.rs (POI 储量上限)' },
+
+  { prefix: 'roadAstar', mod: 'graph.rs (A* 寻路权重)' },
+  { prefix: 'roadConnect', mod: 'ecology.rs (路网连接距离)' },
+  { prefix: 'roadGrade', mod: 'graph.rs (道路等级铺装阈值)' },
+  { prefix: 'roadHidden', mod: 'graph.rs / decisions/ (隐秘道路偏好)' },
+  { prefix: 'roadVisible', mod: 'graph.rs / decisions/ (可见道路偏好)' },
+  { prefix: 'roadLevelFactor', mod: 'graph.rs (等级速度加成)' },
+  { prefix: 'roadSpeed', mod: 'graph.rs (各道路类型限速)' },
+  { prefix: 'roadWear', mod: 'graph.rs (踩踏增长/自然衰减 §4.3)' },
+  { prefix: 'roadMaxWear', mod: 'graph.rs (最高磨损等级)' },
+
+  { prefix: 'season', mod: 'world_season.rs (四季周期)' },
+  { prefix: 'temp', mod: 'world_season.rs (温度正弦曲线)' },
+
+  { prefix: 'trait', mod: 'agent.rs / birth.rs (禀赋遗传演化)' },
+
+  { prefix: 'clanTribute', mod: 'ledger/clan.rs (族税征收)' },
+  { prefix: 'clanMutualAid', mod: 'ledger/clan.rs (族内互助)' },
+
+  { prefix: 'ledgerTax', mod: 'ledger/region.rs (公仓税)' },
+  { prefix: 'ledgerRelief', mod: 'ledger/region.rs (救济)' },
+  { prefix: 'ledgerJournal', mod: 'ledger/ (流水容量)' },
+];
+
+function getImpactModule(fieldName) {
+  if (IMPACT_OVERRIDES[fieldName]) return IMPACT_OVERRIDES[fieldName];
+  for (const rule of IMPACT_PREFIX_RULES) {
+    if (fieldName.startsWith(rule.prefix)) return rule.mod;
+  }
+  return '—';
+}
+
+// ---------------------------------------------------------------------------
 // 解析拆分配置 JS（config.js 或 config.house-upgrade-cost.js）
 //   - globalName: 顶层挂载的对象名（如 'SIM_CONFIG' / 'SIM_HOUSE_UPGRADE_COST'）
 //   - 提取每个键的值（含 `1.0/30.0` 这类表达式求值）与行内中文说明
@@ -270,13 +374,14 @@ function generateReference(rs, js, errors) {
   for (const [section, fields] of sections) {
     lines.push(`## ${section}`);
     lines.push('');
-    lines.push('| 字段 (camelCase) | 类型 | 默认值 | 中文说明 |');
-    lines.push('| :--- | :--- | :--- | :--- |');
+    lines.push('| 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |');
+    lines.push('| :--- | :--- | :--- | :--- | :--- |');
     for (const f of fields) {
       const def = rs.fieldDefaults[f.name];
       const desc = js.descriptions[f.name] || '';
       const defStr = Array.isArray(def) ? JSON.stringify(def) : String(def);
-      lines.push(`| \`${f.name}\` | ${f.type} | ${defStr} | ${desc} |`);
+      const impact = getImpactModule(f.name);
+      lines.push(`| \`${f.name}\` | ${f.type} | ${defStr} | ${impact} | ${desc} |`);
     }
     lines.push('');
   }

@@ -67,14 +67,59 @@ pub const COUNTY_NAMES: &[&str] = &[
     "镇安", "柞水", "商南", "山阳", "丹凤", "洛南", "旬阳", "白河", "平利", "镇坪"
 ];
 
+/// 非有限浮点（Infinity / NaN）的保真序列化助手
+///
+/// serde_json 默认把 `f32::INFINITY` / `NaN` 写成 JSON `null`，而 `f32` 字段反序列化
+/// 遇到 `null` 会直接报错——营地 POI 的储量上限与当前储量恒为 `INFINITY`，
+/// 不加处理会导致「存档能写、读不回来」。这里对非有限值改用字符串哨兵编码，
+/// 有限值仍输出原生 JSON 数字，兼顾体积与语义保真（INFINITY 不能降级为 f32::MAX，
+/// 因为 `observe_poi_stock` 用 `is_finite()` 分支判定无限储量营地）。
+pub(crate) mod finite_f32 {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &f32, s: S) -> Result<S::Ok, S::Error> {
+        if v.is_finite() {
+            v.serialize(s)
+        } else if v.is_nan() {
+            "NaN".serialize(s)
+        } else if *v > 0.0 {
+            "Infinity".serialize(s)
+        } else {
+            "-Infinity".serialize(s)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<f32, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum NumOrStr {
+            Num(f32),
+            Str(String),
+        }
+        match NumOrStr::deserialize(d)? {
+            NumOrStr::Num(v) => Ok(v),
+            NumOrStr::Str(t) => match t.as_str() {
+                "NaN" => Ok(f32::NAN),
+                "Infinity" => Ok(f32::INFINITY),
+                "-Infinity" => Ok(f32::NEG_INFINITY),
+                other => Err(serde::de::Error::custom(format!("无法解析的非有限数值: {}", other))),
+            },
+        }
+    }
+}
+
 /// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿的储量上限与产速均由 SimConfig 的 stock_max_* / regen_base_* 控制；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
+    // 营地的储量恒为 INFINITY，必须走保真序列化（见 finite_f32 说明）
+    #[serde(with = "finite_f32")]
     pub current_stock: f32, // 当前可用储量 (上限与产速由 config.stock_max_* / config.regen_base_* 控制，营地为无限)
+    #[serde(with = "finite_f32")]
     pub max_stock: f32,     // 储量上限 (营地为无限)
+    #[serde(with = "finite_f32")]
     pub regen_rate: f32,    // 每秒自然再生速率
     pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
     pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])

@@ -28,7 +28,12 @@
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `world.rs` | ~880 | World3DEngine 世界调度器：tick() 总管线、四季温度、generate_snapshot()、配置注入、agent_index 维护、各子系统 tick 编排 | 具体业务逻辑（委托给各文件/子目录） |
+| `world.rs` | ~170 | World3DEngine 结构体定义 + 构造函数 + agent_index 工具 + 节点查找。**业务逻辑已拆分到同目录 4 个子文件**（v1.7.1） | 具体业务逻辑（委托给 world_tick/world_snapshot/world_config/world_season） |
+| `world_tick.rs` | ~275 | tick() 管线调度（§4.3 固定顺序）+ settle_gold_inheritance + tick_fetus_reconcile | 具体子系统 tick（委托给 ecology/housing_system/decisions/bookkeeping/ledger） |
+| `world_snapshot.rs` | ~415 | generate_snapshot() 快照生成（地形/POI/房屋/路网/agent/家户/婚姻/宗族/地区） | 快照结构体定义（在 snapshot.rs）、前端映射（在 rustworld.js） |
+| `world_config.rs` | ~50 | 配置注入与反序列化（apply_config_json / apply_config / set_regen_multiplier） | 配置结构体定义（在 config.rs） |
+| `world_season.rs` | ~40 | 四季更迭与宏观环境温度演化（正弦周期拟合） | tick 调度（在 world_tick.rs） |
+| `world_save.rs` | ~205 | **读档/存档契约（v1.8.0）**：`WorldSave` 全量状态结构体 + `to_save()` + `serialize_save()` / `deserialize_save()`（格式版本门禁 + 参数校验 + agent id 唯一性校验 + 按 seed 重建地形 + `rebuild_agent_index()`） | 各实体自身的 serde 实现（在各自文件：`graph.rs` 手写路网 serde、`poi.rs` 的 `finite_f32` 助手、`rng.rs` 的 WorldRng） |
 | `ecology.rs` | ~445 | 生态初始化（POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝）、分娩结算 | 决策（decisions/）、账本结构（ledger/） |
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
 | `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology.rs / maintenance.rs 真实收付） |
@@ -150,14 +155,18 @@ snapshot.rs 只定义**数据结构**，不做任何赋值或转换。三处同�
 
 `test-wasm.js` 的同种子一致性校验会捕获此类回归。
 
-### 4.4 world.rs 行数已接近上限
+### 4.4 world.rs 已拆分为 5 个文件（v1.7.1）
 
-world.rs 当前 ~880 行，已超根 AGENTS.md §4.6 的 800 行规范。新增功能时**优先考虑拆分为新文件或子目录**，而非继续往 world.rs 堆。可拆分的候选：
-- `world_snapshot.rs`：`generate_snapshot()` 及辅助函数
-- `world_season.rs`：`tick_season()` 及温度计算
-- `world_agent_index.rs`：agent_index 维护相关
+world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文件：
+- `world.rs`（~170 行）：结构体定义 + 构造函数 + agent_index 工具 + 节点查找
+- `world_tick.rs`（~275 行）：tick() 管线调度 + 胎儿对账 + 金币继承
+- `world_snapshot.rs`（~415 行）：generate_snapshot() 快照生成
+- `world_config.rs`（~50 行）：配置注入与反序列化
+- `world_season.rs`（~40 行）：四季温度计算
 
-拆分时保持 `World3DEngine` 的 impl 块通过 `impl World3DEngine { }` 在多文件中分散（Rust 支持），无需移动结构体定义。
+**Rust 多文件 impl 块分散**：`impl World3DEngine { }` 可在多个文件中分散定义，无需移动结构体定义。新增方法时放入对应职责文件，勿回退到单文件堆积。
+
+**改"快照相关"只需读 `world_snapshot.rs`**，改"tick 调度"只需读 `world_tick.rs`，不用在 880 行里翻。
 
 ### 4.5 ecology.rs 的世界重置全量清空
 

@@ -4,11 +4,24 @@
 //! 并从 wasm 线性内存读取 JSON 快照（不依赖 wasm-bindgen）。
 //! 所有导出均为 extern "C"，AOT 可解析；world_create 的 seed 参数保证可复现。
 
-use sim_core::spatial::World3DEngine;
+use sim_core::spatial::{deserialize_save, serialize_save, World3DEngine};
 
 static mut WORLD: Option<World3DEngine> = None;
 static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
 static mut CONFIG_BUF: Vec<u8> = Vec::new();
+/// 存档 JSON 缓冲（world_save_ptr 写入 / world_load 读取）
+static mut SAVE_BUF: Vec<u8> = Vec::new();
+/// 最近一次存档/读档失败原因（UTF-8 文本，供前端提示，成功时清空）
+static mut ERROR_BUF: Vec<u8> = Vec::new();
+
+/// 记录最近一次错误文本（成功路径调用 clear_error）
+fn set_error(msg: &str) {
+    unsafe { ERROR_BUF = msg.as_bytes().to_vec(); }
+}
+
+fn clear_error() {
+    unsafe { ERROR_BUF.clear(); }
+}
 
 /// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
 #[no_mangle]
@@ -115,4 +128,97 @@ pub extern "C" fn world_snapshot_ptr() -> u32 {
 #[no_mangle]
 pub extern "C" fn world_snapshot_len() -> u32 {
     unsafe { SNAPSHOT_BUF.len() as u32 }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 读档 / 存档导出（v1.7.0）
+//
+// 沿用现有「线性内存 JSON 缓冲区」约定：
+//   导出：world_save_ptr() → 取指针，world_save_len() → 取长度，从 memory.buffer 读字节
+//   导入：world_save_buf_ptr(len) → 取可写指针，JS 写入字节，world_load(len) → 应用
+// 失败原因通过 world_last_error_ptr/len 读取（成功时长度为 0）。
+// ═══════════════════════════════════════════════════════════════
+
+/// 将当前世界全量状态序列化为存档 JSON 写入内部缓冲，返回缓冲起始指针。
+/// 失败时缓冲清空（world_save_len() 返回 0），原因见 world_last_error_*。
+#[no_mangle]
+pub extern "C" fn world_save_ptr() -> u32 {
+    unsafe {
+        SAVE_BUF = match WORLD.as_ref() {
+            Some(w) => match serialize_save(w) {
+                Ok(json) => {
+                    clear_error();
+                    json.into_bytes()
+                }
+                Err(e) => {
+                    set_error(&e);
+                    Vec::new()
+                }
+            },
+            None => {
+                set_error("世界尚未初始化，无法存档");
+                Vec::new()
+            }
+        };
+        SAVE_BUF.as_ptr() as u32
+    }
+}
+
+/// 返回存档 JSON 字节长度（0 表示上一次存档失败）
+#[no_mangle]
+pub extern "C" fn world_save_len() -> u32 {
+    unsafe { SAVE_BUF.len() as u32 }
+}
+
+/// 准备写入存档 JSON 的内部缓冲区，返回起始指针
+#[no_mangle]
+pub extern "C" fn world_save_buf_ptr(len: u32) -> u32 {
+    unsafe {
+        SAVE_BUF.resize(len as usize, 0);
+        SAVE_BUF.as_mut_ptr() as u32
+    }
+}
+
+/// 解析并加载内部缓冲区中的存档 JSON（覆盖当前世界）
+///
+/// 返回值：0 成功 / -1 长度越界 / -2 UTF-8 解码失败 / -3 解析或校验失败（含版本不兼容）
+#[no_mangle]
+pub extern "C" fn world_load(len: u32) -> i32 {
+    unsafe {
+        let len = len as usize;
+        if len > SAVE_BUF.len() {
+            set_error("存档长度越界");
+            return -1;
+        }
+        let json_str = match std::str::from_utf8(&SAVE_BUF[..len]) {
+            Ok(s) => s,
+            Err(_) => {
+                set_error("存档不是合法 UTF-8 文本");
+                return -2;
+            }
+        };
+        match deserialize_save(json_str) {
+            Ok(world) => {
+                WORLD = Some(world);
+                clear_error();
+                0
+            }
+            Err(e) => {
+                set_error(&e);
+                -3
+            }
+        }
+    }
+}
+
+/// 返回最近一次存档/读档错误文本指针（长度为 0 表示无错误）
+#[no_mangle]
+pub extern "C" fn world_last_error_ptr() -> u32 {
+    unsafe { ERROR_BUF.as_ptr() as u32 }
+}
+
+/// 返回最近一次存档/读档错误文本字节长度
+#[no_mangle]
+pub extern "C" fn world_last_error_len() -> u32 {
+    unsafe { ERROR_BUF.len() as u32 }
 }

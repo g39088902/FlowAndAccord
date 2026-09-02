@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.6.1</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.7.1</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -57,6 +57,12 @@
         <div class="stat-val" id="stat-miscarriages" style="color:#f43f5e;">0</div>
         <div class="stat-lbl">🥀 流产数</div>
       </div>
+    </div>
+
+    <!-- 💾 存档系统入口 (v1.7.0 读档/存档) -->
+    <div class="save-bar-card">
+      <button class="save-bar-btn" id="btn-open-save-panel" title="将当前世界保存到槽位">💾 存档</button>
+      <button class="save-bar-btn" id="btn-open-load-panel" title="从槽位或文件读取世界">📂 读档</button>
     </div>
   </div>
 
@@ -840,6 +846,31 @@
     </div>
   </div>
 
+  <!-- ══════════ 💾 存档面板 (v1.7.0 读档/存档系统) ══════════ -->
+  <div class="save-modal-backdrop" id="save-modal-backdrop" style="display:none;">
+    <div class="save-modal">
+      <div class="save-modal-header">
+        <span>💾 存档管理</span>
+        <button id="save-modal-close" class="save-modal-close" title="关闭 (Esc)" aria-label="关闭存档面板">✕</button>
+      </div>
+
+      <div class="save-tab-switcher">
+        <button class="save-tab-btn active" data-tab="save">💾 保存</button>
+        <button class="save-tab-btn" data-tab="load">📂 读取</button>
+      </div>
+
+      <div class="save-slot-list" id="save-slot-list"></div>
+
+      <div class="save-status" id="save-status"></div>
+
+      <div class="save-modal-footer">
+        <button class="save-btn import" id="btn-import-save" title="从本地 .json 存档文件读取世界">📥 导入存档文件</button>
+        <span class="save-hint" id="save-storage-hint"></span>
+      </div>
+      <input type="file" id="save-file-input" accept="application/json,.json" style="display:none;">
+    </div>
+  </div>
+
   <script src="js/math.js"></script>
   <script src="js/config.js"></script>
   <script src="js/config.decision-order.js"></script>
@@ -855,6 +886,13 @@
   <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
   <script src="js/ledger-ui.js"></script>
-  <script src="js/render.js"></script>
+  <!-- 读档/存档系统 (v1.7.0) · 依赖 main.js 暴露的 window.rustWorldSim -->
+  <script src="js/save-ui.js"></script>
+  <!-- render.js 拆分为5个文件 (v1.7.0): canvas主循环 → HUD → 世界 → 族人 → Inspector -->
+  <script src="js/render_canvas.js"></script>
+  <script src="js/render_hud.js"></script>
+  <script src="js/render_world.js"></script>
+  <script src="js/render_agents.js"></script>
+  <script src="js/render_inspector.js"></script>
 </body>
 </html>

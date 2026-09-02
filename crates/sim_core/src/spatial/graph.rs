@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use petgraph::algo::astar;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::vec3::Vec3;
 use super::curve::Curve3D;
@@ -204,5 +204,69 @@ impl LaneGraph3D {
             }
         }
         Some(lane_route)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 路网持久化（存档系统专用）
+//
+// `LaneGraph3D` 内部持有 petgraph 有向图与两张 HashMap 索引，不宜直接派生 serde。
+// 这里只持久化「按插入顺序排列的节点/车道扁平列表 + 两个发号器」，
+// 反序列化时按同序重建：可得到完全一致的 NodeIndex/EdgeIndex 与邻接表顺序。
+// ★ 正确性前提：路网从不删除节点/车道（见 housing_system/AGENTS.md §4.2），
+//   因此重建后的邻接表边序与原图逐条一致，A* 寻路结果保持确定性。
+// ═══════════════════════════════════════════════════════════════
+
+#[derive(Serialize, Deserialize)]
+struct LaneGraphSaveData {
+    nodes: Vec<NodeData>,
+    lanes: Vec<LaneEdge3D>,
+    next_node_id: NodeId,
+    next_lane_id: LaneId,
+}
+
+impl LaneGraph3D {
+    /// 导出扁平可序列化快照（节点/车道均按插入顺序）
+    fn to_save_data(&self) -> LaneGraphSaveData {
+        LaneGraphSaveData {
+            nodes: self.graph.node_weights().cloned().collect(),
+            lanes: self.graph.edge_weights().cloned().collect(),
+            next_node_id: self.next_node_id,
+            next_lane_id: self.next_lane_id,
+        }
+    }
+
+    /// 由扁平数据重建路网（graph / node_map / edge_map 一并复原）
+    fn from_save_data(data: LaneGraphSaveData) -> Self {
+        let mut net = LaneGraph3D::new();
+        for node in data.nodes {
+            let id = node.id;
+            let idx = net.graph.add_node(node);
+            net.node_map.insert(id, idx);
+        }
+        for lane in data.lanes {
+            let (lane_id, from, to) = (lane.id, lane.from_node, lane.to_node);
+            if let (Some(from_idx), Some(to_idx)) = (net.node_map.get(&from), net.node_map.get(&to)) {
+                let from_idx = *from_idx;
+                let to_idx = *to_idx;
+                let edge_idx = net.graph.add_edge(from_idx, to_idx, lane);
+                net.edge_map.insert(lane_id, edge_idx);
+            }
+        }
+        net.next_node_id = data.next_node_id;
+        net.next_lane_id = data.next_lane_id;
+        net
+    }
+}
+
+impl Serialize for LaneGraph3D {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_save_data().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for LaneGraph3D {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        LaneGraphSaveData::deserialize(deserializer).map(LaneGraph3D::from_save_data)
     }
 }

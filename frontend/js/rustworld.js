@@ -190,6 +190,75 @@
         }
       }
 
+      // ============ 💾 读档 / 存档 (v1.7.0) ============
+      // 存档：world_save_ptr/len 由内核导出全量世界状态 JSON（含 RNG 内部状态，强确定性）
+      // 读档：world_save_buf_ptr(len) 取可写缓冲 → 写入字节 → world_load(len) 覆盖内核世界
+      // 失败原因统一从 world_last_error_ptr/len 读取
+
+      /** 读取内核最近一次存档/读档错误文本（无错误返回空串） */
+      readSaveError() {
+        if (!this._ready || typeof this._wasm.world_last_error_len !== 'function') return '';
+        const len = this._wasm.world_last_error_len();
+        if (!len) return '';
+        const ptr = this._wasm.world_last_error_ptr();
+        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+      }
+
+      /**
+       * 导出当前世界全量存档 JSON（失败返回 null，原因见 readSaveError()）
+       * @returns {string|null}
+       */
+      saveWorld() {
+        if (!this._ready || typeof this._wasm.world_save_ptr !== 'function') return null;
+        const ptr = this._wasm.world_save_ptr();
+        const len = this._wasm.world_save_len();
+        if (!len) return null;
+        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+      }
+
+      /**
+       * 载入存档 JSON 并覆盖当前世界
+       *
+       * 成功后清空前端全部派生缓存（轨迹、先祖档案、地形缓存、选中态）并强制重建地形快照。
+       * 注意：存档自带 SimConfig，读档后**不**重新注入 window.SIM_CONFIG，
+       * 以免前端热调参覆盖存档时的运行参数、破坏续演语义。
+       *
+       * @param {string} jsonStr 存档 JSON 文本
+       * @param {{seed?:number}} [meta] 可选槽位元信息（用于同步引擎种子展示）
+       * @returns {{ok:boolean, error?:string}}
+       */
+      loadWorld(jsonStr, meta) {
+        if (!this._ready || typeof this._wasm.world_load !== 'function') {
+          return { ok: false, error: 'WASM 引擎尚未就绪' };
+        }
+        if (typeof jsonStr !== 'string' || jsonStr.length === 0) {
+          return { ok: false, error: '存档内容为空' };
+        }
+        let encoded;
+        try {
+          encoded = new TextEncoder().encode(jsonStr);
+        } catch (e) {
+          return { ok: false, error: '存档编码失败: ' + e.message };
+        }
+        const ptr = this._wasm.world_save_buf_ptr(encoded.length);
+        new Uint8Array(this._memory.buffer, ptr, encoded.length).set(encoded);
+        const res = this._wasm.world_load(encoded.length);
+        if (res !== 0) {
+          const detail = this.readSaveError();
+          const codeMsg = { '-1': '存档长度越界', '-2': '存档不是合法 UTF-8 文本', '-3': '存档解析或校验失败' }[String(res)] || ('未知错误 ' + res);
+          return { ok: false, error: detail ? codeMsg + '：' + detail : codeMsg };
+        }
+        // 内核世界已被替换，清空前端全部派生缓存并以 forceTerrain 重建
+        this._trails.clear();
+        this.agentArchive.clear();
+        this._lastEvent = null;
+        this._terrainCached = false;
+        this.deselect();
+        if (meta && typeof meta.seed === 'number') this._engineSeed = meta.seed;
+        this._pullSnapshot(true);
+        return { ok: true };
+      }
+
       setWaterRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(0, m); }
       setBerryRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(1, m); }
       setWoodRegenMultiplier(m)  { if (this._ready) this._wasm.world_set_regen_multiplier(2, m); }
