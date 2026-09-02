@@ -106,6 +106,8 @@
 | `scheduler.rs` | `tick_decisions`(错峰) / `build_decision_context`                                                                 | **调度节拍** 图元                 |
 | `agent.rs`(外部) | `PrimitiveActionState`(15 态) / `observe_poi_stock_with_config` / `poi_is_seekable`(施密特触发器)                      | **状态机状态集** + **触发器** 图元     |
 
+> ★ **M4 夺位远征**（v1.3.0 起）：`tick_conquest_expedition` 在马斯洛评估之前运行——男性非国王且存在无主营地时直接置 `SeekingThrone` 冲向最近无主营地登基（最高优先级、不消耗 RNG、可中断施工进度冻结不回滚）。可视化方案建议在决策树根部增加「夺位开关」判定节点（独立于 5 层马斯洛金字塔），并在状态机图中标注 `SeekingThrone` 状态与夺位光束链路。
+
 ### 2.2 实时数据（快照已具备，零改内核）
 
 `crates/sim_core/src/spatial/snapshot.rs::AgentSnapshot` 现成字段：
@@ -448,15 +450,9 @@ graph LR
 | **M3** | 视图 B 实时监控 / 触发器滑块 / 决策原因链（可选 decision\_trace） | 暂停模拟下实况数据与内核一致；10FPS 节流无卡顿         |
 
 **每次提交前必检（对齐根 AGENTS.md §4.12/§4.13）**：
-
-
-
-1. `node tools/config-check.js` 153/153 全绿（若引入新阈值必须三处同步）；
-
+1. `node tools/config-check.js` 163/163 全绿（若引入新阈值必须三处同步）；
 2. `node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（内核未动也必须跑，防回归）；
-
 3. WASM 双副本同步（本方案不改内核，无需重编译，但改动任何 Rust 后必须同步）；
-
 4. 版本号自增（`index.html` / `AGENTS.md` / `11-changelog.md` 三处）。
 
 

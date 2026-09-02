@@ -6,20 +6,21 @@
 
 ## 0. 📚 项目文档地图
 
-除根目录 **AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下：`docs/CURRENT.md` + `docs/current/` 描述"现状"，`docs/PLAN.md` / `docs/ARCHITECTURE.md` 描述"愿景"。
+除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下：`docs/CURRENT.md` + `docs/current/` 描述"现状"，`docs/PLAN.md` / `docs/ARCHITECTURE.md` 描述"愿景"。
 
 | 文件 | 定位 | 何时阅读 |
 | :--- | :--- | :--- |
+| **README.md** | 面向玩家的营销宣传文档：项目定位、八大核心看点、第一局观察指引、三分钟上手、路线图 | 对外宣传 / 新玩家入门时 |
 | **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
 | **docs/CURRENT.md** | 已实现功能索引入口 + 模块导航表（`01`空间路网 / `02`生态POI / `03`四季 / `04`代谢繁衍 / `05`房屋 / `06`决策AI / `07`前端 / `08`配置 / `09`代码地图 / `10`快速启动 / `11`版本演进 / `12`账本系统） | 快速了解现状；改动机制须同步更新对应 `docs/current/0X-*.md` 并在 `11-changelog.md` 追加条目 |
-| **docs/UI_SPEC_AND_LEDGER_DESIGN.md** | UI 页面全景剖析 + 未实现功能（M2-M4）UI 设计 + 多标签页规范 + 前端开发指南 | 了解前端 UI 交互架构、新功能界面设计或开发新 UI 模块时 |
+| **docs/UI_SPEC_AND_LEDGER_DESIGN.md** | UI 页面全景剖析 + 制度大盘（M1-M4）界面实现说明 + 多标签页规范 + 前端开发指南 | 了解前端 UI 交互架构、制度大盘界面实现或开发新 UI 模块时 |
 | **docs/DECISION_VIZ_DESIGN.md** | 马斯洛决策引擎可视化设计方案：决策代码→图元映射、双视图三面板、交互能力预留、实现文件规划与里程碑 | 实现决策可视化网页（逻辑引擎图/实时监控）前必读；配套交互原型 `docs/decision-viz-prototype.html` |
-| **docs/current/12-ledger-system.md** | 账本模块文档（M1 已落地：账本内核、团体基类、婚姻登记簿、家户体系、胎儿预分配 ID） | 改动 ledger/ 代码时查阅 |
+| **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿预分配 ID） | 改动 ledger/ 代码时查阅 |
 | **docs/BUILD_GUIDE.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试与故障排查 | 深入构建与环境排障时 |
 | **docs/browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略 | 需要打开页面/渲染校验/截图/自动化交互时 |
 | **docs/cicd-guide.md** | CI/CD 部署指南：GitHub Actions 流水线、4 个 Secrets、COS MIME 排障 | 调整部署流程或排查部署失败时 |
 | **docs/AGENT_AI_ANALYSIS.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
-| **docs/PLAN_LEDGER_REFACTOR.md** | 账本与仓库重构计划（M1 已完成，M2-M4 规划中） | 账本系统演进规划 |
+| **docs/PLAN_LEDGER_REFACTOR.md** | 账本与仓库重构计划（M1~M4 已完成，M5 收尾 ✅） | 账本系统演进规划 |
 | **docs/ARCHITECTURE.md** | 宏观技术架构愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（多为规划态） |
 | **docs/PLAN.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观方向（多为规划态） |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
@@ -34,7 +35,7 @@
 | `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | WASM 导出层：导出函数清单、静态缓冲区、错误码、指针约定 |
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
-| `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走） |
+| `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -50,7 +51,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.3.0)"]
+    E --> F["浏览器 UI (版本: v1.3.2)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与代际继承、经济账本；
@@ -97,7 +98,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.3.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.3.2`**。
 
 ---
 
@@ -201,7 +202,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.12 🔧 超参集中化、配置校验与速查表
 
-- **超参唯一入口**：全部 **153** 个 `SimConfig` 字段统一由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **超参唯一入口**：全部 **163** 个 `SimConfig` 字段统一由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
 - **调参流程**：直接编辑 `config.js`，浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。
 - **一致性校验**：`tools/config-check.js` 交叉解析 `config.js` 与 `config.rs`，捕获孤儿字段、缺失字段、类型错配、数值漂移四类问题。
 - **参数速查表**：`docs/config-reference.md` 由 `config-check.js` 自动生成，**不要手工维护**。

@@ -1,6 +1,6 @@
-# Flow & Accord · UI 页面全景剖析、未实现功能界面设计与开发指南
+# Flow & Accord · UI 页面全景剖析、制度大盘界面实现与开发指南
 
-> **版本**：v1.0.2 · **定位**：前端 UI 全景解剖说明书 + 制度经济学愿景设计稿 + 模块开发落地指南  
+> **版本**：v1.3.2 · **定位**：前端 UI 全景解剖说明书 + 制度经济学界面实现说明（M1~M4 全部落地）+ 模块开发落地指南  
 > **关联规划**：[`docs/PLAN_LEDGER_REFACTOR.md`](./PLAN_LEDGER_REFACTOR.md) · [`docs/current/07-frontend-ui.md`](./current/07-frontend-ui.md) · [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)
 
 ---
@@ -15,11 +15,11 @@
    - 1.5 [底部生态时钟、控制台与调试监视器 (.control-panel & .debug-hud)](#15-底部生态时钟控制台与调试监视器-control-panel--debug-hud)
    - 1.6 [右下角重大历史事件滚动日志 (.event-log)](#16-右下角重大历史事件滚动日志-event-log)
    - 1.7 [模态弹窗系统 (Lineage Modal & Temporal DAG Family Tree)](#17-模态弹窗系统-lineage-modal--temporal-dag-family-tree)
-2. [🎨 第二篇：PLAN_LEDGER_REFACTOR 未实现功能 UI/UX 设计（愿景设计）](#2-第二篇plan_ledger_refactor-未实现功能-uiux-设计愿景设计)
-   - 2.1 [多标签页制度枢纽升级论证 (Tabbed Society & Ledger Hub)](#21-多标签页制度枢纽升级论证-tabbed-society--ledger-hub)
-   - 2.2 [M2 界面设计：家庭旁路记账 + 分家抽资 + 丧父继承清算](#22-m2-界面设计家庭旁路记账--分家抽资--丧父继承清算)
-   - 2.3 [M3 界面设计：宗族公库 + 族长制 + 族税互助](#23-m3-界面设计宗族公库--族长制--族税互助)
-   - 2.4 [M4 界面设计：地区政体 + 国王尊号 + 夺位远征 + 长子继承](#24-m4-界面设计地区政体--国王尊号--夺位远征--长子继承)
+2. [🎨 第二篇：制度大盘 UI 实现（M1~M4 全落地）](#2-第二篇制度大盘-ui-实现m1m4-全落地)
+   - 2.1 [多标签页制度枢纽（Tabbed Society & Ledger Hub）](#21-多标签页制度枢纽-tabbed-society--ledger-hub)
+   - 2.2 [M2 界面实现：家庭旁路记账 + 分家抽资 + 丧父继承清算](#22-m2-界面实现家庭旁路记账--分家抽资--丧父继承清算)
+   - 2.3 [M3 界面实现：宗族公库 + 族长制 + 族税互助](#23-m3-界面实现宗族公库--族长制--族税互助)
+   - 2.4 [M4 界面实现：地区政体 + 国王尊号 + 夺位远征 + 长子继承](#24-m4-界面实现地区政体--国王尊号--夺位远征--长子继承)
    - 2.5 [高保真 ASCII Wireframe 与视觉原型图](#25-高保真-ascii-wireframe-与视觉原型图)
 3. [🛠️ 第三篇：新功能 UI 开发实施指南（开发落地指引）](#3-第三篇新功能-ui-开发实施指南开发落地指引)
    - 3.1 [前端架构扩展与模块化分工 (frontend/js/ledger-ui.js)](#31-前端架构扩展与模块化分工-frontendjsledger-uijs)
@@ -77,7 +77,7 @@ graph TD
 位于页面顶部，悬浮横贯，两端对齐，`pointer-events: none`（内部卡片 `pointer-events: auto`）。
 
 ### 1. 品牌与版本卡片 (`.brand-card`)
-- 标题：`🍼 Flow & Accord · 流动公约` + 动态版本徽章 `<span class="version-tag">v1.0.2</span>`；
+- 标题：`🍼 Flow & Accord · 流动公约` + 动态版本徽章 `<span class="version-tag">v1.3.2</span>`；
 - 副标题：`确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化`。
 
 ### 2. 全局实时态势仪表 (`.stats-card`)
@@ -189,9 +189,9 @@ graph TD
 
 ---
 
-# 2. 第二篇：PLAN_LEDGER_REFACTOR 未实现功能 UI/UX 设计（愿景设计）
+# 2. 第二篇：制度大盘 UI 实现（M1~M4 全落地）
 
-在 [`docs/PLAN_LEDGER_REFACTOR.md`](./PLAN_LEDGER_REFACTOR.md) 中，M1 已经完成（团体基类、婚姻登记、家户体系、胎儿预分配 ID）。本篇对尚未实现的 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 进行完整的 UI/UX 架构与视觉交互设计。
+在 [`docs/PLAN_LEDGER_REFACTOR.md`](./PLAN_LEDGER_REFACTOR.md) 中，M1~M4 已全部完成（M1 团体基类/婚姻登记/家户体系/胎儿预分配 ID → M4 地区王国）。本篇对 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 的 UI/UX 实现架构与视觉交互进行完整说明——以下界面均已落地于 `frontend/js/ledger-ui.js`。
 
 ```mermaid
 graph LR
@@ -200,18 +200,18 @@ graph LR
         M1_M["婚姻登记簿 (终身留痕)"]
     end
 
-    subgraph "M2 (待实现 · v1.1.0)"
+    subgraph "M2 (已落地 · v1.1.0)"
         M2_J["旁路流水双环穿透 (Deposit/Consume/Heating)"]
         M2_S["分家抽资可视化 (W=2+n)"]
         M2_I["丧父继承清算与入公仓"]
     end
 
-    subgraph "M3 (待实现 · v1.2.0)"
+    subgraph "M3 (已落地 · v1.2.0)"
         M3_C["宗族聚合看板 (姓氏/族长)"]
         M3_T["族税缴纳与互助救济流水"]
     end
 
-    subgraph "M4 (待实现 · v1.3.0)"
+    subgraph "M4 (已落地 · v1.3.0)"
         M4_K["王国与领地面板 (国王/长子顺位)"]
         M4_E["夺位远征视口态势标牌"]
         M4_G["公仓赋税与赈灾大盘"]
@@ -229,27 +229,27 @@ graph LR
 
 ---
 
-## 2.1 多标签页制度枢纽升级论证 (Tabbed Society & Ledger Hub)
+## 2.1 多标签页制度枢纽 (Tabbed Society & Ledger Hub)
 
-### 为什么必须新增多标签页？
-当前右侧面板容器只有一个折叠式的 `ledger-panel`，仅能罗列家户与婚姻两条简单列表。一旦演进至 M2~M4：
+### 为什么是多标签页？
+右侧面板容器在 M1 只有一个折叠式的 `ledger-panel`，仅能罗列家户与婚姻两条简单列表。演进至 M2~M4 后：
 1. **信息维度剧增**：新增了宗族（Clan）、行政领地/王国（Region）、公仓金库、王位顺位链、分家世系；
 2. **纵向滚动失控**：如果在单一面板内垂直无限堆叠列表，会导致用户频繁上下拖动，交互体验崩溃；
 3. **职责隔离清晰**：家户（私有血缘家庭）、婚姻（两性契约）、宗族（同姓父系联盟）、地区（地缘政体与公权力）属于四个不同层级的社会制度。
 
-### 升级方案：4 标签页「🏛️ 社会与制度大盘」
-将现有 `ledger-panel` 重构为带有分段选项卡（Tab Switcher）的制度大盘容器：
+### 实现方案：4 标签页「🏛️ 社会与经济制度大盘」
+将 `ledger-panel` 重构为带有分段选项卡（Tab Switcher）的制度大盘容器（已落地于 `ledger-ui.js`）：
 
 | 标签页 ID | 名称 | 图标 | 主题色彩 | 核心展示内容 | 对应里程碑 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `tab-household` | **家户** | 🏠 | 琥珀金 `#f59e0b` | 存续/已解散家户、分家支系树、账面余额、流水穿透抽屉 | M1 / M2 |
 | `tab-marriage` | **婚姻** | 💍 | 浪漫粉 `#ec4899` | 存续中婚姻、终身多段历史留痕、平均婚龄、离异/丧偶率 | M1 |
 | `tab-clan` | **宗族** | 🛡️ | 翡翠青 `#10b981` | 同姓宗族聚合、世袭族长、族库金库、族税征缴、互助基金 | M3 (v1.2.0) |
-| `tab-region` | **地区** | 👑 | 皇家金 `#fbbf24` | 5 大营地王国、当朝国王、长子顺位链、夺位远征中族人、公仓与赋税救济 | M4 (v1.3.0) |
+| `tab-region` | **王国** | 👑 | 皇家金 `#fbbf24` | 5 大营地王国、当朝国王、长子顺位链、夺位远征中族人、公仓与赋税救济 | M4 (v1.3.0) |
 
 ---
 
-## 2.2 M2 界面设计：家庭旁路记账 + 分家抽资 + 丧父继承清算
+## 2.2 M2 界面实现：家庭旁路记账 + 分家抽资 + 丧父继承清算
 
 ### 1. 旁路双环记账流水穿透抽屉 (Double-Entry Journal Viewer)
 - **触发位置**：点击任一家户卡片或 Agent Inspector 的「📒 账面余额」区域；
@@ -276,7 +276,7 @@ graph LR
 
 ---
 
-## 2.3 M3 界面设计：宗族公库 + 族长制 + 族税互助
+## 2.3 M3 界面实现：宗族公库 + 族长制 + 族税互助
 
 ### 1. 宗族聚合看板 (`tab-clan`)
 - **宗族卡片**：
@@ -292,7 +292,7 @@ graph LR
 
 ---
 
-## 2.4 M4 界面设计：地区政体 + 国王尊号 + 夺位远征 + 长子继承
+## 2.4 M4 界面实现：地区政体 + 国王尊号 + 夺位远征 + 长子继承
 
 ### 1. 地区/王国政体面板 (`tab-region`)
 - **5 大行政区卡片**（对应 5 处营地）：
@@ -361,18 +361,18 @@ graph LR
 
 ---
 
-# 3. 第三篇：新功能 UI 开发实施指南（开发落地指引）
+# 3. 第三篇：制度大盘 UI 开发实施总结（开发落地指引）
 
-为了确保未来开发 M2、M3、M4 前端界面时代码整洁、性能达标、且严格遵循项目规范（根 AGENTS.md），特制定本实施指南。
+本篇章记录了 M1~M4 制度大盘前端界面的落地过程与规范，为后续新增社会制度 UI（M5+ 专利经济、M6 六维政体等）提供可复用的模块化分工、快照同步清单与性能硬约束。
 
 ---
 
 ## 3.1 前端架构扩展与模块化分工 (`frontend/js/ledger-ui.js`)
 
-根据 **AGENTS.md §4.6「单文件严控在 800 行以内」** 的规范，目前 `render.js` 已达 2000 行，若直接往其中追加 M2~M4 的复杂 UI 逻辑，将导致文件进一步膨胀。
+根据 **AGENTS.md §4.6「单文件严控在 800 行以内」** 的规范，`render.js` 已达 2000+ 行，M2~M4 复杂 UI 逻辑已抽离至独立模块：
 
-### 推荐拆分方案
-新建 `frontend/js/ledger-ui.js`，将社会制度与账本大盘 UI 从 `render.js` 中抽离：
+### 已实施的拆分方案
+新建 `frontend/js/ledger-ui.js`（818 行），将社会制度与账本大盘 UI 从 `render.js` 中抽离：
 
 ```mermaid
 graph TD
@@ -386,11 +386,12 @@ graph TD
     C --> D2["renderExpeditionBadge() (M4 夺位)"]
 ```
 
-- **`frontend/js/ledger-ui.js` 职责**：
+- **`frontend/js/ledger-ui.js` 职责（已实现）**：
   1. 管理 4 标签页的切换状态（`activeTab`）；
-  2. 渲染 家户/婚姻/宗族/地区 四大面板及列表 DOM；
-  3. 渲染双环流水穿透抽屉与分家计算器；
-  4. 渲染地图视口上的夺位远征光环与国王标牌。
+  2. 渲染 家户/婚姻/宗族/王国 四大面板及列表 DOM；
+  3. 渲染流水穿透抽屉与分家计算器（W=2+n）；
+  4. 渲染地图视口上的夺位远征光束、金色战盔标牌与登基礼花粒子。
+- **`index.html`** 已新增对应面板容器与 `<script>` 标签；**`style.css`** 已扩展 927+ 行暗黑赛博玻璃拟态样式。
 
 ---
 
@@ -411,47 +412,56 @@ sequenceDiagram
     UI->>UI: DOM 绑定与 Canvas 矢量高亮
 ```
 
-### M2~M4 快照结构体预备清单
+### M2~M4 快照结构体（已落地，与 `snapshot.rs` 实际定义一致）
 
-#### 1. M2 账本流水快照 (`JournalSnapshot`)
+> 以下为 v1.3.0 实际落地的快照结构（注意：`TransferRecordSnapshot.from/to` 为字符串化主体标识，非整数；`ClanSnapshot` 用 `member_ids` 而非家户 ID 列表）。完整字段见 [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)。
+
+#### 1. M2 账本流水快照 (`TransferRecordSnapshot`)
 ```rust
 // snapshot.rs
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferRecordSnapshot {
     pub tick: u64,
-    pub resource: ResourceKind,
+    pub resource: String,   // "Water" / "Food" / "Wood" / "Stone" / "Gold"
     pub amount: f32,
-    pub from_group: u32,
-    pub to_group: u32,
-    pub reason: String, // "Deposit", "Consume", "Split", "Inheritance" 等
+    pub from: String,       // 付出方主体（字符串化，如 Personal(3) / Family(2) / Clan("姬") / Region(1)）
+    pub to: String,         // 接收方主体（字符串化）
+    pub reason: String,     // "Deposit" / "Consume" / "Split" / "Inheritance" 等
 }
 ```
 
 #### 2. M3 宗族快照 (`ClanSnapshot`)
 ```rust
 // snapshot.rs
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClanSnapshot {
     pub surname: String,
-    pub leader_id: u32,
-    pub member_household_ids: Vec<u32>,
+    pub leader_id: Option<AgentId>,  // None = 无主账本冻结
+    pub member_count: u32,
+    pub member_ids: Vec<AgentId>,
     pub balances: Vec<LedgerBalanceSnapshot>,
-    pub recent_transfers: Vec<TransferRecordSnapshot>,
+    pub recent_journal: Vec<TransferRecordSnapshot>,
+    pub recent_events: Vec<String>,
 }
 ```
 
 #### 3. M4 地区/政体快照 (`RegionSnapshot`)
 ```rust
 // snapshot.rs
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegionSnapshot {
     pub camp_id: u32,
-    pub king_id: Option<u32>,
-    pub regime: String,           // "Kingdom"
-    pub succession: String,       // "Primogeniture"
-    pub heir_candidates: Vec<u32>, // 顺位前3继承人
-    pub granary_balances: Vec<LedgerBalanceSnapshot>,
-    pub active_expedition_agents: Vec<u32>, // 正在冲向该营地夺位的族人
+    pub camp_name: String,
+    pub king_id: Option<AgentId>,
+    pub regime: String,            // "Kingdom"
+    pub succession: String,        // "Primogeniture"
+    pub member_count: u32,
+    pub arrival_order: Vec<AgentId>,       // 到达时序前10
+    pub heir_candidates: Vec<AgentId>,     // 顺位前3继承人
+    pub balances: Vec<LedgerBalanceSnapshot>,
+    pub recent_journal: Vec<TransferRecordSnapshot>,
+    pub recent_events: Vec<String>,
+    pub active_expedition_agents: Vec<AgentId>, // 正在冲向该营地夺位的族人
 }
 ```
 
@@ -500,23 +510,25 @@ pub struct RegionSnapshot {
 
 ```mermaid
 gantt
-    title Flow & Accord · 制度大盘 UI 演进路线
+    title Flow & Accord · 制度大盘 UI 演进路线（M1~M4 全部完成）
     dateFormat  YYYY-MM-DD
     section M1 现状
     家户与婚姻大盘(已完成)         :done, m1, 2026-08-01, 2026-08-15
-    section M2 演进
-    旁路记账流水穿透抽屉           :active, m2_1, 2026-09-05, 5d
-    分家抽资与继承清算卡片         :m2_2, after m2_1, 5d
-    section M3 演进
-    4标签页枢纽容器升级            :m3_1, 2026-09-20, 4d
-    宗族聚合与族长公库面板         :m3_2, after m3_1, 6d
-    section M4 演进
-    地区政体与国王/顺位面板        :m4_1, 2026-10-05, 6d
-    夺位远征地图光环与全图战报     :m4_2, after m4_1, 5d
+    section M2 演进 (v1.1.0 已完成)
+    旁路记账流水穿透抽屉           :done, m2_1, 2026-09-05, 5d
+    分家抽资与继承清算卡片         :done, m2_2, after m2_1, 5d
+    section M3 演进 (v1.2.0 已完成)
+    4标签页枢纽容器升级            :done, m3_1, 2026-09-20, 4d
+    宗族聚合与族长公库面板         :done, m3_2, after m3_1, 6d
+    section M4 演进 (v1.3.0 已完成)
+    地区政体与国王/顺位面板        :done, m4_1, 2026-10-05, 6d
+    夺位远征地图光环与全图战报     :done, m4_2, after m4_1, 5d
 ```
 
 ### 交付门禁（每次代码提交前必检）
-1. **配置一致性校验**：`node tools/config-check.js` 必须 153/153 字段完全匹配；
+1. **配置一致性校验**：`node tools/config-check.js` 必须 163/163 字段完全匹配；
 2. **WASM 与引擎确定性测试**：`node tools/test-wasm.js` 必须输出 `ALL_TESTS_DONE`（0 越界、0 NaN、同种子逐字节一致）；
 3. **WASM 双副本同步**：`frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm` 必须同步更新；
 4. **版本号自增与文档同步**：同步更新 `index.html`、`AGENTS.md`、`docs/current/11-changelog.md`。
+
+> ✅ M1~M4 界面已全部按此路线落地（`ledger-ui.js` 4 标签页枢纽 + Canvas 夺位特效），上述 gantt 中的任务均已 `done`。

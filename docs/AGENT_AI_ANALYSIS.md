@@ -3,7 +3,7 @@
 > **分析对象**：`FlowAndAccord` 中部落民 (Agent) 的全部 AI 决策逻辑
 > **源码位置**：`crates/sim_core/src/spatial/decisions/`（7 个文件：`mod.rs` + 6 子模块 `needs` / `evaluate` / `routing` / `harvest` / `seeking` / `scheduler`）
 > **本文定位**：**设计思路深度解析（为什么这么设计）**，与 [`docs/current/06-motivation-ai.md`](./current/06-motivation-ai.md) 形成互补——06 讲"机制是什么"，本文讲"为什么这么设计"。
-> **版本**：v1.0.1
+> **版本**：v1.3.2
 
 ---
 
@@ -28,6 +28,8 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 | ③ 归属 | `FoundHome` / `BuildHouse`(0级) | 成家立业——无家成年男性自立门户 |
 | ④ 尊重 | `BuildHouse`(1-4级) / `StockStone` / `StockGold`(45s冷却) | 建材储备与房屋升级 |
 | ⑤ 自我实现 | `GoldWealth`(180s冷却) | 4 级大庄园竣工后的娱乐淘金 |
+
+> ⚔️ **★ M4 夺位远征（决策树最高优先级，独立于 5 层马斯洛）**：`scheduler.rs::tick_conquest_expedition` 在马斯洛评估**之前**运行——男性非国王且存在无主营地时，直接置 `SeekingThrone` 冲向最近无主营地登基，无需任何生理/安全前置。设计理由：王位空悬是社会结构级重大事件，应压倒一切个人需求（见 [12-ledger-system.md](./current/12-ledger-system.md) §M4）。
 
 ### 2.2 为什么不用效用最大化或行为树
 
@@ -130,4 +132,4 @@ Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离�
 | 寻路 | 加权 A*（坡度/隐秘/踩踏度） | 欲望线热度场 + 时空冲突预约 FIFO |
 | 内核 | Rust 结构体数组（`Vec<Agent3D>`） | ECS（hecs/bevy_ecs）+ 确定性 Command Queue |
 | 快照 | JSON 序列化 | 零拷贝双缓冲共享内存 + Hermite 插值 |
-| 社会 | 婚姻/家户/代际继承（账本 M1） | 宗族/地区政体/国王夺位/专利经济/混合政体 |
+| 社会 | 婚姻/家户/代际继承 + **宗族/地区政体/国王夺位**（账本 M1~M4 已落地） | 专利经济/混合政体/LLM 认知层 |

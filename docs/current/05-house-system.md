@@ -45,8 +45,8 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 房屋系统 tick 管线入口 |
-| `maintenance.rs` | 冬季供暖与耐久修缮结算 |
-| `construction.rs` | 施工计时与多级升级竣工 |
+| `maintenance.rs` | 冬季供暖与耐久修缮结算（★M2 修缮完工记入家户团体事件） |
+| `construction.rs` | 施工计时与多级升级竣工（★M2 升级竣工按升级前等级从户主家户账本记 `Construction` 流水） |
 | `marriage.rs` | 自动成婚与丧偶改嫁匹配 |
 | `settlement.rs` | 立宅选址校验、路网接入、空置节点复用 |
 | `inheritance.rs` | 父系继承与绝嗣废墟处理 |
@@ -56,12 +56,13 @@
 - 0 级仓库不扣生活水粮、不扣供暖木材、无生育功能。
 - 建房/升级/修缮严禁系统扫描指挥，必须来自 agent 自主决策。
 - 房屋升级门槛各等级不同，以 `is_pantry_full()` 判定。
+- ★ M2 升级/修缮仅**追加账本流水**（Construction/Maintenance），不扣物理库存（只记账不扣货）。
 
 ## 与其他模块接口
 - `agent.rs`：户主/配偶状态、行囊卸货入仓、仓库自饮自食。
 - `decisions/`：`FoundHome` / `BuildHouse` / `RepairHouse` 需求触发。
 - `ecology.rs`：POI 采收后回家卸货存入仓库。
-- `ledger/`：家户体系以男性户主为锚，房屋与家户解耦但通过户主关联。
+- `ledger/`：家户体系以男性户主为锚，房屋与家户解耦但通过户主关联；★M2 升级竣工/修缮完工写入家户账本流水。
 - `graph.rs`：立宅时接入路网或复用空置节点。
 - `snapshot.rs`：房屋等级、耐久、仓储随快照下发。
 

@@ -22,6 +22,8 @@
 
 低层级需求未满足时绝对阻断高层任务，严禁越级。
 
+> ⚔️ **★ M4 夺位远征（决策树最高优先级）**：在马斯洛评估**之前**先行处理——男性非国王且存在无主营地时，立即置 `SeekingThrone` 状态冲向最近无主营地登基（可中断施工/修缮，进度冻结不回滚），无需满足任何生理/安全前置；王位无主属社会结构级事件，压倒一切个人需求。
+
 ### 核心决策原则
 
 **原则 1：体力 50% 以下才寻求休息**
@@ -57,19 +59,21 @@
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
 | `harvest.rs` | 现场采收判定 + 仓储满额查询 |
 | `seeking.rs` | 途中熔断与平滑重路由 |
-| `scheduler.rs` | tick_decisions / build_decision_context 调度 |
+| `scheduler.rs` | tick_decisions 调度（含 ★M4 夺位远征 tick_conquest_expedition）/ build_decision_context |
 
 ## 关键不变量
 - 所有决策为确定性执行，无概率掷骰（v0.9.44 起全部收敛）。
 - 决策节拍固定 30 tick，不得修改 `simulation_dt`（=1/30）。
 - 共享 RNG 按 agents 顺序依次消费，新增任何随机消耗必须保持确定性。
 - 中途掉头必须通过 `turn_around_and_route_to` 保持坐标连续性，严禁闪现瞬移。
+- ★ M4 夺位远征优先于马斯洛评估，且不消耗 `WorldRng`；夺位者登基/放弃后恢复正常决策。
 
 ## 与其他模块接口
-- `agent.rs`：读取生理指标与行囊状态，写入 agent.state 与路径。
+- `agent.rs`：读取生理指标与行囊状态，写入 agent.state（含 `SeekingThrone`）与路径。
 - `ecology.rs`：采收与卸货的物理执行。
 - `housing_system/`：FoundHome/BuildHouse/RepairHouse 的物理执行。
 - `graph.rs`：A\* 寻路与路径规划。
+- `ledger/region.rs`：夺位远征读写 `region_registry`（登基/迁籍）与 `expedition_targets`。
 - `world.rs`：tick_decisions 调度，错峰相位控制。
 
 ## 调参入口

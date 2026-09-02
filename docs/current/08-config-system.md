@@ -6,12 +6,12 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。153 个 `SimConfig` 字段由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。163 个 `SimConfig` 字段由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
 ### 全量超参数抽取
-- `SimConfig` 共 **153 个字段**，按 10 个分区组织：
+- `SimConfig` 共 **163 个字段**，按 12 个分区组织：
   1. 引擎节拍与时间基准（3 字段）
   2. 部落民生理、代谢与生命周期（46 字段）
   3. 先天禀赋与遗传演化（5 字段）
@@ -22,6 +22,8 @@
   8. 空间路网、限速与踩踏演化（12 字段）
   9. 动力学移动与寻路权重（10 字段）
   10. 账本与婚姻登记子系统（1 字段）
+  11. 宗族系统 M3（5 字段）
+  12. 地区与王国系统 M4（5 字段）
 
 ### 免编译热调优
 - 前端 `rustworld.js` 在加载 WASM 及重置模拟时，通过 `world_set_config` / `world_apply_config_buf` 将 `window.SIM_CONFIG` 动态序列化注入 Rust WASM 内存。
@@ -51,7 +53,7 @@
 - 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 字段数为 153（非 161，v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153——以实际 `config.rs` 为准）。
+- `SimConfig` 字段数为 163（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5——以实际 `config.rs` 为准）。
 - 严禁在 Rust 逻辑层散落字面量或直引 `const`，一律通过 `self.config.<字段>` 引用。
 - `config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

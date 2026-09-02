@@ -13,8 +13,8 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | `tick_housing(dt)`：房屋系统总管线，固定内部顺序（见 §3） |
-| `maintenance.rs` | 冬季供暖消耗、自然风化折旧与坍塌、修缮进度结算 |
-| `construction.rs` | 施工计时（按 tier 取 `house_build_time_tier*`）与竣工扩容、生育激活播报 |
+| `maintenance.rs` | 冬季供暖消耗、自然风化折旧与坍塌、修缮进度结算（★M2 修缮完工记入家户团体事件） |
+| `construction.rs` | 施工计时（按 tier 取 `house_build_time_tier*`）与竣工扩容、生育激活播报（★M2 升级竣工按升级前等级从户主家户账本记 `Construction` 流水，只记账不扣物理库存） |
 | `marriage.rs` | 丧偶解除婚姻、自动成婚与单身/丧偶女性就近改嫁 |
 | `settlement.rs` | `materialize_founded_houses`（立宅实体化：空置节点复用 → 放置校验 → 建门接入 → 营地绑定）+ 空置节点检索 + 营地行政区阶梯升级 |
 | `inheritance.rs` | 父系代际房产确权继承、绝嗣废墟演化（金币继承在 `world.rs::settle_gold_inheritance`） |

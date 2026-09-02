@@ -18,7 +18,7 @@
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询 |
 | `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心） |
 | `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询 |
-| `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）与 `build_decision_context`（收集全图资源节点） |
+| `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`tick_conquest_expedition`（★ M4 夺位远征调度，决策树最高优先级）与 `build_decision_context`（收集全图资源节点） |
 
 ## 3. 🧱 关键结构
 
@@ -53,3 +53,12 @@
 ### 4.6 无家宅 Agent
 
 `home_house_id.is_none()` 的 agent 不装载行囊、只在现场自饮自食；`wood/stone_fully_stocked` 等仓储查询在无家宅时返回 true（视为已满足）。
+
+### 4.7 ★ M4 夺位远征（决策树最高优先级）
+
+`tick_conquest_expedition` 在 `tick_decisions` 最前调用，**先于**马斯洛需求评估处理：
+- 触发：男性、非国王、存在无主营地（`region.group.leader.is_none()`）→ 立即置 `PrimitiveActionState::SeekingThrone` 冲向**最近**无主营地，行囊保留、可中断施工/修缮（`build_timer` 冻结不回滚）；
+- 途中目标易主（已被他人登基）→ 重定向到最近的新无主营地（原地掉头平滑转向，坐标连续不闪现）；无任何无主营地 → 放弃远征恢复正常决策；
+- 抵达目标营地交互半径内 → 登基（`coronate_king`）：迁籍入地区、`set_leader`、回 `RestingAtCamp`；
+- 状态以 `agent.state == SeekingThrone` 与 `world.expedition_targets` 记录，`current_need = "SelfActualization·SeekingThrone"`；
+- 确定性：不消耗 `WorldRng`；`expedition_targets` 用 `BTreeMap` 保序；选最近营地并列取 id 小者。

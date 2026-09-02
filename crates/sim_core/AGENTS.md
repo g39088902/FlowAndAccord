@@ -33,6 +33,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 | `poi.rs` | `PrimitivePoi`（储量/再生/提取/营地行政级别） |
 | `house.rs` | `House`/`HouseTier`（容量/耐久/`is_pantry_full` 升级门槛） |
 | `birth.rs` | 妊娠/分娩/代际结算 |
+| `bookkeeping.rs` | ★ M2 旁路记账与家户经济规则（`tick_bookkeeping`：Deposit/Consume/Heating 观测 + Inheritance 继承清算 + Split 分家抽资，只追加账本流水不动物理库存） |
 | `snapshot.rs` | `WorldSnapshot3D` 全部快照结构体（前端字段三处同步之一） |
 | `vec3.rs` / `curve.rs` | 几何基础（`Vec3` / Bezier `Curve3D`） |
 | `mod.rs` | spatial 模块声明与 re-export |
@@ -43,7 +44,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 ## 4. 🧱 关键类型不变量
 
 - **`WorldRng`**：xorshift64*，状态仅一个 u64。seed 0 被静默替换为黄金比例常数；`gen_normal`（Box-Muller）恰好消耗 2 个均匀数；`gen_range_usize` 在 `high <= low` 时返回 `low`（不 panic）。
-- **`SimConfig`**：153 个字段，前端 `config.js` 按 camelCase 键注入，缺省回落默认值。`config.rs` 是数值唯一真相源（见根 AGENTS.md §4.12）。
+- **`SimConfig`**：163 个字段，前端 `config.js` 按 camelCase 键注入，缺省回落默认值。`config.rs` 是数值唯一真相源（见根 AGENTS.md §4.12）。
 - **`TerrainMap`**：`sample_elevation` 为最近邻采样（无插值），归一化坐标 clamp 到 [0.0, 0.999]。
 - **`World3DEngine`**：世界总管理器，一切世界级系统方法以 `impl World3DEngine` 分散挂载。
 - **`Agent3D`**：部落民实体（生理/行囊/血缘/禀赋/`poi_seekability` 私有触发器表）。

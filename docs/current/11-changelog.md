@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.3.0**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.3.2**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -58,3 +58,5 @@
 | **v0.9.55** | 文档目录整合：非 AGENTS.md 文档全部移入 `docs/` 目录，引用路径全量修正 |
 | **v0.9.67** | 浏览器自动化使用指南落库：`docs/browser-guide.md`，playwright-cli 4 引擎实测通过 |
 | **v0.9.75** | 前端服务器端口占用说明：AGENTS.md 补充 3000 端口已占用时无需重复启动 server.js |
+| **v1.3.1** | 新增面向玩家的营销型 `README.md`：项目宣传定位、八大核心看点、第一局观察指引、三分钟上手、技术底座、路线图与文档地图（纯文档，无功能代码变更） |
+| **v1.3.2** | 文档全量同步（对齐 v1.3.0 代码状态，纯文档无功能变更）：① AGENTS.md/`docs/CURRENT.md`/`08-config-system.md`/`09-code-map.md`/`crates/sim_core/AGENTS.md`/`DECISION_VIZ_DESIGN.md`/`UI_SPEC` 超参字段数 153→163、config 分区 10→12；② `12-ledger-system.md` 重写为 M1~M4 已实现态（旁路记账/分家继承/宗族/地区王国 + 快照 + 4 标签页）；③ `PLAN_LEDGER_REFACTOR.md` 状态 M1~M5 全部 ✅、`PLAN.md` M2/M3/M4 移入已完成、M5 起为规划；④ `UI_SPEC` 由「未实现设计稿」改为「已实现说明」（4 标签页枢纽/宗族页/王国页/夺位特效/快照实际结构）；⑤ 嵌套 `ledger/AGENTS.md` 重写为 7 子模块 + `decisions/AGENTS.md` 补夺位远征 + `housing_system/AGENTS.md` 补记账钩子；⑥ `06-motivation-ai.md`/`04-agent-life.md`/`05-house-system.md`/`07-frontend-ui.md`/`AGENT_AI_ANALYSIS.md` 补充 M2~M4 机制 |
