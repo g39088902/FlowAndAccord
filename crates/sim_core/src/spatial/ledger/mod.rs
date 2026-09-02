@@ -6,14 +6,18 @@
 //! 2. 一切账本变动经 [`journal::transfer`] 总线或 Group 单点入口，产出可审计流水；
 //! 3. 确定性红线：不消耗 WorldRng、不新增决策相位、所有集合用 BTree 保序。
 
+pub mod clan;
 pub mod family;
 pub mod group;
 pub mod journal;
 pub mod marriage;
+pub mod region;
 
+pub use clan::ClanRegistry;
 pub use family::{Household, HouseholdId, HouseholdRegistry};
 pub use group::{Group, GroupKind};
 pub use journal::{
     transfer, Ledger, LedgerEvent, LedgerRef, ResourceKind, TransferReason, TransferRecord,
 };
 pub use marriage::{Marriage, MarriageEndReason, MarriageId, MarriageRegistry};
+pub use region::{Regime, Region, RegionRegistry, Succession};

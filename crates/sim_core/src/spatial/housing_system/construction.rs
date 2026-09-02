@@ -1,5 +1,6 @@
 use crate::spatial::agent::PrimitiveActionState;
 use crate::spatial::house::HouseTier;
+use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason};
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
@@ -35,8 +36,49 @@ impl World3DEngine {
         for (_, house_id) in upgraded_houses {
             if let Some(house) = self.houses.iter_mut().find(|h| h.id == house_id) {
                 let prev_tier = house.tier;
+                // 捕获升级前的仓储容量（用于 Construction 记账金额计算）
+                let old_max_wood = house.max_pantry_wood;
+                let old_max_stone = house.max_pantry_stone;
+                let old_max_gold = house.max_pantry_gold;
                 let success = house.upgrade_to_next_tier(&self.config);
                 if success {
+                    // ★ M2 Construction 记账：从户主家户账本 debit 对应建材（只记账不扣物理库存）
+                    let tick = self.tick_counter;
+                    let owner_id = house.owner_id;
+                    if let Some(hid) = self.household_registry.household_of(owner_id) {
+                        // 根据升级前等级确定消耗的建材品类与数量（按升级门槛比例 × 升级前容量）
+                        let construction_materials: Vec<(ResourceKind, f32)> = match prev_tier {
+                            HouseTier::Tier0Warehouse => Vec::new(), // 0→1 无建材消耗（仅激活生育）
+                            HouseTier::Tier1ThatchedHut => {
+                                let amt = old_max_wood * self.config.house_upgrade_tier1_wood_ratio;
+                                vec![(ResourceKind::Wood, amt)]
+                            }
+                            HouseTier::Tier2LeanTo => {
+                                let amt = old_max_stone * self.config.house_upgrade_tier2_stone_ratio;
+                                vec![(ResourceKind::Stone, amt)]
+                            }
+                            HouseTier::Tier3Homestead => {
+                                let gold_amt = old_max_gold * self.config.house_upgrade_tier3_gold_stone_ratio;
+                                let stone_amt = old_max_stone * self.config.house_upgrade_tier3_gold_stone_ratio;
+                                vec![(ResourceKind::Gold, gold_amt), (ResourceKind::Stone, stone_amt)]
+                            }
+                            HouseTier::Tier4Manor => Vec::new(),
+                        };
+                        for (resource, amount) in construction_materials {
+                            if amount > 0.001 {
+                                if let Some(hh) = self.household_registry.get_mut(hid) {
+                                    hh.group.ledger.record_consumption(
+                                        LedgerRef::Family(hid),
+                                        resource,
+                                        amount,
+                                        TransferReason::Construction,
+                                        tick,
+                                    );
+                                }
+                            }
+                        }
+                    }
+
                     if prev_tier == HouseTier::Tier0Warehouse {
                         self.last_event = Some(format!("🎉 0级仓库升级为 1级茅草房！正式激活生育功能，仓储扩容至 40 单位！"));
                     } else if prev_tier == HouseTier::Tier1ThatchedHut {

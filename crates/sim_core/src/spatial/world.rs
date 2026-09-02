@@ -6,11 +6,11 @@ use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::{House, HouseSnapshot};
-use super::ledger::{HouseholdRegistry, MarriageRegistry};
+use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
 use super::ledger::journal::ResourceKind;
 use super::snapshot::{
-    AgentSnapshot, GeoCellSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
-    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, WorldSnapshot3D,
+    AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
+    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, WorldSnapshot3D,
 };
 use crate::geo::terrain::TerrainMap;
 
@@ -48,6 +48,20 @@ pub struct World3DEngine {
     pub marriage_registry: MarriageRegistry,
     /// ★ 家户登记簿（**家庭跟着男人走**：以男性户主为锚的家庭单元与账本）
     pub household_registry: HouseholdRegistry,
+    /// ★ M2 旁路记账：上一 tick 的行囊缓存（水/粮/木/石/金），用于 Deposit 增量观测
+    pub prev_carried: std::collections::HashMap<AgentId, (f32, f32, f32, f32, f32)>,
+    /// ★ M2 公仓兜底账本（绝嗣家户资产归集，预留 M4 Region 对接）
+    pub public_granary: Ledger,
+    /// ★ M3 宗族登记簿（按姓氏聚合的宗族团体与账本）
+    pub clan_registry: ClanRegistry,
+    /// ★ M3 族内互助冷却记录（每家户上次接受互助的 tick）
+    pub mutual_aid_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
+    /// ★ M4 地区与王国登记簿（按营地聚合的地区团体、国王、公仓与继承顺位）
+    pub region_registry: RegionRegistry,
+    /// ★ M4 夺位远征目标记录（agent_id → 目标 camp_id）
+    pub expedition_targets: std::collections::BTreeMap<u32, u32>,
+    /// ★ M4 救济冷却记录（每家户上次接受救济的 tick）
+    pub relief_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
 }
 
 impl World3DEngine {
@@ -93,6 +107,13 @@ impl World3DEngine {
             agent_index: HashMap::new(),
             marriage_registry: MarriageRegistry::new(LEDGER_JOURNAL_CAPACITY),
             household_registry: HouseholdRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            prev_carried: std::collections::HashMap::new(),
+            public_granary: Ledger::new(LEDGER_JOURNAL_CAPACITY),
+            clan_registry: ClanRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            mutual_aid_cooldown: std::collections::BTreeMap::new(),
+            region_registry: RegionRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            expedition_targets: std::collections::BTreeMap::new(),
+            relief_cooldown: std::collections::BTreeMap::new(),
         }
     }
 
@@ -234,6 +255,15 @@ impl World3DEngine {
 
         // 错峰决策
         self.tick_decisions();
+
+        // 7. M2 旁路记账（Deposit/Consume/Heating + Inheritance + Split）
+        self.tick_bookkeeping(dt);
+
+        // 8. M3 宗族系统（族长顺位 → 族税征收 → 族内互助）
+        self.tick_clan(dt);
+
+        // 9. M4 地区与王国系统（初王顺位 → 长子继承 → 公仓税 → 救济）
+        self.tick_region(dt);
     }
 
     /// 导出快照
@@ -375,6 +405,29 @@ impl World3DEngine {
                 life_expectancy: agent.life_expectancy,
                 surname: agent.surname.clone(),
                 prestige: agent.children_ids.len() as u32,
+                // ★ M2 婚姻与家户归属
+                marriage_history_count: self.marriage_registry.by_agent.get(&agent.id).map(|v| v.len() as u32).unwrap_or(0),
+                household_id: self.household_registry.household_of(agent.id),
+                household_role: {
+                    if let Some(hid) = self.household_registry.household_of(agent.id) {
+                        if let Some(hh) = self.household_registry.get(hid) {
+                            if hh.head == agent.id {
+                                "Head".to_string()
+                            } else if agent.spouse_id == Some(hh.head) {
+                                "Spouse".to_string()
+                            } else {
+                                "Child".to_string()
+                            }
+                        } else {
+                            "None".to_string()
+                        }
+                    } else {
+                        "None".to_string()
+                    }
+                },
+                // ★ M4 到达时刻与夺位远征状态
+                arrival_tick: agent.arrival_tick,
+                is_on_expedition: matches!(agent.state, crate::spatial::agent::PrimitiveActionState::SeekingThrone),
             });
         }
 
@@ -395,6 +448,20 @@ impl World3DEngine {
                 .take(8)
                 .map(|e| e.note.clone())
                 .collect();
+            // 取最近8笔资源流水（从新到旧）
+            let recent_journal: Vec<TransferRecordSnapshot> = hh.group.ledger.journal
+                .iter()
+                .rev()
+                .take(8)
+                .map(|r| TransferRecordSnapshot {
+                    tick: r.tick,
+                    resource: format!("{:?}", r.resource),
+                    amount: r.amount,
+                    from: format!("{:?}", r.from),
+                    to: format!("{:?}", r.to),
+                    reason: format!("{:?}", r.reason),
+                })
+                .collect();
             households.push(HouseholdSnapshot {
                 id: hh.id,
                 head: hh.head,
@@ -404,6 +471,7 @@ impl World3DEngine {
                 founded_tick: hh.founded_tick,
                 is_dissolved: hh.is_dissolved,
                 recent_events,
+                recent_journal,
             });
         }
 
@@ -418,6 +486,139 @@ impl World3DEngine {
                 end_tick: m.end_tick,
                 end_reason: m.end_reason.map(|r| format!("{:?}", r)),
                 is_active: m.is_active(),
+            });
+        }
+
+        // ★ M3 宗族登记簿快照
+        let mut clans = Vec::new();
+        for (surname, clan) in &self.clan_registry.clans {
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
+                LedgerBalanceSnapshot {
+                    resource: format!("{:?}", rk),
+                    amount: clan.ledger.balance(rk),
+                }
+            }).collect();
+            let recent_events: Vec<String> = clan.ledger.events
+                .iter()
+                .rev()
+                .take(8)
+                .map(|e| e.note.clone())
+                .collect();
+            let recent_journal: Vec<TransferRecordSnapshot> = clan.ledger.journal
+                .iter()
+                .rev()
+                .take(8)
+                .map(|r| TransferRecordSnapshot {
+                    tick: r.tick,
+                    resource: format!("{:?}", r.resource),
+                    amount: r.amount,
+                    from: format!("{:?}", r.from),
+                    to: format!("{:?}", r.to),
+                    reason: format!("{:?}", r.reason),
+                })
+                .collect();
+            clans.push(ClanSnapshot {
+                surname: surname.clone(),
+                leader_id: clan.leader,
+                member_count: clan.members.len() as u32,
+                member_ids: clan.members.iter().copied().collect(),
+                balances,
+                recent_journal,
+                recent_events,
+            });
+        }
+
+        // ★ M4 地区与王国快照
+        let mut regions = Vec::new();
+        for (camp_id, region) in &self.region_registry.regions {
+            let camp_name = self.pois.iter()
+                .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == *camp_id)
+                .map(|p| p.camp_title())
+                .unwrap_or_else(|| format!("营地#{}", camp_id));
+
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
+                LedgerBalanceSnapshot {
+                    resource: format!("{:?}", rk),
+                    amount: region.group.ledger.balance(rk),
+                }
+            }).collect();
+            let recent_events: Vec<String> = region.group.ledger.events
+                .iter()
+                .rev()
+                .take(8)
+                .map(|e| e.note.clone())
+                .collect();
+            let recent_journal: Vec<TransferRecordSnapshot> = region.group.ledger.journal
+                .iter()
+                .rev()
+                .take(8)
+                .map(|r| TransferRecordSnapshot {
+                    tick: r.tick,
+                    resource: format!("{:?}", r.resource),
+                    amount: r.amount,
+                    from: format!("{:?}", r.from),
+                    to: format!("{:?}", r.to),
+                    reason: format!("{:?}", r.reason),
+                })
+                .collect();
+
+            // 到达时序前10
+            let arrival_order: Vec<u32> = region.arrival_order.iter().take(10).copied().collect();
+
+            // 顺位前3继承人（长子继承制：国王的儿子→孙子→arrival_order下一男性）
+            let mut heir_candidates: Vec<u32> = Vec::new();
+            if let Some(king_id) = region.group.leader {
+                // 儿子
+                let mut sons: Vec<(u32, f32)> = Vec::new();
+                for a in &self.agents {
+                    if a.is_alive && a.gender == crate::spatial::agent::Gender::Male && a.father_id == Some(king_id) {
+                        sons.push((a.id, a.age));
+                    }
+                }
+                sons.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
+                for (sid, _) in sons.iter().take(3) {
+                    heir_candidates.push(*sid);
+                }
+                // 若儿子不足3个，补孙子
+                if heir_candidates.len() < 3 {
+                    let son_ids: std::collections::BTreeSet<u32> = sons.iter().map(|(id, _)| *id).collect();
+                    let mut grandsons: Vec<(u32, f32)> = Vec::new();
+                    for a in &self.agents {
+                        if a.is_alive && a.gender == crate::spatial::agent::Gender::Male {
+                            if let Some(fid) = a.father_id {
+                                if son_ids.contains(&fid) {
+                                    grandsons.push((a.id, a.age));
+                                }
+                            }
+                        }
+                    }
+                    grandsons.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
+                    for (gid, _) in grandsons.iter() {
+                        if heir_candidates.len() >= 3 { break; }
+                        heir_candidates.push(*gid);
+                    }
+                }
+            }
+
+            // 正在冲向该营地夺位的族人
+            let active_expedition_agents: Vec<u32> = self.expedition_targets.iter()
+                .filter(|(_, &cid)| cid == *camp_id)
+                .map(|(&aid, _)| aid)
+                .collect();
+
+            regions.push(RegionSnapshot {
+                camp_id: *camp_id,
+                camp_name,
+                king_id: region.group.leader,
+                regime: format!("{:?}", region.regime),
+                succession: format!("{:?}", region.succession),
+                member_count: region.group.members.len() as u32,
+                arrival_order,
+                heir_candidates,
+                balances,
+                recent_journal,
+                recent_events,
+                active_expedition_agents,
             });
         }
 
@@ -445,6 +646,14 @@ impl World3DEngine {
             agents,
             households,
             marriages,
+            clans,
+            regions,
+            public_granary_balances: resource_kinds.iter().map(|&rk| {
+                LedgerBalanceSnapshot {
+                    resource: format!("{:?}", rk),
+                    amount: self.public_granary.balance(rk),
+                }
+            }).collect(),
             total_births: self.total_births,
             total_deaths: self.total_deaths,
             total_deaths_natural: self.total_deaths_natural,

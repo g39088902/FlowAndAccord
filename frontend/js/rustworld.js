@@ -26,6 +26,10 @@
         // ★ 账本与家户/婚姻登记簿 (v0.9.72 M1 账本系统)
         this.households = [];  // 家户列表（家庭跟着男人走：以男性户主为锚）
         this.marriages = [];   // 婚姻列表（一人终生多段婚姻全留痕）
+        this.publicGranaryBalances = {};  // ★ M2: 公仓兜底账本余额
+        this.clans = [];                   // ★ M3: 宗族登记簿
+        this.regions = [];                 // ★ M4: 地区/王国登记簿
+        this.expeditionTargets = new Map();// ★ M4: 远征目标反查表 agent_id -> camp_id
         this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
@@ -401,6 +405,13 @@
             lifeExpectancy: a.life_expectancy,
             surname: a.surname || '',
             prestige: a.prestige || 0,
+            // ★ M2 账本扩展字段
+            marriageHistoryCount: a.marriage_history_count || 0,
+            householdId: a.household_id != null ? a.household_id : null,
+            householdRole: a.household_role || 'None',
+            // ★ M4: 到达时刻与夺位远征标记
+            arrivalTick: a.arrival_tick || 0,
+            isOnExpedition: a.is_on_expedition || false,
             trail
           };
         });
@@ -422,7 +433,8 @@
           parentHousehold: h.parent_household,
           foundedTick: h.founded_tick,
           isDissolved: h.is_dissolved,
-          recentEvents: h.recent_events || []  // 最近团体事件（从新到旧）
+          recentEvents: h.recent_events || [],  // 最近团体事件（从新到旧）
+          recentJournal: h.recent_journal || []  // ★ M2: 最近8笔资源流水（从新到旧）
         }));
 
         // ★ 婚姻登记簿快照映射（一人终生多段婚姻全留痕）
@@ -435,6 +447,50 @@
           endReason: m.end_reason,
           isActive: m.is_active
         }));
+
+        // ★ M2: 公仓兜底账本余额（绝嗣清算资产充入处）
+        this.publicGranaryBalances = (snap.public_granary_balances || []).reduce((acc, b) => {
+          acc[b.resource] = b.amount;
+          return acc;
+        }, {});
+
+        // ★ M3: 宗族登记簿快照映射（按姓氏聚合 · 族长顺位 · 族税族库）
+        this.clans = (snap.clans || []).map(c => ({
+          surname: c.surname,
+          leaderId: c.leader_id != null ? c.leader_id : null,
+          memberCount: c.member_count || 0,
+          memberIds: c.member_ids || [],
+          balances: (c.balances || []).reduce((acc, b) => {
+            acc[b.resource] = b.amount;
+            return acc;
+          }, {}),
+          recentJournal: c.recent_journal || [],
+          recentEvents: c.recent_events || []
+        }));
+
+        // ★ M4: 地区/王国登记簿快照映射（初王/长子继承/公仓税/救济/夺位远征）
+        this.regions = (snap.regions || []).map(r => ({
+          campId: r.camp_id,
+          campName: r.camp_name,
+          kingId: r.king_id != null ? r.king_id : null,
+          regime: r.regime,
+          succession: r.succession,
+          memberCount: r.member_count || 0,
+          arrivalOrder: r.arrival_order || [],
+          heirCandidates: r.heir_candidates || [],
+          balances: (r.balances || []).reduce((acc, b) => { acc[b.resource] = b.amount; return acc; }, {}),
+          recentJournal: r.recent_journal || [],
+          recentEvents: r.recent_events || [],
+          activeExpeditionAgents: r.active_expedition_agents || []
+        }));
+
+        // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）
+        this.expeditionTargets = new Map();
+        for (const r of this.regions) {
+          for (const aid of r.activeExpeditionAgents) {
+            this.expeditionTargets.set(aid, r.campId);
+          }
+        }
       }
     }
 

@@ -12,12 +12,14 @@ use super::family::HouseholdId;
 use super::journal::Ledger;
 
 /// 团体类型（五级产权账本的组织载体；M1 仅落地家庭，其余按计划逐期扩展）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum GroupKind {
     /// 🏠 家庭（**跟着男人走**：以男性户主的家户为锚，与房屋解耦）
     Family(HouseholdId),
-    // ⛩️ Clan(SurnameId)   —— M3 预留：宗族（领导者=族长：同姓最年长在世男性）
-    // 🏛️ Region(CampId)    —— M4 预留：地区（领导者=国王，独有政体与换届）
+    /// ⛩️ 宗族（M3：按姓氏聚合的团体，领导者=族长：同姓最年长在世男性）
+    Clan(String),
+    /// 🏛️ 地区（M4：按营地聚合的王国团体，领导者=国王，独有政体与长子继承制）
+    Region(u32),
     // 🏢 Corporate(CompanyId) —— 预留：商号/公司
 }
 

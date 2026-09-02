@@ -96,6 +96,8 @@ impl World3DEngine {
             );
             // 记录婴儿出生时刻 (当前世界 tick 数), 供前端族谱按出生时序施加纵向重力
             baby.birth_tick = self.tick_counter;
+            // ★ M4 新生儿到达时刻=出生时 tick_counter
+            baby.arrival_tick = self.tick_counter;
             let camp_pos = self.network.graph[*self.network.node_map.get(&birth_node).unwrap()].pos;
             baby.world_pos = camp_pos;
             baby.hunger = self.config.agent_newborn_hunger;
@@ -147,6 +149,24 @@ impl World3DEngine {
             let new_idx = self.agents.len();
             self.agents.push(baby);
             self.agent_index.insert(baby_id, new_idx);
+
+            // ── 8.5 M2 新生儿入父亲家户（家庭跟着男人走：未成年子女归父亲家户）──
+            if let Some(fid) = father_id {
+                let tick = self.tick_counter;
+                // 父亲若无家户则先为父亲立户（罕见边界：父亲未婚但有子）
+                if self.household_registry.household_of(fid).is_none() {
+                    self.household_registry.create(fid, None, tick);
+                }
+                if let Some(father_hid) = self.household_registry.household_of(fid) {
+                    self.household_registry.add_member(father_hid, baby_id, tick);
+                }
+                // ★ M3 新生儿随父姓入宗族
+                self.clan_registry.add_member(&baby_surname, baby_id, tick);
+                // ★ M4 新生儿入父亲所在地区
+                if let Some(father_camp) = self.region_registry.region_of(fid) {
+                    self.region_registry.add_member(father_camp, baby_id, tick, self.tick_counter);
+                }
+            }
 
             // ── 9. 记录出生事件 ───────────────────────────────────────────────
             let parents_str = if let Some(fid) = father_id {

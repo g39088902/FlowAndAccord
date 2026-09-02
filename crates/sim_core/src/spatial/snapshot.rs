@@ -33,6 +33,12 @@ pub struct WorldSnapshot3D {
     pub households: Vec<HouseholdSnapshot>,
     /// ★ 婚姻登记簿快照（一人终生多段婚姻全留痕）
     pub marriages: Vec<MarriageSnapshot>,
+    /// ★ 宗族登记簿快照（M3：按姓氏聚合的宗族团体与账本）
+    pub clans: Vec<ClanSnapshot>,
+    /// ★ 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
+    pub regions: Vec<RegionSnapshot>,
+    /// ★ 公仓兜底账本余额（M2 绝嗣家户资产归集，预留 M4 Region 对接）
+    pub public_granary_balances: Vec<LedgerBalanceSnapshot>,
     pub total_births: u32,
     pub total_deaths: u32,
     pub total_deaths_natural: u32,
@@ -144,6 +150,17 @@ pub struct AgentSnapshot {
     // 姓氏宗族与声望
     pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
     pub prestige: u32,     // 声望值 (当前 = 子女数量，未来可叠加多项)
+    // ★ 婚姻与家户归属（M2 新增）
+    /// 该 agent 的历史婚姻段数（含已封账各段）
+    pub marriage_history_count: u32,
+    /// 当前所属家户 ID（None = 无家户归属）
+    pub household_id: Option<u64>,
+    /// 在家户中的角色: "Head" / "Spouse" / "Child" / "None"
+    pub household_role: String,
+    /// ★ M4 到达该地区的时刻 tick（始祖=0；新生儿=出生时 tick_counter）
+    pub arrival_tick: u64,
+    /// ★ M4 是否在夺位远征中（state=SeekingThrone）
+    pub is_on_expedition: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -157,6 +174,23 @@ pub struct LedgerBalanceSnapshot {
     pub resource: String,
     /// 账面数量
     pub amount: f32,
+}
+
+/// 单笔资源流水快照（字符串化形式，供前端展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferRecordSnapshot {
+    /// 流水发生时的世界 tick
+    pub tick: u64,
+    /// 资源品类: "Water" / "Food" / "Wood" / "Stone" / "Gold"
+    pub resource: String,
+    /// 数量
+    pub amount: f32,
+    /// 付出方主体（字符串化）
+    pub from: String,
+    /// 接收方主体（字符串化）
+    pub to: String,
+    /// 事由: "Deposit" / "Consume" / "Heating" / "Construction" / "Maintenance" / "Inheritance" / "Split" 等
+    pub reason: String,
 }
 
 /// 家户快照（家庭跟着男人走：以男性户主为锚的家庭单元与账本）
@@ -177,6 +211,8 @@ pub struct HouseholdSnapshot {
     pub is_dissolved: bool,
     /// 最近团体事件（家户成立/成员加入/成员离开/领导更替等，最多取最近8条）
     pub recent_events: Vec<String>,
+    /// 最近8笔资源流水（从新到旧）
+    pub recent_journal: Vec<TransferRecordSnapshot>,
 }
 
 /// 婚姻快照（一人终生多段婚姻全留痕，与房屋解耦）
@@ -193,4 +229,52 @@ pub struct MarriageSnapshot {
     pub end_reason: Option<String>,
     /// 是否存续中
     pub is_active: bool,
+}
+
+/// 宗族快照（M3：按姓氏聚合的宗族团体与账本）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClanSnapshot {
+    /// 姓氏（宗族唯一标识）
+    pub surname: String,
+    /// 族长 AgentId（None = 无主，账本冻结）
+    pub leader_id: Option<AgentId>,
+    /// 族人数量
+    pub member_count: u32,
+    /// 族人 AgentId 列表（按升序）
+    pub member_ids: Vec<AgentId>,
+    /// 族库账面余额（5种资源）
+    pub balances: Vec<LedgerBalanceSnapshot>,
+    /// 最近资源流水（从新到旧，最多8笔）
+    pub recent_journal: Vec<TransferRecordSnapshot>,
+    /// 最近团体事件（成员进出/族长更替等，最多8条）
+    pub recent_events: Vec<String>,
+}
+
+/// 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegionSnapshot {
+    /// 营地 ID（1-5）
+    pub camp_id: u32,
+    /// 营地名称（如"桃源营地"）
+    pub camp_name: String,
+    /// 国王 AgentId（None = 王位空悬，账本冻结）
+    pub king_id: Option<AgentId>,
+    /// 政体: "Kingdom"
+    pub regime: String,
+    /// 继承制: "Primogeniture"
+    pub succession: String,
+    /// 地区居民数量
+    pub member_count: u32,
+    /// 到达时序前10（按 (arrival_tick, agent_id) 升序）
+    pub arrival_order: Vec<AgentId>,
+    /// 顺位前3继承人（长子继承制下的候选）
+    pub heir_candidates: Vec<AgentId>,
+    /// 地区公仓账面余额（5种资源）
+    pub balances: Vec<LedgerBalanceSnapshot>,
+    /// 最近资源流水（从新到旧，最多8笔）
+    pub recent_journal: Vec<TransferRecordSnapshot>,
+    /// 最近团体事件（国王登基/继承/成员进出等，最多8条）
+    pub recent_events: Vec<String>,
+    /// 正在冲向该营地夺位的族人列表
+    pub active_expedition_agents: Vec<AgentId>,
 }

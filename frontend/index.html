@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.0.2</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.3.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -280,19 +280,66 @@
         </button>
       </div>
       <div class="ledger-panel-body" id="ledger-panel-body">
-        <!-- 概览统计行 -->
-        <div class="ledger-overview-row">
-          <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续家户</span><span class="ledger-ov-val" id="ledger-ov-active" style="color:#f59e0b;">0</span></div>
-          <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
-          <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
-          <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
+        <!-- ★ M2 标签页枢纽 -->
+        <div class="ledger-tab-switcher">
+          <button class="ledger-tab-btn active" data-tab="household">🏠 家户</button>
+          <button class="ledger-tab-btn" data-tab="marriage">💍 婚姻</button>
+          <button class="ledger-tab-btn" data-tab="clan">🛡️ 宗族</button>
+          <button class="ledger-tab-btn" data-tab="region">👑 王国</button>
         </div>
-        <!-- 家户列表 -->
-        <div class="ledger-section-title">🏠 家户列表（点击户主追踪视角）</div>
-        <div class="ledger-household-list" id="ledger-household-list"></div>
-        <!-- 婚姻列表 -->
-        <div class="ledger-section-title" style="margin-top:6px;">💍 婚姻登记簿</div>
-        <div class="ledger-marriage-list" id="ledger-marriage-list"></div>
+
+        <!-- 家户标签页 -->
+        <div class="ledger-tab-content" id="tab-household-content">
+          <!-- 概览统计行 -->
+          <div class="ledger-overview-row">
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续家户</span><span class="ledger-ov-val" id="ledger-ov-active" style="color:#f59e0b;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
+          </div>
+          <!-- 家户列表 -->
+          <div class="ledger-section-title">🏠 家户列表（点击账面余额查看流水 · 已解散家户查看继承档案）</div>
+          <div class="ledger-household-list" id="ledger-household-list"></div>
+          <!-- 公仓兜底余额 -->
+          <div class="ledger-public-granary" id="ledger-public-granary"></div>
+        </div>
+
+        <!-- 婚姻标签页 -->
+        <div class="ledger-tab-content" id="tab-marriage-content" style="display:none;">
+          <div class="ledger-overview-row">
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-mg-ov-active" style="color:#ec4899;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-mg-ov-total" style="color:#a78bfa;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">平均婚龄</span><span class="ledger-ov-val" id="ledger-mg-ov-avg" style="color:#f59e0b;">—</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">丧偶/离异</span><span class="ledger-ov-val" id="ledger-mg-ov-ended" style="color:#64748b;">0</span></div>
+          </div>
+          <div class="ledger-section-title">💍 婚姻登记簿（一人终生多段婚姻全留痕）</div>
+          <div class="ledger-marriage-list" id="ledger-marriage-list"></div>
+        </div>
+
+        <!-- 宗族标签页（M3 已上线） -->
+        <div class="ledger-tab-content" id="tab-clan-content" style="display:none;">
+          <div class="ledger-overview-row">
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">宗族总数</span><span class="ledger-ov-val" id="ledger-clan-ov-total" style="color:#10b981;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">有主宗族</span><span class="ledger-ov-val" id="ledger-clan-ov-led" style="color:#f59e0b;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">无主冻结</span><span class="ledger-ov-val" id="ledger-clan-ov-frozen" style="color:#64748b;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">族内总人口</span><span class="ledger-ov-val" id="ledger-clan-ov-pop" style="color:#38bdf8;">0</span></div>
+          </div>
+          <div class="ledger-section-title">🛡️ 宗族聚合看板（点击族库余额查看流水 · 族长顺位可展开）</div>
+          <div class="ledger-clan-list" id="ledger-clan-list"></div>
+        </div>
+
+        <!-- 王国标签页（M4 已上线） -->
+        <div class="ledger-tab-content" id="tab-region-content" style="display:none;">
+          <div class="ledger-overview-row">
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">地区总数</span><span class="ledger-ov-val" id="ledger-region-ov-total" style="color:#fbbf24;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">已立国王</span><span class="ledger-ov-val" id="ledger-region-ov-crowned" style="color:#f59e0b;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">王位空悬</span><span class="ledger-ov-val" id="ledger-region-ov-vacant" style="color:#f87171;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">辖属总人口</span><span class="ledger-ov-val" id="ledger-region-ov-pop" style="color:#38bdf8;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">远征夺位</span><span class="ledger-ov-val" id="ledger-region-ov-exped" style="color:#ef4444;">0</span></div>
+          </div>
+          <div class="ledger-section-title">👑 王国政体看板（点击公仓余额查看流水 · 到达时序/长子顺位可展开）</div>
+          <div class="ledger-region-list" id="ledger-region-list"></div>
+        </div>
       </div>
     </div>
 
@@ -718,6 +765,7 @@
   <script src="js/dag-standalone.js"></script>
   <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/ledger-ui.js"></script>
   <script src="js/render.js"></script>
 </body>
 </html>

@@ -66,6 +66,13 @@ impl World3DEngine {
                             if house.durability >= self.config.house_durability_max {
                                 agent.state = PrimitiveActionState::RestingAtCamp;
                                 agent.current_need = Some("Physiological·Rest".to_string());
+                                // ★ M2 Maintenance 事件：修缮完工记入家户团体事件（纯审计，无资源消耗）
+                                let tick = self.tick_counter;
+                                if let Some(hid) = self.household_registry.household_of(house.owner_id) {
+                                    if let Some(hh) = self.household_registry.get_mut(hid) {
+                                        hh.group.ledger.push_event(tick, format!("🔧 修缮完工：房屋 #{} 耐久度恢复至 100%（修缮人 #{})", house.id, agent.id));
+                                    }
+                                }
                                 self.last_event = Some(format!("🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！", agent.id, house.id));
                             }
                         }

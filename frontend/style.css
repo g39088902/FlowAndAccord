@@ -1674,3 +1674,710 @@
   padding: 1px 0;
   line-height: 1.3;
 }
+
+/* ═══════ M2 账本 UI 新增样式 ═══════ */
+
+/* 标签页切换器 */
+.ledger-tab-switcher {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ledger-tab-btn {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  padding: 4px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.ledger-tab-btn:hover:not(.disabled) {
+  background: rgba(30, 41, 59, 0.85);
+  color: #e2e8f0;
+}
+.ledger-tab-btn.active {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+.ledger-tab-btn[data-tab="marriage"].active {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.5);
+  color: #ec4899;
+}
+.ledger-tab-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: rgba(30, 41, 59, 0.3);
+}
+
+/* 标签页内容容器 */
+.ledger-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 账面余额可点击区域 */
+.ledger-bal-click {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.12s;
+}
+.ledger-bal-click:hover {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+/* 分家标记 */
+.ledger-split-badge {
+  position: relative;
+  font-size: 8.5px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 3px;
+  padding: 0 4px;
+  cursor: help;
+  white-space: nowrap;
+}
+.ledger-split-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  background: rgba(10, 18, 30, 0.98);
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 9px;
+  color: #cbd5e1;
+  white-space: normal;
+  width: 180px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.ledger-split-badge:hover .ledger-split-tooltip {
+  display: block;
+}
+.split-tip-title { font-weight: 700; color: #f59e0b; margin-bottom: 3px; }
+.split-tip-formula { color: #e2e8f0; margin-bottom: 2px; }
+.split-tip-ratio { color: #e2e8f0; margin-bottom: 2px; }
+.split-tip-note { font-size: 8px; color: #64748b; margin-top: 3px; line-height: 1.3; }
+
+/* 已解散家户样式 */
+.ledger-hh-item.ledger-dissolved {
+  background: rgba(30, 41, 59, 0.35);
+  border-color: rgba(100, 116, 139, 0.2);
+  opacity: 0.75;
+}
+.ledger-hh-item.ledger-dissolved:hover {
+  opacity: 0.95;
+  border-color: rgba(100, 116, 139, 0.5);
+}
+.ledger-dissolved-tag {
+  font-size: 8.5px;
+  color: #94a3b8;
+  background: rgba(100, 116, 139, 0.15);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* 家户大事记内嵌 */
+.ledger-hh-events {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.ledger-event-item.event-split {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* 流水穿透抽屉 */
+.ledger-journal-drawer {
+  margin-top: 5px;
+  background: rgba(5, 10, 20, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+  overflow: hidden;
+  animation: journalSlideUp 0.2s ease-out;
+}
+@keyframes journalSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ledger-journal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+.ledger-journal-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.ledger-journal-close:hover { color: #ef4444; }
+.ledger-journal-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 3px 6px;
+}
+.ledger-journal-list::-webkit-scrollbar { width: 3px; }
+.ledger-journal-list::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 2px; }
+.ledger-journal-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 8.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  flex-wrap: wrap;
+}
+.journal-tick {
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+}
+.journal-reason {
+  color: #cbd5e1;
+  min-width: 52px;
+  font-weight: 600;
+}
+.journal-res {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+}
+.journal-flow {
+  color: #64748b;
+  font-size: 8px;
+  margin-left: auto;
+  word-break: break-all;
+}
+
+/* 继承清算档案 */
+.ledger-inherit-archive {
+  margin-top: 5px;
+  background: rgba(5, 10, 20, 0.85);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 6px;
+  padding: 6px 8px;
+  animation: journalSlideUp 0.2s ease-out;
+}
+.ledger-inherit-header {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ledger-inherit-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: #94a3b8;
+  padding: 1px 0;
+}
+.ledger-inherit-row b { color: #e2e8f0; }
+.ledger-inherit-subtitle {
+  font-size: 9px;
+  font-weight: 700;
+  color: #a78bfa;
+  margin: 4px 0 2px;
+}
+.ledger-absolve {
+  margin-top: 5px;
+  padding: 4px 6px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 4px;
+  font-size: 8.5px;
+  color: #fbbf24;
+  text-align: center;
+}
+
+/* 公仓兜底余额卡片 */
+.ledger-public-granary {
+  margin-top: 4px;
+}
+.ledger-public-granary-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.pg-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 3px;
+}
+.pg-total {
+  font-size: 9px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.pg-balances {
+  display: flex;
+  gap: 10px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.pg-bal-chip { white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════
+   ★ M3 宗族系统 UI 样式 (翡翠绿 #10b981 主题)
+   ═══════════════════════════════════════════════════════════ */
+.ledger-clan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.clan-card {
+  background: rgba(10, 18, 30, 0.96);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 7px;
+  padding: 6px 8px;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.15s ease;
+}
+.clan-card:hover {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+.clan-card.clan-journal-open {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+.clan-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+.clan-emblem {
+  font-size: 13px;
+  filter: drop-shadow(0 0 3px rgba(16,185,129,0.4));
+}
+.clan-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #10b981;
+  letter-spacing: 0.5px;
+}
+.clan-leader {
+  font-size: 9px;
+  color: #cbd5e1;
+  margin-left: auto;
+}
+.clan-leader .lineage-chip {
+  font-size: 9px;
+}
+.clan-frozen {
+  color: #64748b;
+  font-style: italic;
+}
+.clan-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  color: #94a3b8;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.clan-bal-total {
+  font-weight: 700;
+  color: #10b981;
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(16,185,129,0.08);
+  transition: background 0.15s;
+}
+.clan-bal-total:hover {
+  background: rgba(16,185,129,0.18);
+}
+.clan-balances {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.clan-bal-chip { white-space: nowrap; }
+
+/* 族税进度条 */
+.clan-tribute-bar {
+  margin-top: 4px;
+}
+.clan-tribute-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+.clan-tribute-pct {
+  color: #10b981;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.clan-tribute-track {
+  height: 4px;
+  background: rgba(16,185,129,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.clan-tribute-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #059669, #10b981, #34d399);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* 互助救济气泡 */
+.clan-aid-bubble {
+  margin-top: 4px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-left: 3px solid #10b981;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.clan-aid-item {
+  font-size: 8.5px;
+  color: #6ee7b7;
+  line-height: 1.4;
+  padding: 1px 0;
+}
+
+/* 近期宗族流水 */
+.clan-recent-journal {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.clan-journal-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 8.5px;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+  flex-wrap: wrap;
+}
+
+/* 族长顺位 */
+.clan-succession {
+  margin-top: 4px;
+  border-top: 1px solid rgba(16,185,129,0.12);
+  padding-top: 3px;
+}
+.clan-succession-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 0;
+  user-select: none;
+  transition: color 0.15s;
+}
+.clan-succession-toggle:hover {
+  color: #10b981;
+}
+.clan-succession-arrow {
+  font-size: 7px;
+  color: #10b981;
+  width: 10px;
+  display: inline-block;
+}
+.clan-succession-list {
+  margin-top: 2px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: journalSlideUp 0.15s ease-out;
+}
+.clan-heir-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8.5px;
+  padding: 1px 0;
+}
+.clan-heir-rank {
+  color: #f59e0b;
+  font-weight: 700;
+  min-width: 16px;
+}
+.clan-heir-age {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.clan-heir-current {
+  color: #10b981;
+  font-weight: 700;
+  font-size: 8px;
+  background: rgba(16,185,129,0.1);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+/* ═══════════ ★ M4 王国标签页样式 ═══════════ */
+.kingdom-card {
+  background: rgba(10,18,30,0.96);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.kingdom-card:hover {
+  border-color: rgba(251,191,36,0.5);
+  box-shadow: 0 0 12px rgba(251,191,36,0.1);
+}
+.kingdom-card.kingdom-journal-open {
+  border-color: rgba(251,191,36,0.6);
+  box-shadow: 0 0 16px rgba(251,191,36,0.15);
+}
+.kingdom-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+.kingdom-emblem { font-size: 14px; }
+.kingdom-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 0.5px;
+}
+.kingdom-king {
+  font-size: 9.5px;
+  color: #e2e8f0;
+  margin-left: auto;
+}
+.kingdom-vacant {
+  color: #f87171;
+  font-weight: 600;
+  animation: vacantPulse 2s ease-in-out infinite;
+}
+@keyframes vacantPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.kingdom-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 8.5px;
+  color: #94a3b8;
+  margin-bottom: 3px;
+}
+.kingdom-bal-total {
+  margin-left: auto;
+  color: #fbbf24;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(251,191,36,0.08);
+  transition: background 0.15s;
+}
+.kingdom-bal-total:hover { background: rgba(251,191,36,0.18); }
+.kingdom-balances {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 3px 0;
+  border-top: 1px solid rgba(251,191,36,0.08);
+  border-bottom: 1px solid rgba(251,191,36,0.08);
+  cursor: pointer;
+  margin-bottom: 3px;
+}
+.kingdom-bal-chip {
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kingdom-tax-bar { margin-bottom: 4px; }
+.kingdom-tax-label {
+  font-size: 8.5px;
+  color: #94a3b8;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.kingdom-tax-pct { color: #fbbf24; font-weight: 700; }
+.kingdom-tax-track {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.kingdom-tax-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.kingdom-relief-bubble {
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 6px;
+  padding: 3px 6px;
+  margin-bottom: 4px;
+}
+.kingdom-relief-item {
+  font-size: 8.5px;
+  color: #fde68a;
+  line-height: 1.4;
+}
+.kingdom-arrival, .kingdom-succession {
+  margin-top: 3px;
+  border-top: 1px solid rgba(251,191,36,0.1);
+  padding-top: 2px;
+}
+.kingdom-arrival-toggle, .kingdom-succession-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 0;
+  user-select: none;
+  transition: color 0.15s;
+}
+.kingdom-arrival-toggle:hover, .kingdom-succession-toggle:hover { color: #fbbf24; }
+.kingdom-arrow {
+  font-size: 7px;
+  color: #fbbf24;
+  width: 10px;
+  display: inline-block;
+}
+.kingdom-arrival-list, .kingdom-succession-list {
+  margin-top: 2px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: journalSlideUp 0.15s ease-out;
+}
+.kingdom-arrival-item, .kingdom-heir-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8.5px;
+  padding: 1px 0;
+}
+.kingdom-arrival-rank, .kingdom-heir-rank {
+  color: #f59e0b;
+  font-weight: 700;
+  min-width: 16px;
+}
+.kingdom-arrival-tick, .kingdom-heir-age {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.kingdom-founder-tag {
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 8px;
+  background: rgba(251,191,36,0.12);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.kingdom-heir-current {
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 8px;
+  background: rgba(251,191,36,0.12);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.kingdom-heir-crown {
+  color: #fde68a;
+  font-weight: 700;
+  font-size: 8px;
+  background: rgba(251,191,36,0.18);
+  border: 1px solid rgba(251,191,36,0.3);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.kingdom-expedition {
+  margin-top: 3px;
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+.kingdom-expedition-title {
+  font-size: 9px;
+  color: #f87171;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.kingdom-expedition-list {
+  font-size: 8.5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+.kingdom-empty {
+  font-size: 8.5px;
+  color: #64748b;
+  padding: 2px 0;
+}
+.event-coronation {
+  color: #fbbf24 !important;
+  font-weight: 600;
+  background: rgba(251,191,36,0.08) !important;
+}
+.clan-succession-empty {
+  font-size: 8.5px;
+  color: #64748b;
+  font-style: italic;
+  padding: 2px 0;
+}

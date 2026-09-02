@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.0.2**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.3.0**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -40,6 +40,9 @@
 | **v1.0.0** | **里程碑：账本与家户/婚姻系统 M1 完成**，版本策略升级（M 里程碑递增次版本号，Bug 修复/文档更新递增修订号） | 全项目 |
 | **v1.0.1** | 全量文档重构精简：修复版本号/POI 数量/字段数等失同步，压缩 changelog（58KB→里程碑级）与规划文档，新增账本模块文档，统一文档分层放置策略 | docs |
 | **v1.0.2** | UI 全景剖析与新功能设计规范文档：编写 `docs/UI_SPEC_AND_LEDGER_DESIGN.md`，深度解剖当前 Canvas 渲染/顶栏/大盘/Inspector/族谱时间轴，设计 M2-M4 4标签页制度大盘（家户/婚姻/宗族/地区）原型与 ASCII 原型图，建立快照三处同步清单与前端开发指南 | docs / frontend |
+| **v1.1.0** | **M2 账本内核完成**：旁路记账 `tick_bookkeeping`（Deposit/Consume/Heating 增量观测法，只读物理事件只追加流水）、分家抽资（成年/丧父男子分走 1/(2+n) 资源立新户，Split 流水）、父亲死亡继承（资源平分在世子一代/绝嗣入公仓 `public_granary`，Inheritance 流水后解散）、快照扩展（`TransferRecordSnapshot`/`recent_journal`/`marriage_history_count`/`household_id`/`household_role`/`public_granary_balances`）、出生入家户钩子、Construction/Maintenance 记账钩子 | ledger / world / bookkeeping（新模块） / snapshot / birth / housing_system |
+| **v1.2.0** | **M3 宗族内核完成**：宗族聚合 `ClanRegistry`（按姓氏自动聚合，始祖播撒即入族/新生儿随父姓入族）、族长顺位（同姓在世最年长男性，并列按 id 取小，无男性则无主账本冻结，Succession 审计事件）、族税 `Tribute`（每 1800 tick 全局统一征收，存续家户按账面余额×5% 缴纳，只记账不扣物理库存）、族内互助 `MutualAid`（族库总余额>50 时对水+粮<10 的极贫家户拨付 min(族库×20%, 缺口×2)，每家户 900 tick 冷却，族长签字）、快照扩展 `ClanSnapshot`（surname/leader_id/member_ids/balances/recent_journal/recent_events）、`LedgerRef::Clan(String)` 变体、5 个新超参（clanTributeRate/clanTributeIntervalTicks/clanMutualAidMinBalance/clanMutualAidFamilyThreshold/clanMutualAidCooldownTicks），超参总数 153→158 | ledger/clan（新模块） / ledger/group / ledger/journal / world / snapshot / ecology / birth / config |
+| **v1.3.0** | **M4 地区与王国内核完成**：地区团体 Region（GroupKind::Region(u32)，每营地一册，国王=leader/公仓=ledger/政体=Kingdom/继承制=Primogeniture）、到达时序 arrival_tick（始祖=0/新生儿=出生tick，arrival_order按(arrival_tick,agent_id)升序）、初王顺位（arrival_order最早到达在世男性，无男性则王位空悬账本冻结）、夺位远征 SeekingThrone（决策树最高优先级，男性非国王冲向最近无主营地登基，走现有寻路+运动系统坐标连续不闪现，中断施工build_timer冻结不回滚，行囊保留不卸货，途中目标易主则重定向/放弃，抵达即登基全图播报）、长子继承制（国王死亡→在世最年长儿子→孙子→arrival_order下一男性→绝嗣空悬，胎儿不计入继承）、公仓税 Tax（每2400tick全局统一征收，存续家户按账面余额×3%缴纳，只记账不扣物理库存，有国王地区才征税）、救济 Relief（公仓总余额>30时对水+粮<8的极贫家户拨付min(公仓×15%,缺口×2)，每家户1200tick冷却，国王签字）、快照扩展 RegionSnapshot（camp_id/camp_name/king_id/regime/succession/member_count/arrival_order前10/heir_candidates前3/balances/recent_journal/recent_events/active_expedition_agents）+ AgentSnapshot.arrival_tick/is_on_expedition、LedgerRef::Region(u32)变体、5个新超参（ledgerTaxRate/ledgerTaxIntervalTicks/ledgerReliefMinBalance/ledgerReliefFamilyThreshold/ledgerReliefCooldownTicks），超参总数158→163 | ledger/region（新模块） / ledger/group / ledger/journal / agent / world / snapshot / ecology / birth / decisions / config |
 
 ---
 

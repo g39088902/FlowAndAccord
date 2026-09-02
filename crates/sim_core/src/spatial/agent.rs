@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+﻿use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId};
@@ -80,6 +80,7 @@ pub enum PrimitiveActionState {
     ConstructingHouse,  // 🔨 正在投入工时营建/升级房屋
     RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
     OffRoadDetour,      // ⚠️ 荒野越野寻路中
+    SeekingThrone,      // ⚔️ 夺位远征中（冲向无主营地登基）
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
@@ -94,6 +95,9 @@ pub struct Agent3D {
     /// 出生时刻的世界 tick 数 (始祖在初始化时记录, 后代在分娩时记录)
     /// 用于前端族谱按出生时序施加纵向重力: 越晚出生的越靠下.
     pub birth_tick: u64,
+    /// ★ M4 到达该地区的时刻 tick（始祖=0；新生儿=出生时 tick_counter）
+    /// 用于地区初王顺位与 arrival_order 排序
+    pub arrival_tick: u64,
 
     // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位)
     pub hunger: f32,          // 饱食度 (最大 50.0 单位)
@@ -182,6 +186,7 @@ impl Agent3D {
             is_alive: true,
             age: initial_age,
             birth_tick: 0, // 默认 0; 由调用方 (ecology.rs 始祖初始化 / birth.rs 分娩) 覆写为当前 tick_counter
+            arrival_tick: 0, // 默认 0; 由调用方 (ecology.rs 始祖 / birth.rs 分娩) 覆写
             hunger: config.agent_initial_hunger,
             thirst: config.agent_initial_thirst,
             stamina: config.agent_initial_stamina,
@@ -415,6 +420,7 @@ impl Agent3D {
                 | PrimitiveActionState::SeekingStone
                 | PrimitiveActionState::SeekingGold
                 | PrimitiveActionState::ReturningToCamp
+                | PrimitiveActionState::SeekingThrone
         );
 
         if !is_moving {

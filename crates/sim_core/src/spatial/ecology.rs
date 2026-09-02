@@ -20,9 +20,17 @@ impl World3DEngine {
         self.total_deaths_unnatural = 0;
         self.total_miscarriages = 0;
         self.next_agent_id = 1;
-        // ★ 世界重置：婚姻/家户登记簿与 agents 清空同步（账本重构 M1.7）
+        // ★ 世界重置：婚姻/家户/宗族登记簿与 agents 清空同步（账本重构 M1.7/M3）
         self.marriage_registry.clear();
         self.household_registry.clear();
+        self.clan_registry.clear();
+        self.mutual_aid_cooldown.clear();
+        // ★ M4 地区登记簿同步清空
+        self.region_registry.clear();
+        self.expedition_targets.clear();
+        self.relief_cooldown.clear();
+        // ★ M2 旁路记账缓存同步清空
+        self.prev_carried.clear();
 
         let mut camp_nodes = Vec::new();
         let mut water_nodes = Vec::new();
@@ -194,6 +202,8 @@ impl World3DEngine {
             let mut agent = Agent3D::new_with_config(agent_id, home_camp, self.config.agent_spawn_base_speed, is_covert, initial_age, gender, &self.config);
             // 始祖在初始化阶段 (tick_counter=0) 出生, 显式置 0 以便族谱按出生时序排序
             agent.birth_tick = 0;
+            // ★ M4 始祖到达时刻=0（同时播撒，arrival_order 按 id 升序打破并列）
+            agent.arrival_tick = 0;
             let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
             agent.world_pos = camp_pos;
 
@@ -227,6 +237,22 @@ impl World3DEngine {
         for agent in self.agents.iter().filter(|a| a.is_alive && a.gender == Gender::Male) {
             self.household_registry.create(agent.id, None, 0);
         }
+
+        // ★ M3 始祖入族：按姓氏自动聚合（不区分性别，同姓即同族）
+        for agent in self.agents.iter().filter(|a| a.is_alive) {
+            self.clan_registry.add_member(&agent.surname, agent.id, 0);
+        }
+
+        // ★ M4 始祖入地区：按最近营地 POI 归属（agent 已放置在营地节点位置）
+        for agent in self.agents.iter().filter(|a| a.is_alive) {
+            if let Some(camp) = self.pois.iter()
+                .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
+                .min_by(|a, b| a.pos.distance_to(&agent.world_pos).partial_cmp(&b.pos.distance_to(&agent.world_pos)).unwrap())
+            {
+                self.region_registry.add_member(camp.id, agent.id, 0, 0);
+            }
+        }
+
 
         self.last_event = Some("🏕️ 生态初始：20 位始祖族人（10男10女）成家配对，踏路筑室，社会演化开启！".to_string());
         // 初始化索引，使 agent_by_id 在本次 tick 后立即可用

@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow &amp; Accord · 马斯洛决策引擎可视化 · 交互原型</title>
+<style>
+  :root{
+    --bg:#050a12; --panel:rgba(10,18,30,0.92); --line:rgba(255,255,255,0.12);
+    --txt:#e5eef7; --sub:#8aa0b5; --cyan:#38bdf8; --amber:#fbbf24;
+    --lv1:#ef4444; --lv2:#38bdf8; --lv3:#10b981; --lv4:#f59e0b; --lv5:#a78bfa;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{background:var(--bg); color:var(--txt); font-family:'Roboto','PingFang SC','Segoe UI',Arial,sans-serif;
+       display:flex; flex-direction:column; overflow:hidden; font-size:13px;}
+  /* ── 顶部 ── */
+  header{display:flex; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line);
+         background:linear-gradient(180deg,rgba(20,32,48,.7),rgba(10,18,30,.9)); flex:0 0 auto;}
+  header h1{font-size:16px; font-weight:700; letter-spacing:.5px;}
+  header h1 small{color:var(--sub); font-weight:400; font-size:12px; margin-left:8px;}
+  .version-tag{font-size:11px; color:var(--cyan); border:1px solid rgba(56,189,248,.35);
+               background:rgba(56,189,248,.12); padding:2px 8px; border-radius:6px;}
+  .tabs{display:flex; gap:4px; margin-left:6px;}
+  .tab{padding:6px 14px; border-radius:8px; cursor:pointer; border:1px solid transparent;
+       color:var(--sub); user-select:none; font-size:13px;}
+  .tab:hover{color:var(--txt);}
+  .tab.on{background:rgba(56,189,248,.14); color:var(--cyan); border-color:rgba(56,189,248,.3);}
+  header .tip{margin-left:auto; color:var(--sub); font-size:12px;}
+  /* ── 主体 ── */
+  main{flex:1; display:flex; min-height:0;}
+  /* 左侧 */
+  aside.left{width:210px; flex:0 0 auto; border-right:1px solid var(--line); padding:12px 10px; overflow:auto;}
+  .sec-title{font-size:12px; color:var(--sub); margin:8px 4px 8px; letter-spacing:1px;}
+  .layer-card{border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin:6px 0; cursor:pointer;
+              background:rgba(255,255,255,.03); transition:.15s; user-select:none;}
+  .layer-card:hover{background:rgba(255,255,255,.07);}
+  .layer-card.off{opacity:.35;}
+  .layer-card .lrow{display:flex; align-items:center; gap:8px;}
+  .lvl-dot{width:10px; height:10px; border-radius:3px; flex:0 0 auto;}
+  .layer-card .lname{font-weight:600;}
+  .layer-card .lkinds{font-size:11px; color:var(--sub); margin-top:4px; line-height:1.5;}
+  .legend{font-size:11px; color:var(--sub); line-height:1.7; margin-top:8px;}
+  .legend b{color:var(--txt);}
+  .legend .ln{border-bottom:1px dashed rgba(255,255,255,.18);}
+  .legend .dn{border-bottom:1px dotted rgba(255,255,255,.3);}
+  /* 中央画布 */
+  section.canvas-wrap{flex:1; position:relative; min-width:0; display:flex; flex-direction:column;}
+  .toolbar{display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); flex:0 0 auto; flex-wrap:wrap;}
+  .toolbar button{background:rgba(255,255,255,.05); color:var(--txt); border:1px solid var(--line);
+    border-radius:7px; padding:5px 10px; cursor:pointer; font-size:12px;}
+  .toolbar button:hover{background:rgba(255,255,255,.12);}
+  .toolbar button.primary{background:rgba(56,189,248,.16); border-color:rgba(56,189,248,.4); color:var(--cyan);}
+  .toolbar .hint{margin-left:auto; color:var(--sub); font-size:12px; align-self:center;}
+  .viewport{flex:1; position:relative; overflow:hidden; cursor:grab; background:
+      radial-gradient(1200px 600px at 30% 20%, rgba(56,189,248,.05), transparent 60%),
+      radial-gradient(900px 500px at 80% 80%, rgba(16,185,129,.04), transparent 60%), #070d17;}
+  .viewport.dragging{cursor:grabbing;}
+  .world{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;}
+  #edges{position:absolute; top:0; left:0; pointer-events:none; overflow:visible;}
+  #edges line, #edges path{stroke:rgba(255,255,255,.22); stroke-width:1.5; fill:none;}
+  #edges line.hot, #edges path.hot{stroke:var(--cyan); stroke-width:2.5;}
+  #edges line.dim, #edges path.dim{opacity:.12;}
+  #nodes{position:absolute; top:0; left:0;}
+  .node{position:absolute; border:1px solid var(--line); border-radius:10px; background:rgba(14,24,38,.95);
+        box-shadow:0 6px 18px rgba(0,0,0,.45); cursor:grab; user-select:none; padding:8px 10px; transition:box-shadow .15s;}
+  .node:hover{box-shadow:0 8px 24px rgba(0,0,0,.6);}
+  .node.dragging{cursor:grabbing; box-shadow:0 0 0 2px var(--cyan), 0 10px 28px rgba(0,0,0,.7); z-index:9;}
+  .node.selected{box-shadow:0 0 0 2px var(--amber), 0 8px 24px rgba(0,0,0,.6);}
+  .node.dim{opacity:.18; pointer-events:none;}
+  .node.locked{cursor:default;}
+  .node .n-tag{font-size:10px; color:var(--sub); letter-spacing:1px;}
+  .node .n-title{font-weight:700; font-size:13px; margin-top:2px; line-height:1.35;}
+  .node .n-sub{font-size:11px; color:var(--sub); margin-top:3px; line-height:1.45;}
+  .node .n-result{font-size:12px; font-weight:600; margin-top:3px;}
+  .node .lock-ic{position:absolute; top:5px; right:7px; font-size:11px; opacity:.6;}
+  .node.kind-level{border-left:4px solid var(--lc);}
+  .node.kind-branch{border-left:4px solid var(--lc);}
+  .node.kind-eval{border-style:dashed; border-color:rgba(251,191,36,.55);}
+  .node.kind-fsm{border-color:rgba(56,189,248,.5);}
+  .node.kind-fsm .fsm-states{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;}
+  .fsm-chip{font-size:10px; padding:3px 7px; border-radius:6px; border:1px solid var(--line); background:rgba(255,255,255,.04);}
+  .fsm-chip.cur{border-color:var(--cyan); color:var(--cyan); background:rgba(56,189,248,.1);}
+  /* 右侧检查器 */
+  aside.right{width:280px; flex:0 0 auto; border-left:1px solid var(--line); padding:12px; overflow:auto;}
+  #insp-empty{color:var(--sub); font-size:12px; line-height:1.8; margin-top:20px; text-align:center;}
+  .insp-card{border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.03); overflow:hidden;}
+  .insp-head{padding:10px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px;}
+  .insp-head .insp-title{font-weight:700; font-size:14px;}
+  .insp-body{padding:10px 12px; font-size:12px; line-height:1.7;}
+  .insp-body .row{display:flex; gap:8px; margin:6px 0;}
+  .insp-body .k{color:var(--sub); flex:0 0 66px;}
+  .insp-body .v{color:var(--txt); word-break:break-all;}
+  .insp-body .anchor{font-family:Consolas,Menlo,monospace; font-size:11px; color:var(--cyan); background:rgba(56,189,248,.08);
+                     padding:2px 6px; border-radius:5px; display:inline-block; margin:2px 0;}
+  .insp-body .cfg{font-family:Consolas,Menlo,monospace; font-size:11px; color:var(--amber); background:rgba(251,191,36,.07);
+                  padding:2px 6px; border-radius:5px; display:inline-block; margin:2px 2px 2px 0;}
+  .insp-body .chip{font-size:11px; padding:2px 8px; border-radius:6px; color:#fff; display:inline-block; margin:2px 0;}
+  .insp-sub{font-size:11px; color:var(--sub); margin-top:6px; line-height:1.6;}
+  .insp-sub b{color:var(--txt);}
+  /* ── 底部实时监控 ── */
+  footer{flex:0 0 auto; border-top:1px solid var(--line); display:none; padding:10px 16px; gap:18px; flex-wrap:wrap;
+         background:rgba(8,14,24,.94); max-height:46%; overflow:auto;}
+  footer.on{display:flex;}
+  .live-col{min-width:240px; flex:1 1 260px;}
+  .live-col h3{font-size:12px; color:var(--sub); letter-spacing:1px; margin-bottom:8px;}
+  .agent-row{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--line);
+             border-radius:9px; margin:5px 0; background:rgba(255,255,255,.03);}
+  .agent-row .aid{font-weight:700; width:64px;}
+  .agent-row .need-chip{font-size:11px; padding:3px 8px; border-radius:6px; color:#fff; font-weight:600;}
+  .agent-row .phys{flex:1; display:flex; gap:8px; font-size:10px; color:var(--sub);}
+  .agent-row .phys .p{flex:1;}
+  .meter{height:5px; border-radius:3px; background:rgba(255,255,255,.09); margin-top:2px; overflow:hidden;}
+  .meter i{display:block; height:100%; border-radius:3px;}
+  /* 滑块演示 */
+  .slider-demo{margin-top:6px;}
+  .slider-demo .srow{display:flex; align-items:center; gap:8px; margin:8px 0;}
+  .slider-demo label{width:150px; font-size:11px; color:var(--sub); flex:0 0 auto;}
+  .slider-demo input[type=range]{flex:1;}
+  .slider-demo output{font-size:12px; color:var(--cyan); min-width:44px; text-align:right; font-family:Consolas,monospace;}
+  #schmittSvg{width:100%; height:110px; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.02);}
+  .step-wrap{margin-top:6px;}
+  .step-wrap .srow{display:flex; align-items:center; gap:8px; margin:7px 0;}
+  .step-wrap label{width:150px; font-size:11px; color:var(--sub); flex:0 0 auto;}
+  .step-wrap input[type=range]{flex:1;}
+  .step-wrap output{font-size:12px; color:var(--txt); min-width:44px; text-align:right; font-family:Consolas,monospace;}
+  .step-wrap .toggles{display:flex; gap:14px; margin:8px 0; font-size:12px;}
+  .step-wrap .toggles label{width:auto; display:flex; align-items:center; gap:5px; color:var(--txt); cursor:pointer;}
+  .step-wrap button{margin-top:4px;}
+  #traceLog{border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-family:Consolas,Menlo,monospace;
+            font-size:11px; line-height:1.8; min-height:96px; color:var(--sub); background:rgba(255,255,255,.02);}
+  #traceLog .hit{color:var(--lv3);}
+  #traceLog .skip{color:#4a5a6b;}
+  #traceLog .res{color:var(--cyan); font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧠 马斯洛决策引擎 <small>Flow &amp; Accord · decisions/ 可视化</small></h1>
+  <span class="version-tag">v0.1 · 交互原型</span>
+  <div class="tabs">
+    <div class="tab on" data-tab="logic">🔬 逻辑引擎图</div>
+    <div class="tab" data-tab="live">📡 实时监控</div>
+  </div>
+  <div class="tip">🖱️ 拖动节点 · 滚轮缩放 · 空白拖拽平移 · 悬停高亮 · 点击下钻</div>
+</header>
+
+<main>
+  <!-- 左侧：层级导航 -->
+  <aside class="left">
+    <div class="sec-title">马斯洛层级导航</div>
+    <div id="layerNav"></div>
+    <div class="sec-title">图例</div>
+    <div class="legend">
+      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px dashed rgba(255,255,255,.4)"></span> 需求→目标映射</div>
+      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px solid rgba(255,255,255,.4)"></span> 状态迁移/优先级链</div>
+      <div><span class="ln" style="display:inline-block;width:20px;border-bottom:1px dotted rgba(255,255,255,.5)"></span> 源码锚点引用</div>
+      <div>◆ 评估判断 · ▢ 状态/动作 · ⬡ 调度/触发器</div>
+      <div style="margin-top:6px"><b>数据来源</b><br>needs.rs · evaluate.rs<br>routing.rs · seeking.rs · harvest.rs · scheduler.rs · agent.rs</div>
+    </div>
+  </aside>
+
+  <!-- 中央：决策图视口 -->
+  <section class="canvas-wrap">
+    <div class="toolbar">
+      <button id="btnFit">🎯 适应窗口</button>
+      <button id="btnReset">↺ 重置布局</button>
+      <button id="btnSave">💾 保存布局</button>
+      <button id="btnRestore">📂 还原布局</button>
+      <button id="btnLock" class="primary">🔒 锁定主干</button>
+      <span class="hint" id="statusTip">就绪</span>
+    </div>
+    <div class="viewport" id="viewport">
+      <div class="world" id="world">
+        <svg id="edges"></svg>
+        <div id="nodes"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右侧：检查器 -->
+  <aside class="right">
+    <div id="insp-empty">
+      👆 点击任意图元查看详情<br><br>
+      <span style="font-size:11px">原型演示：拖动节点、缩放平移、层级过滤、布局持久化均已启用。实时监控见底部「📡 实时监控」标签页。</span>
+    </div>
+    <div id="insp-card" class="insp-card" style="display:none"></div>
+  </aside>
+</main>
+
+<!-- 底部：实时监控 -->
+<footer id="livebar">
+  <div class="live-col">
+    <h3>👥 族人实时决策状态（快照 current_need / state）</h3>
+    <div id="agentList"></div>
+    <div style="font-size:11px;color:var(--sub);margin-top:6px">原型为模拟数据，正式实现直接消费 <code>sim.agents[i].currentNeed</code>，10FPS 节流刷新。</div>
+  </div>
+  <div class="live-col">
+    <h3>⬡ G9 施密特触发器演示（agent.rs::observe_poi_stock_with_config）</h3>
+    <div class="slider-demo">
+      <div class="srow"><label>当前库存比例</label><input type="range" id="stockRatio" min="0" max="1" step="0.01" value="0.5"><output id="stockRatioOut">0.50</output></div>
+      <div class="srow"><label>开启阈值 seekMin</label><input type="range" id="seekMin" min="0" max="1" step="0.01" value="0.30"><output id="seekMinOut">0.30</output></div>
+      <div class="srow"><label>关闭阈值 abandon</label><input type="range" id="abandon" min="0" max="1" step="0.01" value="0.10"><output id="abandonOut">0.10</output></div>
+      <svg id="schmittSvg"></svg>
+      <div style="font-size:11px;color:var(--sub);margin-top:5px" id="schmittState">—</div>
+    </div>
+  </div>
+  <div class="live-col">
+    <h3>🧭 决策原因链步进（evaluate_needs 逐层评估）</h3>
+    <div class="step-wrap">
+      <div class="srow"><label>💧 口渴 thirst</label><input type="range" id="tThirst" min="0" max="50" step="1" value="40"><output id="tThirstOut">40</output></div>
+      <div class="srow"><label>🍖 饥饿 hunger</label><input type="range" id="tHunger" min="0" max="50" step="1" value="40"><output id="tHungerOut">40</output></div>
+      <div class="srow"><label>⚡ 体力 stamina</label><input type="range" id="tStamina" min="0" max="100" step="1" value="90"><output id="tStaminaOut">90</output></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="tHasHome" checked> 有家宅</label>
+        <label><input type="checkbox" id="tMale" checked> 成年男</label>
+        <label><input type="checkbox" id="tPantryFull" checked> 仓满</label>
+      </div>
+      <button class="toolbar primary" id="btnStep">▶ 执行评估（步进高亮）</button>
+      <div id="traceLog" style="margin-top:8px"></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+'use strict';
+/* ═══════════════ 数据：图元（与 docs/DECISION_VIZ_DESIGN.md §3 一一对应）═══════════════ */
+var LV = {
+  1:{name:'生理需求', color:'var(--lv1)', hex:'#ef4444', kinds:'QuenchThirst · SateHunger · Rest'},
+  2:{name:'安全需求', color:'var(--lv2)', hex:'#38bdf8', kinds:'RepairHouse · StockWater · StockFood · StockWood'},
+  3:{name:'归属与爱', color:'var(--lv3)', hex:'#10b981', kinds:'FoundHome · BuildHouse(0级)'},
+  4:{name:'尊重需求', color:'var(--lv4)', hex:'#f59e0b', kinds:'BuildHouse(1-4级) · StockStone · StockGold'},
+  5:{name:'自我实现', color:'var(--lv5)', hex:'#a78bfa', kinds:'GoldWealth(冷却180s)'}
+};
+
+/* 13 条 evaluate_needs 分支，顺序即严格优先级 */
+var BRANCHES = [
+  {id:'b1',  cond:'口渴 < 25 且有可用水源',       need:'Physiological · QuenchThirst', target:'SeekingWater',   level:1, cfg:['decisionCriticalThirst=25.0'], anchor:'evaluate.rs::evaluate_needs:102'},
+  {id:'b2',  cond:'饥饿 < 25 且有可用粮源',       need:'Physiological · SateHunger',   target:'SeekingFood',    level:1, cfg:['decisionCriticalHunger=25.0'], anchor:'evaluate.rs::evaluate_needs:105'},
+  {id:'b3',  cond:'体力 < 100',                   need:'Physiological · Rest',         target:'RestingAtCamp',  level:1, cfg:['decisionRestStaminaTarget=100.0'], anchor:'evaluate.rs::evaluate_needs:109'},
+  {id:'b4',  cond:'有家宅 且 耐久 < 50%（成员）',  need:'Safety · RepairHouse',         target:'RepairingHouse', level:2, cfg:['decisionHouseRepairNeedThreshold=50.0'], anchor:'evaluate.rs::evaluate_needs:117'},
+  {id:'b5',  cond:'家缺水 且有水源（有家人→归属层）', need:'Safety · StockWater',      target:'SeekingWater',   level:2, cfg:['house_upgrade_tier*_water_ratio'], anchor:'evaluate.rs::evaluate_needs:127'},
+  {id:'b6',  cond:'家缺粮 且有粮源（有家人→归属层）', need:'Safety · StockFood',       target:'SeekingFood',    level:2, cfg:['house_upgrade_tier*_food_ratio'], anchor:'evaluate.rs::evaluate_needs:130'},
+  {id:'b7',  cond:'家缺木 且有木源（有家人→归属层）', need:'Safety · StockWood',       target:'SeekingWood',    level:2, cfg:['house_upgrade_tier*_wood_ratio'], anchor:'evaluate.rs::evaluate_needs:133'},
+  {id:'b8',  cond:'0级仓库仓满 + 成年男性成员',     need:'Belonging · BuildHouse(0级)', target:'ConstructingHouse', level:3, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:137'},
+  {id:'b9',  cond:'家缺石 且有石源',               need:'Esteem · StockStone',         target:'SeekingStone',   level:4, cfg:['house_upgrade_tier*_stone_ratio'], anchor:'evaluate.rs::evaluate_needs:141'},
+  {id:'b10', cond:'家缺金 且 淘金冷却≤0',          need:'Esteem · StockGold',          target:'SeekingGold',    level:4, cfg:['decisionStockGoldCooldown=45.0'], anchor:'evaluate.rs::evaluate_needs:145'},
+  {id:'b11', cond:'仓满 + 非庄园 + 成年男成员',     need:'Esteem · BuildHouse(1-4级)',  target:'ConstructingHouse', level:4, cfg:['house.is_pantry_full()'], anchor:'evaluate.rs::evaluate_needs:149'},
+  {id:'b12', cond:'无家 + 成年男 + 饥渴体力达标',   need:'Belonging · FoundHome',      target:'掷点→立宅',     level:3, cfg:['decisionFoundHome{Min}=20/20/60','Candidates=12'], anchor:'evaluate.rs::evaluate_needs:167'},
+  {id:'b13', cond:'有金源 且 冷却≤0（4级庄园后）',  need:'SelfActualization · GoldWealth', target:'SeekingGold', level:5, cfg:['decisionGoldWealthCooldown=180.0'], anchor:'evaluate.rs::evaluate_needs:182'}
+];
+
+/* id → 分支 映射（BRANCHES 是数组，需用对象按 id 取用） */
+var BRANCH_MAP={}; BRANCHES.forEach(function(x){ BRANCH_MAP[x.id]=x; });
+
+/* 行动状态机摘要（agent.rs::PrimitiveActionState 15 态） */
+var FSM_STATES = ['RestingAtCamp','SeekingWater','SeekingFood','SeekingWood','SeekingStone','SeekingGold',
+  'DrinkingAtWater','ForagingFood','GatheringWood','MiningStone','MiningGold',
+  'ReturningToCamp','ConstructingHouse','RepairingHouse','OffRoadDetour'];
+
+/* 节点默认布局（world 坐标） */
+function defaultLayout(){
+  var nodes = [];
+  [5,4,3,2,1].forEach(function(lv,i){
+    nodes.push({id:'lv'+lv, kind:'level', level:lv, x:24, y:40+i*178, w:178, h:128, locked:true});
+  });
+  nodes.push({id:'eval', kind:'eval', level:0, x:300, y:30, w:258, h:58, locked:true});
+  BRANCHES.forEach(function(b,i){
+    var col = i<7 ? 0 : 1;
+    var row = i<7 ? i : i-7;
+    nodes.push({id:b.id, kind:'branch', level:b.level, bId:b.id, x:300+col*330, y:120+row*86, w:290, h:78});
+  });
+  nodes.push({id:'fsm', kind:'fsm', level:0, x:1020, y:40, w:280, h:560, locked:true});
+  return nodes;
+}
+
+/* 边：优先级链 + 需求→行动 */
+function defaultEdges(){
+  var e = [];
+  e.push({from:'eval', to:'b1'});
+  for(var i=0;i<BRANCHES.length-1;i++) e.push({from:'b'+(i+1), to:'b'+(i+2)});
+  return e;
+}
+
+/* ═══════════════ 渲染引擎 ═══════════════ */
+var viewport=document.getElementById('viewport'), world=document.getElementById('world');
+var svg=document.getElementById('edges'), nodesLayer=document.getElementById('nodes');
+var scale=1, panX=30, panY=10, worldW=1400, worldH=1180;
+var nodes=defaultLayout(), edges=defaultEdges();
+var nodeMap={}, nodeEls={}, edgeEls=[], selected=null, lockBackbone=true, layerFilter=0;
+
+function nodeCenter(n){ return {x:n.x+n.w/2, y:n.y+n.h/2}; }
+
+function applyTransform(){
+  world.style.transform='translate('+panX+'px,'+panY+'px) scale('+scale+')';
+}
+
+function nodeHTML(n){
+  var c=LV[n.level]?LV[n.level]:null;
+  var lc=c?c.hex:'#38bdf8';
+  var h='';
+  if(n.kind==='level'){
+    h='<div class="n-tag">第'+n.level+'层 · '+c.name+'</div>'
+      +'<div class="n-sub" style="margin-top:4px">'+c.kinds+'</div>';
+  }else if(n.kind==='eval'){
+    h='<div class="n-tag">◆ 评估入口 · RestingAtCamp</div>'
+      +'<div class="n-title">evaluate_needs 逐层评估</div>'
+      +'<div class="n-sub">严格优先级：低层未满足时高层不被考虑</div>';
+  }else if(n.kind==='branch'){
+    var bv=BRANCH_MAP[n.bId];
+    if(bv){
+      h='<div class="n-tag">第'+n.level+'层 · '+LV[n.level].name+'</div>'
+        +'<div class="n-sub">条件：'+bv.cond+'</div>'
+        +'<div class="n-result" style="color:'+lc+'">'+bv.need+'</div>'
+        +'<div class="n-tag">→ '+bv.target+'</div>';
+    }
+  }else if(n.kind==='fsm'){
+    h='<div class="n-tag">⬡ decide 状态机 · 15 态</div>'
+      +'<div class="n-title">PrimitiveActionState</div>'
+      +'<div class="n-sub" style="margin-bottom:2px">Resting→评估→dispatch→Seeking*/现场Harvest*→返家/续采；途中被触发器关闭→原地掉头</div>'
+      +'<div class="fsm-states">'+FSM_STATES.map(function(s){return '<span class="fsm-chip">'+s+'</span>';}).join('')+'</div>'
+      +'<div class="n-sub" style="margin-top:6px">源码：agent.rs::PrimitiveActionState:67 · evaluate.rs::decide:21 · seeking.rs · harvest.rs · routing.rs</div>';
+  }
+  var lockIc=n.locked?'<span class="lock-ic">🔒</span>':'';
+  return h+lockIc;
+}
+
+function renderNodes(){
+  nodesLayer.innerHTML='';
+  nodeEls={};
+  nodes.forEach(function(n){
+    var el=document.createElement('div');
+    el.className='node kind-'+n.kind;
+    el.style.left=n.x+'px'; el.style.top=n.y+'px'; el.style.width=n.w+'px'; el.style.height=n.h+'px';
+    if(n.level){ el.style.setProperty('--lc', LV[n.level].hex); }
+    el.innerHTML=nodeHTML(n);
+    el.dataset.id=n.id;
+    el.addEventListener('pointerdown', function(ev){ onNodeDown(ev,n,el); });
+    el.addEventListener('pointerenter', function(){ hoverNode(n.id,true); });
+    el.addEventListener('pointerleave', function(){ hoverNode(n.id,false); });
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); if(lastMoved){ lastMoved=false; return; } selectNode(n.id); });
+    nodesLayer.appendChild(el);
+    nodeEls[n.id]=el; nodeMap[n.id]=n;
+  });
+  renderEdges();
+}
+
+function renderEdges(){
+  svg.innerHTML='';
+  svg.setAttribute('width',worldW); svg.setAttribute('height',worldH);
+  edgeEls=[];
+  edges.forEach(function(e,i){
+    var a=nodeMap[e.from], b=nodeMap[e.to];
+    if(!a||!b) return;
+    var ac=nodeCenter(a), bc=nodeCenter(b);
+    var line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',ac.x); line.setAttribute('y1',ac.y);
+    line.setAttribute('x2',bc.x); line.setAttribute('y2',bc.y);
+    var m=(e.from==='eval'||e.to==='eval')?'dotted':'solid';
+    if(m==='dotted') line.setAttribute('stroke-dasharray','4 4');
+    line.setAttribute('data-e',i);
+    line.style.stroke='rgba(255,255,255,.22)';
+    svg.appendChild(line);
+    edgeEls.push({a:a.id,b:b.id,el:line});
+  });
+}
+
+function refreshEdges(){
+  edgeEls.forEach(function(e){
+    var a=nodeMap[e.a], b=nodeMap[e.b];
+    if(!a||!b) return;
+    var ac=nodeCenter(a), bc=nodeCenter(b);
+    e.el.setAttribute('x1',ac.x); e.el.setAttribute('y1',ac.y);
+    e.el.setAttribute('x2',bc.x); e.el.setAttribute('y2',bc.y);
+  });
+}
+
+/* ── 拖动节点 ── */
+var drag=null, lastMoved=false;
+function onNodeDown(ev,n,el){
+  if(ev.button!==0 && ev.pointerType==='mouse') return;
+  ev.stopPropagation();
+  if(n.locked && lockBackbone){ flashStatus('🔒 主干节点已锁定，点击「解锁主干」后可拖动'); return; }
+  el.setPointerCapture(ev.pointerId);
+  drag={id:n.id, sx:ev.clientX, sy:ev.clientY, nx:n.x, ny:n.y, moved:false};
+  el.classList.add('dragging');
+}
+viewport.addEventListener('pointermove', function(ev){
+  if(drag){
+    var n=nodeMap[drag.id];
+    var dx=(ev.clientX-drag.sx)/scale, dy=(ev.clientY-drag.sy)/scale;
+    n.x=Math.round(drag.nx+dx); n.y=Math.round(drag.ny+dy);
+    nodeEls[n.id].style.left=n.x+'px'; nodeEls[n.id].style.top=n.y+'px';
+    refreshEdges();
+    if(Math.abs(ev.clientX-drag.sx)+Math.abs(ev.clientY-drag.sy)>3) drag.moved=true;
+  }else if(pan){
+    panX=pan.px+(ev.clientX-pan.sx); panY=pan.py+(ev.clientY-pan.sy);
+    applyTransform();
+  }
+});
+function endPointer(ev){
+  if(drag){
+    var n=nodeMap[drag.id];
+    nodeEls[n.id].classList.remove('dragging');
+    lastMoved=drag.moved;
+    if(drag.moved){ saveLayout(); flashStatus('💾 布局已保存到 localStorage'); }
+    drag=null;
+  }
+  if(pan){ pan=null; viewport.classList.remove('dragging'); }
+}
+viewport.addEventListener('pointerup', endPointer);
+viewport.addEventListener('pointercancel', endPointer);
+
+/* ── 画布平移 ── */
+var pan=null;
+viewport.addEventListener('pointerdown', function(ev){
+  if(ev.target===viewport || ev.target===world || ev.target===svg || ev.target.id==='edges'){
+    if(ev.button===2 || ev.pointerType==='mouse' && ev.button===0){
+      viewport.setPointerCapture(ev.pointerId);
+      pan={sx:ev.clientX, sy:ev.clientY, px:panX, py:panY};
+      viewport.classList.add('dragging');
+    }
+  }
+});
+viewport.addEventListener('contextmenu', function(ev){ ev.preventDefault(); });
+
+/* ── 缩放 ── */
+viewport.addEventListener('wheel', function(ev){
+  ev.preventDefault();
+  var rect=viewport.getBoundingClientRect();
+  var mx=ev.clientX-rect.left, my=ev.clientY-rect.top;
+  var ns=Math.min(3.2, Math.max(.35, scale*(ev.deltaY<0?1.12:0.89)));
+  var wx=(mx-panX)/scale, wy=(my-panY)/scale;
+  panX=mx-wx*ns; panY=my-wy*ns; scale=ns;
+  applyTransform();
+  flashStatus('缩放 '+scale.toFixed(2)+'x');
+},{passive:false});
+
+/* ── 悬停高亮 ── */
+function hoverNode(id,on){
+  if(!id) return;
+  edgeEls.forEach(function(e){
+    var rel=(e.a===id||e.b===id);
+    var d=(nodeEls[e.a]&&nodeEls[e.a].classList.contains('dim'))||(nodeEls[e.b]&&nodeEls[e.b].classList.contains('dim'));
+    if(on){
+      e.el.classList.toggle('hot', rel);
+      if(!rel && !d) e.el.classList.add('dim');
+    }else{
+      e.el.classList.remove('hot');
+      e.el.classList.remove('dim');
+    }
+  });
+}
+
+/* ── 选择 → 检查器 ── */
+function selectNode(id){
+  Object.keys(nodeEls).forEach(function(k){ nodeEls[k].classList.remove('selected'); });
+  var n=nodeMap[id]; if(!n) return;
+  nodeEls[id].classList.add('selected');
+  selected=id;
+  showInspector(n);
+  flashStatus('已选中 '+id);
+}
+function showInspector(n){
+  var empty=document.getElementById('insp-empty'), card=document.getElementById('insp-card');
+  empty.style.display='none'; card.style.display='block';
+  var c=LV[n.level]?LV[n.level]:null;
+  var lc=c?c.hex:'#38bdf8';
+  var html='<div class="insp-head"><span class="chip" style="background:'+lc+'">'+(c?('第'+n.level+'层 · '+c.name):'调度层')+'</span><span class="insp-title">'+n.id+'</span></div><div class="insp-body">';
+  if(n.kind==='level'){
+    html+='<div class="row"><span class="k">需求种类</span><span class="v">'+c.kinds+'</span></div>'
+      +'<div class="row"><span class="k">源码</span><span class="v"><span class="anchor">needs.rs::MaslowLevel（第'+n.level+'层）</span></span></div>'
+      +'<div class="insp-sub">点击左侧「层级导航」可高亮该层全部决策分支；<b>该层未满足时，更高层决策不被评估（严格优先级）</b>。</div>';
+  }else if(n.kind==='eval'){
+    html+='<div class="row"><span class="k">职责</span><span class="v">从最高优先级开始逐条评估 13 个分支，返回第一个命中的 <code>Need{level,kind,target_state}</code></span></div>'
+      +'<div class="row"><span class="k">调度</span><span class="v">scheduler.rs::tick_decisions 错峰决策：<code>(tick+id)%30==0</code>，每拍先观察 POI 库存再评估</span></div>'
+      +'<div class="row"><span class="k">源码</span><span class="v"><span class="anchor">evaluate.rs::evaluate_needs:101</span></span></div>';
+  }else if(n.kind==='branch'){
+    var b=BRANCH_MAP[n.bId]||{};
+    html+='<div class="row"><span class="k">触发条件</span><span class="v">'+b.cond+'</span></div>'
+      +'<div class="row"><span class="k">需求结论</span><span class="v"><b style="color:'+lc+'">'+b.need+'</b></span></div>'
+      +'<div class="row"><span class="k">目标状态</span><span class="v">'+b.target+'</span></div>'
+      +'<div class="row"><span class="k">源码锚点</span><span class="v"><span class="anchor">'+b.anchor+'</span></span></div>'
+      +'<div class="row"><span class="k">config 键</span><span class="v">'+b.cfg.map(function(x){return '<span class="cfg">'+x+'</span>';}).join('')+'</span></div>'
+      +'<div class="insp-sub">命中后经 <code>fulfill_resting_need</code> 落地：<b>寻路 dispatch → Seeking* 状态</b>；若在途中目标被施密特触发器关闭 → <code>turn_around_and_route_to</code> 原地掉头重路由（routing.rs）。</div>';
+  }else if(n.kind==='fsm'){
+    html+='<div class="row"><span class="k">状态集</span><span class="v">'+FSM_STATES.length+' 个 PrimitiveActionState</span></div>'
+      +'<div class="row"><span class="k">调度</span><span class="v">decide() 按 state 分发：Resting→评估；Seeking→seeking.rs 熔断重路由；现场→harvest.rs 完成判定；Return→掉头返家</span></div>'
+      +'<div class="row"><span class="k">源码</span><span class="v"><span class="anchor">agent.rs::PrimitiveActionState:67</span> · <span class="anchor">evaluate.rs::decide:21</span></span></div>';
+  }
+  html+='</div>';
+  card.innerHTML=html;
+}
+
+/* ── 层级过滤 ── */
+function buildLayerNav(){
+  var nav=document.getElementById('layerNav'); nav.innerHTML='';
+  [5,4,3,2,1].forEach(function(lv){
+    var d=document.createElement('div');
+    d.className='layer-card';
+    d.innerHTML='<div class="lrow"><span class="lvl-dot" style="background:'+LV[lv].hex+'"></span><span class="lname">'+LV[lv].name+'</span><span style="margin-left:auto;font-size:11px;color:var(--sub)">'+LV[lv].kinds.split('·').length+' 项</span></div>'
+      +'<div class="lkinds">'+LV[lv].kinds+'</div>';
+    d.dataset.lv=lv;
+    d.addEventListener('click', function(){ toggleLayer(lv); });
+    nav.appendChild(d);
+  });
+}
+function applyLayerFilter(){
+  Object.keys(nodeEls).forEach(function(k){
+    var n=nodeMap[k];
+    var dim = layerFilter && n.level && n.level!==layerFilter;
+    nodeEls[k].classList.toggle('dim', !!dim);
+    nodeEls[k].classList.toggle('locked', false);
+  });
+  refreshEdges();
+}
+function toggleLayer(lv){
+  layerFilter = (layerFilter===lv)?0:lv;
+  var cards=document.querySelectorAll('.layer-card');
+  cards.forEach(function(cd){ cd.classList.toggle('off', layerFilter && +cd.dataset.lv!==layerFilter); });
+  applyLayerFilter();
+  flashStatus(layerFilter?('高亮第 '+layerFilter+' 层'):'清除层级过滤');
+}
+
+/* ── 工具栏 ── */
+function flashStatus(t){ document.getElementById('statusTip').textContent=t; }
+function saveLayout(){
+  try{ localStorage.setItem('decisionViz.layout.v1', JSON.stringify({nodes:nodes.map(function(n){return {id:n.id,x:n.x,y:n.y};}),scale:scale,panX:panX,panY:panY})); }catch(e){}
+}
+function restoreLayout(){
+  try{
+    var raw=localStorage.getItem('decisionViz.layout.v1'); if(!raw) return false;
+    var d=JSON.parse(raw);
+    d.nodes.forEach(function(p){ if(nodeMap[p.id]){ nodeMap[p.id].x=p.x; nodeMap[p.id].y=p.y; } });
+    if(d.scale){ scale=d.scale; panX=d.panX; panY=d.panY; }
+    nodes.forEach(function(n){ var el=nodeEls[n.id]; if(el){ el.style.left=n.x+'px'; el.style.top=n.y+'px'; } });
+    refreshEdges(); applyTransform();
+    return true;
+  }catch(e){ return false; }
+}
+function resetLayout(){
+  nodes=defaultLayout(); nodeMap={};
+  renderNodes(); applyTransform(); layerFilter=0;
+  document.querySelectorAll('.layer-card').forEach(function(cd){cd.classList.remove('off');});
+  flashStatus('↺ 已重置为默认确定性布局');
+}
+function fit(){
+  var rect=viewport.getBoundingClientRect();
+  var pad=40;
+  var s=Math.min((rect.width-pad)/worldW,(rect.height-pad)/worldH,1.2);
+  scale=Math.max(.35,s);
+  panX=(rect.width-worldW*scale)/2; panY=(rect.height-worldH*scale)/2;
+  applyTransform(); flashStatus('🎯 已适应窗口');
+}
+document.getElementById('btnReset').addEventListener('click', resetLayout);
+document.getElementById('btnSave').addEventListener('click', function(){ saveLayout(); flashStatus('💾 布局已保存'); });
+document.getElementById('btnRestore').addEventListener('click', function(){ restoreLayout()?flashStatus('📂 已还原保存的布局'):flashStatus('无保存的布局'); });
+document.getElementById('btnFit').addEventListener('click', fit);
+document.getElementById('btnLock').addEventListener('click', function(){
+  lockBackbone=!lockBackbone;
+  var b=document.getElementById('btnLock');
+  b.textContent=lockBackbone?'🔒 锁定主干':'🔓 解锁主干';
+  flashStatus(lockBackbone?'主干已锁定（分支节点仍可拖动）':'主干已解锁');
+});
+
+/* ── 标签页切换 ── */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
+    t.classList.add('on');
+    var on=t.dataset.tab==='live';
+    document.getElementById('livebar').classList.toggle('on', on);
+    document.querySelector('.canvas-wrap').style.display= on?'none':'flex';
+    document.querySelector('.left').style.display= on?'none':'block';
+    document.querySelector('.right').style.display= on?'none':'block';
+    if(!on) setTimeout(fit,30);
+  });
+});
+
+/* ═══════════════ 实时监控（视图 B 原型）═══════════════ */
+var AGENT_SAMPLES=[
+  {id:3,  need:['Physiological','QuenchThirst'], state:'SeekingWater',  h:22,t:14,s:71, lv:1},
+  {id:7,  need:['Safety','StockWater'],          state:'DrinkingAtWater',h:41,t:38,s:64, lv:2},
+  {id:12, need:['Belonging','BuildHouse'],       state:'ConstructingHouse',h:45,t:46,s:88, lv:3},
+  {id:18, need:['Esteem','StockStone'],          state:'MiningStone',   h:43,t:44,s:55, lv:4},
+  {id:21, need:['SelfActualization','GoldWealth'], state:'SeekingGold',h:44,t:45,s:72, lv:5}
+];
+function renderAgents(){
+  var list=document.getElementById('agentList'); list.innerHTML='';
+  AGENT_SAMPLES.forEach(function(a){
+    var row=document.createElement('div'); row.className='agent-row';
+    row.innerHTML='<span class="aid">#'+a.id+'</span>'
+      +'<span class="need-chip" style="background:'+LV[a.lv].hex+'">'+a.need.join('·')+'</span>'
+      +'<span class="phys">'
+        +'<span class="p">水<div class="meter"><i style="width:'+(a.t/50*100)+'%;background:'+LV[1].hex+'"></i></div></span>'
+        +'<span class="p">饥<div class="meter"><i style="width:'+(a.h/50*100)+'%;background:'+LV[1].hex+'"></i></div></span>'
+        +'<span class="p">力<div class="meter"><i style="width:'+a.s+'%;background:'+LV[2].hex+'"></i></div></span>'
+      +'</span><span style="font-size:10px;color:var(--sub)">'+a.state+'</span>';
+    list.appendChild(row);
+  });
+}
+
+/* 施密特触发器演示 */
+var trigState=false; // false=不可用 true=可用
+function drawSchmitt(){
+  var svgEl=document.getElementById('schmittSvg');
+  var W=svgEl.clientWidth||520, H=110, px=10, pw=W-px*2, py=14, ph=40;
+  svgEl.setAttribute('viewBox','0 0 '+W+' 110');
+  svgEl.innerHTML='';
+  var seek=+document.getElementById('seekMin').value, ab=+document.getElementById('abandon').value;
+  var ratio=+document.getElementById('stockRatio').value;
+  function mk(name,attrs){ var e=document.createElementNS('http://www.w3.org/2000/svg',name); for(var k in attrs)e.setAttribute(k,attrs[k]); return e; }
+  svgEl.appendChild(mk('rect',{x:px,y:py,width:pw,height:ph,rx:6,fill:'rgba(255,255,255,.03)',stroke:'rgba(255,255,255,.12)'}));
+  // 三条带：关带(<abandon 红) 滞回带(ab~seek 灰) 开带(>seek 绿)
+  svgEl.appendChild(mk('rect',{x:px,y:py,width:pw*ab,height:ph,fill:'rgba(239,68,68,.16)'}));
+  svgEl.appendChild(mk('rect',{x:px+pw*ab,y:py,width:pw*(seek-ab),height:ph,fill:'rgba(255,255,255,.05)'}));
+  svgEl.appendChild(mk('rect',{x:px+pw*seek,y:py,width:pw*(1-seek),height:ph,fill:'rgba(16,185,129,.16)'}));
+  // 阈值线
+  svgEl.appendChild(mk('line',{x1:px+pw*ab,y1:py,x2:px+pw*ab,y2:py+ph,stroke:'#ef4444','stroke-width':1.5}));
+  svgEl.appendChild(mk('line',{x1:px+pw*seek,y1:py,x2:px+pw*seek,y2:py+ph,stroke:'#10b981','stroke-width':1.5}));
+  // 当前库存指针
+  svgEl.appendChild(mk('line',{x1:px+pw*ratio,y1:py-4,x2:px+pw*ratio,y2:py+ph+4,stroke:'#38bdf8','stroke-width':2}));
+  svgEl.appendChild(mk('circle',{cx:px+pw*ratio,cy:py+ph+8,r:4,fill:'#38bdf8'}));
+  // 标签
+  svgEl.appendChild(mk('text',{x:px+pw*ab,y:py+ph+22,'font-size':10,fill:'#ef4444','text-anchor':'middle'})).textContent='关<0.10';
+  svgEl.appendChild(mk('text',{x:px+pw*seek,y:py+ph+22,'font-size':10,fill:'#10b981','text-anchor':'middle'})).textContent='开≥0.30';
+  svgEl.appendChild(mk('text',{x:px,y:py-6,'font-size':10,fill:'#8aa0b5'})).textContent='POI 库存比例';
+  // 滞回逻辑：保持前态
+  if(ratio>=seek) trigState=true;
+  else if(ratio<ab) trigState=false;
+  document.getElementById('schmittState').textContent=
+    '当前库存 '+ratio.toFixed(2)+' → 本 Agent 私有触发器状态：'+(trigState?'🟢 可用（seek）':'🔴 不可用（abandon）')+
+    '（滞回带 '+ab.toFixed(2)+'~'+seek.toFixed(2)+' 保持前态，防雷鸣群集）';
+}
+document.getElementById('stockRatio').addEventListener('input',function(e){ document.getElementById('stockRatioOut').textContent=(+e.target.value).toFixed(2); drawSchmitt(); });
+document.getElementById('seekMin').addEventListener('input',function(e){ var v=+e.target.value; document.getElementById('seekMinOut').textContent=v.toFixed(2); document.getElementById('abandon').max=v; if(+document.getElementById('abandon').value>v)document.getElementById('abandon').value=v; drawSchmitt(); });
+document.getElementById('abandon').addEventListener('input',function(e){ document.getElementById('abandonOut').textContent=(+e.target.value).toFixed(2); drawSchmitt(); });
+
+/* 决策原因链步进 */
+var STEP_BRANCHES=[
+  {cond:'口渴 < 25 且有水源', test:function(v){return v.thirst<25;}, b:'b1'},
+  {cond:'饥饿 < 25 且有粮源', test:function(v){return v.hunger<25;}, b:'b2'},
+  {cond:'体力 < 100', test:function(v){return v.stamina<100;}, b:'b3'},
+  {cond:'有家宅 且 耐久<50%', test:function(v){return v.hasHome && v.durability<50;}, b:'b4'},
+  {cond:'家缺水', test:function(v){return v.hasHome && v.hw<v.hwMax;}, b:'b5'},
+  {cond:'家缺粮', test:function(v){return v.hasHome && v.hf<v.hfMax;}, b:'b6'},
+  {cond:'家缺木', test:function(v){return v.hasHome && v.hw2<v.hw2Max;}, b:'b7'},
+  {cond:'0级仓满+成年男', test:function(v){return v.hasHome && v.pantryFull && v.male && v.tier===0;}, b:'b8'},
+  {cond:'缺石', test:function(v){return v.hasHome && v.hs<v.hsMax;}, b:'b9'},
+  {cond:'缺金 且冷却≤0', test:function(v){return v.hasHome && v.hg<v.hgMax && v.cd<=0;}, b:'b10'},
+  {cond:'仓满+非庄园+成年男', test:function(v){return v.hasHome && v.pantryFull && v.male && v.tier>0 && v.tier<4;}, b:'b11'},
+  {cond:'无家 成年男 达标', test:function(v){return !v.hasHome && v.male && v.hunger>=20 && v.thirst>=20 && v.stamina>=60;}, b:'b12'},
+  {cond:'有金 冷却≤0', test:function(v){return v.cd<=0;}, b:'b13'}
+];
+function runStep(){
+  var v={
+    thirst:+document.getElementById('tThirst').value,
+    hunger:+document.getElementById('tHunger').value,
+    stamina:+document.getElementById('tStamina').value,
+    hasHome:document.getElementById('tHasHome').checked,
+    male:document.getElementById('tMale').checked,
+    pantryFull:document.getElementById('tPantryFull').checked,
+    tier:0, hw:50,hwMax:100, hf:50,hfMax:100, hw2:50,hw2Max:100, hs:50,hsMax:100, hg:10,hgMax:100, cd:0, durability:80
+  };
+  var log=document.getElementById('traceLog'); log.innerHTML='';
+  var hit=null, stopped=false;
+  STEP_BRANCHES.forEach(function(sb,i){
+    if(stopped){
+      var skip=document.createElement('div'); skip.className='skip';
+      skip.textContent=(i+1)+'. ⏸ 短路跳过（此前已命中，evaluate_needs 提前返回）';
+      log.appendChild(skip); return;
+    }
+    var ok=!!sb.test(v);
+    var row=document.createElement('div');
+    row.className= ok?'hit':'skip';
+    row.textContent=(i+1)+'. 条件「'+sb.cond+'」→ '+(ok?'✅ 命中':'⏭ 未命中');
+    log.appendChild(row);
+    if(ok){ hit=sb; stopped=true; }
+  });
+  if(hit){
+    var b=BRANCH_MAP[hit.b];
+    var res=document.createElement('div'); res.className='res';
+    res.textContent='🎯 最终决策：'+b.need+'（'+b.target+'） · '+b.anchor;
+    log.appendChild(res);
+    selectNode(hit.b);
+    // 高亮节点
+    var el=nodeEls[hit.b]; if(el){ el.scrollIntoView({block:'nearest'}); el.style.boxShadow='0 0 0 2px var(--lv3), 0 8px 24px rgba(0,0,0,.7)'; setTimeout(function(){ el.classList.contains('selected')||(el.style.boxShadow=''); },2200); }
+  }else{
+    var none=document.createElement('div'); none.className='res';
+    none.textContent='ℹ️ 未命中任何需求 → 原地休养（Physiological·Rest 兜底）';
+    log.appendChild(none);
+  }
+}
+document.getElementById('btnStep').addEventListener('click', runStep);
+document.getElementById('tThirst').addEventListener('input',function(e){ document.getElementById('tThirstOut').textContent=e.target.value; });
+document.getElementById('tHunger').addEventListener('input',function(e){ document.getElementById('tHungerOut').textContent=e.target.value; });
+document.getElementById('tStamina').addEventListener('input',function(e){ document.getElementById('tStaminaOut').textContent=e.target.value; });
+
+/* ═══════════════ 启动 ═══════════════ */
+function init(){
+  buildLayerNav();
+  renderNodes();
+  renderAgents();
+  drawSchmitt();
+  if(!restoreLayout()) fit();
+}
+window.addEventListener('resize', function(){ if(document.querySelector('.tab.on').dataset.tab==='logic') fit(); });
+init();
+})();
+</script>
+</body>
+</html>

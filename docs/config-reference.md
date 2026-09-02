@@ -3,7 +3,7 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 10. 账本与婚姻登记子系统
+## 12. 地区与王国系统
 
 | 字段 (camelCase) | 类型 | 默认值 | 中文说明 |
 | :--- | :--- | :--- | :--- |
@@ -160,3 +160,13 @@
 | `roadHiddenAvoidModifier` | f32 | 2.5 | A* 非偏好隐秘时隐秘道路代价乘子 |
 | `roadVisibleAvoidModifier` | f32 | 1 | A* 非偏好隐秘时公开道路代价乘子 |
 | `ledgerJournalCapacity` | usize | 64 | 账本流水环形缓冲容量 (每团体/家户，条) |
+| `clanTributeRate` | f32 | 0.05 | 族税率：家户每周期向族库缴纳账面余额的比例 |
+| `clanTributeIntervalTicks` | u64 | 1800 | 族税征收周期 (tick)，每 N tick 全局统一征收一次 |
+| `clanMutualAidMinBalance` | f32 | 50 | 族内互助族库最低余额门槛 |
+| `clanMutualAidFamilyThreshold` | f32 | 10 | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
+| `clanMutualAidCooldownTicks` | u64 | 900 | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 |
+| `ledgerTaxRate` | f32 | 0.03 | 公仓税率：家户每周期向地区公仓缴纳账面余额的比例 |
+| `ledgerTaxIntervalTicks` | u64 | 2400 | 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 |
+| `ledgerReliefMinBalance` | f32 | 30 | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
+| `ledgerReliefFamilyThreshold` | f32 | 8 | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
+| `ledgerReliefCooldownTicks` | u64 | 1200 | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |

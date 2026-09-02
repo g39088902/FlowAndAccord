@@ -10,6 +10,7 @@ pub mod birth;
 pub mod decisions;
 pub mod housing_system;
 pub mod ledger;
+pub mod bookkeeping;
 pub mod world;
 
 pub use vec3::Vec3;

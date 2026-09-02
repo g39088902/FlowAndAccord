@@ -205,4 +205,22 @@ window.SIM_CONFIG = {
   // 10. 账本与婚姻登记子系统 (Ledger & Marriage Registry)
   // ==========================================================================
   ledgerJournalCapacity: 64,      // 账本流水环形缓冲容量 (每团体/家户，条)
+
+  // ==========================================================================
+  // 11. 宗族系统 (Clan System — M3)
+  // ==========================================================================
+  clanTributeRate: 0.05,          // 族税率：家户每周期向族库缴纳账面余额的比例
+  clanTributeIntervalTicks: 1800, // 族税征收周期 (tick)，每 N tick 全局统一征收一次
+  clanMutualAidMinBalance: 50.0,  // 族内互助族库最低余额门槛
+  clanMutualAidFamilyThreshold: 10.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
+  clanMutualAidCooldownTicks: 900, // 族内互助冷却 (tick)，每家户每 N tick 最多接收一次
+
+  // ==========================================================================
+  // 12. 地区与王国系统 (Region & Kingdom — M4)
+  // ==========================================================================
+  ledgerTaxRate: 0.03,              // 公仓税率：家户每周期向地区公仓缴纳账面余额的比例
+  ledgerTaxIntervalTicks: 2400,     // 公仓税征收周期 (tick)，每 N tick 全局统一征收一次
+  ledgerReliefMinBalance: 30.0,     // 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济
+  ledgerReliefFamilyThreshold: 8.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
+  ledgerReliefCooldownTicks: 1200,  // 救济冷却 (tick)，每家户每 N tick 最多接收一次救济
 };

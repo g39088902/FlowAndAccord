@@ -13,6 +13,7 @@
 | **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
 | **docs/CURRENT.md** | 已实现功能索引入口 + 模块导航表（`01`空间路网 / `02`生态POI / `03`四季 / `04`代谢繁衍 / `05`房屋 / `06`决策AI / `07`前端 / `08`配置 / `09`代码地图 / `10`快速启动 / `11`版本演进 / `12`账本系统） | 快速了解现状；改动机制须同步更新对应 `docs/current/0X-*.md` 并在 `11-changelog.md` 追加条目 |
 | **docs/UI_SPEC_AND_LEDGER_DESIGN.md** | UI 页面全景剖析 + 未实现功能（M2-M4）UI 设计 + 多标签页规范 + 前端开发指南 | 了解前端 UI 交互架构、新功能界面设计或开发新 UI 模块时 |
+| **docs/DECISION_VIZ_DESIGN.md** | 马斯洛决策引擎可视化设计方案：决策代码→图元映射、双视图三面板、交互能力预留、实现文件规划与里程碑 | 实现决策可视化网页（逻辑引擎图/实时监控）前必读；配套交互原型 `docs/decision-viz-prototype.html` |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1 已落地：账本内核、团体基类、婚姻登记簿、家户体系、胎儿预分配 ID） | 改动 ledger/ 代码时查阅 |
 | **docs/BUILD_GUIDE.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试与故障排查 | 深入构建与环境排障时 |
 | **docs/browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略 | 需要打开页面/渲染校验/截图/自动化交互时 |
@@ -49,7 +50,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.0.2)"]
+    E --> F["浏览器 UI (版本: v1.3.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与代际继承、经济账本；
@@ -96,7 +97,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.0.2`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.3.0`**。
 
 ---
 

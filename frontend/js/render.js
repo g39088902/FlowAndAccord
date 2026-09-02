@@ -16,6 +16,11 @@
     let dbgLastTick = 0, dbgLastTickSec = performance.now(); // ⚡ 每秒真实 Tick 速率采样基准
     const dbgElCache = {};
 
+    // ★ M4: 夺位远征视口动态标牌与登基礼花状态
+    let coronationEffects = [];       // {x, y, startTime, particles:[{dx,dy,life}]}
+    let prevKingsMap = new Map();     // campId -> kingId（上一帧，用于检测新登基）
+    const CORONATION_DURATION = 2000; // 登基礼花持续 2 秒
+
     function dbgEl(id) {
       if (dbgElCache[id] === undefined) dbgElCache[id] = document.getElementById(id);
       return dbgElCache[id];
@@ -87,6 +92,11 @@
       document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
       document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
       document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
+
+      // ★ M2: 账本与社会制度 UI 更新（与顶栏统计同一 10FPS 节流）
+      if (window.LedgerUI && typeof window.LedgerUI.update === 'function') {
+        window.LedgerUI.update(sim);
+      }
     }
 
     // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
@@ -830,6 +840,79 @@
           ctx.fillStyle = need.color;
           ctx.fillText(label, p2D.x, pillY + pillH * 0.72);
         }
+
+        // ★ M4: 夺位远征动态标牌（金色战盔 + 虚线光束指向目标营地）
+        if (agent.isOnExpedition && sim.expeditionTargets) {
+          const targetCampId = sim.expeditionTargets.get(agent.id);
+          if (targetCampId != null) {
+            const targetPoi = sim.pois.find(p => p.id === targetCampId && p.type === 'Camp');
+            if (targetPoi) {
+              const t2D = project3D(targetPoi.pos);
+              // 金色虚线光束
+              ctx.save();
+              ctx.setLineDash([5 * camera.zoom, 5 * camera.zoom]);
+              ctx.strokeStyle = 'rgba(251,191,36,0.5)';
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(p2D.x, p2D.y);
+              ctx.lineTo(t2D.x, t2D.y);
+              ctx.stroke();
+              ctx.restore();
+              // 金色战盔图标（带光晕）
+              ctx.save();
+              ctx.shadowColor = '#fbbf24';
+              ctx.shadowBlur = 8;
+              ctx.font = `${Math.floor(14 * camera.zoom)}px serif`;
+              ctx.textAlign = 'center';
+              ctx.fillText('⚔️', p2D.x, p2D.y - 18 * camera.zoom);
+              ctx.restore();
+            }
+          }
+        }
+      }
+
+      // ★ M4: 登基礼花检测（对比上一帧 kings，新登基时在营地位置触发金色粒子爆炸）
+      if (sim.regions && sim.regions.length > 0) {
+        for (const r of sim.regions) {
+          const prevKing = prevKingsMap.get(r.campId);
+          if (r.kingId != null && prevKing !== r.kingId) {
+            const campPoi = sim.pois.find(p => p.id === r.campId && p.type === 'Camp');
+            if (campPoi) {
+              const cp = project3D(campPoi.pos);
+              const particles = [];
+              for (let i = 0; i < 24; i++) {
+                const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
+                const speed = 1.5 + Math.random() * 2.5;
+                particles.push({ dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, life: 1.0 });
+              }
+              coronationEffects.push({ x: cp.x, y: cp.y, startTime: performance.now(), particles });
+            }
+          }
+          prevKingsMap.set(r.campId, r.kingId);
+        }
+      }
+
+      // ★ M4: 绘制登基礼花粒子（2秒后自动清除）
+      const nowCor = performance.now();
+      coronationEffects = coronationEffects.filter(eff => nowCor - eff.startTime < CORONATION_DURATION);
+      for (const eff of coronationEffects) {
+        const elapsed = nowCor - eff.startTime;
+        const t = elapsed / CORONATION_DURATION;
+        const alpha = Math.max(0, 1 - t);
+        ctx.save();
+        for (const p of eff.particles) {
+          const px = eff.x + p.dx * t * 40 * camera.zoom;
+          const py = eff.y + p.dy * t * 40 * camera.zoom + t * t * 15 * camera.zoom;
+          ctx.globalAlpha = alpha * p.life;
+          ctx.fillStyle = '#fbbf24';
+          ctx.shadowColor = '#fbbf24';
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(px, py, 2.5 * camera.zoom, 0, Math.PI * 2);
+          ctx.fill();
+          p.life = Math.max(0, p.life - 0.008);
+        }
+        ctx.restore();
       }
 
       // 5. 更新顶栏统计 (降频至 ~100ms 刷新一次，减少 DOM 重排重绘)
@@ -937,8 +1020,6 @@
       }
       if (inspectorCard) inspectorCard.style.display = 'flex';
 
-      // ★ 家户与账本大盘更新 (v0.9.72 M1, 始终运行)
-      updateLedgerPanel();
       // ★ Agent 家户/婚姻信息渲染 (仅当选中 agent 时)
       if (sim.selectionType === 'agent' && sim.selectedAgentId !== null) {
         const _ledgerAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(sim.selectedAgentId) : sim.agents.find(a => a.id === sim.selectedAgentId);
@@ -1856,11 +1937,17 @@
       const headAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(hh.head) : null;
       document.getElementById('insp-hh-head').textContent = '#' + hh.head + (headAgent && headAgent.surname ? '【' + headAgent.surname + '】' : '');
       document.getElementById('insp-hh-members').textContent = hh.members.length;
-      // 角色判定
-      let role = '成员';
-      if (hh.head === agent.id) role = '👑 户主';
-      else if (agent.gender === 'female') role = '💍 配偶';
-      else role = '👶 子女';
+      // 角色判定（★ M2: 优先使用内核 household_role 字段，回退本地推断）
+      const roleMap = { Head: '👑 户主', Spouse: '💍 配偶', Child: '👶 子女', None: '—' };
+      let role;
+      if (agent.householdRole && agent.householdRole !== 'None' && roleMap[agent.householdRole]) {
+        role = roleMap[agent.householdRole];
+      } else {
+        role = '成员';
+        if (hh.head === agent.id) role = '👑 户主';
+        else if (agent.gender === 'female') role = '💍 配偶';
+        else role = '👶 子女';
+      }
       const roleEl = document.getElementById('insp-hh-role');
       roleEl.textContent = role;
       roleEl.style.color = hh.head === agent.id ? '#fbbf24' : (agent.gender === 'female' ? '#ec4899' : '#a78bfa');
@@ -1920,9 +2007,10 @@
       const marrySec = tickToSec(sim.tickCount - activeMg.startTick);
       document.getElementById('insp-mg-duration').textContent = formatDuration(marrySec);
       document.getElementById('insp-mg-start').textContent = activeMg.startTick;
-      // 历史婚姻
+      // 历史婚姻（★ M2: 优先使用内核 marriage_history_count）
+      const mgTotal = agent.marriageHistoryCount || allMg.length;
       if (allMg.length > 1) {
-        document.getElementById('insp-mg-history-count').textContent = allMg.length - 1;
+        document.getElementById('insp-mg-history-count').textContent = mgTotal - 1;
         document.getElementById('insp-mg-history-list').innerHTML = allMg
           .filter(m => !m.isActive)
           .map(m => {
@@ -1937,7 +2025,7 @@
       singleEl.style.display = 'none';
       statusEl.textContent = '🕊️ 丧偶/离异';
       statusEl.style.color = '#64748b';
-      document.getElementById('insp-mg-history-count').textContent = allMg.length;
+      document.getElementById('insp-mg-history-count').textContent = agent.marriageHistoryCount || allMg.length;
       document.getElementById('insp-mg-history-list').innerHTML = allMg.map(m => {
         const dur = m.endTick ? formatDuration(tickToSec(m.endTick - m.startTick)) : '—';
         return '<div class="ledger-mg-history-item">婚姻 #' + m.id + ' · 夫#' + m.husbandId + ' 妻#' + m.wifeId + ' · 存续' + dur + ' · ' + (m.endReason || '丧偶') + '</div>';

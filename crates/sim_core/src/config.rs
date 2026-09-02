@@ -253,6 +253,31 @@ pub const ROAD_VISIBLE_AVOID_MODIFIER: f32 = 1.0;
 /// 账本流水环形缓冲容量（每账本，条）：超容量淘汰最旧流水，防长程运行内存膨胀
 pub const LEDGER_JOURNAL_CAPACITY: usize = 64;
 
+/// 族税率：家户每周期向族库缴纳账面余额的比例（默认 5%）
+pub const CLAN_TRIBUTE_RATE: f32 = 0.05;
+/// 族税征收周期（tick）：每 N tick 全局统一征收一次（默认 1800 = 60秒）
+pub const CLAN_TRIBUTE_INTERVAL_TICKS: u64 = 1800;
+/// 族内互助族库最低余额门槛：族库总余额 > 此值方可签发互助（默认 50.0）
+pub const CLAN_MUTUAL_AID_MIN_BALANCE: f32 = 50.0;
+/// 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫，可申请族内互助（默认 10.0）
+pub const CLAN_MUTUAL_AID_FAMILY_THRESHOLD: f32 = 10.0;
+/// 族内互助冷却（tick）：每家户每 N tick 最多接收一次互助（默认 900 = 30秒）
+pub const CLAN_MUTUAL_AID_COOLDOWN_TICKS: u64 = 900;
+
+// ============================================================================
+// 10b. 地区与王国系统 (M4: Region & Kingdom)
+// ============================================================================
+/// 公仓税率：家户每周期向地区公仓缴纳账面余额的比例（默认 3%）
+pub const LEDGER_TAX_RATE: f32 = 0.03;
+/// 公仓税征收周期（tick）：每 N tick 全局统一征收一次（默认 2400 = 80秒）
+pub const LEDGER_TAX_INTERVAL_TICKS: u64 = 2400;
+/// 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济（默认 30.0）
+pub const LEDGER_RELIEF_MIN_BALANCE: f32 = 30.0;
+/// 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫，可申请救济（默认 8.0）
+pub const LEDGER_RELIEF_FAMILY_THRESHOLD: f32 = 8.0;
+/// 救济冷却（tick）：每家户每 N tick 最多接收一次救济（默认 1200 = 40秒）
+pub const LEDGER_RELIEF_COOLDOWN_TICKS: u64 = 1200;
+
 // ============================================================================
 // 11. 动态仿真配置结构体 (SimConfig)
 // ============================================================================
@@ -433,6 +458,20 @@ pub struct SimConfig {
 
     // 10. 账本与婚姻登记子系统
     pub ledger_journal_capacity: usize,
+
+    // 11. 宗族系统 (M3)
+    pub clan_tribute_rate: f32,
+    pub clan_tribute_interval_ticks: u64,
+    pub clan_mutual_aid_min_balance: f32,
+    pub clan_mutual_aid_family_threshold: f32,
+    pub clan_mutual_aid_cooldown_ticks: u64,
+
+    // 12. 地区与王国系统 (M4)
+    pub ledger_tax_rate: f32,
+    pub ledger_tax_interval_ticks: u64,
+    pub ledger_relief_min_balance: f32,
+    pub ledger_relief_family_threshold: f32,
+    pub ledger_relief_cooldown_ticks: u64,
 }
 
 impl Default for SimConfig {
@@ -610,6 +649,20 @@ impl Default for SimConfig {
 
             // 10. 账本与婚姻登记子系统
             ledger_journal_capacity: LEDGER_JOURNAL_CAPACITY,
+
+            // 11. 宗族系统 (M3)
+            clan_tribute_rate: CLAN_TRIBUTE_RATE,
+            clan_tribute_interval_ticks: CLAN_TRIBUTE_INTERVAL_TICKS,
+            clan_mutual_aid_min_balance: CLAN_MUTUAL_AID_MIN_BALANCE,
+            clan_mutual_aid_family_threshold: CLAN_MUTUAL_AID_FAMILY_THRESHOLD,
+            clan_mutual_aid_cooldown_ticks: CLAN_MUTUAL_AID_COOLDOWN_TICKS,
+
+            // 12. 地区与王国系统 (M4)
+            ledger_tax_rate: LEDGER_TAX_RATE,
+            ledger_tax_interval_ticks: LEDGER_TAX_INTERVAL_TICKS,
+            ledger_relief_min_balance: LEDGER_RELIEF_MIN_BALANCE,
+            ledger_relief_family_threshold: LEDGER_RELIEF_FAMILY_THRESHOLD,
+            ledger_relief_cooldown_ticks: LEDGER_RELIEF_COOLDOWN_TICKS,
         }
     }
 }

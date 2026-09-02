@@ -25,14 +25,20 @@ pub enum ResourceKind {
 ///
 /// M1 仅落地 Personal / Family 两级；Clan（M3 宗族）/ Region（M4 地区）/ Corporate
 /// （预留公司）按计划逐期扩展，本枚举即五级产权账本（PLAN.md §3.4）的实例化锚点。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum LedgerRef {
     /// 🧍 个人私产（逻辑指代随身行囊，不改物理字段）
     Personal(AgentId),
     /// 🏠 家产（登记在**男性户主**的家户下，与房屋解耦）
     Family(HouseholdId),
-    // ⛩️ Clan(SurnameId)   —— M3 预留：族产（按姓氏聚合）
-    // 🏛️ Region(CampId)    —— M4 预留：公仓（地区团体账本）
+    /// Void (resource consumed/destroyed, no recipient ledger)
+    Void,
+    /// 公仓兜底账本（M2 绝嗣家户资产归集，预留 M4 Region 对接）
+    PublicGranary,
+    /// ⛩️ 族产（M3：按姓氏聚合的宗族账本）
+    Clan(String),
+    /// 🏛️ 地区公仓（M4：按营地聚合的王国团体账本，领导者=国王）
+    Region(u32),
     // 🏢 Corporate(CompanyId) —— 预留：公司资产
 }
 
@@ -53,6 +59,8 @@ pub enum TransferReason {
     Maintenance,
     /// 遗产继承（M2 启用）
     Inheritance,
+    /// 分家抽资（M2 启用：男子成年/丧父自立门户，从旧家户分走资源）
+    Split,
     /// 公仓税（M4 启用）
     Tax,
     /// 族税（M3 启用）
@@ -154,6 +162,17 @@ impl Ledger {
             self.events.pop_front();
         }
         self.events.push_back(LedgerEvent { tick, note: note.into() });
+    }
+
+    /// 单边消耗记账：debit 资源 + 记录 from -> Void 流水（无接收方账本）
+    /// 用于 Consume（生活吃喝）、Heating（冬季烧柴）等资源灭失场景
+    pub fn record_consumption(&mut self, from: LedgerRef, resource: ResourceKind, amount: f32, reason: TransferReason, tick: u64) {
+        if amount <= 0.0 {
+            return;
+        }
+        self.debit(resource, amount);
+        let record = TransferRecord { tick, from, to: LedgerRef::Void, resource, amount, reason };
+        self.push_transfer(record);
     }
 
     /// 只读流水迭代（从旧到新）
