@@ -7,3 +7,4 @@
 .cargo-home/
 .vendor/
 target/
+.codebuddy
