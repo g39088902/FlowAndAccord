@@ -95,7 +95,15 @@ impl World3DEngine {
         // WRITE: 地区成员变更
         if old_camp != Some(camp_id) {
             if old_camp.is_some() {
-                self.region_registry.remove_member(agent_id, tick);
+                // ★ v1.22.0 防御：无法从原地区移除（如已是原地区国王）则中止登基，避免一人跨多地区/多王
+                if !self.region_registry.remove_member(agent_id, tick) {
+                    if let Some(a) = self.agent_by_id_mut(agent_id) {
+                        a.coronation_pending = None;
+                        a.expedition_target_camp = None;
+                    }
+                    self.last_event = Some(format!("👑 #{} 已是别地国王，放弃对【{}】的登基", agent_id, camp_name));
+                    return;
+                }
             }
             self.region_registry.add_member(camp_id, agent_id, tick, arrival);
         }

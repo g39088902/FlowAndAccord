@@ -40,7 +40,7 @@ pub enum BranchId {
 impl BranchId {
     /// 中性声明序（b1..b16）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
     /// 生产环境的策展优先级只存在于前端配置文件，严禁在此处写死。
-    /// ★ M4 夺位远征 B14SeekThrone 声明在最前：生理层最高档，兜底序下亦优先于口渴/饥饿/休息。
+    /// ★ M4 夺位远征 B14SeekThrone 声明在最前：第一层生存需求（生理层最高档），兜底序下亦优先于口渴/饥饿/休息。
     pub const ALL: [BranchId; 16] = [
         BranchId::B14SeekThrone,
         BranchId::B1QuenchThirst,
@@ -212,7 +212,7 @@ impl BranchId {
                 }
             }
             BranchId::B14SeekThrone => {
-                // ★ M4 夺位远征：生理层最高档（国王 = 数不尽的资源），由马斯洛引擎驱动
+                // ★ M4 夺位远征：第一层生存需求（生理层最高档）——看结果不看开头：王位 = 资源的分配权，夺位为获取资源分配权而自主出征
                 // 守卫（全部内联，任意排列语义安全）：在世男性成年、非现任国王
                 if !a.is_alive || a.gender != Gender::Male || a.age < cfg.agent_adult_age {
                     return None;

@@ -593,26 +593,44 @@
       try {
         localStorage.setItem('flow_sim_speed', val.toString());
       } catch (_) {}
-    
+    });
 
-  // ★ 家户大盘中点击户主/配偶追踪视角 (v0.9.72 M1)
-  document.addEventListener('click', function(e) {
-    const hhItem = e.target.closest('.ledger-hh-item');
-    const chip = e.target.closest('.lineage-chip[data-agent-id]');
-    let targetId = null;
-    if (chip && chip.getAttribute('data-agent-id')) {
-      targetId = parseInt(chip.getAttribute('data-agent-id'), 10);
-    } else if (hhItem && hhItem.getAttribute('data-agent-id')) {
-      targetId = parseInt(hhItem.getAttribute('data-agent-id'), 10);
-    }
-    if (targetId && typeof sim !== 'undefined' && sim.getAgent) {
-      const agent = sim.getAgent(targetId);
-      if (agent) {
-        sim.selectionType = 'agent';
-        sim.selectedAgentId = targetId;
-        if (typeof centerOnAgent === 'function') centerOnAgent(agent);
-      }
-    }
-  });
+    // ==========================================
+    // ★ 统一 Agent 聚焦跳转：平移相机至该族人并立即打开右侧 Inspector 角色卡片
+    //   (v1.21.1 修复 centerOnAgent 不存在导致的点击无反应)
+    // ==========================================
+    window.focusOnAgent = function focusOnAgent(agentId) {
+      if (agentId == null) return;
+      const targetId = parseInt(agentId, 10);
+      if (isNaN(targetId)) return;
+      const targetAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(targetId) : sim.agents.find(a => a.id === targetId);
+      if (!targetAgent) return;
+      sim.selectionType = 'agent';
+      sim.selectedAgentId = targetId;
+      // 相机平移对齐至族人坐标
+      const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+      const rx = targetAgent.pos.x * cosZ - targetAgent.pos.y * sinZ;
+      const ry = targetAgent.pos.x * sinZ + targetAgent.pos.y * cosZ;
+      const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+      const y2 = ry * cosX - (targetAgent.pos.z || 0) * sinX;
+      camera.panX = -rx * camera.zoom;
+      camera.panY = -y2 * camera.zoom;
+      // ★ M1.7 胎儿无地图实体：定位一次但不跟随
+      isCameraFollow = !!targetAgent.isAlive && !targetAgent.isFetus;
+      if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+      // 立即打开/刷新右侧 Inspector 角色卡片
+      if (typeof updateInspector === 'function') updateInspector();
+    };
 
-});
+    // ==========================================
+    // ★ 全局点击委托：点击户主/族长/国王等 .lineage-chip[data-agent-id] → 聚焦角色卡片
+    //   (家户/婚姻/宗族/王国卡片均含该 class，v1.21.1 统一入口)
+    // ==========================================
+    document.addEventListener('click', function(e) {
+      const chip = e.target.closest('.lineage-chip[data-agent-id]');
+      if (!chip) return;
+      const agentId = chip.getAttribute('data-agent-id');
+      if (agentId == null) return;
+      e.stopPropagation();
+      window.focusOnAgent(agentId);
+    });

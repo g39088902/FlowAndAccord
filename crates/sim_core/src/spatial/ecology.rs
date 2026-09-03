@@ -208,14 +208,38 @@ impl World3DEngine {
 
         // 9. 播撒初始 20 名原始小人 (10男10女)
         // ★ v1.9.0 出生地 = 随机的普通道路节点（不能是 POI；营地/水/粮/木/石/金节点均为 POI 节点）
+        // ★ v1.21.1 始祖出生地去营地化：过滤出距离所有营地 POI 均大于安全距离的普通道路节点候选集
         let total_initial = self.config.agent_spawn_count;
         let female_count = total_initial / 2;
+
+        // 营地 POI 坐标（避让基准：严禁始祖出生在营地建筑/交互范围内）
+        let camp_positions: Vec<Vec3> = self.pois.iter()
+            .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
+            .map(|p| p.pos)
+            .collect();
+        // 安全出生距离 = max(交互半径, 最小 POI 间距一半)，确保与营地保持避让
+        let spawn_safe_dist = self.config.poi_interaction_radius.max(self.config.poi_min_distance * 0.5);
+        // 候选集：距离任何营地均 ≥ 安全距离的普通道路节点
+        let valid_spawn_nodes: Vec<u32> = road_nodes.iter().copied()
+            .filter(|&nid| {
+                let pos = self.network.graph[*self.network.node_map.get(&nid).unwrap()].pos;
+                camp_positions.iter().all(|c| pos.distance_to(c) >= spawn_safe_dist)
+            })
+            .collect();
+        // 极端回退：无远离营地的普通道路节点 → 预生成一个远离所有营地的野外交叉节点（并接入路网）
+        let fallback_spawn_node: Option<u32> = if valid_spawn_nodes.is_empty() {
+            Some(self.make_far_spawn_node(&camp_positions, spawn_safe_dist))
+        } else {
+            None
+        };
+
         for i in 0..total_initial {
-            // 出生地为随机普通道路节点（RNG 确定性顺序：每名始祖消耗 1 次；无道路节点时回退营地节点）
-            let spawn_node = if road_nodes.is_empty() {
-                camp_nodes[i % camp_nodes.len()]
+            // 出生地优先从远离营地的候选集中确定性选取（每名始祖仍消耗 1 次 RNG，保持下游随机序列）；
+            // 无候选集时回退到远离营地的野外交叉节点——严禁任何始祖直接出生于营地节点或营地建筑范围内。
+            let spawn_node = if !valid_spawn_nodes.is_empty() {
+                valid_spawn_nodes[self.rng.gen_range_usize(0, valid_spawn_nodes.len())]
             } else {
-                road_nodes[self.rng.gen_range_usize(0, road_nodes.len())]
+                fallback_spawn_node.expect("valid_spawn_nodes 为空时 fallback_spawn_node 必已生成")
             };
             let spawn_pos = self.network.graph[*self.network.node_map.get(&spawn_node).unwrap()].pos;
             // home_camp = 离出生地最近的营地（保证 home_camp_node 与地区归属一致）
@@ -559,6 +583,51 @@ impl World3DEngine {
         // 清理已彻底消逝的尸骸，之后全量重建索引（retain 会改变所有幸存者下标）
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
         self.rebuild_agent_index();
+    }
+
+    /// ★ v1.21.1 生成一个远离所有营地 POI 的野外道路交叉节点（始祖出生地兜底，严禁落营地）
+    fn make_far_spawn_node(&mut self, camp_positions: &[Vec3], safe_dist: f32) -> u32 {
+        let half_size = self.terrain.world_size / 2.0;
+        let spread = self.config.poi_spawn_spread_ratio;
+        let mut best = Vec3::ZERO;
+        let mut best_min_dist = -1.0f32;
+        for _ in 0..100 {
+            let x = self.rng.gen_range(-half_size * spread, half_size * spread);
+            let y = self.rng.gen_range(-half_size * spread, half_size * spread);
+            let cand = Vec3::new(x, y, self.terrain.sample_elevation(x, y));
+            let min_dist = camp_positions.iter()
+                .map(|c| c.distance_to(&cand))
+                .fold(f32::MAX, |a, b| a.min(b));
+            if min_dist >= safe_dist {
+                let nid = self.network.add_node(cand, NodeType::GroundIntersection);
+                self.connect_spawn_node(nid);
+                return nid;
+            }
+            // 记录当前最优（离最近营地最远）候选
+            if min_dist > best_min_dist {
+                best_min_dist = min_dist;
+                best = cand;
+            }
+        }
+        // 兜底：返回 100 次尝试中「离最近营地最远」的候选（最大化避让营地，绝不随机贴近营地）
+        let nid = self.network.add_node(best, NodeType::GroundIntersection);
+        self.connect_spawn_node(nid);
+        nid
+    }
+
+    /// ★ v1.21.1 将新生成的野外节点就近接入既有路网（双向车道），保证始祖出生后即可寻路
+    fn connect_spawn_node(&mut self, nid: u32) {
+        let pos = self.network.graph[*self.network.node_map.get(&nid).unwrap()].pos;
+        let mut nearest: Vec<(f32, u32)> = self.network.graph.node_weights()
+            .filter(|n| n.id != nid)
+            .map(|n| (n.pos.distance_to(&pos), n.id))
+            .collect();
+        nearest.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        for (dist, other) in nearest.into_iter().take(2) {
+            let road_class = if dist > self.config.road_grade_pave_threshold { RoadClass::Cobblestone } else { RoadClass::DirtTrack };
+            let _ = self.network.add_lane(nid, other, None, road_class, &self.config);
+            let _ = self.network.add_lane(other, nid, None, road_class, &self.config);
+        }
     }
 }
 

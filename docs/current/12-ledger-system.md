@@ -63,7 +63,7 @@
 ### RegionRegistry（地区与王国体系 M4）
 - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，政体=`Kingdom`，继承制=`Primogeniture`；始祖播撒时加入最近营地，新生儿随父加入父亲所在地区。
 - **到达时序**：`arrival_tick`（始祖=0，新生儿=出生 tick），`arrival_order` 按 `(arrival_tick, agent_id)` 升序。
-- **初王顺位与登基威望**：初王 = arrival_order 最早到达的在世男性；初任/更替/世袭/夺位登基之国王均享有 +3 威望（`prestigeKingBonus`，v1.18.0）；无在世男性则王位空悬，账本冻结。
+- **初王顺位与登基威望**：初王 = arrival_order 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0 起——杜绝按 arrival_tick 秒封未抵营始祖，封王即终止远征休整防一人双王）；初任/更替/世袭/夺位登基之国王均享有 +3 威望（`prestigeKingBonus`，v1.18.0）；无在世男性则王位空悬，账本冻结。
 - **★ v1.12.0 历史国王（含在位时长与死因）**：`Region.history_kings` 为 `Vec<HistoryKing>{agent_id, reign_start_tick, reign_end_tick, death_cause}`，`Region.current_reign_start` 追踪现任国王登基 tick；`set_king(agent, tick, note, prev_death_cause)` 在更替时将前任国王入档（死因从 `agent.death_cause` 读取，被废黜则为 None）；营地详情模态框展示历史国王列表及在位时长/死因。
 - **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。

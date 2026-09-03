@@ -3,6 +3,7 @@
 > **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
 
 > ⚡ **v1.9.0（Task4）出生地**：开局始祖不再落在 POI/营地节点，而是随机落在**普通道路节点**（`road_nodes` = `countTerrainTransitionNodes`(17) 个地形过渡 `GroundIntersection` 节点，非 POI），每名始祖消耗 1 次共享 `WorldRng` 确定性抽选；`home_camp` = 离出生地最近的营地（保证 `home_camp_node` 与地区归属一致）。
+> ⚡ **v1.21.1 始祖出生地去营地化**：播撒始祖时先过滤出**距离任何营地 POI 均 ≥ 安全距离**（`max(poi_interaction_radius, poi_min_distance × 0.5)`，默认 35m）的普通道路节点候选集 `valid_spawn_nodes`，每名始祖仍消耗 1 次共享 `WorldRng` 确定性抽选；无候选集（极端/无道路节点）时在远离营地的野外坐标生成道路交叉节点（`make_far_spawn_node` 就近接入路网），**严禁任何始祖直接出生于营地节点或营地建筑范围内**。
 
 > ⚡ **M6（v1.4.0）机制更新**：随身搬运链路保留（行囊 `carried_*` 仍为物理背包层），但 `RestingAtCamp` 时行囊按卸货速率**直接卸入户主家户账本**（Deposit 流水）并即时入账，家中吃喝从家户账本真实扣减（Consume）——已无房屋仓库中间层。
 >

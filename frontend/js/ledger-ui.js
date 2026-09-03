@@ -25,6 +25,11 @@
   let regionArrivalExpanded = null;  // 到达时序展开的 camp_id
   let regionSuccessionExpanded = null; // 长子顺位展开的 camp_id
   let _simRef = null;                // 最近一次 sim 引用（事件回调用）
+  // ★ v1.21.1 内容快照缓存：10FPS 高频刷新下，仅当生成的 HTML 与上次写入一致时跳过 innerHTML 重建，
+  //   避免每 100ms 销毁重建卡片 DOM 导致 :hover / transition 反复被打断（悬停闪烁）。
+  const _htmlCache = new Map();
+  // ★ v1.21.1 悬停防闪烁：鼠标停留在大盘交互区时暂停 10FPS 高频重建，仅事件/标签切换强制刷新
+  let _panelHovered = false;
 
   // ─── 工具函数 ───────────────────────────────────────────────
   function tickToSec(t) { return t / 30.0; }
@@ -45,6 +50,13 @@
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  }
+  // ★ v1.21.1 内容一致的渲染：与上次写入相同则跳过 DOM 重建（防悬停闪烁）
+  function renderHtml(el, html) {
+    if (!el) return;
+    if (_htmlCache.get(el) === html) return;
+    _htmlCache.set(el, html);
+    el.innerHTML = html;
   }
   // ─── 宗族辅助：从 Debug 字符串解析实体 ID ────────────────────
   function parseFamilyId(s) {
@@ -93,7 +105,7 @@
       const el = document.getElementById('tab-' + t + '-content');
       if (el) el.style.display = (t === tab) ? '' : 'none';
     });
-    if (_simRef) update(_simRef);
+    if (_simRef) update(_simRef, true);
   }
 
   // ─── 家户标签页渲染 ─────────────────────────────────────────
@@ -118,13 +130,14 @@
     if (!list) return;
 
     if (sorted.length === 0) {
-      list.innerHTML = '<div class="ledger-empty">尚无家户（成年男性立宅后成立）</div>';
+      renderHtml(list, '<div class="ledger-empty">尚无家户（成年男性立宅后成立）</div>');
     } else {
       const shown = sorted.slice(0, 20);
-      list.innerHTML = shown.map(h => renderHouseholdItem(sim, h)).join('');
+      let html = shown.map(h => renderHouseholdItem(sim, h)).join('');
       if (sorted.length > 20) {
-        list.innerHTML += '<div class="ledger-hh-more">... 另有 ' + (sorted.length - 20) + ' 户未展示</div>';
+        html += '<div class="ledger-hh-more">... 另有 ' + (sorted.length - 20) + ' 户未展示</div>';
       }
+      renderHtml(list, html);
     }
 
     // 公仓兜底余额卡片
@@ -289,7 +302,7 @@
       html += '<span class="pg-bal-chip" style="color:' + RES_COLORS[r] + ';">' + RES_ICONS[r] + ' ' + (bal[r] || 0).toFixed(1) + '</span>';
     });
     html += '</div></div>';
-    el.innerHTML = html;
+    renderHtml(el, html);
   }
 
   // ─── 婚姻标签页渲染 ─────────────────────────────────────────
@@ -315,11 +328,11 @@
     if (!list) return;
 
     if (marriages.length === 0) {
-      list.innerHTML = '<div class="ledger-empty">尚无婚姻登记</div>';
+      renderHtml(list, '<div class="ledger-empty">尚无婚姻登记</div>');
       return;
     }
     const shown = marriages.slice(0, 20);
-    list.innerHTML = shown.map(m => {
+    let html = shown.map(m => {
       const husb = agentName(sim, m.husbandId);
       const wife = agentName(sim, m.wifeId);
       const status = m.isActive
@@ -337,8 +350,9 @@
         + '</div>';
     }).join('');
     if (marriages.length > 20) {
-      list.innerHTML += '<div class="ledger-hh-more">... 另有 ' + (marriages.length - 20) + ' 段未展示</div>';
+      html += '<div class="ledger-hh-more">... 另有 ' + (marriages.length - 20) + ' 段未展示</div>';
     }
+    renderHtml(list, html);
   }
 
   // ─── 宗族标签页渲染（M3） ────────────────────────────────────
@@ -357,7 +371,7 @@
     if (!list) return;
 
     if (clans.length === 0) {
-      list.innerHTML = '<div class="ledger-empty">尚无宗族（族人按姓氏自动聚合）</div>';
+      renderHtml(list, '<div class="ledger-empty">尚无宗族（族人按姓氏自动聚合）</div>');
       return;
     }
 
@@ -368,10 +382,11 @@
     );
 
     const shown = sorted.slice(0, 20);
-    list.innerHTML = shown.map(c => renderClanCard(sim, c)).join('');
+    let html = shown.map(c => renderClanCard(sim, c)).join('');
     if (sorted.length > 20) {
-      list.innerHTML += '<div class="ledger-hh-more">... 另有 ' + (sorted.length - 20) + ' 族未展示</div>';
+      html += '<div class="ledger-hh-more">... 另有 ' + (sorted.length - 20) + ' 族未展示</div>';
     }
+    renderHtml(list, html);
   }
 
   function renderClanCard(sim, clan) {
@@ -549,12 +564,12 @@
     const list = document.getElementById('ledger-region-list');
     if (!list) return;
     if (regions.length === 0) {
-      list.innerHTML = '<div class="ledger-empty">尚无地区登记</div>';
+      renderHtml(list, '<div class="ledger-empty">尚无地区登记</div>');
       return;
     }
     // 按 camp_id 升序（5个营地固定顺序）
     const sorted = regions.slice().sort((a, b) => a.campId - b.campId);
-    list.innerHTML = sorted.map(r => renderKingdomCard(sim, r)).join('');
+    renderHtml(list, sorted.map(r => renderKingdomCard(sim, r)).join(''));
   }
 
   function renderKingdomCard(sim, region) {
@@ -682,7 +697,7 @@
   }
 
   // ─── 主更新入口（10FPS 节流由 render.js 保证） ─────────────
-  function update(sim) {
+  function update(sim, force) {
     _simRef = sim;
     const panel = document.getElementById('ledger-panel');
     if (!panel) return;
@@ -695,6 +710,10 @@
 
     // 折叠时跳过渲染
     if (panel.classList.contains('minimized')) return;
+
+    // ★ v1.21.1 悬停防闪烁：鼠标停留在大盘交互区时暂停 10FPS 高频重建，
+    //   仅事件/标签切换的强制刷新（force=true）或移出悬停后恢复更新。
+    if (!force && _panelHovered) return;
 
     if (activeTab === 'household') renderHouseholdTab(sim);
     else if (activeTab === 'marriage') renderMarriageTab(sim);
@@ -716,7 +735,7 @@
       e.stopPropagation();
       const id = parseInt(closeBtn.dataset.journalClose, 10);
       if (journalHHId === id) journalHHId = null;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // 宗族流水抽屉关闭
@@ -725,7 +744,7 @@
       e.stopPropagation();
       const sn = clanCloseBtn.dataset.clanJournalClose;
       if (journalClanSurname === sn) journalClanSurname = null;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // 点击账面余额区域 → 切换流水抽屉（存续家户）
@@ -736,7 +755,7 @@
       const hh = (_simRef ? (_simRef.households || []).find(h => h.id === id) : null);
       if (hh && !hh.isDissolved) {
         journalHHId = (journalHHId === id) ? null : id;
-        if (_simRef) update(_simRef);
+        if (_simRef) update(_simRef, true);
       }
       return;
     }
@@ -746,7 +765,7 @@
       e.stopPropagation();
       const sn = clanBalClick.dataset.clanBal;
       journalClanSurname = (journalClanSurname === sn) ? null : sn;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // 点击族长顺位 → 展开/收起
@@ -755,7 +774,7 @@
       e.stopPropagation();
       const sn = successionClick.dataset.clanSuccession;
       successionExpandedSurname = (successionExpandedSurname === sn) ? null : sn;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // ★ M4: 地区公仓流水抽屉关闭
@@ -764,7 +783,7 @@
       e.stopPropagation();
       const cid = parseInt(regionCloseBtn.dataset.regionJournalClose, 10);
       if (journalRegionCampId === cid) journalRegionCampId = null;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // ★ M4: 点击公仓余额 → 切换地区流水抽屉
@@ -773,7 +792,7 @@
       e.stopPropagation();
       const cid = parseInt(regionBalClick.dataset.regionBal, 10);
       journalRegionCampId = (journalRegionCampId === cid) ? null : cid;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // ★ M4: 到达时序展开/收起
@@ -782,7 +801,7 @@
       e.stopPropagation();
       const cid = parseInt(regionArrivalClick.dataset.regionArrival, 10);
       regionArrivalExpanded = (regionArrivalExpanded === cid) ? null : cid;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // ★ M4: 长子顺位展开/收起
@@ -791,7 +810,7 @@
       e.stopPropagation();
       const cid = parseInt(regionSuccessionClick.dataset.regionSuccession, 10);
       regionSuccessionExpanded = (regionSuccessionExpanded === cid) ? null : cid;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
     // 点击已解散家户卡片 → 切换继承档案
@@ -801,7 +820,7 @@
       // 不拦截 lineage-chip 点击
       if (e.target.closest('.lineage-chip')) return;
       dissolvedExpandedId = (dissolvedExpandedId === id) ? null : id;
-      if (_simRef) update(_simRef);
+      if (_simRef) update(_simRef, true);
       return;
     }
   }
@@ -809,6 +828,15 @@
   // ─── 初始化 ──────────────────────────────────────────────────
   function init() {
     document.addEventListener('click', onDocumentClick);
+    // ★ v1.21.1 悬停防闪烁：监听大盘交互区进出，移出后立即强制刷新一次
+    const panel = document.getElementById('ledger-panel');
+    if (panel) {
+      panel.addEventListener('mouseenter', () => { _panelHovered = true; });
+      panel.addEventListener('mouseleave', () => {
+        _panelHovered = false;
+        if (_simRef) update(_simRef, true);
+      });
+    }
   }
 
   if (document.readyState === 'loading') {

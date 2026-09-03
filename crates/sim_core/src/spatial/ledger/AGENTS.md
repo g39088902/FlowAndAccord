@@ -36,7 +36,7 @@
 - **M2 分家权重**：父亲在世时权重 1，母亲（如有且在世）权重 1，子一代各权重 1，`W = 1(父) + 1(母) + n(子一代)`，分家男子抽走各类资源 `1/W`；丧父/丧母时亡者不占权重；`n = 父亲 children_ids.len()`（胎儿已在其中）；份额按**每类资源独立计算**，只记账本余额不动物理库存。
 - **M2 继承**：户主死亡 → 家户资源平分在世妻子（如有）与在世子一代；无在世妻子且无在世子女（绝嗣） → 全部转入 `public_granary` 公仓兜底账本；清算后 `dissolve`。
 - **M3 宗族**：按 `surname` 自动聚合（始祖播撒即入族、新生儿随父姓入族）；族长 = 同姓在世最年长男性（并列 id 小者），无在世男性则无主账本冻结；族税每 `clan_tribute_interval_ticks` 全局统一征收（账面余额 × `clan_tribute_rate`），族内互助有族库门槛与冷却。
-- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 最早到达在世男性；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却。
+- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却。
 
 ## 4. ⚠️ 本目录局部易踩坑
 

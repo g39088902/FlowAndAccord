@@ -56,6 +56,7 @@ const NEED_KIND_LABEL = {
   BuildHouse: '施工建房',
   Detour: '越野寻路',
   Courtship: '求偶成婚',
+  SeekThrone: '夺位远征',
 };
 const NEED_KIND_REASON = {
   QuenchThirst: '自身水分告急，前往水泉痛饮至满值并带回补给家户账本。',
@@ -72,6 +73,7 @@ const NEED_KIND_REASON = {
   GoldWealth: '4级庄园竣工且水/粮/木/石/金均 ≥ 200 后，娱乐性淘金积累随身财富（冷却180s）。',
   Detour: '车道临时受阻，正在荒野中越野寻路。',
   Courtship: '寻访全图魅力最高的单身女性，前往求偶并迎娶入家户。',
+  SeekThrone: '第一层生存需求（生理）：王位 = 全境资源的分配权，夺位为获取资源分配权而自主出征——在世成年男性非现任国王，向最近空缺王位的营地进军，率先物理抵达者登基为王；途中沿路网车道行走、坐标连续不瞬移。',
 };
 const LEVEL_NUMERALS = ['①', '②', '③', '④', '⑤'];
 

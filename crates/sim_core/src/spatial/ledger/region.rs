@@ -3,8 +3,9 @@
 //! 隶属「账本与仓库重构」计划 M4。核心原则：
 //! - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，领导者=国王；
 //!   始祖播撒时加入最近营地的 Region，新生儿随父加入父亲所在 Region。
-//! - **初王顺位**：初王 = arrival_order 中最早到达的在世男性（arrival_tick 升序 →
-//!   并列 agent_id 升序）；无在世男性则王位空悬（leader=None），账本冻结。
+//! - **初王顺位**：初王 = arrival_order 中第一个「物理抵达营地」（进入交互半径）的在世男性
+//!   （arrival_tick 升序 → 并列 agent_id 升序；始祖出生避让营地后须沿路网走到营地方可称王）；
+//!   无在世男性则王位空悬（leader=None），账本冻结。
 //! - **夺位远征**：男性非国王 agent 在存在无主营地时，放下一切冲向最近无主营地登基；
 //!   走现有寻路+运动系统，坐标连续不闪现；施工进度冻结不回滚。
 //! - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 空悬。
@@ -22,6 +23,7 @@ use crate::spatial::ledger::family::HouseholdId;
 use crate::spatial::ledger::group::{Group, GroupKind};
 use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use crate::spatial::world::World3DEngine;
+use crate::spatial::vec3::Vec3;
 
 /// 五类资源的固定顺序（保证遍历确定性）
 const RESOURCE_ORDER: [ResourceKind; 5] = [
@@ -280,22 +282,47 @@ impl World3DEngine {
     }
 
     // ══════════════════════════════════════════════════════════
-    // 初王顺位：arrival_order 中最早到达的在世男性
+    // 初王顺位：arrival_order 中第一个物理抵达营地（进入交互半径）的在世男性
     // ══════════════════════════════════════════════════════════
 
     fn update_kings(&mut self, tick: u64) {
         // READ PHASE：收集每个地区的新国王候选 + 前任国王死因
         let mut successions: Vec<(u32, Option<AgentId>, Option<String>)> = Vec::new();
 
-        for (camp_id, region) in &self.region_registry.regions {
-            let mut new_king: Option<AgentId> = None;
+        // ★ v1.22.0 初王必须「物理抵达营地」：始祖出生已避让营地，不再于 tick 0 凭
+        //   arrival_order 秒封王；无主地区仅当候选者进入营地交互半径才可登基（沿路网走到营地后称王）。
+        //   有主地区交由 execute_pending_coronations / handle_king_deaths 处理，本方法只做「初王顺位」。
+        let camp_positions: BTreeMap<u32, Vec3> = self.pois.iter()
+            .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
+            .map(|p| (p.id, p.pos))
+            .collect();
+        let interact_radius = self.config.poi_interaction_radius;
 
-            // arrival_order 已按 (arrival_tick, agent_id) 升序，第一个在世男性即初王
+        for (camp_id, region) in &self.region_registry.regions {
+            // 只处理无主地区；有主地区跳过（避免覆盖远征登基/长子继承的现任国王）
+            if region.group.leader.is_some() {
+                continue;
+            }
+            let mut new_king: Option<AgentId> = None;
+            let camp_pos = camp_positions.get(camp_id).copied();
+
+            // arrival_order 已按 (arrival_tick, agent_id) 升序；初王 = 第一个「物理抵达营地」的在世男性
             for &member_id in &region.arrival_order {
                 let Some(agent) = self.agent_by_id(member_id) else { continue };
                 if agent.is_alive && agent.gender == Gender::Male {
-                    new_king = Some(member_id);
-                    break;
+                    // 初王候选不能是正在远征别处的过客：
+                    // （避免把奔赴他营的始祖错封为本站国王，导致一人双王）
+                    if let Some(exp_camp) = agent.expedition_target_camp {
+                        if exp_camp != *camp_id {
+                            continue;
+                        }
+                    }
+                    let arrived = camp_pos.map_or(false, |pos| agent.world_pos.distance_to(&pos) < interact_radius);
+                    if arrived {
+                        new_king = Some(member_id);
+                        break;
+                    }
+                    // 未抵达：继续扫描下一位在世男性（胜者为王：率先抵达者登基）
                 }
             }
 
@@ -319,7 +346,7 @@ impl World3DEngine {
                 Some(id) => {
                     let ok = if region.group.leader.is_none() {
                         // 初王登基
-                        let ok = region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name), None);
+                        let ok = region.set_king(id, tick, &format!("初王登基：arrival_order 首位物理抵达在世男性，【{}】开国", camp_name), None);
                         if ok {
                             self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
                         }
@@ -331,6 +358,12 @@ impl World3DEngine {
                         let bonus = self.config.prestige_king_bonus;
                         if let Some(agent) = self.agent_by_id_mut(id) {
                             agent.prestige = agent.prestige.saturating_add(bonus);
+                            // ★ v1.22.0 封王即终止远征：清除登基决心/远征目标，回到营地休整。
+                            //   （否则刚封王的始祖仍处 SeekingThrone，下拍把自家营地误判为「王位易主」再次远征 → 一人双王）
+                            agent.coronation_pending = None;
+                            agent.expedition_target_camp = None;
+                            agent.current_need = Some("SelfActualization·King".to_string());
+                            agent.state = crate::spatial::agent::PrimitiveActionState::RestingAtCamp;
                         }
                     }
                 }
