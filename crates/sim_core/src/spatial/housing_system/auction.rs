@@ -1,7 +1,7 @@
 //! auction.rs · 二手房屋市场、营地中介拍卖与麦穗 37% 原则最优停止决策 (v1.14.0)
 //!
 //! 依据 TODO.md 规范实现：
-//! 1. 依托外部市场价格系统（水/粮市价 + 木/石基准价）计算房屋建设成本等效黄金；
+//! 1. 依托外部市场价格系统（榷市水/粮实时市价；木/石/金榷市暂未承载记 0 单价）计算房屋建设成本等效黄金，0 级仓库享 house_base_foundation_cost_gold 保底；
 //! 2. 有闲置土地时按建设成本等效黄金估价，买方按 min(建设成本, 家庭全部黄金) 开价；
 //! 3. 无闲置土地时按供求关系估价，买方倾尽家庭全部黄金开价；
 //! 4. 营地充当虚拟中介，按麦穗理论 37% 原则（前 37% 观察期只看不卖树立最高标杆，
@@ -78,12 +78,13 @@ pub fn calculate_house_construction_cost(
         if qty <= 0.001 {
             continue;
         }
+        // 材料单价全部按当时榷市（榷场互市）原料价计算：水/粮取现时市价；木/石/金榷市暂未承载，暂时记 0 单价
         let unit_price = match rk {
             ResourceKind::Water => market_water_price,
             ResourceKind::Food => market_food_price,
-            ResourceKind::Wood => config.market_price_base_wood,
-            ResourceKind::Stone => config.market_price_base_stone,
-            ResourceKind::Gold => 1.0,
+            ResourceKind::Wood => 0.0,
+            ResourceKind::Stone => 0.0,
+            ResourceKind::Gold => 0.0,
         };
         total_gold += qty * unit_price;
     }

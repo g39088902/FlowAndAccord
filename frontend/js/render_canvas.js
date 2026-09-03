@@ -215,6 +215,9 @@ if (now - lastUiUpdate >= 100) {
     // 6. 实时汇总全地图资源大盘
     drawResourceDashboard();
 
+    // 6.2. ★ v1.22.6 生态大盘产速滑块回写：由内核倍率驱动（读档/重置后自动同步）
+    if (typeof window.syncEcoRegenSliders === 'function') window.syncEcoRegenSliders();
+
     // 6.5. 实时汇总全图存活部落民属性平均值大盘
     updateGlobalAverages(aliveAgents, sim.houses, sim.households);
   }

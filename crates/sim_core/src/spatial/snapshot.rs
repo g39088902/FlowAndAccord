@@ -51,6 +51,26 @@ pub struct WorldSnapshot3D {
     /// ★ v1.8.7 死亡/流产墓碑（滑动窗口保留，含本帧死亡与腹中胎儿流产/随母亡故）。
     /// 供前端即使在高倍速单帧跨过整个衰减窗口时，也能强制把档案库对应条目补记为已故并保留死因。
     pub recent_deaths: Vec<RecentDeathSnapshot>,
+    /// ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，随存档持久化）。
+    /// 前端两处消费方共用同一数值，保证「生态大盘设置」与「POI 卡片显示」一致：
+    /// - POI 卡片「产出速率」= 快照 `regen_rate`（基准值）× 本组对应倍率；
+    /// - 生态大盘滑块位置与标签由本组数值回写（读档/重置后自动同步）。
+    /// ⚠ 榷场特例：粮食再生复用**浆果槽位**（见 `world_tick.rs`），内核无独立粮食倍率。
+    #[serde(default = "default_regen_multiplier")]
+    pub water_regen_multiplier: f32,
+    #[serde(default = "default_regen_multiplier")]
+    pub berry_regen_multiplier: f32,
+    #[serde(default = "default_regen_multiplier")]
+    pub wood_regen_multiplier: f32,
+    #[serde(default = "default_regen_multiplier")]
+    pub stone_regen_multiplier: f32,
+    #[serde(default = "default_regen_multiplier")]
+    pub gold_regen_multiplier: f32,
+}
+
+/// 产速倍率的 serde 默认值：1.0（未注入倍率时等同基准产速）
+fn default_regen_multiplier() -> f32 {
+    1.0
 }
 
 /// 死亡/流产墓碑记录（v1.8.7）

@@ -178,7 +178,7 @@ function updateGlobalAverages(aliveAgents, houses, households) {
     if (el('avg-age-val')) el('avg-age-val').textContent = '0.0s';
     if (el('avg-speed-val')) el('avg-speed-val').textContent = '0.0 m/s';
     if (el('avg-gender-val')) el('avg-gender-val').textContent = '0♂ / 0♀';
-    if (el('avg-house-val')) el('avg-house-val').textContent = '0% (0间)';
+    if (el('avg-house-val')) el('avg-house-val').textContent = '0% (0间/0户)';
     if (el('avg-single-val')) el('avg-single-val').textContent = '0♂ / 0♀';
     if (el('avg-married-val')) el('avg-married-val').textContent = '0对 (0人)';
     if (el('avg-gini-gold-val')) el('avg-gini-gold-val').textContent = '0.000 (完全平等)';
@@ -193,7 +193,7 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   let sumHunger = 0, sumThirst = 0, sumStamina = 0, sumHealth = 0, sumMaxHealth = 0, sumAge = 0, sumSpeed = 0;
   let sumWater = 0, sumFood = 0, sumWood = 0, sumStone = 0, sumGold = 0;
   let sumInt = 0, sumStr = 0, sumDig = 0, sumLib = 0, sumSlp = 0, sumLif = 0;
-  let males = 0, withHouse = 0;
+  let males = 0;
   let singleAdultMales = 0, singleAdultFemales = 0, marriedCount = 0;
 
   for (let i = 0; i < n; i++) {
@@ -221,7 +221,6 @@ function updateGlobalAverages(aliveAgents, houses, households) {
     sumLif += a.lifeExpectancy !== undefined ? a.lifeExpectancy : 100;
 
     if (a.gender === 'male') males++;
-    if (a.homeHouseId !== null && a.homeHouseId !== undefined) withHouse++;
 
     const isAdult = (a.age || 0) >= 1800.0;
     const isSingle = !a.spouseId;
@@ -249,8 +248,21 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   const staminaPct = Math.round(avgStamina);
 
   const females = n - males;
-  const housePct = Math.round((withHouse / n) * 100);
-  const validHousesCount = houses ? houses.length : 0;
+  // ★ v1.22.6 有房率口径修正：分子 = 有主房屋数（排除空置/在售/无主房），分母 = 存续家户数
+  let ownedHousesCount = 0;
+  if (houses) {
+    for (let i = 0; i < houses.length; i++) {
+      const ow = houses[i].ownerId;
+      if (ow !== null && ow !== undefined) ownedHousesCount++;
+    }
+  }
+  let activeHouseholdsCount = 0;
+  if (households) {
+    for (let i = 0; i < households.length; i++) {
+      if (!households[i].isDissolved) activeHouseholdsCount++;
+    }
+  }
+  const housePct = activeHouseholdsCount > 0 ? Math.round((ownedHousesCount / activeHouseholdsCount) * 100) : 0;
   const marriedCouples = Math.floor(marriedCount / 2);
 
   // === 家户金余额基尼系数与财富分配统计（基于家户账本，非个人随身携带量） ===
@@ -292,7 +304,7 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   if (el('avg-age-val')) el('avg-age-val').textContent = `${avgAge.toFixed(1)}s`;
   if (el('avg-speed-val')) el('avg-speed-val').textContent = `${avgSpeed.toFixed(1)} m/s`;
   if (el('avg-gender-val')) el('avg-gender-val').textContent = `${males}♂ / ${females}♀`;
-  if (el('avg-house-val')) el('avg-house-val').textContent = `${housePct}% (${validHousesCount}间)`;
+  if (el('avg-house-val')) el('avg-house-val').textContent = `${housePct}% (${ownedHousesCount}间/${activeHouseholdsCount}户)`;
   if (el('avg-single-val')) el('avg-single-val').textContent = `${singleAdultMales}♂ / ${singleAdultFemales}♀`;
   if (el('avg-married-val')) el('avg-married-val').textContent = `${marriedCouples}对 (${marriedCount}人)`;
 

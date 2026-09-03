@@ -35,6 +35,13 @@
 - 外部市场具备主库存（水）与次级库存（粮）的双库存独立再生机制，不纳入 `NodePool`，不设施密特触发器（由 B15 专用派发）。
 - 营地储量无限，不参与资源竞争。
 
+### 产速倍率与生效产速（v1.22.6）
+- 上表「再生速率」为**基准值**，来自 `SimConfig` 的 `regen_base_*` / `market_regen_base_*`；内核每 tick 将 `poi.regen_rate` 覆写为基准值，再按 `dt × 倍率` 推进再生（见 `world_tick.rs`）。
+- 因此**快照 `regen_rate` 只含基准值，不含倍率**；UI 展示的「产出速率」必须是生效值＝`regen_rate × 对应倍率`。
+- 倍率槽位映射：水→`water`、浆果→`berry`、林木→`wood`、石矿→`stone`、金矿→`gold`。
+  **⚠ 榷场特例**：清水走 `water` 槽位，**粮食再生复用 `berry` 槽位**（内核无独立粮食倍率）。
+- 倍率唯一真相源为 `World3DEngine` 的 5 个 `*_regen_multiplier`（随存档持久化），经快照下发为前端 `sim.regenMultipliers`；生态大盘滑块与 POI 卡片均消费同一份数据。
+
 ### Agent 私有施密特触发器
 每名 Agent 在自身决策相位观察 POI 库存，维护 `poi_seekability` 私有锁存：
 - 库存升至 ≥ 30% 才开放；

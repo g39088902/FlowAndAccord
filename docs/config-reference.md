@@ -21,11 +21,11 @@
 | `agentWorkMetabolismMult` | f32 | 1 | agent.rs (劳作代谢) | 劳作代谢消耗倍率 |
 | `agentDeathDecayDuration` | f32 | 12 | agent.rs (死亡衰减) | 生命耗尽后彻底消亡的衰减时长 (秒) |
 | `agentAdultAge` | f32 | 1800 | agent.rs (成年阈值) / decisions/ | 成年年龄阈值 (模拟秒，= 60 分钟) |
-| `agentPregnancyDuration` | f32 | 450 | agent.rs (妊娠代谢) | 妊娠期时长 (模拟秒，= 15 分钟) |
+| `agentPregnancyDuration` | f32 | 200 | agent.rs (妊娠代谢) | 妊娠期时长 (模拟秒，≈ 3.3 分钟) |
 | `agentMiscarriageThreshold` | f32 | 10 | agent.rs (流产判定) | 饥渴任一低于此值即触发流产风险 |
 | `agentMiscarriageStaminaThreshold` | f32 | 20 | agent.rs (流产判定) | 体力低于此值即触发流产风险 |
-| `agentMiscarriageCooldown` | f32 | 450 | agent.rs (流产判定) | 流产后休养冷却 (秒，期间禁止再次受孕) |
-| `agentPostpartumCooldown` | f32 | 450 | agent.rs (产后休养冷却) | 产后休养冷却 (秒，分娩后期间禁止再次受孕) |
+| `agentMiscarriageCooldown` | f32 | 200 | agent.rs (流产判定) | 流产后休养冷却 (秒，期间禁止再次受孕) |
+| `agentPostpartumCooldown` | f32 | 200 | agent.rs (产后休养冷却) | 产后休养冷却 (秒，分娩后期间禁止再次受孕) |
 | `agentMiscarriageAlertDuration` | f32 | 5 | agent.rs (流产判定) | 流产告警存续时长 (秒) |
 | `agentConceptionHungerMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低饱食度 |
 | `agentConceptionThirstMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低水分 |
@@ -191,9 +191,9 @@
 | `houseMarketBiddingIntervalTicks` | u64 | 30 | housing_system/auction.rs (二手房开价周期) | 拍卖开价评估周期 (tick，默认 30 = 1秒) |
 | `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交) |
 | `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 麦穗理论最优停止观察期比例 (37%) |
-| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材折算基准金价 (建设成本等效折算用) |
-| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料折算基准金价 (建设成本等效折算用) |
-| `houseBaseFoundationCostGold` | f32 | 5 | housing_system/auction.rs (地基估价保底) | 0级仓库地基保底估价值 (黄金，防 0 成本畸变) |
+| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价) |
+| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价) |
+| `houseBaseFoundationCostGold` | f32 | 0.1 | housing_system/auction.rs (地基估价保底) | 0级仓库地基保底估价值 (黄金，防 0 成本畸变) |
 
 ## 5. 马斯洛需求与决策门槛
 

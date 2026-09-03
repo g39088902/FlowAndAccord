@@ -34,11 +34,11 @@ window.SIM_CONFIG = {
   agentWorkMetabolismMult: 1.0,   // 劳作代谢消耗倍率
   agentDeathDecayDuration: 12.0,  // 生命耗尽后彻底消亡的衰减时长 (秒)
   agentAdultAge: 1800.0,          // 成年年龄阈值 (模拟秒，= 60 分钟)
-  agentPregnancyDuration: 450.0,  // 妊娠期时长 (模拟秒，= 15 分钟)
+  agentPregnancyDuration: 200.0,  // 妊娠期时长 (模拟秒，≈ 3.3 分钟)
   agentMiscarriageThreshold: 10.0,// 饥渴任一低于此值即触发流产风险
   agentMiscarriageStaminaThreshold: 20.0, // 体力低于此值即触发流产风险
-  agentMiscarriageCooldown: 450.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
-  agentPostpartumCooldown: 450.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
+  agentMiscarriageCooldown: 200.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
+  agentPostpartumCooldown: 200.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
   agentMiscarriageAlertDuration: 5.0, // 流产告警存续时长 (秒)
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分
@@ -238,7 +238,7 @@ window.SIM_CONFIG = {
   houseMarketBiddingIntervalTicks: 30, // 拍卖开价评估周期 (tick，默认 30 = 1秒)
   houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交)
   houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
-  marketPriceBaseWood: 0.15,          // 木材折算基准金价 (建设成本等效折算用)
-  marketPriceBaseStone: 0.20,         // 石料折算基准金价 (建设成本等效折算用)
-  houseBaseFoundationCostGold: 5.0,   // 0级仓库地基保底估价值 (黄金，防 0 成本畸变)
+  marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价)
+  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价)
+  houseBaseFoundationCostGold: 0.1,   // 0级仓库地基保底估价值 (黄金，防 0 成本畸变)
 };

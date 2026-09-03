@@ -309,73 +309,65 @@
     });
 
     // ==========================================
-    // 玩家手动资源生成速率滑块绑定 (水/果/木/石)
+    // 玩家手动资源生成速率滑块绑定 (水/果/木/石/金)
+    // ★ v1.22.6 基准产速统一读 SIM_CONFIG（禁止写死字面量），倍率以内核为唯一真相源
     // ==========================================
-    const sliderWater = document.getElementById('slider-water-rate');
-    const lblWaterRate = document.getElementById('lbl-water-rate');
-    sliderWater.addEventListener('input', e => {
-      const mult = parseFloat(e.target.value);
-      sim.setWaterRegenMultiplier(mult);
-      const actualRate = (2.00 * mult).toFixed(2);
-      lblWaterRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
-    });
+    const ECO_SLIDERS = [
+      { key: 'water', sliderId: 'slider-water-rate',  lblId: 'lbl-water-rate',  baseKey: 'regenBaseWater', setter: 'setWaterRegenMultiplier' },
+      { key: 'berry', sliderId: 'slider-berry-rate',  lblId: 'lbl-berry-rate',  baseKey: 'regenBaseBerry', setter: 'setBerryRegenMultiplier' },
+      { key: 'wood',  sliderId: 'slider-wood-rate',   lblId: 'lbl-wood-rate',   baseKey: 'regenBaseWood',  setter: 'setWoodRegenMultiplier' },
+      { key: 'stone', sliderId: 'slider-stone-rate',  lblId: 'lbl-stone-rate',  baseKey: 'regenBaseStone', setter: 'setStoneRegenMultiplier' },
+      { key: 'gold',  sliderId: 'slider-gold-rate',   lblId: 'lbl-gold-rate',   baseKey: 'regenBaseGold',  setter: 'setGoldRegenMultiplier' },
+    ];
+    // 每类资源的基础产速（取自前端配置镜像 SIM_CONFIG，与 Rust config.rs 保持同步）
+    const ecoBaseRate = def => {
+      const cfg = window.SIM_CONFIG || {};
+      return typeof cfg[def.baseKey] === 'number' ? cfg[def.baseKey] : 0.0;
+    };
+    // 滑块标签文案：生效产速 = 基准 × 倍率（与 POI 卡片「产出速率」同一算法）
+    const ecoSliderLabel = (def, mult) => {
+      const actualRate = ecoBaseRate(def) * (isFinite(mult) ? mult : 1.0);
+      return `${(isFinite(mult) ? mult : 1.0).toFixed(1)}x (${actualRate.toFixed(2)}/s)`;
+    };
+    // 用户拖拽期间禁止内核回写滑块，否则会与拖动打架
+    let ecoSliderDragging = false;
 
-    const sliderBerry = document.getElementById('slider-berry-rate');
-    const lblBerryRate = document.getElementById('lbl-berry-rate');
-    sliderBerry.addEventListener('input', e => {
-      const mult = parseFloat(e.target.value);
-      sim.setBerryRegenMultiplier(mult);
-      const actualRate = (2.00 * mult).toFixed(2);
-      lblBerryRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
-    });
-
-    const sliderWood = document.getElementById('slider-wood-rate');
-    const lblWoodRate = document.getElementById('lbl-wood-rate');
-    sliderWood.addEventListener('input', e => {
-      const mult = parseFloat(e.target.value);
-      sim.setWoodRegenMultiplier(mult);
-      const actualRate = (2.00 * mult).toFixed(2);
-      lblWoodRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
-    });
-
-    const sliderStone = document.getElementById('slider-stone-rate');
-    const lblStoneRate = document.getElementById('lbl-stone-rate');
-    if (sliderStone && lblStoneRate) {
-      sliderStone.addEventListener('input', e => {
+    for (const def of ECO_SLIDERS) {
+      def.sliderEl = document.getElementById(def.sliderId);
+      def.lblEl = document.getElementById(def.lblId);
+      if (!def.sliderEl || !def.lblEl) continue;
+      def.sliderEl.addEventListener('input', e => {
         const mult = parseFloat(e.target.value);
-        sim.setStoneRegenMultiplier(mult);
-        const actualRate = (1.50 * mult).toFixed(2);
-        lblStoneRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
+        if (typeof sim[def.setter] === 'function') sim[def.setter](mult);
+        def.lblEl.textContent = ecoSliderLabel(def, mult);
       });
+      def.sliderEl.addEventListener('pointerdown', () => { ecoSliderDragging = true; });
+      def.sliderEl.addEventListener('pointerup', () => { ecoSliderDragging = false; });
+      def.sliderEl.addEventListener('pointercancel', () => { ecoSliderDragging = false; });
+      def.sliderEl.addEventListener('blur', () => { ecoSliderDragging = false; });
     }
 
-    const sliderGold = document.getElementById('slider-gold-rate');
-    const lblGoldRate = document.getElementById('lbl-gold-rate');
-    if (sliderGold && lblGoldRate) {
-      sliderGold.addEventListener('input', e => {
-        const mult = parseFloat(e.target.value);
-        sim.setGoldRegenMultiplier(mult);
-        const actualRate = (1.20 * mult).toFixed(2);
-        lblGoldRate.textContent = `${mult.toFixed(1)}x (${actualRate}/s)`;
-      });
-    }
+    // ★ 内核倍率 → 滑块回写：读档/重置/重开后滑块自动回到世界真实倍率。
+    // 仅在数值真的变化时写 DOM，避免每帧 5 次无谓写入。
+    window.syncEcoRegenSliders = function () {
+      if (ecoSliderDragging || !sim || !sim.regenMultipliers) return;
+      for (const def of ECO_SLIDERS) {
+        if (!def.sliderEl || !def.lblEl) continue;
+        const mult = sim.regenMultipliers[def.key];
+        if (typeof mult !== 'number' || !isFinite(mult)) continue;
+        if (Math.abs(parseFloat(def.sliderEl.value) - mult) > 1e-4) def.sliderEl.value = String(mult);
+        const txt = ecoSliderLabel(def, mult);
+        if (def.lblEl.textContent !== txt) def.lblEl.textContent = txt;
+      }
+    };
 
     document.getElementById('btn-reset-rate').addEventListener('click', () => {
-      sliderWater.value = 1.0;
-      sliderBerry.value = 1.0;
-      sliderWood.value = 1.0;
-      if (sliderStone) sliderStone.value = 1.0;
-      if (sliderGold) sliderGold.value = 1.0;
-      sim.setWaterRegenMultiplier(1.0);
-      sim.setBerryRegenMultiplier(1.0);
-      sim.setWoodRegenMultiplier(1.0);
-      sim.setStoneRegenMultiplier(1.0);
-      sim.setGoldRegenMultiplier(1.0);
-      lblWaterRate.textContent = `1.0x (2.00/s)`;
-      lblBerryRate.textContent = `1.0x (2.00/s)`;
-      lblWoodRate.textContent = `1.0x (2.00/s)`;
-      if (lblStoneRate) lblStoneRate.textContent = `1.0x (1.50/s)`;
-      if (lblGoldRate) lblGoldRate.textContent = `1.0x (1.20/s)`;
+      for (const def of ECO_SLIDERS) {
+        if (!def.sliderEl || !def.lblEl) continue;
+        def.sliderEl.value = '1.0';
+        if (typeof sim[def.setter] === 'function') sim[def.setter](1.0);
+        def.lblEl.textContent = ecoSliderLabel(def, 1.0);
+      }
       sim.logEvent(`🔄 产速重置: 全局资源已恢复默认基准产率！`, 'water');
     });
 

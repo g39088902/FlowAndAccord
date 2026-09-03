@@ -32,11 +32,11 @@ pub const AGENT_PREGNANT_METABOLISM_MULT: f32 = 1.25;
 pub const AGENT_WORK_METABOLISM_MULT: f32 = 1.0;
 pub const AGENT_DEATH_DECAY_DURATION: f32 = 12.0;
 pub const AGENT_ADULT_AGE: f32 = 1800.0;
-pub const AGENT_PREGNANCY_DURATION: f32 = 450.0;
+pub const AGENT_PREGNANCY_DURATION: f32 = 200.0;
 pub const AGENT_MISCARRIAGE_THRESHOLD: f32 = 10.0;
 pub const AGENT_MISCARRIAGE_STAMINA_THRESHOLD: f32 = 20.0;
-pub const AGENT_MISCARRIAGE_COOLDOWN: f32 = 450.0; // 流产后休养冷却 (秒，期间禁止再次受孕)
-pub const AGENT_POSTPARTUM_COOLDOWN: f32 = 450.0; // 产后休养冷却 (秒，分娩后期间禁止再次受孕)
+pub const AGENT_MISCARRIAGE_COOLDOWN: f32 = 200.0; // 流产后休养冷却 (秒，期间禁止再次受孕)
+pub const AGENT_POSTPARTUM_COOLDOWN: f32 = 200.0; // 产后休养冷却 (秒，分娩后期间禁止再次受孕)
 pub const AGENT_MISCARRIAGE_ALERT_DURATION: f32 = 5.0;
 pub const AGENT_CONCEPTION_HUNGER_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_THIRST_MIN: f32 = 40.0;
@@ -341,12 +341,12 @@ pub const HOUSE_MARKET_BIDDING_INTERVAL_TICKS: u64 = 30;
 pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
 /// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）
 pub const HOUSE_AUCTION_OBSERVATION_RATIO: f32 = 0.37;
-/// 木材折算基准金价（建设成本等效折算用，默认 0.15）
+/// 木材基准金价（保留：待榷市扩展承载木材后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.15）
 pub const MARKET_PRICE_BASE_WOOD: f32 = 0.15;
-/// 石料折算基准金价（建设成本等效折算用，默认 0.20）
+/// 石料基准金价（保留：待榷市扩展承载石料后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.20）
 pub const MARKET_PRICE_BASE_STONE: f32 = 0.20;
-/// 0级仓库地基保底估价值（黄金，默认 5.0，防 0 成本畸变）
-pub const HOUSE_BASE_FOUNDATION_COST_GOLD: f32 = 5.0;
+/// 0级仓库地基保底估价值（黄金，默认 0.1，防 0 成本畸变）
+pub const HOUSE_BASE_FOUNDATION_COST_GOLD: f32 = 0.1;
 
 // ============================================================================
 // 15. 动态仿真配置结构体 (SimConfig)

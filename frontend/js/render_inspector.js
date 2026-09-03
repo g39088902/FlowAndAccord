@@ -33,6 +33,26 @@ function _fmtRate(v) {
 // 每帧游戏时间增量（秒）＝ simulationDt × 倍速
 const _gameDt = () => (sim.simulationDt || 1 / 30) * (sim.speedMult || 1);
 
+// ★ v1.22.6 产速倍率槽位映射（唯一真相源为内核 sim.regenMultipliers）
+// POI 快照的 regen_rate 只含**基准值**，实际再生 = 基准 × 倍率（见 world_tick.rs）。
+// slot='primary' 取主资源槽位；slot='secondary' 仅榷场粮食有意义。
+// ⚠ 榷场特例：清水走 water 槽位，粮食再生**复用 berry 槽位**（内核无独立粮食倍率）。
+function poiRegenMultiplier(poiType, slot) {
+  const m = (sim && sim.regenMultipliers) || {};
+  const pick = k => (typeof m[k] === 'number' ? m[k] : 1.0);
+  if (poiType === 'Water') return pick('water');
+  if (poiType === 'Berry') return pick('berry');
+  if (poiType === 'Wood') return pick('wood');
+  if (poiType === 'Stone') return pick('stone');
+  if (poiType === 'Gold') return pick('gold');
+  if (poiType === 'Market') return slot === 'secondary' ? pick('berry') : pick('water');
+  return 1.0;
+}
+// 生效产速 = 内核基准产速 × 倍率（POI 卡片与生态大盘滑块标签共用，保证两处数字一致）
+function effectiveRegenRate(baseRate, multiplier) {
+  return (baseRate || 0) * (typeof multiplier === 'number' ? multiplier : 1.0);
+}
+
 function updateInspector() {
 const inspectorCard = document.getElementById('inspector-card');
 const agentView = document.getElementById('insp-agent-view');
@@ -313,9 +333,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     }
 
     const stockRow = document.getElementById('insp-poi-stock-row');
+    const secondaryStockRow = document.getElementById('insp-poi-secondary-stock-row');
     const campUpgradeRow = document.getElementById('insp-camp-upgrade-row');
     if (poi.type === 'Camp') {
       stockRow.style.display = 'none';
+      if (secondaryStockRow) secondaryStockRow.style.display = 'none';
       if (campUpgradeRow) {
         campUpgradeRow.style.display = 'flex';
         const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
@@ -341,29 +363,44 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       if (campUpgradeRow) campUpgradeRow.style.display = 'none';
       stockRow.style.display = 'flex';
       const ratio = Math.round((poi.currentStock / poi.maxStock) * 100);
+      // ★ v1.22.6 上限取快照真实 maxStock，避免标题写死 60.0 与下方数值自相矛盾
+      const capText = `上限${poi.maxStock.toFixed(1)}`;
       if (poi.type === 'Water') {
-        document.getElementById('lbl-poi-stock-title').textContent = '清泉蓄水量 (上限60.0)';
+        document.getElementById('lbl-poi-stock-title').textContent = `清泉蓄水量 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#38bdf8';
       } else if (poi.type === 'Berry') {
-        document.getElementById('lbl-poi-stock-title').textContent = '成熟浆果 (上限60.0)';
+        document.getElementById('lbl-poi-stock-title').textContent = `成熟浆果 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#10b981';
       } else if (poi.type === 'Wood') {
-        document.getElementById('lbl-poi-stock-title').textContent = '林木木材 (上限60.0)';
+        document.getElementById('lbl-poi-stock-title').textContent = `林木木材 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#b45309';
       } else if (poi.type === 'Stone') {
-        document.getElementById('lbl-poi-stock-title').textContent = '石矿石料 (上限60.0)';
+        document.getElementById('lbl-poi-stock-title').textContent = `石矿石料 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#94a3b8';
       } else if (poi.type === 'Gold') {
-        document.getElementById('lbl-poi-stock-title').textContent = '璀璨金矿 (上限60.0)';
+        document.getElementById('lbl-poi-stock-title').textContent = `璀璨金矿 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#fbbf24';
       } else if (poi.type === 'Market') {
-        document.getElementById('lbl-poi-stock-title').textContent = `榷场双储备 (水:${poi.currentStock.toFixed(1)}/粮:${poi.secondaryStock.toFixed(1)})`;
-        document.getElementById('insp-poi-stock-fill').style.background = '#f59e0b';
+        // ★ v1.22.6 榷场双商品：清水与粮食为两套独立库存，各占一条进度条
+        document.getElementById('lbl-poi-stock-title').textContent = `💧 榷场清水储备 (${capText})`;
+        document.getElementById('insp-poi-stock-fill').style.background = '#38bdf8';
       }
-      document.getElementById('insp-poi-stock-val').textContent = poi.type === 'Market' 
-        ? `水:${poi.currentStock.toFixed(1)}/100 · 粮:${poi.secondaryStock.toFixed(1)}/100`
-        : `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
-      document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
+      document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
+      document.getElementById('insp-poi-stock-fill').style.width = `${Math.max(0, Math.min(100, isFinite(ratio) ? ratio : 0))}%`;
+
+      // 第二条库存条：仅榷场（粮食）显示
+      if (secondaryStockRow) {
+        if (poi.type === 'Market') {
+          secondaryStockRow.style.display = 'flex';
+          const secMax = poi.secondaryMaxStock || 0;
+          const secRatio = secMax > 0 ? Math.round((poi.secondaryStock / secMax) * 100) : 0;
+          document.getElementById('lbl-poi-secondary-stock-title').textContent = `🍒 榷场粮食储备 (上限${secMax.toFixed(1)})`;
+          document.getElementById('insp-poi-secondary-stock-val').textContent = `${poi.secondaryStock.toFixed(1)} / ${secMax.toFixed(1)} 单位`;
+          document.getElementById('insp-poi-secondary-stock-fill').style.width = `${Math.max(0, Math.min(100, secRatio))}%`;
+        } else {
+          secondaryStockRow.style.display = 'none';
+        }
+      }
     }
 
     // ★ v1.12.0 营地一级卡片仅展示国王 + 详情按钮；继承人/历史国王/管辖家庭/账本/空置房移入详情模态框
@@ -385,29 +422,48 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
     }
 
-    // ★ v1.12.0 营地删除 poi-info-badge（产出速率/地形/辖区）和描述文本
+    // ★ v1.12.0 营地删除 poi-info-badge（产出速率）和描述文本
+    // ★ v1.22.6 移除「地形地貌 / 所属辖区」两行（TODO-2），产出速率改为生效值 = 基准 × 生态大盘倍率
     const poiInfoBadge = document.getElementById('insp-poi-info-badge');
     const detailTextEl = document.getElementById('insp-detail-text');
+    const regenSecondaryRow = document.getElementById('insp-poi-regen-secondary-row');
     if (poi.type === 'Camp') {
       if (poiInfoBadge) poiInfoBadge.style.display = 'none';
       if (detailTextEl) detailTextEl.style.display = 'none';
+      if (regenSecondaryRow) regenSecondaryRow.style.display = 'none';
     } else {
       if (poiInfoBadge) poiInfoBadge.style.display = '';
       if (detailTextEl) detailTextEl.style.display = '';
 
-    document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (公共避风聚落)`;
-    const elevEl = document.getElementById('insp-poi-elev');
-    if (elevEl) elevEl.textContent = poi.pos.z < -10 ? '低洼谷地 (汇水充盈)' : (poi.pos.z > 10 ? '峻峭高台 (视野开阔)' : '平缓原野 (适宜定居)');
-    const poiCoordEl = document.getElementById('insp-poi-coord');
-    if (poiCoordEl) poiCoordEl.textContent = poi.type === 'Camp' ? '聚落中心' : (poi.campTitle ? `${poi.campTitle} 领地` : '荒原公域');
+    const multPrimary = poiRegenMultiplier(poi.type, 'primary');
+    const effPrimary = effectiveRegenRate(poi.regenRate, multPrimary);
+    document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0
+      ? `+${effPrimary.toFixed(2)} 单位/秒 (基准 ${poi.regenRate.toFixed(2)} × ${multPrimary.toFixed(1)}x)`
+      : `无限储量 (公共避风聚落)`;
+
+    // 第二条产速：仅榷场（粮食，复用浆果倍率槽位）
+    if (regenSecondaryRow) {
+      if (poi.type === 'Market') {
+        regenSecondaryRow.style.display = '';
+        const multSecondary = poiRegenMultiplier(poi.type, 'secondary');
+        const effSecondary = effectiveRegenRate(poi.secondaryRegenRate, multSecondary);
+        document.getElementById('insp-poi-regen-secondary').textContent =
+          `+${effSecondary.toFixed(2)} 单位/秒 (基准 ${poi.secondaryRegenRate.toFixed(2)} × ${multSecondary.toFixed(1)}x)`;
+      } else {
+        regenSecondaryRow.style.display = 'none';
+      }
+    }
 
     let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
-    if (poi.type === 'Water') desc = '低洼处天然地泉(上限60单位,产速2.0/s)，小人饮水并补给家宅。';
-    else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
-    else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
-    else if (poi.type === 'Stone') desc = '嶙峋高地石矿(上限60单位,产速1.5/s)，采石仅用于私宅升级木石庄舍与大庄园。';
-    else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。';
-    else if (poi.type === 'Market') desc = `外部边境榷场互市(双库存)，提供外部清水(当前单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金)与粮食(当前单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金)应急兑换。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
+    // ★ v1.22.6 产速不再写死，统一读 SIM_CONFIG 基准值（根 AGENTS.md §4.12 禁止散落字面量）
+    const cfg = (typeof window !== 'undefined' && window.SIM_CONFIG) || {};
+    const baseRateOf = key => (typeof cfg[key] === 'number' ? cfg[key] : 0);
+    if (poi.type === 'Water') desc = `低洼处天然地泉(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWater').toFixed(1)}/s)，小人饮水并补给家宅。`;
+    else if (poi.type === 'Berry') desc = `向阳缓坡野生灌木(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseBerry').toFixed(1)}/s)，小人采食并补给家宅。`;
+    else if (poi.type === 'Wood') desc = `茂密原生林地(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWood').toFixed(1)}/s)，伐木用于冬季房屋供暖与升级茅草房。`;
+    else if (poi.type === 'Stone') desc = `嶙峋高地石矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseStone').toFixed(1)}/s)，采石仅用于私宅升级木石庄舍与大庄园。`;
+    else if (poi.type === 'Gold') desc = `璀璨金矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseGold').toFixed(1)}/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。`;
+    else if (poi.type === 'Market') desc = `外部边境榷场互市，清水与粮食是两套彼此独立的库存（各 ${poi.maxStock.toFixed(0)} / ${poi.secondaryMaxStock.toFixed(0)} 单位上限），分别独立再生与定价：清水单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金、粮食单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
     document.getElementById('insp-detail-text').textContent = desc;
     }
   }
@@ -944,7 +1000,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (selAgent.isPregnant && selAgent.isAlive) {
       pregBox.style.display = 'flex';
       const pVal = Math.round(selAgent.pregnancyProgress * 100);
-      document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 900)}s / 900s)`;
+      const pregTotal = (window.SIM_CONFIG && window.SIM_CONFIG.agentPregnancyDuration) || 200;
+      document.getElementById('insp-preg-val').textContent = pVal + '% (' + Math.round(selAgent.pregnancyProgress * pregTotal) + 's / ' + pregTotal + 's)';
       document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
       // ★ v1.9.0 怀孕进度每秒变化（按游戏秒，进度%）（Task1 进度条悬停）
       const pregFillEl = document.getElementById('insp-preg-fill');

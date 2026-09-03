@@ -499,6 +499,12 @@ impl World3DEngine {
             season_progress,
             last_mutation_event: self.last_event.clone(),
             recent_deaths: self.recent_deaths.clone(),
+            // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，读档后由存档值回填）
+            water_regen_multiplier: self.water_regen_multiplier,
+            berry_regen_multiplier: self.berry_regen_multiplier,
+            wood_regen_multiplier: self.wood_regen_multiplier,
+            stone_regen_multiplier: self.stone_regen_multiplier,
+            gold_regen_multiplier: self.gold_regen_multiplier,
         }
     }
 }

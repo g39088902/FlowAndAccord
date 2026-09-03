@@ -41,6 +41,9 @@
         this.currentSeason = 'Spring';
         this.temperature = 20.0;
         this.tickCount = 0;
+        // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，随快照下发；读档后自动回填存档值）
+        // 榷场粮食再生复用 berry 槽位（内核无独立粮食倍率），见 world_tick.rs
+        this.regenMultipliers = { water: 1.0, berry: 1.0, wood: 1.0, stone: 1.0, gold: 1.0 };
 
         // 引擎状态 (以页面打开时间 Date.now() 作为随机种子)
         this._wasm = null;
@@ -303,6 +306,16 @@
         this.totalMiscarriages = snap.total_miscarriages;
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
+
+        // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
+        // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致
+        this.regenMultipliers = {
+          water: snap.water_regen_multiplier != null ? snap.water_regen_multiplier : 1.0,
+          berry: snap.berry_regen_multiplier != null ? snap.berry_regen_multiplier : 1.0,
+          wood: snap.wood_regen_multiplier != null ? snap.wood_regen_multiplier : 1.0,
+          stone: snap.stone_regen_multiplier != null ? snap.stone_regen_multiplier : 1.0,
+          gold: snap.gold_regen_multiplier != null ? snap.gold_regen_multiplier : 1.0,
+        };
 
         // 事件日志: 仅记录新增事件
         if (snap.last_mutation_event && snap.last_mutation_event !== this._lastEvent) {

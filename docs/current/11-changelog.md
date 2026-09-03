@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.22.4**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.23.0**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -10,6 +10,7 @@
 
 | 版本 | 核心变更 | 影响模块 |
 | :--- | :--- | :--- |
+| **v1.23.0** | **房屋估价改按榷市实时价（0级仓库保底 5.0→0.1 金）**：① **保底缩减**：`houseBaseFoundationCostGold` / `HOUSE_BASE_FOUNDATION_COST_GOLD` 由 5.0 → **0.1** 金，0 级仓库（无建材）估值由 max(0,5)=5 降为 max(0,0.1)=0.1 金，消除零成本畸变兑底的过高地基价；② **原料单价全部按当时榷市（榷场互市）实时价计算**：`auction.rs::calculate_house_construction_cost` 中木/石/金单价由「基准价 0.15/0.20 、金 1.0」改为 0（榷市暂未承载木/石/金，暂时记 0 单价），水/粮维持实时市价；`marketPriceBaseWood`/`Stone` 字段保留待榷市扩展承载后启用；③ **影响**：1 级起房屋建设成本仅由累计水/粮按榷市实时价折算，木/石/金投入不再计入市场估值，4 级庄园所需 125 金亦不计入；④ **文档同步**：05-house-system / housing_system/AGENTS.md / config-reference.md（重新生成）更新；版本号 v1.22.5→v1.23.0，cargo build + test-wasm.js + config-check.js 三门禁全绿 | config / config.js / auction.rs / docs |
 | **v0.9.24** | 随身金币遗产继承：族人故去后 `carried_gold` 平分给在世子一代子女，无子女则清零 | agent / ecology |
 | **v0.9.34** | 房屋系统与世界环境模块化解耦：`housing_system` 拆为 5 个单一职责子模块，四季回归 `world.rs` | housing_system / world |
 | **v0.9.35** | 简化四季参数模型：废除 `season_quarter_length`，单季长度由 `year_length × 0.25` 派生 | config / world |
@@ -98,3 +99,4 @@
 | **v1.22.2** | **夺位远征回归第一层生存需求（生理层）+ 保留“夺位远征”显示**：① **回归（看结果不看开头）**：夺位的**结果**是获得全境资源的分配权（国王=资源分配权=生存），故 `B14SeekThrone` 层级由 v1.22.1 误设的 `SelfActualization` **回归 `MaslowLevel::Physiological`（第一层生存需求）**，`current_need` 回归 `Physiological·SeekThrone`（`evaluate.rs`×2 / `seeking.rs`）；**优先序不变**（b14 仍置首、先于口渴/饥饿/休息——夺位为生存级优先）；② **保留显示修复**：`NEED_KIND_LABEL.SeekThrone="夺位远征"` 保留（不再显示“吃饭喝水”），`NEED_KIND_REASON.SeekThrone` 改写为第一层生存/资源分配权文案（“王位 = 全境资源的分配权，夺位为获取资源分配权而自主出征……”），Inspector 显示 **“💧 ① 生理需求 · 夺位远征”**；③ **决策可视化回归**：`decision-viz-data.js` b14 层级 5→1、kinds 归位生理层、`config.decision-order.js` 注释回归“第一层生存需求”；④ 文档回归（decisions/AGENTS.md、06-motivation-ai、12-ledger-system、agent-ai-analysis、ui-spec、plan-ledger-refactor、decision-viz-design），注释补“看结果不看开头”理据；⑤ 版本号 v1.22.1→v1.22.2，cargo build + test-wasm.js + config-check.js 门禁全绿 | render_canvas / branches / evaluate / seeking / needs / decision-viz-data / config.decision-order / index.html / AGENTS.md / docs |
 | **v1.22.3** | **拍卖大盘交互修复（内容快照缓存）**：修复「点不同在售房屋无法切换到被点房屋」与「历史成交记录无法跳转已售房屋/买主」——根因是大盘开启时 `auction-ui.js::_auctionUiTick` 每帧全量 `innerHTML` 重建 strip/买家池/竞价流水/历史成交四类列表，点击（mousedown 与 mouseup 之间）节点被替换、`click` 事件落到容器祖先上、`e.target.closest(...)` 落空，导致点击无反应且控制台零报错；修复：引入 `renderHtml` 内容快照缓存（生成 HTML 与上次一致即跳过重建，与 v1.21.1 `ledger-ui.js` 同款），四类列表 + 顶部徽章/hero 价格/土地状态全部套缓存，仅内容变化才重建 DOM，点击切换与历史跳转恢复；同步在根 AGENTS.md §4.15 记录「高频 DOM 重建禁止破坏交互」红线供后续审计；版本号 v1.22.2→v1.22.3（纯前端，Ctrl+F5 生效） | auction-ui.js / index.html / AGENTS.md / docs |
 | **v1.22.4** | **拍卖大盘无在售房空态修复（禁止拿任意房屋占位）**：① **根因**：`auction-ui.js::getSelectedHouse()` 在无在售房产且无有效 `currentHouseId` 时回退 `return sim.houses[0] || null`，导致打开拍卖交易所直接拿世界第一栋房（#1）占位显示详情，误导用户以为该房在售；② **修复**：回退改为 `return null`，走新增 `renderEmptyDetail()` 空态——hero 卡各字段显示「暂无在售房产」占位文案（**逐字段更新占位、不重建整卡**，保留 `#auction-hero-name`/`#auction-hero-phase-pill` 等固定子元素，出现新在售房后能正常恢复；避免早期整卡 innerHTML 替换破坏子元素的回归）、麦穗时间轴归零（指针/分段/五组数值置 --）、买家池与竞价流水显示空提示并计数归零；`openAuctionModal` 无在售房时同步将 `currentHouseId` 置 null，防止上一轮残留选择导致 reopen 仍显示旧房；③ **浏览器实测**：开局 0 在售 → 空态（strip/hero/买家/竞价全空信息、hero 子元素存活）→ 提速产生在售房 → hero 正常恢复显示真实在售房（无 TypeError）→ 售罄后自动回落空态，全程无 #1 占位；④ 版本号 v1.22.3→v1.22.4（纯前端，Ctrl+F5 生效） | auction-ui.js / index.html / AGENTS.md / docs |
+| **v1.22.5** | **生育节奏再提速（妊娠期 / 流产冷却 / 产后冷却 450→200 秒）**：① **超参调整**：`AGENT_PREGNANCY_DURATION`（妊娠期时长）、`AGENT_MISCARRIAGE_COOLDOWN`（流产后休养冷却）、`AGENT_POSTPARTUM_COOLDOWN`（产后休养冷却）三值统一由 450s 缩至 **200s**，`config.rs` const 与 `config.js` 同步（config-check 无漂移）；② **前端显示去硬编码**：`render_inspector.js` 妊娠进度条原硬编码 `900s` 总时长（早于 v1.20.0 已失真），改为读 `window.SIM_CONFIG.agentPregnancyDuration` 实时显示；③ **影响**：受孕→分娩周期由「7.5 分钟妊娠 + 7.5 分钟产后」缩短为「约 3.3 分钟妊娠 + 约 3.3 分钟产后」，流产休养冷却同步缩至约 3.3 分钟，进一步抬升代际出生率、缩短女性再孕间隔；④ **文档同步**：04-agent-life / 14-invariants(B11) / ui-spec 数值更新，config-reference.md 由 config-check.js 重新生成；⑤ **Rust 内核改动需重编译 WASM 并双副本同步**；版本号 v1.22.4→v1.22.5，cargo build + test-wasm.js + config-check.js 三门禁全绿 | config / config.js / render_inspector.js / docs |
