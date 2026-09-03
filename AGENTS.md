@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.22.2)"]
+    E --> F["浏览器 UI (版本: v1.22.3)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.22.2`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.22.3`**。
 
 ---
 
@@ -241,6 +241,12 @@ node frontend/server.js           # http://localhost:3000
 - **真相源在文件**：策展顺序唯一真相源为 `frontend/js/config.decision-order.js`，启动时由 `decision-viz.js` 合并进 `SIM_CONFIG`（脚本顺序：config.js → config.decision-order.js → decision-viz 三件套 → rustworld.js，必早于首次 applyConfig）。
 - **拖动生效链路**：决策引擎覆层（index.html「🧠 决策引擎」）拖卡/拖分界松手 → 改 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入运行中实例（与模拟共用引擎，故必须内嵌页面而非独立页）→ `POST save-decision-order` 由 `server.js` 校验后原子写盘；静态 COS 部署无写能力时降级 localStorage 并提示。
 - **分支自包含铁律**：新增/改分支时，无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认必须写在分支条件内部——否则重排顺序即破坏语义。层级覆盖（`decision_eval_levels`，`0`=动态默认）与 `current_need` 标签共用 `level_override_for`。
+
+### 4.15 🟠 高频 DOM 重建禁止破坏交互（内容快照缓存）
+
+- **症状与根因**：任何被高频（每帧 / 10FPS）`innerHTML = ...` 全量重建的容器，其内部可交互元素（`.lineage-chip`、按钮、卡片）会在 mousedown 与 mouseup 之间被替换成新节点，`click` 事件因此落到新旧节点的共同祖先上、`e.target.closest(...)` 落空——表现为「点击无反应 / 无法切换选中项 / 历史跳转失效」，且**控制台零报错**（handler 只是没被命中，并非抛异常）。
+- **唯一正确姿势**：高频刷新容器一律套**内容快照缓存**——生成 HTML 与上次一致即跳过 `innerHTML` 重建（先例：`ledger-ui.js::renderHtml` v1.21.1、`auction-ui.js::renderHtml` v1.22.3、`render_inspector.js` 的 `innerHTML !== html` 守卫）。仅内容真正变化时才重建 DOM，`:hover`/`click` 才稳定。
+- **新增交互前的审计清单**：凡计划在「每帧 / 高频重建的容器」内放可点击元素（chip / 按钮 / 卡片），必须先确认该容器走快照缓存；`render_hud.js` 的 `eventsList`、`insp-mg-history-list`、家户/婚姻列表等每帧 innerHTML 重建且含 chip 的容器同样在此红线内，动它们前先套缓存。
 
 ---
 

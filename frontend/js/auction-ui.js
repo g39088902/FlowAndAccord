@@ -15,6 +15,16 @@
 
   const TICK_PER_SEC = 30; // 30 ticks = 1 模拟秒
 
+  // ★ v1.22.3 内容快照缓存：拍卖大盘每帧高频刷新，仅当生成 HTML 与上次不一致时才重建 DOM，
+  //   避免每帧销毁重建卡片导致 mousedown 与 mouseup 之间节点被替换、click 无法命中（点房屋无法切换/历史跳转失效）。
+  const _htmlCache = new Map();
+  function renderHtml(el, html) {
+    if (!el) return;
+    if (_htmlCache.get(el) === html) return;
+    _htmlCache.set(el, html);
+    el.innerHTML = html;
+  }
+
   function getSim() {
     return window.rustWorldSim;
   }
@@ -222,9 +232,9 @@
     // 1. 顶部状态计数
     const statusBadge = document.getElementById('auction-modal-status-badge');
     if (statusBadge) {
-      statusBadge.innerHTML = activeHouses.length > 0
+      renderHtml(statusBadge, activeHouses.length > 0
         ? `<span style="color:#10b981;">🟢 ${activeHouses.length} 栋房屋挂牌竞拍中</span>`
-        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span>`;
+        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span>`);
     }
 
     const tabActiveCount = document.getElementById('tab-active-count');
@@ -256,9 +266,9 @@
     const stripEl = document.getElementById('auction-house-strip');
     if (stripEl) {
       if (activeHouses.length === 0) {
-        stripEl.innerHTML = `<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>`;
+        renderHtml(stripEl, `<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>`);
       } else {
-        stripEl.innerHTML = activeHouses.map(h => {
+        renderHtml(stripEl, activeHouses.map(h => {
           const t = getTierLabel(h.tier);
           const isSelected = (h.id === currentHouseId);
           const phaseColor = (h.auctionPhase === '观察期') ? '#f59e0b' : ((h.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
@@ -274,7 +284,7 @@
               </div>
             </div>
           `;
-        }).join('');
+        }).join(''));
       }
     }
 
@@ -282,7 +292,7 @@
     const house = getSelectedHouse();
     if (!house) {
       const heroCard = document.getElementById('auction-hero-card');
-      if (heroCard) heroCard.innerHTML = `<div style="color:#94a3b8; font-size:12px; padding:12px;">暂无选中的房屋</div>`;
+      if (heroCard) renderHtml(heroCard, `<div style="color:#94a3b8; font-size:12px; padding:12px;">暂无选中的房屋</div>`);
       return;
     }
 
@@ -321,7 +331,7 @@
 
     const heroPrice = document.getElementById('auction-hero-price');
     if (heroPrice) {
-      heroPrice.innerHTML = `${(house.currentValuation || 0).toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`;
+      renderHtml(heroPrice, `${(house.currentValuation || 0).toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`);
     }
 
     const landStatus = document.getElementById('auction-hero-land-status');
@@ -329,9 +339,9 @@
       const campHouses = sim.houses.filter(h => h.campId === house.campId).length;
       const maxHouses = (sim.config && sim.config.campMaxHouses) || 30;
       if (campHouses < maxHouses) {
-        landStatus.innerHTML = `<span style="color:#10b981;">🟢 闲置土地充裕 (${campHouses}/${maxHouses}栋) · 估价以自建成本为上限</span>`;
+        renderHtml(landStatus, `<span style="color:#10b981;">🟢 闲置土地充裕 (${campHouses}/${maxHouses}栋) · 估价以自建成本为上限</span>`);
       } else {
-        landStatus.innerHTML = `<span style="color:#f87171;">🔴 聚落土地告罄 (${campHouses}/${maxHouses}栋) · 供求绝对稀缺溢价</span>`;
+        renderHtml(landStatus, `<span style="color:#f87171;">🔴 聚落土地告罄 (${campHouses}/${maxHouses}栋) · 供求绝对稀缺溢价</span>`);
       }
     }
 
@@ -427,11 +437,11 @@
     if (buyersCountEl) buyersCountEl.textContent = buyers.length;
 
     if (buyers.length === 0) {
-      buyersListEl.innerHTML = `<div class="auction-empty-hint">当前聚落无单身/无房成年男性户主，暂无潜在买家</div>`;
+      renderHtml(buyersListEl, `<div class="auction-empty-hint">当前聚落无单身/无房成年男性户主，暂无潜在买家</div>`);
       return;
     }
 
-    buyersListEl.innerHTML = buyers.map(b => {
+    renderHtml(buyersListEl, buyers.map(b => {
       const sameBadge = b.sameCamp
         ? `<span class="buyer-tag local">本地族人</span>`
         : `<span class="buyer-tag foreign">邻境移入</span>`;
@@ -450,7 +460,7 @@
           </div>
         </div>
       `;
-    }).join('');
+    }).join(''));
   }
 
   /**
@@ -465,12 +475,12 @@
     if (countEl) countEl.textContent = house.bidsCount || bids.length;
 
     if (bids.length === 0) {
-      feedEl.innerHTML = `<div class="auction-empty-hint">等待营地中介开启报价轮询中… (每 3 秒评估一次)</div>`;
+      renderHtml(feedEl, `<div class="auction-empty-hint">等待营地中介开启报价轮询中… (每 3 秒评估一次)</div>`);
       return;
     }
 
     // 竞价流水
-    feedEl.innerHTML = bids.map((b, idx) => {
+    renderHtml(feedEl, bids.map((b, idx) => {
       let verdict = '';
       let verdictColor = '#94a3b8';
 
@@ -502,7 +512,7 @@
           </div>
         </div>
       `;
-    }).join('');
+    }).join(''));
   }
 
   /**
@@ -513,11 +523,11 @@
     if (!listEl) return;
 
     if (deals.length === 0) {
-      listEl.innerHTML = `<div class="auction-empty-hint">暂无已完成的拍卖交易记录</div>`;
+      renderHtml(listEl, `<div class="auction-empty-hint">暂无已完成的拍卖交易记录</div>`);
       return;
     }
 
-    listEl.innerHTML = deals.map(d => {
+    renderHtml(listEl, deals.map(d => {
       const t = getTierLabel(d.tier);
       return `
         <div class="auction-deal-card">
@@ -540,7 +550,7 @@
           </div>
         </div>
       `;
-    }).join('');
+    }).join(''));
   }
 
   // ══════════ 事件委托与初始化绑定 ══════════
