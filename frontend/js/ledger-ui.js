@@ -194,16 +194,16 @@
 
   // ─── 分家公式气泡 ───────────────────────────────────────────
   function renderSplitTooltip(sim, h) {
-    // 权重 W = 2(父) + n(子一代)；n 取父家户当前成员数 - 2（父母）作为近似
+    // 权重 W = 1(父) + 1(母) + n(子一代)；n 取父家户当前成员数 - 2（父母）作为近似
     const parent = (sim.households || []).find(p => p.id === h.parentHousehold);
     const parentMembers = parent ? parent.members.length : 2;
     const n = Math.max(0, parentMembers - 2);
     const W = 2 + n;
     const pct = (100 / W).toFixed(1);
     return '<div class="split-tip-title">🌱 分家抽资公式</div>'
-      + '<div class="split-tip-formula">W = 2(父) + n(子一代) = 2 + ' + n + ' = <b>' + W + '</b></div>'
+      + '<div class="split-tip-formula">W = 1(父) + 1(母) + n(子一代) = 2 + ' + n + ' = <b>' + W + '</b></div>'
       + '<div class="split-tip-ratio">抽资比例 1/W = <b style="color:#f59e0b;">' + pct + '%</b></div>'
-      + '<div class="split-tip-note">长子分家时从父家户账面按比例抽资立户</div>';
+      + '<div class="split-tip-note">成年分家时从父家户账面按比例抽资立户（双亲在世各占权重1）</div>';
   }
 
   // ─── 流水穿透抽屉 ───────────────────────────────────────────

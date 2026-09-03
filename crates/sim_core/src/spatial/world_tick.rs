@@ -138,7 +138,7 @@ impl World3DEngine {
             .retain(|d| self.tick_counter.saturating_sub(d.tick) < RECENT_DEATH_RETAIN_TICKS);
     }
 
-    /// 结算已故族人的金币遗产：某人死后随身金币平分给所有在世的子一代子女
+    /// 结算已故族人的金币遗产：某人死后随身金币平分给在世妻子（如有）与在世子一代
     pub fn settle_gold_inheritance(&mut self) {
         loop {
             let deceased_info = self.agents.iter_mut()
@@ -151,21 +151,44 @@ impl World3DEngine {
 
             match deceased_info {
                 Some((deceased_id, gold)) => {
-                    let living_children_ids: Vec<AgentId> = self.agents.iter()
-                        .filter(|a| a.is_alive && (a.father_id == Some(deceased_id) || a.mother_id == Some(deceased_id)))
-                        .map(|a| a.id)
-                        .collect();
+                    let mut heirs: Vec<AgentId> = Vec::new();
 
-                    if !living_children_ids.is_empty() {
-                        let count = living_children_ids.len();
+                    // 1. 妻子（若在世）
+                    if let Some(mids) = self.marriage_registry.by_agent.get(&deceased_id) {
+                        if let Some(&mid) = mids.last() {
+                            if let Some(m) = self.marriage_registry.get(mid) {
+                                if m.husband_id == deceased_id {
+                                    let wife_alive = self.agent_index.get(&m.wife_id)
+                                        .and_then(|idx| self.agents.get(*idx))
+                                        .map(|a| a.is_alive)
+                                        .unwrap_or(false);
+                                    if wife_alive {
+                                        heirs.push(m.wife_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. 在世子女
+                    for a in &self.agents {
+                        if a.is_alive && (a.father_id == Some(deceased_id) || a.mother_id == Some(deceased_id)) {
+                            if !heirs.contains(&a.id) {
+                                heirs.push(a.id);
+                            }
+                        }
+                    }
+
+                    if !heirs.is_empty() {
+                        let count = heirs.len();
                         let share = gold / (count as f32);
-                        for cid in &living_children_ids {
-                            if let Some(child) = self.agents.iter_mut().find(|a| a.id == *cid) {
-                                child.carried_gold += share;
+                        for hid in &heirs {
+                            if let Some(heir) = self.agents.iter_mut().find(|a| a.id == *hid) {
+                                heir.carried_gold += share;
                             }
                         }
                         self.last_event = Some(format!(
-                            "💰 遗产继承: 逝者 Agent #{} 遗留 {:.1} 黄金，由在世的 {} 位子女平分 (每人继承 {:.1} 黄金)！",
+                            "💰 遗产继承: 逝者 Agent #{} 遗留 {:.1} 黄金，由在世的 {} 位继承人平分 (每人继承 {:.1} 黄金)！",
                             deceased_id, gold, count, share
                         ));
                     }

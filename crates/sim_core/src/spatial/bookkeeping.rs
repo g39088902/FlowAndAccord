@@ -39,7 +39,7 @@ impl World3DEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // Inheritance：户主死亡 → 资源平分在世子一代 / 绝嗣入公仓 → 解散家户
+    // Inheritance：户主死亡 → 资源平分在世妻子（如有）与子一代 / 绝嗣入公仓 → 解散家户
     // ══════════════════════════════════════════════════════════════
 
     fn tick_inheritance(&mut self, tick: u64) {
@@ -61,15 +61,40 @@ impl World3DEngine {
                 continue;
             }
 
-            // 收集户主的在世子一代（children_ids 中 is_alive=true，不含配偶/母亲）
-            let mut living_children: Vec<AgentId> = Vec::new();
+            // 收集继承人：在世妻子（如有）+ 在世子一代
+            let mut living_heirs: Vec<AgentId> = Vec::new();
+
+            // 1. 妻子（若在世）
+            let surviving_wife = self.marriage_registry.by_agent.get(&hh.head).and_then(|mids| {
+                mids.last().and_then(|&mid| {
+                    let m = self.marriage_registry.get(mid)?;
+                    if m.husband_id == hh.head {
+                        let is_alive = self.agent_index.get(&m.wife_id)
+                            .and_then(|idx| self.agents.get(*idx))
+                            .map(|a| a.is_alive)
+                            .unwrap_or(false);
+                        if is_alive {
+                            Some(m.wife_id)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            });
+            if let Some(wife_id) = surviving_wife {
+                living_heirs.push(wife_id);
+            }
+
+            // 2. 收集户主的在世子一代（children_ids 中 is_alive=true）
             if let Some(head_idx) = self.agent_index.get(&hh.head) {
                 if let Some(head_agent) = self.agents.get(*head_idx) {
                     for cid in &head_agent.children_ids {
                         if let Some(cidx) = self.agent_index.get(cid) {
                             if let Some(child) = self.agents.get(*cidx) {
-                                if child.is_alive {
-                                    living_children.push(*cid);
+                                if child.is_alive && !living_heirs.contains(cid) {
+                                    living_heirs.push(*cid);
                                 }
                             }
                         }
@@ -84,25 +109,21 @@ impl World3DEngine {
                 .filter(|(_, amt)| *amt > 0.001)
                 .collect();
 
-            pending.push((*hid, balances, living_children));
+            pending.push((*hid, balances, living_heirs));
         }
 
         // WRITE PHASE：执行继承分配
-        for (hid, balances, living_children) in pending {
-            if !living_children.is_empty() {
-                // 有在世子一代：资源平分
-                let n = living_children.len() as f32;
-                for child_id in &living_children {
-                    // 确定子女的目标家户：已有自己家户则直接转入，否则立户
-                    let target_hid = if let Some(chid) = self.household_registry.household_of(*child_id) {
-                        if let Some(chh) = self.household_registry.get(chid) {
-                            if chh.head == *child_id {
-                                Some(chid)
-                            } else {
-                                None // 子女仍在父亲家户中，需立新户
-                            }
+        for (hid, balances, living_heirs) in pending {
+            if !living_heirs.is_empty() {
+                // 有在世继承人（妻子/子女）：资源平分
+                let n = living_heirs.len() as f32;
+                for heir_id in &living_heirs {
+                    // 确定继承人的目标家户：若已属于其他独立家户则转入，否则立新户
+                    let target_hid = if let Some(chid) = self.household_registry.household_of(*heir_id) {
+                        if chid != hid {
+                            Some(chid)
                         } else {
-                            None
+                            None // 仍在已故家户中（如丧偶妻子或未立户子女），需立新户
                         }
                     } else {
                         None
@@ -110,7 +131,7 @@ impl World3DEngine {
 
                     let target_hid = match target_hid {
                         Some(h) => h,
-                        None => self.household_registry.create(*child_id, Some(hid), tick),
+                        None => self.household_registry.create(*heir_id, Some(hid), tick),
                     };
 
                     // 按品类转入继承份额
@@ -122,7 +143,7 @@ impl World3DEngine {
                     }
                 }
             } else {
-                // 绝嗣：全部资源转入公仓兜底账本
+                // 绝嗣（无在世妻子且无在世子女）：全部资源转入公仓兜底账本
                 for (resource, amount) in &balances {
                     if *amount > 0.001 {
                         // Debit 旧家户
@@ -159,7 +180,7 @@ impl World3DEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // Split：男子成年（父在世 W=2+n）或丧父（父亡 W=n）→ 从父亲家户分走 1/W 资源 → 立新户
+    // Split：男子成年或丧父 → 从父亲家户分走 1/W 资源（W = 1(父) + 1(母) + n(子一代)）→ 立新户
     // ══════════════════════════════════════════════════════════════
 
     fn tick_household_split(&mut self, tick: u64) {
@@ -221,10 +242,35 @@ impl World3DEngine {
                 }
             }
 
-            // 父权重仅在父亲在世时计入：成年分家 → W = 2(父) + n(子一代，含胎儿)；
-            // 丧父分家 → 亡父不占权重，W = n，资源在子一代间平分（与继承清算语义一致）。
+            // 权重计算：
+            // 成年分家 → 父亲权重 1.0（若在世），母亲权重 1.0（若在世/如有），子一代各权重 1.0
+            // 丧父/丧母时，亡者不占权重。
             let father_alive = !father_dead;
-            let weight_total = n_children as f32 + if father_alive { 2.0 } else { 0.0 };
+            let father_weight = if father_alive { 1.0 } else { 0.0 };
+
+            // 母亲（生母优先，若生母已故但父亲有在世续弦妻室则看续弦）是否在世
+            let mother_alive = {
+                let bio_mother_alive = agent.mother_id
+                    .and_then(|mid| self.agent_index.get(&mid))
+                    .and_then(|idx| self.agents.get(*idx))
+                    .map(|m| m.is_alive)
+                    .unwrap_or(false);
+                if bio_mother_alive {
+                    true
+                } else {
+                    agent.father_id
+                        .and_then(|fid| self.agent_index.get(&fid))
+                        .and_then(|idx| self.agents.get(*idx))
+                        .and_then(|f| f.spouse_id)
+                        .and_then(|sp| self.agent_index.get(&sp))
+                        .and_then(|idx| self.agents.get(*idx))
+                        .map(|sp| sp.is_alive)
+                        .unwrap_or(false)
+                }
+            };
+            let mother_weight = if mother_alive { 1.0 } else { 0.0 };
+
+            let weight_total = (n_children as f32 + father_weight + mother_weight).max(1.0);
             let split_ratio = 1.0 / weight_total;
 
             // 预先计算各品类分割金额（基于当前原始余额）
