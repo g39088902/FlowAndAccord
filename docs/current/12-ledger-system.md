@@ -55,7 +55,7 @@
 ### ClanRegistry（宗族体系 M3）
 - **按姓氏聚合**：同姓 agent 自动归入同一宗族（不要求同营地）；始祖播撒即入族，新生儿随父姓入族。
 - **★ v1.9.1 宗族与女性无关（Task10/11）**：宗族 = 纯父系男性团体——女性一律不入族（`add_member` 对女性直接拒绝）；始祖仅男性入族，新生儿随父姓入族仅限男性子嗣。
-- **族长顺位**：族长 = 同姓在世最年长男性，并列按 id 取小；无在世男性则宗族无主（`leader=None`），账本冻结（不主动支出，可接收 Tribute）。
+- **族长顺位**：族长 = 同姓在世最年长男性，并列按 id 取小；顺位任职赋予 +3 威望（`prestigeClanElderBonus`，v1.18.0）；无在世男性则宗族无主（`leader=None`），账本冻结（不主动支出，可接收 Tribute）。
 - **★ v1.9.0 绝嗣（Task11）**：宗族无在世男性（`mark_clan_extinct`）→ 标记 `extinct`，族产平分给其他存续宗族（无存续宗族则入 `public_granary` 兜底，`TransferReason::Legacy` 流水事由）；前端宗族页红色「⛩️ 绝嗣 · 无在世男性」标签（v1.9.1 起宗族仅含男性、不统计在世女性）。
 - **族税 Tribute**：每 `clan_tribute_interval_ticks`(1800=60s) 全局统一征收，存续家户按账面余额 × `clan_tribute_rate`(5%) 向族库缴纳（只记账不扣物理库存）。
 - **族内互助 MutualAid**：族库总余额 > `clan_mutual_aid_min_balance`(50) 时，对水+粮 < `clan_mutual_aid_family_threshold`(10) 的极贫家户拨付 `min(族库×20%, 缺口×2)`，每家户每 `clan_mutual_aid_cooldown_ticks`(900=30s) 最多一次，族长签字。
@@ -63,7 +63,7 @@
 ### RegionRegistry（地区与王国体系 M4）
 - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，政体=`Kingdom`，继承制=`Primogeniture`；始祖播撒时加入最近营地，新生儿随父加入父亲所在地区。
 - **到达时序**：`arrival_tick`（始祖=0，新生儿=出生 tick），`arrival_order` 按 `(arrival_tick, agent_id)` 升序。
-- **初王顺位**：初王 = arrival_order 最早到达的在世男性；无在世男性则王位空悬，账本冻结。
+- **初王顺位与登基威望**：初王 = arrival_order 最早到达的在世男性；初任/更替/世袭/夺位登基之国王均享有 +3 威望（`prestigeKingBonus`，v1.18.0）；无在世男性则王位空悬，账本冻结。
 - **★ v1.12.0 历史国王（含在位时长与死因）**：`Region.history_kings` 为 `Vec<HistoryKing>{agent_id, reign_start_tick, reign_end_tick, death_cause}`，`Region.current_reign_start` 追踪现任国王登基 tick；`set_king(agent, tick, note, prev_death_cause)` 在更替时将前任国王入档（死因从 `agent.death_cause` 读取，被废黜则为 None）；营地详情模态框展示历史国王列表及在位时长/死因。
 - **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。

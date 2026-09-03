@@ -170,11 +170,13 @@
 | `clanMutualAidMinBalance` | f32 | 50 | ledger/clan.rs (族内互助) | 族内互助族库最低余额门槛 |
 | `clanMutualAidFamilyThreshold` | f32 | 10 | ledger/clan.rs (族内互助) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `clanMutualAidCooldownTicks` | u64 | 900 | ledger/clan.rs (族内互助) | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 |
+| `prestigeClanElderBonus` | u32 | 3 | ledger/clan.rs (族长威望奖励) | 宗族长老（族长）顺位任职威望奖励 |
 | `ledgerTaxRate` | f32 | 0.03 | ledger/region.rs (公仓税) | 公仓税率：家户每周期向地区公仓缴纳账面余额的比例 |
 | `ledgerTaxIntervalTicks` | u64 | 2400 | ledger/region.rs (公仓税) | 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 |
 | `ledgerReliefMinBalance` | f32 | 30 | ledger/region.rs (救济) | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
 | `ledgerReliefFamilyThreshold` | f32 | 8 | ledger/region.rs (救济) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
+| `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
 | `marketStockMaxWater` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
 | `marketStockMaxFood` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |

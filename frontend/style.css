@@ -539,6 +539,20 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .insp-prestige-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(251, 191, 36, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      font-size: 9.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: help;
+    }
     .insp-close-btn {
       width: 18px;
       height: 18px;

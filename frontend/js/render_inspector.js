@@ -557,6 +557,21 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
     }
 
+    // 🌟 族人副栏威望徽章展示
+    const prestigeBadge = document.getElementById('insp-prestige-badge');
+    if (prestigeBadge) {
+      const p = selAgent.prestige || 0;
+      if (p > 0) {
+        prestigeBadge.style.display = 'inline-flex';
+        prestigeBadge.textContent = `🌟 威望 ${p}`;
+        prestigeBadge.style.color = p >= 5 ? '#fbbf24' : (p > 0 ? '#a78bfa' : '#64748b');
+        prestigeBadge.style.borderColor = p >= 5 ? 'rgba(251, 191, 36, 0.4)' : 'rgba(167, 139, 250, 0.3)';
+        prestigeBadge.style.background = p >= 5 ? 'rgba(251, 191, 36, 0.12)' : 'rgba(167, 139, 250, 0.1)';
+      } else {
+        prestigeBadge.style.display = 'none';
+      }
+    }
+
     // 马斯洛当前主导需求与决策逻辑卡片更新
     const maslowBox = document.getElementById('insp-maslow-box');
     const maslowBadge = document.getElementById('insp-maslow-badge');
@@ -817,13 +832,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
     }
 
-    // 🌟 威望值展示（所有影响因子的综合集合体：子嗣 + 宅邸等级等）
+    // 🌟 威望值展示（所有影响因子的综合集合体：子嗣 + 宅邸等级 + 国王/宗族长老等）
     const prestigeElem = document.getElementById('insp-prestige-val');
     if (prestigeElem) {
       const prestige = selAgent.prestige || 0;
       prestigeElem.textContent = prestige > 0
         ? `🌟 威望 ${prestige}`
         : '暂无威望';
+      prestigeElem.title = '威望构成：子嗣活产父母各+1、私宅每晋升一级户主+1、担任国王+3、担任宗族长老+3';
       prestigeElem.style.color = prestige >= 5 ? '#fbbf24' : (prestige > 0 ? '#a78bfa' : '#64748b');
     }
 

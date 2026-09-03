@@ -188,7 +188,13 @@ impl World3DEngine {
             };
             match new_leader {
                 Some(id) => {
-                    clan.set_leader(id, tick, "同姓最年长在世男性顺位继承");
+                    let ok = clan.set_leader(id, tick, "同姓最年长在世男性顺位继承");
+                    if ok {
+                        let bonus = self.config.prestige_clan_elder_bonus;
+                        if let Some(agent) = self.agent_by_id_mut(id) {
+                            agent.prestige = agent.prestige.saturating_add(bonus);
+                        }
+                    }
                 }
                 None => {
                     // 无在世男性：宗族无主，账本冻结（绝嗣宗族由 mark_clan_extinct 记录事件）

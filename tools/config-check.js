@@ -40,6 +40,8 @@ const IMPACT_OVERRIDES = {
   decisionEvalOrder: 'decisions/branches.rs (前端拖动热注入)',
   decisionEvalLevels: 'decisions/branches.rs (层级覆盖)',
   ledgerJournalCapacity: 'ledger/ (所有账本容量)',
+  prestigeClanElderBonus: 'ledger/clan.rs (族长威望奖励)',
+  prestigeKingBonus: 'ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励)',
 };
 
 const IMPACT_PREFIX_RULES = [

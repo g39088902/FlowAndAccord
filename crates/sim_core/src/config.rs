@@ -287,6 +287,8 @@ pub const CLAN_MUTUAL_AID_MIN_BALANCE: f32 = 50.0;
 pub const CLAN_MUTUAL_AID_FAMILY_THRESHOLD: f32 = 10.0;
 /// 族内互助冷却（tick）：每家户每 N tick 最多接收一次互助（默认 900 = 30秒）
 pub const CLAN_MUTUAL_AID_COOLDOWN_TICKS: u64 = 900;
+/// 宗族长老（族长）顺位任职威望奖励（默认 +3）
+pub const PRESTIGE_CLAN_ELDER_BONUS: u32 = 3;
 
 // ============================================================================
 // 10b. 地区与王国系统 (M4: Region & Kingdom)
@@ -301,6 +303,8 @@ pub const LEDGER_RELIEF_MIN_BALANCE: f32 = 30.0;
 pub const LEDGER_RELIEF_FAMILY_THRESHOLD: f32 = 8.0;
 /// 救济冷却（tick）：每家户每 N tick 最多接收一次救济（默认 1200 = 40秒）
 pub const LEDGER_RELIEF_COOLDOWN_TICKS: u64 = 1200;
+/// 国王登基任职威望奖励（默认 +3）
+pub const PRESTIGE_KING_BONUS: u32 = 3;
 
 // ============================================================================
 // 10c. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
@@ -546,6 +550,7 @@ pub struct SimConfig {
     pub clan_mutual_aid_min_balance: f32,
     pub clan_mutual_aid_family_threshold: f32,
     pub clan_mutual_aid_cooldown_ticks: u64,
+    pub prestige_clan_elder_bonus: u32,
 
     // 12. 地区与王国系统 (M4)
     pub ledger_tax_rate: f32,
@@ -553,6 +558,7 @@ pub struct SimConfig {
     pub ledger_relief_min_balance: f32,
     pub ledger_relief_family_threshold: f32,
     pub ledger_relief_cooldown_ticks: u64,
+    pub prestige_king_bonus: u32,
 
     // 13. 外部市场（榷场互市）与幂律动态定价
     pub count_markets: usize,
@@ -766,6 +772,7 @@ impl Default for SimConfig {
             clan_mutual_aid_min_balance: CLAN_MUTUAL_AID_MIN_BALANCE,
             clan_mutual_aid_family_threshold: CLAN_MUTUAL_AID_FAMILY_THRESHOLD,
             clan_mutual_aid_cooldown_ticks: CLAN_MUTUAL_AID_COOLDOWN_TICKS,
+            prestige_clan_elder_bonus: PRESTIGE_CLAN_ELDER_BONUS,
 
             // 12. 地区与王国系统 (M4)
             ledger_tax_rate: LEDGER_TAX_RATE,
@@ -773,6 +780,7 @@ impl Default for SimConfig {
             ledger_relief_min_balance: LEDGER_RELIEF_MIN_BALANCE,
             ledger_relief_family_threshold: LEDGER_RELIEF_FAMILY_THRESHOLD,
             ledger_relief_cooldown_ticks: LEDGER_RELIEF_COOLDOWN_TICKS,
+            prestige_king_bonus: PRESTIGE_KING_BONUS,
 
             // 13. 外部市场（榷场互市）与幂律动态定价
             count_markets: COUNT_MARKETS,

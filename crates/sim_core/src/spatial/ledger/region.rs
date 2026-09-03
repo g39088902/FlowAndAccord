@@ -317,12 +317,21 @@ impl World3DEngine {
                 .unwrap_or_else(|| format!("营地#{}", camp_id));
             match new_king {
                 Some(id) => {
-                    if region.group.leader.is_none() {
+                    let ok = if region.group.leader.is_none() {
                         // 初王登基
-                        region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name), None);
-                        self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
+                        let ok = region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name), None);
+                        if ok {
+                            self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
+                        }
+                        ok
                     } else {
-                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name), prev_death_cause);
+                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name), prev_death_cause)
+                    };
+                    if ok {
+                        let bonus = self.config.prestige_king_bonus;
+                        if let Some(agent) = self.agent_by_id_mut(id) {
+                            agent.prestige = agent.prestige.saturating_add(bonus);
+                        }
                     }
                 }
                 None => {
@@ -418,8 +427,14 @@ impl World3DEngine {
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
             match heir {
                 Some(heir_id) => {
-                    region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name), prev_death_cause);
-                    self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！", camp_name, dead_king_id, heir_id));
+                    let ok = region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name), prev_death_cause);
+                    if ok {
+                        self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！", camp_name, dead_king_id, heir_id));
+                        let bonus = self.config.prestige_king_bonus;
+                        if let Some(agent) = self.agent_by_id_mut(heir_id) {
+                            agent.prestige = agent.prestige.saturating_add(bonus);
+                        }
+                    }
                 }
                 None => {
                     region.group.leader = None;

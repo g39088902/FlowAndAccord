@@ -101,11 +101,13 @@ impl World3DEngine {
         }
 
         // WRITE: 立王（历史国王入档，见 Region::set_king）
+        let mut coronated = false;
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
-            region.set_king(agent_id, tick, &format!("夺位远征登基：【{}】", camp_name), None);
+            coronated = region.set_king(agent_id, tick, &format!("夺位远征登基：【{}】", camp_name), None);
         }
 
-        // WRITE: agent 状态
+        // WRITE: agent 状态与威望加成
+        let bonus = self.config.prestige_king_bonus;
         let camp_node = self.pois.iter()
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .and_then(|p| self.find_nearest_node(p.pos));
@@ -114,6 +116,9 @@ impl World3DEngine {
             agent.current_need = Some("SelfActualization·King".to_string());
             agent.coronation_pending = None;
             agent.expedition_target_camp = None;
+            if coronated {
+                agent.prestige = agent.prestige.saturating_add(bonus);
+            }
             if let Some(node) = camp_node {
                 agent.home_camp_node = node;
             }

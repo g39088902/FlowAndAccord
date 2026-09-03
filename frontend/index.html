@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.17.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.18.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -395,6 +395,7 @@
         <div class="insp-subbar">
           <span id="insp-home-badge" class="insp-home-chip">🏕️ 营地</span>
           <span id="insp-age-val" style="font-weight:600; color:#38bdf8;">1800s (成年)</span>
+          <span id="insp-prestige-badge" class="insp-prestige-chip" style="display:none;" title="个人综合威望：子嗣(+1)、宅邸晋升(+1)、担任国王(+3)、担任宗族长老(+3)">🌟 威望 0</span>
         </div>
 
         <!-- 马斯洛当前需求层级与决策逻辑卡片 -->
@@ -761,9 +762,9 @@
               </div>
             </div>
           </div>
-          <!-- 威望值展示行（综合影响因子集合体：子嗣 + 宅邸等级等） -->
+          <!-- 威望值展示行（综合影响因子集合体：子嗣 + 宅邸等级 + 国王/宗族长老等） -->
           <div class="lineage-section" style="grid-column: 1 / -1;">
-            <div class="lineage-section-title">🌟 威望</div>
+            <div class="lineage-section-title">🌟 威望 (子嗣+1 · 私宅升级+1 · 国王/宗族长老+3)</div>
             <div class="lineage-section-content" style="padding-top:4px;">
               <span id="insp-prestige-val" style="font-size:12px; color:#64748b;">暂无威望</span>
             </div>

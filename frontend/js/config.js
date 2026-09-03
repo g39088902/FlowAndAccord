@@ -205,6 +205,7 @@ window.SIM_CONFIG = {
   clanMutualAidMinBalance: 50.0,  // 族内互助族库最低余额门槛
   clanMutualAidFamilyThreshold: 10.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
   clanMutualAidCooldownTicks: 900, // 族内互助冷却 (tick)，每家户每 N tick 最多接收一次
+  prestigeClanElderBonus: 3,      // 宗族长老（族长）顺位任职威望奖励
 
   // ==========================================================================
   // 12. 地区与王国系统 (Region & Kingdom — M4)
@@ -214,6 +215,7 @@ window.SIM_CONFIG = {
   ledgerReliefMinBalance: 30.0,     // 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济
   ledgerReliefFamilyThreshold: 8.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
   ledgerReliefCooldownTicks: 1200,  // 救济冷却 (tick)，每家户每 N tick 最多接收一次救济
+  prestigeKingBonus: 3,             // 国王登基任职威望奖励
 
   // ==========================================================================
   // 13. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
