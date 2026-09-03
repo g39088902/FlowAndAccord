@@ -19,7 +19,7 @@ const MIME_TYPES = {
 
 // ── 决策顺序持久化：决策引擎视图拖动后落盘 config.decision-order.js ──
 const DECISION_ORDER_FILE = path.join(__dirname, 'js', 'config.decision-order.js');
-const VALID_BRANCH_ID = /^b(?:[1-9]|1[0-5])$/;
+const VALID_BRANCH_ID = /^b(?:[1-9]|1[0-6])$/;
 const MAX_BODY_BYTES = 16 * 1024;
 
 function renderDecisionOrderFile(order, levels) {
@@ -27,8 +27,8 @@ function renderDecisionOrderFile(order, levels) {
 // Flow & Accord · 决策分支评估顺序持久化配置 (config.decision-order.js)
 // ==========================================================================
 // 本文件由 server.js 的 POST /save-decision-order 端点原子重写（决策引擎视图拖动落盘），
-// 是 evaluate_needs 15 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
-// decisionEvalOrder: 15 个分支 ID（b1~b15），数组顺序即评估优先级（越靠前越优先）。
+// 是 evaluate_needs 16 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
+// decisionEvalOrder: 16 个分支 ID（b1~b16），数组顺序即评估优先级（越靠前越优先）。
 // decisionEvalLevels: 与顺序下标并行的层级覆盖，0=保留代码动态默认，1-5=强制马斯洛层级。
 // ==========================================================================
 window.SIM_DECISION_ORDER = {
@@ -54,9 +54,9 @@ function handleSaveDecisionOrder(req, res) {
       const payload = JSON.parse(body);
       const order = payload.decisionEvalOrder;
       const levels = payload.decisionEvalLevels;
-      const orderOk = Array.isArray(order) && order.length === 15
-        && new Set(order).size === 15 && order.every((s) => VALID_BRANCH_ID.test(s));
-      const levelsOk = Array.isArray(levels) && levels.length === 15
+      const orderOk = Array.isArray(order) && order.length === 16
+        && new Set(order).size === 16 && order.every((s) => VALID_BRANCH_ID.test(s));
+      const levelsOk = Array.isArray(levels) && levels.length === 16
         && levels.every((v) => Number.isInteger(v) && v >= 0 && v <= 5);
       if (!orderOk || !levelsOk) {
         res.writeHead(400, { 'Content-Type': 'application/json' });

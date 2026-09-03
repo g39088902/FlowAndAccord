@@ -517,6 +517,7 @@
             isOnExpedition: a.is_on_expedition || false,
             expeditionTargetCamp: a.expedition_target_camp ?? null,
             coronationPending: a.coronation_pending ?? null,
+            courtshipTargetId: a.courtship_target_id ?? null,
             trail
           };
         });

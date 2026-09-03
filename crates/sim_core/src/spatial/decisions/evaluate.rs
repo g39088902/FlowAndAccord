@@ -23,10 +23,26 @@ pub struct Decisioner<'a> {
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 15],
+    pub branch_order: &'a [BranchId; 16],
 }
 
 impl<'a> Decisioner<'a> {
+    /// ★ 求偶目标检索：按魅力最高优先；魅力相同时距离最近优先；再以 ID 确定性打破并列
+    pub fn best_courtship_target(&self, agent: &Agent3D) -> Option<&EligibleFemale> {
+        self.ctx.eligible_females.iter().min_by(|a, b| {
+            // 1. 魅力 libido 降序（最高优先）
+            b.libido.partial_cmp(&a.libido).unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    // 2. 距离当前 agent 空间位置升序（最近优先）
+                    let dist_a = a.pos.distance_to(&agent.world_pos);
+                    let dist_b = b.pos.distance_to(&agent.world_pos);
+                    dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                })
+                // 3. ID 升序
+                .then_with(|| a.id.cmp(&b.id))
+        })
+    }
+
     /// ★ M6 账本化：读取 agent 所属家户账本的品类余额（无家户返回 0.0）
     pub fn ledger_balance(&self, agent: &Agent3D, kind: ResourceKind) -> f32 {
         ledger_balance_of(self.households, agent, kind)
@@ -135,6 +151,11 @@ impl<'a> Decisioner<'a> {
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_buying_market(agent);
             }
+            PrimitiveActionState::SeekingCourtship => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingCourtship, agent, self.houses, self.households, self.config)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_seeking_courtship(agent);
+            }
             _ => {}
         }
     }
@@ -233,6 +254,21 @@ impl<'a> Decisioner<'a> {
             self.dispatch(agent, start, target, PrimitiveActionState::SeekingMarket);
             return;
         }
+        if need.kind == NeedKind::Courtship {
+            let Some(target) = self.best_courtship_target(agent).copied() else {
+                agent.current_need = None;
+                return;
+            };
+            agent.courtship_target_id = Some(target.id);
+            agent.current_need = Some("Belonging·Courtship".to_string());
+            if agent.world_pos.distance_to(&target.pos) <= self.config.poi_interaction_radius {
+                agent.courtship_pending = Some(target.id);
+            } else {
+                let start = self.start_node(agent);
+                self.dispatch(agent, start, target.nearest_node, PrimitiveActionState::SeekingCourtship);
+            }
+            return;
+        }
         if need.kind == NeedKind::StockGold {
             agent.gold_mining_cooldown = self.config.decision_stock_gold_cooldown;
         } else if need.kind == NeedKind::GoldWealth {
@@ -246,7 +282,7 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
             NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
             NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);

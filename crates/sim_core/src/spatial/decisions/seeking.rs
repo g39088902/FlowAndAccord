@@ -172,4 +172,74 @@ impl<'a> Decisioner<'a> {
         agent.current_need = None;
         agent.state = PrimitiveActionState::RestingAtCamp;
     }
+
+    /// ★ 求偶途中状态机：奔赴心仪女性
+    pub fn decide_seeking_courtship(&mut self, agent: &mut Agent3D) {
+        // 1. 生存指标熔断：口渴/饥饿/体力严重告警时终止求偶，保命优先
+        if agent.thirst < self.config.decision_critical_thirst
+            || agent.hunger < self.config.decision_critical_hunger
+            || agent.stamina < self.config.decision_work_stamina_threshold
+        {
+            agent.courtship_target_id = None;
+            agent.courtship_pending = None;
+            self.return_home(agent);
+            return;
+        }
+
+        // 2. 身份资格校验（若自身已婚或死亡，立刻清空并恢复营地）
+        if agent.spouse_id.is_some() || !agent.is_alive || agent.gender != crate::spatial::agent::Gender::Male {
+            agent.courtship_target_id = None;
+            agent.courtship_pending = None;
+            agent.state = PrimitiveActionState::RestingAtCamp;
+            return;
+        }
+
+        let interact_radius = self.config.poi_interaction_radius;
+        let target_female_id = agent.courtship_target_id;
+
+        // 检查原目标女性是否仍处于候选集合中
+        let current_target = target_female_id.and_then(|tid| {
+            self.ctx.eligible_females.iter().find(|f| f.id == tid).copied()
+        });
+
+        if let Some(target) = current_target {
+            if agent.world_pos.distance_to(&target.pos) <= interact_radius {
+                // 已抵达且满足互动半径：写下求偶决心，待世界调度执行结婚
+                agent.courtship_pending = Some(target.id);
+                agent.current_need = Some("Belonging·Courtship".to_string());
+                return;
+            }
+            // 仍在途中：若路径走完但尚未进入互动半径（如目标略有移动），向其最新最近路网节点重补路径
+            if agent.route.is_empty() {
+                let curr = self.start_node(agent);
+                if curr != target.nearest_node {
+                    self.dispatch(agent, curr, target.nearest_node, PrimitiveActionState::SeekingCourtship);
+                }
+            }
+            return;
+        }
+
+        // 目标女性已不可用（已被他人迎娶/已怀孕/已身亡）：尝试重定向到全图下一名魅力最高单身女性
+        if let Some(new_target) = self.best_courtship_target(agent).copied() {
+            agent.courtship_target_id = Some(new_target.id);
+            if agent.world_pos.distance_to(&new_target.pos) <= interact_radius {
+                agent.courtship_pending = Some(new_target.id);
+                agent.current_need = Some("Belonging·Courtship".to_string());
+                return;
+            }
+            if self.turn_around_and_route_to(agent, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                return;
+            }
+            let curr = self.start_node(agent);
+            if self.dispatch(agent, curr, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                return;
+            }
+        }
+
+        // 全图已无任何合格单身女性：放弃求偶，返回归宿营地/私宅
+        agent.courtship_target_id = None;
+        agent.courtship_pending = None;
+        agent.current_need = None;
+        self.return_home(agent);
+    }
 }

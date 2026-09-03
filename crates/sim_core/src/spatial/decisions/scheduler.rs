@@ -36,6 +36,8 @@ impl World3DEngine {
         drop(decisioner);
         // ★ M4 登基物理规则：把本拍内 agent 自主下定决心（coronation_pending）的登基落地
         self.execute_pending_coronations();
+        // ★ 求偶物理规则：把本拍内 male agent 自主下定决心（courtship_pending）的成婚登记落地
+        self.execute_pending_courtships();
         // 实体化登记：将本拍内 agent 自主选定的宅址落地为 0 级仓库（放置校验/路网接入/房产绑定）
         self.materialize_founded_houses();
     }
@@ -120,6 +122,109 @@ impl World3DEngine {
         self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", agent_id, camp_name));
     }
 
+    // ══════════════════════════════════════════════════════════
+    // ★ 求偶成婚 · 物理规则执行器（决策由马斯洛引擎驱动，此处只执行物理结算）
+    // ══════════════════════════════════════════════════════════
+
+    /// 求偶物理规则执行器：扫描本拍内 male agent 自主写下的求偶达成决心（courtship_pending），
+    /// 校验双方资格（在世、单身、女方未孕）后执行结婚登记并转籍家户。
+    /// 与 execute_pending_coronations / materialize_founded_houses 同模式：系统只当物理规则执行者。
+    pub fn execute_pending_courtships(&mut self) {
+        let tick = self.tick_counter;
+        let mut pending: Vec<(u32, u32)> = Vec::new(); // (male_id, female_id)
+        for agent in &self.agents {
+            if let Some(female_id) = agent.courtship_pending {
+                pending.push((agent.id, female_id));
+            }
+        }
+        if pending.is_empty() {
+            return;
+        }
+
+        for (male_id, female_id) in pending {
+            // 清空男方的 pending 决心
+            if let Some(male) = self.agent_by_id_mut(male_id) {
+                male.courtship_pending = None;
+            }
+
+            // 资格二次原子核验
+            let male_eligible = self.agent_by_id(male_id).map(|a| {
+                a.is_alive && a.gender == crate::spatial::agent::Gender::Male && a.spouse_id.is_none()
+            }).unwrap_or(false);
+            let female_eligible = self.agent_by_id(female_id).map(|a| {
+                a.is_alive && a.gender == crate::spatial::agent::Gender::Female && a.spouse_id.is_none() && !a.is_pregnant
+            }).unwrap_or(false);
+
+            if !male_eligible || !female_eligible {
+                if let Some(male) = self.agent_by_id_mut(male_id) {
+                    male.courtship_target_id = None;
+                    if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
+                        male.state = crate::spatial::agent::PrimitiveActionState::RestingAtCamp;
+                    }
+                }
+                continue;
+            }
+
+            // 登记婚姻（登记簿保证存续唯一性；失败则不结）
+            let Some(_marriage_id) = self.marriage_registry.register(male_id, female_id, tick) else {
+                if let Some(male) = self.agent_by_id_mut(male_id) {
+                    male.courtship_target_id = None;
+                    if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
+                        male.state = crate::spatial::agent::PrimitiveActionState::RestingAtCamp;
+                    }
+                }
+                continue;
+            };
+
+            // 获取男方家户 ID（无家户则自动建户）
+            let male_hid = match self.household_registry.household_of(male_id) {
+                Some(hid) => hid,
+                None => self.household_registry.create(male_id, None, tick),
+            };
+
+            // 女方转入男方家户（家庭跟着男人走）
+            self.household_registry.transfer_member(female_id, male_hid, tick);
+
+            // 更新男方状态
+            if let Some(male) = self.agent_by_id_mut(male_id) {
+                male.spouse_id = Some(female_id);
+                male.courtship_target_id = None;
+                if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
+                    male.state = crate::spatial::agent::PrimitiveActionState::RestingAtCamp;
+                }
+            }
+
+            // 更新女方状态与房产居住
+            let house_info = self.houses.iter_mut().find(|h| h.owner_id == Some(male_id)).map(|h| {
+                h.spouse_id = Some(female_id);
+                (h.id, h.door_node_id)
+            });
+
+            let is_remarriage = if let Some(female) = self.agent_by_id_mut(female_id) {
+                female.spouse_id = Some(male_id);
+                if let Some((house_id, door_node_id)) = house_info {
+                    female.home_house_id = Some(house_id);
+                    female.home_camp_node = door_node_id;
+                }
+                !female.children_ids.is_empty()
+            } else {
+                false
+            };
+
+            if is_remarriage {
+                self.last_event = Some(format!(
+                    "💍 族人求偶改嫁成家: 女性 #{} ♀ 改嫁家户户主 #{} ♂（入家户 #{}）！",
+                    female_id, male_id, male_hid
+                ));
+            } else {
+                self.last_event = Some(format!(
+                    "💍 族人求偶喜结连理: 男性 #{} ♂ 成功迎娶单身女性 #{} ♀（入家户 #{}）！",
+                    male_id, female_id, male_hid
+                ));
+            }
+        }
+    }
+
     pub fn build_decision_context(&self) -> DecisionContext {
         let mut water_nodes = Vec::new();
         let mut food_nodes = Vec::new();
@@ -147,6 +252,27 @@ impl World3DEngine {
             }
         }
 
+        // ★ 求偶候选池：预收集全图在世、成年、单身、未孕的女性
+        let mut eligible_females = Vec::new();
+        for a in &self.agents {
+            if a.is_alive
+                && a.gender == crate::spatial::agent::Gender::Female
+                && !a.is_fetus
+                && a.age >= self.config.agent_adult_age
+                && a.spouse_id.is_none()
+                && !a.is_pregnant
+            {
+                if let Some(node) = self.find_nearest_node(a.world_pos) {
+                    eligible_females.push(EligibleFemale {
+                        id: a.id,
+                        pos: a.world_pos,
+                        libido: a.libido,
+                        nearest_node: node,
+                    });
+                }
+            }
+        }
+
         DecisionContext {
             water_nodes,
             food_nodes,
@@ -156,6 +282,7 @@ impl World3DEngine {
             market_nodes,
             camp_positions,
             camp_pois,
+            eligible_females,
         }
     }
 }

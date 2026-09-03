@@ -218,6 +218,8 @@ pub struct AgentSnapshot {
     pub expedition_target_camp: Option<u32>,
     /// ★ v1.9.0 M4 待登基（抵达且王位仍空缺，待世界物理执行器 coronate）
     pub coronation_pending: Option<u32>,
+    /// ★ 求偶目标女性 ID（决策器选定写入）
+    pub courtship_target_id: Option<u32>,
 }
 
 // ═══════════════════════════════════════════════════════════════

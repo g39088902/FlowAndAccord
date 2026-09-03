@@ -55,6 +55,7 @@ const NEED_KIND_LABEL = {
   RepairHouse: '修缮房屋',
   BuildHouse: '施工建房',
   Detour: '越野寻路',
+  Courtship: '求偶成婚',
 };
 const NEED_KIND_REASON = {
   QuenchThirst: '自身水分告急，前往水泉痛饮至满值并带回补给家户账本。',
@@ -70,6 +71,7 @@ const NEED_KIND_REASON = {
   StockGold: '有房即可：家户账本金 < 100 触发去采，补到 ≥ 200 才停（淘金冷却45s）。',
   GoldWealth: '4级庄园竣工且水/粮/木/石/金均 ≥ 200 后，娱乐性淘金积累随身财富（冷却180s）。',
   Detour: '车道临时受阻，正在荒野中越野寻路。',
+  Courtship: '寻访全图魅力最高的单身女性，前往求偶并迎娶入家户。',
 };
 const LEVEL_NUMERALS = ['①', '②', '③', '④', '⑤'];
 

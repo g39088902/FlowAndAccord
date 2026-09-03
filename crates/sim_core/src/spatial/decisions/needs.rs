@@ -1,6 +1,6 @@
 use super::super::vec3::Vec3;
 use super::super::graph::NodeId;
-use super::super::agent::{Agent3D, PrimitiveActionState};
+use super::super::agent::{Agent3D, AgentId, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
 use super::super::ledger::family::HouseholdRegistry;
 use super::super::ledger::journal::ResourceKind;
@@ -60,6 +60,7 @@ pub enum NeedKind {
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
     SeekThrone,     // 生理(最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基
     MarketTrade,    // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
+    Courtship,      // 归属: 寻找全图魅力最高单身女性求偶成婚
 }
 
 /// 一条需求判定结论
@@ -99,6 +100,15 @@ pub struct ResourceNode {
     pub node: NodeId,
 }
 
+/// 决策时收集的单身适婚女性候选
+#[derive(Debug, Clone, Copy)]
+pub struct EligibleFemale {
+    pub id: AgentId,
+    pub pos: Vec3,
+    pub libido: f32,
+    pub nearest_node: NodeId,
+}
+
 /// 决策上下文：收集资源节点；是否可用由每个 Agent 的私有触发器决定。
 pub struct DecisionContext {
     pub water_nodes: Vec<ResourceNode>,
@@ -110,6 +120,8 @@ pub struct DecisionContext {
     pub camp_positions: Vec<(NodeId, Vec3)>,
     /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
     pub camp_pois: Vec<(u32, Vec3)>,
+    /// 全图可求偶的在世成年单身女性列表（求偶分支使用）
+    pub eligible_females: Vec<EligibleFemale>,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）
@@ -261,6 +273,7 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
                 .unwrap_or(false);
             if is_tier0 { ("Belonging", "BuildHouse", Some(BranchId::B8BuildHouseTier0)) } else { ("Esteem", "BuildHouse", Some(BranchId::B11BuildHouseUpgrade)) }
         }
+        PrimitiveActionState::SeekingCourtship => ("Belonging", "Courtship", Some(BranchId::B16Courtship)),
         PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest", Some(BranchId::B3Rest)),
         PrimitiveActionState::OffRoadDetour => ("Safety", "Detour", None),
         _ => return None,

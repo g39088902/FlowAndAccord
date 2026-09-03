@@ -241,6 +241,7 @@ impl World3DEngine {
                 is_on_expedition: matches!(agent.state, crate::spatial::agent::PrimitiveActionState::SeekingThrone),
                 expedition_target_camp: agent.expedition_target_camp,
                 coronation_pending: agent.coronation_pending,
+                courtship_target_id: agent.courtship_target_id,
             });
         }
 

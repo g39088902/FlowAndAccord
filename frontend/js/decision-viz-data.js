@@ -33,7 +33,8 @@
     { id: 'b11', cond: '账本可付本次材料(2级木粮水75/3级石木粮水100/4级金石木粮水125)', need: 'Esteem · BuildHouse(1-4级)', target: '瞬发升级(下一级)', level: 4, cfg: ['upgrade_material_cost(tier)'], anchor: 'branches.rs::B11BuildHouseUpgrade' },
     { id: 'b13', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' },
     { id: 'b14', cond: '在世成年男性 且 非现任国王 且 存在空缺王位营地（有房限自家房屋营地/无房可任意）', need: 'Physiological · SeekThrone', target: 'SeekingThrone', level: 1, cfg: ['poiMinDistance=70', '性别+房籍守卫'], anchor: 'branches.rs::B14SeekThrone' },
-    { id: 'b15', cond: '成年男性户主 且 (水或粮断供) 且 存金≥0.5 且 体力≥15', need: 'Physiological · MarketTrade', target: 'SeekingMarket', level: 1, cfg: ['marketEmergencyFamilyStockThreshold=10.0', 'marketMinFamilyGold=0.5', 'marketMinDispatchStamina=15.0'], anchor: 'market.rs::evaluate_market_trade' }
+    { id: 'b15', cond: '成年男性户主 且 (水或粮断供) 且 存金≥0.5 且 体力≥15', need: 'Physiological · MarketTrade', target: 'SeekingMarket', level: 1, cfg: ['marketEmergencyFamilyStockThreshold=10.0', 'marketMinFamilyGold=0.5', 'marketMinDispatchStamina=15.0'], anchor: 'market.rs::evaluate_market_trade' },
+    { id: 'b16', cond: '在世成年男性 且 单身 且 存在全图单身成年女性', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, cfg: ['性别+单身守卫', '魅力最高优先'], anchor: 'branches.rs::B16Courtship' }
   ];
 
   var BRANCH_MAP = {};
@@ -42,26 +43,27 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
-  // 默认分界线：位于第 g 张卡之后（第1层|第2层=6 / 第2层|第3层=10 / 第3层|第4层=11 / 第4层|第5层=14）
-  var DEFAULT_DIVGAPS = [6, 10, 11, 14];
+  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b5', 'b6', 'b7', 'b16', 'b8', 'b9', 'b10', 'b11', 'b13'];
+  // 默认分界线：位于第 g 张卡之后（第1层|第2层=6 / 第2层|第3层=10 / 第3层|第4层=12 / 第4层|第5层=15）
+  var DEFAULT_DIVGAPS = [6, 10, 12, 15];
 
-  // 行动状态机摘要（agent.rs::PrimitiveActionState 17 态）
+  // 行动状态机摘要（agent.rs::PrimitiveActionState 18 态）
   var FSM_STATES = [
     'RestingAtCamp', 'SeekingWater', 'SeekingFood', 'SeekingWood', 'SeekingStone', 'SeekingGold',
     'DrinkingAtWater', 'ForagingFood', 'GatheringWood', 'MiningStone', 'MiningGold',
     'ReturningToCamp', 'ConstructingHouse', 'RepairingHouse', 'OffRoadDetour', 'SeekingThrone',
-    'SeekingMarket', 'BuyingAtMarket'
+    'SeekingMarket', 'BuyingAtMarket', 'SeekingCourtship'
   ];
 
-  // 行动状态中文描述（PrimitiveActionState 17 态 → 中文语义），决策卡 target 与状态机芯片共用
+  // 行动状态中文描述（PrimitiveActionState 18 态 → 中文语义），决策卡 target 与状态机芯片共用
   var FSM_STATE_ZH = {
     RestingAtCamp: '营地休整', SeekingWater: '外出寻水', SeekingFood: '外出觅食',
     SeekingWood: '外出寻木', SeekingStone: '外出寻石', SeekingGold: '外出寻金',
     DrinkingAtWater: '清泉饮水', ForagingFood: '采食浆果', GatheringWood: '伐木取木',
     MiningStone: '采石取石', MiningGold: '淘金取金', ReturningToCamp: '返家卸货',
     ConstructingHouse: '建房施工', RepairingHouse: '房屋修缮', OffRoadDetour: '途中掉头重路由',
-    SeekingThrone: '夺位远征', SeekingMarket: '奔赴榷场', BuyingAtMarket: '榷场交易'
+    SeekingThrone: '夺位远征', SeekingMarket: '奔赴榷场', BuyingAtMarket: '榷场交易',
+    SeekingCourtship: '奔赴求偶'
   };
   /** 英文状态码 → 中文语义；未知则原样返回 */
   function zh(s) { return FSM_STATE_ZH[s] || s; }

@@ -128,7 +128,7 @@ impl Region {
 
     /// 插入 agent 到 arrival_order 的正确位置（按 (arrival_tick, agent_id) 升序）
     /// 调用方需先从 world 读取 agent.arrival_tick
-    pub fn insert_arrival(&mut self, agent: AgentId, arrival_tick: u64) {
+    pub fn insert_arrival(&mut self, agent: AgentId, _arrival_tick: u64) {
         if self.arrival_order.contains(&agent) {
             return;
         }

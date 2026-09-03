@@ -532,6 +532,10 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         stateText = '🚶 疲惫返巢';
         detailText = '体力耗竭跌破50%，正在沿路返回专属私宅/营地；到达归宿后就地休养至100%满值。';
       }
+    } else if (selAgent.state === 'SeekingCourtship') {
+      const targetStr = selAgent.courtshipTargetId ? ` (#${selAgent.courtshipTargetId})` : '';
+      stateText = '💍 前往求偶' + targetStr;
+      detailText = `正在前往寻访全图魅力最高的单身女性${targetStr}，准备向其求偶并迎娶入家户。`;
     }
 
     document.getElementById('insp-title-state').textContent = stateText;

@@ -26,9 +26,6 @@ impl World3DEngine {
         // 4. ★ M6 房屋升级瞬时化（一次性扣账+晋升，无施工工时/体力）
         self.tick_house_construction();
 
-        // 5. 自动成婚与单身女性改嫁机制
-        self.tick_marriage_and_remarriage();
-
         // 7. ★ v1.10.0 空置房屋事件驱动追踪（户主死亡→无主空置→营地登记受益人，取代原继承/绝嗣废墟）
         self.tick_vacant_house_tracking();
 

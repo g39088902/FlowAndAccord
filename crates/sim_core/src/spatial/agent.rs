@@ -83,6 +83,7 @@ pub enum PrimitiveActionState {
     SeekingThrone,      // ⚔️ 夺位远征中（冲向无主营地登基）
     SeekingMarket,      // 🚶 正在赶往外部市场求购水粮
     BuyingAtMarket,     // ⚖️ 正在市场现场交易（就地自救与装载行囊）
+    SeekingCourtship,   // 💍 正在奔赴心仪女性求偶
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
@@ -128,6 +129,12 @@ pub struct Agent3D {
     /// （与 pending_house_pos 同模式：决策器只下决心，实体化由 world 负责）。
     #[serde(default)]
     pub coronation_pending: Option<u32>,
+    /// ★ 求偶目标女性 ID（决策引擎驱动：由成年单身男性自主选定）
+    #[serde(default)]
+    pub courtship_target_id: Option<AgentId>,
+    /// ★ 求偶待结算标记：本 agent 已抵达目标女性互动半径，等待世界物理执行器登记结婚
+    #[serde(default)]
+    pub courtship_pending: Option<AgentId>,
     pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
@@ -230,6 +237,8 @@ impl Agent3D {
             pending_house_pos: None,
             expedition_target_camp: None,
             coronation_pending: None,
+            courtship_target_id: None,
+            courtship_pending: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
             generation: 1,
@@ -364,6 +373,8 @@ impl Agent3D {
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.pregnancy_child_id = None;
+            self.courtship_target_id = None;
+            self.courtship_pending = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 因长期饥荒不幸饿死！", self.id));
         }
@@ -375,6 +386,8 @@ impl Agent3D {
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.pregnancy_child_id = None;
+            self.courtship_target_id = None;
+            self.courtship_pending = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 因严重脱水在荒野中渴死！", self.id));
         }
@@ -386,6 +399,8 @@ impl Agent3D {
             self.is_pregnant = false;
             self.pregnancy_father_id = None;
             self.pregnancy_child_id = None;
+            self.courtship_target_id = None;
+            self.courtship_pending = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
         }
