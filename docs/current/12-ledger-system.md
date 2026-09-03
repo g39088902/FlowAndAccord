@@ -65,7 +65,7 @@
 - **到达时序**：`arrival_tick`（始祖=0，新生儿=出生 tick），`arrival_order` 按 `(arrival_tick, agent_id)` 升序。
 - **初王顺位**：初王 = arrival_order 最早到达的在世男性；无在世男性则王位空悬，账本冻结。
 - **★ v1.12.0 历史国王（含在位时长与死因）**：`Region.history_kings` 为 `Vec<HistoryKing>{agent_id, reign_start_tick, reign_end_tick, death_cause}`，`Region.current_reign_start` 追踪现任国王登基 tick；`set_king(agent, tick, note, prev_death_cause)` 在更替时将前任国王入档（死因从 `agent.death_cause` 读取，被废黜则为 None）；营地详情模态框展示历史国王列表及在位时长/死因。
-- **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
+- **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
 - **公仓税 Tax**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。

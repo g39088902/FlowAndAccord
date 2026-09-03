@@ -68,7 +68,7 @@
 ### 4.8 ★ M4 夺位远征（决策引擎驱动 · 生理层最高档）
 
 v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决策引擎的第 14 条分支 `B14SeekThrone`**（`NeedKind::SeekThrone`，`MaslowLevel::Physiological`，策展序/兜底序均置首 b14）：
-- **触发（守卫全内联在分支内）**：在世成年男性、非现任国王、且 `Decisioner.eligible_leaderless_camp` 找到空缺王位营地——有房（含 0 级非废墟）者只能夺**自家房屋所在营地**的空缺王位，无房/废墟可夺**任意**空缺王位营地（Task6 语义）；
+- **触发（守卫全内联在分支内）**：在世成年男性、非现任国王、且 `Decisioner.eligible_leaderless_camp` 找到空缺王位营地——有房（含 0 级）者只能夺**自家房屋所在营地**的空缺王位，无房可夺**任意**空缺王位营地（Task6 语义）；
 - **选点写字段**：`fulfill_resting_need` 将选定营地写入 `agent.expedition_target_camp` 并 `dispatch` 为 `PrimitiveActionState::SeekingThrone`，`current_need = "Physiological·SeekThrone"`；
 - **途中状态机 `decide_seeking_throne`**（seeking.rs，寻路+运动系统，坐标连续不闪现）：体力告警 → 折返；抵达目标营地交互半径且王位仍空缺 → 写 `coronation_pending` 待世界登基；途中目标已易主 → 原地掉头重定向到新的空缺王位营地；无可夺位营地 → 放弃远征恢复常规决策；
 - **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；

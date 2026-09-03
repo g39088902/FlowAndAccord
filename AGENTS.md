@@ -56,7 +56,7 @@ graph TD
     E --> F["浏览器 UI (版本: v1.12.0)"]
 ```
 
-- **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与代际继承、经济账本；
+- **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化、tick 步进、JS 动态配置注入；
 - **`frontend/`**：原生静态前端（9 个 JS 文件），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
@@ -187,7 +187,7 @@ node frontend/server.js           # http://localhost:3000
 
 - **冬季供暖**：冬季或气温 < `config.houseWinterColdTemp`(5℃) 时，非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材；家宅木材 < 10 时禁孕。
 - **家庭储备 = 家户账本（M6 起）**：`House.pantry_*`/仓储容量已删除，吃喝、冬季烧柴全部从**家户账本真实扣减**（账本余额即家庭实有物资，无容量上限）。
-- **去采货 = 施密特触发器（M7 起）**：有房（含 0 级、非废墟）即可采，与房屋等级**彻底脱钩**——每类资源（水/粮/木/石/金统一）家户账本余额 < `decisionFamilyStockTriggerOn`(100) 触发去采，补到 ≥ `decisionFamilyStockTriggerOff`(200) 才停（滞回带）。无房者不触发补货、现场只自用不装袋。
+- **去采货 = 施密特触发器（M7 起）**：有房（含 0 级）即可采，与房屋等级**彻底脱钩**——每类资源（水/粮/木/石/金统一）家户账本余额 < `decisionFamilyStockTriggerOn`(100) 触发去采，补到 ≥ `decisionFamilyStockTriggerOff`(200) 才停（滞回带）。无房者不触发补货、现场只自用不装袋。
 - **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，数值来自 **20 个超参**（`config.house-upgrade-cost.js` 的 `houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold}`，权威默认值三处同步于 `config.rs`）——升到 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，该级不消耗的品类填 0（扣账自动跳过、就绪不阻塞）；b8/b11 就绪 = 每类 `ledger.balance ≥ cost`（0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50），升级时一次性扣账并户主威望+1。
 - **生育去房屋化**：受孕不再依赖房屋等级或仓储备货——成年已婚女性身体指标达标且流产冷却（450s）与产后休养冷却（900s，分娩后触发）均结束即可受孕，无房也可生育（原 0 级禁孕/木材支持门槛已删）。
 - **淘金纪律**：4 级大庄园竣工前绝不娱乐淘金（`GoldWealth` 冷却 180s）；盖房备料淘金 `StockGold` 冷却 45s。

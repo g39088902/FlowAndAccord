@@ -29,7 +29,7 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 | ④ 尊重 | `BuildHouse`(1-4级) / `StockStone` / `StockGold`(45s冷却) | 建材储备与房屋升级 |
 | ⑤ 自我实现 | `GoldWealth`(180s冷却) | 4 级大庄园竣工后的娱乐淘金 |
 
-> ⚔️ **★ M4 夺位远征（v1.9.0 起决策引擎驱动，生理层最高档）**：第 14 条决策分支 `B14SeekThrone` 在马斯洛引擎内评估——在世成年男性、非现任国王、且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）时，决策器自主选定最近可夺位营地写入 `expedition_target_camp` 并 `dispatch` 为 `SeekingThrone` 冲向目标；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后登基。设计理由：王位空悬属社会结构级事件，夺位作为生理层最高档需求压倒解渴/觅食/休息（见 [12-ledger-system.md](./current/12-ledger-system.md) §M4）。
+> ⚔️ **★ M4 夺位远征（v1.9.0 起决策引擎驱动，生理层最高档）**：第 14 条决策分支 `B14SeekThrone` 在马斯洛引擎内评估——在世成年男性、非现任国王、且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，决策器自主选定最近可夺位营地写入 `expedition_target_camp` 并 `dispatch` 为 `SeekingThrone` 冲向目标；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后登基。设计理由：王位空悬属社会结构级事件，夺位作为生理层最高档需求压倒解渴/觅食/休息（见 [12-ledger-system.md](./current/12-ledger-system.md) §M4）。
 
 ### 2.2 为什么不用效用最大化或行为树
 
@@ -132,4 +132,4 @@ Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离�
 | 寻路 | 加权 A*（坡度/隐秘/踩踏度） | 欲望线热度场 + 时空冲突预约 FIFO |
 | 内核 | Rust 结构体数组（`Vec<Agent3D>`） | ECS（hecs/bevy_ecs）+ 确定性 Command Queue |
 | 快照 | JSON 序列化 | 零拷贝双缓冲共享内存 + Hermite 插值 |
-| 社会 | 婚姻/家户/代际继承 + **宗族/地区政体/国王夺位**（账本 M1~M4 已落地） | 专利经济/混合政体/LLM 认知层 |
+| 社会 | 婚姻/家户/分家继承 + **宗族/地区政体/国王夺位**（账本 M1~M4 已落地） | 专利经济/混合政体/LLM 认知层 |

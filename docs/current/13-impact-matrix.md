@@ -100,7 +100,7 @@
    2.3 tick_fetus_reconcile()                受孕建胎儿/流产移除/位置跟随
    2.5 settle_gold_inheritance()              死者金币平分给在世子一代
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
-4. tick_housing(dt)                           房屋折旧、冬季供暖、代际继承
+4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
    tick_decisions()                           错峰决策 ((tick + id) % 30 == 0)

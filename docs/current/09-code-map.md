@@ -45,7 +45,7 @@ FlowAndAccord/
 │   │           │   ├── construction.rs     # 升级瞬时竣工 (M6 起一次性扣账无工时) + 材料成本校验
 │   │           │   ├── marriage.rs         # 自动成婚与丧偶改嫁匹配 (M6 起遍历家户户主)
 │   │           │   ├── settlement.rs       # 立宅选址校验、路网接入、空置节点复用
-│   │           │   └── inheritance.rs      # 父系继承与绝嗣废墟处理
+│   │           │   └── inheritance.rs      # 空置房登记（户主亡故→无主→营地列表+受益人）
 │   │           └── ledger/                  # 📒 账本与社会经济制度子系统 (7 文件, M1~M4)
 │   │               ├── mod.rs              # ledger 模块入口与重新导出
 │   │               ├── journal.rs          # 账本内核 (ResourceKind/Ledger/TransferRecord/TransferReason/LedgerRef)

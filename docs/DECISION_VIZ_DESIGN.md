@@ -107,7 +107,7 @@
 | `scheduler.rs` | `tick_decisions`(错峰) / `build_decision_context`                                                                 | **调度节拍** 图元                 |
 | `agent.rs`(外部) | `PrimitiveActionState`(15 态) / `observe_poi_stock_with_config` / `poi_is_seekable`(施密特触发器)                      | **状态机状态集** + **触发器** 图元     |
 
-> ★ **M4 夺位远征**（v1.9.0 起决策引擎驱动）：第 14 条决策分支 `B14SeekThrone` 在马斯洛引擎内评估（生理层最高档）——在世成年男性、非现任国王、存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）时，决策器选定最近可夺位营地写入 `agent.expedition_target_camp` 置 `SeekingThrone` 冲向目标（不消耗 RNG、可中断施工进度冻结不回滚）；抵达王位仍空缺写 `coronation_pending`，世界 `execute_pending_coronations` 校验后登基。可视化方案建议在决策树生理层顶部增加「夺位」判定节点，并在状态机图中标注 `SeekingThrone` 状态与夺位光束链路。
+> ★ **M4 夺位远征**（v1.9.0 起决策引擎驱动）：第 14 条决策分支 `B14SeekThrone` 在马斯洛引擎内评估（生理层最高档）——在世成年男性、非现任国王、存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，决策器选定最近可夺位营地写入 `agent.expedition_target_camp` 置 `SeekingThrone` 冲向目标（不消耗 RNG、可中断施工进度冻结不回滚）；抵达王位仍空缺写 `coronation_pending`，世界 `execute_pending_coronations` 校验后登基。可视化方案建议在决策树生理层顶部增加「夺位」判定节点，并在状态机图中标注 `SeekingThrone` 状态与夺位光束链路。
 
 ### 2.2 实时数据（快照已具备，零改内核）
 

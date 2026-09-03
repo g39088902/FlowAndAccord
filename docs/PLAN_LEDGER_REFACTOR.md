@@ -92,7 +92,7 @@
 - 每营地一册 `Region { group, regime: Kingdom, succession: Primogeniture, arrival_order }`（`ledger/region.rs::RegionRegistry`）；
 - **到达时序**：`Agent3D.arrival_tick`（始祖=0，新生儿出生 tick 登记）；`arrival_order` 按 `(arrival_tick, agent_id)` 排序；
 - **初王**：`arrival_order` 中最早到达的在世男性；
-- **★ 夺位远征（v1.9.0 起决策引擎驱动，`B14SeekThrone` 生理层最高档分支）**：在世成年男性、非国王、存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）→ 决策器选定最近可夺位营地写入 `agent.expedition_target_camp` 冲往（可中断施工/修缮，进度冻结不回滚）；抵达王位仍空缺写 `coronation_pending`，世界 `execute_pending_coronations` 校验后登基 + `Succession` 流水；途中目标易主则重定向/放弃；
+- **★ 夺位远征（v1.9.0 起决策引擎驱动，`B14SeekThrone` 生理层最高档分支）**：在世成年男性、非国王、存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）→ 决策器选定最近可夺位营地写入 `agent.expedition_target_camp` 冲往（可中断施工/修缮，进度冻结不回滚）；抵达王位仍空缺写 `coronation_pending`，世界 `execute_pending_coronations` 校验后登基 + `Succession` 流水；途中目标易主则重定向/放弃；
 - **长子继承制**：国王死亡 → 在世最年长直系男性后代（无子女则孙辈隔代承继）；绝嗣 → `arrival_order` 中下一个最先到达的在世男性；全营地无男性则王位空悬、账本冻结；
 - **公仓税与救济**：每 `ledger_tax_interval_ticks`(2400) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 缴 `Tax`（有国王才征）；公仓总余额 > `ledger_relief_min_balance`(30) 且家户水+粮 < `ledger_relief_family_threshold`(8) 时由国王签发 `Relief`（每家户 1200 tick 冷却）；
 - 前端营地面板升级为"地区面板"（`ledger-ui.js` 王国页）：国王名号、政体/换届规则、成员户数、地区账本收支、换届历史 + Canvas 夺位特效。

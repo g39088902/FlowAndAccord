@@ -44,7 +44,7 @@
 | 子目录 | 文件数 | 职责 | 局部指南 |
 |---|---|---|---|
 | `decisions/` | 8 | 马斯洛决策状态机：需求评估、分支注册表、寻路路由、采收判定、途中重路由、错峰调度 | `decisions/AGENTS.md` |
-| `housing_system/` | 7 | 房屋全生命周期：施工升级、冬季供暖、耐久修缮、自动成婚、立宅选址、代际继承 | `housing_system/AGENTS.md` |
+| `housing_system/` | 7 | 房屋全生命周期：施工升级、冬季供暖、耐久修缮、自动成婚、立宅选址、空置房登记 | `housing_system/AGENTS.md` |
 | `ledger/` | 8 | 账本与社会经济制度：账本内核、团体基类、婚姻登记簿、家户体系、宗族、地区王国 | `ledger/AGENTS.md` |
 
 ---
@@ -60,7 +60,7 @@
    2.3 tick_fetus_reconcile()                受孕建胎儿/流产移除/位置跟随
    2.5 settle_gold_inheritance()              死者金币平分给在世子一代
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
-4. tick_housing(dt)                           房屋折旧、冬季供暖、代际继承
+4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
    tick_decisions()                           错峰决策 ((tick + id) % 30 == 0)
