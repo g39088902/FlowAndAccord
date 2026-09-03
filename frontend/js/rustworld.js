@@ -508,7 +508,7 @@
             lifeExpectancy: a.life_expectancy,
             surname: a.surname || '',
             prestige: a.prestige || 0,
-            // ★ M2 账本扩展字段
+            familyStockActive: a.family_stock_active || [false, false, false, false, false],
             marriageHistoryCount: a.marriage_history_count || 0,
             householdId: a.household_id != null ? a.household_id : null,
             householdRole: a.household_role || 'None',

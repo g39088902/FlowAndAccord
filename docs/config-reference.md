@@ -21,11 +21,11 @@
 | `agentWorkMetabolismMult` | f32 | 1 | agent.rs (劳作代谢) | 劳作代谢消耗倍率 |
 | `agentDeathDecayDuration` | f32 | 12 | agent.rs (死亡衰减) | 生命耗尽后彻底消亡的衰减时长 (秒) |
 | `agentAdultAge` | f32 | 1800 | agent.rs (成年阈值) / decisions/ | 成年年龄阈值 (模拟秒，= 60 分钟) |
-| `agentPregnancyDuration` | f32 | 900 | agent.rs (妊娠代谢) | 妊娠期时长 (模拟秒，= 30 分钟) |
+| `agentPregnancyDuration` | f32 | 450 | agent.rs (妊娠代谢) | 妊娠期时长 (模拟秒，= 15 分钟) |
 | `agentMiscarriageThreshold` | f32 | 10 | agent.rs (流产判定) | 饥渴任一低于此值即触发流产风险 |
 | `agentMiscarriageStaminaThreshold` | f32 | 20 | agent.rs (流产判定) | 体力低于此值即触发流产风险 |
 | `agentMiscarriageCooldown` | f32 | 450 | agent.rs (流产判定) | 流产后休养冷却 (秒，期间禁止再次受孕) |
-| `agentPostpartumCooldown` | f32 | 900 | agent.rs (产后休养冷却) | 产后休养冷却 (秒，分娩后期间禁止再次受孕) |
+| `agentPostpartumCooldown` | f32 | 450 | agent.rs (产后休养冷却) | 产后休养冷却 (秒，分娩后期间禁止再次受孕) |
 | `agentMiscarriageAlertDuration` | f32 | 5 | agent.rs (流产判定) | 流产告警存续时长 (秒) |
 | `agentConceptionHungerMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低饱食度 |
 | `agentConceptionThirstMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低水分 |

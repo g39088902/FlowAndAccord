@@ -220,6 +220,8 @@ pub struct AgentSnapshot {
     pub coronation_pending: Option<u32>,
     /// ★ 求偶目标女性 ID（决策器选定写入）
     pub courtship_target_id: Option<u32>,
+    /// ★ M7/诊断 透传家庭库存施密特触发器（水/粮/木/石/金，true=需补采，false=充足）
+    pub family_stock_active: [bool; 5],
 }
 
 // ═══════════════════════════════════════════════════════════════

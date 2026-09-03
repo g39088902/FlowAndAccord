@@ -43,9 +43,9 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b5', 'b6', 'b7', 'b16', 'b8', 'b9', 'b10', 'b11', 'b13'];
-  // 默认分界线：位于第 g 张卡之后（第1层|第2层=6 / 第2层|第3层=10 / 第3层|第4层=12 / 第4层|第5层=15）
-  var DEFAULT_DIVGAPS = [6, 10, 12, 15];
+  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
+  // 默认分界线：位于第 g 张卡之后（第1层|第2层=6 / 第2层|第3层=12 / 第3层|第4层=14 / 第4层|第5层=15）
+  var DEFAULT_DIVGAPS = [6, 12, 14, 15];
 
   // 行动状态机摘要（agent.rs::PrimitiveActionState 18 态）
   var FSM_STATES = [

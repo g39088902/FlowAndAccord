@@ -242,6 +242,7 @@ impl World3DEngine {
                 expedition_target_camp: agent.expedition_target_camp,
                 coronation_pending: agent.coronation_pending,
                 courtship_target_id: agent.courtship_target_id,
+                family_stock_active: agent.family_stock_active,
             });
         }
 

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow & Accord · 512x 长程运行报告 v1.20.0（100,000 模拟秒）</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root{ --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --line:#334155; --tx:#e2e8f0; --tx2:#94a3b8; --tx3:#64748b; --teal:#2dd4bf; --red:#f87171; --amber:#fbbf24; --green:#4ade80; --blue:#60a5fa; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--tx);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.65;padding:0 0 60px}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+  header{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#134e4a 100%);border-bottom:1px solid var(--line);padding:34px 0 28px;margin-bottom:28px}
+  header h1{font-size:24px;font-weight:700;letter-spacing:.5px}
+  header .sub{color:var(--tx2);font-size:14px;margin-top:6px}
+  .badge{display:inline-block;background:rgba(45,212,191,.15);color:var(--teal);border:1px solid rgba(45,212,191,.4);border-radius:999px;padding:2px 12px;font-size:12px;margin-right:8px;font-weight:600}
+  .badge.red{background:rgba(248,113,113,.12);color:var(--red);border-color:rgba(248,113,113,.4)}
+  .badge.amber{background:rgba(251,191,36,.12);color:var(--amber);border-color:rgba(251,191,36,.4)}
+  .badge.green{background:rgba(74,222,128,.12);color:var(--green);border-color:rgba(74,222,128,.4)}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin:18px 0}
+  h2{font-size:17px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  h2 .no{background:var(--teal);color:#042f2e;border-radius:6px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .kpi .k{color:var(--tx3);font-size:12px;margin-bottom:4px}
+  .kpi .v{font-size:20px;font-weight:700}
+  .kpi .v small{font-size:12px;color:var(--tx2);font-weight:400}
+  .kpi.danger .v{color:var(--red)}
+  .kpi.good .v{color:var(--green)}
+  .kpi.warn .v{color:var(--amber)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:center}
+  th{background:var(--panel2);color:var(--tx2);font-weight:600;font-size:12px}
+  td.hl{color:var(--red);font-weight:700}
+  td.hl2{color:var(--green);font-weight:700}
+  td small{color:var(--tx3);font-size:10px;display:block}
+  .chart{width:100%;height:420px}
+  .note{color:var(--tx2);font-size:13px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:10px}
+  .note.red{border-color:rgba(248,113,113,.4);color:#fecaca}
+  .note.green{border-color:rgba(74,222,128,.4);color:#bbf7d0}
+  .muted{color:var(--tx3);font-size:12px}
+  code{background:#0b1220;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px;color:var(--teal)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="badge green">v1.20.0</div><div class="badge amber">b16 求偶前置 + 生育提速（900→450s）</div><div class="badge red">512× 无头长程</div>
+    <h1>Flow &amp; Accord · 运行报告（100,000 模拟秒）</h1>
+    <div class="sub">5 种子 · 无头 WASM 同引擎同生产配置 · 重点观察长期（10 万秒）世界存续与人口动态</div>
+  </div>
+</header>
+<div class="wrap">
+
+<section>
+  <h2><span class="no">1</span>运行与部署配置</h2>
+  <div class="grid2">
+    <div class="kpi"><div class="k">代码分支</div><div class="v">test <small>· 268e049 + 本地改动</small></div></div>
+    <div class="kpi"><div class="k">版本</div><div class="v">v1.20.0 <small>b16 前置 + 妊娠/产后冷却 450s</small></div></div>
+    <div class="kpi"><div class="k">推进方式</div><div class="v">512× <small>每帧 512 tick（1/30s/步）</small></div></div>
+    <div class="kpi"><div class="k">运行时长</div><div class="v">100,000 s <small>= 3,000,000 tick</small></div></div>
+    <div class="kpi"><div class="k">配置注入</div><div class="v">生产配置 <small>config.js + decision-order + upgrade-cost</small></div></div>
+    <div class="kpi"><div class="k">门禁</div><div class="v good">全绿 <small>cargo build / test-wasm.js / config-check.js</small></div></div>
+  </div>
+  <div class="note">决策序注入：<code>b14,b1,b2,b15,b3,b12,b4,b16,b5,b6,b7,b8,b9,b10,b11,b13</code>。单种子实测 21~154 秒（吞吐随人口规模波动）。采样间隔 2,000s（每种子 50 点）。</div>
+</section>
+
+<section>
+  <h2><span class="no">2</span>核心发现：10 万秒视角 —— 3/5 存活但呈「扩张—崩落」震荡，长期均衡未达成</h2>
+  <p style="color:var(--tx2);font-size:14px">生育提速使种群具备 <strong style="color:var(--teal)">扩张能力</strong>（30ks 时 5/5 存活、峰值 30~89 人），但拉长到 <strong style="color:var(--amber)">100,000s</strong> 后真相显现：<strong style="color:var(--green)">3/5 种子存活（43/17/30 人）</strong>、<strong style="color:var(--red)">2/5 灭绝</strong>（seed 1 于 22ks、seed 42 于 88ks）。存活种子的曲线均为「上升→见顶→下杀→再波动」的震荡形态，无一达到稳定的代际均衡——出生随生育提速高企，但死亡（自然寿终为主）与房屋/资源承载在高峰后反超，形成 boom-bust 循环。</p>
+  <div class="chart" id="chart1"></div>
+  <div class="muted" style="margin-top:6px">▲ 图1 · 存活人口演化（x=千模拟秒，0~100ks）。可见多次代际波动：seed 123456 于 30ks 见顶 89 人后回落至 24 人再回升；seed 42 于 40ks 见顶 45 人后一路阴跌至 88ks 归零；seed 20260903 / 777 亦反复震荡。</div>
+</section>
+
+<section>
+  <h2><span class="no">3</span>关键指标（100,000s 末，5 种子明细）</h2>
+  <table>
+    <thead><tr><th>种子</th><th>末态存活</th><th>峰值存活</th><th>累计出生</th><th>累计死亡<br>(自然/非自然)</th><th>流产</th><th>房屋</th><th>累计婚姻</th><th>家户</th><th>在位国王</th><th>灭绝</th></tr></thead>
+    <tbody>
+      <tr><td>20260903</td><td class="hl2">43</td><td>78<small>@58010s</small></td><td>345</td><td>322 (317/5)</td><td>9</td><td>23</td><td>74</td><td>29</td><td>5</td><td>未灭绝</td></tr>
+      <tr><td>1</td><td class="hl">0</td><td>25<small>@6008s</small></td><td>19</td><td>39 (38/1)</td><td>0</td><td>0</td><td>4</td><td>0</td><td>0</td><td>~22,016s</td></tr>
+      <tr><td>42</td><td class="hl">0</td><td>45<small>@40004s</small></td><td>192</td><td>212 (211/1)</td><td>30</td><td>0</td><td>45</td><td>0</td><td>0</td><td>~88,012.8s</td></tr>
+      <tr><td>777</td><td class="hl2">17</td><td>47<small>@76015s</small></td><td>311</td><td>314 (313/1)</td><td>0</td><td>6</td><td>76</td><td>12</td><td>4</td><td>未灭绝</td></tr>
+      <tr><td>123456</td><td class="hl2">30</td><td>89<small>@30003s</small></td><td>465</td><td>455 (451/4)</td><td>6</td><td>14</td><td>114</td><td>21</td><td>5</td><td>未灭绝</td></tr>
+    </tbody>
+  </table>
+  <div class="note red" style="margin-top:14px">长程结论：出生始终高企（192~465 次）但没能带来稳定增长——3 个存活种子末态人口（43/17/30）均低于各自峰值（78/47/89）。死亡以自然寿终占绝对主导（非自然每种子仅 1~5 例），说明崩溃不是饥荒/暴力，而是「人口—房屋—资源」承载与代际寿终叠加的周期性下杀。</div>
+</section>
+
+<section>
+  <h2><span class="no">4</span>出生 / 婚姻 / 死亡累计对比（100,000s 末）</h2>
+  <div class="chart" id="chart2"></div>
+  <div class="muted" style="margin-top:6px">▲ 图2 · 5 种子 100,000s 末累计出生/婚姻/死亡。存活 3 种子出生(345/311/465)均大于死亡(322/314/455)，是 100ks 末仍有人口在维持的原因；灭绝 2 种子出生(19/192)远小于死亡(39/212)。婚姻持续累积（74~114 次），求偶系统长期健康。</div>
+</section>
+
+<section>
+  <h2><span class="no">5</span>末态世界构成（100,000s）</h2>
+<h3 style="font-size:14px;margin:16px 0 6px;color:var(--tx)">seed 20260903 · 存活 43 人 · 累计婚姻 74（在婚 7） · 在位国王 5</h3>
+  <p style="color:var(--tx2);font-size:13px;margin:4px 0">房屋等级构成：<code>tTier4Manor=7 tTier0Warehouse=14 tTier1ThatchedHut=2</code> · 当前动作：<code>SeekingStone×6 SeekingFood×1 RestingAtCamp×19 SeekingWater×4 SeekingCourtship×10 ReturningToCamp×2 DrinkingAtWater×1</code> · 当前需求：<code>Esteem·StockStone×6 Safety·StockFood×1 Physiological·Rest×19 Safety·StockWater×5 Belonging·Courtship×10 Safety·ReturnHome×2</code></p>
+  <table>
+    <thead><tr><th>营地</th><th>国王</th><th>居民</th><th>辖户</th><th>历史国王数</th></tr></thead>
+    <tbody>
+          <tr><td>1:宿松营地</td><td>#380</td><td>15</td><td>1</td><td>0</td></tr>
+      <tr><td>2:平利营地</td><td>#356</td><td>103</td><td>10</td><td>33</td></tr>
+      <tr><td>3:嵩阳营地</td><td>#375</td><td>48</td><td>6</td><td>9</td></tr>
+      <tr><td>4:蒲江乡</td><td>#350</td><td>147</td><td>8</td><td>44</td></tr>
+      <tr><td>5:开化村</td><td>#357</td><td>52</td><td>4</td><td>15</td></tr>
+    </tbody>
+  </table>
+<h3 style="font-size:14px;margin:16px 0 6px;color:var(--tx)">seed 1 · 存活 0 人 · 累计婚姻 4（在婚 0） · 在位国王 0</h3>
+  <p style="color:var(--tx2);font-size:13px;margin:4px 0">房屋等级构成：<code></code> · 当前动作：<code></code> · 当前需求：<code></code></p>
+  <table>
+    <thead><tr><th>营地</th><th>国王</th><th>居民</th><th>辖户</th><th>历史国王数</th></tr></thead>
+    <tbody>
+          <tr><td>1:开远营地</td><td>空悬</td><td>2</td><td>0</td><td>0</td></tr>
+      <tr><td>2:崇安营地</td><td>空悬</td><td>9</td><td>0</td><td>1</td></tr>
+      <tr><td>3:密云营地</td><td>空悬</td><td>4</td><td>0</td><td>0</td></tr>
+      <tr><td>4:射阳营地</td><td>空悬</td><td>18</td><td>0</td><td>7</td></tr>
+      <tr><td>5:廉江营地</td><td>空悬</td><td>6</td><td>0</td><td>1</td></tr>
+    </tbody>
+  </table>
+<h3 style="font-size:14px;margin:16px 0 6px;color:var(--tx)">seed 42 · 存活 0 人 · 累计婚姻 45（在婚 0） · 在位国王 0</h3>
+  <p style="color:var(--tx2);font-size:13px;margin:4px 0">房屋等级构成：<code></code> · 当前动作：<code></code> · 当前需求：<code></code></p>
+  <table>
+    <thead><tr><th>营地</th><th>国王</th><th>居民</th><th>辖户</th><th>历史国王数</th></tr></thead>
+    <tbody>
+          <tr><td>1:邵武营地</td><td>空悬</td><td>16</td><td>0</td><td>1</td></tr>
+      <tr><td>2:惠东营地</td><td>空悬</td><td>17</td><td>0</td><td>6</td></tr>
+      <tr><td>3:柏乡营地</td><td>空悬</td><td>11</td><td>0</td><td>1</td></tr>
+      <tr><td>4:密云营地</td><td>空悬</td><td>145</td><td>0</td><td>50</td></tr>
+      <tr><td>5:象山营地</td><td>空悬</td><td>23</td><td>0</td><td>3</td></tr>
+    </tbody>
+  </table>
+<h3 style="font-size:14px;margin:16px 0 6px;color:var(--tx)">seed 777 · 存活 17 人 · 累计婚姻 76（在婚 2） · 在位国王 4</h3>
+  <p style="color:var(--tx2);font-size:13px;margin:4px 0">房屋等级构成：<code>tTier4Manor=2 tTier0Warehouse=3 tTier3Homestead=1</code> · 当前动作：<code>RestingAtCamp×11 GatheringWood×1 ReturningToCamp×1 SeekingCourtship×3 SeekingWood×1</code> · 当前需求：<code>Physiological·Rest×11 Safety·StockWood×2 Safety·ReturnHome×1 Belonging·Courtship×3</code></p>
+  <table>
+    <thead><tr><th>营地</th><th>国王</th><th>居民</th><th>辖户</th><th>历史国王数</th></tr></thead>
+    <tbody>
+          <tr><td>1:陈留营地</td><td>#348</td><td>160</td><td>5</td><td>58</td></tr>
+      <tr><td>2:泾川营地</td><td>#338</td><td>35</td><td>2</td><td>8</td></tr>
+      <tr><td>3:丰都营地</td><td>#344</td><td>121</td><td>4</td><td>40</td></tr>
+      <tr><td>5:盐亭营地</td><td>#337</td><td>15</td><td>1</td><td>0</td></tr>
+    </tbody>
+  </table>
+<h3 style="font-size:14px;margin:16px 0 6px;color:var(--tx)">seed 123456 · 存活 30 人 · 累计婚姻 114（在婚 2） · 在位国王 5</h3>
+  <p style="color:var(--tx2);font-size:13px;margin:4px 0">房屋等级构成：<code>tTier4Manor=3 tTier0Warehouse=10 tTier2LeanTo=1</code> · 当前动作：<code>SeekingCourtship×8 RestingAtCamp×18 SeekingWater×4</code> · 当前需求：<code>Belonging·Courtship×8 Physiological·Rest×18 Safety·StockWater×4</code></p>
+  <table>
+    <thead><tr><th>营地</th><th>国王</th><th>居民</th><th>辖户</th><th>历史国王数</th></tr></thead>
+    <tbody>
+          <tr><td>1:荣昌营地</td><td>#495</td><td>122</td><td>2</td><td>44</td></tr>
+      <tr><td>2:石台营地</td><td>#491</td><td>54</td><td>2</td><td>15</td></tr>
+      <tr><td>3:新郑营地</td><td>#486</td><td>89</td><td>8</td><td>27</td></tr>
+      <tr><td>4:泸西营地</td><td>#497</td><td>125</td><td>3</td><td>46</td></tr>
+      <tr><td>5:阳春营地</td><td>#511</td><td>95</td><td>6</td><td>33</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2><span class="no">6</span>机制归因与结论</h2>
+  <ul style="padding-left:20px;color:var(--tx2);font-size:14px">
+    <li><strong style="color:var(--tx)">生育提速把「灭绝时间线」显著推后</strong>：对照 v1.16.0（50ks 内 5/5 灭绝），本版 100ks 时仍有 3/5 存活；seed 42 从 30ks 的"最健康"（45 人、5 王）撑到 88ks 才归零，说明高生育率下的种群能扛过数轮代际更替。</li>
+    <li><strong style="color:var(--tx)">长期瓶颈仍是「承载与更替失衡」，而非结婚或生育</strong>：婚姻（74~114）与出生（311~465）都健康，问题在于每轮高峰后的死亡反超——房屋随人口萎缩而弃置衰败（seed 123456 房 55→14、seed 42 房 28→0），加剧下杀；高流产（seed 42 达 30）也在损耗生育力。</li>
+    <li><strong style="color:var(--tx)">世界呈「扩张—崩落」震荡，未见稳态</strong>：3 个存活种子 100ks 末人口均低于各自峰值，曲线呈多次波峰/波谷；若要长期存续，下一步宜关注承载上限（房屋修缮/冬季烧柴/资源再生的周期约束）与生育-死亡平衡，而非继续压生育间隔。</li>
+    <li><strong style="color:var(--tx)">政治结构韧性好</strong>：存活 3 种子在位国王 4~5 位、历史国王 33~58 任，营地/王国体系在人口大幅波动下持续运转。</li>
+    <li><strong style="color:var(--tx)">seed 1 是独立坏样本</strong>：整局仅 4 次婚姻、19 出生，22ks 即灭绝，与生育节奏无关，属婚姻供给不足。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="no">7</span>数据口径与方法</h2>
+  <ul style="padding-left:20px;color:var(--tx2);font-size:13px">
+    <li>引擎：本仓库 <code>frontend/rust/sim_wasm.wasm</code>（v1.20.0 改动后重编译双副本，879,172 B），Node WebAssembly 无头驱动，<code>world_create(60, 764.0, seed, 20)</code> + 生产配置注入。</li>
+    <li>推进：<code>world_tick_steps(512, 1/30)</code> 循环至 3,000,000 tick；每 2,000s 采样一次快照（每种子 50 点）。</li>
+    <li>口径：快照 <code>total_births / total_deaths_natural / total_deaths_unnatural / total_miscarriages / marriages / households / clans / regions</code>；「自然死亡」=寿终正寝；「峰值存活」为 2ks 采样分辨率下的近似峰值。</li>
+    <li>当前生效参数：b16 求偶优先级置于备料之前（决策序第 8 位）；<code>AGENT_PREGNANCY_DURATION=450</code>、<code>AGENT_POSTPARTUM_COOLDOWN=450</code>。</li>
+    <li>局限：灭绝/峰值时刻为 2ks 采样近似；结论基于涌现统计而非单元断言（AGENTS.md §4.10）。</li>
+  </ul>
+</section>
+
+<footer style="text-align:center;color:var(--tx3);font-size:12px;margin-top:24px">Flow &amp; Accord · 运行报告自动生成 · 2026-09-03 · 数据来源：本机 WASM 实测</footer>
+</div>
+
+<script>
+(function(){
+  var t1 = document.getElementById('chart1'), t2 = document.getElementById('chart2');
+  if (!window.echarts) { t1.innerHTML = '<p style="padding:40px;text-align:center;color:#94a3b8">ECharts 加载失败（离线或 CDN 被拦截），请联网刷新查看图表。</p>'; t2.style.display='none'; return; }
+  var colors = ['#4ade80','#60a5fa','#fbbf24','#a78bfa','#f87171'];
+  var c1 = echarts.init(t1);
+  c1.setOption({
+    backgroundColor:'transparent',
+    title:{ text:'人口演化轨迹（v1.20.0 · 100,000s）', subtext:'512× 无头推进至 100,000 模拟秒 · 每 2ks 采样 · 数据：本机 WASM 运行', left:'center', textStyle:{color:'#e2e8f0',fontSize:15,fontWeight:600}, subtextStyle:{color:'#64748b',fontSize:11} },
+    tooltip:{ trigger:'axis', triggerOn:'click', renderMode:'richText', confine:true, textStyle:{fontSize:11,lineHeight:15}, padding:[6,8] },
+    legend:{ top:62, type:'scroll', itemWidth:14, itemHeight:8, textStyle:{color:'#94a3b8',fontSize:11} },
+    grid:{ left:46, right:22, top:104, bottom:44, containLabel:true },
+    xAxis:{ type:'value', name:'模拟时间（千秒）', nameTextStyle:{color:'#94a3b8',fontSize:11}, min:0, max:100, axisLabel:{color:'#94a3b8',fontSize:11}, axisLine:{lineStyle:{color:'#334155'}}, splitLine:{lineStyle:{color:'#273449'}} },
+    yAxis:{ type:'value', name:'存活人口', nameTextStyle:{color:'#94a3b8',fontSize:11}, axisLabel:{color:'#94a3b8',fontSize:11}, splitLine:{lineStyle:{color:'#273449'}} },
+    series:[
+      { name:'seed 20260903', type:'line', smooth:true, symbol:'none', data:[[2,21],[4,25],[6,29],[8,24],[10,26],[12,24],[14,26],[16,24],[18,28],[20,34],[22,34],[24,36],[26,43],[28,41],[30,49],[32,50],[34,47],[36,40],[38,43],[40,41],[42,40],[44,36],[46,42],[48,56],[50,63],[52,65],[54,67],[56,75],[58,78],[60,66],[62,55],[64,50],[66,41],[68,32],[70,26],[72,26],[74,28],[76,33],[78,36],[80,35],[82,33],[84,33],[86,25],[88,29],[90,30],[92,31],[94,35],[96,36],[98,41],[100,43]], lineStyle:{width:2} },
+      { name:'seed 1', type:'line', smooth:true, symbol:'none', data:[[2,20],[4,22],[6,25],[8,24],[10,19],[12,19],[14,16],[16,11],[18,5],[20,3],[22,0],[24,0],[26,0],[28,0],[30,0],[32,0],[34,0],[36,0],[38,0],[40,0],[42,0],[44,0],[46,0],[48,0],[50,0],[52,0],[54,0],[56,0],[58,0],[60,0],[62,0],[64,0],[66,0],[68,0],[70,0],[72,0],[74,0],[76,0],[78,0],[80,0],[82,0],[84,0],[86,0],[88,0],[90,0],[92,0],[94,0],[96,0],[98,0],[100,0]], lineStyle:{width:2} },
+      { name:'seed 42', type:'line', smooth:true, symbol:'none', data:[[2,25],[4,31],[6,37],[8,39],[10,34],[12,34],[14,36],[16,39],[18,37],[20,36],[22,34],[24,28],[26,20],[28,21],[30,24],[32,30],[34,34],[36,38],[38,42],[40,45],[42,43],[44,40],[46,40],[48,39],[50,39],[52,35],[54,38],[56,37],[58,38],[60,31],[62,22],[64,16],[66,10],[68,7],[70,6],[72,4],[74,4],[76,3],[78,2],[80,1],[82,1],[84,1],[86,1],[88,0],[90,0],[92,0],[94,0],[96,0],[98,0],[100,0]], lineStyle:{width:2} },
+      { name:'seed 777', type:'line', smooth:true, symbol:'none', data:[[2,26],[4,31],[6,36],[8,35],[10,28],[12,25],[14,21],[16,22],[18,17],[20,19],[22,21],[24,27],[26,30],[28,33],[30,40],[32,45],[34,43],[36,41],[38,39],[40,34],[42,32],[44,31],[46,25],[48,26],[50,29],[52,27],[54,32],[56,32],[58,32],[60,36],[62,34],[64,34],[66,41],[68,45],[70,44],[72,43],[74,45],[76,47],[78,42],[80,43],[82,43],[84,39],[86,35],[88,34],[90,31],[92,27],[94,21],[96,21],[98,16],[100,17]], lineStyle:{width:2} },
+      { name:'seed 123456', type:'line', smooth:true, symbol:'none', data:[[2,25],[4,39],[6,51],[8,51],[10,49],[12,48],[14,44],[16,47],[18,45],[20,51],[22,56],[24,62],[26,75],[28,78],[30,89],[32,89],[34,81],[36,80],[38,65],[40,58],[42,51],[44,45],[46,38],[48,31],[50,24],[52,29],[54,28],[56,30],[58,33],[60,34],[62,31],[64,25],[66,27],[68,29],[70,34],[72,38],[74,46],[76,49],[78,49],[80,48],[82,50],[84,42],[86,43],[88,51],[90,52],[92,54],[94,51],[96,48],[98,36],[100,30]], lineStyle:{width:2} }
+    ].map(function(s,i){ s.itemStyle={color:colors[i%colors.length]}; return s; })
+  });
+
+  var c2 = echarts.init(t2);
+  c2.setOption({
+    backgroundColor:'transparent',
+    title:{ text:'累计指标对比（5 种子 · 100,000s 末）', subtext:'数据：本机 WASM 运行', left:'center', textStyle:{color:'#e2e8f0',fontSize:15,fontWeight:600}, subtextStyle:{color:'#64748b',fontSize:11} },
+    tooltip:{ trigger:'axis', triggerOn:'click', renderMode:'richText', confine:true, textStyle:{fontSize:11,lineHeight:15}, padding:[6,8] },
+    legend:{ top:62, type:'scroll', itemWidth:14, itemHeight:8, textStyle:{color:'#94a3b8',fontSize:11} },
+    grid:{ left:46, right:22, top:104, bottom:44, containLabel:true },
+    xAxis:{ type:'category', data:["累计出生","累计婚姻","累计死亡"], axisLabel:{color:'#94a3b8',fontSize:12}, axisLine:{lineStyle:{color:'#334155'}} },
+    yAxis:{ type:'value', name:'累计次数', nameTextStyle:{color:'#94a3b8',fontSize:11}, axisLabel:{color:'#94a3b8',fontSize:11}, splitLine:{lineStyle:{color:'#273449'}} },
+    series:[
+      { name:'seed 20260903', type:'bar', barWidth:'14%', data:[{value:345,name:'出生'},{value:74,name:'婚姻'},{value:322,name:'死亡'}], itemStyle:{color:'#4ade80'} },
+      { name:'seed 1', type:'bar', barWidth:'14%', data:[{value:19,name:'出生'},{value:4,name:'婚姻'},{value:39,name:'死亡'}], itemStyle:{color:'#60a5fa'} },
+      { name:'seed 42', type:'bar', barWidth:'14%', data:[{value:192,name:'出生'},{value:45,name:'婚姻'},{value:212,name:'死亡'}], itemStyle:{color:'#fbbf24'} },
+      { name:'seed 777', type:'bar', barWidth:'14%', data:[{value:311,name:'出生'},{value:76,name:'婚姻'},{value:314,name:'死亡'}], itemStyle:{color:'#a78bfa'} },
+      { name:'seed 123456', type:'bar', barWidth:'14%', data:[{value:465,name:'出生'},{value:114,name:'婚姻'},{value:455,name:'死亡'}], itemStyle:{color:'#f87171'} }
+    ]
+  });
+
+  window.addEventListener('resize', function(){ c1.resize(); c2.resize(); });
+})();
+</script>
+</body>
+</html>

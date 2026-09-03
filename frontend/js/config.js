@@ -34,11 +34,11 @@ window.SIM_CONFIG = {
   agentWorkMetabolismMult: 1.0,   // 劳作代谢消耗倍率
   agentDeathDecayDuration: 12.0,  // 生命耗尽后彻底消亡的衰减时长 (秒)
   agentAdultAge: 1800.0,          // 成年年龄阈值 (模拟秒，= 60 分钟)
-  agentPregnancyDuration: 900.0,  // 妊娠期时长 (模拟秒，= 30 分钟)
+  agentPregnancyDuration: 450.0,  // 妊娠期时长 (模拟秒，= 15 分钟)
   agentMiscarriageThreshold: 10.0,// 饥渴任一低于此值即触发流产风险
   agentMiscarriageStaminaThreshold: 20.0, // 体力低于此值即触发流产风险
   agentMiscarriageCooldown: 450.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
-  agentPostpartumCooldown: 900.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
+  agentPostpartumCooldown: 450.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
   agentMiscarriageAlertDuration: 5.0, // 流产告警存续时长 (秒)
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分
