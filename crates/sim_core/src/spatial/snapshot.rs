@@ -48,6 +48,33 @@ pub struct WorldSnapshot3D {
     pub temperature: f32,
     pub season_progress: f32,
     pub last_mutation_event: Option<String>,
+    /// ★ v1.8.7 死亡/流产墓碑（滑动窗口保留，含本帧死亡与腹中胎儿流产/随母亡故）。
+    /// 供前端即使在高倍速单帧跨过整个衰减窗口时，也能强制把档案库对应条目补记为已故并保留死因。
+    pub recent_deaths: Vec<RecentDeathSnapshot>,
+}
+
+/// 死亡/流产墓碑记录（v1.8.7）
+///
+/// 每次 tick 内发生的**死亡**（饥荒饿死/脱水渴死/寿终正寝）与**腹中胎儿夭折**
+/// （流产 / 随母亡故）都会记入本结构，随快照输出。前端据此：
+/// - 对档案库中"滞留存活"的陈旧副本强制补记 `isAlive=false` 并写入死因；
+/// - 将流产/随母亡故的胎儿以"已故子嗣"身份写入档案库（族谱可见）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentDeathSnapshot {
+    /// 死者 AgentId（含腹中胎儿预分配 id）
+    pub id: AgentId,
+    /// 死亡原因："饥荒饿死" / "脱水渴死" / "寿终正寝" / "流产" / "随母亡故"
+    pub cause: String,
+    /// 是否自然死亡（寿终正寝=true；饥荒/脱水/流产等=false）
+    pub is_natural: bool,
+    /// 是否腹中胎儿（流产/随母亡故的胎儿=true）
+    pub is_fetus: bool,
+    /// 死者生父 AgentId（胎儿/成年人均携带，供前端族谱入档时保血缘）
+    pub father_id: Option<AgentId>,
+    /// 死者生母 AgentId（胎儿/成年人均携带，供前端族谱入档时保血缘）
+    pub mother_id: Option<AgentId>,
+    /// 死亡发生的世界 tick（供前端去重与族谱时间轴）
+    pub tick: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,6 +159,7 @@ pub struct AgentSnapshot {
     /// ★ M1.7 腹中胎儿标记（已获 agent 身份，但无地图实体、跳过决策/代谢/行动）
     pub is_fetus: bool,
     pub miscarriage_cooldown: f32,
+    pub postpartum_cooldown: f32,
     pub miscarriage_alert: bool,
     pub death_decay_timer: f32,
     pub death_cause: Option<String>,
@@ -151,9 +179,11 @@ pub struct AgentSnapshot {
     pub libido: f32,
     pub sleep_efficiency: f32,
     pub life_expectancy: f32,
-    // 姓氏宗族与声望
+    // 姓氏宗族与威望
     pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
-    pub prestige: u32,     // 声望值 (当前 = 子女数量，未来可叠加多项)
+    /// ★ M6 威望持久综合分值（所有影响因子集合体）：当前因子 = 子嗣活产 +1、宅邸每级 +1；
+    /// 子女日后死亡不回减；随 agent 终身、不随房屋/家户转移（非"宗族声望"）
+    pub prestige: u32,
     // ★ 婚姻与家户归属（M2 新增）
     /// 该 agent 的历史婚姻段数（含已封账各段）
     pub marriage_history_count: u32,
@@ -165,6 +195,10 @@ pub struct AgentSnapshot {
     pub arrival_tick: u64,
     /// ★ M4 是否在夺位远征中（state=SeekingThrone）
     pub is_on_expedition: bool,
+    /// ★ v1.9.0 M4 远征目标营地（决策器选定写入）
+    pub expedition_target_camp: Option<u32>,
+    /// ★ v1.9.0 M4 待登基（抵达且王位仍空缺，待世界物理执行器 coronate）
+    pub coronation_pending: Option<u32>,
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -252,6 +286,8 @@ pub struct ClanSnapshot {
     pub recent_journal: Vec<TransferRecordSnapshot>,
     /// 最近团体事件（成员进出/族长更替等，最多8条）
     pub recent_events: Vec<String>,
+    /// ★ v1.9.0 是否已绝嗣（所有男性已亡；族产已平分/入公仓）
+    pub is_extinct: bool,
 }
 
 /// 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
@@ -281,4 +317,10 @@ pub struct RegionSnapshot {
     pub recent_events: Vec<String>,
     /// 正在冲向该营地夺位的族人列表
     pub active_expedition_agents: Vec<AgentId>,
+    /// ★ v1.9.0 历史国王（已离任/驾崩的所有前任国王，不含现任）
+    pub history_kings: Vec<AgentId>,
+    /// ★ v1.9.0 地区居民 AgentId 列表（按升序）
+    pub member_ids: Vec<AgentId>,
+    /// ★ v1.9.0 管辖的家庭（户主所属本地区的存续家户 HouseholdId，按升序）
+    pub governed_households: Vec<u64>,
 }

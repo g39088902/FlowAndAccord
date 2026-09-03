@@ -128,6 +128,27 @@
     const inspectorCard = document.getElementById('inspector-card');
     if (inspectorCard) {
       inspectorCard.addEventListener('click', e => {
+        // ★ v1.9.0 Task8: agent 卡片点击房屋引用 → 跳转房屋卡片
+        const houseChip = e.target.closest('[data-house-id]');
+        if (houseChip) {
+          e.stopPropagation();
+          const hid = parseInt(houseChip.getAttribute('data-house-id'), 10);
+          const targetHouse = sim.houses.find(h => h.id === hid);
+          if (targetHouse) {
+            sim.selectionType = 'house';
+            sim.selectedHouseId = targetHouse.id;
+            isCameraFollow = false;
+            const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+            const rx = targetHouse.pos.x * cosZ - targetHouse.pos.y * sinZ;
+            const ry = targetHouse.pos.x * sinZ + targetHouse.pos.y * cosZ;
+            const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+            const y2 = ry * cosX - (targetHouse.pos.z || 0) * sinX;
+            camera.panX = -rx * camera.zoom;
+            camera.panY = -y2 * camera.zoom;
+            if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+          }
+          return;
+        }
         const chip = e.target.closest('[data-agent-id]');
         if (chip) {
           e.stopPropagation();
@@ -184,6 +205,28 @@
       lineageModal.addEventListener('click', e => {
         if (e.target === lineageModal) {
           closeLineageModal();
+          return;
+        }
+        // ★ v1.9.0 Task8: 族谱弹窗中点击房屋引用 → 跳转房屋卡片
+        const houseChip = e.target.closest('[data-house-id]');
+        if (houseChip) {
+          e.stopPropagation();
+          closeLineageModal();
+          const hid = parseInt(houseChip.getAttribute('data-house-id'), 10);
+          const targetHouse = sim.houses.find(h => h.id === hid);
+          if (targetHouse) {
+            sim.selectionType = 'house';
+            sim.selectedHouseId = targetHouse.id;
+            isCameraFollow = false;
+            const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+            const rx = targetHouse.pos.x * cosZ - targetHouse.pos.y * sinZ;
+            const ry = targetHouse.pos.x * sinZ + targetHouse.pos.y * cosZ;
+            const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+            const y2 = ry * cosX - (targetHouse.pos.z || 0) * sinX;
+            camera.panX = -rx * camera.zoom;
+            camera.panY = -y2 * camera.zoom;
+            if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+          }
           return;
         }
         const chip = e.target.closest('[data-agent-id]');

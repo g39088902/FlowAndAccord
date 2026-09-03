@@ -2,6 +2,12 @@
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
 
+> ⚡ **v1.9.0（Task4）出生地**：开局始祖不再落在 POI/营地节点，而是随机落在**普通道路节点**（`road_nodes` = `countTerrainTransitionNodes`(17) 个地形过渡 `GroundIntersection` 节点，非 POI），每名始祖消耗 1 次共享 `WorldRng` 确定性抽选；`home_camp` = 离出生地最近的营地（保证 `home_camp_node` 与地区归属一致）。
+
+> ⚡ **M6（v1.4.0）机制更新**：随身搬运链路保留（行囊 `carried_*` 仍为物理背包层），但 `RestingAtCamp` 时行囊按卸货速率**直接卸入户主家户账本**（Deposit 流水）并即时入账，家中吃喝从家户账本真实扣减（Consume）——已无房屋仓库中间层。
+>
+> ⚡ **M7（v1.5.0）追加**：是否去 POI 采货由家庭库存施密特触发器驱动（有房含 0 级即可采：账本余额 <100 触发、补到 ≥200 停，水/粮/木/石/金统一；无房者仍不装袋）。本文件以下旧描述如按"卸入私宅仓库/独立仓储/按等级备货目标"阅读时请注意此变更。
+
 ---
 
 ## 模块定位

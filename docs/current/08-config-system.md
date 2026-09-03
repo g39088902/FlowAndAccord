@@ -6,7 +6,7 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。163 个 `SimConfig` 字段由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**169 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
@@ -55,12 +55,13 @@
 任一报错即说明前后端已失同步，须先修复再发布。改参后必跑。
 
 ### 参数速查表 `docs/config-reference.md`
-- 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值与中文说明。
+- 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值、**影响模块**（v1.7.1 起新增）与中文说明。
+- **影响模块列**：169 个字段全部标注改动后会影响哪些 Rust/前端模块，由 `IMPACT_OVERRIDES`（12 个特殊字段显式覆盖）+ `IMPACT_PREFIX_RULES`（60+ 前缀规则）自动推导。示例：`carryCapacityResource`→`agent.rs / ecology.rs / decisions/`、`decisionPoiSeekMinStockRatio`→`decisions/routing.rs / decisions/harvest.rs`、`houseWinterWoodBurnRate`→`housing_system/maintenance.rs`。
 - 是用户检索/核对参数的唯一权威入口，**不要手工维护**。
 - 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 字段数为 165（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2——以实际 `config.rs` 为准）。
+- `SimConfig` 字段数为 **168**（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2，v1.6.0 M8 升级成本矩阵 +20 并删除 14 个废弃字段——以实际 `config.rs` 为准）。
 - 严禁在 Rust 逻辑层散落字面量或直引 `const`，一律通过 `self.config.<字段>` 引用。
 - `config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

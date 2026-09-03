@@ -66,6 +66,8 @@ pub struct Region {
     /// 到达时序：按 (arrival_tick, agent_id) 升序排序的 agent_id 列表
     /// 初王顺位与绝嗣继承均依赖此序
     pub arrival_order: Vec<AgentId>,
+    /// ★ v1.9.0 历史国王（已离任/驾崩的所有前任国王，不含现任），前端营地卡片展示
+    pub history_kings: Vec<AgentId>,
 }
 
 impl Region {
@@ -77,7 +79,21 @@ impl Region {
             regime: Regime::Kingdom,
             succession: Succession::Primogeniture,
             arrival_order: Vec::new(),
+            history_kings: Vec::new(),
         }
+    }
+
+    /// 更替国王并记录历史国王（历史 = 所有离任/驾崩的前任国王；现任不入档）
+    pub fn set_king(&mut self, agent: AgentId, tick: u64, note: &str) -> bool {
+        if !self.group.members.contains(&agent) {
+            return false;
+        }
+        if let Some(prev) = self.group.leader {
+            if prev != agent && !self.history_kings.contains(&prev) {
+                self.history_kings.push(prev);
+            }
+        }
+        self.group.set_leader(agent, tick, note)
     }
 
     /// 插入 agent 到 arrival_order 的正确位置（按 (arrival_tick, agent_id) 升序）
@@ -270,10 +286,10 @@ impl World3DEngine {
                 Some(id) => {
                     if region.group.leader.is_none() {
                         // 初王登基
-                        region.group.set_leader(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name));
+                        region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name));
                         self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
                     } else {
-                        region.group.set_leader(id, tick, &format!("国王更替：【{}】", camp_name));
+                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name));
                     }
                 }
                 None => {
@@ -367,7 +383,7 @@ impl World3DEngine {
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
             match heir {
                 Some(heir_id) => {
-                    region.group.set_leader(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name));
+                    region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name));
                     self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！", camp_name, dead_king_id, heir_id));
                 }
                 None => {

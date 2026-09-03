@@ -3,6 +3,12 @@
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/ledger/`（7 子模块）+ `crates/sim_core/src/spatial/bookkeeping.rs`
 > **里程碑状态**：M1~M4 已完整落地（M1 v1.0.0 / M2 v1.1.0 / M3 v1.2.0 / M4 v1.3.0），前端配套 4 标签页「社会与经济制度大盘」(`ledger-ui.js`)。
 
+> ⚡ **M6（v1.4.0）语义升级：家户账本从「权责镜像」成为「家庭物资唯一真相源」**。房屋仓库已删除，卸货（Deposit）/在家吃喝（Consume）/冬季烧柴（Heating）在生态与维护层**真实收付**家户账本，`bookkeeping.rs` 仅保留继承清算（Inheritance）与分家抽资（Split）；决策层改读账本余额；账本无容量上限。
+>
+> ⚡ **M7（v1.5.0）追加**：去采货触发改由**家庭库存施密特触发器**驱动（余额 <100 触发、≥200 停，五类统一，有房即可采）；升级就绪改按一次性材料成本（`needs::upgrade_material_cost`）。
+>
+> ⚡ **M8（v1.6.0）追加**：升级材料成本改**4×5 固定矩阵**（20 超参，`config.house-upgrade-cost.js` 权威值，Rust `config.rs` 平铺三处同步）；升 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，升级时从家户账本**一次性扣账**（Construction 流水）。本文件以下 M2~M4 记账机制描述中涉及「旁路观测/与物理仓库分离/等级备货目标/容量上限」的表述已过时，请以代码注释与 11-changelog v1.6.0 条目为准。
+
 ---
 
 ## 模块定位
@@ -48,7 +54,9 @@
 
 ### ClanRegistry（宗族体系 M3）
 - **按姓氏聚合**：同姓 agent 自动归入同一宗族（不要求同营地）；始祖播撒即入族，新生儿随父姓入族。
+- **★ v1.9.1 宗族与女性无关（Task10/11）**：宗族 = 纯父系男性团体——女性一律不入族（`add_member` 对女性直接拒绝）；始祖仅男性入族，新生儿随父姓入族仅限男性子嗣。
 - **族长顺位**：族长 = 同姓在世最年长男性，并列按 id 取小；无在世男性则宗族无主（`leader=None`），账本冻结（不主动支出，可接收 Tribute）。
+- **★ v1.9.0 绝嗣（Task11）**：宗族无在世男性（`mark_clan_extinct`）→ 标记 `extinct`，族产平分给其他存续宗族（无存续宗族则入 `public_granary` 兜底，`TransferReason::Legacy` 流水事由）；前端宗族页红色「⛩️ 绝嗣 · 无在世男性」标签（v1.9.1 起宗族仅含男性、不统计在世女性）。
 - **族税 Tribute**：每 `clan_tribute_interval_ticks`(1800=60s) 全局统一征收，存续家户按账面余额 × `clan_tribute_rate`(5%) 向族库缴纳（只记账不扣物理库存）。
 - **族内互助 MutualAid**：族库总余额 > `clan_mutual_aid_min_balance`(50) 时，对水+粮 < `clan_mutual_aid_family_threshold`(10) 的极贫家户拨付 `min(族库×20%, 缺口×2)`，每家户每 `clan_mutual_aid_cooldown_ticks`(900=30s) 最多一次，族长签字。
 
@@ -56,7 +64,8 @@
 - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，政体=`Kingdom`，继承制=`Primogeniture`；始祖播撒时加入最近营地，新生儿随父加入父亲所在地区。
 - **到达时序**：`arrival_tick`（始祖=0，新生儿=出生 tick），`arrival_order` 按 `(arrival_tick, agent_id)` 升序。
 - **初王顺位**：初王 = arrival_order 最早到达的在世男性；无在世男性则王位空悬，账本冻结。
-- **夺位远征**：男性非国王在存在无主营地时，放下一切冲向最近无主营地登基（决策树最高优先级，见 [06-motivation-ai.md](./06-motivation-ai.md)），走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚。
+- **★ v1.9.0 历史国王**：`Region.set_king()` 包装——初王登基 / 国王更替 / 长子继承登基均将前任国王记入 `history_kings` 档案（营地卡片展示历史国王）。
+- **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
 - **公仓税 Tax**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。
@@ -109,7 +118,7 @@
 | `agent.rs` | 受孕 → 预分配胎儿 ID 并标记 `is_fetus` 身份；`spouse_id` 作为缓存从登记簿同步；`arrival_tick` 记录到达时刻 |
 | `world.rs` | `tick_fetus_reconcile` 受孕即建胎儿实体 / 流产移除 / 位置随母；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
 | `birth.rs` | 分娩 → 原位复用胎儿 ID 替换为新生儿；新生儿入父亲家户（M2）/随父姓入宗族（M3）/入父亲地区（M4） |
-| `decisions/scheduler.rs` | ★ M4 夺位远征调度（`tick_conquest_expedition`）读写 `expedition_targets` 与 `SeekingThrone` 状态 |
+| `decisions/scheduler.rs` | ★ M4 登基物理执行器 `execute_pending_coronations`（扫描 `coronation_pending` 校验王位仍空缺后 `coronate_king`）；`decisions/evaluate.rs` 决策器选定远征目标写入 `agent.expedition_target_camp` |
 | `ecology.rs` | 始祖播撒 → 入宗族（M3）+ 入最近营地地区（M4）+ `arrival_tick=0` |
 | `world.rs` | 世界重置 → 清空各登记簿/缓存；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
 | `snapshot.rs` | `HouseholdSnapshot` / `MarriageSnapshot` / `ClanSnapshot` / `RegionSnapshot` / `TransferRecordSnapshot` / `LedgerBalanceSnapshot` 快照结构 |
@@ -120,9 +129,9 @@
 
 - **HouseholdSnapshot**：家户 ID、户主 ID、成员列表、账面 5 资源余额、最近团体事件、最近 8 笔资源流水（`recent_journal`）。
 - **MarriageSnapshot**：婚姻 ID、夫妻双方 ID、婚龄、存续/封账状态、历史婚姻段。
-- **ClanSnapshot**（M3）：姓氏、族长 ID、族人数量与列表、族库 5 资源余额、最近流水与事件。
-- **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表。
-- **AgentSnapshot 新增**（M2/M4）：`marriage_history_count` / `household_id` / `household_role`（Head/Spouse/Child/None）/ `arrival_tick` / `is_on_expedition`。
+- **ClanSnapshot**（M3）：姓氏、族长 ID、族人数量与列表、族库 5 资源余额、最近流水与事件；v1.9.0 新增 `is_extinct`（绝嗣标记；v1.9.1 起宗族仅含男性成员）。
+- **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表；v1.9.0 新增 `history_kings`（历史国王档案）/ `member_ids`（成员列表）/ `governed_households`（管辖家户）。
+- **AgentSnapshot 新增**（M2/M4）：`marriage_history_count` / `household_id` / `household_role`（Head/Spouse/Child/None）/ `arrival_tick` / `is_on_expedition`；v1.9.0 新增 `expedition_target_camp`（远征目标营地）/ `coronation_pending`（待登基营地）。
 - **LedgerBalanceSnapshot**：团体账面对应的 5 资源余额；`public_granary_balances` 为公仓兜底账本余额。
 
 ## 前端展示
@@ -131,7 +140,7 @@
 - **4 标签页「社会与经济制度大盘」（`ledger-ui.js`）**：
   - 🏠 **家户页**：分家公式气泡（W=2+n）、流水穿透抽屉、继承清算档案、公仓余额；
   - 💍 **婚姻页**：存续婚姻、终身多段历史留痕；
-  - 🛡️ **宗族页**：宗族看板、族长顺位、族库仪表、族税进度、互助救济气泡；
+  - 🛡️ **宗族页**：宗族看板、族长顺位、族库仪表、族税进度、互助救济气泡；v1.9.0 绝嗣宗族红色卡片（`⛩️ 绝嗣 · 无在世男性`）；
   - 👑 **王国页**：5 大营地王国、国王尊号、长子顺位链、到达时序、公仓赋税。
 - **Canvas 夺位特效**：金色战盔标牌 + 虚线光束 + 登基礼花粒子。
 - **Agent Inspector**：

@@ -22,8 +22,8 @@ impl World3DEngine {
         // 3. 房屋劳作修缮机制 (耐久度跌破 50% 安排修缮, 一旦开工修满至 100%)
         self.tick_house_repair(dt);
 
-        // 4. 施工与多级房屋升级推进、5. 升级竣工与扩容储量
-        self.tick_house_construction(dt);
+        // 4. ★ M6 房屋升级瞬时化（一次性扣账+晋升，无施工工时/体力）
+        self.tick_house_construction();
 
         // 5. 自动成婚与单身女性改嫁机制
         self.tick_marriage_and_remarriage();

@@ -3,8 +3,13 @@
 //! 替换 `rand` 依赖：零外部依赖、wasm32-unknown-unknown 安全（不触发 getrandom）、
 //! 同一种子可完全复现世界演化（符合 ARCHITECTURE.md 的确定性核心目标）。
 
+use serde::{Deserialize, Serialize};
+
 /// xorshift64* 确定性 PRNG
-#[derive(Debug, Clone, Copy)]
+///
+/// ★ 存档系统：整个世界的随机演化完全由 `state` 这一个 u64 决定，
+/// 读档必须原样恢复该内部状态，否则后续所有随机数漂移、确定性校验失败。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct WorldRng {
     state: u64,
 }

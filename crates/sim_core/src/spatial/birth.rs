@@ -139,6 +139,8 @@ impl World3DEngine {
                 if !mother.children_ids.contains(&baby_id) {
                     mother.children_ids.push(baby_id);
                 }
+                // ★ M6 威望·子嗣因子：平安诞下活产儿，母亲威望 +1（子女日后死亡不回减）
+                mother.prestige = mother.prestige.saturating_add(1);
                 mother.pregnancy_father_id = None;
                 mother.pregnancy_child_id = None; // 胎儿 ID 已由新生儿实体继承
             }
@@ -147,8 +149,13 @@ impl World3DEngine {
                     if !father.children_ids.contains(&baby_id) {
                         father.children_ids.push(baby_id);
                     }
+                    // ★ M6 威望·子嗣因子：父亲威望 +1
+                    father.prestige = father.prestige.saturating_add(1);
                 }
             }
+
+            // ★ v1.9.0 提前缓存新生儿性别（baby 在步骤 8 被 move，入族需在 move 后读取）
+            let baby_gender = baby.gender;
 
             // ── 8. 新生儿实体落位：受孕时已建胎儿 agent → 原位替换为新生儿；否则新建 ──
             if let Some(fetus_idx) = self.agent_index.get(&baby_id).copied() {
@@ -174,8 +181,8 @@ impl World3DEngine {
                 if let Some(father_hid) = self.household_registry.household_of(fid) {
                     self.household_registry.add_member(father_hid, baby_id, tick);
                 }
-                // ★ M3 新生儿随父姓入宗族
-                self.clan_registry.add_member(&baby_surname, baby_id, tick);
+                // ★ M3 新生儿随父姓入宗族（v1.9.0 传性别：父姓宗族已存在，故不受纯女性不立宗门禁影响）
+                self.clan_registry.add_member(&baby_surname, baby_id, tick, baby_gender);
                 // ★ M4 新生儿入父亲所在地区
                 if let Some(father_camp) = self.region_registry.region_of(fid) {
                     self.region_registry.add_member(father_camp, baby_id, tick, self.tick_counter);

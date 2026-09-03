@@ -1,17 +1,35 @@
 use crate::spatial::agent::PrimitiveActionState;
 use crate::spatial::graph::NodeId;
 use crate::spatial::house::HouseTier;
+use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason};
 use crate::spatial::snapshot::Season;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
     /// 冬季取暖消耗：低温或冬季时房屋消耗木材取暖
+    /// ★ M6 终态：真实消耗「户主家户账本」木（Heating: Family → Void）；房屋 pantry 已删除。
+    /// 0 级仓库无火炕不取暖（与历史语义一致）；账本有柴才烧得到，无柴则本 tick 不耗。
     pub(crate) fn tick_winter_heating(&mut self, dt: f32) {
         if self.current_season == Season::Winter || self.temperature < self.config.house_winter_cold_temp {
             let wood_burn_rate = self.config.house_winter_wood_burn_rate * dt;
-            for house in &mut self.houses {
-                if !house.is_ruin && house.tier != HouseTier::Tier0Warehouse {
-                    house.pantry_wood = (house.pantry_wood - wood_burn_rate).max(0.0);
+            let tick = self.tick_counter;
+            // READ：需供暖房屋的户主家户（非废墟且非 0 级）
+            let targets: Vec<Option<u64>> = self
+                .houses
+                .iter()
+                .filter(|h| !h.is_ruin && h.tier != HouseTier::Tier0Warehouse)
+                .map(|h| self.household_registry.household_of(h.owner_id))
+                .collect();
+            // WRITE：对每户家户账本真实扣柴
+            for hh_hid in targets {
+                if let Some(hh_hid) = hh_hid {
+                    let ledger_wood = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Wood)).unwrap_or(0.0);
+                    let burn = wood_burn_rate.min(ledger_wood);
+                    if burn > 0.001 {
+                        if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                            hh.group.ledger.record_consumption(LedgerRef::Family(hh_hid), ResourceKind::Wood, burn, TransferReason::Heating, tick);
+                        }
+                    }
                 }
             }
         }

@@ -1,19 +1,19 @@
 //! bookkeeping.rs · M2 旁路记账与家户经济规则（tick_bookkeeping 总入口）
 //!
-//! 隶属「账本与仓库重构」计划 M2。核心原则：
-//! - **旁路观测**：只读物理事件（行囊变化/休息状态/季节温度），只追加账本流水，
-//!   不修改任何物理库存字段（pantry_*/carried_*），与物理层完全解耦。
+//! 隶属「账本与仓库重构」计划 M2，M6（账本化改造）阶段一修订：
+//! - **旧旁路观测已删除**：Deposit（卸货差分）/ Consume（在家吃喝）/ Heating（冬季烧柴）
+//!   三条观测自 M6 阶段一起改由生态层/维护层**真实收付**家户账本（见 ecology.rs RestingAtCamp、
+//!   maintenance.rs tick_winter_heating），此处不再重复记账，避免双写。
+//! - 本文件仍承担**家庭生命周期结算**：Inheritance（户主死亡继承清算）+ Split（成年/丧父分家抽资），
+//!   二者只记账本余额（credit/debit + 流水），不动物理库存。
 //! - **确定性**：不消耗 WorldRng；所有集合遍历按 id 保序；不新增决策相位。
-//! - **执行顺序**：Deposit/Consume/Heating（观测）→ Inheritance（户主死亡清算）→ Split（成年/丧父分家）。
-//!   Inheritance 先于 Split：丧父之子由继承直接立户，Split 幂等跳过已立户者。
+//! - **执行顺序**：Inheritance 先于 Split（丧父之子由继承直接立户，Split 幂等跳过已立户者）。
 
-use crate::spatial::agent::{AgentId, Gender, PrimitiveActionState};
-use crate::spatial::house::HouseTier;
+use crate::spatial::agent::{AgentId, Gender};
 use crate::spatial::ledger::family::HouseholdId;
 use crate::spatial::ledger::journal::{
     LedgerRef, ResourceKind, TransferReason, TransferRecord,
 };
-use crate::spatial::snapshot::Season;
 use crate::spatial::world::World3DEngine;
 
 /// 五类资源的固定顺序（保证遍历确定性）
@@ -26,164 +26,15 @@ const RESOURCE_ORDER: [ResourceKind; 5] = [
 ];
 
 impl World3DEngine {
-    /// M2 旁路记账总入口：只读观测物理事件并追加账本流水。
-    /// 在 tick() 尾段（错峰决策之后）调用，作为 tick 的最后一步。
-    pub fn tick_bookkeeping(&mut self, dt: f32) {
+    /// M2 家庭生命周期结算总入口（M6 起仅含继承清算与分家抽资）。
+    /// 在 tick() 尾段（错峰决策之后）调用，作为账本制度结算的最后一步前序。
+    pub fn tick_bookkeeping(&mut self) {
         let tick = self.tick_counter;
 
-        // ══════════════════════════════════════════════════════════
-        // READ PHASE：收集所有观测数据（不可变借用，无修改）
-        // ══════════════════════════════════════════════════════════
-
-        // ── 1. 行囊快照 + Deposit 检测 ──
-        let mut deposits: Vec<(AgentId, HouseholdId, ResourceKind, f32)> = Vec::new();
-        let mut current_carried: Vec<(AgentId, (f32, f32, f32, f32, f32))> = Vec::new();
-
-        for agent in &self.agents {
-            if !agent.is_alive {
-                continue;
-            }
-            let cur = (
-                agent.carried_water,
-                agent.carried_food,
-                agent.carried_wood,
-                agent.carried_stone,
-                agent.carried_gold,
-            );
-            current_carried.push((agent.id, cur));
-
-            // Deposit：RestingAtCamp + 有 home_house_id + 某类行囊较上 tick 减少 > 0.01
-            if agent.state == PrimitiveActionState::RestingAtCamp && agent.home_house_id.is_some() {
-                if let Some(prev) = self.prev_carried.get(&agent.id) {
-                    if let Some(hid) = self.household_registry.household_of(agent.id) {
-                        let diffs = [
-                            prev.0 - cur.0,
-                            prev.1 - cur.1,
-                            prev.2 - cur.2,
-                            prev.3 - cur.3,
-                            prev.4 - cur.4,
-                        ];
-                        for (r, d) in RESOURCE_ORDER.iter().zip(diffs.iter()) {
-                            if *d > 0.01 {
-                                deposits.push((agent.id, hid, *r, *d));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── 2. Consume 检测：RestingAtCamp + 有 home_house_id + 非0级房屋 ──
-        let mut consumes: Vec<(HouseholdId, f32, f32)> = Vec::new();
-        let consume_rate = self.config.camp_home_consume_rate * dt;
-        for agent in &self.agents {
-            if !agent.is_alive {
-                continue;
-            }
-            if agent.state != PrimitiveActionState::RestingAtCamp {
-                continue;
-            }
-            let Some(house_id) = agent.home_house_id else {
-                continue;
-            };
-            // 0级仓库不扣生活水粮（AGENTS.md §4.8）
-            let is_tier0 = self
-                .houses
-                .iter()
-                .any(|h| h.id == house_id && h.tier == HouseTier::Tier0Warehouse);
-            if is_tier0 {
-                continue;
-            }
-            if let Some(hid) = self.household_registry.household_of(agent.id) {
-                consumes.push((hid, consume_rate, consume_rate));
-            }
-        }
-
-        // ── 3. Heating 检测：冬季/低温 + 户主有非0级房屋 ──
-        let mut heatings: Vec<HouseholdId> = Vec::new();
-        if self.current_season == Season::Winter || self.temperature < self.config.house_winter_cold_temp {
-            for (hid, hh) in &self.household_registry.households {
-                if hh.is_dissolved {
-                    continue;
-                }
-                // 查户主是否有非0级房屋（用 agent_index O(1) 查找）
-                if let Some(head_idx) = self.agent_index.get(&hh.head) {
-                    if let Some(head_agent) = self.agents.get(*head_idx) {
-                        if let Some(house_id) = head_agent.home_house_id {
-                            if let Some(house) = self.houses.iter().find(|h| h.id == house_id) {
-                                if house.tier != HouseTier::Tier0Warehouse {
-                                    heatings.push(*hid);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ══════════════════════════════════════════════════════════
-        // WRITE PHASE：修改账本（prev_carried / household ledgers）
-        // ══════════════════════════════════════════════════════════
-
-        // 更新 prev_carried 缓存
-        for (id, cur) in &current_carried {
-            self.prev_carried.insert(*id, *cur);
-        }
-
-        // 处理 Deposit：Personal(agent) → Family(household)，credit 家户账本
-        for (agent_id, hid, resource, amount) in deposits {
-            if let Some(hh) = self.household_registry.get_mut(hid) {
-                hh.group.ledger.credit(resource, amount);
-                let record = TransferRecord {
-                    tick,
-                    from: LedgerRef::Personal(agent_id),
-                    to: LedgerRef::Family(hid),
-                    resource,
-                    amount,
-                    reason: TransferReason::Deposit,
-                };
-                hh.group.ledger.push_transfer(record);
-            }
-        }
-
-        // 处理 Consume：Family → Void（record_consumption 单边 debit + 流水）
-        for (hid, water_amt, food_amt) in consumes {
-            if let Some(hh) = self.household_registry.get_mut(hid) {
-                hh.group.ledger.record_consumption(
-                    LedgerRef::Family(hid),
-                    ResourceKind::Water,
-                    water_amt,
-                    TransferReason::Consume,
-                    tick,
-                );
-                hh.group.ledger.record_consumption(
-                    LedgerRef::Family(hid),
-                    ResourceKind::Food,
-                    food_amt,
-                    TransferReason::Consume,
-                    tick,
-                );
-            }
-        }
-
-        // 处理 Heating：Family → Void（冬季烧柴）
-        let wood_rate = self.config.house_winter_wood_burn_rate * dt;
-        for hid in heatings {
-            if let Some(hh) = self.household_registry.get_mut(hid) {
-                hh.group.ledger.record_consumption(
-                    LedgerRef::Family(hid),
-                    ResourceKind::Wood,
-                    wood_rate,
-                    TransferReason::Heating,
-                    tick,
-                );
-            }
-        }
-
-        // ── 4. Inheritance（户主死亡清算）先于 Split ──
+        // ── 1. Inheritance（户主死亡清算）先于 Split ──
         self.tick_inheritance(tick);
 
-        // ── 5. Split（成年/丧父分家抽资）──
+        // ── 2. Split（成年/丧父分家抽资）──
         self.tick_household_split(tick);
     }
 

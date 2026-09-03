@@ -20,9 +20,9 @@
 ① 生理需求 (解渴/觅食/体力休养/末档立宅)
 ```
 
-低层级需求未满足时绝对阻断高层任务，严禁越级。生理层内部按「解渴 → 觅食 → 体力休养 → **立宅(末档)**」短路判定：无家成年男性在饥渴 ≥ 20、体力 ≥ 60 的生理稳定态下，将 `FoundHome` 作为生理层最后一档必然触发自立门户（归属层不再承载建仓，仅保留 0 级仓库升级成家）。
+低层级需求未满足时绝对阻断高层任务，严禁越级。生理层内部按「**夺位远征(最高档) → 解渴 → 觅食 → 体力休养 → 立宅(末档)**」短路判定：无家成年男性在饥渴 ≥ 20、体力 ≥ 60 的生理稳定态下，将 `FoundHome` 作为生理层最后一档必然触发自立门户（归属层不再承载建仓，仅保留 0 级仓库升级成家）。
 
-> ⚔️ **★ M4 夺位远征（决策树最高优先级）**：在马斯洛评估**之前**先行处理——男性非国王且存在无主营地时，立即置 `SeekingThrone` 状态冲向最近无主营地登基（可中断施工/修缮，进度冻结不回滚），无需满足任何生理/安全前置；王位无主属社会结构级事件，压倒一切个人需求。
+> ⚔️ **★ M4 夺位远征（v1.9.0 起决策引擎驱动，生理层最高档）**：不再由世界系统前置扫描触发，而是作为第 14 条决策分支 `B14SeekThrone`（`NeedKind::SeekThrone`，生理层最高档、策展序/兜底序均置首）在马斯洛引擎内评估——在世成年男性、非现任国王、且存在空缺王位营地（有房者只能夺自家房屋所在营地、无房/废墟可夺任意）时，决策器自主选定最近可夺位营地写入 `expedition_target_camp` 并 `dispatch` 为 `SeekingThrone` 冲向目标（可中断施工/修缮，进度冻结不回滚；途中目标易主原地掉头重定向，无可夺则放弃）；抵达且王位仍空缺 → 写 `coronation_pending`，由世界物理执行器 `execute_pending_coronations` 校验后登基。
 
 ### 核心决策原则
 
@@ -51,32 +51,32 @@
 - 详见根 AGENTS.md §4.3。
 
 ### 分支评估顺序（数据驱动，v1.3.6 起）
-- 13 条分支抽为 `branches.rs` 注册表（`BranchId::B1QuenchThirst .. B13GoldWealth` ↔ 字符串 ID `"b1".."b13"`），
-  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认全部内建），
+- 14 条分支抽为 `branches.rs` 注册表（`BranchId::B14SeekThrone` + `B1QuenchThirst .. B13GoldWealth` ↔ 字符串 ID `"b14".."b13"`，即 `"b1".."b14"`），
+  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫全部内建），
   因此任意排列都语义安全。
 - `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
 - **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`
-  声明序 b1→b13 中性兜底；策展优先级的唯一真相源是前端持久化文件 `frontend/js/config.decision-order.js`，
+  声明序 b14→b1..b13 中性兜底（b14 夺位置首，兜底序亦优先于口渴/饥饿/休息）；策展优先级的唯一真相源是前端持久化文件 `frontend/js/config.decision-order.js`，
   启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入（拖动决策卡后热注入 + 落盘，详见 §与其他模块接口）。
 
 ### decisions 子模块（8 个）
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 决策子模块入口与重新导出 |
-| `branches.rs` | 13 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
+| `branches.rs` | 14 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
 | `needs.rs` | 需求定义（MaslowLevel/NeedKind）、节点池、家宅缺口计算、`state_need_label_with_agent` 层级覆盖 |
 | `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs（数据驱动）/fulfill_resting_need |
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
 | `harvest.rs` | 现场采收判定 + 仓储满额查询 |
-| `seeking.rs` | 途中熔断与平滑重路由 |
-| `scheduler.rs` | tick_decisions 调度（含 ★M4 夺位远征 tick_conquest_expedition）/ build_decision_context |
+| `seeking.rs` | 途中熔断与平滑重路由（含 `decide_seeking_throne` 夺位远征途中状态机） |
+| `scheduler.rs` | tick_decisions 调度 + ★M4 登基物理执行器 `execute_pending_coronations`（扫描 `coronation_pending` 校验后 `coronate_king`）/ build_decision_context |
 
 ## 关键不变量
 - 所有决策为确定性执行，无概率掷骰（v0.9.44 起全部收敛）。
 - 决策节拍固定 30 tick，不得修改 `simulation_dt`（=1/30）。
 - 共享 RNG 按 agents 顺序依次消费，新增任何随机消耗必须保持确定性。
 - 中途掉头必须通过 `turn_around_and_route_to` 保持坐标连续性，严禁闪现瞬移。
-- ★ M4 夺位远征优先于马斯洛评估，且不消耗 `WorldRng`；夺位者登基/放弃后恢复正常决策。
+- ★ M4 夺位远征由决策分支 `B14SeekThrone` 在马斯洛引擎内驱动（生理层最高档），不消耗 `WorldRng`；登基由世界物理执行器 `execute_pending_coronations` 完成，夺位者登基/放弃后恢复正常决策。
 
 ## 与其他模块接口
 - `frontend/js/decision-viz*.js` + `config.decision-order.js`：决策引擎可视化视图拖动卡片/分界线 →
@@ -85,7 +85,7 @@
 - `ecology.rs`：采收与卸货的物理执行。
 - `housing_system/`：FoundHome/BuildHouse/RepairHouse 的物理执行。
 - `graph.rs`：A\* 寻路与路径规划。
-- `ledger/region.rs`：夺位远征读写 `region_registry`（登基/迁籍）与 `expedition_targets`。
+- `ledger/region.rs`：登基/迁籍读写 `region_registry`（`set_king` 旧王入档 `history_kings`）；夺位远征目标营地记录在 `agent.expedition_target_camp`。
 - `world.rs`：tick_decisions 调度，错峰相位控制。
 
 ## 调参入口

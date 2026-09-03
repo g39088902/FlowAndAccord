@@ -38,6 +38,7 @@ window.SIM_CONFIG = {
   agentMiscarriageThreshold: 10.0,// 饥渴任一低于此值即触发流产风险
   agentMiscarriageStaminaThreshold: 20.0, // 体力低于此值即触发流产风险
   agentMiscarriageCooldown: 450.0,// 流产后休养冷却 (秒，期间禁止再次受孕)
+  agentPostpartumCooldown: 900.0,// 产后休养冷却 (秒，分娩后期间禁止再次受孕)
   agentMiscarriageAlertDuration: 5.0, // 流产告警存续时长 (秒)
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分
@@ -49,7 +50,7 @@ window.SIM_CONFIG = {
   agentStealthVisibilityCovert: 0.25, // 隐秘特工可见度
   agentStealthVisibilityNormal: 1.0,  // 普通族人可见度
   agentRestStaminaRecoveryRate: 8.0,  // 营地/家宅休息时基础体力恢复速率 (每秒，乘睡眠效率)
-  agentConstructStaminaBurn: 3.5, // 营建/升级房屋体力消耗速率 (每秒)
+  // M6 升级瞬时化：agentConstructStaminaBurn 已删除（房屋升级不再耗体力）
   agentRepairStaminaBurn: 2.5,    // 修缮房屋体力消耗速率 (每秒)
   agentGatherStaminaBurn: 2.0,    // 伐木/采石/淘金体力消耗速率 (每秒)
   agentLaborStaminaFloor: 5.0,    // 劳作体力消耗后的最低保留体力下限
@@ -132,6 +133,8 @@ window.SIM_CONFIG = {
   decisionFoundHomeDistMin: 24.0, // 立宅候选点与现有房屋的硬间距下限 (m)
   decisionFoundHomeDistMax: 80.0, // 立宅候选点与营地的软间距上限 (m)
   decisionWorkStaminaThreshold: 50.0, // 劳作所需最低体力 (低于则返家休息)
+  decisionFamilyStockTriggerOn: 100.0, // M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采
+  decisionFamilyStockTriggerOff: 200.0, // M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止
   decisionEvalOrder: [], // 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖）
   decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认）
 
@@ -142,24 +145,9 @@ window.SIM_CONFIG = {
   houseDepreciationRate: 0.02,    // 房屋耐久自然折旧速率 (每秒)
   houseRepairTriggerThreshold: 80.0, // 耐久低于此值允许修缮
   houseRepairSpeed: 5.0,          // 修缮进度速率 (每秒)
-  houseBuildTimeTier0To1: 30.0,   // 0→1 级建造时长 (秒)
-  houseBuildTimeTier1To2: 45.0,   // 1→2 级建造时长
-  houseBuildTimeTier2To3: 60.0,   // 2→3 级建造时长
-  houseBuildTimeTier3To4: 90.0,   // 3→4 级建造时长
-  houseCapacityTier0: 20.0,       // 0 级仓库仓储容量
-  houseCapacityTier1: 40.0,       // 1 级茅草房仓储容量
-  houseCapacityTier2: 80.0,       // 2 级半棚屋仓储容量
-  houseCapacityTier3: 120.0,      // 3 级木石庄舍仓储容量
-  houseCapacityTier4: 160.0,      // 4 级大庄园仓储容量
-  houseUpgradeTier0WaterRatio: 0.90, // 0 级升级所需水占比
-  houseUpgradeTier0FoodRatio: 0.90,  // 0 级升级所需粮占比
-  houseUpgradeTier1WoodRatio: 0.85,  // 1 级升级所需木占比
-  houseUpgradeTier1FoodWaterRatio: 0.50, // 1 级升级所需水粮占比
-  houseUpgradeTier2StoneRatio: 0.85, // 2 级升级所需石占比
-  houseUpgradeTier2OtherRatio: 0.50, // 2 级升级所需水粮木占比
-  houseUpgradeTier3GoldStoneRatio: 0.85, // 3 级升级所需金石占比
-  houseUpgradeTier3OtherRatio: 0.50, // 3 级升级所需水粮木占比
-  houseFertilityStockRatio: 0.50, // 户主受孕所需仓储充裕比例
+  // M6 升级瞬时化：houseBuildTimeTier*To* 已删除（房屋升级一次性扣账、无施工时长）
+  // M8：houseCapacityTier0..4、houseUpgradeTier{0..3}*Ratio、houseFertilityStockRatio 共 14 个字段已删除，
+  // 升级材料成本改由 config.house-upgrade-cost.js 的 20 个 houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold} 字段承载
   houseWinterWoodBurnRate: 0.12,  // 冬季供暖木材消耗速率 (每秒)
   houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
   houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)

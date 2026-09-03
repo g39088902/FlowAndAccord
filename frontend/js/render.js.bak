@@ -129,18 +129,18 @@
       Detour: '越野寻路',
     };
     const NEED_KIND_REASON = {
-      QuenchThirst: '自身水分告急(<25.0)，前往水泉痛饮至满值并回填家宅水库。',
-      SateHunger: '自身饱食告急(<25.0)，前往浆果丛采食至满值并回填家宅粮仓。',
+      QuenchThirst: '自身水分告急，前往水泉痛饮至满值并带回补给家户账本。',
+      SateHunger: '自身饱食告急，前往浆果丛采食至满值并带回补给家户账本。',
       Rest: '正在归宿静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100，属性越高休息越快，恢复至 100% 满值后方可结束。',
-      ReturnHome: '现场采收或搬运完成，折返回家将物资存入私宅仓库（安全需求）。',
+      ReturnHome: '现场采收或搬运完成，折返回家将行囊卸入家户账本（家庭储备唯一真相源）。',
       RepairHouse: '房屋耐久跌破50%，正在投入体力劳作修缮至100%避免风化坍塌。',
-      StockWater: '私宅水库蓄水不足50%，优先外出运水保障家庭基础生存（安全需求，优先于建房）。',
-      StockFood: '私宅粮仓储粮不足50%，优先外出采粮保障家庭基础生存（安全需求，优先于建房）。',
-      StockWood: '私宅木料储备不足50%容量，优先外出伐木并一路补满至100%满仓（安全需求，优先于建房）。',
-      BuildHouse: '建材已齐备，正在投入体力与30s工时营建或扩建升级私宅（消耗体力）。',
-      StockStone: '拥有2~3级私宅且石料不足，前往石矿采石用于升级木石庄舍与大庄园。',
-      StockGold: '拥有3级木石庄舍且金库缺金，外出采金备料用于升级4级大庄园(尊重需求，冷却45s)。',
-      GoldWealth: '4级大庄园已竣工且物资充沛，闲暇无事外出娱乐性淘金积累随身财富(冷却180s)。',
+      StockWater: '有房即可：家户账本水 < 100 触发去采，补到 ≥ 200 才停（施密特滞回，与房屋等级脱钩）。',
+      StockFood: '有房即可：家户账本粮 < 100 触发去采，补到 ≥ 200 才停。',
+      StockWood: '有房即可：家户账本木 < 100 触发去采，补到 ≥ 200 才停。',
+      BuildHouse: '家户账本可付本次升级材料（升1级水粮各50/升2级木粮水各75/升3级石木粮水各100/升4级金石木粮水各125）→ 一次性扣账并瞬时晋升，户主威望+1。',
+      StockStone: '有房即可：家户账本石 < 100 触发去采，补到 ≥ 200 才停（不再以升级建材为唯一导向）。',
+      StockGold: '有房即可：家户账本金 < 100 触发去采，补到 ≥ 200 才停（淘金冷却45s）。',
+      GoldWealth: '4级庄园竣工且水/粮/木/石/金均 ≥ 200 后，娱乐性淘金积累随身财富（冷却180s）。',
       Detour: '车道临时受阻，正在荒野中越野寻路。',
     };
     const LEVEL_NUMERALS = ['①', '②', '③', '④', '⑤'];
@@ -505,14 +505,14 @@
           ctx.textAlign = 'center';
           ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
 
-          // 门牌与仓储数值提示
+          // 门牌与耐久提示（M6：房屋不再显示库存，家庭储备见家户账本）
           ctx.font = '8px sans-serif';
           if (house.isRepairing) {
             ctx.fillStyle = '#38bdf8';
             ctx.fillText(`🔧修缮(${Math.round(house.durability)}%)`, p2D.x, p2D.y + 16 * camera.zoom);
           } else {
-            ctx.fillStyle = house.isFertilityActive() ? '#10b981' : '#fde68a';
-            ctx.fillText(`#${house.id}${tierLabel}(💧${Math.round(house.pantryWater)}/🍒${Math.round(house.pantryFood)}/🌲${Math.round(house.pantryWood)}${house.pantryStone > 0 ? '/🪨' + Math.round(house.pantryStone) : ''})`, p2D.x, p2D.y + 16 * camera.zoom);
+            ctx.fillStyle = '#fde68a';
+            ctx.fillText(`#${house.id}${tierLabel}`, p2D.x, p2D.y + 16 * camera.zoom);
           }
         }
 
@@ -1052,10 +1052,8 @@
             stateText = `🔧 族人劳作修缮中 (${Math.round(house.durability)}%)`;
           } else if (house.durability < 85.0) {
             stateText = `⚠️ 建筑磨损折旧 (${Math.round(house.durability)}% 待修缮)`;
-          } else if (house.isPantryFull()) {
-            stateText = house.tier === 'Tier4Manor' ? '🏰 终极庄园满仓' : '🔨 材料已备齐 (升级扩容中)';
           } else {
-            stateText = isWarehouse ? '📦 储备补给中 (需水粮各满10.0)' : '🌾 私产安居中 (持续储备扩产)';
+            stateText = isWarehouse ? '🏠 起步营地' : (house.tier === 'Tier4Manor' ? '🏰 4级氏族大庄园' : '🏡 安居宅邸');
           }
           document.getElementById('insp-title-state').textContent = stateText;
           document.getElementById('insp-title-state').style.color = house.isRuin ? '#ef4444' : (house.isRepairing ? '#38bdf8' : (isWarehouse ? '#f59e0b' : '#10b981'));
@@ -1065,64 +1063,44 @@
           document.getElementById('insp-house-dur-fill').style.width = `${durPct}%`;
           document.getElementById('insp-house-dur-fill').style.background = durPct < 30 ? '#ef4444' : (durPct < 85 ? '#f59e0b' : '#10b981');
 
-          // 独立清泉储量 (水)
-          const waterPct = Math.round((house.pantryWater / house.maxPantryWater) * 100);
-          document.getElementById('insp-house-water-val').textContent = `${house.pantryWater.toFixed(1)} / ${house.maxPantryWater.toFixed(1)} 单位 (${waterPct}%)`;
-          document.getElementById('insp-house-water-fill').style.width = `${waterPct}%`;
-
-          // 独立粮食储量 (果)
-          const foodPct = Math.round((house.pantryFood / house.maxPantryFood) * 100);
-          document.getElementById('insp-house-food-val').textContent = `${house.pantryFood.toFixed(1)} / ${house.maxPantryFood.toFixed(1)} 单位 (${foodPct}%)`;
-          document.getElementById('insp-house-food-fill').style.width = `${foodPct}%`;
-
-          // 独立木材储量 (木)
-          const woodPct = Math.round((house.pantryWood / house.maxPantryWood) * 100);
-          document.getElementById('insp-house-wood-val').textContent = `${house.pantryWood.toFixed(1)} / ${house.maxPantryWood.toFixed(1)} 单位 (${woodPct}%)`;
-          document.getElementById('insp-house-wood-fill').style.width = `${woodPct}%`;
-
-          // 独立石料储量 (石)
-          const stonePct = Math.round((house.pantryStone / house.maxPantryStone) * 100);
-          document.getElementById('insp-house-stone-val').textContent = `${house.pantryStone.toFixed(1)} / ${house.maxPantryStone.toFixed(1)} 单位 (${stonePct}%)`;
-          document.getElementById('insp-house-stone-fill').style.width = `${stonePct}%`;
-
-          // 独立黄金储量 (金)
-          const goldPct = Math.round((house.pantryGold / Math.max(1, house.maxPantryGold)) * 100);
-          const goldValEl = document.getElementById('insp-house-gold-val');
-          const goldFillEl = document.getElementById('insp-house-gold-fill');
-          if (goldValEl && goldFillEl) {
-            goldValEl.textContent = `${house.pantryGold.toFixed(1)} / ${house.maxPantryGold.toFixed(1)} 单位 (${goldPct}%)`;
-            goldFillEl.style.width = `${goldPct}%`;
+          // ★ M6 家庭储备展示（唯一真相源 = 户主家户账本；房屋不再持有仓库）
+          const ownerAgentRef = (typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : sim.agents.find(a => a.id === house.ownerId);
+          const ownerHousehold = (typeof sim.getHouseholdOfAgent === 'function') ? sim.getHouseholdOfAgent(house.ownerId)
+            : (sim.households.find(hh2 => hh2.head === house.ownerId || (hh2.members || []).includes(house.ownerId)) || null);
+          const hhBal = (ownerHousehold && ownerHousehold.balances) || {};
+          // ★ M8 储备条改纯数值：账本余额无容量上限，删除了 houseCapacityTier 百分比分母（进度条 DOM 已移除）
+          const hhRows = [
+            ['insp-house-water-val', hhBal.Water],
+            ['insp-house-food-val', hhBal.Food],
+            ['insp-house-wood-val', hhBal.Wood],
+            ['insp-house-stone-val', hhBal.Stone],
+            ['insp-house-gold-val', hhBal.Gold]
+          ];
+          for (const [valId, amt] of hhRows) {
+            const vEl = document.getElementById(valId);
+            const v = amt || 0;
+            if (vEl) vEl.textContent = `${v.toFixed(1)} 单位`;
           }
 
-          // 建筑形态与升级要求
+          // 建筑形态与升级要求（M6：一次性扣账、瞬时升级，无施工工时/体力）
           const tierDescElem = document.getElementById('insp-house-tier-desc');
           if (tierDescElem) {
             let upgradeCondition = '';
-            if (isWarehouse) upgradeCondition = `0级 仓库 (需搬运水粮各满 ${(house.maxPantryWater * 0.9).toFixed(0)}单位升级为1级茅草房)`;
-            else if (house.tier === 'Tier1ThatchedHut') upgradeCondition = `1级 茅草房 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级2级私宅需木材 ${(house.maxPantryWood * 0.85).toFixed(0)}单位)`;
-            else if (house.tier === 'Tier2LeanTo') upgradeCondition = `2级 私宅 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级3级庄舍需石头 ${(house.maxPantryStone * 0.85).toFixed(0)}单位)`;
-            else if (house.tier === 'Tier3Homestead') upgradeCondition = `3级 木石庄舍 (仓储上限: ${house.maxPantryWater.toFixed(0)}单位，升级4级庄园需金石建材)`;
-            else upgradeCondition = `4级 家族大庄园 (终极形态，仓储上限 160 单位)`;
+            // ★ M8 升级条件 = 家户账本可支付该次一次性材料成本（数值与 config.house-upgrade-cost.js 矩阵一致）
+            if (isWarehouse) upgradeCondition = '0级 起步营地 → 升级 1 级需账本水50+粮50（瞬时扣账晋升）';
+            else if (house.tier === 'Tier1ThatchedHut') upgradeCondition = '1级 茅草房 → 升级 2 级需账本木/粮/水各75（瞬时扣账晋升）';
+            else if (house.tier === 'Tier2LeanTo') upgradeCondition = '2级 私宅 → 升级 3 级需账本石/木/粮/水各100（瞬时扣账晋升）';
+            else if (house.tier === 'Tier3Homestead') upgradeCondition = '3级 木石庄舍 → 升级 4 级需账本金/石/木/粮/水各125（瞬时扣账晋升）';
+            else upgradeCondition = '4级 氏族大庄园 (终极形态；户主威望已达此宅邸等级点数)';
             tierDescElem.textContent = upgradeCondition;
             tierDescElem.style.color = isWarehouse ? '#f59e0b' : '#10b981';
           }
 
           const fertilityBadge = document.getElementById('insp-house-fertility-badge');
           if (fertilityBadge) {
-            const reqCap = (house.maxPantryWater * 0.5).toFixed(0);
-            if (isWarehouse) {
-              fertilityBadge.textContent = '🔒 未激活 (0级仓库不支持生育，需升级为1级茅草房)';
-              fertilityBadge.style.color = '#ef4444';
-            } else if (house.pantryWood < house.maxPantryWood * 0.5) {
-              fertilityBadge.textContent = `⚠️ 失去支持 (木材不足50%无法保障冬季取暖: 🌲${house.pantryWood.toFixed(1)}/${reqCap})`;
-              fertilityBadge.style.color = '#ef4444';
-            } else if (house.pantryWater < house.maxPantryWater * 0.5 || house.pantryFood < house.maxPantryFood * 0.5) {
-              fertilityBadge.textContent = `⚠️ 失去支持 (水粮不足50%: 💧${house.pantryWater.toFixed(1)}/🍒${house.pantryFood.toFixed(1)}，需各≥${reqCap})`;
-              fertilityBadge.style.color = '#f59e0b';
-            } else {
-              fertilityBadge.textContent = `🟢 充盈激活 (水粮木均≥50%即${reqCap}单位，保障过冬取暖与夫妻受孕)`;
-              fertilityBadge.style.color = '#10b981';
-            }
+            // ★ M6 生育去房屋化：房屋/仓储不再作为生育前提
+            fertilityBadge.textContent = '🍼 生育已去房屋化：已婚夫妻身体指标达标即可受孕（无需房屋或储仓）';
+            fertilityBadge.style.color = '#10b981';
           }
 
           // 户主追踪按钮绑定
@@ -1624,13 +1602,13 @@
             }
           }
 
-          // 🌟 声望值展示（= 子女数量）
+          // 🌟 威望值展示（所有影响因子的综合集合体：子嗣 + 宅邸等级等）
           const prestigeElem = document.getElementById('insp-prestige-val');
           if (prestigeElem) {
             const prestige = selAgent.prestige || 0;
             prestigeElem.textContent = prestige > 0
-              ? `🌟 声望 ${prestige} · 育有 ${prestige} 位子嗣`
-              : '暂无声望 (尚未育有子女)';
+              ? `🌟 威望 ${prestige}`
+              : '暂无威望';
             prestigeElem.style.color = prestige >= 5 ? '#fbbf24' : (prestige > 0 ? '#a78bfa' : '#64748b');
           }
 

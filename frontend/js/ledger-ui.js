@@ -10,8 +10,8 @@
   // ─── 常量映射 ───────────────────────────────────────────────
   const RES_ICONS  = { Water: '💧', Food: '🍒', Wood: '🌲', Stone: '🪨', Gold: '🪙' };
   const RES_COLORS = { Water: '#38bdf8', Food: '#10b981', Wood: '#d97706', Stone: '#94a3b8', Gold: '#fbbf24' };
-  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲' };
-  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济' };
+  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️' };
+  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并' };
   const ROLE_LABELS = { Head: '👑 户主', Spouse: '💍 配偶', Child: '👶 子女', None: '—' };
 
   // ─── 模块状态 ───────────────────────────────────────────────
@@ -383,13 +383,17 @@
     const successionOpen = (successionExpandedSurname === clan.surname);
     const hhCount = countClanHouseholds(sim, clan);
 
-    let html = '<div class="clan-card' + (journalOpen ? ' clan-journal-open' : '') + '" data-clan-surname="' + surname + '">';
+    // ★ v1.9.0 Task11 绝嗣状态：所有男性已亡 → 标记绝嗣，族产已平分/入公仓，保留历史数据与账本流水
+    const isExtinct = !!clan.isExtinct;
+    let html = '<div class="clan-card' + (journalOpen ? ' clan-journal-open' : '') + (isExtinct ? ' clan-extinct' : '') + '" data-clan-surname="' + surname + '">';
 
     // ── 族徽 + 名号 + 族长 ──
     html += '<div class="clan-header">';
-    html += '<span class="clan-emblem">🛡️</span>';
+    html += '<span class="clan-emblem">' + (isExtinct ? '⛩️' : '🛡️') + '</span>';
     html += '<span class="clan-title">「' + surname + '」氏宗族</span>';
-    if (hasLeader) {
+    if (isExtinct) {
+      html += '<span class="clan-leader clan-extinct-badge">⛩️ 绝嗣 · 无在世男性</span>';
+    } else if (hasLeader) {
       html += '<span class="clan-leader">👑 族长: <span class="lineage-chip" data-agent-id="' + clan.leaderId + '">' + esc(agentName(sim, clan.leaderId)) + '</span></span>';
     } else {
       html += '<span class="clan-leader clan-frozen">⚪ 宗族无主 · 账本冻结</span>';

@@ -21,6 +21,7 @@
         // 世界视图对象 (由快照映射而来)
         this.agents = [];
         this.agentArchive = new Map(); // 族人全量生命周期档案库 (含已故先祖，保障断代/绝嗣穿梭不跳帧)
+        this._consumedDeathIds = new Set(); // ★ v1.8.7 已消费的死亡/流产墓碑 id（防快照重复读档误处理）
         this.houses = [];
         this.pois = [];
         // ★ 账本与家户/婚姻登记簿 (v0.9.72 M1 账本系统)
@@ -78,8 +79,13 @@
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
       applyConfig(cfg) {
         if (!this._ready) return false;
-        const configObj = cfg || window.SIM_CONFIG;
+        const configObj = Object.assign({}, cfg || window.SIM_CONFIG);
         if (!configObj) return false;
+        // ★ M8 合并「升级材料成本矩阵」拆分配置（config.house-upgrade-cost.js，20 字段），
+        // 该文件已由 index.html 在本脚本之前加载；合并后随主配置一并注入 WASM 内核。
+        if (window.SIM_HOUSE_UPGRADE_COST) {
+          Object.assign(configObj, window.SIM_HOUSE_UPGRADE_COST);
+        }
         try {
           const jsonStr = JSON.stringify(configObj);
           const encoded = new TextEncoder().encode(jsonStr);
@@ -175,6 +181,7 @@
         this._lastEvent = null;
         this._trails.clear();
         this.agentArchive.clear();
+        this._consumedDeathIds.clear();
         if (this._ready) {
           this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20);
           if (window.SIM_CONFIG) {
@@ -183,6 +190,76 @@
           this._pullSnapshot(true);
           if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
         }
+      }
+
+      // ============ 💾 读档 / 存档 (v1.7.0) ============
+      // 存档：world_save_ptr/len 由内核导出全量世界状态 JSON（含 RNG 内部状态，强确定性）
+      // 读档：world_save_buf_ptr(len) 取可写缓冲 → 写入字节 → world_load(len) 覆盖内核世界
+      // 失败原因统一从 world_last_error_ptr/len 读取
+
+      /** 读取内核最近一次存档/读档错误文本（无错误返回空串） */
+      readSaveError() {
+        if (!this._ready || typeof this._wasm.world_last_error_len !== 'function') return '';
+        const len = this._wasm.world_last_error_len();
+        if (!len) return '';
+        const ptr = this._wasm.world_last_error_ptr();
+        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+      }
+
+      /**
+       * 导出当前世界全量存档 JSON（失败返回 null，原因见 readSaveError()）
+       * @returns {string|null}
+       */
+      saveWorld() {
+        if (!this._ready || typeof this._wasm.world_save_ptr !== 'function') return null;
+        const ptr = this._wasm.world_save_ptr();
+        const len = this._wasm.world_save_len();
+        if (!len) return null;
+        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+      }
+
+      /**
+       * 载入存档 JSON 并覆盖当前世界
+       *
+       * 成功后清空前端全部派生缓存（轨迹、先祖档案、地形缓存、选中态）并强制重建地形快照。
+       * 注意：存档自带 SimConfig，读档后**不**重新注入 window.SIM_CONFIG，
+       * 以免前端热调参覆盖存档时的运行参数、破坏续演语义。
+       *
+       * @param {string} jsonStr 存档 JSON 文本
+       * @param {{seed?:number}} [meta] 可选槽位元信息（用于同步引擎种子展示）
+       * @returns {{ok:boolean, error?:string}}
+       */
+      loadWorld(jsonStr, meta) {
+        if (!this._ready || typeof this._wasm.world_load !== 'function') {
+          return { ok: false, error: 'WASM 引擎尚未就绪' };
+        }
+        if (typeof jsonStr !== 'string' || jsonStr.length === 0) {
+          return { ok: false, error: '存档内容为空' };
+        }
+        let encoded;
+        try {
+          encoded = new TextEncoder().encode(jsonStr);
+        } catch (e) {
+          return { ok: false, error: '存档编码失败: ' + e.message };
+        }
+        const ptr = this._wasm.world_save_buf_ptr(encoded.length);
+        new Uint8Array(this._memory.buffer, ptr, encoded.length).set(encoded);
+        const res = this._wasm.world_load(encoded.length);
+        if (res !== 0) {
+          const detail = this.readSaveError();
+          const codeMsg = { '-1': '存档长度越界', '-2': '存档不是合法 UTF-8 文本', '-3': '存档解析或校验失败' }[String(res)] || ('未知错误 ' + res);
+          return { ok: false, error: detail ? codeMsg + '：' + detail : codeMsg };
+        }
+        // 内核世界已被替换，清空前端全部派生缓存并以 forceTerrain 重建
+        this._trails.clear();
+        this.agentArchive.clear();
+        this._consumedDeathIds.clear();
+        this._lastEvent = null;
+        this._terrainCached = false;
+        this.deselect();
+        if (meta && typeof meta.seed === 'number') this._engineSeed = meta.seed;
+        this._pullSnapshot(true);
+        return { ok: true };
       }
 
       setWaterRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(0, m); }
@@ -285,30 +362,25 @@
           boundHouses: p.bound_houses || 0
         }));
 
-        // --- 房屋 ---
+        // --- 房屋（M6 建筑化：不再携带任何资源存量；家庭物资展示读家户账本） ---
         this.houses = snap.houses.map(h => {
-          const view = {
-            id: h.id,
-            pos: { x: h.x, y: h.y, z: h.z },
-            tier: h.tier,
-            ownerId: h.owner_id,
-            spouseId: h.spouse_id,
-            campId: h.camp_id,
-            isRuin: h.is_ruin,
-            isRepairing: h.is_repairing,
-            durability: h.durability,
-            pantryWater: h.pantry_water, maxPantryWater: h.max_pantry_water,
-            pantryFood: h.pantry_food, maxPantryFood: h.max_pantry_food,
-            pantryWood: h.pantry_wood, maxPantryWood: h.max_pantry_wood,
-            pantryStone: h.pantry_stone, maxPantryStone: h.max_pantry_stone,
-            pantryGold: h.pantry_gold || 0.0, maxPantryGold: h.max_pantry_gold || 0.0,
-            age: h.age,
-            generation: h.generation,
-            constructionProgress: h.construction_progress,
-            isFertilityActive: () => h.is_fertility_active,
-            isPantryFull: () => h.is_pantry_full
-          };
-          return view;
+        const view = {
+          id: h.id,
+          pos: { x: h.x, y: h.y, z: h.z },
+          tier: h.tier,
+          ownerId: h.owner_id,
+          spouseId: h.spouse_id,
+          campId: h.camp_id,
+          isRuin: h.is_ruin,
+          isRepairing: h.is_repairing,
+          durability: h.durability,
+          age: h.age,
+          generation: h.generation,
+          constructionProgress: h.construction_progress,
+          builderId: h.builder_id,
+          lastUpgraderId: h.last_upgrader_id,
+        };
+        return view;
         });
 
         // --- 路网 (车道 + 节点) ---
@@ -388,6 +460,7 @@
             pregnancyChildId: a.pregnancy_child_id != null ? a.pregnancy_child_id : null,
             isFetus: a.is_fetus || false,
             miscarriageCooldown: a.miscarriage_cooldown,
+            postpartumCooldown: a.postpartum_cooldown,
             miscarriageTimer: a.miscarriage_alert_timer,
             deathDecayTimer: a.death_decay_timer,
             deathCause: a.death_cause,
@@ -414,6 +487,8 @@
             // ★ M4: 到达时刻与夺位远征标记
             arrivalTick: a.arrival_tick || 0,
             isOnExpedition: a.is_on_expedition || false,
+            expeditionTargetCamp: a.expedition_target_camp ?? null,
+            coronationPending: a.coronation_pending ?? null,
             trail
           };
         });
@@ -423,6 +498,37 @@
         for (const ag of this.agents) {
           if (ag.isFetus) continue;
           this.agentArchive.set(ag.id, ag);
+        }
+
+        // ★ v1.8.7 消费死亡/流产墓碑（recent_deaths）：
+        //   · 高倍速单帧跨过衰减窗口时，强制把档案库滞留的"存活"副本补记为已故并写入死因（修复绝嗣废墟/卡片误判"健在"）；
+        //   · 流产/随母亡故的腹中胎儿以"已故子嗣"身份入档（族谱可见，死因=流产/随母亡故）。
+        const consumedDeaths = this._consumedDeathIds || (this._consumedDeathIds = new Set());
+        for (const d of (snap.recent_deaths || [])) {
+          if (consumedDeaths.has(d.id)) continue;
+          consumedDeaths.add(d.id);
+          let rec = this.agentArchive.get(d.id);
+          if (!rec) rec = prevAgents.get(d.id);   // 胎儿（未入档）从上一帧活跃列表取，保留血缘字段
+          if (rec) {
+            rec = Object.assign({}, rec);         // 克隆，避免污染 prevAgents 引用
+            rec.isAlive = false;
+            rec.deathCause = d.cause;
+            if (d.is_fetus) rec.isFetus = false;  // 流产胎儿以"已故子嗣"身份入档
+            // 血缘优先以墓碑为准（高倍速下胎儿可能无上一帧快照，prevAgents 取不到）
+            if (d.father_id !== undefined) rec.fatherId = d.father_id;
+            if (d.mother_id !== undefined) rec.motherId = d.mother_id;
+            this.agentArchive.set(d.id, rec);
+          } else {
+            // 兜底：墓碑字段建最小档案（血缘直接来自墓碑，不丢 parent 链接）
+            // 已故入档统一以"已故子嗣"身份（isFetus=false），与 prevAgents 分支一致
+            this.agentArchive.set(d.id, {
+              id: d.id, isAlive: false, deathCause: d.cause,
+              isFetus: false, age: 0, birthTick: 0,
+              fatherId: d.father_id !== undefined ? d.father_id : null,
+              motherId: d.mother_id !== undefined ? d.mother_id : null,
+              surname: '', gender: 'female'
+            });
+          }
         }
 
         // ★ 家户登记簿快照映射（家庭跟着男人走）
@@ -469,7 +575,8 @@
             return acc;
           }, {}),
           recentJournal: c.recent_journal || [],
-          recentEvents: c.recent_events || []
+          recentEvents: c.recent_events || [],
+          isExtinct: !!c.is_extinct
         }));
 
         // ★ M4: 地区/王国登记簿快照映射（初王/长子继承/公仓税/救济/夺位远征）
@@ -485,7 +592,10 @@
           balances: (r.balances || []).reduce((acc, b) => { acc[b.resource] = b.amount; return acc; }, {}),
           recentJournal: r.recent_journal || [],
           recentEvents: r.recent_events || [],
-          activeExpeditionAgents: r.active_expedition_agents || []
+          activeExpeditionAgents: r.active_expedition_agents || [],
+          historyKings: r.history_kings || [],
+          memberIds: r.member_ids || [],
+          governedHouseholds: r.governed_households || []
         }));
 
         // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）

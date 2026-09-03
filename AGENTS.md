@@ -27,15 +27,17 @@
 
 ### 0.1 📑 嵌套 AGENTS.md（目录级操作指南）
 
-每个复杂 Rust 代码目录维护一份局部 AGENTS.md，聚焦职责边界、文件清单与局部易踩坑。**改哪个目录的代码，先读对应局部 AGENTS.md**；全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
+每个复杂代码目录维护一份局部 AGENTS.md，聚焦职责边界、文件清单与局部易踩坑。**改哪个目录的代码，先读对应局部 AGENTS.md**；全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
 | 目录 | 局部 AGENTS.md | 覆盖范围 |
 | :--- | :--- | :--- |
 | `crates/sim_core/` | `crates/sim_core/AGENTS.md` | sim_core 内核：crate 布局、SimConfig、WorldRng 确定性、geo/spatial 模块地图 |
 | `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | WASM 导出层：导出函数清单、静态缓冲区、错误码、指针约定 |
+| `crates/sim_core/src/spatial/` | `crates/sim_core/src/spatial/AGENTS.md` | spatial 核心层：14 散文件 + 3 子目录职责边界、world.rs tick 调用顺序、agent↔ecology 装载卸货契约、bookkeeping 与 ledger 分工、快照映射责任 |
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
+| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：14 JS 文件职责边界、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -51,7 +53,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.3.6)"]
+    E --> F["浏览器 UI (版本: v1.9.1)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与代际继承、经济账本；
@@ -98,7 +100,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.3.6`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.9.1`**。
 
 ---
 
@@ -118,6 +120,19 @@ node frontend/server.js           # http://localhost:3000
 ## 4. ⚠️ 重要易踩坑清单
 
 > 以下坑均由实际开发沉淀，**改动代码前先对照本节**。按"最常踩 → 最隐蔽"排序。实现细节见对应模块文档与嵌套 AGENTS.md。
+
+### 4.0 ✅ 改动前快速自检（10 秒扫完）
+
+> 详细版（含影响面说明）见 [`docs/current/13-impact-matrix.md` §五](docs/current/13-impact-matrix.md)。
+
+```
+□ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增
+□ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
+□ 三处同步：快照字段变更时 snapshot.rs / world.rs / rustworld.js 一致
+□ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
+□ 测试门禁：cargo build + test-wasm.js + config-check.js 全绿
+□ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md + 受影响的局部 AGENTS.md
+```
 
 ### 4.1 🔴 WASM 编译与双副本同步（最常踩）
 
@@ -139,12 +154,12 @@ node frontend/server.js           # http://localhost:3000
 - **时间基准**：每 tick = `config.simulationDt`(1/30) 模拟秒，`config.agentDecisionIntervalTicks`(30) tick = 1 模拟秒；前端 30fps 每帧调一次 `sim.tick()`。
 - **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策，全员相位均摊错开。
 - **严禁修改 `config.simulationDt`**：倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
-- **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货在决策之前，决策看到的是卸货后的仓库状态。
+- **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
 
 ### 4.4 🟠 随身搬运机制（真实背包，非瞬移）
 
-- 水/粮/木/石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(50.0)，互不共享），回家休整时按 `config.poiUnloadRateResource`/s(10) 卸货存入家宅仓库；行囊满即返家。
+- 水/粮/木/石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(50.0)，互不共享），回家休整时按 `config.poiUnloadRateResource`/s(10) 卸货**入家户账本**（M6 起：家户账本为家庭储备唯一真相源，房屋仓库已删除）；行囊满即返家。
 - 金：容量无限，单趟运满 20 回宅存入金库（5/s）。
 - 无家宅（`home_house_id.is_none()`）的 agent 不装载行囊，只在现场就地自饮自食。
 - 改容量/装卸速率必须全链条联动：`agent.rs` → `ecology.rs` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`。
@@ -171,8 +186,10 @@ node frontend/server.js           # http://localhost:3000
 ### 4.8 🟡 行为与生理硬约束
 
 - **冬季供暖**：冬季或气温 < `config.houseWinterColdTemp`(5℃) 时，非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材；家宅木材 < 10 时禁孕。
-- **0 级仓库不扣生活水粮**（只有 `tier != Tier0Warehouse` 才允许从仓库吃喝）。
-- **房屋升级材料门槛**：`house.rs::is_pantry_full()` 按等级判定（0 级水粮 90%；1 级木 85%+水粮 50%；2 级石 85%+木水粮 50%；3 级金 85%+石 85%+木水粮 50%）。详见 `housing_system/AGENTS.md`。
+- **家庭储备 = 家户账本（M6 起）**：`House.pantry_*`/仓储容量已删除，吃喝、冬季烧柴全部从**家户账本真实扣减**（账本余额即家庭实有物资，无容量上限）。
+- **去采货 = 施密特触发器（M7 起）**：有房（含 0 级、非废墟）即可采，与房屋等级**彻底脱钩**——每类资源（水/粮/木/石/金统一）家户账本余额 < `decisionFamilyStockTriggerOn`(100) 触发去采，补到 ≥ `decisionFamilyStockTriggerOff`(200) 才停（滞回带）。无房者不触发补货、现场只自用不装袋。
+- **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，数值来自 **20 个超参**（`config.house-upgrade-cost.js` 的 `houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold}`，权威默认值三处同步于 `config.rs`）——升到 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，该级不消耗的品类填 0（扣账自动跳过、就绪不阻塞）；b8/b11 就绪 = 每类 `ledger.balance ≥ cost`（0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50），升级时一次性扣账并户主威望+1。
+- **生育去房屋化**：受孕不再依赖房屋等级或仓储备货——成年已婚女性身体指标达标且流产冷却（450s）与产后休养冷却（900s，分娩后触发）均结束即可受孕，无房也可生育（原 0 级禁孕/木材支持门槛已删）。
 - **淘金纪律**：4 级大庄园竣工前绝不娱乐淘金（`GoldWealth` 冷却 180s）；盖房备料淘金 `StockGold` 冷却 45s。
 - **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随。
 
@@ -195,14 +212,15 @@ node frontend/server.js           # http://localhost:3000
 - **设计原则**：系统只当"物理规则执行者"（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切"盖不盖、何时盖、在哪盖"必须来自 agent 自己的 `evaluate_needs` 输出。**严禁**引入扫描全图并强制改写 `agent.state` 的指挥式逻辑。
 - **三条自主触发链路**：
   - **立宅**：`NeedKind::FoundHome`——**生理层最后一档**（在解渴/觅食/体力休养之后），无家成年男性且饥渴/体力达标时必然触发，agent 自主掷候选点选址，系统仅做放置校验与实体化绑定；
-  - **升级施工**：`NeedKind::BuildHouse`——仓满 + 男户主在家满体力时自主触发，系统仅结算施工计时与竣工扩容；
+  - **升级施工（M6 瞬时化）**：`NeedKind::BuildHouse`——家户账本建材达标即由决策自主触发，系统**一次性扣账并瞬时晋升**（无体力、无工时），每晋升一级户主威望 +1；
   - **修缮**：`NeedKind::RepairHouse`——耐久 < 50% 时户主/配偶自主触发，系统仅结算修缮进度。
 - **已删除的旧扫描器（勿复活）**：`tick_warehouse_founding`、`check_start_house_upgrades`、修缮强制切换扫描块。
 - 详见 `housing_system/AGENTS.md`。
 
 ### 4.12 🔧 超参集中化、配置校验与速查表
 
-- **超参唯一入口**：全部 **165** 个 `SimConfig` 字段统一由 `frontend/js/config.js` 驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **超参唯一入口**：全部 **168** 个 `SimConfig` 字段统一由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **拆分文件规范（v1.6.0 起）**：字段较多/独立语义的配置组可拆到独立 JS 文件（先例：`config.house-upgrade-cost.js` 挂 `window.SIM_HOUSE_UPGRADE_COST`、`config.decision-order.js` 挂 `window.SIM_DECISION_ORDER`），须满足：① `index.html` 加载顺序早于 `rustworld.js`；② `rustworld.js::applyConfig` 用 `Object.assign` 合并进注入对象；③ **同步改造** `tools/config-check.js`（纳入前端字段集比对）与 `tools/test-wasm.js`（合并注入），否则门禁报"缺失字段/0 成本"。
 - **文档化例外（v1.3.6 起）**：`decisionEvalOrder: Vec<String>` 与 `decisionEvalLevels: Vec<u8>` 是**「Rust 无顺序」字段**——Rust 默认为空 Vec，权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。**严禁**在 Rust 侧写死任何策展优先级序列（`branches.rs::BranchId::ALL` 仅为配置缺失/非法时的中性兜底序）。
 - **调参流程**：直接编辑 `config.js`，浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。
 - **一致性校验**：`tools/config-check.js` 交叉解析 `config.js` 与 `config.rs`，捕获孤儿字段、缺失字段、类型错配、数值漂移四类问题。
