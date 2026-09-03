@@ -1,4 +1,4 @@
-//! ledger · 独立经济账本子系统（账本与仓库重构计划，docs/PLAN_LEDGER_REFACTOR.md）
+//! ledger · 独立经济账本子系统（账本与仓库重构计划，docs/plan-ledger-refactor.md）
 //!
 //! **新旧分离三原则**（改此目录前必读，详见计划文档与局部 AGENTS.md）：
 //! 1. 与现有房屋/仓库系统完全分离：不 import house.rs 仓储字段、不改 agent.rs 行囊字段、

@@ -1,6 +1,6 @@
 //! journal.rs · 账本内核：统一资源类型、账本存量与可审计流水
 //!
-//! 隶属「账本与仓库重构」计划（docs/PLAN_LEDGER_REFACTOR.md）M1.1。
+//! 隶属「账本与仓库重构」计划（docs/plan-ledger-refactor.md）M1.1。
 //! 设计原则：本模块为**制度账本层**，只记录"归谁、谁付的、谁收的"权责流水，
 //! 与物理仓储层（house.rs pantry_* / agent.rs carried_* / ecology.rs POI 储量）完全分离，
 //! 不读取、不修改任何物理库存字段。
@@ -24,7 +24,7 @@ pub enum ResourceKind {
 /// 流水主体引用（账本一方的社会身份）
 ///
 /// M1 仅落地 Personal / Family 两级；Clan（M3 宗族）/ Region（M4 地区）/ Corporate
-/// （预留公司）按计划逐期扩展，本枚举即五级产权账本（PLAN.md §3.4）的实例化锚点。
+/// （预留公司）按计划逐期扩展，本枚举即五级产权账本（plan.md §3.4）的实例化锚点。
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum LedgerRef {
     /// 🧍 个人私产（逻辑指代随身行囊，不改物理字段）

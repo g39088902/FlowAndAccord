@@ -1,6 +1,6 @@
 # 🌊 Flow & Accord（流动公约）项目长期规划书
 
-> ⚠️ 本文档为**规划态/愿景**，描述未来方向，不代表当前已实现。当前已实现功能见 [docs/CURRENT.md](./CURRENT.md)。
+> ⚠️ 本文档为**规划态/愿景**，描述未来方向，不代表当前已实现。当前已实现功能见 [docs/current.md](./current.md)。
 >
 > **版本**：v1.8.0 · **当前基线**：v1.8.0（确定性内核 + 生态 POI + 四季气候 + 代谢繁衍 + 5 级私宅（家户账本化）+ 代际继承 + 族谱 + 账本 M1~M9 + 决策可编排 + 存档系统 + WASM 桥接 + Canvas 前端 + CI/CD 全部已落地）
 
@@ -20,7 +20,7 @@
 
 ## 2. 已完成阶段（v0.x → v1.8.0）
 
-以下全部已实现，详细机制见 [docs/CURRENT.md](./CURRENT.md) 及 `docs/current/` 各模块文档，本规划书不再展开：
+以下全部已实现，详细机制见 [docs/current.md](./current.md) 及 `docs/current/` 各模块文档，本规划书不再展开：
 
 | 领域 | 已交付内容 |
 | :--- | :--- |
@@ -55,7 +55,7 @@
 
 ## 3. 未来里程碑（规划态）
 
-> 账本经济 M1~M4（v1.0.0~v1.3.0）、家户账本化 M6（v1.4.0）、家庭库存触发器 M7（v1.5.0）、升级成本矩阵 M8（v1.6.0）、存档系统 M9（v1.8.0）已全部落地，详见 [docs/current/12-ledger-system.md](./current/12-ledger-system.md)、[docs/current/15-save-load.md](./current/15-save-load.md) 与 [docs/PLAN_LEDGER_REFACTOR.md](./PLAN_LEDGER_REFACTOR.md)。以下为尚未实现的未来方向（编号自 M10 顺延，避免与已落地里程碑冲突）。
+> 账本经济 M1~M4（v1.0.0~v1.3.0）、家户账本化 M6（v1.4.0）、家庭库存触发器 M7（v1.5.0）、升级成本矩阵 M8（v1.6.0）、存档系统 M9（v1.8.0）已全部落地，详见 [docs/current/12-ledger-system.md](./current/12-ledger-system.md)、[docs/current/15-save-load.md](./current/15-save-load.md) 与 [docs/plan-ledger-refactor.md](./plan-ledger-refactor.md)。以下为尚未实现的未来方向（编号自 M10 顺延，避免与已落地里程碑冲突）。
 
 ### M10 · 专利经济与痛点动态发明 → v1.9.0
 
@@ -94,7 +94,7 @@
 - **ECS 内核重构**：从当前 `Vec<Agent3D>` 结构体数组迁移至 ECS（hecs/bevy_ecs），组件化实体、系统调度；
 - **零拷贝快照**：从当前 JSON 序列化迁移为双缓冲共享内存快照 + Hermite 时间戳插值，消除 WASM 边界序列化开销；
 - **sim_cli**：命令行调试、性能 Benchmark 与大批量蒙特卡洛仿真；
-- 详细架构愿景见 [docs/ARCHITECTURE.md](./ARCHITECTURE.md)。
+- 详细架构愿景见 [docs/architecture.md](./architecture.md)。
 
 ### M14 · 梅贾德斯羊皮卷预言（确定性叙事层）→ v2.2.0
 

@@ -1,6 +1,6 @@
 # 9. 📂 核心代码目录与模块映射
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
+> **模块索引**：[← 返回 current.md 全景索引](../current.md)
 > 本文件源码树与实际仓库 100% 对应（最后核验：v1.5.1，由 `tools/code-map-check.js` 自动校验）。
 
 ---
@@ -97,16 +97,16 @@ FlowAndAccord/
 ├── AGENTS.md                                # 📖 智能体操作指南 (唯一保留在根目录的文档)
 ├── TODO.md                                  # 待办事项清单
 └── docs/                                    # 📚 全部项目文档
-    ├── CURRENT.md                           # 已实现功能「索引入口」(模块导航表)
-    ├── BUILD_GUIDE.md                       # 编译与运行深度指南
+    ├── current.md                           # 已实现功能「索引入口」(模块导航表)
+    ├── build-guide.md                       # 编译与运行深度指南
     ├── browser-guide.md                     # 浏览器自动化使用指南 (playwright-cli)
     ├── cicd-guide.md                        # CI/CD 自动部署指南
-    ├── AGENT_AI_ANALYSIS.md                 # 部落民 AI 决策系统深度拆解
-    ├── ARCHITECTURE.md                      # 系统技术架构设计愿景书
-    ├── PLAN.md                              # 项目长期规划书
-    ├── PLAN_LEDGER_REFACTOR.md              # 账本系统重构规划 (M1~M4 已完成)
-    ├── UI_SPEC_AND_LEDGER_DESIGN.md         # UI 全景剖析 + 制度大盘实现指南
-    ├── DECISION_VIZ_DESIGN.md               # 马斯洛决策引擎可视化设计方案
+    ├── agent-ai-analysis.md                 # 部落民 AI 决策系统深度拆解
+    ├── architecture.md                      # 系统技术架构设计愿景书
+    ├── plan.md                              # 项目长期规划书
+    ├── plan-ledger-refactor.md              # 账本系统重构规划 (M1~M4 已完成)
+    ├── ui-spec-and-ledger-design.md         # UI 全景剖析 + 制度大盘实现指南
+    ├── decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图

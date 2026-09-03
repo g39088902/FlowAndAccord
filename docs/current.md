@@ -52,7 +52,7 @@
 | 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记、二手房屋市场与营地麦穗 37% 拍卖系统 |
 | 6 | 🧠 马斯洛需求层次与行动状态机 (Motivation AI) | [06-motivation-ai.md](./current/06-motivation-ai.md) | 5 层需求、私有触发器、连续采收与平滑重路由、错峰决策节拍 |
 | 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、在售呼吸图标、Inspector、族谱时间轴、账本大盘、房屋拍卖交易所大盘、调试监视器 |
-| 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [UI_SPEC_AND_LEDGER_DESIGN.md](./UI_SPEC_AND_LEDGER_DESIGN.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
+| 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [ui-spec-and-ledger-design.md](./ui-spec-and-ledger-design.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
 | 10 | 🚀 快速启动与体验 | [10-quickstart.md](./current/10-quickstart.md) | 浏览器 / Node 回归 / Rust 编译三种启动方式 |

@@ -1,6 +1,6 @@
 # 3. ❄️ 四季更替与热力学供暖系统 (`seasons`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/world.rs`（`tick_season`）、`housing_system/maintenance.rs`
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/world.rs`（`tick_season`）、`housing_system/maintenance.rs`
 
 ---
 

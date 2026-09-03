@@ -1,6 +1,6 @@
 # 6. 🧠 马斯洛需求层次与行动状态机 (Motivation AI)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（7 子模块）· 深度拆解见 [`docs/AGENT_AI_ANALYSIS.md`](../AGENT_AI_ANALYSIS.md)
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（7 子模块）· 深度拆解见 [`docs/agent-ai-analysis.md`](../agent-ai-analysis.md)
 
 ---
 

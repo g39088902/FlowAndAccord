@@ -1,6 +1,6 @@
 # 4. 🧬 部落民生理代谢、繁衍与寿命 (`agent`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/agent.rs`、`birth.rs`、`housing_system/marriage.rs`
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/agent.rs`、`birth.rs`、`housing_system/marriage.rs`
 
 ---
 

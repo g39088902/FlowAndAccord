@@ -1,6 +1,6 @@
 # 💾 读档 / 存档系统 (v1.11.0)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
+> **模块索引**：[← 返回 current.md 全景索引](../current.md)
 > **主要源码**：`crates/sim_core/src/spatial/world_save.rs` + `crates/sim_wasm/src/lib.rs` + `frontend/js/save-ui.js`
 > 相关文档：[13-impact-matrix.md](./13-impact-matrix.md)（跨模块影响）· [14-invariants.md](./14-invariants.md)（确定性硬约束）· `crates/sim_core/src/spatial/AGENTS.md` · `frontend/AGENTS.md`
 

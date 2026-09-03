@@ -1,6 +1,6 @@
 # 14. 🔒 核心不变量集中清单 (Invariants)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
+> **模块索引**：[← 返回 current.md 全景索引](../current.md)
 >
 > 本清单将散落在根 `AGENTS.md` §4 各小节中的硬约束集中提炼，按类别组织。
 > **agent 启动时读这一页即可掌握"哪些东西绝对不能动"**，比在 21KB 的 AGENTS.md 里逐节找高效。

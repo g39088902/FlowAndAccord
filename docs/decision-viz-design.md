@@ -23,7 +23,7 @@
 >
 > （施密特触发器 / PrimitiveActionState）・深度拆解见 
 >
-> [docs/AGENT_AI_ANALYSIS.md](./AGENT_AI_ANALYSIS.md)
+> [docs/agent-ai-analysis.md](./agent-ai-analysis.md)
 >
 >  与 
 >
@@ -136,7 +136,7 @@ pub home\_house\_id / spouse\_id / children\_ids,
 | 确定性布局引擎 | `dag-layout.js`                                   | Y 语义映射、X 冲突消解、布局可复用为 "逻辑图" 基础                              |
 | 视口渲染层   | `dag-view.js`                                     | 拖拽平移、滚轮缩放、LOD 分级、hover 高亮、`transform: translate+scale` 虚拟化 |
 | 独立标签页   | `dag-standalone.js`                               | 决策图独立新开 Tab，与主地图双屏联动                                       |
-| 设计系统    | `style.css` + `UI_SPEC_AND_LEDGER_DESIGN.md` §3.3 | 暗黑玻璃拟态、`.lineage-chip`、语义色板                                |
+| 设计系统    | `style.css` + `ui-spec-and-ledger-design.md` §3.3 | 暗黑玻璃拟态、`.lineage-chip`、语义色板                                |
 | 检查器模式   | `render.js` Inspector                             | 右侧浮动检查器、Esc 关闭、事件驱动刷新                                      |
 
 ### 2.4 关键阈值（真实 config，直接标注在图元上）

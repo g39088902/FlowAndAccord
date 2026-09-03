@@ -1,6 +1,6 @@
 # 10. 🚀 快速启动与体验
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
+> **模块索引**：[← 返回 current.md 全景索引](../current.md)
 
 ---
 

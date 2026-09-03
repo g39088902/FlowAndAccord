@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.15.0` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.15.1` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 </div>
 
@@ -181,10 +181,10 @@ node frontend/server.js
 | 文档 | 内容 |
 | :--- | :--- |
 | [AGENTS.md](./AGENTS.md) | 开发操作指南与易踩坑清单（改代码前必读） |
-| [docs/CURRENT.md](./docs/CURRENT.md) | 已实现功能全景索引 |
+| [docs/current.md](./docs/current.md) | 已实现功能全景索引 |
 | [docs/current/](./docs/current/) | 分模块机制文档（空间路网 / 生态 POI / 四季 / 代谢繁衍 / 房屋 / 决策 AI / 前端 / 配置 / 账本） |
-| [docs/UI_SPEC_AND_LEDGER_DESIGN.md](./docs/UI_SPEC_AND_LEDGER_DESIGN.md) | UI 全景剖析与新功能界面设计 |
-| [docs/PLAN.md](./docs/PLAN.md) | 项目长期规划书 |
+| [docs/ui-spec-and-ledger-design.md](./docs/ui-spec-and-ledger-design.md) | UI 全景剖析与新功能界面设计 |
+| [docs/plan.md](./docs/plan.md) | 项目长期规划书 |
 | [docs/config-reference.md](./docs/config-reference.md) | 163 个可调超参速查表 |
 
 ---

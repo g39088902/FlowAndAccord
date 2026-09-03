@@ -1,8 +1,8 @@
 # 账本与仓库重构 · 开发计划 (Ledger Refactor Plan)
 
-> ⚠️ 本文档为**账本重构计划**：M1~M4 已全部落地（v1.3.0），M5 为收尾/验收。当前已实现的账本代码结构见 [`crates/sim_core/src/spatial/ledger/AGENTS.md`](../../crates/sim_core/src/spatial/ledger/AGENTS.md) 与 [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)。
+> ⚠️ 本文档为**账本重构计划**：M1~M4 已全部落地（v1.3.0），M5 为收尾/验收。当前已实现的账本代码结构见 [`crates/sim_core/src/spatial/ledger/AGENTS.md`](../crates/sim_core/src/spatial/ledger/AGENTS.md) 与 [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)。
 >
-> **依据**：[docs/PLAN.md](./PLAN.md) §3.4「多级产权账本经济」
+> **依据**：[docs/plan.md](./plan.md) §3.4「多级产权账本经济」
 > **版本**：v1.3.2 · **当前进度**：M1 ✅（v1.0.0）/ M2 ✅（v1.1.0）/ M3 ✅（v1.2.0）/ M4 ✅（v1.3.0）/ M5 收尾 ✅
 
 ---

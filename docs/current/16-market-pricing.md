@@ -1,6 +1,6 @@
 # 16. 🏪 外部市场与动态价格系统 (`market`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`decisions/market.rs`、`ecology.rs`、`ledger/journal.rs`
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`decisions/market.rs`、`ecology.rs`、`ledger/journal.rs`
 
 ---
 

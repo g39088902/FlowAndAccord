@@ -1,6 +1,6 @@
 # 5. 🏡 多级私产房屋与建材升级体系 (`house`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（6 子模块）
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（6 子模块）
 
 > ⚡ **M6（v1.4.0）机制更新**：房屋已**完全去仓储化**——`House.pantry_*/max_pantry_*`、`is_pantry_full`、`is_fertility_active` 全部删除，家庭物资唯一真相源是**家户账本**（`Household.group.ledger`）；房屋回归纯建筑角色（等级/耐久/位置/户主/代际）。升级改为**瞬时化**：`BuildHouse` 决策就绪后一次性扣账晋升、无体力无工时；房屋每晋升一级户主威望（prestige）+1。生育与婚姻已**去房屋化**（无房可婚可育）。
 >

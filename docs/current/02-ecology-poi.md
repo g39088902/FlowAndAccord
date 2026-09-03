@@ -1,6 +1,6 @@
 # 2. 🌲 全局有限生态与 POI 资源体系 (`poi`)
 
-> **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
+> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
 
 > ⚡ **v1.9.0（Task4）出生地**：开局始祖不再落在 POI/营地节点，而是随机落在**普通道路节点**（`road_nodes` = `countTerrainTransitionNodes`(17) 个地形过渡 `GroundIntersection` 节点，非 POI），每名始祖消耗 1 次共享 `WorldRng` 确定性抽选；`home_camp` = 离出生地最近的营地（保证 `home_camp_node` 与地区归属一致）。
 
