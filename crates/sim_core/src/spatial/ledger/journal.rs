@@ -79,6 +79,8 @@ pub enum TransferReason {
     Investment,
     /// 榷场商贸交易（外部市场求购水粮，黄金流出部落灭失）
     Market,
+    /// 房屋拍卖竞得/购置交易（二手房竞价成交，买方出资）
+    HousingPurchase,
 }
 
 /// 单笔显式交易流水（可审计核心：每笔都写明谁→谁、什么资源、多少、为何）

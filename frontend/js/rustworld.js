@@ -371,7 +371,7 @@
           }))
         }));
 
-        // --- 房屋（M6 建筑化：不再携带任何资源存量；家庭物资展示读家户账本） ---
+        // --- 房屋（M6 建筑化：不再携带任何资源存量；家庭物资展示读家户账本；v1.14.0 拍卖与档案） ---
         this.houses = snap.houses.map(h => {
         const view = {
           id: h.id,
@@ -386,6 +386,27 @@
           constructionProgress: h.construction_progress,
           builderId: h.builder_id,
           lastUpgraderId: h.last_upgrader_id,
+          currentValuation: h.current_valuation || 0,
+          auctionPhase: h.auction_phase || null,
+          benchmarkBid: h.benchmark_bid || 0,
+          highestBid: h.highest_bid || 0,
+          bidsCount: h.bids_count || 0,
+          lastDealPrice: h.last_deal_price != null ? h.last_deal_price : null,
+          lastDealTick: h.last_deal_tick != null ? h.last_deal_tick : null,
+          auctionStartDurability: h.auction_start_durability != null ? h.auction_start_durability : null,
+          recentBids: (h.recent_bids || []).map(b => ({
+            tick: b.tick,
+            bidderId: b.bidder_id,
+            amount: b.amount,
+            phase: b.phase,
+          })),
+          recentDeals: (h.recent_deals || []).map(d => ({
+            tick: d.tick,
+            buyerId: d.buyer_id,
+            price: d.price,
+            durability: d.durability,
+            reason: d.reason,
+          })),
         };
         return view;
         });

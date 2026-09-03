@@ -87,6 +87,9 @@ const IMPACT_PREFIX_RULES = [
   { prefix: 'houseDepreciation', mod: 'housing_system/maintenance.rs (折旧)' },
   { prefix: 'houseDurability', mod: 'housing_system/ (耐久度上限)' },
   { prefix: 'houseUpgradeCost', mod: 'housing_system/upgrade.rs (升级成本矩阵 §4.8)' },
+  { prefix: 'houseAuction', mod: 'housing_system/auction.rs (营地中介麦穗拍卖 §4.8)' },
+  { prefix: 'houseMarket', mod: 'housing_system/auction.rs (二手房开价周期)' },
+  { prefix: 'houseBase', mod: 'housing_system/auction.rs (地基估价保底)' },
 
   { prefix: 'poiInteraction', mod: 'ecology.rs (POI 交互采收/卸货)' },
   { prefix: 'poiUnload', mod: 'ecology.rs (回家卸货入账速率 §4.4)' },

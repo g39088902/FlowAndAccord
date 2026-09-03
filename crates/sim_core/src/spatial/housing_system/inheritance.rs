@@ -52,9 +52,16 @@ impl World3DEngine {
             beneficiaries.sort_unstable();
             beneficiaries.dedup();
 
-            // 标记房屋为无主空置
+            // 标记房屋为无主空置并初始化营地中介拍卖状态
             self.houses[h_idx].owner_id = None;
             self.houses[h_idx].spouse_id = None;
+            let current_dur = self.houses[h_idx].durability;
+            self.houses[h_idx].auction_state = Some(crate::spatial::house::HouseAuctionState {
+                start_durability: current_dur,
+                benchmark_bid: 0.0,
+                current_highest_bid: 0.0,
+                current_highest_bidder: None,
+            });
 
             // 登记到所属营地空置列表
             if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == camp_id) {

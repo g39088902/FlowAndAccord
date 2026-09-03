@@ -28,7 +28,7 @@ use super::world::World3DEngine;
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 3;
 /// 写入存档时附带的应用版本（仅供前端提示与人工排查，不作为加载门禁）
-pub const SAVE_APP_VERSION: &str = "1.7.0";
+pub const SAVE_APP_VERSION: &str = "1.14.0";
 
 /// 存档契约：世界全量可持久化状态
 ///

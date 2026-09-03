@@ -3,7 +3,7 @@ use super::vec3::Vec3;
 use super::graph::{LaneId, NodeId};
 use super::agent::AgentId;
 use super::poi::PoiId;
-use super::house::HouseSnapshot;
+pub use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
 
 /// 四季系统 (240秒完整年轮，每季60秒)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

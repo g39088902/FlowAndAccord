@@ -510,12 +510,12 @@
     const btnHeadless = document.getElementById('btn-headless');
     function updateHeadlessBtnState() {
       if (sim.headless) {
-        btnHeadless.textContent = '🧠 无头模式运行中… (点击退出)';
+        btnHeadless.textContent = '🧠 无头模式 (运行中)';
         btnHeadless.style.borderColor = '#a78bfa';
         btnHeadless.style.color = '#a78bfa';
         btnHeadless.style.background = 'rgba(167, 139, 250, 0.15)';
       } else {
-        btnHeadless.textContent = '🧠 无头模式 (只运行不渲染)';
+        btnHeadless.textContent = '🧠 无头模式';
         btnHeadless.style.borderColor = '#f59e0b';
         btnHeadless.style.color = '#f59e0b';
         btnHeadless.style.background = 'rgba(245, 158, 11, 0.12)';

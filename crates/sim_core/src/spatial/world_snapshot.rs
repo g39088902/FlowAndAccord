@@ -1,7 +1,7 @@
 use super::agent::{Gender, PrimitiveActionState};
 use super::ledger::journal::ResourceKind;
 use super::poi::{PoiType, market_unit_price};
-use super::house::HouseSnapshot;
+use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
     MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
@@ -65,6 +65,44 @@ impl World3DEngine {
 
         let mut houses = Vec::new();
         for h in &self.houses {
+            let (auction_phase, benchmark_bid, highest_bid) = match &h.auction_state {
+                Some(st) => {
+                    let deadline = self.config.house_auction_deadline_durability;
+                    let obs_ratio = self.config.house_auction_observation_ratio;
+                    let obs_dur = if st.start_durability > deadline {
+                        st.start_durability - obs_ratio * (st.start_durability - deadline)
+                    } else {
+                        deadline
+                    };
+                    let phase = if h.durability > obs_dur {
+                        "观察期"
+                    } else if h.durability > deadline {
+                        "决策期"
+                    } else {
+                        "出清期"
+                    };
+                    (Some(phase.to_string()), st.benchmark_bid, st.current_highest_bid)
+                }
+                None => (None, 0.0, 0.0),
+            };
+
+            let last_deal = h.deal_history.last();
+
+            let recent_bids: Vec<HouseBidSnapshot> = h.bids_history.iter().rev().take(10).map(|b| HouseBidSnapshot {
+                tick: b.tick,
+                bidder_id: b.bidder_id,
+                amount: b.amount,
+                phase: b.phase.clone(),
+            }).collect();
+
+            let recent_deals: Vec<HouseDealSnapshot> = h.deal_history.iter().rev().take(5).map(|d| HouseDealSnapshot {
+                tick: d.deal_tick,
+                buyer_id: d.buyer_id,
+                price: d.price,
+                durability: d.durability,
+                reason: d.reason.clone(),
+            }).collect();
+
             houses.push(HouseSnapshot {
                 id: h.id,
                 owner_id: h.owner_id,
@@ -80,6 +118,16 @@ impl World3DEngine {
                 is_repairing: h.is_repairing,
                 builder_id: h.builder_id,
                 last_upgrader_id: h.last_upgrader_id,
+                current_valuation: h.current_valuation,
+                auction_phase,
+                benchmark_bid,
+                highest_bid,
+                bids_count: h.bids_history.len(),
+                last_deal_price: last_deal.map(|d| d.price),
+                last_deal_tick: last_deal.map(|d| d.deal_tick),
+                auction_start_durability: h.auction_state.as_ref().map(|st| st.start_durability),
+                recent_bids,
+                recent_deals,
             });
         }
 

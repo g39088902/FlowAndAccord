@@ -229,4 +229,14 @@ window.SIM_CONFIG = {
   marketEmergencyFamilyStockThreshold: 10.0,// 家户物资绝境警戒线
   marketMinFamilyGold: 0.5,                 // 户主准入起步黄金底线
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
+
+  // ==========================================================================
+  // 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+  // ==========================================================================
+  houseMarketBiddingIntervalTicks: 30, // 拍卖开价评估周期 (tick，默认 30 = 1秒)
+  houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交)
+  houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
+  marketPriceBaseWood: 0.15,          // 木材折算基准金价 (建设成本等效折算用)
+  marketPriceBaseStone: 0.20,         // 石料折算基准金价 (建设成本等效折算用)
+  houseBaseFoundationCostGold: 5.0,   // 0级仓库地基保底估价值 (黄金，防 0 成本畸变)
 };

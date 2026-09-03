@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.13.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.15.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -59,10 +59,11 @@
       </div>
     </div>
 
-    <!-- 💾 存档系统入口 (v1.7.0 读档/存档) -->
+    <!-- 💾 存档系统入口 (v1.7.0 读档/存档) + 🏛️ 房屋拍卖入口 (v1.15.0) -->
     <div class="save-bar-card">
       <button class="save-bar-btn" id="btn-open-save-panel" title="将当前世界保存到槽位">💾 存档</button>
       <button class="save-bar-btn" id="btn-open-load-panel" title="从槽位或文件读取世界">📂 读档</button>
+      <button class="save-bar-btn auction-bar-btn" id="btn-open-auction-modal" title="查看全图房屋拍卖大盘与实时竞价过程">🏛️ 拍卖 (<span id="top-auction-count">0</span>)</button>
     </div>
   </div>
 
@@ -575,6 +576,28 @@
         <div class="meter-row">
           <div class="meter-label plain-stock"><span style="color:#fbbf24;">🪙 家户账本·金</span><span id="insp-house-gold-val">0.0 单位</span></div>
         </div>
+
+        <!-- ★ v1.14.0 房屋估价与营地中介拍卖/档案卡片 -->
+        <div class="poi-info-badge" id="insp-house-market-badge" style="background:rgba(245, 158, 11, 0.08); border-color:rgba(245, 158, 11, 0.3); color:#fcd34d;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span><strong>🪙 市场估价:</strong> <span id="insp-house-val-gold" style="font-weight:700; color:#fbbf24;">—</span></span>
+            <span id="insp-house-auction-tag" style="font-size:10px; padding:1px 5px; border-radius:4px; background:rgba(245,158,11,0.2); border:1px solid rgba(245,158,11,0.4); color:#fbbf24;">正常私宅</span>
+          </div>
+          <div id="insp-house-auction-info" style="display:none; flex-direction:column; gap:2px; font-size:11px; border-top:1px dashed rgba(245,158,11,0.3); margin-top:3px; padding-top:3px;">
+            <div><strong>🌾 麦穗阶段:</strong> <span id="insp-house-auction-phase" style="font-weight:600;">—</span></div>
+            <div><strong>🎯 观察期标杆:</strong> <span id="insp-house-benchmark-bid">—</span></div>
+            <div><strong>🔥 最高出价:</strong> <span id="insp-house-highest-bid" style="font-weight:600; color:#38bdf8;">—</span> (累计 <span id="insp-house-bids-count">0</span> 次出价)</div>
+          </div>
+          <div id="insp-house-deal-info" style="display:none; font-size:11px; border-top:1px dashed rgba(16,185,129,0.3); margin-top:3px; padding-top:3px; color:#6ee7b7;">
+            <strong>📜 最近成交:</strong> <span id="insp-house-last-deal-text">—</span>
+          </div>
+          <div id="insp-house-history-toggle" style="margin-top:3px;">
+            <button id="btn-toggle-house-bids" type="button" style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; border-radius:4px; font-size:10px; cursor:pointer; padding:3px 4px; text-align:center;">📜 展开报价与成交档案 (<span id="insp-house-archive-summary">0 报价 / 0 成交</span>)</button>
+            <div id="insp-house-archive-content" style="display:none; max-height:120px; overflow-y:auto; font-size:10px; margin-top:4px; padding:4px; background:rgba(0,0,0,0.3); border-radius:4px; border:1px solid rgba(255,255,255,0.08);"></div>
+          </div>
+          <button id="btn-open-auction-window" type="button" class="house-auction-live-btn" style="width:100%; margin-top:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; padding:4px; text-align:center;">🔨 窥视实时竞拍与麦穗博弈大盘 ↗</button>
+        </div>
+
         <div class="poi-info-badge">
           <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <strong>👑 户主确权:</strong>
@@ -598,7 +621,7 @@
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
       <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动需求判定卡调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
       <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
-      <button class="headless-btn" id="btn-headless" title="🧠 无头模式: 只推进模拟、跳过画布渲染，适合长程快速演化">🧠 无头模式 (只运行不渲染)</button>
+      <button class="headless-btn" id="btn-headless" title="无头模式">🧠 无头模式</button>
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
@@ -956,6 +979,152 @@
     </div>
   </div>
 
+  <!-- ══════════ 🏛️ 房屋拍卖与竞价窥视大盘模态框 (v1.15.0) ══════════ -->
+  <div class="house-auction-backdrop" id="house-auction-backdrop" style="display:none;">
+    <div class="house-auction-modal">
+      <div class="house-auction-header">
+        <div class="house-auction-header-left">
+          <span class="house-auction-title">🏛️ 房屋拍卖交易所 · 实时竞价与麦穗博弈大盘</span>
+          <span class="house-auction-count-badge" id="auction-modal-status-badge">🟢 0 栋房屋在售</span>
+        </div>
+        <button id="house-auction-close" class="house-auction-close" title="关闭 (Esc)" aria-label="关闭拍卖大盘">✕</button>
+      </div>
+
+      <!-- 房产选择器与历史成交 Tab 切换 -->
+      <div class="house-auction-nav-bar">
+        <div class="house-auction-tabs" id="auction-nav-tabs">
+          <button class="auction-tab-btn active" id="tab-btn-active-auctions">🏷️ 正在拍卖 (<span id="tab-active-count">0</span>)</button>
+          <button class="auction-tab-btn" id="tab-btn-history-deals">📜 历史成交 (<span id="tab-history-count">0</span>)</button>
+        </div>
+        <!-- 房屋切换选择条 (横向滑动小卡片) -->
+        <div class="auction-house-strip" id="auction-house-strip"></div>
+      </div>
+
+      <div class="house-auction-body" id="house-auction-body">
+        <!-- 正在拍卖视图 -->
+        <div id="auction-active-view" class="auction-view-pane">
+          <!-- 核心资产概况条 -->
+          <div class="auction-hero-card" id="auction-hero-card">
+            <div class="auction-hero-main">
+              <div class="auction-hero-tier-icon" id="auction-hero-icon">🛖</div>
+              <div class="auction-hero-info">
+                <div class="auction-hero-title">
+                  <span id="auction-hero-name" style="font-size:15px; font-weight:700; color:#fbbf24;">房屋 #1</span>
+                  <span class="auction-phase-pill" id="auction-hero-phase-pill">🌾 麦穗37%观察期</span>
+                  <span class="auction-camp-chip" id="auction-hero-camp">🏕️ 桃源营地</span>
+                </div>
+                <div class="auction-hero-sub" id="auction-hero-details">
+                  耐久 95.2% · 房龄 120s · 建造者 Agent #1
+                </div>
+              </div>
+            </div>
+            <div class="auction-hero-valuation">
+              <div style="font-size:10px; color:#94a3b8;">当前市场估价 (动态建造成本折算)</div>
+              <div class="auction-hero-price" id="auction-hero-price">18.50 <span style="font-size:12px; color:#f59e0b;">金</span></div>
+              <div class="auction-hero-land-status" id="auction-hero-land-status">🟢 存在闲置土地（估价 = 自建成本）</div>
+            </div>
+          </div>
+
+          <!-- 🌾 麦穗 37% 竞价博弈标尺 (核心特色可视化组件) -->
+          <div class="auction-timeline-box">
+            <div class="auction-timeline-header">
+              <div class="auction-timeline-title">
+                <strong>🌾 麦穗 37% 最优停止博弈时间轴</strong>
+                <span style="font-size:10px; color:#94a3b8; margin-left:6px;">以房屋空置耐久度为起点，自然风化损耗推进博弈</span>
+              </div>
+              <div class="auction-timeline-legend">
+                <span class="legend-pip obs">🌾 观察期 (前37%)</span>
+                <span class="legend-pip dec">🎯 决策期 (后63%)</span>
+                <span class="legend-pip clr">⚠️ 10% 强制出清</span>
+              </div>
+            </div>
+
+            <!-- 时间轴容器 -->
+            <div class="auction-timeline-bar-wrapper">
+              <div class="auction-timeline-track" id="auction-timeline-track">
+                <!-- 观察期分段 -->
+                <div class="auction-timeline-segment obs" id="timeline-seg-obs" style="left:63%; width:37%;">
+                  <span class="segment-label">🌾 观察摸底 · 只立标杆不出售</span>
+                </div>
+                <!-- 决策期分段 -->
+                <div class="auction-timeline-segment dec" id="timeline-seg-dec" style="left:10%; width:53%;">
+                  <span class="segment-label">🎯 决策窗口 · 出现更高报价即成交</span>
+                </div>
+                <!-- 出清期分段 (10%~0%) -->
+                <div class="auction-timeline-segment clr" style="left:0%; width:10%;">
+                  <span class="segment-label">⚠️ 出清防塌</span>
+                </div>
+                <!-- 37% 阈值标线 -->
+                <div class="timeline-threshold-line obs-threshold" id="timeline-line-37" style="left:63%;">
+                  <div class="threshold-tag">37%截断线</div>
+                </div>
+                <!-- 10% 阈值标线 -->
+                <div class="timeline-threshold-line deadline-threshold" style="left:10%;">
+                  <div class="threshold-tag">10%出清线</div>
+                </div>
+                <!-- 当前耐久实时移动指针 -->
+                <div class="timeline-needle" id="timeline-current-needle" style="left:90%;">
+                  <div class="needle-flag" id="needle-dur-text">90%</div>
+                  <div class="needle-line"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="auction-timeline-stats-row">
+              <div class="stat-pill"><span class="lbl">起拍耐久:</span> <strong id="timeline-stat-start">100%</strong></div>
+              <div class="stat-pill"><span class="lbl">当前耐久:</span> <strong id="timeline-stat-dur" style="color:#fbbf24;">90%</strong> <span style="font-size:9px; color:#94a3b8;">(-0.04/s)</span></div>
+              <div class="stat-pill"><span class="lbl">37%分界耐久:</span> <strong id="timeline-stat-37dur">66.7%</strong></div>
+              <div class="stat-pill"><span class="lbl">观察期最高标杆:</span> <strong id="timeline-stat-bench" style="color:#f59e0b;">—</strong></div>
+              <div class="stat-pill"><span class="lbl">当前最高出价:</span> <strong id="timeline-stat-highest" style="color:#38bdf8;">—</strong></div>
+            </div>
+          </div>
+
+          <!-- 下方双列布局：左侧潜在意向买家池，右侧实时竞价流水 -->
+          <div class="auction-details-grid">
+            <!-- 左列：意向买家池 -->
+            <div class="auction-col buyers-col">
+              <div class="auction-col-title">
+                <span>👥 辖区意向买家池 (<span id="auction-buyers-count">0</span>人)</span>
+                <span class="col-sub">成年单身/无房男性户主</span>
+              </div>
+              <div class="auction-buyers-list" id="auction-buyers-list">
+                <div class="auction-empty-hint">当前聚落无单身/无房成年男性户主</div>
+              </div>
+            </div>
+
+            <!-- 右列：实时竞价流水过程 -->
+            <div class="auction-col bids-col">
+              <div class="auction-col-title">
+                <span>⚡ 实时竞价与博弈过程 (<span id="auction-bids-count">0</span>次报价)</span>
+                <span class="col-sub" id="auction-bidding-pace">每 3 秒一轮竞价</span>
+              </div>
+              <div class="auction-bids-feed" id="auction-bids-feed">
+                <div class="auction-empty-hint">等待营地买家出价摸底中…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史成交视图 -->
+        <div id="auction-history-view" class="auction-view-pane" style="display:none;">
+          <div class="auction-col-title" style="margin-bottom:8px;">
+            <span>📜 全图历史房屋成交公证书记录</span>
+            <span class="col-sub">持久沉淀于各房屋档案之中</span>
+          </div>
+          <div class="auction-deals-list" id="auction-deals-list">
+            <div class="auction-empty-hint">暂无已完成的拍卖交易记录</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="house-auction-footer">
+        <button id="btn-auction-focus-house" class="auction-footer-btn focus-btn" title="在视口中聚焦并跳转到该房屋">🎯 地图定位该房屋</button>
+        <span style="font-size:11px; color:#64748b;">按 Esc 或点击遮罩可快速退出</span>
+        <button id="btn-auction-footer-close" class="auction-footer-btn close-btn">关闭大盘</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/math.js"></script>
   <script src="js/config.js"></script>
   <script src="js/config.decision-order.js"></script>
@@ -979,5 +1148,7 @@
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>
   <script src="js/render_inspector.js"></script>
+  <!-- 房屋拍卖交易所与实时竞价窥视大盘 (v1.15.0) -->
+  <script src="js/auction-ui.js"></script>
 </body>
 </html>

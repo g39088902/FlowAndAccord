@@ -173,6 +173,98 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       houseCampElem.textContent = `🏕️ ${campTitle}`;
     }
 
+    // ★ v1.14.0 房屋市场估价、拍卖状态与档案展示
+    const valGoldEl = document.getElementById('insp-house-val-gold');
+    if (valGoldEl) {
+      valGoldEl.textContent = `${(house.currentValuation || 0).toFixed(2)} 金`;
+    }
+
+    const auctionTagEl = document.getElementById('insp-house-auction-tag');
+    const auctionInfoEl = document.getElementById('insp-house-auction-info');
+    const dealInfoEl = document.getElementById('insp-house-deal-info');
+
+    if (isVacant) {
+      if (auctionTagEl) {
+        auctionTagEl.textContent = '🏛️ 营地中介挂牌拍卖';
+        auctionTagEl.style.background = 'rgba(239,68,68,0.2)';
+        auctionTagEl.style.borderColor = 'rgba(239,68,68,0.4)';
+        auctionTagEl.style.color = '#f87171';
+      }
+      if (auctionInfoEl) auctionInfoEl.style.display = 'flex';
+
+      const phaseEl = document.getElementById('insp-house-auction-phase');
+      if (phaseEl) {
+        if (house.auctionPhase === '观察期') {
+          phaseEl.textContent = '🌾 麦穗37%观察期 (摸底蓄势，绝不卖出)';
+          phaseEl.style.color = '#f59e0b';
+        } else if (house.auctionPhase === '决策期') {
+          phaseEl.textContent = '🎯 麦穗决策期 (出现更高报价即成交)';
+          phaseEl.style.color = '#38bdf8';
+        } else {
+          phaseEl.textContent = '⚠️ 10%修缮度强制出清 (选最高出价成交)';
+          phaseEl.style.color = '#ef4444';
+        }
+      }
+
+      const benchEl = document.getElementById('insp-house-benchmark-bid');
+      if (benchEl) {
+        benchEl.textContent = house.benchmarkBid > 0 ? `${house.benchmarkBid.toFixed(2)} 金` : '暂无标杆 (摸底中)';
+      }
+
+      const highEl = document.getElementById('insp-house-highest-bid');
+      if (highEl) {
+        highEl.textContent = house.highestBid > 0 ? `${house.highestBid.toFixed(2)} 金` : '暂无有效出价';
+      }
+
+      const countEl = document.getElementById('insp-house-bids-count');
+      if (countEl) countEl.textContent = house.bidsCount || 0;
+    } else {
+      if (auctionTagEl) {
+        auctionTagEl.textContent = isWarehouse ? '0级仓库' : '正常私宅';
+        auctionTagEl.style.background = 'rgba(245,158,11,0.2)';
+        auctionTagEl.style.borderColor = 'rgba(245,158,11,0.4)';
+        auctionTagEl.style.color = '#fbbf24';
+      }
+      if (auctionInfoEl) auctionInfoEl.style.display = 'none';
+    }
+
+    if (house.lastDealPrice != null) {
+      if (dealInfoEl) dealInfoEl.style.display = 'block';
+      const lastDealEl = document.getElementById('insp-house-last-deal-text');
+      if (lastDealEl) {
+        lastDealEl.textContent = `以 ${house.lastDealPrice.toFixed(2)} 金竞得成交 (第 ${house.lastDealTick} 拍)`;
+      }
+    } else {
+      if (dealInfoEl) dealInfoEl.style.display = 'none';
+    }
+
+    // 档案摘要与展开列表
+    const bidsList = house.recentBids || [];
+    const dealsList = house.recentDeals || [];
+    const summaryEl = document.getElementById('insp-house-archive-summary');
+    if (summaryEl) {
+      summaryEl.textContent = `${house.bidsCount || bidsList.length} 报价 / ${dealsList.length} 成交`;
+    }
+
+    const archiveContentEl = document.getElementById('insp-house-archive-content');
+    if (archiveContentEl && archiveContentEl.style.display !== 'none') {
+      let html = '';
+      if (dealsList.length > 0) {
+        html += '<div style="color:#6ee7b7; font-weight:600; margin-bottom:2px;">📜 历史成交记录:</div>';
+        for (const d of dealsList) {
+          html += `<div style="color:#a7f3d0; margin-bottom:2px;">• 第${d.tick}拍: 买方 #${d.buyerId} 以 ${d.price.toFixed(2)}金 成交 (修缮度${d.durability.toFixed(1)}%, ${d.reason})</div>`;
+        }
+      }
+      if (bidsList.length > 0) {
+        html += '<div style="color:#fcd34d; font-weight:600; margin-top:4px; margin-bottom:2px;">📋 近期报价记录:</div>';
+        for (const b of bidsList) {
+          html += `<div style="color:#e2e8f0; margin-bottom:1px;">• 第${b.tick}拍 [${b.phase}]: 买方 #${b.bidderId} 开价 ${b.amount.toFixed(2)}金</div>`;
+        }
+      }
+      if (!html) html = '<div style="color:#94a3b8;">暂无历史报价或成交记录</div>';
+      archiveContentEl.innerHTML = html;
+    }
+
     const houseCoordEl = document.getElementById('insp-house-coord');
 
     // ★ 修建/升级者（历史确权：立宅修建者与最近升级者，均不随代际继承改变）
@@ -182,7 +274,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       builderVal.textContent = `修建者 Agent #${house.builderId} · 最近升级 ${upgName}`;
     }
     if (houseCoordEl) houseCoordEl.textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
-    document.getElementById('insp-detail-text').textContent = isVacant ? '户主故去后成为无主空置房，受益人（子女+配偶）已登记于所属营地空置列表，等待后续房屋转让机制确权。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
+    document.getElementById('insp-detail-text').textContent = isVacant ? '户主故去后由营地中介挂牌拍卖，按麦穗理论37%原则撮合交易，修缮度跌至10%时强制选最高出价成交。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
   }
 } else if (sim.selectionType === 'poi' && sim.selectedPoiId !== null) {
   const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
@@ -998,7 +1090,9 @@ canvas.addEventListener('click', e => {
         const ben = (vh.beneficiaryIds && vh.beneficiaryIds.length > 0)
           ? vh.beneficiaryIds.map(bid => agentChip(bid, 'dead', '受益人')).join(' ')
           : '<span style="color:#94a3b8;">无受益人</span>';
-        return `<div style="margin-bottom:2px;">🏚️ 房屋 #${vh.houseId} → 受益人: ${ben}</div>`;
+        const hObj = sim.houses.find(h => h.id === vh.houseId);
+        const valStr = hObj ? ` · 估价 ${hObj.currentValuation.toFixed(2)}金 (${hObj.auctionPhase || '挂牌拍卖中'})` : '';
+        return `<div style="margin-bottom:2px;">🏚️ 房屋 #${vh.houseId}${valStr} → 受益人: ${ben}</div>`;
       }).join('');
     } else {
       vacEl.textContent = '— 暂无空置房屋';
@@ -1015,7 +1109,7 @@ canvas.addEventListener('click', e => {
       if (jEl) {
         const jn = (region.recentJournal || []).slice(0, 6);
         if (jn.length > 0) {
-          const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承' };
+          const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承', 'HousingPurchase': '房屋拍卖' };
           jEl.innerHTML = jn.map(r => `<div>· ${reasonZh[r.reason] || r.reason} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`).join('');
         } else {
           jEl.textContent = '暂无流水记录';
@@ -1050,6 +1144,17 @@ canvas.addEventListener('click', e => {
       if (sim && sim.selectionType === 'poi' && sim.selectedPoiId != null) {
         const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
         if (poi) openCampDetail(poi);
+      }
+    }
+  });
+
+  // 事件绑定：房屋报价档案展开/折叠
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#btn-toggle-house-bids');
+    if (btn) {
+      const content = document.getElementById('insp-house-archive-content');
+      if (content) {
+        content.style.display = (content.style.display === 'none') ? 'block' : 'none';
       }
     }
   });

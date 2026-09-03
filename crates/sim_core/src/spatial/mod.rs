@@ -22,7 +22,7 @@ pub use vec3::Vec3;
 pub use curve::Curve3D;
 pub use graph::{LaneGraph3D, LaneNode3D, NodeData, LaneEdge3D, NodeType, RoadClass, NodeId, LaneId};
 pub use poi::{PrimitivePoi, PoiType, PoiId};
-pub use house::{House, HouseTier, HouseSnapshot};
+pub use house::{House, HouseTier, HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
 pub use agent::{Agent3D, PrimitiveActionState, AgentId, Gender};
 pub use snapshot::{WorldSnapshot3D, Season, PoiSnapshot, NodeSnapshot, LaneSnapshot, AgentSnapshot, GeoCellSnapshot};
 pub use ledger::{Group, GroupKind, Household, HouseholdRegistry, Ledger, LedgerRef, Marriage, MarriageRegistry, ResourceKind, TransferRecord};

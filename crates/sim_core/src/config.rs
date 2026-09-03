@@ -329,7 +329,23 @@ pub const MARKET_MIN_FAMILY_GOLD: f32 = 0.5;
 pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
 
 // ============================================================================
-// 11. 动态仿真配置结构体 (SimConfig)
+// 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+// ============================================================================
+/// 拍卖开价评估周期（tick，默认 30 = 1秒，与错峰决策周期对齐）
+pub const HOUSE_MARKET_BIDDING_INTERVAL_TICKS: u64 = 30;
+/// 最晚出售修缮度时限（耐久度跌至此值时只要有报价就必须选最高强制成交，默认 10.0%）
+pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
+/// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）
+pub const HOUSE_AUCTION_OBSERVATION_RATIO: f32 = 0.37;
+/// 木材折算基准金价（建设成本等效折算用，默认 0.15）
+pub const MARKET_PRICE_BASE_WOOD: f32 = 0.15;
+/// 石料折算基准金价（建设成本等效折算用，默认 0.20）
+pub const MARKET_PRICE_BASE_STONE: f32 = 0.20;
+/// 0级仓库地基保底估价值（黄金，默认 5.0，防 0 成本畸变）
+pub const HOUSE_BASE_FOUNDATION_COST_GOLD: f32 = 5.0;
+
+// ============================================================================
+// 15. 动态仿真配置结构体 (SimConfig)
 // ============================================================================
 
 /// 统一动态超参数结构体，支持从前端 JSON 动态反序列化更新
@@ -550,6 +566,14 @@ pub struct SimConfig {
     pub market_emergency_family_stock_threshold: f32,
     pub market_min_family_gold: f32,
     pub market_min_dispatch_stamina: f32,
+
+    // 14. 二手房屋市场、营地中介拍卖与麦穗估价
+    pub house_market_bidding_interval_ticks: u64,
+    pub house_auction_deadline_durability: f32,
+    pub house_auction_observation_ratio: f32,
+    pub market_price_base_wood: f32,
+    pub market_price_base_stone: f32,
+    pub house_base_foundation_cost_gold: f32,
 }
 
 impl Default for SimConfig {
@@ -762,6 +786,14 @@ impl Default for SimConfig {
             market_emergency_family_stock_threshold: MARKET_EMERGENCY_FAMILY_STOCK_THRESHOLD,
             market_min_family_gold: MARKET_MIN_FAMILY_GOLD,
             market_min_dispatch_stamina: MARKET_MIN_DISPATCH_STAMINA,
+
+            // 14. 二手房屋市场、营地中介拍卖与麦穗估价
+            house_market_bidding_interval_ticks: HOUSE_MARKET_BIDDING_INTERVAL_TICKS,
+            house_auction_deadline_durability: HOUSE_AUCTION_DEADLINE_DURABILITY,
+            house_auction_observation_ratio: HOUSE_AUCTION_OBSERVATION_RATIO,
+            market_price_base_wood: MARKET_PRICE_BASE_WOOD,
+            market_price_base_stone: MARKET_PRICE_BASE_STONE,
+            house_base_foundation_cost_gold: HOUSE_BASE_FOUNDATION_COST_GOLD,
         }
     }
 }

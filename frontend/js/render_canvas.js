@@ -219,6 +219,8 @@ if (now - lastUiUpdate >= 100) {
   updateInspector();
   // ★ v1.12.0 刷新营地辖区详情模态框（若打开）
   if (typeof window._campDetailTick === 'function') window._campDetailTick();
+  // ★ v1.15.0 刷新房屋拍卖交易所模态框与顶部数字徽章
+  if (typeof window._auctionUiTick === 'function') window._auctionUiTick();
 
 // 🐞 采样本帧「渲染 + UI」耗时与整帧耗时 (调试模式下)
 if (sim.debugMode) {

@@ -1,8 +1,8 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.13.0（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（181 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
+> **版本**：v1.15.0（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **超参配置**：全部可调超参（187 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -49,9 +49,9 @@
 | 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 24 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
 | 3 | ❄️ 四季更替与热力学供暖系统 (`seasons`) | [03-seasons-climate.md](./current/03-seasons-climate.md) | 240s 四季年轮模型、冬季供暖消耗、低温受孕安全红线 |
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |
-| 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记 |
+| 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记、二手房屋市场与营地麦穗 37% 拍卖系统 |
 | 6 | 🧠 马斯洛需求层次与行动状态机 (Motivation AI) | [06-motivation-ai.md](./current/06-motivation-ai.md) | 5 层需求、私有触发器、连续采收与平滑重路由、错峰决策节拍 |
-| 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、Inspector、族谱时间轴、账本大盘、调试监视器 |
+| 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、在售呼吸图标、Inspector、族谱时间轴、账本大盘、房屋拍卖交易所大盘、调试监视器 |
 | 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [UI_SPEC_AND_LEDGER_DESIGN.md](./UI_SPEC_AND_LEDGER_DESIGN.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
@@ -61,7 +61,7 @@
 | 14 | 🔒 核心不变量集中清单 | [14-invariants.md](./current/14-invariants.md) | 确定性/数据一致性/行为语义/构建部署/代码组织/前端 DOM 六大类硬约束，每条标注来源与违反后果，末尾附 10 秒快速自检清单 |
 | 15 | 💾 读档 / 存档系统 | [15-save-load.md](./current/15-save-load.md) | `WorldSave` 全量状态契约、排除字段与重建方式、WASM 导出与错误码、三槽位 localStorage 与导入导出、确定性验证与易踩坑 |
 | 16 | 🏪 外部市场与动态价格系统 (`market`) | [16-market-pricing.md](./current/16-market-pricing.md) | 榷场互市 POI、次级库存、幂律动态定价、B15 榷场商贸决策、黄金流出虚空闭环 |
-| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.13.0 各版本核心机制改动 |
+| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.15.0 各版本核心机制改动 |
 
 ---
 

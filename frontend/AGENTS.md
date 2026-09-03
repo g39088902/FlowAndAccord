@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：16 个 JS 文件 + index.html + style.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：17 个 JS 文件 + index.html + style.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照三处同步、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -39,6 +39,7 @@
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
 | `js/main.js` | ~574 | 全局初始化 / 相机控制（缩放/平移/跟随）/ 事件绑定（点击拾取/快捷键 Space/Esc/重置按钮/倍速切换）/ 控制台日志 / 无头模式切换 | Canvas 绘制（在 render.js）、wasm 交互（在 rustworld.js） |
 | `js/save-ui.js` | ~620 | **读档/存档系统 UI**（v1.11.0）：三槽位（自动槽每 60s 覆盖 + 手动槽 1/2）localStorage 读写、槽位元信息索引、顶栏「💾 存档/📂 读档」面板（保存/读取双标签）、导出 Blob 下载 / 导入 FileReader 校验、读档后自动暂停；**v1.11.0 新增本地文件存档**（File System Access API）：用户连接本地 .json 文件后存档直写磁盘、自动保存同步切换本地模式、不支持浏览器降级到传统导入导出 | 存档正文序列化（在 rustworld.js + 内核 `world_save.rs`） |
+| `js/auction-ui.js` | ~380 | **房屋拍卖交易所与竞价大盘 UI**（v1.15.0）：`#house-auction-modal` 视窗交互 / `_auctionUiTick` 每帧高频驱动 / 麦穗 37% 动态时间轴标尺与当前耐久指针 / 辖区意向买家池扫描 / 实时竞价信息流与裁决 / 历史成交档案 / 视口与族人定位聚焦 | Canvas 绘制（在 render_world） |
 
 ### 1.4 族谱系统（四件套，独立标签页）
 

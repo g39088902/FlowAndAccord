@@ -270,15 +270,83 @@ for (const house of sim.houses) {
   else if (house.tier === 'Tier4Manor') { tierIcon = '🏰'; tierLabel = '堡'; }
 
   if (house.ownerId == null) {
-    // ★ v1.10.0 无主空置房：半透明渲染 + "空"标签
-    ctx.globalAlpha = 0.55;
-    ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
-    ctx.font = '9px sans-serif';
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillText(`#${house.id}空`, p2D.x, p2D.y + 16 * camera.zoom);
-    ctx.globalAlpha = 1.0;
+    const isAuction = house.auctionPhase != null;
+    if (isAuction) {
+      // ★ v1.15.0 独特在售动效：金色脉冲呼吸光晕
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005);
+      const auraR = (16 + 5 * pulse) * camera.zoom;
+      const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, auraR);
+      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 + 0.25 * pulse})`);
+      grad.addColorStop(0.7, `rgba(217, 119, 6, ${0.15 + 0.15 * pulse})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p2D.x, p2D.y, auraR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 房屋图标
+      ctx.globalAlpha = 0.95;
+      ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
+      ctx.globalAlpha = 1.0;
+
+      // 悬浮拍卖标牌 (Floating Auction Plaque)
+      const phaseColor = (house.auctionPhase === '观察期') ? '#f59e0b' : ((house.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
+      const phaseText = house.auctionPhase === '观察期' ? '🌾摸底' : (house.auctionPhase === '决策期' ? '🎯竞价' : '⚠️出清');
+      const priceVal = (house.currentValuation || 0).toFixed(1);
+      const plaqueLabel = `🔨 ${phaseText} · ${priceVal}G`;
+
+      ctx.font = 'bold 9px sans-serif';
+      const textW = ctx.measureText(plaqueLabel).width;
+      const badgeW = textW + 10;
+      const badgeH = 15;
+      const badgeX = p2D.x - badgeW / 2;
+      const badgeY = p2D.y - (18 * camera.zoom) - badgeH;
+
+      // 标牌背景与描边
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.strokeStyle = phaseColor;
+      ctx.lineWidth = 1.2;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+        ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+      }
+
+      // 指向屋顶的小三角
+      ctx.fillStyle = phaseColor;
+      ctx.beginPath();
+      ctx.moveTo(p2D.x - 3, badgeY + badgeH);
+      ctx.lineTo(p2D.x + 3, badgeY + badgeH);
+      ctx.lineTo(p2D.x, badgeY + badgeH + 3);
+      ctx.closePath();
+      ctx.fill();
+
+      // 标牌文字
+      ctx.fillStyle = '#f8fafc';
+      ctx.textAlign = 'center';
+      ctx.fillText(plaqueLabel, p2D.x, badgeY + 11);
+
+      // 门牌号与修缮度
+      ctx.font = '8px sans-serif';
+      ctx.fillStyle = phaseColor;
+      ctx.fillText(`#${house.id}在售 (${Math.round(house.durability)}%)`, p2D.x, p2D.y + 16 * camera.zoom);
+    } else {
+      // 常规空置房屋
+      ctx.globalAlpha = 0.55;
+      ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`#${house.id}空`, p2D.x, p2D.y + 16 * camera.zoom);
+      ctx.globalAlpha = 1.0;
+    }
   } else {
     // 居所光晕与图标
     const glowColor = isWarehouse ? 'rgba(217, 119, 6, 0.45)' : (house.tier === 'Tier4Manor' ? 'rgba(168, 85, 247, 0.45)' : 'rgba(245, 158, 11, 0.45)');

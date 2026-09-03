@@ -3,12 +3,13 @@ pub mod construction;
 pub mod marriage;
 pub mod settlement;
 pub mod inheritance;
+pub mod auction;
 
 
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
-    /// 部落定居与自发筑屋演化总管线 (冬季取暖、多级营建扩容、私产确权与代际继承、自动婚姻)
+    /// 部落定居与自发筑屋演化总管线 (冬季取暖、多级营建扩容、私产确权与代际继承、自动婚姻、二手房拍卖)
     pub fn tick_housing(&mut self, dt: f32) {
         // 0. 冬季私宅柴火供暖消耗
         self.tick_winter_heating(dt);
@@ -30,6 +31,9 @@ impl World3DEngine {
 
         // 7. ★ v1.10.0 空置房屋事件驱动追踪（户主死亡→无主空置→营地登记受益人，取代原继承/绝嗣废墟）
         self.tick_vacant_house_tracking();
+
+        // 7.5 ★ v1.14.0 二手房屋市场与营地中介麦穗 37% 原则拍卖
+        self.tick_housing_auctions(dt);
 
         // 8. 金币遗产继承机制 (死者金币平分给在世子一代子女)
         self.settle_gold_inheritance();
