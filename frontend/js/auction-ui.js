@@ -72,7 +72,60 @@
       currentHouseId = active[0].id;
       return active[0];
     }
-    return sim.houses[0] || null;
+    // v1.22.4 无在售房产时返回 null，由 renderEmptyDetail 展示空态（禁止用任意房屋占位）
+    return null;
+  }
+
+  /**
+   * v1.22.4 无在售房产空态：hero 卡显示空信息，并清空时间轴/买家池/竞价流水，
+   *   避免残留上一套被选中房屋的数据（此前 getSelectedHouse 回退到 sim.houses[0] 拿 #1 占位）。
+   */
+  function renderEmptyDetail() {
+    // 更新 hero 卡各字段为空态占位文案（不重建整卡，保留内部固定子元素，#auction-hero-name 等节点后续仍可恢复）
+    const heroIcon = document.getElementById('auction-hero-icon');
+    if (heroIcon) heroIcon.textContent = '🏚️';
+    const heroName = document.getElementById('auction-hero-name');
+    if (heroName) heroName.textContent = '暂无在售房产';
+    const phasePill = document.getElementById('auction-hero-phase-pill');
+    if (phasePill) { phasePill.textContent = ''; phasePill.className = 'auction-phase-pill'; }
+    const heroCamp = document.getElementById('auction-hero-camp');
+    if (heroCamp) heroCamp.textContent = '';
+    const heroDetails = document.getElementById('auction-hero-details');
+    if (heroDetails) heroDetails.textContent = '当前全图聚落安居乐业，暂无房屋挂牌拍卖 · 营地中介暂无二手房源，可稍后再来查看';
+    const heroPrice = document.getElementById('auction-hero-price');
+    if (heroPrice) renderHtml(heroPrice, '-- <span style="font-size:12px; color:#f59e0b;">金</span>');
+    const landStatus = document.getElementById('auction-hero-land-status');
+    if (landStatus) renderHtml(landStatus, '<span style="color:#94a3b8;">暂无挂牌拍卖房屋</span>');
+    // 麦穗时间轴归零
+    const needle = document.getElementById('timeline-current-needle');
+    if (needle) needle.style.left = '0%';
+    const needleText = document.getElementById('needle-dur-text');
+    if (needleText) needleText.textContent = '--';
+    const segObs = document.getElementById('timeline-seg-obs');
+    if (segObs) { segObs.style.left = '0%'; segObs.style.width = '0%'; }
+    const segDec = document.getElementById('timeline-seg-dec');
+    if (segDec) { segDec.style.left = '0%'; segDec.style.width = '0%'; }
+    const line37 = document.getElementById('timeline-line-37');
+    if (line37) line37.style.left = '0%';
+    const statStart = document.getElementById('timeline-stat-start');
+    if (statStart) statStart.textContent = '--';
+    const statDur = document.getElementById('timeline-stat-dur');
+    if (statDur) statDur.textContent = '--';
+    const stat37 = document.getElementById('timeline-stat-37dur');
+    if (stat37) stat37.textContent = '--';
+    const statBench = document.getElementById('timeline-stat-bench');
+    if (statBench) statBench.textContent = '--';
+    const statHighest = document.getElementById('timeline-stat-highest');
+    if (statHighest) statHighest.textContent = '--';
+    // 买家池与竞价流水清空
+    const buyersListEl = document.getElementById('auction-buyers-list');
+    if (buyersListEl) renderHtml(buyersListEl, `<div class="auction-empty-hint">暂无在售房产，无潜在买家</div>`);
+    const buyersCountEl = document.getElementById('auction-buyers-count');
+    if (buyersCountEl) buyersCountEl.textContent = '0';
+    const feedEl = document.getElementById('auction-bids-feed');
+    if (feedEl) renderHtml(feedEl, `<div class="auction-empty-hint">暂无在售房产，无竞价流水</div>`);
+    const bidsCountEl = document.getElementById('auction-bids-count');
+    if (bidsCountEl) bidsCountEl.textContent = '0';
   }
 
   function getTierLabel(tier) {
@@ -158,6 +211,8 @@
       const active = getActiveAuctionHouses();
       if (active.length > 0) {
         currentHouseId = active[0].id;
+      } else {
+        currentHouseId = null; // v1.22.4 无在售房时清空选择，展示空态
       }
     }
 
@@ -291,8 +346,7 @@
     // 4. 当前选中房屋的核心基本面
     const house = getSelectedHouse();
     if (!house) {
-      const heroCard = document.getElementById('auction-hero-card');
-      if (heroCard) renderHtml(heroCard, `<div style="color:#94a3b8; font-size:12px; padding:12px;">暂无选中的房屋</div>`);
+      renderEmptyDetail();
       return;
     }
 
