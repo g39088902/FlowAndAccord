@@ -595,9 +595,15 @@
           recentJournal: r.recent_journal || [],
           recentEvents: r.recent_events || [],
           activeExpeditionAgents: r.active_expedition_agents || [],
-          historyKings: r.history_kings || [],
+          // ★ v1.12.0 历史国王改为对象数组（含在位起止 tick 与死因），兼容旧档数字数组
+          historyKings: (r.history_kings || []).map(hk =>
+            typeof hk === 'number'
+              ? { agentId: hk, reignStartTick: 0, reignEndTick: 0, deathCause: null }
+              : { agentId: hk.agent_id, reignStartTick: hk.reign_start_tick, reignEndTick: hk.reign_end_tick, deathCause: hk.death_cause || null }
+          ),
           memberIds: r.member_ids || [],
-          governedHouseholds: r.governed_households || []
+          governedHouseholds: r.governed_households || [],
+          currentReignStart: r.current_reign_start != null ? r.current_reign_start : null
         }));
 
         // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）

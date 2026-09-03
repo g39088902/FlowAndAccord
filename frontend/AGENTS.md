@@ -38,7 +38,7 @@
 | `js/render_agents.js` | ~210 | **族人与特效绘制**（v1.7.1 拆分）：drawAgents（部落民 Agent 渲染 + 选中高亮 + 状态气泡 + 死亡骷髅）/ drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
 | `js/main.js` | ~574 | 全局初始化 / 相机控制（缩放/平移/跟随）/ 事件绑定（点击拾取/快捷键 Space/Esc/重置按钮/倍速切换）/ 控制台日志 / 无头模式切换 | Canvas 绘制（在 render.js）、wasm 交互（在 rustworld.js） |
-| `js/save-ui.js` | ~330 | **读档/存档系统 UI**（v1.8.0）：三槽位（自动槽每 60s 覆盖 + 手动槽 1/2）localStorage 读写、槽位元信息索引、顶栏「💾 存档/📂 读档」面板（保存/读取双标签）、导出 Blob 下载 / 导入 FileReader 校验、读档后自动暂停 | 存档正文序列化（在 rustworld.js + 内核 `world_save.rs`） |
+| `js/save-ui.js` | ~620 | **读档/存档系统 UI**（v1.11.0）：三槽位（自动槽每 60s 覆盖 + 手动槽 1/2）localStorage 读写、槽位元信息索引、顶栏「💾 存档/📂 读档」面板（保存/读取双标签）、导出 Blob 下载 / 导入 FileReader 校验、读档后自动暂停；**v1.11.0 新增本地文件存档**（File System Access API）：用户连接本地 .json 文件后存档直写磁盘、自动保存同步切换本地模式、不支持浏览器降级到传统导入导出 | 存档正文序列化（在 rustworld.js + 内核 `world_save.rs`） |
 
 ### 1.4 族谱系统（四件套，独立标签页）
 
@@ -236,10 +236,14 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 只改前端 JS/CSS/HTML 时**不需要重编译 wasm**，浏览器 Ctrl+F5 即生效。
 
-### 5.8 存档系统的存储配额与读档副作用（v1.8.0）
+### 5.8 存档系统的存储配额与读档副作用（v1.11.0）
 
 - 存档正文存在 `localStorage` 的 `flowaccord.save.v1.<slotId>`（3 槽位），**槽位元信息统一放索引键** `flowaccord.save.v1.__index`——元信息若随正文各存一份会双倍占用配额。
-- 单份存档约 392 KB，三槽位约 1.2 MB；localStorage 单域约 5 MB，`setItem` 抛 `QuotaExceededError` 时必须捕获并提示用户删除旧档或导出备份。
+- 单份存档约 392 KB（人口增长/账本流水累积后可达数 MB），三槽位约 1.2 MB+；localStorage 单域约 5 MB，`setItem` 抛 `QuotaExceededError` 时必须捕获并提示用户删除旧档或导出备份。
+- **v1.11.0 本地文件存档（File System Access API）**：用户通过 `showSaveFilePicker` 连接一个本地 .json 文件后获得 `FileSystemFileHandle`，存档经 `createWritable()` 直写用户磁盘，不受浏览器存储配额限制；已连接本地文件时 `tickAutoSave()` 自动切换为写本地文件而非 localStorage。
+- **本地文件句柄不持久化**：页面刷新后 `localFileHandle` 失效（浏览器安全策略），需用户重新连接；状态条和底部提示必须明确告知这一点。
+- **权限失效处理**：写入/读取时捕获 `NotAllowedError`，自动 `disconnectLocalFile()` 并提示重新连接，不可静默失败。
+- **兼容性降级**：`supportsLocalFileAPI()` 检测 `showSaveFilePicker`/`showOpenFilePicker`，不支持时（Firefox 等）隐藏连接按钮，读取标签下的「选择存档文件」降级到传统 `input[type=file]`，底部提示引导使用 Chrome/Edge。
 - `loadWorld()` 成功后会清空 `_trails` / `agentArchive` / `_lastEvent` / `_terrainCached` 并 `deselect()`，**任何新增的派生缓存都必须同步清空**，否则读档后残留旧世界的可视化状态。
 - 读档后**不重新注入 `window.SIM_CONFIG`**：存档自带 `SimConfig`，重注入会让前端热调参覆盖存档时的运行参数。
 - 自动槽每 60 秒覆盖一次，世界 tick 未推进时跳过（`lastAutoTick` 守卫），暂停时不会空写。

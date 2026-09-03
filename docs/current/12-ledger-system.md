@@ -64,7 +64,7 @@
 - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，政体=`Kingdom`，继承制=`Primogeniture`；始祖播撒时加入最近营地，新生儿随父加入父亲所在地区。
 - **到达时序**：`arrival_tick`（始祖=0，新生儿=出生 tick），`arrival_order` 按 `(arrival_tick, agent_id)` 升序。
 - **初王顺位**：初王 = arrival_order 最早到达的在世男性；无在世男性则王位空悬，账本冻结。
-- **★ v1.9.0 历史国王**：`Region.set_king()` 包装——初王登基 / 国王更替 / 长子继承登基均将前任国王记入 `history_kings` 档案（营地卡片展示历史国王）。
+- **★ v1.12.0 历史国王（含在位时长与死因）**：`Region.history_kings` 为 `Vec<HistoryKing>{agent_id, reign_start_tick, reign_end_tick, death_cause}`，`Region.current_reign_start` 追踪现任国王登基 tick；`set_king(agent, tick, note, prev_death_cause)` 在更替时将前任国王入档（死因从 `agent.death_cause` 读取，被废黜则为 None）；营地详情模态框展示历史国王列表及在位时长/死因。
 - **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房/废墟可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
 - **公仓税 Tax**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。
@@ -130,7 +130,7 @@
 - **HouseholdSnapshot**：家户 ID、户主 ID、成员列表、账面 5 资源余额、最近团体事件、最近 8 笔资源流水（`recent_journal`）。
 - **MarriageSnapshot**：婚姻 ID、夫妻双方 ID、婚龄、存续/封账状态、历史婚姻段。
 - **ClanSnapshot**（M3）：姓氏、族长 ID、族人数量与列表、族库 5 资源余额、最近流水与事件；v1.9.0 新增 `is_extinct`（绝嗣标记；v1.9.1 起宗族仅含男性成员）。
-- **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表；v1.9.0 新增 `history_kings`（历史国王档案）/ `member_ids`（成员列表）/ `governed_households`（管辖家户）。
+- **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表；v1.9.0 新增 `history_kings`（历史国王档案）/ `member_ids`（成员列表）/ `governed_households`（管辖家户）；v1.12.0 `history_kings` 改为 `Vec<HistoryKingSnapshot>`（含在位起止 tick 与死因），新增 `current_reign_start`（现任国王登基 tick）。
 - **AgentSnapshot 新增**（M2/M4）：`marriage_history_count` / `household_id` / `household_role`（Head/Spouse/Child/None）/ `arrival_tick` / `is_on_expedition`；v1.9.0 新增 `expedition_target_camp`（远征目标营地）/ `coronation_pending`（待登基营地）。
 - **LedgerBalanceSnapshot**：团体账面对应的 5 资源余额；`public_granary_balances` 为公仓兜底账本余额。
 

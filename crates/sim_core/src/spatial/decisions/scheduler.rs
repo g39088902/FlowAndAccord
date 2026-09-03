@@ -100,7 +100,7 @@ impl World3DEngine {
 
         // WRITE: 立王（历史国王入档，见 Region::set_king）
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
-            region.set_king(agent_id, tick, &format!("夺位远征登基：【{}】", camp_name));
+            region.set_king(agent_id, tick, &format!("夺位远征登基：【{}】", camp_name), None);
         }
 
         // WRITE: agent 状态

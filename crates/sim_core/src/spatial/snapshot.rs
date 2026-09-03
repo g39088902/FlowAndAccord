@@ -299,6 +299,15 @@ pub struct ClanSnapshot {
     pub is_extinct: bool,
 }
 
+/// ★ v1.12.0 历史国王快照（含在位起止 tick 与死因）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryKingSnapshot {
+    pub agent_id: AgentId,
+    pub reign_start_tick: u64,
+    pub reign_end_tick: u64,
+    pub death_cause: Option<String>,
+}
+
 /// 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegionSnapshot {
@@ -326,10 +335,12 @@ pub struct RegionSnapshot {
     pub recent_events: Vec<String>,
     /// 正在冲向该营地夺位的族人列表
     pub active_expedition_agents: Vec<AgentId>,
-    /// ★ v1.9.0 历史国王（已离任/驾崩的所有前任国王，不含现任）
-    pub history_kings: Vec<AgentId>,
+    /// ★ v1.12.0 历史国王（已离任/驾崩的所有前任国王，不含现任），含在位时长与死因
+    pub history_kings: Vec<HistoryKingSnapshot>,
     /// ★ v1.9.0 地区居民 AgentId 列表（按升序）
     pub member_ids: Vec<AgentId>,
     /// ★ v1.9.0 管辖的家庭（户主所属本地区的存续家户 HouseholdId，按升序）
     pub governed_households: Vec<u64>,
+    /// ★ v1.12.0 现任国王登基 tick（None = 王位空悬），前端计算在位时长
+    pub current_reign_start: Option<u64>,
 }

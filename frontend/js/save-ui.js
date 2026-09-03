@@ -1,47 +1,95 @@
-// === 读档 / 存档系统 (v1.7.0) ===
-// 三槽位（自动槽 / 手动槽 1 / 手动槽 2）持久化于 localStorage，支持 JSON 文件导入导出。
+// === 读档 / 存档系统 (v1.12.0) ===
+// 三文件槽位（save1.json / save2.json / save3.json）直写用户磁盘，
+// FileSystemFileHandle 经 IndexedDB 持久化，页面刷新后自动恢复连接。
 // 存档正文为内核导出的全量世界状态 JSON（含 RNG 内部状态），读档后可确定性续演。
-// 槽位元信息统一放在索引键里，避免正文被重复写入、浪费 localStorage 配额。
+// 自动保存每 60 秒写入槽位 1。仅支持 Chrome / Edge（File System Access API）。
+// v1.12.0: 彻底删除 localStorage 存档体系，仅保留文件直写。
 
 (function () {
   'use strict';
 
-  const STORAGE_NS = 'flowaccord.save.v1';
-  const INDEX_KEY = STORAGE_NS + '.__index';
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
-  const SAVE_FORMAT_VERSION = 2;
+  const SAVE_FORMAT_VERSION = 3;
   const AUTO_SAVE_INTERVAL_MS = 60000;
 
   const SLOTS = [
-    { id: 'auto', icon: '🤖', name: '自动槽', desc: '每 60 秒自动覆盖保存' },
-    { id: 'slot1', icon: '📁', name: '手动槽 1', desc: '手动覆盖保存' },
-    { id: 'slot2', icon: '📁', name: '手动槽 2', desc: '手动覆盖保存' },
+    { id: 'save1', icon: '📁', name: '存档槽 1', desc: '自动保存默认写入此槽', suggestedName: 'flowaccord-save1.json', isAuto: true },
+    { id: 'save2', icon: '📁', name: '存档槽 2', desc: '手动覆盖保存', suggestedName: 'flowaccord-save2.json', isAuto: false },
+    { id: 'save3', icon: '📁', name: '存档槽 3', desc: '手动覆盖保存', suggestedName: 'flowaccord-save3.json', isAuto: false },
   ];
 
+  // ── 运行时状态 ──
   let activeTab = 'save';
   let lastAutoTick = -1;
   let els = {};
+  // 每槽位的文件句柄与元信息（句柄来自 IndexedDB 恢复或用户新选择）
+  const slotState = {}; // { save1: { handle, fileName, meta, lastSaved }, ... }
 
   const getSim = () => window.rustWorldSim || null;
 
-  function slotKey(id) { return STORAGE_NS + '.' + id; }
+  // ══════════════════════════════════════════════════════════════
+  // IndexedDB：持久化 FileSystemFileHandle（刷新后自动恢复连接）
+  // ══════════════════════════════════════════════════════════════
+  const IDB_NAME = 'flowaccord-save-handles';
+  const IDB_STORE = 'handles';
+  let idb = null;
+  let idbReady = false;
 
-  function loadIndex() {
-    try { return JSON.parse(localStorage.getItem(INDEX_KEY)) || {}; }
-    catch (e) { return {}; }
+  function openIDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE, { keyPath: 'slotId' });
+        }
+      };
+      req.onsuccess = () => { idb = req.result; idbReady = true; resolve(); };
+      req.onerror = () => reject(req.error);
+    });
   }
 
-  function saveIndex(index) {
-    try { localStorage.setItem(INDEX_KEY, JSON.stringify(index)); return true; }
-    catch (e) { return false; }
+  function idbPut(slotId, handle, fileName) {
+    return new Promise((resolve, reject) => {
+      if (!idbReady) { resolve(); return; }
+      const tx = idb.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ slotId, handle, fileName, savedAt: Date.now() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   }
 
-  function readSlotData(id) {
-    try { return localStorage.getItem(slotKey(id)); }
-    catch (e) { return null; }
+  function idbGet(slotId) {
+    return new Promise((resolve, reject) => {
+      if (!idbReady) { resolve(null); return; }
+      const tx = idb.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(slotId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
   }
 
-  // ── 元信息提取（存档正文较大，仅在保存/导入时解析一次）──
+  function idbDelete(slotId) {
+    return new Promise((resolve, reject) => {
+      if (!idbReady) { resolve(); return; }
+      const tx = idb.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(slotId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 浏览器兼容性
+  // ══════════════════════════════════════════════════════════════
+  function supportsFileAPI() {
+    return typeof window.showSaveFilePicker === 'function' &&
+           typeof window.showOpenFilePicker === 'function';
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 元信息提取
+  // ══════════════════════════════════════════════════════════════
   function extractMeta(jsonStr) {
     const obj = JSON.parse(jsonStr);
     const agents = Array.isArray(obj.agents) ? obj.agents : [];
@@ -81,9 +129,70 @@
     if (s && typeof s.logEvent === 'function') s.logEvent(msg, 'camp');
   }
 
-  // ── 槽位操作 ──
+  // ══════════════════════════════════════════════════════════════
+  // 槽位操作
+  // ══════════════════════════════════════════════════════════════
 
-  function doSave(slotId) {
+  /** 为指定槽位弹出文件选择器，连接/创建一个本地存档文件 */
+  async function connectSlot(slotId) {
+    if (!supportsFileAPI()) {
+      setStatus('当前浏览器不支持本地文件直写，请使用 Chrome 或 Edge', 'err');
+      return;
+    }
+    const slot = SLOTS.find(s => s.id === slotId);
+    if (!slot) return;
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: slot.suggestedName,
+        types: [{
+          description: 'Flow & Accord 存档文件',
+          accept: { 'application/json': ['.json'] },
+        }],
+      });
+      slotState[slotId] = { handle, fileName: handle.name, meta: null, lastSaved: 0 };
+      await idbPut(slotId, handle, handle.name);
+      // 尝试读取已有文件的元信息
+      await refreshSlotMeta(slotId);
+      renderList();
+      setStatus(`已连接「${handle.name}」到${slot.name}`, 'ok');
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        setStatus('连接文件失败：' + e.message, 'err');
+      }
+    }
+  }
+
+  /** 从文件重新读取元信息（用于刷新后恢复显示） */
+  async function refreshSlotMeta(slotId) {
+    const st = slotState[slotId];
+    if (!st || !st.handle) return;
+    try {
+      const file = await st.handle.getFile();
+      const text = await file.text();
+      const meta = extractMeta(text);
+      if (meta.formatVersion === SAVE_FORMAT_VERSION) {
+        st.meta = meta;
+        st.lastSaved = file.lastModified;
+      } else {
+        st.meta = null; // 版本不兼容，不显示
+      }
+    } catch (e) {
+      if (e.name === 'NotAllowedError') {
+        // 权限失效，断开槽位
+        disconnectSlot(slotId);
+      }
+    }
+  }
+
+  /** 将当前世界存档写入指定槽位的文件 */
+  async function saveToSlot(slotId) {
+    const st = slotState[slotId];
+    if (!st || !st.handle) {
+      // 未连接，先让用户选择文件
+      await connectSlot(slotId);
+      // 用户可能取消
+      if (!slotState[slotId] || !slotState[slotId].handle) return;
+    }
     const s = getSim();
     if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return; }
     const json = s.saveWorld();
@@ -95,28 +204,68 @@
     let meta;
     try { meta = extractMeta(json); }
     catch (e) { setStatus('存档数据异常，已中止保存', 'err'); return; }
-    meta.savedAt = Date.now();
-    meta.bytes = new Blob([json]).size;
 
     try {
-      localStorage.setItem(slotKey(slotId), json);
+      const writable = await st.handle.createWritable();
+      await writable.write(json);
+      await writable.close();
     } catch (e) {
-      setStatus('保存失败：浏览器本地存储已满，请先删除旧存档或导出备份', 'err');
+      if (e.name === 'NotAllowedError') {
+        setStatus('文件写入权限已失效，请重新连接该槽位', 'err');
+        disconnectSlot(slotId);
+        return;
+      }
+      setStatus('写入文件失败：' + e.message, 'err');
       return;
     }
-    const index = loadIndex();
-    index[slotId] = meta;
-    saveIndex(index);
+
+    meta.savedAt = Date.now();
+    meta.bytes = new Blob([json]).size;
+    st.meta = meta;
+    st.lastSaved = meta.savedAt;
     lastAutoTick = meta.tick;
     renderList();
-    setStatus(`已保存到「${slotName(slotId)}」· Tick ${meta.tick} · ${fmtBytes(meta.bytes)}`, 'ok');
-    simLog(`💾 存档已写入${slotName(slotId)}（Tick ${meta.tick}，${fmtBytes(meta.bytes)}）`);
+    const slot = SLOTS.find(s => s.id === slotId);
+    setStatus(`已保存到${slot.name}「${st.fileName}」· Tick ${meta.tick} · ${fmtBytes(meta.bytes)}`, 'ok');
+    simLog(`💾 存档已写入${slot.name}（Tick ${meta.tick}，${fmtBytes(meta.bytes)}）`);
   }
 
-  function doLoad(slotId) {
-    const json = readSlotData(slotId);
-    if (!json) { setStatus('该槽位为空，无法读取', 'err'); return; }
-    applySave(json, loadIndex()[slotId] || null, `${slotName(slotId)}`);
+  /** 从指定槽位的文件读取存档 */
+  async function loadFromSlot(slotId) {
+    const st = slotState[slotId];
+    if (!st || !st.handle) {
+      setStatus('该槽位尚未连接文件，请先点击「连接文件」', 'err');
+      return;
+    }
+    let file;
+    try {
+      file = await st.handle.getFile();
+    } catch (e) {
+      if (e.name === 'NotAllowedError') {
+        setStatus('文件读取权限已失效，请重新连接该槽位', 'err');
+        disconnectSlot(slotId);
+        return;
+      }
+      setStatus('读取文件失败：' + e.message, 'err');
+      return;
+    }
+    const text = await file.text();
+    let meta;
+    try { meta = extractMeta(text); }
+    catch (e) { setStatus('文件不是合法的存档 JSON', 'err'); return; }
+    if (meta.formatVersion !== SAVE_FORMAT_VERSION) {
+      setStatus(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`, 'err');
+      return;
+    }
+    applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
+  }
+
+  /** 断开槽位的文件连接（删除 IndexedDB 句柄） */
+  async function disconnectSlot(slotId) {
+    delete slotState[slotId];
+    await idbDelete(slotId);
+    renderList();
+    setStatus(`已断开${SLOTS.find(s => s.id === slotId).name}的文件连接`, 'ok');
   }
 
   function applySave(json, meta, label) {
@@ -136,87 +285,52 @@
     simLog(`📂 已从${label}读档（Tick ${tick}），模拟已暂停`);
   }
 
-  function doDelete(slotId) {
-    const index = loadIndex();
-    if (!index[slotId]) { setStatus('该槽位为空', 'err'); return; }
-    if (!window.confirm(`确定删除「${slotName(slotId)}」的存档？该操作不可恢复。`)) return;
-    try { localStorage.removeItem(slotKey(slotId)); } catch (e) { /* 忽略：索引已删除即可 */ }
-    delete index[slotId];
-    saveIndex(index);
-    renderList();
-    setStatus(`已删除「${slotName(slotId)}」`, 'ok');
-  }
-
-  function doExport(slotId) {
-    const json = readSlotData(slotId);
-    if (!json) { setStatus('该槽位为空，无法导出', 'err'); return; }
-    const meta = (loadIndex()[slotId]) || {};
-    const stamp = new Date(meta.savedAt || Date.now());
-    const p = (v) => String(v).padStart(2, '0');
-    const fname = `flowaccord-save-${slotId}-t${meta.tick || 0}-${stamp.getFullYear()}${p(stamp.getMonth() + 1)}${p(stamp.getDate())}-${p(stamp.getHours())}${p(stamp.getMinutes())}.json`;
-    try {
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setStatus(`已导出 ${fname}`, 'ok');
-    } catch (e) {
-      setStatus('导出失败：' + e.message, 'err');
-    }
-  }
-
-  function handleImportFile(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let meta;
-      try { meta = extractMeta(String(reader.result)); }
-      catch (e) { setStatus('导入失败：文件不是合法的存档 JSON', 'err'); return; }
-      if (meta.formatVersion !== SAVE_FORMAT_VERSION) {
-        setStatus(`导入失败：存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`, 'err');
-        return;
-      }
-      applySave(String(reader.result), meta, `导入文件（${file.name}）`);
-    };
-    reader.onerror = () => setStatus('导入失败：文件读取错误', 'err');
-    reader.readAsText(file);
-  }
-
-  // ── 面板渲染 ──
-
-  function slotName(id) {
-    const s = SLOTS.find(x => x.id === id);
-    return s ? s.name : id;
-  }
+  // ══════════════════════════════════════════════════════════════
+  // 面板渲染
+  // ══════════════════════════════════════════════════════════════
 
   function renderList() {
     if (!els.list) return;
-    const index = loadIndex();
     els.list.innerHTML = '';
+
+    // 浏览器不兼容提示
+    if (!supportsFileAPI()) {
+      const warn = document.createElement('div');
+      warn.className = 'save-slot-card';
+      warn.style.cssText = 'border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.06);';
+      warn.innerHTML = `<div style="font-size:13px; font-weight:600; color:#ef4444;">🚫 浏览器不兼容</div>
+        <div style="font-size:11px; color:#94a3b8; margin-top:4px; line-height:1.6;">
+          存档系统需要 File System Access API 支持直写本地文件。<br>
+          请使用 <b>Chrome</b> 或 <b>Edge</b> 浏览器打开本页面。
+        </div>`;
+      els.list.appendChild(warn);
+      if (els.hint) els.hint.textContent = '';
+      return;
+    }
+
     for (const slot of SLOTS) {
-      const meta = index[slot.id] || null;
+      const st = slotState[slot.id] || null;
       const card = document.createElement('div');
-      card.className = 'save-slot-card' + (meta ? '' : ' empty');
+      card.className = 'save-slot-card' + (st ? '' : ' empty');
 
       const head = document.createElement('div');
       head.className = 'save-slot-head';
+      const autoBadge = slot.isAuto ? '<span class="save-slot-badge" style="color:#60a5fa; background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.3);">🤖 自动保存</span>' : '';
       head.innerHTML = `<span class="save-slot-name">${slot.icon} ${slot.name}</span>` +
-        (meta ? `<span class="save-slot-badge">v${meta.appVersion || '—'}</span>` : `<span class="save-slot-badge muted">空存档</span>`);
+        (st ? `<span class="save-slot-badge">v${st.meta ? st.meta.appVersion : '—'}</span>` : autoBadge || `<span class="save-slot-badge muted">未连接</span>`);
       card.appendChild(head);
 
       const info = document.createElement('div');
       info.className = 'save-slot-meta';
-      if (meta) {
+      if (st && st.meta) {
         info.innerHTML =
-          `<span title="模拟 Tick">⏱️ <b class="mono-num">${meta.tick}</b></span>` +
-          `<span title="存活人口">👤 <b class="mono-num">${meta.population}</b> 人</span>` +
-          `<span title="存续家户">🏠 <b class="mono-num">${meta.households}</b> 户</span>` +
-          `<span title="存档体积">💾 <b class="mono-num">${fmtBytes(meta.bytes)}</b></span>`;
+          `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+          `<span title="模拟 Tick">⏱️ <b class="mono-num">${st.meta.tick}</b></span>` +
+          `<span title="存活人口">👤 <b class="mono-num">${st.meta.population}</b> 人</span>` +
+          `<span title="存续家户">🏠 <b class="mono-num">${st.meta.households}</b> 户</span>`;
+      } else if (st) {
+        info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+          `<span class="save-slot-desc">文件为空或版本不兼容，点击下方「保存」写入当前世界</span>`;
       } else {
         info.innerHTML = `<span class="save-slot-desc">${slot.desc}</span>`;
       }
@@ -224,21 +338,36 @@
 
       const time = document.createElement('div');
       time.className = 'save-slot-time';
-      time.textContent = meta ? `🕒 ${fmtTime(meta.savedAt)} · 种子 ${meta.seed}` : '尚未保存任何进度';
+      if (st && st.lastSaved) {
+        time.textContent = `🕒 最后写入: ${fmtTime(st.lastSaved)}`;
+      } else if (st) {
+        time.textContent = '已连接，等待首次写入';
+      } else {
+        time.textContent = '点击「连接文件」选择一个 .json 存档文件';
+      }
       card.appendChild(time);
 
       const actions = document.createElement('div');
       actions.className = 'save-slot-actions';
-      const buttons = activeTab === 'save'
-        ? [['save', '💾 覆盖保存', 'primary'], ['export', '📤 导出', ''], ['delete', '🗑️ 删除', 'danger']]
-        : [['load', '📂 读取', 'primary'], ['export', '📤 导出', ''], ['delete', '🗑️ 删除', 'danger']];
-      for (const [act, label, kind] of buttons) {
+      if (st) {
+        const btns = activeTab === 'save'
+          ? [['save', '💾 覆盖保存', 'primary'], ['load', '📂 读取', ''], ['disconnect', '🔌 断开', 'danger']]
+          : [['load', '📂 读取', 'primary'], ['save', '💾 覆盖保存', ''], ['disconnect', '🔌 断开', 'danger']];
+        for (const [act, label, kind] of btns) {
+          const btn = document.createElement('button');
+          btn.className = 'save-slot-btn' + (kind ? ' ' + kind : '');
+          btn.dataset.slot = slot.id;
+          btn.dataset.act = act;
+          if (act === 'load' && (!st.meta)) btn.disabled = true;
+          btn.textContent = label;
+          actions.appendChild(btn);
+        }
+      } else {
         const btn = document.createElement('button');
-        btn.className = 'save-slot-btn' + (kind ? ' ' + kind : '');
+        btn.className = 'save-slot-btn primary';
         btn.dataset.slot = slot.id;
-        btn.dataset.act = act;
-        if (!meta && (act === 'load' || act === 'export' || act === 'delete')) btn.disabled = true;
-        btn.textContent = label;
+        btn.dataset.act = 'connect';
+        btn.textContent = '🔗 连接存档文件';
         actions.appendChild(btn);
       }
       card.appendChild(actions);
@@ -246,12 +375,10 @@
     }
 
     if (els.hint) {
-      let used = 0;
-      for (const slot of SLOTS) {
-        const d = readSlotData(slot.id);
-        if (d) used += d.length;
-      }
-      els.hint.textContent = `本地已占用约 ${fmtBytes(used * 2)}（UTF-16 计）· 存档含完整世界状态，可跨设备导入`;
+      const connected = SLOTS.filter(s => slotState[s.id]).length;
+      els.hint.textContent = connected > 0
+        ? `💻 文件直写模式 · 已连接 ${connected}/3 槽位 · 自动保存每 60 秒写入「存档槽 1」· 刷新后自动恢复连接`
+        : '💻 文件直写模式 · 存档直写您电脑上的 .json 文件，不受浏览器存储配额限制 · 请先连接槽位';
     }
   }
 
@@ -273,39 +400,38 @@
     return !!els.backdrop && els.backdrop.style.display !== 'none';
   }
 
-  // ── 自动保存 ──
+  // ══════════════════════════════════════════════════════════════
+  // 自动保存（每 60 秒写入槽位 1）
+  // ══════════════════════════════════════════════════════════════
   function tickAutoSave() {
     const s = getSim();
     if (!s || !s._ready) return;
-    if (typeof s.tickCount === 'number' && s.tickCount === lastAutoTick) return; // 状态未推进，跳过
-    const json = s.saveWorld();
-    if (!json) return;
-    let meta;
-    try { meta = extractMeta(json); } catch (e) { return; }
-    meta.savedAt = Date.now();
-    meta.bytes = new Blob([json]).size;
-    try { localStorage.setItem(slotKey('auto'), json); }
-    catch (e) { return; }
-    const index = loadIndex();
-    index.auto = meta;
-    saveIndex(index);
-    lastAutoTick = meta.tick;
-    if (isOpen()) renderList();
+    if (typeof s.tickCount === 'number' && s.tickCount === lastAutoTick) return;
+
+    const st = slotState['save1'];
+    if (!st || !st.handle) return; // 槽位1未连接，跳过自动保存
+    saveToSlot('save1'); // 异步执行，不阻塞主循环
   }
 
-  // ── 初始化 ──
-  function init() {
+  // ══════════════════════════════════════════════════════════════
+  // 初始化
+  // ══════════════════════════════════════════════════════════════
+  async function init() {
     els.backdrop = document.getElementById('save-modal-backdrop');
     els.list = document.getElementById('save-slot-list');
     els.status = document.getElementById('save-status');
     els.hint = document.getElementById('save-storage-hint');
-    els.fileInput = document.getElementById('save-file-input');
     if (!els.backdrop) return;
+
+    // 隐藏旧的导入按钮（纯文件槽位体系不需要导入）
+    const btnImport = document.getElementById('btn-import-save');
+    if (btnImport) btnImport.style.display = 'none';
+    const fileInput = document.getElementById('save-file-input');
+    if (fileInput) fileInput.style.display = 'none';
 
     const btnOpenSave = document.getElementById('btn-open-save-panel');
     const btnOpenLoad = document.getElementById('btn-open-load-panel');
     const btnClose = document.getElementById('save-modal-close');
-    const btnImport = document.getElementById('btn-import-save');
 
     if (btnOpenSave) btnOpenSave.addEventListener('click', () => openPanel('save'));
     if (btnOpenLoad) btnOpenLoad.addEventListener('click', () => openPanel('load'));
@@ -313,29 +439,21 @@
     if (els.backdrop) {
       els.backdrop.addEventListener('mousedown', (e) => { if (e.target === els.backdrop) closePanel(); });
     }
-    if (btnImport && els.fileInput) {
-      btnImport.addEventListener('click', () => els.fileInput.click());
-      els.fileInput.addEventListener('change', () => {
-        const file = els.fileInput.files && els.fileInput.files[0];
-        handleImportFile(file);
-        els.fileInput.value = '';
-      });
-    }
 
     for (const btn of document.querySelectorAll('.save-tab-btn')) {
       btn.addEventListener('click', () => openPanel(btn.dataset.tab));
     }
 
     if (els.list) {
-      els.list.addEventListener('click', (e) => {
+      els.list.addEventListener('click', async (e) => {
         const btn = e.target.closest('.save-slot-btn');
         if (!btn || btn.disabled) return;
         const slotId = btn.dataset.slot;
         switch (btn.dataset.act) {
-          case 'save': doSave(slotId); break;
-          case 'load': doLoad(slotId); break;
-          case 'delete': doDelete(slotId); break;
-          case 'export': doExport(slotId); break;
+          case 'connect': await connectSlot(slotId); break;
+          case 'save': await saveToSlot(slotId); break;
+          case 'load': await loadFromSlot(slotId); break;
+          case 'disconnect': await disconnectSlot(slotId); break;
         }
       });
     }
@@ -347,6 +465,23 @@
         e.stopPropagation();
       }
     }, true);
+
+    // 从 IndexedDB 恢复所有槽位的文件句柄
+    if (supportsFileAPI()) {
+      try {
+        await openIDB();
+        for (const slot of SLOTS) {
+          const rec = await idbGet(slot.id);
+          if (rec && rec.handle) {
+            slotState[slot.id] = { handle: rec.handle, fileName: rec.fileName, meta: null, lastSaved: 0 };
+            // 异步刷新元信息，不阻塞初始化
+            refreshSlotMeta(slot.id).then(() => { if (isOpen()) renderList(); });
+          }
+        }
+      } catch (e) {
+        console.warn('IndexedDB 句柄恢复失败:', e);
+      }
+    }
 
     setInterval(tickAutoSave, AUTO_SAVE_INTERVAL_MS);
   }

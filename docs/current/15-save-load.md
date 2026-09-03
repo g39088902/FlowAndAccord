@@ -1,4 +1,4 @@
-# 💾 读档 / 存档系统 (v1.8.0)
+# 💾 读档 / 存档系统 (v1.11.0)
 
 > **模块索引**：[← 返回 CURRENT.md 全景索引](../CURRENT.md)
 > **主要源码**：`crates/sim_core/src/spatial/world_save.rs` + `crates/sim_wasm/src/lib.rs` + `frontend/js/save-ui.js`
@@ -8,7 +8,9 @@
 
 ## 一、定位与设计红线
 
-存档系统把「内核全量世界状态」序列化为 JSON，浏览器落 `localStorage`，支持三槽位与文件导入导出。
+存档系统把「内核全量世界状态」序列化为 JSON，支持两种持久化后端：
+1. **浏览器槽位**：三槽位落 `localStorage`，适合中小存档；
+2. **本地文件直写**（v1.11.0）：用户通过 File System Access API 连接一个本地 `.json` 文件后，存档直写用户磁盘，**不受浏览器存储配额限制**，适合长时间运行后的大存档。
 
 **三条设计红线**：
 
@@ -95,7 +97,7 @@ World3DEngine
 
 **读档后不重新注入 `window.SIM_CONFIG`**——存档自带 `SimConfig`，重注入会让前端热调参覆盖存档时的运行参数、破坏续演语义。
 
-### 4.2 UI 层 `save-ui.js`（新文件，~330 行）
+### 4.2 UI 层 `save-ui.js`（~620 行）
 
 - **三槽位**：自动槽（每 60 秒覆盖，世界未推进则跳过）/ 手动槽 1 / 手动槽 2。
 - **存储键**：正文 `flowaccord.save.v1.<slotId>`，元信息统一放索引键 `flowaccord.save.v1.__index`（避免正文重复占用配额）。
@@ -103,6 +105,16 @@ World3DEngine
 - **面板**：顶栏「💾 存档」「📂 读档」两个按钮打开同一面板，切换保存/读取标签；槽位卡片支持覆盖保存、读取、导出、删除（二次确认）；底部支持导入 `.json` 文件（校验 `format_version` 后直接载入）。
 - **读档后自动暂停**并同步顶栏暂停按钮文案，便于核对世界状态。
 - **Esc 关闭**走捕获阶段拦截，避免同时触发 Inspector 关闭逻辑。
+
+#### 4.2.1 本地文件存档（v1.11.0，File System Access API）
+
+- **连接**：`connectLocalFile()` 调 `showSaveFilePicker()` 让用户选择/新建一个 `.json` 文件，获得 `FileSystemFileHandle` 后存入 `localFileHandle`。
+- **写入**：`saveToLocalFile()` 经 `handle.createWritable()` → `write(json)` → `close()` 直写磁盘，无需重复弹窗。
+- **读取**：`loadFromLocalFile()` 从已连接文件读取；`loadFromLocalFilePicker()` 支持不先连接、直接 `showOpenFilePicker()` 打开任意存档文件。
+- **自动保存切换**：已连接本地文件时，`tickAutoSave()` 每 60 秒直写本地文件而非 localStorage，彻底规避大存档的 `QuotaExceededError`。
+- **兼容性降级**：`supportsLocalFileAPI()` 检测 `showSaveFilePicker`/`showOpenFilePicker`；不支持时（Firefox 等）隐藏连接按钮，读取标签下的「选择存档文件」降级到传统 `input[type=file]`，底部提示引导使用 Chrome/Edge。
+- **权限失效**：写入/读取捕获 `NotAllowedError`，自动 `disconnectLocalFile()` 并提示重新连接。
+- **句柄不持久化**：页面刷新后 `localFileHandle` 失效（浏览器安全策略），需用户重新连接。
 
 ---
 
@@ -115,7 +127,7 @@ World3DEngine
 | Test 3 存档读档确定性 | 同种子跑到存档点 → 存档 → 续演；对照组新建同种子世界跑到存档点 → 读档 → 续演同一步数，两组快照 JSON **逐字符串相等**；且读档后 `tick` 与存档时刻一致 |
 | Test 4 版本门禁 | 篡改 `format_version` 后 `world_load` 返回 `-3`，且**当前世界快照不变**（失败不污染内存） |
 
-当前实测：存档体积 **约 392 KB**（世界 60×60、30 名族人、10 座房屋），三槽位合计约 1.2 MB，在 localStorage 5 MB 配额内。
+当前实测：初始世界（60×60、20 名族人、无房屋）存档体积 **约 392 KB**；长时间运行后人口增长、账本流水累积，存档可达数 MB 甚至更大，可能超出 localStorage 5 MB 配额。**大存档请使用本地文件直写模式**（v1.11.0），存档直接写入用户磁盘，无配额限制。
 
 ---
 
@@ -126,3 +138,6 @@ World3DEngine
 3. **读档必须重建 `agent_index`**：遗漏会导致 `agent_by_id()` 返回错误下标或 panic。
 4. **读档必须强制重建地形快照**：不同种子的档地形不同，`_terrainCached` 不清会沿用旧地形。
 5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。
+6. **本地文件句柄不跨页面刷新持久化**（v1.11.0）：`FileSystemFileHandle` 仅在当前页面生命周期内有效，刷新后必须重新连接；不可假设句柄持久化，也不要尝试把句柄存入 localStorage（它不可序列化）。
+7. **`showSaveFilePicker`/`showOpenFilePicker` 必须在用户手势中调用**：不能在 `setInterval` 或异步回调中间接触发，否则浏览器会报 `SecurityError`。`connectLocalFile()` 和 `loadFromLocalFilePicker()` 均由按钮点击直接触发。
+8. **自动保存切换本地文件后不再写 localStorage**：已连接本地文件时 `tickAutoSave()` 直写磁盘，localStorage 自动槽不再更新——这是有意行为（避免双倍写入且大存档会撑爆 localStorage），断开连接后自动恢复 localStorage 模式。

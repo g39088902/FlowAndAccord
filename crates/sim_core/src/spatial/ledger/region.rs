@@ -49,6 +49,23 @@ pub enum Succession {
 }
 
 // ══════════════════════════════════════════════════════════════
+// HistoryKing：历史国王记录（含在位时长与死因，v1.12.0）
+// ══════════════════════════════════════════════════════════════
+
+/// 历史国王完整记录：前任国王离任/驾崩后入档，现任不入档
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryKing {
+    /// 国王 AgentId
+    pub agent_id: AgentId,
+    /// 登基 tick（reign_start）
+    pub reign_start_tick: u64,
+    /// 退位/驾崩 tick（reign_end）
+    pub reign_end_tick: u64,
+    /// 死因（仅驾崩时有值；被废黜/仍在世则为 None）
+    pub death_cause: Option<String>,
+}
+
+// ══════════════════════════════════════════════════════════════
 // Region：单个地区团体（按营地聚合，领导者=国王）
 // ══════════════════════════════════════════════════════════════
 
@@ -66,8 +83,10 @@ pub struct Region {
     /// 到达时序：按 (arrival_tick, agent_id) 升序排序的 agent_id 列表
     /// 初王顺位与绝嗣继承均依赖此序
     pub arrival_order: Vec<AgentId>,
-    /// ★ v1.9.0 历史国王（已离任/驾崩的所有前任国王，不含现任），前端营地卡片展示
-    pub history_kings: Vec<AgentId>,
+    /// ★ v1.12.0 历史国王（已离任/驾崩的所有前任国王，不含现任），含在位时长与死因
+    pub history_kings: Vec<HistoryKing>,
+    /// ★ v1.12.0 现任国王登基 tick（None = 王位空悬），用于计算在位时长
+    pub current_reign_start: Option<u64>,
 }
 
 impl Region {
@@ -80,20 +99,31 @@ impl Region {
             succession: Succession::Primogeniture,
             arrival_order: Vec::new(),
             history_kings: Vec::new(),
+            current_reign_start: None,
         }
     }
 
     /// 更替国王并记录历史国王（历史 = 所有离任/驾崩的前任国王；现任不入档）
-    pub fn set_king(&mut self, agent: AgentId, tick: u64, note: &str) -> bool {
+    /// prev_death_cause：前任国王的死因（仅驾崩时有值，由调用方从 agent 读取）
+    pub fn set_king(&mut self, agent: AgentId, tick: u64, note: &str, prev_death_cause: Option<String>) -> bool {
         if !self.group.members.contains(&agent) {
             return false;
         }
         if let Some(prev) = self.group.leader {
-            if prev != agent && !self.history_kings.contains(&prev) {
-                self.history_kings.push(prev);
+            if prev != agent && !self.history_kings.iter().any(|h| h.agent_id == prev) {
+                self.history_kings.push(HistoryKing {
+                    agent_id: prev,
+                    reign_start_tick: self.current_reign_start.unwrap_or(0),
+                    reign_end_tick: tick,
+                    death_cause: prev_death_cause,
+                });
             }
         }
-        self.group.set_leader(agent, tick, note)
+        let ok = self.group.set_leader(agent, tick, note);
+        if ok {
+            self.current_reign_start = Some(tick);
+        }
+        ok
     }
 
     /// 插入 agent 到 arrival_order 的正确位置（按 (arrival_tick, agent_id) 升序）
@@ -254,8 +284,8 @@ impl World3DEngine {
     // ══════════════════════════════════════════════════════════
 
     fn update_kings(&mut self, tick: u64) {
-        // READ PHASE：收集每个地区的新国王候选
-        let mut successions: Vec<(u32, Option<AgentId>)> = Vec::new();
+        // READ PHASE：收集每个地区的新国王候选 + 前任国王死因
+        let mut successions: Vec<(u32, Option<AgentId>, Option<String>)> = Vec::new();
 
         for (camp_id, region) in &self.region_registry.regions {
             let mut new_king: Option<AgentId> = None;
@@ -271,12 +301,15 @@ impl World3DEngine {
 
             // 仅在国王实际变化时记录（避免每 tick 刷事件）
             if region.group.leader != new_king {
-                successions.push((*camp_id, new_king));
+                let prev_death_cause = region.group.leader.and_then(|prev_id| {
+                    self.agent_by_id(prev_id).and_then(|a| a.death_cause.clone())
+                });
+                successions.push((*camp_id, new_king, prev_death_cause));
             }
         }
 
         // WRITE PHASE：应用国王更替
-        for (camp_id, new_king) in successions {
+        for (camp_id, new_king, prev_death_cause) in successions {
             let Some(region) = self.region_registry.regions.get_mut(&camp_id) else { continue };
             let camp_name = self.pois.iter()
                 .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
@@ -286,15 +319,16 @@ impl World3DEngine {
                 Some(id) => {
                     if region.group.leader.is_none() {
                         // 初王登基
-                        region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name));
+                        region.set_king(id, tick, &format!("初王登基：arrival_order 最早到达在世男性，【{}】开国", camp_name), None);
                         self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
                     } else {
-                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name));
+                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name), prev_death_cause);
                     }
                 }
                 None => {
                     // 无在世男性：王位空悬，账本冻结
                     region.group.leader = None;
+                    region.current_reign_start = None;
                     region.group.ledger.push_event(tick, format!("👑 【{}】无在世男性，王位空悬，公仓账本冻结", camp_name));
                 }
             }
@@ -380,14 +414,16 @@ impl World3DEngine {
         };
 
         // WRITE：应用继承
+        let prev_death_cause = self.agent_by_id(dead_king_id).and_then(|a| a.death_cause.clone());
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
             match heir {
                 Some(heir_id) => {
-                    region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name));
+                    region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name), prev_death_cause);
                     self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！", camp_name, dead_king_id, heir_id));
                 }
                 None => {
                     region.group.leader = None;
+                    region.current_reign_start = None;
                     region.group.ledger.push_event(tick, format!("👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬，公仓账本冻结", camp_name, dead_king_id));
                     self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬！", camp_name, dead_king_id));
                 }

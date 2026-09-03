@@ -3,7 +3,7 @@ use super::ledger::journal::ResourceKind;
 use super::poi::PoiType;
 use super::house::HouseSnapshot;
 use super::snapshot::{
-    AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
+    AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
     MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
@@ -361,8 +361,13 @@ impl World3DEngine {
                 .map(|a| a.id)
                 .collect();
 
-            // ★ v1.9.0 历史国王 / 居民列表 / 管辖家庭
-            let history_kings: Vec<u32> = region.history_kings.clone();
+            // ★ v1.12.0 历史国王（含在位时长与死因）/ 居民列表 / 管辖家庭
+            let history_kings: Vec<HistoryKingSnapshot> = region.history_kings.iter().map(|hk| HistoryKingSnapshot {
+                agent_id: hk.agent_id,
+                reign_start_tick: hk.reign_start_tick,
+                reign_end_tick: hk.reign_end_tick,
+                death_cause: hk.death_cause.clone(),
+            }).collect();
             let member_ids: Vec<u32> = region.group.members.iter().copied().collect();
             let governed_households: Vec<u64> = self.household_registry.households.iter()
                 .filter(|(_, hh)| !hh.is_dissolved && self.region_registry.region_of(hh.head) == Some(*camp_id))
@@ -385,6 +390,7 @@ impl World3DEngine {
                 history_kings,
                 member_ids,
                 governed_households,
+                current_reign_start: region.current_reign_start,
             });
         }
 

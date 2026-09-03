@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.10.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.12.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -539,34 +539,14 @@
           <div class="meter-label"><span id="lbl-camp-upgrade-title" style="color:#facc15;">🏛️ 辖区私宅与聚落晋升</span><span id="insp-camp-upgrade-val">0 / 6 间房</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-camp-upgrade-fill" style="background:#facc15; width:0%;"></div></div>
         </div>
-        <!-- ★ v1.9.0 营地王国信息与王国账本（Task3：国王/继承人/历史国王/管辖家庭/国家账本） -->
+        <!-- ★ v1.12.0 营地一级卡片仅展示国王 + 详情按钮；继承人/历史国王/管辖家庭/账本/空置房移入详情模态框 -->
         <div id="insp-camp-kingdom-box" style="display:none; flex-direction:column; gap:6px; border-top:1px dashed rgba(148,163,184,0.25); padding-top:6px;">
-          <div style="font-size:11px; color:#facc15; font-weight:600;">👑 王国 · 营地辖区（地区政体）</div>
           <div class="poi-info-badge">
             <div><strong>👑 国王:</strong> <span id="insp-camp-king">—</span></div>
-            <div><strong>🤴 继承人:</strong> <span id="insp-camp-heir">—</span></div>
-            <div><strong>📜 历史国王:</strong> <span id="insp-camp-hist-kings">—</span></div>
-            <div><strong>🏛️ 管辖家庭:</strong> <span id="insp-camp-governed">—</span></div>
           </div>
-          <div style="font-size:10.5px; color:#94a3b8;">💰 王国账本（公仓 · 税赋/救济/遗产归并）</div>
-          <div class="meter-row">
-            <div class="meter-label plain-stock"><span style="color:#38bdf8;">💧 水</span><span id="insp-camp-ledger-water">0.0</span></div>
-          </div>
-          <div class="meter-row">
-            <div class="meter-label plain-stock"><span style="color:#10b981;">🍒 粮</span><span id="insp-camp-ledger-food">0.0</span></div>
-          </div>
-          <div class="meter-row">
-            <div class="meter-label plain-stock"><span style="color:#d97706;">🌲 木</span><span id="insp-camp-ledger-wood">0.0</span></div>
-          </div>
-          <div class="meter-row">
-            <div class="meter-label plain-stock"><span style="color:#94a3b8;">🪨 石</span><span id="insp-camp-ledger-stone">0.0</span></div>
-          </div>
-          <div class="meter-row">
-            <div class="meter-label plain-stock"><span style="color:#fbbf24;">🪙 金</span><span id="insp-camp-ledger-gold">0.0</span></div>
-          </div>
-          <div id="insp-camp-ledger-journal" style="font-size:10px; color:#94a3b8; line-height:1.5;"></div>
+          <button id="btn-camp-detail" class="camp-detail-btn" style="width:100%; padding:6px 10px; background:rgba(250,204,21,0.12); border:1px solid rgba(250,204,21,0.35); color:#facc15; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">📜 查看辖区详情（继承人/历史国王/管辖家庭/空置房/公仓）</button>
         </div>
-        <div class="poi-info-badge">
+        <div class="poi-info-badge" id="insp-poi-info-badge">
           <div><strong>🌱 产出速率:</strong> <span id="insp-poi-regen">+2.00 单位/秒</span></div>
           <div><strong>🏞️ 地形地貌:</strong> <span id="insp-poi-elev">低洼谷地</span></div>
           <div><strong>📍 所属辖区:</strong> <span id="insp-poi-coord">桃源辖区</span></div>
@@ -924,6 +904,55 @@
         <span class="save-hint" id="save-storage-hint"></span>
       </div>
       <input type="file" id="save-file-input" accept="application/json,.json" style="display:none;">
+    </div>
+  </div>
+
+  <!-- ══════════ 🏛️ 营地辖区详情模态框 (v1.12.0) ══════════ -->
+  <div class="camp-detail-backdrop" id="camp-detail-backdrop" style="display:none;">
+    <div class="camp-detail-modal">
+      <div class="camp-detail-header">
+        <span id="camp-detail-title">🏛️ 辖区详情</span>
+        <button id="camp-detail-close" class="camp-detail-close" title="关闭 (Esc)" aria-label="关闭辖区详情">✕</button>
+      </div>
+      <div class="camp-detail-body" id="camp-detail-body">
+        <!-- 国王 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">👑 现任国王</div>
+          <div id="camp-detail-king" class="camp-detail-content">—</div>
+        </div>
+        <!-- 继承人 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">🤴 继承人（长子继承制）</div>
+          <div id="camp-detail-heir" class="camp-detail-content">—</div>
+        </div>
+        <!-- 历史国王 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">📜 历史国王（含在位时长与死因）</div>
+          <div id="camp-detail-hist-kings" class="camp-detail-content">—</div>
+        </div>
+        <!-- 管辖家庭 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">🏛️ 管辖家庭（存续家户）</div>
+          <div id="camp-detail-governed" class="camp-detail-content">—</div>
+        </div>
+        <!-- 空置房屋 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">🏚️ 空置房屋（户主故去·待确权）</div>
+          <div id="camp-detail-vacant" class="camp-detail-content">—</div>
+        </div>
+        <!-- 王国账本 -->
+        <div class="camp-detail-section">
+          <div class="camp-detail-section-title">💰 王国公仓账本（税赋/救济/遗产归并）</div>
+          <div class="camp-detail-ledger">
+            <div class="meter-row"><div class="meter-label plain-stock"><span style="color:#38bdf8;">💧 水</span><span id="camp-detail-ledger-water">0.0</span></div></div>
+            <div class="meter-row"><div class="meter-label plain-stock"><span style="color:#10b981;">🍒 粮</span><span id="camp-detail-ledger-food">0.0</span></div></div>
+            <div class="meter-row"><div class="meter-label plain-stock"><span style="color:#d97706;">🌲 木</span><span id="camp-detail-ledger-wood">0.0</span></div></div>
+            <div class="meter-row"><div class="meter-label plain-stock"><span style="color:#94a3b8;">🪨 石</span><span id="camp-detail-ledger-stone">0.0</span></div></div>
+            <div class="meter-row"><div class="meter-label plain-stock"><span style="color:#fbbf24;">🪙 金</span><span id="camp-detail-ledger-gold">0.0</span></div></div>
+          </div>
+          <div id="camp-detail-ledger-journal" class="camp-detail-journal"></div>
+        </div>
+      </div>
     </div>
   </div>
 

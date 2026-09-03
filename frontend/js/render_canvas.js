@@ -217,6 +217,8 @@ if (now - lastUiUpdate >= 100) {
 
   // 7. 刷新动态 Inspector 面板
   updateInspector();
+  // ★ v1.12.0 刷新营地辖区详情模态框（若打开）
+  if (typeof window._campDetailTick === 'function') window._campDetailTick();
 
 // 🐞 采样本帧「渲染 + UI」耗时与整帧耗时 (调试模式下)
 if (sim.debugMode) {

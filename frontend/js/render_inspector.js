@@ -65,6 +65,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     houseView.style.display = 'flex';
     if (followBtn) followBtn.style.display = 'none';
 
+    // ★ v1.12.0 恢复营地视图可能隐藏的元素
+    const tsHouse = document.getElementById('insp-title-state');
+    if (tsHouse) tsHouse.style.display = '';
+    const dtHouse = document.getElementById('insp-detail-text');
+    if (dtHouse) dtHouse.style.display = '';
+    const pibHouse = document.getElementById('insp-poi-info-badge');
+    if (pibHouse) pibHouse.style.display = '';
+
     const isWarehouse = house.tier === 'Tier0Warehouse';
     let tierTitle = '📦 0级 仓库';
     if (house.tier === 'Tier1ThatchedHut') tierTitle = '🛖 1级 茅草房';
@@ -186,26 +194,28 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
     const poiIcon = poi.type === 'Camp' ? ((poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️')) : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨'))));
     document.getElementById('insp-title-name').textContent = poi.type === 'Camp' ? `${poiIcon} ${poi.campTitle || poi.name}` : `${poiIcon} ${poi.name}`;
-    
-    let stateBadge = '资源充足';
-    let badgeColor = '#10b981';
+
+    // ★ v1.12.0 营地删除标题右侧 state-badge；等级+辖房数移入晋升条标题
+    const titleStateEl = document.getElementById('insp-title-state');
     if (poi.type === 'Camp') {
-      const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
-      const vacantCount = (poi.vacantHouses && poi.vacantHouses.length) || 0;
-      stateBadge = `${lvlNames[poi.level || 0]} · 辖 ${poi.boundHouses || 0} 房${vacantCount > 0 ? ` · ${vacantCount}空置` : ''}`;
-      badgeColor = '#f59e0b';
-    } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
-      stateBadge = '无限供应';
-      badgeColor = '#f59e0b';
-    } else if (poi.currentStock < 4.0) {
-      stateBadge = '资源枯竭中';
-      badgeColor = '#ef4444';
-    } else if (poi.currentStock < poi.maxStock * 0.4) {
-      stateBadge = '储量偏低';
-      badgeColor = '#f59e0b';
+      if (titleStateEl) titleStateEl.style.display = 'none';
+    } else {
+      if (titleStateEl) titleStateEl.style.display = '';
+      let stateBadge = '资源充足';
+      let badgeColor = '#10b981';
+      if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
+        stateBadge = '无限供应';
+        badgeColor = '#f59e0b';
+      } else if (poi.currentStock < 4.0) {
+        stateBadge = '资源枯竭中';
+        badgeColor = '#ef4444';
+      } else if (poi.currentStock < poi.maxStock * 0.4) {
+        stateBadge = '储量偏低';
+        badgeColor = '#f59e0b';
+      }
+      titleStateEl.textContent = stateBadge;
+      titleStateEl.style.color = badgeColor;
     }
-    document.getElementById('insp-title-state').textContent = stateBadge;
-    document.getElementById('insp-title-state').style.color = badgeColor;
 
     const stockRow = document.getElementById('insp-poi-stock-row');
     const campUpgradeRow = document.getElementById('insp-camp-upgrade-row');
@@ -213,18 +223,21 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       stockRow.style.display = 'none';
       if (campUpgradeRow) {
         campUpgradeRow.style.display = 'flex';
+        const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
+        const vacantCount = (poi.vacantHouses && poi.vacantHouses.length) || 0;
         const nextTarget = (poi.level || 0) === 0 ? 6 : ((poi.level || 0) === 1 ? 12 : ((poi.level || 0) === 2 ? 18 : 24));
         const prevTarget = (poi.level || 0) === 0 ? 0 : ((poi.level || 0) === 1 ? 6 : ((poi.level || 0) === 2 ? 12 : 18));
         const count = poi.boundHouses || 0;
         const nextTitle = (poi.level || 0) === 0 ? '村落 (6房)' : ((poi.level || 0) === 1 ? '乡集 (12房)' : ((poi.level || 0) === 2 ? '集镇 (18房)' : '县邑 (24房)'));
-        
+        const lvlLabel = `${lvlNames[poi.level || 0]} · 辖 ${count} 房${vacantCount > 0 ? ` · ${vacantCount}空置` : ''}`;
+
         if ((poi.level || 0) >= 4) {
-          document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ 县级行政区 (已达最高级)`;
+          document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ ${lvlLabel} (已达最高级)`;
           document.getElementById('insp-camp-upgrade-val').textContent = `${count} 间私宅`;
           document.getElementById('insp-camp-upgrade-fill').style.width = '100%';
         } else {
           const ratio = Math.min(100, Math.round(((count - prevTarget) / (nextTarget - prevTarget)) * 100));
-          document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ 晋升 ${nextTitle}`;
+          document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ ${lvlLabel} → 晋升 ${nextTitle}`;
           document.getElementById('insp-camp-upgrade-val').textContent = `${count} / ${nextTarget} 间房`;
           document.getElementById('insp-camp-upgrade-fill').style.width = `${Math.max(0, ratio)}%`;
         }
@@ -253,7 +266,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
     }
 
-    // ★ v1.9.0 营地王国信息与王国账本（Task3：国王/继承人/历史国王/管辖家庭/国家账本）
+    // ★ v1.12.0 营地一级卡片仅展示国王 + 详情按钮；继承人/历史国王/管辖家庭/账本/空置房移入详情模态框
     const kingdomBox = document.getElementById('insp-camp-kingdom-box');
     if (kingdomBox) {
       const region = sim.regions.find(r => r.campId === poi.id);
@@ -267,86 +280,49 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
             kingEl.innerHTML = `<span style="color:#ef4444;">王位空缺（可被夺位）</span>`;
           }
         }
-        const heirEl = document.getElementById('insp-camp-heir');
-        if (heirEl) {
-          const heirId = (region.heirCandidates || [])[0];
-          if (heirId != null) {
-            heirEl.innerHTML = `<span class="lineage-chip" data-agent-id="${heirId}" title="点击追踪继承人视角">🤴 Agent #${heirId}</span>`;
-          } else {
-            heirEl.textContent = '—';
-          }
-        }
-        const histEl = document.getElementById('insp-camp-hist-kings');
-        if (histEl) {
-          const hk = region.historyKings || [];
-          if (hk.length > 0) {
-            histEl.innerHTML = hk.map(kid => `<span class="lineage-chip dead" data-agent-id="${kid}" title="点击查看历史国王">#${kid}</span>`).join(' ');
-          } else {
-            histEl.textContent = '—';
-          }
-        }
-        const govEl = document.getElementById('insp-camp-governed');
-        if (govEl) {
-          const ghs = region.governedHouseholds || [];
-          if (ghs.length > 0) {
-            govEl.textContent = ghs.map(hid => {
-              const hh = (sim.households || []).find(h => h.id === hid);
-              const n = hh && hh.members ? hh.members.length : '?';
-              return `🏠#${hid}(${n}人)`;
-            }).join('  ');
-          } else {
-            govEl.textContent = '—';
-          }
-        }
-        const resMap = { Water: 'insp-camp-ledger-water', Food: 'insp-camp-ledger-food', Wood: 'insp-camp-ledger-wood', Stone: 'insp-camp-ledger-stone', Gold: 'insp-camp-ledger-gold' };
-        for (const rk of Object.keys(resMap)) {
-          const el = document.getElementById(resMap[rk]);
-          if (el) el.textContent = ((region.balances && region.balances[rk]) || 0).toFixed(1);
-        }
-        const jEl = document.getElementById('insp-camp-ledger-journal');
-        if (jEl) {
-          const jn = (region.recentJournal || []).slice(0, 4);
-          if (jn.length > 0) {
-            jEl.innerHTML = jn.map(r => {
-              const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承' }[r.reason] || r.reason;
-              return `<div>· ${reasonZh} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`;
-            }).join('');
-          } else {
-            jEl.textContent = '';
-          }
-        }
       } else {
         kingdomBox.style.display = 'none';
       }
     }
+
+    // ★ v1.12.0 营地删除 poi-info-badge（产出速率/地形/辖区）和描述文本
+    const poiInfoBadge = document.getElementById('insp-poi-info-badge');
+    const detailTextEl = document.getElementById('insp-detail-text');
+    if (poi.type === 'Camp') {
+      if (poiInfoBadge) poiInfoBadge.style.display = 'none';
+      if (detailTextEl) detailTextEl.style.display = 'none';
+    } else {
+      if (poiInfoBadge) poiInfoBadge.style.display = '';
+      if (detailTextEl) detailTextEl.style.display = '';
 
     document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (公共避风聚落)`;
     const elevEl = document.getElementById('insp-poi-elev');
     if (elevEl) elevEl.textContent = poi.pos.z < -10 ? '低洼谷地 (汇水充盈)' : (poi.pos.z > 10 ? '峻峭高台 (视野开阔)' : '平缓原野 (适宜定居)');
     const poiCoordEl = document.getElementById('insp-poi-coord');
     if (poiCoordEl) poiCoordEl.textContent = poi.type === 'Camp' ? '聚落中心' : (poi.campTitle ? `${poi.campTitle} 领地` : '荒原公域');
-    
+
     let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
-    // ★ v1.10.0 营地空置房屋列表展示（户主故去→无主空置→登记受益人）
-    if (poi.type === 'Camp' && poi.vacantHouses && poi.vacantHouses.length > 0) {
-      const vhLines = poi.vacantHouses.map(vh => {
-        const ben = (vh.beneficiaryIds && vh.beneficiaryIds.length > 0) ? vh.beneficiaryIds.join(', ') : '无';
-        return `  🏚️ 房屋 #${vh.houseId} → 受益人: ${ben}`;
-      }).join('\n');
-      desc += `\n\n【空置房屋登记】(${poi.vacantHouses.length} 间无主空置房)\n${vhLines}`;
-    }
     if (poi.type === 'Water') desc = '低洼处天然地泉(上限60单位,产速2.0/s)，小人饮水并补给家宅。';
     else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
     else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
     else if (poi.type === 'Stone') desc = '嶙峋高地石矿(上限60单位,产速1.5/s)，采石仅用于私宅升级木石庄舍与大庄园。';
     else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。';
     document.getElementById('insp-detail-text').textContent = desc;
+    }
   }
 } else {
   agentView.style.display = 'block';
   poiView.style.display = 'none';
   houseView.style.display = 'none';
   if (followBtn) followBtn.style.display = 'block';
+
+  // ★ v1.12.0 恢复营地视图可能隐藏的元素
+  const tsAgent = document.getElementById('insp-title-state');
+  if (tsAgent) tsAgent.style.display = '';
+  const dtAgent = document.getElementById('insp-detail-text');
+  if (dtAgent) dtAgent.style.display = '';
+  const pibAgent = document.getElementById('insp-poi-info-badge');
+  if (pibAgent) pibAgent.style.display = '';
 
   let selAgent = null;
   if (sim.selectedAgentId !== null) {
@@ -928,5 +904,172 @@ canvas.addEventListener('click', e => {
   else sim.selectedPoiId = chosen.id;
   clickCycle = { x: clickX, y: clickY };
 });
+
+// ══════════ 🏛️ 营地辖区详情模态框 (v1.12.0) ══════════
+(function () {
+  const TICK_PER_SEC = 30; // config.simulationDt * agentDecisionIntervalTicks = 1/30 * 30 = 1s
+  let currentCampPoi = null;
+
+  function fmtDuration(ticks) {
+    if (!ticks || ticks <= 0) return '—';
+    const secs = Math.floor(ticks / TICK_PER_SEC);
+    if (secs < 60) return secs + '秒';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return mins + '分' + (secs % 60) + '秒';
+    const hrs = Math.floor(mins / 60);
+    return hrs + '时' + (mins % 60) + '分';
+  }
+
+  function agentChip(id, cls, title) {
+    return `<span class="lineage-chip ${cls || ''}" data-agent-id="${id}" title="${title || '点击追踪'}">${cls === 'dead' ? '💀' : '👤'} #${id}</span>`;
+  }
+
+  function renderCampDetail() {
+    if (!currentCampPoi) return;
+    const sim = window.rustWorldSim;
+    const poi = currentCampPoi;
+    const region = (sim.regions || []).find(r => r.campId === poi.id);
+    const backdrop = document.getElementById('camp-detail-backdrop');
+    if (!backdrop) return;
+
+    document.getElementById('camp-detail-title').textContent = `🏛️ ${poi.campTitle || poi.name} · 辖区详情`;
+
+    // 国王
+    const kingEl = document.getElementById('camp-detail-king');
+    if (region && region.kingId != null) {
+      const reignSecs = region.currentReignStart != null ? fmtDuration(sim.tickCount - region.currentReignStart) : '—';
+      kingEl.innerHTML = `${agentChip(region.kingId, '', '点击追踪国王视角')} <span style="color:#94a3b8;font-size:11px;">· 在位 ${reignSecs}</span>`;
+    } else {
+      kingEl.innerHTML = '<span style="color:#ef4444;">王位空缺（可被夺位）</span>';
+    }
+
+    // 继承人
+    const heirEl = document.getElementById('camp-detail-heir');
+    const heirs = region ? (region.heirCandidates || []) : [];
+    if (heirs.length > 0) {
+      heirEl.innerHTML = heirs.map((hid, i) =>
+        `${i === 0 ? '🫅 第一顺位：' : ''}${agentChip(hid, '', '点击追踪继承人')}`
+      ).join('  ');
+    } else {
+      heirEl.textContent = '— 无明确继承人（绝嗣风险）';
+    }
+
+    // 历史国王（含在位时长与死因）
+    const histEl = document.getElementById('camp-detail-hist-kings');
+    const hks = region ? (region.historyKings || []) : [];
+    if (hks.length > 0) {
+      histEl.innerHTML = hks.map(hk => {
+        const dur = fmtDuration(hk.reignEndTick - hk.reignStartTick);
+        const cause = hk.deathCause ? ` · 💀 ${hk.deathCause}` : ' · 被废黜/仍在世';
+        return `<div style="margin-bottom:2px;">${agentChip(hk.agentId, 'dead', '点击查看先祖')} <span style="color:#94a3b8;font-size:11px;">在位 ${dur}${cause}</span></div>`;
+      }).join('');
+    } else {
+      histEl.textContent = '— 暂无历史国王记录';
+    }
+
+    // 管辖家庭
+    const govEl = document.getElementById('camp-detail-governed');
+    const ghs = region ? (region.governedHouseholds || []) : [];
+    if (ghs.length > 0) {
+      govEl.innerHTML = ghs.map(hid => {
+        const hh = (sim.households || []).find(h => h.id === hid);
+        const n = hh && hh.members ? hh.members.length : '?';
+        const head = hh && hh.headId != null ? `户主#${hh.headId}` : '';
+        return `<span style="display:inline-block;margin:1px 4px 1px 0;">🏠 #${hid} (${n}人${head ? ' · ' + head : ''})</span>`;
+      }).join('');
+    } else {
+      govEl.textContent = '— 暂无管辖家庭';
+    }
+
+    // 空置房屋
+    const vacEl = document.getElementById('camp-detail-vacant');
+    const vhs = poi.vacantHouses || [];
+    if (vhs.length > 0) {
+      vacEl.innerHTML = vhs.map(vh => {
+        const ben = (vh.beneficiaryIds && vh.beneficiaryIds.length > 0)
+          ? vh.beneficiaryIds.map(bid => agentChip(bid, 'dead', '受益人')).join(' ')
+          : '<span style="color:#94a3b8;">无受益人</span>';
+        return `<div style="margin-bottom:2px;">🏚️ 房屋 #${vh.houseId} → 受益人: ${ben}</div>`;
+      }).join('');
+    } else {
+      vacEl.textContent = '— 暂无空置房屋';
+    }
+
+    // 王国账本
+    if (region) {
+      const resMap = { Water: 'camp-detail-ledger-water', Food: 'camp-detail-ledger-food', Wood: 'camp-detail-ledger-wood', Stone: 'camp-detail-ledger-stone', Gold: 'camp-detail-ledger-gold' };
+      for (const rk of Object.keys(resMap)) {
+        const el = document.getElementById(resMap[rk]);
+        if (el) el.textContent = ((region.balances && region.balances[rk]) || 0).toFixed(1);
+      }
+      const jEl = document.getElementById('camp-detail-ledger-journal');
+      if (jEl) {
+        const jn = (region.recentJournal || []).slice(0, 6);
+        if (jn.length > 0) {
+          const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承' };
+          jEl.innerHTML = jn.map(r => `<div>· ${reasonZh[r.reason] || r.reason} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`).join('');
+        } else {
+          jEl.textContent = '暂无流水记录';
+        }
+      }
+    }
+  }
+
+  function openCampDetail(poi) {
+    currentCampPoi = poi;
+    renderCampDetail();
+    const backdrop = document.getElementById('camp-detail-backdrop');
+    if (backdrop) backdrop.style.display = 'flex';
+  }
+
+  function closeCampDetail() {
+    currentCampPoi = null;
+    const backdrop = document.getElementById('camp-detail-backdrop');
+    if (backdrop) backdrop.style.display = 'none';
+  }
+
+  function isCampDetailOpen() {
+    const backdrop = document.getElementById('camp-detail-backdrop');
+    return !!backdrop && backdrop.style.display !== 'none';
+  }
+
+  // 事件绑定：详情按钮（在营地渲染时动态存在，用事件委托）
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#btn-camp-detail');
+    if (btn) {
+      const sim = window.rustWorldSim;
+      if (sim && sim.selectionType === 'poi' && sim.selectedPoiId != null) {
+        const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
+        if (poi) openCampDetail(poi);
+      }
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'camp-detail-backdrop') closeCampDetail();
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('camp-detail-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeCampDetail);
+  });
+
+  // Esc 关闭（捕获阶段，避免与 Inspector 关闭冲突）
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isCampDetailOpen()) {
+      closeCampDetail();
+      e.stopPropagation();
+    }
+  }, true);
+
+  // 每帧刷新详情框内容（如果打开着）
+  window._campDetailTick = function () {
+    if (isCampDetailOpen() && currentCampPoi) {
+      const sim = window.rustWorldSim;
+      const poi = sim.pois.find(p => p.id === currentCampPoi.id);
+      if (poi) { currentCampPoi = poi; renderCampDetail(); }
+    }
+  };
+})();
 
 // 点击拾取需要的全局变量

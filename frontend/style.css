@@ -2783,3 +2783,112 @@
   border-color: rgba(56, 189, 248, 0.8);
 }
 .save-hint { font-size: 10px; line-height: 1.5; color: #64748b; }
+
+/* 本地文件存档卡片（v1.11.0） */
+.save-slot-card.local-file-card {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(255, 255, 255, 0.02));
+}
+.save-slot-card.local-file-card:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09), rgba(255, 255, 255, 0.03));
+}
+.save-slot-badge.local-connected {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+/* ══════════ 营地辖区详情模态框 (v1.12.0) ══════════ */
+.camp-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.camp-detail-modal {
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  background: linear-gradient(160deg, #1e293b, #0f172a);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: campDetailIn 0.2s ease-out;
+}
+@keyframes campDetailIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.camp-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(250, 204, 21, 0.06);
+}
+.camp-detail-header span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #facc15;
+}
+.camp-detail-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.camp-detail-close:hover { color: #f87171; background: rgba(248, 113, 113, 0.1); }
+.camp-detail-body {
+  padding: 12px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.camp-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.camp-detail-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #facc15;
+  letter-spacing: 0.3px;
+  padding-bottom: 2px;
+  border-bottom: 1px dashed rgba(250, 204, 21, 0.15);
+}
+.camp-detail-content {
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+.camp-detail-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+.camp-detail-journal {
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.camp-detail-btn:hover {
+  background: rgba(250, 204, 21, 0.2) !important;
+  border-color: rgba(250, 204, 21, 0.55) !important;
+}

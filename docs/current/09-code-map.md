@@ -73,6 +73,7 @@ FlowAndAccord/
 │   │   ├── dag.js                          # 族谱数据构建 + 模态编排 + Inspector
 │   │   ├── main.js                         # 页面交互、控制台、事件绑定、相机控制
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
+│   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   └── render.js                       # Canvas 渲染、Inspector、顶栏、大盘、调试监视器 (2130行，待拆分)
 │   ├── rust/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
