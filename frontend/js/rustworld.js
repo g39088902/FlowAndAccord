@@ -348,7 +348,7 @@
         }
 
         // --- POI ---
-        const poiTypeMap = { Camp: 'Camp', WaterSource: 'Water', BerryBush: 'Berry', WoodForest: 'Wood', StoneQuarry: 'Stone', GoldMine: 'Gold' };
+        const poiTypeMap = { Camp: 'Camp', WaterSource: 'Water', BerryBush: 'Berry', WoodForest: 'Wood', StoneQuarry: 'Stone', GoldMine: 'Gold', Market: 'Market' };
         this.pois = snap.pois.map(p => ({
           id: p.id,
           type: poiTypeMap[p.poi_type] || p.poi_type,
@@ -356,6 +356,11 @@
           currentStock: p.current_stock,
           maxStock: p.max_stock,
           regenRate: p.regen_rate,
+          secondaryStock: p.secondary_stock || 0,
+          secondaryMaxStock: p.secondary_max_stock || 0,
+          secondaryRegenRate: p.secondary_regen_rate || 0,
+          waterPrice: p.water_price || 0,
+          foodPrice: p.food_price || 0,
           name: p.name || (p.poi_type === 'Camp' ? '聚落 #' + p.id : (poiTypeMap[p.poi_type] || p.poi_type) + ' #' + p.id),
           campTitle: p.camp_title || p.name || ('聚落 #' + p.id),
           level: p.level || 0,

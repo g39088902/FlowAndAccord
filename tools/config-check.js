@@ -98,6 +98,7 @@ const IMPACT_PREFIX_RULES = [
 
   { prefix: 'regenBase', mod: 'ecology.rs / world_tick.rs (POI 再生速率)' },
   { prefix: 'stockMax', mod: 'poi.rs / ecology.rs (POI 储量上限)' },
+  { prefix: 'market', mod: 'poi.rs / ecology.rs / market.rs (外部市场与动态定价)' },
 
   { prefix: 'roadAstar', mod: 'graph.rs (A* 寻路权重)' },
   { prefix: 'roadConnect', mod: 'ecology.rs (路网连接距离)' },
@@ -324,11 +325,11 @@ function main() {
         errors.push('config.decision-order.js: 对象字面量求值失败');
       } else {
         const ids = o.decisionEvalOrder, lv = o.decisionEvalLevels;
-        const idOk = Array.isArray(ids) && ids.length === 14 && new Set(ids).size === 14
-          && ids.every(s => /^b(?:[1-9]|1[0-4])$/.test(s));
-        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 14 个互不重复的 b1..b14');
-        const lvOk = Array.isArray(lv) && lv.length === 14 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
-        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 14 个 0-5 整数');
+        const idOk = Array.isArray(ids) && ids.length === 15 && new Set(ids).size === 15
+          && ids.every(s => /^b(?:[1-9]|1[0-5])$/.test(s));
+        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 15 个互不重复的 b1..b15');
+        const lvOk = Array.isArray(lv) && lv.length === 15 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 15 个 0-5 整数');
       }
     }
   } else {

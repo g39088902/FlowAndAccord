@@ -20,7 +20,7 @@
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `poi.rs` | ~175 | PrimitivePoi 实体定义（23 处 POI：营地5/泉6/果6/木3/石2/金1）、ID 段位、储量再生 | 采收逻辑、初始化布局 |
+| `poi.rs` | ~210 | PrimitivePoi 实体定义（24 处 POI：营地5/泉6/果6/木3/石2/金1/榷场互市1）、ID 段位、储量再生与双库存计价 | 采收逻辑、初始化布局 |
 | `house.rs` | ~115 | House 实体（5 阶等级、耐久度、户主绑定）、HouseSnapshot | 施工计时、升级判定、继承（这些在 housing_system/） |
 | `agent.rs` | ~530 | Agent3D 实体（生理代谢、随身行囊、状态机、运动、施密特触发器、威望）、百家姓库、Gender/PrimitiveActionState 枚举 | 决策逻辑（在 decisions/）、POI 交互（在 ecology.rs） |
 
@@ -34,7 +34,7 @@
 | `world_config.rs` | ~50 | 配置注入与反序列化（apply_config_json / apply_config / set_regen_multiplier） | 配置结构体定义（在 config.rs） |
 | `world_season.rs` | ~40 | 四季更迭与宏观环境温度演化（正弦周期拟合） | tick 调度（在 world_tick.rs） |
 | `world_save.rs` | ~205 | **读档/存档契约（v1.8.0）**：`WorldSave` 全量状态结构体 + `to_save()` + `serialize_save()` / `deserialize_save()`（格式版本门禁 + 参数校验 + agent id 唯一性校验 + 按 seed 重建地形 + `rebuild_agent_index()`） | 各实体自身的 serde 实现（在各自文件：`graph.rs` 手写路网 serde、`poi.rs` 的 `finite_f32` 助手、`rng.rs` 的 WorldRng） |
-| `ecology.rs` | ~445 | 生态初始化（POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝）、分娩结算 | 决策（decisions/）、账本结构（ledger/） |
+| `ecology.rs` | ~445 | 生态初始化（POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝、榷场互市）、分娩结算 | 决策（decisions/）、账本结构（ledger/） |
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
 | `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology.rs / maintenance.rs 真实收付） |
 | `snapshot.rs` | ~290 | 全部快照结构体定义（WorldSnapshot3D / AgentSnapshot / HouseSnapshot / PoiSnapshot / NodeSnapshot / LaneSnapshot / HouseholdSnapshot / MarriageSnapshot / ClanSnapshot / RegionSnapshot / LedgerBalanceSnapshot / TransferRecordSnapshot / GeoCellSnapshot） | 快照赋值（在 world.rs）、前端映射（在 rustworld.js） |
@@ -43,7 +43,7 @@
 
 | 子目录 | 文件数 | 职责 | 局部指南 |
 |---|---|---|---|
-| `decisions/` | 8 | 马斯洛决策状态机：需求评估、分支注册表、寻路路由、采收判定、途中重路由、错峰调度 | `decisions/AGENTS.md` |
+| `decisions/` | 9 | 马斯洛决策状态机：需求评估、分支注册表、寻路路由、采收判定、途中重路由、商贸决策、错峰调度 | `decisions/AGENTS.md` |
 | `housing_system/` | 7 | 房屋全生命周期：施工升级、冬季供暖、耐久修缮、自动成婚、立宅选址、空置房登记 | `housing_system/AGENTS.md` |
 | `ledger/` | 8 | 账本与社会经济制度：账本内核、团体基类、婚姻登记簿、家户体系、宗族、地区王国 | `ledger/AGENTS.md` |
 

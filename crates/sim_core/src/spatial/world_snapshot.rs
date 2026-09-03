@@ -1,6 +1,6 @@
 use super::agent::{Gender, PrimitiveActionState};
 use super::ledger::journal::ResourceKind;
-use super::poi::PoiType;
+use super::poi::{PoiType, market_unit_price};
 use super::house::HouseSnapshot;
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
@@ -30,6 +30,14 @@ impl World3DEngine {
 
         let mut pois = Vec::new();
         for p in &self.pois {
+            let (water_price, food_price) = if p.poi_type == PoiType::Market {
+                (
+                    market_unit_price(p.current_stock, p.max_stock, &self.config),
+                    market_unit_price(p.secondary_stock, p.secondary_max_stock, &self.config),
+                )
+            } else {
+                (0.0, 0.0)
+            };
             pois.push(PoiSnapshot {
                 id: p.id,
                 poi_type: format!("{:?}", p.poi_type),
@@ -39,6 +47,11 @@ impl World3DEngine {
                 current_stock: p.current_stock,
                 max_stock: p.max_stock,
                 regen_rate: p.regen_rate,
+                secondary_stock: p.secondary_stock,
+                secondary_max_stock: p.secondary_max_stock,
+                secondary_regen_rate: p.secondary_regen_rate,
+                water_price,
+                food_price,
                 name: p.name.clone(),
                 camp_title: p.camp_title(),
                 level: p.level,

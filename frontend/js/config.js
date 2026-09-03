@@ -214,4 +214,19 @@ window.SIM_CONFIG = {
   ledgerReliefMinBalance: 30.0,     // 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济
   ledgerReliefFamilyThreshold: 8.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
   ledgerReliefCooldownTicks: 1200,  // 救济冷却 (tick)，每家户每 N tick 最多接收一次救济
+
+  // ==========================================================================
+  // 13. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
+  // ==========================================================================
+  countMarkets: 1,                          // 全图生成外部市场 POI 数量
+  marketStockMaxWater: 100.0,               // 外部市场清水储备容量上限
+  marketStockMaxFood: 100.0,                // 外部市场粮食储备容量上限
+  marketRegenBaseWater: 2.0,                // 外部市场清水每秒自然再生速率
+  marketRegenBaseFood: 2.0,                 // 外部市场粮食每秒自然再生速率
+  marketPriceBase: 0.1,                     // 满库存起步基准单价 (黄金 / 单位资源)
+  marketPricePowerExponent: 2.0,            // 幂律定价指数 k
+  marketPriceFloorStock: 1.0,               // 计价库存钳制下限 (防除零与价格封顶)
+  marketEmergencyFamilyStockThreshold: 10.0,// 家户物资绝境警戒线
+  marketMinFamilyGold: 0.5,                 // 户主准入起步黄金底线
+  marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
 };

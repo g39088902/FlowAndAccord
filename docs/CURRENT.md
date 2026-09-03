@@ -1,8 +1,8 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.6.1（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（169 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
+> **版本**：v1.13.0（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **超参配置**：全部可调超参（181 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -15,13 +15,13 @@
                        └──────────────┬───────────────┘
                                       ▼
                        ┌──────────────────────────────┐
-                       │   有限生态地标 (23处 POI)    │
-                       │ (营地5/清泉6/浆果6/林木3/石矿2/金矿1)│
+                       │   有限生态地标 (24处 POI)    │
+                       │ (营地5/清泉6/浆果6/林木3/石2/金1/市1)│
                        └──────────────┬───────────────┘
                                       ▼
                        ┌──────────────────────────────┐
                        │   部落民 AI 层次化动机引擎   │
-                       │ (生理自救/建仓备货/淘金/成家) │
+                       │ (生理自救/建仓备货/榷场/淘金/成家) │
                        └──────────────┬───────────────┘
          ┌────────────────────────────┼────────────────────────────┐
          ▼                            ▼                            ▼
@@ -35,7 +35,7 @@
                        ┌──────────────────────────────────────────────┐
                        │  📒 账本与社会经济制度系统 (M1~M4 已落地)    │
                        │ (家户/婚姻/宗族/王国 · 旁路记账/分家继承/     │
-                       │  族税互助/公仓赋税救济/夺位远征)             │
+                       │  族税互助/公仓赋税救济/夺位远征/榷场商贸)     │
                        └──────────────────────────────────────────────┘
 ```
 
@@ -46,7 +46,7 @@
 | # | 功能模块 | 文档路径 | 主要内容 |
 | :--- | :--- | :--- | :--- |
 | 1 | 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`) | [01-spatial-network.md](./current/01-spatial-network.md) | 连续 3D 地形、贝塞尔路网、A\* 寻路、踏路成道、5 阶恒宽色彩 |
-| 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 23 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
+| 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 24 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
 | 3 | ❄️ 四季更替与热力学供暖系统 (`seasons`) | [03-seasons-climate.md](./current/03-seasons-climate.md) | 240s 四季年轮模型、冬季供暖消耗、低温受孕安全红线 |
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |
 | 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记 |
@@ -60,7 +60,8 @@
 | 13 | 🔗 跨模块影响矩阵 | [13-impact-matrix.md](./current/13-impact-matrix.md) | 改 X 牵动哪些文件的速查表、tick 内部调用顺序、数据流向图、脚本加载顺序、改动前自检清单 |
 | 14 | 🔒 核心不变量集中清单 | [14-invariants.md](./current/14-invariants.md) | 确定性/数据一致性/行为语义/构建部署/代码组织/前端 DOM 六大类硬约束，每条标注来源与违反后果，末尾附 10 秒快速自检清单 |
 | 15 | 💾 读档 / 存档系统 | [15-save-load.md](./current/15-save-load.md) | `WorldSave` 全量状态契约、排除字段与重建方式、WASM 导出与错误码、三槽位 localStorage 与导入导出、确定性验证与易踩坑 |
-| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.8.0 各版本核心机制改动 |
+| 16 | 🏪 外部市场与动态价格系统 (`market`) | [16-market-pricing.md](./current/16-market-pricing.md) | 榷场互市 POI、次级库存、幂律动态定价、B15 榷场商贸决策、黄金流出虚空闭环 |
+| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.13.0 各版本核心机制改动 |
 
 ---
 

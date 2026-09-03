@@ -87,6 +87,15 @@
 | 前端 JS/CSS/HTML 变更 | 浏览器 Ctrl+F5 刷新 / 版本号自增 / 如涉及快照字段须三处同步 | 前端纯静态，改完即生效 |
 | `.github/workflows/deploy.yml` 变更 | 4 个 Secrets 配置 / COS MIME 覆写 / 门禁顺序 / `docs/cicd-guide.md` | §4.13 CI/CD 使用标准 rustup，非便携工具链 |
 
+### 1.10 外部市场与动态价格系统 (v1.13.0)
+
+| 改动对象 | 必须同步改动 | 原因 |
+|---|---|---|
+| 外部市场 POI 实体 (`poi.rs`) | `ecology.rs` 播撒与双库存再生 / `snapshot.rs` secondary_* / `world_snapshot.rs` / `rustworld.js` / `render_world.js` 绘制 / `render_inspector.js` 弹窗 | 市场是双库存且动态计价的特殊 POI，独立于 NodePool |
+| 动态定价算法 (`market_unit_price`) | `world_snapshot.rs` 快照单价计算 / `ecology.rs` 现场交易计费 / `decisions/market.rs` / `config.rs` + `config.js` 超参 / 16-market-pricing.md | 幂律定价纯函数，全链条调用须一致 |
+| 外部商贸决策分支 (`decisions/market.rs`) | `branches.rs` (定长数组 15 / ALL / resolve_order / seen) / `evaluate.rs` / `server.js` VALID_BRANCH_ID / `config.decision-order.js` / `decision-viz-data.js` / `config-check.js` | 决策分支定长数组严格全链条联动 |
+| 外部商贸资金流失记账 | `ledger/journal.rs` TransferReason::Market / `ecology.rs` debit 家户黄金转至 Void / `12-ledger-system.md` | 黄金单向流失沉淀，形成通缩调节机制 |
+
 ---
 
 ## 二、tick 内部调用顺序（勿打乱）

@@ -138,7 +138,7 @@ impl<'a> Decisioner<'a> {
                 PoiType::WoodForest => NodePool::Wood,
                 PoiType::StoneQuarry => NodePool::Stone,
                 PoiType::GoldMine => NodePool::Gold,
-                PoiType::Camp => return false,
+                PoiType::Camp | PoiType::Market => return false,
             };
             if let Some(target) = pool.nodes(self.ctx).iter().find(|target| target.node == target_node) {
                 return !agent.poi_is_seekable(target.poi_id);
@@ -150,7 +150,7 @@ impl<'a> Decisioner<'a> {
             PoiType::WoodForest => NodePool::Wood,
             PoiType::StoneQuarry => NodePool::Stone,
             PoiType::GoldMine => NodePool::Gold,
-            PoiType::Camp => return false,
+            PoiType::Camp | PoiType::Market => return false,
         })
     }
 }

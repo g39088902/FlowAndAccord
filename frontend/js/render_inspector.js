@@ -192,7 +192,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     poiView.style.display = 'flex';
     if (followBtn) followBtn.style.display = 'none';
 
-    const poiIcon = poi.type === 'Camp' ? ((poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️')) : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨'))));
+    const poiIcon = poi.type === 'Camp' ? ((poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️')) : (poi.type === 'Market' ? '🏪' : (poi.type === 'Water' ? '💧' : (poi.type === 'Berry' ? '🍒' : (poi.type === 'Wood' ? '🌲' : (poi.type === 'Gold' ? '🪙' : '🪨')))));
     document.getElementById('insp-title-name').textContent = poi.type === 'Camp' ? `${poiIcon} ${poi.campTitle || poi.name}` : `${poiIcon} ${poi.name}`;
 
     // ★ v1.12.0 营地删除标题右侧 state-badge；等级+辖房数移入晋升条标题
@@ -203,7 +203,10 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       if (titleStateEl) titleStateEl.style.display = '';
       let stateBadge = '资源充足';
       let badgeColor = '#10b981';
-      if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
+      if (poi.type === 'Market') {
+        stateBadge = `水:${(poi.waterPrice || 0.1).toFixed(2)}金 | 粮:${(poi.foodPrice || 0.1).toFixed(2)}金`;
+        badgeColor = '#f59e0b';
+      } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
         stateBadge = '无限供应';
         badgeColor = '#f59e0b';
       } else if (poi.currentStock < 4.0) {
@@ -261,8 +264,13 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else if (poi.type === 'Gold') {
         document.getElementById('lbl-poi-stock-title').textContent = '璀璨金矿 (上限60.0)';
         document.getElementById('insp-poi-stock-fill').style.background = '#fbbf24';
+      } else if (poi.type === 'Market') {
+        document.getElementById('lbl-poi-stock-title').textContent = `榷场双储备 (水:${poi.currentStock.toFixed(1)}/粮:${poi.secondaryStock.toFixed(1)})`;
+        document.getElementById('insp-poi-stock-fill').style.background = '#f59e0b';
       }
-      document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
+      document.getElementById('insp-poi-stock-val').textContent = poi.type === 'Market' 
+        ? `水:${poi.currentStock.toFixed(1)}/100 · 粮:${poi.secondaryStock.toFixed(1)}/100`
+        : `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
       document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
     }
 
@@ -307,6 +315,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';
     else if (poi.type === 'Stone') desc = '嶙峋高地石矿(上限60单位,产速1.5/s)，采石仅用于私宅升级木石庄舍与大庄园。';
     else if (poi.type === 'Gold') desc = '璀璨金矿(上限60单位,产速1.2/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。';
+    else if (poi.type === 'Market') desc = `外部边境榷场互市(双库存)，提供外部清水(当前单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金)与粮食(当前单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金)应急兑换。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
     document.getElementById('insp-detail-text').textContent = desc;
     }
   }

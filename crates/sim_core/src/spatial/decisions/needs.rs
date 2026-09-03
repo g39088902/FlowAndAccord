@@ -59,6 +59,7 @@ pub enum NeedKind {
     StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
     SeekThrone,     // 生理(最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基
+    MarketTrade,    // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
 }
 
 /// 一条需求判定结论
@@ -105,6 +106,7 @@ pub struct DecisionContext {
     pub wood_nodes: Vec<ResourceNode>,
     pub stone_nodes: Vec<ResourceNode>,
     pub gold_nodes: Vec<ResourceNode>,
+    pub market_nodes: Vec<ResourceNode>,
     pub camp_positions: Vec<(NodeId, Vec3)>,
     /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
     pub camp_pois: Vec<(u32, Vec3)>,
@@ -249,6 +251,9 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
             if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest", Some(BranchId::B3Rest)) } else { ("Safety", "ReturnHome", None) }
         }
         PrimitiveActionState::RepairingHouse => ("Safety", "RepairHouse", Some(BranchId::B4RepairHouse)),
+        PrimitiveActionState::SeekingMarket | PrimitiveActionState::BuyingAtMarket => {
+            ("Physiological", "MarketTrade", Some(BranchId::B15MarketTrade))
+        }
         PrimitiveActionState::ConstructingHouse => {
             let is_tier0 = agent.home_house_id
                 .and_then(|hid| houses.iter().find(|h| h.id == hid))

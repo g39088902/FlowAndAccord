@@ -33,13 +33,14 @@ pub enum BranchId {
     B12FoundHome,
     B13GoldWealth,
     B14SeekThrone,
+    B15MarketTrade,
 }
 
 impl BranchId {
-    /// 中性声明序（b1..b14）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
+    /// 中性声明序（b1..b15）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
     /// 生产环境的策展优先级只存在于前端配置文件，严禁在此处写死。
     /// ★ M4 夺位远征 B14SeekThrone 声明在最前：生理层最高档，兜底序下亦优先于口渴/饥饿/休息。
-    pub const ALL: [BranchId; 14] = [
+    pub const ALL: [BranchId; 15] = [
         BranchId::B14SeekThrone,
         BranchId::B1QuenchThirst,
         BranchId::B2SateHunger,
@@ -54,6 +55,7 @@ impl BranchId {
         BranchId::B11BuildHouseUpgrade,
         BranchId::B12FoundHome,
         BranchId::B13GoldWealth,
+        BranchId::B15MarketTrade,
     ];
 
     /// 分支 → 稳定字符串 ID（与前端 decision-viz-data.js 的 BRANCHES 一一对应）
@@ -73,6 +75,7 @@ impl BranchId {
             BranchId::B12FoundHome => "b12",
             BranchId::B13GoldWealth => "b13",
             BranchId::B14SeekThrone => "b14",
+            BranchId::B15MarketTrade => "b15",
         }
     }
 
@@ -93,6 +96,7 @@ impl BranchId {
             "b12" => BranchId::B12FoundHome,
             "b13" => BranchId::B13GoldWealth,
             "b14" => BranchId::B14SeekThrone,
+            "b15" => BranchId::B15MarketTrade,
             _ => return None,
         })
     }
@@ -220,6 +224,9 @@ impl BranchId {
                     return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SeekThrone, target_state: PrimitiveActionState::SeekingThrone });
                 }
             }
+            BranchId::B15MarketTrade => {
+                return d.evaluate_market_trade(a);
+            }
         }
         None
     }
@@ -247,12 +254,12 @@ fn is_male_adult(a: &Agent3D, cfg: &SimConfig) -> bool {
     a.gender == Gender::Male && a.age >= cfg.agent_adult_age
 }
 
-/// 解析注入的评估顺序：恰好 13 个互不重复的有效 ID 才采用，否则回退中性声明序。
+/// 解析注入的评估顺序：恰好 15 个互不重复的有效 ID 才采用，否则回退中性声明序。
 /// 解析结果为定长数组，热路径零分配。
-pub fn resolve_order(ids: &[String]) -> [BranchId; 14] {
-    if ids.len() == 14 {
+pub fn resolve_order(ids: &[String]) -> [BranchId; 15] {
+    if ids.len() == 15 {
         let mut parsed = BranchId::ALL;
-        let mut seen = [false; 14];
+        let mut seen = [false; 15];
         for (i, s) in ids.iter().enumerate() {
             match BranchId::from_str_id(s) {
                 Some(b) if !seen[b.index()] => {

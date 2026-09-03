@@ -53,7 +53,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.12.0)"]
+    E --> F["浏览器 UI (版本: v1.13.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -100,7 +100,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.12.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.13.0`**。
 
 ---
 
@@ -111,7 +111,7 @@ node frontend/server.js           # http://localhost:3000
 | **`Space`** | 全局暂停 / 继续模拟 |
 | **鼠标左键点击小人** | 选中族人，右侧 Inspector 展示马斯洛主导需求、决策原因、饱食/水分/体力/行囊 |
 | **鼠标左键点击房屋** | 查看私宅等级、耐久度、仓储及家庭成员 |
-| **鼠标左键点击地标** | 查看清泉/果丛/森林/采石场/金矿的储量与产速 |
+| **鼠标左键点击地标** | 查看清泉/果丛/森林/采石场/金矿/榷场互市的储量与产速/单价 |
 | **鼠标滚轮 / 右键拖拽** | 缩放与平移视口 |
 | **重置模拟（顶部按钮）** | 重新播撒 20 名初始族人（10 男 10 女，±10 随机离散） |
 
@@ -179,7 +179,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
-- **共 23 处 POI**：营地 5 / 清泉 6 / 浆果 6 / 林木 3 / 石矿 2 / 金矿 1，由 `config.countCamps` 等字段控制。ID 段位：营地 1-5 / 清泉 10-15 / 浆果 20-25 / 林木 30-32 / 石矿 40-41 / 金矿 50。空间排斥间距 `config.poiMinDistance`(70m)。
+- **共 24 处 POI**：营地 5 / 清泉 6 / 浆果 6 / 林木 3 / 石矿 2 / 金矿 1 / 榷场互市 1，由 `config.countCamps` 等字段控制。ID 段位：营地 1-5 / 清泉 10-15 / 浆果 20-25 / 林木 30-32 / 石矿 40-41 / 金矿 50 / 榷场互市 60。空间排斥间距 `config.poiMinDistance`(70m)。
 - **营地行政区升级**：随辖内有效房屋数量自动升级——0~5 营地 / 6~11 村 / 12~17 乡 / 18~23 镇 / 24+ 县。
 - 改 POI 数量须同步：`ecology.rs` → `index.html` 面板文案 → `docs/current/02-ecology-poi.md`。
 
@@ -219,7 +219,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.12 🔧 超参集中化、配置校验与速查表
 
-- **超参唯一入口**：全部 **168** 个 `SimConfig` 字段统一由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **超参唯一入口**：全部 **181** 个 `SimConfig` 字段统一由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
 - **拆分文件规范（v1.6.0 起）**：字段较多/独立语义的配置组可拆到独立 JS 文件（先例：`config.house-upgrade-cost.js` 挂 `window.SIM_HOUSE_UPGRADE_COST`、`config.decision-order.js` 挂 `window.SIM_DECISION_ORDER`），须满足：① `index.html` 加载顺序早于 `rustworld.js`；② `rustworld.js::applyConfig` 用 `Object.assign` 合并进注入对象；③ **同步改造** `tools/config-check.js`（纳入前端字段集比对）与 `tools/test-wasm.js`（合并注入），否则门禁报"缺失字段/0 成本"。
 - **文档化例外（v1.3.6 起）**：`decisionEvalOrder: Vec<String>` 与 `decisionEvalLevels: Vec<u8>` 是**「Rust 无顺序」字段**——Rust 默认为空 Vec，权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。**严禁**在 Rust 侧写死任何策展优先级序列（`branches.rs::BranchId::ALL` 仅为配置缺失/非法时的中性兜底序）。
 - **调参流程**：直接编辑 `config.js`，浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。
@@ -236,7 +236,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.14 🧠 决策顺序可编排（Rust 无顺序 · 前端拖动热注入 · 落盘持久化）
 
-- **内核无序**：`evaluate_needs` 按 `Decisioner.branch_order` 迭代 `decisions/branches.rs` 的 13 条自包含条件函数；顺序来自 `SIM_CONFIG.decisionEvalOrder`，默认空 = 中性声明序兜底（见 §4.12 例外）。**严禁**在 Rust 写死策展优先级。
+- **内核无序**：`evaluate_needs` 按 `Decisioner.branch_order` 迭代 `decisions/branches.rs` 的 15 条自包含条件函数；顺序来自 `SIM_CONFIG.decisionEvalOrder`，默认空 = 中性声明序兜底（见 §4.12 例外）。**严禁**在 Rust 写死策展优先级。
 - **真相源在文件**：策展顺序唯一真相源为 `frontend/js/config.decision-order.js`，启动时由 `decision-viz.js` 合并进 `SIM_CONFIG`（脚本顺序：config.js → config.decision-order.js → decision-viz 三件套 → rustworld.js，必早于首次 applyConfig）。
 - **拖动生效链路**：决策引擎覆层（index.html「🧠 决策引擎」）拖卡/拖分界松手 → 改 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入运行中实例（与模拟共用引擎，故必须内嵌页面而非独立页）→ `POST save-decision-order` 由 `server.js` 校验后原子写盘；静态 COS 部署无写能力时降级 localStorage 并提示。
 - **分支自包含铁律**：新增/改分支时，无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认必须写在分支条件内部——否则重排顺序即破坏语义。层级覆盖（`decision_eval_levels`，`0`=动态默认）与 `current_need` 标签共用 `level_override_for`。

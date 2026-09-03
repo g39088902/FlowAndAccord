@@ -126,6 +126,7 @@ impl World3DEngine {
         let mut wood_nodes = Vec::new();
         let mut stone_nodes = Vec::new();
         let mut gold_nodes = Vec::new();
+        let mut market_nodes = Vec::new();
         let mut camp_positions = Vec::new();
         let mut camp_pois = Vec::new();
 
@@ -138,6 +139,7 @@ impl World3DEngine {
                 PoiType::WoodForest => wood_nodes.push(target),
                 PoiType::StoneQuarry => stone_nodes.push(target),
                 PoiType::GoldMine => gold_nodes.push(target),
+                PoiType::Market => market_nodes.push(target),
                 PoiType::Camp => {
                     camp_positions.push((node, poi.pos));
                     camp_pois.push((poi.id, poi.pos));
@@ -151,6 +153,7 @@ impl World3DEngine {
             wood_nodes,
             stone_nodes,
             gold_nodes,
+            market_nodes,
             camp_positions,
             camp_pois,
         }

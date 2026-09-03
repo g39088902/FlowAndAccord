@@ -2,7 +2,7 @@ use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
-use super::poi::{PrimitivePoi, PoiType};
+use super::poi::{PrimitivePoi, PoiType, market_unit_price};
 use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::world::World3DEngine;
 
@@ -156,6 +156,22 @@ impl World3DEngine {
             poi.max_stock = self.config.stock_max_gold;
             poi.current_stock = self.config.stock_max_gold * 0.75;
             poi.regen_rate = self.config.regen_base_gold;
+            self.pois.push(poi);
+        }
+
+        // 6.5 生成榷场互市 (外部市场，ID 60 段位)
+        for i in 0..self.config.count_markets {
+            let pos = find_spaced_pos(&mut self.rng, &self.terrain, self.config.poi_spawn_radius_resource);
+            let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
+            all_node_ids.push(node_id);
+
+            let mut poi = PrimitivePoi::new_with_name((i + 60) as u32, PoiType::Market, pos, format!("榷场互市 #{}", i + 1));
+            poi.max_stock = self.config.market_stock_max_water;
+            poi.current_stock = self.config.market_stock_max_water * 0.75;
+            poi.regen_rate = self.config.market_regen_base_water;
+            poi.secondary_max_stock = self.config.market_stock_max_food;
+            poi.secondary_stock = self.config.market_stock_max_food * 0.75;
+            poi.secondary_regen_rate = self.config.market_regen_base_food;
             self.pois.push(poi);
         }
 
@@ -360,6 +376,90 @@ impl World3DEngine {
                         if poi.current_stock > 0.01 {
                             let extracted = poi.extract(rate_gold * dt);
                             agent.carried_gold += extracted;
+                        }
+                    }
+                }
+                PrimitiveActionState::BuyingAtMarket => {
+                    let agent_pos = agent.world_pos;
+                    let Some(hh_hid) = self.household_registry.household_of(agent.id) else {
+                        continue;
+                    };
+                    if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Market && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
+                        let tick = self.tick_counter;
+                        let rate = rate_res * dt;
+                        let p_water = market_unit_price(poi.current_stock, poi.max_stock, &self.config);
+                        let p_food = market_unit_price(poi.secondary_stock, poi.secondary_max_stock, &self.config);
+
+                        let mut hh_gold = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
+                        let mut total_gold_paid = 0.0;
+
+                        // 步骤 A：现场濒危自救缓冲（thirst/hunger < 10.0 优先就地饮水/进食保命）
+                        if agent.thirst < 10.0 && poi.current_stock > 0.01 && hh_gold >= 0.01 {
+                            let thirst_need = (self.config.agent_thirst_capacity - agent.thirst).min(rate);
+                            let max_afford = hh_gold / p_water;
+                            let buy_amount = thirst_need.min(poi.current_stock).min(max_afford);
+                            if buy_amount > 0.001 {
+                                let gold_cost = buy_amount * p_water;
+                                poi.extract(buy_amount);
+                                agent.thirst = (agent.thirst + buy_amount).min(self.config.agent_thirst_capacity);
+                                hh_gold -= gold_cost;
+                                total_gold_paid += gold_cost;
+                            }
+                        }
+                        if agent.hunger < 10.0 && poi.secondary_stock > 0.01 && hh_gold >= 0.01 {
+                            let hunger_need = (self.config.agent_hunger_capacity - agent.hunger).min(rate);
+                            let max_afford = hh_gold / p_food;
+                            let buy_amount = hunger_need.min(poi.secondary_stock).min(max_afford);
+                            if buy_amount > 0.001 {
+                                let gold_cost = buy_amount * p_food;
+                                poi.extract_secondary(buy_amount);
+                                agent.hunger = (agent.hunger + buy_amount).min(self.config.agent_hunger_capacity);
+                                hh_gold -= gold_cost;
+                                total_gold_paid += gold_cost;
+                            }
+                        }
+
+                        // 步骤 B：连续装袋购入（行囊容量 / 市场库存 / 剩余家财 三重约束）
+                        // 购水装袋
+                        let water_space = (carry_cap - agent.carried_water).max(0.0);
+                        if water_space > 0.01 && poi.current_stock > 0.01 && hh_gold >= 0.01 {
+                            let max_afford = hh_gold / p_water;
+                            let buy_amount = rate.min(water_space).min(poi.current_stock).min(max_afford);
+                            if buy_amount > 0.001 {
+                                let gold_cost = buy_amount * p_water;
+                                poi.extract(buy_amount);
+                                agent.carried_water = (agent.carried_water + buy_amount).min(carry_cap);
+                                hh_gold -= gold_cost;
+                                total_gold_paid += gold_cost;
+                            }
+                        }
+                        // 购粮装袋
+                        let food_space = (carry_cap - agent.carried_food).max(0.0);
+                        if food_space > 0.01 && poi.secondary_stock > 0.01 && hh_gold >= 0.01 {
+                            let max_afford = hh_gold / p_food;
+                            let buy_amount = rate.min(food_space).min(poi.secondary_stock).min(max_afford);
+                            if buy_amount > 0.001 {
+                                let gold_cost = buy_amount * p_food;
+                                poi.extract_secondary(buy_amount);
+                                agent.carried_food = (agent.carried_food + buy_amount).min(carry_cap);
+                                hh_gold -= gold_cost;
+                                total_gold_paid += gold_cost;
+                            }
+                        }
+
+                        // 步骤 C：扣减黄金记账流水（Transfer to Void, Reason = Market）
+                        if total_gold_paid > 0.001 {
+                            if let Some(hh) = self.household_registry.get_mut(hh_hid) {
+                                hh.group.ledger.debit(ResourceKind::Gold, total_gold_paid);
+                                hh.group.ledger.push_transfer(TransferRecord {
+                                    tick,
+                                    from: LedgerRef::Family(hh_hid),
+                                    to: LedgerRef::Void,
+                                    resource: ResourceKind::Gold,
+                                    amount: total_gold_paid,
+                                    reason: TransferReason::Market,
+                                });
+                            }
                         }
                     }
                 }

@@ -77,6 +77,8 @@ pub enum TransferReason {
     Dividend,
     /// 投资/注资（Corporate 预留）
     Investment,
+    /// 榷场商贸交易（外部市场求购水粮，黄金流出部落灭失）
+    Market,
 }
 
 /// 单笔显式交易流水（可审计核心：每笔都写明谁→谁、什么资源、多少、为何）

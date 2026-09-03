@@ -100,6 +100,16 @@ pub struct PoiSnapshot {
     pub current_stock: f32,
     pub max_stock: f32,
     pub regen_rate: f32,
+    #[serde(default)]
+    pub secondary_stock: f32,
+    #[serde(default)]
+    pub secondary_max_stock: f32,
+    #[serde(default)]
+    pub secondary_regen_rate: f32,
+    #[serde(default)]
+    pub water_price: f32,
+    #[serde(default)]
+    pub food_price: f32,
     pub name: String,
     pub camp_title: String,
     pub level: u8,

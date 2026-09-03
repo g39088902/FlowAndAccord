@@ -51,24 +51,25 @@
 - 详见根 AGENTS.md §4.3。
 
 ### 分支评估顺序（数据驱动，v1.3.6 起）
-- 14 条分支抽为 `branches.rs` 注册表（`BranchId::B14SeekThrone` + `B1QuenchThirst .. B13GoldWealth` ↔ 字符串 ID `"b14".."b13"`，即 `"b1".."b14"`），
-  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫全部内建），
+- 15 条分支抽为 `branches.rs` 注册表（`BranchId::B14SeekThrone` + `B1QuenchThirst .. B13GoldWealth` + `B15MarketTrade` ↔ 字符串 ID `"b1".."b15"`），
+  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫、b15 的榷场商贸守卫全部内建），
   因此任意排列都语义安全。
 - `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
 - **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`
-  声明序 b14→b1..b13 中性兜底（b14 夺位置首，兜底序亦优先于口渴/饥饿/休息）；策展优先级的唯一真相源是前端持久化文件 `frontend/js/config.decision-order.js`，
+  声明序 b14→b1..b13→b15 中性兜底；策展优先级的唯一真相源是前端持久化文件 `frontend/js/config.decision-order.js`，
   启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入（拖动决策卡后热注入 + 落盘，详见 §与其他模块接口）。
 
-### decisions 子模块（8 个）
+### decisions 子模块（9 个）
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 决策子模块入口与重新导出 |
-| `branches.rs` | 14 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
+| `branches.rs` | 15 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
 | `needs.rs` | 需求定义（MaslowLevel/NeedKind）、节点池、家宅缺口计算、`state_need_label_with_agent` 层级覆盖 |
 | `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs（数据驱动）/fulfill_resting_need |
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
-| `harvest.rs` | 现场采收判定 + 仓储满额查询 |
 | `seeking.rs` | 途中熔断与平滑重路由（含 `decide_seeking_throne` 夺位远征途中状态机） |
+| `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 自包含判定）+ 途中可用性检查与现场交易完成返家 |
+| `harvest.rs` | 现场采收判定 + 仓储满额查询 |
 | `scheduler.rs` | tick_decisions 调度 + ★M4 登基物理执行器 `execute_pending_coronations`（扫描 `coronation_pending` 校验后 `coronate_king`）/ build_decision_context |
 
 ## 关键不变量

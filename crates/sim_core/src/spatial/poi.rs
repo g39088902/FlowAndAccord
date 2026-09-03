@@ -23,6 +23,7 @@ pub enum PoiType {
     WoodForest,  // 🌲 茂密林木 (储量上限与产速由 config.stock_max_wood / config.regen_base_wood 控制)
     StoneQuarry, // 🪨 嶙峋石矿 (储量上限与产速由 config.stock_max_stone / config.regen_base_stone 控制)
     GoldMine,    // 🪙 璀璨金矿 (储量上限与产速由 config.stock_max_gold / config.regen_base_gold 控制)
+    Market,      // 🏪 榷场互市 (外部商贸枢纽，主库存承载水、次级库存承载粮，以黄金计价)
 }
 
 /// 全国县级行政区地名库 (240+ 处真实古雅县级行政区地名，营地生成时随机挑选)
@@ -131,6 +132,13 @@ pub struct PrimitivePoi {
     pub max_stock: f32,     // 储量上限 (营地为无限)
     #[serde(with = "finite_f32")]
     pub regen_rate: f32,    // 每秒自然再生速率
+    /// 次级库存（仅 Market 为外部粮食储备 Food，其他 POI 恒为 0.0）
+    #[serde(default)]
+    pub secondary_stock: f32,
+    #[serde(default)]
+    pub secondary_max_stock: f32,
+    #[serde(default)]
+    pub secondary_regen_rate: f32,
     pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
     pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
     pub bound_houses_count: u32, // 当前绑定的房屋总数
@@ -147,6 +155,7 @@ impl PrimitivePoi {
             PoiType::WoodForest => format!("茂密林木 #{}", id),
             PoiType::StoneQuarry => format!("嶙峋石矿 #{}", id),
             PoiType::GoldMine => format!("璀璨金矿 #{}", id),
+            PoiType::Market => format!("榷场互市 #{}", id),
         };
         Self::new_with_name(id, poi_type, pos, default_name)
     }
@@ -159,6 +168,13 @@ impl PrimitivePoi {
             PoiType::WoodForest => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WOOD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
             PoiType::StoneQuarry => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_STONE, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
             PoiType::GoldMine => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_GOLD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::Market => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WATER, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+        };
+
+        let (sec_stock, sec_max, sec_regen) = if poi_type == PoiType::Market {
+            (POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO, POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_BERRY)
+        } else {
+            (0.0, 0.0, 0.0)
         };
 
         Self {
@@ -168,6 +184,9 @@ impl PrimitivePoi {
             current_stock: initial_stock,
             max_stock,
             regen_rate,
+            secondary_stock: sec_stock,
+            secondary_max_stock: sec_max,
+            secondary_regen_rate: sec_regen,
             name,
             level: 0,
             bound_houses_count: 0,
@@ -217,9 +236,12 @@ impl PrimitivePoi {
         if self.regen_rate > 0.0 && self.current_stock.is_finite() {
             self.current_stock = (self.current_stock + self.regen_rate * dt).min(self.max_stock);
         }
+        if self.secondary_regen_rate > 0.0 && self.secondary_max_stock > 0.0 {
+            self.secondary_stock = (self.secondary_stock + self.secondary_regen_rate * dt).min(self.secondary_max_stock);
+        }
     }
 
-    /// 提取资源
+    /// 提取主库存资源（水/粮/木/石/金）
     pub fn extract(&mut self, amount: f32) -> f32 {
         if !self.current_stock.is_finite() {
             return amount;
@@ -228,4 +250,23 @@ impl PrimitivePoi {
         self.current_stock -= available;
         available
     }
+
+    /// 提取次级库存资源（仅 Market 的粮食有效）
+    pub fn extract_secondary(&mut self, amount: f32) -> f32 {
+        if self.secondary_max_stock <= 0.0 {
+            return 0.0;
+        }
+        let available = self.secondary_stock.min(amount);
+        self.secondary_stock -= available;
+        available
+    }
 }
+
+/// 外部市场（榷场互市）幂律动态计价函数（纯函数，零随机，O(1)）
+/// 公式: P(S) = P_0 * (S_max / max(S, S_floor))^k
+/// 当库存降低至 floor 以下时，单价封顶为 P_0 * (S_max / S_floor)^k，彻底消除除零与浮点溢出风险。
+pub fn market_unit_price(current: f32, max: f32, cfg: &crate::config::SimConfig) -> f32 {
+    let eff = current.max(cfg.market_price_floor_stock);
+    cfg.market_price_base * (max / eff).powf(cfg.market_price_power_exponent)
+}
+

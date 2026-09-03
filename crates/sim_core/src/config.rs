@@ -303,6 +303,32 @@ pub const LEDGER_RELIEF_FAMILY_THRESHOLD: f32 = 8.0;
 pub const LEDGER_RELIEF_COOLDOWN_TICKS: u64 = 1200;
 
 // ============================================================================
+// 10c. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
+// ============================================================================
+/// 全图生成外部市场 POI 数量（默认 1 座）
+pub const COUNT_MARKETS: usize = 1;
+/// 外部市场清水储备容量上限（等同于 1 座低洼清泉）
+pub const MARKET_STOCK_MAX_WATER: f32 = 100.0;
+/// 外部市场粮食储备容量上限（等同于 1 座缓坡浆果）
+pub const MARKET_STOCK_MAX_FOOD: f32 = 100.0;
+/// 外部市场清水每秒自然再生速率
+pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
+/// 外部市场粮食每秒自然再生速率
+pub const MARKET_REGEN_BASE_FOOD: f32 = 2.0;
+/// 满库存起步基准单价（黄金 / 单位资源）
+pub const MARKET_PRICE_BASE: f32 = 0.1;
+/// 幂律定价指数 k（越大则低库存时价格飙升越剧烈）
+pub const MARKET_PRICE_POWER_EXPONENT: f32 = 2.0;
+/// 计价库存钳制下限（防除以零与价格封顶，库存<=此值时单价封顶 1000 金）
+pub const MARKET_PRICE_FLOOR_STOCK: f32 = 1.0;
+/// 家户物资绝境警戒线（低于该值且野外对应点断流时触发商贸求购）
+pub const MARKET_EMERGENCY_FAMILY_STOCK_THRESHOLD: f32 = 10.0;
+/// 户主准入起步黄金底线（家户账面黄金低于该值不启动商贸）
+pub const MARKET_MIN_FAMILY_GOLD: f32 = 0.5;
+/// 户主出发前往市场的最低体力门槛（低于该值不启程，防半路力竭）
+pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
+
+// ============================================================================
 // 11. 动态仿真配置结构体 (SimConfig)
 // ============================================================================
 
@@ -511,6 +537,19 @@ pub struct SimConfig {
     pub ledger_relief_min_balance: f32,
     pub ledger_relief_family_threshold: f32,
     pub ledger_relief_cooldown_ticks: u64,
+
+    // 13. 外部市场（榷场互市）与幂律动态定价
+    pub count_markets: usize,
+    pub market_stock_max_water: f32,
+    pub market_stock_max_food: f32,
+    pub market_regen_base_water: f32,
+    pub market_regen_base_food: f32,
+    pub market_price_base: f32,
+    pub market_price_power_exponent: f32,
+    pub market_price_floor_stock: f32,
+    pub market_emergency_family_stock_threshold: f32,
+    pub market_min_family_gold: f32,
+    pub market_min_dispatch_stamina: f32,
 }
 
 impl Default for SimConfig {
@@ -710,6 +749,19 @@ impl Default for SimConfig {
             ledger_relief_min_balance: LEDGER_RELIEF_MIN_BALANCE,
             ledger_relief_family_threshold: LEDGER_RELIEF_FAMILY_THRESHOLD,
             ledger_relief_cooldown_ticks: LEDGER_RELIEF_COOLDOWN_TICKS,
+
+            // 13. 外部市场（榷场互市）与幂律动态定价
+            count_markets: COUNT_MARKETS,
+            market_stock_max_water: MARKET_STOCK_MAX_WATER,
+            market_stock_max_food: MARKET_STOCK_MAX_FOOD,
+            market_regen_base_water: MARKET_REGEN_BASE_WATER,
+            market_regen_base_food: MARKET_REGEN_BASE_FOOD,
+            market_price_base: MARKET_PRICE_BASE,
+            market_price_power_exponent: MARKET_PRICE_POWER_EXPONENT,
+            market_price_floor_stock: MARKET_PRICE_FLOOR_STOCK,
+            market_emergency_family_stock_threshold: MARKET_EMERGENCY_FAMILY_STOCK_THRESHOLD,
+            market_min_family_gold: MARKET_MIN_FAMILY_GOLD,
+            market_min_dispatch_stamina: MARKET_MIN_DISPATCH_STAMINA,
         }
     }
 }

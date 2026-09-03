@@ -81,6 +81,8 @@ pub enum PrimitiveActionState {
     RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
     OffRoadDetour,      // ⚠️ 荒野越野寻路中
     SeekingThrone,      // ⚔️ 夺位远征中（冲向无主营地登基）
+    SeekingMarket,      // 🚶 正在赶往外部市场求购水粮
+    BuyingAtMarket,     // ⚖️ 正在市场现场交易（就地自救与装载行囊）
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
@@ -456,6 +458,7 @@ impl Agent3D {
                 | PrimitiveActionState::SeekingGold
                 | PrimitiveActionState::ReturningToCamp
                 | PrimitiveActionState::SeekingThrone
+                | PrimitiveActionState::SeekingMarket
         );
 
         if !is_moving {
@@ -547,6 +550,9 @@ impl Agent3D {
                 }
                 PrimitiveActionState::ReturningToCamp => {
                     self.state = PrimitiveActionState::RestingAtCamp;
+                }
+                PrimitiveActionState::SeekingMarket => {
+                    self.state = PrimitiveActionState::BuyingAtMarket;
                 }
                 _ => {}
             }

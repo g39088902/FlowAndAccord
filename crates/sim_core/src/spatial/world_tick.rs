@@ -30,24 +30,37 @@ impl World3DEngine {
 
         // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
         for poi in &mut self.pois {
-            let base_regen = match poi.poi_type {
-                PoiType::WaterSource => self.config.regen_base_water,
-                PoiType::BerryBush => self.config.regen_base_berry,
-                PoiType::WoodForest => self.config.regen_base_wood,
-                PoiType::StoneQuarry => self.config.regen_base_stone,
-                PoiType::GoldMine => self.config.regen_base_gold,
-                _ => 1.0,
-            };
-            poi.regen_rate = base_regen;
-            let mult = match poi.poi_type {
-                PoiType::WaterSource => self.water_regen_multiplier,
-                PoiType::BerryBush => self.berry_regen_multiplier,
-                PoiType::WoodForest => self.wood_regen_multiplier,
-                PoiType::StoneQuarry => self.stone_regen_multiplier,
-                PoiType::GoldMine => self.gold_regen_multiplier,
-                _ => 1.0,
-            };
-            poi.tick_regenerate(dt * mult);
+            if poi.poi_type == PoiType::Market {
+                poi.regen_rate = self.config.market_regen_base_water;
+                poi.secondary_regen_rate = self.config.market_regen_base_food;
+                let mult_water = self.water_regen_multiplier;
+                let mult_food = self.berry_regen_multiplier;
+                if poi.regen_rate > 0.0 && poi.current_stock.is_finite() {
+                    poi.current_stock = (poi.current_stock + poi.regen_rate * dt * mult_water).min(poi.max_stock);
+                }
+                if poi.secondary_regen_rate > 0.0 && poi.secondary_max_stock > 0.0 {
+                    poi.secondary_stock = (poi.secondary_stock + poi.secondary_regen_rate * dt * mult_food).min(poi.secondary_max_stock);
+                }
+            } else {
+                let base_regen = match poi.poi_type {
+                    PoiType::WaterSource => self.config.regen_base_water,
+                    PoiType::BerryBush => self.config.regen_base_berry,
+                    PoiType::WoodForest => self.config.regen_base_wood,
+                    PoiType::StoneQuarry => self.config.regen_base_stone,
+                    PoiType::GoldMine => self.config.regen_base_gold,
+                    _ => 1.0,
+                };
+                poi.regen_rate = base_regen;
+                let mult = match poi.poi_type {
+                    PoiType::WaterSource => self.water_regen_multiplier,
+                    PoiType::BerryBush => self.berry_regen_multiplier,
+                    PoiType::WoodForest => self.wood_regen_multiplier,
+                    PoiType::StoneQuarry => self.stone_regen_multiplier,
+                    PoiType::GoldMine => self.gold_regen_multiplier,
+                    _ => 1.0,
+                };
+                poi.tick_regenerate(dt * mult);
+            }
         }
 
         // 2. 代谢与繁衍（受孕瞬间需为胎儿占号，故将发号器取出循环外，循环结束回写）

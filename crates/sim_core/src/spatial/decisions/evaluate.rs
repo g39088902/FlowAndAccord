@@ -23,7 +23,7 @@ pub struct Decisioner<'a> {
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 14],
+    pub branch_order: &'a [BranchId; 15],
 }
 
 impl<'a> Decisioner<'a> {
@@ -125,6 +125,16 @@ impl<'a> Decisioner<'a> {
                 agent.current_need = state_need_label_with_agent(PrimitiveActionState::ReturningToCamp, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
             }
+            PrimitiveActionState::SeekingMarket => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingMarket, agent, self.houses, self.households, self.config)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_seeking_market(agent);
+            }
+            PrimitiveActionState::BuyingAtMarket => {
+                agent.current_need = state_need_label_with_agent(PrimitiveActionState::BuyingAtMarket, agent, self.houses, self.households, self.config)
+                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                self.decide_buying_market(agent);
+            }
             _ => {}
         }
     }
@@ -213,6 +223,16 @@ impl<'a> Decisioner<'a> {
             self.dispatch(agent, start, target_node, PrimitiveActionState::SeekingThrone);
             return;
         }
+        if need.kind == NeedKind::MarketTrade {
+            let Some(target) = self.nearest_market_node(agent) else {
+                agent.current_need = None;
+                return;
+            };
+            let start = self.start_node(agent);
+            agent.current_need = Some("Physiological·MarketTrade".to_string());
+            self.dispatch(agent, start, target, PrimitiveActionState::SeekingMarket);
+            return;
+        }
         if need.kind == NeedKind::StockGold {
             agent.gold_mining_cooldown = self.config.decision_stock_gold_cooldown;
         } else if need.kind == NeedKind::GoldWealth {
@@ -226,7 +246,7 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
             NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
             NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);

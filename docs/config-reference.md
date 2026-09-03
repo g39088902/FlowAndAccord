@@ -3,7 +3,7 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 12. 地区与王国系统
+## 13. 外部市场（榷场互市）与幂律动态定价
 
 | 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -175,6 +175,17 @@
 | `ledgerReliefMinBalance` | f32 | 30 | ledger/region.rs (救济) | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
 | `ledgerReliefFamilyThreshold` | f32 | 8 | ledger/region.rs (救济) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
+| `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
+| `marketStockMaxWater` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
+| `marketRegenBaseWater` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水每秒自然再生速率 |
+| `marketRegenBaseFood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食每秒自然再生速率 |
+| `marketPriceBase` | f32 | 0.1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 满库存起步基准单价 (黄金 / 单位资源) |
+| `marketPricePowerExponent` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 幂律定价指数 k |
+| `marketPriceFloorStock` | f32 | 1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 计价库存钳制下限 (防除零与价格封顶) |
+| `marketEmergencyFamilyStockThreshold` | f32 | 10 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 家户物资绝境警戒线 |
+| `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
+| `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
 
 ## 5. 马斯洛需求与决策门槛
 
