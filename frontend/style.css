@@ -63,8 +63,11 @@
       margin-top: 4px;
     }
 
-    /* 全局生命体征状态栏 */
+    /* 全局生命体征状态栏 (v1.9.0 改为窗口水平居中，不再居中于 brand 与存档之间的空位) */
     .stats-card {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       gap: 16px;
       background: rgba(10, 18, 30, 0.95);
@@ -1013,9 +1016,8 @@
       background: linear-gradient(135deg, #b45309, #047857);
       box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
     }
-    /* 🧠 无头模式按钮 (独占一行) */
+    /* 🧠 无头模式按钮 (v1.9.0 置于重演生态右侧空位，节省一行) */
     button.headless-btn {
-      grid-column: 1 / -1;
       background: rgba(245, 158, 11, 0.12);
       border: 1px solid #f59e0b;
       color: #f59e0b;
@@ -1980,6 +1982,23 @@
 .clan-card.clan-journal-open {
   border-color: rgba(16, 185, 129, 0.6);
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+/* ★ v1.9.0 绝嗣宗族视觉提醒（Task11：所有男性已亡，族产已平分/入公仓） */
+.clan-card.clan-extinct {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(60, 10, 16, 0.4);
+}
+.clan-card.clan-extinct:hover {
+  border-color: rgba(239, 68, 68, 0.8);
+}
+.clan-extinct-badge {
+  color: #f87171;
+  font-weight: 700;
+  font-style: normal;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 .clan-header {
   display: flex;

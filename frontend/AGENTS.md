@@ -14,14 +14,14 @@
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
 | `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（148 字段，M8 起不含升级成本矩阵），按功能分区注释 | 默认值真相源在 Rust `config.rs`，本文件是前端镜像 |
-| `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（13 条 b1~b13）。**唯一真相源**，由 server.js 原子写盘 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
+| `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（14 条 b1~b14，b14 夺位置首）。**唯一真相源**，由 server.js 原子写盘 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
 
 ### 1.2 决策引擎视图层（三件套，必须在 rustworld.js 之前加载）
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `js/decision-viz-data.js` | ~75 | `D.BRANCH_MAP`：13 条分支的元数据（中文名/条件文案/默认层级/图标/FSM 状态映射 `FSM_STATE_ZH`） | DOM 操作、拖动逻辑 |
+| `js/decision-viz-data.js` | ~75 | `D.BRANCH_MAP`：14 条分支的元数据（中文名/条件文案/默认层级/图标/FSM 状态映射 `FSM_STATE_ZH`，含 b14 SeekThrone 夺位） | DOM 操作、拖动逻辑 |
 | `js/decision-viz-view.js` | ~438 | 决策引擎覆层的 DOM 渲染：分支卡片/分界线/层级图例/检查器/拖动事件绑定 | 数据来源、配置合并 |
 | `js/decision-viz.js` | ~207 | 集成层：`mergeIntoSimConfig()` 把顺序合并进 SIM_CONFIG / 拖动松手→`applyConfig()` 热注入→`POST /save-decision-order` 写盘 / localStorage 降级 | 具体渲染（委托给 view）、具体元数据（委托给 data） |
 

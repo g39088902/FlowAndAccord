@@ -2,11 +2,12 @@
 // Flow & Accord · 决策分支评估顺序持久化配置 (config.decision-order.js)
 // ==========================================================================
 // 本文件由 server.js 的 POST /save-decision-order 端点原子重写（决策引擎视图拖动落盘），
-// 是 evaluate_needs 13 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
-// decisionEvalOrder: 13 个分支 ID（b1~b13），数组顺序即评估优先级（越靠前越优先）。
+// 是 evaluate_needs 14 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
+// decisionEvalOrder: 14 个分支 ID（b1~b14），数组顺序即评估优先级（越靠前越优先）。
+// ★ v1.9.0 b14SeekThrone（夺位远征）置于最前：生理需求最高档，优先于口渴/饥饿/休息。
 // decisionEvalLevels: 与顺序下标并行的层级覆盖，0=保留代码动态默认，1-5=强制马斯洛层级。
 // ==========================================================================
 window.SIM_DECISION_ORDER = {
-  decisionEvalOrder: ["b1", "b2", "b3", "b12", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b13"],
-  decisionEvalLevels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0],
+  decisionEvalOrder: ["b14", "b1", "b2", "b3", "b12", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b13"],
+  decisionEvalLevels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 0, 0, 0],
 };

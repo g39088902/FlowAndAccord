@@ -13,13 +13,13 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
-| `branches.rs` | 13 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b13"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
+| `branches.rs` | 14 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b14"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
 | `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + **数据驱动**评估 `evaluate_needs`（按 `branch_order` 迭代注册表）+ 需求落地 `fulfill_resting_need`（含立宅自主选址） |
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询 |
-| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心） |
+| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机） |
 | `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询 |
-| `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`tick_conquest_expedition`（★ M4 夺位远征调度，决策树最高优先级）与 `build_decision_context`（收集全图资源节点） |
+| `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`execute_pending_coronations`（★ M4 登基物理执行器：每拍扫描 `coronation_pending`，校验王位仍空缺后 `coronate_king`）与 `build_decision_context`（收集全图资源节点） |
 
 ## 3. 🧱 关键结构
 
@@ -65,11 +65,12 @@
 - 层级覆盖（`decision_eval_levels`，与顺序下标并行，按分支 ID 查位）：`0`/缺失 = 保留分支动态默认，
   `1-5` = 强制马斯洛层级；评估结论与 `state_need_label_with_agent` 标签共用 `level_override_for`，改一处须保持一致。
 
-### 4.8 ★ M4 夺位远征（决策树最高优先级）
+### 4.8 ★ M4 夺位远征（决策引擎驱动 · 生理层最高档）
 
-`tick_conquest_expedition` 在 `tick_decisions` 最前调用，**先于**马斯洛需求评估处理：
-- 触发：男性、非国王、存在无主营地（`region.group.leader.is_none()`）→ 立即置 `PrimitiveActionState::SeekingThrone` 冲向**最近**无主营地，行囊保留、可中断施工/修缮（`build_timer` 冻结不回滚）；
-- 途中目标易主（已被他人登基）→ 重定向到最近的新无主营地（原地掉头平滑转向，坐标连续不闪现）；无任何无主营地 → 放弃远征恢复正常决策；
-- 抵达目标营地交互半径内 → 登基（`coronate_king`）：迁籍入地区、`set_leader`、回 `RestingAtCamp`；
-- 状态以 `agent.state == SeekingThrone` 与 `world.expedition_targets` 记录，`current_need = "SelfActualization·SeekingThrone"`；
-- 确定性：不消耗 `WorldRng`；`expedition_targets` 用 `BTreeMap` 保序；选最近营地并列取 id 小者。
+v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决策引擎的第 14 条分支 `B14SeekThrone`**（`NeedKind::SeekThrone`，`MaslowLevel::Physiological`，策展序/兜底序均置首 b14）：
+- **触发（守卫全内联在分支内）**：在世成年男性、非现任国王、且 `Decisioner.eligible_leaderless_camp` 找到空缺王位营地——有房（含 0 级非废墟）者只能夺**自家房屋所在营地**的空缺王位，无房/废墟可夺**任意**空缺王位营地（Task6 语义）；
+- **选点写字段**：`fulfill_resting_need` 将选定营地写入 `agent.expedition_target_camp` 并 `dispatch` 为 `PrimitiveActionState::SeekingThrone`，`current_need = "Physiological·SeekThrone"`；
+- **途中状态机 `decide_seeking_throne`**（seeking.rs，寻路+运动系统，坐标连续不闪现）：体力告警 → 折返；抵达目标营地交互半径且王位仍空缺 → 写 `coronation_pending` 待世界登基；途中目标已易主 → 原地掉头重定向到新的空缺王位营地；无可夺位营地 → 放弃远征恢复常规决策；
+- **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；
+- 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
+- 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。

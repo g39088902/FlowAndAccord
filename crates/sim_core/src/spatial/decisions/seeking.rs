@@ -80,4 +80,96 @@ impl<'a> Decisioner<'a> {
             self.return_home(agent);
         }
     }
+
+    /// ★ M4 夺位远征途中状态处理（马斯洛引擎驱动，世界不干涉）：
+    /// - 体力告警 → 放弃远征折返回家；
+    /// - 抵达目标营地且王位仍空缺 → 写下登基决心（coronation_pending），交由世界物理规则登基；
+    /// - 目标营地王位易主 → 重定向至最近仍空缺的可夺位营地（原地掉头，保持坐标连续）；
+    /// - 无可夺位营地 → 放弃远征恢复正常决策。
+    pub fn decide_seeking_throne(&mut self, agent: &mut Agent3D) {
+        // 体力告警：放弃夺位，折返回家
+        if agent.stamina < self.config.decision_work_stamina_threshold {
+            agent.expedition_target_camp = None;
+            agent.current_need = Some("Physiological·Rest".to_string());
+            self.return_home(agent);
+            return;
+        }
+
+        let interact_radius = self.config.poi_interaction_radius;
+        let home_camp_id = || -> Option<u32> {
+            agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                .map(|h| h.camp_id)
+        };
+
+        let Some(target_camp) = agent.expedition_target_camp else {
+            // 无目标记录：重新按资格找目标，找不到则放弃
+            if let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id()) {
+                agent.expedition_target_camp = Some(camp_id);
+                if let Some(node) = self.camp_node_of(camp_id) {
+                    if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                        return;
+                    }
+                    let curr = self.start_node(agent);
+                    if self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone) {
+                        return;
+                    }
+                }
+            }
+            agent.expedition_target_camp = None;
+            agent.current_need = None;
+            agent.state = PrimitiveActionState::RestingAtCamp;
+            return;
+        };
+
+        // 目标营地王位仍空缺？
+        let target_still_leaderless = self
+            .regions
+            .regions
+            .get(&target_camp)
+            .map(|r| r.group.leader.is_none())
+            .unwrap_or(false);
+        let camp_pos = self
+            .ctx
+            .camp_pois
+            .iter()
+            .find(|(id, _)| *id == target_camp)
+            .map(|(_, p)| *p);
+
+        if target_still_leaderless {
+            if let Some(pos) = camp_pos {
+                if agent.world_pos.distance_to(&pos) < interact_radius {
+                    // 已抵达且王位空缺：写下登基决心，交由世界物理规则执行登基
+                    agent.coronation_pending = Some(target_camp);
+                    agent.current_need = Some("Physiological·SeekThrone".to_string());
+                    return;
+                }
+            }
+            // 仍在途中：保持现有路线，无需处理
+            return;
+        }
+
+        // 目标易主：重定向至最近仍空缺的可夺位营地；无则放弃
+        if let Some(new_camp) = self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id()) {
+            if new_camp != target_camp {
+                agent.expedition_target_camp = Some(new_camp);
+                if let Some(node) = self.camp_node_of(new_camp) {
+                    if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                        return;
+                    }
+                    let curr = self.start_node(agent);
+                    if self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone) {
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
+        // 无任何可夺位营地：放弃远征，恢复正常决策
+        agent.expedition_target_camp = None;
+        agent.coronation_pending = None;
+        agent.current_need = None;
+        agent.state = PrimitiveActionState::RestingAtCamp;
+    }
 }

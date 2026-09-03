@@ -30,11 +30,11 @@
 
   // ── 校验与推导工具 ───────────────────────────────────────────────────────
   function isValidOrder(a) {
-    return Array.isArray(a) && a.length === 13 && new Set(a).size === 13
+    return Array.isArray(a) && a.length === 14 && new Set(a).size === 14
       && a.every(function (s) { return D.BRANCH_MAP[s]; });
   }
   function isValidLevels(a) {
-    return Array.isArray(a) && a.length === 13 && a.every(function (v) { return Number.isInteger(v) && v >= 0 && v <= 5; });
+    return Array.isArray(a) && a.length === 14 && a.every(function (v) { return Number.isInteger(v) && v >= 0 && v <= 5; });
   }
   function defaultZone(id) { return D.BRANCH_MAP[id] ? D.BRANCH_MAP[id].level : 1; }
   function zoneOf(divGaps, p) {
@@ -53,11 +53,12 @@
   function deriveDivGaps(order, levels) {
     var eff = order.map(function (id, i) { return levels[i] || defaultZone(id); });
     var gaps = [], prev = 0;
+    var n = order.length;
     for (var k = 1; k <= 4; k++) {
       var cnt = 0;
-      for (var i = 0; i < 13; i++) { if (eff[i] <= k) cnt++; }
+      for (var i = 0; i < n; i++) { if (eff[i] <= k) cnt++; }
       var g = Math.max(cnt, prev + 1, k);
-      g = Math.min(Math.max(g, 1), 12 - (4 - k));
+      g = Math.min(Math.max(g, 1), (n - 1) - (4 - k));
       gaps.push(g); prev = g;
     }
     return gaps;

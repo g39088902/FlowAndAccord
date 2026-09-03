@@ -195,6 +195,10 @@ pub struct AgentSnapshot {
     pub arrival_tick: u64,
     /// ★ M4 是否在夺位远征中（state=SeekingThrone）
     pub is_on_expedition: bool,
+    /// ★ v1.9.0 M4 远征目标营地（决策器选定写入）
+    pub expedition_target_camp: Option<u32>,
+    /// ★ v1.9.0 M4 待登基（抵达且王位仍空缺，待世界物理执行器 coronate）
+    pub coronation_pending: Option<u32>,
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -282,6 +286,8 @@ pub struct ClanSnapshot {
     pub recent_journal: Vec<TransferRecordSnapshot>,
     /// 最近团体事件（成员进出/族长更替等，最多8条）
     pub recent_events: Vec<String>,
+    /// ★ v1.9.0 是否已绝嗣（所有男性已亡；族产已平分/入公仓）
+    pub is_extinct: bool,
 }
 
 /// 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
@@ -311,4 +317,10 @@ pub struct RegionSnapshot {
     pub recent_events: Vec<String>,
     /// 正在冲向该营地夺位的族人列表
     pub active_expedition_agents: Vec<AgentId>,
+    /// ★ v1.9.0 历史国王（已离任/驾崩的所有前任国王，不含现任）
+    pub history_kings: Vec<AgentId>,
+    /// ★ v1.9.0 地区居民 AgentId 列表（按升序）
+    pub member_ids: Vec<AgentId>,
+    /// ★ v1.9.0 管辖的家庭（户主所属本地区的存续家户 HouseholdId，按升序）
+    pub governed_households: Vec<u64>,
 }

@@ -62,8 +62,6 @@ pub struct World3DEngine {
     pub mutual_aid_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
     /// ★ M4 地区与王国登记簿（按营地聚合的地区团体、国王、公仓与继承顺位）
     pub region_registry: RegionRegistry,
-    /// ★ M4 夺位远征目标记录（agent_id → 目标 camp_id）
-    pub expedition_targets: std::collections::BTreeMap<u32, u32>,
     /// ★ M4 救济冷却记录（每家户上次接受救济的 tick）
     pub relief_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
 }
@@ -116,7 +114,6 @@ impl World3DEngine {
             clan_registry: ClanRegistry::new(LEDGER_JOURNAL_CAPACITY),
             mutual_aid_cooldown: std::collections::BTreeMap::new(),
             region_registry: RegionRegistry::new(LEDGER_JOURNAL_CAPACITY),
-            expedition_targets: std::collections::BTreeMap::new(),
             relief_cooldown: std::collections::BTreeMap::new(),
         }
     }

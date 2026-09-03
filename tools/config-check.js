@@ -324,11 +324,11 @@ function main() {
         errors.push('config.decision-order.js: 对象字面量求值失败');
       } else {
         const ids = o.decisionEvalOrder, lv = o.decisionEvalLevels;
-        const idOk = Array.isArray(ids) && ids.length === 13 && new Set(ids).size === 13
-          && ids.every(s => /^b(?:[1-9]|1[0-3])$/.test(s));
-        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 13 个互不重复的 b1..b13');
-        const lvOk = Array.isArray(lv) && lv.length === 13 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
-        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 13 个 0-5 整数');
+        const idOk = Array.isArray(ids) && ids.length === 14 && new Set(ids).size === 14
+          && ids.every(s => /^b(?:[1-9]|1[0-4])$/.test(s));
+        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 14 个互不重复的 b1..b14');
+        const lvOk = Array.isArray(lv) && lv.length === 14 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 14 个 0-5 整数');
       }
     }
   } else {

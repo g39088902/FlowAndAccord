@@ -32,12 +32,15 @@ pub enum BranchId {
     B11BuildHouseUpgrade,
     B12FoundHome,
     B13GoldWealth,
+    B14SeekThrone,
 }
 
 impl BranchId {
-    /// 中性声明序（b1..b13）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
+    /// 中性声明序（b1..b14）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
     /// 生产环境的策展优先级只存在于前端配置文件，严禁在此处写死。
-    pub const ALL: [BranchId; 13] = [
+    /// ★ M4 夺位远征 B14SeekThrone 声明在最前：生理层最高档，兜底序下亦优先于口渴/饥饿/休息。
+    pub const ALL: [BranchId; 14] = [
+        BranchId::B14SeekThrone,
         BranchId::B1QuenchThirst,
         BranchId::B2SateHunger,
         BranchId::B3Rest,
@@ -69,6 +72,7 @@ impl BranchId {
             BranchId::B11BuildHouseUpgrade => "b11",
             BranchId::B12FoundHome => "b12",
             BranchId::B13GoldWealth => "b13",
+            BranchId::B14SeekThrone => "b14",
         }
     }
 
@@ -88,6 +92,7 @@ impl BranchId {
             "b11" => BranchId::B11BuildHouseUpgrade,
             "b12" => BranchId::B12FoundHome,
             "b13" => BranchId::B13GoldWealth,
+            "b14" => BranchId::B14SeekThrone,
             _ => return None,
         })
     }
@@ -196,6 +201,23 @@ impl BranchId {
                     }
                 }
             }
+            BranchId::B14SeekThrone => {
+                // ★ M4 夺位远征：生理层最高档（国王 = 数不尽的资源），由马斯洛引擎驱动
+                // 守卫（全部内联，任意排列语义安全）：在世男性成年、非现任国王
+                if !a.is_alive || a.gender != Gender::Male || a.age < cfg.agent_adult_age {
+                    return None;
+                }
+                if d.is_king(a) {
+                    return None;
+                }
+                // ★ M6 前提：空缺王位的营地 = 自家房屋（含 0 级仓库）所在地；或完全未建房未建仓
+                let home_camp_id = a.home_house_id
+                    .and_then(|hid| d.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                    .map(|h| h.camp_id);
+                if d.eligible_leaderless_camp(a, home_camp_id.is_some(), home_camp_id).is_some() {
+                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SeekThrone, target_state: PrimitiveActionState::SeekingThrone });
+                }
+            }
         }
         None
     }
@@ -225,10 +247,10 @@ fn is_male_adult(a: &Agent3D, cfg: &SimConfig) -> bool {
 
 /// 解析注入的评估顺序：恰好 13 个互不重复的有效 ID 才采用，否则回退中性声明序。
 /// 解析结果为定长数组，热路径零分配。
-pub fn resolve_order(ids: &[String]) -> [BranchId; 13] {
-    if ids.len() == 13 {
+pub fn resolve_order(ids: &[String]) -> [BranchId; 14] {
+    if ids.len() == 14 {
         let mut parsed = BranchId::ALL;
-        let mut seen = [false; 13];
+        let mut seen = [false; 14];
         for (i, s) in ids.iter().enumerate() {
             match BranchId::from_str_id(s) {
                 Some(b) if !seen[b.index()] => {

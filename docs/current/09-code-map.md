@@ -32,13 +32,13 @@ FlowAndAccord/
 │   │           ├── snapshot.rs             # 快照结构体定义 (Agent/House/POI/Household/Marriage/Clan/Region/Ledger)
 │   │           ├── decisions/              # 🧠 马斯洛决策子系统 (8 文件)
 │   │           │   ├── mod.rs              # 决策子模块入口与重新导出
-│   │           │   ├── branches.rs         # ★ 13 条分支注册表 (BranchId ↔ b1~b13，自包含条件函数，Rust 侧无顺序)
+│   │           │   ├── branches.rs         # ★ 14 条分支注册表 (BranchId ↔ b1~b14，含 b14 SeekThrone 夺位，自包含条件函数，Rust 侧无顺序)
 │   │           │   ├── needs.rs            # NeedKind 需求定义、升级材料成本 (upgrade_material_cost)、家户缺口计算
 │   │           │   ├── evaluate.rs         # Decisioner 结构体 + decide/evaluate_needs (按配置顺序迭代分支)
 │   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性
 │   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active)
 │   │           │   ├── seeking.rs          # 途中熔断与平滑重路由
-│   │           │   └── scheduler.rs        # tick_decisions + tick_conquest_expedition(★M4夺位) + build_decision_context
+│   │           │   └── scheduler.rs        # tick_decisions + execute_pending_coronations(★M4登基) + build_decision_context
 │   │           ├── housing_system/         # 🏡 房屋全生命周期子系统 (7 文件)
 │   │           │   ├── mod.rs              # 房屋系统 tick 管线入口
 │   │           │   ├── maintenance.rs      # 冬季供暖与耐久修缮结算
@@ -60,7 +60,7 @@ FlowAndAccord/
 ├── frontend/
 │   ├── js/
 │   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 149 字段)
-│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源 (13 条 b1~b13 + 层级覆盖，§4.12 文档化例外)
+│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源 (14 条 b1~b14 + 层级覆盖，b14 夺位置首，§4.12 文档化例外)
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── math.js                         # 3D 向量与投影变换
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)

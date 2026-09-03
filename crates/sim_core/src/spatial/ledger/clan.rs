@@ -13,7 +13,7 @@
 //! - **新旧分离**：不 import house.rs 仓储字段；族税/互助只记账本余额。
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::spatial::agent::{AgentId, Gender};
 use crate::spatial::ledger::family::HouseholdId;
@@ -41,6 +41,9 @@ pub struct ClanRegistry {
     pub clans: BTreeMap<String, Group>,
     /// 每人当前所属姓氏（唯一归属索引）
     pub by_agent: BTreeMap<AgentId, String>,
+    /// ★ v1.9.0 绝嗣宗族标记（所有男性已亡；族产已平分给其他宗族 / 入公仓）。
+    /// 绝嗣后不再反复清算；保留历史数据与账本流水。
+    pub extinct: BTreeSet<String>,
     journal_capacity: usize,
 }
 
@@ -49,6 +52,7 @@ impl ClanRegistry {
         Self {
             clans: BTreeMap::new(),
             by_agent: BTreeMap::new(),
+            extinct: BTreeSet::new(),
             journal_capacity: journal_capacity.max(1),
         }
     }
@@ -57,6 +61,7 @@ impl ClanRegistry {
     pub fn clear(&mut self) {
         self.clans.clear();
         self.by_agent.clear();
+        self.extinct.clear();
     }
 
     /// 按姓氏读取宗族
@@ -83,7 +88,11 @@ impl ClanRegistry {
     }
 
     /// 加入宗族成员（幂等：已是成员返回 false）。自动确保宗族存在。
-    pub fn add_member(&mut self, surname: &str, agent: AgentId, tick: u64) -> bool {
+    /// ★ v1.9.1 宗族与女性无关：女性一律不入族（宗族 = 纯父系男性团体）。
+    pub fn add_member(&mut self, surname: &str, agent: AgentId, tick: u64, gender: Gender) -> bool {
+        if gender != Gender::Male {
+            return false;
+        }
         self.ensure_clan(surname);
         let clan = self.clans.get_mut(surname).expect("clan just ensured");
         if !clan.add_member(agent, tick) {
@@ -131,9 +140,12 @@ impl World3DEngine {
     fn update_clan_leaders(&mut self, tick: u64) {
         // READ PHASE：收集每个宗族的新族长候选（不可变借用 agents）
         let mut successions: Vec<(String, Option<AgentId>)> = Vec::new();
+        // ★ v1.9.0 绝嗣检测：已无在世男性且尚未标记绝嗣的宗族
+        let mut extinct_candidates: Vec<String> = Vec::new();
 
         for (surname, clan) in &self.clan_registry.clans {
             let mut best: Option<(AgentId, f32)> = None; // (id, age)
+            let mut has_living_male = false;
 
             // BTreeSet 按 AgentId 升序遍历，并列时先遇到的 id 更小，自然满足确定性
             for &member_id in &clan.members {
@@ -143,6 +155,7 @@ impl World3DEngine {
                 if !agent.is_alive || agent.gender != Gender::Male {
                     continue;
                 }
+                has_living_male = true;
                 match best {
                     None => best = Some((member_id, agent.age)),
                     Some((_, best_age)) if agent.age > best_age => {
@@ -153,13 +166,22 @@ impl World3DEngine {
             }
 
             let new_leader = best.map(|(id, _)| id);
+            // 绝嗣判定：宗族已存在（成员非空）但已无在世男性，且尚未标记绝嗣
+            if !has_living_male && !clan.members.is_empty() && !self.clan_registry.extinct.contains(surname) {
+                extinct_candidates.push(surname.clone());
+            }
             // 仅在族长实际变化时记录（避免每 tick 刷事件）
             if clan.leader != new_leader {
                 successions.push((surname.clone(), new_leader));
             }
         }
 
-        // WRITE PHASE：应用族长更替
+        // WRITE PHASE A：绝嗣结算（族产平分给其他宗族 / 入公仓），在领导更替前执行
+        for surname in extinct_candidates {
+            self.mark_clan_extinct(&surname, tick);
+        }
+
+        // WRITE PHASE B：应用族长更替
         for (surname, new_leader) in successions {
             let Some(clan) = self.clan_registry.clans.get_mut(&surname) else {
                 continue;
@@ -169,12 +191,91 @@ impl World3DEngine {
                     clan.set_leader(id, tick, "同姓最年长在世男性顺位继承");
                 }
                 None => {
-                    // 无在世男性：宗族无主，账本冻结
+                    // 无在世男性：宗族无主，账本冻结（绝嗣宗族由 mark_clan_extinct 记录事件）
                     clan.leader = None;
-                    clan.ledger.push_event(tick, format!("⛩️ 宗族【{}】无在世男性，族长之位空缺，账本冻结", surname));
+                    if !self.clan_registry.extinct.contains(&surname) {
+                        clan.ledger.push_event(tick, format!("⛩️ 宗族【{}】无在世男性，族长之位空缺，账本冻结", surname));
+                    }
                 }
             }
         }
+    }
+
+    /// ★ v1.9.0 宗族绝嗣结算：所有男性已亡 → 标记绝嗣，族产平分给其他存续宗族（无则入公仓兜底）。
+    /// 保留历史数据：宗族实体、成员列表与账本流水均保留。
+    fn mark_clan_extinct(&mut self, surname: &str, tick: u64) {
+        if self.clan_registry.extinct.contains(surname) {
+            return;
+        }
+        // READ：收集绝嗣宗族账面余额（五类固定顺序）
+        let mut balances: Vec<(ResourceKind, f32)> = Vec::new();
+        if let Some(clan) = self.clan_registry.get(surname) {
+            for &rk in RESOURCE_ORDER.iter() {
+                let bal = clan.ledger.balance(rk);
+                if bal > 0.001 {
+                    balances.push((rk, bal));
+                }
+            }
+        }
+
+        // 收集其他存续宗族（非绝嗣、且仍留有成员）
+        let other_clans: Vec<String> = self.clan_registry.clans.iter()
+            .filter(|(s, c)| *s != surname && !self.clan_registry.extinct.contains(*s) && !c.members.is_empty())
+            .map(|(s, _)| s.clone())
+            .collect();
+
+        if other_clans.is_empty() {
+            // 无其他存续宗族：族产入公仓兜底账本
+            for (rk, amt) in &balances {
+                let record = TransferRecord {
+                    tick,
+                    from: LedgerRef::Clan(surname.to_string()),
+                    to: LedgerRef::PublicGranary,
+                    resource: *rk,
+                    amount: *amt,
+                    reason: TransferReason::Legacy,
+                };
+                if let Some(clan) = self.clan_registry.get_mut(surname) {
+                    clan.ledger.debit(*rk, *amt);
+                    clan.ledger.push_transfer(record.clone());
+                }
+                self.public_granary.credit(*rk, *amt);
+                self.public_granary.push_transfer(record);
+            }
+        } else {
+            // 族产平分给其他存续宗族
+            let share_count = other_clans.len() as f32;
+            for (rk, amt) in &balances {
+                if let Some(clan) = self.clan_registry.get_mut(surname) {
+                    clan.ledger.debit(*rk, *amt);
+                }
+                let share = amt / share_count;
+                for other in &other_clans {
+                    let record = TransferRecord {
+                        tick,
+                        from: LedgerRef::Clan(surname.to_string()),
+                        to: LedgerRef::Clan(other.clone()),
+                        resource: *rk,
+                        amount: share,
+                        reason: TransferReason::Legacy,
+                    };
+                    if let Some(clan) = self.clan_registry.get_mut(surname) {
+                        clan.ledger.push_transfer(record.clone());
+                    }
+                    if let Some(other_clan) = self.clan_registry.get_mut(other) {
+                        other_clan.ledger.credit(*rk, share);
+                        other_clan.ledger.push_transfer(record);
+                    }
+                }
+            }
+        }
+
+        // WRITE：标记绝嗣 + 记录事件
+        self.clan_registry.extinct.insert(surname.to_string());
+        if let Some(clan) = self.clan_registry.get_mut(surname) {
+            clan.ledger.push_event(tick, format!("⛩️ 宗族【{}】所有男性已亡，转为【绝嗣】状态，族产{}归集", surname, if other_clans.is_empty() { "入公仓兜底".to_string() } else { format!("平分给其他 {} 个宗族", other_clans.len()) }));
+        }
+        self.last_event = Some(format!("⛩️ 宗族【{}】绝嗣：所有男性已亡，族产{}归集", surname, if other_clans.is_empty() { "入公仓兜底".to_string() } else { format!("平分给其他 {} 个宗族", other_clans.len()) }));
     }
 
     // ══════════════════════════════════════════════════════════

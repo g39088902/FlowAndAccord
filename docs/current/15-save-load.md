@@ -49,9 +49,9 @@ World3DEngine
 | 时钟 | `tick_counter` / `last_event` |
 | 配置 | `config`（`SimConfig` 全量，**读档沿用存档时的配置**） |
 | 社会制度 | `marriage_registry` / `household_registry` / `clan_registry` / `region_registry` / `public_granary` |
-| 冷却表 | `mutual_aid_cooldown` / `expedition_targets` / `relief_cooldown`（均 BTreeMap 保序） |
+| 冷却表 | `mutual_aid_cooldown` / `relief_cooldown`（均 BTreeMap 保序） |
 
-每名 agent 的私有状态（`poi_seekability` 施密特触发器 / `family_stock_active` / `gold_mining_cooldown` / `miscarriage_cooldown_timer` / `postpartum_cooldown_timer` / `route` 等）随 `Agent3D` 整体序列化，**无需单独处理**。
+每名 agent 的私有状态（`poi_seekability` 施密特触发器 / `family_stock_active` / `gold_mining_cooldown` / `miscarriage_cooldown_timer` / `postpartum_cooldown_timer` / `route` 等）随 `Agent3D` 整体序列化，**无需单独处理**。夺位远征目标（`expedition_target_camp` / `coronation_pending`）为瞬态不落档，读档后重置为空，下一决策相位重新评估（v1.9.0）。
 
 ### 2.2 显式排除的字段
 

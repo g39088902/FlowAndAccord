@@ -1,9 +1,10 @@
 use super::super::vec3::Vec3;
-use super::super::graph::LaneGraph3D;
+use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
 use super::super::house::House;
 use super::super::ledger::family::HouseholdRegistry;
+use super::super::ledger::region::RegionRegistry;
 use super::super::ledger::journal::ResourceKind;
 use super::branches::{self, BranchId};
 use super::needs::*;
@@ -17,10 +18,12 @@ pub struct Decisioner<'a> {
     pub houses: &'a [House],
     /// ★ M6 账本化：家户登记簿只读引用（家庭物资唯一真相源 = 家户账本余额）
     pub households: &'a HouseholdRegistry,
+    /// ★ M4 地区与王国登记簿只读引用（夺位远征资格 / 国王立宅约束 / 登基判定）
+    pub regions: &'a RegionRegistry,
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 13],
+    pub branch_order: &'a [BranchId; 14],
 }
 
 impl<'a> Decisioner<'a> {
@@ -81,6 +84,10 @@ impl<'a> Decisioner<'a> {
                 agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingGold, agent, self.houses, self.households, self.config)
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_material(agent, NodePool::Gold, PoiType::GoldMine);
+            }
+            PrimitiveActionState::SeekingThrone => {
+                agent.current_need = Some("Physiological·SeekThrone".to_string());
+                self.decide_seeking_throne(agent);
             }
             PrimitiveActionState::DrinkingAtWater => {
                 agent.current_need = state_need_label_with_agent(PrimitiveActionState::DrinkingAtWater, agent, self.houses, self.households, self.config)
@@ -150,6 +157,10 @@ impl<'a> Decisioner<'a> {
             return;
         }
         if need.kind == NeedKind::FoundHome {
+            // ★ M4 无房国王立宅约束：只能盖在自己的王国（营地）附近（复用 poiMinDistance）
+            let king_camp_pos = self.king_camp_of(agent)
+                .and_then(|kcid| self.ctx.camp_pois.iter().find(|(id, _)| *id == kcid))
+                .map(|(_, p)| *p);
             // 系统仅在实体化阶段执行放置校验与路网接入（见 materialize_founded_houses）。
             for _ in 0..self.config.decision_found_home_candidates {
                 let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);
@@ -159,11 +170,21 @@ impl<'a> Decisioner<'a> {
                     agent.world_pos.y + angle.sin() * dist,
                     agent.world_pos.z,
                 );
-                let is_valid = self.houses.iter().all(|h| {
+                let mut is_valid = self.houses.iter().all(|h| {
                     let dx = h.pos.x - cand.x;
                     let dy = h.pos.y - cand.y;
                     (dx * dx + dy * dy).sqrt() >= self.config.house_min_spacing
                 });
+                // 国王宅址必须落在自己王国营地 poi_min_distance 以内（挂靠自己的王国）
+                if is_valid {
+                    if let Some(cp) = king_camp_pos {
+                        let dx = cp.x - cand.x;
+                        let dy = cp.y - cand.y;
+                        if (dx * dx + dy * dy).sqrt() > self.config.poi_min_distance {
+                            is_valid = false;
+                        }
+                    }
+                }
                 if is_valid {
                     agent.pending_house_pos = Some(cand);
                     agent.current_need = Some("Physiological·FoundHome".to_string());
@@ -171,6 +192,25 @@ impl<'a> Decisioner<'a> {
                 }
             }
             agent.current_need = Some("Physiological·FoundHome".to_string());
+            return;
+        }
+        if need.kind == NeedKind::SeekThrone {
+            // ★ M4 夺位远征：目标 = 最近的可夺位营地（资格规则与分支守卫一致）
+            let home_camp_id = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                .map(|h| h.camp_id);
+            let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id) else {
+                agent.current_need = None;
+                return;
+            };
+            let Some(target_node) = self.camp_node_of(camp_id) else {
+                agent.current_need = None;
+                return;
+            };
+            let start = self.start_node(agent);
+            agent.expedition_target_camp = Some(camp_id);
+            agent.current_need = Some("Physiological·SeekThrone".to_string());
+            self.dispatch(agent, start, target_node, PrimitiveActionState::SeekingThrone);
             return;
         }
         if need.kind == NeedKind::StockGold {
@@ -186,10 +226,56 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
             NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
             NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);
         }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ★ M4 夺位远征 / 国王立宅 · 决策辅助
+    // ══════════════════════════════════════════════════════════
+
+    /// 本 agent 是否已是一地之王
+    pub fn is_king(&self, agent: &Agent3D) -> bool {
+        self.regions.regions.iter().any(|(_, r)| r.group.leader == Some(agent.id))
+    }
+
+    /// 本 agent 若为王，返回其王国的营地 ID
+    pub fn king_camp_of(&self, agent: &Agent3D) -> Option<u32> {
+        self.regions.regions.iter()
+            .find(|(_, r)| r.group.leader == Some(agent.id))
+            .map(|(cid, _)| *cid)
+    }
+
+    /// 判定夺位远征资格并返回最近的可夺位营地。
+    /// has_house=true 时仅自家营地王位空缺才可夺；无房（含废墟）则可夺任意空缺王位营地。
+    pub fn eligible_leaderless_camp(&self, agent: &Agent3D, has_house: bool, home_camp_id: Option<u32>) -> Option<u32> {
+        let mut best: Option<(u32, f32)> = None;
+        for (cid, region) in &self.regions.regions {
+            if region.group.leader.is_some() {
+                continue; // 王位未空缺
+            }
+            if has_house && Some(*cid) != home_camp_id {
+                continue; // 有房者只能夺自家营地王位
+            }
+            let Some(pos) = self.ctx.camp_pois.iter().find(|(id, _)| *id == *cid).map(|(_, p)| *p) else {
+                continue;
+            };
+            let dist = agent.world_pos.distance_to(&pos);
+            if best.map(|(_, bd)| dist < bd).unwrap_or(true) {
+                best = Some((*cid, dist));
+            }
+        }
+        best.map(|(id, _)| id)
+    }
+
+    /// 营地 ID → 最近路网节点（夺位远征目标节点）
+    pub fn camp_node_of(&self, camp_id: u32) -> Option<NodeId> {
+        let pos = self.ctx.camp_pois.iter().find(|(id, _)| *id == camp_id).map(|(_, p)| *p)?;
+        self.ctx.camp_positions.iter()
+            .min_by(|a, b| a.1.distance_to(&pos).partial_cmp(&b.1.distance_to(&pos)).unwrap())
+            .map(|(n, _)| *n)
     }
 }

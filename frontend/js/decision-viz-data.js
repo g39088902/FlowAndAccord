@@ -10,7 +10,7 @@
 
   // 马斯洛层级色板（与主页深色科技风一致）
   var LV = {
-    1: { name: '生理需求', hex: '#ef4444', kinds: 'QuenchThirst · SateHunger · Rest · FoundHome' },
+    1: { name: '生理需求', hex: '#ef4444', kinds: 'SeekThrone · QuenchThirst · SateHunger · Rest · FoundHome' },
     2: { name: '安全需求', hex: '#38bdf8', kinds: 'RepairHouse · StockWater · StockFood · StockWood' },
     3: { name: '归属与爱', hex: '#10b981', kinds: 'BuildHouse(0级)' },
     4: { name: '尊重需求', hex: '#f59e0b', kinds: 'BuildHouse(1-4级) · StockStone · StockGold' },
@@ -31,7 +31,8 @@
     { id: 'b9', cond: '有房(含0级) 且 家户账本石 <100', need: 'Safety · StockStone', target: 'SeekingStone', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B9StockStone' },
     { id: 'b10', cond: '有房(含0级) 且 家户账本金 <100 且 淘金冷却≤0', need: 'Safety · StockGold', target: 'SeekingGold', level: 2, cfg: ['decisionStockGoldCooldown=45.0'], anchor: 'branches.rs::B10StockGold' },
     { id: 'b11', cond: '账本可付本次材料(2级木粮水75/3级石木粮水100/4级金石木粮水125)', need: 'Esteem · BuildHouse(1-4级)', target: '瞬发升级(下一级)', level: 4, cfg: ['upgrade_material_cost(tier)'], anchor: 'branches.rs::B11BuildHouseUpgrade' },
-    { id: 'b13', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' }
+    { id: 'b13', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' },
+    { id: 'b14', cond: '在世成年男性 且 非现任国王 且 存在空缺王位营地（有房限自家房屋营地/无房可任意）', need: 'Physiological · SeekThrone', target: 'SeekingThrone', level: 1, cfg: ['poiMinDistance=70', '性别+房籍守卫'], anchor: 'branches.rs::B14SeekThrone' }
   ];
 
   var BRANCH_MAP = {};
@@ -40,15 +41,15 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b1', 'b2', 'b3', 'b12', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
-  // 默认分界线：位于第 g 张卡之后（第1层|第2层=4 / 第2层|第3层=8 / 第3层|第4层=9 / 第4层|第5层=12）
-  var DEFAULT_DIVGAPS = [4, 8, 9, 12];
+  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b3', 'b12', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
+  // 默认分界线：位于第 g 张卡之后（第1层|第2层=5 / 第2层|第3层=9 / 第3层|第4层=10 / 第4层|第5层=13）
+  var DEFAULT_DIVGAPS = [5, 9, 10, 13];
 
   // 行动状态机摘要（agent.rs::PrimitiveActionState 15 态）
   var FSM_STATES = [
     'RestingAtCamp', 'SeekingWater', 'SeekingFood', 'SeekingWood', 'SeekingStone', 'SeekingGold',
     'DrinkingAtWater', 'ForagingFood', 'GatheringWood', 'MiningStone', 'MiningGold',
-    'ReturningToCamp', 'ConstructingHouse', 'RepairingHouse', 'OffRoadDetour'
+    'ReturningToCamp', 'ConstructingHouse', 'RepairingHouse', 'OffRoadDetour', 'SeekingThrone'
   ];
 
   // 行动状态中文描述（PrimitiveActionState 15 态 → 中文语义），决策卡 target 与状态机芯片共用
@@ -57,7 +58,8 @@
     SeekingWood: '外出寻木', SeekingStone: '外出寻石', SeekingGold: '外出寻金',
     DrinkingAtWater: '清泉饮水', ForagingFood: '采食浆果', GatheringWood: '伐木取木',
     MiningStone: '采石取石', MiningGold: '淘金取金', ReturningToCamp: '返家卸货',
-    ConstructingHouse: '建房施工', RepairingHouse: '房屋修缮', OffRoadDetour: '途中掉头重路由'
+    ConstructingHouse: '建房施工', RepairingHouse: '房屋修缮', OffRoadDetour: '途中掉头重路由',
+    SeekingThrone: '夺位远征'
   };
   /** 英文状态码 → 中文语义；未知则原样返回 */
   function zh(s) { return FSM_STATE_ZH[s] || s; }

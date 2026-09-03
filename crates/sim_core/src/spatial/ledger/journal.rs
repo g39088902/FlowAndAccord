@@ -69,6 +69,8 @@ pub enum TransferReason {
     Relief,
     /// 族内互助（M3 启用）
     MutualAid,
+    /// 宗族绝嗣遗产归并（M3 · v1.9.0：绝嗣宗族族产平分给其他宗族 / 入公仓）
+    Legacy,
     /// 工资（Corporate 预留）
     Wage,
     /// 分红（Corporate 预留）

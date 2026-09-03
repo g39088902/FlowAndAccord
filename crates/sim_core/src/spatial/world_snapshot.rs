@@ -1,4 +1,4 @@
-use super::agent::Gender;
+use super::agent::{Gender, PrimitiveActionState};
 use super::ledger::journal::ResourceKind;
 use super::poi::PoiType;
 use super::house::HouseSnapshot;
@@ -176,6 +176,8 @@ impl World3DEngine {
                 // ★ M4 到达时刻与夺位远征状态
                 arrival_tick: agent.arrival_tick,
                 is_on_expedition: matches!(agent.state, crate::spatial::agent::PrimitiveActionState::SeekingThrone),
+                expedition_target_camp: agent.expedition_target_camp,
+                coronation_pending: agent.coronation_pending,
             });
         }
 
@@ -265,6 +267,8 @@ impl World3DEngine {
                     reason: format!("{:?}", r.reason),
                 })
                 .collect();
+            // ★ v1.9.0 绝嗣状态
+            let is_extinct = self.clan_registry.extinct.contains(surname);
             clans.push(ClanSnapshot {
                 surname: surname.clone(),
                 leader_id: clan.leader,
@@ -273,6 +277,7 @@ impl World3DEngine {
                 balances,
                 recent_journal,
                 recent_events,
+                is_extinct,
             });
         }
 
@@ -348,10 +353,18 @@ impl World3DEngine {
                 }
             }
 
-            // 正在冲向该营地夺位的族人
-            let active_expedition_agents: Vec<u32> = self.expedition_targets.iter()
-                .filter(|(_, &cid)| cid == *camp_id)
-                .map(|(&aid, _)| aid)
+            // 正在冲向该营地夺位的族人（决策引擎驱动的远征：agent 自主持有目标营地）
+            let active_expedition_agents: Vec<u32> = self.agents.iter()
+                .filter(|a| a.is_alive && a.state == PrimitiveActionState::SeekingThrone && a.expedition_target_camp == Some(*camp_id))
+                .map(|a| a.id)
+                .collect();
+
+            // ★ v1.9.0 历史国王 / 居民列表 / 管辖家庭
+            let history_kings: Vec<u32> = region.history_kings.clone();
+            let member_ids: Vec<u32> = region.group.members.iter().copied().collect();
+            let governed_households: Vec<u64> = self.household_registry.households.iter()
+                .filter(|(_, hh)| !hh.is_dissolved && self.region_registry.region_of(hh.head) == Some(*camp_id))
+                .map(|(hid, _)| *hid)
                 .collect();
 
             regions.push(RegionSnapshot {
@@ -367,6 +380,9 @@ impl World3DEngine {
                 recent_journal,
                 recent_events,
                 active_expedition_agents,
+                history_kings,
+                member_ids,
+                governed_households,
             });
         }
 

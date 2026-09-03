@@ -41,7 +41,7 @@
 | `ledger/journal.rs` ResourceKind 变更 | `bookkeeping.rs` RESOURCE_ORDER / `ecology.rs` 收付映射 / `housing_system/maintenance.rs` 烧柴 / `decisions/` 余额读取 / `snapshot.rs` LedgerBalanceSnapshot / `rustworld.js` / `render.js` / `ledger-ui.js` 五类余额展示 | ResourceKind 是账本系统的基础枚举，全系统横切 |
 | `ledger/family.rs` 家户锚定规则变更 | `housing_system/marriage.rs` 成婚入家户 / `housing_system/inheritance.rs` 房产继承 / `bookkeeping.rs` 分家/继承 / `birth.rs` 新生儿入家户 / `decisions/` 家户守卫 / `ledger-ui.js` 家户页 | "家庭跟着男人走"是 M1 核心不变量，改动影响所有家庭相关逻辑 |
 | `ledger/clan.rs` 宗族规则变更 | `world.rs` tick_clan 调用 / `birth.rs` 新生儿入族 / `ecology.rs` 始祖入族 / `snapshot.rs` ClanSnapshot / `rustworld.js` / `ledger-ui.js` 宗族页 / `config.rs` 族税/互助超参 | M3 宗族是按姓氏聚合的团体，与家户、地区并列 |
-| `ledger/region.rs` 地区王国规则变更 | `world.rs` tick_region / `decisions/scheduler.rs` 夺位远征 / `agent.rs` is_on_expedition / `snapshot.rs` RegionSnapshot / `rustworld.js` / `ledger-ui.js` 王国页 / `config.rs` 公仓税/救济超参 | M4 地区与王国涉及夺位远征(决策层)和继承(agent层) |
+| `ledger/region.rs` 地区王国规则变更 | `world.rs` tick_region / `decisions/branches.rs` B14SeekThrone 夺位分支 + `decisions/evaluate.rs` 目标选定 + `decisions/scheduler.rs` execute_pending_coronations 登基 / `agent.rs` is_on_expedition + expedition_target_camp + coronation_pending / `snapshot.rs` RegionSnapshot(history_kings/member_ids/governed_households) + AgentSnapshot(expedition_target_camp/coronation_pending) / `rustworld.js` / `ledger-ui.js` 王国页 / `config.rs` 公仓税/救济超参 | M4 地区与王国涉及夺位远征(决策层)和继承(agent层) |
 | `bookkeeping.rs` 继承/分家规则变更 | `ledger/family.rs` 家户解散/立户 / `ledger/journal.rs` Inheritance/Split 流水 / `housing_system/inheritance.rs` 房产继承 / `agent.rs` 金币遗产 / `world.rs` tick 顺序 | M2 家庭生命周期结算是账本制度的最后一步前序 |
 
 ### 1.5 房屋系统

@@ -2,6 +2,37 @@
 // 族人/房屋/POI Inspector 面板 DOM 更新 / 智能点击拾取 / 家户账本信息
 // 依赖全局: sim, camera, project3D, canvas, totalDragDist, clickCycle
 
+// ★ v1.9.0 进度条变化速率追踪（按游戏时间秒计量，悬停展示每秒变化量；Task1）
+const _meterRateTracker = (() => {
+  const buckets = {};
+  return {
+    push(key, value, gameDt) {
+      const t = performance.now() / 1000;
+      const b = buckets[key] || (buckets[key] = { prevVal: value, prevT: t, rate: 0 });
+      const realDt = t - b.prevT;
+      if (realDt > 0.6) {
+        // 间隔过久（暂停/切卡/重开）：重置基准，不产出速率
+        b.prevVal = value; b.prevT = t;
+        return b.rate;
+      }
+      if (realDt > 0.02 && gameDt > 0) {
+        const inst = (value - b.prevVal) / gameDt;
+        // 忽略极端跳变（数值被重置/瞬移），用 EMA 平滑
+        if (Math.abs(inst) < 60) b.rate = b.rate === 0 ? inst : b.rate * 0.6 + inst * 0.4;
+      }
+      b.prevVal = value; b.prevT = t;
+      return b.rate;
+    },
+    reset(key) { if (buckets[key]) buckets[key].rate = 0; }
+  };
+})();
+function _fmtRate(v) {
+  if (!isFinite(v) || Math.abs(v) < 0.005) return '约 0.00/秒';
+  return (v > 0 ? '+' : '') + v.toFixed(2) + '/秒';
+}
+// 每帧游戏时间增量（秒）＝ simulationDt × 倍速
+const _gameDt = () => (sim.simulationDt || 1 / 30) * (sim.speedMult || 1);
+
 function updateInspector() {
 const inspectorCard = document.getElementById('inspector-card');
 const agentView = document.getElementById('insp-agent-view');
@@ -58,6 +89,15 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     document.getElementById('insp-house-dur-val').textContent = `${durPct}% (${house.isRuin ? '加速风化中' : (house.isRepairing ? '族人修缮回血中' : (durPct < 85 ? '需修缮' : '稳固使用中'))})`;
     document.getElementById('insp-house-dur-fill').style.width = `${durPct}%`;
     document.getElementById('insp-house-dur-fill').style.background = durPct < 30 ? '#ef4444' : (durPct < 85 ? '#f59e0b' : '#10b981');
+    // ★ v1.9.0 房屋耐久/修缮变化速度（按游戏秒；Task1 进度条悬停）
+    const durRate = _meterRateTracker.push('dur' + house.id, house.durability, _gameDt());
+    const durFillEl = document.getElementById('insp-house-dur-fill');
+    if (durFillEl) {
+      let durHint = '耐久变化 ' + _fmtRate(durRate);
+      if (house.isRuin) durHint = '💀 绝嗣废墟 · 加速风化 ' + _fmtRate(durRate);
+      else if (house.isRepairing) durHint = '🔧 修缮回血中 · 每秒变化 ' + _fmtRate(durRate);
+      durFillEl.title = durHint;
+    }
 
     // ★ M6 家庭储备展示（唯一真相源 = 户主家户账本；房屋不再持有仓库）
     const ownerAgentRef = (typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : sim.agents.find(a => a.id === house.ownerId);
@@ -202,6 +242,73 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
       document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
       document.getElementById('insp-poi-stock-fill').style.width = `${ratio}%`;
+    }
+
+    // ★ v1.9.0 营地王国信息与王国账本（Task3：国王/继承人/历史国王/管辖家庭/国家账本）
+    const kingdomBox = document.getElementById('insp-camp-kingdom-box');
+    if (kingdomBox) {
+      const region = sim.regions.find(r => r.campId === poi.id);
+      if (poi.type === 'Camp' && region) {
+        kingdomBox.style.display = 'flex';
+        const kingEl = document.getElementById('insp-camp-king');
+        if (kingEl) {
+          if (region.kingId != null) {
+            kingEl.innerHTML = `<span class="lineage-chip" data-agent-id="${region.kingId}" title="点击追踪国王视角">👑 Agent #${region.kingId}</span>`;
+          } else {
+            kingEl.innerHTML = `<span style="color:#ef4444;">王位空缺（可被夺位）</span>`;
+          }
+        }
+        const heirEl = document.getElementById('insp-camp-heir');
+        if (heirEl) {
+          const heirId = (region.heirCandidates || [])[0];
+          if (heirId != null) {
+            heirEl.innerHTML = `<span class="lineage-chip" data-agent-id="${heirId}" title="点击追踪继承人视角">🤴 Agent #${heirId}</span>`;
+          } else {
+            heirEl.textContent = '—';
+          }
+        }
+        const histEl = document.getElementById('insp-camp-hist-kings');
+        if (histEl) {
+          const hk = region.historyKings || [];
+          if (hk.length > 0) {
+            histEl.innerHTML = hk.map(kid => `<span class="lineage-chip dead" data-agent-id="${kid}" title="点击查看历史国王">#${kid}</span>`).join(' ');
+          } else {
+            histEl.textContent = '—';
+          }
+        }
+        const govEl = document.getElementById('insp-camp-governed');
+        if (govEl) {
+          const ghs = region.governedHouseholds || [];
+          if (ghs.length > 0) {
+            govEl.textContent = ghs.map(hid => {
+              const hh = (sim.households || []).find(h => h.id === hid);
+              const n = hh && hh.members ? hh.members.length : '?';
+              return `🏠#${hid}(${n}人)`;
+            }).join('  ');
+          } else {
+            govEl.textContent = '—';
+          }
+        }
+        const resMap = { Water: 'insp-camp-ledger-water', Food: 'insp-camp-ledger-food', Wood: 'insp-camp-ledger-wood', Stone: 'insp-camp-ledger-stone', Gold: 'insp-camp-ledger-gold' };
+        for (const rk of Object.keys(resMap)) {
+          const el = document.getElementById(resMap[rk]);
+          if (el) el.textContent = ((region.balances && region.balances[rk]) || 0).toFixed(1);
+        }
+        const jEl = document.getElementById('insp-camp-ledger-journal');
+        if (jEl) {
+          const jn = (region.recentJournal || []).slice(0, 4);
+          if (jn.length > 0) {
+            jEl.innerHTML = jn.map(r => {
+              const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承' }[r.reason] || r.reason;
+              return `<div>· ${reasonZh} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`;
+            }).join('');
+          } else {
+            jEl.textContent = '';
+          }
+        }
+      } else {
+        kingdomBox.style.display = 'none';
+      }
     }
 
     document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0 ? `+${poi.regenRate.toFixed(2)} 单位/秒` : `无限储量 (公共避风聚落)`;
@@ -407,6 +514,12 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const thirstFillEl = document.getElementById('insp-thirst-fill');
     if (thirstFillEl) thirstFillEl.style.width = `${Math.round((selAgent.thirst / 50.0) * 100)}%`;
 
+    // ★ v1.9.0 饱食/口渴/体力每秒变化速度（按游戏时间秒；Task1 进度条悬停）
+    const _gdt = _gameDt();
+    if (hungerFillEl) hungerFillEl.title = '饱食度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('hunger' + selAgent.id, selAgent.hunger, _gdt));
+    if (thirstFillEl) thirstFillEl.title = '口渴度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('thirst' + selAgent.id, selAgent.thirst, _gdt));
+    if (stamFillEl) stamFillEl.title = '体力 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('stamina' + selAgent.id, selAgent.stamina, _gdt));
+
     // 🎒 随身行囊 (紧凑胶囊网格)
     const CARRY_TOTAL_CAP = 200.0;
     const cWater = selAgent.carriedWater || 0.0;
@@ -573,7 +686,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           'Tier3Homestead': '3级木石庄舍',
           'Tier4Manor': '4级大庄园'
         }[myH.tier] || '私宅') : '私宅';
-        const hHtml = `<span style="color:#38bdf8; font-weight:600;">🏠 #${selAgent.homeHouseId} (${tierName})</span>`;
+        // ★ v1.9.0 点击房屋 → 跳转房屋卡片（Task8）
+        const hHtml = `<span class="lineage-chip house" data-house-id="${selAgent.homeHouseId}" style="color:#38bdf8; font-weight:600;" title="点击跳转到房屋卡片 #${selAgent.homeHouseId}">🏠 #${selAgent.homeHouseId} (${tierName})</span>`;
         if (houseElem.innerHTML !== hHtml) houseElem.innerHTML = hHtml;
       } else {
         const hHtml = `<span style="color:#64748b;">居于营地 (无私宅)</span>`;
@@ -718,6 +832,9 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       const pVal = Math.round(selAgent.pregnancyProgress * 100);
       document.getElementById('insp-preg-val').textContent = `${pVal}% (${Math.round(selAgent.pregnancyProgress * 900)}s / 900s)`;
       document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
+      // ★ v1.9.0 怀孕进度每秒变化（按游戏秒，进度%）（Task1 进度条悬停）
+      const pregFillEl = document.getElementById('insp-preg-fill');
+      if (pregFillEl) pregFillEl.title = '怀孕进度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('preg' + selAgent.id, selAgent.pregnancyProgress, _gdt) * 100) + '（进度%）';
       // ★ M1.7 母亲卡片按钮 → 跳转胎儿卡片（data-agent-id 由 main.js 委托处理）
       const pregFetusBtn = document.getElementById('insp-preg-fetus-btn');
       if (pregFetusBtn) {

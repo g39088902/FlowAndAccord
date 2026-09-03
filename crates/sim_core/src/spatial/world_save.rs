@@ -97,7 +97,6 @@ pub struct WorldSave {
 
     // ── 团体冷却表（保序 BTreeMap）──
     pub mutual_aid_cooldown: BTreeMap<HouseholdId, u64>,
-    pub expedition_targets: BTreeMap<u32, u32>,
     pub relief_cooldown: BTreeMap<HouseholdId, u64>,
 }
 
@@ -139,7 +138,6 @@ impl World3DEngine {
             clan_registry: self.clan_registry.clone(),
             region_registry: self.region_registry.clone(),
             mutual_aid_cooldown: self.mutual_aid_cooldown.clone(),
-            expedition_targets: self.expedition_targets.clone(),
             relief_cooldown: self.relief_cooldown.clone(),
         }
     }
@@ -213,7 +211,6 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         clan_registry: save.clan_registry,
         mutual_aid_cooldown: save.mutual_aid_cooldown,
         region_registry: save.region_registry,
-        expedition_targets: save.expedition_targets,
         relief_cooldown: save.relief_cooldown,
     };
 

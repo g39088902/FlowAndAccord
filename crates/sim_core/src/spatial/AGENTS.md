@@ -173,7 +173,7 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 `seed_primitive_ecology()` 是世界重置入口，必须清空**所有**与 agents 相关的状态：
 - agents / pois / network / houses（基础实体）
 - marriage_registry / household_registry / clan_registry / region_registry（登记簿）
-- mutual_aid_cooldown / expedition_targets / relief_cooldown（冷却映射）
+- mutual_aid_cooldown / relief_cooldown（冷却映射）
 - total_births / total_deaths / total_miscarriages（计数器）
 - next_agent_id / next_house_id（发号器）
 

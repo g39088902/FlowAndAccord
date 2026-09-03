@@ -487,6 +487,8 @@
             // ★ M4: 到达时刻与夺位远征标记
             arrivalTick: a.arrival_tick || 0,
             isOnExpedition: a.is_on_expedition || false,
+            expeditionTargetCamp: a.expedition_target_camp ?? null,
+            coronationPending: a.coronation_pending ?? null,
             trail
           };
         });
@@ -573,7 +575,8 @@
             return acc;
           }, {}),
           recentJournal: c.recent_journal || [],
-          recentEvents: c.recent_events || []
+          recentEvents: c.recent_events || [],
+          isExtinct: !!c.is_extinct
         }));
 
         // ★ M4: 地区/王国登记簿快照映射（初王/长子继承/公仓税/救济/夺位远征）
@@ -589,7 +592,10 @@
           balances: (r.balances || []).reduce((acc, b) => { acc[b.resource] = b.amount; return acc; }, {}),
           recentJournal: r.recent_journal || [],
           recentEvents: r.recent_events || [],
-          activeExpeditionAgents: r.active_expedition_agents || []
+          activeExpeditionAgents: r.active_expedition_agents || [],
+          historyKings: r.history_kings || [],
+          memberIds: r.member_ids || [],
+          governedHouseholds: r.governed_households || []
         }));
 
         // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）

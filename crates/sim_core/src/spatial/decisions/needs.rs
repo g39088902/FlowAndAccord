@@ -58,6 +58,7 @@ pub enum NeedKind {
     StockStone,     // 尊重: 采石建材 (庄舍/庄园升级储备)
     StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
     GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
+    SeekThrone,     // 生理(最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基
 }
 
 /// 一条需求判定结论
@@ -105,6 +106,8 @@ pub struct DecisionContext {
     pub stone_nodes: Vec<ResourceNode>,
     pub gold_nodes: Vec<ResourceNode>,
     pub camp_positions: Vec<(NodeId, Vec3)>,
+    /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
+    pub camp_pois: Vec<(u32, Vec3)>,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）

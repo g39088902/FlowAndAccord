@@ -13,7 +13,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.8.7</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.9.1</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -510,6 +510,33 @@
         <div class="meter-row" id="insp-camp-upgrade-row" style="display:none;">
           <div class="meter-label"><span id="lbl-camp-upgrade-title" style="color:#facc15;">🏛️ 辖区私宅与聚落晋升</span><span id="insp-camp-upgrade-val">0 / 6 间房</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-camp-upgrade-fill" style="background:#facc15; width:0%;"></div></div>
+        </div>
+        <!-- ★ v1.9.0 营地王国信息与王国账本（Task3：国王/继承人/历史国王/管辖家庭/国家账本） -->
+        <div id="insp-camp-kingdom-box" style="display:none; flex-direction:column; gap:6px; border-top:1px dashed rgba(148,163,184,0.25); padding-top:6px;">
+          <div style="font-size:11px; color:#facc15; font-weight:600;">👑 王国 · 营地辖区（地区政体）</div>
+          <div class="poi-info-badge">
+            <div><strong>👑 国王:</strong> <span id="insp-camp-king">—</span></div>
+            <div><strong>🤴 继承人:</strong> <span id="insp-camp-heir">—</span></div>
+            <div><strong>📜 历史国王:</strong> <span id="insp-camp-hist-kings">—</span></div>
+            <div><strong>🏛️ 管辖家庭:</strong> <span id="insp-camp-governed">—</span></div>
+          </div>
+          <div style="font-size:10.5px; color:#94a3b8;">💰 王国账本（公仓 · 税赋/救济/遗产归并）</div>
+          <div class="meter-row">
+            <div class="meter-label plain-stock"><span style="color:#38bdf8;">💧 水</span><span id="insp-camp-ledger-water">0.0</span></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label plain-stock"><span style="color:#10b981;">🍒 粮</span><span id="insp-camp-ledger-food">0.0</span></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label plain-stock"><span style="color:#d97706;">🌲 木</span><span id="insp-camp-ledger-wood">0.0</span></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label plain-stock"><span style="color:#94a3b8;">🪨 石</span><span id="insp-camp-ledger-stone">0.0</span></div>
+          </div>
+          <div class="meter-row">
+            <div class="meter-label plain-stock"><span style="color:#fbbf24;">🪙 金</span><span id="insp-camp-ledger-gold">0.0</span></div>
+          </div>
+          <div id="insp-camp-ledger-journal" style="font-size:10px; color:#94a3b8; line-height:1.5;"></div>
         </div>
         <div class="poi-info-badge">
           <div><strong>🌱 产出速率:</strong> <span id="insp-poi-regen">+2.00 单位/秒</span></div>

@@ -119,13 +119,21 @@ impl World3DEngine {
             let house_id = self.next_house_id;
             self.next_house_id += 1;
 
+            let owner_id = self.agents[i].id;
+            // ★ v1.9.0 无房国王盖房挂靠自己的王国（营地）：国王宅邸必属其治下营地
+            let king_camp_id = self.region_registry.regions.iter()
+                .find(|(_, r)| r.group.leader == Some(owner_id))
+                .map(|(cid, _)| *cid);
             let nearest_camp = self.pois.iter()
                 .filter(|p| p.poi_type == PoiType::Camp)
                 .min_by(|a, b| a.pos.distance_to(&site_pos).partial_cmp(&b.pos.distance_to(&site_pos)).unwrap());
-            let camp_id = nearest_camp.map(|p| p.id).unwrap_or(1);
-            let camp_name = nearest_camp.map(|p| p.camp_title()).unwrap_or_else(|| "营地".to_string());
-
-            let owner_id = self.agents[i].id;
+            let camp_id = king_camp_id
+                .or_else(|| nearest_camp.map(|p| p.id))
+                .unwrap_or(1);
+            let camp_name = self.pois.iter()
+                .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
+                .map(|p| p.camp_title())
+                .unwrap_or_else(|| "营地".to_string());
             let house = House::new_with_config(house_id, owner_id, site_pos, door_node, HouseTier::Tier0Warehouse, camp_id, &self.config);
             self.houses.push(house);
 

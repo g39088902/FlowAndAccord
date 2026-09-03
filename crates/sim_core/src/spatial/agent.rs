@@ -118,6 +118,14 @@ pub struct Agent3D {
     pub home_house_id: Option<u32>, // 绑定的私宅/大庄园 ID (若有)
     /// 自主“自立门户”决策选定的宅址候选 (待系统实体化登记为 0 级仓库)
     pub pending_house_pos: Option<Vec3>,
+    /// ★ M4 夺位远征目标营地（决策引擎驱动：由本 agent 自主选定并持有的远征目标）
+    /// 仅在本 agent 处于夺位远征意图期间非空；登基/重定向/放弃均由决策器读写。
+    #[serde(default)]
+    pub expedition_target_camp: Option<u32>,
+    /// ★ M4 登基待结算标记：本 agent 已抵达目标营地且王位空缺，等待世界系统执行登基物理规则
+    /// （与 pending_house_pos 同模式：决策器只下决心，实体化由 world 负责）。
+    #[serde(default)]
+    pub coronation_pending: Option<u32>,
     pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
@@ -218,6 +226,8 @@ impl Agent3D {
             poi_seekability: BTreeMap::new(),
             home_house_id: None,
             pending_house_pos: None,
+            expedition_target_camp: None,
+            coronation_pending: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
             generation: 1,

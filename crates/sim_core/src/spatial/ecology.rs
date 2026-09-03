@@ -27,7 +27,6 @@ impl World3DEngine {
         self.mutual_aid_cooldown.clear();
         // ★ M4 地区登记簿同步清空
         self.region_registry.clear();
-        self.expedition_targets.clear();
         self.relief_cooldown.clear();
         // ★ v1.8.7 死亡/流产墓碑同步清空（世界重置不留旧死亡记录）
         self.recent_deaths.clear();
@@ -39,6 +38,8 @@ impl World3DEngine {
         let mut stone_nodes = Vec::new();
         let mut gold_nodes = Vec::new();
         let mut all_node_ids = Vec::new();
+        // ★ v1.9.0 普通道路节点（非 POI 的地形过渡节点，作为开局小人生成位）
+        let mut road_nodes = Vec::new();
 
         let mut poi_positions: Vec<Vec3> = Vec::new();
         let min_poi_distance = self.config.poi_min_distance;
@@ -165,6 +166,7 @@ impl World3DEngine {
             let elev = self.terrain.sample_elevation(x, y);
             let node_id = self.network.add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
             all_node_ids.push(node_id);
+            road_nodes.push(node_id);
         }
 
         // 8. 全图路网连接
@@ -189,10 +191,26 @@ impl World3DEngine {
         }
 
         // 9. 播撒初始 20 名原始小人 (10男10女)
+        // ★ v1.9.0 出生地 = 随机的普通道路节点（不能是 POI；营地/水/粮/木/石/金节点均为 POI 节点）
         let total_initial = self.config.agent_spawn_count;
         let female_count = total_initial / 2;
         for i in 0..total_initial {
-            let home_camp = camp_nodes[i % camp_nodes.len()];
+            // 出生地为随机普通道路节点（RNG 确定性顺序：每名始祖消耗 1 次；无道路节点时回退营地节点）
+            let spawn_node = if road_nodes.is_empty() {
+                camp_nodes[i % camp_nodes.len()]
+            } else {
+                road_nodes[self.rng.gen_range_usize(0, road_nodes.len())]
+            };
+            let spawn_pos = self.network.graph[*self.network.node_map.get(&spawn_node).unwrap()].pos;
+            // home_camp = 离出生地最近的营地（保证 home_camp_node 与地区归属一致）
+            let home_camp = camp_nodes.iter()
+                .min_by(|a, b| {
+                    let pa = self.network.graph[*self.network.node_map.get(a).unwrap()].pos;
+                    let pb = self.network.graph[*self.network.node_map.get(b).unwrap()].pos;
+                    pa.distance_to(&spawn_pos).partial_cmp(&pb.distance_to(&spawn_pos)).unwrap()
+                })
+                .copied()
+                .unwrap_or(camp_nodes[0]);
             let is_covert = i % self.config.agent_covert_every_n == 0;
             let agent_id = self.next_agent_id;
             self.next_agent_id += 1;
@@ -204,8 +222,7 @@ impl World3DEngine {
             agent.birth_tick = 0;
             // ★ M4 始祖到达时刻=0（同时播撒，arrival_order 按 id 升序打破并列）
             agent.arrival_tick = 0;
-            let camp_pos = self.network.graph[*self.network.node_map.get(&home_camp).unwrap()].pos;
-            agent.world_pos = camp_pos;
+            agent.world_pos = spawn_pos;
 
             let hunger_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
             let thirst_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
@@ -238,9 +255,9 @@ impl World3DEngine {
             self.household_registry.create(agent.id, None, 0);
         }
 
-        // ★ M3 始祖入族：按姓氏自动聚合（不区分性别，同姓即同族）
-        for agent in self.agents.iter().filter(|a| a.is_alive) {
-            self.clan_registry.add_member(&agent.surname, agent.id, 0);
+        // ★ M3 始祖入族（v1.9.1 宗族与女性无关）：仅男性始祖入族（按姓氏自动建宗）
+        for agent in self.agents.iter().filter(|a| a.is_alive && a.gender == Gender::Male) {
+            self.clan_registry.add_member(&agent.surname, agent.id, 0, agent.gender);
         }
 
         // ★ M4 始祖入地区：按最近营地 POI 归属（agent 已放置在营地节点位置）
