@@ -359,7 +359,11 @@
           name: p.name || (p.poi_type === 'Camp' ? '聚落 #' + p.id : (poiTypeMap[p.poi_type] || p.poi_type) + ' #' + p.id),
           campTitle: p.camp_title || p.name || ('聚落 #' + p.id),
           level: p.level || 0,
-          boundHouses: p.bound_houses || 0
+          boundHouses: p.bound_houses || 0,
+          vacantHouses: (p.vacant_houses || []).map(vh => ({
+            houseId: vh.house_id,
+            beneficiaryIds: vh.beneficiary_ids || []
+          }))
         }));
 
         // --- 房屋（M6 建筑化：不再携带任何资源存量；家庭物资展示读家户账本） ---
@@ -371,11 +375,9 @@
           ownerId: h.owner_id,
           spouseId: h.spouse_id,
           campId: h.camp_id,
-          isRuin: h.is_ruin,
           isRepairing: h.is_repairing,
           durability: h.durability,
           age: h.age,
-          generation: h.generation,
           constructionProgress: h.construction_progress,
           builderId: h.builder_id,
           lastUpgraderId: h.last_upgrader_id,

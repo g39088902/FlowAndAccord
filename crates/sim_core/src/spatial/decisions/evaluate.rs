@@ -197,7 +197,7 @@ impl<'a> Decisioner<'a> {
         if need.kind == NeedKind::SeekThrone {
             // ★ M4 夺位远征：目标 = 最近的可夺位营地（资格规则与分支守卫一致）
             let home_camp_id = agent.home_house_id
-                .and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| h.camp_id);
             let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id) else {
                 agent.current_need = None;
@@ -240,6 +240,14 @@ impl<'a> Decisioner<'a> {
     /// 本 agent 是否已是一地之王
     pub fn is_king(&self, agent: &Agent3D) -> bool {
         self.regions.regions.iter().any(|(_, r)| r.group.leader == Some(agent.id))
+    }
+
+    /// ★ v1.10.0 是否存在未满（< camp_max_houses）的营地（B12FoundHome 预检用）
+    pub fn has_nonfull_camp(&self) -> bool {
+        let max = self.config.camp_max_houses as usize;
+        self.ctx.camp_pois.iter().any(|(cid, _)| {
+            self.houses.iter().filter(|h| h.camp_id == *cid).count() < max
+        })
     }
 
     /// 本 agent 若为王，返回其王国的营地 ID

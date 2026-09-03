@@ -151,6 +151,7 @@ window.SIM_CONFIG = {
   houseWinterWoodBurnRate: 0.12,  // 冬季供暖木材消耗速率 (每秒)
   houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
   houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)
+  campMaxHouses: 30,               // 每个营地最多可建设的房屋数量
   houseNodeReuseRadius: 20.0,     // 立宅优先复用空置路网节点检索半径 (m)
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 

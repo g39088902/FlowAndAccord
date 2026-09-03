@@ -4,7 +4,7 @@ use super::poi::PoiType;
 use super::house::HouseSnapshot;
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
-    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, WorldSnapshot3D,
+    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -43,6 +43,10 @@ impl World3DEngine {
                 camp_title: p.camp_title(),
                 level: p.level,
                 bound_houses: p.bound_houses_count,
+                vacant_houses: p.vacant_houses.iter().map(|vh| VacantHouseSnapshot {
+                    house_id: vh.house_id,
+                    beneficiary_ids: vh.beneficiary_ids.clone(),
+                }).collect(),
             });
         }
 
@@ -59,8 +63,6 @@ impl World3DEngine {
                 tier: format!("{:?}", h.tier),
                 durability: h.durability,
                 age: h.age,
-                generation: h.generation,
-                is_ruin: h.is_ruin,
                 construction_progress: h.construction_progress,
                 is_repairing: h.is_repairing,
                 builder_id: h.builder_id,

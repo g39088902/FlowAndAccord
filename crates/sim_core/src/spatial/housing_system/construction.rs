@@ -42,7 +42,7 @@ impl World3DEngine {
         let Some(owner_hid) = self.household_registry.household_of(agent_id) else {
             return;
         };
-        let Some(house) = self.houses.iter().find(|h| h.id == house_id && !h.is_ruin) else {
+        let Some(house) = self.houses.iter().find(|h| h.id == house_id) else {
             return;
         };
         let prev_tier = house.tier;
@@ -90,7 +90,7 @@ impl World3DEngine {
         }
 
         // ★ M6 威望·宅邸因子：房屋每晋升一级，户主威望 +1（最高 4 级宅邸累计 +4；纯立宅不计）
-        let owner_id = self.houses.iter().find(|h| h.id == house_id).map(|h| h.owner_id);
+        let owner_id = self.houses.iter().find(|h| h.id == house_id).and_then(|h| h.owner_id);
         if let Some(oid) = owner_id {
             if let Some(owner) = self.agents.iter_mut().find(|a| a.id == oid) {
                 owner.prestige = owner.prestige.saturating_add(1);

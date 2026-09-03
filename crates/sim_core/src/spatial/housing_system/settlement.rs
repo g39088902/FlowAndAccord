@@ -14,8 +14,8 @@ impl World3DEngine {
         })
     }
 
-    /// 节点是否空置：既不是任何现存房屋（含废墟）的大门节点，也不是某个 POI 自身的接驳节点。
-    /// 绝嗣废墟坍塌后遗留的孤儿门节点、以及无人占用的野外路口均属空置。
+    /// 节点是否空置：既不是任何现存房屋的大门节点，也不是某个 POI 自身的接驳节点。
+    /// 房屋坍塌后遗留的孤儿门节点、以及无人占用的野外路口均属空置。
     pub(crate) fn is_node_vacant(&self, node_id: NodeId, node_pos: Vec3) -> bool {
         if self.houses.iter().any(|h| h.door_node_id == node_id) {
             return false;
@@ -99,7 +99,7 @@ impl World3DEngine {
         for (i, chosen) in pending {
             let cand_pos = Vec3::new(chosen.x, chosen.y, self.terrain.sample_elevation(chosen.x, chosen.y));
 
-            // 优先复用合法范围内最近的空置节点（绝嗣废墟坍塌遗留的孤儿门节点 / 无主野外路口），
+            // 优先复用合法范围内最近的空置节点（房屋坍塌遗留的孤儿门节点 / 无主野外路口），
             // 无可复用节点时才新建，杜绝路网节点随代际更替无限膨胀。
             let reuse = self.find_vacant_node_near(cand_pos, self.config.house_node_reuse_radius);
 
@@ -124,12 +124,36 @@ impl World3DEngine {
             let king_camp_id = self.region_registry.regions.iter()
                 .find(|(_, r)| r.group.leader == Some(owner_id))
                 .map(|(cid, _)| *cid);
-            let nearest_camp = self.pois.iter()
+            // ★ v1.10.0 营地房屋上限：只在未满（< camp_max_houses）的营地建设，所有营地满则放弃本次建房
+            let max_houses = self.config.camp_max_houses as usize;
+            // 按距宅址的距离排序所有营地（确定性：同距取 id 小）
+            let mut camps_by_dist: Vec<(u32, f32)> = self.pois.iter()
                 .filter(|p| p.poi_type == PoiType::Camp)
-                .min_by(|a, b| a.pos.distance_to(&site_pos).partial_cmp(&b.pos.distance_to(&site_pos)).unwrap());
-            let camp_id = king_camp_id
-                .or_else(|| nearest_camp.map(|p| p.id))
-                .unwrap_or(1);
+                .map(|p| (p.id, p.pos.distance_to(&site_pos)))
+                .collect();
+            camps_by_dist.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)));
+            // 统计各营地当前房屋数（含本拍已实体化的房屋，防止同拍超建）
+            let camp_house_count = |cid: u32| -> usize {
+                self.houses.iter().filter(|h| h.camp_id == cid).count()
+            };
+            // 选址：国王优先自己的王国营地（若未满），否则按距离尝试未满营地；全部满则放弃
+            let camp_id = if let Some(kcid) = king_camp_id {
+                if camp_house_count(kcid) < max_houses {
+                    Some(kcid)
+                } else {
+                    camps_by_dist.iter()
+                        .find(|(cid, _)| camp_house_count(*cid) < max_houses)
+                        .map(|(cid, _)| *cid)
+                }
+            } else {
+                camps_by_dist.iter()
+                    .find(|(cid, _)| camp_house_count(*cid) < max_houses)
+                    .map(|(cid, _)| *cid)
+            };
+            let Some(camp_id) = camp_id else {
+                // 所有营地均已满，放弃本次建房（agent 下拍重新决策）
+                continue;
+            };
             let camp_name = self.pois.iter()
                 .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
                 .map(|p| p.camp_title())
@@ -154,7 +178,7 @@ impl World3DEngine {
     pub(crate) fn tick_camp_administrative_upgrades(&mut self) {
         for poi in &mut self.pois {
             if poi.poi_type == PoiType::Camp {
-                let count = self.houses.iter().filter(|h| h.camp_id == poi.id && !h.is_ruin).count() as u32;
+                let count = self.houses.iter().filter(|h| h.camp_id == poi.id).count() as u32;
                 if let Some(msg) = poi.update_camp_level(count) {
                     self.last_event = Some(msg);
                 }

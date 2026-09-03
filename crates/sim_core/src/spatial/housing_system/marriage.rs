@@ -79,7 +79,7 @@ impl World3DEngine {
                 let is_remarriage = if let Some(wife) = self.agents.iter_mut().find(|a| a.id == female_id) {
                     wife.spouse_id = Some(owner_id);
                     // 男方有房则夫妇同住并登记房屋配偶；无房则随家户（婚后由 FoundHome 立宅）
-                    if let Some(house) = self.houses.iter_mut().find(|h| h.owner_id == owner_id && !h.is_ruin) {
+                    if let Some(house) = self.houses.iter_mut().find(|h| h.owner_id == Some(owner_id)) {
                         wife.home_house_id = Some(house.id);
                         wife.home_camp_node = house.door_node_id;
                         house.spouse_id = Some(female_id);

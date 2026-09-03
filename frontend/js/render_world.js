@@ -244,13 +244,16 @@ for (const house of sim.houses) {
   else if (house.tier === 'Tier3Homestead') { tierIcon = '🏯'; tierLabel = '庄'; }
   else if (house.tier === 'Tier4Manor') { tierIcon = '🏰'; tierLabel = '堡'; }
 
-  if (house.isRuin) {
+  if (house.ownerId == null) {
+    // ★ v1.10.0 无主空置房：半透明渲染 + "空"标签
+    ctx.globalAlpha = 0.55;
     ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('🏚️', p2D.x, p2D.y + 4);
+    ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
     ctx.font = '9px sans-serif';
-    ctx.fillStyle = '#ef4444';
-    ctx.fillText(`#${house.id}废墟`, p2D.x, p2D.y + 16 * camera.zoom);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`#${house.id}空`, p2D.x, p2D.y + 16 * camera.zoom);
+    ctx.globalAlpha = 1.0;
   } else {
     // 居所光晕与图标
     const glowColor = isWarehouse ? 'rgba(217, 119, 6, 0.45)' : (house.tier === 'Tier4Manor' ? 'rgba(168, 85, 247, 0.45)' : 'rgba(245, 158, 11, 0.45)');

@@ -12,7 +12,7 @@ impl<'a> Decisioner<'a> {
     /// 无房（无 home 或已废墟）→ 恒视为已补足（不可采）；有房 → 触发器 OFF（账本余额 ≥ 上限）为补足。
     fn stock_met(&self, agent: &Agent3D, kind: ResourceKind) -> bool {
         let has_home = match agent.home_house_id {
-            Some(id) => self.houses.iter().any(|h| h.id == id && !h.is_ruin),
+            Some(id) => self.houses.iter().any(|h| h.id == id),
             None => false,
         };
         !has_home || !family_stock_on(agent, kind)

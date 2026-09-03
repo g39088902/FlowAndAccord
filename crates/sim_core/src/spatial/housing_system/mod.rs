@@ -28,8 +28,8 @@ impl World3DEngine {
         // 5. 自动成婚与单身女性改嫁机制
         self.tick_marriage_and_remarriage();
 
-        // 7. 父系房产代际确权继承机制与绝嗣废墟演化
-        self.tick_patrilineal_inheritance();
+        // 7. ★ v1.10.0 空置房屋事件驱动追踪（户主死亡→无主空置→营地登记受益人，取代原继承/绝嗣废墟）
+        self.tick_vacant_house_tracking();
 
         // 8. 金币遗产继承机制 (死者金币平分给在世子一代子女)
         self.settle_gold_inheritance();

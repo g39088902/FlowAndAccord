@@ -75,18 +75,19 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     document.getElementById('insp-title-name').textContent = `${tierTitle} #${house.id}`;
     
     let stateText = '🌿 私人居所';
-    if (house.isRuin) {
-      stateText = '💀 绝嗣废墟 (快速风化中)';
+    const isVacant = house.ownerId == null;
+    if (isVacant) {
+      stateText = '🏚️ 无主空置房 (正常风化中)';
     } else if (house.isRepairing) {
       stateText = `🔧 族人劳作修缮中 (${Math.round(house.durability)}%)`;
     } else {
       stateText = isWarehouse ? '🏠 起步营地' : (house.tier === 'Tier4Manor' ? '🏰 4级氏族大庄园' : '🏡 安居宅邸');
     }
     document.getElementById('insp-title-state').textContent = stateText;
-    document.getElementById('insp-title-state').style.color = house.isRuin ? '#ef4444' : (house.isRepairing ? '#38bdf8' : (isWarehouse ? '#f59e0b' : '#10b981'));
+    document.getElementById('insp-title-state').style.color = isVacant ? '#94a3b8' : (house.isRepairing ? '#38bdf8' : (isWarehouse ? '#f59e0b' : '#10b981'));
 
     const durPct = Math.round(house.durability);
-    document.getElementById('insp-house-dur-val').textContent = `${durPct}% (${house.isRuin ? '加速风化中' : (house.isRepairing ? '族人修缮回血中' : (durPct < 85 ? '需修缮' : '稳固使用中'))})`;
+    document.getElementById('insp-house-dur-val').textContent = `${durPct}% (${isVacant ? '无主正常风化中' : (house.isRepairing ? '族人修缮回血中' : (durPct < 85 ? '需修缮' : '稳固使用中'))})`;
     document.getElementById('insp-house-dur-fill').style.width = `${durPct}%`;
     document.getElementById('insp-house-dur-fill').style.background = durPct < 30 ? '#ef4444' : (durPct < 85 ? '#f59e0b' : '#10b981');
     // ★ v1.9.0 房屋耐久/修缮变化速度（按游戏秒；Task1 进度条悬停）
@@ -94,15 +95,16 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const durFillEl = document.getElementById('insp-house-dur-fill');
     if (durFillEl) {
       let durHint = '耐久变化 ' + _fmtRate(durRate);
-      if (house.isRuin) durHint = '💀 绝嗣废墟 · 加速风化 ' + _fmtRate(durRate);
+      if (isVacant) durHint = '🏚️ 无主空置房 · 正常风化 ' + _fmtRate(durRate);
       else if (house.isRepairing) durHint = '🔧 修缮回血中 · 每秒变化 ' + _fmtRate(durRate);
       durFillEl.title = durHint;
     }
 
     // ★ M6 家庭储备展示（唯一真相源 = 户主家户账本；房屋不再持有仓库）
-    const ownerAgentRef = (typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : sim.agents.find(a => a.id === house.ownerId);
-    const ownerHousehold = (typeof sim.getHouseholdOfAgent === 'function') ? sim.getHouseholdOfAgent(house.ownerId)
-      : (sim.households.find(hh2 => hh2.head === house.ownerId || (hh2.members || []).includes(house.ownerId)) || null);
+    // ★ v1.10.0 无主空置房（ownerId==null）无家户账本，跳过储备展示
+    const ownerAgentRef = (house.ownerId != null && typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : (house.ownerId != null ? sim.agents.find(a => a.id === house.ownerId) : null);
+    const ownerHousehold = (house.ownerId != null && typeof sim.getHouseholdOfAgent === 'function') ? sim.getHouseholdOfAgent(house.ownerId)
+      : (house.ownerId != null ? (sim.households.find(hh2 => hh2.head === house.ownerId || (hh2.members || []).includes(house.ownerId)) || null) : null);
     const hhBal = (ownerHousehold && ownerHousehold.balances) || {};
     // ★ M8 储备条改纯数值：账本余额无容量上限，删除了 houseCapacityTier 百分比分母（进度条 DOM 已移除）
     const hhRows = [
@@ -139,14 +141,20 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       fertilityBadge.style.color = '#10b981';
     }
 
-    // 户主追踪按钮绑定
-    const ownerAgent = (typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : sim.agents.find(a => a.id === house.ownerId);
+    // 户主追踪按钮绑定（v1.10.0 无主空置房显示"无主"，删除代际显示）
+    const ownerAgent = (house.ownerId != null && typeof sim.getAgent === 'function') ? sim.getAgent(house.ownerId) : (house.ownerId != null ? sim.agents.find(a => a.id === house.ownerId) : null);
     const ownerAlive = ownerAgent && ownerAgent.isAlive;
     const ownerBtn = document.getElementById('insp-house-owner-btn');
     if (ownerBtn) {
-      ownerBtn.textContent = `Agent #${house.ownerId} ${ownerAlive ? '🟢 健在 (点击追踪)' : '💀 已故'} (第${house.generation}代) 🔍`;
-      ownerBtn.className = `lineage-chip ${ownerAlive ? '' : 'dead'}`;
-      ownerBtn.setAttribute('data-agent-id', house.ownerId);
+      if (house.ownerId == null) {
+        ownerBtn.textContent = '🏚️ 无主空置房（受益人登记于所属营地）';
+        ownerBtn.className = 'lineage-chip dead';
+        ownerBtn.removeAttribute('data-agent-id');
+      } else {
+        ownerBtn.textContent = `Agent #${house.ownerId} ${ownerAlive ? '🟢 健在 (点击追踪)' : '💀 已故'} 🔍`;
+        ownerBtn.className = `lineage-chip ${ownerAlive ? '' : 'dead'}`;
+        ownerBtn.setAttribute('data-agent-id', house.ownerId);
+      }
     }
 
     // 所属聚落辖区绑定
@@ -166,7 +174,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       builderVal.textContent = `修建者 Agent #${house.builderId} · 最近升级 ${upgName}`;
     }
     if (houseCoordEl) houseCoordEl.textContent = `(X: ${Math.round(house.pos.x)}m, Y: ${Math.round(house.pos.y)}m)`;
-    document.getElementById('insp-detail-text').textContent = house.isRuin ? '户主去世且未有族人继承，房屋正处于风化瓦解状态。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
+    document.getElementById('insp-detail-text').textContent = isVacant ? '户主故去后成为无主空置房，受益人（子女+配偶）已登记于所属营地空置列表，等待后续房屋转让机制确权。' : (isWarehouse ? '0级仓库自带5水5粮5木，需搬运水粮各满10.0单位后，投入30s升级为1级茅草房并激活家庭生育。' : `属于族人 #${house.ownerId} 的私产空间。冬季自动消耗木材供暖(木材<10无法生育)；升级私宅需要木头，私宅往上升级需要石头(石头仅用于盖房升级)。`);
   }
 } else if (sim.selectionType === 'poi' && sim.selectedPoiId !== null) {
   const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
@@ -183,7 +191,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     let badgeColor = '#10b981';
     if (poi.type === 'Camp') {
       const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
-      stateBadge = `${lvlNames[poi.level || 0]} · 辖 ${poi.boundHouses || 0} 房`;
+      const vacantCount = (poi.vacantHouses && poi.vacantHouses.length) || 0;
+      stateBadge = `${lvlNames[poi.level || 0]} · 辖 ${poi.boundHouses || 0} 房${vacantCount > 0 ? ` · ${vacantCount}空置` : ''}`;
       badgeColor = '#f59e0b';
     } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
       stateBadge = '无限供应';
@@ -318,6 +327,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (poiCoordEl) poiCoordEl.textContent = poi.type === 'Camp' ? '聚落中心' : (poi.campTitle ? `${poi.campTitle} 领地` : '荒原公域');
     
     let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
+    // ★ v1.10.0 营地空置房屋列表展示（户主故去→无主空置→登记受益人）
+    if (poi.type === 'Camp' && poi.vacantHouses && poi.vacantHouses.length > 0) {
+      const vhLines = poi.vacantHouses.map(vh => {
+        const ben = (vh.beneficiaryIds && vh.beneficiaryIds.length > 0) ? vh.beneficiaryIds.join(', ') : '无';
+        return `  🏚️ 房屋 #${vh.houseId} → 受益人: ${ben}`;
+      }).join('\n');
+      desc += `\n\n【空置房屋登记】(${poi.vacantHouses.length} 间无主空置房)\n${vhLines}`;
+    }
     if (poi.type === 'Water') desc = '低洼处天然地泉(上限60单位,产速2.0/s)，小人饮水并补给家宅。';
     else if (poi.type === 'Berry') desc = '向阳缓坡野生灌木(上限60单位,产速2.0/s)，小人采食并补给家宅。';
     else if (poi.type === 'Wood') desc = '茂密原生林地(上限60单位,产速2.0/s)，伐木用于冬季房屋供暖与升级茅草房。';

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use super::vec3::Vec3;
+use super::agent::AgentId;
 
 pub type PoiId = u32;
 
@@ -108,6 +109,15 @@ pub(crate) mod finite_f32 {
     }
 }
 
+/// 空置房屋登记条目（v1.10.0）：户主死亡后房屋成为无主空置房，
+/// 在所属营地登记房屋 ID 与受益人列表（户主所有在世子女 + 目前的妻子）。
+/// 仅登记，房屋转让/继承逻辑留待后续迭代。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VacantHouseEntry {
+    pub house_id: u32,
+    pub beneficiary_ids: Vec<AgentId>,
+}
+
 /// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿的储量上限与产速均由 SimConfig 的 stock_max_* / regen_base_* 控制；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
@@ -124,6 +134,8 @@ pub struct PrimitivePoi {
     pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
     pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
     pub bound_houses_count: u32, // 当前绑定的房屋总数
+    /// ★ v1.10.0 空置房屋列表（仅营地有意义；户主死亡后登记，房屋坍塌后移除）
+    pub vacant_houses: Vec<VacantHouseEntry>,
 }
 
 impl PrimitivePoi {
@@ -159,6 +171,7 @@ impl PrimitivePoi {
             name,
             level: 0,
             bound_houses_count: 0,
+            vacant_houses: Vec::new(),
         }
     }
 

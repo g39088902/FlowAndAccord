@@ -102,6 +102,7 @@ pub const TRAIT_INHERIT_CLAMP_MAX: f32 = 190.0;
 // ============================================================================
 pub const POI_MIN_DISTANCE: f32 = 70.0;
 pub const COUNT_CAMPS: usize = 5;
+pub const CAMP_MAX_HOUSES: u32 = 30;
 pub const COUNT_WATER_SOURCES: usize = 6;
 pub const COUNT_BERRY_BUSHES: usize = 6;
 pub const COUNT_WOODS: usize = 3;
@@ -459,6 +460,7 @@ pub struct SimConfig {
     pub house_winter_wood_burn_rate: f32,
     pub house_winter_cold_temp: f32,
     pub house_min_spacing: f32,
+    pub camp_max_houses: u32,
     pub house_node_reuse_radius: f32,
     pub house_node_poi_occupy_radius: f32,
 
@@ -657,6 +659,7 @@ impl Default for SimConfig {
             house_winter_wood_burn_rate: HOUSE_WINTER_WOOD_BURN_RATE,
             house_winter_cold_temp: HOUSE_WINTER_COLD_TEMP,
             house_min_spacing: HOUSE_MIN_SPACING,
+            camp_max_houses: CAMP_MAX_HOUSES,
             house_node_reuse_radius: HOUSE_NODE_REUSE_RADIUS,
             house_node_poi_occupy_radius: HOUSE_NODE_POI_OCCUPY_RADIUS,
 

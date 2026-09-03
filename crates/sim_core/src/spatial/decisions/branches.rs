@@ -128,7 +128,7 @@ impl BranchId {
             }
             BranchId::B4RepairHouse => {
                 if let Some(house) = home_house(d, a) {
-                    let need_repair = house.durability < cfg.decision_house_repair_need_threshold && !house.is_ruin;
+                    let need_repair = house.durability < cfg.decision_house_repair_need_threshold;
                     if need_repair && is_house_member(house, a) {
                         return Some(Need { level: MaslowLevel::Safety, kind: NeedKind::RepairHouse, target_state: PrimitiveActionState::RepairingHouse });
                     }
@@ -179,12 +179,14 @@ impl BranchId {
                 }
             }
             BranchId::B12FoundHome => {
-                // 无家判定 = home_house_id 为空，或其家宅已坍塌为废墟
+                // 无家判定 = home_house_id 为空（v1.10.0 起无绝嗣废墟状态）
+                // ★ v1.10.0 营地容量预检：至少存在一个未满（< camp_max_houses）的营地才允许立宅
                 if home_house(d, a).is_none()
                     && is_male_adult(a, cfg)
                     && a.hunger >= cfg.decision_found_home_hunger_min
                     && a.thirst >= cfg.decision_found_home_thirst_min
                     && a.stamina >= cfg.decision_found_home_stamina_min
+                    && d.has_nonfull_camp()
                 {
                     return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::FoundHome, target_state: PrimitiveActionState::RestingAtCamp });
                 }
@@ -193,7 +195,7 @@ impl BranchId {
                 // 4 级大庄园「万事俱备」门禁（M7 再锚）：庄园竣工 + 家户五类储备 trigger 全 OFF（余额均 ≥200）
                 // + 无修缮缺口 + 有金源 + 冷却结束
                 if let Some(house) = home_house(d, a) {
-                    let need_repair = house.durability < cfg.decision_house_repair_need_threshold && !house.is_ruin;
+                    let need_repair = house.durability < cfg.decision_house_repair_need_threshold;
                     let all_stocked = FAMILY_STOCK_ORDER.iter().all(|&rk| !family_stock_on(a, rk));
                     let gated = house.tier != HouseTier::Tier4Manor || need_repair || !all_stocked;
                     if !gated && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
@@ -212,7 +214,7 @@ impl BranchId {
                 }
                 // ★ M6 前提：空缺王位的营地 = 自家房屋（含 0 级仓库）所在地；或完全未建房未建仓
                 let home_camp_id = a.home_house_id
-                    .and_then(|hid| d.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                    .and_then(|hid| d.houses.iter().find(|h| h.id == hid))
                     .map(|h| h.camp_id);
                 if d.eligible_leaderless_camp(a, home_camp_id.is_some(), home_camp_id).is_some() {
                     return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SeekThrone, target_state: PrimitiveActionState::SeekingThrone });
@@ -223,13 +225,13 @@ impl BranchId {
     }
 }
 
-/// 家宅查找（存活且非废墟）
+/// 家宅查找（存活房屋；v1.10.0 起无绝嗣废墟状态）
 fn home_house<'h>(d: &Decisioner<'h>, a: &Agent3D) -> Option<&'h House> {
-    a.home_house_id.and_then(|hid| d.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+    a.home_house_id.and_then(|hid| d.houses.iter().find(|h| h.id == hid))
 }
 
 fn is_house_member(house: &House, a: &Agent3D) -> bool {
-    house.owner_id == a.id || house.spouse_id == Some(a.id)
+    house.owner_id == Some(a.id) || house.spouse_id == Some(a.id)
 }
 
 /// b5/b6/b7 的动态默认层级：有配偶或子女 → 归属层，否则 → 安全层

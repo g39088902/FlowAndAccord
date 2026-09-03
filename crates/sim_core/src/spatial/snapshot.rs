@@ -83,6 +83,13 @@ pub struct GeoCellSnapshot {
     pub slope_angle: f32,
 }
 
+/// ★ v1.10.0 空置房屋快照条目（营地空置房屋列表：房屋 ID + 受益人 ID 列表）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VacantHouseSnapshot {
+    pub house_id: u32,
+    pub beneficiary_ids: Vec<AgentId>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoiSnapshot {
     pub id: PoiId,
@@ -97,6 +104,8 @@ pub struct PoiSnapshot {
     pub camp_title: String,
     pub level: u8,
     pub bound_houses: u32,
+    /// ★ v1.10.0 空置房屋列表（仅营地有意义）
+    pub vacant_houses: Vec<VacantHouseSnapshot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

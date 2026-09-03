@@ -98,7 +98,7 @@ impl<'a> Decisioner<'a> {
         let interact_radius = self.config.poi_interaction_radius;
         let home_camp_id = || -> Option<u32> {
             agent.home_house_id
-                .and_then(|hid| self.houses.iter().find(|h| h.id == hid && !h.is_ruin))
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| h.camp_id)
         };
 

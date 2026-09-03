@@ -127,7 +127,7 @@ function updateTopBarStats(now) {
   const pregnantAgents = aliveAgents.filter(a => a.isPregnant);
 
   document.getElementById('stat-pop').textContent = aliveAgents.length;
-  document.getElementById('stat-houses').textContent = sim.houses.filter(h => !h.isRuin).length;
+  document.getElementById('stat-houses').textContent = sim.houses.length;
   document.getElementById('stat-pois').textContent = sim.pois.length;
   // ★ 家户与婚姻统计 (v0.9.72 M1)
   const activeHouseholds = sim.households ? sim.households.filter(h => !h.isDissolved).length : 0;
@@ -250,7 +250,7 @@ function updateGlobalAverages(aliveAgents, houses, households) {
 
   const females = n - males;
   const housePct = Math.round((withHouse / n) * 100);
-  const validHousesCount = houses ? houses.filter(h => !h.isRuin).length : 0;
+  const validHousesCount = houses ? houses.length : 0;
   const marriedCouples = Math.floor(marriedCount / 2);
 
   // === 家户金余额基尼系数与财富分配统计（基于家户账本，非个人随身携带量） ===

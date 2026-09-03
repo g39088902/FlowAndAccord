@@ -14,11 +14,13 @@ pub enum HouseTier {
     Tier4Manor,       // 4级 氏族大庄园
 }
 
-/// 房屋实体（M6 建筑化：只保留等级/耐久/位置/户主/代际等建筑属性，不再持有任何资源存量）
+/// 房屋实体（M6 建筑化：只保留等级/耐久/位置/户主等建筑属性，不再持有任何资源存量）
+/// ★ v1.10.0 去绝嗣废弃：owner_id 改为 Option（None=无主空置房），删除 is_ruin/generation，
+/// 无主房屋不再加速风化，户主死亡后由营地空置房屋列表登记受益人。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct House {
     pub id: u32,
-    pub owner_id: AgentId,                 // 户主 ID
+    pub owner_id: Option<AgentId>,          // 户主 ID（None=无主空置房）
     pub spouse_id: Option<AgentId>,         // 配偶共有人 ID（有房夫妇同住时登记）
     pub camp_id: u32,                       // 归属行政管辖营地 ID (PoiId)
     pub pos: Vec3,                          // 房屋世界坐标
@@ -26,12 +28,10 @@ pub struct House {
     pub tier: HouseTier,                    // 房屋等级
     pub durability: f32,                    // 耐久度 (0.0 ~ 100.0)
     pub age: f32,                           // 房龄 (秒)
-    pub generation: u32,                    // 代际传承代数 (从第1代祖屋开始)
-    pub is_ruin: bool,                      // 是否因户主绝嗣而成为无主废墟
     pub construction_progress: f32,         // 保留字段：历史施工进度（瞬时升级后恒为 1.0 由竣工置位，纯兼容保留）
     pub is_repairing: bool,                 // 当前是否正在被族人劳作修缮
-    pub builder_id: AgentId,                // 修建者（立宅人）：立宅时即固定，代际继承绝不改变
-    pub last_upgrader_id: Option<AgentId>,  // 最近升级者：每次升级时更新，继承不改；从未升级为 None
+    pub builder_id: AgentId,                // 修建者（立宅人）：立宅时即固定
+    pub last_upgrader_id: Option<AgentId>,  // 最近升级者：每次升级时更新；从未升级为 None
 }
 
 impl House {
@@ -42,7 +42,7 @@ impl House {
     pub fn new_with_config(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier, camp_id: u32, config: &SimConfig) -> Self {
         Self {
             id,
-            owner_id,
+            owner_id: Some(owner_id),
             spouse_id: None,
             camp_id,
             pos,
@@ -50,8 +50,6 @@ impl House {
             tier,
             durability: config.house_durability_max,
             age: 0.0,
-            generation: 1,
-            is_ruin: false,
             construction_progress: 0.0,
             is_repairing: false,
             builder_id: owner_id,
@@ -91,19 +89,19 @@ impl House {
         self.durability = (self.durability + amount).min(config.house_durability_max);
     }
 
-    /// 房屋自然风化与折旧
+    /// 房屋自然风化与折旧（v1.10.0 起无主房屋不再加速风化，统一正常速率）
     pub fn tick_depreciation(&mut self, dt: f32, config: &SimConfig) {
         self.age += dt;
-        let decay_rate = if self.is_ruin { config.house_depreciation_rate * 15.0 } else { config.house_depreciation_rate * 2.0 };
+        let decay_rate = config.house_depreciation_rate * 2.0;
         self.durability = (self.durability - decay_rate * dt).max(0.0);
     }
 }
 
-/// 房屋可视化与前端快照（M6：不再携带任何资源存量字段）
+/// 房屋可视化与前端快照（M6：不再携带任何资源存量字段；v1.10.0 删除 is_ruin/generation，owner_id 为 Option）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HouseSnapshot {
     pub id: u32,
-    pub owner_id: AgentId,
+    pub owner_id: Option<AgentId>,
     pub spouse_id: Option<AgentId>,
     pub camp_id: u32,
     pub x: f32,
@@ -112,8 +110,6 @@ pub struct HouseSnapshot {
     pub tier: String,
     pub durability: f32,
     pub age: f32,
-    pub generation: u32,
-    pub is_ruin: bool,
     pub construction_progress: f32,
     pub is_repairing: bool,
     pub builder_id: AgentId,
