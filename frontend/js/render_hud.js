@@ -158,7 +158,7 @@ function updateTopBarStats(now) {
 // ==========================================
 // 全局存活部落民属性均值大盘汇总计算与 DOM 渲染
 // ==========================================
-function updateGlobalAverages(aliveAgents, houses) {
+function updateGlobalAverages(aliveAgents, houses, households) {
   const cardEl = document.getElementById('global-averages-card');
   if (!cardEl) return;
   const countEl = document.getElementById('avg-alive-count');
@@ -181,6 +181,12 @@ function updateGlobalAverages(aliveAgents, houses) {
     if (el('avg-house-val')) el('avg-house-val').textContent = '0% (0间)';
     if (el('avg-single-val')) el('avg-single-val').textContent = '0♂ / 0♀';
     if (el('avg-married-val')) el('avg-married-val').textContent = '0对 (0人)';
+    if (el('avg-gini-gold-val')) el('avg-gini-gold-val').textContent = '0.000 (完全平等)';
+    if (el('avg-gini-gold-fill')) { el('avg-gini-gold-fill').style.width = '0%'; el('avg-gini-gold-fill').style.background = '#10b981'; }
+    if (el('avg-gini-top-val')) el('avg-gini-top-val').textContent = '0.0';
+    if (el('avg-gini-bottom-val')) el('avg-gini-bottom-val').textContent = '0.0';
+    if (el('avg-gini-ratio-val')) el('avg-gini-ratio-val').textContent = '0.0x';
+    if (el('avg-gini-zero-val')) el('avg-gini-zero-val').textContent = '0户';
     return;
   }
 
@@ -247,6 +253,32 @@ function updateGlobalAverages(aliveAgents, houses) {
   const validHousesCount = houses ? houses.filter(h => !h.isRuin).length : 0;
   const marriedCouples = Math.floor(marriedCount / 2);
 
+  // === 家户金余额基尼系数与财富分配统计（基于家户账本，非个人随身携带量） ===
+  const hhGoldValues = (households || [])
+    .filter(hh => !hh.isDissolved)
+    .map(hh => (hh.balances && hh.balances.Gold) || 0);
+  const hhCount = hhGoldValues.length;
+  const sortedGold = [...hhGoldValues].sort((a, b) => a - b);
+  const totalGold = sortedGold.reduce((s, v) => s + v, 0);
+  let giniGold = 0;
+  if (hhCount > 1 && totalGold > 0) {
+    let cumWeighted = 0;
+    for (let i = 0; i < hhCount; i++) cumWeighted += (i + 1) * sortedGold[i];
+    giniGold = (2 * cumWeighted) / (hhCount * totalGold) - (hhCount + 1) / hhCount;
+  }
+  const giniPct = Math.round(Math.min(100, Math.max(0, giniGold * 100)));
+  let giniLabel, giniColor;
+  if (giniGold < 0.2)      { giniLabel = '高度平等';   giniColor = '#10b981'; }
+  else if (giniGold < 0.3) { giniLabel = '比较平等';   giniColor = '#22c55e'; }
+  else if (giniGold < 0.4) { giniLabel = '相对合理';   giniColor = '#eab308'; }
+  else if (giniGold < 0.5) { giniLabel = '差距较大';   giniColor = '#f59e0b'; }
+  else if (giniGold < 0.6) { giniLabel = '高度不平等'; giniColor = '#f97316'; }
+  else                      { giniLabel = '极端不平等'; giniColor = '#ef4444'; }
+  const topGold = sortedGold[hhCount - 1] || 0;
+  const bottomGold = sortedGold[0] || 0;
+  const richPoorRatio = bottomGold > 0 ? (topGold / bottomGold) : (topGold > 0 ? Infinity : 0);
+  const zeroGoldCount = sortedGold.filter(v => v <= 0).length;
+
   const el = id => document.getElementById(id);
   if (el('avg-health-val')) el('avg-health-val').textContent = `${avgHealth.toFixed(1)} / ${avgMaxHealth.toFixed(1)} (${healthPct}%)`;
   if (el('avg-health-fill')) el('avg-health-fill').style.width = `${Math.min(100, Math.max(0, healthPct))}%`;
@@ -276,6 +308,17 @@ function updateGlobalAverages(aliveAgents, houses) {
   if (el('avg-trait-lib')) el('avg-trait-lib').textContent = (sumLib / n).toFixed(1);
   if (el('avg-trait-slp')) el('avg-trait-slp').textContent = (sumSlp / n).toFixed(1);
   if (el('avg-trait-lif')) el('avg-trait-lif').textContent = (sumLif / n).toFixed(1);
+
+  // 基尼指数与财富分配统计
+  if (el('avg-gini-gold-val')) el('avg-gini-gold-val').textContent = `${giniGold.toFixed(3)} (${giniLabel})`;
+  if (el('avg-gini-gold-fill')) {
+    el('avg-gini-gold-fill').style.width = `${giniPct}%`;
+    el('avg-gini-gold-fill').style.background = giniColor;
+  }
+  if (el('avg-gini-top-val')) el('avg-gini-top-val').textContent = topGold.toFixed(1);
+  if (el('avg-gini-bottom-val')) el('avg-gini-bottom-val').textContent = bottomGold.toFixed(1);
+  if (el('avg-gini-ratio-val')) el('avg-gini-ratio-val').textContent = richPoorRatio === Infinity ? '∞' : `${richPoorRatio.toFixed(1)}x`;
+  if (el('avg-gini-zero-val')) el('avg-gini-zero-val').textContent = `${zeroGoldCount}户`;
 }
 
 

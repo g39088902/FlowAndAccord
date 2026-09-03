@@ -212,7 +212,7 @@ if (now - lastUiUpdate >= 100) {
     drawResourceDashboard();
 
     // 6.5. 实时汇总全图存活部落民属性平均值大盘
-    updateGlobalAverages(aliveAgents, sim.houses);
+    updateGlobalAverages(aliveAgents, sim.houses, sim.households);
   }
 
   // 7. 刷新动态 Inspector 面板
