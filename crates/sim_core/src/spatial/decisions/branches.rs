@@ -260,7 +260,7 @@ impl BranchId {
                 if !a.is_alive || a.gender != Gender::Male || a.is_fetus || a.age < cfg.agent_adult_age {
                     return None;
                 }
-                if a.home_house_id.is_some() || a.pending_bid_house_id.is_some() {
+                if a.pending_bid_house_id.is_some() {
                     return None;
                 }
                 let cooldown_ok = a
@@ -270,12 +270,23 @@ impl BranchId {
                 if !cooldown_ok {
                     return None;
                 }
-                if d.ledger_balance(a, ResourceKind::Gold) < cfg.house_auction_min_bid_gold {
+                let own_tier = a.home_house_id
+                    .and_then(|hid| d.houses.iter().find(|h| h.id == hid))
+                    .map(|h| h.tier)
+                    .unwrap_or(HouseTier::Tier0Warehouse);
+                let mut candidates: Vec<(&House, f32, bool)> = d.houses.iter()
+                    .filter(|h| h.owner_id.is_none() && h.auction_state.is_some())
+                    .filter_map(|h| {
+                        if a.home_house_id.is_some() && h.tier <= own_tier { return None; }
+                        let price = house_upgrade_cost_price(own_tier, h.tier, cfg);
+                        if price < cfg.house_auction_min_bid_gold || d.ledger_balance(a, ResourceKind::Gold) < price { return None; }
+                        let gap = h.tier as u8 - own_tier as u8;
+                        Some((h, gap as f32, a.home_house_id.is_some()))
+                    }).collect();
+                if candidates.is_empty() {
                     return None;
                 }
-                if !d.houses.iter().any(|h| h.owner_id.is_none()) {
-                    return None;
-                }
+                candidates.sort_by(|(ha, ga, _), (hb, gb, _)| gb.partial_cmp(ga).unwrap_or(std::cmp::Ordering::Equal).then_with(|| ha.id.cmp(&hb.id)));
                 return Some(Need {
                     level: MaslowLevel::Safety,
                     kind: NeedKind::BidHouse,

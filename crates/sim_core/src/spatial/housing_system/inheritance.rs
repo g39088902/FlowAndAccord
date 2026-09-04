@@ -64,6 +64,7 @@ impl World3DEngine {
                 current_highest_bidder: None,
                 // ★ v1.26.0 本次拍卖会话报价流水：挂牌即从空队列开始，不跨场次
                 bids_history: std::collections::VecDeque::new(),
+                voluntary_seller_household_id: None,
             });
 
             // ★ v1.26.0 挂牌瞬间清空全部居住者（房屋真正空置，遗孀遗孤立即无家）

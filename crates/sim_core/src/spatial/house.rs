@@ -6,7 +6,7 @@ use super::agent::AgentId;
 use crate::config::*;
 
 /// 房屋建筑等级（M6 起不再承载仓储容量——家庭物资唯一真相源为家户账本，等级仅作目标基准与威望因子）
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum HouseTier {
     Tier0Warehouse,   // 0级 仓库 (无建材即立的起步营地)
     Tier1ThatchedHut, // 1级 茅草房
@@ -50,6 +50,8 @@ pub struct HouseAuctionState {
     /// 本次拍卖会话的报价流水（环形缓冲，容量由 config.house_auction_bid_history_capacity 控制）
     #[serde(default)]
     pub bids_history: VecDeque<HouseBidRecord>,
+    #[serde(default)]
+    pub voluntary_seller_household_id: Option<u64>,
 }
 
 /// 房屋实体（M6 建筑化：只保留等级/耐久/位置/户主等建筑属性，不再持有任何资源存量）

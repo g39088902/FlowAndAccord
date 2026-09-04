@@ -105,3 +105,4 @@
 | **v0.9.35** | 简化四季参数模型：废除 `season_quarter_length`，单季长度由 `year_length × 0.25` 派生 | config / world |
 | **v0.9.34** | 房屋系统与世界环境模块化解耦：`housing_system` 拆为 5 个单一职责子模块，四季回归 `world.rs` | housing / world |
 | **v0.9.24** | 随身金币遗产继承：族人故去后 `carried_gold` 平分给在世子一代子女，无子女则清零 | agent / ecology |
+| **v1.26.6** | 改善型换房竞买：有房户主可按等级差竞买更高等级房屋，资源差×市场价成本报价，麦穗决策期 `≥` 标杆成交，成交后旧房自动挂牌 | decisions / housing / ledger / wasm / docs |

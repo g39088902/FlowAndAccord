@@ -159,6 +159,12 @@ pub struct Agent3D {
     /// ★ v1.26.0 竞拍决心：本 agent 自主选定要出价的在售房屋 ID，等待世界执行器落地
     #[serde(default)]
     pub pending_bid_house_id: Option<u32>,
+    /// 竞买时按资源差×市场价格计算的确定性成本价
+    #[serde(default)]
+    pub pending_bid_price: Option<f32>,
+    /// 首次置业或改善型换房
+    #[serde(default)]
+    pub pending_bid_upgrade: bool,
     /// ★ v1.26.0 上次出价的世界 tick（None = 从未出价），用于全局出价冷却
     #[serde(default)]
     pub last_bid_tick: Option<u64>,
@@ -275,6 +281,8 @@ impl Agent3D {
             courtship_pending: None,
             raise_child_pending: false,
             pending_bid_house_id: None,
+            pending_bid_price: None,
+            pending_bid_upgrade: false,
             last_bid_tick: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,

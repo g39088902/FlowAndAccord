@@ -119,10 +119,14 @@ stateDiagram-v2
 
 ### 二手房屋竞价与营地中介麦穗拍卖 (v1.26.0 重构)
 
-1. **出价下沉到决策引擎**：无房成年男性在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支，用共享 `WorldRng` 随机挑一套在售房屋写下 `pending_bid_house_id`（不改变运动状态）；世界物理执行器 `execute_pending_bids` 校验后落地：**金额 = 家户账本全部黄金（无出价上限，倾囊竞价）**，出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却——根治同一 tick 单人多次成交。
+#### v1.26.6 改善型换房
+
+有房男性户主也可自主竞买更高等级的在售房屋。候选目标只按等级差降序、同差按房屋 ID 升序；报价为当前等级到目标等级的升级资源差乘市场基准价格所得成本价，不设置安全储备。麦穗决策期采用 `bid >= benchmark_bid` 成交。目标房成交完成后，原房屋才清空所有权并在下一阶段创建新的空置拍卖会话；主动出售的后续成交款归原户主家户，不走遗产受益人分账。详细需求与技术方案见 [plan-house-upgrade-auction.md](../plan-house-upgrade-auction.md)。
+
+1. **出价下沉到决策引擎**：无房成年男性或已有房屋的户主在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支，按目标等级差降序、同差房屋 ID 升序选择在售房屋，写下 `pending_bid_house_id` 与资源差成本价（不改变运动状态）；世界物理执行器 `execute_pending_bids` 校验后落地，出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却。
 2. **麦穗 37% 最优停止博弈**（成交判定只看新报价，不回溯历史）：
    - **观察期 ($D > D_{37\%}$)**：只收集报价、刷新最高标杆价（`benchmark_bid`），绝不出售；
-   - **决策期 ($10.0\% < D \le D_{37\%}$)**：新报价 $\text{bid} > \text{benchmark\_bid}$ 即成交；
+   - **决策期 ($10.0\% < D \le D_{37\%}$)**：新报价 $\text{bid} \ge \text{benchmark\_bid}$ 即成交；
    - **出清期 ($D \le 10.0\%$)**：有新报价即成交（无人出价则挂到耐久归零坍塌，接受该兜底缺失）。
 3. **报价流水绑定拍卖会话**：`HouseAuctionState.bids_history` 为环形缓冲（容量 `houseAuctionBidHistoryCapacity`=128），挂牌时新建空队列、成交时随会话归档消失，不跨场次。
 4. **份额制分账**：王国公户（`LedgerRef::Region`，权重 `houseAuctionCrownShareWeight`=1）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）按权重共分全额成交价，失效受益人份额并入王国公户（无人类受益人时王国独得，零特判）；流水 `TransferTax`（王室）与 `EstateShare`（受益人）。

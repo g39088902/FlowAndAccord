@@ -15,7 +15,7 @@ use crate::spatial::agent::{AgentId, Gender};
 use crate::spatial::graph::NodeId;
 use crate::spatial::house::{HouseAuctionState, HouseBidRecord, HouseDealRecord};
 use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
-use crate::spatial::poi::PoiType;
+use crate::spatial::poi::{PoiType, VacantHouseEntry};
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
@@ -37,7 +37,7 @@ impl World3DEngine {
         }
     }
 
-    /// ★ v1.26.0 竞拍世界物理执行器：把本拍内无房成年男性自主写下的 pending_bid_house_id 落地
+    /// ★ 改善型换房：把无房户或有房户主自主写下的竞买决心落地
     /// （决策器只下决心，本方法只做物理结算：校验 → 出价 → 判阶段 → 交割，不扫描指挥）
     pub fn execute_pending_bids(&mut self) {
         let tick = self.tick_counter;
@@ -68,7 +68,6 @@ impl World3DEngine {
                         && !a.is_fetus
                         && a.gender == Gender::Male
                         && a.age >= self.config.agent_adult_age
-                        && a.home_house_id.is_none()
                         && a.last_bid_tick
                             .map(|t| tick >= t && tick - t >= self.config.house_auction_bid_cooldown_ticks)
                             .unwrap_or(true)
@@ -102,7 +101,8 @@ impl World3DEngine {
             if hh_gold < self.config.house_auction_min_bid_gold {
                 continue;
             }
-            let amount = hh_gold;
+            let amount = self.agent_by_id(bidder_id).and_then(|a| a.pending_bid_price).unwrap_or(hh_gold);
+            if hh_gold + 0.0001 < amount { continue; }
 
             // 写出价冷却（无论是否成交，出价动作已发生）
             if let Some(a) = self.agent_by_id_mut(bidder_id) {
@@ -150,7 +150,7 @@ impl World3DEngine {
                     .as_ref()
                     .map(|st| st.benchmark_bid)
                     .unwrap_or(0.0);
-                if amount > bench {
+                if amount >= bench {
                     Some("麦穗决策期击中更高报价".to_string())
                 } else {
                     None
@@ -177,6 +177,7 @@ impl World3DEngine {
     ) {
         let tick = self.tick_counter;
         let house_id = self.houses[house_idx].id;
+        let replaced_house_id = self.agent_by_id(buyer_id).and_then(|a| a.home_house_id);
         let camp_id = self.houses[house_idx].camp_id;
         let durability = self.houses[house_idx].durability;
         let door_node = self.houses[house_idx].door_node_id;
@@ -192,8 +193,25 @@ impl World3DEngine {
             .as_ref()
             .map(|st| st.bids_history.len())
             .unwrap_or(0);
+        let voluntary_seller_hh = self.houses[house_idx]
+            .auction_state.as_ref()
+            .and_then(|st| st.voluntary_seller_household_id);
 
-        // 3. 份额制分账（王国公户 + 遗产受益人）
+        // 3. 主动换房旧房的成交款归原家户；遗产房沿用王国公户+受益人分账。
+        if let Some(seller_hh) = voluntary_seller_hh {
+            if let Some(hh) = self.household_registry.get_mut(seller_hh) {
+                hh.group.ledger.credit(ResourceKind::Gold, price);
+                hh.group.ledger.push_transfer(TransferRecord {
+                    tick, from: LedgerRef::Family(buyer_hh), to: LedgerRef::Family(seller_hh),
+                    resource: ResourceKind::Gold, amount: price, reason: TransferReason::HousingPurchase,
+                });
+            }
+        }
+
+        // 4. 份额制分账（王国公户 + 遗产受益人）
+        if voluntary_seller_hh.is_some() {
+            // 主动出售已完成卖方入账，不再进入遗产受益人分账。
+        } else {
         let beneficiary_ids = self
             .pois
             .iter()
@@ -277,7 +295,9 @@ impl World3DEngine {
             }
         }
 
-        // 4. 房屋所有权变更（会话随 auction_state=None 一并归档，报价流水不跨场次）
+        }
+
+        // 5. 房屋所有权变更（会话随 auction_state=None 一并归档，报价流水不跨场次）
         let spouse_id = self
             .agents
             .iter()
@@ -322,12 +342,30 @@ impl World3DEngine {
             }
         }
 
+        // 改善型换房：目标房成交后，原房屋才转为空置并延迟挂牌。
+        if let Some(old_id) = replaced_house_id {
+            if old_id != house_id {
+                if let Some(old_idx) = self.houses.iter().position(|h| h.id == old_id && h.owner_id == Some(buyer_id)) {
+                    let old_durability = self.houses[old_idx].durability;
+                    self.houses[old_idx].owner_id = None;
+                    self.houses[old_idx].spouse_id = None;
+                    self.houses[old_idx].auction_state = Some(HouseAuctionState {
+                        start_durability: old_durability,
+                        benchmark_bid: 0.0,
+                        current_highest_bid: 0.0,
+                        current_highest_bidder: None,
+                        bids_history: std::collections::VecDeque::new(),
+                        voluntary_seller_household_id: Some(buyer_hh),
+                    });
+                    if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == self.houses[old_idx].camp_id) {
+                        camp.vacant_houses.push(VacantHouseEntry { house_id: old_id, beneficiary_ids: Vec::new() });
+                    }
+                }
+            }
+        }
+
         // 8. 永久沉淀成交档案到房屋档案
-        let final_reason = if valid_beneficiaries.is_empty() {
-            format!("{}·王国公户独得", reason)
-        } else {
-            reason
-        };
+        let final_reason = reason;
         self.houses[house_idx].deal_history.push(HouseDealRecord {
             deal_tick: tick,
             buyer_id,

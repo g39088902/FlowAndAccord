@@ -2,7 +2,7 @@ use super::super::vec3::Vec3;
 use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
-use super::super::house::House;
+use super::super::house::{House, HouseTier};
 use super::super::ledger::family::HouseholdRegistry;
 use super::super::ledger::region::RegionRegistry;
 use super::super::ledger::journal::ResourceKind;
@@ -194,22 +194,29 @@ impl<'a> Decisioner<'a> {
         if need.kind == NeedKind::BidHouse {
             // ★ v1.26.0 竞购现房：随机挑一套在售空置房屋写 pending（消耗共享 RNG，确定性），
             // 不改变运动状态——只下决心，交割由世界执行器 execute_pending_bids 落地。
-            let candidates: Vec<u32> = self
+            let own_tier = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.tier)
+                .unwrap_or(HouseTier::Tier0Warehouse);
+            let mut candidates: Vec<(u32, HouseTier, f32)> = self
                 .houses
                 .iter()
-                .filter(|h| h.owner_id.is_none())
-                .map(|h| h.id)
+                .filter(|h| h.owner_id.is_none() && h.auction_state.is_some() && (agent.home_house_id.is_none() || h.tier > own_tier))
+                .map(|h| (h.id, h.tier, house_upgrade_cost_price(own_tier, h.tier, self.config)))
                 .collect();
             if candidates.is_empty() {
                 agent.current_need = None;
                 return;
             }
-            let idx = if candidates.len() == 1 {
-                0
-            } else {
-                self.rng.gen_range_usize(0, candidates.len())
-            };
-            agent.pending_bid_house_id = Some(candidates[idx]);
+            candidates.sort_by(|a, b| (b.1 as u8).cmp(&(a.1 as u8)).then_with(|| a.0.cmp(&b.0)));
+            let (house_id, _tier, price) = candidates[0];
+            if price < self.config.house_auction_min_bid_gold || ledger_balance_of(self.households, agent, ResourceKind::Gold) < price {
+                agent.current_need = None;
+                return;
+            }
+            agent.pending_bid_house_id = Some(house_id);
+            agent.pending_bid_price = Some(price);
+            agent.pending_bid_upgrade = agent.home_house_id.is_some();
             agent.current_need = Some("Safety·BidHouse".to_string());
             return;
         }
