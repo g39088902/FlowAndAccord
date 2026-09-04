@@ -671,6 +671,22 @@
       color: #94a3b8;
       line-height: 1.25;
     }
+    /* 调试模式 · 累计开采资源量 (v1.26.3，仅调试模式显示) */
+    .debug-mining-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: rgba(167, 139, 250, 0.07);
+      border: 1px dashed rgba(167, 139, 250, 0.35);
+      border-radius: 6px;
+      padding: 4px 7px;
+      font-size: 9.5px;
+    }
+    .mining-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     /* 🚚 搬运去向 */
     .carry-haul {
       display: flex;

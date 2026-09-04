@@ -1,10 +1,12 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.26.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.26.3**。
 
 | 版本 | 核心变更 | 影响模块 |
 | :--- | :--- | :--- |
+| **v1.26.3** | 调试模式累计开采按品种拆分：内核为 Agent3D 新增 cumulative_mined_water/food/wood/stone/gold 五个分品种字段（合计 cumulative_mined 保留，五者之和恒等于合计）；前端调试卡片改为「⛏️ 累计开采」标题行 + 五品种胶囊网格（💧水/🍒粮/🌲木/🪨石/🪙金），合计与品种明细同时展示 | agent / ecology / snapshot / frontend |
+| **v1.26.2** | 调试模式增强：agent 卡片新增「累计开采资源量」显示——内核为 `Agent3D` 新增 `cumulative_mined` 字段，在资源点装载入随身行囊时累计（水/粮/木/石/金五类合计，口径 = 开采搬运，市场购买与就地自饮自食不计入）；快照三处同步透传，仅调试模式勾选时在角色卡片健康/体力区块与随身行囊之间展示 | agent / ecology / snapshot / frontend |
 | **v1.26.1** | 优化 `AGENTS.md` 表述并拆分提交前检查单至 `docs/current/19-commit-checklist.md`，根指南保留入口、触发条件和最低提交门槛 | docs / engineering |
 | **v1.26.0** | 房屋拍卖系统重构：① 出价下沉到 agent 个体决策相位——新增 `B17BidHouse` 分支，无房成年男性每次只对随机一套在售房屋出价，出价后进入 300 tick 全局冷却，根治同一 tick 单人多次成交；② 成交判定改为「新报价驱动」，删除出清期历史报价回溯；③ 删除纯展示的估价机制（`current_valuation` / 建设成本折算 / 双轨估价 / D/S 供求比），前端四处估价展示改为最高出价/标杆价；④ 报价流水绑定拍卖会话并加环形上限（不跨场次）；⑤ 取消出价上限改为倾囊竞价；⑥ 成交价款份额制分账——王国公户作为受益人之一（权重可配）+ 在世配偶/子女各 1 份，无人类受益人时王国独得（天然兜底），新增 `EstateShare` / `TransferTax` 流水；⑦ 修复旧住户残留（挂牌即清空居住者）与前端买家池年龄阈值 | housing_system / decisions / ledger / config / frontend / docs |
 | **v1.25.7** | 在 `AGENTS.md` 增加集中式 commit 前检查单：所有提交基础检查、Rust/WASM、前端、配置、诊断和最终 diff 审阅按改动类型分级执行 | docs / engineering |

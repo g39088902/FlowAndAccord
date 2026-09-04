@@ -14,7 +14,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.26.1</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.26.3</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -411,6 +411,20 @@
           </div>
         </div>
 
+        <!-- ★ v1.26.3 调试模式: 累计开采资源量 · 分品种（仅调试模式勾选时显示） -->
+        <div class="debug-mining-card" id="insp-debug-mining" style="display:none;">
+          <div class="mining-header">
+            <span style="font-weight:700; color:#a78bfa;">⛏️ 累计开采</span>
+            <span id="insp-debug-mining-val" class="mono-num" style="color:#fde68a; font-weight:700;">0.0 单位</span>
+          </div>
+          <div class="carry-chips-grid" id="insp-debug-mining-chips">
+            <div class="carry-chip" id="mining-chip-water"><span class="chip-icon">💧</span><span class="chip-num" id="insp-debug-mining-water">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-food"><span class="chip-icon">🍒</span><span class="chip-num" id="insp-debug-mining-food">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-wood"><span class="chip-icon">🌲</span><span class="chip-num" id="insp-debug-mining-wood">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-stone"><span class="chip-icon">🪨</span><span class="chip-num" id="insp-debug-mining-stone">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-gold"><span class="chip-icon">🪙</span><span class="chip-num" id="insp-debug-mining-gold">0.0</span></div>
+          </div>
+        </div>
         <!-- 2x2 紧凑型生存健康指标网格 -->
         <div class="vital-grid">
           <div class="vital-item">
@@ -451,7 +465,7 @@
             <span id="insp-carry-haul-text" style="font-weight:600; color:#e2e8f0;">—</span>
           </div>
         </div>
-        
+
         <!-- ★ 家户归属与账本 (v0.9.72 M1) -->
         <div class="ledger-household-card" id="insp-household-box" style="display:none;">
           <div class="ledger-card-title">
@@ -685,7 +699,6 @@
     <div class="log-list" id="log-list">
     </div>
   </div>
-
 
   <!-- 家族世系族谱模态弹窗 -->
   <div id="lineage-modal" class="lineage-modal-overlay" style="display:none;">

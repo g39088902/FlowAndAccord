@@ -353,6 +353,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_water).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_water = (agent.carried_water + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_water += extracted;
                         }
                     }
                 }
@@ -369,6 +371,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_food).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_food = (agent.carried_food + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_food += extracted;
                         }
                     }
                 }
@@ -380,6 +384,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_wood).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_wood = (agent.carried_wood + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_wood += extracted;
                         }
                     }
                 }
@@ -391,6 +397,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_stone).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_stone = (agent.carried_stone + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_stone += extracted;
                         }
                     }
                 }
@@ -400,6 +408,8 @@ impl World3DEngine {
                         if poi.current_stock > 0.01 {
                             let extracted = poi.extract(rate_gold * dt);
                             agent.carried_gold += extracted;
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_gold += extracted;
                         }
                     }
                 }

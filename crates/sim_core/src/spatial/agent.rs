@@ -114,6 +114,23 @@ pub struct Agent3D {
     pub carried_wood: f32,    // 随身携带木材
     pub carried_stone: f32,   // 随身携带石料
     pub carried_gold: f32,    // 随身携带黄金
+    /// ★ v1.26.3 累计开采资源量（单位）：本 agent 一生从资源点装载入随身行囊的累计总量
+    /// （水/粮/木/石/金五类合计）。口径 = 「开采搬运」：市场购买与就地自饮自食不计入。
+    /// 纯累加、不消耗 WorldRng，确定性不受影响。调试模式前端卡片展示用。
+    #[serde(default)]
+    pub cumulative_mined: f32,
+    /// ★ v1.26.3 累计开采资源量 · 分品种（水/粮/木/石/金）：合计字段的明细拆分，仅调试展示用。
+    /// 与 `cumulative_mined` 同步累加，保证 合计 == 五者之和。
+    #[serde(default)]
+    pub cumulative_mined_water: f32,
+    #[serde(default)]
+    pub cumulative_mined_food: f32,
+    #[serde(default)]
+    pub cumulative_mined_wood: f32,
+    #[serde(default)]
+    pub cumulative_mined_stone: f32,
+    #[serde(default)]
+    pub cumulative_mined_gold: f32,
     pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     /// 对各 POI 的私有可派遣性记忆；仅在本 Agent 的决策相位刷新。
@@ -237,6 +254,12 @@ impl Agent3D {
             carried_wood: 0.0,
             carried_stone: 0.0,
             carried_gold: 0.0,
+            cumulative_mined: 0.0,
+            cumulative_mined_water: 0.0,
+            cumulative_mined_food: 0.0,
+            cumulative_mined_wood: 0.0,
+            cumulative_mined_stone: 0.0,
+            cumulative_mined_gold: 0.0,
             home_camp_node: home_camp,
             target_poi_node: None,
             poi_seekability: BTreeMap::new(),
