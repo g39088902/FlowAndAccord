@@ -6,14 +6,15 @@
   <title>Flow & Accord · 流动公约</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+  <body>
+  <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
   <div id="canvas-container">
     <canvas id="sim-canvas"></canvas>
   </div>
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.25.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.25.2</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -78,7 +79,7 @@
     <div class="res-meter-group">
       <div class="meter-row">
         <div class="meter-label">
-          <span style="color:#38bdf8;">💧 全图清泉总水量 (5处)</span>
+          <span style="color:#38bdf8;">💧 全图清泉总水量 (6处)</span>
           <span id="val-global-water" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-water" style="background:#38bdf8; width:75%;"></div></div>
@@ -86,7 +87,7 @@
 
       <div class="meter-row">
         <div class="meter-label">
-          <span style="color:#10b981;">🍒 全图成熟浆果量 (5处)</span>
+          <span style="color:#10b981;">🍒 全图成熟浆果量 (6处)</span>
           <span id="val-global-berry" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-berry" style="background:#10b981; width:75%;"></div></div>
@@ -283,7 +284,7 @@
       <div class="legend-title" id="legend-header" title="点击展开图例">
         <div style="display:flex; align-items:center; gap:6px;">
           <span>🗺️ 图例窗口</span>
-          <span style="color:#10b981; font-size:10px;">21处 POI</span>
+          <span style="color:#10b981; font-size:10px;">24处 POI</span>
         </div>
         <button id="btn-toggle-legend" class="legend-collapse-btn" aria-label="展开/最小化图例" title="展开/最小化图例">
           <span id="legend-toggle-icon">+</span>
@@ -292,8 +293,8 @@
       <div class="legend-body" id="legend-body">
         <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图5处，储量无限，就近归宿)</div>
         <div class="legend-item"><div class="legend-icon">🛖</div> 1级茅草房 / 2级私宅🏡 / 3级庄舍🏯 / 4级庄园🏰</div>
-        <div class="legend-item"><div class="legend-icon">💧</div> 天然清泉 (全图5处，上限60.0单位，2.0/s，随机分布)</div>
-        <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果 (全图5处，上限60.0单位，2.0/s)</div>
+        <div class="legend-item"><div class="legend-icon">💧</div> 天然清泉 (全图6处，上限60.0单位，2.0/s，随机分布)</div>
+        <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果 (全图6处，上限60.0单位，2.0/s)</div>
         <div class="legend-item"><div class="legend-icon">🌲</div> 茂密林木 (全图3处，上限60.0单位，冬季取暖/升级)</div>
         <div class="legend-item"><div class="legend-icon">🪨</div> 嶙峋石矿 (全图2处，上限60.0单位，纯升级建材)</div>
         <div class="legend-item"><div class="legend-icon">🪙</div> 璀璨金矿 (全图1处，上限60.0单位，产金随身携带·行囊上限20.0/升级大庄园)</div>
@@ -601,7 +602,7 @@
             <button id="btn-toggle-house-bids" type="button" style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; border-radius:4px; font-size:10px; cursor:pointer; padding:3px 4px; text-align:center;">📜 展开报价与成交档案 (<span id="insp-house-archive-summary">0 报价 / 0 成交</span>)</button>
             <div id="insp-house-archive-content" style="display:none; max-height:120px; overflow-y:auto; font-size:10px; margin-top:4px; padding:4px; background:rgba(0,0,0,0.3); border-radius:4px; border:1px solid rgba(255,255,255,0.08);"></div>
           </div>
-          <button id="btn-open-auction-window" type="button" class="house-auction-live-btn" style="width:100%; margin-top:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; padding:4px; text-align:center;">🔨 窥视实时竞拍与麦穗博弈大盘 ↗</button>
+          <button id="btn-open-auction-window" type="button" class="house-auction-live-btn" style="width:100%; margin-top:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; padding:4px; text-align:center;">🔨 查看实时竞价与麦穗博弈大盘 ↗</button>
         </div>
 
         <div class="poi-info-badge">
@@ -631,20 +632,20 @@
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-      <span style="font-weight:600; color:#f472b6;">👤 隐藏部落民 (仅留地图与建筑)</span>
-      <input type="checkbox" id="chk-hide-agents" style="accent-color: #f472b6; cursor: pointer;">
+      <label for="chk-hide-agents" style="font-weight:600; color:#f472b6;">👤 隐藏部落民 (仅留地图与建筑)</label>
+      <input aria-label="隐藏部落民" type="checkbox" id="chk-hide-agents" style="accent-color: #f472b6; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span style="font-weight:600; color:#a3e635;">🛣️ 隐藏路网 (仅显示地表与地标)</span>
-      <input type="checkbox" id="chk-hide-lanes" style="accent-color: #a3e635; cursor: pointer;">
+      <label for="chk-hide-lanes" style="font-weight:600; color:#a3e635;">🛣️ 隐藏路网 (仅显示地表与地标)</label>
+      <input aria-label="隐藏路网" type="checkbox" id="chk-hide-lanes" style="accent-color: #a3e635; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span style="font-weight:600; color:#a78bfa;">🐞 调试模式 (Tick / CPU / 内存)</span>
-      <input type="checkbox" id="chk-debug-mode" style="accent-color: #a78bfa; cursor: pointer;">
+      <label for="chk-debug-mode" style="font-weight:600; color:#a78bfa;">🐞 调试模式 (Tick / CPU / 内存)</label>
+      <input aria-label="调试模式" type="checkbox" id="chk-debug-mode" style="accent-color: #a78bfa; cursor: pointer;">
     </div>
     <div class="toggle-row">
       <span style="font-weight:600; color:#facc15;">⚡ 模拟演化倍速</span>
-      <select id="sel-speed" style="background:#1e293b; color:#facc15; font-weight:600; border:1px solid #f59e0b; border-radius:6px; padding:3px 8px; cursor:pointer;">
+      <select id="sel-speed" aria-label="模拟演化倍速" style="background:#1e293b; color:#facc15; font-weight:600; border:1px solid #f59e0b; border-radius:6px; padding:3px 8px; cursor:pointer;">
         <option value="1">1x</option>
         <option value="2" selected>2x</option>
         <option value="4">4x</option>
@@ -682,7 +683,6 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">🏕️ 生态系统就绪：20 位始祖族人（10男10女）已降临，踏路筑室，社会演化开启！</div>
     </div>
   </div>
 
@@ -929,7 +929,8 @@
       <div class="save-status" id="save-status"></div>
 
       <div class="save-modal-footer">
-        <button class="save-btn import" id="btn-import-save" title="从本地 .json 存档文件读取世界">📥 导入存档文件</button>
+          <button class="save-btn import" id="btn-import-save" title="从本地 .json 存档文件读取世界">📥 导入存档文件</button>
+          <button class="save-btn" id="btn-export-save" title="下载当前世界 JSON 备份">📤 下载当前存档</button>
         <span class="save-hint" id="save-storage-hint"></span>
       </div>
       <input type="file" id="save-file-input" accept="application/json,.json" style="display:none;">
@@ -985,7 +986,7 @@
     </div>
   </div>
 
-  <!-- ══════════ 🏛️ 房屋拍卖与竞价窥视大盘模态框 (v1.15.0) ══════════ -->
+  <!-- ══════════ 🏛️ 房屋拍卖与实时竞价大盘模态框 (v1.15.0) ══════════ -->
   <div class="house-auction-backdrop" id="house-auction-backdrop" style="display:none;">
     <div class="house-auction-modal">
       <div class="house-auction-header">
@@ -1154,7 +1155,7 @@
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>
   <script src="js/render_inspector.js"></script>
-  <!-- 房屋拍卖交易所与实时竞价窥视大盘 (v1.15.0) -->
+  <!-- 房屋拍卖交易所与实时竞价大盘 (v1.15.0) -->
   <script src="js/auction-ui.js"></script>
 </body>
 </html>

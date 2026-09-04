@@ -12,6 +12,13 @@
       height: 100vh;
       user-select: none;
     }
+    #engine-status {
+      position: fixed; inset: 0; z-index: 3000; display: flex;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 24px; background: rgba(2, 6, 23, .92); color: #bae6fd;
+      font-size: 14px; font-weight: 600; pointer-events: auto;
+    }
+    #engine-status[data-state="error"] { color: #fecaca; }
     button, input, select, textarea {
       font-family: inherit;
     }
@@ -913,6 +920,15 @@
     }
     @media (max-width: 640px) {
       .lineage-traits-grid { grid-template-columns: 1fr; }
+      .global-resource-panel, .control-panel, .event-log, #inspector-card {
+        position: fixed; left: 8px; right: 8px; width: auto; max-width: none;
+      }
+      .global-resource-panel { top: 72px; bottom: auto; max-height: 34vh; overflow-y: auto; }
+      #inspector-card { top: 72px; bottom: auto; max-height: 42vh; overflow-y: auto; }
+      .control-panel { left: 8px; bottom: 8px; max-height: 30vh; overflow-y: auto; }
+      .event-log { left: 8px; bottom: calc(30vh + 18px); width: auto; height: 150px; }
+      .save-bar-card, .stat-bar { transform: scale(.9); transform-origin: top right; }
+      .brand-subtitle { display: none; }
     }
 
     /* 控制面板 */

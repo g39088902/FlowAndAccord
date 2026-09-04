@@ -213,12 +213,12 @@ graph TD
 ### 4. 存档管理面板 (`#save-modal`，v1.12.0 重构)
 顶栏「💾 存档」按钮打开，详见 §1.8。
 
-### 5. 房屋拍卖交易所与实时竞价窥视大盘 (`#house-auction-backdrop` / `#house-auction-modal`，v1.15.0 新增)
+### 5. 房屋拍卖交易所与实时竞价大盘 (`#house-auction-backdrop` / `#house-auction-modal`，v1.15.0 新增)
 专用于二手房屋市场挂牌流转、麦穗 37% 最优停止博弈全过程透视与买方报价竞逐的全景大盘。由 `frontend/js/auction-ui.js` 驱动，渲染循环每帧调用 `window._auctionUiTick` 保证数据毫秒级同步。
 
 #### 呼出方式（三入口）
 1. **顶栏常驻徽章按钮**：`.top-bar .save-bar-card #btn-open-auction-modal`（显示当前挂牌在售房屋总数，有在售房产时激活金色呼吸脉冲光晕）；
-2. **房屋 Inspector 专属按钮**：选中在售房屋时，Inspector 卡片内显示 `🔨 窥视实时竞拍与麦穗博弈大盘 ↗`；
+2. **房屋 Inspector 专属按钮**：选中在售房屋时，Inspector 卡片内显示 `🔨 查看实时竞价与麦穗博弈大盘 ↗`；
 3. **主画布双击**：双击游戏视口中带有悬浮拍卖标牌与金色光晕的在售房屋，直接展开对应房产大盘。
 
 #### 核心面板布局与视觉图元

@@ -423,11 +423,34 @@
     els.hint = document.getElementById('save-storage-hint');
     if (!els.backdrop) return;
 
-    // 隐藏旧的导入按钮（纯文件槽位体系不需要导入）
+    // 保留无 File System Access API 浏览器的导入/导出降级路径
     const btnImport = document.getElementById('btn-import-save');
-    if (btnImport) btnImport.style.display = 'none';
     const fileInput = document.getElementById('save-file-input');
-    if (fileInput) fileInput.style.display = 'none';
+    if (btnImport && fileInput) btnImport.addEventListener('click', () => fileInput.click());
+    if (fileInput) fileInput.addEventListener('change', async e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const meta = extractMeta(text);
+        if (meta.formatVersion !== SAVE_FORMAT_VERSION) throw new Error(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`);
+        applySave(text, meta, `导入文件（${file.name}）`);
+      } catch (err) { setStatus('导入失败：' + err.message, 'err'); }
+      fileInput.value = '';
+    });
+    const btnExport = document.getElementById('btn-export-save');
+    if (btnExport) btnExport.addEventListener('click', () => {
+      const s = getSim();
+      if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return; }
+      const json = s.saveWorld();
+      if (!json) { setStatus('导出失败：' + (s.readSaveError ? s.readSaveError() : '未知错误'), 'err'); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+      a.download = `flowaccord-${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setStatus('已下载当前世界存档备份', 'ok');
+    });
 
     const btnOpenSave = document.getElementById('btn-open-save-panel');
     const btnOpenLoad = document.getElementById('btn-open-load-panel');

@@ -53,6 +53,7 @@
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
+        this._setEngineStatus('正在加载生态演算引擎…', 'loading');
 
         // 异步加载 Rust 引擎 (wasm)
         this._loadWasm();
@@ -68,15 +69,24 @@
           this._memory = this._wasm.memory;
           this._wasm.world_create(60, 764.0, this._engineSeed, 20);
           this._ready = true;
+          this._setEngineStatus('', 'ready');
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
-          if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
           console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
         } catch (e) {
+          this._setEngineStatus('生态演算引擎加载失败，请检查服务器或刷新重试。', 'error');
           console.error('[RustWorld] 无法加载 Rust 引擎 (请通过 HTTP 服务访问):', e);
         }
+      }
+
+      _setEngineStatus(message, state) {
+        const el = document.getElementById('engine-status');
+        if (!el) return;
+        el.textContent = message;
+        el.dataset.state = state;
+        el.style.display = state === 'ready' ? 'none' : 'flex';
       }
 
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
@@ -191,7 +201,6 @@
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
-          if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
         }
       }
 

@@ -550,6 +550,7 @@
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {
+      if (!window.confirm('重演生态会永久丢失当前世界且无法撤销。\n确定要重新播撒 20 名初始族人吗？')) return;
       sim.initEcology(20);
       isCameraFollow = false;
       updateFollowBtnState();
