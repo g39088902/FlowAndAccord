@@ -35,7 +35,8 @@
     { id: 'b13', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' },
     { id: 'b14', cond: '在世成年男性 且 非现任国王 且 存在空缺王位营地（有房限自家房屋营地/无房可任意）', need: 'Physiological · SeekThrone', target: 'SeekingThrone', level: 1, cfg: ['poiMinDistance=70', '性别+房籍守卫'], anchor: 'branches.rs::B14SeekThrone' },
     { id: 'b15', cond: '成年男性户主 且 (水或粮断供) 且 存金≥0.5 且 体力≥15', need: 'Physiological · MarketTrade', target: 'SeekingMarket', level: 1, cfg: ['marketEmergencyFamilyStockThreshold=10.0', 'marketMinFamilyGold=0.5', 'marketMinDispatchStamina=15.0'], anchor: 'market.rs::evaluate_market_trade' },
-    { id: 'b16', cond: '在世成年男性 且 单身 且 存在全图单身成年女性', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, cfg: ['性别+单身守卫', '魅力最高优先'], anchor: 'branches.rs::B16Courtship' }
+    { id: 'b16', cond: '在世成年男性 且 单身 且 存在全图单身成年女性', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, cfg: ['性别+单身守卫', '魅力最高优先'], anchor: 'branches.rs::B16Courtship' },
+    { id: 'b18', cond: '在世成年男性 + 有老婆 + 妻子满足原怀孕条件', need: 'Esteem · RaiseChild', target: 'RaiseChild→受孕', level: 4, cfg: ['原有受孕阈值与冷却'], anchor: 'branches.rs::B18RaiseChild' }
   ];
 
   var BRANCH_MAP = {};
@@ -44,7 +45,7 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b17', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
+  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b17', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13', 'b18'];
   // 默认分界线：位于第 g 张卡之后（第1层|第2层=7 / 第2层|第3层=13 / 第3层|第4层=15 / 第4层|第5层=16）
   var DEFAULT_DIVGAPS = [7, 13, 15, 16];
 
@@ -53,7 +54,7 @@
     'RestingAtCamp', 'SeekingWater', 'SeekingFood', 'SeekingWood', 'SeekingStone', 'SeekingGold',
     'DrinkingAtWater', 'ForagingFood', 'GatheringWood', 'MiningStone', 'MiningGold',
     'ReturningToCamp', 'ConstructingHouse', 'RepairingHouse', 'OffRoadDetour', 'SeekingThrone',
-    'SeekingMarket', 'BuyingAtMarket', 'SeekingCourtship'
+    'SeekingMarket', 'BuyingAtMarket', 'SeekingCourtship', 'RaiseChild'
   ];
 
   // 行动状态中文描述（PrimitiveActionState 18 态 → 中文语义），决策卡 target 与状态机芯片共用
@@ -64,7 +65,7 @@
     MiningStone: '采石取石', MiningGold: '淘金取金', ReturningToCamp: '返家卸货',
     ConstructingHouse: '建房施工', RepairingHouse: '房屋修缮', OffRoadDetour: '途中掉头重路由',
     SeekingThrone: '夺位远征', SeekingMarket: '奔赴榷场', BuyingAtMarket: '榷场交易',
-    SeekingCourtship: '奔赴求偶'
+    SeekingCourtship: '奔赴求偶', RaiseChild: '养育小孩'
   };
   /** 英文状态码 → 中文语义；未知则原样返回 */
   function zh(s) { return FSM_STATE_ZH[s] || s; }

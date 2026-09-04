@@ -270,7 +270,18 @@ impl World3DEngine {
 
         // ★ 求偶候选池：预收集全图在世、成年、单身、未孕的女性
         let mut eligible_females = Vec::new();
+        let mut conception_ready_females = Vec::new();
         for a in &self.agents {
+            if a.is_alive && a.gender == crate::spatial::agent::Gender::Female && !a.is_fetus
+                && a.spouse_id.is_some() && !a.is_pregnant
+                && a.age >= self.config.agent_adult_age
+                && a.miscarriage_cooldown_timer <= 0.0 && a.postpartum_cooldown_timer <= 0.0
+                && a.hunger >= self.config.agent_conception_hunger_min
+                && a.thirst >= self.config.agent_conception_thirst_min
+                && a.stamina >= self.config.agent_conception_stamina_min
+            {
+                conception_ready_females.push(a.id);
+            }
             if a.is_alive
                 && a.gender == crate::spatial::agent::Gender::Female
                 && !a.is_fetus
@@ -299,6 +310,7 @@ impl World3DEngine {
             camp_positions,
             camp_pois,
             eligible_females,
+            conception_ready_females,
         }
     }
 }

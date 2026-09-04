@@ -98,6 +98,9 @@ impl World3DEngine {
         }
         self.next_agent_id = next_agent_id; // 回写发号器（受孕占号后递增）
 
+        // ★ 生育改为马斯洛“养育小孩”行动：仅处理男性自主下达且妻子仍满足原受孕条件的意图。
+        self.execute_pending_childcare();
+
         // ★ 2.3 受孕即建胎儿 agent（流产/母亡则移除，并同步胎儿位置跟随母亲）
         self.tick_fetus_reconcile();
 
@@ -136,6 +139,43 @@ impl World3DEngine {
         // ★ v1.8.7 墓碑滑动窗口清理：仅保留最近若干 tick 内的死亡/流产记录（覆盖 1024x 单帧推进与渲染间隙）
         self.recent_deaths
             .retain(|d| self.tick_counter.saturating_sub(d.tick) < RECENT_DEATH_RETAIN_TICKS);
+    }
+
+    /// 执行男性 RaiseChild 意图；条件不满足时直接清除意图，不进入妊娠。
+    fn execute_pending_childcare(&mut self) {
+        let mut pairs = Vec::new();
+        for a in &self.agents {
+            if a.raise_child_pending {
+                if let Some(wife_id) = a.spouse_id { pairs.push((a.id, wife_id)); }
+            }
+        }
+        let mut next_id = self.next_agent_id;
+        for (male_id, wife_id) in pairs {
+            let Some(mi) = self.agents.iter().position(|a| a.id == male_id) else { continue };
+            let Some(wi) = self.agents.iter().position(|a| a.id == wife_id) else {
+                self.agents[mi].raise_child_pending = false;
+                continue;
+            };
+            let eligible = {
+                let m = &self.agents[mi];
+                let w = &self.agents[wi];
+                m.is_alive && m.gender == Gender::Male && !m.is_fetus && m.age >= self.config.agent_adult_age
+                    && m.spouse_id == Some(wife_id)
+                    && w.is_alive && w.gender == Gender::Female && !w.is_fetus && w.age >= self.config.agent_adult_age
+                    && !w.is_pregnant && w.miscarriage_cooldown_timer <= 0.0 && w.postpartum_cooldown_timer <= 0.0
+                    && w.hunger >= self.config.agent_conception_hunger_min && w.thirst >= self.config.agent_conception_thirst_min
+                    && w.stamina >= self.config.agent_conception_stamina_min
+            };
+            self.agents[mi].raise_child_pending = false;
+            if !eligible { continue; }
+            self.agents[wi].is_pregnant = true;
+            self.agents[wi].pregnancy_father_id = Some(male_id);
+            self.agents[wi].pregnancy_child_id = Some(next_id);
+            self.agents[wi].pregnancy_progress = 0.0;
+            next_id += 1;
+            self.last_event = Some(format!("🤰 女性部落民 #{} 在丈夫 #{} 的养育行动下成功受孕！", wife_id, male_id));
+        }
+        self.next_agent_id = next_id;
     }
 
     /// 结算已故族人的金币遗产：某人死后随身金币平分给在世妻子（如有）与在世子一代

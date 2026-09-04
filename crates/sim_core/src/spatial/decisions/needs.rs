@@ -62,6 +62,7 @@ pub enum NeedKind {
     MarketTrade,    // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
     Courtship,      // 归属: 寻找全图魅力最高单身女性求偶成婚
     BidHouse,       // ★ v1.26.0 安全: 无房成年男性对随机一套在售空置房屋出价竞购（出价后进入全局冷却）
+    RaiseChild,     // 尊重: 已婚成年男性自主发起养育小孩行动
 }
 
 /// 一条需求判定结论
@@ -123,6 +124,8 @@ pub struct DecisionContext {
     pub camp_pois: Vec<(u32, Vec3)>,
     /// 全图可求偶的在世成年单身女性列表（求偶分支使用）
     pub eligible_females: Vec<EligibleFemale>,
+    /// 满足原受孕条件的已婚女性 ID（供“养育小孩”分支核验配偶）
+    pub conception_ready_females: Vec<AgentId>,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）
@@ -275,6 +278,7 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
             if is_tier0 { ("Belonging", "BuildHouse", Some(BranchId::B8BuildHouseTier0)) } else { ("Esteem", "BuildHouse", Some(BranchId::B11BuildHouseUpgrade)) }
         }
         PrimitiveActionState::SeekingCourtship => ("Belonging", "Courtship", Some(BranchId::B16Courtship)),
+        PrimitiveActionState::RaiseChild => ("Esteem", "RaiseChild", Some(BranchId::B18RaiseChild)),
         PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest", Some(BranchId::B3Rest)),
         PrimitiveActionState::OffRoadDetour => ("Safety", "Detour", None),
         _ => return None,

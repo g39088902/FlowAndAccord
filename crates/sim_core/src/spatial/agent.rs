@@ -84,6 +84,7 @@ pub enum PrimitiveActionState {
     SeekingMarket,      // 🚶 正在赶往外部市场求购水粮
     BuyingAtMarket,     // ⚖️ 正在市场现场交易（就地自救与装载行囊）
     SeekingCourtship,   // 💍 正在奔赴心仪女性求偶
+    RaiseChild,         // 👶 尊重需求：男性自主承担养育小孩并尝试使妻子受孕
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
 }
 
@@ -152,6 +153,9 @@ pub struct Agent3D {
     /// ★ 求偶待结算标记：本 agent 已抵达目标女性互动半径，等待世界物理执行器登记结婚
     #[serde(default)]
     pub courtship_pending: Option<AgentId>,
+    /// 男方自主“养育小孩”决策待执行标记；世界结算阶段核验妻子条件后受孕。
+    #[serde(default)]
+    pub raise_child_pending: bool,
     /// ★ v1.26.0 竞拍决心：本 agent 自主选定要出价的在售房屋 ID，等待世界执行器落地
     #[serde(default)]
     pub pending_bid_house_id: Option<u32>,
@@ -269,6 +273,7 @@ impl Agent3D {
             coronation_pending: None,
             courtship_target_id: None,
             courtship_pending: None,
+            raise_child_pending: false,
             pending_bid_house_id: None,
             last_bid_tick: None,
             build_timer: 0.0,
@@ -341,20 +346,19 @@ impl Agent3D {
         self.poi_seekability.get(&poi_id).map(StockSchmittTrigger::is_active).unwrap_or(false)
     }
 
-    /// 核心生命代谢 Tick (上限50.0单位，房屋激活受孕繁衍)
+    /// 核心生命代谢 Tick (上限50.0单位；受孕由马斯洛“养育小孩”行动触发)
     /// 代谢与繁衍结算。
     ///
     /// `next_agent_id` 为全局发号器的可变引用：**受孕瞬间**即为胎儿占号并写入
     /// [`Self::pregnancy_child_id`]，使未出生的孩子能参与分家权重与遗产继承（账本重构 M1.6）。
     /// 该发号不消耗 `WorldRng`，仅按调用顺序递增，确定性不受影响。
     ///
-    /// ★ M6 去房屋化生育：不再由外部传入 fertility_active（房屋等级/仓储备货门槛）——
-    /// 只要已婚且身体指标达标即可受孕，无房也可生育。
+    /// 受孕不在此处自动触发；由世界阶段执行男性的 raise_child_pending 意图。
     pub fn tick_metabolism(
         &mut self,
         dt: f32,
         config: &SimConfig,
-        next_agent_id: &mut AgentId,
+        _next_agent_id: &mut AgentId,
     ) -> Option<String> {
         if self.gold_mining_cooldown > 0.0 {
             self.gold_mining_cooldown = (self.gold_mining_cooldown - dt).max(0.0);
@@ -377,7 +381,7 @@ impl Agent3D {
         // 年龄增长
         self.age += dt;
 
-        let mut event_msg = None;
+        let event_msg = None;
         let mut metabolic_multiplier = if self.is_pregnant { config.agent_pregnant_metabolism_mult } else { 1.0 };
 
         // ★ M6 升级瞬时化：ConstructingHouse 已无体力/工时投入，不再计入劳动代谢加速
@@ -435,21 +439,6 @@ impl Agent3D {
             self.courtship_pending = None;
             self.death_decay_timer = config.agent_death_decay_duration;
             return Some(format!("💀 部落民 #{} 寿终正寝，安详离世！", self.id));
-        }
-
-        // 受孕判定：M6 去房屋化——已婚（无论是否有房）且指标达标即可受孕；执行任意任务期间均可
-        if self.gender == Gender::Female && self.spouse_id.is_some() && !self.is_pregnant && self.miscarriage_cooldown_timer <= 0.0 && self.postpartum_cooldown_timer <= 0.0 {
-            if self.age >= config.agent_adult_age && self.hunger >= config.agent_conception_hunger_min && self.thirst >= config.agent_conception_thirst_min && self.stamina >= config.agent_conception_stamina_min {
-                self.is_pregnant = true;
-                self.pregnancy_father_id = self.spouse_id;
-                // ★ 受孕即为腹中胎儿占号（分家/继承需计入未出生的孩子；M1.7 起实体由 tick_fetus_reconcile 于世界 tick 创建）
-                let child_id = *next_agent_id;
-                *next_agent_id += 1;
-                self.pregnancy_child_id = Some(child_id);
-                self.pregnancy_progress = 0.0;
-                let spouse_str = self.spouse_id.map(|s| format!("与丈夫 #{} 结发", s)).unwrap_or_default();
-                event_msg = Some(format!("🤰 女性部落民 #{} ({}) 饱暖充盈(≥{:.1}单位)，成功受孕进入{:.0}秒妊娠期！", self.id, spouse_str, config.agent_conception_hunger_min, config.agent_pregnancy_duration));
-            }
         }
 
         // 妊娠与流产判定

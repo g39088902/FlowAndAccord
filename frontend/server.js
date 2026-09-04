@@ -19,7 +19,7 @@ const MIME_TYPES = {
 
 // ── 决策顺序持久化：决策引擎视图拖动后落盘 config.decision-order.js ──
 const DECISION_ORDER_FILE = path.join(__dirname, 'js', 'config.decision-order.js');
-const VALID_BRANCH_ID = /^b(?:[1-9]|1[0-6])$/;
+const VALID_BRANCH_ID = /^b(?:[1-9]|1[0-8])$/;
 const MAX_BODY_BYTES = 16 * 1024;
 
 function renderDecisionOrderFile(order, levels) {
@@ -54,9 +54,9 @@ function handleSaveDecisionOrder(req, res) {
       const payload = JSON.parse(body);
       const order = payload.decisionEvalOrder;
       const levels = payload.decisionEvalLevels;
-      const orderOk = Array.isArray(order) && order.length === 16
-        && new Set(order).size === 16 && order.every((s) => VALID_BRANCH_ID.test(s));
-      const levelsOk = Array.isArray(levels) && levels.length === 16
+      const orderOk = Array.isArray(order) && order.length === 18
+        && new Set(order).size === 18 && order.every((s) => VALID_BRANCH_ID.test(s));
+      const levelsOk = Array.isArray(levels) && levels.length === 18
         && levels.every((v) => Number.isInteger(v) && v >= 0 && v <= 5);
       if (!orderOk || !levelsOk) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
