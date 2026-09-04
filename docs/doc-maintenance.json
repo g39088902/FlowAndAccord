@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "reviewIntervalDays": 90,
+  "ignoreDocs": ["docs/current/11-changelog.md"],
+  "docs": [
+    {"id":"spatial-network","path":"docs/current/01-spatial-network.md","owner":"sim-core/spatial","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/**/*.rs","docs/current/01-spatial-network.md"]},
+    {"id":"ecology-poi","path":"docs/current/02-ecology-poi.md","owner":"sim-core/ecology","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/ecology.rs","crates/sim_core/src/spatial/poi.rs","docs/current/02-ecology-poi.md"]},
+    {"id":"seasons-climate","path":"docs/current/03-seasons-climate.md","owner":"sim-core/world","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/world_season.rs","crates/sim_core/src/config.rs","docs/current/03-seasons-climate.md"]},
+    {"id":"agent-life","path":"docs/current/04-agent-life.md","owner":"sim-core/agent","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/agent.rs","crates/sim_core/src/spatial/birth.rs","docs/current/04-agent-life.md"]},
+    {"id":"house-system","path":"docs/current/05-house-system.md","owner":"sim-core/housing","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/house.rs","crates/sim_core/src/spatial/housing_system/**/*.rs","docs/current/05-house-system.md"]},
+    {"id":"motivation-ai","path":"docs/current/06-motivation-ai.md","owner":"sim-core/decisions","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/decisions/**/*.rs","docs/current/06-motivation-ai.md"]},
+    {"id":"frontend-ui","path":"docs/current/07-frontend-ui.md","owner":"frontend","lastReviewed":"2026-09-04","sources":["frontend/index.html","frontend/style.css","frontend/js/**/*.js","docs/current/07-frontend-ui.md"]},
+    {"id":"config-system","path":"docs/current/08-config-system.md","owner":"frontend/sim-core","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/config.rs","frontend/js/config*.js","tools/config-check.js","docs/current/08-config-system.md"]},
+    {"id":"code-map","path":"docs/current/09-code-map.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/**/*.rs","crates/sim_wasm/src/**/*.rs","frontend/**/*.js","docs/current/09-code-map.md"]},
+    {"id":"quickstart","path":"docs/current/10-quickstart.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["AGENTS.md","docs/build-guide.md","docs/current/10-quickstart.md"]},
+    {"id":"ledger-system","path":"docs/current/12-ledger-system.md","owner":"sim-core/ledger","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/ledger/**/*.rs","docs/current/12-ledger-system.md"]},
+    {"id":"impact-matrix","path":"docs/current/13-impact-matrix.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["AGENTS.md","frontend/AGENTS.md","crates/sim_core/src/spatial/**/*.rs","docs/current/13-impact-matrix.md"]},
+    {"id":"invariants","path":"docs/current/14-invariants.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["AGENTS.md","frontend/AGENTS.md","crates/sim_core/src/**/*.rs","frontend/**/*.js","docs/current/14-invariants.md"]},
+    {"id":"save-load","path":"docs/current/15-save-load.md","owner":"frontend/sim-core","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/world_save.rs","crates/sim_wasm/src/**/*.rs","frontend/js/save-ui.js","frontend/js/rustworld.js","docs/current/15-save-load.md"]},
+    {"id":"market-pricing","path":"docs/current/16-market-pricing.md","owner":"sim-core/market","lastReviewed":"2026-09-04","sources":["crates/sim_core/src/spatial/decisions/market.rs","frontend/js/auction-ui.js","docs/current/16-market-pricing.md"]},
+    {"id":"frontend-window-navigation","path":"docs/current/17-frontend-window-navigation.md","owner":"frontend","lastReviewed":"2026-09-04","sources":["frontend/index.html","frontend/js/**/*.js","docs/current/17-frontend-window-navigation.md"]},
+    {"id":"doc-maintenance","path":"docs/current/18-doc-maintenance.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["tools/doc-maintenance-check.js","docs/doc-maintenance.json","docs/current/18-doc-maintenance.md"]},
+    {"id":"commit-checklist","path":"docs/current/19-commit-checklist.md","owner":"engineering","lastReviewed":"2026-09-04","sources":["AGENTS.md","tools/doc-maintenance-check.js","docs/current/19-commit-checklist.md"]}
+  ]
+}
