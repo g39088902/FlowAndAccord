@@ -737,6 +737,30 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
     }
 
+    // ★ v1.26.3 调试模式: 累计开采资源量 · 分品种（仅调试模式勾选时显示）
+    const debugMiningEl = document.getElementById('insp-debug-mining');
+    const debugMiningValEl = document.getElementById('insp-debug-mining-val');
+    if (debugMiningEl && debugMiningValEl) {
+      if (sim.debugMode) {
+        debugMiningEl.style.display = 'flex';
+        debugMiningValEl.textContent = `${(selAgent.cumulativeMined || 0).toFixed(1)} 单位`;
+        debugMiningValEl.title = '本 agent 一生从资源点装载入随身行囊的累计总量（水/粮/木/石/金五类合计；市场购买与就地自饮自食不计入）';
+        const miningVals = [
+          ['insp-debug-mining-water', selAgent.cumulativeMinedWater],
+          ['insp-debug-mining-food', selAgent.cumulativeMinedFood],
+          ['insp-debug-mining-wood', selAgent.cumulativeMinedWood],
+          ['insp-debug-mining-stone', selAgent.cumulativeMinedStone],
+          ['insp-debug-mining-gold', selAgent.cumulativeMinedGold],
+        ];
+        for (const [id, v] of miningVals) {
+          const el = document.getElementById(id);
+          if (el) el.textContent = (v || 0).toFixed(1);
+        }
+      } else {
+        debugMiningEl.style.display = 'none';
+      }
+    }
+
     // 🚚 搬运去向
     const haulBox = document.getElementById('insp-carry-haul');
     const haulTextEl = document.getElementById('insp-carry-haul-text');

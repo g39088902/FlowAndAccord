@@ -182,6 +182,15 @@ pub struct AgentSnapshot {
     pub carried_wood: f32,
     pub carried_stone: f32,
     pub carried_gold: f32,
+    /// ★ v1.26.3 累计开采资源量（单位）：本 agent 一生从资源点装载入随身行囊的累计总量
+    /// （水/粮/木/石/金五类合计；市场购买与就地自饮自食不计入）。调试模式前端展示用。
+    pub cumulative_mined: f32,
+    /// ★ v1.26.3 累计开采资源量 · 分品种（水/粮/木/石/金），合计字段的明细拆分。
+    pub cumulative_mined_water: f32,
+    pub cumulative_mined_food: f32,
+    pub cumulative_mined_wood: f32,
+    pub cumulative_mined_stone: f32,
+    pub cumulative_mined_gold: f32,
     pub build_timer: f32,
     pub miscarriage_alert_timer: f32,
     pub state: String,
