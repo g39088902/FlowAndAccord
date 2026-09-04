@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.23.0)"]
+    E --> F["浏览器 UI (版本: v1.24.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.23.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.24.0`**。
 
 ---
 
@@ -247,6 +247,17 @@ node frontend/server.js           # http://localhost:3000
 - **症状与根因**：任何被高频（每帧 / 10FPS）`innerHTML = ...` 全量重建的容器，其内部可交互元素（`.lineage-chip`、按钮、卡片）会在 mousedown 与 mouseup 之间被替换成新节点，`click` 事件因此落到新旧节点的共同祖先上、`e.target.closest(...)` 落空——表现为「点击无反应 / 无法切换选中项 / 历史跳转失效」，且**控制台零报错**（handler 只是没被命中，并非抛异常）。
 - **唯一正确姿势**：高频刷新容器一律套**内容快照缓存**——生成 HTML 与上次一致即跳过 `innerHTML` 重建（先例：`ledger-ui.js::renderHtml` v1.21.1、`auction-ui.js::renderHtml` v1.22.3、`render_inspector.js` 的 `innerHTML !== html` 守卫）。仅内容真正变化时才重建 DOM，`:hover`/`click` 才稳定。
 - **新增交互前的审计清单**：凡计划在「每帧 / 高频重建的容器」内放可点击元素（chip / 按钮 / 卡片），必须先确认该容器走快照缓存；`render_hud.js` 的 `eventsList`、`insp-mg-history-list`、家户/婚姻列表等每帧 innerHTML 重建且含 chip 的容器同样在此红线内，动它们前先套缓存。
+
+### 4.16 🟠 新增移动态必须进 `is_moving` 白名单（agent ↔ decisions 契约，勿漏）
+
+给 agent 新增任何**需要物理移动**的 `PrimitiveActionState`（如新的 `Seeking*` / 途中等状态）时，必须三处联动，缺一处即"dispatch 成功却原地定格"：
+
+1. **枚举注册**：`agent.rs` 的 `PrimitiveActionState` 增加该状态；
+2. **🔴 `agent.rs::tick_movement` 的 `is_moving` 白名单补入该状态**——漏配时 `tick_movement` 会把它判为"非移动"直接 `current_velocity=0` 早退，agent 携带完整路线却永不出发（**v1.24.0 求偶卡死根因**：`SeekingCourtship` 未列入，求偶男性定格在家里、需求标签恒为 `Belonging·Courtship`）；
+3. **`advance_to_next_lane` 走完路线后的状态语义**：若该状态走完后不自动转换（如 `SeekingCourtship` 保持原态等决策器结算），其途中状态机的"重补路"判定**严禁用 `route.is_empty()`**——路线走完后 `route` Vec 未清空（仅 `route_index` 越界、`current_lane_id` 置 `None`），原条件永不成立会使"已到目标节点但未进互动半径"者站死；必须用 `current_lane_id.is_none()` 判断"是否停在路上"。
+
+- 实现细节见 `spatial/AGENTS.md`（运动系统契约）与 `decisions/AGENTS.md`（新增分支 `target_state` 必须是 `is_moving` 白名单成员）。
+- 新增/改动移动态后，用 `node tools/diagnose.js --check all` 复现验证：`Seeking*` 状态连续 60 tick 位移 < 0.05m 即触发 Rule 5 移动停滞嗅探。
 
 ---
 

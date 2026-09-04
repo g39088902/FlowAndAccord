@@ -475,6 +475,7 @@ impl Agent3D {
                 | PrimitiveActionState::ReturningToCamp
                 | PrimitiveActionState::SeekingThrone
                 | PrimitiveActionState::SeekingMarket
+                | PrimitiveActionState::SeekingCourtship
         );
 
         if !is_moving {

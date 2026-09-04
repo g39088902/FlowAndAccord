@@ -210,7 +210,9 @@ impl<'a> Decisioner<'a> {
                 return;
             }
             // 仍在途中：若路径走完但尚未进入互动半径（如目标略有移动），向其最新最近路网节点重补路径
-            if agent.route.is_empty() {
+            // 注：advance_to_next_lane 走完路线后 route Vec 未清空（仅 route_index 越界、current_lane_id 置 None），
+            //     故必须同时以 current_lane_id.is_none() 判断"已停在目标节点附近"，否则不会重补路径而站死。
+            if agent.route.is_empty() || agent.current_lane_id.is_none() {
                 let curr = self.start_node(agent);
                 if curr != target.nearest_node {
                     self.dispatch(agent, curr, target.nearest_node, PrimitiveActionState::SeekingCourtship);

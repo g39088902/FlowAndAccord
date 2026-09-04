@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.23.0**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.24.0**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -10,6 +10,7 @@
 
 | 版本 | 核心变更 | 影响模块 |
 | :--- | :--- | :--- |
+| **v1.24.0** | **修复求偶卡死：`SeekingCourtship` 未列入 `tick_movement::is_moving` 白名单**：① **根因**：`agent.rs::tick_movement` 的 `is_moving` 枚举白名单漏配 `SeekingCourtship`，男性命中 B16 求偶分支 dispatch 成功后状态虽切为 `SeekingCourtship`，但运动系统将该状态判为"非移动"直接 `current_velocity=0` 早退，导致求偶男性携带完整路线却永远不出发、定格在家里，需求标签恒为 `Belonging·Courtship`；② **修复**：`is_moving` 补入 `SeekingCourtship`；并加固 `seeking.rs::decide_seeking_courtship` 的"路径走完重补路"判定（`route.is_empty()` → 增加 `current_lane_id.is_none()`，因 `advance_to_next_lane` 走完后 route Vec 未清空，原条件永不成立会使抵达目标节点但未进互动半径者站死）；③ **代码规范沉淀**：新增移动态必须进 `is_moving` 白名单（agent↔decisions 契约），已写入根 AGENTS.md §4.16 / spatial/AGENTS.md §4.6 / decisions/AGENTS.md §4.9，防止同类"dispatch 成功却原地定格"回归；④ **验证**：无头 256x 高产出长程（Seed42/120000 tick）修复前 5→7 名求偶男性卡死、婚姻停滞在 2 对；修复后卡死归零、婚姻 20 对、出生 94、存活 113，`cargo build` + `test-wasm.js` + `config-check.js` 三门禁全绿；版本号 v1.23.0→v1.24.0 | agent / decisions/seeking / docs |
 | **v1.23.0** | **房屋估价改按榷市实时价（0级仓库保底 5.0→0.1 金）**：① **保底缩减**：`houseBaseFoundationCostGold` / `HOUSE_BASE_FOUNDATION_COST_GOLD` 由 5.0 → **0.1** 金，0 级仓库（无建材）估值由 max(0,5)=5 降为 max(0,0.1)=0.1 金，消除零成本畸变兑底的过高地基价；② **原料单价全部按当时榷市（榷场互市）实时价计算**：`auction.rs::calculate_house_construction_cost` 中木/石/金单价由「基准价 0.15/0.20 、金 1.0」改为 0（榷市暂未承载木/石/金，暂时记 0 单价），水/粮维持实时市价；`marketPriceBaseWood`/`Stone` 字段保留待榷市扩展承载后启用；③ **影响**：1 级起房屋建设成本仅由累计水/粮按榷市实时价折算，木/石/金投入不再计入市场估值，4 级庄园所需 125 金亦不计入；④ **文档同步**：05-house-system / housing_system/AGENTS.md / config-reference.md（重新生成）更新；版本号 v1.22.5→v1.23.0，cargo build + test-wasm.js + config-check.js 三门禁全绿 | config / config.js / auction.rs / docs |
 | **v0.9.24** | 随身金币遗产继承：族人故去后 `carried_gold` 平分给在世子一代子女，无子女则清零 | agent / ecology |
 | **v0.9.34** | 房屋系统与世界环境模块化解耦：`housing_system` 拆为 5 个单一职责子模块，四季回归 `world.rs` | housing_system / world |

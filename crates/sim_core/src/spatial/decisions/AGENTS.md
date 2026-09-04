@@ -75,3 +75,11 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
 - 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。
+
+### 4.9 🔴 新增分支的 `target_state` 必须是移动态白名单成员
+
+分支命中返回的 `Need.target_state` 若是**需要物理移动**的状态（`Seeking*` 等），该状态必须已列入 `agent.rs::tick_movement::is_moving` 白名单（见 `spatial/AGENTS.md` §4.6 与根 AGENTS.md §4.16）——否则 `fulfill_resting_need` → `dispatch` 成功写入路线后，运动系统仍判为"非移动"直接定格（v1.24.0 求偶卡死：B16Courtship 的 `SeekingCourtship` 漏配白名单，男性带路线却永不出发）。
+
+配套契约：
+- 若该状态**走完路线后不自动转换**（如 `SeekingCourtship` 保持原态等待决策器结算），则途中状态机（`seeking.rs::decide_seeking_*`）的"重补路/是否在移动"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（`advance_to_next_lane` 走完后 `route` Vec 未清空，条件永不成立 → 到点站死）。
+- 新增/改动此类分支后，用 `node tools/diagnose.js --check all` 复现：Rule 5 移动停滞嗅探（`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。

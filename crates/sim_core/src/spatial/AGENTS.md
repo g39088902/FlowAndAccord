@@ -179,6 +179,16 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 
 遗漏任何一项会导致重置后残留旧状态，引发"重置后族人仍显示旧家户"等 bug。
 
+### 4.6 🔴 运动系统 `is_moving` 白名单契约（agent ↔ decisions）
+
+`agent.rs::tick_movement` 以 `is_moving` 白名单决定哪些 `PrimitiveActionState` 会真正走位移管线（速度积分/车道循迹/踩踏拓路）；白名单外的状态一律 `current_velocity=0` 早退。**任何新增的移动态（`Seeking*`/途中类）必须补入白名单**，否则 `dispatch` 虽成功写入 `state/route/current_lane_id`，agent 仍永久定格（v1.24.0 求偶卡死根因：漏配 `SeekingCourtship`）。
+
+配套契约：
+- `advance_to_next_lane` 走完路线后，`route` Vec **不会清空**（仅 `route_index` 越界、`current_lane_id` 置 `None`）。凡"走完后保持原态、等待决策器结算"的状态，其决策层"是否还在移动"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点后站死）。
+- 白名单成员新增/变更后，用无头诊断复现：`node tools/diagnose.js --check all` 的 Rule 5（移动停滞：`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
+
+详见根 AGENTS.md §4.16 与 `decisions/AGENTS.md`。
+
 ---
 
 ## 五、跨子目录调用关系
