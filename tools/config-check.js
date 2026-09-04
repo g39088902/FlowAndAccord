@@ -87,6 +87,7 @@ const IMPACT_PREFIX_RULES = [
   { prefix: 'houseNode', mod: 'housing_system/founding.rs (立宅节点占用)' },
   { prefix: 'houseMinSpacing', mod: 'housing_system/founding.rs (房屋间距)' },
   { prefix: 'houseDepreciation', mod: 'housing_system/maintenance.rs (折旧)' },
+  { prefix: 'houseAuction', mod: 'housing_system/auction.rs (竞价冷却/报价流水/遗产分账)' },
   { prefix: 'houseDurability', mod: 'housing_system/ (耐久度上限)' },
   { prefix: 'houseUpgradeCost', mod: 'housing_system/upgrade.rs (升级成本矩阵 §4.8)' },
   { prefix: 'houseAuction', mod: 'housing_system/auction.rs (营地中介麦穗拍卖 §4.8)' },
@@ -330,11 +331,11 @@ function main() {
         errors.push('config.decision-order.js: 对象字面量求值失败');
       } else {
         const ids = o.decisionEvalOrder, lv = o.decisionEvalLevels;
-        const idOk = Array.isArray(ids) && ids.length === 16 && new Set(ids).size === 16
-          && ids.every(s => /^b(?:[1-9]|1[0-6])$/.test(s));
-        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 16 个互不重复的 b1..b16');
-        const lvOk = Array.isArray(lv) && lv.length === 16 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
-        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 16 个 0-5 整数');
+        const idOk = Array.isArray(ids) && ids.length === 17 && new Set(ids).size === 17
+          && ids.every(s => /^b(?:[1-9]|1[0-7])$/.test(s));
+        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 17 个互不重复的 b1..b17');
+        const lvOk = Array.isArray(lv) && lv.length === 17 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 17 个 0-5 整数');
       }
     }
   } else {

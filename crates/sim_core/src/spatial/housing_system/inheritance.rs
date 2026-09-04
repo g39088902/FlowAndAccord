@@ -1,4 +1,5 @@
 use crate::spatial::agent::AgentId;
+use crate::spatial::graph::NodeId;
 use crate::spatial::poi::{PoiType, VacantHouseEntry};
 use crate::spatial::world::World3DEngine;
 
@@ -61,7 +62,24 @@ impl World3DEngine {
                 benchmark_bid: 0.0,
                 current_highest_bid: 0.0,
                 current_highest_bidder: None,
+                // ★ v1.26.0 本次拍卖会话报价流水：挂牌即从空队列开始，不跨场次
+                bids_history: std::collections::VecDeque::new(),
             });
+
+            // ★ v1.26.0 挂牌瞬间清空全部居住者（房屋真正空置，遗孀遗孤立即无家）
+            let mut evictions: Vec<(AgentId, NodeId)> = Vec::new();
+            for a in &self.agents {
+                if a.home_house_id == Some(house_id) {
+                    let c_node = self.find_nearest_camp_node(a.world_pos);
+                    evictions.push((a.id, c_node));
+                }
+            }
+            for (aid, c_node) in evictions {
+                if let Some(a) = self.agent_by_id_mut(aid) {
+                    a.home_house_id = None;
+                    a.home_camp_node = c_node;
+                }
+            }
 
             // 登记到所属营地空置列表
             if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == camp_id) {

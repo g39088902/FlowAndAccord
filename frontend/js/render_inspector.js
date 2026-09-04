@@ -193,10 +193,10 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       houseCampElem.textContent = `🏕️ ${campTitle}`;
     }
 
-    // ★ v1.14.0 房屋市场估价、拍卖状态与档案展示
+    // ★ v1.26.0 房屋拍卖状态与档案展示（估价机制已删除，改展示最高出价）
     const valGoldEl = document.getElementById('insp-house-val-gold');
     if (valGoldEl) {
-      valGoldEl.textContent = `${(house.currentValuation || 0).toFixed(2)} 金`;
+      valGoldEl.textContent = (house.highestBid || 0) > 0 ? `${(house.highestBid || 0).toFixed(2)} 金` : '暂无出价';
     }
 
     const auctionTagEl = document.getElementById('insp-house-auction-tag');
@@ -1168,7 +1168,7 @@ canvas.addEventListener('click', e => {
           ? vh.beneficiaryIds.map(bid => agentChip(bid, 'dead', '受益人')).join(' ')
           : '<span style="color:#94a3b8;">无受益人</span>';
         const hObj = sim.houses.find(h => h.id === vh.houseId);
-        const valStr = hObj ? ` · 估价 ${hObj.currentValuation.toFixed(2)}金 (${hObj.auctionPhase || '挂牌拍卖中'})` : '';
+        const valStr = hObj ? ` · 最高出价 ${(hObj.highestBid || 0).toFixed(2)}金 (${hObj.auctionPhase || '挂牌拍卖中'})` : '';
         return `<div style="margin-bottom:2px;">🏚️ 房屋 #${vh.houseId}${valStr} → 受益人: ${ben}</div>`;
       }).join('');
     } else {

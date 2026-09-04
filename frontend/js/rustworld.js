@@ -408,7 +408,6 @@
           constructionProgress: h.construction_progress,
           builderId: h.builder_id,
           lastUpgraderId: h.last_upgrader_id,
-          currentValuation: h.current_valuation || 0,
           auctionPhase: h.auction_phase || null,
           benchmarkBid: h.benchmark_bid || 0,
           highestBid: h.highest_bid || 0,

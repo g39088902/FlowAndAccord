@@ -35,18 +35,20 @@ pub enum BranchId {
     B14SeekThrone,
     B15MarketTrade,
     B16Courtship,
+    B17BidHouse,
 }
 
 impl BranchId {
     /// 中性声明序（b1..b16）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
     /// 生产环境的策展优先级只存在于前端配置文件，严禁在此处写死。
     /// ★ M4 夺位远征 B14SeekThrone 声明在最前：第一层生存需求（生理层最高档），兜底序下亦优先于口渴/饥饿/休息。
-    pub const ALL: [BranchId; 16] = [
+    pub const ALL: [BranchId; 17] = [
         BranchId::B14SeekThrone,
         BranchId::B1QuenchThirst,
         BranchId::B2SateHunger,
         BranchId::B15MarketTrade,
         BranchId::B3Rest,
+        BranchId::B17BidHouse,
         BranchId::B12FoundHome,
         BranchId::B4RepairHouse,
         BranchId::B5StockWater,
@@ -79,6 +81,7 @@ impl BranchId {
             BranchId::B14SeekThrone => "b14",
             BranchId::B15MarketTrade => "b15",
             BranchId::B16Courtship => "b16",
+            BranchId::B17BidHouse => "b17",
         }
     }
 
@@ -101,6 +104,7 @@ impl BranchId {
             "b14" => BranchId::B14SeekThrone,
             "b15" => BranchId::B15MarketTrade,
             "b16" => BranchId::B16Courtship,
+            "b17" => BranchId::B17BidHouse,
             _ => return None,
         })
     }
@@ -246,6 +250,34 @@ impl BranchId {
                     });
                 }
             }
+            BranchId::B17BidHouse => {
+                // ★ v1.26.0 竞购现房：无房成年男性自主对随机一套在售空置房屋出价
+                // 守卫全内联（任意排列语义安全）：在世 + 非胎儿 + 成年男性 + 无房 + 无未结算 pending + 冷却结束 + 有金 + 有在售房
+                if !a.is_alive || a.gender != Gender::Male || a.is_fetus || a.age < cfg.agent_adult_age {
+                    return None;
+                }
+                if a.home_house_id.is_some() || a.pending_bid_house_id.is_some() {
+                    return None;
+                }
+                let cooldown_ok = a
+                    .last_bid_tick
+                    .map(|t| d.tick >= t && d.tick - t >= cfg.house_auction_bid_cooldown_ticks)
+                    .unwrap_or(true);
+                if !cooldown_ok {
+                    return None;
+                }
+                if d.ledger_balance(a, ResourceKind::Gold) < cfg.house_auction_min_bid_gold {
+                    return None;
+                }
+                if !d.houses.iter().any(|h| h.owner_id.is_none()) {
+                    return None;
+                }
+                return Some(Need {
+                    level: MaslowLevel::Safety,
+                    kind: NeedKind::BidHouse,
+                    target_state: PrimitiveActionState::RestingAtCamp, // 占位：落地阶段只写 pending，不改运动状态
+                });
+            }
         }
         None
     }
@@ -275,10 +307,10 @@ fn is_male_adult(a: &Agent3D, cfg: &SimConfig) -> bool {
 
 /// 解析注入的评估顺序：恰好 16 个互不重复的有效 ID 才采用，否则回退中性声明序。
 /// 解析结果为定长数组，热路径零分配。
-pub fn resolve_order(ids: &[String]) -> [BranchId; 16] {
-    if ids.len() == 16 {
+pub fn resolve_order(ids: &[String]) -> [BranchId; 17] {
+    if ids.len() == 17 {
         let mut parsed = BranchId::ALL;
-        let mut seen = [false; 16];
+        let mut seen = [false; 17];
         for (i, s) in ids.iter().enumerate() {
             match BranchId::from_str_id(s) {
                 Some(b) if !seen[b.index()] => {

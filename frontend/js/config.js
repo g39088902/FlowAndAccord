@@ -233,12 +233,14 @@ window.SIM_CONFIG = {
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
 
   // ==========================================================================
-  // 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+  // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
   // ==========================================================================
-  houseMarketBiddingIntervalTicks: 30, // 拍卖开价评估周期 (tick，默认 30 = 1秒)
-  houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交)
+  houseAuctionBidCooldownTicks: 300,  // 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价)
+  houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交)
   houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
-  marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价)
-  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价)
-  houseBaseFoundationCostGold: 0.1,   // 0级仓库地基保底估价值 (黄金，防 0 成本畸变)
+  houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)
+  houseAuctionBidHistoryCapacity: 128, // 单次拍卖会话报价流水环形缓冲容量 (条)
+  houseAuctionCrownShareWeight: 1.0,  // 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额)
+  marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市扩展承载木材后作单价基准)
+  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市扩展承载石料后作单价基准)
 };

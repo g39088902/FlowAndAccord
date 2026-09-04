@@ -135,6 +135,12 @@ pub struct Agent3D {
     /// ★ 求偶待结算标记：本 agent 已抵达目标女性互动半径，等待世界物理执行器登记结婚
     #[serde(default)]
     pub courtship_pending: Option<AgentId>,
+    /// ★ v1.26.0 竞拍决心：本 agent 自主选定要出价的在售房屋 ID，等待世界执行器落地
+    #[serde(default)]
+    pub pending_bid_house_id: Option<u32>,
+    /// ★ v1.26.0 上次出价的世界 tick（None = 从未出价），用于全局出价冷却
+    #[serde(default)]
+    pub last_bid_tick: Option<u64>,
     pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
@@ -240,6 +246,8 @@ impl Agent3D {
             coronation_pending: None,
             courtship_target_id: None,
             courtship_pending: None,
+            pending_bid_house_id: None,
+            last_bid_tick: None,
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
             generation: 1,

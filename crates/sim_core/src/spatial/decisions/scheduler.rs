@@ -23,6 +23,7 @@ impl World3DEngine {
             rng: &mut self.rng,
             config: &self.config,
             branch_order: &branch_order,
+            tick: self.tick_counter,
         };
         for agent in &mut self.agents {
             // ★ 胎儿跳过行动决策：无地图实体、无自主行动
@@ -38,6 +39,8 @@ impl World3DEngine {
         self.execute_pending_coronations();
         // ★ 求偶物理规则：把本拍内 male agent 自主下定决心（courtship_pending）的成婚登记落地
         self.execute_pending_courtships();
+        // ★ v1.26.0 竞拍物理规则：把本拍内无房成年男性自主下定决心（pending_bid_house_id）的出价落地
+        self.execute_pending_bids();
         // 实体化登记：将本拍内 agent 自主选定的宅址落地为 0 级仓库（放置校验/路网接入/房产绑定）
         self.materialize_founded_houses();
     }

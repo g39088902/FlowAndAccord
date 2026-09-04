@@ -146,13 +146,14 @@
   /**
    * 扫描辖区内符合出价条件的单身/无房成年男性户主（意向买家池）
    */
-  function scanPotentialBuyers(campId, houseValuation) {
+  function scanPotentialBuyers(campId, benchmarkBid) {
     const sim = getSim();
     if (!sim || !sim.agents) return [];
+    const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
 
     const buyers = [];
     for (const a of sim.agents) {
-      if (a.isAlive && a.gender === 'Male' && a.age >= 18 && a.homeHouseId == null) {
+      if (a.isAlive && a.gender === 'Male' && a.age >= adultAge && a.homeHouseId == null) {
         // 查找家户账本黄金
         let gold = 0;
         if (typeof sim.getHouseholdOfAgent === 'function') {
@@ -166,7 +167,7 @@
         // 判断出价意愿与能力
         let status = '蓄资中';
         let statusColor = '#94a3b8';
-        if (gold >= houseValuation) {
+        if (gold >= benchmarkBid) {
           status = '💰 资金充裕 · 意向强烈';
           statusColor = '#10b981';
         } else if (gold > 0) {
@@ -335,7 +336,7 @@
               </div>
               <div class="strip-card-bottom">
                 <span>${Math.round(h.durability)}%耐久</span>
-                <span style="color:#fbbf24; font-weight:700;">${(h.currentValuation || 0).toFixed(1)}G</span>
+                <span style="color:#fbbf24; font-weight:700;">${(h.highestBid || 0).toFixed(1)}G</span>
               </div>
             </div>
           `;
@@ -385,18 +386,20 @@
 
     const heroPrice = document.getElementById('auction-hero-price');
     if (heroPrice) {
-      renderHtml(heroPrice, `${(house.currentValuation || 0).toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      const hb = house.highestBid || 0;
+      if (hb > 0) {
+        renderHtml(heroPrice, `${hb.toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      } else {
+        renderHtml(heroPrice, `-- <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      }
     }
 
     const landStatus = document.getElementById('auction-hero-land-status');
     if (landStatus) {
-      const campHouses = sim.houses.filter(h => h.campId === house.campId).length;
-      const maxHouses = (sim.config && sim.config.campMaxHouses) || 30;
-      if (campHouses < maxHouses) {
-        renderHtml(landStatus, `<span style="color:#10b981;">🟢 闲置土地充裕 (${campHouses}/${maxHouses}栋) · 估价以自建成本为上限</span>`);
-      } else {
-        renderHtml(landStatus, `<span style="color:#f87171;">🔴 聚落土地告罄 (${campHouses}/${maxHouses}栋) · 供求绝对稀缺溢价</span>`);
-      }
+      const vacant = sim.houses.filter(h => h.ownerId == null).length;
+      const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
+      const buyerCount = (sim.agents || []).filter(a => a.isAlive && a.gender === 'Male' && a.age >= adultAge && a.homeHouseId == null).length;
+      renderHtml(landStatus, `<span style="color:#f59e0b;">🔨 全图在售 ${vacant} 栋 · 无房成年男性买家 ${buyerCount} 人 · 倾囊竞价，王国与受益人份额分账</span>`);
     }
 
     // 5. 麦穗 37% 时间轴标尺与动态指针
@@ -487,7 +490,7 @@
     const buyersCountEl = document.getElementById('auction-buyers-count');
     if (!buyersListEl) return;
 
-    const buyers = scanPotentialBuyers(house.campId, house.currentValuation);
+    const buyers = scanPotentialBuyers(house.campId, house.benchmarkBid || 0);
     if (buyersCountEl) buyersCountEl.textContent = buyers.length;
 
     if (buyers.length === 0) {

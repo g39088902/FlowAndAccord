@@ -333,20 +333,24 @@ pub const MARKET_MIN_FAMILY_GOLD: f32 = 0.5;
 pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
 
 // ============================================================================
-// 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+// 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
 // ============================================================================
-/// 拍卖开价评估周期（tick，默认 30 = 1秒，与错峰决策周期对齐）
-pub const HOUSE_MARKET_BIDDING_INTERVAL_TICKS: u64 = 30;
-/// 最晚出售修缮度时限（耐久度跌至此值时只要有报价就必须选最高强制成交，默认 10.0%）
+/// ★ v1.26.0 买家全局出价冷却（tick，默认 300 = 10 模拟秒）：出价后对任何在售房屋都不再出价
+pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 300;
+/// 最晚出售修缮度时限（耐久度跌至此值时只要有新报价即成交，默认 10.0%）
 pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
 /// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）
 pub const HOUSE_AUCTION_OBSERVATION_RATIO: f32 = 0.37;
-/// 木材基准金价（保留：待榷市扩展承载木材后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.15）
+/// ★ v1.26.0 单次出价最低家户黄金门槛（家户账面黄金低于该值不出价，默认 0.01）
+pub const HOUSE_AUCTION_MIN_BID_GOLD: f32 = 0.01;
+/// ★ v1.26.0 单次拍卖会话报价流水环形缓冲容量（条，默认 128；超容量淘汰最旧）
+pub const HOUSE_AUCTION_BID_HISTORY_CAPACITY: usize = 128;
+/// ★ v1.26.0 王国公户遗产分账份额权重（与人类受益人同等参与份额制分配，默认 1.0；无人类受益人时独得全额）
+pub const HOUSE_AUCTION_CROWN_SHARE_WEIGHT: f32 = 1.0;
+/// 木材基准金价（保留：待榷市扩展承载木材后作单价基准，默认 0.15）
 pub const MARKET_PRICE_BASE_WOOD: f32 = 0.15;
-/// 石料基准金价（保留：待榷市扩展承载石料后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.20）
+/// 石料基准金价（保留：待榷市扩展承载石料后作单价基准，默认 0.20）
 pub const MARKET_PRICE_BASE_STONE: f32 = 0.20;
-/// 0级仓库地基保底估价值（黄金，默认 0.1，防 0 成本畸变）
-pub const HOUSE_BASE_FOUNDATION_COST_GOLD: f32 = 0.1;
 
 // ============================================================================
 // 15. 动态仿真配置结构体 (SimConfig)
@@ -573,13 +577,15 @@ pub struct SimConfig {
     pub market_min_family_gold: f32,
     pub market_min_dispatch_stamina: f32,
 
-    // 14. 二手房屋市场、营地中介拍卖与麦穗估价
-    pub house_market_bidding_interval_ticks: u64,
+    // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+    pub house_auction_bid_cooldown_ticks: u64,
     pub house_auction_deadline_durability: f32,
     pub house_auction_observation_ratio: f32,
+    pub house_auction_min_bid_gold: f32,
+    pub house_auction_bid_history_capacity: usize,
+    pub house_auction_crown_share_weight: f32,
     pub market_price_base_wood: f32,
     pub market_price_base_stone: f32,
-    pub house_base_foundation_cost_gold: f32,
 }
 
 impl Default for SimConfig {
@@ -795,13 +801,15 @@ impl Default for SimConfig {
             market_min_family_gold: MARKET_MIN_FAMILY_GOLD,
             market_min_dispatch_stamina: MARKET_MIN_DISPATCH_STAMINA,
 
-            // 14. 二手房屋市场、营地中介拍卖与麦穗估价
-            house_market_bidding_interval_ticks: HOUSE_MARKET_BIDDING_INTERVAL_TICKS,
+            // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+            house_auction_bid_cooldown_ticks: HOUSE_AUCTION_BID_COOLDOWN_TICKS,
             house_auction_deadline_durability: HOUSE_AUCTION_DEADLINE_DURABILITY,
             house_auction_observation_ratio: HOUSE_AUCTION_OBSERVATION_RATIO,
+            house_auction_min_bid_gold: HOUSE_AUCTION_MIN_BID_GOLD,
+            house_auction_bid_history_capacity: HOUSE_AUCTION_BID_HISTORY_CAPACITY,
+            house_auction_crown_share_weight: HOUSE_AUCTION_CROWN_SHARE_WEIGHT,
             market_price_base_wood: MARKET_PRICE_BASE_WOOD,
             market_price_base_stone: MARKET_PRICE_BASE_STONE,
-            house_base_foundation_cost_gold: HOUSE_BASE_FOUNDATION_COST_GOLD,
         }
     }
 }

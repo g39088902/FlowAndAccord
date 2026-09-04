@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use super::vec3::Vec3;
 use super::graph::NodeId;
 use super::agent::AgentId;
@@ -14,7 +15,7 @@ pub enum HouseTier {
     Tier4Manor,       // 4级 氏族大庄园
 }
 
-/// 房屋历史报价档案条目 (v1.14.0)
+/// 房屋本次拍卖会话的报价流水条目（v1.26.0：随会话创建、随成交归档，不跨场次）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HouseBidRecord {
     pub tick: u64,
@@ -22,11 +23,10 @@ pub struct HouseBidRecord {
     pub household_id: u64,
     pub amount: f32,
     pub durability: f32,
-    pub valuation: f32,
     pub phase: String, // "观察期" | "决策期" | "出清期"
 }
 
-/// 房屋历史成交档案条目 (v1.14.0)
+/// 房屋历史成交档案条目 (v1.14.0；v1.26.0 删 valuation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HouseDealRecord {
     pub deal_tick: u64,
@@ -34,25 +34,28 @@ pub struct HouseDealRecord {
     pub household_id: u64,
     pub price: f32,
     pub durability: f32,
-    pub valuation: f32,
     pub camp_id: u32,
     pub total_bids_count: usize,
-    pub reason: String, // "麦穗决策期击中更高报价" | "10%修缮度最后时限最高价强制成交"
+    pub reason: String, // "麦穗决策期击中更高报价" | "10%修缮度时限新报价成交" | "王国公户独得" 等
 }
 
 /// 正在进行的拍卖现场状态（房屋有主时为 None）
+/// ★ v1.26.0：报价流水随会话生命周期存在——挂牌时新建空队列，成交时随本结构一并归档消失。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HouseAuctionState {
     pub start_durability: f32,
     pub benchmark_bid: f32,
     pub current_highest_bid: f32,
     pub current_highest_bidder: Option<AgentId>,
+    /// 本次拍卖会话的报价流水（环形缓冲，容量由 config.house_auction_bid_history_capacity 控制）
+    #[serde(default)]
+    pub bids_history: VecDeque<HouseBidRecord>,
 }
 
 /// 房屋实体（M6 建筑化：只保留等级/耐久/位置/户主等建筑属性，不再持有任何资源存量）
 /// ★ v1.10.0 去绝嗣废弃：owner_id 改为 Option（None=无主空置房），删除 is_ruin/generation，
 /// 无主房屋不再加速风化，户主死亡后由营地空置房屋列表登记受益人。
-/// ★ v1.14.0 营地虚拟中介拍卖与档案持久化（估价、麦穗拍卖状态、报价历史、成交记录）
+/// ★ v1.26.0 营地虚拟中介拍卖与档案持久化（麦穗拍卖状态、本次会话报价历史、成交记录）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct House {
     pub id: u32,
@@ -69,15 +72,11 @@ pub struct House {
     pub builder_id: AgentId,                // 修建者（立宅人）：立宅时即固定
     pub last_upgrader_id: Option<AgentId>,  // 最近升级者：每次升级时更新；从未升级为 None
 
-    // ★ v1.14.0 拍卖与档案扩展
-    #[serde(default)]
-    pub bids_history: Vec<HouseBidRecord>,
+    // ★ v1.26.0 拍卖与档案扩展（报价流水已移入拍卖会话，不跨场次）
     #[serde(default)]
     pub deal_history: Vec<HouseDealRecord>,
     #[serde(default)]
     pub auction_state: Option<HouseAuctionState>,
-    #[serde(default)]
-    pub current_valuation: f32,
 }
 
 impl House {
@@ -100,10 +99,8 @@ impl House {
             is_repairing: false,
             builder_id: owner_id,
             last_upgrader_id: None,
-            bids_history: Vec::new(),
             deal_history: Vec::new(),
             auction_state: None,
-            current_valuation: 0.0,
         }
     }
 
@@ -184,8 +181,7 @@ pub struct HouseSnapshot {
     pub is_repairing: bool,
     pub builder_id: AgentId,
     pub last_upgrader_id: Option<AgentId>,
-    // ★ v1.14.0 拍卖与档案字段
-    pub current_valuation: f32,
+    // ★ v1.26.0 拍卖与档案字段（估价机制已删除）
     pub auction_phase: Option<String>,
     pub benchmark_bid: f32,
     pub highest_bid: f32,

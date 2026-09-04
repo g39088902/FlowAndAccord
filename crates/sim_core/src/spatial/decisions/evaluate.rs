@@ -23,7 +23,9 @@ pub struct Decisioner<'a> {
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 16],
+    pub branch_order: &'a [BranchId; 17],
+    /// ★ v1.26.0 当前世界 tick（用于竞拍冷却判定，见 B17BidHouse）
+    pub tick: u64,
 }
 
 impl<'a> Decisioner<'a> {
@@ -178,6 +180,28 @@ impl<'a> Decisioner<'a> {
 
     pub fn fulfill_resting_need(&mut self, agent: &mut Agent3D, need: Need) {
         if need.kind == NeedKind::Rest { return; }
+        if need.kind == NeedKind::BidHouse {
+            // ★ v1.26.0 竞购现房：随机挑一套在售空置房屋写 pending（消耗共享 RNG，确定性），
+            // 不改变运动状态——只下决心，交割由世界执行器 execute_pending_bids 落地。
+            let candidates: Vec<u32> = self
+                .houses
+                .iter()
+                .filter(|h| h.owner_id.is_none())
+                .map(|h| h.id)
+                .collect();
+            if candidates.is_empty() {
+                agent.current_need = None;
+                return;
+            }
+            let idx = if candidates.len() == 1 {
+                0
+            } else {
+                self.rng.gen_range_usize(0, candidates.len())
+            };
+            agent.pending_bid_house_id = Some(candidates[idx]);
+            agent.current_need = Some("Safety·BidHouse".to_string());
+            return;
+        }
         if need.kind == NeedKind::RepairHouse {
             agent.enter_stationary_state(PrimitiveActionState::RepairingHouse);
             return;
@@ -282,7 +306,7 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
             NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
             NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship | NeedKind::BidHouse => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);

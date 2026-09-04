@@ -10,8 +10,8 @@
   // ─── 常量映射 ───────────────────────────────────────────────
   const RES_ICONS  = { Water: '💧', Food: '🍒', Wood: '🌲', Stone: '🪨', Gold: '🪙' };
   const RES_COLORS = { Water: '#38bdf8', Food: '#10b981', Wood: '#d97706', Stone: '#94a3b8', Gold: '#fbbf24' };
-  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️' };
-  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并' };
+  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️', HousingPurchase: '🏠', EstateShare: '⚖️', TransferTax: '🏛️' };
+  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并', HousingPurchase: '购房', EstateShare: '遗产分账', TransferTax: '过户税' };
   const ROLE_LABELS = { Head: '👑 户主', Spouse: '💍 配偶', Child: '👶 子女', None: '—' };
 
   // ─── 模块状态 ───────────────────────────────────────────────

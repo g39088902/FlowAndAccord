@@ -37,6 +37,7 @@
 - **M2 继承**：户主死亡 → 家户资源平分在世妻子（如有）与在世子一代；无在世妻子且无在世子女（绝嗣） → 全部转入 `public_granary` 公仓兜底账本；清算后 `dissolve`。
 - **M3 宗族**：按 `surname` 自动聚合（始祖播撒即入族、新生儿随父姓入族）；族长 = 同姓在世最年长男性（并列 id 小者），无在世男性则无主账本冻结；族税每 `clan_tribute_interval_ticks` 全局统一征收（账面余额 × `clan_tribute_rate`），族内互助有族库门槛与冷却。
 - **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却。
+- **房屋拍卖分账（v1.26.0）**：成交价款按份额制分账——王国公户（`LedgerRef::Region`，权重 `house_auction_crown_share_weight`）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）共分；新增流水 `TransferReason::EstateShare`（买方 → 受益人家户）与 `TransferReason::TransferTax`（买方 → 地区公仓）；无人类受益人时王国独得（天然兜底，零特判），金额严格守恒。
 
 ## 4. ⚠️ 本目录局部易踩坑
 

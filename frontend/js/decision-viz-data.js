@@ -23,6 +23,7 @@
     { id: 'b2', cond: '饥饿 < 25 且有可用粮源', need: 'Physiological · SateHunger', target: 'SeekingFood', level: 1, cfg: ['decisionCriticalHunger=25.0'], anchor: 'branches.rs::B2SateHunger' },
     { id: 'b3', cond: '体力 < 100', need: 'Physiological · Rest', target: 'RestingAtCamp', level: 1, cfg: ['decisionRestStaminaTarget=100.0'], anchor: 'branches.rs::B3Rest' },
     { id: 'b12', cond: '无家 + 成年男 + 饥渴体力达标', need: 'Physiological · FoundHome', target: '掷点→立宅', level: 1, cfg: ['decisionFoundHome{Min}=20/20/60', 'Candidates=12'], anchor: 'branches.rs::B12FoundHome' },
+    { id: 'b17', cond: '无房成年男 + 冷却结束 + 有在售空置房 + 家户金≥0.01', need: 'Safety · BidHouse', target: '随机一套→pending', level: 2, cfg: ['houseAuctionBidCooldownTicks=300', 'houseAuctionMinBidGold=0.01'], anchor: 'branches.rs::B17BidHouse' },
     { id: 'b4', cond: '有家宅 且 耐久 < 50%（成员）', need: 'Safety · RepairHouse', target: 'RepairingHouse', level: 2, cfg: ['decisionHouseRepairNeedThreshold=50.0'], anchor: 'branches.rs::B4RepairHouse' },
     { id: 'b5', cond: '有房(含0级) 且 家户账本水 <100', need: 'Safety · StockWater', target: 'SeekingWater', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B5StockWater' },
     { id: 'b6', cond: '有房(含0级) 且 家户账本粮 <100', need: 'Safety · StockFood', target: 'SeekingFood', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B6StockFood' },
@@ -43,9 +44,9 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
-  // 默认分界线：位于第 g 张卡之后（第1层|第2层=6 / 第2层|第3层=12 / 第3层|第4层=14 / 第4层|第5层=15）
-  var DEFAULT_DIVGAPS = [6, 12, 14, 15];
+  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b17', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13'];
+  // 默认分界线：位于第 g 张卡之后（第1层|第2层=7 / 第2层|第3层=13 / 第3层|第4层=15 / 第4层|第5层=16）
+  var DEFAULT_DIVGAPS = [7, 13, 15, 16];
 
   // 行动状态机摘要（agent.rs::PrimitiveActionState 18 态）
   var FSM_STATES = [

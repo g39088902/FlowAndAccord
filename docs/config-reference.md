@@ -3,7 +3,7 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 14. 二手房屋市场、营地中介拍卖与麦穗估价
+## 14. 二手房屋市场、营地中介拍卖与麦穗竞价
 
 | 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -188,12 +188,14 @@
 | `marketEmergencyFamilyStockThreshold` | f32 | 10 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 家户物资绝境警戒线 |
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
-| `houseMarketBiddingIntervalTicks` | u64 | 30 | housing_system/auction.rs (二手房开价周期) | 拍卖开价评估周期 (tick，默认 30 = 1秒) |
-| `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交) |
-| `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 麦穗理论最优停止观察期比例 (37%) |
-| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价) |
-| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价) |
-| `houseBaseFoundationCostGold` | f32 | 0.1 | housing_system/auction.rs (地基估价保底) | 0级仓库地基保底估价值 (黄金，防 0 成本畸变) |
+| `houseAuctionBidCooldownTicks` | u64 | 300 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价) |
+| `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
+| `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |
+| `houseAuctionMinBidGold` | f32 | 0.01 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次出价最低家户黄金门槛 (低于此值不出价) |
+| `houseAuctionBidHistoryCapacity` | usize | 128 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次拍卖会话报价流水环形缓冲容量 (条) |
+| `houseAuctionCrownShareWeight` | f32 | 1 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额) |
+| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
+| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市扩展承载石料后作单价基准) |
 
 ## 5. 马斯洛需求与决策门槛
 

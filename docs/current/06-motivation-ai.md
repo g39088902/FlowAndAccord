@@ -44,6 +44,73 @@
 **原则 4：执行中生理熔断**
 - 外出任何高层任务途中，饥渴 < 25.0 或体力 < 50.0 时立即中断并降级折返。
 
+### 行动状态机总图（`PrimitiveActionState` · 20 态）
+
+> 状态集权威定义在 `agent.rs::PrimitiveActionState`（共 20 态）；转移由 `evaluate.rs::decide` 按状态分发、`agent.rs::advance_to_next_lane` 在路线走完时自动切换、世界执行器（scheduler / housing_system）完成登基/成婚/升级等物理结算。移动唯一由 `current_lane_id.is_some()` 驱动，移动态→静止态必须走 `enter_stationary_state()`（根 AGENTS.md §4.16）。
+
+**图 A · 主行为环（18 态：休息 / 六类采办 12 态 / 返家 / 建造 / 修缮 / 越野 / 死亡）**。六类采办同构：奔赴态 = `SeekingWater/Food/Wood/Stone/Gold/Market`，现场态 = `DrinkingAtWater/ForagingFood/GatheringWood/MiningStone/MiningGold/BuyingAtMarket`。
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Rest : 开局播撒或分娩落位
+
+    state "🏕️ RestingAtCamp 营地休息（唯一评估入口）" as Rest
+    note right of Rest
+        B12 FoundHome 不离开本态：掷 12 候选点写 pending_house_pos，
+        由 settlement 实体化为 0 级仓库并绑定 home_house_id
+    end note
+
+    state "资源采办环（水/粮/木/石/金/榷市六类同构）" as Loop {
+      state "🚶 奔赴途中 Seeking*（六类）" as Going
+      state "🛠️ 现场作业（饮/食/伐木/采石/淘金/交易）" as OnSite
+      Going --> OnSite : 路线走完自动切现场态
+      OnSite --> Going : 源关闭则连续采收改赴下一处，饮/食互链
+      Going --> Going : 途中断流原地掉头重路由（严禁瞬移）
+    }
+
+    Rest --> Loop : 采办类分支命中且 dispatch 成功
+    Going --> Returning : 熔断（体力小于 50、饥渴小于 25）或无可用点
+    OnSite --> Returning : 行囊满、家户补足、淘金收工或熔断
+    state "🏕️ ReturningToCamp 返家卸货" as Returning
+    Returning --> Rest : 到家 enter_stationary_state
+
+    Rest --> Repairing : B4 家宅耐久小于 50 且为户主或配偶
+    state "🔧 RepairingHouse 修缮（+5/s）" as Repairing
+    Repairing --> Rest : 耐久修满 100%
+
+    Rest --> Constructing : B8/B11 账本可付升级成本
+    state "🔨 ConstructingHouse 待升级标记（瞬时化）" as Constructing
+    Constructing --> Rest : 当拍扣账晋升，不足则静默退出
+
+    Going --> Detour : 当前车道在路网中消失
+    OnSite --> Detour : 当前车道在路网中消失
+    state "⚠️ OffRoadDetour 停滞清车道，下拍重派" as Detour
+    Detour --> Loop : 下拍决策重新 dispatch
+    Detour --> Returning : 决策判定返家
+
+    state "💀 Dead（风化 12s 后移除）" as Dead
+    note left of Dead : 任意存活态在代谢结算中 hunger、thirst、health 任一归零即进入 Dead
+    Dead --> [*] : 风化计时归零
+```
+
+**图 B · 社会行为链（新增 2 态 `SeekingThrone` / `SeekingCourtship`，休息态与图 A 共用；均由休息态评估发起、结算后回到休息态）**
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    state "🏕️ RestingAtCamp 休息评估" as Rest
+    Rest --> Throne : B14 有空缺王位营地，dispatch 出征
+    state "⚔️ SeekingThrone 夺位远征途中" as Throne
+    Throne --> Throne : 目标易主，原地掉头改赴新空营
+    Throne --> Rest : 抵达写 coronation_pending 由执行器登基；<br/>体力告警或无可夺则放弃折返
+
+    Rest --> Court : B16 有合格单身女性（魅力、距离、ID 择优）
+    state "💍 SeekingCourtship 奔赴求偶途中" as Court
+    Court --> Court : 原目标失效，改追新最优女性并重补路
+    Court --> Rest : 抵达写 courtship_pending 由执行器原子成婚；<br/>熔断、无候选或资格失败则返家
+```
+
 ### 错峰决策节拍
 - 每个引擎 tick = 1/30 模拟秒，agent 每 30 tick（1.0 模拟秒）决策一次。
 - 错峰相位：`(tick_counter + agent.id) % 30 == 0`，全员相位均摊错开。

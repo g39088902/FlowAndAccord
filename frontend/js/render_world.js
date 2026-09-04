@@ -294,8 +294,8 @@ for (const house of sim.houses) {
       // 悬浮拍卖标牌 (Floating Auction Plaque)
       const phaseColor = (house.auctionPhase === '观察期') ? '#f59e0b' : ((house.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
       const phaseText = house.auctionPhase === '观察期' ? '🌾摸底' : (house.auctionPhase === '决策期' ? '🎯竞价' : '⚠️出清');
-      const priceVal = (house.currentValuation || 0).toFixed(1);
-      const plaqueLabel = `🔨 ${phaseText} · ${priceVal}G`;
+      const priceVal = house.highestBid || 0;
+      const plaqueLabel = priceVal > 0 ? `🔨 ${phaseText} · ${priceVal.toFixed(1)}G` : `🔨 ${phaseText}`;
 
       ctx.font = 'bold 9px sans-serif';
       const textW = ctx.measureText(plaqueLabel).width;

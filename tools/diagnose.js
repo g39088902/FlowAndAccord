@@ -411,7 +411,8 @@ function generateReport({ opts, simConfig, durationMs, finalSnap, sampleSnapshot
       lines.push(`❌ 未找到 ID 为 #${opts.house} 的房屋。`);
     } else {
       const hh = finalSnap.households.find(item => item.head === h.owner_id && !item.is_dissolved);
-      lines.push(`- **规格与耐久**: 等级=\`${h.tier}\` | 耐久度=${h.durability.toFixed(1)} | 估值=${h.current_valuation.toFixed(0)} | 建设工时=${h.construction_progress.toFixed(1)}s`);
+      const bidInfo = (h.highest_bid || 0) > 0 ? ` | 最高出价=${(h.highest_bid || 0).toFixed(1)}金 | 标杆=${(h.benchmark_bid || 0).toFixed(1)}金 | 阶段=${h.auction_phase || '无'}` : '';
+      lines.push(`- **规格与耐久**: 等级=\`${h.tier}\` | 耐久度=${h.durability.toFixed(1)}${bidInfo} | 建设工时=${h.construction_progress.toFixed(1)}s`);
       lines.push(`- **产权户主**: 户主ID=\`${h.owner_id != null ? '#' + h.owner_id : '空置/无主'}\` | 营地辖区=\`营地${h.camp_id}\``);
       if (hh) {
         lines.push(`- **对应家户账本 (#${hh.id})**:`);

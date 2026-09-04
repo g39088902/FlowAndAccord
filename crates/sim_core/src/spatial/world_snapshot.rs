@@ -88,12 +88,19 @@ impl World3DEngine {
 
             let last_deal = h.deal_history.last();
 
-            let recent_bids: Vec<HouseBidSnapshot> = h.bids_history.iter().rev().take(10).map(|b| HouseBidSnapshot {
-                tick: b.tick,
-                bidder_id: b.bidder_id,
-                amount: b.amount,
-                phase: b.phase.clone(),
-            }).collect();
+            // ★ v1.26.0 报价流水取自本次拍卖会话（房屋有主 / 无会话时为空）
+            let session_bids = h.auction_state.as_ref();
+            let mut recent_bids: Vec<HouseBidSnapshot> = Vec::new();
+            if let Some(st) = session_bids {
+                for b in st.bids_history.iter().rev().take(10) {
+                    recent_bids.push(HouseBidSnapshot {
+                        tick: b.tick,
+                        bidder_id: b.bidder_id,
+                        amount: b.amount,
+                        phase: b.phase.clone(),
+                    });
+                }
+            }
 
             let recent_deals: Vec<HouseDealSnapshot> = h.deal_history.iter().rev().take(5).map(|d| HouseDealSnapshot {
                 tick: d.deal_tick,
@@ -118,11 +125,10 @@ impl World3DEngine {
                 is_repairing: h.is_repairing,
                 builder_id: h.builder_id,
                 last_upgrader_id: h.last_upgrader_id,
-                current_valuation: h.current_valuation,
                 auction_phase,
                 benchmark_bid,
                 highest_bid,
-                bids_count: h.bids_history.len(),
+                bids_count: session_bids.map(|st| st.bids_history.len()).unwrap_or(0),
                 last_deal_price: last_deal.map(|d| d.price),
                 last_deal_tick: last_deal.map(|d| d.deal_tick),
                 auction_start_durability: h.auction_state.as_ref().map(|st| st.start_durability),
