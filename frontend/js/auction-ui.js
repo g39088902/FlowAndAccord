@@ -34,6 +34,9 @@
     if (!sim || !sim.houses) return [];
     return sim.houses.filter(h => h.ownerId == null && h.auctionPhase != null);
   }
+  function tierRank(tier) {
+    return { Tier0Warehouse: 0, Tier1ThatchedHut: 1, Tier2LeanTo: 2, Tier3Homestead: 3, Tier4Manor: 4 }[tier] || 0;
+  }
 
   function getAllDeals() {
     const sim = getSim();
@@ -153,7 +156,9 @@
 
     const buyers = [];
     for (const a of sim.agents) {
-      if (a.isAlive && a.gender === 'Male' && a.age >= adultAge && a.homeHouseId == null) {
+      const auctionTier = Math.max(0, ...((sim.houses || []).filter(h => h.ownerId == null && h.auctionPhase != null).map(h => tierRank(h.tier))));
+      const ownHouse = a.homeHouseId != null ? (sim.houses || []).find(h => h.id === a.homeHouseId) : null;
+      if (a.isAlive && a.gender === 'male' && a.age >= adultAge && (a.homeHouseId == null || tierRank(ownHouse && ownHouse.tier) < auctionTier)) {
         // 查找家户账本黄金
         let gold = 0;
         if (typeof sim.getHouseholdOfAgent === 'function') {
@@ -309,11 +314,15 @@
       if (tabHistoryBtn) tabHistoryBtn.classList.remove('active');
       if (activeView) activeView.style.display = 'block';
       if (historyView) historyView.style.display = 'none';
+      const strip = document.getElementById('auction-house-strip');
+      if (strip) strip.style.display = '';
     } else {
       if (tabActiveBtn) tabActiveBtn.classList.remove('active');
       if (tabHistoryBtn) tabHistoryBtn.classList.add('active');
       if (activeView) activeView.style.display = 'none';
       if (historyView) historyView.style.display = 'block';
+      const strip = document.getElementById('auction-house-strip');
+      if (strip) strip.style.display = 'none';
       renderHistoryView(allDeals);
       return;
     }
@@ -398,7 +407,7 @@
     if (landStatus) {
       const vacant = sim.houses.filter(h => h.ownerId == null).length;
       const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
-      const buyerCount = (sim.agents || []).filter(a => a.isAlive && a.gender === 'Male' && a.age >= adultAge && a.homeHouseId == null).length;
+      const buyerCount = scanPotentialBuyers(house.campId, house.benchmarkBid || 0).length;
       renderHtml(landStatus, `<span style="color:#f59e0b;">🔨 全图在售 ${vacant} 栋 · 无房成年男性买家 ${buyerCount} 人 · 倾囊竞价，王国与受益人份额分账</span>`);
     }
 

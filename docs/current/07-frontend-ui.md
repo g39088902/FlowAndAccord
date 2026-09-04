@@ -121,15 +121,15 @@
 | `math.js` | 3D 向量与投影变换 |
 | `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接 |
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |
-| `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘 |
+| `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘（不含随身行囊均值与贫富倍差） |
 | `render_world.js` | 3D 地形、POI 指示环、房屋及★在售呼吸光晕与拍卖标牌、踩踏道路 |
 | `render_agents.js` | 族人渲染、妊娠光环、状态气泡、登基礼花粒子 |
 | `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与拾取点击 |
 | `main.js` | 页面交互、相机控制、快捷键、无头模式 |
 | `save-ui.js` | 本地文件与槽位存档/读档系统 |
 | `dag.js` / `dag-*.js` | 直系血脉时间轴族谱四件套（布局/渲染/新标签页/编排） |
-| `ledger-ui.js` | 社会与经济制度大盘 4 标签页（家户/婚姻/宗族/王国） |
-| `auction-ui.js` | ★ 房屋拍卖交易所与实时竞价大盘 UI（v1.15.0） |
+| `ledger-ui.js` | 社会与经济制度大盘 4 标签页（家户/婚姻/宗族/王国），家户页含五类资源均值 |
+| `auction-ui.js` | ★ 房屋拍卖交易所与实时竞价大盘 UI（历史成交与在售列表分离，买家池支持低等级家户核对） |
 
 ## 关键不变量
 - 前端是纯静态文件（index.html + style.css + js/*.js），无构建步骤，改完刷新即生效。

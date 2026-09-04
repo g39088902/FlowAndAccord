@@ -122,6 +122,14 @@
     setText('ledger-ov-marriages', activeMG.length);
     setText('ledger-ov-marriages-total', marriages.length);
 
+    const avgEl = document.getElementById('ledger-resource-averages');
+    if (avgEl) {
+      const keys = ['Water', 'Food', 'Wood', 'Stone', 'Gold'];
+      const icons = ['💧', '🍒', '🌲', '🪨', '🪙'];
+      const sums = keys.map(k => activeHH.reduce((s, h) => s + ((h.balances && h.balances[k]) || 0), 0));
+      renderHtml(avgEl, keys.map((k, i) => `<span>${icons[i]} ${(sums[i] / Math.max(1, activeHH.length)).toFixed(1)}</span>`).join(''));
+    }
+
     // 家户列表（存续优先，已解散附后；并列 id 小者在前）
     const sorted = activeHH.slice().sort((a, b) => a.id - b.id)
       .concat(dissolvedHH.slice().sort((a, b) => a.id - b.id));

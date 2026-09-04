@@ -431,12 +431,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const poiInfoBadge = document.getElementById('insp-poi-info-badge');
     const detailTextEl = document.getElementById('insp-detail-text');
     const regenSecondaryRow = document.getElementById('insp-poi-regen-secondary-row');
+    const marketTrades = document.getElementById('insp-market-trades');
     if (poi.type === 'Camp') {
       if (poiInfoBadge) poiInfoBadge.style.display = 'none';
       if (detailTextEl) detailTextEl.style.display = 'none';
       if (regenSecondaryRow) regenSecondaryRow.style.display = 'none';
+      if (marketTrades) marketTrades.style.display = 'none';
     } else {
-      if (poiInfoBadge) poiInfoBadge.style.display = '';
+      if (poiInfoBadge) poiInfoBadge.style.display = poi.type === 'Market' ? 'none' : '';
       if (detailTextEl) detailTextEl.style.display = '';
 
     const multPrimary = poiRegenMultiplier(poi.type, 'primary');
@@ -446,7 +448,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       : `无限储量 (公共避风聚落)`;
 
     // 第二条产速：仅榷场（粮食，复用浆果倍率槽位）
-    if (regenSecondaryRow) {
+      if (regenSecondaryRow) {
       if (poi.type === 'Market') {
         regenSecondaryRow.style.display = '';
         const multSecondary = poiRegenMultiplier(poi.type, 'secondary');
@@ -455,6 +457,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           `+${effSecondary.toFixed(2)} 单位/秒 (基准 ${poi.secondaryRegenRate.toFixed(2)} × ${multSecondary.toFixed(1)}x)`;
       } else {
         regenSecondaryRow.style.display = 'none';
+      }
+      if (marketTrades) {
+        if (poi.type === 'Market') {
+          const rows = (sim.households || []).flatMap(h => (h.recentJournal || []).filter(r => r.reason === 'MarketTrade').map(r => ({ h, r })));
+          marketTrades.style.display = '';
+          const list = document.getElementById('insp-market-trades-list');
+          if (list) list.innerHTML = rows.length ? rows.slice(0, 8).map(({h, r}) => `<div style="font-size:10px;color:#fbbf24;">t${r.tick} · 家户#${h.id} · ${r.resource || '水粮'} ${Number(r.amount || 0).toFixed(1)} · ${r.from || '榷场'} → ${r.to || '家户'}</div>`).join('') : '<span style="color:#64748b;">暂无交易记录</span>';
+        } else marketTrades.style.display = 'none';
       }
     }
 
@@ -484,6 +494,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
   if (dtAgent) dtAgent.style.display = '';
   const pibAgent = document.getElementById('insp-poi-info-badge');
   if (pibAgent) pibAgent.style.display = '';
+  const marketTradesAgent = document.getElementById('insp-market-trades');
+  if (marketTradesAgent) marketTradesAgent.style.display = 'none';
 
   let selAgent = null;
   if (sim.selectedAgentId !== null) {

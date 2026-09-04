@@ -94,7 +94,7 @@
 
   function gapCenters() {
     var cs = [], base = 24 + 56 + GAP;
-    for (var g = 0; g <= 13; g++) cs.push(base + (g - 1) * (NODE_H + GAP) + NODE_H + GAP / 2);
+    for (var g = 0; g <= st.order.length; g++) cs.push(base + (g - 1) * (NODE_H + GAP) + NODE_H + GAP / 2);
     return cs;
   }
 
@@ -210,9 +210,9 @@
     if (drag.div) {
       var py = drag.startY + (ev.clientY - drag.sy) / scale;
       var centers = gapCenters(), best = 0, bd = 1e9;
-      for (var gi = 0; gi <= 13; gi++) { var dd = Math.abs(py - centers[gi]); if (dd < bd) { bd = dd; best = gi; } }
+      for (var gi = 1; gi < centers.length - 1; gi++) { var dd = Math.abs(py - centers[gi]); if (dd < bd) { bd = dd; best = gi; } }
       var minG = (drag.di === 0 ? 1 : st.divGaps[drag.di - 1] + 1);
-      var maxG = (drag.di === 3 ? 12 : st.divGaps[drag.di + 1] - 1);
+      var maxG = (drag.di === 3 ? st.order.length - 1 : st.divGaps[drag.di + 1] - 1);
       var g = Math.max(minG, Math.min(maxG, best));
       if (g !== st.divGaps[drag.di]) {
         st.divGaps[drag.di] = g;
