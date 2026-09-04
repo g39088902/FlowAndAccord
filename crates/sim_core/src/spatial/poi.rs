@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::config::SimConfig;
 use super::vec3::Vec3;
 use super::agent::AgentId;
 
@@ -210,16 +211,20 @@ impl PrimitivePoi {
     }
 
     /// 根据当前绑定的有效房屋数量更新营地等级并返回升级播报
-    pub fn update_camp_level(&mut self, house_count: u32) -> Option<String> {
+    pub fn update_camp_level(&mut self, house_count: u32, config: &SimConfig) -> Option<String> {
         if self.poi_type != PoiType::Camp { return None; }
         self.bound_houses_count = house_count;
         let old_level = self.level;
-        let new_level = match house_count {
-            0..=5 => 0,
-            6..=11 => 1,
-            12..=17 => 2,
-            18..=23 => 3,
-            _ => 4,
+        let new_level = if house_count < config.camp_level_village_min_houses {
+            0
+        } else if house_count < config.camp_level_township_min_houses {
+            1
+        } else if house_count < config.camp_level_town_min_houses {
+            2
+        } else if house_count < config.camp_level_county_min_houses {
+            3
+        } else {
+            4
         };
         self.level = new_level;
         if new_level > old_level {
@@ -269,4 +274,3 @@ pub fn market_unit_price(current: f32, max: f32, cfg: &crate::config::SimConfig)
     let eff = current.max(cfg.market_price_floor_stock);
     cfg.market_price_base * (max / eff).powf(cfg.market_price_power_exponent)
 }
-

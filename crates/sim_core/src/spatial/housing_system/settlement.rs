@@ -179,7 +179,7 @@ impl World3DEngine {
         for poi in &mut self.pois {
             if poi.poi_type == PoiType::Camp {
                 let count = self.houses.iter().filter(|h| h.camp_id == poi.id).count() as u32;
-                if let Some(msg) = poi.update_camp_level(count) {
+                if let Some(msg) = poi.update_camp_level(count, &self.config) {
                     self.last_event = Some(msg);
                 }
             }

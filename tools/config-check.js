@@ -42,6 +42,10 @@ const IMPACT_OVERRIDES = {
   ledgerJournalCapacity: 'ledger/ (所有账本容量)',
   prestigeClanElderBonus: 'ledger/clan.rs (族长威望奖励)',
   prestigeKingBonus: 'ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励)',
+  campLevelVillageMinHouses: 'poi.rs (营地行政级别升级)',
+  campLevelTownshipMinHouses: 'poi.rs (营地行政级别升级)',
+  campLevelTownMinHouses: 'poi.rs (营地行政级别升级)',
+  campLevelCountyMinHouses: 'poi.rs (营地行政级别升级)',
 };
 
 const IMPACT_PREFIX_RULES = [

@@ -152,6 +152,10 @@ window.SIM_CONFIG = {
   houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
   houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)
   campMaxHouses: 30,               // 每个营地最多可建设的房屋数量
+  campLevelVillageMinHouses: 6,    // 营地升级为村的最低房屋数量
+  campLevelTownshipMinHouses: 12,  // 营地升级为乡的最低房屋数量
+  campLevelTownMinHouses: 18,      // 营地升级为镇的最低房屋数量
+  campLevelCountyMinHouses: 24,    // 营地升级为县的最低房屋数量
   houseNodeReuseRadius: 20.0,     // 立宅优先复用空置路网节点检索半径 (m)
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
