@@ -458,34 +458,38 @@ impl Agent3D {
         event_msg
     }
 
+    /// 切换到静止态：统一清空车道、速度与路线索引，确保物理移动立即停止。
+    ///
+    /// 所有从移动态切到非移动态的场景必须调用本方法，禁止直接 `agent.state = X`
+    /// 而不清 `current_lane_id`——否则 `tick_movement` 会沿残留路线继续移动，
+    /// 出现"人在家休息但坐标在跑"的异常。移动由 `current_lane_id.is_some()` 唯一驱动，
+    /// 本方法是该不变量的唯一写入入口。
+    pub fn enter_stationary_state(&mut self, state: PrimitiveActionState) {
+        self.state = state;
+        self.current_lane_id = None;
+        self.current_velocity = 0.0;
+        self.route_index = 0;
+    }
+
     /// 3D 动力学移动与踩踏拓路 (走的人多了踩踏等级提升，移动速度连续浮点加快)
+    ///
+    /// 移动由 `current_lane_id.is_some()` 唯一驱动：有车道则沿路线积分位移，
+    /// 无车道则清零速度并静止。不再维护 is_moving 白名单——非移动态必须通过
+    /// `enter_stationary_state()` 确保 `current_lane_id=None`，从源头消除残留。
     pub fn tick_movement(&mut self, dt: f32, road_network: &mut LaneGraph3D, config: &SimConfig) {
         if !self.is_alive {
             self.current_velocity = 0.0;
             return;
         }
 
-        let is_moving = matches!(
-            self.state,
-            PrimitiveActionState::SeekingWater
-                | PrimitiveActionState::SeekingFood
-                | PrimitiveActionState::SeekingWood
-                | PrimitiveActionState::SeekingStone
-                | PrimitiveActionState::SeekingGold
-                | PrimitiveActionState::ReturningToCamp
-                | PrimitiveActionState::SeekingThrone
-                | PrimitiveActionState::SeekingMarket
-                | PrimitiveActionState::SeekingCourtship
-        );
-
-        if !is_moving {
+        // 无车道 = 静止（非移动态通过 enter_stationary_state 保证到达此处）
+        let Some(lane_id) = self.current_lane_id else {
             self.current_velocity = 0.0;
             return;
-        }
-
-        let Some(lane_id) = self.current_lane_id else { return };
+        };
         let Some(edge_idx) = road_network.edge_map.get(&lane_id).copied() else {
-            self.state = PrimitiveActionState::OffRoadDetour;
+            // 车道在路网中消失（路网重建/衰减极端情况）：进入越野静止态等待决策器重路由
+            self.enter_stationary_state(PrimitiveActionState::OffRoadDetour);
             return;
         };
 
@@ -544,34 +548,40 @@ impl Agent3D {
                 self.current_lane_id = Some(next_lane_id);
                 self.distance_along_curve = 0.0;
             } else {
-                self.state = PrimitiveActionState::OffRoadDetour;
+                // 下一条车道在路网中消失：进入越野静止态，清空车道等待决策器重路由
+                self.enter_stationary_state(PrimitiveActionState::OffRoadDetour);
             }
         } else {
-            self.current_velocity = 0.0;
-            self.current_lane_id = None;
+            // 路线走完：统一通过 enter_stationary_state 切到对应静止态，确保车道/速度清零
             match self.state {
                 PrimitiveActionState::SeekingWater => {
-                    self.state = PrimitiveActionState::DrinkingAtWater;
+                    self.enter_stationary_state(PrimitiveActionState::DrinkingAtWater);
                 }
                 PrimitiveActionState::SeekingFood => {
-                    self.state = PrimitiveActionState::ForagingFood;
+                    self.enter_stationary_state(PrimitiveActionState::ForagingFood);
                 }
                 PrimitiveActionState::SeekingWood => {
-                    self.state = PrimitiveActionState::GatheringWood;
+                    self.enter_stationary_state(PrimitiveActionState::GatheringWood);
                 }
                 PrimitiveActionState::SeekingStone => {
-                    self.state = PrimitiveActionState::MiningStone;
+                    self.enter_stationary_state(PrimitiveActionState::MiningStone);
                 }
                 PrimitiveActionState::SeekingGold => {
-                    self.state = PrimitiveActionState::MiningGold;
+                    self.enter_stationary_state(PrimitiveActionState::MiningGold);
                 }
                 PrimitiveActionState::ReturningToCamp => {
-                    self.state = PrimitiveActionState::RestingAtCamp;
+                    self.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
                 }
                 PrimitiveActionState::SeekingMarket => {
-                    self.state = PrimitiveActionState::BuyingAtMarket;
+                    self.enter_stationary_state(PrimitiveActionState::BuyingAtMarket);
                 }
-                _ => {}
+                _ => {
+                    // SeekingCourtship / SeekingThrone 等由决策模块自行处理状态转换，
+                    // 此处仅清零车道与速度，保持原 state 等待 decide_seeking_* 重补路或结算
+                    self.current_velocity = 0.0;
+                    self.current_lane_id = None;
+                    self.route_index = 0;
+                }
             }
         }
     }

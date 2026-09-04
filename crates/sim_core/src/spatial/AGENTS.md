@@ -179,15 +179,19 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 
 遗漏任何一项会导致重置后残留旧状态，引发"重置后族人仍显示旧家户"等 bug。
 
-### 4.6 🔴 运动系统 `is_moving` 白名单契约（agent ↔ decisions）
+### 4.6 🔴 运动系统：移动由 `current_lane_id` 唯一驱动 · 非移动态切换必须走 `enter_stationary_state()`（v1.25.0 起）
 
-`agent.rs::tick_movement` 以 `is_moving` 白名单决定哪些 `PrimitiveActionState` 会真正走位移管线（速度积分/车道循迹/踩踏拓路）；白名单外的状态一律 `current_velocity=0` 早退。**任何新增的移动态（`Seeking*`/途中类）必须补入白名单**，否则 `dispatch` 虽成功写入 `state/route/current_lane_id`，agent 仍永久定格（v1.24.0 求偶卡死根因：漏配 `SeekingCourtship`）。
+`agent.rs::tick_movement` 不再维护 `is_moving` 白名单。移动完全由 `current_lane_id.is_some()` 决定：有车道则走完整位移管线（速度积分/车道循迹/踩踏拓路/坡度能耗），无车道则 `current_velocity=0` 直接静止。`dispatch()` / `turn_around_and_route_to()` 自动写入 `current_lane_id`，因此**新增移动态无需修改运动系统任何代码**。
+
+**硬约束**：所有从移动态切到非移动态的场景，必须调用 `agent.enter_stationary_state(state)`——该方法统一清空 `current_lane_id` / `current_velocity` / `route_index`，是"非移动态 = 无车道"不变量的唯一写入入口。禁止直接 `agent.state = X` 而不清车道（会导致沿残留路线继续移动，"人在家但坐标在跑"）。
+
+当前所有非移动态切换点均已走 `enter_stationary_state()`：`advance_to_next_lane`（路线走完转静止态）、`tick_movement`（车道消失转 OffRoadDetour）、`evaluate.rs`（RepairHouse/BuildHouse 需求）、`routing.rs::return_home`（已在家）、`seeking.rs`（放弃远征/求偶资格失败）、`scheduler.rs`（登基/成婚/资格失败）、`ledger/region.rs`（封王终止远征）、`housing_system/`（营建/修缮完工）。
 
 配套契约：
-- `advance_to_next_lane` 走完路线后，`route` Vec **不会清空**（仅 `route_index` 越界、`current_lane_id` 置 `None`）。凡"走完后保持原态、等待决策器结算"的状态，其决策层"是否还在移动"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点后站死）。
-- 白名单成员新增/变更后，用无头诊断复现：`node tools/diagnose.js --check all` 的 Rule 5（移动停滞：`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
+- `advance_to_next_lane` 走完路线后，`route` Vec **不会清空**（仅 `route_index` 越界、`current_lane_id` 置 `None`）。凡"走完后保持原态、等待决策器结算"的状态（`SeekingCourtship` / `SeekingThrone` 走 `_ => {}` 分支），其决策层"是否还在移动/重补路"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点站死）。
+- 立宅时 `settlement.rs` 直接设置 `world_pos = site_pos` 是已有设计（FoundHome 触发的位置瞬移），与移动系统无关。
 
-详见根 AGENTS.md §4.16 与 `decisions/AGENTS.md`。
+详见根 AGENTS.md §4.16 与 `decisions/AGENTS.md` §4.9。
 
 ---
 

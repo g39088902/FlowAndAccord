@@ -1,7 +1,7 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.24.0**。
+> 本文件为里程碑级变更记录，按版本号正序排列。最新版本：**v1.25.0**。
 > 实现细节与验证数据已精简，如需追溯请查阅 git 历史。
 
 ---
@@ -10,6 +10,7 @@
 
 | 版本 | 核心变更 | 影响模块 |
 | :--- | :--- | :--- |
+| **v1.25.0** | **删除 `is_moving` 白名单，移动改由 `current_lane_id` 唯一驱动**：① **根因**：v1.24.0 用白名单补入 `SeekingCourtship` 修复求偶卡死，但白名单方案本身是"用冗余防御引入新 bug 源"——新增移动态忘加白名单→"该动的不动"（隐蔽难发现），而非移动态 route 残留→"不该动的动了"（显眼易发现），权衡后选择删除白名单；② **核心改动**：`agent.rs::tick_movement` 删除 `is_moving` matches! 白名单，移动完全由 `current_lane_id.is_some()` 决定（有车道则位移积分，无车道则速度清零静止）；新增 `Agent3D::enter_stationary_state(state)` 方法，统一清空 `current_lane_id`/`current_velocity`/`route_index`，作为"非移动态=无车道"不变量的唯一写入入口；③ **全量切换点改造**：10 个文件 15 处非移动态直接赋值全部改为 `enter_stationary_state()`（agent.rs 的 advance_to_next_lane/tick_movement、evaluate.rs、routing.rs、seeking.rs×3、scheduler.rs×4、ledger/region.rs、construction.rs、maintenance.rs×2），杜绝"直接改 state 不清车道"导致的残留移动；④ **设计收益**：新增任何移动态（`Seeking*`/途中等）零额外成本——dispatch 自动写 `current_lane_id` 即会移动，不再需要同步更新白名单；⑤ **验证**：`cargo build` + `test-wasm.js`（确定性/长程稳定/无越界无 NaN/存档契约）+ `config-check.js`（189 字段一致）三门禁全绿；高精度 1x 短程验证（3000 tick）非移动态连续单 tick 位移 >0.05m = 0 次（立宅位置瞬移 8 次为已有设计，不计入异常）；长程 256x 验证（120000 tick）求偶男性卡死 = 0、婚姻 8 对、出生 10、存活 30；⑥ **文档重写**：根 AGENTS.md §4.16 / spatial/AGENTS.md §4.6 / decisions/AGENTS.md §4.9 三层文档从"新增移动态必须进白名单"重写为"移动由 current_lane_id 驱动，非移动态切换必须走 enter_stationary_state()"；版本号 v1.24.0→v1.25.0 | agent / decisions/* / ledger/region / housing_system/* / docs |
 | **v1.24.0** | **修复求偶卡死：`SeekingCourtship` 未列入 `tick_movement::is_moving` 白名单**：① **根因**：`agent.rs::tick_movement` 的 `is_moving` 枚举白名单漏配 `SeekingCourtship`，男性命中 B16 求偶分支 dispatch 成功后状态虽切为 `SeekingCourtship`，但运动系统将该状态判为"非移动"直接 `current_velocity=0` 早退，导致求偶男性携带完整路线却永远不出发、定格在家里，需求标签恒为 `Belonging·Courtship`；② **修复**：`is_moving` 补入 `SeekingCourtship`；并加固 `seeking.rs::decide_seeking_courtship` 的"路径走完重补路"判定（`route.is_empty()` → 增加 `current_lane_id.is_none()`，因 `advance_to_next_lane` 走完后 route Vec 未清空，原条件永不成立会使抵达目标节点但未进互动半径者站死）；③ **代码规范沉淀**：新增移动态必须进 `is_moving` 白名单（agent↔decisions 契约），已写入根 AGENTS.md §4.16 / spatial/AGENTS.md §4.6 / decisions/AGENTS.md §4.9，防止同类"dispatch 成功却原地定格"回归；④ **验证**：无头 256x 高产出长程（Seed42/120000 tick）修复前 5→7 名求偶男性卡死、婚姻停滞在 2 对；修复后卡死归零、婚姻 20 对、出生 94、存活 113，`cargo build` + `test-wasm.js` + `config-check.js` 三门禁全绿；版本号 v1.23.0→v1.24.0 | agent / decisions/seeking / docs |
 | **v1.23.0** | **房屋估价改按榷市实时价（0级仓库保底 5.0→0.1 金）**：① **保底缩减**：`houseBaseFoundationCostGold` / `HOUSE_BASE_FOUNDATION_COST_GOLD` 由 5.0 → **0.1** 金，0 级仓库（无建材）估值由 max(0,5)=5 降为 max(0,0.1)=0.1 金，消除零成本畸变兑底的过高地基价；② **原料单价全部按当时榷市（榷场互市）实时价计算**：`auction.rs::calculate_house_construction_cost` 中木/石/金单价由「基准价 0.15/0.20 、金 1.0」改为 0（榷市暂未承载木/石/金，暂时记 0 单价），水/粮维持实时市价；`marketPriceBaseWood`/`Stone` 字段保留待榷市扩展承载后启用；③ **影响**：1 级起房屋建设成本仅由累计水/粮按榷市实时价折算，木/石/金投入不再计入市场估值，4 级庄园所需 125 金亦不计入；④ **文档同步**：05-house-system / housing_system/AGENTS.md / config-reference.md（重新生成）更新；版本号 v1.22.5→v1.23.0，cargo build + test-wasm.js + config-check.js 三门禁全绿 | config / config.js / auction.rs / docs |
 | **v0.9.24** | 随身金币遗产继承：族人故去后 `carried_gold` 平分给在世子一代子女，无子女则清零 | agent / ecology |

@@ -76,10 +76,14 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
 - 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。
 
-### 4.9 🔴 新增分支的 `target_state` 必须是移动态白名单成员
+### 4.9 🔴 决策层非移动态切换必须走 `enter_stationary_state()` · 移动态由 dispatch 自动驱动（v1.25.0 起）
 
-分支命中返回的 `Need.target_state` 若是**需要物理移动**的状态（`Seeking*` 等），该状态必须已列入 `agent.rs::tick_movement::is_moving` 白名单（见 `spatial/AGENTS.md` §4.6 与根 AGENTS.md §4.16）——否则 `fulfill_resting_need` → `dispatch` 成功写入路线后，运动系统仍判为"非移动"直接定格（v1.24.0 求偶卡死：B16Courtship 的 `SeekingCourtship` 漏配白名单，男性带路线却永不出发）。
+**移动态**：分支命中返回的 `Need.target_state` 若是需要物理移动的状态（`Seeking*` 等），`fulfill_resting_need` → `dispatch()` 会自动写入 `state / route / current_lane_id`，运动系统读到 `current_lane_id.is_some()` 即开始移动。**无需维护任何白名单**，新增移动态分支零额外成本。
+
+**非移动态**：若 `Need.target_state` 是静止态（`RepairingHouse` / `ConstructingHouse` / `RestingAtCamp` 等），或决策途中从移动态切回静止态（放弃远征/求偶资格失败/成婚结算/登基/封王等），**必须调用 `agent.enter_stationary_state(state)`**，禁止直接 `agent.state = X`——该方法统一清空 `current_lane_id` / `current_velocity` / `route_index`，确保运动系统读到无车道即静止。直接赋值不清车道会导致"人在家但坐标在跑"。
 
 配套契约：
 - 若该状态**走完路线后不自动转换**（如 `SeekingCourtship` 保持原态等待决策器结算），则途中状态机（`seeking.rs::decide_seeking_*`）的"重补路/是否在移动"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（`advance_to_next_lane` 走完后 `route` Vec 未清空，条件永不成立 → 到点站死）。
-- 新增/改动此类分支后，用 `node tools/diagnose.js --check all` 复现：Rule 5 移动停滞嗅探（`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
+- 新增/改动分支后，用 `node tools/diagnose.js --check all` 复现：Rule 5 移动停滞嗅探（`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
+
+详见根 AGENTS.md §4.16 与 `spatial/AGENTS.md` §4.6。

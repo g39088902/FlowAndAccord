@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.24.0)"]
+    E --> F["浏览器 UI (版本: v1.25.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.24.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.25.0`**。
 
 ---
 
@@ -248,16 +248,18 @@ node frontend/server.js           # http://localhost:3000
 - **唯一正确姿势**：高频刷新容器一律套**内容快照缓存**——生成 HTML 与上次一致即跳过 `innerHTML` 重建（先例：`ledger-ui.js::renderHtml` v1.21.1、`auction-ui.js::renderHtml` v1.22.3、`render_inspector.js` 的 `innerHTML !== html` 守卫）。仅内容真正变化时才重建 DOM，`:hover`/`click` 才稳定。
 - **新增交互前的审计清单**：凡计划在「每帧 / 高频重建的容器」内放可点击元素（chip / 按钮 / 卡片），必须先确认该容器走快照缓存；`render_hud.js` 的 `eventsList`、`insp-mg-history-list`、家户/婚姻列表等每帧 innerHTML 重建且含 chip 的容器同样在此红线内，动它们前先套缓存。
 
-### 4.16 🟠 新增移动态必须进 `is_moving` 白名单（agent ↔ decisions 契约，勿漏）
+### 4.16 🟠 移动由 `current_lane_id` 唯一驱动 · 非移动态切换必须走 `enter_stationary_state()`（v1.25.0 起）
 
-给 agent 新增任何**需要物理移动**的 `PrimitiveActionState`（如新的 `Seeking*` / 途中等状态）时，必须三处联动，缺一处即"dispatch 成功却原地定格"：
+**设计原则**：不再维护 `is_moving` 白名单。agent 是否物理移动完全由 `current_lane_id.is_some()` 决定——有车道则沿路线积分位移，无车道则清零速度并静止。`dispatch()` / `turn_around_and_route_to()` 自动写入 `current_lane_id`，因此**新增任何移动态（`Seeking*` / 途中等）无需更新任何白名单**，dispatch 成功即会移动。
 
-1. **枚举注册**：`agent.rs` 的 `PrimitiveActionState` 增加该状态；
-2. **🔴 `agent.rs::tick_movement` 的 `is_moving` 白名单补入该状态**——漏配时 `tick_movement` 会把它判为"非移动"直接 `current_velocity=0` 早退，agent 携带完整路线却永不出发（**v1.24.0 求偶卡死根因**：`SeekingCourtship` 未列入，求偶男性定格在家里、需求标签恒为 `Belonging·Courtship`）；
-3. **`advance_to_next_lane` 走完路线后的状态语义**：若该状态走完后不自动转换（如 `SeekingCourtship` 保持原态等决策器结算），其途中状态机的"重补路"判定**严禁用 `route.is_empty()`**——路线走完后 `route` Vec 未清空（仅 `route_index` 越界、`current_lane_id` 置 `None`），原条件永不成立会使"已到目标节点但未进互动半径"者站死；必须用 `current_lane_id.is_none()` 判断"是否停在路上"。
+**硬约束**：所有从移动态切到非移动态的场景，**必须调用 `agent.enter_stationary_state(state)`**，禁止直接 `agent.state = X` 而不清 `current_lane_id`——否则 `tick_movement` 会沿残留路线继续移动，出现"人在家休息但坐标在跑"的异常。`enter_stationary_state()` 统一清空 `current_lane_id` / `current_velocity` / `route_index`，是该不变量的唯一写入入口。
 
-- 实现细节见 `spatial/AGENTS.md`（运动系统契约）与 `decisions/AGENTS.md`（新增分支 `target_state` 必须是 `is_moving` 白名单成员）。
-- 新增/改动移动态后，用 `node tools/diagnose.js --check all` 复现验证：`Seeking*` 状态连续 60 tick 位移 < 0.05m 即触发 Rule 5 移动停滞嗅探。
+**配套契约**：
+- `advance_to_next_lane` 走完路线后，`route` Vec **不会清空**（仅 `route_index` 越界、`current_lane_id` 置 `None`）。凡"走完后保持原态、等待决策器结算"的状态（如 `SeekingCourtship` / `SeekingThrone`），其决策层"是否还在移动/重补路"判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点站死）。
+- 立宅时 `settlement.rs` 直接设置 `world_pos = site_pos` 是已有设计（FoundHome 需求触发的位置瞬移），与移动系统无关，不计入异常。
+
+- 实现细节见 `spatial/AGENTS.md` §4.6（运动系统契约）与 `decisions/AGENTS.md` §4.9（决策层非移动态切换规范）。
+- 改动后用无头诊断复现：`node tools/diagnose.js --check all` 的 Rule 5（移动停滞：`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
 
 ---
 

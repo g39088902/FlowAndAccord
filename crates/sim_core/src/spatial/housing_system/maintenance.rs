@@ -87,7 +87,7 @@ impl World3DEngine {
                             house.is_repairing = true;
                             house.repair(self.config.house_repair_speed * dt, &self.config);
                             if house.durability >= self.config.house_durability_max {
-                                agent.state = PrimitiveActionState::RestingAtCamp;
+                                agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
                                 agent.current_need = Some("Physiological·Rest".to_string());
                                 // ★ M2 Maintenance 事件：修缮完工记入家户团体事件（纯审计，无资源消耗）
                                 let tick = self.tick_counter;
@@ -106,7 +106,7 @@ impl World3DEngine {
             } else {
                 for agent in &mut self.agents {
                     if agent.state == PrimitiveActionState::RepairingHouse && agent.home_house_id == Some(house.id) {
-                        agent.state = PrimitiveActionState::RestingAtCamp;
+                        agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
                         agent.current_need = Some("Physiological·Rest".to_string());
                     }
                 }

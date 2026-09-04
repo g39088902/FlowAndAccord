@@ -179,11 +179,11 @@ impl<'a> Decisioner<'a> {
     pub fn fulfill_resting_need(&mut self, agent: &mut Agent3D, need: Need) {
         if need.kind == NeedKind::Rest { return; }
         if need.kind == NeedKind::RepairHouse {
-            agent.state = PrimitiveActionState::RepairingHouse;
+            agent.enter_stationary_state(PrimitiveActionState::RepairingHouse);
             return;
         }
         if need.kind == NeedKind::BuildHouse {
-            agent.state = PrimitiveActionState::ConstructingHouse;
+            agent.enter_stationary_state(PrimitiveActionState::ConstructingHouse);
             agent.build_timer = 0.0;
             return;
         }

@@ -118,7 +118,7 @@ impl<'a> Decisioner<'a> {
             }
             agent.expedition_target_camp = None;
             agent.current_need = None;
-            agent.state = PrimitiveActionState::RestingAtCamp;
+            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             return;
         };
 
@@ -170,7 +170,7 @@ impl<'a> Decisioner<'a> {
         agent.expedition_target_camp = None;
         agent.coronation_pending = None;
         agent.current_need = None;
-        agent.state = PrimitiveActionState::RestingAtCamp;
+        agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
     }
 
     /// ★ 求偶途中状态机：奔赴心仪女性
@@ -190,7 +190,7 @@ impl<'a> Decisioner<'a> {
         if agent.spouse_id.is_some() || !agent.is_alive || agent.gender != crate::spatial::agent::Gender::Male {
             agent.courtship_target_id = None;
             agent.courtship_pending = None;
-            agent.state = PrimitiveActionState::RestingAtCamp;
+            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             return;
         }
 

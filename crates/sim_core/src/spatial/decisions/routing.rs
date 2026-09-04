@@ -115,9 +115,7 @@ impl<'a> Decisioner<'a> {
 
         let curr_node = self.start_node(agent);
         if curr_node == target_home {
-            agent.state = PrimitiveActionState::RestingAtCamp;
-            agent.current_velocity = 0.0;
-            agent.current_lane_id = None;
+            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             agent.home_camp_node = target_home;
             return;
         }

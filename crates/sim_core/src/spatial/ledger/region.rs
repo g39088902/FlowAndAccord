@@ -363,7 +363,7 @@ impl World3DEngine {
                             agent.coronation_pending = None;
                             agent.expedition_target_camp = None;
                             agent.current_need = Some("SelfActualization·King".to_string());
-                            agent.state = crate::spatial::agent::PrimitiveActionState::RestingAtCamp;
+                            agent.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
                         }
                     }
                 }

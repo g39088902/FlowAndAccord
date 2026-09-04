@@ -31,7 +31,7 @@ impl World3DEngine {
     /// 单次瞬时升级事务：无论成败都先离开 ConstructingHouse（失败静默，待再次备料决策触发）
     fn try_instant_upgrade(&mut self, agent_id: u32) {
         if let Some(a) = self.agents.iter_mut().find(|a| a.id == agent_id) {
-            a.state = PrimitiveActionState::RestingAtCamp;
+            a.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             a.build_timer = 0.0;
             a.current_need = Some("Physiological·Rest".to_string());
         }
