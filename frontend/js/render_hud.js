@@ -268,14 +268,14 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   // === 家户金余额基尼系数与财富分配统计（基于家户账本，非个人随身携带量） ===
   const hhGoldValues = (households || [])
     .filter(hh => !hh.isDissolved)
-    .map(hh => (hh.balances && hh.balances.Gold) || 0);
+    .map(hh => ({ id: hh.id, gold: (hh.balances && hh.balances.Gold) || 0 }));
   const hhCount = hhGoldValues.length;
-  const sortedGold = [...hhGoldValues].sort((a, b) => a - b);
-  const totalGold = sortedGold.reduce((s, v) => s + v, 0);
+  const sortedGold = [...hhGoldValues].sort((a, b) => a.gold - b.gold || a.id - b.id);
+  const totalGold = sortedGold.reduce((s, v) => s + v.gold, 0);
   let giniGold = 0;
   if (hhCount > 1 && totalGold > 0) {
     let cumWeighted = 0;
-    for (let i = 0; i < hhCount; i++) cumWeighted += (i + 1) * sortedGold[i];
+    for (let i = 0; i < hhCount; i++) cumWeighted += (i + 1) * sortedGold[i].gold;
     giniGold = (2 * cumWeighted) / (hhCount * totalGold) - (hhCount + 1) / hhCount;
   }
   const giniPct = Math.round(Math.min(100, Math.max(0, giniGold * 100)));
@@ -286,10 +286,12 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   else if (giniGold < 0.5) { giniLabel = '差距较大';   giniColor = '#f59e0b'; }
   else if (giniGold < 0.6) { giniLabel = '高度不平等'; giniColor = '#f97316'; }
   else                      { giniLabel = '极端不平等'; giniColor = '#ef4444'; }
-  const topGold = sortedGold[hhCount - 1] || 0;
-  const bottomGold = sortedGold[0] || 0;
+  const topEntry = [...hhGoldValues].sort((a, b) => b.gold - a.gold || a.id - b.id)[0];
+  const topGold = topEntry ? topEntry.gold : 0;
+  const topHouseholdId = topEntry ? topEntry.id : null;
+  const bottomGold = sortedGold[0] ? sortedGold[0].gold : 0;
   const richPoorRatio = bottomGold > 0 ? (topGold / bottomGold) : (topGold > 0 ? Infinity : 0);
-  const zeroGoldCount = sortedGold.filter(v => v <= 0).length;
+  const zeroGoldCount = sortedGold.filter(v => v.gold <= 0).length;
 
   const el = id => document.getElementById(id);
   if (el('avg-health-val')) el('avg-health-val').textContent = `${avgHealth.toFixed(1)} / ${avgMaxHealth.toFixed(1)} (${healthPct}%)`;
@@ -327,7 +329,7 @@ function updateGlobalAverages(aliveAgents, houses, households) {
     el('avg-gini-gold-fill').style.width = `${giniPct}%`;
     el('avg-gini-gold-fill').style.background = giniColor;
   }
-  if (el('avg-gini-top-val')) el('avg-gini-top-val').textContent = topGold.toFixed(1);
+  if (el('avg-gini-top-val')) el('avg-gini-top-val').textContent = topHouseholdId == null ? '—' : `#${topHouseholdId} · ${topGold.toFixed(1)}`;
   if (el('avg-gini-bottom-val')) el('avg-gini-bottom-val').textContent = bottomGold.toFixed(1);
   if (el('avg-gini-ratio-val')) el('avg-gini-ratio-val').textContent = richPoorRatio === Infinity ? '∞' : `${richPoorRatio.toFixed(1)}x`;
   if (el('avg-gini-zero-val')) el('avg-gini-zero-val').textContent = `${zeroGoldCount}户`;

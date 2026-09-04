@@ -85,6 +85,8 @@ pub enum TransferReason {
     EstateShare,
     /// ★ v1.26.0 房屋拍卖成交的王国公户份额（买方 → 地区公仓，模拟过户税/遗产税）
     TransferTax,
+    /// 国王内帑（地区公仓按固定周期划转至国王随身黄金）
+    RoyalPrivy,
 }
 
 /// 单笔显式交易流水（可审计核心：每笔都写明谁→谁、什么资源、多少、为何）
@@ -216,4 +218,3 @@ pub fn transfer(
     from_ledger.push_transfer(record.clone());
     to_ledger.push_transfer(record);
 }
-

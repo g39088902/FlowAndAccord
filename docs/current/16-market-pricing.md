@@ -12,6 +12,8 @@
 3. **生死兜底 AI**：部落民在野外采集点枯竭、家境绝望时自主携带黄金前往榷场采购救命物资；
 4. **黄金流失闭环**：黄金从家户账本流出至系统虚空（`LedgerRef::Void`），回收流通货币，杜绝经济恶性通胀。
 
+v1.27.0 起，采水/采粮途中若目标 POI 触发器关闭且无同类可用点，**家户户主**（家户账本金币 ≥ `market_min_family_gold` 且体力 ≥ `decision_work_stamina_threshold`）可直接原地掉头改道榷场；交易从家户账本**远程结算**（户主无需先回家、不要求随身携带金币），仍只允许水和粮，不改变木石金采集规则。
+
 ---
 
 ## 核心机制
@@ -165,6 +167,6 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 ## 七、关键不变量
 
 1. **确定性保证**：市场价格纯由物理库存函数推导，不消耗任何伪随机数生成器（`WorldRng`）。
-2. **定长数组联动铁律**：内核与前端决策分支数组定长为 15（`BranchId::ALL: [BranchId; 15]`、`resolve_order`、`seen = [false; 15]`、`DEFAULT_ORDER`）。
+2. **定长数组联动铁律**：内核与前端决策分支数组定长为 18（`BranchId::ALL: [BranchId; 18]`、`resolve_order`、`seen = [false; 18]`、`DEFAULT_ORDER`）。
 3. **资金单向流失**：外部市场交易黄金必须进入 `LedgerRef::Void`，严禁转给其他 Agent 或营地，确保生态存在通缩调节机制。
 4. **自包含分支铁律**：`evaluate_market_trade` 内部封装全部守卫与断流条件，在决策引擎中可安全拖动至任意优先级次序而不破坏代码语义。

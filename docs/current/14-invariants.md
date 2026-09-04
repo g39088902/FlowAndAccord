@@ -86,8 +86,8 @@
 | B11 | **生育去房屋化**：受孕不再依赖房屋等级或仓储备货，成年已婚女性身体指标达标且**流产冷却（200s）与产后休养冷却（200s）均结束**即可受孕，无房也可生育 | §4.8 | 旧 0 级禁孕/木材支持门槛已删除 |
 | B12 | **淘金纪律**：4 级大庄园竣工前绝不娱乐淘金（`GoldWealth` 冷却 180s）；盖房备料淘金 `StockGold` 冷却 45s | §4.8 | 行为优先级混乱 |
 | B13 | **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随 | §4.8 | 镜头持续跟随已取消选中的族人 |
-| B14 | **外部市场隔离与单向流失（v1.13.0）**：榷场互市不进入 `NodePool`，不设公地施密特触发器，由 B15 专用派发；到达后先濒危自救再装袋购入，黄金单向扣入 `LedgerRef::Void` | 16-market-pricing.md | 族人蹭吃蹭喝破坏公地平衡或黄金通缩机制失效 |
-| B15 | **决策分支数组定长联动（15分支）**：内核 `BranchId::ALL: [BranchId; 15]`、`resolve_order`、`seen: [bool; 15]` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / 16-market-pricing.md | 决策分支越界、反序列化 panic 或写盘校验失败 |
+| B14 | **外部市场隔离与单向流失（v1.13.0，v1.27.0 扩展）**：榷场互市不进入 `NodePool`，不设公地施密特触发器，由 B15 专用派发；★ v1.27.0 起水/粮采集断流时家户户主（账本黄金 ≥ `market_min_family_gold` 且体力达标）可由 `try_route_to_market` 直接改道榷场——仍是**家户账本远程结算付费**，不改变市场支付与黄金单向扣入 `LedgerRef::Void` 的通缩闭环；到达后先濒危自救再装袋购入 | 16-market-pricing.md | 族人蹭吃蹭喝破坏公地平衡或黄金通缩机制失效 |
+| B15 | **决策分支数组定长联动（18分支）**：内核 `BranchId::ALL`、`resolve_order`、`seen` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / 16-market-pricing.md | 决策分支越界、反序列化 panic 或写盘校验失败 |
 
 ---
 

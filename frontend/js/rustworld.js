@@ -313,6 +313,11 @@
         this.totalDeathsNatural = snap.total_deaths_natural || 0;
         this.totalDeathsUnnatural = snap.total_deaths_unnatural || 0;
         this.totalMiscarriages = snap.total_miscarriages;
+        this.auctionStats = {
+          started: snap.auction_started || 0,
+          sold: snap.auction_sold || 0,
+          flopped: snap.auction_flopped || 0,
+        };
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
 

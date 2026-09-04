@@ -13,13 +13,13 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
-| `branches.rs` | 17 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b17"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
+| `branches.rs` | 18 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b18"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
 | `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + **数据驱动**评估 `evaluate_needs`（按 `branch_order` 迭代注册表）+ 需求落地 `fulfill_resting_need`（含立宅自主选址） |
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询 |
-| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机） |
+| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 `try_route_to_market`（水/粮断流时户主直接改道榷场，家户账本远程结算） |
 | `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 需求判定）+ `decide_seeking_market` / `decide_buying_market` |
-| `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询 |
+| `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询；★ v1.27.0 水/粮目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`execute_pending_coronations`（★ M4 登基物理执行器）、`execute_pending_courtships`（★ 求偶成婚物理执行器）、`execute_pending_bids`（★ v1.26.0 竞拍出价物理执行器）与 `build_decision_context`（收集全图资源节点与单身女性候选） |
 
 ## 3. 🧱 关键结构

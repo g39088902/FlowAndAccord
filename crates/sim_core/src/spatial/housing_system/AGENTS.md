@@ -13,12 +13,12 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | `tick_housing(dt)`：房屋系统总管线，固定内部顺序（见 §3） |
-| `maintenance.rs` | 冬季供暖消耗、自然风化折旧与坍塌、修缮进度结算（★M2 修缮完工记入家户团体事件） |
+| `maintenance.rs` | 冬季供暖消耗、自然风化折旧与坍塌、修缮进度结算（★M2 修缮完工记入家户团体事件）；★ v1.27.0 坍塌时若房屋处于拍卖中则 `auction_flopped` +1 |
 | `construction.rs` | 施工计时与瞬时升级（★M6 一次性从户主家户账本扣除建材，瞬时晋升） |
 | `marriage.rs` | 丧偶解除婚姻（成婚已迁移至马斯洛决策引擎 B16Courtship 与 execute_pending_courtships 物理执行器） |
 | `settlement.rs` | `materialize_founded_houses`（立宅实体化：空置节点复用 → 放置校验 → 建门接入 → 营地绑定）+ 空置节点检索 + 营地行政区阶梯升级 |
 | `inheritance.rs` | 空置房登记（户主亡故→无主空置→★挂牌瞬间清空居住者→新建携带空报价队列的拍卖会话→营地 vacant_houses 列表+受益人），取代原父系继承；金币继承在 `world.rs::settle_gold_inheritance` |
-| `auction.rs` | ★ v1.26.0 决策相位出价执行器 `execute_pending_bids`、麦穗 37% 竞价、份额制分账（王国公户+受益人）与成交交割 |
+| `auction.rs` | ★ v1.26.0 决策相位出价执行器 `execute_pending_bids`、麦穗 37% 竞价、份额制分账（王国公户+受益人）与成交交割；★ v1.27.0 世界级统计（挂牌/成交计 `auction_started` / `auction_sold`） |
 
 ## 3. ⚙️ tick_housing 内部顺序（勿打乱）
 
@@ -51,7 +51,7 @@
 
 ### 4.4 空置房登记与拍卖挂牌（v1.10.0 ~ v1.26.0）
 
-户主故去 → 房屋 `owner_id`/`spouse_id` 置空 → **★ v1.26.0 挂牌瞬间清空全部居住者**（`home_house_id=None`、`home_camp_node` 回最近营地节点，房屋真正空置，遗孀遗孤立即无家）→ 新建拍卖会话 `HouseAuctionState`（携带空 `bids_history`，报价流水不跨场次）→ 登记到所属营地 `vacant_houses` 列表（附带受益人：在世子女+在世配偶，按 agent.id 升序去重）；无主空置房正常风化（与有主同速率），等待决策引擎竞价；坍塌后从列表移除，大门路网节点可被新立宅复用。
+户主故去 → 房屋 `owner_id`/`spouse_id` 置空 → **★ v1.26.0 挂牌瞬间清空全部居住者**（`home_house_id=None`、`home_camp_node` 回最近营地节点，房屋真正空置，遗孀遗孤立即无家）→ 新建拍卖会话 `HouseAuctionState`（携带空 `bids_history`，报价流水不跨场次，**`auction_started` +1**）→ 登记到所属营地 `vacant_houses` 列表（附带受益人：在世子女+在世配偶，按 agent.id 升序去重）；无主空置房正常风化（与有主同速率），等待决策引擎竞价；坍塌后从列表移除（若仍在拍卖中 `auction_flopped` +1），大门路网节点可被新立宅复用。
 
 ### 4.5 修缮口径
 
@@ -70,4 +70,4 @@
    - 出清期（$\le 10\%$ 修缮度）：有新报价即成交（无人出价则挂到坍塌，接受该兜底缺失）；
 3. **报价流水绑定拍卖会话**：`HouseAuctionState.bids_history` 为环形缓冲（容量 `houseAuctionBidHistoryCapacity`），挂牌时新建空队列、成交时随会话归档消失，不跨场次；
 4. **份额制分账**：王国公户（`LedgerRef::Region`，权重 `houseAuctionCrownShareWeight`=1）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）按权重共分全额成交价，失效受益人份额并入王国公户（无人类受益人时王国独得，零特判）；流水 `TransferTax`（王室）与 `EstateShare`（受益人）；
-5. **交割与确权**：买方家户 `debit` 全额黄金 → 分账 → 过户 → 买家与家眷迁入、清出残留旧住户 → `deal_history` 沉淀（`total_bids_count` 取自会话队列长度）。
+5. **交割与确权**：买方家户 `debit` 全额黄金 → 分账 → 过户 → 买家与家眷迁入、清出残留旧住户 → `deal_history` 沉淀（`total_bids_count` 取自会话队列长度）→ **`auction_sold` +1**。三个世界级计数器（`auction_started` / `auction_sold` / `auction_flopped`）随快照与存档持久化，前端按 `sold + flopped` 计算流拍率。

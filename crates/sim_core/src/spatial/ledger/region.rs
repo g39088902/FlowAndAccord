@@ -279,6 +279,31 @@ impl World3DEngine {
         self.handle_king_deaths(tick);
         self.tick_region_tax(tick);
         self.tick_region_relief(tick);
+        self.tick_royal_privy(tick);
+    }
+
+    /// 每 100 游戏秒从地区公仓拨付现任国王内帑，进入其随身黄金。
+    fn tick_royal_privy(&mut self, tick: u64) {
+        const INTERVAL_TICKS: u64 = 3000;
+        if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(INTERVAL_TICKS) { return; }
+        self.last_royal_payout_tick = tick - (tick % INTERVAL_TICKS);
+        let mut payouts: Vec<(u32, AgentId, f32)> = Vec::new();
+        for (camp_id, region) in &self.region_registry.regions {
+            let Some(king_id) = region.group.leader else { continue };
+            let gold = region.group.ledger.balance(ResourceKind::Gold);
+            let amount = gold * 0.10;
+            if amount > 0.0 { payouts.push((*camp_id, king_id, amount)); }
+        }
+        for (camp_id, king_id, amount) in payouts {
+            if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
+                region.group.ledger.debit(ResourceKind::Gold, amount);
+                region.group.ledger.push_transfer(TransferRecord {
+                    tick, from: LedgerRef::Region(camp_id), to: LedgerRef::Personal(king_id),
+                    resource: ResourceKind::Gold, amount, reason: TransferReason::RoyalPrivy,
+                });
+            }
+            if let Some(king) = self.agent_by_id_mut(king_id) { king.carried_gold += amount; }
+        }
     }
 
     // ══════════════════════════════════════════════════════════

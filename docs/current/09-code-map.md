@@ -32,12 +32,12 @@ FlowAndAccord/
 │   │           ├── snapshot.rs             # 快照结构体定义 (Agent/House/POI/Household/Marriage/Clan/Region/Ledger)
 │   │           ├── decisions/              # 🧠 马斯洛决策子系统 (9 文件)
 │   │           │   ├── mod.rs              # 决策子模块入口与重新导出
-│   │           │   ├── branches.rs         # ★ 15 条分支注册表 (BranchId ↔ b1~b15，含 b14 夺位与 b15 榷场商贸，自包含条件函数，Rust 侧无顺序)
+│   │           │   ├── branches.rs         # ★ 18 条分支注册表 (BranchId ↔ b1~b18，含 b14 夺位、b15 榷场商贸、b17 竞拍、b18 养育，自包含条件函数，Rust 侧无顺序)
 │   │           │   ├── needs.rs            # NeedKind 需求定义、升级材料成本 (upgrade_material_cost)、家户缺口计算
 │   │           │   ├── evaluate.rs         # Decisioner 结构体 + decide/evaluate_needs (按配置顺序迭代分支)
 │   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性
-│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active)
-│   │           │   ├── seeking.rs          # 途中熔断与平滑重路由
+│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active；★v1.27.0 水/粮断流转榷场)
+│   │           │   ├── seeking.rs          # 途中熔断与平滑重路由 (★v1.27.0 try_route_to_market 断流直达榷场)
 │   │           │   ├── market.rs           # 外部商贸决策子模块 (evaluate_market_trade / 途中可用性 / 现场交易完成返家)
 │   │           │   └── scheduler.rs        # tick_decisions + execute_pending_coronations(★M4登基) + build_decision_context
 │   │           ├── housing_system/         # 🏡 房屋全生命周期子系统 (7 文件)

@@ -25,7 +25,7 @@
 | `marriage.rs` | 婚姻登记簿 `MarriageRegistry`（多段婚姻留痕、存续唯一性、确定性发号）——**只记两性关系，不承载账本** |
 | `family.rs` | ★ 家户体系 `HouseholdRegistry`（以男性户主为锚、`by_agent` 唯一归属、`parent_household` 血缘链） |
 | `clan.rs` | ★ M3 宗族系统 `ClanRegistry`（按姓氏聚合、族长顺位、族税 `Tribute`、族内互助 `MutualAid`） |
-| `region.rs` | ★ M4 地区与王国系统 `RegionRegistry`（按营地聚合、初王顺位、长子继承、公仓税 `Tax`、救济 `Relief`；夺位远征调度在 `decisions/scheduler.rs`） |
+| `region.rs` | ★ M4 地区与王国系统 `RegionRegistry`（按营地聚合、初王顺位、长子继承、公仓税 `Tax`、救济 `Relief`、★ v1.27.0 国王内帑 `RoyalPrivy`；夺位远征调度在 `decisions/scheduler.rs`） |
 
 ## 3. ⚙️ 核心规则与不变式
 
@@ -36,7 +36,7 @@
 - **M2 分家权重**：父亲在世时权重 1，母亲（如有且在世）权重 1，子一代各权重 1，`W = 1(父) + 1(母) + n(子一代)`，分家男子抽走各类资源 `1/W`；丧父/丧母时亡者不占权重；`n = 父亲 children_ids.len()`（胎儿已在其中）；份额按**每类资源独立计算**，只记账本余额不动物理库存。
 - **M2 继承**：户主死亡 → 家户资源平分在世妻子（如有）与在世子一代；无在世妻子且无在世子女（绝嗣） → 全部转入 `public_granary` 公仓兜底账本；清算后 `dissolve`。
 - **M3 宗族**：按 `surname` 自动聚合（始祖播撒即入族、新生儿随父姓入族）；族长 = 同姓在世最年长男性（并列 id 小者），无在世男性则无主账本冻结；族税每 `clan_tribute_interval_ticks` 全局统一征收（账面余额 × `clan_tribute_rate`），族内互助有族库门槛与冷却。
-- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却。
+- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却；**★ v1.27.0 国王内帑**：每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 转入现任国王随身黄金（`tick_royal_privy`，`RoyalPrivy` 流水，`last_royal_payout_tick` 记录上次结算 tick 随档持久化）。
 - **房屋拍卖分账（v1.26.0）**：成交价款按份额制分账——王国公户（`LedgerRef::Region`，权重 `house_auction_crown_share_weight`）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）共分；新增流水 `TransferReason::EstateShare`（买方 → 受益人家户）与 `TransferReason::TransferTax`（买方 → 地区公仓）；无人类受益人时王国独得（天然兜底，零特判），金额严格守恒。
 
 ## 4. ⚠️ 本目录局部易踩坑

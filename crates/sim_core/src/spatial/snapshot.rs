@@ -44,6 +44,12 @@ pub struct WorldSnapshot3D {
     pub total_deaths_natural: u32,
     pub total_deaths_unnatural: u32,
     pub total_miscarriages: u32,
+    #[serde(default)]
+    pub auction_started: u64,
+    #[serde(default)]
+    pub auction_sold: u64,
+    #[serde(default)]
+    pub auction_flopped: u64,
     pub season: String,
     pub temperature: f32,
     pub season_progress: f32,

@@ -84,7 +84,7 @@ window.SIM_CONFIG = {
   // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
   // ==========================================================================
   poiMinDistance: 70.0,           // POI 间最小排斥间距 (m)
-  countCamps: 4,                  // 营地数量
+  countCamps: 5,                  // 营地数量
   countWaterSources: 6,           // 清泉数量
   countBerryBushes: 6,            // 浆果数量
   countWoods: 3,                  // 林木数量

@@ -357,6 +357,7 @@ impl World3DEngine {
                         bids_history: std::collections::VecDeque::new(),
                         voluntary_seller_household_id: Some(buyer_hh),
                     });
+                    self.auction_started = self.auction_started.saturating_add(1);
                     if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == self.houses[old_idx].camp_id) {
                         camp.vacant_houses.push(VacantHouseEntry { house_id: old_id, beneficiary_ids: Vec::new() });
                     }
@@ -376,6 +377,7 @@ impl World3DEngine {
             total_bids_count: total_bids,
             reason: final_reason.clone(),
         });
+        self.auction_sold = self.auction_sold.saturating_add(1);
 
         // 9. 播报成交事件
         let camp_name = self

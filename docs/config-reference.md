@@ -207,7 +207,3 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
 | `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认） |
-
-## ⚠ 校验错误
-
-- 数值漂移: countCamps Rust 默认 5 ≠ 前端 4

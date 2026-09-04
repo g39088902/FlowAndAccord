@@ -66,6 +66,7 @@ impl World3DEngine {
                 bids_history: std::collections::VecDeque::new(),
                 voluntary_seller_household_id: None,
             });
+            self.auction_started = self.auction_started.saturating_add(1);
 
             // ★ v1.26.0 挂牌瞬间清空全部居住者（房屋真正空置，遗孀遗孤立即无家）
             let mut evictions: Vec<(AgentId, NodeId)> = Vec::new();

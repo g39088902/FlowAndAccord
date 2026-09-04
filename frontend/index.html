@@ -6,7 +6,14 @@
   <title>Flow & Accord · 流动公约</title>
   <link rel="stylesheet" href="style.css">
 </head>
-  <body>
+<body>
+  <div id="startup-save-gate" class="save-modal-backdrop" style="display:flex; z-index:9999;">
+    <div style="width:min(460px, calc(100vw - 32px)); padding:24px; border:1px solid rgba(56,189,248,.35); border-radius:12px; background:#0b1220; color:#e5eef7; text-align:center; box-shadow:0 20px 80px rgba(0,0,0,.55);">
+      <div style="font-size:22px; margin-bottom:8px;">💾 先建立本地存档文件</div>
+      <div id="startup-save-message" style="font-size:12px; color:#9fb3c8; line-height:1.6; margin-bottom:16px;">游戏开始前必须连接一个 .json 存档文件。请使用 Chrome 或 Edge。</div>
+      <button id="startup-save-connect" class="save-bar-btn" style="padding:9px 18px;">建立存档文件</button>
+    </div>
+  </div>
   <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
   <div id="canvas-container">
     <canvas id="sim-canvas"></canvas>
@@ -14,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.26.9</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.27.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -240,7 +247,7 @@
         <div class="avg-stat-grid" style="margin-top:4px;">
           <div class="avg-stat-item">
             <span class="avg-lbl">🏆 最富家户</span>
-            <span id="avg-gini-top-val" class="avg-val" style="color:#fbbf24;">0.0</span>
+            <span id="avg-gini-top-val" class="avg-val" style="color:#fbbf24;">—</span>
           </div>
           <div class="avg-stat-item">
             <span class="avg-lbl">🏠 零金家户</span>
@@ -314,6 +321,7 @@
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
+            <div class="ledger-overview-item"><span class="ledger-ov-lbl">最富家户</span><span class="ledger-ov-val" id="ledger-ov-richest" style="color:#fbbf24;">—</span></div>
           </div>
           <div class="ledger-section-title">📊 存续家户资源平均值</div>
           <div class="ledger-overview-row ledger-resource-averages" id="ledger-resource-averages">

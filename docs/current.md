@@ -1,8 +1,8 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.26.4（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（187 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
+> **版本**：v1.27.0（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **超参配置**：全部可调超参（195 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
 

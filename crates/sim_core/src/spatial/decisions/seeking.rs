@@ -7,6 +7,18 @@ use super::evaluate::Decisioner;
 /// 途中转向与可用性检查（§4.2）：目标 POI 被 Agent 私有施密特触发器关闭时，
 /// 原地掉头平滑重路由至就近同类可用 POI；仅当自身无可用品或体力告警时才折返回家。
 impl<'a> Decisioner<'a> {
+    pub fn try_route_to_market(&mut self, agent: &mut Agent3D, pool: NodePool) -> bool {
+        if !matches!(pool, NodePool::Water | NodePool::Food) || self.ctx.market_nodes.is_empty() { return false; }
+        let can_pay = self.households.household_of(agent.id)
+            .and_then(|hid| self.households.get(hid))
+            .map(|hh| hh.group.leader == Some(agent.id) && hh.group.ledger.balance(ResourceKind::Gold) >= self.config.market_min_family_gold)
+            .unwrap_or(false);
+        if !can_pay || agent.stamina < self.config.decision_work_stamina_threshold { return false; }
+        let Some(target) = self.nearest_market_node(agent) else { return false; };
+        agent.current_need = Some("Physiological·MarketTrade".to_string());
+        self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingMarket)
+            || { let curr = self.start_node(agent); self.dispatch(agent, curr, target, PrimitiveActionState::SeekingMarket) }
+    }
     /// 建材途中转向与可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
     pub fn decide_seeking_material(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
         let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
@@ -60,6 +72,9 @@ impl<'a> Decisioner<'a> {
         }
 
         if !self.has_available_node(agent, pool) || target_unavailable {
+            // 采集途中发现同类野外 POI 全部关闭时，直接原地掉头赴榷场；
+            // 市场支付使用家户账本远程结算，不要求 agent 先回家或携带金币。
+            if !self.has_available_node(agent, pool) && self.try_route_to_market(agent, pool) { return; }
             if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {

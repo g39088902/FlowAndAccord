@@ -131,6 +131,39 @@
     if (bidsCountEl) bidsCountEl.textContent = '0';
   }
 
+  function renderActiveStrip(stripEl, houses) {
+    if (!stripEl) return;
+    if (!houses.length) {
+      if (!stripEl.dataset.empty) {
+        stripEl.dataset.empty = '1';
+        stripEl.innerHTML = '<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>';
+      }
+      return;
+    }
+    delete stripEl.dataset.empty;
+    const keep = new Set(houses.map(h => String(h.id)));
+    stripEl.querySelectorAll('.auction-strip-card').forEach(card => { if (!keep.has(card.dataset.houseId)) card.remove(); });
+    houses.forEach(h => {
+      let card = stripEl.querySelector('.auction-strip-card[data-house-id="' + h.id + '"]');
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'auction-strip-card';
+        card.dataset.houseId = h.id;
+        card.innerHTML = '<div class="strip-card-top"><span class="strip-card-name"></span><span class="strip-card-phase"></span></div><div class="strip-card-bottom"><span class="strip-card-dur"></span><span class="strip-card-bid"></span></div>';
+        stripEl.appendChild(card);
+      }
+      const t = getTierLabel(h.tier);
+      const phaseColor = h.auctionPhase === '观察期' ? '#f59e0b' : (h.auctionPhase === '决策期' ? '#38bdf8' : '#ef4444');
+      card.classList.toggle('selected', h.id === currentHouseId);
+      card.querySelector('.strip-card-name').textContent = `${t.icon} #${h.id}`;
+      const phase = card.querySelector('.strip-card-phase');
+      phase.textContent = h.auctionPhase || '在售'; phase.style.color = phaseColor;
+      card.querySelector('.strip-card-dur').textContent = `${Math.round(h.durability)}%耐久`;
+      const bid = card.querySelector('.strip-card-bid');
+      bid.textContent = `${(h.highestBid || 0).toFixed(1)}G`; bid.style.color = '#fbbf24'; bid.style.fontWeight = '700';
+    });
+  }
+
   function getTierLabel(tier) {
     if (tier === 'Tier1ThatchedHut') return { icon: '🛖', name: '茅草私宅' };
     if (tier === 'Tier2LeanTo') return { icon: '🏡', name: '进阶私宅' };
@@ -293,9 +326,12 @@
     // 1. 顶部状态计数
     const statusBadge = document.getElementById('auction-modal-status-badge');
     if (statusBadge) {
+      const stats = sim.auctionStats || {};
+      const finished = (stats.sold || 0) + (stats.flopped || 0);
+      const flopRate = finished > 0 ? ((stats.flopped || 0) / finished * 100).toFixed(1) : '0.0';
       renderHtml(statusBadge, activeHouses.length > 0
-        ? `<span style="color:#10b981;">🟢 ${activeHouses.length} 栋房屋挂牌竞拍中</span>`
-        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span>`);
+        ? `<span style="color:#10b981;">🟢 ${activeHouses.length} 栋房屋挂牌竞拍中</span><span style="margin-left:8px;color:#f59e0b;">流拍率 ${flopRate}%</span>`
+        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span><span style="margin-left:8px;color:#f59e0b;">流拍率 ${flopRate}%</span>`);
     }
 
     const tabActiveCount = document.getElementById('tab-active-count');
@@ -329,29 +365,7 @@
 
     // 3. 在售房屋水平切换条 (Strip Cards)
     const stripEl = document.getElementById('auction-house-strip');
-    if (stripEl) {
-      if (activeHouses.length === 0) {
-        renderHtml(stripEl, `<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>`);
-      } else {
-        renderHtml(stripEl, activeHouses.map(h => {
-          const t = getTierLabel(h.tier);
-          const isSelected = (h.id === currentHouseId);
-          const phaseColor = (h.auctionPhase === '观察期') ? '#f59e0b' : ((h.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
-          return `
-            <div class="auction-strip-card ${isSelected ? 'selected' : ''}" data-house-id="${h.id}">
-              <div class="strip-card-top">
-                <span>${t.icon} #${h.id}</span>
-                <span style="color:${phaseColor}; font-size:10px; font-weight:600;">${h.auctionPhase || '在售'}</span>
-              </div>
-              <div class="strip-card-bottom">
-                <span>${Math.round(h.durability)}%耐久</span>
-                <span style="color:#fbbf24; font-weight:700;">${(h.highestBid || 0).toFixed(1)}G</span>
-              </div>
-            </div>
-          `;
-        }).join(''));
-      }
-    }
+    renderActiveStrip(stripEl, activeHouses);
 
     // 4. 当前选中房屋的核心基本面
     const house = getSelectedHouse();

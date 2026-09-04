@@ -14,6 +14,8 @@ node frontend/server.js
 
 > 若 3000 端口已被占用，说明前端服务已在运行，直接访问即可，无需重复启动。
 
+> ⚠️ **v1.27.0 启动存档门禁**：页面打开后模拟默认暂停，需先点击「建立存档文件」创建/连接一个本地 `.json` 存档文件（File System Access API），写入成功后才解除门禁开始模拟。请使用最新版 Chrome 或 Edge（Firefox 不支持）。
+
 ### 编译 WASM（改 Rust 代码后）
 ```powershell
 # 注入便携工具链

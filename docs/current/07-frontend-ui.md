@@ -102,6 +102,11 @@
   - **🖱️ v1.22.3 交互修复（内容快照缓存）**：修复「点不同在售房屋无法切换到被点房屋」与「历史成交记录无法跳转已售房屋/买主」——大盘开启时 `_auctionUiTick` 每帧全量重建 strip/买家池/竞价流水/历史成交四类列表，点击（mousedown 与 mouseup 之间）节点已被替换、`click` 不命中且控制台零报错；现四类列表 + 顶部徽章/hero 价格/土地状态统一走 `renderHtml` 内容快照缓存（与 v1.21.1 账本大盘同款），仅内容变化才重建 DOM。
   - **🏚️ v1.22.4 空态显示修复（禁止拿任意房屋占位）**：无在售房产时 `getSelectedHouse()` 不再回退到 `sim.houses[0]`（此前拿世界里的 #1 当占位），改为返回 null 走 `renderEmptyDetail()` 空态——hero 卡各字段显示「暂无在售房产」占位文案（**逐字段更新、不重建整卡**，保留 `#auction-hero-name` 等固定子元素，出现新在售房后能正常恢复显示），麦穗时间轴归零、买家池与竞价流水显示空提示；`openAuctionModal` 无在售房时同步清空 `currentHouseId` 防残留上一轮选择。
 
+### v1.27.0 交互与启动约束
+- 决策顺序以 `flowaccord.decision-order.v1`（schema 1）保存在浏览器本地；启动时必须先连接可写 JSON 存档文件，文件写入成功后才解除模拟暂停。Firefox 等不支持 File System Access API 的浏览器保持阻断。
+- 拍卖大盘状态徽章显示累计场次、成交/流拍及流拍率；在售房源条使用固定节点按 ID 更新，避免高倍速刷新破坏点击。
+- 家户制度大盘和顶栏均显示按金币排序、ID 作为并列裁决的最富家户。
+
 ### 轻量化渲染优化
 - 地形网格批处理：单次顶点投影 + 静态高度颜色预缓存 + 视口边界裁剪 + 批处理线框渲染。
 - 零 Shader 开销光晕：移除 Canvas shadowBlur 与 CSS backdrop-filter，改用双层矢量描边与深色半透明底色。
@@ -113,11 +118,11 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `config.js` | 全局动态数值配置（window.SIM_CONFIG） |
-| `config.decision-order.js` | 决策分支评估顺序持久化配置（唯一真相源，拖动后由 server.js 重写） |
+| `config.decision-order.js` | 决策分支评估顺序持久化配置（启动注入权威默认值；★ v1.27.0 起用户调整保存到浏览器 localStorage） |
 | `config.house-upgrade-cost.js` | 房屋升级材料成本矩阵 20 字段（M8 拆分） |
-| `decision-viz-data.js` | 决策引擎 15 条分支元数据（含 b14 夺位与 b15 榷场商贸） |
+| `decision-viz-data.js` | 决策引擎 18 条分支元数据（含 b14 夺位与 b15 榷场商贸） |
 | `decision-viz-view.js` | 决策引擎视图层：单列布局、拖拽换序、分界线吸附、缩放平移、检查器 |
-| `decision-viz.js` | 决策引擎集成层：启动合并顺序配置 → SIM_CONFIG；拖动热注入 + POST 落盘 + 降级 |
+| `decision-viz.js` | 决策引擎集成层：启动合并顺序配置 → SIM_CONFIG；拖动热注入 + ★ v1.27.0 保存到 localStorage |
 | `math.js` | 3D 向量与投影变换 |
 | `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接 |
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |

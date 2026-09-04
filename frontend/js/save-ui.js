@@ -87,6 +87,54 @@
            typeof window.showOpenFilePicker === 'function';
   }
 
+  function releaseStartupGate(message) {
+    const gate = document.getElementById('startup-save-gate');
+    if (gate) gate.style.display = 'none';
+    const s = getSim();
+    if (s) s.isPaused = false;
+    if (message) setStatus(message, 'ok');
+  }
+
+  function setStartupGateMessage(message, error) {
+    const el = document.getElementById('startup-save-message');
+    if (el) { el.textContent = message; el.style.color = error ? '#f87171' : '#9fb3c8'; }
+  }
+
+  async function bootstrapStartupGate() {
+    const gate = document.getElementById('startup-save-gate');
+    const btn = document.getElementById('startup-save-connect');
+    if (!gate || !btn) return;
+    if (!supportsFileAPI()) {
+      btn.disabled = true;
+      setStartupGateMessage('当前浏览器不兼容本地存档文件，请使用最新版 Chrome 或 Edge。', true);
+      return;
+    }
+    const st = slotState.save1;
+    if (st && st.handle && st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION) {
+      releaseStartupGate('已连接现有存档文件');
+      return;
+    }
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      setStartupGateMessage('正在申请创建存档文件…');
+      await connectSlot('save1');
+      const connected = slotState.save1 && slotState.save1.handle;
+      if (connected) {
+        const s = getSim();
+        const saved = s && s._ready ? await saveToSlot('save1') : false;
+        if (saved && slotState.save1.meta && slotState.save1.meta.formatVersion === SAVE_FORMAT_VERSION) {
+          releaseStartupGate('已建立存档文件，模拟开始');
+        } else {
+          btn.disabled = false;
+          setStartupGateMessage('存档文件尚未成功写入，游戏仍被暂停。请重试。', true);
+        }
+      } else {
+        btn.disabled = false;
+        setStartupGateMessage('未建立存档文件，游戏仍被暂停。请重试。', true);
+      }
+    }, { once: false });
+  }
+
   // ══════════════════════════════════════════════════════════════
   // 元信息提取
   // ══════════════════════════════════════════════════════════════
@@ -191,19 +239,19 @@
       // 未连接，先让用户选择文件
       await connectSlot(slotId);
       // 用户可能取消
-      if (!slotState[slotId] || !slotState[slotId].handle) return;
+      if (!slotState[slotId] || !slotState[slotId].handle) return false;
     }
     const s = getSim();
-    if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return; }
+    if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return false; }
     const json = s.saveWorld();
     if (!json) {
       const detail = s.readSaveError ? s.readSaveError() : '';
       setStatus('存档失败：' + (detail || '未知错误'), 'err');
-      return;
+      return false;
     }
     let meta;
     try { meta = extractMeta(json); }
-    catch (e) { setStatus('存档数据异常，已中止保存', 'err'); return; }
+    catch (e) { setStatus('存档数据异常，已中止保存', 'err'); return false; }
 
     try {
       const writable = await st.handle.createWritable();
@@ -213,10 +261,10 @@
       if (e.name === 'NotAllowedError') {
         setStatus('文件写入权限已失效，请重新连接该槽位', 'err');
         disconnectSlot(slotId);
-        return;
+        return false;
       }
       setStatus('写入文件失败：' + e.message, 'err');
-      return;
+      return false;
     }
 
     meta.savedAt = Date.now();
@@ -228,6 +276,7 @@
     const slot = SLOTS.find(s => s.id === slotId);
     setStatus(`已保存到${slot.name}「${st.fileName}」· Tick ${meta.tick} · ${fmtBytes(meta.bytes)}`, 'ok');
     simLog(`💾 存档已写入${slot.name}（Tick ${meta.tick}，${fmtBytes(meta.bytes)}）`);
+    return true;
   }
 
   /** 从指定槽位的文件读取存档 */
@@ -497,14 +546,16 @@
           const rec = await idbGet(slot.id);
           if (rec && rec.handle) {
             slotState[slot.id] = { handle: rec.handle, fileName: rec.fileName, meta: null, lastSaved: 0 };
-            // 异步刷新元信息，不阻塞初始化
-            refreshSlotMeta(slot.id).then(() => { if (isOpen()) renderList(); });
+            await refreshSlotMeta(slot.id);
+            if (isOpen()) renderList();
           }
         }
       } catch (e) {
         console.warn('IndexedDB 句柄恢复失败:', e);
       }
     }
+
+    await bootstrapStartupGate();
 
     setInterval(tickAutoSave, AUTO_SAVE_INTERVAL_MS);
   }

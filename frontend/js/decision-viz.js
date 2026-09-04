@@ -5,13 +5,13 @@
  *   1) 启动时把 config.decision-order.js（或本地未落盘副本）合并进 window.SIM_CONFIG，
  *      保证 rustworld.js 首次 applyConfig 之前顺序已就位；
  *   2) 拖动卡片/分界线松手 → 计算层级覆盖 → 经 rustWorld.applyConfig() 热注入运行中的 WASM；
- *   3) 同步 POST /save-decision-order 落盘 config.decision-order.js（静态环境降级 localStorage）。
+ *   3) 将用户的顺序与分界线配置保存到浏览器 localStorage。
  * ========================================================================== */
 (function (global) {
   'use strict';
 
   var D = global.SIM_DECISION_VIZ_DATA;
-  var STORE_KEY = 'decisionViz.pending.v1';
+  var STORE_KEY = 'flowaccord.decision-order.v1';
   var IDS = {
     overlay: 'decision-viz-overlay',
     viewport: 'dviz-viewport',
@@ -23,18 +23,20 @@
     statusTip: 'dviz-status'
   };
 
-  var zeros = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  var zeros = Object.keys(D.BRANCH_MAP || {}).map(function () { return 0; });
   var state = { order: [], divGaps: [], levels: [] };
   var lastGood = null;
   var mounted = false;
 
   // ── 校验与推导工具 ───────────────────────────────────────────────────────
   function isValidOrder(a) {
-    return Array.isArray(a) && a.length === 14 && new Set(a).size === 14
+    var n = Object.keys(D.BRANCH_MAP || {}).length;
+    return Array.isArray(a) && a.length === n && new Set(a).size === n
       && a.every(function (s) { return D.BRANCH_MAP[s]; });
   }
   function isValidLevels(a) {
-    return Array.isArray(a) && a.length === 14 && a.every(function (v) { return Number.isInteger(v) && v >= 0 && v <= 5; });
+    var n = Object.keys(D.BRANCH_MAP || {}).length;
+    return Array.isArray(a) && a.length === n && a.every(function (v) { return Number.isInteger(v) && v >= 0 && v <= 5; });
   }
   function defaultZone(id) { return D.BRANCH_MAP[id] ? D.BRANCH_MAP[id].level : 1; }
   function zoneOf(divGaps, p) {
@@ -69,12 +71,12 @@
       var raw = localStorage.getItem(STORE_KEY);
       if (!raw) return null;
       var o = JSON.parse(raw);
-      if (isValidOrder(o.decisionEvalOrder) && isValidLevels(o.decisionEvalLevels)) return o;
+      if (o && o.schema === 1 && isValidOrder(o.decisionEvalOrder) && isValidLevels(o.decisionEvalLevels)) return o;
     } catch (e) { /* ignore */ }
     return null;
   }
   function savePending(o) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ schema: 1, decisionEvalOrder: o.decisionEvalOrder, decisionEvalLevels: o.decisionEvalLevels, savedAt: Date.now() })); } catch (e) { /* ignore */ }
   }
   function clearPending() {
     try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
@@ -133,22 +135,9 @@
     }
 
     var payload = { decisionEvalOrder: state.order, decisionEvalLevels: state.levels };
-    savePending(payload); // 先写本地兜底，落盘成功后再清除
-    fetch('save-decision-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function (res) { return res.json(); }).then(function (j) {
-      if (j && j.ok) {
-        clearPending();
-        lastGood = snapshot();
-        flash('✅ 已热注入内核并落盘 config.decision-order.js', 'ok');
-      } else {
-        flash('⚠️ 已热注入内核，落盘被拒绝（' + ((j && j.error) || '未知原因') + '）· 已暂存本机', 'warn');
-      }
-    }).catch(function () {
-      flash('⚠️ 已热注入内核，未落盘（静态环境无写文件能力）· 已暂存本机', 'warn');
-    });
+    savePending(payload);
+    lastGood = snapshot();
+    flash('✅ 已热注入内核并保存到本浏览器', 'ok');
   }
 
   function flash(text, tone) {
@@ -189,7 +178,7 @@
     var btnReset = document.getElementById('dviz-btn-reset');
     if (btnReset) btnReset.addEventListener('click', function () {
       state.order = D.DEFAULT_ORDER.slice();
-      state.levels = zeros.slice();
+      state.levels = state.order.map(function () { return 0; });
       state.divGaps = D.DEFAULT_DIVGAPS.slice();
       global.DecisionVizView.setState(state.order, state.divGaps, state.levels);
       commit();

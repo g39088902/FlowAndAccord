@@ -2,6 +2,8 @@
     const canvas = document.getElementById('sim-canvas');
     const ctx = canvas.getContext('2d');
     const sim = new RustWorld();
+    // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
+    sim.isPaused = true;
     window.rustWorldSim = sim; // 供 decision-viz.js 热注入决策顺序配置（共用同一引擎实例）
 
     let camera = {
