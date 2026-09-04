@@ -68,11 +68,11 @@
 | `countWoods` | usize | 3 | ecology.rs (POI 数量 §4.7) | 林木数量 |
 | `countStoneMines` | usize | 2 | ecology.rs (POI 数量 §4.7) | 石矿数量 |
 | `countGoldMines` | usize | 1 | ecology.rs (POI 数量 §4.7) | 金矿数量 |
-| `stockMaxWater` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
-| `stockMaxBerry` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
-| `stockMaxWood` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
-| `stockMaxStone` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
-| `stockMaxGold` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |
+| `stockMaxWater` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
+| `stockMaxBerry` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
+| `stockMaxWood` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
+| `stockMaxStone` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
+| `stockMaxGold` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |
 | `regenBaseWater` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 清泉基础再生速率 (单位/秒) |
 | `regenBaseBerry` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 浆果基础再生速率 |
 | `regenBaseWood` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 林木基础再生速率 |
@@ -92,7 +92,7 @@
 | `roadGradePaveThreshold` | f32 | 8 | graph.rs (道路等级铺装阈值) | 坡度铺装阈值 (高差超过则盘山道，否则泥径) |
 | `poiInteractionRadius` | f32 | 22 | ecology.rs (POI 交互采收/卸货) | 采收现场「已抵达 POI」判定半径 (m) |
 | `campHomeConsumeRate` | f32 | 3 | ecology.rs (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/秒) |
-| `decisionPoiSeekMinStockRatio` | f32 | 0.3 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
+| `decisionPoiSeekMinStockRatio` | f32 | 0.5 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
 | `decisionPoiAbandonStockRatio` | f32 | 0.1 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器关闭阈值 (库存 < 此比例) |
 | `decisionCriticalThirst` | f32 | 25 | decisions/ (生理临界阈值) | 临界口渴阈值 (触发寻水) |
 | `decisionCriticalHunger` | f32 | 25 | decisions/ (生理临界阈值) | 临界饥饿阈值 (触发觅食) |
@@ -182,8 +182,8 @@
 | `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
-| `marketStockMaxWater` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
-| `marketStockMaxFood` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
+| `marketStockMaxWater` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
 | `marketRegenBaseWater` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水每秒自然再生速率 |
 | `marketRegenBaseFood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食每秒自然再生速率 |
 | `marketPriceBase` | f32 | 0.1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 满库存起步基准单价 (黄金 / 单位资源) |
@@ -207,3 +207,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
 | `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认） |
+
+## ⚠ 校验错误
+
+- 数值漂移: countCamps Rust 默认 5 ≠ 前端 4

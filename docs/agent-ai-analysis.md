@@ -58,9 +58,9 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 ### 4.1 设计选择：每个 agent 维护自己的 `poi_seekability`
 
 `agent.rs::observe_poi_stock_with_config()` 在每个 agent 的决策相位更新私有触发器：
-- **开启**：POI 库存升至 ≥ `config.decisionPoiSeekMinStockRatio`（0.30）；
+- **开启**：POI 库存升至 ≥ `config.decisionPoiSeekMinStockRatio`（0.50）；
 - **关闭**：已开放点仅在跌破 < `config.decisionPoiAbandonStockRatio`（0.10）时关闭；
-- **中间带**（10%~30%）：保持该 agent 的前态。
+- **中间带**（10%~50%）：保持该 agent 的前态。
 
 `routing.rs::available_nodes()` 和 `seeking.rs` 的路由/重路由只读取 agent 私有触发器结论，相同 POI 可被不同 agent 判为不同可用性。
 

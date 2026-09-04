@@ -90,11 +90,11 @@ window.SIM_CONFIG = {
   countWoods: 3,                  // 林木数量
   countStoneMines: 2,             // 石矿数量
   countGoldMines: 1,              // 金矿数量
-  stockMaxWater: 100.0,           // 清泉储量上限
-  stockMaxBerry: 100.0,           // 浆果储量上限
-  stockMaxWood: 100.0,            // 林木储量上限
-  stockMaxStone: 100.0,           // 石矿储量上限
-  stockMaxGold: 100.0,            // 金矿储量上限
+  stockMaxWater: 200.0,           // 清泉储量上限
+  stockMaxBerry: 200.0,           // 浆果储量上限
+  stockMaxWood: 200.0,            // 林木储量上限
+  stockMaxStone: 200.0,           // 石矿储量上限
+  stockMaxGold: 200.0,            // 金矿储量上限
   regenBaseWater: 2.0,            // 清泉基础再生速率 (单位/秒)
   regenBaseBerry: 2.0,            // 浆果基础再生速率
   regenBaseWood: 2.0,             // 林木基础再生速率
@@ -118,7 +118,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
   // ==========================================================================
-  decisionPoiSeekMinStockRatio: 0.30, // POI 私有施密特触发器开启阈值 (库存 ≥ 此比例)
+  decisionPoiSeekMinStockRatio: 0.50, // POI 私有施密特触发器开启阈值 (库存 ≥ 此比例)
   decisionPoiAbandonStockRatio: 0.10,// POI 私有施密特触发器关闭阈值 (库存 < 此比例)
   decisionCriticalThirst: 25.0,   // 临界口渴阈值 (触发寻水)
   decisionCriticalHunger: 25.0,   // 临界饥饿阈值 (触发觅食)
@@ -225,8 +225,8 @@ window.SIM_CONFIG = {
   // 13. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
   // ==========================================================================
   countMarkets: 1,                          // 全图生成外部市场 POI 数量
-  marketStockMaxWater: 100.0,               // 外部市场清水储备容量上限
-  marketStockMaxFood: 100.0,                // 外部市场粮食储备容量上限
+  marketStockMaxWater: 200.0,               // 外部市场清水储备容量上限
+  marketStockMaxFood: 200.0,                // 外部市场粮食储备容量上限
   marketRegenBaseWater: 2.0,                // 外部市场清水每秒自然再生速率
   marketRegenBaseFood: 2.0,                 // 外部市场粮食每秒自然再生速率
   marketPriceBase: 0.1,                     // 满库存起步基准单价 (黄金 / 单位资源)

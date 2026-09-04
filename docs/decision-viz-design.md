@@ -151,7 +151,7 @@ pub home\_house\_id / spouse\_id / children\_ids,
 | `decisionCriticalHunger`           | 25.0  | 临界饥饿 → 触发觅食（生理）  |
 | `decisionRestStaminaTarget`        | 100.0 | 归巢休息目标体力         |
 | `decisionWorkStaminaThreshold`     | 50.0  | 劳作最低体力（低于则返家休息）  |
-| `decisionPoiSeekMinStockRatio`     | 0.30  | 施密特触发器**开启**阈值   |
+| `decisionPoiSeekMinStockRatio`     | 0.50  | 施密特触发器**开启**阈值   |
 | `decisionPoiAbandonStockRatio`     | 0.10  | 施密特触发器**关闭**阈值   |
 | `decisionHouseRepairNeedThreshold` | 50.0  | 耐久 <50% 触发修缮     |
 | `decisionStockGoldCooldown`        | 45.0  | 盖房备料淘金冷却 (s)     |

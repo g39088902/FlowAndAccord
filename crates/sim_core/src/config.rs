@@ -113,11 +113,11 @@ pub const COUNT_BERRY_BUSHES: usize = 6;
 pub const COUNT_WOODS: usize = 3;
 pub const COUNT_STONE_MINES: usize = 2;
 pub const COUNT_GOLD_MINES: usize = 1;
-pub const STOCK_MAX_WATER: f32 = 100.0;
-pub const STOCK_MAX_BERRY: f32 = 100.0;
-pub const STOCK_MAX_WOOD: f32 = 100.0;
-pub const STOCK_MAX_STONE: f32 = 100.0;
-pub const STOCK_MAX_GOLD: f32 = 100.0;
+pub const STOCK_MAX_WATER: f32 = 200.0;
+pub const STOCK_MAX_BERRY: f32 = 200.0;
+pub const STOCK_MAX_WOOD: f32 = 200.0;
+pub const STOCK_MAX_STONE: f32 = 200.0;
+pub const STOCK_MAX_GOLD: f32 = 200.0;
 pub const REGEN_BASE_WATER: f32 = 2.0;
 pub const REGEN_BASE_BERRY: f32 = 2.0;
 pub const REGEN_BASE_WOOD: f32 = 2.0;
@@ -151,7 +151,7 @@ pub const CAMP_HOME_CONSUME_RATE: f32 = 3.0;
 // ============================================================================
 // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
 // ============================================================================
-pub const DECISION_POI_SEEK_MIN_STOCK_RATIO: f32 = 0.30;
+pub const DECISION_POI_SEEK_MIN_STOCK_RATIO: f32 = 0.50;
 pub const DECISION_POI_ABANDON_STOCK_RATIO: f32 = 0.10;
 pub const DECISION_CRITICAL_THIRST: f32 = 25.0;
 pub const DECISION_CRITICAL_HUNGER: f32 = 25.0;
@@ -317,9 +317,9 @@ pub const PRESTIGE_KING_BONUS: u32 = 3;
 /// 全图生成外部市场 POI 数量（默认 1 座）
 pub const COUNT_MARKETS: usize = 1;
 /// 外部市场清水储备容量上限（等同于 1 座低洼清泉）
-pub const MARKET_STOCK_MAX_WATER: f32 = 100.0;
+pub const MARKET_STOCK_MAX_WATER: f32 = 200.0;
 /// 外部市场粮食储备容量上限（等同于 1 座缓坡浆果）
-pub const MARKET_STOCK_MAX_FOOD: f32 = 100.0;
+pub const MARKET_STOCK_MAX_FOOD: f32 = 200.0;
 /// 外部市场清水每秒自然再生速率
 pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
 /// 外部市场粮食每秒自然再生速率
