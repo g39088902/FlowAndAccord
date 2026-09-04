@@ -136,11 +136,11 @@
 | `houseWinterWoodBurnRate` | f32 | 0.12 | housing_system/maintenance.rs (冬季供暖 §4.8) | 冬季供暖木材消耗速率 (每秒) |
 | `houseWinterColdTemp` | f32 | 5 | housing_system/maintenance.rs (冬季供暖 §4.8) | 低温供暖阈值 (℃) |
 | `houseMinSpacing` | f32 | 20 | housing_system/founding.rs (房屋间距) | 房屋间最小水平间距 (m) |
-| `campMaxHouses` | u32 | 30 | — | 每个营地最多可建设的房屋数量 |
-| `campLevelVillageMinHouses` | u32 | 6 | poi.rs (营地行政级别升级) | 营地升级为村的最低房屋数量 |
-| `campLevelTownshipMinHouses` | u32 | 12 | poi.rs (营地行政级别升级) | 营地升级为乡的最低房屋数量 |
-| `campLevelTownMinHouses` | u32 | 18 | poi.rs (营地行政级别升级) | 营地升级为镇的最低房屋数量 |
-| `campLevelCountyMinHouses` | u32 | 24 | poi.rs (营地行政级别升级) | 营地升级为县的最低房屋数量 |
+| `campMaxHouses` | u32 | 25 | — | 每个营地最多可建设的房屋数量 |
+| `campLevelVillageMinHouses` | u32 | 5 | poi.rs (营地行政级别升级) | 营地升级为村的最低房屋数量 |
+| `campLevelTownshipMinHouses` | u32 | 10 | poi.rs (营地行政级别升级) | 营地升级为乡的最低房屋数量 |
+| `campLevelTownMinHouses` | u32 | 15 | poi.rs (营地行政级别升级) | 营地升级为镇的最低房屋数量 |
+| `campLevelCountyMinHouses` | u32 | 20 | poi.rs (营地行政级别升级) | 营地升级为县的最低房屋数量 |
 | `houseNodeReuseRadius` | f32 | 20 | housing_system/founding.rs (立宅节点占用) | 立宅优先复用空置路网节点检索半径 (m) |
 | `houseNodePoiOccupyRadius` | f32 | 1.5 | housing_system/founding.rs (立宅节点占用) | 判定节点被 POI 占用的贴合半径 (m) |
 | `seasonYearLength` | f32 | 240 | world_season.rs (四季周期) | 一年 (四季) 总时长 (模拟秒) |

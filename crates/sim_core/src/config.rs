@@ -102,12 +102,12 @@ pub const TRAIT_INHERIT_CLAMP_MAX: f32 = 190.0;
 // ============================================================================
 pub const POI_MIN_DISTANCE: f32 = 70.0;
 pub const COUNT_CAMPS: usize = 5;
-pub const CAMP_MAX_HOUSES: u32 = 30;
+pub const CAMP_MAX_HOUSES: u32 = 25;
 /// 营地行政级别升级所需的最低房屋数量（村、乡、镇、县）
-pub const CAMP_LEVEL_VILLAGE_MIN_HOUSES: u32 = 6;
-pub const CAMP_LEVEL_TOWNSHIP_MIN_HOUSES: u32 = 12;
-pub const CAMP_LEVEL_TOWN_MIN_HOUSES: u32 = 18;
-pub const CAMP_LEVEL_COUNTY_MIN_HOUSES: u32 = 24;
+pub const CAMP_LEVEL_VILLAGE_MIN_HOUSES: u32 = 5;
+pub const CAMP_LEVEL_TOWNSHIP_MIN_HOUSES: u32 = 10;
+pub const CAMP_LEVEL_TOWN_MIN_HOUSES: u32 = 15;
+pub const CAMP_LEVEL_COUNTY_MIN_HOUSES: u32 = 20;
 pub const COUNT_WATER_SOURCES: usize = 6;
 pub const COUNT_BERRY_BUSHES: usize = 6;
 pub const COUNT_WOODS: usize = 3;

@@ -258,6 +258,7 @@ for (const poi of sim.pois) {
 }
 
 function drawHouses() {
+drawSelectedCampHouseLinks();
 for (const house of sim.houses) {
   const p2D = project3D(house.pos);
   const isSelectedHouse = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
@@ -384,6 +385,41 @@ for (const house of sim.houses) {
     ctx.stroke();
   }
 }
+}
+
+// 选中营地时，用特殊虚线把辖区内的全部房屋连回营地；线段置于房屋图标下方避免遮挡信息。
+function drawSelectedCampHouseLinks() {
+  if (sim.selectionType !== 'poi' || sim.selectedPoiId == null) return;
+  const camp = sim.pois.find(p => p.id === sim.selectedPoiId && p.type === 'Camp');
+  if (!camp) return;
+  const houses = sim.houses.filter(h => h.campId === camp.id);
+  if (houses.length === 0) return;
+
+  const camp2D = project3D(camp.pos);
+  ctx.save();
+  ctx.lineWidth = Math.max(1.2, 2.0 * camera.zoom);
+  ctx.setLineDash([Math.max(4, 8 * camera.zoom), Math.max(3, 5 * camera.zoom)]);
+  ctx.lineCap = 'round';
+  for (const house of houses) {
+    const house2D = project3D(house.pos);
+    const vacant = house.ownerId == null;
+    const color = vacant ? '#f59e0b' : '#38bdf8';
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 7 * camera.zoom;
+    ctx.globalAlpha = 0.72;
+    ctx.beginPath();
+    ctx.moveTo(camp2D.x, camp2D.y);
+    ctx.lineTo(house2D.x, house2D.y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(house2D.x, house2D.y, Math.max(1.5, 2.5 * camera.zoom), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawLanes() {

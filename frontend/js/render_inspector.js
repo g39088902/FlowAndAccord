@@ -342,13 +342,17 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         campUpgradeRow.style.display = 'flex';
         const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
         const vacantCount = (poi.vacantHouses && poi.vacantHouses.length) || 0;
-        const nextTarget = (poi.level || 0) === 0 ? 6 : ((poi.level || 0) === 1 ? 12 : ((poi.level || 0) === 2 ? 18 : 24));
-        const prevTarget = (poi.level || 0) === 0 ? 0 : ((poi.level || 0) === 1 ? 6 : ((poi.level || 0) === 2 ? 12 : 18));
+        const cfg = window.SIM_CONFIG || {};
+        const levelThresholds = [0, cfg.campLevelVillageMinHouses || 5, cfg.campLevelTownshipMinHouses || 10, cfg.campLevelTownMinHouses || 15, cfg.campLevelCountyMinHouses || 20];
+        const level = poi.level || 0;
+        const nextTarget = levelThresholds[Math.min(level + 1, 4)];
+        const prevTarget = levelThresholds[level];
         const count = poi.boundHouses || 0;
-        const nextTitle = (poi.level || 0) === 0 ? '村落 (6房)' : ((poi.level || 0) === 1 ? '乡集 (12房)' : ((poi.level || 0) === 2 ? '集镇 (18房)' : '县邑 (24房)'));
-        const lvlLabel = `${lvlNames[poi.level || 0]} · 辖 ${count} 房${vacantCount > 0 ? ` · ${vacantCount}空置` : ''}`;
+        const nextName = ['村落', '乡集', '集镇', '县邑'][level] || '县邑';
+        const nextTitle = `${nextName} (${nextTarget}房)`;
+        const lvlLabel = `${lvlNames[level]} · 辖 ${count} 房${vacantCount > 0 ? ` · ${vacantCount}空置` : ''}`;
 
-        if ((poi.level || 0) >= 4) {
+        if (level >= 4) {
           document.getElementById('lbl-camp-upgrade-title').textContent = `🏛️ ${lvlLabel} (已达最高级)`;
           document.getElementById('insp-camp-upgrade-val').textContent = `${count} 间私宅`;
           document.getElementById('insp-camp-upgrade-fill').style.width = '100%';
@@ -1159,20 +1163,31 @@ canvas.addEventListener('click', e => {
       govEl.textContent = '— 暂无管辖家庭';
     }
 
-    // 空置房屋
+    // 辖区房屋：从实时房屋快照分为全部空置与已有人居住，避免只展示 vacant_houses 登记表。
     const vacEl = document.getElementById('camp-detail-vacant');
-    const vhs = poi.vacantHouses || [];
-    if (vhs.length > 0) {
-      vacEl.innerHTML = vhs.map(vh => {
-        const ben = (vh.beneficiaryIds && vh.beneficiaryIds.length > 0)
-          ? vh.beneficiaryIds.map(bid => agentChip(bid, 'dead', '受益人')).join(' ')
-          : '<span style="color:#94a3b8;">无受益人</span>';
-        const hObj = sim.houses.find(h => h.id === vh.houseId);
-        const valStr = hObj ? ` · 最高出价 ${(hObj.highestBid || 0).toFixed(2)}金 (${hObj.auctionPhase || '挂牌拍卖中'})` : '';
-        return `<div style="margin-bottom:2px;">🏚️ 房屋 #${vh.houseId}${valStr} → 受益人: ${ben}</div>`;
+    const occEl = document.getElementById('camp-detail-occupied');
+    const campHouses = (sim.houses || []).filter(h => h.campId === poi.id);
+    const vacantHouses = campHouses.filter(h => h.ownerId == null);
+    const occupiedHouses = campHouses.filter(h => h.ownerId != null);
+    const vacantById = new Map((poi.vacantHouses || []).map(vh => [vh.houseId, vh]));
+    const tierNames = { Tier0Warehouse: '仓库', Tier1ThatchedHut: '茅草房', Tier2LeanTo: '半棚屋', Tier3Homestead: '庄舍', Tier4Manor: '大庄园' };
+    if (vacantHouses.length > 0) {
+      vacEl.innerHTML = `<div style="color:#f59e0b;margin-bottom:2px;">🏚️ 空置（${vacantHouses.length}）</div>` + vacantHouses.map(h => {
+        const vh = vacantById.get(h.id);
+        const ben = vh && vh.beneficiaryIds && vh.beneficiaryIds.length > 0
+          ? ` · 受益人 ${vh.beneficiaryIds.map(bid => `#${bid}`).join('、')}` : '';
+        const auction = h.auctionPhase ? ` · ${h.auctionPhase}` : '';
+        return `<div style="margin-bottom:2px;">🏚️ #${h.id} ${tierNames[h.tier] || h.tier} · 耐久 ${Math.round(h.durability)}%${auction}${ben}</div>`;
       }).join('');
     } else {
-      vacEl.textContent = '— 暂无空置房屋';
+      vacEl.innerHTML = '<div style="color:#94a3b8;">🏚️ 空置（0）</div>';
+    }
+    if (occupiedHouses.length > 0) {
+      occEl.innerHTML = `<div style="color:#38bdf8;margin-bottom:2px;">🏠 已有人居住（${occupiedHouses.length}）</div>` + occupiedHouses.map(h =>
+        `<div style="margin-bottom:2px;">🏠 #${h.id} ${tierNames[h.tier] || h.tier} · 户主 #${h.ownerId} · 耐久 ${Math.round(h.durability)}%</div>`
+      ).join('');
+    } else {
+      occEl.innerHTML = '<div style="color:#94a3b8;">🏠 已有人居住（0）</div>';
     }
 
     // 王国账本
