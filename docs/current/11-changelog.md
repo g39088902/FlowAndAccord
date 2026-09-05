@@ -1,6 +1,6 @@
 # 📜 版本演进记录 (Changelog)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.28.6**。
 
 | **v1.28.6** | 修复送货回家时决策节拍提前重新派出的问题：新增统一卸货完成判定，行囊（含黄金）清空前保持卸货状态，避免半卸货再次出门 | sim_core / decisions |
@@ -99,7 +99,7 @@
 | **v0.9.57~62** | 族谱系统迭代：全量血脉单图 → 力导向 → 纯力学 → 出生时序纵向重力 → 无惯性收敛 → 直系血脉裁剪（最终于 v0.9.64 被时间轴取代） | frontend/dag |
 | **v0.9.56** | 无头模式顶栏常驻更新 + 每秒 Tick 监视 + 空格键全局暂停 + 族谱拖拽修复 | frontend |
 | **v0.9.55** | 文档目录整合：非 AGENTS.md 文档全部移入 `docs/`（纯文档） | docs |
-| **v0.9.54** | current.md 按功能模块拆分：根索引 + `docs/current/` 分模块文档两级结构（纯文档） | docs |
+| **v0.9.54** | 01-current.md 按功能模块拆分：根索引 + `docs/current/` 分模块文档两级结构（纯文档） | docs |
 | **v0.9.53** | 死亡数区分自然死亡（寿终正寝）与非自然死亡（饿死/渴死），顶栏分列统计 | agent / snapshot / frontend |
 | **v0.9.52** | 视图显隐改造：新增隐藏部落民/隐藏路网开关，POI 指示环改为恒显 | frontend |
 | **v0.9.51** | 步行速度受力量禀赋加成（后于 v0.9.65 重构为力量直接乘率） | agent / config |
@@ -113,7 +113,7 @@
 | **v0.9.43** | 建房/升级/修缮全流程回归 Agent 自主决策：废除系统发房扫描器，新增 `FoundHome` 需求 | decisions / housing |
 | **v0.9.42** | 开局人口 12→20（10男10女），百家姓库 60→150 | ecology / agent / frontend |
 | **v0.9.39** | 混沌系统测试策略落地：不再持久化单元测试，长期确定性验证由 `test-wasm.js` 承担 | 工程规范 |
-| **v0.9.38** | 文档偏差修复：修正 AGENTS.md / current.md / build-guide.md 等与现状不符的描述（纯文档） | docs |
+| **v0.9.38** | 文档偏差修复：修正 AGENTS.md / 01-current.md / 02-build-guide.md 等与现状不符的描述（纯文档） | docs |
 | **v0.9.37** | 婚姻系统与建房事件解耦：移除升级竣工即时迎娶钩子，成婚统一由 `marriage.rs` 扫描匹配 | housing / marriage |
 | **v0.9.35** | 简化四季参数模型：废除 `season_quarter_length`，单季长度由 `year_length × 0.25` 派生 | config / world |
 | **v0.9.34** | 房屋系统与世界环境模块化解耦：`housing_system` 拆为 5 个单一职责子模块，四季回归 `world.rs` | housing / world |

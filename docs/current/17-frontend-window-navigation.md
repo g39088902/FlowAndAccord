@@ -2,7 +2,7 @@
 
 > **用途**：为 UI/交互方案设计提供当前前端的信息架构、窗口层级、入口与返回关系参考。
 > 本文描述的是现有实现（单页静态前端），不是待实现的产品原型；新增页面或重构交互时，应先确认是否能复用现有窗口与选择态。
-> **相关文档**：[07-frontend-ui.md](./07-frontend-ui.md) · [ui-spec-and-ledger-design.md](../ui-spec-and-ledger-design.md) · [15-save-load.md](./15-save-load.md)
+> **相关文档**：[07-frontend-ui.md](./07-frontend-ui.md) · [09-ui-spec-and-ledger-design.md](../09-ui-spec-and-ledger-design.md) · [15-save-load.md](./15-save-load.md)
 
 ## 1. 总体模型：一个世界窗口，四类附属窗口
 

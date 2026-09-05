@@ -1,7 +1,7 @@
 # Flow & Accord · UI 页面全景剖析、制度大盘界面实现与开发指南
 
 > **版本**：v1.15.0 · **定位**：前端 UI 全景解剖说明书 + 制度经济学界面实现说明（M1~M4 全部落地）+ 模块开发落地指南  
-> **关联规划**：[`docs/plan-ledger-refactor.md`](./plan-ledger-refactor.md) · [`docs/current/07-frontend-ui.md`](./current/07-frontend-ui.md) · [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)
+> **关联规划**：[`docs/12-plan-ledger-refactor.md`](./12-plan-ledger-refactor.md) · [`docs/current/07-frontend-ui.md`](./current/07-frontend-ui.md) · [`docs/current/12-ledger-system.md`](./current/12-ledger-system.md)
 
 ---
 
@@ -280,7 +280,7 @@ graph TD
 
 # 2. 第二篇：制度大盘 UI 实现（M1~M4 全落地）
 
-在 [`docs/plan-ledger-refactor.md`](./plan-ledger-refactor.md) 中，M1~M4 已全部完成（M1 团体基类/婚姻登记/家户体系/胎儿 Agent 身份 → M4 地区王国）。本篇对 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 的 UI/UX 实现架构与视觉交互进行完整说明——以下界面均已落地于 `frontend/js/ledger-ui.js`。
+在 [`docs/12-plan-ledger-refactor.md`](./12-plan-ledger-refactor.md) 中，M1~M4 已全部完成（M1 团体基类/婚姻登记/家户体系/胎儿 Agent 身份 → M4 地区王国）。本篇对 **M2（旁路记账与分家继承）、M3（宗族与族长制）、M4（地区团体与国王政体）** 的 UI/UX 实现架构与视觉交互进行完整说明——以下界面均已落地于 `frontend/js/ledger-ui.js`。
 
 ```mermaid
 graph LR

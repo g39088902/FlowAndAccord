@@ -5,7 +5,7 @@
  * 用途：
  *   1. 交叉校验 frontend/js/config.js 与 Rust SimConfig (crates/sim_core/src/config.rs)
  *      的字段集、类型与默认值是否完全一致，捕获「孤儿字段 / 缺失字段 / 类型错配 / 数值漂移」。
- *   2. 生成 docs/config-reference.md —— 一份带中文说明的参数速查表，降低用户检索与调参成本。
+ *   2. 生成 docs/06-config-reference.md —— 一份带中文说明的参数速查表，降低用户检索与调参成本。
  *
  * 用法：
  *   node tools/config-check.js
@@ -23,11 +23,11 @@ const ROOT = path.resolve(__dirname, '..');
 const CONFIG_JS = path.join(ROOT, 'frontend', 'js', 'config.js');
 const CONFIG_RS = path.join(ROOT, 'crates', 'sim_core', 'src', 'config.rs');
 const ORDER_JS = path.join(ROOT, 'frontend', 'js', 'config.decision-order.js');
-const OUT_MD = path.join(ROOT, 'docs', 'config-reference.md');
+const OUT_MD = path.join(ROOT, 'docs', '06-config-reference.md');
 
 // ---------------------------------------------------------------------------
 // 配置字段 → 影响模块映射 (v1.7.0 新增)
-//   基于字段名前缀推断，特殊字段显式覆盖。用于 config-reference.md 的「影响模块」列。
+//   基于字段名前缀推断，特殊字段显式覆盖。用于 06-config-reference.md 的「影响模块」列。
 //   改字段影响面时须同步更新此映射。
 // ---------------------------------------------------------------------------
 const IMPACT_OVERRIDES = {
@@ -367,7 +367,7 @@ function main() {
 }
 
 // ---------------------------------------------------------------------------
-// 生成 docs/config-reference.md
+// 生成 docs/06-config-reference.md
 // ---------------------------------------------------------------------------
 function generateReference(rs, js, errors) {
   const sections = new Map();
@@ -377,7 +377,7 @@ function generateReference(rs, js, errors) {
   }
 
   const lines = [];
-  lines.push('# Flow & Accord · 仿真超参数速查表 (config-reference.md)');
+  lines.push('# Flow & Accord · 仿真超参数速查表 (06-config-reference.md)');
   lines.push('');
   lines.push('> 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。');
   lines.push('> 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。');

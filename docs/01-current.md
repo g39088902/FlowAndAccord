@@ -2,7 +2,7 @@
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
 > **版本**：v1.28.3（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（195 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/config-reference.md](./config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
+> **超参配置**：全部可调超参（195 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -55,7 +55,7 @@
 | 7.1 | 🧭 前端窗口结构与跳转关系 | [17-frontend-window-navigation.md](./current/17-frontend-window-navigation.md) | 主世界布局、常驻面板、模态窗口、独立族谱页、入口/返回/跨窗口跳转、设计契约 |
 | 7.2 | 🧭 文档维护发现机制 | [18-doc-maintenance.md](./current/18-doc-maintenance.md) | 维护清单、源码/文档新鲜度检测、复核周期、CI 严格模式与人工确认流程 |
 | 7.3 | ✅ Commit 前检查单 | [19-commit-checklist.md](./current/19-commit-checklist.md) | 提交前基础检查、Rust/WASM、前端、配置、诊断与最终 diff 审阅 |
-| 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [ui-spec-and-ledger-design.md](./ui-spec-and-ledger-design.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
+| 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [09-ui-spec-and-ledger-design.md](./09-ui-spec-and-ledger-design.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
 | 10 | 🚀 快速启动与体验 | [10-quickstart.md](./current/10-quickstart.md) | 浏览器 / Node 回归 / Rust 编译三种启动方式 |

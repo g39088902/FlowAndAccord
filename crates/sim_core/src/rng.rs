@@ -1,7 +1,7 @@
 //! 确定性伪随机数生成器 (xorshift64*)
 //!
 //! 替换 `rand` 依赖：零外部依赖、wasm32-unknown-unknown 安全（不触发 getrandom）、
-//! 同一种子可完全复现世界演化（符合 architecture.md 的确定性核心目标）。
+//! 同一种子可完全复现世界演化（符合 10-architecture.md 的确定性核心目标）。
 
 use serde::{Deserialize, Serialize};
 

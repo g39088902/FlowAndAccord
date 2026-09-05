@@ -1,7 +1,7 @@
 # 7. 🎨 交互式表现层与控制台 (`frontend`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`ledger-ui.js`、`dag*.js`、`frontend/index.html`  
-> **UI 深度解剖与实现指南**：详见 [docs/ui-spec-and-ledger-design.md](../ui-spec-and-ledger-design.md)（含当前页面全景拆解、M1-M4 制度大盘 4 标签页实现说明与前端开发指南）。
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`ledger-ui.js`、`dag*.js`、`frontend/index.html`  
+> **UI 深度解剖与实现指南**：详见 [docs/09-ui-spec-and-ledger-design.md](../09-ui-spec-and-ledger-design.md)（含当前页面全景拆解、M1-M4 制度大盘 4 标签页实现说明与前端开发指南）。
 > **窗口结构与跳转参考**：详见 [17-frontend-window-navigation.md](./17-frontend-window-navigation.md)。
 
 ---
@@ -150,4 +150,4 @@
 - `config.js`：所有数值参数的唯一前端入口。
 
 ## 调参入口
-前端无独立配置文件，所有数值参数通过 `config.js` 驱动，见 [config-reference.md](../config-reference.md)。
+前端无独立配置文件，所有数值参数通过 `config.js` 驱动，见 [06-config-reference.md](../06-config-reference.md)。

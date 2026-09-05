@@ -1,6 +1,6 @@
 # 8. ⚙️ JavaScript 动态数值配置系统 (`config.js`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`frontend/js/config.js`、`frontend/js/rustworld.js`、`crates/sim_core/src/config.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`frontend/js/config.js`、`frontend/js/rustworld.js`、`crates/sim_core/src/config.rs`
 
 ---
 
@@ -54,7 +54,7 @@
 
 任一报错即说明前后端已失同步，须先修复再发布。改参后必跑。
 
-### 参数速查表 `docs/config-reference.md`
+### 参数速查表 `docs/06-config-reference.md`
 - 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值、**影响模块**（v1.7.1 起新增）与中文说明。
 - **影响模块列**：169 个字段全部标注改动后会影响哪些 Rust/前端模块，由 `IMPACT_OVERRIDES`（12 个特殊字段显式覆盖）+ `IMPACT_PREFIX_RULES`（60+ 前缀规则）自动推导。示例：`carryCapacityResource`→`agent.rs / ecology.rs / decisions/`、`decisionPoiSeekMinStockRatio`→`decisions/routing.rs / decisions/harvest.rs`、`houseWinterWoodBurnRate`→`housing_system/maintenance.rs`。
 - 是用户检索/核对参数的唯一权威入口，**不要手工维护**。
@@ -73,4 +73,4 @@
 - `tools/config-check.js`：校验前后端一致性并生成速查表。
 
 ## 调参入口
-所有参数均在 `frontend/js/config.js` 中，字段说明见 [config-reference.md](../config-reference.md)。
+所有参数均在 `frontend/js/config.js` 中，字段说明见 [06-config-reference.md](../06-config-reference.md)。

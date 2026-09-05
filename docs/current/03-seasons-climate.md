@@ -1,6 +1,6 @@
 # 3. ❄️ 四季更替与热力学供暖系统 (`seasons`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/world.rs`（`tick_season`）、`housing_system/maintenance.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/world.rs`（`tick_season`）、`housing_system/maintenance.rs`
 
 ---
 
@@ -35,4 +35,4 @@
 - 前端 `render.js`：顶栏展示四季时钟与实时气温。
 
 ## 调参入口
-年轮周期、气温基准与振幅、供暖温度阈值与木材消耗速率见 [config-reference.md](../config-reference.md) 第 6、7 分区。
+年轮周期、气温基准与振幅、供暖温度阈值与木材消耗速率见 [06-config-reference.md](../06-config-reference.md) 第 6、7 分区。

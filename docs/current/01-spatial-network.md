@@ -1,6 +1,6 @@
 # 1. 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/graph.rs`、`curve.rs`、`vec3.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/graph.rs`、`curve.rs`、`vec3.rs`
 
 ---
 
@@ -48,4 +48,4 @@
 - `snapshot.rs`：路网状态随快照序列化下发前端渲染。
 
 ## 调参入口
-道路踩踏、衰减、限速、A\* 权重等参数见 [config-reference.md](../config-reference.md) 第 8、9 分区。
+道路踩踏、衰减、限速、A\* 权重等参数见 [06-config-reference.md](../06-config-reference.md) 第 8、9 分区。

@@ -1,6 +1,6 @@
 # 9. 📂 核心代码目录与模块映射
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
 > 本文件源码树与实际仓库 100% 对应（最后核验：v1.5.1，由 `tools/code-map-check.js` 自动校验）。
 
 ---
@@ -84,7 +84,7 @@ FlowAndAccord/
 │   └── style.css                           # 全局样式
 ├── tools/
 │   ├── test-wasm.js                        # WASM 回归测试 (确定性/防越界/防 NaN/长程稳定)
-│   ├── config-check.js                     # 前后端配置一致性校验 (含 config.house-upgrade-cost.js) + config-reference.md 自动生成
+│   ├── config-check.js                     # 前后端配置一致性校验 (含 config.house-upgrade-cost.js) + 06-config-reference.md 自动生成
 │   ├── code-map-check.js                   # ★ 代码地图一致性校验 (实际文件 vs 09-code-map.md 登记 + 描述漂移检测 + 嵌套 AGENTS.md 覆盖)
 │   ├── snapshot-check.js                   # ★ 快照三处同步校验 (snapshot.rs定义 vs world.rs赋值 vs rustworld.js映射)
 │   ├── gen-dag-testdata.js                 # 族谱布局参数拟合测试数据生成 (驱动 sim_wasm 跑满 50 万 tick)
@@ -97,20 +97,20 @@ FlowAndAccord/
 ├── AGENTS.md                                # 📖 智能体操作指南 (唯一保留在根目录的文档)
 ├── TODO.md                                  # 待办事项清单
 └── docs/                                    # 📚 全部项目文档
-    ├── current.md                           # 已实现功能「索引入口」(模块导航表)
-    ├── build-guide.md                       # 编译与运行深度指南
-    ├── browser-guide.md                     # 浏览器自动化使用指南 (playwright-cli)
-    ├── cicd-guide.md                        # CI/CD 自动部署指南
-    ├── agent-ai-analysis.md                 # 部落民 AI 决策系统深度拆解
-    ├── architecture.md                      # 系统技术架构设计愿景书
-    ├── plan.md                              # 项目长期规划书
-    ├── plan-ledger-refactor.md              # 账本系统重构规划 (M1~M4 已完成)
-    ├── ui-spec-and-ledger-design.md         # UI 全景剖析 + 制度大盘实现指南
-    ├── decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
+    ├── 01-current.md                           # 已实现功能「索引入口」(模块导航表)
+    ├── 02-build-guide.md                       # 编译与运行深度指南
+    ├── 03-browser-guide.md                     # 浏览器自动化使用指南 (playwright-cli)
+    ├── 04-cicd-guide.md                        # CI/CD 自动部署指南
+    ├── 07-agent-ai-analysis.md                 # 部落民 AI 决策系统深度拆解
+    ├── 10-architecture.md                      # 系统技术架构设计愿景书
+    ├── 11-plan.md                              # 项目长期规划书
+    ├── 12-plan-ledger-refactor.md              # 账本系统重构规划 (M1~M4 已完成)
+    ├── 09-ui-spec-and-ledger-design.md         # UI 全景剖析 + 制度大盘实现指南
+    ├── 08-decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图
-    ├── config-reference.md                  # 参数速查表 (由 config-check.js 自动生成, 勿手改)
+    ├── 06-config-reference.md                  # 参数速查表 (由 config-check.js 自动生成, 勿手改)
     └── current/                             # 已实现功能按模块拆分文档
         ├── 01-spatial-network.md
         ├── 02-ecology-poi.md
