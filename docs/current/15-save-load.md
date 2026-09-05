@@ -116,13 +116,13 @@ World3DEngine
 - **权限失效**：写入/读取捕获 `NotAllowedError`，自动 `disconnectLocalFile()` 并提示重新连接。
 - **句柄不持久化**：页面刷新后 `localFileHandle` 失效（浏览器安全策略），需用户重新连接。
 
-#### 4.2.2 启动存档文件门禁（v1.27.0）
+#### 4.2.2 启动存档文件门禁（v1.27.0）与自动读档（★ v1.28.0，v1.28.1 权限加固）
 
 - **启动即暂停**：`main.js` 构造世界后立即置 `sim.isPaused = true`，页面叠加阻塞式启动层（`#startup-save-gate`），模拟画布不可操作。
-- **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟；成功连接旧档（元信息格式版本匹配）则直接放行。
+- **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟。**★ v1.28.0 自动读档**：已连接自动槽（默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复，无需用户手势）时，打开游戏直接读取其内容续演（自动解除暂停、同步暂停按钮文案），**不再开新世界等自动保存覆盖旧档**；读取失败（权限失效/文件损坏/版本不兼容）保持阻断并回退手动连接。**★ v1.28.1**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动时先静默重授（授权已持久化立即成功），失败则提供「🔓 授权并读取上次存档」按钮（点击 = 用户手势内 `requestPermission` 弹授权）；保存/读取遇 `NotAllowedError` 亦就地重授后重试一次，仅显式「断开」才删除句柄记录。
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 标记**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发步更新（当前 **1.27.0**），仅供前端提示与人工排查，不作为加载门禁。
+- **`app_version` 标记**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发步更新（当前 **1.28.1**），仅供前端提示与人工排查，不作为加载门禁。
 
 ---
 

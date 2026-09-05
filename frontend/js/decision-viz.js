@@ -17,7 +17,6 @@
     viewport: 'dviz-viewport',
     world: 'dviz-world',
     nodes: 'dviz-nodes',
-    layerNav: 'dviz-layer-nav',
     inspEmpty: 'dviz-insp-empty',
     inspCard: 'dviz-insp-card',
     statusTip: 'dviz-status'

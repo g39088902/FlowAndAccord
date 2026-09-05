@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.28.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.28.2</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -636,7 +636,7 @@
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
-      <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动需求判定卡调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
+      <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动 Branch 分支调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
       <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
       <button class="headless-btn" id="btn-headless" title="无头模式">🧠 无头模式</button>
     </div>
@@ -845,12 +845,12 @@
           <span style="font-size:22px;">🧠</span>
           <div>
             <div style="font-size:14px; font-weight:700; color:#38bdf8;">马斯洛决策引擎 · evaluate_needs</div>
-            <div style="font-size:10px; color:#94a3b8;">拖动需求判定卡调整评估顺序 · 拖动分界线重划层级 · 松手即热注入运行中的模拟并落盘 config.decision-order.js</div>
+            <div style="font-size:10px; color:#94a3b8;">拖动 Branch 分支调整评估顺序 · 拖动分界线重划层级 · 松手即热注入运行中的模拟并落盘 config.decision-order.js</div>
           </div>
         </div>
         <div class="dag-modal-tools">
           <button id="dviz-btn-fit" class="dag-tool-btn" title="整图自适应居中">🎯 适应窗口</button>
-          <button id="dviz-btn-reset" class="dag-tool-btn" title="恢复出厂策展顺序（b1→b13 原硬编码优先级）">↺ 重置顺序</button>
+          <button id="dviz-btn-reset" class="dag-tool-btn" title="恢复出厂策展顺序（原硬编码优先级）">↺ 重置顺序</button>
           <button id="dviz-btn-close" class="dag-modal-close" title="关闭决策引擎 (Esc)">✕</button>
         </div>
       </div>
@@ -858,19 +858,12 @@
         <aside class="dviz-left">
           <div class="dviz-panel">
             <div class="dviz-panel-head">
-              <span class="dviz-panel-title">🎨 层级图例</span>
-              <span class="dviz-panel-sub">点击过滤 · 再点取消</span>
-            </div>
-            <div id="dviz-layer-nav" class="dviz-layer-nav"></div>
-          </div>
-          <div class="dviz-panel">
-            <div class="dviz-panel-head">
               <span class="dviz-panel-title">🕹️ 操作指引</span>
             </div>
             <div class="dviz-legend">
               <div class="dviz-legend-item">
                 <span class="dviz-legend-ico" style="background:rgba(56,189,248,.14);color:#38bdf8">↕</span>
-                <div><b>拖动卡片 · 调序</b><span>调整 13 条需求判定的评估优先级，松手即热注入</span></div>
+                <div><b>拖动卡片 · 调序</b><span>调整 18 条 Branch 分支的评估优先级，松手即热注入</span></div>
               </div>
               <div class="dviz-legend-item">
                 <span class="dviz-legend-ico" style="background:rgba(16,185,129,.14);color:#10b981">╌</span>
@@ -884,16 +877,6 @@
                 <span class="dviz-legend-ico" style="background:rgba(167,139,250,.14);color:#a78bfa">🔍</span>
                 <div><b>滚轮缩放 · 空白平移</b><span>右键或空白处拖拽平移画布</span></div>
               </div>
-            </div>
-          </div>
-          <div class="dviz-panel">
-            <div class="dviz-panel-head">
-              <span class="dviz-panel-title">📦 数据来源</span>
-              <span class="dviz-panel-sub">decisions/</span>
-            </div>
-            <div class="dviz-src-list">
-              <code>branches.rs</code><code>evaluate.rs</code><code>needs.rs</code>
-              <code>routing.rs</code><code>seeking.rs</code><code>harvest.rs</code><code>scheduler.rs</code>
             </div>
           </div>
         </aside>
@@ -913,7 +896,7 @@
           <div id="dviz-insp-empty" class="dviz-empty">
             <div class="dviz-empty-ico">🧠</div>
             <div class="dviz-empty-title">尚未选中图元</div>
-            <div class="dviz-empty-sub">点击中央任意「需求判定卡 / 分界线 / 状态机」查看详情</div>
+            <div class="dviz-empty-sub">点击中央任意「Branch 分支卡 / 分界线」查看详情</div>
           </div>
           <div id="dviz-insp-card" class="dviz-insp-card" style="display:none"></div>
         </aside>

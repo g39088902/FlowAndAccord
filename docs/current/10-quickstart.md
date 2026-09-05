@@ -14,7 +14,7 @@ node frontend/server.js
 
 > 若 3000 端口已被占用，说明前端服务已在运行，直接访问即可，无需重复启动。
 
-> ⚠️ **v1.27.0 启动存档门禁**：页面打开后模拟默认暂停，需先点击「建立存档文件」创建/连接一个本地 `.json` 存档文件（File System Access API），写入成功后才解除门禁开始模拟。请使用最新版 Chrome 或 Edge（Firefox 不支持）。
+> ⚠️ **v1.27.0 启动存档门禁 / ★ v1.28.0 自动读档**：页面打开后模拟默认暂停。若已连接默认存档文件（自动槽 1 = 浏览器记住的默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复）则**直接读取其内容续演**；首次使用需点击「建立存档文件」创建/连接一个本地 `.json` 存档文件（File System Access API），写入成功后才解除门禁开始模拟。请使用最新版 Chrome 或 Edge（Firefox 不支持）。
 
 ### 编译 WASM（改 Rust 代码后）
 ```powershell

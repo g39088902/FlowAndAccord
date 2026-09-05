@@ -4,7 +4,7 @@
 // 本文件提供启动注入的权威默认顺序（★ v1.27.0 起用户运行时调整保存到浏览器
 // localStorage 键 flowaccord.decision-order.v1，不再写回本文件；server.js 的
 // POST /save-decision-order 端点保留仅作兼容迁移），
-// 是 evaluate_needs 18 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
+// 是 evaluate_needs 18 条 Branch 分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
 // decisionEvalOrder: 18 个分支 ID（b1~b18），数组顺序即评估优先级（越靠前越优先）。
 // ★ v1.19.0 b16Courtship（男性求偶成婚）提升至 b5/b6/b7/b9/b10 收集资源入家户账本之前：
 //   避免单身男性被安全/备料分支长期占满决策、求偶极少触发导致人口无法自我更替。
