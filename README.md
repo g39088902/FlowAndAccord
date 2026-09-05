@@ -200,11 +200,11 @@ node frontend/server.js
 | 文档 | 内容 |
 | :--- | :--- |
 | [AGENTS.md](./AGENTS.md) | 开发操作指南与易踩坑清单（改代码前必读） |
-| [docs/current.md](./docs/current.md) | 已实现功能全景索引 |
+| [docs/01-current.md](./docs/01-current.md) | 已实现功能全景索引 |
 | [docs/current/](./docs/current/) | 分模块机制文档（空间路网 / 生态 POI / 四季 / 代谢繁衍 / 房屋 / 决策 AI / 前端 / 配置 / 账本 / 市场 / 存档 / 影响矩阵） |
-| [docs/ui-spec-and-ledger-design.md](./docs/ui-spec-and-ledger-design.md) | UI 全景剖析与新功能界面设计 |
-| [docs/plan.md](./docs/plan.md) | 项目长期规划书 |
-| [docs/config-reference.md](./docs/config-reference.md) | 190+ 个可调超参速查表（自动生成） |
+| [docs/09-ui-spec-and-ledger-design.md](./docs/09-ui-spec-and-ledger-design.md) | UI 全景剖析与新功能界面设计 |
+| [docs/11-plan.md](./docs/11-plan.md) | 项目长期规划书 |
+| [docs/06-config-reference.md](./docs/06-config-reference.md) | 190+ 个可调超参速查表（自动生成） |
 
 ---
 

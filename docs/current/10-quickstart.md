@@ -1,6 +1,6 @@
 # 10. 🚀 快速启动与体验
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
 
 ---
 
@@ -39,7 +39,7 @@ node tools/test-wasm.js
 ```bash
 node tools/config-check.js
 ```
-输出「字段集、类型、默认值完全一致，无漂移」即代表前后端配置同步。同时自动刷新 `docs/config-reference.md`。
+输出「字段集、类型、默认值完全一致，无漂移」即代表前后端配置同步。同时自动刷新 `docs/06-config-reference.md`。
 
 ## 方式 4：Rust 内核编译检查
 ```bash

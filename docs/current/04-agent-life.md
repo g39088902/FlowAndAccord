@@ -1,6 +1,6 @@
 # 4. 🧬 部落民生理代谢、繁衍与寿命 (`agent`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/agent.rs`、`birth.rs`、`housing_system/marriage.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/agent.rs`、`birth.rs`、`housing_system/marriage.rs`
 
 ---
 
@@ -121,4 +121,4 @@ stateDiagram-v2
 - `snapshot.rs`：生理指标、行囊、禀赋、家户/宗族/地区归属随快照下发。
 
 ## 调参入口
-生理代谢、容量、繁衍门槛、遗传参数、行囊容量等见 [config-reference.md](../config-reference.md) 第 2、3 分区。
+生理代谢、容量、繁衍门槛、遗传参数、行囊容量等见 [06-config-reference.md](../06-config-reference.md) 第 2、3 分区。

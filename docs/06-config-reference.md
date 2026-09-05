@@ -1,4 +1,4 @@
-# Flow & Accord · 仿真超参数速查表 (config-reference.md)
+# Flow & Accord · 仿真超参数速查表 (06-config-reference.md)
 
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。

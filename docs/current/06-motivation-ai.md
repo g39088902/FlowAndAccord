@@ -1,6 +1,6 @@
 # 6. 🧠 马斯洛需求层次与行动状态机 (Motivation AI)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（7 子模块）· 深度拆解见 [`docs/agent-ai-analysis.md`](../agent-ai-analysis.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（7 子模块）· 深度拆解见 [`docs/07-agent-ai-analysis.md`](../07-agent-ai-analysis.md)
 
 ---
 
@@ -160,4 +160,4 @@ stateDiagram-v2
 - `world.rs`：tick_decisions 调度，错峰相位控制。
 
 ## 调参入口
-决策阈值、施密特触发器、淘金冷却、立宅门槛、体力作业门槛等见 [config-reference.md](../config-reference.md) 第 5 分区。
+决策阈值、施密特触发器、淘金冷却、立宅门槛、体力作业门槛等见 [06-config-reference.md](../06-config-reference.md) 第 5 分区。

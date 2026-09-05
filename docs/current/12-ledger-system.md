@@ -1,6 +1,6 @@
 # 12. 📒 账本与社会经济制度系统 (`ledger` + `bookkeeping`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/ledger/`（7 子模块）+ `crates/sim_core/src/spatial/bookkeeping.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/ledger/`（7 子模块）+ `crates/sim_core/src/spatial/bookkeeping.rs`
 > **里程碑状态**：M1~M4 已完整落地（M1 v1.0.0 / M2 v1.1.0 / M3 v1.2.0 / M4 v1.3.0），前端配套 4 标签页「社会与经济制度大盘」(`ledger-ui.js`)。
 
 > ⚡ **M6（v1.4.0）语义升级：家户账本从「权责镜像」成为「家庭物资唯一真相源」**。房屋仓库已删除，卸货（Deposit）/在家吃喝（Consume）/冬季烧柴（Heating）在生态与维护层**真实收付**家户账本，`bookkeeping.rs` 仅保留继承清算（Inheritance）与分家抽资（Split）；决策层改读账本余额；账本无容量上限。
@@ -151,4 +151,4 @@
 
 ## 调参入口
 
-账本与婚姻登记子系统（`ledger_journal_capacity`）、宗族系统 M3（`clan_tribute_*` / `clan_mutual_aid_*`）、地区与王国系统 M4（`ledger_tax_*` / `ledger_relief_*`）见 [config-reference.md](../config-reference.md) 第 10/11/12 分区。
+账本与婚姻登记子系统（`ledger_journal_capacity`）、宗族系统 M3（`clan_tribute_*` / `clan_mutual_aid_*`）、地区与王国系统 M4（`ledger_tax_*` / `ledger_relief_*`）见 [06-config-reference.md](../06-config-reference.md) 第 10/11/12 分区。

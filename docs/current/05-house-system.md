@@ -1,6 +1,6 @@
 # 5. 🏡 多级私产房屋与建材升级体系 (`house`)
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（6 子模块）
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/house.rs`、`housing_system/`（6 子模块）
 
 > ⚡ **M6（v1.4.0）机制更新**：房屋已**完全去仓储化**——`House.pantry_*/max_pantry_*`、`is_pantry_full`、`is_fertility_active` 全部删除，家庭物资唯一真相源是**家户账本**（`Household.group.ledger`）；房屋回归纯建筑角色（等级/耐久/位置/户主/代际）。升级改为**瞬时化**：`BuildHouse` 决策就绪后一次性扣账晋升、无体力无工时；房屋每晋升一级户主威望（prestige）+1（v1.18.0 新增担任国王与宗族长老各 +3 威望）。婚姻已**去房屋化**（无房可婚）；生育在 ★ v1.28.0 重新挂钩住宅等级——男方（户主）名下须有 ≥1 级私宅方可生育（0 级仓库不生育）。
 >
@@ -123,7 +123,7 @@ v1.28.3 起，拍卖大盘的“辖区意向买家/换家家户池”卡片仅�
 
 #### v1.26.6 改善型换房
 
-有房男性户主也可自主竞买更高等级的在售房屋。候选目标只按等级差降序、同差按房屋 ID 升序；报价为当前等级到目标等级的升级资源差乘市场基准价格所得成本价，不设置安全储备。麦穗决策期采用 `bid >= benchmark_bid` 成交。目标房成交完成后，原房屋才清空所有权并在下一阶段创建新的空置拍卖会话；主动出售的后续成交款归原户主家户，不走遗产受益人分账。详细需求与技术方案见 [plan-house-upgrade-auction.md](../plan-house-upgrade-auction.md)。
+有房男性户主也可自主竞买更高等级的在售房屋。候选目标只按等级差降序、同差按房屋 ID 升序；报价为当前等级到目标等级的升级资源差乘市场基准价格所得成本价，不设置安全储备。麦穗决策期采用 `bid >= benchmark_bid` 成交。目标房成交完成后，原房屋才清空所有权并在下一阶段创建新的空置拍卖会话；主动出售的后续成交款归原户主家户，不走遗产受益人分账。详细需求与技术方案见 [13-plan-house-upgrade-auction.md](../13-plan-house-upgrade-auction.md)。
 
 1. **出价下沉到决策引擎**：无房成年男性或已有房屋的户主在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支，按目标等级差降序、同差房屋 ID 升序选择在售房屋，写下 `pending_bid_house_id` 与资源差成本价（不改变运动状态）；世界物理执行器 `execute_pending_bids` 校验后落地，出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却。
 2. **麦穗 37% 最优停止博弈**（成交判定只看新报价，不回溯历史）：
@@ -167,4 +167,4 @@ v1.28.3 起，拍卖大盘的“辖区意向买家/换家家户池”卡片仅�
 - `snapshot.rs`：房屋等级、耐久、仓储随快照下发。
 
 ## 调参入口
-房屋容量、升级门槛、施工时长、折旧修缮、供暖参数、立宅选址参数等见 [config-reference.md](../config-reference.md) 第 6 分区。
+房屋容量、升级门槛、施工时长、折旧修缮、供暖参数、立宅选址参数等见 [06-config-reference.md](../06-config-reference.md) 第 6 分区。

@@ -21,7 +21,7 @@ $env:CARGO_HOME = "$PWD\.cargo-home"
 - `.cargo-home/`：离线依赖缓存（registry + git）
 - 注入后 `cargo --version` / `rustc --version` 应正常输出
 
-> ⚠️ CI 中**禁止**使用便携链——CI 运行在 ubuntu-latest，用标准 rustup（见 [cicd-guide.md](./cicd-guide.md)）。`.toolchain/` 与 `.cargo-home/` 已被 gitignore。
+> ⚠️ CI 中**禁止**使用便携链——CI 运行在 ubuntu-latest，用标准 rustup（见 [04-cicd-guide.md](./04-cicd-guide.md)）。`.toolchain/` 与 `.cargo-home/` 已被 gitignore。
 
 ### 1.2 macOS / Linux（标准 rustup）
 
@@ -70,7 +70,7 @@ node tools/config-check.js
 3. **类型错配**：`usize/u64` 与浮点混淆
 4. **数值漂移**：默认值不一致
 
-通过时输出字段数对比，并自动刷新 `docs/config-reference.md`（参数速查表，**勿手改**）。
+通过时输出字段数对比，并自动刷新 `docs/06-config-reference.md`（参数速查表，**勿手改**）。
 
 > 发布前双绿：`test-wasm.js` + `config-check.js` 均通过方可发布。
 

@@ -1,6 +1,6 @@
 # 13. 🔗 跨模块影响矩阵
 
-> **模块索引**：[← 返回 current.md 全景索引](../current.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
 > 本文档是 agent 设计方案时的最高价值单页参考：**改 X 会牵动哪些文件**。按"最常改动 → 最隐蔽联动"排序。
 > 最后核验：v1.27.0。
 
@@ -77,7 +77,7 @@
 
 | 改动对象 | 必须同步改动 | 原因 |
 |---|---|---|
-| `config.rs` 新增超参 | 命名 `const` 默认值 / `SimConfig` 字段 / `Default` 映射 (三处同文件) / `config.js` 对应字段 / `config-check.js` 自动覆盖 / `docs/config-reference.md` (自动生成) | §4.12 超参集中化：Rust 侧三处 + 前端一处 |
+| `config.rs` 新增超参 | 命名 `const` 默认值 / `SimConfig` 字段 / `Default` 映射 (三处同文件) / `config.js` 对应字段 / `config-check.js` 自动覆盖 / `docs/06-config-reference.md` (自动生成) | §4.12 超参集中化：Rust 侧三处 + 前端一处 |
 | `config.js` 数值调整 | 浏览器 Ctrl+F5 即生效 / `node tools/config-check.js` 校验 / 如影响机制须更新文档 | 调参不需重编译，但须通过一致性校验 |
 | `config.decision-order.js` 分支顺序变更 | `decision-viz.js` 合并进 SIM_CONFIG / `rustworld.js` applyConfig 热注入 / `server.js` POST save-decision-order 写盘 | §4.14 决策顺序真相源在文件，拖动即热注入 |
 
@@ -87,7 +87,7 @@
 |---|---|---|
 | Rust 内核代码变更 | `cargo build --target wasm32-unknown-unknown --release` / 双副本复制到 `frontend/rust/` + `frontend/` / `node tools/test-wasm.js` 门禁 / 版本号自增 | §4.1 双副本同步：缺一不可 |
 | 前端 JS/CSS/HTML 变更 | 浏览器 Ctrl+F5 刷新 / 版本号自增 / 如涉及快照字段须三处同步 | 前端纯静态，改完即生效 |
-| `.github/workflows/deploy.yml` 变更 | 4 个 Secrets 配置 / COS MIME 覆写 / 门禁顺序 / `docs/cicd-guide.md` | §4.13 CI/CD 使用标准 rustup，非便携工具链 |
+| `.github/workflows/deploy.yml` 变更 | 4 个 Secrets 配置 / COS MIME 覆写 / 门禁顺序 / `docs/04-cicd-guide.md` | §4.13 CI/CD 使用标准 rustup，非便携工具链 |
 
 ### 1.10 外部市场与动态价格系统 (v1.13.0)
 
