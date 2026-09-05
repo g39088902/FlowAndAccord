@@ -326,6 +326,8 @@ pub const MARKET_STOCK_MAX_FOOD: f32 = 200.0;
 pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
 /// 外部市场粮食每秒自然再生速率
 pub const MARKET_REGEN_BASE_FOOD: f32 = 2.0;
+/// 外部市场（榷场互市）单次交易结算步长（单位，默认 2.0）
+pub const MARKET_SETTLEMENT_STEP: f32 = 2.0;
 /// 满库存起步基准单价（黄金 / 单位资源）
 pub const MARKET_PRICE_BASE: f32 = 0.1;
 /// 幂律定价指数 k（越大则低库存时价格飙升越剧烈）
@@ -594,6 +596,7 @@ pub struct SimConfig {
     pub market_emergency_family_stock_threshold: f32,
     pub market_min_family_gold: f32,
     pub market_min_dispatch_stamina: f32,
+    pub market_settlement_step: f32,
 
     // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
     pub house_auction_bid_cooldown_ticks: u64,
@@ -824,6 +827,7 @@ impl Default for SimConfig {
             market_emergency_family_stock_threshold: MARKET_EMERGENCY_FAMILY_STOCK_THRESHOLD,
             market_min_family_gold: MARKET_MIN_FAMILY_GOLD,
             market_min_dispatch_stamina: MARKET_MIN_DISPATCH_STAMINA,
+            market_settlement_step: MARKET_SETTLEMENT_STEP,
 
             // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
             house_auction_bid_cooldown_ticks: HOUSE_AUCTION_BID_COOLDOWN_TICKS,

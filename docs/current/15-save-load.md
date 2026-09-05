@@ -99,7 +99,7 @@ World3DEngine
 
 ### 4.2 UI 层 `save-ui.js`（~620 行）
 
-- **三槽位**：自动槽（每 60 秒覆盖，世界未推进则跳过）/ 手动槽 1 / 手动槽 2。
+- **三槽位**：自动槽（每 30 秒覆盖，世界未推进则跳过；重置生态开启新档时亦自动更新保存）/ 手动槽 1 / 手动槽 2。
 - **存储键**：正文 `flowaccord.save.v1.<slotId>`，元信息统一放索引键 `flowaccord.save.v1.__index`（避免正文重复占用配额）。
 - **元信息**：`tick` / 存活人口 / 存续家户数 / 保存时间 / 种子 / 体积 / `app_version`，仅在保存或导入时解析一次。
 - **面板**：顶栏「💾 存档」「📂 读档」两个按钮打开同一面板，切换保存/读取标签；槽位卡片支持覆盖保存、读取、导出、删除（二次确认）；底部支持导入 `.json` 文件（校验 `format_version` 后直接载入）。
@@ -111,7 +111,7 @@ World3DEngine
 - **连接**：`connectLocalFile()` 调 `showSaveFilePicker()` 让用户选择/新建一个 `.json` 文件，获得 `FileSystemFileHandle` 后存入 `localFileHandle`。
 - **写入**：`saveToLocalFile()` 经 `handle.createWritable()` → `write(json)` → `close()` 直写磁盘，无需重复弹窗。
 - **读取**：`loadFromLocalFile()` 从已连接文件读取；`loadFromLocalFilePicker()` 支持不先连接、直接 `showOpenFilePicker()` 打开任意存档文件。
-- **自动保存切换**：已连接本地文件时，`tickAutoSave()` 每 60 秒直写本地文件而非 localStorage，彻底规避大存档的 `QuotaExceededError`。
+- **自动保存切换**：已连接本地文件时，`tickAutoSave()` 每 30 秒直写本地文件而非 localStorage，彻底规避大存档的 `QuotaExceededError`。重置生态开启新档时同样触发自动更新。
 - **兼容性降级**：`supportsLocalFileAPI()` 检测 `showSaveFilePicker`/`showOpenFilePicker`；不支持时（Firefox 等）隐藏连接按钮，读取标签下的「选择存档文件」降级到传统 `input[type=file]`，底部提示引导使用 Chrome/Edge。
 - **权限失效**：写入/读取捕获 `NotAllowedError`，自动 `disconnectLocalFile()` 并提示重新连接。
 - **句柄不持久化**：页面刷新后 `localFileHandle` 失效（浏览器安全策略），需用户重新连接。

@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.32.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.33.0**。
+
+| **v1.33.0** | 落地 TODO.md 四大核心需求：① **时光倒流控制器**：强确定性回滚 Tick（Checkpoint + Replay），支持输入任意指定目标 Tick 毫秒级回溯历史世界，配滑块与快捷选项卡并自动暂停；② **榷场固定以 2 个单位作为结算步长**：引入 `market_settlement_step: 2.0` 配置，弃用原本每 tick 微量浮点扣除（`rate_res * dt`），自救自饮/自食与装袋购水/购粮均以 2.0 离散步长结算，单笔流水额度整洁统一；③ **开新档自动更新存档 & 30秒自动保存**：自动保存周期由 60 秒调整为 30 秒，重演生态开启新世界时立即触发槽位 1 自动写盘；④ **UI 增加明亮主题**：增加高对比度、柔和通透的浅色主题（`body.theme-light`），顶栏提供一键切换并本地持久化偏好 | sim_core / ecology / config / frontend / docs |
 
 | **v1.32.0** | 修复「孤儿营地」永无国王缺陷：夺位远征判定 `eligible_leaderless_camp` 由遍历已存在的 Region 实体改为遍历完整营地 POI 列表，无 Region 实体（有房无王）的营地一并视为空缺王位；`decide_seeking_throne` 途中校验与 `execute_pending_coronations` 登基校验同步将「无 region」从「非空缺」修正为「空缺」（`unwrap_or(false)` → `unwrap_or(true)`），使房屋辖区（House.camp_id）与地区成员登记簿（RegionRegistry）脱节产生的孤儿营地能被 B14SeekThrone 识别并自然产生国王（种子 1788611184736 扶风营地无王问题） | sim_core / decisions / docs |
 

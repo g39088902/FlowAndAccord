@@ -236,6 +236,7 @@ window.SIM_CONFIG = {
   marketEmergencyFamilyStockThreshold: 10.0,// 家户物资绝境警戒线
   marketMinFamilyGold: 0.5,                 // 户主准入起步黄金底线
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
+  marketSettlementStep: 2.0,                // 外部市场单次交易结算步长 (单位)
 
   // ==========================================================================
   // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)

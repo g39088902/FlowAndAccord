@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.32.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.33.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -67,11 +67,13 @@
       </div>
     </div>
 
-    <!-- 💾 存档系统入口 (v1.7.0 读档/存档) + 🏛️ 房屋拍卖入口 (v1.15.0) -->
+    <!-- 💾 存档系统入口 (v1.7.0 读档/存档) + 🏛️ 房屋拍卖入口 (v1.15.0) + ⏪ 时光倒流 + ☀️ 主题 -->
     <div class="save-bar-card">
       <button class="save-bar-btn" id="btn-open-save-panel" title="将当前世界保存到槽位">💾 存档</button>
       <button class="save-bar-btn" id="btn-open-load-panel" title="从槽位或文件读取世界">📂 读档</button>
+      <button class="save-bar-btn" id="btn-open-rewind" title="打开时光倒流控制器：输入指定 Tick 瞬间回滚世界历史">⏪ 倒流</button>
       <button class="save-bar-btn auction-bar-btn" id="btn-open-auction-modal" title="查看全图房屋拍卖大盘与连续报价过程">🏛️ 报价 (<span id="top-auction-count">0</span>)</button>
+      <button class="save-bar-btn" id="btn-toggle-theme" title="切换明亮/暗色主题">☀️ 主题</button>
     </div>
   </div>
 
@@ -637,6 +639,7 @@
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
       <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动 Branch 分支调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
       <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
+      <button class="ecology-btn" id="btn-open-rewind-ctrl" title="打开时光倒流控制器：输入指定 Tick 瞬间回滚世界历史" style="border-color:rgba(245,158,11,.45); color:#fbbf24; background:rgba(245,158,11,.14);">⏪ 时光倒流</button>
       <button class="headless-btn" id="btn-headless" title="无头模式">🧠 无头模式</button>
     </div>
     
@@ -926,6 +929,69 @@
         <span class="save-hint" id="save-storage-hint"></span>
       </div>
       <input type="file" id="save-file-input" accept="application/json,.json" style="display:none;">
+    </div>
+  </div>
+
+  <!-- ══════════ ⏪ 时光倒流控制器模态弹窗 ══════════ -->
+  <div class="rewind-modal-overlay" id="rewind-modal" style="display:none;">
+    <div class="rewind-modal-card">
+      <div class="rewind-modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">⏪</span>
+          <div>
+            <div style="font-size:14px; font-weight:700; color:#38bdf8;">时光倒流控制器</div>
+            <div style="font-size:10px; color:#94a3b8;">强确定性 Tick 回滚 · 输入任意指定 Tick 瞬间还原历史世界</div>
+          </div>
+        </div>
+        <button id="btn-close-rewind" class="rewind-modal-close" title="关闭 (Esc)" aria-label="关闭时光倒流">✕</button>
+      </div>
+
+      <div class="rewind-modal-body">
+        <div class="rewind-info-box">
+          <div class="rewind-info-row">
+            <span>⏱️ 当前模拟进度:</span>
+            <span style="color:#38bdf8; font-weight:700;">Tick <b id="rewind-current-tick" class="mono-num">0</b></span>
+          </div>
+          <div class="rewind-info-row">
+            <span>⏳ 累计运行时间:</span>
+            <span style="color:#f59e0b; font-weight:600;" id="rewind-current-time" class="mono-num">0.0 秒</span>
+          </div>
+          <div class="rewind-info-row">
+            <span>🌐 可回滚历史区间:</span>
+            <span id="rewind-range-text" class="mono-num" style="color:#94a3b8;">Tick 0 ~ 0</span>
+          </div>
+        </div>
+
+        <div class="rewind-input-section">
+          <label for="input-target-tick" style="font-size:12px; font-weight:600; color:#cbd5e1; display:block; margin-bottom:6px;">🎯 输入目标回滚 Tick：</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="number" id="input-target-tick" min="0" value="0" class="rewind-tick-input mono-num" placeholder="输入目标 Tick">
+            <button id="btn-execute-rewind" class="rewind-primary-btn">⏪ 立即回滚</button>
+          </div>
+        </div>
+
+        <div class="rewind-slider-section">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#64748b; margin-bottom:4px;">
+            <span id="rewind-slider-min">Tick 0</span>
+            <span id="rewind-slider-val" style="color:#38bdf8; font-weight:600;">Tick 0</span>
+            <span id="rewind-slider-max">Tick 0</span>
+          </div>
+          <input type="range" id="slider-target-tick" min="0" max="0" value="0" class="rewind-slider">
+        </div>
+
+        <div class="rewind-chips-section">
+          <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;">⚡ 快捷回滚幅度：</div>
+          <div class="rewind-chips-grid">
+            <button class="rewind-chip-btn" data-delta="100">-100 Tick (~3.3秒)</button>
+            <button class="rewind-chip-btn" data-delta="300">-300 Tick (~10秒)</button>
+            <button class="rewind-chip-btn" data-delta="900">-900 Tick (~30秒)</button>
+            <button class="rewind-chip-btn" data-delta="1800">-1800 Tick (~1分钟)</button>
+            <button class="rewind-chip-btn" data-target="0">⏪ 回滚至创世 (Tick 0)</button>
+          </div>
+        </div>
+
+        <div id="rewind-status-msg" class="rewind-status-msg" style="display:none;"></div>
+      </div>
     </div>
   </div>
 

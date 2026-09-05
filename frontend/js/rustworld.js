@@ -53,6 +53,8 @@
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
+        this._historyCheckpoints = [];
+        this._lastCheckpointTick = -1;
         this._setEngineStatus('正在加载生态演算引擎…', 'loading');
 
         // 异步加载 Rust 引擎 (wasm)
@@ -74,6 +76,7 @@
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
+          this._recordHistoryCheckpoint();
           console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
         } catch (e) {
           this._setEngineStatus('生态演算引擎加载失败，请检查服务器或刷新重试。', 'error');
@@ -173,6 +176,9 @@
         const t1 = performance.now();
         this._pullSnapshot(false);
         const t2 = performance.now();
+        if (this.tickCount - this._lastCheckpointTick >= 30 || this._lastCheckpointTick < 0) {
+          this._recordHistoryCheckpoint();
+        }
         // 指数移动平均平滑，避免 HUD 数值抖动 (仅在调试模式下采样)
         if (this.debugMode) {
           this.tickMs += ((t1 - t0) - this.tickMs) * 0.15;
@@ -202,12 +208,15 @@
         this._trails.clear();
         this.agentArchive.clear();
         this._consumedDeathIds.clear();
+        this._historyCheckpoints = [];
+        this._lastCheckpointTick = -1;
         if (this._ready) {
           this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20, this._campCountFromConfig());
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
+          this._recordHistoryCheckpoint();
         }
       }
 
@@ -278,7 +287,85 @@
         this.deselect();
         if (meta && typeof meta.seed === 'number') this._engineSeed = meta.seed;
         this._pullSnapshot(true);
+        this._historyCheckpoints = [];
+        this._lastCheckpointTick = -1;
+        this._recordHistoryCheckpoint();
         return { ok: true };
+      }
+
+      // ============ ⏪ 时光倒流控制器支持 ============
+      _recordHistoryCheckpoint() {
+        if (!this._ready) return;
+        const json = this.saveWorld();
+        if (!json) return;
+        const tick = this.tickCount || 0;
+        if (this._historyCheckpoints.length > 0 && this._historyCheckpoints[this._historyCheckpoints.length - 1].tick === tick) return;
+        this._historyCheckpoints.push({ tick, json });
+        this._lastCheckpointTick = tick;
+
+        // 内存与性能保护：最多保留 160 个历史检查点（~6MB），首档保留，近程密集，较早历史稀疏
+        if (this._historyCheckpoints.length > 160) {
+          const genesis = this._historyCheckpoints[0];
+          const recent = this._historyCheckpoints.slice(-60);
+          const middle = this._historyCheckpoints.slice(1, -60).filter((_, idx) => idx % 6 === 0);
+          this._historyCheckpoints = [genesis, ...middle, ...recent];
+        }
+      }
+
+      rewindToTick(targetTick) {
+        if (!this._ready) return { ok: false, error: 'WASM 引擎尚未就绪' };
+        targetTick = Math.round(Number(targetTick));
+        if (isNaN(targetTick) || targetTick < 0) return { ok: false, error: '目标 Tick 必须为非负整数' };
+        const currentTick = this.tickCount || 0;
+        if (targetTick > currentTick) {
+          return { ok: false, error: `目标 Tick (${targetTick}) 大于当前 Tick (${currentTick})，时光倒流仅支持向历史回滚` };
+        }
+        if (targetTick === currentTick) {
+          this.isPaused = true;
+          return { ok: true, tick: currentTick, message: '已位于目标 Tick' };
+        }
+        if (!this._historyCheckpoints || this._historyCheckpoints.length === 0) return { ok: false, error: '暂无可用的历史检查点' };
+        const minRecorded = this._historyCheckpoints[0].tick;
+        if (targetTick < minRecorded) return { ok: false, error: `目标 Tick (${targetTick}) 早于历史最早检查点 (${minRecorded})` };
+
+        // 1. 寻找 <= targetTick 的最近基准检查点
+        let bestCp = this._historyCheckpoints[0];
+        for (let i = this._historyCheckpoints.length - 1; i >= 0; i--) {
+          if (this._historyCheckpoints[i].tick <= targetTick) {
+            bestCp = this._historyCheckpoints[i];
+            break;
+          }
+        }
+
+        // 2. 加载基准检查点覆盖当前世界
+        const res = this.loadWorld(bestCp.json);
+        if (!res.ok) return { ok: false, error: `还原检查点失败: ${res.error}` };
+
+        // 3. 确定性步进微量余数 (delta)
+        const delta = targetTick - bestCp.tick;
+        if (delta > 0) {
+          this._wasm.world_tick_steps(delta, 1.0 / 30.0);
+          this._pullSnapshot(true);
+        }
+
+        // 4. 截断 targetTick 之后的分叉检查点并落盘当前目标刻
+        this._historyCheckpoints = this._historyCheckpoints.filter(cp => cp.tick <= targetTick);
+        this._lastCheckpointTick = targetTick;
+        const currentJson = this.saveWorld();
+        if (currentJson) this._historyCheckpoints.push({ tick: targetTick, json: currentJson });
+
+        // 5. 回滚后自动暂停模拟
+        this.isPaused = true;
+        const btnPause = document.getElementById('btn-pause');
+        if (btnPause) btnPause.textContent = '▶️ 继续模拟 (空格)';
+        this.logEvent(`⏪ 时光倒流：世界已成功回滚至 Tick ${targetTick}（第 ${(targetTick / 30).toFixed(1)} 模拟秒）`, 'camp');
+        return { ok: true, tick: targetTick };
+      }
+
+      getRewindInfo() {
+        const currentTick = this.tickCount || 0;
+        const minTick = (this._historyCheckpoints && this._historyCheckpoints.length > 0) ? this._historyCheckpoints[0].tick : currentTick;
+        return { currentTick, minTick, maxTick: currentTick, checkpointCount: this._historyCheckpoints ? this._historyCheckpoints.length : 0 };
       }
 
       setWaterRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(0, m); }

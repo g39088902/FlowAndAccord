@@ -5,7 +5,7 @@
 // 静默重授（授权已持久化时立即成功），失败则提供「授权并读取上次存档」按钮（点击=
 // 用户手势内 requestPermission）；保存/读取遇 NotAllowedError 亦就地重授后重试。
 // 存档正文为内核导出的全量世界状态 JSON（含 RNG 内部状态），读档后可确定性续演。
-// 自动保存每 60 秒写入槽位 1。仅支持 Chrome / Edge（File System Access API）。
+// 自动保存每 30 秒写入槽位 1。仅支持 Chrome / Edge（File System Access API）。
 // v1.12.0: 彻底删除 localStorage 存档体系，仅保留文件直写。
 
 (function () {
@@ -13,7 +13,7 @@
 
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
   const SAVE_FORMAT_VERSION = 3;
-  const AUTO_SAVE_INTERVAL_MS = 60000;
+  const AUTO_SAVE_INTERVAL_MS = 30000;
 
   const SLOTS = [
     { id: 'save1', icon: '📁', name: '存档槽 1', desc: '自动保存默认写入此槽', suggestedName: 'flowaccord-save1.json', isAuto: true },
@@ -574,7 +574,7 @@
     if (els.hint) {
       const connected = SLOTS.filter(s => slotState[s.id]).length;
       els.hint.textContent = connected > 0
-        ? `💻 文件直写模式 · 已连接 ${connected}/3 槽位 · 自动保存每 60 秒写入「存档槽 1」· 刷新后自动恢复连接（权限失效时点击操作自动重授）`
+        ? `💻 文件直写模式 · 已连接 ${connected}/3 槽位 · 自动保存每 30 秒写入「存档槽 1」· 刷新后自动恢复连接（权限失效时点击操作自动重授）`
         : '💻 文件直写模式 · 存档直写您电脑上的 .json 文件，不受浏览器存储配额限制 · 请先连接槽位';
     }
   }
@@ -704,6 +704,22 @@
     }
 
     await bootstrapStartupGate();
+
+    // 暴露全局 API 供生态重置开新档与外部系统联动
+    window.saveUI = {
+      saveSlot: saveToSlot,
+      loadSlot: loadFromSlot,
+      autoSave: () => saveToSlot('save1'),
+      refresh: renderList,
+    };
+
+    // 监听生态重置事件，开启新档后自动更新存档
+    window.addEventListener('ecology-reset', async () => {
+      const st = slotState['save1'];
+      if (st && st.handle && !st.permError) {
+        await saveToSlot('save1');
+      }
+    });
 
     setInterval(tickAutoSave, AUTO_SAVE_INTERVAL_MS);
   }

@@ -556,6 +556,11 @@
       sim.initEcology(20);
       isCameraFollow = false;
       updateFollowBtnState();
+      // ★ 重置生态开启新档：自动更新存档
+      window.dispatchEvent(new CustomEvent('ecology-reset'));
+      if (window.saveUI && typeof window.saveUI.autoSave === 'function') {
+        window.saveUI.autoSave();
+      }
     });
 
     // ==========================================
@@ -646,3 +651,133 @@
       e.stopPropagation();
       window.focusOnAgent(agentId);
     });
+
+    // ==========================================
+    // ☀️ 明亮 / 🌙 暗色主题切换
+    // ==========================================
+    const btnToggleTheme = document.getElementById('btn-toggle-theme');
+    const THEME_KEY = 'flow_sim_theme';
+    function applyTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.add('theme-light');
+        if (btnToggleTheme) btnToggleTheme.textContent = '🌙 暗色';
+      } else {
+        document.body.classList.remove('theme-light');
+        if (btnToggleTheme) btnToggleTheme.textContent = '☀️ 主题';
+      }
+    }
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
+    applyTheme(savedTheme);
+
+    if (btnToggleTheme) {
+      btnToggleTheme.addEventListener('click', () => {
+        const nextTheme = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+        applyTheme(nextTheme);
+        try {
+          localStorage.setItem(THEME_KEY, nextTheme);
+        } catch (_) {}
+      });
+    }
+
+    // ==========================================
+    // ⏪ 时光倒流控制器交互绑定
+    // ==========================================
+    const rewindModal = document.getElementById('rewind-modal');
+    const btnOpenRewind = document.getElementById('btn-open-rewind');
+    const btnOpenRewindCtrl = document.getElementById('btn-open-rewind-ctrl');
+    const btnCloseRewind = document.getElementById('btn-close-rewind');
+    const inputTargetTick = document.getElementById('input-target-tick');
+    const sliderTargetTick = document.getElementById('slider-target-tick');
+    const btnExecuteRewind = document.getElementById('btn-execute-rewind');
+    const rewindStatusMsg = document.getElementById('rewind-status-msg');
+
+    function updateRewindUI() {
+      if (!sim || typeof sim.getRewindInfo !== 'function') return;
+      const info = sim.getRewindInfo();
+      const curTickEl = document.getElementById('rewind-current-tick');
+      const curTimeEl = document.getElementById('rewind-current-time');
+      const rangeTextEl = document.getElementById('rewind-range-text');
+      const sliderMinEl = document.getElementById('rewind-slider-min');
+      const sliderMaxEl = document.getElementById('rewind-slider-max');
+      const sliderValEl = document.getElementById('rewind-slider-val');
+
+      if (curTickEl) curTickEl.textContent = info.currentTick;
+      if (curTimeEl) curTimeEl.textContent = `${(info.currentTick / 30).toFixed(1)} 秒`;
+      if (rangeTextEl) rangeTextEl.textContent = `Tick ${info.minTick} ~ ${info.maxTick} (${info.checkpointCount} 个检查点)`;
+      if (sliderMinEl) sliderMinEl.textContent = `Tick ${info.minTick}`;
+      if (sliderMaxEl) sliderMaxEl.textContent = `Tick ${info.maxTick}`;
+
+      if (sliderTargetTick) { sliderTargetTick.min = info.minTick; sliderTargetTick.max = info.maxTick; sliderTargetTick.value = info.currentTick; }
+      if (inputTargetTick) { inputTargetTick.min = info.minTick; inputTargetTick.max = info.maxTick; inputTargetTick.value = info.currentTick; }
+      if (sliderValEl) sliderValEl.textContent = `Tick ${info.currentTick}`;
+      if (rewindStatusMsg) rewindStatusMsg.style.display = 'none';
+    }
+
+    const openRewindModal = () => { if (rewindModal) { updateRewindUI(); rewindModal.style.display = 'flex'; } };
+    const closeRewindModal = () => { if (rewindModal) rewindModal.style.display = 'none'; };
+    if (btnOpenRewind) btnOpenRewind.addEventListener('click', openRewindModal);
+    if (btnOpenRewindCtrl) btnOpenRewindCtrl.addEventListener('click', openRewindModal);
+    if (btnCloseRewind) btnCloseRewind.addEventListener('click', closeRewindModal);
+    if (rewindModal) rewindModal.addEventListener('click', (e) => { if (e.target === rewindModal) closeRewindModal(); });
+
+    const syncTickValue = (val) => {
+      if (sliderTargetTick) sliderTargetTick.value = val;
+      if (inputTargetTick) inputTargetTick.value = val;
+      const sliderValEl = document.getElementById('rewind-slider-val');
+      if (sliderValEl) sliderValEl.textContent = `Tick ${val}`;
+    };
+    if (sliderTargetTick) sliderTargetTick.addEventListener('input', (e) => syncTickValue(parseInt(e.target.value, 10) || 0));
+    if (inputTargetTick) inputTargetTick.addEventListener('input', (e) => syncTickValue(parseInt(e.target.value, 10) || 0));
+
+    document.querySelectorAll('.rewind-chip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!sim || typeof sim.getRewindInfo !== 'function') return;
+        const info = sim.getRewindInfo();
+        let target = info.currentTick;
+        if (btn.dataset.target !== undefined) {
+          target = parseInt(btn.dataset.target, 10) || 0;
+        } else if (btn.dataset.delta !== undefined) {
+          target = Math.max(info.minTick, info.currentTick - (parseInt(btn.dataset.delta, 10) || 0));
+        }
+        syncTickValue(target);
+      });
+    });
+
+    if (btnExecuteRewind) {
+      btnExecuteRewind.addEventListener('click', () => {
+        const targetTick = parseInt(inputTargetTick.value, 10);
+        if (isNaN(targetTick) || targetTick < 0) {
+          if (rewindStatusMsg) {
+            rewindStatusMsg.className = 'rewind-status-msg err';
+            rewindStatusMsg.textContent = '❌ 请输入合法的非负整数 Tick';
+            rewindStatusMsg.style.display = 'block';
+          }
+          return;
+        }
+        btnExecuteRewind.disabled = true;
+        const res = sim.rewindToTick(targetTick);
+        btnExecuteRewind.disabled = false;
+        if (res.ok) {
+          if (rewindStatusMsg) {
+            rewindStatusMsg.className = 'rewind-status-msg ok';
+            rewindStatusMsg.textContent = `✅ 已成功倒流回滚至 Tick ${res.tick}！模拟已自动暂停。`;
+            rewindStatusMsg.style.display = 'block';
+          }
+          updateRewindUI();
+          isCameraFollow = false;
+          if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+          if (typeof updateInspector === 'function') updateInspector();
+        } else if (rewindStatusMsg) {
+          rewindStatusMsg.className = 'rewind-status-msg err';
+          rewindStatusMsg.textContent = `❌ 回滚失败: ${res.error || '未知错误'}`;
+          rewindStatusMsg.style.display = 'block';
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && rewindModal && rewindModal.style.display !== 'none') {
+        closeRewindModal();
+        e.stopPropagation();
+      }
+    }, true);
