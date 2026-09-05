@@ -121,7 +121,7 @@ stateDiagram-v2
 
 ### 分支评估顺序（数据驱动，v1.3.6 起）
 - 18 条分支抽为 `branches.rs` 注册表（`BranchId::B14SeekThrone` + `B1QuenchThirst .. B13GoldWealth` + `B15MarketTrade` + `B16Courtship` + `B17BidHouse` + `B18RaiseChild` ↔ 字符串 ID `"b1".."b18"`），
-  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫、b15 的榷场商贸守卫、b16 的男性求偶守卫全部内建），
+  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫、b15 的榷场商贸守卫、b16 的男性求偶守卫及家户金币门槛全部内建），
   因此任意排列都语义安全。
 - `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
 - **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`

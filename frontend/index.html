@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.28.2</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.28.3</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -321,7 +321,6 @@
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
-            <div class="ledger-overview-item"><span class="ledger-ov-lbl">最富家户</span><span class="ledger-ov-val" id="ledger-ov-richest" style="color:#fbbf24;">—</span></div>
           </div>
           <div class="ledger-section-title">📊 存续家户资源平均值</div>
           <div class="ledger-overview-row ledger-resource-averages" id="ledger-resource-averages">
@@ -1085,11 +1084,10 @@
             <!-- 左列：意向买家池 -->
             <div class="auction-col buyers-col">
               <div class="auction-col-title">
-                <span>👥 辖区意向买家/换房家户池 (<span id="auction-buyers-count">0</span>户)</span>
-                <span class="col-sub">成年单身/无房男性户主</span>
+                <span>👥 辖区意向买家/换家家户池 (<span id="auction-buyers-count">0</span>户)</span>
               </div>
               <div class="auction-buyers-list" id="auction-buyers-list">
-                <div class="auction-empty-hint">当前聚落无单身/无房成年男性户主</div>
+                <div class="auction-empty-hint">当前辖区暂无符合条件的意向买家</div>
               </div>
             </div>
 
@@ -1140,6 +1138,7 @@
   <script src="js/dag-standalone.js"></script>
   <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/entity-link.js"></script>
   <script src="js/ledger-ui.js"></script>
   <!-- 读档/存档系统 (v1.7.0) · 依赖 main.js 暴露的 window.rustWorldSim -->
   <script src="js/save-ui.js"></script>

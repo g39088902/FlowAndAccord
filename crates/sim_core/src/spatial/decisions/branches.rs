@@ -246,7 +246,8 @@ impl BranchId {
                     return None;
                 }
                 // 需存在至少一名合格单身女性
-                if d.best_courtship_target(a).is_some() {
+                if d.ledger_balance(a, ResourceKind::Gold) > cfg.decision_courtship_min_family_gold
+                    && d.best_courtship_target(a).is_some() {
                     return Some(Need {
                         level: MaslowLevel::Belonging,
                         kind: NeedKind::Courtship,

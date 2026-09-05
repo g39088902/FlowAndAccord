@@ -180,7 +180,7 @@
   }
 
   /**
-   * 扫描辖区内符合出价条件的单身/无房成年男性户主（意向买家池）
+   * 扫描辖区内符合出价条件的成年男性户主（意向买家/换家家户池）
    */
   function scanPotentialBuyers(campId, benchmarkBid) {
     const sim = getSim();
@@ -220,6 +220,7 @@
           id: a.id,
           age: Math.floor(a.age),
           gold,
+          houseTier: ownHouse ? getTierLabel(ownHouse.tier).name : '无房',
           spouseId: a.spouseId,
           status,
           statusColor,
@@ -517,26 +518,22 @@
     if (buyersCountEl) buyersCountEl.textContent = buyers.length;
 
     if (buyers.length === 0) {
-      renderHtml(buyersListEl, `<div class="auction-empty-hint">当前聚落无单身/无房成年男性户主，暂无潜在买家</div>`);
+      renderHtml(buyersListEl, `<div class="auction-empty-hint">当前辖区暂无符合条件的意向买家</div>`);
       return;
     }
 
     renderHtml(buyersListEl, buyers.map(b => {
-      const sameBadge = b.sameCamp
-        ? `<span class="buyer-tag local">本地族人</span>`
-        : `<span class="buyer-tag foreign">邻境移入</span>`;
       return `
         <div class="auction-buyer-card">
           <div class="buyer-card-left">
             <div class="buyer-card-name">
-              <span class="lineage-chip" data-agent-id="${b.id}">👤 #${b.id} (${b.age}岁)</span>
-              ${sameBadge}
+              <span class="lineage-chip" data-entity-kind="agent" data-entity-id="${b.id}">👤 #${b.id} (${b.age}岁)</span>
             </div>
             <div class="buyer-card-status" style="color:${b.statusColor};">${b.status}</div>
           </div>
           <div class="buyer-card-right">
             <div class="buyer-gold-val">🪙 ${b.gold.toFixed(1)} 金</div>
-            <button class="buyer-jump-btn" data-agent-id="${b.id}" title="聚焦并追踪该族人">定位 🔍</button>
+            <div class="buyer-house-tier">🏠 当前房屋：${b.houseTier}</div>
           </div>
         </div>
       `;
@@ -583,7 +580,7 @@
         <div class="auction-bid-card">
           <div class="bid-card-header">
             <span class="bid-tick-tag">Tick #${b.tick}</span>
-            <span class="lineage-chip" data-agent-id="${b.bidderId}">买方 #${b.bidderId} 🔍</span>
+              ${window.EntityLink ? window.EntityLink.agent(b.bidderId, `买方 #${b.bidderId} 🔍`) : `<span class="lineage-chip" data-agent-id="${b.bidderId}">买方 #${b.bidderId} 🔍</span>`}
             <span class="bid-phase-badge ${b.phase === '观察期' ? 'obs' : (b.phase === '决策期' ? 'dec' : 'clr')}">${b.phase}</span>
           </div>
           <div class="bid-card-body">
@@ -619,7 +616,7 @@
             <div class="deal-tick-lbl">成交于 Tick #${d.tick}</div>
           </div>
           <div class="deal-card-grid">
-            <div><strong>买受户主:</strong> <span class="lineage-chip" data-agent-id="${d.buyerId}">Agent #${d.buyerId} 🔍</span></div>
+            <div><strong>买受户主:</strong> ${window.EntityLink ? window.EntityLink.agent(d.buyerId, `Agent #${d.buyerId} 🔍`) : `<span class="lineage-chip" data-agent-id="${d.buyerId}">Agent #${d.buyerId} 🔍</span>`}</div>
             <div><strong>成交金额:</strong> <strong style="color:#fbbf24;">🪙 ${d.price.toFixed(2)} 金</strong></div>
             <div><strong>交割修缮度:</strong> <span>${d.durability.toFixed(1)}%</span></div>
             <div><strong>成交事由:</strong> <span style="color:#10b981;">${d.reason || '房屋拍卖竞购'}</span></div>

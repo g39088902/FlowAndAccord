@@ -135,6 +135,7 @@ window.SIM_CONFIG = {
   decisionWorkStaminaThreshold: 50.0, // 劳作所需最低体力 (低于则返家休息)
   decisionFamilyStockTriggerOn: 100.0, // M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采
   decisionFamilyStockTriggerOff: 200.0, // M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止
+  decisionCourtshipMinFamilyGold: 5.0, // 求偶发起最低家户金币（严格大于此值）
   decisionEvalOrder: [], // 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖）
   decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认）
 

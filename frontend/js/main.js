@@ -615,6 +615,23 @@
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
       // 立即打开/刷新右侧 Inspector 角色卡片
       if (typeof updateInspector === 'function') updateInspector();
+      return true;
+    };
+
+    window.focusOnHouse = function focusOnHouse(houseId) {
+      const hid = parseInt(houseId, 10);
+      const targetHouse = sim.houses && sim.houses.find(h => h.id === hid);
+      if (!targetHouse) return false;
+      sim.selectionType = 'house'; sim.selectedHouseId = hid; isCameraFollow = false;
+      const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+      const rx = targetHouse.pos.x * cosZ - targetHouse.pos.y * sinZ;
+      const ry = targetHouse.pos.x * sinZ + targetHouse.pos.y * cosZ;
+      const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+      const y2 = ry * cosX - (targetHouse.pos.z || 0) * sinX;
+      camera.panX = -rx * camera.zoom; camera.panY = -y2 * camera.zoom;
+      if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+      if (typeof updateInspector === 'function') updateInspector();
+      return true;
     };
 
     // ==========================================

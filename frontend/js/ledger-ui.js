@@ -121,11 +121,6 @@
     setText('ledger-ov-dissolved', dissolvedHH.length);
     setText('ledger-ov-marriages', activeMG.length);
     setText('ledger-ov-marriages-total', marriages.length);
-    const richest = activeHH.reduce((best, h) => {
-      const gold = (h.balances && h.balances.Gold) || 0;
-      return !best || gold > best.gold || (gold === best.gold && h.id < best.id) ? { id: h.id, gold } : best;
-    }, null);
-    setText('ledger-ov-richest', richest ? '#' + richest.id + ' · ' + richest.gold.toFixed(1) : '—');
 
     const avgEl = document.getElementById('ledger-resource-averages');
     if (avgEl) {

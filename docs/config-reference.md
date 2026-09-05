@@ -109,6 +109,7 @@
 | `decisionWorkStaminaThreshold` | f32 | 50 | decisions/ (劳作体力阈值) | 劳作所需最低体力 (低于则返家休息) |
 | `decisionFamilyStockTriggerOn` | f32 | 100 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采 |
 | `decisionFamilyStockTriggerOff` | f32 | 200 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止 |
+| `decisionCourtshipMinFamilyGold` | f32 | 5 | — | 求偶发起最低家户金币（严格大于此值） |
 | `houseDurabilityMax` | f32 | 100 | housing_system/ (耐久度上限) | 房屋耐久上限 |
 | `houseDepreciationRate` | f32 | 0.02 | housing_system/maintenance.rs (折旧) | 房屋耐久自然折旧速率 (每秒) |
 | `houseRepairTriggerThreshold` | f32 | 80 | housing_system/maintenance.rs (修缮) | 耐久低于此值允许修缮 |

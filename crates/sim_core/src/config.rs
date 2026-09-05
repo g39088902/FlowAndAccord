@@ -170,6 +170,8 @@ pub const DECISION_WORK_STAMINA_THRESHOLD: f32 = 50.0;
 pub const DECISION_FAMILY_STOCK_TRIGGER_ON: f32 = 100.0;
 /// M7 家庭库存施密特触发器：结束上限（一旦 ON，余额 ≥ 此值 → 置 OFF 补足）
 pub const DECISION_FAMILY_STOCK_TRIGGER_OFF: f32 = 200.0;
+/// 求偶发起所需的家户账本最低黄金（严格大于此值）
+pub const DECISION_COURTSHIP_MIN_FAMILY_GOLD: f32 = 5.0;
 
 // ============================================================================
 // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -478,6 +480,7 @@ pub struct SimConfig {
     pub decision_family_stock_trigger_on: f32,
     /// M7 家庭库存施密特结束上限（ON 后余额达此 → 补足停止）
     pub decision_family_stock_trigger_off: f32,
+    pub decision_courtship_min_family_gold: f32,
     /// 决策分支评估顺序（13 个分支 ID，如 "b1".."b13"）。
     /// ⚠️ §4.12 三处规约的文档化例外：Rust 层**无策展顺序**，默认空 Vec = 未注入，
     /// 空/非法时按 branches.rs 声明序中性兜底；权威顺序在前端 `config.decision-order.js`。
@@ -711,6 +714,7 @@ impl Default for SimConfig {
             decision_work_stamina_threshold: DECISION_WORK_STAMINA_THRESHOLD,
             decision_family_stock_trigger_on: DECISION_FAMILY_STOCK_TRIGGER_ON,
             decision_family_stock_trigger_off: DECISION_FAMILY_STOCK_TRIGGER_OFF,
+            decision_courtship_min_family_gold: DECISION_COURTSHIP_MIN_FAMILY_GOLD,
             // Rust 无策展顺序：空 = 未注入（中性兜底），权威值在前端 config.decision-order.js
             decision_eval_order: Vec::new(),
             decision_eval_levels: Vec::new(),

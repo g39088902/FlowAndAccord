@@ -1154,6 +1154,7 @@ canvas.addEventListener('click', e => {
   }
 
   function agentChip(id, cls, title) {
+    if (window.EntityLink) return window.EntityLink.agent(id, `${cls === 'dead' ? '💀' : '👤'} #${id}`, { className: cls, title });
     return `<span class="lineage-chip ${cls || ''}" data-agent-id="${id}" title="${title || '点击追踪'}">${cls === 'dead' ? '💀' : '👤'} #${id}</span>`;
   }
 
@@ -1278,6 +1279,8 @@ canvas.addEventListener('click', e => {
     const backdrop = document.getElementById('camp-detail-backdrop');
     return !!backdrop && backdrop.style.display !== 'none';
   }
+  window.closeCampDetail = closeCampDetail;
+  window.isCampDetailOpen = isCampDetailOpen;
 
   // 事件绑定：详情按钮（在营地渲染时动态存在，用事件委托）
   document.addEventListener('click', (e) => {

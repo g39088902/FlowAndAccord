@@ -38,6 +38,7 @@
 | `js/render_agents.js` | ~210 | **族人与特效绘制**（v1.7.1 拆分）：drawAgents（部落民 Agent 渲染 + 选中高亮 + 状态气泡 + 死亡骷髅）/ drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
 | `js/main.js` | ~574 | 全局初始化 / 相机控制（缩放/平移/跟随）/ 事件绑定（点击拾取/快捷键 Space/Esc/重置按钮/倍速切换）/ 控制台日志 / 无头模式切换 / **★ v1.27.0 启动即暂停**（`sim.isPaused=true`，由 save-ui.js 完成存档连接后解除） | Canvas 绘制（在 render.js）、wasm 交互（在 rustworld.js） |
+| `js/entity-link.js` | — | **统一 Agent/房屋实体跳转**：生成实体链接并以唯一捕获阶段委托路由到世界 Inspector | 业务卡片数据、Canvas 绘制 |
 | `js/save-ui.js` | ~630 | **读档/存档系统 UI**（v1.11.0）：三槽位（自动槽每 60s 覆盖 + 手动槽 1/2）localStorage 读写、槽位元信息索引、顶栏「💾 存档/📂 读档」面板（保存/读取双标签）、导出 Blob 下载 / 导入 FileReader 校验、读档后自动暂停；**v1.11.0 新增本地文件存档**（File System Access API）：用户连接本地 .json 文件后存档直写磁盘、自动保存同步切换本地模式、不支持浏览器降级到传统导入导出；**★ v1.27.0 启动存档文件门禁**（`bootstrapStartupGate`）：启动层必须先建立/连接可写 `.json` 存档文件（格式版本匹配）才解除模拟暂停，Firefox 等不兼容浏览器保持阻断；**★ v1.28.0 启动自动读档**：已连接自动槽（默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复）时打开游戏直接读取其内容续演，读取失败回退手动连接；**★ v1.28.1 权限重授加固**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动门禁先静默重授（授权已持久化立即成功），失败提供「授权并读取上次存档」按钮（用户手势内 requestPermission），保存/读取遇 NotAllowedError 就地重授重试 | 存档正文序列化（在 rustworld.js + 内核 `world_save.rs`） |
 | `js/auction-ui.js` | ~380 | **房屋拍卖交易所与竞价大盘 UI**（v1.15.0）：`#house-auction-modal` 视窗交互 / `_auctionUiTick` 每帧高频驱动 / 麦穗 37% 动态时间轴标尺与当前耐久指针 / 辖区意向买家池扫描 / 实时竞价信息流与裁决 / 历史成交档案 / 视口与族人定位聚焦 / ★ v1.27.0 状态徽章流拍率统计 + 在售房源条固定节点增量更新（内容快照缓存，高倍速点击稳定） | Canvas 绘制（在 render_world） |
 
@@ -54,7 +55,7 @@
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `js/ledger-ui.js` | ~818 | 社会与经济制度大盘：**四标签页**（家户 household / 婚姻 marriage / 宗族 clan / 王国 region）/ 标签切换 `switchTab` / 每家户账本余额展示 / 流水穿透抽屉 / 族长/国王顺位展示 / 公仓/族库余额 / ★ v1.27.0 总览「最富家户」（账本 Gold 降序、并列取较小 id）/ 格式化工具函数（tickToSec / agentName / balTotal） | Canvas 渲染、wasm 交互、族人 Inspector |
+| `js/ledger-ui.js` | ~818 | 社会与经济制度大盘：**四标签页**（家户 household / 婚姻 marriage / 宗族 clan / 王国 region）/ 标签切换 `switchTab` / 每家户账本余额展示 / 流水穿透抽屉 / 族长/国王顺位展示 / 公仓/族库余额 / 格式化工具函数（tickToSec / agentName / balTotal） | Canvas 渲染、wasm 交互、族人 Inspector |
 
 ### 1.6 基础设施
 
@@ -84,7 +85,8 @@
 11. dag-standalone.js         族谱独立页模板
 12. dag.js                    族谱数据构建+编排
 13. main.js                   事件绑定+初始化
-14. ledger-ui.js              制度大盘
+14. entity-link.js            统一实体跳转（依赖 main.js）
+15. ledger-ui.js              制度大盘
 15. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
 16. render_canvas.js           Canvas 主循环调度（v1.7.1 拆分）
 17. render_hud.js              HUD/大盘辅助函数（v1.7.1 拆分）

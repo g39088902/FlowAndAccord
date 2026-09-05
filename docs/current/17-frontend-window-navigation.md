@@ -194,6 +194,8 @@ flowchart TD
 
 ## 6. 设计方案时应保留的交互契约
 
+v1.28.3 起，所有跨窗口 Agent/房屋引用统一由 `frontend/js/entity-link.js` 捕获阶段路由；默认回到世界并刷新 Inspector，族谱等需保留上下文的链接必须显式声明 `keepContext`。
+
 1. **地图是最终落点**：任何“查看某人/某房屋”的列表动作都应能回到地图定位，而不是只在列表中改变选中样式。
 2. **对象选择互斥**：Agent、房屋、POI 共用一个 Inspector，不要同时显示两个主对象详情。
 3. **关系 chip 语义统一**：带 `data-agent-id` 的 chip 进入 Agent 视角；带 `data-house-id` 的 chip 进入房屋视角。新列表应复用这一语义。

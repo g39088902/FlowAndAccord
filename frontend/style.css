@@ -743,6 +743,12 @@
       transition: all 0.2s ease;
       user-select: none;
     }
+    .entity-link {
+      font-family: inherit;
+      line-height: inherit;
+      text-align: left;
+      appearance: none;
+    }
     .lineage-chip:hover {
       background: rgba(56, 189, 248, 0.35);
       border-color: #38bdf8;
