@@ -3,7 +3,7 @@ use super::vec3::Vec3;
 use super::graph::{LaneId, NodeId};
 use super::agent::AgentId;
 use super::poi::PoiId;
-pub use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
+pub use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 
 /// 四季系统 (240秒完整年轮，每季60秒)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,6 +50,9 @@ pub struct WorldSnapshot3D {
     pub auction_sold: u64,
     #[serde(default)]
     pub auction_flopped: u64,
+    /// ★ 房屋报价中心历史受理记录 (256 size 环形缓冲区快照)
+    #[serde(default)]
+    pub auction_history: Vec<HouseAuctionHistorySnapshot>,
     pub season: String,
     pub temperature: f32,
     pub season_progress: f32,

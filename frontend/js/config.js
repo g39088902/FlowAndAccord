@@ -150,7 +150,7 @@ window.SIM_CONFIG = {
   // M8：houseCapacityTier0..4、houseUpgradeTier{0..3}*Ratio、houseFertilityStockRatio 共 14 个字段已删除，
   // 升级材料成本改由 config.house-upgrade-cost.js 的 20 个 houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold} 字段承载
   houseWinterWoodBurnRate: 0.12,  // 冬季供暖木材消耗速率 (每秒)
-  houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
+  houseWinterColdTemp: 8.0,       // 低温供暖阈值 (℃)
   houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)
   campMaxHouses: 25,               // 每个营地最多可建设的房屋数量
   campLevelVillageMinHouses: 5,    // 营地升级为村的最低房屋数量
@@ -166,6 +166,8 @@ window.SIM_CONFIG = {
   seasonYearLength: 240.0,        // 一年 (四季) 总时长 (模拟秒)
   tempBaseMid: 14.0,              // 年均基准温度 (℃)
   tempAmplitude: 17.0,            // 季节温度振幅 (℃)
+  tempElNinoCycleYears: 7.0,      // 厄尔尼诺叠加正弦周期 (年)
+  tempElNinoAmplitude: 3.0,       // 厄尔尼诺叠加正弦振幅范围 (±℃)
 
   // ==========================================================================
   // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
@@ -226,8 +228,8 @@ window.SIM_CONFIG = {
   // 13. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
   // ==========================================================================
   countMarkets: 1,                          // 全图生成外部市场 POI 数量
-  marketStockMaxWater: 200.0,               // 外部市场清水储备容量上限
-  marketStockMaxFood: 200.0,                // 外部市场粮食储备容量上限
+  marketStockMaxWater: 400.0,               // 外部市场清水储备容量上限
+  marketStockMaxFood: 400.0,                // 外部市场粮食储备容量上限
   marketRegenBaseWater: 2.0,                // 外部市场清水每秒自然再生速率
   marketRegenBaseFood: 2.0,                 // 外部市场粮食每秒自然再生速率
   marketPriceBase: 0.1,                     // 满库存起步基准单价 (黄金 / 单位资源)

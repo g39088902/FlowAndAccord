@@ -391,7 +391,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         document.getElementById('insp-poi-stock-fill').style.background = '#fbbf24';
       } else if (poi.type === 'Market') {
         // ★ v1.22.6 榷场双商品：清水与粮食为两套独立库存，各占一条进度条
-        document.getElementById('lbl-poi-stock-title').textContent = `💧 榷场清水储备 (${capText})`;
+        document.getElementById('lbl-poi-stock-title').textContent = `💧 榷场清水储备`;
         document.getElementById('insp-poi-stock-fill').style.background = '#38bdf8';
       }
       document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
@@ -403,7 +403,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           secondaryStockRow.style.display = 'flex';
           const secMax = poi.secondaryMaxStock || 0;
           const secRatio = secMax > 0 ? Math.round((poi.secondaryStock / secMax) * 100) : 0;
-          document.getElementById('lbl-poi-secondary-stock-title').textContent = `🍒 榷场粮食储备 (上限${secMax.toFixed(1)})`;
+          document.getElementById('lbl-poi-secondary-stock-title').textContent = `🍒 榷场粮食储备`;
           document.getElementById('insp-poi-secondary-stock-val').textContent = `${poi.secondaryStock.toFixed(1)} / ${secMax.toFixed(1)} 单位`;
           document.getElementById('insp-poi-secondary-stock-fill').style.width = `${Math.max(0, Math.min(100, secRatio))}%`;
         } else {
@@ -492,7 +492,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     else if (poi.type === 'Wood') desc = `茂密原生林地(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWood').toFixed(1)}/s)，伐木用于冬季房屋供暖与升级茅草房。`;
     else if (poi.type === 'Stone') desc = `嶙峋高地石矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseStone').toFixed(1)}/s)，采石仅用于私宅升级木石庄舍与大庄园。`;
     else if (poi.type === 'Gold') desc = `璀璨金矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseGold').toFixed(1)}/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。`;
-    else if (poi.type === 'Market') desc = `外部边境榷场互市，清水与粮食是两套彼此独立的库存（各 ${poi.maxStock.toFixed(0)} / ${poi.secondaryMaxStock.toFixed(0)} 单位上限），分别独立再生与定价：清水单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金、粮食单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
+    else if (poi.type === 'Market') desc = `外部边境榷场互市，清水与粮食是两套彼此独立的库存，分别独立再生与定价：清水单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金、粮食单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
     document.getElementById('insp-detail-text').textContent = desc;
     }
   }
@@ -950,19 +950,26 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     // 弹窗头部与自身卡片更新
     const modalTitle = document.getElementById('lineage-modal-title');
     if (modalTitle) {
-      const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
       const clanPrefix = selAgent.surname ? `${selAgent.surname}氏 · ` : '';
-      modalTitle.textContent = `${clanPrefix}部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '♀' : '♂'}) 详细档案与族谱`;
+      modalTitle.textContent = `${clanPrefix}部落民 #${selAgent.id} 详细档案与族谱`;
     }
     const selfName = document.getElementById('lineage-self-name');
     if (selfName) {
-      const genText = selAgent.generation === 1 ? '始祖第1代' : `第${selAgent.generation || 2}代`;
       const clanLabel = selAgent.surname ? `【${selAgent.surname}】氏 ` : '';
-      selfName.textContent = `${clanLabel}部落民 #${selAgent.id} (${genText} · ${selAgent.gender === 'female' ? '女性 ♀' : '男性 ♂'})`;
+      selfName.textContent = `${clanLabel}部落民 #${selAgent.id}`;
+    }
+    const selfGender = document.getElementById('lineage-self-gender');
+    if (selfGender) {
+      const isFem = selAgent.gender === 'female';
+      selfGender.textContent = isFem ? '♀ 女性' : '♂ 男性';
+      selfGender.className = `lineage-badge-gender ${isFem ? 'female' : 'male'}`;
     }
     const selfAvatar = document.getElementById('lineage-self-avatar');
     if (selfAvatar) {
-      selfAvatar.textContent = !selAgent.isAlive ? '💀' : (selAgent.gender === 'female' ? (selAgent.isPregnant ? '🤰' : '👩') : '👦');
+      const isAlive = selAgent.isAlive;
+      const isFem = selAgent.gender === 'female';
+      selfAvatar.textContent = !isAlive ? '💀' : (isFem ? (selAgent.isPregnant ? '🤰' : '👩') : '👦');
+      selfAvatar.className = `lineage-self-avatar ${!isAlive ? 'dead' : (isFem ? 'female' : 'male')}`;
     }
     const selfGen = document.getElementById('lineage-self-gen');
     if (selfGen) {
@@ -972,7 +979,28 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const selfStatus = document.getElementById('lineage-self-status');
     if (selfStatus) {
       const hVal = selAgent.health !== undefined ? selAgent.health.toFixed(1) : '—';
-      selfStatus.textContent = `年龄 ${Math.floor(selAgent.age)}s · 健康 ${hVal} · 饱食 ${Math.round(selAgent.hunger)} · 体力 ${Math.round(selAgent.stamina)}%`;
+      const isLowHealth = selAgent.health !== undefined && selAgent.health < 40;
+      const isLowHunger = selAgent.hunger !== undefined && selAgent.hunger < 30;
+      const isLowStamina = selAgent.stamina !== undefined && selAgent.stamina < 25;
+      const sHtml = `
+        <div class="vital-item" title="存活年龄 (秒)">
+          <span class="vital-label">⏳ 年龄</span>
+          <span class="vital-value">${Math.floor(selAgent.age)}s</span>
+        </div>
+        <div class="vital-item ${isLowHealth ? 'vital-warn' : ''}" title="生命健康度 (0~100)">
+          <span class="vital-label">❤️ 健康</span>
+          <span class="vital-value" style="color:${isLowHealth ? '#f87171' : '#34d399'};">${hVal}</span>
+        </div>
+        <div class="vital-item ${isLowHunger ? 'vital-warn' : ''}" title="饱食度 (0~100)">
+          <span class="vital-label">🍖 饱食</span>
+          <span class="vital-value" style="color:${isLowHunger ? '#fbbf24' : '#38bdf8'};">${Math.round(selAgent.hunger)}</span>
+        </div>
+        <div class="vital-item ${isLowStamina ? 'vital-warn' : ''}" title="体力精力 (0~100%)">
+          <span class="vital-label">⚡ 体力</span>
+          <span class="vital-value" style="color:${isLowStamina ? '#fb923c' : '#a78bfa'};">${Math.round(selAgent.stamina)}%</span>
+        </div>
+      `;
+      if (selfStatus.innerHTML !== sHtml) selfStatus.innerHTML = sHtml;
     }
     const selfNeedBadge = document.getElementById('lineage-self-need-badge');
     if (selfNeedBadge) {

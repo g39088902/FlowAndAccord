@@ -453,32 +453,7 @@
       });
     }
 
-    // ==========================================
-    // 图例折叠 / 展开交互 (默认折叠)
-    // ==========================================
-    const legendEl = document.getElementById('ecology-legend');
-    const legendHeader = document.getElementById('legend-header');
-    const legendToggleIcon = document.getElementById('legend-toggle-icon');
-    let isLegendMinimized = true;
-
-    function toggleLegendMinimize() {
-      isLegendMinimized = !isLegendMinimized;
-      if (isLegendMinimized) {
-        legendEl.classList.add('minimized');
-        legendToggleIcon.textContent = '+';
-        legendHeader.title = '点击展开图例';
-      } else {
-        legendEl.classList.remove('minimized');
-        legendToggleIcon.textContent = '−';
-        legendHeader.title = '点击最小化图例';
-      }
-    }
-
-    legendHeader.addEventListener('click', () => {
-      toggleLegendMinimize();
-    });
-
-    // ★ 家户与账本大盘折叠/展开 (与图例/均值大盘一致：CSS 控制 body 显隐)
+    // ★ 家户与账本大盘折叠/展开 (CSS 控制 body 显隐，展开时触发强制全量渲染)
     const _ledgerPanel = document.getElementById('ledger-panel');
     const _ledgerToggleIcon = document.getElementById('ledger-toggle-icon');
     const _ledgerPanelHeader = document.getElementById('ledger-panel-header');
@@ -486,6 +461,9 @@
       _ledgerPanelHeader.addEventListener('click', () => {
         const isMin = _ledgerPanel.classList.toggle('minimized');
         if (_ledgerToggleIcon) _ledgerToggleIcon.textContent = isMin ? '+' : '−';
+        if (!isMin && window.LedgerUI && typeof window.LedgerUI.update === 'function') {
+          window.LedgerUI.update(sim, true);
+        }
       });
     }
 

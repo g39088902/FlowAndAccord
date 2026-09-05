@@ -165,6 +165,39 @@ pub struct HouseDealSnapshot {
     pub reason: String,
 }
 
+/// 全局拍卖历史受理记录容量（256 size 环形缓冲区）
+pub const AUCTION_HISTORY_CAPACITY: usize = 256;
+
+/// 房屋报价中心历史受理档案条目（成交与流拍全留痕，存入 256 size 环形缓冲区）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HouseAuctionHistoryRecord {
+    pub tick: u64,
+    pub house_id: u32,
+    pub tier: HouseTier,
+    pub camp_id: u32,
+    pub durability: f32,
+    pub is_flop: bool,
+    pub buyer_id: Option<AgentId>,
+    pub price: f32,
+    pub total_bids_count: usize,
+    pub reason: String,
+}
+
+/// 历史受理快照条目（输出给前端房屋报价中心历史受理视图）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HouseAuctionHistorySnapshot {
+    pub tick: u64,
+    pub house_id: u32,
+    pub tier: String,
+    pub camp_id: u32,
+    pub durability: f32,
+    pub is_flop: bool,
+    pub buyer_id: Option<AgentId>,
+    pub price: f32,
+    pub total_bids_count: usize,
+    pub reason: String,
+}
+
 /// 房屋可视化与前端快照（M6：不再携带任何资源存量字段；v1.10.0 删除 is_ruin/generation，owner_id 为 Option）
 /// ★ v1.14.0 增加估价、麦穗拍卖状态、成交与报价档案快照
 #[derive(Debug, Clone, Serialize, Deserialize)]

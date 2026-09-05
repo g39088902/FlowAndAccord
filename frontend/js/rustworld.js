@@ -31,6 +31,7 @@
         this.clans = [];                   // ★ M3: 宗族登记簿
         this.regions = [];                 // ★ M4: 地区/王国登记簿
         this.expeditionTargets = new Map();// ★ M4: 远征目标反查表 agent_id -> camp_id
+        this.auctionHistory = [];          // ★ 房屋报价中心历史受理记录 (256 环形缓冲区)
         this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
@@ -413,6 +414,11 @@
           sold: snap.auction_sold || 0,
           flopped: snap.auction_flopped || 0,
         };
+        this.auctionHistory = (snap.auction_history || []).map(r => ({
+          houseId: r.house_id, tier: r.tier, campId: r.camp_id, tick: r.tick,
+          buyerId: r.buyer_id, price: r.price, durability: r.durability,
+          isFlop: !!r.is_flop, totalBidsCount: r.total_bids_count || 0, reason: r.reason || '',
+        }));
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
 
@@ -608,16 +614,11 @@
             stamina: a.stamina,
             health: a.health,
             maxHealth: a.max_health,
-            carriedWater: a.carried_water,
-            carriedFood: a.carried_food,
-            carriedWood: a.carried_wood,
-            carriedStone: a.carried_stone,
-            carriedGold: a.carried_gold,
+            carriedWater: a.carried_water, carriedFood: a.carried_food, carriedWood: a.carried_wood,
+            carriedStone: a.carried_stone, carriedGold: a.carried_gold,
             cumulativeMined: a.cumulative_mined || 0,
-            cumulativeMinedWater: a.cumulative_mined_water || 0,
-            cumulativeMinedFood: a.cumulative_mined_food || 0,
-            cumulativeMinedWood: a.cumulative_mined_wood || 0,
-            cumulativeMinedStone: a.cumulative_mined_stone || 0,
+            cumulativeMinedWater: a.cumulative_mined_water || 0, cumulativeMinedFood: a.cumulative_mined_food || 0,
+            cumulativeMinedWood: a.cumulative_mined_wood || 0, cumulativeMinedStone: a.cumulative_mined_stone || 0,
             cumulativeMinedGold: a.cumulative_mined_gold || 0,
             buildTimer: a.build_timer,
             isPregnant: a.is_pregnant,

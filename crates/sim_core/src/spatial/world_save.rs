@@ -11,14 +11,14 @@
 //! 4. 集合一律 BTreeMap / Vec 保序，反序列化忠实还原遍历顺序（确定性红线）。
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use crate::config::SimConfig;
 use crate::geo::terrain::TerrainMap;
 use crate::rng::WorldRng;
 use super::agent::{Agent3D, AgentId};
 use super::graph::LaneGraph3D;
-use super::house::House;
+use super::house::{House, HouseAuctionHistoryRecord};
 use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
 use super::poi::PrimitivePoi;
 use super::snapshot::Season;
@@ -71,6 +71,8 @@ pub struct WorldSave {
     pub season_timer: f32,
     pub current_season: Season,
     pub temperature: f32,
+    #[serde(default)]
+    pub el_nino_phase: f32,
 
     // ── 全局 RNG 内部状态（确定性核心）──
     pub rng: WorldRng,
@@ -106,6 +108,8 @@ pub struct WorldSave {
     #[serde(default)]
     pub auction_flopped: u64,
     #[serde(default)]
+    pub auction_history: VecDeque<HouseAuctionHistoryRecord>,
+    #[serde(default)]
     pub last_royal_payout_tick: u64,
 }
 
@@ -132,6 +136,7 @@ impl World3DEngine {
             season_timer: self.season_timer,
             current_season: self.current_season,
             temperature: self.temperature,
+            el_nino_phase: self.el_nino_phase,
             rng: self.rng,
             water_regen_multiplier: self.water_regen_multiplier,
             berry_regen_multiplier: self.berry_regen_multiplier,
@@ -151,6 +156,7 @@ impl World3DEngine {
             auction_started: self.auction_started,
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,
+            auction_history: self.auction_history.clone(),
             last_royal_payout_tick: self.last_royal_payout_tick,
         }
     }
@@ -206,6 +212,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         season_timer: save.season_timer,
         current_season: save.current_season,
         temperature: save.temperature,
+        el_nino_phase: save.el_nino_phase,
         rng: save.rng,
         water_regen_multiplier: save.water_regen_multiplier,
         berry_regen_multiplier: save.berry_regen_multiplier,
@@ -228,6 +235,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         auction_started: save.auction_started,
         auction_sold: save.auction_sold,
         auction_flopped: save.auction_flopped,
+        auction_history: save.auction_history,
         last_royal_payout_tick: save.last_royal_payout_tick,
     };
 

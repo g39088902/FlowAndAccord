@@ -405,8 +405,9 @@ impl World3DEngine {
             }
         }
 
-        // 8. 永久沉淀成交档案到房屋档案
+        // 8. 永久沉淀成交档案到房屋档案与全局受理历史 (256 环形缓冲区)
         let final_reason = reason;
+        let house_tier = self.houses[house_idx].tier;
         self.houses[house_idx].deal_history.push(HouseDealRecord {
             deal_tick: tick,
             buyer_id,
@@ -414,6 +415,18 @@ impl World3DEngine {
             price,
             durability,
             camp_id,
+            total_bids_count: total_bids,
+            reason: final_reason.clone(),
+        });
+        self.push_auction_history(crate::spatial::house::HouseAuctionHistoryRecord {
+            tick,
+            house_id,
+            tier: house_tier,
+            camp_id,
+            durability,
+            is_flop: false,
+            buyer_id: Some(buyer_id),
+            price,
             total_bids_count: total_bids,
             reason: final_reason.clone(),
         });

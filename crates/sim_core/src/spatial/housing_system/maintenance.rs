@@ -2,15 +2,14 @@ use crate::spatial::agent::PrimitiveActionState;
 use crate::spatial::graph::NodeId;
 use crate::spatial::house::HouseTier;
 use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason};
-use crate::spatial::snapshot::Season;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
-    /// 冬季取暖消耗：低温或冬季时房屋消耗木材取暖
+    /// 低温供暖消耗：气温低于阈值时房屋消耗木材取暖
     /// ★ M6 终态：真实消耗「户主家户账本」木（Heating: Family → Void）；房屋 pantry 已删除。
     /// 0 级仓库无火炕不取暖（与历史语义一致）；账本有柴才烧得到，无柴则本 tick 不耗。
     pub(crate) fn tick_winter_heating(&mut self, dt: f32) {
-        if self.current_season == Season::Winter || self.temperature < self.config.house_winter_cold_temp {
+        if self.temperature < self.config.house_winter_cold_temp {
             let wood_burn_rate = self.config.house_winter_wood_burn_rate * dt;
             let tick = self.tick_counter;
             // READ：需供暖房屋的户主家户（非 0 级；无主空置房不取暖）
@@ -62,7 +61,22 @@ impl World3DEngine {
             }
             for hid in &collapsed_house_ids {
                 if let Some(h) = self.houses.iter().find(|h| h.id == *hid) {
-                    if h.auction_state.is_some() { self.auction_flopped = self.auction_flopped.saturating_add(1); }
+                    if h.auction_state.is_some() {
+                        self.auction_flopped = self.auction_flopped.saturating_add(1);
+                        let total_bids = h.auction_state.as_ref().map(|st| st.bids_history.len()).unwrap_or(0);
+                        self.push_auction_history(crate::spatial::house::HouseAuctionHistoryRecord {
+                            tick: self.tick_counter,
+                            house_id: h.id,
+                            tier: h.tier,
+                            camp_id: h.camp_id,
+                            durability: 0.0,
+                            is_flop: true,
+                            buyer_id: None,
+                            price: 0.0,
+                            total_bids_count: total_bids,
+                            reason: "耐久耗尽自然坍塌流拍".to_string(),
+                        });
+                    }
                 }
                 self.last_event = Some(format!("🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！", hid));
             }

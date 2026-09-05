@@ -218,7 +218,7 @@ pub const HOUSE_UPGRADE_COST_TIER4_STONE: f32 = 125.0;
 pub const HOUSE_UPGRADE_COST_TIER4_GOLD: f32 = 125.0;
 
 pub const HOUSE_WINTER_WOOD_BURN_RATE: f32 = 0.12;
-pub const HOUSE_WINTER_COLD_TEMP: f32 = 5.0;
+pub const HOUSE_WINTER_COLD_TEMP: f32 = 8.0;
 pub const HOUSE_MIN_SPACING: f32 = 20.0;
 /// 立宅时优先复用空置路网节点的检索半径 (m)：候选宅址此半径内若存在空置节点则直接复用，不再新建节点
 pub const HOUSE_NODE_REUSE_RADIUS: f32 = 20.0;
@@ -231,6 +231,10 @@ pub const HOUSE_NODE_POI_OCCUPY_RADIUS: f32 = 1.5;
 pub const SEASON_YEAR_LENGTH: f32 = 240.0;
 pub const TEMP_BASE_MID: f32 = 14.0;
 pub const TEMP_AMPLITUDE: f32 = 17.0;
+/// 厄尔尼诺叠加正弦周期 (年，默认 7.0 年)
+pub const TEMP_EL_NINO_CYCLE_YEARS: f32 = 7.0;
+/// 厄尔尼诺叠加正弦振幅范围 (±°C，默认 3.0°C)
+pub const TEMP_EL_NINO_AMPLITUDE: f32 = 3.0;
 
 // ============================================================================
 // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
@@ -319,9 +323,9 @@ pub const PRESTIGE_KING_BONUS: u32 = 3;
 /// 全图生成外部市场 POI 数量（默认 1 座）
 pub const COUNT_MARKETS: usize = 1;
 /// 外部市场清水储备容量上限（等同于 1 座低洼清泉）
-pub const MARKET_STOCK_MAX_WATER: f32 = 200.0;
+pub const MARKET_STOCK_MAX_WATER: f32 = 400.0;
 /// 外部市场粮食储备容量上限（等同于 1 座缓坡浆果）
-pub const MARKET_STOCK_MAX_FOOD: f32 = 200.0;
+pub const MARKET_STOCK_MAX_FOOD: f32 = 400.0;
 /// 外部市场清水每秒自然再生速率
 pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
 /// 外部市场粮食每秒自然再生速率
@@ -538,6 +542,8 @@ pub struct SimConfig {
     pub season_year_length: f32,
     pub temp_base_mid: f32,
     pub temp_amplitude: f32,
+    pub temp_el_nino_cycle_years: f32,
+    pub temp_el_nino_amplitude: f32,
 
     // 8. 空间路网、限速与踩踏演化
     pub road_wear_decay_rate: f32,
@@ -769,6 +775,8 @@ impl Default for SimConfig {
             season_year_length: SEASON_YEAR_LENGTH,
             temp_base_mid: TEMP_BASE_MID,
             temp_amplitude: TEMP_AMPLITUDE,
+            temp_el_nino_cycle_years: TEMP_EL_NINO_CYCLE_YEARS,
+            temp_el_nino_amplitude: TEMP_EL_NINO_AMPLITUDE,
 
             // 8. 空间路网、限速与踩踏演化
             road_wear_decay_rate: ROAD_WEAR_DECAY_RATE,

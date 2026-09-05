@@ -135,7 +135,7 @@
 | `houseUpgradeCostTier4Stone` | f32 | 125 | housing_system/upgrade.rs (升级成本矩阵 §4.8) | 升到 4 级：石 |
 | `houseUpgradeCostTier4Gold` | f32 | 125 | housing_system/upgrade.rs (升级成本矩阵 §4.8) | 升到 4 级：金 |
 | `houseWinterWoodBurnRate` | f32 | 0.12 | housing_system/maintenance.rs (冬季供暖 §4.8) | 冬季供暖木材消耗速率 (每秒) |
-| `houseWinterColdTemp` | f32 | 5 | housing_system/maintenance.rs (冬季供暖 §4.8) | 低温供暖阈值 (℃) |
+| `houseWinterColdTemp` | f32 | 8 | housing_system/maintenance.rs (冬季供暖 §4.8) | 低温供暖阈值 (℃) |
 | `houseMinSpacing` | f32 | 20 | housing_system/founding.rs (房屋间距) | 房屋间最小水平间距 (m) |
 | `campMaxHouses` | u32 | 25 | — | 每个营地最多可建设的房屋数量 |
 | `campLevelVillageMinHouses` | u32 | 5 | poi.rs (营地行政级别升级) | 营地升级为村的最低房屋数量 |
@@ -147,6 +147,8 @@
 | `seasonYearLength` | f32 | 240 | world_season.rs (四季周期) | 一年 (四季) 总时长 (模拟秒) |
 | `tempBaseMid` | f32 | 14 | world_season.rs (温度正弦曲线) | 年均基准温度 (℃) |
 | `tempAmplitude` | f32 | 17 | world_season.rs (温度正弦曲线) | 季节温度振幅 (℃) |
+| `tempElNinoCycleYears` | f32 | 7 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦周期 (年) |
+| `tempElNinoAmplitude` | f32 | 3 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦振幅范围 (±℃) |
 | `roadWearDecayRate` | f32 | 0.0067 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路自然杂草衰减速率 (%/秒,相对当前磨损比例衰减) |
 | `roadWearStepInc` | f32 | 0.05 | graph.rs (踩踏增长/自然衰减 §4.3) | 族人单次通行踩踏增量 (等级/次) |
 | `roadMaxWear` | f32 | 5 | graph.rs (最高磨损等级) | 道路磨损上限 |
@@ -183,8 +185,8 @@
 | `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
-| `marketStockMaxWater` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
-| `marketStockMaxFood` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
+| `marketStockMaxWater` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
 | `marketRegenBaseWater` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水每秒自然再生速率 |
 | `marketRegenBaseFood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食每秒自然再生速率 |
 | `marketPriceBase` | f32 | 0.1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 满库存起步基准单价 (黄金 / 单位资源) |

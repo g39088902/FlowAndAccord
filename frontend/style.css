@@ -343,22 +343,7 @@
       font-size: 10px;
     }
 
-    /* 原始生态图例 (右侧 - 支持最小化) */
-    .ecology-legend {
-      width: 100%;
-      background: rgba(10, 18, 30, 0.95);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 12px 16px;
-      border-radius: 14px;
-      font-size: 11px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      color: #cbd5e1;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      pointer-events: auto;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    /* 通用小卡片标题与折叠按钮 (右侧面板共享) */
     .legend-title {
       font-size: 11px;
       font-weight: 700;
@@ -399,24 +384,7 @@
       border-color: #38bdf8;
       color: #38bdf8;
     }
-    .legend-body {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .ecology-legend.minimized {
-      gap: 0;
-      padding: 10px 14px;
-    }
-    .ecology-legend.minimized .legend-body {
-      display: none;
-    }
-    .ecology-legend.minimized .legend-title {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-    .legend-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+
 
     /* 道路悬浮提示卡片 (Tooltip) */
     .road-tooltip {
@@ -825,35 +793,89 @@
     .lineage-modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0, 0, 0, 0.82);
+      background: rgba(2, 6, 23, 0.82);
+      backdrop-filter: blur(8px);
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 1000;
     }
     .lineage-modal-card {
-      background: rgba(10, 18, 30, 0.96);
-      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 18, 32, 0.98));
+      border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 16px;
-      width: 480px;
-      max-width: 92vw;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.15);
+      width: 620px;
+      max-width: min(620px, 94vw);
+      max-height: 88vh;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       padding: 18px 22px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
+      overflow-y: auto;
       animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
+    .lineage-modal-card::-webkit-scrollbar {
+      width: 5px;
+    }
+    .lineage-modal-card::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 4px;
+    }
     @keyframes modalPopIn {
-      from { transform: scale(0.94); opacity: 0; }
+      from { transform: scale(0.96); opacity: 0; }
       to { transform: scale(1); opacity: 1; }
     }
     .lineage-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       padding-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .lineage-modal-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+    .lineage-header-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .lineage-modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lineage-modal-subtitle {
+      font-size: 10.5px;
+      color: #94a3b8;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lineage-modal-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      margin-left: 10px;
     }
     .lineage-modal-close {
       background: rgba(255, 255, 255, 0.08);
@@ -862,7 +884,7 @@
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -878,53 +900,177 @@
     .lineage-modal-body {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 11px;
     }
+
+    /* 核心角色卡片 Hero Card */
     .lineage-self-card {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-      padding: 10px 14px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      padding: 12px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
-    .lineage-modal-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .lineage-section {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 8px 12px;
+    .lineage-self-main {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 11px;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1;
     }
-    .lineage-section-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: #38bdf8;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      padding-bottom: 4px;
+    .lineage-self-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 25px;
+      flex-shrink: 0;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s ease;
     }
-    .lineage-section-content {
+    .lineage-self-avatar.male {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(14, 165, 233, 0.06));
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+    }
+    .lineage-self-avatar.female {
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(219, 39, 119, 0.06));
+      border-color: rgba(236, 72, 153, 0.4);
+      box-shadow: 0 0 12px rgba(236, 72, 153, 0.15);
+    }
+    .lineage-self-avatar.dead {
+      background: rgba(148, 163, 184, 0.12);
+      border-color: rgba(148, 163, 184, 0.25);
+      filter: grayscale(1);
+    }
+    .lineage-self-info {
       display: flex;
       flex-direction: column;
       gap: 5px;
+      min-width: 0;
+      flex: 1;
     }
-    .lineage-traits-block {
+    .lineage-self-name-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+    .lineage-self-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    .lineage-badge-gender {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      line-height: 1.2;
+    }
+    .lineage-badge-gender.male {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+    }
+    .lineage-badge-gender.female {
+      background: rgba(236, 72, 153, 0.15);
+      border: 1px solid rgba(236, 72, 153, 0.35);
+      color: #f472b6;
+    }
+    .lineage-badge-gen {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+      line-height: 1.2;
+    }
+    .lineage-vitals-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .vital-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       background: rgba(15, 23, 42, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 8px 12px;
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+    .vital-item .vital-label {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .vital-item .vital-value {
+      color: #f1f5f9;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .vital-item.vital-warn {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+    .lineage-self-action-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+      flex-shrink: 0;
+      max-width: 170px;
+    }
+    .lineage-action-title {
+      font-size: 9.5px;
+      color: #94a3b8;
+      letter-spacing: 0.2px;
+    }
+    .lineage-self-need-badge {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3.5px 9px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      white-space: nowrap;
+      text-align: right;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 禀赋属性与关系网 */
+    .lineage-traits-block {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      font-size: 11px;
+    }
+    .lineage-traits-source-badge {
+      font-size: 9.5px;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: normal;
     }
     .lineage-traits-grid {
       display: grid;
@@ -934,11 +1080,84 @@
     .lineage-trait {
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      background: rgba(30, 41, 59, 0.55);
+      gap: 4px;
+      background: rgba(30, 41, 59, 0.5);
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 7px;
       padding: 6px 9px;
+      transition: all 0.15s ease;
+    }
+    .lineage-trait:hover {
+      border-color: rgba(56, 189, 248, 0.3);
+      transform: translateY(-1px);
+    }
+    .lineage-trait .meter-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+    }
+    .lineage-trait .meter-bg {
+      height: 4px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .lineage-trait .meter-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+
+    .lineage-modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .lineage-section {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 9px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 11px;
+    }
+    .lineage-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .lineage-section-content {
+      display: flex;
+      align-items: center;
+      min-height: 24px;
+    }
+    .lineage-sub-badge {
+      font-size: 9.5px;
+      color: #94a3b8;
+      font-weight: normal;
+    }
+    .lineage-children-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+      max-height: 84px;
+      overflow-y: auto;
+    }
+    .lineage-prestige-val {
+      font-size: 11.5px;
+      color: #64748b;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     @media (max-width: 640px) {
       .lineage-traits-grid { grid-template-columns: 1fr; }
@@ -3522,6 +3741,18 @@
   padding: 1px 6px;
   border-radius: 4px;
 }
+.auction-deal-card.flop {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(30, 15, 20, 0.6);
+}
+.auction-deal-card.flop .deal-card-title {
+  color: #fca5a5;
+}
+.deal-badge.flop {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
 .deal-tick-lbl {
   font-size: 11px;
   color: #94a3b8;
@@ -3904,4 +4135,34 @@ body.theme-light .save-tab-btn.active {
   background: #ffffff;
   color: #0f172a;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+body.theme-light .lineage-self-card {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+body.theme-light .lineage-self-avatar {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+body.theme-light .lineage-self-name {
+  color: #0f172a;
+}
+body.theme-light .vital-item {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .vital-item .vital-label {
+  color: #64748b;
+}
+body.theme-light .vital-item .vital-value {
+  color: #0f172a;
+}
+body.theme-light .lineage-traits-block,
+body.theme-light .lineage-section {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .lineage-trait {
+  background: #ffffff;
+  border-color: #e2e8f0;
 }

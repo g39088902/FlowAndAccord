@@ -40,9 +40,12 @@
 
   function getAllDeals() {
     const sim = getSim();
-    if (!sim || !sim.houses) return [];
+    if (!sim) return [];
+    if (sim.auctionHistory && sim.auctionHistory.length > 0) {
+      return sim.auctionHistory;
+    }
     const deals = [];
-    for (const h of sim.houses) {
+    for (const h of sim.houses || []) {
       if (h.recentDeals && h.recentDeals.length > 0) {
         for (const d of h.recentDeals) {
           deals.push({
@@ -54,6 +57,7 @@
             price: d.price,
             durability: d.durability,
             reason: d.reason,
+            isFlop: false,
           });
         }
       }
@@ -594,19 +598,41 @@
   }
 
   /**
-   * 渲染历史成交记录视图
+   * 渲染历史成交与流拍受理记录视图
    */
   function renderHistoryView(deals) {
     const listEl = document.getElementById('auction-deals-list');
     if (!listEl) return;
 
     if (deals.length === 0) {
-      renderHtml(listEl, `<div class="auction-empty-hint">暂无已完成的拍卖交易记录</div>`);
+      renderHtml(listEl, `<div class="auction-empty-hint">暂无拍卖受理记录（成交或流拍）</div>`);
       return;
     }
 
     renderHtml(listEl, deals.map(d => {
       const t = getTierLabel(d.tier);
+      if (d.isFlop) {
+        return `
+          <div class="auction-deal-card flop">
+            <div class="deal-card-header">
+              <div class="deal-card-title">
+                <span>${t.icon} ${t.name} #${d.houseId}</span>
+                <span class="deal-badge flop">⚠️ 流拍告终</span>
+              </div>
+              <div class="deal-tick-lbl">结案于 Tick #${d.tick}</div>
+            </div>
+            <div class="deal-card-grid">
+              <div><strong>受理事由:</strong> <span style="color:#f87171;">${d.reason || '房屋自然风化坍塌流拍'}</span></div>
+              <div><strong>归属营地:</strong> <span>🏕️ ${getCampTitle(d.campId)}</span></div>
+              <div><strong>累计报价:</strong> <span>${d.totalBidsCount || 0} 笔</span></div>
+              <div><strong>结案修缮度:</strong> <span>${(d.durability || 0).toFixed(1)}%</span></div>
+            </div>
+            <div class="deal-card-footer">
+              <span style="color:#94a3b8;">🏚️ 房屋因耐久耗尽自然坍塌，路网接驳节点已释放可重新立宅</span>
+            </div>
+          </div>
+        `;
+      }
       return `
         <div class="auction-deal-card">
           <div class="deal-card-header">

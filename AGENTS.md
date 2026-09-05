@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.33.1)"]
+    E --> F["浏览器 UI (版本: v1.34.1)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.33.1`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.34.1`**。
 
 ---
 
@@ -195,7 +195,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.8 🟡 行为与生理硬约束
 
-- **冬季供暖**：冬季或气温 < `config.houseWinterColdTemp`(5℃) 时，非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材；家宅木材 < 10 时禁孕。
+- **冬季供暖**：气温 < `config.houseWinterColdTemp`(8℃) 时（不再固定冬季消耗，低于阈值即烧），非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材；家宅木材 < 10 时禁孕。
 - **家庭储备 = 家户账本（M6 起）**：`House.pantry_*`/仓储容量已删除，吃喝、冬季烧柴全部从**家户账本真实扣减**（账本余额即家庭实有物资，无容量上限）。
 - **去采货 = 施密特触发器（M7 起）**：有房（含 0 级）即可采，与房屋等级**彻底脱钩**——每类资源（水/粮/木/石/金统一）家户账本余额 < `decisionFamilyStockTriggerOn`(100) 触发去采，补到 ≥ `decisionFamilyStockTriggerOff`(200) 才停（滞回带）。无房者不触发补货、现场只自用不装袋。
 - **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，数值来自 **20 个超参**（`config.house-upgrade-cost.js` 的 `houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold}`，权威默认值三处同步于 `config.rs`）——升到 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，该级不消耗的品类填 0（扣账自动跳过、就绪不阻塞）；b8/b11 就绪 = 每类 `ledger.balance ≥ cost`（0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50），升级时一次性扣账并户主威望+1。
@@ -236,7 +236,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.12 🔧 超参集中化、配置校验与速查表
 
-- **超参唯一入口**：全部 **197** 个 `SimConfig` 字段统一由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
+- **超参唯一入口**：全部 **200** 个 `SimConfig` 字段统一由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。新增超参须在 `config.rs` 同时出现于「命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射」三处。
 - **拆分文件规范（v1.6.0 起）**：字段较多/独立语义的配置组可拆到独立 JS 文件（先例：`config.house-upgrade-cost.js` 挂 `window.SIM_HOUSE_UPGRADE_COST`、`config.decision-order.js` 挂 `window.SIM_DECISION_ORDER`），须满足：① `index.html` 加载顺序早于 `rustworld.js`；② `rustworld.js::applyConfig` 用 `Object.assign` 合并进注入对象；③ **同步改造** `tools/config-check.js`（纳入前端字段集比对）与 `tools/test-wasm.js`（合并注入），否则门禁报"缺失字段/0 成本"。
 - **文档化例外（v1.3.6 起）**：`decisionEvalOrder: Vec<String>` 与 `decisionEvalLevels: Vec<u8>` 是**「Rust 无顺序」字段**——Rust 默认为空 Vec，权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。**严禁**在 Rust 侧写死任何策展优先级序列（`branches.rs::BranchId::ALL` 仅为配置缺失/非法时的中性兜底序）。
 - **调参流程**：直接编辑 `config.js`，浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。

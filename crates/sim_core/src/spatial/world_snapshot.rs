@@ -1,7 +1,7 @@
 use super::agent::{Gender, PrimitiveActionState};
 use super::ledger::journal::ResourceKind;
 use super::poi::{PoiType, market_unit_price};
-use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
+use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
     MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
@@ -523,6 +523,18 @@ impl World3DEngine {
             auction_started: self.auction_started,
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,
+            auction_history: self.auction_history.iter().rev().map(|r| HouseAuctionHistorySnapshot {
+                tick: r.tick,
+                house_id: r.house_id,
+                tier: format!("{:?}", r.tier),
+                camp_id: r.camp_id,
+                durability: r.durability,
+                is_flop: r.is_flop,
+                buyer_id: r.buyer_id,
+                price: r.price,
+                total_bids_count: r.total_bids_count,
+                reason: r.reason.clone(),
+            }).collect(),
             season: season_str.to_string(),
             temperature: self.temperature,
             season_progress,

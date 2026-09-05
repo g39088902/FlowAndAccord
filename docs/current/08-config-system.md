@@ -6,7 +6,7 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**195 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**200 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 

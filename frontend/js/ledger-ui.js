@@ -28,8 +28,10 @@
   // ★ v1.21.1 内容快照缓存：10FPS 高频刷新下，仅当生成的 HTML 与上次写入一致时跳过 innerHTML 重建，
   //   避免每 100ms 销毁重建卡片 DOM 导致 :hover / transition 反复被打断（悬停闪烁）。
   const _htmlCache = new Map();
-  // ★ v1.21.1 悬停防闪烁：鼠标停留在大盘交互区时暂停 10FPS 高频重建，仅事件/标签切换强制刷新
+  // ★ v1.21.1 悬停防闪烁：鼠标停留在大盘交互区时降频更新，仅事件/标签切换强制刷新
   let _panelHovered = false;
+  let _wasMinimized = true;
+  let _lastHoverUpdateTick = 0;
 
   // ─── 工具函数 ───────────────────────────────────────────────
   function tickToSec(t) { return t / 30.0; }
@@ -716,12 +718,28 @@
     const countEl = document.getElementById('ledger-panel-count');
     if (countEl) countEl.textContent = activeHH.length + '户';
 
-    // 折叠时跳过渲染
-    if (panel.classList.contains('minimized')) return;
+    const isMin = panel.classList.contains('minimized');
+    // 折叠时跳过渲染并记录状态
+    if (isMin) {
+      _wasMinimized = true;
+      return;
+    }
 
-    // ★ v1.21.1 悬停防闪烁：鼠标停留在大盘交互区时暂停 10FPS 高频重建，
-    //   仅事件/标签切换的强制刷新（force=true）或移出悬停后恢复更新。
-    if (!force && _panelHovered) return;
+    // ★ 从折叠转为展开状态时，强制立即全量渲染一次，避免首开空白
+    if (_wasMinimized) {
+      _wasMinimized = false;
+      force = true;
+    }
+
+    // ★ 悬停节流：鼠标停留在大盘交互区时不再永久冻结，而是降频至 1秒/30 ticks 刷新一次，
+    //   兼顾交互防闪烁与数据实时更新。
+    const currentTick = (sim && sim.tickCount) || 0;
+    if (!force && _panelHovered) {
+      if (currentTick - _lastHoverUpdateTick < 30) {
+        return;
+      }
+    }
+    _lastHoverUpdateTick = currentTick;
 
     if (activeTab === 'household') renderHouseholdTab(sim);
     else if (activeTab === 'marriage') renderMarriageTab(sim);

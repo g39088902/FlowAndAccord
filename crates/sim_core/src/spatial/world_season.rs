@@ -25,13 +25,18 @@ impl World3DEngine {
             let (icon, name) = match self.current_season {
                 Season::Spring => ("🌸", "春季 (大地回春，气候温和)"),
                 Season::Summer => ("☀️", "夏季 (炎炎夏日，草木茂盛)"),
-                Season::Autumn => ("🍂", "秋季 (秋风送爽，抓紧备柴过冬)"),
-                Season::Winter => ("❄️", "冬季 (严寒降临，房屋消耗木头取暖)"),
+                Season::Autumn => ("🍂", "秋季 (秋风送爽，抓紧备柴防寒)"),
+                Season::Winter => ("❄️", "冬季 (严寒降临，气温低于8°C消耗木头取暖)"),
             };
             self.last_event = Some(format!("{} 季节轮转: 步入 {}！", icon, name));
         }
 
         let angle = (season_time / year_length) * std::f32::consts::TAU;
-        self.temperature = self.config.temp_base_mid + self.config.temp_amplitude * angle.sin();
+        let base_temp = self.config.temp_base_mid + self.config.temp_amplitude * angle.sin();
+        let enso_years = self.config.temp_el_nino_cycle_years.max(0.1);
+        let enso_period = enso_years * year_length;
+        let enso_angle = self.el_nino_phase + (self.season_timer / enso_period) * std::f32::consts::TAU;
+        let enso_effect = self.config.temp_el_nino_amplitude * enso_angle.sin();
+        self.temperature = base_temp + enso_effect;
     }
 }

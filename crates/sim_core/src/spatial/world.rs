@@ -1,11 +1,11 @@
 use crate::rng::WorldRng;
 use crate::config::{SimConfig, LEDGER_JOURNAL_CAPACITY};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
-use super::house::House;
+use super::house::{House, HouseAuctionHistoryRecord, AUCTION_HISTORY_CAPACITY};
 use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
 use super::snapshot::{RecentDeathSnapshot, Season};
 use crate::geo::terrain::TerrainMap;
@@ -36,6 +36,8 @@ pub struct World3DEngine {
     pub season_timer: f32,
     pub current_season: Season,
     pub temperature: f32,
+    /// 厄尔尼诺现象随机初始相位
+    pub el_nino_phase: f32,
     pub rng: WorldRng,
     pub water_regen_multiplier: f32,
     pub berry_regen_multiplier: f32,
@@ -68,6 +70,8 @@ pub struct World3DEngine {
     pub auction_started: u64,
     pub auction_sold: u64,
     pub auction_flopped: u64,
+    /// ★ 房屋报价中心历史受理记录 (256 容量环形缓冲区，成交与流拍全留痕)
+    pub auction_history: VecDeque<HouseAuctionHistoryRecord>,
     /// 上次国王内帑结算 tick；按 3000 tick（100 游戏秒）结算。
     pub last_royal_payout_tick: u64,
 }
@@ -103,6 +107,7 @@ impl World3DEngine {
             season_timer: 0.0,
             current_season: Season::Spring,
             temperature: 20.0,
+            el_nino_phase: WorldRng::new(seed.wrapping_add(0x454c4e494e4f)).gen_range(0.0, std::f32::consts::TAU),
             rng: WorldRng::new(seed),
             water_regen_multiplier: 1.0,
             berry_regen_multiplier: 1.0,
@@ -124,6 +129,7 @@ impl World3DEngine {
             auction_started: 0,
             auction_sold: 0,
             auction_flopped: 0,
+            auction_history: VecDeque::with_capacity(AUCTION_HISTORY_CAPACITY),
             last_royal_payout_tick: 0,
         }
     }
@@ -175,5 +181,13 @@ impl World3DEngine {
     pub fn agent_by_id_mut(&mut self, id: AgentId) -> Option<&mut Agent3D> {
         let idx = *self.agent_index.get(&id)?;
         self.agents.get_mut(idx)
+    }
+
+    /// 追加一条房屋拍卖受理记录（成交或流拍，放入 256 容量环形缓冲区）
+    pub fn push_auction_history(&mut self, record: HouseAuctionHistoryRecord) {
+        while self.auction_history.len() >= AUCTION_HISTORY_CAPACITY {
+            self.auction_history.pop_front();
+        }
+        self.auction_history.push_back(record);
     }
 }
