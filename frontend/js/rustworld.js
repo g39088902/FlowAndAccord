@@ -67,7 +67,7 @@
           const result = await WebAssembly.instantiate(bytes, {});
           this._wasm = result.instance.exports;
           this._memory = this._wasm.memory;
-          this._wasm.world_create(60, 764.0, this._engineSeed, 20);
+          this._wasm.world_create(60, 764.0, this._engineSeed, 20, this._campCountFromConfig());
           this._ready = true;
           this._setEngineStatus('', 'ready');
           if (window.SIM_CONFIG) {
@@ -87,6 +87,13 @@
         el.textContent = message;
         el.dataset.state = state;
         el.style.display = state === 'ready' ? 'none' : 'flex';
+      }
+
+      // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
+      _campCountFromConfig() {
+        const n = window.SIM_CONFIG && window.SIM_CONFIG.countCamps;
+        if (typeof n === 'number' && n > 0) return n;
+        return 4; // 与 Rust config.rs COUNT_CAMPS 默认一致
       }
 
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
@@ -196,7 +203,7 @@
         this.agentArchive.clear();
         this._consumedDeathIds.clear();
         if (this._ready) {
-          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20);
+          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20, this._campCountFromConfig());
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }

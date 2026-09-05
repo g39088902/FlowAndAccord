@@ -255,7 +255,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 | 前端调用 | WASM 导出 | 用途 |
 |---|---|---|
-| `rustWorld._loadWasm()` | `world_create(grid, size, seed, agentCount)` | 创建世界实例 |
+| `rustWorld._loadWasm()` | `world_create(grid, size, seed, agentCount, campCount)` | 创建世界实例（campCount 播种前注入，见根 AGENTS.md §4.7） |
 | `rustWorld.tick()` / 倍速多步 | `world_tick(dt)` | 推进模拟 |
 | `rustWorld.applyConfig(cfg)` | `world_apply_config(jsonPtr, len)` | 热注入配置 |
 | `rustWorld._pullSnapshot()` | `world_snapshot()` → 线性内存 JSON | 拉取快照 |

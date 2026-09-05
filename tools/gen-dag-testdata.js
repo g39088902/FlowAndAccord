@@ -58,7 +58,7 @@ function summarize(arr) {
     return JSON.parse(new TextDecoder().decode(new Uint8Array(ex.memory.buffer, ptr, len)));
   }
 
-  ex.world_create(60, 764.0, SEED, 20);
+  ex.world_create(60, 764.0, SEED, 20, 5);
 
   // archive: id -> 族人档案 (末次出现状态覆盖式写入)
   const archive = new Map();

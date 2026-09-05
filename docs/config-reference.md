@@ -62,7 +62,7 @@
 | `traitInheritClampMin` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取下限 |
 | `traitInheritClampMax` | f32 | 190 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取上限 |
 | `poiMinDistance` | f32 | 70 | ecology.rs (POI 空间排斥间距 §4.7) | POI 间最小排斥间距 (m) |
-| `countCamps` | usize | 5 | ecology.rs (POI 数量 §4.7) | 营地数量 |
+| `countCamps` | usize | 4 | ecology.rs (POI 数量 §4.7) | 营地数量 |
 | `countWaterSources` | usize | 6 | ecology.rs (POI 数量 §4.7) | 清泉数量 |
 | `countBerryBushes` | usize | 6 | ecology.rs (POI 数量 §4.7) | 浆果数量 |
 | `countWoods` | usize | 3 | ecology.rs (POI 数量 §4.7) | 林木数量 |

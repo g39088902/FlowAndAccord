@@ -24,10 +24,14 @@ fn clear_error() {
 }
 
 /// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
+/// camp_count: 营地数量，须在播种生态前注入（否则 countCamps 前端配置无法生效，见 §4.7）
 #[no_mangle]
-pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_count: u32) -> i32 {
+pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32 {
     unsafe {
         let mut w = World3DEngine::new_seeded(grid_res as usize, world_size, seed as u64);
+        if camp_count > 0 {
+            w.config.count_camps = camp_count as usize;
+        }
         w.seed_primitive_ecology(agent_count as usize);
         WORLD = Some(w);
     }

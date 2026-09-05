@@ -101,7 +101,7 @@ pub const TRAIT_INHERIT_CLAMP_MAX: f32 = 190.0;
 // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
 // ============================================================================
 pub const POI_MIN_DISTANCE: f32 = 70.0;
-pub const COUNT_CAMPS: usize = 5;
+pub const COUNT_CAMPS: usize = 4;
 pub const CAMP_MAX_HOUSES: u32 = 25;
 /// 营地行政级别升级所需的最低房屋数量（村、乡、镇、县）
 pub const CAMP_LEVEL_VILLAGE_MIN_HOUSES: u32 = 5;
