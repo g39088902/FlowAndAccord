@@ -237,14 +237,10 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 竞拍决心写入（瞬发）：复用 `branches::best_bid_candidate` 的确定性选房（等级降序、ID 升序），
-    /// 只写 pending 三件套；出价冷却与交割由 `housing_system/auction.rs` 落地。
+    /// 竞拍决心写入（瞬发）：复用 `branches::all_bid_candidates` 的确定性候选全集（升序、不耗 RNG），
+    /// 一次性写全部待出价房屋 ID；出价冷却与交割由 `housing_system/auction.rs` 落地。
     fn write_bid_pending(&mut self, agent: &mut Agent3D) {
-        let Some((house_id, price)) = branches::best_bid_candidate(self, agent) else {
-            return;
-        };
-        agent.pending_bid_house_id = Some(house_id);
-        agent.pending_bid_price = Some(price);
+        agent.pending_bid_house_ids = branches::all_bid_candidates(self, agent);
         agent.pending_bid_upgrade = agent.home_house_id.is_some();
     }
 
@@ -299,9 +295,9 @@ impl<'a> Decisioner<'a> {
         }
         if need.kind == NeedKind::BidHouse {
             // ★ v1.29.0 竞购现房：常规（被层级覆盖降级）路径同样只写 pending，
-            // 选房判据与瞬发路径共用 branches::best_bid_candidate（确定性、不耗 RNG）。
+            // 选房判据与瞬发路径共用 branches::all_bid_candidates（确定性、不耗 RNG）。
             self.write_bid_pending(agent);
-            if agent.pending_bid_house_id.is_none() {
+            if agent.pending_bid_house_ids.is_empty() {
                 agent.current_need = None;
             }
             return;
@@ -381,8 +377,9 @@ impl<'a> Decisioner<'a> {
                         .map(|n| (n.id, n.pos))
                         .min_by(|(_, a), (_, b)| a.distance_to(&cand).partial_cmp(&b.distance_to(&cand)).unwrap()) {
                         let start = self.start_node(agent);
-                        let target_pos = self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap()).map(|n| n.pos).unwrap_or(cand);
-                        agent.pending_house_pos = Some(target_pos);
+                        // 存已通过校验的候选点 cand 本身，而非「离 cand 最近的路网节点」——
+                        // 后者可能是别人家门节点/营地节点，会导致实体化阶段 is_house_site_valid 校验失败、房子盖不起来。
+                        agent.pending_house_pos = Some(cand);
                         let _ = self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp);
                     } else {
                         agent.pending_house_pos = None;
@@ -483,21 +480,21 @@ impl<'a> Decisioner<'a> {
 
     /// 判定夺位远征资格并返回最近的可夺位营地。
     /// has_house=true 时仅自家营地王位空缺才可夺；无房（含废墟）则可夺任意空缺王位营地。
+    /// ★ 遍历完整营地列表（camp_pois）：无 Region 实体的营地（有房无王的孤儿营地）也视为空缺王位，
+    ///   避免房屋辖区（House.camp_id）与地区成员登记簿（RegionRegistry）脱节导致永无国王。
     pub fn eligible_leaderless_camp(&self, agent: &Agent3D, has_house: bool, home_camp_id: Option<u32>) -> Option<u32> {
         let mut best: Option<(u32, f32)> = None;
-        for (cid, region) in &self.regions.regions {
-            if region.group.leader.is_some() {
+        for &(cid, pos) in &self.ctx.camp_pois {
+            // 有王（region 存在且 leader 非空）→ 跳过；无 region 或 leader 为空 → 空缺王位
+            if self.regions.regions.get(&cid).is_some_and(|r| r.group.leader.is_some()) {
                 continue; // 王位未空缺
             }
-            if has_house && Some(*cid) != home_camp_id {
+            if has_house && Some(cid) != home_camp_id {
                 continue; // 有房者只能夺自家营地王位
             }
-            let Some(pos) = self.ctx.camp_pois.iter().find(|(id, _)| *id == *cid).map(|(_, p)| *p) else {
-                continue;
-            };
             let dist = agent.world_pos.distance_to(&pos);
             if best.map(|(_, bd)| dist < bd).unwrap_or(true) {
-                best = Some((*cid, dist));
+                best = Some((cid, dist));
             }
         }
         best.map(|(id, _)| id)

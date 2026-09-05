@@ -211,7 +211,9 @@ impl BranchId {
             BranchId::B12FoundHome => {
                 // 无家判定 = home_house_id 为空（v1.10.0 起无绝嗣废墟状态）
                 // ★ v1.10.0 营地容量预检：至少存在一个未满（< camp_max_houses）的营地才允许立宅
+                // ★ 已选定宅址（pending_house_pos 非空）则不再重掷：继续前往/等待实体化，防止途中每拍重掷导致目标漂移
                 if home_house(d, a).is_none()
+                    && a.pending_house_pos.is_none()
                     && is_male_adult(a, cfg)
                     && a.hunger >= cfg.decision_found_home_hunger_min
                     && a.thirst >= cfg.decision_found_home_thirst_min
@@ -285,13 +287,13 @@ impl BranchId {
                 });
             }
             BranchId::B17BidHouse => {
-                // ★ v1.26.0 竞购现房：成年男性自主对最优在售空置房屋出价
-                // ★ v1.29.0 放宽进入条件：无房 或 有比自己家等级更高的房在售 均可参与（见 best_bid_candidate）
-                // 守卫全内联（任意排列语义安全）：在世 + 非胎儿 + 成年男性 + 无未结算 pending + 冷却结束 + 有金 + 有在售房
+                // ★ v1.26.0 竞购现房：成年男性自主对所有符合条件的在售空置房一次性出价
+                // ★ v1.31.0 出价范围：无房者→全部在售房；有房者→全部 tier 高于自宅的在售房（见 all_bid_candidates）
+                // 守卫全内联（任意排列语义安全）：在世 + 非胎儿 + 成年男性 + 无未结算 pending + 冷却结束 + 有在售房
                 if !a.is_alive || a.gender != Gender::Male || a.is_fetus || a.age < cfg.agent_adult_age {
                     return None;
                 }
-                if a.pending_bid_house_id.is_some() {
+                if !a.pending_bid_house_ids.is_empty() {
                     return None;
                 }
                 let cooldown_ok = a
@@ -301,7 +303,7 @@ impl BranchId {
                 if !cooldown_ok {
                     return None;
                 }
-                if best_bid_candidate(d, a).is_none() {
+                if all_bid_candidates(d, a).is_empty() {
                     return None;
                 }
                 // ★ v1.29.0 竞拍购房归入 ⓪ 瞬间行为：只写 pending，不移动、不扣账
@@ -347,47 +349,26 @@ fn is_house_member(house: &House, a: &Agent3D) -> bool {
     house.owner_id == Some(a.id) || house.spouse_id == Some(a.id)
 }
 
-/// ★ v1.29.0 竞拍最优目标：等级降序、ID 升序（确定性、**零分配**、不耗 RNG）。
-/// 分支守卫与 `fulfill_resting_need::write_bid_pending` 共用同一判据，杜绝两处公式漂移。
-/// 进入条件（★ v1.29.0 放宽）：**无房** 或 **有比自己家等级更高的房在售** 均可参与——
-/// - 无房者：可竞拍任意在售空置房（含 0 级仓库，起拍价抬到 `house_auction_min_bid_gold` 兜底）；
-/// - 有房者：仅改善型换房，只竞拍 `tier > 自家等级` 的更高等级房。
-/// 返回 `(房屋 ID, 折算金价)`。
-pub fn best_bid_candidate(d: &Decisioner, a: &Agent3D) -> Option<(u32, f32)> {
-    let cfg = d.config;
+/// ★ v1.31.0 竞拍候选全集：把所有符合条件的在售空置房一次性返回（升序、确定性、不耗 RNG）。
+/// 分支守卫与 `fulfill_resting_need::write_bid_pending` 共用同一判据，杜绝两处口径漂移。
+/// - 无房者（`home_house_id` 为 None，视为 0 级）：对**全部**在售空置房（含 0 级仓库）出价；
+/// - 有房者：仅改善型换房，只对 `tier > 自家等级` 的更高等级在售房出价。
+/// 出价金额由执行器统一倾囊（家户全部黄金），故此处只返回房屋 ID 升序集合。
+pub fn all_bid_candidates(d: &Decisioner, a: &Agent3D) -> Vec<u32> {
     let own_tier = a
         .home_house_id
         .and_then(|hid| d.houses.iter().find(|h| h.id == hid))
-        .map(|h| h.tier)
-        .unwrap_or(HouseTier::Tier0Warehouse);
-    let gold = d.ledger_balance(a, ResourceKind::Gold);
-    let mut best: Option<(u32, f32, u8)> = None; // (house_id, price, tier)
-    for h in d.houses.iter() {
-        if h.owner_id.is_some() || h.auction_state.is_none() {
-            continue; // 仅无主且在售的空置房
-        }
-        // 连续随机报价：有房者也可以对任意在售房屋表达意向，
-        // 不再把“改善型换房”当作资格门槛；是否接受由报价时点规则决定。
-        let mut price = house_upgrade_cost_price(own_tier, h.tier, cfg);
-        if a.home_house_id.is_none() {
-            // ★ v1.29.0 放宽：无房者竞拍 0 级仓库时折算价为 0，抬到起拍底价，保证「无房即可参与」
-            price = price.max(cfg.house_auction_min_bid_gold);
-        }
-        if price < cfg.house_auction_min_bid_gold || gold < cfg.house_auction_min_bid_gold {
-            continue;
-        }
-        let tier = h.tier as u8;
-        let is_better = match best {
-            None => true,
-            Some((best_id, _, best_tier)) => tier > best_tier || (tier == best_tier && h.id < best_id),
-        };
-        if is_better {
-            best = Some((h.id, price, tier));
-        }
-    }
-    // 连续报价允许“尽力报价”：报价能力不足以覆盖折算价时仍产生一笔
-    // 不可撤回的随机报价，由当前时点的接受规则决定是否受理。
-    best.map(|(id, price, _)| (id, price.min(gold).max(cfg.house_auction_min_bid_gold)))
+        .map(|h| h.tier as u8)
+        .unwrap_or(HouseTier::Tier0Warehouse as u8);
+    let mut candidates: Vec<u32> = d
+        .houses
+        .iter()
+        .filter(|h| h.owner_id.is_none() && h.auction_state.is_some())
+        .filter(|h| a.home_house_id.is_none() || (h.tier as u8) > own_tier)
+        .map(|h| h.id)
+        .collect();
+    candidates.sort_unstable();
+    candidates
 }
 
 /// ★ v1.29.0 夫妻是否同在自家宅门口（判据与 `world_tick.rs::execute_pending_childcare`

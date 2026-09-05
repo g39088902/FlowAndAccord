@@ -246,6 +246,7 @@ window.SIM_CONFIG = {
   houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)
   houseAuctionBidHistoryCapacity: 128, // 单次拍卖会话报价流水环形缓冲容量 (条)
   houseAuctionCrownShareWeight: 1.0,  // 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额)
+  houseAuctionBenchmarkDecayRate: 0.02, // ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭
   marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市扩展承载木材后作单价基准)
   marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市扩展承载石料后作单价基准)
 };

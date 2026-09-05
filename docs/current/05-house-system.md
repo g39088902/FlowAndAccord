@@ -31,7 +31,7 @@
 
 ### 三条自主决策链路
 系统只当"物理规则执行者"，一切"盖不盖、何时盖、在哪盖"来自 agent 自身的 `evaluate_needs`：
-1. **立宅（0级仓库）**：**生理层最后一档**的 `NeedKind::FoundHome`——无家成年男性且饥渴 ≥ 20、体力 ≥ 60 时必然触发，agent 自主掷 12 个候选点选址并沿路网走到分配地点；候选与实体化均避让非营地 POI 交互范围，抵达后系统才做放置校验、路网接入与房产绑定。
+1. **立宅（0级仓库）**：**生理层最后一档**的 `NeedKind::FoundHome`——无家成年男性且饥渴 ≥ 20、体力 ≥ 60 时必然触发，agent 自主掷 12 个候选点选址并沿路网走到分配地点；候选与实体化均避让非营地 POI 交互范围，抵达后系统才做放置校验、路网接入与房产绑定。★ v1.29.1 起宅址落地 = 候选点本身（而非离候选点最近的路网节点），到达判定 = 走完派发路线即视为抵达，且已选定宅址（`pending_house_pos` 非空）不再重掷，避免派发到别人家门节点后校验失败、房子盖不起来。
    - **★ v1.9.0（Task7）无房国王盖房约束**：若立宅人为**现任国王且无房**，候选点必须落在其**王国营地** `poiMinDistance`(70m) 半径内；实体化（`settlement.rs::materialize_founded_houses`）时 `camp_id` 优先取王国营地（`region.group.leader == Some(owner_id)` 的地区），否则最近营地兜底——国王宅邸挂靠王国辖区。
 2. **升级施工**：仓满（各等级门槛）+ 男户主在家满体力时，户主自身决策相位触发 `ConstructingHouse`。
 3. **修缮**：耐久 < 50% 时户主/配偶自身决策相位触发 `RepairingHouse`。
@@ -115,7 +115,7 @@ stateDiagram-v2
 | `marriage.rs` | 自动成婚与丧偶改嫁匹配（★M6 去房屋化成婚） |
 | `settlement.rs` | 立宅选址校验、路网接入、空置节点复用 |
 | `inheritance.rs` | 空置房登记（户主死亡→无主空置→营地 vacant_houses 列表+受益人），取代原父系继承 |
-| `auction.rs` | ★ v1.26.0 决策相位出价执行器、麦穗 37% 竞价、份额制分账与成交交割（估价机制已删除）；★ v1.27.0 世界级拍卖累计统计（`auction_started` / `auction_sold`） |
+| `auction.rs` | ★ v1.26.0 决策相位出价执行器、麦穗 37% 竞价、份额制分账与成交交割（估价机制已删除）；★ v1.27.0 世界级拍卖累计统计（`auction_started` / `auction_sold`）；★ v1.30.0 决策期标杆衰减 `tick_auction_benchmark_decay`（无人击穿时按 `houseAuctionBenchmarkDecayRate` 线性下调至底价） |
 
 ### 二手房屋竞价与营地中介麦穗拍卖 (v1.26.0 重构)
 
@@ -123,12 +123,12 @@ v1.28.3 起，拍卖大盘的“辖区意向买家/换家家户池”卡片仅�
 
 #### v1.26.6 改善型换房
 
-有房男性户主也可自主竞买更高等级的在售房屋。候选目标只按等级差降序、同差按房屋 ID 升序；报价为当前等级到目标等级的升级资源差乘市场基准价格所得成本价，不设置安全储备。麦穗决策期采用 `bid >= benchmark_bid` 成交。目标房成交完成后，原房屋才清空所有权并在下一阶段创建新的空置拍卖会话；主动出售的后续成交款归原户主家户，不走遗产受益人分账。详细需求与技术方案见 [13-plan-house-upgrade-auction.md](../13-plan-house-upgrade-auction.md)。
+有房男性户主也可自主竞买更高等级的在售房屋。★ v1.31.0 出价改为**对全部更高等级在售房一次性倾囊出价**：无房者（视为 0 级）对所有在售空置房（含 0 级仓库）出价，有房者对所有 `tier > 自宅等级` 的在售房出价；一次决心写入升序目标集合 `pending_bid_house_ids`，执行器按房屋 ID 升序逐个落地、首套成交即停（一人一房铁律）。出价金额 = 家户账本全部黄金（倾囊，无上限），不再按升级资源差折算成本价。麦穗决策期采用 `bid >= benchmark_bid` 成交。目标房成交完成后，原房屋才清空所有权并在下一阶段创建新的空置拍卖会话；主动出售的后续成交款归原户主家户，不走遗产受益人分账。详细需求与技术方案见 [13-plan-house-upgrade-auction.md](../13-plan-house-upgrade-auction.md)。
 
-1. **出价下沉到决策引擎**：无房成年男性或已有房屋的户主在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支，按目标等级差降序、同差房屋 ID 升序选择在售房屋，写下 `pending_bid_house_id` 与资源差成本价（不改变运动状态）；世界物理执行器 `execute_pending_bids` 校验后落地，出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却。
+1. **出价下沉到决策引擎**：无房成年男性或已有房屋的户主在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支，一次性对所有符合条件的在售房写下升序目标集合 `pending_bid_house_ids`（不改变运动状态）；世界物理执行器 `execute_pending_bids` 按房屋 ID 升序逐个倾囊落地、成交一套即停，出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却。
 2. **麦穗 37% 最优停止博弈**（成交判定只看新报价，不回溯历史）：
    - **观察期 ($D > D_{37\%}$)**：只收集报价、刷新最高标杆价（`benchmark_bid`），绝不出售；
-   - **决策期 ($10.0\% < D \le D_{37\%}$)**：新报价 $\text{bid} \ge \text{benchmark\_bid}$ 即成交；
+   - **决策期 ($10.0\% < D \le D_{37\%}$)**：新报价 $\text{bid} \ge \text{benchmark\_bid}$ 即成交；★ v1.30.0 起标杆每模拟秒按 `houseAuctionBenchmarkDecayRate`(0.02 金) 线性衰减、下限为出价底价 `houseAuctionMinBidGold`，防止高标杆与购买力脱节导致双锁死流拍；
    - **出清期 ($D \le 10.0\%$)**：有新报价即成交（无人出价则挂到耐久归零坍塌，接受该兜底缺失）。
 3. **报价流水绑定拍卖会话**：`HouseAuctionState.bids_history` 为环形缓冲（容量 `houseAuctionBidHistoryCapacity`=128），挂牌时新建空队列、成交时随会话归档消失，不跨场次。
 4. **份额制分账**：王国公户（`LedgerRef::Region`，权重 `houseAuctionCrownShareWeight`=1）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）按权重共分全额成交价，失效受益人份额并入王国公户（无人类受益人时王国独得，零特判）；流水 `TransferTax`（王室）与 `EstateShare`（受益人）。

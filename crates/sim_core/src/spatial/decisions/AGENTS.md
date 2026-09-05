@@ -46,7 +46,7 @@
 
 ### 4.4 立宅选址掷点
 
-`FoundHome` 在 `fulfill_resting_need` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing` 自检，存 `pending_house_pos`；系统仅由 `housing_system/settlement.rs::materialize_founded_houses` 实体化。选址掷点消耗共享 RNG，改动候选数/距离/间距必须走 `SimConfig`（`decision_found_home_*`）。
+`FoundHome` 在 `fulfill_resting_need` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing` 自检，存 `pending_house_pos`（★ v1.29.1 起存**候选点本身**，而非离候选点最近的路网节点——后者可能是别人家门节点，会导致实体化校验失败）；系统仅由 `housing_system/settlement.rs::materialize_founded_houses` 实体化，到达判定 = 走完派发路线（`current_lane_id` 清空）即视为抵达。`B12FoundHome` 分支含 `pending_house_pos.is_none()` 守卫，已选定宅址则不重掷。选址掷点消耗共享 RNG，改动候选数/距离/间距必须走 `SimConfig`（`decision_found_home_*`）。
 
 ### 4.5 淘金冷却三处联动
 
@@ -75,6 +75,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
 - 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。
+- ★ v1.32.0 孤儿营地补王：`eligible_leaderless_camp` 遍历完整营地列表（`ctx.camp_pois`）而非 `regions`，无 Region 实体（有房无王）的营地一并视为空缺王位；`decide_seeking_throne` 与 `execute_pending_coronations` 的「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，修复房屋辖区与地区成员登记簿脱节导致的孤儿营地永无国王。
 
 ### 4.9 🔴 决策层非移动态切换必须走 `enter_stationary_state()` · 移动态由 dispatch 自动驱动（v1.25.0 起）
 
@@ -94,6 +95,6 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **评估时机与续评估**：`decide()` 顶部 `evaluate_instant_needs` **全状态**、每拍最先执行，只遍历 `BranchId::is_instant()` 白名单（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅）；命中即 `apply_instant_need`（只写决心/pending，不 dispatch、不改 state、不消耗资源与 RNG）并 `continue` 继续遍历后续瞬发分支——因为本回合动作零消耗。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。
 - **白名单与钳制**：只有 `is_instant()` 为 true 的分支可产出瞬间层结论；`level_override_for` 对「非瞬发分支被强制覆盖为 0」返回 None（回退代码默认层级），防止玩家在决策引擎 UI 把移动型分支（如 b1 解渴）拖进瞬间层破坏语义。
 - **瞬发变体写在分支内部（分支自包含铁律）**：b16 求偶「目标已在 `poi_interaction_radius` 内」、b18 育儿「夫妻已在自家宅门口（`couple_at_home_door`，判据与 `execute_pending_childcare` 的 at_home 一致）」返回 `Instantaneous` 结论；远距离仍返回原常规层结论走移动链路。b17 竞拍购房整体归入瞬间层。
-- **幂等守卫**：b16 加 `courtship_pending.is_none()`、b18 加 `!raise_child_pending`、b17 加 `pending_bid_house_id.is_none()` + 冷却，避免每拍重复写。
-- **确定性**：瞬发链路不消耗 `WorldRng`（b17 用 `best_bid_candidate` 等级降序/ID 升序确定性选房，b16 用 `best_courtship_target` 的 `min_by`）。
+- **幂等守卫**：b16 加 `courtship_pending.is_none()`、b18 加 `!raise_child_pending`、b17 加 `pending_bid_house_ids.is_empty()` + 冷却，避免每拍重复写。
+- **确定性**：瞬发链路不消耗 `WorldRng`（b17 用 `all_bid_candidates` 升序确定性枚举全部更高等级在售房，b16 用 `best_courtship_target` 的 `min_by`）。
 - **标签**：瞬发命中写 `"Instantaneous·BidHouse/Courtship/RaiseChild"`；本拍无常规需求时保留瞬间标签，否则被常规标签覆盖。

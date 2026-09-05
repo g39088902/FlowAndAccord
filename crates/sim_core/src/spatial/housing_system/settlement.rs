@@ -95,9 +95,10 @@ impl World3DEngine {
         for (i, agent) in self.agents.iter().enumerate() {
             if agent.is_alive && agent.home_house_id.is_none() {
                 if let Some(pos) = agent.pending_house_pos {
-                    // pending 宅址已通过路网派发到其最近节点；抵达节点即视为到达分配地点。
-                    if agent.current_lane_id.is_some()
-                        || agent.world_pos.distance_to(&pos) > self.config.house_node_reuse_radius {
+                    // pending 宅址派发到离候选点最近的路网节点；走完路线（current_lane_id 清空）即视为抵达。
+                    // 不再用 world_pos 到候选点的距离阈值——候选点与最近节点的距离可能超过 reuse_radius，
+                    // 用距离会误判「未抵达」导致房子永远盖不起来。
+                    if agent.current_lane_id.is_some() {
                         continue;
                     }
                     pending.push((i, pos));

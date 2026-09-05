@@ -3,7 +3,7 @@
 //! v1.26.0 重构（依据 TODO.md 与 AGENTS.md §4.11 自主决策原则）：
 //! 1. 删除房屋估价机制（current_valuation / 建设成本折算 / 双轨估价 / D/S 供求比），
 //!    估价不参与任何成交判定，纯展示字段彻底移除；
-//! 2. 出价下沉到 agent 个体决策相位——`B17BidHouse` 分支写 `pending_bid_house_id`，
+//! 2. 出价下沉到 agent 个体决策相位——`B17BidHouse` 分支写 `pending_bid_house_ids`，
 //!    本文件只承担世界物理执行器 `execute_pending_bids` 与成交交割 `execute_house_deal`；
 //! 3. 成交判定改为「新报价驱动」：只有新报价落下的那一刻才瞬时判定，不再回溯历史报价；
 //! 4. 成交价款按份额制分账：王国公户（权重可配）与遗产受益人（在世配偶 + 在世子女各 1 份）共分，
@@ -37,16 +37,49 @@ impl World3DEngine {
         }
     }
 
+    /// ★ v1.30.0 决策期标杆衰减：麦穗决策期无人击穿标杆时，标杆按
+    /// `house_auction_benchmark_decay_rate`（金/模拟秒）线性下调，直至出价底价兜底。
+    /// 解决「观察期高标杆 + 决策期全民钱袋空」双锁死导致的必然流拍：
+    /// 标杆跌回购买力区间后，执行器现有的 `amount >= benchmark` 判定自然恢复成交。
+    /// 仅决策期衰减（观察期仍在摸底树立标杆；出清期本就有新报价即成交），不耗 RNG、确定性。
+    pub fn tick_auction_benchmark_decay(&mut self) {
+        let rate = self.config.house_auction_benchmark_decay_rate;
+        if rate <= 0.0 {
+            return;
+        }
+        let dt = self.config.simulation_dt;
+        let deadline = self.config.house_auction_deadline_durability;
+        let obs_ratio = self.config.house_auction_observation_ratio;
+        let floor = self.config.house_auction_min_bid_gold;
+        for h in &mut self.houses {
+            let Some(st) = h.auction_state.as_mut() else {
+                continue;
+            };
+            let obs_dur = if st.start_durability > deadline {
+                st.start_durability - obs_ratio * (st.start_durability - deadline)
+            } else {
+                deadline
+            };
+            // 仅决策期衰减：durability ∈ (deadline, obs_dur]
+            if h.durability > obs_dur || h.durability <= deadline {
+                continue;
+            }
+            st.benchmark_bid = (st.benchmark_bid - rate * dt).max(floor);
+        }
+    }
+
     /// ★ 改善型换房：把无房户或有房户主自主写下的竞买决心落地
     /// （决策器只下决心，本方法只做物理结算：校验 → 出价 → 判阶段 → 交割，不扫描指挥）
+    /// ★ v1.31.0 一次决心对多套在售房倾囊出价：按 agent id / 房屋 id 双升序逐个落地，
+    /// 首套成交即停（一人一房铁律），该 agent 对同 tick 其余房源出价作废。
     pub fn execute_pending_bids(&mut self) {
         let tick = self.tick_counter;
 
-        // 收集本拍决心（按 agent id 升序保证确定性）
-        let mut pending: Vec<(AgentId, u32)> = Vec::new();
+        // 收集本拍决心（按 agent id 升序；每 agent 一组升序房屋 ID，保证确定性）
+        let mut pending: Vec<(AgentId, Vec<u32>)> = Vec::new();
         for agent in &self.agents {
-            if let Some(hid) = agent.pending_bid_house_id {
-                pending.push((agent.id, hid));
+            if !agent.pending_bid_house_ids.is_empty() {
+                pending.push((agent.id, agent.pending_bid_house_ids.clone()));
             }
         }
         if pending.is_empty() {
@@ -54,14 +87,13 @@ impl World3DEngine {
         }
         pending.sort_by_key(|(aid, _)| *aid);
 
-        for (bidder_id, house_id) in pending {
-            // 清空决心
+        for (bidder_id, house_ids) in pending {
+            // 清空决心（本拍已消耗，无论资格是否通过）
             if let Some(a) = self.agent_by_id_mut(bidder_id) {
-                a.pending_bid_house_id = None;
+                a.pending_bid_house_ids.clear();
             }
 
-            // 资格复核：在世 / 非胎儿 / 成年男性 / 冷却结束
-            // （进入资格由决策侧 branches.rs::best_bid_candidate 把关：无房 或 有更高等级房在售）
+            // 资格复核（agent 粒度一次）：在世 / 非胎儿 / 成年男性 / 冷却结束
             let eligible = self
                 .agent_by_id(bidder_id)
                 .map(|a| {
@@ -78,18 +110,6 @@ impl World3DEngine {
                 continue;
             }
 
-            // 目标房屋仍在售且存在拍卖会话
-            let Some(house_idx) = self
-                .houses
-                .iter()
-                .position(|h| h.id == house_id && h.owner_id.is_none())
-            else {
-                continue;
-            };
-            if self.houses[house_idx].auction_state.is_none() {
-                continue;
-            }
-
             // 家户黄金（无出价上限，倾囊）
             let Some(hh_id) = self.household_registry.household_of(bidder_id) else {
                 continue;
@@ -102,72 +122,86 @@ impl World3DEngine {
             if hh_gold < self.config.house_auction_min_bid_gold {
                 continue;
             }
-            let base_amount = self.agent_by_id(bidder_id).and_then(|a| a.pending_bid_price).unwrap_or(hh_gold);
-            // In the decision phase a fixed upgrade price can never beat a benchmark
-            // established by an earlier bidder. Raise the offer to one cent above it,
-            // bounded by the household balance, so eligible buyers can actually close.
-            let benchmark = self.houses[house_idx].auction_state.as_ref().map(|s| s.benchmark_bid).unwrap_or(0.0);
-            let amount = base_amount.max((benchmark + 0.01).min(hh_gold));
-            if hh_gold + 0.0001 < amount { continue; }
+            let amount = hh_gold; // ★ v1.31.0 倾囊出价（金额 = 家户全部黄金）
 
-            // 写出价冷却（无论是否成交，出价动作已发生）
-            if let Some(a) = self.agent_by_id_mut(bidder_id) {
-                a.last_bid_tick = Some(tick);
-            }
-
-            // 写入本次拍卖会话报价流水（环形缓冲，超容量淘汰最旧）
-            let durability = self.houses[house_idx].durability;
-            let phase = {
-                let st = self.houses[house_idx].auction_state.as_ref().unwrap();
-                Self::auction_phase_name(durability, st, &self.config)
-            };
-            let capacity = self.config.house_auction_bid_history_capacity.max(1);
-            if let Some(st) = &mut self.houses[house_idx].auction_state {
-                st.bids_history.push_back(HouseBidRecord {
-                    tick,
-                    bidder_id,
-                    household_id: hh_id,
-                    amount,
-                    durability,
-                    phase: phase.clone(),
-                });
-                if st.bids_history.len() > capacity {
-                    st.bids_history.pop_front();
+            let mut did_bid = false;
+            for house_id in house_ids {
+                // 目标房屋仍在售且存在拍卖会话
+                let Some(house_idx) = self
+                    .houses
+                    .iter()
+                    .position(|h| h.id == house_id && h.owner_id.is_none())
+                else {
+                    continue;
+                };
+                if self.houses[house_idx].auction_state.is_none() {
+                    continue;
                 }
-                if amount > st.current_highest_bid {
-                    st.current_highest_bid = amount;
-                    st.current_highest_bidder = Some(bidder_id);
-                }
-            }
 
-            // 阶段判定（新报价驱动：仅在本拍有报价时才判定，不回溯历史）
-            let deal_reason = if phase == "观察期" {
-                // 只抬标杆，不成交
+                // 写入本次拍卖会话报价流水（环形缓冲，超容量淘汰最旧）
+                let durability = self.houses[house_idx].durability;
+                let phase = {
+                    let st = self.houses[house_idx].auction_state.as_ref().unwrap();
+                    Self::auction_phase_name(durability, st, &self.config)
+                };
+                let capacity = self.config.house_auction_bid_history_capacity.max(1);
                 if let Some(st) = &mut self.houses[house_idx].auction_state {
-                    if amount > st.benchmark_bid {
-                        st.benchmark_bid = amount;
+                    st.bids_history.push_back(HouseBidRecord {
+                        tick,
+                        bidder_id,
+                        household_id: hh_id,
+                        amount,
+                        durability,
+                        phase: phase.clone(),
+                    });
+                    if st.bids_history.len() > capacity {
+                        st.bids_history.pop_front();
+                    }
+                    if amount > st.current_highest_bid {
+                        st.current_highest_bid = amount;
+                        st.current_highest_bidder = Some(bidder_id);
                     }
                 }
-                None
-            } else if phase == "决策期" {
-                let bench = self
-                    .houses[house_idx]
-                    .auction_state
-                    .as_ref()
-                    .map(|st| st.benchmark_bid)
-                    .unwrap_or(0.0);
-                if amount >= bench {
-                    Some("麦穗决策期击中更高报价".to_string())
-                } else {
-                    None
-                }
-            } else {
-                // 出清期：有新报价即成交
-                Some("10%修缮度时限新报价成交".to_string())
-            };
 
-            if let Some(reason) = deal_reason {
-                self.execute_house_deal(house_idx, bidder_id, hh_id, amount, reason);
+                // 阶段判定（新报价驱动：仅在本拍有报价时才判定，不回溯历史）
+                let deal_reason = if phase == "观察期" {
+                    // 只抬标杆，不成交
+                    if let Some(st) = &mut self.houses[house_idx].auction_state {
+                        if amount > st.benchmark_bid {
+                            st.benchmark_bid = amount;
+                        }
+                    }
+                    None
+                } else if phase == "决策期" {
+                    let bench = self
+                        .houses[house_idx]
+                        .auction_state
+                        .as_ref()
+                        .map(|st| st.benchmark_bid)
+                        .unwrap_or(0.0);
+                    if amount >= bench {
+                        Some("麦穗决策期击中更高报价".to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    // 出清期：有新报价即成交
+                    Some("10%修缮度时限新报价成交".to_string())
+                };
+
+                did_bid = true;
+                if let Some(reason) = deal_reason {
+                    self.execute_house_deal(house_idx, bidder_id, hh_id, amount, reason);
+                    // ★ v1.31.0 一人一房铁律：成交一套即停
+                    break;
+                }
+            }
+
+            // 本拍至少落一笔报价 → 写出价冷却
+            if did_bid {
+                if let Some(a) = self.agent_by_id_mut(bidder_id) {
+                    a.last_bid_tick = Some(tick);
+                }
             }
         }
     }

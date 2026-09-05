@@ -144,13 +144,13 @@ impl<'a> Decisioner<'a> {
             return;
         };
 
-        // 目标营地王位仍空缺？
+        // 目标营地王位仍空缺？（无 region 实体视为空缺，允许孤儿营地继续走向登基）
         let target_still_leaderless = self
             .regions
             .regions
             .get(&target_camp)
             .map(|r| r.group.leader.is_none())
-            .unwrap_or(false);
+            .unwrap_or(true);
         let camp_pos = self
             .ctx
             .camp_pois

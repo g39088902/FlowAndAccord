@@ -354,6 +354,9 @@ pub const HOUSE_AUCTION_MIN_BID_GOLD: f32 = 0.01;
 pub const HOUSE_AUCTION_BID_HISTORY_CAPACITY: usize = 128;
 /// ★ v1.26.0 王国公户遗产分账份额权重（与人类受益人同等参与份额制分配，默认 1.0；无人类受益人时独得全额）
 pub const HOUSE_AUCTION_CROWN_SHARE_WEIGHT: f32 = 1.0;
+/// ★ v1.30.0 麦穗决策期标杆衰减速率（金/模拟秒，默认 0.02）：决策期无人击穿标杆时，
+/// 标杆随时间线性下调直至出价底价，避免「高标杆 + 全民钱袋空」双锁死导致必然流拍；≤0 关闭衰减
+pub const HOUSE_AUCTION_BENCHMARK_DECAY_RATE: f32 = 0.02;
 /// 木材基准金价（保留：待榷市扩展承载木材后作单价基准，默认 0.15）
 pub const MARKET_PRICE_BASE_WOOD: f32 = 0.15;
 /// 石料基准金价（保留：待榷市扩展承载石料后作单价基准，默认 0.20）
@@ -599,6 +602,7 @@ pub struct SimConfig {
     pub house_auction_min_bid_gold: f32,
     pub house_auction_bid_history_capacity: usize,
     pub house_auction_crown_share_weight: f32,
+    pub house_auction_benchmark_decay_rate: f32,
     pub market_price_base_wood: f32,
     pub market_price_base_stone: f32,
 }
@@ -828,6 +832,7 @@ impl Default for SimConfig {
             house_auction_min_bid_gold: HOUSE_AUCTION_MIN_BID_GOLD,
             house_auction_bid_history_capacity: HOUSE_AUCTION_BID_HISTORY_CAPACITY,
             house_auction_crown_share_weight: HOUSE_AUCTION_CROWN_SHARE_WEIGHT,
+            house_auction_benchmark_decay_rate: HOUSE_AUCTION_BENCHMARK_DECAY_RATE,
             market_price_base_wood: MARKET_PRICE_BASE_WOOD,
             market_price_base_stone: MARKET_PRICE_BASE_STONE,
         }

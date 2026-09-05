@@ -39,7 +39,9 @@ impl World3DEngine {
         self.execute_pending_coronations();
         // ★ 求偶物理规则：把本拍内 male agent 自主下定决心（courtship_pending）的成婚登记落地
         self.execute_pending_courtships();
-        // ★ v1.26.0 竞拍物理规则：把本拍内无房成年男性自主下定决心（pending_bid_house_id）的出价落地
+        // ★ v1.30.0 竞拍物理规则：决策期标杆衰减（先于出价结算，保证本拍报价读到的是衰减后标杆）
+        self.tick_auction_benchmark_decay();
+        // ★ v1.26.0 竞拍物理规则：把本拍内无房成年男性/有房户主自主下定决心（pending_bid_house_ids）的出价落地
         self.execute_pending_bids();
         // 实体化登记：将本拍内 agent 自主选定的宅址落地为 0 级仓库（放置校验/路网接入/房产绑定）
         self.materialize_founded_houses();
@@ -70,7 +72,7 @@ impl World3DEngine {
                 .regions
                 .get(&camp_id)
                 .map(|r| r.group.leader.is_none())
-                .unwrap_or(false);
+                .unwrap_or(true); // 无 region 实体视为空缺，允许孤儿营地登基
             if !still_leaderless {
                 // 王位已被他人抢先：清空登基决心与远征目标，交由决策器重定向/放弃
                 if let Some(agent) = self.agent_by_id_mut(agent_id) {

@@ -156,12 +156,10 @@ pub struct Agent3D {
     /// 男方自主“养育小孩”决策待执行标记；世界结算阶段核验妻子条件后受孕。
     #[serde(default)]
     pub raise_child_pending: bool,
-    /// ★ v1.26.0 竞拍决心：本 agent 自主选定要出价的在售房屋 ID，等待世界执行器落地
+    /// ★ v1.31.0 竞拍决心：本 agent 自主选定要出价的一组在售房屋 ID（升序，确定性），等待世界执行器落地；
+    /// 无房者对全部在售房、有房者对全部 tier 高于自宅的在售房一次性倾囊出价
     #[serde(default)]
-    pub pending_bid_house_id: Option<u32>,
-    /// 竞买时按资源差×市场价格计算的确定性成本价
-    #[serde(default)]
-    pub pending_bid_price: Option<f32>,
+    pub pending_bid_house_ids: Vec<u32>,
     /// 首次置业或改善型换房
     #[serde(default)]
     pub pending_bid_upgrade: bool,
@@ -280,8 +278,7 @@ impl Agent3D {
             courtship_target_id: None,
             courtship_pending: None,
             raise_child_pending: false,
-            pending_bid_house_id: None,
-            pending_bid_price: None,
+            pending_bid_house_ids: Vec::new(),
             pending_bid_upgrade: false,
             last_bid_tick: None,
             build_timer: 0.0,

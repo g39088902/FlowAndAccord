@@ -276,28 +276,6 @@ pub fn upgrade_material_cost(tier: HouseTier, config: &SimConfig) -> Vec<(Resour
     ]
 }
 
-/// 房屋改善型换房成本：把当前等级到目标等级之间的升级资源差按市场基准价折算为黄金。
-/// 该函数无随机数，供决策与成交执行器共同调用。
-pub fn house_upgrade_cost_price(from: HouseTier, to: HouseTier, config: &SimConfig) -> f32 {
-    let tiers = [HouseTier::Tier0Warehouse, HouseTier::Tier1ThatchedHut, HouseTier::Tier2LeanTo, HouseTier::Tier3Homestead, HouseTier::Tier4Manor];
-    let start = tiers.iter().position(|t| *t == from).unwrap_or(0);
-    let end = tiers.iter().position(|t| *t == to).unwrap_or(start);
-    if end <= start { return 0.0; }
-    let mut total = 0.0;
-    for tier in tiers[start..end].iter().copied() {
-        for (kind, amount) in upgrade_material_cost(tier, config) {
-            let price = match kind {
-                ResourceKind::Water | ResourceKind::Food => config.market_price_base,
-                ResourceKind::Wood => config.market_price_base_wood,
-                ResourceKind::Stone => config.market_price_base_stone,
-                ResourceKind::Gold => 1.0,
-            };
-            total += amount * price;
-        }
-    }
-    (total * 100.0).round() / 100.0
-}
-
 /// 升级就绪：家户账本余额能覆盖该级所有材料成本（成本为 0 的品类不阻塞）
 pub fn upgrade_ready_by_cost(
     tier: HouseTier,

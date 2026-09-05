@@ -181,17 +181,19 @@
 
   /**
    * 扫描辖区内符合出价条件的成年男性户主（意向买家/换家家户池）
+   * ★ v1.30.1 准入过滤：家户黄金 > 0（无出价能力者不展示），
+   * 且仅保留「无房」或「自有房屋等级 < 选中在售房屋等级」者（对选中房源无换房动机者不展示）。
    */
-  function scanPotentialBuyers(campId, benchmarkBid) {
+  function scanPotentialBuyers(campId, benchmarkBid, selectedTier) {
     const sim = getSim();
     if (!sim || !sim.agents) return [];
     const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
+    const selectedRank = tierRank(selectedTier);
 
     const buyers = [];
     for (const a of sim.agents) {
-      const auctionTier = Math.max(0, ...((sim.houses || []).filter(h => h.ownerId == null && h.auctionPhase != null).map(h => tierRank(h.tier))));
       const ownHouse = a.homeHouseId != null ? (sim.houses || []).find(h => h.id === a.homeHouseId) : null;
-      if (a.isAlive && a.gender === 'male' && a.age >= adultAge && (a.homeHouseId == null || tierRank(ownHouse && ownHouse.tier) < auctionTier)) {
+      if (a.isAlive && a.gender === 'male' && a.age >= adultAge && (a.homeHouseId == null || tierRank(ownHouse && ownHouse.tier) < selectedRank)) {
         // 查找家户账本黄金
         let gold = 0;
         if (typeof sim.getHouseholdOfAgent === 'function') {
@@ -201,6 +203,8 @@
           const hh = sim.households.find(h => h.head === a.id || (h.members || []).includes(a.id));
           if (hh && hh.balances) gold = hh.balances.Gold || 0;
         }
+        // ★ v1.30.1 0 资金无出价能力，直接不展示
+        if (!(gold > 0)) continue;
 
         // 判断出价意愿与能力
         let status = '蓄资中';
@@ -208,12 +212,9 @@
         if (gold >= benchmarkBid) {
           status = '💰 资金充裕 · 意向强烈';
           statusColor = '#10b981';
-        } else if (gold > 0) {
+        } else {
           status = `🪙 存金 ${gold.toFixed(1)} (尽力出资)`;
           statusColor = '#f59e0b';
-        } else {
-          status = '微薄无金 · 暂无出价能力';
-          statusColor = '#64748b';
         }
 
         buyers.push({
@@ -422,7 +423,7 @@
     if (landStatus) {
       const vacant = sim.houses.filter(h => h.ownerId == null).length;
       const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
-      const buyerCount = scanPotentialBuyers(house.campId, house.benchmarkBid || 0).length;
+      const buyerCount = scanPotentialBuyers(house.campId, house.benchmarkBid || 0, house.tier).length;
       renderHtml(landStatus, `<span style="color:#f59e0b;">🔨 全图在售 ${vacant} 栋 · 无房成年男性买家 ${buyerCount} 人 · 倾囊竞价，王国与受益人份额分账</span>`);
     }
 
@@ -514,7 +515,7 @@
     const buyersCountEl = document.getElementById('auction-buyers-count');
     if (!buyersListEl) return;
 
-    const buyers = scanPotentialBuyers(house.campId, house.benchmarkBid || 0);
+    const buyers = scanPotentialBuyers(house.campId, house.benchmarkBid || 0, house.tier);
     if (buyersCountEl) buyersCountEl.textContent = buyers.length;
 
     if (buyers.length === 0) {
