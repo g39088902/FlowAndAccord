@@ -269,6 +269,9 @@ impl World3DEngine {
             let stamina_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
             agent.hunger = (self.config.agent_spawn_hunger_base + hunger_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
             agent.thirst = (self.config.agent_spawn_hunger_base + thirst_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
+            // 始祖播撒时携带满额水粮，避免出生即因补给缺口触发采集。
+            agent.carried_water = self.config.carry_capacity_resource;
+            agent.carried_food = self.config.carry_capacity_resource;
             agent.stamina = (self.config.agent_spawn_stamina_base + stamina_jitter).clamp(self.config.agent_spawn_stamina_clamp_min, self.config.agent_spawn_stamina_clamp_max);
 
             let mean = self.config.trait_default_mean;
@@ -682,4 +685,3 @@ impl World3DEngine {
         }
     }
 }
-

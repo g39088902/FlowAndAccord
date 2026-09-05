@@ -84,6 +84,10 @@ impl World3DEngine {
         for (i, agent) in self.agents.iter().enumerate() {
             if agent.is_alive && agent.home_house_id.is_none() {
                 if let Some(pos) = agent.pending_house_pos {
+                    // pending 宅址已通过路网派发到其最近节点；抵达节点即视为到达分配地点。
+                    if agent.current_lane_id.is_some() {
+                        continue;
+                    }
                     pending.push((i, pos));
                 }
             }

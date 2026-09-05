@@ -12,8 +12,8 @@
 | `agentDecisionIntervalTicks` | u64 | 30 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 秒决策一次 |
 | `agentHungerCapacity` | f32 | 50 | agent.rs (饱食容量) | 饱食度容量上限 |
 | `agentThirstCapacity` | f32 | 50 | agent.rs (水分容量) | 水分容量上限 |
-| `agentInitialHunger` | f32 | 25 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
-| `agentInitialThirst` | f32 | 25 | agent.rs (初始属性) | 始祖/新生儿初始水分 |
+| `agentInitialHunger` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
+| `agentInitialThirst` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始水分 |
 | `agentInitialStamina` | f32 | 95 | agent.rs (初始属性) | 始祖初始体力 |
 | `agentBaseMetabolismDecay` | f32 | 0.1 | agent.rs (基础代谢/速度) | 基础代谢消耗速率 (饱食/水分 每秒) |
 | `agentHealthDecayPerSec` | f32 | 0.01 | agent.rs (健康衰减) | 濒死健康衰减速率 (每秒) |
@@ -30,7 +30,7 @@
 | `agentConceptionHungerMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低饱食度 |
 | `agentConceptionThirstMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低水分 |
 | `agentConceptionStaminaMin` | f32 | 80 | agent.rs (受孕判定) | 受孕所需最低体力 |
-| `carryCapacityResource` | f32 | 50 | agent.rs / ecology.rs / decisions/ | 单类资源随身行囊容量 (水/粮/木/石 互不共享) |
+| `carryCapacityResource` | f32 | 100 | agent.rs / ecology.rs / decisions/ | 单类资源随身行囊容量 (水/粮/木/石 互不共享) |
 | `agentGoldLoadFull` | f32 | 20 | agent.rs (淘金行囊) / ecology.rs | 单趟淘金运满入库量 |
 | `agentBaseMoveSpeedMult` | f32 | 4 | agent.rs (基础代谢/速度) | 基础移动速度倍率 |
 | `agentStaminaCapacity` | f32 | 100 | agent.rs (体力容量) | 体力值上限 (%) |
@@ -49,9 +49,9 @@
 | `agentSpawnCount` | usize | 20 | ecology.rs (始祖播撒) / agent.rs | 每局播撒的初始始祖族人数量 |
 | `agentCovertEveryN` | usize | 4 | ecology.rs (始祖隐秘特工比例) | 每第 N 名始祖设为隐秘特工 (i % N == 0) |
 | `agentSpawnJitter` | f32 | 10 | ecology.rs (始祖播撒) / agent.rs | 始祖初始属性随机抖动幅度 (±) |
-| `agentSpawnHungerBase` | f32 | 25 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食抖动基线 |
-| `agentSpawnHungerClampMin` | f32 | 10 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食夹取下限 |
-| `agentSpawnHungerClampMax` | f32 | 45 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食夹取上限 |
+| `agentSpawnHungerBase` | f32 | 45 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分抖动基线 |
+| `agentSpawnHungerClampMin` | f32 | 35 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分夹取下限 |
+| `agentSpawnHungerClampMax` | f32 | 50 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分夹取上限 |
 | `agentSpawnStaminaBase` | f32 | 90 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力抖动基线 |
 | `agentSpawnStaminaClampMin` | f32 | 55 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取下限 |
 | `agentSpawnStaminaClampMax` | f32 | 100 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取上限 |

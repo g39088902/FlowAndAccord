@@ -332,6 +332,11 @@ impl Agent3D {
         self.carried_water + self.carried_food + self.carried_wood + self.carried_stone
     }
 
+    /// 是否仍有待回家卸载的随身物资（黄金虽不占容量，也必须计入卸货完成判定）。
+    pub fn has_cargo_to_unload(&self) -> bool {
+        self.carried_load() > 0.01 || self.carried_gold > 0.01
+    }
+
     /// 用本次观察到的 POI 库存刷新该 Agent 私有的施密特触发器。
     pub fn observe_poi_stock(&mut self, poi_id: PoiId, current_stock: f32, max_stock: f32) -> bool {
         self.observe_poi_stock_with_config(poi_id, current_stock, max_stock, &SimConfig::default())

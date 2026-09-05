@@ -91,7 +91,7 @@ ecology.rs::tick_poi_interactions(dt)
   │    └─ 从 POI 储量扣减 → 装入 agent 行囊 (受 carryCapacityResource 限制)
   │    └─ 无家宅者不装袋，只就地自饮自食
   └─ 回家卸货 (RestingAtCamp)
-       └─ 按 poiUnloadRateResource(10/s) 从行囊扣减 → 存入家户账本 (Deposit 流水)
+       └─ 按 poiUnloadRateResource(10/s) 从行囊扣减 → 存入家户账本 (Deposit 流水)，清空前决策器保持卸货态
        └─ 在家吃喝从家户账本真实扣减 (Consume 流水)
        └─ 行囊满即触发 ReturningToCamp 返家
 ```

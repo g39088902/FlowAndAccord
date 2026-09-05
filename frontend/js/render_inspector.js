@@ -721,20 +721,15 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (stamFillEl) stamFillEl.title = '体力 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('stamina' + selAgent.id, selAgent.stamina, _gdt));
 
     // 🎒 随身行囊 (紧凑胶囊网格)
-    const CARRY_TOTAL_CAP = 200.0;
     const cWater = selAgent.carriedWater || 0.0;
     const cFood = selAgent.carriedFood || 0.0;
     const cWood = selAgent.carriedWood || 0.0;
     const cStone = selAgent.carriedStone || 0.0;
     const cGold = selAgent.carriedGold || 0.0;
-    const carryUsed = Math.min(CARRY_TOTAL_CAP, cWater + cFood + cWood + cStone);
-    const totalCargo = carryUsed + cGold;
-    const carryPct = Math.round((carryUsed / CARRY_TOTAL_CAP) * 100);
-
     const carryCapEl = document.getElementById('insp-carry-cap');
-    if (carryCapEl) carryCapEl.textContent = `${carryUsed.toFixed(1)} / ${CARRY_TOTAL_CAP.toFixed(0)}`;
+    if (carryCapEl) carryCapEl.textContent = '分项容量 100 · 黄金∞';
     const carryFillEl = document.getElementById('insp-carry-fill');
-    if (carryFillEl) carryFillEl.style.width = `${carryPct}%`;
+    if (carryFillEl) carryFillEl.parentElement.style.display = 'none';
 
     const updateChip = (chipId, numId, val) => {
       const chip = document.getElementById(chipId);
@@ -755,10 +750,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (carryHintEl) {
       if (!selAgent.isAlive) {
         carryHintEl.textContent = '💀 遗骸物资将随遗体风化消散。';
-      } else if (totalCargo <= 0.01) {
+      } else if (cWater + cFood + cWood + cStone + cGold <= 0.01) {
         carryHintEl.textContent = '行囊空空 (物资将在现场采收后装入)';
-      } else if (carryUsed >= CARRY_TOTAL_CAP - 0.01) {
-        carryHintEl.textContent = '🎒 行囊已满载，正在返家卸货入库。';
       } else {
         carryHintEl.textContent = '🏠 随身携货，返回家宅后卸货存入私宅仓库。';
       }

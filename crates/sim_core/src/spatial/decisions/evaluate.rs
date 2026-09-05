@@ -72,6 +72,12 @@ impl<'a> Decisioner<'a> {
 
         match agent.state {
             PrimitiveActionState::RestingAtCamp => {
+                // ecology.rs 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
+                // 否则决策节拍可能在半卸货时把 agent 再次派出，造成“送货未完就出门”。
+                if agent.has_cargo_to_unload() {
+                    agent.current_need = Some("Safety·UnloadCargo".to_string());
+                    return;
+                }
                 if let Some(need) = self.evaluate_needs(agent) {
                     agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.households, self.config)
                         .map(|(lvl, k)| format!("{}·{}", lvl, k));
@@ -187,6 +193,21 @@ impl<'a> Decisioner<'a> {
         if need.kind == NeedKind::Rest { return; }
         if need.kind == NeedKind::RaiseChild {
             agent.raise_child_pending = true;
+            // 受孕意图需夫妻回到户主住宅后才执行；户主先返回自宅。
+            if let Some(target) = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.door_node_id)
+            {
+                let start = self.start_node(agent);
+                let at_home = agent.current_lane_id.is_none()
+                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                        .unwrap_or(false);
+                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::RaiseChild) {
+                    agent.current_need = Some("Esteem·RaiseChild·ReturningHome".to_string());
+                    return;
+                }
+            }
             agent.enter_stationary_state(PrimitiveActionState::RaiseChild);
             agent.current_need = Some("Esteem·RaiseChild".to_string());
             return;
@@ -225,6 +246,21 @@ impl<'a> Decisioner<'a> {
             return;
         }
         if need.kind == NeedKind::BuildHouse {
+            // 升级施工必须在自宅门口执行；未到家先沿路网返回，抵达后由 construction 结算。
+            let target = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.door_node_id);
+            if let Some(target) = target {
+                let start = self.start_node(agent);
+                let at_home = agent.current_lane_id.is_none()
+                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                        .unwrap_or(false);
+                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::ConstructingHouse) {
+                    agent.current_need = Some("Esteem·BuildHouse·ReturningHome".to_string());
+                    return;
+                }
+            }
             agent.enter_stationary_state(PrimitiveActionState::ConstructingHouse);
             agent.build_timer = 0.0;
             return;
@@ -261,6 +297,13 @@ impl<'a> Decisioner<'a> {
                 if is_valid {
                     agent.pending_house_pos = Some(cand);
                     agent.current_need = Some("Physiological·FoundHome".to_string());
+                    // 先沿路网走到候选宅址附近，抵达后 settlement 才实体化房屋。
+                    if let Some((target, _)) = self.network.graph.node_weights()
+                        .map(|n| (n.id, n.pos))
+                        .min_by(|(_, a), (_, b)| a.distance_to(&cand).partial_cmp(&b.distance_to(&cand)).unwrap()) {
+                        let start = self.start_node(agent);
+                        let _ = self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp);
+                    }
                     return;
                 }
             }

@@ -167,8 +167,20 @@ impl World3DEngine {
                     && w.hunger >= self.config.agent_conception_hunger_min && w.thirst >= self.config.agent_conception_thirst_min
                     && w.stamina >= self.config.agent_conception_stamina_min
             };
+            // 养育动作必须在夫妻回到户主住宅后才落地；未到家则保留意图，等待下一拍。
+            let at_home = self.houses.iter().find(|h| h.owner_id == Some(male_id))
+                .map(|h| {
+                    let door = self.network.graph[*self.network.node_map.get(&h.door_node_id).unwrap()].pos;
+                    self.agents[mi].world_pos.distance_to(&door) <= self.config.poi_interaction_radius
+                        && self.agents[wi].world_pos.distance_to(&door) <= self.config.poi_interaction_radius
+                        && self.agents[mi].current_lane_id.is_none() && self.agents[wi].current_lane_id.is_none()
+                }).unwrap_or(false);
+            if !eligible {
+                self.agents[mi].raise_child_pending = false;
+                continue;
+            }
+            if !at_home { continue; }
             self.agents[mi].raise_child_pending = false;
-            if !eligible { continue; }
             self.agents[wi].is_pregnant = true;
             self.agents[wi].pregnancy_father_id = Some(male_id);
             self.agents[wi].pregnancy_child_id = Some(next_id);

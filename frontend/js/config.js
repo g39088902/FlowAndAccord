@@ -25,8 +25,8 @@ window.SIM_CONFIG = {
   // ==========================================================================
   agentHungerCapacity: 50.0,       // 饱食度容量上限
   agentThirstCapacity: 50.0,       // 水分容量上限
-  agentInitialHunger: 25.0,       // 始祖/新生儿初始饱食度
-  agentInitialThirst: 25.0,       // 始祖/新生儿初始水分
+  agentInitialHunger: 45.0,       // 始祖/新生儿初始饱食度
+  agentInitialThirst: 45.0,       // 始祖/新生儿初始水分
   agentInitialStamina: 95.0,      // 始祖初始体力
   agentBaseMetabolismDecay: 0.10, // 基础代谢消耗速率 (饱食/水分 每秒)
   agentHealthDecayPerSec: 0.01,   // 濒死健康衰减速率 (每秒)
@@ -43,7 +43,7 @@ window.SIM_CONFIG = {
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分
   agentConceptionStaminaMin: 80.0,// 受孕所需最低体力
-  carryCapacityResource: 50.0,    // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
+  carryCapacityResource: 100.0,   // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
   agentGoldLoadFull: 20.0,        // 单趟淘金运满入库量
   agentBaseMoveSpeedMult: 4.0,    // 基础移动速度倍率
   agentStaminaCapacity: 100.0,    // 体力值上限 (%)
@@ -63,9 +63,9 @@ window.SIM_CONFIG = {
   agentSpawnCount: 20,             // 每局播撒的初始始祖族人数量
   agentCovertEveryN: 4,            // 每第 N 名始祖设为隐秘特工 (i % N == 0)
   agentSpawnJitter: 10.0,          // 始祖初始属性随机抖动幅度 (±)
-  agentSpawnHungerBase: 25.0,      // 始祖初始饱食抖动基线
-  agentSpawnHungerClampMin: 10.0,  // 始祖初始饱食夹取下限
-  agentSpawnHungerClampMax: 45.0,  // 始祖初始饱食夹取上限
+  agentSpawnHungerBase: 45.0,      // 始祖初始饱食/水分抖动基线
+  agentSpawnHungerClampMin: 35.0,  // 始祖初始饱食/水分夹取下限
+  agentSpawnHungerClampMax: 50.0,  // 始祖初始饱食/水分夹取上限
   agentSpawnStaminaBase: 90.0,     // 始祖初始体力抖动基线
   agentSpawnStaminaClampMin: 55.0, // 始祖初始体力夹取下限
   agentSpawnStaminaClampMax: 100.0,// 始祖初始体力夹取上限

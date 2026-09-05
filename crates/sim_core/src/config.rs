@@ -23,8 +23,8 @@ pub const AGENT_DECISION_INTERVAL_TICKS: u64 = 30;
 // ============================================================================
 pub const AGENT_HUNGER_CAPACITY: f32 = 50.0;
 pub const AGENT_THIRST_CAPACITY: f32 = 50.0;
-pub const AGENT_INITIAL_HUNGER: f32 = 25.0;
-pub const AGENT_INITIAL_THIRST: f32 = 25.0;
+pub const AGENT_INITIAL_HUNGER: f32 = 45.0;
+pub const AGENT_INITIAL_THIRST: f32 = 45.0;
 pub const AGENT_INITIAL_STAMINA: f32 = 95.0;
 pub const AGENT_BASE_METABOLISM_DECAY: f32 = 0.10;
 pub const AGENT_HEALTH_DECAY_PER_SEC: f32 = 0.01;
@@ -41,7 +41,7 @@ pub const AGENT_MISCARRIAGE_ALERT_DURATION: f32 = 5.0;
 pub const AGENT_CONCEPTION_HUNGER_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_THIRST_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_STAMINA_MIN: f32 = 80.0;
-pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
+pub const CARRY_CAPACITY_RESOURCE: f32 = 100.0;
 pub const AGENT_GOLD_LOAD_FULL: f32 = 20.0;
 pub const AGENT_BASE_MOVE_SPEED_MULT: f32 = 4.0;
 /// 体力值上限 (%，休息恢复与劳作消耗均 clamp 至此)
@@ -76,9 +76,9 @@ pub const AGENT_COVERT_EVERY_N: usize = 4;
 /// 始祖初始属性随机抖动幅度（± 此值）
 pub const AGENT_SPAWN_JITTER: f32 = 10.0;
 /// 始祖初始饱食/水分抖动基线（基线 ± 抖动后 clamp）
-pub const AGENT_SPAWN_HUNGER_BASE: f32 = 25.0;
-pub const AGENT_SPAWN_HUNGER_CLAMP_MIN: f32 = 10.0;
-pub const AGENT_SPAWN_HUNGER_CLAMP_MAX: f32 = 45.0;
+pub const AGENT_SPAWN_HUNGER_BASE: f32 = 45.0;
+pub const AGENT_SPAWN_HUNGER_CLAMP_MIN: f32 = 35.0;
+pub const AGENT_SPAWN_HUNGER_CLAMP_MAX: f32 = 50.0;
 /// 始祖初始体力抖动基线（基线 ± 抖动后 clamp）
 pub const AGENT_SPAWN_STAMINA_BASE: f32 = 90.0;
 pub const AGENT_SPAWN_STAMINA_CLAMP_MIN: f32 = 55.0;
