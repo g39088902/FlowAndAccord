@@ -6,7 +6,7 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**169 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**195 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
@@ -61,7 +61,7 @@
 - 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 字段数为 **168**（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2，v1.6.0 M8 升级成本矩阵 +20 并删除 14 个废弃字段——以实际 `config.rs` 为准）。
+- `SimConfig` 字段数为 **195**（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2，v1.6.0 M8 升级成本矩阵 +20 并删除 14 个废弃字段，后续清理/修正若干——以实际 `config.rs` 为准，`node tools/config-check.js` 输出为权威数字）。
 - 严禁在 Rust 逻辑层散落字面量或直引 `const`，一律通过 `self.config.<字段>` 引用。
 - `config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

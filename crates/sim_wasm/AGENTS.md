@@ -21,7 +21,7 @@
 
 | 导出 | 签名 | 作用 |
 | :--- | :--- | :--- |
-| `world_create` | `(grid_res: u32, world_size: f32, seed: f64, agent_count: u32) -> i32` | 建世界 + 播撒生态；seed 保证可复现 |
+| `world_create` | `(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32` | 建世界 + 播撒生态；seed 保证可复现；camp_count 在播种前注入（否则前端 countCamps 不生效，见根 AGENTS.md §4.7） |
 | `world_config_buf_ptr` | `(len: u32) -> u32` | 准备 Config JSON 内部缓冲区，返回起始指针 |
 | `world_apply_config_buf` | `(len: u32) -> i32` | 解析并应用缓冲区 JSON；0 成功，-1 长度越界，-2 JSON 解析失败，-3 UTF-8 非法，-4 世界未创建 |
 | `world_set_config` | `(ptr: u32, len: u32) -> i32` | 直接从线性内存指针应用 Config JSON；返回码同上 |

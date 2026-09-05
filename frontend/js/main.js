@@ -2,6 +2,8 @@
     const canvas = document.getElementById('sim-canvas');
     const ctx = canvas.getContext('2d');
     const sim = new RustWorld();
+    // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
+    sim.isPaused = true;
     window.rustWorldSim = sim; // 供 decision-viz.js 热注入决策顺序配置（共用同一引擎实例）
 
     let camera = {
@@ -550,6 +552,7 @@
     });
 
     document.getElementById('btn-reroll-eco').addEventListener('click', () => {
+      if (!window.confirm('重演生态会永久丢失当前世界且无法撤销。\n确定要重新播撒 20 名初始族人吗？')) return;
       sim.initEcology(20);
       isCameraFollow = false;
       updateFollowBtnState();
@@ -612,6 +615,23 @@
       if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
       // 立即打开/刷新右侧 Inspector 角色卡片
       if (typeof updateInspector === 'function') updateInspector();
+      return true;
+    };
+
+    window.focusOnHouse = function focusOnHouse(houseId) {
+      const hid = parseInt(houseId, 10);
+      const targetHouse = sim.houses && sim.houses.find(h => h.id === hid);
+      if (!targetHouse) return false;
+      sim.selectionType = 'house'; sim.selectedHouseId = hid; isCameraFollow = false;
+      const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+      const rx = targetHouse.pos.x * cosZ - targetHouse.pos.y * sinZ;
+      const ry = targetHouse.pos.x * sinZ + targetHouse.pos.y * cosZ;
+      const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+      const y2 = ry * cosX - (targetHouse.pos.z || 0) * sinX;
+      camera.panX = -rx * camera.zoom; camera.panY = -y2 * camera.zoom;
+      if (typeof updateFollowBtnState === 'function') updateFollowBtnState();
+      if (typeof updateInspector === 'function') updateInspector();
+      return true;
     };
 
     // ==========================================

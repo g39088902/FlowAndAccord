@@ -20,12 +20,13 @@
 | ⚡ 体力 (`stamina`) | 0~100% | 劳作/移动消耗，休息恢复 | 无法劳作 |
 
 - 初始族人按开局年龄折减初始健康，寿命约 5000s（150,000 ticks）。
-- 饱食/水分初始 25.0（50%）。
+- 新生始祖饱食/水分基线提升至 45.0，并随身携带满额水粮；新生儿仍按独立的新生儿参数初始化。
 
 ### 随身行囊（真实搬运）
 - 水/粮/木/石：每类独立容量 50.0，互不共享；回家休整时按 10.0/s 卸货存入家宅仓库。
 - 黄金：容量无限，单趟运满 20 回宅，卸货 5.0/s。
 - 无家宅者不装包，只在现场就地自饮自食。
+- ★ v1.26.3 调试口径：`Agent3D.cumulative_mined`（合计）+ `cumulative_mined_water/food/wood/stone/gold`（分品种）累计本 agent 一生装载入行囊的资源总量（市场购买与就地自饮自食不计入），随快照下发供调试模式分品种展示，不参与任何行为结算。
 - 详见根 AGENTS.md §4.4。
 
 ### 年龄与两性分化
@@ -35,12 +36,62 @@
 
 ### 婚姻、改嫁与繁衍
 - 拥有 1 级以上私宅的成年单身/丧偶男性自动就近迎娶营地中的成年单身/丧偶女性。成婚由 `housing_system/marriage.rs` 每 tick 扫描匹配，与建房/升级事件解耦。
-- **受孕门槛**：成年已婚女性饱食 ≥ 40.0、水分 ≥ 40.0、体力 ≥ 80%（无房可育，不受房屋等级/储备限制）；流产后休养冷却 200s、**分娩后产后休养冷却 200s**，两类冷却期内禁止再次受孕。
+- **受孕门槛（★ v1.28.0）**：由男性户主在 `B18RaiseChild` 分支发起养育行动并令配偶受孕，条件为——① 男方（户主）名下须有 **≥1 级私宅**（0 级仓库与无房者不生育）；② 妻子为成年已婚女性且饱食 ≥ 40.0、水分 ≥ 40.0、体力 ≥ 80%；③ 流产后休养冷却 200s、**分娩后产后休养冷却 200s**，两类冷却期内禁止再次受孕。
 - **妊娠期 200s**：孕妇头顶显示孕育进度环与粉色光晕。
 - **分娩**：在家庭私宅诞生新生儿（50%男/50%女），代际 = max(父代, 母代) + 1，始祖为第 1 代。
   - ★ M2/M3/M4 出生归属钩子：新生儿随父入父亲家户（无家户则先为父立户）、随父姓入宗族、入父亲所在地区；`arrival_tick` = 出生时 tick。
 - **孕期禁改嫁**：丈夫在妊娠期内离世，怀孕女性在分娩前不可改嫁；新生儿继承真实生父 ID，分娩后母亲恢复单身待改嫁资格。
 - 婚姻登记的完整权责记录见 [12-ledger-system.md](./12-ledger-system.md)。
+
+### 生命周期与孕育状态机
+
+> 状态与阈值对照源码 `agent.rs::tick_metabolism`、`birth.rs::resolve_newborns`、`decisions/branches.rs`（B16）与 `scheduler.rs::execute_pending_courtships`；时间常量权威定义在 `config.rs`（成年 1800s、孕期 200s、流产/产后冷却各 200s、遗骸风化 12s）。求偶/成婚的动作层状态见 [06-motivation-ai.md](./06-motivation-ai.md) 的行动状态机总图。
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Fetus : 受孕瞬间占号，tick_fetus_reconcile 建 is_fetus 实体
+    state "🫄 胎儿 Fetus（无地图实体，跳过决策/代谢/运动；计入分家权重与继承）" as Fetus
+    Fetus --> Juvenile : 妊娠满 200s 分娩，原位替换复用 ID，随父入家户/宗族/地区
+
+    state "🧒 幼年 Juvenile（age 小于 1800s，与父母同住，不立宅不求偶）" as Juvenile
+    Juvenile --> Single : age 达到 1800s 成年
+
+    state "🧑 成年单身 Single（男可立宅/求偶/夺位，女可被求偶）" as Single
+    Single --> Court : 男性 B16 发起求偶（魅力最高、最近、ID 最小）
+    state "💍 SeekingCourtship 奔赴求偶（仅男性进入）" as Court
+    Court --> Married : 抵达写 courtship_pending，执行器原子登记、女方随夫入家户
+    Court --> Single : 生理熔断、候选全部失效或资格核验失败
+    Single --> Married : 单身女性被男性求偶，执行器直接登记成婚
+
+    state "💑 已婚 Married（一夫一妻，spouse_id 互绑）" as Married
+    Married --> Widowed : 配偶亡故 tick_bereavement_unmarry 解除婚姻
+    state "🪦 丧偶单身 Widowed（孕期遗孀分娩前禁改嫁）" as Widowed
+    Widowed --> Court : 男性再发起 B16
+    Widowed --> Married : 女性被其他男性求偶，执行器直接登记
+    Widowed --> Single : 恢复单身资格
+
+    state "♀ 已婚女性孕育子状态机（仅已婚女性运行）" as PregLoop {
+      state "未孕 NonPregnant（两类冷却均结束才允许受孕）" as NP
+      state "🤰 妊娠期 Pregnant（200s，progress 0→1，孕期代谢倍率）" as Preg
+      state "🥀 流产休养冷却（200s）" as MC
+      state "🍼 产后休养冷却（200s）" as PC
+      [*] --> NP
+      NP --> Preg : 饱食≥40 且 水≥40 且 体力≥80%
+      Preg --> MC : 饱食或水小于 10、体力小于 20 则流产并释放胎儿 ID
+      MC --> NP : 冷却归零
+      Preg --> PC : progress≥1 分娩（50% 性别、代际+1、父母威望各+1）
+      PC --> NP : 冷却归零
+    }
+
+    Juvenile --> Dead : 饥饿、脱水或寿终
+    Single --> Dead : 饥饿、脱水或寿终
+    Court --> Dead : 饥饿、脱水或寿终
+    Married --> Dead : 饥饿、脱水或寿终
+    Widowed --> Dead : 饥饿、脱水或寿终
+    state "💀 死亡 Dead（遗骸风化 12s；区分寿终/饿死/渴死分别统计）" as Dead
+    Dead --> [*] : 风化移除
+```
 
 ### 先天禀赋（6 项）
 每位族人携带：🧠智力 / 💪力量 / ❤️‍🔥魅力 / 🍽️消化效率 / 😴睡眠效率 / ⏳预期寿命。

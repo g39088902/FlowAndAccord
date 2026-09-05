@@ -28,7 +28,7 @@ use super::world::World3DEngine;
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 3;
 /// 写入存档时附带的应用版本（仅供前端提示与人工排查，不作为加载门禁）
-pub const SAVE_APP_VERSION: &str = "1.14.0";
+pub const SAVE_APP_VERSION: &str = "1.28.1";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -99,6 +99,14 @@ pub struct WorldSave {
     // ── 团体冷却表（保序 BTreeMap）──
     pub mutual_aid_cooldown: BTreeMap<HouseholdId, u64>,
     pub relief_cooldown: BTreeMap<HouseholdId, u64>,
+    #[serde(default)]
+    pub auction_started: u64,
+    #[serde(default)]
+    pub auction_sold: u64,
+    #[serde(default)]
+    pub auction_flopped: u64,
+    #[serde(default)]
+    pub last_royal_payout_tick: u64,
 }
 
 impl World3DEngine {
@@ -140,6 +148,10 @@ impl World3DEngine {
             region_registry: self.region_registry.clone(),
             mutual_aid_cooldown: self.mutual_aid_cooldown.clone(),
             relief_cooldown: self.relief_cooldown.clone(),
+            auction_started: self.auction_started,
+            auction_sold: self.auction_sold,
+            auction_flopped: self.auction_flopped,
+            last_royal_payout_tick: self.last_royal_payout_tick,
         }
     }
 }
@@ -213,6 +225,10 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         mutual_aid_cooldown: save.mutual_aid_cooldown,
         region_registry: save.region_registry,
         relief_cooldown: save.relief_cooldown,
+        auction_started: save.auction_started,
+        auction_sold: save.auction_sold,
+        auction_flopped: save.auction_flopped,
+        last_royal_payout_tick: save.last_royal_payout_tick,
     };
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic

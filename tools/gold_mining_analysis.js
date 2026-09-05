@@ -212,7 +212,7 @@ async function main() {
   const memory = wasm.memory;
 
   // 创建世界（与前端一致：grid=60, size=764, seed=42, 20人）
-  wasm.world_create(60, 764.0, 42, 20);
+  wasm.world_create(60, 764.0, 42, 20, 5);
 
   function getSnapshot() {
     const ptr = wasm.world_snapshot_ptr();

@@ -61,6 +61,8 @@ pub enum NeedKind {
     SeekThrone,     // 生理(第一层生存·最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基（夺位=资源分配权）
     MarketTrade,    // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
     Courtship,      // 归属: 寻找全图魅力最高单身女性求偶成婚
+    BidHouse,       // ★ v1.26.0 安全: 无房成年男性对随机一套在售空置房屋出价竞购（出价后进入全局冷却）
+    RaiseChild,     // 尊重: 已婚成年男性自主发起养育小孩行动
 }
 
 /// 一条需求判定结论
@@ -120,8 +122,12 @@ pub struct DecisionContext {
     pub camp_positions: Vec<(NodeId, Vec3)>,
     /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
     pub camp_pois: Vec<(u32, Vec3)>,
+    /// 非营地 POI 坐标；宅址候选必须避让其交互范围。
+    pub poi_positions: Vec<Vec3>,
     /// 全图可求偶的在世成年单身女性列表（求偶分支使用）
     pub eligible_females: Vec<EligibleFemale>,
+    /// 满足原受孕条件的已婚女性 ID（供“养育小孩”分支核验配偶）
+    pub conception_ready_females: Vec<AgentId>,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）
@@ -233,6 +239,28 @@ pub fn upgrade_material_cost(tier: HouseTier, config: &SimConfig) -> Vec<(Resour
     ]
 }
 
+/// 房屋改善型换房成本：把当前等级到目标等级之间的升级资源差按市场基准价折算为黄金。
+/// 该函数无随机数，供决策与成交执行器共同调用。
+pub fn house_upgrade_cost_price(from: HouseTier, to: HouseTier, config: &SimConfig) -> f32 {
+    let tiers = [HouseTier::Tier0Warehouse, HouseTier::Tier1ThatchedHut, HouseTier::Tier2LeanTo, HouseTier::Tier3Homestead, HouseTier::Tier4Manor];
+    let start = tiers.iter().position(|t| *t == from).unwrap_or(0);
+    let end = tiers.iter().position(|t| *t == to).unwrap_or(start);
+    if end <= start { return 0.0; }
+    let mut total = 0.0;
+    for tier in tiers[start..end].iter().copied() {
+        for (kind, amount) in upgrade_material_cost(tier, config) {
+            let price = match kind {
+                ResourceKind::Water | ResourceKind::Food => config.market_price_base,
+                ResourceKind::Wood => config.market_price_base_wood,
+                ResourceKind::Stone => config.market_price_base_stone,
+                ResourceKind::Gold => 1.0,
+            };
+            total += amount * price;
+        }
+    }
+    (total * 100.0).round() / 100.0
+}
+
 /// 升级就绪：家户账本余额能覆盖该级所有材料成本（成本为 0 的品类不阻塞）
 pub fn upgrade_ready_by_cost(
     tier: HouseTier,
@@ -274,6 +302,7 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
             if is_tier0 { ("Belonging", "BuildHouse", Some(BranchId::B8BuildHouseTier0)) } else { ("Esteem", "BuildHouse", Some(BranchId::B11BuildHouseUpgrade)) }
         }
         PrimitiveActionState::SeekingCourtship => ("Belonging", "Courtship", Some(BranchId::B16Courtship)),
+        PrimitiveActionState::RaiseChild => ("Esteem", "RaiseChild", Some(BranchId::B18RaiseChild)),
         PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest", Some(BranchId::B3Rest)),
         PrimitiveActionState::OffRoadDetour => ("Safety", "Detour", None),
         _ => return None,

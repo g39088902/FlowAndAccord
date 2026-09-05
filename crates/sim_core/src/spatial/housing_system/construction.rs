@@ -24,6 +24,16 @@ impl World3DEngine {
             .map(|a| a.id)
             .collect();
         for agent_id in pending {
+            let at_house = self.agents.iter().find(|a| a.id == agent_id)
+                .and_then(|a| a.home_house_id)
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| {
+                    let pos = self.network.graph[*self.network.node_map.get(&h.door_node_id).unwrap()].pos;
+                    self.agents.iter().find(|a| a.id == agent_id)
+                        .map(|a| a.current_lane_id.is_none() && a.world_pos.distance_to(&pos) <= self.config.poi_interaction_radius)
+                        .unwrap_or(false)
+                }).unwrap_or(false);
+            if !at_house { continue; }
             self.try_instant_upgrade(agent_id);
         }
     }

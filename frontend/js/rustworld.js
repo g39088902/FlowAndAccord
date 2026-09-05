@@ -53,6 +53,7 @@
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
+        this._setEngineStatus('正在加载生态演算引擎…', 'loading');
 
         // 异步加载 Rust 引擎 (wasm)
         this._loadWasm();
@@ -66,17 +67,33 @@
           const result = await WebAssembly.instantiate(bytes, {});
           this._wasm = result.instance.exports;
           this._memory = this._wasm.memory;
-          this._wasm.world_create(60, 764.0, this._engineSeed, 20);
+          this._wasm.world_create(60, 764.0, this._engineSeed, 20, this._campCountFromConfig());
           this._ready = true;
+          this._setEngineStatus('', 'ready');
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
-          if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
           console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
         } catch (e) {
+          this._setEngineStatus('生态演算引擎加载失败，请检查服务器或刷新重试。', 'error');
           console.error('[RustWorld] 无法加载 Rust 引擎 (请通过 HTTP 服务访问):', e);
         }
+      }
+
+      _setEngineStatus(message, state) {
+        const el = document.getElementById('engine-status');
+        if (!el) return;
+        el.textContent = message;
+        el.dataset.state = state;
+        el.style.display = state === 'ready' ? 'none' : 'flex';
+      }
+
+      // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
+      _campCountFromConfig() {
+        const n = window.SIM_CONFIG && window.SIM_CONFIG.countCamps;
+        if (typeof n === 'number' && n > 0) return n;
+        return 4; // 与 Rust config.rs COUNT_CAMPS 默认一致
       }
 
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
@@ -186,12 +203,11 @@
         this.agentArchive.clear();
         this._consumedDeathIds.clear();
         if (this._ready) {
-          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20);
+          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20, this._campCountFromConfig());
           if (window.SIM_CONFIG) {
             this.applyConfig(window.SIM_CONFIG);
           }
           this._pullSnapshot(true);
-          if (this._lastEvent) this.logEvent(this._lastEvent, 'camp');
         }
       }
 
@@ -304,6 +320,11 @@
         this.totalDeathsNatural = snap.total_deaths_natural || 0;
         this.totalDeathsUnnatural = snap.total_deaths_unnatural || 0;
         this.totalMiscarriages = snap.total_miscarriages;
+        this.auctionStats = {
+          started: snap.auction_started || 0,
+          sold: snap.auction_sold || 0,
+          flopped: snap.auction_flopped || 0,
+        };
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
 
@@ -381,6 +402,16 @@
           vacantHouses: (p.vacant_houses || []).map(vh => ({
             houseId: vh.house_id,
             beneficiaryIds: vh.beneficiary_ids || []
+          })),
+          // ★ v1.28.0 榷场交易流水（从新到旧，仅 Market 有内容）
+          marketTrades: (p.market_trades || []).map(t => ({
+            tick: t.tick,
+            agentId: t.agent_id,
+            householdId: (t.household_id === null || t.household_id === undefined) ? null : t.household_id,
+            resource: t.resource || 'Water',
+            amount: t.amount || 0,
+            unitPrice: t.unit_price || 0,
+            goldCost: t.gold_cost || 0
           }))
         }));
 
@@ -399,7 +430,6 @@
           constructionProgress: h.construction_progress,
           builderId: h.builder_id,
           lastUpgraderId: h.last_upgrader_id,
-          currentValuation: h.current_valuation || 0,
           auctionPhase: h.auction_phase || null,
           benchmarkBid: h.benchmark_bid || 0,
           highestBid: h.highest_bid || 0,
@@ -495,6 +525,12 @@
             carriedWood: a.carried_wood,
             carriedStone: a.carried_stone,
             carriedGold: a.carried_gold,
+            cumulativeMined: a.cumulative_mined || 0,
+            cumulativeMinedWater: a.cumulative_mined_water || 0,
+            cumulativeMinedFood: a.cumulative_mined_food || 0,
+            cumulativeMinedWood: a.cumulative_mined_wood || 0,
+            cumulativeMinedStone: a.cumulative_mined_stone || 0,
+            cumulativeMinedGold: a.cumulative_mined_gold || 0,
             buildTimer: a.build_timer,
             isPregnant: a.is_pregnant,
             pregnancyProgress: a.pregnancy_progress,

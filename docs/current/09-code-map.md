@@ -22,7 +22,7 @@ FlowAndAccord/
 │   │           ├── vec3.rs                 # 3D 向量数学库
 │   │           ├── curve.rs                # 三次贝塞尔曲线定义与采样
 │   │           ├── graph.rs                # LaneGraph3D 拓扑路网 + A* 寻路 + 踩踏衰减
-│   │           ├── poi.rs                  # 24 处 POI 实体定义 (营地5/泉6/果6/木3/石2/金1/榷场互市1)
+│   │           ├── poi.rs                  # 23 处 POI 实体定义 (营地4/泉6/果6/木3/石2/金1/榷场互市1)
 │   │           ├── house.rs                # 5 阶房屋模型、耐久度与户主绑定 (M6 起无仓储，家户账本为唯一真相源)
 │   │           ├── agent.rs                # 部落民实体、生理代谢、随身行囊、运动与状态机
 │   │           ├── ecology.rs              # 生态初始化、POI 采收装载、回家卸货入账、榷场交易结算
@@ -32,12 +32,12 @@ FlowAndAccord/
 │   │           ├── snapshot.rs             # 快照结构体定义 (Agent/House/POI/Household/Marriage/Clan/Region/Ledger)
 │   │           ├── decisions/              # 🧠 马斯洛决策子系统 (9 文件)
 │   │           │   ├── mod.rs              # 决策子模块入口与重新导出
-│   │           │   ├── branches.rs         # ★ 15 条分支注册表 (BranchId ↔ b1~b15，含 b14 夺位与 b15 榷场商贸，自包含条件函数，Rust 侧无顺序)
+│   │           │   ├── branches.rs         # ★ 18 条分支注册表 (BranchId ↔ b1~b18，含 b14 夺位、b15 榷场商贸、b17 竞拍、b18 养育，自包含条件函数，Rust 侧无顺序)
 │   │           │   ├── needs.rs            # NeedKind 需求定义、升级材料成本 (upgrade_material_cost)、家户缺口计算
 │   │           │   ├── evaluate.rs         # Decisioner 结构体 + decide/evaluate_needs (按配置顺序迭代分支)
 │   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性
-│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active)
-│   │           │   ├── seeking.rs          # 途中熔断与平滑重路由
+│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active；★v1.27.0 水/粮断流转榷场)
+│   │           │   ├── seeking.rs          # 途中熔断与平滑重路由 (★v1.27.0 try_route_to_market 断流直达榷场)
 │   │           │   ├── market.rs           # 外部商贸决策子模块 (evaluate_market_trade / 途中可用性 / 现场交易完成返家)
 │   │           │   └── scheduler.rs        # tick_decisions + execute_pending_coronations(★M4登基) + build_decision_context
 │   │           ├── housing_system/         # 🏡 房屋全生命周期子系统 (7 文件)
@@ -61,11 +61,11 @@ FlowAndAccord/
 ├── frontend/
 │   ├── js/
 │   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 149 字段)
-│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源 (14 条 b1~b14 + 层级覆盖，b14 夺位置首，§4.12 文档化例外)
+│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源 (18 条 b1~b18 + 层级覆盖，b14 夺位置首，§4.12 文档化例外)
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── math.js                         # 3D 向量与投影变换
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
-│   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (分支卡/分界线/层级图例/检查器/拖动)
+│   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
 │   │   ├── decision-viz.js                 # 决策引擎集成层 (合并配置进 SIM_CONFIG / 拖动热注入 / POST 写盘 / localStorage 降级)
 │   │   ├── rustworld.js                    # WASM 桥接层、快照映射、Config 注入驱动、agentArchive 全量档案库
 │   │   ├── dag-layout.js                   # 族谱时间轴布局数学 (纯函数, 零 DOM)

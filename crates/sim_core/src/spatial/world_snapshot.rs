@@ -4,7 +4,7 @@ use super::poi::{PoiType, market_unit_price};
 use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
-    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
+    MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -60,6 +60,20 @@ impl World3DEngine {
                     house_id: vh.house_id,
                     beneficiary_ids: vh.beneficiary_ids.clone(),
                 }).collect(),
+                // ★ v1.28.0 榷场交易流水：仅 Market 输出最近 8 条（从新到旧），其余类型空数组
+                market_trades: if p.poi_type == PoiType::Market {
+                    p.market_trades.iter().rev().take(8).map(|t| MarketTradeSnapshot {
+                        tick: t.tick,
+                        agent_id: t.agent_id,
+                        household_id: t.household_id,
+                        resource: t.resource.clone(),
+                        amount: t.amount,
+                        unit_price: t.unit_price,
+                        gold_cost: t.gold_cost,
+                    }).collect()
+                } else {
+                    Vec::new()
+                },
             });
         }
 
@@ -88,12 +102,19 @@ impl World3DEngine {
 
             let last_deal = h.deal_history.last();
 
-            let recent_bids: Vec<HouseBidSnapshot> = h.bids_history.iter().rev().take(10).map(|b| HouseBidSnapshot {
-                tick: b.tick,
-                bidder_id: b.bidder_id,
-                amount: b.amount,
-                phase: b.phase.clone(),
-            }).collect();
+            // ★ v1.26.0 报价流水取自本次拍卖会话（房屋有主 / 无会话时为空）
+            let session_bids = h.auction_state.as_ref();
+            let mut recent_bids: Vec<HouseBidSnapshot> = Vec::new();
+            if let Some(st) = session_bids {
+                for b in st.bids_history.iter().rev().take(10) {
+                    recent_bids.push(HouseBidSnapshot {
+                        tick: b.tick,
+                        bidder_id: b.bidder_id,
+                        amount: b.amount,
+                        phase: b.phase.clone(),
+                    });
+                }
+            }
 
             let recent_deals: Vec<HouseDealSnapshot> = h.deal_history.iter().rev().take(5).map(|d| HouseDealSnapshot {
                 tick: d.deal_tick,
@@ -118,11 +139,10 @@ impl World3DEngine {
                 is_repairing: h.is_repairing,
                 builder_id: h.builder_id,
                 last_upgrader_id: h.last_upgrader_id,
-                current_valuation: h.current_valuation,
                 auction_phase,
                 benchmark_bid,
                 highest_bid,
-                bids_count: h.bids_history.len(),
+                bids_count: session_bids.map(|st| st.bids_history.len()).unwrap_or(0),
                 last_deal_price: last_deal.map(|d| d.price),
                 last_deal_tick: last_deal.map(|d| d.deal_tick),
                 auction_start_durability: h.auction_state.as_ref().map(|st| st.start_durability),
@@ -180,6 +200,12 @@ impl World3DEngine {
                 carried_wood: agent.carried_wood,
                 carried_stone: agent.carried_stone,
                 carried_gold: agent.carried_gold,
+                cumulative_mined: agent.cumulative_mined,
+                cumulative_mined_water: agent.cumulative_mined_water,
+                cumulative_mined_food: agent.cumulative_mined_food,
+                cumulative_mined_wood: agent.cumulative_mined_wood,
+                cumulative_mined_stone: agent.cumulative_mined_stone,
+                cumulative_mined_gold: agent.cumulative_mined_gold,
                 build_timer: agent.build_timer,
                 miscarriage_alert_timer: agent.miscarriage_alert_timer,
                 state: format!("{:?}", agent.state),
@@ -494,6 +520,9 @@ impl World3DEngine {
             total_deaths_natural: self.total_deaths_natural,
             total_deaths_unnatural: self.total_deaths_unnatural,
             total_miscarriages: self.total_miscarriages,
+            auction_started: self.auction_started,
+            auction_sold: self.auction_sold,
+            auction_flopped: self.auction_flopped,
             season: season_str.to_string(),
             temperature: self.temperature,
             season_progress,

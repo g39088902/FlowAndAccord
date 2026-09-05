@@ -44,6 +44,12 @@ pub struct WorldSnapshot3D {
     pub total_deaths_natural: u32,
     pub total_deaths_unnatural: u32,
     pub total_miscarriages: u32,
+    #[serde(default)]
+    pub auction_started: u64,
+    #[serde(default)]
+    pub auction_sold: u64,
+    #[serde(default)]
+    pub auction_flopped: u64,
     pub season: String,
     pub temperature: f32,
     pub season_progress: f32,
@@ -110,6 +116,25 @@ pub struct VacantHouseSnapshot {
     pub beneficiary_ids: Vec<AgentId>,
 }
 
+/// ★ v1.28.0 榷场单笔成交流水快照（供前端「🔄 交易流水」面板展示，与内核 `MarketTradeRecord` 一一对应）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketTradeSnapshot {
+    /// 成交时的世界 tick
+    pub tick: u64,
+    /// 采购人 AgentId
+    pub agent_id: AgentId,
+    /// 采购人家户 ID（无家户时为 null）
+    pub household_id: Option<u64>,
+    /// 资源品类: "Water" / "Food"
+    pub resource: String,
+    /// 成交数量
+    pub amount: f32,
+    /// 成交单价（金/单位）
+    pub unit_price: f32,
+    /// 本次支出黄金总额
+    pub gold_cost: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoiSnapshot {
     pub id: PoiId,
@@ -136,6 +161,9 @@ pub struct PoiSnapshot {
     pub bound_houses: u32,
     /// ★ v1.10.0 空置房屋列表（仅营地有意义）
     pub vacant_houses: Vec<VacantHouseSnapshot>,
+    /// ★ v1.28.0 榷场交易流水（仅 Market 有内容，从新到旧最多 8 条）
+    #[serde(default)]
+    pub market_trades: Vec<MarketTradeSnapshot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,6 +210,15 @@ pub struct AgentSnapshot {
     pub carried_wood: f32,
     pub carried_stone: f32,
     pub carried_gold: f32,
+    /// ★ v1.26.3 累计开采资源量（单位）：本 agent 一生从资源点装载入随身行囊的累计总量
+    /// （水/粮/木/石/金五类合计；市场购买与就地自饮自食不计入）。调试模式前端展示用。
+    pub cumulative_mined: f32,
+    /// ★ v1.26.3 累计开采资源量 · 分品种（水/粮/木/石/金），合计字段的明细拆分。
+    pub cumulative_mined_water: f32,
+    pub cumulative_mined_food: f32,
+    pub cumulative_mined_wood: f32,
+    pub cumulative_mined_stone: f32,
+    pub cumulative_mined_gold: f32,
     pub build_timer: f32,
     pub miscarriage_alert_timer: f32,
     pub state: String,

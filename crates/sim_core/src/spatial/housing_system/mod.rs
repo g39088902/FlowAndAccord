@@ -27,10 +27,8 @@ impl World3DEngine {
         self.tick_house_construction();
 
         // 7. ★ v1.10.0 空置房屋事件驱动追踪（户主死亡→无主空置→营地登记受益人，取代原继承/绝嗣废墟）
+        //    ★ v1.26.0 挂牌瞬间清空居住者 + 新建携带空报价队列的拍卖会话（见 inheritance.rs）
         self.tick_vacant_house_tracking();
-
-        // 7.5 ★ v1.14.0 二手房屋市场与营地中介麦穗 37% 原则拍卖
-        self.tick_housing_auctions(dt);
 
         // 8. 金币遗产继承机制 (死者金币平分给在世子一代子女)
         self.settle_gold_inheritance();

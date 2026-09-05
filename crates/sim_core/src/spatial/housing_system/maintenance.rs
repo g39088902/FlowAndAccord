@@ -61,6 +61,9 @@ impl World3DEngine {
                 self.agents[i].home_camp_node = c_node;
             }
             for hid in &collapsed_house_ids {
+                if let Some(h) = self.houses.iter().find(|h| h.id == *hid) {
+                    if h.auction_state.is_some() { self.auction_flopped = self.auction_flopped.saturating_add(1); }
+                }
                 self.last_event = Some(format!("🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！", hid));
             }
             self.houses.retain(|h| h.durability > 0.0);

@@ -3,7 +3,7 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 14. 二手房屋市场、营地中介拍卖与麦穗估价
+## 14. 二手房屋市场、营地中介拍卖与麦穗竞价
 
 | 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -12,8 +12,8 @@
 | `agentDecisionIntervalTicks` | u64 | 30 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 秒决策一次 |
 | `agentHungerCapacity` | f32 | 50 | agent.rs (饱食容量) | 饱食度容量上限 |
 | `agentThirstCapacity` | f32 | 50 | agent.rs (水分容量) | 水分容量上限 |
-| `agentInitialHunger` | f32 | 25 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
-| `agentInitialThirst` | f32 | 25 | agent.rs (初始属性) | 始祖/新生儿初始水分 |
+| `agentInitialHunger` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
+| `agentInitialThirst` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始水分 |
 | `agentInitialStamina` | f32 | 95 | agent.rs (初始属性) | 始祖初始体力 |
 | `agentBaseMetabolismDecay` | f32 | 0.1 | agent.rs (基础代谢/速度) | 基础代谢消耗速率 (饱食/水分 每秒) |
 | `agentHealthDecayPerSec` | f32 | 0.01 | agent.rs (健康衰减) | 濒死健康衰减速率 (每秒) |
@@ -30,7 +30,7 @@
 | `agentConceptionHungerMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低饱食度 |
 | `agentConceptionThirstMin` | f32 | 40 | agent.rs (受孕判定) | 受孕所需最低水分 |
 | `agentConceptionStaminaMin` | f32 | 80 | agent.rs (受孕判定) | 受孕所需最低体力 |
-| `carryCapacityResource` | f32 | 50 | agent.rs / ecology.rs / decisions/ | 单类资源随身行囊容量 (水/粮/木/石 互不共享) |
+| `carryCapacityResource` | f32 | 100 | agent.rs / ecology.rs / decisions/ | 单类资源随身行囊容量 (水/粮/木/石 互不共享) |
 | `agentGoldLoadFull` | f32 | 20 | agent.rs (淘金行囊) / ecology.rs | 单趟淘金运满入库量 |
 | `agentBaseMoveSpeedMult` | f32 | 4 | agent.rs (基础代谢/速度) | 基础移动速度倍率 |
 | `agentStaminaCapacity` | f32 | 100 | agent.rs (体力容量) | 体力值上限 (%) |
@@ -49,9 +49,9 @@
 | `agentSpawnCount` | usize | 20 | ecology.rs (始祖播撒) / agent.rs | 每局播撒的初始始祖族人数量 |
 | `agentCovertEveryN` | usize | 4 | ecology.rs (始祖隐秘特工比例) | 每第 N 名始祖设为隐秘特工 (i % N == 0) |
 | `agentSpawnJitter` | f32 | 10 | ecology.rs (始祖播撒) / agent.rs | 始祖初始属性随机抖动幅度 (±) |
-| `agentSpawnHungerBase` | f32 | 25 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食抖动基线 |
-| `agentSpawnHungerClampMin` | f32 | 10 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食夹取下限 |
-| `agentSpawnHungerClampMax` | f32 | 45 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食夹取上限 |
+| `agentSpawnHungerBase` | f32 | 45 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分抖动基线 |
+| `agentSpawnHungerClampMin` | f32 | 35 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分夹取下限 |
+| `agentSpawnHungerClampMax` | f32 | 50 | ecology.rs (始祖播撒) / agent.rs | 始祖初始饱食/水分夹取上限 |
 | `agentSpawnStaminaBase` | f32 | 90 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力抖动基线 |
 | `agentSpawnStaminaClampMin` | f32 | 55 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取下限 |
 | `agentSpawnStaminaClampMax` | f32 | 100 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取上限 |
@@ -62,17 +62,17 @@
 | `traitInheritClampMin` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取下限 |
 | `traitInheritClampMax` | f32 | 190 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取上限 |
 | `poiMinDistance` | f32 | 70 | ecology.rs (POI 空间排斥间距 §4.7) | POI 间最小排斥间距 (m) |
-| `countCamps` | usize | 5 | ecology.rs (POI 数量 §4.7) | 营地数量 |
+| `countCamps` | usize | 4 | ecology.rs (POI 数量 §4.7) | 营地数量 |
 | `countWaterSources` | usize | 6 | ecology.rs (POI 数量 §4.7) | 清泉数量 |
 | `countBerryBushes` | usize | 6 | ecology.rs (POI 数量 §4.7) | 浆果数量 |
 | `countWoods` | usize | 3 | ecology.rs (POI 数量 §4.7) | 林木数量 |
 | `countStoneMines` | usize | 2 | ecology.rs (POI 数量 §4.7) | 石矿数量 |
 | `countGoldMines` | usize | 1 | ecology.rs (POI 数量 §4.7) | 金矿数量 |
-| `stockMaxWater` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
-| `stockMaxBerry` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
-| `stockMaxWood` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
-| `stockMaxStone` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
-| `stockMaxGold` | f32 | 100 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |
+| `stockMaxWater` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
+| `stockMaxBerry` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
+| `stockMaxWood` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
+| `stockMaxStone` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
+| `stockMaxGold` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |
 | `regenBaseWater` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 清泉基础再生速率 (单位/秒) |
 | `regenBaseBerry` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 浆果基础再生速率 |
 | `regenBaseWood` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 林木基础再生速率 |
@@ -92,7 +92,7 @@
 | `roadGradePaveThreshold` | f32 | 8 | graph.rs (道路等级铺装阈值) | 坡度铺装阈值 (高差超过则盘山道，否则泥径) |
 | `poiInteractionRadius` | f32 | 22 | ecology.rs (POI 交互采收/卸货) | 采收现场「已抵达 POI」判定半径 (m) |
 | `campHomeConsumeRate` | f32 | 3 | ecology.rs (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/秒) |
-| `decisionPoiSeekMinStockRatio` | f32 | 0.3 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
+| `decisionPoiSeekMinStockRatio` | f32 | 0.5 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
 | `decisionPoiAbandonStockRatio` | f32 | 0.1 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器关闭阈值 (库存 < 此比例) |
 | `decisionCriticalThirst` | f32 | 25 | decisions/ (生理临界阈值) | 临界口渴阈值 (触发寻水) |
 | `decisionCriticalHunger` | f32 | 25 | decisions/ (生理临界阈值) | 临界饥饿阈值 (触发觅食) |
@@ -109,6 +109,7 @@
 | `decisionWorkStaminaThreshold` | f32 | 50 | decisions/ (劳作体力阈值) | 劳作所需最低体力 (低于则返家休息) |
 | `decisionFamilyStockTriggerOn` | f32 | 100 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采 |
 | `decisionFamilyStockTriggerOff` | f32 | 200 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止 |
+| `decisionCourtshipMinFamilyGold` | f32 | 5 | — | 求偶发起最低家户金币（严格大于此值） |
 | `houseDurabilityMax` | f32 | 100 | housing_system/ (耐久度上限) | 房屋耐久上限 |
 | `houseDepreciationRate` | f32 | 0.02 | housing_system/maintenance.rs (折旧) | 房屋耐久自然折旧速率 (每秒) |
 | `houseRepairTriggerThreshold` | f32 | 80 | housing_system/maintenance.rs (修缮) | 耐久低于此值允许修缮 |
@@ -136,7 +137,11 @@
 | `houseWinterWoodBurnRate` | f32 | 0.12 | housing_system/maintenance.rs (冬季供暖 §4.8) | 冬季供暖木材消耗速率 (每秒) |
 | `houseWinterColdTemp` | f32 | 5 | housing_system/maintenance.rs (冬季供暖 §4.8) | 低温供暖阈值 (℃) |
 | `houseMinSpacing` | f32 | 20 | housing_system/founding.rs (房屋间距) | 房屋间最小水平间距 (m) |
-| `campMaxHouses` | u32 | 30 | — | 每个营地最多可建设的房屋数量 |
+| `campMaxHouses` | u32 | 25 | — | 每个营地最多可建设的房屋数量 |
+| `campLevelVillageMinHouses` | u32 | 5 | poi.rs (营地行政级别升级) | 营地升级为村的最低房屋数量 |
+| `campLevelTownshipMinHouses` | u32 | 10 | poi.rs (营地行政级别升级) | 营地升级为乡的最低房屋数量 |
+| `campLevelTownMinHouses` | u32 | 15 | poi.rs (营地行政级别升级) | 营地升级为镇的最低房屋数量 |
+| `campLevelCountyMinHouses` | u32 | 20 | poi.rs (营地行政级别升级) | 营地升级为县的最低房屋数量 |
 | `houseNodeReuseRadius` | f32 | 20 | housing_system/founding.rs (立宅节点占用) | 立宅优先复用空置路网节点检索半径 (m) |
 | `houseNodePoiOccupyRadius` | f32 | 1.5 | housing_system/founding.rs (立宅节点占用) | 判定节点被 POI 占用的贴合半径 (m) |
 | `seasonYearLength` | f32 | 240 | world_season.rs (四季周期) | 一年 (四季) 总时长 (模拟秒) |
@@ -178,8 +183,8 @@
 | `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
-| `marketStockMaxWater` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
-| `marketStockMaxFood` | f32 | 100 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
+| `marketStockMaxWater` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
 | `marketRegenBaseWater` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水每秒自然再生速率 |
 | `marketRegenBaseFood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食每秒自然再生速率 |
 | `marketPriceBase` | f32 | 0.1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 满库存起步基准单价 (黄金 / 单位资源) |
@@ -188,12 +193,14 @@
 | `marketEmergencyFamilyStockThreshold` | f32 | 10 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 家户物资绝境警戒线 |
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
-| `houseMarketBiddingIntervalTicks` | u64 | 30 | housing_system/auction.rs (二手房开价周期) | 拍卖开价评估周期 (tick，默认 30 = 1秒) |
-| `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交) |
-| `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (营地中介麦穗拍卖 §4.8) | 麦穗理论最优停止观察期比例 (37%) |
-| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价) |
-| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价) |
-| `houseBaseFoundationCostGold` | f32 | 0.1 | housing_system/auction.rs (地基估价保底) | 0级仓库地基保底估价值 (黄金，防 0 成本畸变) |
+| `houseAuctionBidCooldownTicks` | u64 | 300 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价) |
+| `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
+| `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |
+| `houseAuctionMinBidGold` | f32 | 0.01 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次出价最低家户黄金门槛 (低于此值不出价) |
+| `houseAuctionBidHistoryCapacity` | usize | 128 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次拍卖会话报价流水环形缓冲容量 (条) |
+| `houseAuctionCrownShareWeight` | f32 | 1 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额) |
+| `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
+| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市扩展承载石料后作单价基准) |
 
 ## 5. 马斯洛需求与决策门槛
 

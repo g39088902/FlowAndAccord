@@ -10,8 +10,8 @@
   // ─── 常量映射 ───────────────────────────────────────────────
   const RES_ICONS  = { Water: '💧', Food: '🍒', Wood: '🌲', Stone: '🪨', Gold: '🪙' };
   const RES_COLORS = { Water: '#38bdf8', Food: '#10b981', Wood: '#d97706', Stone: '#94a3b8', Gold: '#fbbf24' };
-  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️' };
-  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并' };
+  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️', HousingPurchase: '🏠', EstateShare: '⚖️', TransferTax: '🏛️', RoyalPrivy: '💰' };
+  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并', HousingPurchase: '购房', EstateShare: '遗产分账', TransferTax: '过户税', RoyalPrivy: '国王内帑' };
   const ROLE_LABELS = { Head: '👑 户主', Spouse: '💍 配偶', Child: '👶 子女', None: '—' };
 
   // ─── 模块状态 ───────────────────────────────────────────────
@@ -121,6 +121,14 @@
     setText('ledger-ov-dissolved', dissolvedHH.length);
     setText('ledger-ov-marriages', activeMG.length);
     setText('ledger-ov-marriages-total', marriages.length);
+
+    const avgEl = document.getElementById('ledger-resource-averages');
+    if (avgEl) {
+      const keys = ['Water', 'Food', 'Wood', 'Stone', 'Gold'];
+      const icons = ['💧', '🍒', '🌲', '🪨', '🪙'];
+      const sums = keys.map(k => activeHH.reduce((s, h) => s + ((h.balances && h.balances[k]) || 0), 0));
+      renderHtml(avgEl, keys.map((k, i) => `<span>${icons[i]} ${(sums[i] / Math.max(1, activeHH.length)).toFixed(1)}</span>`).join(''));
+    }
 
     // 家户列表（存续优先，已解散附后；并列 id 小者在前）
     const sorted = activeHH.slice().sort((a, b) => a.id - b.id)

@@ -33,6 +33,7 @@ impl<'a> Decisioner<'a> {
                     return;
                 }
             }
+            if self.try_route_to_market(agent, NodePool::Water) { return; }
         }
 
         let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || unavailable;
@@ -66,6 +67,7 @@ impl<'a> Decisioner<'a> {
                     return;
                 }
             }
+            if self.try_route_to_market(agent, NodePool::Food) { return; }
         }
 
         let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || unavailable;

@@ -25,8 +25,8 @@ window.SIM_CONFIG = {
   // ==========================================================================
   agentHungerCapacity: 50.0,       // 饱食度容量上限
   agentThirstCapacity: 50.0,       // 水分容量上限
-  agentInitialHunger: 25.0,       // 始祖/新生儿初始饱食度
-  agentInitialThirst: 25.0,       // 始祖/新生儿初始水分
+  agentInitialHunger: 45.0,       // 始祖/新生儿初始饱食度
+  agentInitialThirst: 45.0,       // 始祖/新生儿初始水分
   agentInitialStamina: 95.0,      // 始祖初始体力
   agentBaseMetabolismDecay: 0.10, // 基础代谢消耗速率 (饱食/水分 每秒)
   agentHealthDecayPerSec: 0.01,   // 濒死健康衰减速率 (每秒)
@@ -43,7 +43,7 @@ window.SIM_CONFIG = {
   agentConceptionHungerMin: 40.0, // 受孕所需最低饱食度
   agentConceptionThirstMin: 40.0, // 受孕所需最低水分
   agentConceptionStaminaMin: 80.0,// 受孕所需最低体力
-  carryCapacityResource: 50.0,    // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
+  carryCapacityResource: 100.0,   // 单类资源随身行囊容量 (水/粮/木/石 互不共享)
   agentGoldLoadFull: 20.0,        // 单趟淘金运满入库量
   agentBaseMoveSpeedMult: 4.0,    // 基础移动速度倍率
   agentStaminaCapacity: 100.0,    // 体力值上限 (%)
@@ -63,9 +63,9 @@ window.SIM_CONFIG = {
   agentSpawnCount: 20,             // 每局播撒的初始始祖族人数量
   agentCovertEveryN: 4,            // 每第 N 名始祖设为隐秘特工 (i % N == 0)
   agentSpawnJitter: 10.0,          // 始祖初始属性随机抖动幅度 (±)
-  agentSpawnHungerBase: 25.0,      // 始祖初始饱食抖动基线
-  agentSpawnHungerClampMin: 10.0,  // 始祖初始饱食夹取下限
-  agentSpawnHungerClampMax: 45.0,  // 始祖初始饱食夹取上限
+  agentSpawnHungerBase: 45.0,      // 始祖初始饱食/水分抖动基线
+  agentSpawnHungerClampMin: 35.0,  // 始祖初始饱食/水分夹取下限
+  agentSpawnHungerClampMax: 50.0,  // 始祖初始饱食/水分夹取上限
   agentSpawnStaminaBase: 90.0,     // 始祖初始体力抖动基线
   agentSpawnStaminaClampMin: 55.0, // 始祖初始体力夹取下限
   agentSpawnStaminaClampMax: 100.0,// 始祖初始体力夹取上限
@@ -84,17 +84,17 @@ window.SIM_CONFIG = {
   // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
   // ==========================================================================
   poiMinDistance: 70.0,           // POI 间最小排斥间距 (m)
-  countCamps: 5,                  // 营地数量
+  countCamps: 4,                  // 营地数量
   countWaterSources: 6,           // 清泉数量
   countBerryBushes: 6,            // 浆果数量
   countWoods: 3,                  // 林木数量
   countStoneMines: 2,             // 石矿数量
   countGoldMines: 1,              // 金矿数量
-  stockMaxWater: 100.0,           // 清泉储量上限
-  stockMaxBerry: 100.0,           // 浆果储量上限
-  stockMaxWood: 100.0,            // 林木储量上限
-  stockMaxStone: 100.0,           // 石矿储量上限
-  stockMaxGold: 100.0,            // 金矿储量上限
+  stockMaxWater: 200.0,           // 清泉储量上限
+  stockMaxBerry: 200.0,           // 浆果储量上限
+  stockMaxWood: 200.0,            // 林木储量上限
+  stockMaxStone: 200.0,           // 石矿储量上限
+  stockMaxGold: 200.0,            // 金矿储量上限
   regenBaseWater: 2.0,            // 清泉基础再生速率 (单位/秒)
   regenBaseBerry: 2.0,            // 浆果基础再生速率
   regenBaseWood: 2.0,             // 林木基础再生速率
@@ -118,7 +118,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
   // ==========================================================================
-  decisionPoiSeekMinStockRatio: 0.30, // POI 私有施密特触发器开启阈值 (库存 ≥ 此比例)
+  decisionPoiSeekMinStockRatio: 0.50, // POI 私有施密特触发器开启阈值 (库存 ≥ 此比例)
   decisionPoiAbandonStockRatio: 0.10,// POI 私有施密特触发器关闭阈值 (库存 < 此比例)
   decisionCriticalThirst: 25.0,   // 临界口渴阈值 (触发寻水)
   decisionCriticalHunger: 25.0,   // 临界饥饿阈值 (触发觅食)
@@ -135,6 +135,7 @@ window.SIM_CONFIG = {
   decisionWorkStaminaThreshold: 50.0, // 劳作所需最低体力 (低于则返家休息)
   decisionFamilyStockTriggerOn: 100.0, // M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采
   decisionFamilyStockTriggerOff: 200.0, // M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止
+  decisionCourtshipMinFamilyGold: 5.0, // 求偶发起最低家户金币（严格大于此值）
   decisionEvalOrder: [], // 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖）
   decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认）
 
@@ -151,7 +152,11 @@ window.SIM_CONFIG = {
   houseWinterWoodBurnRate: 0.12,  // 冬季供暖木材消耗速率 (每秒)
   houseWinterColdTemp: 5.0,       // 低温供暖阈值 (℃)
   houseMinSpacing: 20.0,          // 房屋间最小水平间距 (m)
-  campMaxHouses: 30,               // 每个营地最多可建设的房屋数量
+  campMaxHouses: 25,               // 每个营地最多可建设的房屋数量
+  campLevelVillageMinHouses: 5,    // 营地升级为村的最低房屋数量
+  campLevelTownshipMinHouses: 10,  // 营地升级为乡的最低房屋数量
+  campLevelTownMinHouses: 15,      // 营地升级为镇的最低房屋数量
+  campLevelCountyMinHouses: 20,    // 营地升级为县的最低房屋数量
   houseNodeReuseRadius: 20.0,     // 立宅优先复用空置路网节点检索半径 (m)
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
@@ -221,8 +226,8 @@ window.SIM_CONFIG = {
   // 13. 外部市场（榷场互市）与幂律动态定价 (External Market & Dynamic Pricing)
   // ==========================================================================
   countMarkets: 1,                          // 全图生成外部市场 POI 数量
-  marketStockMaxWater: 100.0,               // 外部市场清水储备容量上限
-  marketStockMaxFood: 100.0,                // 外部市场粮食储备容量上限
+  marketStockMaxWater: 200.0,               // 外部市场清水储备容量上限
+  marketStockMaxFood: 200.0,                // 外部市场粮食储备容量上限
   marketRegenBaseWater: 2.0,                // 外部市场清水每秒自然再生速率
   marketRegenBaseFood: 2.0,                 // 外部市场粮食每秒自然再生速率
   marketPriceBase: 0.1,                     // 满库存起步基准单价 (黄金 / 单位资源)
@@ -233,12 +238,14 @@ window.SIM_CONFIG = {
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
 
   // ==========================================================================
-  // 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+  // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
   // ==========================================================================
-  houseMarketBiddingIntervalTicks: 30, // 拍卖开价评估周期 (tick，默认 30 = 1秒)
-  houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有报价就必须选最高强制成交)
+  houseAuctionBidCooldownTicks: 300,  // 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价)
+  houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交)
   houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
-  marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市承载木材后作单价基准，当前房屋估价按 0 单价)
-  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市承载石料后作单价基准，当前房屋估价按 0 单价)
-  houseBaseFoundationCostGold: 0.1,   // 0级仓库地基保底估价值 (黄金，防 0 成本畸变)
+  houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)
+  houseAuctionBidHistoryCapacity: 128, // 单次拍卖会话报价流水环形缓冲容量 (条)
+  houseAuctionCrownShareWeight: 1.0,  // 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额)
+  marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市扩展承载木材后作单价基准)
+  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市扩展承载石料后作单价基准)
 };

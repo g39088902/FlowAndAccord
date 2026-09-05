@@ -23,8 +23,8 @@ pub const AGENT_DECISION_INTERVAL_TICKS: u64 = 30;
 // ============================================================================
 pub const AGENT_HUNGER_CAPACITY: f32 = 50.0;
 pub const AGENT_THIRST_CAPACITY: f32 = 50.0;
-pub const AGENT_INITIAL_HUNGER: f32 = 25.0;
-pub const AGENT_INITIAL_THIRST: f32 = 25.0;
+pub const AGENT_INITIAL_HUNGER: f32 = 45.0;
+pub const AGENT_INITIAL_THIRST: f32 = 45.0;
 pub const AGENT_INITIAL_STAMINA: f32 = 95.0;
 pub const AGENT_BASE_METABOLISM_DECAY: f32 = 0.10;
 pub const AGENT_HEALTH_DECAY_PER_SEC: f32 = 0.01;
@@ -41,7 +41,7 @@ pub const AGENT_MISCARRIAGE_ALERT_DURATION: f32 = 5.0;
 pub const AGENT_CONCEPTION_HUNGER_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_THIRST_MIN: f32 = 40.0;
 pub const AGENT_CONCEPTION_STAMINA_MIN: f32 = 80.0;
-pub const CARRY_CAPACITY_RESOURCE: f32 = 50.0;
+pub const CARRY_CAPACITY_RESOURCE: f32 = 100.0;
 pub const AGENT_GOLD_LOAD_FULL: f32 = 20.0;
 pub const AGENT_BASE_MOVE_SPEED_MULT: f32 = 4.0;
 /// 体力值上限 (%，休息恢复与劳作消耗均 clamp 至此)
@@ -76,9 +76,9 @@ pub const AGENT_COVERT_EVERY_N: usize = 4;
 /// 始祖初始属性随机抖动幅度（± 此值）
 pub const AGENT_SPAWN_JITTER: f32 = 10.0;
 /// 始祖初始饱食/水分抖动基线（基线 ± 抖动后 clamp）
-pub const AGENT_SPAWN_HUNGER_BASE: f32 = 25.0;
-pub const AGENT_SPAWN_HUNGER_CLAMP_MIN: f32 = 10.0;
-pub const AGENT_SPAWN_HUNGER_CLAMP_MAX: f32 = 45.0;
+pub const AGENT_SPAWN_HUNGER_BASE: f32 = 45.0;
+pub const AGENT_SPAWN_HUNGER_CLAMP_MIN: f32 = 35.0;
+pub const AGENT_SPAWN_HUNGER_CLAMP_MAX: f32 = 50.0;
 /// 始祖初始体力抖动基线（基线 ± 抖动后 clamp）
 pub const AGENT_SPAWN_STAMINA_BASE: f32 = 90.0;
 pub const AGENT_SPAWN_STAMINA_CLAMP_MIN: f32 = 55.0;
@@ -101,18 +101,23 @@ pub const TRAIT_INHERIT_CLAMP_MAX: f32 = 190.0;
 // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
 // ============================================================================
 pub const POI_MIN_DISTANCE: f32 = 70.0;
-pub const COUNT_CAMPS: usize = 5;
-pub const CAMP_MAX_HOUSES: u32 = 30;
+pub const COUNT_CAMPS: usize = 4;
+pub const CAMP_MAX_HOUSES: u32 = 25;
+/// 营地行政级别升级所需的最低房屋数量（村、乡、镇、县）
+pub const CAMP_LEVEL_VILLAGE_MIN_HOUSES: u32 = 5;
+pub const CAMP_LEVEL_TOWNSHIP_MIN_HOUSES: u32 = 10;
+pub const CAMP_LEVEL_TOWN_MIN_HOUSES: u32 = 15;
+pub const CAMP_LEVEL_COUNTY_MIN_HOUSES: u32 = 20;
 pub const COUNT_WATER_SOURCES: usize = 6;
 pub const COUNT_BERRY_BUSHES: usize = 6;
 pub const COUNT_WOODS: usize = 3;
 pub const COUNT_STONE_MINES: usize = 2;
 pub const COUNT_GOLD_MINES: usize = 1;
-pub const STOCK_MAX_WATER: f32 = 100.0;
-pub const STOCK_MAX_BERRY: f32 = 100.0;
-pub const STOCK_MAX_WOOD: f32 = 100.0;
-pub const STOCK_MAX_STONE: f32 = 100.0;
-pub const STOCK_MAX_GOLD: f32 = 100.0;
+pub const STOCK_MAX_WATER: f32 = 200.0;
+pub const STOCK_MAX_BERRY: f32 = 200.0;
+pub const STOCK_MAX_WOOD: f32 = 200.0;
+pub const STOCK_MAX_STONE: f32 = 200.0;
+pub const STOCK_MAX_GOLD: f32 = 200.0;
 pub const REGEN_BASE_WATER: f32 = 2.0;
 pub const REGEN_BASE_BERRY: f32 = 2.0;
 pub const REGEN_BASE_WOOD: f32 = 2.0;
@@ -146,7 +151,7 @@ pub const CAMP_HOME_CONSUME_RATE: f32 = 3.0;
 // ============================================================================
 // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
 // ============================================================================
-pub const DECISION_POI_SEEK_MIN_STOCK_RATIO: f32 = 0.30;
+pub const DECISION_POI_SEEK_MIN_STOCK_RATIO: f32 = 0.50;
 pub const DECISION_POI_ABANDON_STOCK_RATIO: f32 = 0.10;
 pub const DECISION_CRITICAL_THIRST: f32 = 25.0;
 pub const DECISION_CRITICAL_HUNGER: f32 = 25.0;
@@ -165,6 +170,8 @@ pub const DECISION_WORK_STAMINA_THRESHOLD: f32 = 50.0;
 pub const DECISION_FAMILY_STOCK_TRIGGER_ON: f32 = 100.0;
 /// M7 家庭库存施密特触发器：结束上限（一旦 ON，余额 ≥ 此值 → 置 OFF 补足）
 pub const DECISION_FAMILY_STOCK_TRIGGER_OFF: f32 = 200.0;
+/// 求偶发起所需的家户账本最低黄金（严格大于此值）
+pub const DECISION_COURTSHIP_MIN_FAMILY_GOLD: f32 = 5.0;
 
 // ============================================================================
 // 6. 私宅营造、代际传承与升级 (Housing System)
@@ -312,9 +319,9 @@ pub const PRESTIGE_KING_BONUS: u32 = 3;
 /// 全图生成外部市场 POI 数量（默认 1 座）
 pub const COUNT_MARKETS: usize = 1;
 /// 外部市场清水储备容量上限（等同于 1 座低洼清泉）
-pub const MARKET_STOCK_MAX_WATER: f32 = 100.0;
+pub const MARKET_STOCK_MAX_WATER: f32 = 200.0;
 /// 外部市场粮食储备容量上限（等同于 1 座缓坡浆果）
-pub const MARKET_STOCK_MAX_FOOD: f32 = 100.0;
+pub const MARKET_STOCK_MAX_FOOD: f32 = 200.0;
 /// 外部市场清水每秒自然再生速率
 pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
 /// 外部市场粮食每秒自然再生速率
@@ -333,20 +340,24 @@ pub const MARKET_MIN_FAMILY_GOLD: f32 = 0.5;
 pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
 
 // ============================================================================
-// 14. 二手房屋市场、营地中介拍卖与麦穗估价 (Housing Market & Auction)
+// 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
 // ============================================================================
-/// 拍卖开价评估周期（tick，默认 30 = 1秒，与错峰决策周期对齐）
-pub const HOUSE_MARKET_BIDDING_INTERVAL_TICKS: u64 = 30;
-/// 最晚出售修缮度时限（耐久度跌至此值时只要有报价就必须选最高强制成交，默认 10.0%）
+/// ★ v1.26.0 买家全局出价冷却（tick，默认 300 = 10 模拟秒）：出价后对任何在售房屋都不再出价
+pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 300;
+/// 最晚出售修缮度时限（耐久度跌至此值时只要有新报价即成交，默认 10.0%）
 pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
 /// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）
 pub const HOUSE_AUCTION_OBSERVATION_RATIO: f32 = 0.37;
-/// 木材基准金价（保留：待榷市扩展承载木材后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.15）
+/// ★ v1.26.0 单次出价最低家户黄金门槛（家户账面黄金低于该值不出价，默认 0.01）
+pub const HOUSE_AUCTION_MIN_BID_GOLD: f32 = 0.01;
+/// ★ v1.26.0 单次拍卖会话报价流水环形缓冲容量（条，默认 128；超容量淘汰最旧）
+pub const HOUSE_AUCTION_BID_HISTORY_CAPACITY: usize = 128;
+/// ★ v1.26.0 王国公户遗产分账份额权重（与人类受益人同等参与份额制分配，默认 1.0；无人类受益人时独得全额）
+pub const HOUSE_AUCTION_CROWN_SHARE_WEIGHT: f32 = 1.0;
+/// 木材基准金价（保留：待榷市扩展承载木材后作单价基准，默认 0.15）
 pub const MARKET_PRICE_BASE_WOOD: f32 = 0.15;
-/// 石料基准金价（保留：待榷市扩展承载石料后作单价基准；当前房屋估价按榷市价、榷市没有即 0 单价，默认 0.20）
+/// 石料基准金价（保留：待榷市扩展承载石料后作单价基准，默认 0.20）
 pub const MARKET_PRICE_BASE_STONE: f32 = 0.20;
-/// 0级仓库地基保底估价值（黄金，默认 0.1，防 0 成本畸变）
-pub const HOUSE_BASE_FOUNDATION_COST_GOLD: f32 = 0.1;
 
 // ============================================================================
 // 15. 动态仿真配置结构体 (SimConfig)
@@ -469,6 +480,7 @@ pub struct SimConfig {
     pub decision_family_stock_trigger_on: f32,
     /// M7 家庭库存施密特结束上限（ON 后余额达此 → 补足停止）
     pub decision_family_stock_trigger_off: f32,
+    pub decision_courtship_min_family_gold: f32,
     /// 决策分支评估顺序（13 个分支 ID，如 "b1".."b13"）。
     /// ⚠️ §4.12 三处规约的文档化例外：Rust 层**无策展顺序**，默认空 Vec = 未注入，
     /// 空/非法时按 branches.rs 声明序中性兜底；权威顺序在前端 `config.decision-order.js`。
@@ -507,6 +519,10 @@ pub struct SimConfig {
     pub house_winter_cold_temp: f32,
     pub house_min_spacing: f32,
     pub camp_max_houses: u32,
+    pub camp_level_village_min_houses: u32,
+    pub camp_level_township_min_houses: u32,
+    pub camp_level_town_min_houses: u32,
+    pub camp_level_county_min_houses: u32,
     pub house_node_reuse_radius: f32,
     pub house_node_poi_occupy_radius: f32,
 
@@ -573,13 +589,15 @@ pub struct SimConfig {
     pub market_min_family_gold: f32,
     pub market_min_dispatch_stamina: f32,
 
-    // 14. 二手房屋市场、营地中介拍卖与麦穗估价
-    pub house_market_bidding_interval_ticks: u64,
+    // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+    pub house_auction_bid_cooldown_ticks: u64,
     pub house_auction_deadline_durability: f32,
     pub house_auction_observation_ratio: f32,
+    pub house_auction_min_bid_gold: f32,
+    pub house_auction_bid_history_capacity: usize,
+    pub house_auction_crown_share_weight: f32,
     pub market_price_base_wood: f32,
     pub market_price_base_stone: f32,
-    pub house_base_foundation_cost_gold: f32,
 }
 
 impl Default for SimConfig {
@@ -696,6 +714,7 @@ impl Default for SimConfig {
             decision_work_stamina_threshold: DECISION_WORK_STAMINA_THRESHOLD,
             decision_family_stock_trigger_on: DECISION_FAMILY_STOCK_TRIGGER_ON,
             decision_family_stock_trigger_off: DECISION_FAMILY_STOCK_TRIGGER_OFF,
+            decision_courtship_min_family_gold: DECISION_COURTSHIP_MIN_FAMILY_GOLD,
             // Rust 无策展顺序：空 = 未注入（中性兜底），权威值在前端 config.decision-order.js
             decision_eval_order: Vec::new(),
             decision_eval_levels: Vec::new(),
@@ -729,6 +748,10 @@ impl Default for SimConfig {
             house_winter_cold_temp: HOUSE_WINTER_COLD_TEMP,
             house_min_spacing: HOUSE_MIN_SPACING,
             camp_max_houses: CAMP_MAX_HOUSES,
+            camp_level_village_min_houses: CAMP_LEVEL_VILLAGE_MIN_HOUSES,
+            camp_level_township_min_houses: CAMP_LEVEL_TOWNSHIP_MIN_HOUSES,
+            camp_level_town_min_houses: CAMP_LEVEL_TOWN_MIN_HOUSES,
+            camp_level_county_min_houses: CAMP_LEVEL_COUNTY_MIN_HOUSES,
             house_node_reuse_radius: HOUSE_NODE_REUSE_RADIUS,
             house_node_poi_occupy_radius: HOUSE_NODE_POI_OCCUPY_RADIUS,
 
@@ -795,13 +818,15 @@ impl Default for SimConfig {
             market_min_family_gold: MARKET_MIN_FAMILY_GOLD,
             market_min_dispatch_stamina: MARKET_MIN_DISPATCH_STAMINA,
 
-            // 14. 二手房屋市场、营地中介拍卖与麦穗估价
-            house_market_bidding_interval_ticks: HOUSE_MARKET_BIDDING_INTERVAL_TICKS,
+            // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+            house_auction_bid_cooldown_ticks: HOUSE_AUCTION_BID_COOLDOWN_TICKS,
             house_auction_deadline_durability: HOUSE_AUCTION_DEADLINE_DURABILITY,
             house_auction_observation_ratio: HOUSE_AUCTION_OBSERVATION_RATIO,
+            house_auction_min_bid_gold: HOUSE_AUCTION_MIN_BID_GOLD,
+            house_auction_bid_history_capacity: HOUSE_AUCTION_BID_HISTORY_CAPACITY,
+            house_auction_crown_share_weight: HOUSE_AUCTION_CROWN_SHARE_WEIGHT,
             market_price_base_wood: MARKET_PRICE_BASE_WOOD,
             market_price_base_stone: MARKET_PRICE_BASE_STONE,
-            house_base_foundation_cost_gold: HOUSE_BASE_FOUNDATION_COST_GOLD,
         }
     }
 }

@@ -20,7 +20,7 @@
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `poi.rs` | ~210 | PrimitivePoi 实体定义（24 处 POI：营地5/泉6/果6/木3/石2/金1/榷场互市1）、ID 段位、储量再生与双库存计价 | 采收逻辑、初始化布局 |
+| `poi.rs` | ~235 | PrimitivePoi 实体定义（23 处 POI：营地4/泉6/果6/木3/石2/金1/榷场互市1）、ID 段位、储量再生与双库存计价、★ v1.28.0 `MarketTradeRecord` 与榷场流水环形缓冲 | 采收逻辑、初始化布局 |
 | `house.rs` | ~115 | House 实体（5 阶等级、耐久度、户主绑定）、HouseSnapshot | 施工计时、升级判定、继承（这些在 housing_system/） |
 | `agent.rs` | ~530 | Agent3D 实体（生理代谢、随身行囊、状态机、运动、施密特触发器、威望）、百家姓库、Gender/PrimitiveActionState 枚举 | 决策逻辑（在 decisions/）、POI 交互（在 ecology.rs） |
 
@@ -91,7 +91,7 @@ ecology.rs::tick_poi_interactions(dt)
   │    └─ 从 POI 储量扣减 → 装入 agent 行囊 (受 carryCapacityResource 限制)
   │    └─ 无家宅者不装袋，只就地自饮自食
   └─ 回家卸货 (RestingAtCamp)
-       └─ 按 poiUnloadRateResource(10/s) 从行囊扣减 → 存入家户账本 (Deposit 流水)
+       └─ 按 poiUnloadRateResource(10/s) 从行囊扣减 → 存入家户账本 (Deposit 流水)，清空前决策器保持卸货态
        └─ 在家吃喝从家户账本真实扣减 (Consume 流水)
        └─ 行囊满即触发 ReturningToCamp 返家
 ```

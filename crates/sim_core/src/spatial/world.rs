@@ -64,6 +64,12 @@ pub struct World3DEngine {
     pub region_registry: RegionRegistry,
     /// ★ M4 救济冷却记录（每家户上次接受救济的 tick）
     pub relief_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
+    /// 房屋拍卖累计场次统计（started / sold / flopped）。
+    pub auction_started: u64,
+    pub auction_sold: u64,
+    pub auction_flopped: u64,
+    /// 上次国王内帑结算 tick；按 3000 tick（100 游戏秒）结算。
+    pub last_royal_payout_tick: u64,
 }
 
 impl World3DEngine {
@@ -115,6 +121,10 @@ impl World3DEngine {
             mutual_aid_cooldown: std::collections::BTreeMap::new(),
             region_registry: RegionRegistry::new(LEDGER_JOURNAL_CAPACITY),
             relief_cooldown: std::collections::BTreeMap::new(),
+            auction_started: 0,
+            auction_sold: 0,
+            auction_flopped: 0,
+            last_royal_payout_tick: 0,
         }
     }
 

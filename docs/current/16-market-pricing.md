@@ -12,20 +12,22 @@
 3. **生死兜底 AI**：部落民在野外采集点枯竭、家境绝望时自主携带黄金前往榷场采购救命物资；
 4. **黄金流失闭环**：黄金从家户账本流出至系统虚空（`LedgerRef::Void`），回收流通货币，杜绝经济恶性通胀。
 
+v1.27.0 起，采水/采粮途中若目标 POI 触发器关闭且无同类可用点，**家户户主**（家户账本金币 ≥ `market_min_family_gold` 且体力 ≥ `decision_work_stamina_threshold`）可直接原地掉头改道榷场；交易从家户账本**远程结算**（户主无需先回家、不要求随身携带金币），仍只允许水和粮，不改变木石金采集规则。
+
 ---
 
 ## 核心机制
 
 ### 一、外部市场 POI 与次级库存设计
 
-全图生成 **1 处**常驻外部市场地标（`PoiType::Market`，ID 60 段位，全图 POI 总数 24 处）：
+全图生成 **1 处**常驻外部市场地标（`PoiType::Market`，ID 60 段位，全图 POI 总数 23 处）：
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                   榷场互市 (Market, ID 60)                │
 ├────────────────────────────┬─────────────────────────────┤
 │ 主库存: 清水 (Water)        │ 次级库存: 粮食 (Food)        │
-│ 储量上限: 100.0            │ 储量上限: 100.0             │
+│ 储量上限: 200.0            │ 储量上限: 200.0             │
 │ 自然产速: 2.0/秒           │ 自然产速: 2.0/秒            │
 │ 提取接口: extract()        │ 提取接口: extract_secondary()│
 └────────────────────────────┴─────────────────────────────┘
@@ -56,16 +58,16 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | :--- | :--- | :--- |
 | $P(S)$ | 当前品类单位资源黄金单价 | 纯函数计算返回值 |
 | $P_0$ | 满库存时的基准起步单价 | `marketPriceBase = 0.1` (金/单位) |
-| $S_{max}$ | 该品类库存容量上限 | `marketStockMaxWater / Food = 100.0` |
+| $S_{max}$ | 该品类库存容量上限 | `marketStockMaxWater / Food = 200.0` |
 | $S$ | 当前实际物理库存量 | `poi.current_stock` / `secondary_stock` |
 | $k$ | 幂律弹性指数 | `marketPricePowerExponent = 2.0` (平方反比敏感度) |
 | $S_{floor}$ | 计价库存安全钳制下限 | `marketPriceFloorStock = 1.0` (防除以零与价格封顶) |
 
 ### 典型价格曲线演变
-- **满库存** ($S = 100.0$)：$P = 0.10 \times (100 / 100)^2 = \mathbf{0.10}$ 金/单位（廉价补给）。
-- **半库存** ($S = 50.0$)：$P = 0.10 \times (100 / 50)^2 = \mathbf{0.40}$ 金/单位（价格温和上涨）。
-- **告急库存** ($S = 10.0$)：$P = 0.10 \times (100 / 10)^2 = \mathbf{10.00}$ 金/单位（价格暴涨 100 倍）。
-- **极端枯竭** ($S \le 1.0$)：$P = 0.10 \times (100 / 1)^2 = \mathbf{1000.00}$ 金/单位（安全硬封顶，单价绝不超过 1000 金，杜绝 NaN 与无穷大）。
+- **满库存** ($S = 200.0$)：$P = 0.10 \times (200 / 200)^2 = \mathbf{0.10}$ 金/单位（廉价补给）。
+- **半库存** ($S = 100.0$)：$P = 0.10 \times (200 / 100)^2 = \mathbf{0.40}$ 金/单位（价格温和上涨）。
+- **告急库存** ($S = 20.0$)：$P = 0.10 \times (200 / 20)^2 = \mathbf{10.00}$ 金/单位（价格暴涨 100 倍）。
+- **极端枯竭** ($S \le 2.0$)：$P = 0.10 \times (200 / 2)^2 = \mathbf{1000.00}$ 金/单位（安全硬封顶，单价绝不超过 1000 金，杜绝 NaN 与无穷大）。
 
 ---
 
@@ -115,6 +117,26 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 ### 4. 平滑返航与卸货
 当行囊装满、家财耗尽（`< 0.05` 金）或体力见底时，决策器平滑切换为 `PrimitiveActionState::ReturningToCamp` 返家。回家休整时，购入的水粮按正常物理卸货速率卸入家户账本（Deposit 流水），拯救阖家老小。
 
+### 5. 交易流水环形缓冲（★ v1.28.0）
+
+榷场自带**交易流水环形缓冲** `PrimitivePoi.market_trades: VecDeque<MarketTradeRecord>`，四个成交写入点（濒危自救的水/粮、连续装袋的水/粮）各追加一条：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `tick` | 成交时的世界 tick |
+| `agent_id` | 采购人（赴市的家户户主） |
+| `household_id` | 采购人家户 ID |
+| `resource` | `"Water"` / `"Food"` |
+| `amount` | 成交数量 |
+| `unit_price` | 成交时单价（金/单位） |
+| `gold_cost` | 本次支出黄金总额 |
+
+- **容量复用** `config.ledger_journal_capacity`（64，**未新增超参**），超容量淘汰最旧（`PrimitivePoi::push_market_trade`）；
+- **只留痕、不记账**：黄金流出仍走家户账本 `TransferReason::Market` 流水，买入的水/粮仍走行囊 → 回家 `Deposit` 链路，杜绝账面与库存二次入账；
+- **随档持久化**：`world_save.rs` 全量克隆 `pois`，字段带 `#[serde(default)]`，旧档零破坏；
+- **确定性**：`VecDeque` 保序、不消耗 `WorldRng`、不新增决策相位；
+- **旧缺陷**：此前前端扫描全部家户流水并过滤 `reason === 'MarketTrade'`，而内核序列化为 `"Market"`，且家户账本只记黄金、水粮无记录——面板恒显示"暂无交易记录"。现改为直接读 POI 自带流水。
+
 ---
 
 ## 五、快照三处同步与前端呈现
@@ -127,6 +149,7 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | `secondary_regen_rate`| `f32` | 外部市场粮食每秒再生速度 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `water_price` | `f32` | 外部市场清水当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `food_price` | `f32` | 外部市场粮食当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `market_trades` | `Vec<MarketTradeSnapshot>` | ★ v1.28.0 榷场最近 8 笔交易流水（从新到旧） | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 
 ### 2. 前端可视化渲染
 - **Canvas 视口** (`render_world.js`)：
@@ -149,8 +172,8 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | 超参名称 | 默认值 | 物理含义与设计考量 |
 | :--- | :---: | :--- |
 | `countMarkets` | `1` | 全图生成外部市场 POI 数量 |
-| `marketStockMaxWater` | `100.0` | 外部市场清水储备容量上限 |
-| `marketStockMaxFood` | `100.0` | 外部市场粮食储备容量上限 |
+| `marketStockMaxWater` | `200.0` | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | `200.0` | 外部市场粮食储备容量上限 |
 | `marketRegenBaseWater` | `2.0` | 外部市场清水每秒自然恢复速率 |
 | `marketRegenBaseFood` | `2.0` | 外部市场粮食每秒自然恢复速率 |
 | `marketPriceBase` | `0.1` | 满库存时的基础单价（黄金/单位） |
@@ -165,6 +188,6 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 ## 七、关键不变量
 
 1. **确定性保证**：市场价格纯由物理库存函数推导，不消耗任何伪随机数生成器（`WorldRng`）。
-2. **定长数组联动铁律**：内核与前端决策分支数组定长为 15（`BranchId::ALL: [BranchId; 15]`、`resolve_order`、`seen = [false; 15]`、`DEFAULT_ORDER`）。
+2. **定长数组联动铁律**：内核与前端决策分支数组定长为 18（`BranchId::ALL: [BranchId; 18]`、`resolve_order`、`seen = [false; 18]`、`DEFAULT_ORDER`）。
 3. **资金单向流失**：外部市场交易黄金必须进入 `LedgerRef::Void`，严禁转给其他 Agent 或营地，确保生态存在通缩调节机制。
 4. **自包含分支铁律**：`evaluate_market_trade` 内部封装全部守卫与断流条件，在决策引擎中可安全拖动至任意优先级次序而不破坏代码语义。

@@ -2,7 +2,7 @@ use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
-use super::poi::{PrimitivePoi, PoiType, market_unit_price};
+use super::poi::{MarketTradeRecord, PrimitivePoi, PoiType, market_unit_price};
 use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::world::World3DEngine;
 
@@ -269,6 +269,9 @@ impl World3DEngine {
             let stamina_jitter = self.rng.gen_range(-self.config.agent_spawn_jitter, self.config.agent_spawn_jitter);
             agent.hunger = (self.config.agent_spawn_hunger_base + hunger_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
             agent.thirst = (self.config.agent_spawn_hunger_base + thirst_jitter).clamp(self.config.agent_spawn_hunger_clamp_min, self.config.agent_spawn_hunger_clamp_max);
+            // 始祖播撒时携带满额水粮，避免出生即因补给缺口触发采集。
+            agent.carried_water = self.config.carry_capacity_resource;
+            agent.carried_food = self.config.carry_capacity_resource;
             agent.stamina = (self.config.agent_spawn_stamina_base + stamina_jitter).clamp(self.config.agent_spawn_stamina_clamp_min, self.config.agent_spawn_stamina_clamp_max);
 
             let mean = self.config.trait_default_mean;
@@ -353,6 +356,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_water).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_water = (agent.carried_water + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_water += extracted;
                         }
                     }
                 }
@@ -369,6 +374,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_food).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_food = (agent.carried_food + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_food += extracted;
                         }
                     }
                 }
@@ -380,6 +387,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_wood).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_wood = (agent.carried_wood + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_wood += extracted;
                         }
                     }
                 }
@@ -391,6 +400,8 @@ impl World3DEngine {
                             let load = (carry_cap - agent.carried_stone).min(rate_res * dt);
                             let extracted = poi.extract(load);
                             agent.carried_stone = (agent.carried_stone + extracted).min(carry_cap);
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_stone += extracted;
                         }
                     }
                 }
@@ -400,6 +411,8 @@ impl World3DEngine {
                         if poi.current_stock > 0.01 {
                             let extracted = poi.extract(rate_gold * dt);
                             agent.carried_gold += extracted;
+                            agent.cumulative_mined += extracted;
+                            agent.cumulative_mined_gold += extracted;
                         }
                     }
                 }
@@ -413,6 +426,8 @@ impl World3DEngine {
                         let rate = rate_res * dt;
                         let p_water = market_unit_price(poi.current_stock, poi.max_stock, &self.config);
                         let p_food = market_unit_price(poi.secondary_stock, poi.secondary_max_stock, &self.config);
+                        // ★ v1.28.0 榷场流水环形缓冲容量（复用账本流水容量，未新增超参）
+                        let market_trade_capacity = self.config.ledger_journal_capacity;
 
                         let mut hh_gold = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
                         let mut total_gold_paid = 0.0;
@@ -428,6 +443,16 @@ impl World3DEngine {
                                 agent.thirst = (agent.thirst + buy_amount).min(self.config.agent_thirst_capacity);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（自救饮水）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Water".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_water,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
                         if agent.hunger < 10.0 && poi.secondary_stock > 0.01 && hh_gold >= 0.01 {
@@ -440,6 +465,16 @@ impl World3DEngine {
                                 agent.hunger = (agent.hunger + buy_amount).min(self.config.agent_hunger_capacity);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（自救进食）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Food".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_food,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
 
@@ -455,6 +490,16 @@ impl World3DEngine {
                                 agent.carried_water = (agent.carried_water + buy_amount).min(carry_cap);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（清水装袋）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Water".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_water,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
                         // 购粮装袋
@@ -468,6 +513,16 @@ impl World3DEngine {
                                 agent.carried_food = (agent.carried_food + buy_amount).min(carry_cap);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（粮食装袋）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Food".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_food,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
 
@@ -492,6 +547,8 @@ impl World3DEngine {
                     // 行囊按速率卸入「家户账本」（Deposit: Personal → Family）；
                     // 吃喝从家户账本真实扣减（Consume: Family → Void）。
                     // 房屋 pantry 已删除：无容量上限、无房屋等级/0 级门槛，凡有家户即享家庭储备。
+                    // 只有已经拥有实体住宅的 agent 才能把行囊卸入家户；无房者不得“隔空入账”。
+                    if agent.home_house_id.is_some() {
                     if let Some(hh_hid) = self.household_registry.household_of(agent.id) {
                         let tick = self.tick_counter;
                         let deposit_rate = unload_res * dt;
@@ -572,6 +629,7 @@ impl World3DEngine {
                             }
                         }
                     }
+                    }
                 }
                 _ => {}
             }
@@ -630,4 +688,3 @@ impl World3DEngine {
         }
     }
 }
-

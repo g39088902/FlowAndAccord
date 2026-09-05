@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use crate::config::SimConfig;
 use super::vec3::Vec3;
 use super::agent::AgentId;
 
@@ -119,6 +121,29 @@ pub struct VacantHouseEntry {
     pub beneficiary_ids: Vec<AgentId>,
 }
 
+/// ★ v1.28.0 榷场单笔成交流水（环形缓冲中的一条记录）
+///
+/// 只做「买到了什么、花了多少」的可观测留痕，不参与任何物理结算：
+/// 黄金流出仍走家户账本 `TransferReason::Market` 流水，买入的水/粮仍走行囊 → 回家 Deposit 链路，
+/// 因此本流水**不与账本重复记账**（前端分别标注"交易流水"与"账本流水"）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketTradeRecord {
+    /// 成交时的世界 tick
+    pub tick: u64,
+    /// 采购人（赴市的家户户主）
+    pub agent_id: AgentId,
+    /// 采购人家户 ID（无家户时为 None）
+    pub household_id: Option<u64>,
+    /// 资源品类: "Water" / "Food"
+    pub resource: String,
+    /// 成交数量
+    pub amount: f32,
+    /// 成交时单价（金/单位）
+    pub unit_price: f32,
+    /// 本次支出黄金总额
+    pub gold_cost: f32,
+}
+
 /// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿的储量上限与产速均由 SimConfig 的 stock_max_* / regen_base_* 控制；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
@@ -144,6 +169,10 @@ pub struct PrimitivePoi {
     pub bound_houses_count: u32, // 当前绑定的房屋总数
     /// ★ v1.10.0 空置房屋列表（仅营地有意义；户主死亡后登记，房屋坍塌后移除）
     pub vacant_houses: Vec<VacantHouseEntry>,
+    /// ★ v1.28.0 榷场交易流水环形缓冲（仅 Market 有内容；超容量淘汰最旧，
+    /// 容量复用 `config.ledger_journal_capacity`；随 pois 全量存档持久化）
+    #[serde(default)]
+    pub market_trades: VecDeque<MarketTradeRecord>,
 }
 
 impl PrimitivePoi {
@@ -191,6 +220,7 @@ impl PrimitivePoi {
             level: 0,
             bound_houses_count: 0,
             vacant_houses: Vec::new(),
+            market_trades: VecDeque::new(),
         }
     }
 
@@ -210,16 +240,20 @@ impl PrimitivePoi {
     }
 
     /// 根据当前绑定的有效房屋数量更新营地等级并返回升级播报
-    pub fn update_camp_level(&mut self, house_count: u32) -> Option<String> {
+    pub fn update_camp_level(&mut self, house_count: u32, config: &SimConfig) -> Option<String> {
         if self.poi_type != PoiType::Camp { return None; }
         self.bound_houses_count = house_count;
         let old_level = self.level;
-        let new_level = match house_count {
-            0..=5 => 0,
-            6..=11 => 1,
-            12..=17 => 2,
-            18..=23 => 3,
-            _ => 4,
+        let new_level = if house_count < config.camp_level_village_min_houses {
+            0
+        } else if house_count < config.camp_level_township_min_houses {
+            1
+        } else if house_count < config.camp_level_town_min_houses {
+            2
+        } else if house_count < config.camp_level_county_min_houses {
+            3
+        } else {
+            4
         };
         self.level = new_level;
         if new_level > old_level {
@@ -260,6 +294,18 @@ impl PrimitivePoi {
         self.secondary_stock -= available;
         available
     }
+
+    /// ★ v1.28.0 追加一条榷场成交流水（环形缓冲，超容量淘汰最旧）
+    ///
+    /// 容量由调用方传入（`config.ledger_journal_capacity`，复用账本流水容量，未新增超参）。
+    /// 仅 Market 类型会调用；不消耗 RNG、不改变任何物理库存，纯留痕。
+    pub fn push_market_trade(&mut self, record: MarketTradeRecord, capacity: usize) {
+        let cap = capacity.max(1);
+        while self.market_trades.len() >= cap {
+            self.market_trades.pop_front();
+        }
+        self.market_trades.push_back(record);
+    }
 }
 
 /// 外部市场（榷场互市）幂律动态计价函数（纯函数，零随机，O(1)）
@@ -269,4 +315,3 @@ pub fn market_unit_price(current: f32, max: f32, cfg: &crate::config::SimConfig)
     let eff = current.max(cfg.market_price_floor_stock);
     cfg.market_price_base * (max / eff).powf(cfg.market_price_power_exponent)
 }
-

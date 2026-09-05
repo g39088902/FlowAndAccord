@@ -23,6 +23,7 @@ impl World3DEngine {
             rng: &mut self.rng,
             config: &self.config,
             branch_order: &branch_order,
+            tick: self.tick_counter,
         };
         for agent in &mut self.agents {
             // ★ 胎儿跳过行动决策：无地图实体、无自主行动
@@ -38,6 +39,8 @@ impl World3DEngine {
         self.execute_pending_coronations();
         // ★ 求偶物理规则：把本拍内 male agent 自主下定决心（courtship_pending）的成婚登记落地
         self.execute_pending_courtships();
+        // ★ v1.26.0 竞拍物理规则：把本拍内无房成年男性自主下定决心（pending_bid_house_id）的出价落地
+        self.execute_pending_bids();
         // 实体化登记：将本拍内 agent 自主选定的宅址落地为 0 级仓库（放置校验/路网接入/房产绑定）
         self.materialize_founded_houses();
     }
@@ -247,10 +250,14 @@ impl World3DEngine {
         let mut market_nodes = Vec::new();
         let mut camp_positions = Vec::new();
         let mut camp_pois = Vec::new();
+        let mut poi_positions = Vec::new();
 
         for poi in &self.pois {
             let Some(node) = self.find_nearest_node(poi.pos) else { continue };
             let target = ResourceNode { poi_id: poi.id, node };
+            if poi.poi_type != PoiType::Camp {
+                poi_positions.push(poi.pos);
+            }
             match poi.poi_type {
                 PoiType::WaterSource => water_nodes.push(target),
                 PoiType::BerryBush => food_nodes.push(target),
@@ -267,7 +274,18 @@ impl World3DEngine {
 
         // ★ 求偶候选池：预收集全图在世、成年、单身、未孕的女性
         let mut eligible_females = Vec::new();
+        let mut conception_ready_females = Vec::new();
         for a in &self.agents {
+            if a.is_alive && a.gender == crate::spatial::agent::Gender::Female && !a.is_fetus
+                && a.spouse_id.is_some() && !a.is_pregnant
+                && a.age >= self.config.agent_adult_age
+                && a.miscarriage_cooldown_timer <= 0.0 && a.postpartum_cooldown_timer <= 0.0
+                && a.hunger >= self.config.agent_conception_hunger_min
+                && a.thirst >= self.config.agent_conception_thirst_min
+                && a.stamina >= self.config.agent_conception_stamina_min
+            {
+                conception_ready_females.push(a.id);
+            }
             if a.is_alive
                 && a.gender == crate::spatial::agent::Gender::Female
                 && !a.is_fetus
@@ -295,7 +313,9 @@ impl World3DEngine {
             market_nodes,
             camp_positions,
             camp_pois,
+            poi_positions,
             eligible_females,
+            conception_ready_females,
         }
     }
 }

@@ -1,5 +1,5 @@
 /**
- * auction-ui.js · 房屋拍卖交易所与竞价窥视大盘 (v1.15.0)
+ * auction-ui.js · 房屋拍卖交易所与实时竞价大盘 (v1.15.0)
  *
  * 职责：
  * 1. 控制 #house-auction-modal 视窗的开启、关闭与标签页切换；
@@ -33,6 +33,9 @@
     const sim = getSim();
     if (!sim || !sim.houses) return [];
     return sim.houses.filter(h => h.ownerId == null && h.auctionPhase != null);
+  }
+  function tierRank(tier) {
+    return { Tier0Warehouse: 0, Tier1ThatchedHut: 1, Tier2LeanTo: 2, Tier3Homestead: 3, Tier4Manor: 4 }[tier] || 0;
   }
 
   function getAllDeals() {
@@ -128,6 +131,39 @@
     if (bidsCountEl) bidsCountEl.textContent = '0';
   }
 
+  function renderActiveStrip(stripEl, houses) {
+    if (!stripEl) return;
+    if (!houses.length) {
+      if (!stripEl.dataset.empty) {
+        stripEl.dataset.empty = '1';
+        stripEl.innerHTML = '<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>';
+      }
+      return;
+    }
+    delete stripEl.dataset.empty;
+    const keep = new Set(houses.map(h => String(h.id)));
+    stripEl.querySelectorAll('.auction-strip-card').forEach(card => { if (!keep.has(card.dataset.houseId)) card.remove(); });
+    houses.forEach(h => {
+      let card = stripEl.querySelector('.auction-strip-card[data-house-id="' + h.id + '"]');
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'auction-strip-card';
+        card.dataset.houseId = h.id;
+        card.innerHTML = '<div class="strip-card-top"><span class="strip-card-name"></span><span class="strip-card-phase"></span></div><div class="strip-card-bottom"><span class="strip-card-dur"></span><span class="strip-card-bid"></span></div>';
+        stripEl.appendChild(card);
+      }
+      const t = getTierLabel(h.tier);
+      const phaseColor = h.auctionPhase === '观察期' ? '#f59e0b' : (h.auctionPhase === '决策期' ? '#38bdf8' : '#ef4444');
+      card.classList.toggle('selected', h.id === currentHouseId);
+      card.querySelector('.strip-card-name').textContent = `${t.icon} #${h.id}`;
+      const phase = card.querySelector('.strip-card-phase');
+      phase.textContent = h.auctionPhase || '在售'; phase.style.color = phaseColor;
+      card.querySelector('.strip-card-dur').textContent = `${Math.round(h.durability)}%耐久`;
+      const bid = card.querySelector('.strip-card-bid');
+      bid.textContent = `${(h.highestBid || 0).toFixed(1)}G`; bid.style.color = '#fbbf24'; bid.style.fontWeight = '700';
+    });
+  }
+
   function getTierLabel(tier) {
     if (tier === 'Tier1ThatchedHut') return { icon: '🛖', name: '茅草私宅' };
     if (tier === 'Tier2LeanTo') return { icon: '🏡', name: '进阶私宅' };
@@ -144,15 +180,18 @@
   }
 
   /**
-   * 扫描辖区内符合出价条件的单身/无房成年男性户主（意向买家池）
+   * 扫描辖区内符合出价条件的成年男性户主（意向买家/换家家户池）
    */
-  function scanPotentialBuyers(campId, houseValuation) {
+  function scanPotentialBuyers(campId, benchmarkBid) {
     const sim = getSim();
     if (!sim || !sim.agents) return [];
+    const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
 
     const buyers = [];
     for (const a of sim.agents) {
-      if (a.isAlive && a.gender === 'Male' && a.age >= 18 && a.homeHouseId == null) {
+      const auctionTier = Math.max(0, ...((sim.houses || []).filter(h => h.ownerId == null && h.auctionPhase != null).map(h => tierRank(h.tier))));
+      const ownHouse = a.homeHouseId != null ? (sim.houses || []).find(h => h.id === a.homeHouseId) : null;
+      if (a.isAlive && a.gender === 'male' && a.age >= adultAge && (a.homeHouseId == null || tierRank(ownHouse && ownHouse.tier) < auctionTier)) {
         // 查找家户账本黄金
         let gold = 0;
         if (typeof sim.getHouseholdOfAgent === 'function') {
@@ -166,7 +205,7 @@
         // 判断出价意愿与能力
         let status = '蓄资中';
         let statusColor = '#94a3b8';
-        if (gold >= houseValuation) {
+        if (gold >= benchmarkBid) {
           status = '💰 资金充裕 · 意向强烈';
           statusColor = '#10b981';
         } else if (gold > 0) {
@@ -181,6 +220,7 @@
           id: a.id,
           age: Math.floor(a.age),
           gold,
+          houseTier: ownHouse ? getTierLabel(ownHouse.tier).name : '无房',
           spouseId: a.spouseId,
           status,
           statusColor,
@@ -287,9 +327,12 @@
     // 1. 顶部状态计数
     const statusBadge = document.getElementById('auction-modal-status-badge');
     if (statusBadge) {
+      const stats = sim.auctionStats || {};
+      const finished = (stats.sold || 0) + (stats.flopped || 0);
+      const flopRate = finished > 0 ? ((stats.flopped || 0) / finished * 100).toFixed(1) : '0.0';
       renderHtml(statusBadge, activeHouses.length > 0
-        ? `<span style="color:#10b981;">🟢 ${activeHouses.length} 栋房屋挂牌竞拍中</span>`
-        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span>`);
+        ? `<span style="color:#10b981;">🟢 ${activeHouses.length} 栋房屋挂牌竞拍中</span><span style="margin-left:8px;color:#f59e0b;">流拍率 ${flopRate}%</span>`
+        : `<span style="color:#94a3b8;">⚪ 暂无在售空置房屋</span><span style="margin-left:8px;color:#f59e0b;">流拍率 ${flopRate}%</span>`);
     }
 
     const tabActiveCount = document.getElementById('tab-active-count');
@@ -308,40 +351,22 @@
       if (tabHistoryBtn) tabHistoryBtn.classList.remove('active');
       if (activeView) activeView.style.display = 'block';
       if (historyView) historyView.style.display = 'none';
+      const strip = document.getElementById('auction-house-strip');
+      if (strip) strip.style.display = '';
     } else {
       if (tabActiveBtn) tabActiveBtn.classList.remove('active');
       if (tabHistoryBtn) tabHistoryBtn.classList.add('active');
       if (activeView) activeView.style.display = 'none';
       if (historyView) historyView.style.display = 'block';
+      const strip = document.getElementById('auction-house-strip');
+      if (strip) strip.style.display = 'none';
       renderHistoryView(allDeals);
       return;
     }
 
     // 3. 在售房屋水平切换条 (Strip Cards)
     const stripEl = document.getElementById('auction-house-strip');
-    if (stripEl) {
-      if (activeHouses.length === 0) {
-        renderHtml(stripEl, `<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>`);
-      } else {
-        renderHtml(stripEl, activeHouses.map(h => {
-          const t = getTierLabel(h.tier);
-          const isSelected = (h.id === currentHouseId);
-          const phaseColor = (h.auctionPhase === '观察期') ? '#f59e0b' : ((h.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
-          return `
-            <div class="auction-strip-card ${isSelected ? 'selected' : ''}" data-house-id="${h.id}">
-              <div class="strip-card-top">
-                <span>${t.icon} #${h.id}</span>
-                <span style="color:${phaseColor}; font-size:10px; font-weight:600;">${h.auctionPhase || '在售'}</span>
-              </div>
-              <div class="strip-card-bottom">
-                <span>${Math.round(h.durability)}%耐久</span>
-                <span style="color:#fbbf24; font-weight:700;">${(h.currentValuation || 0).toFixed(1)}G</span>
-              </div>
-            </div>
-          `;
-        }).join(''));
-      }
-    }
+    renderActiveStrip(stripEl, activeHouses);
 
     // 4. 当前选中房屋的核心基本面
     const house = getSelectedHouse();
@@ -385,18 +410,20 @@
 
     const heroPrice = document.getElementById('auction-hero-price');
     if (heroPrice) {
-      renderHtml(heroPrice, `${(house.currentValuation || 0).toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      const hb = house.highestBid || 0;
+      if (hb > 0) {
+        renderHtml(heroPrice, `${hb.toFixed(2)} <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      } else {
+        renderHtml(heroPrice, `-- <span style="font-size:12px; color:#f59e0b;">金</span>`);
+      }
     }
 
     const landStatus = document.getElementById('auction-hero-land-status');
     if (landStatus) {
-      const campHouses = sim.houses.filter(h => h.campId === house.campId).length;
-      const maxHouses = (sim.config && sim.config.campMaxHouses) || 30;
-      if (campHouses < maxHouses) {
-        renderHtml(landStatus, `<span style="color:#10b981;">🟢 闲置土地充裕 (${campHouses}/${maxHouses}栋) · 估价以自建成本为上限</span>`);
-      } else {
-        renderHtml(landStatus, `<span style="color:#f87171;">🔴 聚落土地告罄 (${campHouses}/${maxHouses}栋) · 供求绝对稀缺溢价</span>`);
-      }
+      const vacant = sim.houses.filter(h => h.ownerId == null).length;
+      const adultAge = (sim.config && sim.config.agentAdultAge) || 1800;
+      const buyerCount = scanPotentialBuyers(house.campId, house.benchmarkBid || 0).length;
+      renderHtml(landStatus, `<span style="color:#f59e0b;">🔨 全图在售 ${vacant} 栋 · 无房成年男性买家 ${buyerCount} 人 · 倾囊竞价，王国与受益人份额分账</span>`);
     }
 
     // 5. 麦穗 37% 时间轴标尺与动态指针
@@ -487,30 +514,26 @@
     const buyersCountEl = document.getElementById('auction-buyers-count');
     if (!buyersListEl) return;
 
-    const buyers = scanPotentialBuyers(house.campId, house.currentValuation);
+    const buyers = scanPotentialBuyers(house.campId, house.benchmarkBid || 0);
     if (buyersCountEl) buyersCountEl.textContent = buyers.length;
 
     if (buyers.length === 0) {
-      renderHtml(buyersListEl, `<div class="auction-empty-hint">当前聚落无单身/无房成年男性户主，暂无潜在买家</div>`);
+      renderHtml(buyersListEl, `<div class="auction-empty-hint">当前辖区暂无符合条件的意向买家</div>`);
       return;
     }
 
     renderHtml(buyersListEl, buyers.map(b => {
-      const sameBadge = b.sameCamp
-        ? `<span class="buyer-tag local">本地族人</span>`
-        : `<span class="buyer-tag foreign">邻境移入</span>`;
       return `
         <div class="auction-buyer-card">
           <div class="buyer-card-left">
             <div class="buyer-card-name">
-              <span class="lineage-chip" data-agent-id="${b.id}">👤 #${b.id} (${b.age}岁)</span>
-              ${sameBadge}
+              <span class="lineage-chip" data-entity-kind="agent" data-entity-id="${b.id}">👤 #${b.id} (${b.age}岁)</span>
             </div>
             <div class="buyer-card-status" style="color:${b.statusColor};">${b.status}</div>
           </div>
           <div class="buyer-card-right">
             <div class="buyer-gold-val">🪙 ${b.gold.toFixed(1)} 金</div>
-            <button class="buyer-jump-btn" data-agent-id="${b.id}" title="聚焦并追踪该族人">定位 🔍</button>
+            <div class="buyer-house-tier">🏠 当前房屋：${b.houseTier}</div>
           </div>
         </div>
       `;
@@ -557,7 +580,7 @@
         <div class="auction-bid-card">
           <div class="bid-card-header">
             <span class="bid-tick-tag">Tick #${b.tick}</span>
-            <span class="lineage-chip" data-agent-id="${b.bidderId}">买方 #${b.bidderId} 🔍</span>
+              ${window.EntityLink ? window.EntityLink.agent(b.bidderId, `买方 #${b.bidderId} 🔍`) : `<span class="lineage-chip" data-agent-id="${b.bidderId}">买方 #${b.bidderId} 🔍</span>`}
             <span class="bid-phase-badge ${b.phase === '观察期' ? 'obs' : (b.phase === '决策期' ? 'dec' : 'clr')}">${b.phase}</span>
           </div>
           <div class="bid-card-body">
@@ -593,7 +616,7 @@
             <div class="deal-tick-lbl">成交于 Tick #${d.tick}</div>
           </div>
           <div class="deal-card-grid">
-            <div><strong>买受户主:</strong> <span class="lineage-chip" data-agent-id="${d.buyerId}">Agent #${d.buyerId} 🔍</span></div>
+            <div><strong>买受户主:</strong> ${window.EntityLink ? window.EntityLink.agent(d.buyerId, `Agent #${d.buyerId} 🔍`) : `<span class="lineage-chip" data-agent-id="${d.buyerId}">Agent #${d.buyerId} 🔍</span>`}</div>
             <div><strong>成交金额:</strong> <strong style="color:#fbbf24;">🪙 ${d.price.toFixed(2)} 金</strong></div>
             <div><strong>交割修缮度:</strong> <span>${d.durability.toFixed(1)}%</span></div>
             <div><strong>成交事由:</strong> <span style="color:#10b981;">${d.reason || '房屋拍卖竞购'}</span></div>

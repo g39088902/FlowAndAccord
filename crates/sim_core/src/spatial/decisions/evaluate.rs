@@ -2,7 +2,7 @@ use super::super::vec3::Vec3;
 use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
-use super::super::house::House;
+use super::super::house::{House, HouseTier};
 use super::super::ledger::family::HouseholdRegistry;
 use super::super::ledger::region::RegionRegistry;
 use super::super::ledger::journal::ResourceKind;
@@ -23,7 +23,9 @@ pub struct Decisioner<'a> {
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 16],
+    pub branch_order: &'a [BranchId; 18],
+    /// ★ v1.26.0 当前世界 tick（用于竞拍冷却判定，见 B17BidHouse）
+    pub tick: u64,
 }
 
 impl<'a> Decisioner<'a> {
@@ -70,12 +72,25 @@ impl<'a> Decisioner<'a> {
 
         match agent.state {
             PrimitiveActionState::RestingAtCamp => {
+                // ecology.rs 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
+                // 否则决策节拍可能在半卸货时把 agent 再次派出，造成“送货未完就出门”。
+                if agent.home_house_id.is_some() && agent.has_cargo_to_unload() {
+                    agent.current_need = Some("Safety·UnloadCargo".to_string());
+                    return;
+                }
                 if let Some(need) = self.evaluate_needs(agent) {
                     agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.households, self.config)
                         .map(|(lvl, k)| format!("{}·{}", lvl, k));
                     self.fulfill_resting_need(agent, need);
                 } else {
                     agent.current_need = Some("Physiological·Rest".to_string());
+                    // 未婚且无房的女性没有可执行事务时回所属营地休息，避免长期停在道路节点。
+                    if agent.gender == super::super::agent::Gender::Female
+                        && agent.spouse_id.is_none()
+                        && agent.home_house_id.is_none()
+                    {
+                        self.return_home(agent);
+                    }
                 }
             }
             PrimitiveActionState::SeekingWater => {
@@ -156,6 +171,11 @@ impl<'a> Decisioner<'a> {
                     .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_courtship(agent);
             }
+            PrimitiveActionState::RaiseChild => {
+                agent.current_need = Some("Esteem·RaiseChild".to_string());
+                // 行动在世界结算阶段完成；下一决策拍重新评估。
+                agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+            }
             _ => {}
         }
     }
@@ -178,11 +198,76 @@ impl<'a> Decisioner<'a> {
 
     pub fn fulfill_resting_need(&mut self, agent: &mut Agent3D, need: Need) {
         if need.kind == NeedKind::Rest { return; }
+        if need.kind == NeedKind::RaiseChild {
+            agent.raise_child_pending = true;
+            // 受孕意图需夫妻回到户主住宅后才执行；户主先返回自宅。
+            if let Some(target) = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.door_node_id)
+            {
+                let start = self.start_node(agent);
+                let at_home = agent.current_lane_id.is_none()
+                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                        .unwrap_or(false);
+                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::RaiseChild) {
+                    agent.current_need = Some("Esteem·RaiseChild·ReturningHome".to_string());
+                    return;
+                }
+            }
+            agent.enter_stationary_state(PrimitiveActionState::RaiseChild);
+            agent.current_need = Some("Esteem·RaiseChild".to_string());
+            return;
+        }
+        if need.kind == NeedKind::BidHouse {
+            // ★ v1.26.0 竞购现房：随机挑一套在售空置房屋写 pending（消耗共享 RNG，确定性），
+            // 不改变运动状态——只下决心，交割由世界执行器 execute_pending_bids 落地。
+            let own_tier = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.tier)
+                .unwrap_or(HouseTier::Tier0Warehouse);
+            let mut candidates: Vec<(u32, HouseTier, f32)> = self
+                .houses
+                .iter()
+                .filter(|h| h.owner_id.is_none() && h.auction_state.is_some() && (agent.home_house_id.is_none() || h.tier > own_tier))
+                .map(|h| (h.id, h.tier, house_upgrade_cost_price(own_tier, h.tier, self.config)))
+                .collect();
+            if candidates.is_empty() {
+                agent.current_need = None;
+                return;
+            }
+            candidates.sort_by(|a, b| (b.1 as u8).cmp(&(a.1 as u8)).then_with(|| a.0.cmp(&b.0)));
+            let (house_id, _tier, price) = candidates[0];
+            if price < self.config.house_auction_min_bid_gold || ledger_balance_of(self.households, agent, ResourceKind::Gold) < price {
+                agent.current_need = None;
+                return;
+            }
+            agent.pending_bid_house_id = Some(house_id);
+            agent.pending_bid_price = Some(price);
+            agent.pending_bid_upgrade = agent.home_house_id.is_some();
+            agent.current_need = Some("Safety·BidHouse".to_string());
+            return;
+        }
         if need.kind == NeedKind::RepairHouse {
             agent.enter_stationary_state(PrimitiveActionState::RepairingHouse);
             return;
         }
         if need.kind == NeedKind::BuildHouse {
+            // 升级施工必须在自宅门口执行；未到家先沿路网返回，抵达后由 construction 结算。
+            let target = agent.home_house_id
+                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                .map(|h| h.door_node_id);
+            if let Some(target) = target {
+                let start = self.start_node(agent);
+                let at_home = agent.current_lane_id.is_none()
+                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                        .unwrap_or(false);
+                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::ConstructingHouse) {
+                    agent.current_need = Some("Esteem·BuildHouse·ReturningHome".to_string());
+                    return;
+                }
+            }
             agent.enter_stationary_state(PrimitiveActionState::ConstructingHouse);
             agent.build_timer = 0.0;
             return;
@@ -206,6 +291,21 @@ impl<'a> Decisioner<'a> {
                     let dy = h.pos.y - cand.y;
                     (dx * dx + dy * dy).sqrt() >= self.config.house_min_spacing
                 });
+                // 资源点/榷场是基础设施实体，宅址不得落入其交互范围。
+                if is_valid {
+                    is_valid = self.ctx.poi_positions.iter().all(|p| {
+                        let dx = p.x - cand.x;
+                        let dy = p.y - cand.y;
+                        (dx * dx + dy * dy).sqrt() >= self.config.poi_interaction_radius
+                    });
+                }
+                if is_valid {
+                    is_valid = self.ctx.camp_pois.iter().all(|(_, p)| {
+                        let dx = p.x - cand.x;
+                        let dy = p.y - cand.y;
+                        (dx * dx + dy * dy).sqrt() >= self.config.house_node_poi_occupy_radius
+                    });
+                }
                 // 国王宅址必须落在自己王国营地 poi_min_distance 以内（挂靠自己的王国）
                 if is_valid {
                     if let Some(cp) = king_camp_pos {
@@ -217,8 +317,18 @@ impl<'a> Decisioner<'a> {
                     }
                 }
                 if is_valid {
-                    agent.pending_house_pos = Some(cand);
                     agent.current_need = Some("Physiological·FoundHome".to_string());
+                    // 先沿路网走到候选宅址附近，抵达后 settlement 才实体化房屋。
+                    if let Some((target, _)) = self.network.graph.node_weights()
+                        .map(|n| (n.id, n.pos))
+                        .min_by(|(_, a), (_, b)| a.distance_to(&cand).partial_cmp(&b.distance_to(&cand)).unwrap()) {
+                        let start = self.start_node(agent);
+                        let target_pos = self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap()).map(|n| n.pos).unwrap_or(cand);
+                        agent.pending_house_pos = Some(target_pos);
+                        let _ = self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp);
+                    } else {
+                        agent.pending_house_pos = None;
+                    }
                     return;
                 }
             }
@@ -282,7 +392,7 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => self.nearest_of(agent, NodePool::Wood, agent.world_pos),
             NeedKind::StockStone => self.nearest_of(agent, NodePool::Stone, agent.world_pos),
             NeedKind::StockGold | NeedKind::GoldWealth => self.nearest_of(agent, NodePool::Gold, agent.world_pos),
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship => None,
+            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship | NeedKind::BidHouse | NeedKind::RaiseChild => None,
         };
         if let Some(target) = target {
             self.dispatch(agent, start, target, need.target_state);

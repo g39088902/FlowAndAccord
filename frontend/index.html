@@ -7,13 +7,21 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="startup-save-gate" class="save-modal-backdrop" style="display:flex; z-index:9999;">
+    <div style="width:min(460px, calc(100vw - 32px)); padding:24px; border:1px solid rgba(56,189,248,.35); border-radius:12px; background:#0b1220; color:#e5eef7; text-align:center; box-shadow:0 20px 80px rgba(0,0,0,.55);">
+      <div style="font-size:22px; margin-bottom:8px;">💾 先建立本地存档文件</div>
+      <div id="startup-save-message" style="font-size:12px; color:#9fb3c8; line-height:1.6; margin-bottom:16px;">游戏开始前必须连接一个 .json 存档文件。请使用 Chrome 或 Edge。</div>
+      <button id="startup-save-connect" class="save-bar-btn" style="padding:9px 18px;">建立存档文件</button>
+    </div>
+  </div>
+  <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
   <div id="canvas-container">
     <canvas id="sim-canvas"></canvas>
   </div>
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.25.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.28.11</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -26,7 +34,7 @@
         <div class="stat-lbl">🏡 私产宅舍</div>
       </div>
       <div class="stat-item">
-        <div class="stat-val" id="stat-pois" style="color:#10b981;">24</div>
+        <div class="stat-val" id="stat-pois" style="color:#10b981;">23</div>
         <div class="stat-lbl">生态地标</div>
       </div>
       <div class="stat-item" title="存续家户数（家庭跟着男人走：以男性户主为锚）">
@@ -78,16 +86,16 @@
     <div class="res-meter-group">
       <div class="meter-row">
         <div class="meter-label">
-          <span style="color:#38bdf8;">💧 全图清泉总水量 (5处)</span>
-          <span id="val-global-water" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
+          <span style="color:#38bdf8;">💧 全图清泉总水量 (6处)</span>
+          <span id="val-global-water" class="mono-num" style="font-weight:700;">900.0 / 1200.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-water" style="background:#38bdf8; width:75%;"></div></div>
       </div>
 
       <div class="meter-row">
         <div class="meter-label">
-          <span style="color:#10b981;">🍒 全图成熟浆果量 (5处)</span>
-          <span id="val-global-berry" class="mono-num" style="font-weight:700;">270.0 / 360.0 单位 (75%)</span>
+          <span style="color:#10b981;">🍒 全图成熟浆果量 (6处)</span>
+          <span id="val-global-berry" class="mono-num" style="font-weight:700;">900.0 / 1200.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-berry" style="background:#10b981; width:75%;"></div></div>
       </div>
@@ -95,7 +103,7 @@
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#d97706;">🌲 全图林木木材量 (3处)</span>
-          <span id="val-global-wood" class="mono-num" style="font-weight:700;">180.0 / 240.0 单位 (75%)</span>
+          <span id="val-global-wood" class="mono-num" style="font-weight:700;">450.0 / 600.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-wood" style="background:#d97706; width:75%;"></div></div>
       </div>
@@ -103,7 +111,7 @@
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#94a3b8;">🪨 全图石矿石料量 (2处)</span>
-          <span id="val-global-stone" class="mono-num" style="font-weight:700;">90.0 / 120.0 单位 (75%)</span>
+          <span id="val-global-stone" class="mono-num" style="font-weight:700;">300.0 / 400.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-stone" style="background:#94a3b8; width:75%;"></div></div>
       </div>
@@ -111,7 +119,7 @@
       <div class="meter-row">
         <div class="meter-label">
           <span style="color:#fbbf24;">🪙 全图金矿黄金量 (1处)</span>
-          <span id="val-global-gold" class="mono-num" style="font-weight:700;">45.0 / 60.0 单位 (75%)</span>
+          <span id="val-global-gold" class="mono-num" style="font-weight:700;">150.0 / 200.0 单位 (75%)</span>
         </div>
         <div class="meter-bg"><div class="meter-fill" id="fill-global-gold" style="background:#fbbf24; width:75%;"></div></div>
       </div>
@@ -227,16 +235,6 @@
           </div>
         </div>
 
-        <!-- 随身行囊均值 -->
-        <div class="avg-section-title" style="margin-top:6px;">🎒 随身行囊均值</div>
-        <div class="avg-carry-grid">
-          <div class="avg-carry-chip"><span style="color:#38bdf8;">💧 水</span><span id="avg-carry-water" class="mono-num">0.0</span></div>
-          <div class="avg-carry-chip"><span style="color:#10b981;">🍒 食</span><span id="avg-carry-food" class="mono-num">0.0</span></div>
-          <div class="avg-carry-chip"><span style="color:#d97706;">🌲 木</span><span id="avg-carry-wood" class="mono-num">0.0</span></div>
-          <div class="avg-carry-chip"><span style="color:#94a3b8;">🪨 石</span><span id="avg-carry-stone" class="mono-num">0.0</span></div>
-          <div class="avg-carry-chip"><span style="color:#fbbf24;">🪙 金</span><span id="avg-carry-gold" class="mono-num">0.0</span></div>
-        </div>
-
         <!-- 财富分配不平等度（基尼指数） -->
         <div class="avg-section-title" style="margin-top:6px;">💰 财富分配不平等度 · 基尼指数（家户账本）</div>
         <div class="meter-row">
@@ -249,15 +247,7 @@
         <div class="avg-stat-grid" style="margin-top:4px;">
           <div class="avg-stat-item">
             <span class="avg-lbl">🏆 最富家户</span>
-            <span id="avg-gini-top-val" class="avg-val" style="color:#fbbf24;">0.0</span>
-          </div>
-          <div class="avg-stat-item">
-            <span class="avg-lbl">📉 最贫家户</span>
-            <span id="avg-gini-bottom-val" class="avg-val" style="color:#94a3b8;">0.0</span>
-          </div>
-          <div class="avg-stat-item">
-            <span class="avg-lbl">📊 贫富倍差</span>
-            <span id="avg-gini-ratio-val" class="avg-val" style="color:#f472b6;">0.0x</span>
+            <span id="avg-gini-top-val" class="avg-val" style="color:#fbbf24;">—</span>
           </div>
           <div class="avg-stat-item">
             <span class="avg-lbl">🏠 零金家户</span>
@@ -278,25 +268,25 @@
       </div>
     </div>
 
-    <!-- 图例窗口 (支持最小化，默认折叠) -->
-    <div class="ecology-legend minimized" id="ecology-legend">
+    <!-- 图例窗口已移除：信息由各 Inspector 与制度大盘就地展示 -->
+    <div class="ecology-legend minimized" id="ecology-legend" style="display:none;">
       <div class="legend-title" id="legend-header" title="点击展开图例">
         <div style="display:flex; align-items:center; gap:6px;">
           <span>🗺️ 图例窗口</span>
-          <span style="color:#10b981; font-size:10px;">21处 POI</span>
+          <span style="color:#10b981; font-size:10px;">23处 POI</span>
         </div>
         <button id="btn-toggle-legend" class="legend-collapse-btn" aria-label="展开/最小化图例" title="展开/最小化图例">
           <span id="legend-toggle-icon">+</span>
         </button>
       </div>
       <div class="legend-body" id="legend-body">
-        <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图5处，储量无限，就近归宿)</div>
+        <div class="legend-item"><div class="legend-icon">🏕️</div> 避风营地 (全图4处，储量无限，就近归宿)</div>
         <div class="legend-item"><div class="legend-icon">🛖</div> 1级茅草房 / 2级私宅🏡 / 3级庄舍🏯 / 4级庄园🏰</div>
-        <div class="legend-item"><div class="legend-icon">💧</div> 天然清泉 (全图5处，上限60.0单位，2.0/s，随机分布)</div>
-        <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果 (全图5处，上限60.0单位，2.0/s)</div>
-        <div class="legend-item"><div class="legend-icon">🌲</div> 茂密林木 (全图3处，上限60.0单位，冬季取暖/升级)</div>
-        <div class="legend-item"><div class="legend-icon">🪨</div> 嶙峋石矿 (全图2处，上限60.0单位，纯升级建材)</div>
-        <div class="legend-item"><div class="legend-icon">🪙</div> 璀璨金矿 (全图1处，上限60.0单位，产金随身携带·行囊上限20.0/升级大庄园)</div>
+        <div class="legend-item"><div class="legend-icon">💧</div> 天然清泉 (全图6处，上限200.0单位，2.0/s，随机分布)</div>
+        <div class="legend-item"><div class="legend-icon">🍒</div> 缓坡浆果 (全图6处，上限200.0单位，2.0/s)</div>
+        <div class="legend-item"><div class="legend-icon">🌲</div> 茂密林木 (全图3处，上限200.0单位，冬季取暖/升级)</div>
+        <div class="legend-item"><div class="legend-icon">🪨</div> 嶙峋石矿 (全图2处，上限200.0单位，纯升级建材)</div>
+        <div class="legend-item"><div class="legend-icon">🪙</div> 璀璨金矿 (全图1处，上限200.0单位，产金随身携带·行囊上限20.0/升级大庄园)</div>
         <div class="legend-item" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;"><div class="legend-icon" style="color:#f59e0b;">═</div> 1~5级 踩踏道路 (颜色表征等级/恒定宽度/悬浮查看)</div>
         <div class="legend-item"><div class="legend-icon">❄️</div> 冬季严寒供暖 (房屋消耗木头取暖，木材<10禁止怀孕)</div>
         <div class="legend-item"><div class="legend-icon">🏗️</div> 升级材料要求 (升1级水粮50 · 升2级木粮水75 · 升3级石木粮水100 · 升4级金石木粮水125)</div>
@@ -331,6 +321,10 @@
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">已解散</span><span class="ledger-ov-val" id="ledger-ov-dissolved" style="color:#64748b;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">存续婚姻</span><span class="ledger-ov-val" id="ledger-ov-marriages" style="color:#ec4899;">0</span></div>
             <div class="ledger-overview-item"><span class="ledger-ov-lbl">累计登记</span><span class="ledger-ov-val" id="ledger-ov-marriages-total" style="color:#a78bfa;">0</span></div>
+          </div>
+          <div class="ledger-section-title">📊 存续家户资源平均值</div>
+          <div class="ledger-overview-row ledger-resource-averages" id="ledger-resource-averages">
+            <span>💧 —</span><span>🍒 —</span><span>🌲 —</span><span>🪨 —</span><span>🪙 —</span>
           </div>
           <!-- 家户列表 -->
           <div class="ledger-section-title">🏠 家户列表（点击账面余额查看流水 · 已解散家户查看继承档案）</div>
@@ -410,6 +404,21 @@
           </div>
         </div>
 
+        <!-- ★ v1.26.3 调试模式: 累计开采资源量 · 分品种（仅调试模式勾选时显示） -->
+        <div class="debug-mining-card" id="insp-debug-mining" style="display:none;">
+          <div class="mining-header">
+            <span style="font-weight:700; color:#a78bfa;">⛏️ 累计开采</span>
+            <span id="insp-debug-mining-val" class="mono-num" style="color:#fde68a; font-weight:700;">0.0 单位</span>
+          </div>
+          <div class="carry-chips-grid" id="insp-debug-mining-chips">
+            <div class="carry-chip" id="mining-chip-water"><span class="chip-icon">💧</span><span class="chip-num" id="insp-debug-mining-water">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-food"><span class="chip-icon">🍒</span><span class="chip-num" id="insp-debug-mining-food">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-wood"><span class="chip-icon">🌲</span><span class="chip-num" id="insp-debug-mining-wood">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-stone"><span class="chip-icon">🪨</span><span class="chip-num" id="insp-debug-mining-stone">0.0</span></div>
+            <div class="carry-chip" id="mining-chip-gold"><span class="chip-icon">🪙</span><span class="chip-num" id="insp-debug-mining-gold">0.0</span></div>
+          </div>
+        </div>
+
         <!-- 2x2 紧凑型生存健康指标网格 -->
         <div class="vital-grid">
           <div class="vital-item">
@@ -434,9 +443,9 @@
         <div class="carry-card" id="insp-carry-box">
           <div class="carry-header">
             <span>🎒 随身行囊</span>
-            <span id="insp-carry-cap" class="mono-num" style="font-weight:700; color:#fbbf24;">0.0 / 200.0</span>
+            <span id="insp-carry-cap" class="mono-num" style="font-weight:700; color:#fbbf24;">分项容量 100 · 黄金∞</span>
           </div>
-          <div class="meter-bg"><div class="meter-fill" id="insp-carry-fill" style="background:#fbbf24; width:0%;"></div></div>
+          <div class="meter-bg" id="insp-carry-meter" style="display:none"><div class="meter-fill" id="insp-carry-fill" style="background:#fbbf24; width:0%;"></div></div>
           <div class="carry-chips-grid" id="insp-carry-items">
             <div class="carry-chip" id="chip-water"><span class="chip-icon">💧</span><span class="chip-num" id="insp-carry-water">0.0</span></div>
             <div class="carry-chip" id="chip-food"><span class="chip-icon">🍒</span><span class="chip-num" id="insp-carry-food">0.0</span></div>
@@ -534,7 +543,7 @@
 
       <div id="insp-poi-view" style="display:none; flex-direction:column; gap:6px;">
         <div class="meter-row" id="insp-poi-stock-row">
-          <div class="meter-label"><span id="lbl-poi-stock-title">当前可用储量 (上限60.0)</span><span id="insp-poi-stock-val">45.0 / 60.0 单位</span></div>
+          <div class="meter-label"><span id="lbl-poi-stock-title">当前可用储量 (上限200.0)</span><span id="insp-poi-stock-val">45.0 / 200.0 单位</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-poi-stock-fill" style="background:#10b981; width:75%;"></div></div>
         </div>
         <!-- ★ v1.22.6 榷场互市第二库存：与清水独立的粮食储备（仅 Market 显示） -->
@@ -558,6 +567,7 @@
           <!-- ★ v1.22.6 榷场互市第二条产速：粮食再生独立计数（仅 Market 显示） -->
           <div id="insp-poi-regen-secondary-row" style="display:none;"><strong>🌾 粮食产出:</strong> <span id="insp-poi-regen-secondary">+2.00 单位/秒</span></div>
         </div>
+        <div class="poi-info-badge" id="insp-market-trades" style="display:none;"><strong>🔄 交易流水:</strong><div id="insp-market-trades-list" style="margin-top:3px;"></div></div>
       </div>
 
       <!-- 房屋专属 Inspector 视图 -->
@@ -586,7 +596,7 @@
         <!-- ★ v1.14.0 房屋估价与营地中介拍卖/档案卡片 -->
         <div class="poi-info-badge" id="insp-house-market-badge" style="background:rgba(245, 158, 11, 0.08); border-color:rgba(245, 158, 11, 0.3); color:#fcd34d;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span><strong>🪙 市场估价:</strong> <span id="insp-house-val-gold" style="font-weight:700; color:#fbbf24;">—</span></span>
+            <span><strong>🪙 当前最高出价:</strong> <span id="insp-house-val-gold" style="font-weight:700; color:#fbbf24;">—</span></span>
             <span id="insp-house-auction-tag" style="font-size:10px; padding:1px 5px; border-radius:4px; background:rgba(245,158,11,0.2); border:1px solid rgba(245,158,11,0.4); color:#fbbf24;">正常私宅</span>
           </div>
           <div id="insp-house-auction-info" style="display:none; flex-direction:column; gap:2px; font-size:11px; border-top:1px dashed rgba(245,158,11,0.3); margin-top:3px; padding-top:3px;">
@@ -601,7 +611,7 @@
             <button id="btn-toggle-house-bids" type="button" style="width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; border-radius:4px; font-size:10px; cursor:pointer; padding:3px 4px; text-align:center;">📜 展开报价与成交档案 (<span id="insp-house-archive-summary">0 报价 / 0 成交</span>)</button>
             <div id="insp-house-archive-content" style="display:none; max-height:120px; overflow-y:auto; font-size:10px; margin-top:4px; padding:4px; background:rgba(0,0,0,0.3); border-radius:4px; border:1px solid rgba(255,255,255,0.08);"></div>
           </div>
-          <button id="btn-open-auction-window" type="button" class="house-auction-live-btn" style="width:100%; margin-top:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; padding:4px; text-align:center;">🔨 窥视实时竞拍与麦穗博弈大盘 ↗</button>
+          <button id="btn-open-auction-window" type="button" class="house-auction-live-btn" style="width:100%; margin-top:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); color:#fbbf24; border-radius:4px; font-size:10px; font-weight:600; cursor:pointer; padding:4px; text-align:center;">🔨 查看实时竞价与麦穗博弈大盘 ↗</button>
         </div>
 
         <div class="poi-info-badge">
@@ -612,7 +622,7 @@
           <div><strong>🏕️ 所属聚落:</strong> <span id="insp-house-camp-name" style="color:#38bdf8; font-weight:600;">—</span></div>
           <div><strong>🏛️ 建筑形态:</strong> <span id="insp-house-tier-desc" style="color:#f59e0b;">0级 起步营地</span></div>
           <div><strong>🧱 修建/升级者:</strong> <span id="insp-house-builder-val" style="color:#a78bfa; font-weight:600;">—</span></div>
-          <div><strong>🍼 生育:</strong> <span id="insp-house-fertility-badge" style="color:#10b981;">已去房屋化：已婚达标即可受孕</span></div>
+          <div><strong>🍼 生育:</strong> <span id="insp-house-fertility-badge" style="color:#10b981;">需 ≥1 级住宅：户主名下房屋达 1 级即可受孕</span></div>
         </div>
       </div>
     </div>
@@ -625,26 +635,26 @@
     </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
-      <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动需求判定卡调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
+      <button class="ecology-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动 Branch 分支调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）" style="border-color:rgba(56,189,248,.45); color:#38bdf8; background:rgba(56,189,248,.14);">🧠 决策引擎</button>
       <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
       <button class="headless-btn" id="btn-headless" title="无头模式">🧠 无头模式</button>
     </div>
     
     <div class="toggle-row" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
-      <span style="font-weight:600; color:#f472b6;">👤 隐藏部落民 (仅留地图与建筑)</span>
-      <input type="checkbox" id="chk-hide-agents" style="accent-color: #f472b6; cursor: pointer;">
+      <label for="chk-hide-agents" style="font-weight:600; color:#f472b6;">👤 隐藏部落民 (仅留地图与建筑)</label>
+      <input aria-label="隐藏部落民" type="checkbox" id="chk-hide-agents" style="accent-color: #f472b6; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span style="font-weight:600; color:#a3e635;">🛣️ 隐藏路网 (仅显示地表与地标)</span>
-      <input type="checkbox" id="chk-hide-lanes" style="accent-color: #a3e635; cursor: pointer;">
+      <label for="chk-hide-lanes" style="font-weight:600; color:#a3e635;">🛣️ 隐藏路网 (仅显示地表与地标)</label>
+      <input aria-label="隐藏路网" type="checkbox" id="chk-hide-lanes" style="accent-color: #a3e635; cursor: pointer;">
     </div>
     <div class="toggle-row">
-      <span style="font-weight:600; color:#a78bfa;">🐞 调试模式 (Tick / CPU / 内存)</span>
-      <input type="checkbox" id="chk-debug-mode" style="accent-color: #a78bfa; cursor: pointer;">
+      <label for="chk-debug-mode" style="font-weight:600; color:#a78bfa;">🐞 调试模式 (Tick / CPU / 内存)</label>
+      <input aria-label="调试模式" type="checkbox" id="chk-debug-mode" style="accent-color: #a78bfa; cursor: pointer;">
     </div>
     <div class="toggle-row">
       <span style="font-weight:600; color:#facc15;">⚡ 模拟演化倍速</span>
-      <select id="sel-speed" style="background:#1e293b; color:#facc15; font-weight:600; border:1px solid #f59e0b; border-radius:6px; padding:3px 8px; cursor:pointer;">
+      <select id="sel-speed" aria-label="模拟演化倍速" style="background:#1e293b; color:#facc15; font-weight:600; border:1px solid #f59e0b; border-radius:6px; padding:3px 8px; cursor:pointer;">
         <option value="1">1x</option>
         <option value="2" selected>2x</option>
         <option value="4">4x</option>
@@ -682,7 +692,6 @@
   <div class="event-log">
     <div class="log-title">🛰️ 部落繁衍与生死播报</div>
     <div class="log-list" id="log-list">
-      <div class="log-entry camp">🏕️ 生态系统就绪：20 位始祖族人（10男10女）已降临，踏路筑室，社会演化开启！</div>
     </div>
   </div>
 
@@ -835,12 +844,12 @@
           <span style="font-size:22px;">🧠</span>
           <div>
             <div style="font-size:14px; font-weight:700; color:#38bdf8;">马斯洛决策引擎 · evaluate_needs</div>
-            <div style="font-size:10px; color:#94a3b8;">拖动需求判定卡调整评估顺序 · 拖动分界线重划层级 · 松手即热注入运行中的模拟并落盘 config.decision-order.js</div>
+            <div style="font-size:10px; color:#94a3b8;">拖动 Branch 分支调整评估顺序 · 拖动分界线重划层级 · 松手即热注入运行中的模拟并落盘 config.decision-order.js</div>
           </div>
         </div>
         <div class="dag-modal-tools">
           <button id="dviz-btn-fit" class="dag-tool-btn" title="整图自适应居中">🎯 适应窗口</button>
-          <button id="dviz-btn-reset" class="dag-tool-btn" title="恢复出厂策展顺序（b1→b13 原硬编码优先级）">↺ 重置顺序</button>
+          <button id="dviz-btn-reset" class="dag-tool-btn" title="恢复出厂策展顺序（原硬编码优先级）">↺ 重置顺序</button>
           <button id="dviz-btn-close" class="dag-modal-close" title="关闭决策引擎 (Esc)">✕</button>
         </div>
       </div>
@@ -848,19 +857,12 @@
         <aside class="dviz-left">
           <div class="dviz-panel">
             <div class="dviz-panel-head">
-              <span class="dviz-panel-title">🎨 层级图例</span>
-              <span class="dviz-panel-sub">点击过滤 · 再点取消</span>
-            </div>
-            <div id="dviz-layer-nav" class="dviz-layer-nav"></div>
-          </div>
-          <div class="dviz-panel">
-            <div class="dviz-panel-head">
               <span class="dviz-panel-title">🕹️ 操作指引</span>
             </div>
             <div class="dviz-legend">
               <div class="dviz-legend-item">
                 <span class="dviz-legend-ico" style="background:rgba(56,189,248,.14);color:#38bdf8">↕</span>
-                <div><b>拖动卡片 · 调序</b><span>调整 13 条需求判定的评估优先级，松手即热注入</span></div>
+                <div><b>拖动卡片 · 调序</b><span>调整 18 条 Branch 分支的评估优先级，松手即热注入</span></div>
               </div>
               <div class="dviz-legend-item">
                 <span class="dviz-legend-ico" style="background:rgba(16,185,129,.14);color:#10b981">╌</span>
@@ -874,16 +876,6 @@
                 <span class="dviz-legend-ico" style="background:rgba(167,139,250,.14);color:#a78bfa">🔍</span>
                 <div><b>滚轮缩放 · 空白平移</b><span>右键或空白处拖拽平移画布</span></div>
               </div>
-            </div>
-          </div>
-          <div class="dviz-panel">
-            <div class="dviz-panel-head">
-              <span class="dviz-panel-title">📦 数据来源</span>
-              <span class="dviz-panel-sub">decisions/</span>
-            </div>
-            <div class="dviz-src-list">
-              <code>branches.rs</code><code>evaluate.rs</code><code>needs.rs</code>
-              <code>routing.rs</code><code>seeking.rs</code><code>harvest.rs</code><code>scheduler.rs</code>
             </div>
           </div>
         </aside>
@@ -903,7 +895,7 @@
           <div id="dviz-insp-empty" class="dviz-empty">
             <div class="dviz-empty-ico">🧠</div>
             <div class="dviz-empty-title">尚未选中图元</div>
-            <div class="dviz-empty-sub">点击中央任意「需求判定卡 / 分界线 / 状态机」查看详情</div>
+            <div class="dviz-empty-sub">点击中央任意「Branch 分支卡 / 分界线」查看详情</div>
           </div>
           <div id="dviz-insp-card" class="dviz-insp-card" style="display:none"></div>
         </aside>
@@ -929,7 +921,8 @@
       <div class="save-status" id="save-status"></div>
 
       <div class="save-modal-footer">
-        <button class="save-btn import" id="btn-import-save" title="从本地 .json 存档文件读取世界">📥 导入存档文件</button>
+          <button class="save-btn import" id="btn-import-save" title="从本地 .json 存档文件读取世界">📥 导入存档文件</button>
+          <button class="save-btn" id="btn-export-save" title="下载当前世界 JSON 备份">📤 下载当前存档</button>
         <span class="save-hint" id="save-storage-hint"></span>
       </div>
       <input type="file" id="save-file-input" accept="application/json,.json" style="display:none;">
@@ -964,10 +957,11 @@
           <div class="camp-detail-section-title">🏛️ 管辖家庭（存续家户）</div>
           <div id="camp-detail-governed" class="camp-detail-content">—</div>
         </div>
-        <!-- 空置房屋 -->
+        <!-- 辖区房屋 -->
         <div class="camp-detail-section">
-          <div class="camp-detail-section-title">🏚️ 空置房屋（户主故去·待确权）</div>
+          <div class="camp-detail-section-title">🏠 辖区房屋（空置 / 已有人居住）</div>
           <div id="camp-detail-vacant" class="camp-detail-content">—</div>
+          <div id="camp-detail-occupied" class="camp-detail-content" style="margin-top:4px;">—</div>
         </div>
         <!-- 王国账本 -->
         <div class="camp-detail-section">
@@ -985,7 +979,7 @@
     </div>
   </div>
 
-  <!-- ══════════ 🏛️ 房屋拍卖与竞价窥视大盘模态框 (v1.15.0) ══════════ -->
+  <!-- ══════════ 🏛️ 房屋拍卖与实时竞价大盘模态框 (v1.15.0) ══════════ -->
   <div class="house-auction-backdrop" id="house-auction-backdrop" style="display:none;">
     <div class="house-auction-modal">
       <div class="house-auction-header">
@@ -1025,9 +1019,9 @@
               </div>
             </div>
             <div class="auction-hero-valuation">
-              <div style="font-size:10px; color:#94a3b8;">当前市场估价 (动态建造成本折算)</div>
-              <div class="auction-hero-price" id="auction-hero-price">18.50 <span style="font-size:12px; color:#f59e0b;">金</span></div>
-              <div class="auction-hero-land-status" id="auction-hero-land-status">🟢 存在闲置土地（估价 = 自建成本）</div>
+              <div style="font-size:10px; color:#94a3b8;">当前最高出价 (麦穗竞价)</div>
+              <div class="auction-hero-price" id="auction-hero-price">-- <span style="font-size:12px; color:#f59e0b;">金</span></div>
+              <div class="auction-hero-land-status" id="auction-hero-land-status">🔨 全图在售 · 无房成年男性买家 · 倾囊竞价分账</div>
             </div>
           </div>
 
@@ -1090,11 +1084,10 @@
             <!-- 左列：意向买家池 -->
             <div class="auction-col buyers-col">
               <div class="auction-col-title">
-                <span>👥 辖区意向买家池 (<span id="auction-buyers-count">0</span>人)</span>
-                <span class="col-sub">成年单身/无房男性户主</span>
+                <span>👥 辖区意向买家/换家家户池 (<span id="auction-buyers-count">0</span>户)</span>
               </div>
               <div class="auction-buyers-list" id="auction-buyers-list">
-                <div class="auction-empty-hint">当前聚落无单身/无房成年男性户主</div>
+                <div class="auction-empty-hint">当前辖区暂无符合条件的意向买家</div>
               </div>
             </div>
 
@@ -1145,6 +1138,7 @@
   <script src="js/dag-standalone.js"></script>
   <script src="js/dag.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/entity-link.js"></script>
   <script src="js/ledger-ui.js"></script>
   <!-- 读档/存档系统 (v1.7.0) · 依赖 main.js 暴露的 window.rustWorldSim -->
   <script src="js/save-ui.js"></script>
@@ -1154,7 +1148,7 @@
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>
   <script src="js/render_inspector.js"></script>
-  <!-- 房屋拍卖交易所与实时竞价窥视大盘 (v1.15.0) -->
+  <!-- 房屋拍卖交易所与实时竞价大盘 (v1.15.0) -->
   <script src="js/auction-ui.js"></script>
 </body>
 </html>
