@@ -547,6 +547,8 @@ impl World3DEngine {
                     // 行囊按速率卸入「家户账本」（Deposit: Personal → Family）；
                     // 吃喝从家户账本真实扣减（Consume: Family → Void）。
                     // 房屋 pantry 已删除：无容量上限、无房屋等级/0 级门槛，凡有家户即享家庭储备。
+                    // 只有已经拥有实体住宅的 agent 才能把行囊卸入家户；无房者不得“隔空入账”。
+                    if agent.home_house_id.is_some() {
                     if let Some(hh_hid) = self.household_registry.household_of(agent.id) {
                         let tick = self.tick_counter;
                         let deposit_rate = unload_res * dt;
@@ -626,6 +628,7 @@ impl World3DEngine {
                                 }
                             }
                         }
+                    }
                     }
                 }
                 _ => {}

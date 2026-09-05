@@ -5,13 +5,24 @@ use crate::spatial::vec3::Vec3;
 use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
-    /// 宅址放置校验：与现有房屋（含尚未坍塌的废墟）的水平距离须 ≥ house_min_spacing
+    /// 宅址放置校验：避让现有房屋、营地占用点与非营地 POI 交互范围。
     pub(crate) fn is_house_site_valid(&self, pos: Vec3) -> bool {
-        self.houses.iter().all(|h| {
+        let houses_clear = self.houses.iter().all(|h| {
             let dx = h.pos.x - pos.x;
             let dy = h.pos.y - pos.y;
             (dx * dx + dy * dy).sqrt() >= self.config.house_min_spacing
-        })
+        });
+        let pois_clear = self.pois.iter().all(|p| {
+            let dx = p.pos.x - pos.x;
+            let dy = p.pos.y - pos.y;
+            let clearance = if p.poi_type == PoiType::Camp {
+                self.config.house_node_poi_occupy_radius
+            } else {
+                self.config.poi_interaction_radius
+            };
+            (dx * dx + dy * dy).sqrt() >= clearance
+        });
+        houses_clear && pois_clear
     }
 
     /// 节点是否空置：既不是任何现存房屋的大门节点，也不是某个 POI 自身的接驳节点。
@@ -85,7 +96,8 @@ impl World3DEngine {
             if agent.is_alive && agent.home_house_id.is_none() {
                 if let Some(pos) = agent.pending_house_pos {
                     // pending 宅址已通过路网派发到其最近节点；抵达节点即视为到达分配地点。
-                    if agent.current_lane_id.is_some() {
+                    if agent.current_lane_id.is_some()
+                        || agent.world_pos.distance_to(&pos) > self.config.house_node_reuse_radius {
                         continue;
                     }
                     pending.push((i, pos));

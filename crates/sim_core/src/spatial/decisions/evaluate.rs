@@ -74,7 +74,7 @@ impl<'a> Decisioner<'a> {
             PrimitiveActionState::RestingAtCamp => {
                 // ecology.rs 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
                 // 否则决策节拍可能在半卸货时把 agent 再次派出，造成“送货未完就出门”。
-                if agent.has_cargo_to_unload() {
+                if agent.home_house_id.is_some() && agent.has_cargo_to_unload() {
                     agent.current_need = Some("Safety·UnloadCargo".to_string());
                     return;
                 }
@@ -84,6 +84,13 @@ impl<'a> Decisioner<'a> {
                     self.fulfill_resting_need(agent, need);
                 } else {
                     agent.current_need = Some("Physiological·Rest".to_string());
+                    // 未婚且无房的女性没有可执行事务时回所属营地休息，避免长期停在道路节点。
+                    if agent.gender == super::super::agent::Gender::Female
+                        && agent.spouse_id.is_none()
+                        && agent.home_house_id.is_none()
+                    {
+                        self.return_home(agent);
+                    }
                 }
             }
             PrimitiveActionState::SeekingWater => {
@@ -284,6 +291,21 @@ impl<'a> Decisioner<'a> {
                     let dy = h.pos.y - cand.y;
                     (dx * dx + dy * dy).sqrt() >= self.config.house_min_spacing
                 });
+                // 资源点/榷场是基础设施实体，宅址不得落入其交互范围。
+                if is_valid {
+                    is_valid = self.ctx.poi_positions.iter().all(|p| {
+                        let dx = p.x - cand.x;
+                        let dy = p.y - cand.y;
+                        (dx * dx + dy * dy).sqrt() >= self.config.poi_interaction_radius
+                    });
+                }
+                if is_valid {
+                    is_valid = self.ctx.camp_pois.iter().all(|(_, p)| {
+                        let dx = p.x - cand.x;
+                        let dy = p.y - cand.y;
+                        (dx * dx + dy * dy).sqrt() >= self.config.house_node_poi_occupy_radius
+                    });
+                }
                 // 国王宅址必须落在自己王国营地 poi_min_distance 以内（挂靠自己的王国）
                 if is_valid {
                     if let Some(cp) = king_camp_pos {
@@ -295,14 +317,17 @@ impl<'a> Decisioner<'a> {
                     }
                 }
                 if is_valid {
-                    agent.pending_house_pos = Some(cand);
                     agent.current_need = Some("Physiological·FoundHome".to_string());
                     // 先沿路网走到候选宅址附近，抵达后 settlement 才实体化房屋。
                     if let Some((target, _)) = self.network.graph.node_weights()
                         .map(|n| (n.id, n.pos))
                         .min_by(|(_, a), (_, b)| a.distance_to(&cand).partial_cmp(&b.distance_to(&cand)).unwrap()) {
                         let start = self.start_node(agent);
+                        let target_pos = self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap()).map(|n| n.pos).unwrap_or(cand);
+                        agent.pending_house_pos = Some(target_pos);
                         let _ = self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp);
+                    } else {
+                        agent.pending_house_pos = None;
                     }
                     return;
                 }

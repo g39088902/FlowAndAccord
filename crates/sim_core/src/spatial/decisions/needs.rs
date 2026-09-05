@@ -122,6 +122,8 @@ pub struct DecisionContext {
     pub camp_positions: Vec<(NodeId, Vec3)>,
     /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
     pub camp_pois: Vec<(u32, Vec3)>,
+    /// 非营地 POI 坐标；宅址候选必须避让其交互范围。
+    pub poi_positions: Vec<Vec3>,
     /// 全图可求偶的在世成年单身女性列表（求偶分支使用）
     pub eligible_females: Vec<EligibleFemale>,
     /// 满足原受孕条件的已婚女性 ID（供“养育小孩”分支核验配偶）

@@ -65,7 +65,14 @@ impl<'a> Decisioner<'a> {
     pub fn decide_seeking_survival(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
         let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
 
-        if agent.stamina < self.config.decision_work_stamina_threshold {
+        // 临界口渴/饥饿属于更高优先级的生理需求，不能被普通疲劳熔断强制打断；
+        // 只有没有临界生存需求时，体力阈值才允许决策器安排返家休息。
+        let critical_survival = match pool {
+            NodePool::Water => agent.thirst < self.config.decision_critical_thirst,
+            NodePool::Food => agent.hunger < self.config.decision_critical_hunger,
+            _ => false,
+        };
+        if agent.stamina < self.config.decision_work_stamina_threshold && !critical_survival {
             agent.current_need = Some("Physiological·Rest".to_string());
             self.return_home(agent);
             return;

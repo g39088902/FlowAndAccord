@@ -250,10 +250,14 @@ impl World3DEngine {
         let mut market_nodes = Vec::new();
         let mut camp_positions = Vec::new();
         let mut camp_pois = Vec::new();
+        let mut poi_positions = Vec::new();
 
         for poi in &self.pois {
             let Some(node) = self.find_nearest_node(poi.pos) else { continue };
             let target = ResourceNode { poi_id: poi.id, node };
+            if poi.poi_type != PoiType::Camp {
+                poi_positions.push(poi.pos);
+            }
             match poi.poi_type {
                 PoiType::WaterSource => water_nodes.push(target),
                 PoiType::BerryBush => food_nodes.push(target),
@@ -309,6 +313,7 @@ impl World3DEngine {
             market_nodes,
             camp_positions,
             camp_pois,
+            poi_positions,
             eligible_females,
             conception_ready_females,
         }

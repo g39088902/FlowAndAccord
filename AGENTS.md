@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.28.6)"]
+    E --> F["浏览器 UI (版本: v1.28.11)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.28.6`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.28.11`**。
 
 ---
 
@@ -225,6 +225,13 @@ node frontend/server.js           # http://localhost:3000
   - **修缮**：`NeedKind::RepairHouse`——耐久 < 50% 时户主/配偶自主触发，系统仅结算修缮进度。
 - **已删除的旧扫描器（勿复活）**：`tick_warehouse_founding`、`check_start_house_upgrades`、修缮强制切换扫描块。
 - 详见 `housing_system/AGENTS.md`。
+
+### 4.11.1 🧠 马斯洛引擎是唯一任务分派入口（严禁强制状态执行）
+
+- **唯一入口**：任何“去哪里/做什么”的 Agent 任务，必须来自 `Decisioner::evaluate_needs` → `fulfill_resting_need`；系统 tick、生态层、房屋层和账本层不得扫描 Agent 并直接摊派 `Seeking*`、`ReturningToCamp`、`ConstructingHouse` 等行动状态。
+- **状态执行边界**：决策器的途中熔断只能执行当前马斯洛层级允许的降级；临界口渴/饥饿等更高优先级生理需求不得被普通疲劳阈值强制改写为回家休息。
+- **物理结算例外**：系统只结算 Agent 已写下的 pending 意图（如立宅、升级、成婚、受孕、登基），不得借结算流程生成新的任务或覆盖当前需求优先级。
+- **新增分支/熔断审计**：必须证明任意决策顺序下语义仍由分支自包含条件决定；禁止在分支外新增“看到某状态就强制切换”的旁路指挥逻辑。
 
 ### 4.12 🔧 超参集中化、配置校验与速查表
 
