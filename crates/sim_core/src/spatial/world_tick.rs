@@ -70,7 +70,8 @@ impl World3DEngine {
             if agent.is_fetus {
                 continue;
             }
-            // ★ M6 去房屋化生育：不再计算房屋/仓储 fertility_active 门禁，受孕条件见 agent.rs
+            // ★ M6 起代谢层不再计算房屋/仓储 fertility_active 门禁；
+            //   ★ v1.28.0 受孕额外要求男方（户主）名下住宅 ≥1 级，该门槛在决策层 branches.rs::B18RaiseChild 判定
             if let Some(event) = agent.tick_metabolism(dt, &self.config, &mut next_agent_id) {
                 if !agent.is_alive {
                     self.total_deaths += 1;

@@ -36,7 +36,7 @@
     { id: 'b14', cond: '在世成年男性 且 非现任国王 且 存在空缺王位营地（有房限自家房屋营地/无房可任意）', need: 'Physiological · SeekThrone', target: 'SeekingThrone', level: 1, cfg: ['poiMinDistance=70', '性别+房籍守卫'], anchor: 'branches.rs::B14SeekThrone' },
     { id: 'b15', cond: '成年男性户主 且 (水或粮断供) 且 存金≥0.5 且 体力≥15', need: 'Physiological · MarketTrade', target: 'SeekingMarket', level: 1, cfg: ['marketEmergencyFamilyStockThreshold=10.0', 'marketMinFamilyGold=0.5', 'marketMinDispatchStamina=15.0'], anchor: 'market.rs::evaluate_market_trade' },
     { id: 'b16', cond: '在世成年男性 且 单身 且 存在全图单身成年女性', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, cfg: ['性别+单身守卫', '魅力最高优先'], anchor: 'branches.rs::B16Courtship' },
-    { id: 'b18', cond: '在世成年男性 + 有老婆 + 妻子满足原怀孕条件', need: 'Esteem · RaiseChild', target: 'RaiseChild→受孕', level: 4, cfg: ['原有受孕阈值与冷却'], anchor: 'branches.rs::B18RaiseChild' }
+    { id: 'b18', cond: '在世成年男性 + 有老婆 + 妻子满足原怀孕条件 + ★v1.28.0 男方名下住宅≥1级', need: 'Esteem · RaiseChild', target: 'RaiseChild→受孕', level: 4, cfg: ['原有受孕阈值与冷却', '房屋≥1级（非0级仓库）'], anchor: 'branches.rs::B18RaiseChild' }
   ];
 
   var BRANCH_MAP = {};

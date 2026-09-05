@@ -4,7 +4,7 @@ use super::poi::{PoiType, market_unit_price};
 use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot};
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
-    MarriageSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
+    MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -60,6 +60,20 @@ impl World3DEngine {
                     house_id: vh.house_id,
                     beneficiary_ids: vh.beneficiary_ids.clone(),
                 }).collect(),
+                // ★ v1.28.0 榷场交易流水：仅 Market 输出最近 8 条（从新到旧），其余类型空数组
+                market_trades: if p.poi_type == PoiType::Market {
+                    p.market_trades.iter().rev().take(8).map(|t| MarketTradeSnapshot {
+                        tick: t.tick,
+                        agent_id: t.agent_id,
+                        household_id: t.household_id,
+                        resource: t.resource.clone(),
+                        amount: t.amount,
+                        unit_price: t.unit_price,
+                        gold_cost: t.gold_cost,
+                    }).collect()
+                } else {
+                    Vec::new()
+                },
             });
         }
 

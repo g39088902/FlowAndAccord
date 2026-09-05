@@ -117,6 +117,26 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 ### 4. 平滑返航与卸货
 当行囊装满、家财耗尽（`< 0.05` 金）或体力见底时，决策器平滑切换为 `PrimitiveActionState::ReturningToCamp` 返家。回家休整时，购入的水粮按正常物理卸货速率卸入家户账本（Deposit 流水），拯救阖家老小。
 
+### 5. 交易流水环形缓冲（★ v1.28.0）
+
+榷场自带**交易流水环形缓冲** `PrimitivePoi.market_trades: VecDeque<MarketTradeRecord>`，四个成交写入点（濒危自救的水/粮、连续装袋的水/粮）各追加一条：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `tick` | 成交时的世界 tick |
+| `agent_id` | 采购人（赴市的家户户主） |
+| `household_id` | 采购人家户 ID |
+| `resource` | `"Water"` / `"Food"` |
+| `amount` | 成交数量 |
+| `unit_price` | 成交时单价（金/单位） |
+| `gold_cost` | 本次支出黄金总额 |
+
+- **容量复用** `config.ledger_journal_capacity`（64，**未新增超参**），超容量淘汰最旧（`PrimitivePoi::push_market_trade`）；
+- **只留痕、不记账**：黄金流出仍走家户账本 `TransferReason::Market` 流水，买入的水/粮仍走行囊 → 回家 `Deposit` 链路，杜绝账面与库存二次入账；
+- **随档持久化**：`world_save.rs` 全量克隆 `pois`，字段带 `#[serde(default)]`，旧档零破坏；
+- **确定性**：`VecDeque` 保序、不消耗 `WorldRng`、不新增决策相位；
+- **旧缺陷**：此前前端扫描全部家户流水并过滤 `reason === 'MarketTrade'`，而内核序列化为 `"Market"`，且家户账本只记黄金、水粮无记录——面板恒显示"暂无交易记录"。现改为直接读 POI 自带流水。
+
 ---
 
 ## 五、快照三处同步与前端呈现
@@ -129,6 +149,7 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | `secondary_regen_rate`| `f32` | 外部市场粮食每秒再生速度 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `water_price` | `f32` | 外部市场清水当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `food_price` | `f32` | 外部市场粮食当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `market_trades` | `Vec<MarketTradeSnapshot>` | ★ v1.28.0 榷场最近 8 笔交易流水（从新到旧） | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 
 ### 2. 前端可视化渲染
 - **Canvas 视口** (`render_world.js`)：

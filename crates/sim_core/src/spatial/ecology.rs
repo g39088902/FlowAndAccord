@@ -2,7 +2,7 @@ use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
-use super::poi::{PrimitivePoi, PoiType, market_unit_price};
+use super::poi::{MarketTradeRecord, PrimitivePoi, PoiType, market_unit_price};
 use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::world::World3DEngine;
 
@@ -423,6 +423,8 @@ impl World3DEngine {
                         let rate = rate_res * dt;
                         let p_water = market_unit_price(poi.current_stock, poi.max_stock, &self.config);
                         let p_food = market_unit_price(poi.secondary_stock, poi.secondary_max_stock, &self.config);
+                        // ★ v1.28.0 榷场流水环形缓冲容量（复用账本流水容量，未新增超参）
+                        let market_trade_capacity = self.config.ledger_journal_capacity;
 
                         let mut hh_gold = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
                         let mut total_gold_paid = 0.0;
@@ -438,6 +440,16 @@ impl World3DEngine {
                                 agent.thirst = (agent.thirst + buy_amount).min(self.config.agent_thirst_capacity);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（自救饮水）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Water".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_water,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
                         if agent.hunger < 10.0 && poi.secondary_stock > 0.01 && hh_gold >= 0.01 {
@@ -450,6 +462,16 @@ impl World3DEngine {
                                 agent.hunger = (agent.hunger + buy_amount).min(self.config.agent_hunger_capacity);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（自救进食）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Food".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_food,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
 
@@ -465,6 +487,16 @@ impl World3DEngine {
                                 agent.carried_water = (agent.carried_water + buy_amount).min(carry_cap);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（清水装袋）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Water".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_water,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
                         // 购粮装袋
@@ -478,6 +510,16 @@ impl World3DEngine {
                                 agent.carried_food = (agent.carried_food + buy_amount).min(carry_cap);
                                 hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
+                                // ★ v1.28.0 流水留痕（粮食装袋）
+                                poi.push_market_trade(MarketTradeRecord {
+                                    tick,
+                                    agent_id: agent.id,
+                                    household_id: Some(hh_hid),
+                                    resource: "Food".to_string(),
+                                    amount: buy_amount,
+                                    unit_price: p_food,
+                                    gold_cost,
+                                }, market_trade_capacity);
                             }
                         }
 

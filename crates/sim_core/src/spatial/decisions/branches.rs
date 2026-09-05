@@ -297,6 +297,8 @@ impl BranchId {
                 if a.is_alive && !a.is_fetus && a.gender == Gender::Male
                     && a.age >= cfg.agent_adult_age
                     && a.spouse_id.map(|sid| d.ctx.conception_ready_females.contains(&sid)).unwrap_or(false)
+                    // ★ v1.28.0 住宅门槛：男方（户主）名下须有 ≥1 级私宅，0 级仓库不再生育
+                    && d.houses.iter().any(|h| h.owner_id == Some(a.id) && h.tier != HouseTier::Tier0Warehouse)
                 {
                     return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::RaiseChild, target_state: PrimitiveActionState::RaiseChild });
                 }

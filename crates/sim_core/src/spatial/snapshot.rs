@@ -116,6 +116,25 @@ pub struct VacantHouseSnapshot {
     pub beneficiary_ids: Vec<AgentId>,
 }
 
+/// ★ v1.28.0 榷场单笔成交流水快照（供前端「🔄 交易流水」面板展示，与内核 `MarketTradeRecord` 一一对应）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketTradeSnapshot {
+    /// 成交时的世界 tick
+    pub tick: u64,
+    /// 采购人 AgentId
+    pub agent_id: AgentId,
+    /// 采购人家户 ID（无家户时为 null）
+    pub household_id: Option<u64>,
+    /// 资源品类: "Water" / "Food"
+    pub resource: String,
+    /// 成交数量
+    pub amount: f32,
+    /// 成交单价（金/单位）
+    pub unit_price: f32,
+    /// 本次支出黄金总额
+    pub gold_cost: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoiSnapshot {
     pub id: PoiId,
@@ -142,6 +161,9 @@ pub struct PoiSnapshot {
     pub bound_houses: u32,
     /// ★ v1.10.0 空置房屋列表（仅营地有意义）
     pub vacant_houses: Vec<VacantHouseSnapshot>,
+    /// ★ v1.28.0 榷场交易流水（仅 Market 有内容，从新到旧最多 8 条）
+    #[serde(default)]
+    pub market_trades: Vec<MarketTradeSnapshot>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

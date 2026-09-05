@@ -395,6 +395,16 @@
           vacantHouses: (p.vacant_houses || []).map(vh => ({
             houseId: vh.house_id,
             beneficiaryIds: vh.beneficiary_ids || []
+          })),
+          // ★ v1.28.0 榷场交易流水（从新到旧，仅 Market 有内容）
+          marketTrades: (p.market_trades || []).map(t => ({
+            tick: t.tick,
+            agentId: t.agent_id,
+            householdId: (t.household_id === null || t.household_id === undefined) ? null : t.household_id,
+            resource: t.resource || 'Water',
+            amount: t.amount || 0,
+            unitPrice: t.unit_price || 0,
+            goldCost: t.gold_cost || 0
           }))
         }));
 

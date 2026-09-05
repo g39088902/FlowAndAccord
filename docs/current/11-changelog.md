@@ -1,10 +1,11 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.27.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.28.0**。
 
 | 版本 | 核心变更 | 影响模块 |
 | :--- | :--- | :--- |
+| **v1.28.0** | ① 养育后代重新挂钩住宅等级：`B18RaiseChild` 分支内新增「男方（户主）名下须有 ≥1 级私宅」守卫（0 级仓库/无房不生育），同步决策卡片与房屋 Inspector 文案；② 榷场交易流水修复：`PrimitivePoi` 新增交易流水环形缓冲（容量复用 `ledgerJournalCapacity=64`），在自救与装袋四笔成交处逐笔留痕（时间/采购人/家户/品类/数量/单价/黄金支出），随存档持久化，快照三处同步并修复前端面板「过滤 `MarketTrade` 而内核序列化为 `Market`」导致恒为空的问题 | decisions / poi / ecology / snapshot / frontend / docs |
 | **v1.27.0** | 浏览器端决策顺序持久化、启动存档文件门禁、拍卖流拍统计与高倍速房源切换稳定性、采集断流直达榷场、最富家户定位、国王每100秒内帑划转 | frontend / sim-core / wasm / ledger / docs |
 | **v1.26.9** | POI 私有施密特触发器开启阈值 `decisionPoiSeekMinStockRatio` 由 0.30 提升至 0.50（库存 ≥ 50% 才触发去采集，关闭阈值 0.10 不变），同步 Rust 默认值与前端动态配置 | config / decisions / docs |
 | **v1.26.8** | 全部 POI（清泉/浆果/林木/石矿/金矿及榷场互市水粮双库存）储量上限翻倍：stock_max_* / market_stock_max_* 由 100 提升至 200，同步 Rust 默认值与前端动态配置 | config / ecology / frontend / docs |

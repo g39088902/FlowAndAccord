@@ -164,9 +164,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
     const fertilityBadge = document.getElementById('insp-house-fertility-badge');
     if (fertilityBadge) {
-      // ★ M6 生育去房屋化：房屋/仓储不再作为生育前提
-      fertilityBadge.textContent = '🍼 生育已去房屋化：已婚夫妻身体指标达标即可受孕（无需房屋或储仓）';
-      fertilityBadge.style.color = '#10b981';
+      // ★ v1.28.0 生育重新挂钩住宅等级：男方（户主）名下须有 ≥1 级私宅，0 级仓库不可生育
+      if (isWarehouse) {
+        fertilityBadge.textContent = '🍼 0级仓库不可生育：户主需先升级到 1 级茅草房';
+        fertilityBadge.style.color = '#f59e0b';
+      } else {
+        fertilityBadge.textContent = '🍼 可生育：户主名下住宅 ≥1 级，夫妻身体指标达标即可受孕';
+        fertilityBadge.style.color = '#10b981';
+      }
     }
 
     // 户主追踪按钮绑定（v1.10.0 无主空置房显示"无主"，删除代际显示）
@@ -460,10 +465,20 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
       if (marketTrades) {
         if (poi.type === 'Market') {
-          const rows = (sim.households || []).flatMap(h => (h.recentJournal || []).filter(r => r.reason === 'MarketTrade').map(r => ({ h, r })));
           marketTrades.style.display = '';
           const list = document.getElementById('insp-market-trades-list');
-          if (list) list.innerHTML = rows.length ? rows.slice(0, 8).map(({h, r}) => `<div style="font-size:10px;color:#fbbf24;">t${r.tick} · 家户#${h.id} · ${r.resource || '水粮'} ${Number(r.amount || 0).toFixed(1)} · ${r.from || '榷场'} → ${r.to || '家户'}</div>`).join('') : '<span style="color:#64748b;">暂无交易记录</span>';
+          if (list) {
+            // ★ v1.28.0 数据源改为榷场自带环形流水（不再扫描家户账本；家户账本只记黄金流出且会被冲掉）
+            const rows = (poi.marketTrades || []).slice(0, 8);
+            const html = rows.length ? rows.map(t => {
+              const icon = t.resource === 'Food' ? '🍒' : '💧';
+              const name = t.resource === 'Food' ? '粮食' : '清水';
+              const hh = (t.householdId === null || t.householdId === undefined) ? '无家户' : ('家户#' + t.householdId);
+              return `<div style="font-size:10px;color:#fbbf24;">t${t.tick} · 族人#${t.agentId} · ${hh} · ${icon}${name} ${Number(t.amount || 0).toFixed(1)} · 单价 ${Number(t.unitPrice || 0).toFixed(2)}金 · 支出 ${Number(t.goldCost || 0).toFixed(2)}金</div>`;
+            }).join('') : '<span style="color:#64748b;">暂无交易记录</span>';
+            // ★ 高频重建容器：内容快照缓存，避免每帧 innerHTML 重建打断交互（根 AGENTS.md §4.15）
+            if (list.innerHTML !== html) list.innerHTML = html;
+          }
         } else marketTrades.style.display = 'none';
       }
     }
@@ -534,7 +549,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (homeBadgeEl) homeBadgeEl.textContent = homeTag;
     
     let stateText = selAgent.homeHouseId ? '🏡 私宅安居' : '🏕️ 营地驻留';
-    let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖，满足饱暖与木材>=10可激活孕育。' : '在露天营地休息，无私宅不可受孕。';
+    let detailText = selAgent.homeHouseId ? '在专属家宅中安居，夫妻与子女共享水粮木石储备，冬季房屋自动供暖；★ v1.28.0 户主（男性）名下住宅需 ≥1 级（非0级仓库）且夫妻身体指标达标才可孕育。' : '在露天营地休息，无私宅不可受孕。';
 
     if (selAgent.isFetus) {
       // ★ M1.7 腹中胎儿：已获 agent 身份，但不占地图实体、不行动、不消耗

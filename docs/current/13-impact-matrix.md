@@ -70,7 +70,7 @@
 |---|---|---|
 | `agent.rs` 代谢规则 (饱食/水分/体力衰减) | `world.rs` tick 代谢段 / `decisions/branches.rs` 需求阈值 / `ecology.rs` 在家吃喝 / `config.rs` 代谢超参 / `render.js` 状态条 / `birth.rs` 如涉及孕期 | 代谢是 agent 生存的基础，决定所有需求触发 |
 | `agent.rs` 新增属性字段 | `snapshot.rs` AgentSnapshot / `world.rs` generate_snapshot / `rustworld.js` / `render.js` Inspector / `birth.rs` 遗传如涉及 / `decisions/` 如决策读取 | §4.5 快照三处同步 |
-| `birth.rs` 生育/遗传规则 | `agent.rs` 受孕/妊娠 / `world.rs` tick_fetus_reconcile / `ledger/family.rs` 新生儿入家户 / `ledger/clan.rs` 新生儿入族 / `bookkeeping.rs` 分家权重 / `snapshot.rs` / `render.js` 母亲卡片 | §4.8 生育去房屋化：受孕只依赖身体指标，胎儿即建 agent 身份 |
+| `birth.rs` 生育/遗传规则 | `agent.rs` 受孕/妊娠 / `world.rs` tick_fetus_reconcile / `ledger/family.rs` 新生儿入家户 / `ledger/clan.rs` 新生儿入族 / `bookkeeping.rs` 分家权重 / `snapshot.rs` / `render.js` 母亲卡片 | §4.8 受孕门槛：女方身体指标达标 + 男方（户主）名下住宅 ≥1 级（B18 判定），胎儿即建 agent 身份 |
 | 死亡规则变更 | `agent.rs` 死亡判定 / `world.rs` 死亡计数 / `bookkeeping.rs` 继承清算 / `housing_system/inheritance.rs` 房产继承 / `ledger/family.rs` 家户解散 / `ledger/clan.rs` 族长顺位 / `ledger/region.rs` 王位继承 / `render.js` 死亡动画 | 死亡触发全系统继承链：账本→房产→宗族→王位 |
 
 ### 1.8 配置系统
