@@ -6,7 +6,7 @@ use super::world::World3DEngine;
 ///
 /// 前端 `rustworld.js::applyConfig` 将 `window.SIM_CONFIG` 序列化为 JSON
 /// 后经 WASM 桥接调用 `apply_config_json`，反序列化为 `SimConfig` 并
-/// 同步刷新所有现有 POI 的产速基准。
+/// 同步刷新所有现有 POI 的产速基准与储量上限。
 impl World3DEngine {
     /// 从 JSON 字符串解析并应用动态仿真配置
     pub fn apply_config_json(&mut self, json_str: &str) -> Result<(), String> {
@@ -18,17 +18,43 @@ impl World3DEngine {
     /// 应用动态仿真配置
     pub fn apply_config(&mut self, config: SimConfig) {
         self.config = config;
-        // 同步刷新所有现有 POI 的产速基准
+        // 同步刷新所有现有 POI 的产速基准与储量上限（v1.33.1 修复 max_stock 动态更新遗漏）
         for poi in &mut self.pois {
-            let base_regen = match poi.poi_type {
-                PoiType::WaterSource => self.config.regen_base_water,
-                PoiType::BerryBush => self.config.regen_base_berry,
-                PoiType::WoodForest => self.config.regen_base_wood,
-                PoiType::StoneQuarry => self.config.regen_base_stone,
-                PoiType::GoldMine => self.config.regen_base_gold,
-                _ => poi.regen_rate,
-            };
-            poi.regen_rate = base_regen;
+            match poi.poi_type {
+                PoiType::WaterSource => {
+                    poi.regen_rate = self.config.regen_base_water;
+                    poi.max_stock = self.config.stock_max_water;
+                }
+                PoiType::BerryBush => {
+                    poi.regen_rate = self.config.regen_base_berry;
+                    poi.max_stock = self.config.stock_max_berry;
+                }
+                PoiType::WoodForest => {
+                    poi.regen_rate = self.config.regen_base_wood;
+                    poi.max_stock = self.config.stock_max_wood;
+                }
+                PoiType::StoneQuarry => {
+                    poi.regen_rate = self.config.regen_base_stone;
+                    poi.max_stock = self.config.stock_max_stone;
+                }
+                PoiType::GoldMine => {
+                    poi.regen_rate = self.config.regen_base_gold;
+                    poi.max_stock = self.config.stock_max_gold;
+                }
+                PoiType::Market => {
+                    poi.regen_rate = self.config.market_regen_base_water;
+                    poi.max_stock = self.config.market_stock_max_water;
+                    poi.secondary_regen_rate = self.config.market_regen_base_food;
+                    poi.secondary_max_stock = self.config.market_stock_max_food;
+                }
+                _ => {}
+            }
+            if poi.max_stock.is_finite() && poi.current_stock > poi.max_stock {
+                poi.current_stock = poi.max_stock;
+            }
+            if poi.secondary_max_stock.is_finite() && poi.secondary_stock > poi.secondary_max_stock {
+                poi.secondary_stock = poi.secondary_max_stock;
+            }
         }
     }
 

@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.33.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.33.1**。
+
+| **v1.33.1** | 修复配置热更新下 POI 储量上限失效 Bug：① **内核热更新同步刷新储量上限**：`World3DEngine::apply_config` 补充各类 POI 的 `max_stock`（水/浆果/林木/石矿/金矿）以及榷场的 `secondary_max_stock` 与 `secondary_regen_rate` 动态同步，并对超额储量自动钳制，使前端 `SIM_CONFIG`（如 `stockMaxWater`）热注入与重开生态均能即时生效；② **基准配置同步**：`config.rs` 中 `STOCK_MAX_WATER` 与 `STOCK_MAX_BERRY` 默认值同步对齐为 `400.0`，全量门禁检查全绿 | sim_core / world_config / config / docs |
 
 | **v1.33.0** | 落地 TODO.md 四大核心需求：① **时光倒流控制器**：强确定性回滚 Tick（Checkpoint + Replay），支持输入任意指定目标 Tick 毫秒级回溯历史世界，配滑块与快捷选项卡并自动暂停；② **榷场固定以 2 个单位作为结算步长**：引入 `market_settlement_step: 2.0` 配置，弃用原本每 tick 微量浮点扣除（`rate_res * dt`），自救自饮/自食与装袋购水/购粮均以 2.0 离散步长结算，单笔流水额度整洁统一；③ **开新档自动更新存档 & 30秒自动保存**：自动保存周期由 60 秒调整为 30 秒，重演生态开启新世界时立即触发槽位 1 自动写盘；④ **UI 增加明亮主题**：增加高对比度、柔和通透的浅色主题（`body.theme-light`），顶栏提供一键切换并本地持久化偏好 | sim_core / ecology / config / frontend / docs |
 

@@ -5,6 +5,8 @@
     // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
     sim.isPaused = true;
     window.rustWorldSim = sim; // 供 decision-viz.js 热注入决策顺序配置（共用同一引擎实例）
+    window.sim = sim;          // 暴露全局变量方便控制台交互与调参
+    window.applyConfig = (cfg) => sim.applyConfig(cfg);
 
     let camera = {
       rotX: 1.05,

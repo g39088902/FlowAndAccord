@@ -81,7 +81,8 @@ const server = http.createServer((req, res) => {
     handleSaveDecisionOrder(req, res);
     return;
   }
-  let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  const pathname = req.url.split('?')[0];
+  let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
   const extname = String(path.extname(filePath)).toLowerCase();
   const contentType = MIME_TYPES[extname] || 'application/octet-stream';
 
@@ -95,7 +96,10 @@ const server = http.createServer((req, res) => {
         res.end(`Server Error: ${error.code}`);
       }
     } else {
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      });
       res.end(content, 'utf-8');
     }
   });

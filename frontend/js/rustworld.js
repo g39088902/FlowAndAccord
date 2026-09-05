@@ -63,7 +63,7 @@
 
       async _loadWasm() {
         try {
-          const resp = await fetch('rust/sim_wasm.wasm');
+          const resp = await fetch('rust/sim_wasm.wasm?v=' + Date.now(), { cache: 'no-store' });
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           const bytes = await resp.arrayBuffer();
           const result = await WebAssembly.instantiate(bytes, {});
@@ -118,6 +118,7 @@
             const res = this._wasm.world_apply_config_buf(encoded.length);
             if (res === 0) {
               console.info('[RustWorld] 已成功同步并应用 JS 动态配置至 WASM 内核');
+              this._pullSnapshot(false);
               return true;
             } else {
               console.warn('[RustWorld] 应用 JS 动态配置失败，状态码:', res);

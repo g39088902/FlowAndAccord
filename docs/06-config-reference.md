@@ -68,8 +68,8 @@
 | `countWoods` | usize | 3 | ecology.rs (POI 数量 §4.7) | 林木数量 |
 | `countStoneMines` | usize | 2 | ecology.rs (POI 数量 §4.7) | 石矿数量 |
 | `countGoldMines` | usize | 1 | ecology.rs (POI 数量 §4.7) | 金矿数量 |
-| `stockMaxWater` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
-| `stockMaxBerry` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
+| `stockMaxWater` | f32 | 400 | poi.rs / ecology.rs (POI 储量上限) | 清泉储量上限 |
+| `stockMaxBerry` | f32 | 400 | poi.rs / ecology.rs (POI 储量上限) | 浆果储量上限 |
 | `stockMaxWood` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
 | `stockMaxStone` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
 | `stockMaxGold` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |

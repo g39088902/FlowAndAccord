@@ -90,8 +90,8 @@ window.SIM_CONFIG = {
   countWoods: 3,                  // 林木数量
   countStoneMines: 2,             // 石矿数量
   countGoldMines: 1,              // 金矿数量
-  stockMaxWater: 200.0,           // 清泉储量上限
-  stockMaxBerry: 200.0,           // 浆果储量上限
+  stockMaxWater: 400.0,           // 清泉储量上限
+  stockMaxBerry: 400.0,           // 浆果储量上限
   stockMaxWood: 200.0,            // 林木储量上限
   stockMaxStone: 200.0,           // 石矿储量上限
   stockMaxGold: 200.0,            // 金矿储量上限
