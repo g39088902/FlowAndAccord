@@ -1,5 +1,5 @@
 /**
- * auction-ui.js · 房屋拍卖交易所与实时竞价大盘 (v1.15.0)
+ * auction-ui.js · 房屋连续报价中心与实时竞价大盘 (v1.15.0)
  *
  * 职责：
  * 1. 控制 #house-auction-modal 视窗的开启、关闭与标签页切换；
@@ -15,7 +15,7 @@
 
   const TICK_PER_SEC = 30; // 30 ticks = 1 模拟秒
 
-  // ★ v1.22.3 内容快照缓存：拍卖大盘每帧高频刷新，仅当生成 HTML 与上次不一致时才重建 DOM，
+  // ★ v1.22.3 内容快照缓存：报价中心每帧高频刷新，仅当生成 HTML 与上次不一致时才重建 DOM，
   //   避免每帧销毁重建卡片导致 mousedown 与 mouseup 之间节点被替换、click 无法命中（点房屋无法切换/历史跳转失效）。
   const _htmlCache = new Map();
   function renderHtml(el, html) {
@@ -122,11 +122,11 @@
     if (statHighest) statHighest.textContent = '--';
     // 买家池与竞价流水清空
     const buyersListEl = document.getElementById('auction-buyers-list');
-    if (buyersListEl) renderHtml(buyersListEl, `<div class="auction-empty-hint">暂无在售房产，无潜在买家</div>`);
+    if (buyersListEl) renderHtml(buyersListEl, `<div class="auction-empty-hint">当前没有符合条件的报价者</div>`);
     const buyersCountEl = document.getElementById('auction-buyers-count');
     if (buyersCountEl) buyersCountEl.textContent = '0';
     const feedEl = document.getElementById('auction-bids-feed');
-    if (feedEl) renderHtml(feedEl, `<div class="auction-empty-hint">暂无在售房产，无竞价流水</div>`);
+    if (feedEl) renderHtml(feedEl, `<div class="auction-empty-hint">当前还没有产生报价</div>`);
     const bidsCountEl = document.getElementById('auction-bids-count');
     if (bidsCountEl) bidsCountEl.textContent = '0';
   }
@@ -136,7 +136,7 @@
     if (!houses.length) {
       if (!stripEl.dataset.empty) {
         stripEl.dataset.empty = '1';
-        stripEl.innerHTML = '<span style="font-size:11px; color:#64748b; padding:4px 8px;">全图聚落目前安居乐业，暂无遗留挂牌房产</span>';
+        stripEl.innerHTML = '<span style="font-size:11px; color:#64748b; padding:4px 8px;">当前没有持续报价中的房屋</span>';
       }
       return;
     }

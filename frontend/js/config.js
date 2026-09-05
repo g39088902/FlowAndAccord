@@ -240,7 +240,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
   // ==========================================================================
-  houseAuctionBidCooldownTicks: 300,  // 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价)
+  houseAuctionBidCooldownTicks: 90,  // 买家全局出价冷却 (tick，默认 90 = 3 模拟秒，出价后对任何房屋都不再出价)
   houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交)
   houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
   houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)

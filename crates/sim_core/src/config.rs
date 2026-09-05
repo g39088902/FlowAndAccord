@@ -343,7 +343,7 @@ pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
 // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
 // ============================================================================
 /// ★ v1.26.0 买家全局出价冷却（tick，默认 300 = 10 模拟秒）：出价后对任何在售房屋都不再出价
-pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 300;
+pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 90;
 /// 最晚出售修缮度时限（耐久度跌至此值时只要有新报价即成交，默认 10.0%）
 pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
 /// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）

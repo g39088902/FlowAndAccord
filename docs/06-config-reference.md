@@ -193,7 +193,7 @@
 | `marketEmergencyFamilyStockThreshold` | f32 | 10 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 家户物资绝境警戒线 |
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
-| `houseAuctionBidCooldownTicks` | u64 | 300 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 300 = 10 模拟秒，出价后对任何房屋都不再出价) |
+| `houseAuctionBidCooldownTicks` | u64 | 90 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 90 = 3 模拟秒，出价后对任何房屋都不再出价) |
 | `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
 | `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |
 | `houseAuctionMinBidGold` | f32 | 0.01 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次出价最低家户黄金门槛 (低于此值不出价) |

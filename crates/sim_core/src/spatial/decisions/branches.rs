@@ -366,15 +366,14 @@ pub fn best_bid_candidate(d: &Decisioner, a: &Agent3D) -> Option<(u32, f32)> {
         if h.owner_id.is_some() || h.auction_state.is_none() {
             continue; // 仅无主且在售的空置房
         }
-        if a.home_house_id.is_some() && h.tier <= own_tier {
-            continue; // 改善型换房：有房者只买更高等级
-        }
+        // 连续随机报价：有房者也可以对任意在售房屋表达意向，
+        // 不再把“改善型换房”当作资格门槛；是否接受由报价时点规则决定。
         let mut price = house_upgrade_cost_price(own_tier, h.tier, cfg);
         if a.home_house_id.is_none() {
             // ★ v1.29.0 放宽：无房者竞拍 0 级仓库时折算价为 0，抬到起拍底价，保证「无房即可参与」
             price = price.max(cfg.house_auction_min_bid_gold);
         }
-        if price < cfg.house_auction_min_bid_gold || gold < price {
+        if price < cfg.house_auction_min_bid_gold || gold < cfg.house_auction_min_bid_gold {
             continue;
         }
         let tier = h.tier as u8;
@@ -386,7 +385,9 @@ pub fn best_bid_candidate(d: &Decisioner, a: &Agent3D) -> Option<(u32, f32)> {
             best = Some((h.id, price, tier));
         }
     }
-    best.map(|(id, price, _)| (id, price))
+    // 连续报价允许“尽力报价”：报价能力不足以覆盖折算价时仍产生一笔
+    // 不可撤回的随机报价，由当前时点的接受规则决定是否受理。
+    best.map(|(id, price, _)| (id, price.min(gold).max(cfg.house_auction_min_bid_gold)))
 }
 
 /// ★ v1.29.0 夫妻是否同在自家宅门口（判据与 `world_tick.rs::execute_pending_childcare`

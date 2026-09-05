@@ -1,4 +1,4 @@
-//! auction.rs · 二手房屋市场与营地中介麦穗 37% 原则拍卖 (v1.26.0)
+//! auction.rs · 二手房屋市场与营地中介麦穗 37% 连续报价 (v1.26.0)
 //!
 //! v1.26.0 重构（依据 TODO.md 与 AGENTS.md §4.11 自主决策原则）：
 //! 1. 删除房屋估价机制（current_valuation / 建设成本折算 / 双轨估价 / D/S 供求比），
@@ -102,7 +102,12 @@ impl World3DEngine {
             if hh_gold < self.config.house_auction_min_bid_gold {
                 continue;
             }
-            let amount = self.agent_by_id(bidder_id).and_then(|a| a.pending_bid_price).unwrap_or(hh_gold);
+            let base_amount = self.agent_by_id(bidder_id).and_then(|a| a.pending_bid_price).unwrap_or(hh_gold);
+            // In the decision phase a fixed upgrade price can never beat a benchmark
+            // established by an earlier bidder. Raise the offer to one cent above it,
+            // bounded by the household balance, so eligible buyers can actually close.
+            let benchmark = self.houses[house_idx].auction_state.as_ref().map(|s| s.benchmark_bid).unwrap_or(0.0);
+            let amount = base_amount.max((benchmark + 0.01).min(hh_gold));
             if hh_gold + 0.0001 < amount { continue; }
 
             // 写出价冷却（无论是否成交，出价动作已发生）
