@@ -9,9 +9,14 @@ use super::branches::BranchId;
 use crate::config::*;
 
 /// 马斯洛需求层次 (低 → 高，低层绝对优先)
+///
+/// ★ v1.29.0 新增 ⓪ 瞬间行为：优先级高于生理需求——条件满足即刻执行（只写决心 / pending），
+/// 不移动、不消耗任何资源，因此命中后**不占用本回合**，同一 tick 内继续向后遍历其余分支。
+/// 声明序首位 ⇒ `Ord` 最小 ⇒ 优先级最高（本枚举沿用「越小越优先」约定）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MaslowLevel {
-    Physiological,      // ① 生理需求 (最高优先级·生存底线)
+    Instantaneous,      // ⓪ 瞬间行为 (最高优先级·不移动不消耗，命中后续评估下一分支)
+    Physiological,      // ① 生理需求 (生存底线)
     Safety,             // ② 安全需求 (仓库水粮木储备填满 / 房屋修缮)
     Belonging,          // ③ 归属与爱 (0级仓库升级成婚 / 家庭纽带)
     Esteem,             // ④ 尊重需求 (建材储备 / 盖房淘金[45s] / 房屋施工升级)
@@ -19,9 +24,13 @@ pub enum MaslowLevel {
 }
 
 impl MaslowLevel {
-    /// 数字层级 (1-5) → 枚举；0 及非法值返回 None（0 语义 = 保留代码动态默认）
+    /// 数值编码 → 枚举：
+    /// - `0` → ⓪ 瞬间行为
+    /// - `1..5` → ① 生理 … ⑤ 自我实现
+    /// - `6` 及非法值 → None（语义 = 保留代码动态默认，见 `decision_eval_levels` 注入约定）
     pub fn from_u8(v: u8) -> Option<MaslowLevel> {
         Some(match v {
+            0 => MaslowLevel::Instantaneous,
             1 => MaslowLevel::Physiological,
             2 => MaslowLevel::Safety,
             3 => MaslowLevel::Belonging,
@@ -34,6 +43,7 @@ impl MaslowLevel {
     /// 层级 → 前端标签字符串（与 current_need 标签格式一致）
     pub fn as_str(self) -> &'static str {
         match self {
+            MaslowLevel::Instantaneous => "Instantaneous",
             MaslowLevel::Physiological => "Physiological",
             MaslowLevel::Safety => "Safety",
             MaslowLevel::Belonging => "Belonging",
@@ -66,11 +76,28 @@ pub enum NeedKind {
 }
 
 /// 一条需求判定结论
+///
+/// ★ v1.29.0 瞬间行为约定：`level == MaslowLevel::Instantaneous` 的 Need 为**瞬发需求**——
+/// 由 `evaluate.rs::evaluate_instant_needs` 立即执行（只写 pending / 决心，不 dispatch、不改 state、
+/// 不消耗资源与 RNG），执行后继续遍历后续分支。只有 `BranchId::is_instant()` 白名单内的分支
+/// 才可能产出瞬间层结论，其余分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。
 #[derive(Debug, Clone, Copy)]
 pub struct Need {
     pub level: MaslowLevel,
     pub kind: NeedKind,
     pub target_state: PrimitiveActionState,
+}
+
+impl Need {
+    /// 是否瞬发需求（命中后即刻执行并继续遍历后续分支，本回合无消耗）
+    pub fn is_instant(&self) -> bool {
+        self.level == MaslowLevel::Instantaneous
+    }
+
+    /// 瞬间行为标签（写入 `Agent3D::current_need`，如 "Instantaneous·BidHouse"）
+    pub fn instant_label(&self) -> String {
+        format!("{}·{:?}", MaslowLevel::Instantaneous.as_str(), self.kind)
+    }
 }
 
 /// 资源节点池 (供给类型 → 节点表)
@@ -111,6 +138,16 @@ pub struct EligibleFemale {
     pub nearest_node: NodeId,
 }
 
+/// ★ v1.29.0 满足原受孕条件的已婚女性快照（供「养育小孩」分支核验配偶是否在宅门口）。
+/// 决策器只持有只读上下文，故妻子的坐标与静止状态必须在建上下文时一次性采样。
+#[derive(Debug, Clone, Copy)]
+pub struct ReadyWife {
+    pub id: AgentId,
+    pub pos: Vec3,
+    /// true = 未处于任何车道上（静止在家，与 `execute_pending_childcare` 的 at_home 判据一致）
+    pub stationary: bool,
+}
+
 /// 决策上下文：收集资源节点；是否可用由每个 Agent 的私有触发器决定。
 pub struct DecisionContext {
     pub water_nodes: Vec<ResourceNode>,
@@ -126,8 +163,8 @@ pub struct DecisionContext {
     pub poi_positions: Vec<Vec3>,
     /// 全图可求偶的在世成年单身女性列表（求偶分支使用）
     pub eligible_females: Vec<EligibleFemale>,
-    /// 满足原受孕条件的已婚女性 ID（供“养育小孩”分支核验配偶）
-    pub conception_ready_females: Vec<AgentId>,
+    /// 满足原受孕条件的已婚女性快照（供“养育小孩”分支核验配偶资格与在宅状态）
+    pub conception_ready_wives: Vec<ReadyWife>,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）

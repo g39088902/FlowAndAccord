@@ -207,4 +207,4 @@
 | 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
-| `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认） |
+| `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=⓪瞬间行为/1-5=①..⑤马斯洛层级/6=保留代码动态默认；空=全动态默认） |

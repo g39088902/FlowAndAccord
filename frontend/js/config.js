@@ -137,7 +137,7 @@ window.SIM_CONFIG = {
   decisionFamilyStockTriggerOff: 200.0, // M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止
   decisionCourtshipMinFamilyGold: 5.0, // 求偶发起最低家户金币（严格大于此值）
   decisionEvalOrder: [], // 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖）
-  decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=代码动态默认，1-5=强制层级；空=全动态默认）
+  decisionEvalLevels: [], // 分支层级覆盖（与顺序下标并行，0=⓪瞬间行为/1-5=①..⑤马斯洛层级/6=保留代码动态默认；空=全动态默认）
 
   // ==========================================================================
   // 6. 私宅营造、代际传承与升级 (Housing System)

@@ -485,7 +485,10 @@ pub struct SimConfig {
     /// ⚠️ §4.12 三处规约的文档化例外：Rust 层**无策展顺序**，默认空 Vec = 未注入，
     /// 空/非法时按 branches.rs 声明序中性兜底；权威顺序在前端 `config.decision-order.js`。
     pub decision_eval_order: Vec<String>,
-    /// 分支层级覆盖（与 decision_eval_order 下标并行）：0=保留代码动态默认，1-5=强制马斯洛层级。
+    /// 分支层级覆盖（与 decision_eval_order 下标并行）：
+    /// 0=⓪瞬间行为 / 1=①生理 / 2=②安全 / 3=③归属 / 4=④尊重 / 5=⑤自我实现 / 6=保留代码动态默认。
+    /// ★ v1.29.0 编码迁移：原「0=保留代码动态默认」改由 6 承担，0 让位给新层级「瞬间行为」。
+    /// 非瞬发分支被写成 0 时由 branches.rs::level_override_for 钳制回代码默认层级。
     /// 默认空 Vec = 全部动态默认。
     pub decision_eval_levels: Vec<u8>,
 

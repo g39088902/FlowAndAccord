@@ -1,7 +1,7 @@
 /* ==========================================================================
  * Flow & Accord · 马斯洛决策引擎视图层 (decision-viz-view.js)
  * --------------------------------------------------------------------------
- * 单列纵列画布：18 张 Branch 分支卡 → 4 条可拖分界线。
+ * 单列纵列画布：18 张 Branch 分支卡 → 5 条可拖分界线（v1.29.0 起 6 个层级分区）。
  * 本文件只负责「渲染 + 拖拽交互」，不直接改配置：
  *   卡片换序 / 分界线重划 → onCommit(state) → 由 decision-viz.js 落盘并热注入内核。
  * ========================================================================== */
@@ -9,6 +9,7 @@
   'use strict';
 
   var D = global.SIM_DECISION_VIZ_DATA;
+  var DYNAMIC_DEFAULT = 6;   // 层级覆盖哨兵：保留分支自带的代码动态默认（v1.29.0 起 0 已让位给⓪瞬间行为）
   // GAP 加大为分界线让出空间；DIV_H 从 24 → 40，分界线热区显著增大（拖动更容易命中）
   var NODE_W = 560, NODE_H = 80, GAP = 50, DIV_H = 40, COL_X = 30, BASE_Y = 24;
 
@@ -32,8 +33,9 @@
   }
 
   // ── 布局 ────────────────────────────────────────────────────────────────
+  /** 分区层级码（0 起算，与 LV 键 / 内核 MaslowLevel 编码一致：0=⓪瞬间 … 5=⑤自我实现） */
   function zoneOf(p) { // p: 1-based 卡片位置
-    var lv = 1;
+    var lv = 0;
     for (var j = 0; j < st.divGaps.length; j++) { if (st.divGaps[j] < p) lv++; }
     return lv;
   }
@@ -117,11 +119,12 @@
       }
     } else if (n.kind === 'divider') {
       h += '<div class="dv-div">'
-        + '<span class="dv-chip" style="background:' + D.LV[n.k].hex + '">↑ 第' + n.k + '层 · ' + D.LV[n.k].name + '</span>'
+        // 分界线 k（1 起算）上方为第 k-1 层、下方为第 k 层（层级码 0 起算）
+        + '<span class="dv-chip" style="background:' + D.LV[n.k - 1].hex + '">↑ 第' + (n.k - 1) + '层 · ' + D.LV[n.k - 1].name + '</span>'
         + '<span class="dv-line"></span>'
         + '<span class="dv-grab">⋮⋮ 拖动分界</span>'
         + '<span class="dv-line"></span>'
-        + '<span class="dv-chip" style="background:' + D.LV[n.k + 1].hex + '">第' + (n.k + 1) + '层 · ' + D.LV[n.k + 1].name + ' ↓</span>'
+        + '<span class="dv-chip" style="background:' + D.LV[n.k].hex + '">第' + n.k + '层 · ' + D.LV[n.k].name + ' ↓</span>'
         + '</div>';
     }
     return h;
@@ -187,12 +190,13 @@
       var centers = gapCenters(), best = 0, bd = 1e9;
       for (var gi = 1; gi < centers.length - 1; gi++) { var dd = Math.abs(py - centers[gi]); if (dd < bd) { bd = dd; best = gi; } }
       var minG = (drag.di === 0 ? 1 : st.divGaps[drag.di - 1] + 1);
-      var maxG = (drag.di === 3 ? st.order.length - 1 : st.divGaps[drag.di + 1] - 1);
+      // 末条分界线上界为「倒数第二张卡之后」，保证最底层至少 1 张卡（v1.29.0 起 5 条分界）
+      var maxG = (drag.di === st.divGaps.length - 1 ? st.order.length - 1 : st.divGaps[drag.di + 1] - 1);
       var g = Math.max(minG, Math.min(maxG, best));
       if (g !== st.divGaps[drag.di]) {
         st.divGaps[drag.di] = g;
         syncBranchOrder(); layoutNodes(nodes); applyNodePositions(); refreshLevels();
-        status('⤦ 分界线移至第 ' + g + ' 张卡之后：第' + (drag.di + 1) + '层 | 第' + (drag.di + 2) + '层');
+        status('⤦ 分界线移至第 ' + g + ' 张卡之后：第' + drag.di + '层 | 第' + (drag.di + 1) + '层');
       }
     } else {
       var desiredY = drag.startY + (ev.clientY - drag.sy) / scale;
@@ -267,8 +271,11 @@
       var b = D.BRANCH_MAP[n.bId] || {};
       var i = st.order.indexOf(n.bId);
       var lv = i >= 0 ? levelAt(i) : b.level;
+      // ⚠️ v1.29.0 起 0 是合法层级（⓪ 瞬间行为），判定「是否被强制覆盖」必须用哨兵 6 比较，不可用真值短路
+      var overridden = i >= 0 && st.levels[i] !== undefined && st.levels[i] !== DYNAMIC_DEFAULT;
+      var instantNote = b.instant ? ' · ⚡ 具备瞬发变体（近距/在宅时归入⓪瞬间行为）' : '';
       html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[lv].hex + '">第' + lv + '层</span>'
-        + '<div class="dv-insp-title"><b>' + n.bId + ' · ' + (b.zh || '') + '</b><span>' + D.LV[lv].name + (st.levels[i] ? ' · 层级被强制覆盖' : ' · 0(代码动态默认)') + '</span></div></div>'
+        + '<div class="dv-insp-title"><b>' + n.bId + ' · ' + (b.zh || '') + '</b><span>' + D.LV[lv].name + (overridden ? ' · 层级被强制覆盖' : ' · 6(代码动态默认)') + instantNote + '</span></div></div>'
         + '<div class="dv-insp-body">'
         + '<div class="dv-row"><span class="dv-k">触发条件</span><span class="dv-v">' + b.cond + '</span></div>'
         + '<div class="dv-row"><span class="dv-k">需求结论</span><span class="dv-v"><b style="color:' + D.LV[lv].hex + '">' + b.need + '</b></span></div>'
@@ -279,9 +286,9 @@
         + '<div class="dv-sub">命中后经 <code>fulfill_resting_need</code> 落地：寻路 dispatch → Seeking* 状态；途中目标被触发器关闭 → 原地掉头重路由。</div></div>';
     } else if (n.kind === 'divider') {
       html = '<div class="dv-insp-head"><span class="dv-chip" style="background:' + D.LV[n.k].hex + '">分界线 ' + n.k + '</span>'
-        + '<div class="dv-insp-title"><b>层级划分</b><span>' + D.LV[n.k].name + ' ｜ ' + D.LV[n.k + 1].name + '</span></div></div>'
+        + '<div class="dv-insp-title"><b>层级划分</b><span>' + D.LV[n.k - 1].name + ' ｜ ' + D.LV[n.k].name + '</span></div></div>'
         + '<div class="dv-insp-body">'
-        + '<div class="dv-row"><span class="dv-k">划分</span><span class="dv-v">第' + n.k + '层（上方）｜第' + (n.k + 1) + '层（下方）</span></div>'
+        + '<div class="dv-row"><span class="dv-k">划分</span><span class="dv-v">第' + (n.k - 1) + '层（上方）｜第' + n.k + '层（下方）</span></div>'
         + '<div class="dv-row"><span class="dv-k">当前位于</span><span class="dv-v">第 ' + n.g + ' 张 Branch 分支卡之后</span></div>'
         + '<div class="dv-sub">拖动此分界线到任意两张 Branch 分支卡之间可重新划分层级归属；每层至少保留 1 张卡。松手后层级覆盖随顺序一并落盘 <code>config.decision-order.js</code> 并热注入内核。</div></div>';
     }

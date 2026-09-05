@@ -29,7 +29,7 @@ function renderDecisionOrderFile(order, levels) {
 // 本文件由 server.js 的 POST /save-decision-order 端点原子重写（决策引擎视图拖动落盘），
 // 是 evaluate_needs 18 条判定分支评估顺序的「唯一真相源」（Rust 内核无策展优先级）。
 // decisionEvalOrder: 18 个分支 ID（b1~b18），数组顺序即评估优先级（越靠前越优先）。
-// decisionEvalLevels: 与顺序下标并行的层级覆盖，0=保留代码动态默认，1-5=强制马斯洛层级。
+// decisionEvalLevels: 与顺序下标并行的层级覆盖，0=⓪瞬间行为 / 1-5=①..⑤马斯洛层级 / 6=保留代码动态默认。
 // ==========================================================================
 window.SIM_DECISION_ORDER = {
   decisionEvalOrder: [${order.map(s => `"${s}"`).join(', ')}],
@@ -57,7 +57,7 @@ function handleSaveDecisionOrder(req, res) {
       const orderOk = Array.isArray(order) && order.length === 18
         && new Set(order).size === 18 && order.every((s) => VALID_BRANCH_ID.test(s));
       const levelsOk = Array.isArray(levels) && levels.length === 18
-        && levels.every((v) => Number.isInteger(v) && v >= 0 && v <= 5);
+        && levels.every((v) => Number.isInteger(v) && v >= 0 && v <= 6);
       if (!orderOk || !levelsOk) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: 'invalid decisionEvalOrder/decisionEvalLevels' }));

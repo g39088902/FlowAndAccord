@@ -60,7 +60,8 @@ impl World3DEngine {
                 a.pending_bid_house_id = None;
             }
 
-            // 资格复核：在世 / 非胎儿 / 成年男性 / 无房 / 冷却结束
+            // 资格复核：在世 / 非胎儿 / 成年男性 / 冷却结束
+            // （进入资格由决策侧 branches.rs::best_bid_candidate 把关：无房 或 有更高等级房在售）
             let eligible = self
                 .agent_by_id(bidder_id)
                 .map(|a| {

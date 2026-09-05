@@ -14,7 +14,7 @@
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
 | `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（175 字段，M8 起不含升级成本矩阵），按功能分区注释 | 默认值真相源在 Rust `config.rs`，本文件是前端镜像 |
-| `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（18 条 b1~b18，b14 夺位置首，b15 榷场商贸）。**启动注入权威默认值**；★ v1.27.0 起用户运行时调整保存到浏览器 localStorage（`flowaccord.decision-order.v1`，schema 1），不再写回本文件 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
+| `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（18 条 b1~b18，★ v1.29.0 起 b17 竞拍购房置于首位）。**启动注入权威默认值**；★ v1.27.0 起用户运行时调整保存到浏览器 localStorage（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1），不再写回本文件 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
 
 ### 1.2 决策引擎视图层（三件套，必须在 rustworld.js 之前加载）
@@ -202,7 +202,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 `rustWorld.applyConfig(cfg)` 支持运行中热注入，但有两个约束：
 1. **必须在 wasm 加载完成后**（`this._ready === true`），否则静默返回 false
-2. **决策顺序变更**须先改 `SIM_CONFIG.decisionEvalOrder` / `decisionEvalLevels`，再调 `applyConfig`，最后保存到浏览器 localStorage（★ v1.27.0 起；decision-viz.js 已封装此链路，键 `flowaccord.decision-order.v1`）
+2. **决策顺序变更**须先改 `SIM_CONFIG.decisionEvalOrder` / `decisionEvalLevels`，再调 `applyConfig`，最后保存到浏览器 localStorage（★ v1.27.0 起；decision-viz.js 已封装此链路，★ v1.29.0 起键 `flowaccord.decision-order.v2`）
 
 直接改 `rustWorld.config` 无效——配置只通过 `applyConfig` 序列化注入 wasm。
 
@@ -225,7 +225,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 ### 5.6 决策顺序保存（v1.27.0 起 localStorage 为主）
 
-★ v1.27.0 起决策顺序保存主路径改为浏览器 `localStorage`（键 `flowaccord.decision-order.v1`，schema 1，含 `savedAt`）：静态 COS 与本地开发行为一致，无需写文件；非法/版本不符的覆盖值在启动时丢弃并回退内置默认。`server.js` 的 `POST /save-decision-order` 端点**保留仅作兼容迁移/清理**，不再是正常保存路径。
+★ v1.27.0 起决策顺序保存主路径改为浏览器 `localStorage`（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1，含 `savedAt`；启动时自动迁移旧键 v1 的 0→6 编码）：静态 COS 与本地开发行为一致，无需写文件；非法/版本不符的覆盖值在启动时丢弃并回退内置默认。`server.js` 的 `POST /save-decision-order` 端点**保留仅作兼容迁移/清理**，不再是正常保存路径。
 
 **不要新增其他写文件端点**——前端定位是纯静态，本地文件写入仅限存档系统（File System Access API 用户手势直写）这一个文档化例外。
 

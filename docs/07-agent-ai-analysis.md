@@ -17,12 +17,13 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 
 ## 2. 为什么是马斯洛层次化 FSM，而非效用最大化或行为树
 
-### 2.1 设计选择：严格优先级的 5 层马斯洛
+### 2.1 设计选择：严格优先级的 6 层马斯洛
 
-`needs.rs` 定义了 `MaslowLevel`（5 层，低→高绝对优先）与 13 种 `NeedKind`：
+`needs.rs` 定义了 `MaslowLevel`（★ v1.29.0 起 6 层，低→高绝对优先）与 17 种 `NeedKind`：
 
 | 层级 | 需求种类 | 设计意图 |
 | :--- | :--- | :--- |
+| ⓪ 瞬间行为 | `BidHouse` / `Courtship`(近距) / `RaiseChild`(在宅) | ★ v1.29.0 新增：条件满足即刻执行（只写决心，不移动、不消耗资源），命中后同一 tick 继续评估后续分支 |
 | ① 生理 | `QuenchThirst` / `SateHunger` / `Rest` / `FoundHome` | 生存底线——饥渴/体力告急时压倒一切；末档为无家男性自立门户 |
 | ② 安全 | `RepairHouse` / `StockWater` / `StockFood` / `StockWood` | 家宅储备——仓库填满优先于盖房升级 |
 | ③ 归属 | `BuildHouse`(0级) | 成家立业——0级仓库仓满后施工升级成家 |
@@ -128,7 +129,7 @@ Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离�
 
 | 维度 | 当前实现 | 愿景（[11-plan.md](./11-plan.md) M6/M7/M8） |
 | :--- | :--- | :--- |
-| 决策架构 | 马斯洛 5 层 FSM + 错峰调度 | 六维政治资本仲裁 + 异步 LLM 认知总线 |
+| 决策架构 | 马斯洛 6 层 FSM（⓪ 瞬间行为 + ①~⑤）+ 错峰调度 | 六维政治资本仲裁 + 异步 LLM 认知总线 |
 | 寻路 | 加权 A*（坡度/隐秘/踩踏度） | 欲望线热度场 + 时空冲突预约 FIFO |
 | 内核 | Rust 结构体数组（`Vec<Agent3D>`） | ECS（hecs/bevy_ecs）+ 确定性 Command Queue |
 | 快照 | JSON 序列化 | 零拷贝双缓冲共享内存 + Hermite 插值 |

@@ -9,7 +9,10 @@
   'use strict';
 
   // 马斯洛层级色板（与主页深色科技风一致）
+  // ★ v1.29.0 新增 ⓪ 瞬间行为（编码 0）：优先级高于生理需求——条件满足即刻执行，
+  //   不移动、不消耗资源，命中后同一 tick 内继续向后遍历其余分支。
   var LV = {
+    0: { name: '瞬间行为', hex: '#22d3ee', kinds: 'BidHouse · Courtship(近距) · RaiseChild(在宅)' },
     1: { name: '生理需求', hex: '#ef4444', kinds: 'SeekThrone · QuenchThirst · SateHunger · Rest · FoundHome' },
     2: { name: '安全需求', hex: '#38bdf8', kinds: 'RepairHouse · StockWater · StockFood · StockWood' },
     3: { name: '归属与爱', hex: '#10b981', kinds: 'BuildHouse(0级)' },
@@ -23,7 +26,7 @@
     { id: 'b2', zh: '觅食', cond: '饥饿 < 25 且有可用粮源', need: 'Physiological · SateHunger', target: 'SeekingFood', level: 1, cfg: ['decisionCriticalHunger=25.0'], anchor: 'branches.rs::B2SateHunger' },
     { id: 'b3', zh: '休整', cond: '体力 < 100', need: 'Physiological · Rest', target: 'RestingAtCamp', level: 1, cfg: ['decisionRestStaminaTarget=100.0'], anchor: 'branches.rs::B3Rest' },
     { id: 'b12', zh: '立宅', cond: '无家 + 成年男 + 饥渴体力达标', need: 'Physiological · FoundHome', target: '掷点→立宅', level: 1, cfg: ['decisionFoundHome{Min}=20/20/60', 'Candidates=12'], anchor: 'branches.rs::B12FoundHome' },
-    { id: 'b17', zh: '竞拍购房', cond: '无房成年男 + 冷却结束 + 有在售空置房 + 家户金≥0.01', need: 'Safety · BidHouse', target: '随机一套→pending', level: 2, cfg: ['houseAuctionBidCooldownTicks=300', 'houseAuctionMinBidGold=0.01'], anchor: 'branches.rs::B17BidHouse' },
+    { id: 'b17', zh: '竞拍购房', cond: '成年男 + 无未结算出价 + 冷却结束 + 有在售空置房 + 家户金够价（无房可竞拍任意在售房 / 有房仅竞拍更高等级房）', need: 'Instantaneous · BidHouse', target: '⚡ 最优一套→pending', level: 0, instant: true, cfg: ['houseAuctionBidCooldownTicks=300', 'houseAuctionMinBidGold=0.01'], anchor: 'branches.rs::B17BidHouse' },
     { id: 'b4', zh: '修缮', cond: '有家宅 且 耐久 < 50%（成员）', need: 'Safety · RepairHouse', target: 'RepairingHouse', level: 2, cfg: ['decisionHouseRepairNeedThreshold=50.0'], anchor: 'branches.rs::B4RepairHouse' },
     { id: 'b5', zh: '备水', cond: '有房(含0级) 且 家户账本水 <100', need: 'Safety · StockWater', target: 'SeekingWater', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B5StockWater' },
     { id: 'b6', zh: '备粮', cond: '有房(含0级) 且 家户账本粮 <100', need: 'Safety · StockFood', target: 'SeekingFood', level: 2, cfg: ['familyStock{On,Off}=100/200'], anchor: 'branches.rs::B6StockFood' },
@@ -35,8 +38,8 @@
     { id: 'b13', zh: '娱乐淘金', cond: '4级庄园 且 五类储备全≥200 且 冷却≤0', need: 'SelfActualization · GoldWealth', target: 'SeekingGold', level: 5, cfg: ['decisionGoldWealthCooldown=180.0'], anchor: 'branches.rs::B13GoldWealth' },
     { id: 'b14', zh: '夺位', cond: '在世成年男性 且 非现任国王 且 存在空缺王位营地（有房限自家房屋营地/无房可任意）', need: 'Physiological · SeekThrone', target: 'SeekingThrone', level: 1, cfg: ['poiMinDistance=70', '性别+房籍守卫'], anchor: 'branches.rs::B14SeekThrone' },
     { id: 'b15', zh: '榷场贸易', cond: '成年男性户主 且 (水或粮断供) 且 存金≥0.5 且 体力≥15', need: 'Physiological · MarketTrade', target: 'SeekingMarket', level: 1, cfg: ['marketEmergencyFamilyStockThreshold=10.0', 'marketMinFamilyGold=0.5', 'marketMinDispatchStamina=15.0'], anchor: 'market.rs::evaluate_market_trade' },
-    { id: 'b16', zh: '求偶', cond: '在世成年男性 且 单身 且 存在全图单身成年女性', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, cfg: ['性别+单身守卫', '魅力最高优先'], anchor: 'branches.rs::B16Courtship' },
-    { id: 'b18', zh: '育儿', cond: '在世成年男性 + 有老婆 + 妻子满足原怀孕条件 + ★v1.28.0 男方名下住宅≥1级', need: 'Esteem · RaiseChild', target: 'RaiseChild→受孕', level: 4, cfg: ['原有受孕阈值与冷却', '房屋≥1级（非0级仓库）'], anchor: 'branches.rs::B18RaiseChild' }
+    { id: 'b16', zh: '求偶', cond: '在世成年男性 且 单身 且 存在全图单身成年女性（⚡近距变体：目标已在交互半径内→就地写决心）', need: 'Belonging · Courtship', target: 'SeekingCourtship', level: 3, instant: true, cfg: ['性别+单身守卫', '魅力最高优先', 'poiInteractionRadius 近距瞬发'], anchor: 'branches.rs::B16Courtship' },
+    { id: 'b18', zh: '育儿', cond: '在世成年男性 + 有老婆 + 妻子满足原怀孕条件 + ★v1.28.0 男方名下住宅≥1级（⚡在宅变体：夫妻同在自家门口→就地写决心）', need: 'Esteem · RaiseChild', target: 'RaiseChild→受孕', level: 4, instant: true, cfg: ['原有受孕阈值与冷却', '房屋≥1级（非0级仓库）', '宅门口双静止瞬发'], anchor: 'branches.rs::B18RaiseChild' }
   ];
 
   var BRANCH_MAP = {};
@@ -45,9 +48,11 @@
   var ALL_IDS = BRANCHES.map(function (b) { return b.id; });
 
   // 出厂策展优先级（与原硬编码级联语义等价）；「重置顺序」恢复此序列
-  var DEFAULT_ORDER = ['b14', 'b1', 'b2', 'b15', 'b3', 'b17', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13', 'b18'];
-  // 默认分界线：位于第 g 张卡之后（第1层|第2层=7 / 第2层|第3层=13 / 第3层|第4层=15 / 第4层|第5层=16）
-  var DEFAULT_DIVGAPS = [7, 13, 15, 16];
+  // ★ v1.29.0：b17 竞拍购房归入 ⓪ 瞬间行为并置于首位（瞬间层必须至少 1 张卡，否则分界线会误吞首卡）
+  var DEFAULT_ORDER = ['b17', 'b14', 'b1', 'b2', 'b15', 'b3', 'b12', 'b4', 'b16', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b11', 'b13', 'b18'];
+  // 默认分界线：位于第 g 张卡之后
+  // （⓪|①=1 / ①|②=7 / ②|③=13 / ③|④=15 / ④|⑤=16）
+  var DEFAULT_DIVGAPS = [1, 7, 13, 15, 16];
 
   // 行动状态中文描述（PrimitiveActionState → 中文语义），Branch 分支卡 target 的中文显示依赖此表
   var FSM_STATE_ZH = {

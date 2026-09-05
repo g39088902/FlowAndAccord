@@ -15,7 +15,7 @@
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
 | `branches.rs` | 18 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b18"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
-| `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + **数据驱动**评估 `evaluate_needs`（按 `branch_order` 迭代注册表）+ 需求落地 `fulfill_resting_need`（含立宅自主选址） |
+| `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + ★ v1.29.0 ⓪瞬间层调度 `evaluate_instant_needs`/`apply_instant_need`/`write_bid_pending`（全状态、每拍最先、命中即执行并续评估）+ **数据驱动**评估 `evaluate_needs`（按 `branch_order` 迭代注册表）+ 需求落地 `fulfill_resting_need`（含立宅自主选址） |
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询 |
 | `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 `try_route_to_market`（水/粮断流时户主直接改道榷场，家户账本远程结算） |
 | `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 需求判定）+ `decide_seeking_market` / `decide_buying_market` |
@@ -63,8 +63,8 @@
   策展顺序的唯一真相源是 `frontend/js/config.decision-order.js`，经 `SIM_CONFIG` 注入。
 - 新增/修改分支时必须保持条件函数**自包含**：无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认
   全部写在分支内部——否则重排顺序会破坏语义。
-- 层级覆盖（`decision_eval_levels`，与顺序下标并行，按分支 ID 查位）：`0`/缺失 = 保留分支动态默认，
-  `1-5` = 强制马斯洛层级；评估结论与 `state_need_label_with_agent` 标签共用 `level_override_for`，改一处须保持一致。
+- 层级覆盖（`decision_eval_levels`，与顺序下标并行，按分支 ID 查位）：★ v1.29.0 编码 `0`=⓪瞬间行为 /
+  `1-5`=①..⑤马斯洛层级 / `6`、缺失、非法 = 保留分支动态默认；评估结论与 `state_need_label_with_agent` 标签共用 `level_override_for`，改一处须保持一致。非瞬发分支（`is_instant()` 为 false）被覆盖为 0 时钳制回代码默认层级。
 
 ### 4.8 ★ M4 夺位远征（决策引擎驱动 · 生理层最高档）
 
@@ -87,3 +87,13 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - 新增/改动分支后，用 `node tools/diagnose.js --check all` 复现：Rule 5 移动停滞嗅探（`Seeking*` 连续 60 tick 位移 < 0.05m）是回归门禁之一。
 
 详见根 AGENTS.md §4.16 与 `spatial/AGENTS.md` §4.6。
+
+### 4.10 🔴 ⓪ 瞬间行为层（v1.29.0 起 · 优先级高于生理需求）
+
+- **语义**：`MaslowLevel::Instantaneous` 为 `MaslowLevel` 声明序**首位**变体（`Ord` 最小 = 优先级最高），编码 `0`；原「0=保留代码动态默认」迁移到哨兵 `6`。
+- **评估时机与续评估**：`decide()` 顶部 `evaluate_instant_needs` **全状态**、每拍最先执行，只遍历 `BranchId::is_instant()` 白名单（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅）；命中即 `apply_instant_need`（只写决心/pending，不 dispatch、不改 state、不消耗资源与 RNG）并 `continue` 继续遍历后续瞬发分支——因为本回合动作零消耗。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。
+- **白名单与钳制**：只有 `is_instant()` 为 true 的分支可产出瞬间层结论；`level_override_for` 对「非瞬发分支被强制覆盖为 0」返回 None（回退代码默认层级），防止玩家在决策引擎 UI 把移动型分支（如 b1 解渴）拖进瞬间层破坏语义。
+- **瞬发变体写在分支内部（分支自包含铁律）**：b16 求偶「目标已在 `poi_interaction_radius` 内」、b18 育儿「夫妻已在自家宅门口（`couple_at_home_door`，判据与 `execute_pending_childcare` 的 at_home 一致）」返回 `Instantaneous` 结论；远距离仍返回原常规层结论走移动链路。b17 竞拍购房整体归入瞬间层。
+- **幂等守卫**：b16 加 `courtship_pending.is_none()`、b18 加 `!raise_child_pending`、b17 加 `pending_bid_house_id.is_none()` + 冷却，避免每拍重复写。
+- **确定性**：瞬发链路不消耗 `WorldRng`（b17 用 `best_bid_candidate` 等级降序/ID 升序确定性选房，b16 用 `best_courtship_target` 的 `min_by`）。
+- **标签**：瞬发命中写 `"Instantaneous·BidHouse/Courtship/RaiseChild"`；本拍无常规需求时保留瞬间标签，否则被常规标签覆盖。

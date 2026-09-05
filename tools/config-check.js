@@ -338,8 +338,8 @@ function main() {
         const idOk = Array.isArray(ids) && ids.length === 18 && new Set(ids).size === 18
           && ids.every(s => /^b(?:[1-9]|1[0-8])$/.test(s));
         if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 18 个互不重复的 b1..b18');
-        const lvOk = Array.isArray(lv) && lv.length === 18 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 5);
-        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 18 个 0-5 整数');
+        const lvOk = Array.isArray(lv) && lv.length === 18 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 6);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 18 个 0-6 整数（0=⓪瞬间行为/1-5=马斯洛层级/6=保留动态默认）');
       }
     }
   } else {

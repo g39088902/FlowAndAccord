@@ -105,7 +105,7 @@
   - **🏚️ v1.22.4 空态显示修复（禁止拿任意房屋占位）**：无在售房产时 `getSelectedHouse()` 不再回退到 `sim.houses[0]`（此前拿世界里的 #1 当占位），改为返回 null 走 `renderEmptyDetail()` 空态——hero 卡各字段显示「暂无在售房产」占位文案（**逐字段更新、不重建整卡**，保留 `#auction-hero-name` 等固定子元素，出现新在售房后能正常恢复显示），麦穗时间轴归零、买家池与竞价流水显示空提示；`openAuctionModal` 无在售房时同步清空 `currentHouseId` 防残留上一轮选择。
 
 ### v1.27.0 交互与启动约束
-- 决策顺序以 `flowaccord.decision-order.v1`（schema 1）保存在浏览器本地；启动时必须先连接可写 JSON 存档文件，文件写入成功后才解除模拟暂停——★ v1.28.0 起已连接自动槽存档（默认目录 + 默认文件名 `flowaccord-save1.json`）时启动直接自动读档续演。Firefox 等不支持 File System Access API 的浏览器保持阻断。
+- 决策顺序以 `flowaccord.decision-order.v2`（schema 1）保存在浏览器本地（★ v1.29.0 起键升 v2，编码 0=⓪瞬间行为/6=保留动态默认）；启动时必须先连接可写 JSON 存档文件，文件写入成功后才解除模拟暂停——★ v1.28.0 起已连接自动槽存档（默认目录 + 默认文件名 `flowaccord-save1.json`）时启动直接自动读档续演。Firefox 等不支持 File System Access API 的浏览器保持阻断。
 - 拍卖大盘状态徽章显示累计场次、成交/流拍及流拍率；在售房源条使用固定节点按 ID 更新，避免高倍速刷新破坏点击。
 - 全局族人均值大盘显示按金币排序、ID 作为并列裁决的最富家户；家户制度大盘不重复展示该指标。
 

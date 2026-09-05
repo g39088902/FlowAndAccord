@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.28.11)"]
+    E --> F["浏览器 UI (版本: v1.29.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -101,7 +101,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.28.11`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.29.0`**。
 
 ---
 
@@ -165,6 +165,7 @@ node frontend/server.js           # http://localhost:3000
 - **严禁修改 `config.simulationDt`**：倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
 - **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
+- **★ v1.29.0 ⓪ 瞬间行为层（优先级高于生理需求）**：每名 agent 在自己的决策相位**最前**（`decide()` 顶部、全状态）先跑 `evaluate_instant_needs`——只遍历 `BranchId::is_instant()` 白名单分支（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅），命中即「只写决心 / pending、不 dispatch、不改运动状态、不消耗资源与 RNG」并 `continue` 继续遍历后续瞬发分支；随后才进入常规状态机。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。非瞬发分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。
 
 ### 4.4 🟠 随身搬运机制（真实背包，非瞬移）
 
@@ -254,8 +255,8 @@ node frontend/server.js           # http://localhost:3000
 
 - **内核无序**：`evaluate_needs` 按 `Decisioner.branch_order` 迭代 `decisions/branches.rs` 的 18 条自包含条件函数；顺序来自 `SIM_CONFIG.decisionEvalOrder`，默认空 = 中性声明序兜底（见 §4.12 例外）。**严禁**在 Rust 写死策展优先级。
 - **真相源在文件**：策展顺序唯一真相源为 `frontend/js/config.decision-order.js`，启动时由 `decision-viz.js` 合并进 `SIM_CONFIG`（脚本顺序：config.js → config.decision-order.js → decision-viz 三件套 → rustworld.js，必早于首次 applyConfig）。
-- **拖动生效链路**：决策引擎覆层（index.html「🧠 决策引擎」）拖卡/拖分界松手 → 改 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入运行中实例（与模拟共用引擎，故必须内嵌页面而非独立页）→ ★ v1.27.0 起保存到浏览器 `localStorage`（键 `flowaccord.decision-order.v1`，schema 1，含 `savedAt`）；`server.js` 的 `POST /save-decision-order` 端点保留但不再作为正常保存路径。
-- **分支自包含铁律**：新增/改分支时，无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认必须写在分支条件内部——否则重排顺序即破坏语义。层级覆盖（`decision_eval_levels`，`0`=动态默认）与 `current_need` 标签共用 `level_override_for`。
+- **拖动生效链路**：决策引擎覆层（index.html「🧠 决策引擎」）拖卡/拖分界松手 → 改 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入运行中实例（与模拟共用引擎，故必须内嵌页面而非独立页）→ ★ v1.27.0 起保存到浏览器 `localStorage`（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1，含 `savedAt`；启动时自动把旧键 v1 的编码迁移为 0→6 后写入 v2）；`server.js` 的 `POST /save-decision-order` 端点保留但不再作为正常保存路径。
+- **分支自包含铁律**：新增/改分支时，无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认必须写在分支条件内部——否则重排顺序即破坏语义。层级覆盖（`decision_eval_levels`，★ v1.29.0 编码：`0`=⓪瞬间行为 / `1-5`=①..⑤马斯洛层级 / `6`=保留代码动态默认）与 `current_need` 标签共用 `level_override_for`；非瞬发分支被覆盖为 0 时自动回退代码默认层级。
 
 ### 4.15 🟠 高频 DOM 重建禁止破坏交互（内容快照缓存）
 

@@ -2,7 +2,7 @@ use super::super::vec3::Vec3;
 use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::poi::PoiType;
-use super::super::house::{House, HouseTier};
+use super::super::house::House;
 use super::super::ledger::family::HouseholdRegistry;
 use super::super::ledger::region::RegionRegistry;
 use super::super::ledger::journal::ResourceKind;
@@ -70,6 +70,14 @@ impl<'a> Decisioner<'a> {
         // ★ M7 先刷新家庭库存触发器（若该 agent 无家户/无房，分支层 guard 短路，不影响行为）
         self.refresh_family_stock(agent);
 
+        // ★ v1.29.0 ⓪ 瞬间行为层：**全状态**、每拍先跑一遍。
+        // 命中即刻执行（只写决心，不移动、不消耗资源），因此不占用本回合——
+        // 执行后继续遍历后续瞬时分支，全部结算完再进入下面的常规状态机。
+        let instant_label = self.evaluate_instant_needs(agent);
+        if let Some(label) = &instant_label {
+            agent.current_need = Some(label.clone());
+        }
+
         match agent.state {
             PrimitiveActionState::RestingAtCamp => {
                 // ecology.rs 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
@@ -82,7 +90,8 @@ impl<'a> Decisioner<'a> {
                     agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.households, self.config)
                         .map(|(lvl, k)| format!("{}·{}", lvl, k));
                     self.fulfill_resting_need(agent, need);
-                } else {
+                } else if instant_label.is_none() {
+                    // ★ v1.29.0 本拍已执行过瞬间行为且无常规需求：保留瞬间标签，避免行为不可见
                     agent.current_need = Some("Physiological·Rest".to_string());
                     // 未婚且无房的女性没有可执行事务时回所属营地休息，避免长期停在道路节点。
                     if agent.gender == super::super::agent::Gender::Female
@@ -180,15 +189,79 @@ impl<'a> Decisioner<'a> {
         }
     }
 
+    /// ★ v1.29.0 ⓪ 瞬间行为层评估：**全状态**、每拍最先执行（decide 顶部调用）。
+    ///
+    /// 只遍历 `BranchId::is_instant()` 白名单分支；结论为瞬间层者**立即执行并 continue**，
+    /// 直至白名单遍历结束——因为瞬发动作不移动、不消耗任何资源，本回合没有被占用。
+    /// 非瞬间层结论（如远距离求偶）一律忽略，交由后续常规状态机在合适状态下重新评估。
+    ///
+    /// 确定性：全链路不消耗 `WorldRng`（选房与选偶都用确定性排序）。
+    /// 返回最后一条瞬间需求的标签（如 "Instantaneous·BidHouse"），供本拍无常规需求时保留显示。
+    pub fn evaluate_instant_needs(&mut self, agent: &mut Agent3D) -> Option<String> {
+        let order: &'a [BranchId; 18] = self.branch_order;
+        let mut label: Option<String> = None;
+        for branch in order.iter() {
+            if !branch.is_instant() {
+                continue;
+            }
+            let Some(need) = branch.evaluate(self, agent) else {
+                continue;
+            };
+            if !need.is_instant() {
+                continue; // 被层级覆盖降级为常规需求 → 交给常规状态机处理
+            }
+            label = Some(need.instant_label());
+            self.apply_instant_need(agent, need);
+        }
+        label
+    }
+
+    /// ★ v1.29.0 瞬发落地：只写「决心 / pending」，**不 dispatch、不改运动状态、不消耗资源与 RNG**。
+    /// 物理结算由世界执行器（`execute_pending_bids` / `execute_pending_courtships` /
+    /// `execute_pending_childcare`）在随后完成——系统照例只当物理规则执行者。
+    fn apply_instant_need(&mut self, agent: &mut Agent3D, need: Need) {
+        match need.kind {
+            NeedKind::BidHouse => self.write_bid_pending(agent),
+            NeedKind::Courtship => {
+                // 目标已在交互半径内（分支已判定）：就地写下求偶决心，当拍由执行器成婚
+                if let Some(target) = self.best_courtship_target(agent).copied() {
+                    agent.courtship_target_id = Some(target.id);
+                    agent.courtship_pending = Some(target.id);
+                }
+            }
+            NeedKind::RaiseChild => {
+                // 夫妻已在自家宅门口：就地写下养育决心，下一拍由 childcare 执行器受孕
+                agent.raise_child_pending = true;
+            }
+            _ => {}
+        }
+    }
+
+    /// 竞拍决心写入（瞬发）：复用 `branches::best_bid_candidate` 的确定性选房（等级降序、ID 升序），
+    /// 只写 pending 三件套；出价冷却与交割由 `housing_system/auction.rs` 落地。
+    fn write_bid_pending(&mut self, agent: &mut Agent3D) {
+        let Some((house_id, price)) = branches::best_bid_candidate(self, agent) else {
+            return;
+        };
+        agent.pending_bid_house_id = Some(house_id);
+        agent.pending_bid_price = Some(price);
+        agent.pending_bid_upgrade = agent.home_house_id.is_some();
+    }
+
     /// 马斯洛需求逐条评估（数据驱动）：
     /// 按注入的分支顺序迭代 branches.rs 注册表，首个命中即返回；
-    /// 命中后套用 decision_eval_levels 层级覆盖（0/缺失 = 保留分支自带的代码动态默认）。
+    /// 命中后套用 decision_eval_levels 层级覆盖（6/缺失 = 保留分支自带的代码动态默认）。
     /// 顺序的唯一真相源在前端配置文件，空/非法注入已由 resolve_order 回退为中性声明序。
     pub fn evaluate_needs(&mut self, agent: &Agent3D) -> Option<Need> {
-        for branch in self.branch_order.iter() {
+        let order: &'a [BranchId; 18] = self.branch_order;
+        for branch in order.iter() {
             if let Some(mut need) = branch.evaluate(self, agent) {
                 if let Some(lv) = branches::level_override_for(self.config, *branch) {
                     need.level = lv;
+                }
+                // ★ v1.29.0 瞬发命中已在 decide() 顶部结算完毕 → 跳过并继续遍历后续分支
+                if need.is_instant() {
+                    continue;
                 }
                 return Some(need);
             }
@@ -197,6 +270,11 @@ impl<'a> Decisioner<'a> {
     }
 
     pub fn fulfill_resting_need(&mut self, agent: &mut Agent3D, need: Need) {
+        // ★ v1.29.0 瞬发需求不得走常规落地链路（会派发移动/改状态）
+        if need.is_instant() {
+            self.apply_instant_need(agent, need);
+            return;
+        }
         if need.kind == NeedKind::Rest { return; }
         if need.kind == NeedKind::RaiseChild {
             agent.raise_child_pending = true;
@@ -220,32 +298,12 @@ impl<'a> Decisioner<'a> {
             return;
         }
         if need.kind == NeedKind::BidHouse {
-            // ★ v1.26.0 竞购现房：随机挑一套在售空置房屋写 pending（消耗共享 RNG，确定性），
-            // 不改变运动状态——只下决心，交割由世界执行器 execute_pending_bids 落地。
-            let own_tier = agent.home_house_id
-                .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
-                .map(|h| h.tier)
-                .unwrap_or(HouseTier::Tier0Warehouse);
-            let mut candidates: Vec<(u32, HouseTier, f32)> = self
-                .houses
-                .iter()
-                .filter(|h| h.owner_id.is_none() && h.auction_state.is_some() && (agent.home_house_id.is_none() || h.tier > own_tier))
-                .map(|h| (h.id, h.tier, house_upgrade_cost_price(own_tier, h.tier, self.config)))
-                .collect();
-            if candidates.is_empty() {
+            // ★ v1.29.0 竞购现房：常规（被层级覆盖降级）路径同样只写 pending，
+            // 选房判据与瞬发路径共用 branches::best_bid_candidate（确定性、不耗 RNG）。
+            self.write_bid_pending(agent);
+            if agent.pending_bid_house_id.is_none() {
                 agent.current_need = None;
-                return;
             }
-            candidates.sort_by(|a, b| (b.1 as u8).cmp(&(a.1 as u8)).then_with(|| a.0.cmp(&b.0)));
-            let (house_id, _tier, price) = candidates[0];
-            if price < self.config.house_auction_min_bid_gold || ledger_balance_of(self.households, agent, ResourceKind::Gold) < price {
-                agent.current_need = None;
-                return;
-            }
-            agent.pending_bid_house_id = Some(house_id);
-            agent.pending_bid_price = Some(price);
-            agent.pending_bid_upgrade = agent.home_house_id.is_some();
-            agent.current_need = Some("Safety·BidHouse".to_string());
             return;
         }
         if need.kind == NeedKind::RepairHouse {

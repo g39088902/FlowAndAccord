@@ -35,6 +35,9 @@ let w = window.innerWidth, h = window.innerHeight;
 // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
 // ==========================================
 const MASLOW_STYLE = {
+  // ★ v1.29.0 ⓪ 瞬间行为：优先级高于生理需求——条件满足即刻执行（只写下决心），
+  //   不移动、不消耗任何资源，因此命中后同一 tick 内继续向后评估其余分支。
+  Instantaneous:     { level: 0, icon: '⚡', name: '瞬间行为', color: '#22d3ee', desc: '零消耗即刻执行：竞拍出价 / 就地求偶 / 在宅养育，只写下决心，本回合继续评估后续需求' },
   Physiological:     { level: 1, icon: '💧', name: '生理需求', color: '#38bdf8', desc: '生存底线：口渴饮水 / 饥饿进食 / 体力<50% 归巢休养' },
   Safety:            { level: 2, icon: '🏠', name: '安全需求', color: '#f59e0b', desc: '家宅安全：私宅水粮木储备填满 / 房屋耐久<50%修缮至100%' },
   Belonging:         { level: 3, icon: '👪', name: '归属与爱', color: '#ec4899', desc: '成家立业：0级仓库水粮填满升级成婚 / 家庭生存纽带' },
@@ -57,6 +60,9 @@ const NEED_KIND_LABEL = {
   Detour: '越野寻路',
   Courtship: '求偶成婚',
   SeekThrone: '夺位远征',
+  MarketTrade: '榷场贸易',
+  BidHouse: '竞拍购房',      // ★ v1.29.0 ⓪ 瞬间行为 · 竞拍购房
+  RaiseChild: '养育后代',    // ★ v1.29.0 ⓪ 瞬间行为 · 在宅养育（远距离变体仍属 ④ 尊重需求）
 };
 const NEED_KIND_REASON = {
   QuenchThirst: '自身水分告急，前往水泉痛饮至满值并带回补给家户账本。',
@@ -74,8 +80,12 @@ const NEED_KIND_REASON = {
   Detour: '车道临时受阻，正在荒野中越野寻路。',
   Courtship: '寻访全图魅力最高的单身女性，前往求偶并迎娶入家户。',
   SeekThrone: '第一层生存需求（生理）：王位 = 全境资源的分配权，夺位为获取资源分配权而自主出征——在世成年男性非现任国王，向最近空缺王位的营地进军，率先物理抵达者登基为王；途中沿路网车道行走、坐标连续不瞬移。',
+  MarketTrade: '家户水粮断供且野外同类资源断流时，户主以家户账本金币赴榷场互市交易（家户金 ≥ 0.5 且体力 ≥ 15）。',
+  BidHouse: '⓪ 瞬间行为：成年男性对全图等级最高（同级取 ID 最小）的在售空置房即刻下定出价决心，只写 pending 不迈步，交割与冷却由拍卖执行器落地。',
+  RaiseChild: '⓪ 瞬间行为（夫妻已同在自家宅门口）：即刻写下养育决心，下一拍由世界执行器核验妻子条件后受孕；远距离仍按常规返家链路执行。',
 };
-const LEVEL_NUMERALS = ['①', '②', '③', '④', '⑤'];
+// 按下标直接索引（⓪ 在索引 0，与层级码 0-5 一一对应）
+const LEVEL_NUMERALS = ['⓪', '①', '②', '③', '④', '⑤'];
 
 // 解析 Rust 侧 current_need 字符串 (如 "Physiological·QuenchThirst" -> 层级元数据)
 function parseMaslowNeed(needStr, agent) {
@@ -123,7 +133,7 @@ function parseMaslowNeed(needStr, agent) {
     kindKey,
     kindLabel,
     reason: NEED_KIND_REASON[kindKey] || style.desc,
-    numeral: LEVEL_NUMERALS[style.level - 1],
+    numeral: LEVEL_NUMERALS[style.level],
     badgeText: `${style.icon} ${style.name} · ${kindLabel}`,
     ...style,
   };
