@@ -22,6 +22,10 @@ let currentTick = 0;
 // 时光倒流历史检查点
 let historyCheckpoints = [];
 let lastCheckpointTick = -1;
+// 快照下发节流：距上次快照生成的现实时间戳（60Hz 严格锚定，见 M1）
+let lastSnapshotTime = 0;
+// 检查点写入节流：距上次 world_save 的现实时间戳（150ms 守卫，见 M1）
+let lastCheckpointRealTime = 0;
 
 function readLastError() {
   if (!_ready || typeof _wasm.world_last_error_len !== 'function') return '';
@@ -94,11 +98,15 @@ function loadWorldInternal(jsonStr) {
 function recordHistoryCheckpoint(tick) {
   if (!_ready) return;
   if (tick - lastCheckpointTick < 30 && lastCheckpointTick >= 0) return;
+  // 现实时间守卫（M1）：高倍速下至少流逝 150ms 才导出一次 world_save，避免高频 GC 停顿。
+  // 首次检查点（lastCheckpointTick < 0，即 genesis）不受限，确保时光倒流首档必然保存。
+  if (lastCheckpointTick >= 0 && performance.now() - lastCheckpointRealTime < 150) return;
   const json = saveWorldInternal();
   if (!json) return;
   if (historyCheckpoints.length > 0 && historyCheckpoints[historyCheckpoints.length - 1].tick === tick) return;
   historyCheckpoints.push({ tick, json });
   lastCheckpointTick = tick;
+  lastCheckpointRealTime = performance.now();
 
   // 内存与性能保护：最多保留 160 个历史检查点（~6MB），首档保留，近程密集，较早历史稀疏
   if (historyCheckpoints.length > 160) {
@@ -158,9 +166,14 @@ function simulationStep() {
   const t1 = performance.now();
   tickMs = t1 - t0;
 
-  // 检查是否满足快照下发时机且主线程已 ACK
-  if (ackReceived || forceTerrain) {
+  // 快照下发 60Hz 严格节流（M1）：距上次快照至少 16.6ms 才生成快照，
+  // 窗口未到前专职推进 world_tick_steps，跳过 JSON 序列化与通信开销。
+  // forceTerrain 立即下发（绕过窗口），保证地形网格必需场景不被延误。
+  const now = performance.now();
+  const throttlePass = forceTerrain || (now - lastSnapshotTime >= 16.6);
+  if (throttlePass && (ackReceived || forceTerrain)) {
     ackReceived = false;
+    lastSnapshotTime = now;
     const snap = pullSnapshot(forceTerrain);
     forceTerrain = false;
     if (snap) {
@@ -209,6 +222,7 @@ self.onmessage = async function(e) {
         }
         historyCheckpoints = [];
         lastCheckpointTick = -1;
+        lastCheckpointRealTime = 0;
         const initialSnap = pullSnapshot(true);
         if (initialSnap) {
           recordHistoryCheckpoint(initialSnap.tick);
@@ -302,6 +316,7 @@ self.onmessage = async function(e) {
         }
         historyCheckpoints = [];
         lastCheckpointTick = -1;
+        lastCheckpointRealTime = 0;
         const snap = pullSnapshot(true);
         if (snap) {
           recordHistoryCheckpoint(snap.tick);
@@ -334,6 +349,7 @@ self.onmessage = async function(e) {
       if (res.ok) {
         historyCheckpoints = [];
         lastCheckpointTick = -1;
+        lastCheckpointRealTime = 0;
         snap = pullSnapshot(true);
         if (snap) {
           recordHistoryCheckpoint(snap.tick);

@@ -599,11 +599,20 @@ impl Agent3D {
                     config.road_wear_tier_step,
                     config.road_benefit_max_wear,
                 );
-                let edge = &mut road_network.graph[edge_idx];
-                let new_wear = (edge.wear + config.road_wear_step_inc).min(config.road_max_wear);
-                edge.wear = new_wear;
+                let new_wear = {
+                    let edge = &mut road_network.graph[edge_idx];
+                    let nw = (edge.wear + config.road_wear_step_inc).min(config.road_max_wear);
+                    edge.wear = nw;
+                    nw
+                };
                 if let Some(rev_idx) = rev_edge_idx {
                     road_network.graph[rev_idx].wear = new_wear;
+                }
+                if new_wear > 0.0 {
+                    road_network.active_wear_edges.insert(edge_idx);
+                    if let Some(rev_idx) = rev_edge_idx {
+                        road_network.active_wear_edges.insert(rev_idx);
+                    }
                 }
                 let new_bucket = LaneEdge3D::wear_tier_bucket(
                     new_wear,

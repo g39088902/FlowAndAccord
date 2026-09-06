@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use petgraph::algo::astar;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -99,6 +99,8 @@ pub struct LaneGraph3D {
     pub next_lane_id: LaneId,
     // ★ 静态端点对路径缓存：(from_node, to_node, prefer_hidden) -> Option<Vec<LaneId>>
     pub path_cache: std::cell::RefCell<HashMap<(NodeId, NodeId, bool), Option<Vec<LaneId>>>>,
+    // ★ 稀疏活跃磨损边集合 (wear > 0.0)，避免每拍遍历全图无路/荒野边 (M2 优化)
+    pub active_wear_edges: BTreeSet<EdgeIndex>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,6 +121,7 @@ impl LaneGraph3D {
             next_node_id: 1,
             next_lane_id: 1,
             path_cache: std::cell::RefCell::new(HashMap::new()),
+            active_wear_edges: BTreeSet::new(),
         }
     }
 
@@ -190,23 +193,45 @@ impl LaneGraph3D {
 
         let edge_idx = self.graph.add_edge(from_idx, to_idx, edge_data);
         self.edge_map.insert(lane_id, edge_idx);
+        if self.graph[edge_idx].wear > 0.0 {
+            self.active_wear_edges.insert(edge_idx);
+        }
         self.clear_path_cache();
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减（跨阶跌落时使端点对路径缓存失效）
+    /// 道路自然杂草丛生与退化衰减（仅扫描稀疏活跃磨损边，跨阶跌落时使端点对路径缓存失效）
     pub fn tick_wear_decay(&mut self, dt: f32, config: &SimConfig) {
+        if self.active_wear_edges.is_empty() {
+            return;
+        }
         let mut bucket_changed = false;
         let tier_step = config.road_wear_tier_step;
         let benefit_max = config.road_benefit_max_wear;
-        for edge in self.graph.edge_weights_mut() {
+        let decay_mult = (1.0 - config.road_wear_decay_rate * dt).max(0.0);
+
+        let mut to_remove = Vec::new();
+        for &edge_idx in &self.active_wear_edges {
+            let edge = &mut self.graph[edge_idx];
             let old_bucket = LaneEdge3D::wear_tier_bucket(edge.wear, tier_step, benefit_max);
-            edge.wear = (edge.wear * (1.0 - config.road_wear_decay_rate * dt)).max(0.0);
-            let new_bucket = LaneEdge3D::wear_tier_bucket(edge.wear, tier_step, benefit_max);
+            let decayed = edge.wear * decay_mult;
+            let new_wear = if decayed < 1e-5 {
+                to_remove.push(edge_idx);
+                0.0
+            } else {
+                decayed
+            };
+            edge.wear = new_wear;
+            let new_bucket = LaneEdge3D::wear_tier_bucket(new_wear, tier_step, benefit_max);
             if old_bucket != new_bucket {
                 bucket_changed = true;
             }
         }
+
+        for edge_idx in to_remove {
+            self.active_wear_edges.remove(&edge_idx);
+        }
+
         if bucket_changed {
             self.clear_path_cache();
         }
@@ -330,11 +355,15 @@ impl LaneGraph3D {
         }
         for lane in data.lanes {
             let (lane_id, from, to) = (lane.id, lane.from_node, lane.to_node);
+            let has_wear = lane.wear > 0.0;
             if let (Some(from_idx), Some(to_idx)) = (net.node_map.get(&from), net.node_map.get(&to)) {
                 let from_idx = *from_idx;
                 let to_idx = *to_idx;
                 let edge_idx = net.graph.add_edge(from_idx, to_idx, lane);
                 net.edge_map.insert(lane_id, edge_idx);
+                if has_wear {
+                    net.active_wear_edges.insert(edge_idx);
+                }
             }
         }
         net.next_node_id = data.next_node_id;
