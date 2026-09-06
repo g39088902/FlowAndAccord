@@ -104,6 +104,16 @@ pub extern "C" fn world_tick_steps(steps: u32, dt: f32) {
     }
 }
 
+/// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~8）
+#[no_mangle]
+pub extern "C" fn world_tick_subphase(phase_idx: u32, dt: f32) {
+    unsafe {
+        if let Some(w) = WORLD.as_mut() {
+            w.tick_subphase(phase_idx, dt);
+        }
+    }
+}
+
 /// 设置某类 POI 再生倍率 (0=水 1=果 2=木 3=石 4=金)
 #[no_mangle]
 pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
@@ -132,6 +142,16 @@ pub extern "C" fn world_snapshot_ptr() -> u32 {
 #[no_mangle]
 pub extern "C" fn world_snapshot_len() -> u32 {
     unsafe { SNAPSHOT_BUF.len() as u32 }
+}
+
+/// 强制下一帧快照输出完整地形网格 (例如初始化或前端重新加载时调用)
+#[no_mangle]
+pub extern "C" fn world_require_terrain() {
+    unsafe {
+        if let Some(w) = WORLD.as_ref() {
+            w.terrain_dirty.set(true);
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

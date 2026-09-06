@@ -142,7 +142,7 @@ class AnomalyDetector {
           const dist = Math.hypot(a.x - prev.pos.x, a.y - prev.pos.y);
           if (dist < 0.05) {
             prev.count++;
-            if (prev.count === 60) { // ~2秒无位移
+            if (prev.count === 60) { // ~1游戏小时无位移
               this.anomalies.push({
                 tick,
                 severity: 'MEDIUM',
@@ -249,7 +249,7 @@ async function main() {
   ex.world_create(60, 764.0, opts.seed, 20, simConfig.countCamps);
   applyConfig(simConfig);
 
-  const DT = 1.0 / 30.0;
+  const DT = 1.0 / 60.0;
   const SUBSTEPS = 10;
   const totalTicks = opts.tick;
   let currentTick = 0;
@@ -258,7 +258,7 @@ async function main() {
   const focusAgentTrace = [];
   const traceStartTick = Math.max(0, totalTicks - opts.traceWindow);
 
-  console.log(`🚀 启动无头仿真诊断: Seed=${opts.seed} | 目标Tick=${totalTicks} (~${(totalTicks / 30).toFixed(1)}s 模拟时间)`);
+  console.log(`🚀 启动无头仿真诊断: Seed=${opts.seed} | 目标Tick=${totalTicks} (~${(totalTicks / 60).toFixed(1)}小时 游戏时间)`);
 
   const startTime = Date.now();
 
@@ -332,7 +332,7 @@ function generateReport({ opts, simConfig, durationMs, finalSnap, sampleSnapshot
 
   const lines = [];
   lines.push(`# 🛠️ Flow & Accord 确定性内核诊断报告`);
-  lines.push(`> **种子 (Seed)**: \`${opts.seed}\` | **截止 Tick**: \`${opts.tick}\` (~${(opts.tick / 30).toFixed(1)}s 模拟时间) | **步进耗时**: \`${durationMs} ms\``);
+  lines.push(`> **种子 (Seed)**: \`${opts.seed}\` | **截止 Tick**: \`${opts.tick}\` (~${(opts.tick / 60).toFixed(1)}小时 游戏时间) | **步进耗时**: \`${durationMs} ms\``);
   lines.push(`> **时间与环境**: ${finalSnap.season} ${finalSnap.temperature.toFixed(1)}°C (进度 ${(finalSnap.season_progress * 100).toFixed(0)}%) | 偏角: ${(finalSnap.tilt_angle_rad * 180 / Math.PI).toFixed(1)}°`);
   lines.push(``);
 

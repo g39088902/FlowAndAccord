@@ -243,6 +243,8 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         auction_flopped: save.auction_flopped,
         auction_history: save.auction_history,
         last_royal_payout_tick: save.last_royal_payout_tick,
+        terrain_dirty: std::cell::Cell::new(true),
+        regions_arrival_dirty: true,
     };
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic

@@ -176,8 +176,8 @@ function updateGlobalAverages(aliveAgents, houses, households) {
     if (el('avg-thirst-fill')) el('avg-thirst-fill').style.width = '0%';
     if (el('avg-stamina-val')) el('avg-stamina-val').textContent = '0.0%';
     if (el('avg-stamina-fill')) el('avg-stamina-fill').style.width = '0%';
-    if (el('avg-age-val')) el('avg-age-val').textContent = '0.0s';
-    if (el('avg-speed-val')) el('avg-speed-val').textContent = '0.0 m/s';
+    if (el('avg-age-val')) el('avg-age-val').textContent = '0.0小时';
+    if (el('avg-speed-val')) el('avg-speed-val').textContent = '0.0 m/h';
     if (el('avg-gender-val')) el('avg-gender-val').textContent = '0♂ / 0♀';
     if (el('avg-house-val')) el('avg-house-val').textContent = '0% (0间/0户)';
     if (el('avg-single-val')) el('avg-single-val').textContent = '0♂ / 0♀';
@@ -304,8 +304,8 @@ function updateGlobalAverages(aliveAgents, houses, households) {
   if (el('avg-stamina-val')) el('avg-stamina-val').textContent = `${avgStamina.toFixed(1)}%`;
   if (el('avg-stamina-fill')) el('avg-stamina-fill').style.width = `${Math.min(100, Math.max(0, staminaPct))}%`;
 
-  if (el('avg-age-val')) el('avg-age-val').textContent = `${avgAge.toFixed(1)}s`;
-  if (el('avg-speed-val')) el('avg-speed-val').textContent = `${avgSpeed.toFixed(1)} m/s`;
+  if (el('avg-age-val')) el('avg-age-val').textContent = `${avgAge.toFixed(1)}小时`;
+  if (el('avg-speed-val')) el('avg-speed-val').textContent = `${avgSpeed.toFixed(1)} m/h`;
   if (el('avg-gender-val')) el('avg-gender-val').textContent = `${males}♂ / ${females}♀`;
   if (el('avg-house-val')) el('avg-house-val').textContent = `${housePct}% (${ownedHousesCount}间/${activeHouseholdsCount}户)`;
   if (el('avg-single-val')) el('avg-single-val').textContent = `${singleAdultMales}♂ / ${singleAdultFemales}♀`;
@@ -341,13 +341,17 @@ function updateGlobalAverages(aliveAgents, houses, households) {
 // ★ 账本与家户/婚姻系统渲染函数 (v0.9.72 M1)
 // ═══════════════════════════════════════════════════════════
 
-// tick → 模拟秒转换 (1 tick = 1/30 s)
-function tickToSec(tick) { return tick / 30.0; }
-// 模拟秒 → 可读时长
-function formatDuration(sec) {
-  if (sec < 60) return sec.toFixed(0) + 's';
-  if (sec < 3600) return (sec / 60).toFixed(1) + 'min';
-  return (sec / 3600).toFixed(1) + 'h';
+// tick → 游戏小时转换 (1 tick = 1/60 h)
+function tickToHour(tick) { return tick / 60.0; }
+function tickToSec(tick) { return tickToHour(tick); } // 兼容历史调用
+// 游戏小时 → 可读时长
+function formatDuration(hours) {
+  if (!hours || hours <= 0) return '0小时';
+  if (hours < 1) return (hours * 60).toFixed(0) + '分';
+  if (hours < 24) return hours.toFixed(1) + '小时';
+  const days = Math.floor(hours / 24);
+  const remHrs = Math.floor(hours % 24);
+  return remHrs > 0 ? `${days}天${remHrs}小时` : `${days}天`;
 }
 
 // 更新 Agent Inspector 中的家户与婚姻信息

@@ -189,7 +189,7 @@
     content.innerHTML =
       '<div style="margin-bottom:6px; color:#38bdf8; font-weight:600;">' +
         (n.isAlive
-          ? ('🟢 活跃中 · 年龄 ' + n.age + 's · 健康 ' + n.health)
+          ? ('🟢 活跃中 · 年龄 ' + n.age + 'h · 健康 ' + n.health)
           : ('💀 已故 · 死因: ' + (n.deathCause || '寿终正寝'))) +
       '</div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">' +

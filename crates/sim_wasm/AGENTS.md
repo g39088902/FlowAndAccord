@@ -38,6 +38,6 @@
 - **静态可变缓冲区是 unsafe 根源**：`WORLD`/`SNAPSHOT_BUF`/`CONFIG_BUF` 为 `static mut`，编译期产生 `static_mut_refs` 警告（既有、可接受）。新增共享状态仍须走静态缓冲区 + 指针传递，**禁止**引入运行时全局锁或线程（wasm32 单线程）。
 - **指针约定**：所有跨边界数据都是"先调 `*_ptr`/`*_buf_ptr` 拿指针 + 对应 len"，前端用 `Uint8Array` 拷贝。**不要在 wasm 内存外返回指针**。`world_snapshot_ptr` 每次调用重新序列化；序列化失败时缓冲区保持旧内容、指针仍指向旧数据，前端须先读 `world_snapshot_len` 再按长度取 `world_snapshot_ptr`。
 - **错误码语义**：`world_apply_config_buf` 与 `world_set_config` 的返回码（0/-1/-2/-3/-4）已被前端依赖，**新增失败分支只能向后追加新负数**，不得改动既有语义。
-- **`dt` 语义**：`world_tick` 接收 dt 秒；前端固定 1/30，倍速用 `world_tick_steps`，**严禁改动内核 dt=1/30**（根 AGENTS.md §4.3）。
+- **`dt` 语义**：`world_tick` 接收 dt；前端固定 1/60，倍速用 `world_tick_steps`，**严禁改动内核 dt=1/60**（根 AGENTS.md §4.3）。
 - **确定性**：`world_create` 的 seed 是复现入口；`tools/test-wasm.js` 的同种子逐字节校验覆盖本层，改动导出或序列化格式前先跑回归。
 - **改本目录代码后必须重编并同步双副本**（根 AGENTS.md §4.1），不要用字节数判断是否更新，以 `test-wasm.js` 输出为准。

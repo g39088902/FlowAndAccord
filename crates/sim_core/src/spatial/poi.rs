@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use crate::config::SimConfig;
 use super::vec3::Vec3;
 use super::agent::AgentId;
+use super::graph::NodeId;
 
 pub type PoiId = u32;
 
@@ -26,6 +27,21 @@ pub enum PoiType {
     StoneQuarry, // 🪨 嶙峋石矿 (储量上限与产速由 config.stock_max_stone / config.regen_base_stone 控制)
     GoldMine,    // 🪙 璀璨金矿 (储量上限与产速由 config.stock_max_gold / config.regen_base_gold 控制)
     Market,      // 🏪 榷场互市 (外部商贸枢纽，主库存承载水、次级库存承载粮，以黄金计价)
+}
+
+impl PoiType {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            PoiType::Camp => "Camp",
+            PoiType::WaterSource => "WaterSource",
+            PoiType::BerryBush => "BerryBush",
+            PoiType::WoodForest => "WoodForest",
+            PoiType::StoneQuarry => "StoneQuarry",
+            PoiType::GoldMine => "GoldMine",
+            PoiType::Market => "Market",
+        }
+    }
 }
 
 /// 全国县级行政区地名库 (240+ 处真实古雅县级行政区地名，营地生成时随机挑选)
@@ -189,6 +205,9 @@ pub struct PrimitivePoi {
     pub cumulative_sold_wood: f32,
     #[serde(default)]
     pub cumulative_revenue: f32,
+    /// 接驳/最近的路网节点 ID（避免每 Tick 遍历全图节点寻找）
+    #[serde(default)]
+    pub nearest_node_id: Option<NodeId>,
 }
 
 impl PrimitivePoi {
@@ -250,6 +269,7 @@ impl PrimitivePoi {
             cumulative_sold_food: 0.0,
             cumulative_sold_wood: 0.0,
             cumulative_revenue: 0.0,
+            nearest_node_id: None,
         }
     }
 

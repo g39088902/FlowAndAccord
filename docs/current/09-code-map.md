@@ -66,8 +66,8 @@ FlowAndAccord/
 │   │   ├── math.js                         # 3D 向量与投影变换
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
-│   │   ├── decision-viz.js                 # 决策引擎集成层 (合并配置进 SIM_CONFIG / 拖动热注入 / POST 写盘 / localStorage 降级)
-│   │   ├── rustworld.js                    # WASM 桥接层、快照映射、Config 注入驱动、agentArchive 全量档案库
+│   │   ├── sim_worker.js                   # ★ v1.38.0 仿真内核专用 Web Worker (后台独立线程加载 WASM、自主步进与快照背压推送)
+│   │   ├── rustworld.js                    # ★ v1.38.0 主线程仿真代理层、快照映射、Worker 生命周期管理、agentArchive 全量档案库
 │   │   ├── dag-layout.js                   # 族谱时间轴布局数学 (纯函数, 零 DOM)
 │   │   ├── dag-view.js                     # 族谱虚拟化渲染 + LOD + pan/zoom + 刻度尺
 │   │   ├── dag-standalone.js               # 族谱独立新标签页 HTML 模板

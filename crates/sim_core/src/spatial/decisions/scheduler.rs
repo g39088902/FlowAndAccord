@@ -111,6 +111,7 @@ impl World3DEngine {
                 }
             }
             self.region_registry.add_member(camp_id, agent_id, tick, arrival);
+            self.regions_arrival_dirty = true;
         }
 
         // WRITE: 立王（历史国王入档，见 Region::set_king）
@@ -255,7 +256,7 @@ impl World3DEngine {
         let mut poi_positions = Vec::new();
 
         for poi in &self.pois {
-            let Some(node) = self.find_nearest_node(poi.pos) else { continue };
+            let Some(node) = poi.nearest_node_id.or_else(|| self.find_nearest_node(poi.pos)) else { continue };
             let target = ResourceNode { poi_id: poi.id, node };
             if poi.poi_type != PoiType::Camp {
                 poi_positions.push(poi.pos);

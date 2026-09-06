@@ -271,13 +271,16 @@ impl World3DEngine {
     /// 在 tick() 尾段（tick_clan 之后）调用。
     pub fn tick_region(&mut self, _dt: f32) {
         let tick = self.tick_counter;
-        // 先收集所有 agent 的 arrival_tick（避免借用冲突），再重排所有地区的 arrival_order
-        let arrival_ticks: std::collections::BTreeMap<AgentId, u64> = self.agents.iter()
-            .map(|a| (a.id, a.arrival_tick))
-            .collect();
-        let camp_ids: Vec<u32> = self.region_registry.regions.keys().copied().collect();
-        for camp_id in camp_ids {
-            self.region_registry.reorder_arrival(camp_id, &arrival_ticks);
+        // 仅在有新成员加入或变动时按需重排 arrival_order，消除每 Tick 无谓红黑树堆分配
+        if self.regions_arrival_dirty {
+            let arrival_ticks: std::collections::BTreeMap<AgentId, u64> = self.agents.iter()
+                .map(|a| (a.id, a.arrival_tick))
+                .collect();
+            let camp_ids: Vec<u32> = self.region_registry.regions.keys().copied().collect();
+            for camp_id in camp_ids {
+                self.region_registry.reorder_arrival(camp_id, &arrival_ticks);
+            }
+            self.regions_arrival_dirty = false;
         }
         self.update_kings(tick);
         self.handle_king_deaths(tick);
@@ -286,9 +289,9 @@ impl World3DEngine {
         self.tick_royal_privy(tick);
     }
 
-    /// 每 100 游戏秒从地区公仓拨付现任国王内帑，进入其随身黄金。
+    /// 每 100 游戏小时从地区公仓拨付现任国王内帑，进入其随身黄金。
     fn tick_royal_privy(&mut self, tick: u64) {
-        const INTERVAL_TICKS: u64 = 3000;
+        const INTERVAL_TICKS: u64 = 6000;
         if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(INTERVAL_TICKS) { return; }
         self.last_royal_payout_tick = tick - (tick % INTERVAL_TICKS);
         let mut payouts: Vec<(u32, AgentId, f32)> = Vec::new();

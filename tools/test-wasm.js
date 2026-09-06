@@ -75,11 +75,11 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   // === Test 1: 确定性 (同种子 -> 快照逐字节一致) ===
   ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   applyConfig(simConfig);
-  runSteps(600, 1 / 30);
+  runSteps(600, 1 / 60);
   const snapA = JSON.stringify(snapshot());
   ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   applyConfig(simConfig);
-  runSteps(600, 1 / 30);
+  runSteps(600, 1 / 60);
   const snapB = JSON.stringify(snapshot());
   console.log('determinism (same seed):', snapA === snapB);
   if (snapA !== snapB) throw new Error('DETERMINISM FAILED');
@@ -87,7 +87,7 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   // === Test 2: 长程运行稳定性 (无 panic / 越界 / NaN) ===
   ex.world_create(60, 764.0, 2026, 20, simConfig.countCamps);
   applyConfig(simConfig);
-  runSteps(6000, 1 / 30); // ~200 秒
+  runSteps(6000, 1 / 60); // ~100 小时
   const s = snapshot();
   let outOfBounds = 0, nanCount = 0;
   for (const a of s.agents) {
@@ -103,26 +103,26 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   // === Test 3: 存档 / 读档确定性 (存档点续演 == 不中断连续运行) ===
   // 强确定性要求：RNG 内部状态、施密特触发器、私有冷却、账本流水、路网磨损、
   // 发号器与计数器全部入档。若任一字段漏存，此处续演结果即与连续运行分叉。
-  const SAVE_TICKS = 900;  // 存档前推进（×2 = 1800 tick ≈ 60 模拟秒）
+  const SAVE_TICKS = 900;  // 存档前推进（×2 = 1800 tick ≈ 30 游戏小时）
   const POST_TICKS = 900;  // 存档后推进
   const SAVE_SEED = 31415;
 
   // 基准：连续不中断跑到 SAVE + POST
   ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   applyConfig(simConfig);
-  runSteps(SAVE_TICKS, 1 / 30);
+  runSteps(SAVE_TICKS, 1 / 60);
   const savedJson = saveToString();
   const tickAtSave = snapshot().tick;
-  runSteps(POST_TICKS, 1 / 30);
+  runSteps(POST_TICKS, 1 / 60);
   const snapContinuous = JSON.stringify(snapshot());
 
   // 对照：新建同种子世界 → 跑到存档点 → 读档覆盖 → 续演同样步数
   ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   applyConfig(simConfig);
-  runSteps(SAVE_TICKS, 1 / 30);
+  runSteps(SAVE_TICKS, 1 / 60);
   loadFromString(savedJson);
   const tickAfterLoad = snapshot().tick;
-  runSteps(POST_TICKS, 1 / 30);
+  runSteps(POST_TICKS, 1 / 60);
   const snapReloaded = JSON.stringify(snapshot());
 
   console.log('save size: ' + (savedJson.length / 1024).toFixed(1) + ' KB  tick@save=' + tickAtSave);

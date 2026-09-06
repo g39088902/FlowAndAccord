@@ -27,11 +27,11 @@ const _meterRateTracker = (() => {
   };
 })();
 function _fmtRate(v) {
-  if (!isFinite(v) || Math.abs(v) < 0.005) return '约 0.00/秒';
-  return (v > 0 ? '+' : '') + v.toFixed(2) + '/秒';
+  if (!isFinite(v) || Math.abs(v) < 0.005) return '约 0.00/小时';
+  return (v > 0 ? '+' : '') + v.toFixed(2) + '/小时';
 }
-// 每帧游戏时间增量（秒）＝ simulationDt × 倍速
-const _gameDt = () => (sim.simulationDt || 1 / 30) * (sim.speedMult || 1);
+// 每帧游戏时间增量（小时）＝ simulationDt × 倍速
+const _gameDt = () => (sim.simulationDt || 1 / 60) * (sim.speedMult || 1);
 
 // ★ v1.22.6 产速倍率槽位映射（唯一真相源为内核 sim.regenMultipliers）
 // POI 快照的 regen_rate 只含**基准值**，实际再生 = 基准 × 倍率（见 world_tick.rs）。
@@ -130,7 +130,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (durFillEl) {
       let durHint = '耐久变化 ' + _fmtRate(durRate);
       if (isVacant) durHint = '🏚️ 无主空置房 · 正常风化 ' + _fmtRate(durRate);
-      else if (house.isRepairing) durHint = '🔧 修缮回血中 · 每秒变化 ' + _fmtRate(durRate);
+      else if (house.isRepairing) durHint = '🔧 修缮回血中 · 每小时变化 ' + _fmtRate(durRate);
       durFillEl.title = durHint;
     }
 
@@ -411,7 +411,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const waterStockEl = document.getElementById('insp-market-water-stock');
         if (waterStockEl) waterStockEl.textContent = `${poi.currentStock.toFixed(1)}/${poi.maxStock.toFixed(0)}`;
         const waterRegenEl = document.getElementById('insp-market-water-regen');
-        if (waterRegenEl) waterRegenEl.textContent = `+${effPrimary.toFixed(1)}/s`;
+        if (waterRegenEl) waterRegenEl.textContent = `+${effPrimary.toFixed(1)}/h`;
 
         // 🍒 粮食
         const foodPriceEl = document.getElementById('insp-market-food-price');
@@ -423,7 +423,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const foodStockEl = document.getElementById('insp-market-food-stock');
         if (foodStockEl) foodStockEl.textContent = `${(poi.secondaryStock || 0).toFixed(1)}/${foodMax.toFixed(0)}`;
         const foodRegenEl = document.getElementById('insp-market-food-regen');
-        if (foodRegenEl) foodRegenEl.textContent = `+${effSecondary.toFixed(1)}/s`;
+        if (foodRegenEl) foodRegenEl.textContent = `+${effSecondary.toFixed(1)}/h`;
 
         // 🌲 木料
         const woodPriceEl = document.getElementById('insp-market-wood-price');
@@ -435,7 +435,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const woodStockEl = document.getElementById('insp-market-wood-stock');
         if (woodStockEl) woodStockEl.textContent = `${(poi.tertiaryStock || 0).toFixed(1)}/${woodMax.toFixed(0)}`;
         const woodRegenEl = document.getElementById('insp-market-wood-regen');
-        if (woodRegenEl) woodRegenEl.textContent = `+${effTertiary.toFixed(1)}/s`;
+        if (woodRegenEl) woodRegenEl.textContent = `+${effTertiary.toFixed(1)}/h`;
       }
     } else {
       if (marketBox) marketBox.style.display = 'none';
@@ -542,7 +542,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const multPrimary = poiRegenMultiplier(poi.type, 'primary');
     const effPrimary = effectiveRegenRate(poi.regenRate, multPrimary);
     document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0
-      ? `+${effPrimary.toFixed(2)} 单位/秒 (基准 ${poi.regenRate.toFixed(2)} × ${multPrimary.toFixed(1)}x)`
+      ? `+${effPrimary.toFixed(2)} 单位/小时 (基准 ${poi.regenRate.toFixed(2)} × ${multPrimary.toFixed(1)}x)`
       : `无限储量 (公共避风聚落)`;
 
     // 第二条产速：仅榷场（粮食，复用浆果倍率槽位）
@@ -552,7 +552,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const multSecondary = poiRegenMultiplier(poi.type, 'secondary');
         const effSecondary = effectiveRegenRate(poi.secondaryRegenRate, multSecondary);
         document.getElementById('insp-poi-regen-secondary').textContent =
-          `+${effSecondary.toFixed(2)} 单位/秒 (基准 ${poi.secondaryRegenRate.toFixed(2)} × ${multSecondary.toFixed(1)}x)`;
+          `+${effSecondary.toFixed(2)} 单位/小时 (基准 ${poi.secondaryRegenRate.toFixed(2)} × ${multSecondary.toFixed(1)}x)`;
       } else {
         regenSecondaryRow.style.display = 'none';
       }
@@ -565,7 +565,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const multTertiary = poiRegenMultiplier(poi.type, 'tertiary');
         const effTertiary = effectiveRegenRate(poi.tertiaryRegenRate, multTertiary);
         document.getElementById('insp-poi-regen-tertiary').textContent =
-          `+${effTertiary.toFixed(2)} 单位/秒 (基准 ${poi.tertiaryRegenRate.toFixed(2)} × ${multTertiary.toFixed(1)}x)`;
+          `+${effTertiary.toFixed(2)} 单位/小时 (基准 ${poi.tertiaryRegenRate.toFixed(2)} × ${multTertiary.toFixed(1)}x)`;
       } else {
         regenTertiaryRow.style.display = 'none';
       }
@@ -593,11 +593,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     // ★ v1.22.6 产速不再写死，统一读 SIM_CONFIG 基准值（根 AGENTS.md §4.12 禁止散落字面量）
     const cfg = (typeof window !== 'undefined' && window.SIM_CONFIG) || {};
     const baseRateOf = key => (typeof cfg[key] === 'number' ? cfg[key] : 0);
-    if (poi.type === 'Water') desc = `低洼处天然地泉(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWater').toFixed(1)}/s)，小人饮水并补给家宅。`;
-    else if (poi.type === 'Berry') desc = `向阳缓坡野生灌木(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseBerry').toFixed(1)}/s)，小人采食并补给家宅。`;
-    else if (poi.type === 'Wood') desc = `茂密原生林地(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWood').toFixed(1)}/s)，伐木用于冬季房屋供暖与升级茅草房。`;
-    else if (poi.type === 'Stone') desc = `嶙峋高地石矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseStone').toFixed(1)}/s)，采石仅用于私宅升级木石庄舍与大庄园。`;
-    else if (poi.type === 'Gold') desc = `璀璨金矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseGold').toFixed(1)}/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。`;
+    if (poi.type === 'Water') desc = `低洼处天然地泉(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWater').toFixed(1)}/h)，小人饮水并补给家宅。`;
+    else if (poi.type === 'Berry') desc = `向阳缓坡野生灌木(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseBerry').toFixed(1)}/h)，小人采食并补给家宅。`;
+    else if (poi.type === 'Wood') desc = `茂密原生林地(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWood').toFixed(1)}/h)，伐木用于冬季房屋供暖与升级茅草房。`;
+    else if (poi.type === 'Stone') desc = `嶙峋高地石矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseStone').toFixed(1)}/h)，采石仅用于私宅升级木石庄舍与大庄园。`;
+    else if (poi.type === 'Gold') desc = `璀璨金矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseGold').toFixed(1)}/h)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。`;
     else if (poi.type === 'Market') desc = `外部边境常驻榷场互市，为部落提供清水、粮食与木材商贸。各物资牌价随供需幂律动态浮动，交易黄金由户主家户账本远程结算并回收。`;
     document.getElementById('insp-detail-text').textContent = desc;
     }
@@ -667,13 +667,13 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       const isDecaying = typeof selAgent.deathDecayTimer === 'number' && selAgent.deathDecayTimer > 0;
       stateText = isDecaying ? '💀 刚离世' : '💀 已故先祖';
       detailText = isDecaying
-        ? `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}s 后消逝)`
+        ? `死因: ${selAgent.deathCause || '未知饥荒'} (遗骸将在 ${Math.ceil(selAgent.deathDecayTimer)}小时 后消逝)`
         : `死因: ${selAgent.deathCause || '寿终正寝/未知'} (已入土长眠，载入族谱先祖志)`;
     } else if (selAgent.state === 'RestingAtCamp') {
       if (selAgent.stamina < 99.5) {
         const restRate = (8.0 * (selAgent.sleepEfficiency || 100) / 100).toFixed(1);
-        stateText = (selAgent.homeHouseId ? '🏡 私宅休养' : '🏕️ 营地休养') + ' (+' + restRate + '%/s)';
-        detailText = '正在家宅/营地静坐休养，体力恢复速率 = 8.0%/s × 睡眠效率/100 (' + restRate + '%/s)，睡眠效率越高休息越快，恢复至 100% 满值后方可开展后续工作。';
+        stateText = (selAgent.homeHouseId ? '🏡 私宅休养' : '🏕️ 营地休养') + ' (+' + restRate + '%/h)';
+        detailText = '正在家宅/营地静坐休养，体力恢复速率 = 8.0%/h × 睡眠效率/100 (' + restRate + '%/h)，睡眠效率越高休息越快，恢复至 100% 满值后方可开展后续工作。';
       } else {
         stateText = selAgent.homeHouseId ? '🏡 私宅安居' : '🏕️ 营地驻留';
         detailText = '体力充盈至 100% 且温饱无虞，安居静候下一个生活/营建需求。';
@@ -681,7 +681,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     } else if (selAgent.state === 'ConstructingHouse') {
       const progPct = Math.round((selAgent.buildTimer / 30.0) * 100);
       stateText = `🔨 营建中 (${progPct}%)`;
-      detailText = '投入体力与工时营建或升级私宅(30s工期)，完成后将扩容储备空间并激活/保障繁衍孕育。';
+      detailText = '投入体力与工时营建或升级私宅(30小时工期)，完成后将扩容储备空间并激活/保障繁衍孕育。';
     } else if (selAgent.state === 'RepairingHouse') {
       stateText = '🔧 房屋修缮中';
       detailText = '投入体力劳作修缮专属私宅，恢复房屋耐久度至 100% 避免风化坍塌。';
@@ -743,11 +743,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         ageValElem.textContent = '🤰 孕育中 (未出生)';
         ageValElem.style.color = '#ec4899';
       } else if (isAdult) {
-        ageValElem.textContent = `${Math.floor(selAgent.age)}s · ${isFemale ? '已成年♀' : '已成年♂'}`;
+        ageValElem.textContent = `${Math.floor(selAgent.age)}小时 · ${isFemale ? '已成年♀' : '已成年♂'}`;
         ageValElem.style.color = isFemale ? '#ec4899' : '#38bdf8';
       } else {
         const needGrow = Math.ceil(1800.0 - selAgent.age);
-        ageValElem.textContent = `${Math.floor(selAgent.age)}s · 🍼幼年(需${needGrow}s)`;
+        ageValElem.textContent = `${Math.floor(selAgent.age)}小时 · 🍼幼年(需${needGrow}小时)`;
         ageValElem.style.color = '#a78bfa';
       }
     }
@@ -824,9 +824,9 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
     // ★ v1.9.0 饱食/口渴/体力每秒变化速度（按游戏时间秒；Task1 进度条悬停）
     const _gdt = _gameDt();
-    if (hungerFillEl) hungerFillEl.title = '饱食度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('hunger' + selAgent.id, selAgent.hunger, _gdt));
-    if (thirstFillEl) thirstFillEl.title = '口渴度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('thirst' + selAgent.id, selAgent.thirst, _gdt));
-    if (stamFillEl) stamFillEl.title = '体力 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('stamina' + selAgent.id, selAgent.stamina, _gdt));
+    if (hungerFillEl) hungerFillEl.title = '饱食度 · 每小时变化 ' + _fmtRate(_meterRateTracker.push('hunger' + selAgent.id, selAgent.hunger, _gdt));
+    if (thirstFillEl) thirstFillEl.title = '口渴度 · 每小时变化 ' + _fmtRate(_meterRateTracker.push('thirst' + selAgent.id, selAgent.thirst, _gdt));
+    if (stamFillEl) stamFillEl.title = '体力 · 每小时变化 ' + _fmtRate(_meterRateTracker.push('stamina' + selAgent.id, selAgent.stamina, _gdt));
 
     // 🎒 随身行囊 (紧凑胶囊网格)
     const cWater = selAgent.carriedWater || 0.0;
@@ -1106,9 +1106,9 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       const isLowHunger = selAgent.hunger !== undefined && selAgent.hunger < 30;
       const isLowStamina = selAgent.stamina !== undefined && selAgent.stamina < 25;
       const sHtml = `
-        <div class="vital-item" title="存活年龄 (秒)">
+        <div class="vital-item" title="存活年龄 (小时)">
           <span class="vital-label">⏳ 年龄</span>
-          <span class="vital-value">${Math.floor(selAgent.age)}s</span>
+          <span class="vital-value">${Math.floor(selAgent.age)}小时</span>
         </div>
         <div class="vital-item ${isLowHealth ? 'vital-warn' : ''}" title="生命健康度 (0~100)">
           <span class="vital-label">❤️ 健康</span>
@@ -1200,11 +1200,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       pregBox.style.display = 'flex';
       const pVal = Math.round(selAgent.pregnancyProgress * 100);
       const pregTotal = (window.SIM_CONFIG && window.SIM_CONFIG.agentPregnancyDuration) || 200;
-      document.getElementById('insp-preg-val').textContent = pVal + '% (' + Math.round(selAgent.pregnancyProgress * pregTotal) + 's / ' + pregTotal + 's)';
+      document.getElementById('insp-preg-val').textContent = pVal + '% (' + Math.round(selAgent.pregnancyProgress * pregTotal) + 'h / ' + pregTotal + 'h)';
       document.getElementById('insp-preg-fill').style.width = `${pVal}%`;
-      // ★ v1.9.0 怀孕进度每秒变化（按游戏秒，进度%）（Task1 进度条悬停）
+      // ★ v1.9.0 怀孕进度每小时变化（按游戏小时，进度%）（Task1 进度条悬停）
       const pregFillEl = document.getElementById('insp-preg-fill');
-      if (pregFillEl) pregFillEl.title = '怀孕进度 · 每秒变化 ' + _fmtRate(_meterRateTracker.push('preg' + selAgent.id, selAgent.pregnancyProgress, _gdt) * 100) + '（进度%）';
+      if (pregFillEl) pregFillEl.title = '怀孕进度 · 每小时变化 ' + _fmtRate(_meterRateTracker.push('preg' + selAgent.id, selAgent.pregnancyProgress, _gdt) * 100) + '（进度%）';
       // ★ M1.7 母亲卡片按钮 → 跳转胎儿卡片（data-agent-id 由 main.js 委托处理）
       const pregFetusBtn = document.getElementById('insp-preg-fetus-btn');
       if (pregFetusBtn) {
@@ -1284,17 +1284,17 @@ canvas.addEventListener('click', e => {
 
 // ══════════ 🏛️ 营地辖区详情模态框 (v1.12.0) ══════════
 (function () {
-  const TICK_PER_SEC = 30; // config.simulationDt * agentDecisionIntervalTicks = 1/30 * 30 = 1s
+  const TICK_PER_SEC = 60; // 60 ticks = 1 游戏小时
   let currentCampPoi = null;
 
   function fmtDuration(ticks) {
     if (!ticks || ticks <= 0) return '—';
-    const secs = Math.floor(ticks / TICK_PER_SEC);
-    if (secs < 60) return secs + '秒';
-    const mins = Math.floor(secs / 60);
-    if (mins < 60) return mins + '分' + (secs % 60) + '秒';
-    const hrs = Math.floor(mins / 60);
-    return hrs + '时' + (mins % 60) + '分';
+    const hours = Math.floor(ticks / TICK_PER_SEC);
+    if (hours < 1) return ticks + ' tick';
+    if (hours < 24) return hours + '小时';
+    const days = Math.floor(hours / 24);
+    const rem = hours % 24;
+    return rem > 0 ? `${days}天${rem}小时` : `${days}天`;
   }
 
   function agentChip(id, cls, title) {

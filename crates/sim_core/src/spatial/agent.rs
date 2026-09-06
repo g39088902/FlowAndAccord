@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use super::vec3::Vec3;
-use super::graph::{LaneGraph3D, LaneId, NodeId};
+use super::graph::{LaneGraph3D, LaneId, NodeId, LaneEdge3D};
 use super::poi::PoiId;
 use crate::config::*;
 
@@ -62,6 +62,16 @@ pub enum Gender {
     Female, // ♀ 女性 (只有女性能受孕与分娩)
 }
 
+impl Gender {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Gender::Male => "Male",
+            Gender::Female => "Female",
+        }
+    }
+}
+
 /// 原始生存与繁衍行为状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
@@ -86,6 +96,35 @@ pub enum PrimitiveActionState {
     SeekingCourtship,   // 💍 正在奔赴心仪女性求偶
     RaiseChild,         // 👶 尊重需求：男性自主承担养育小孩并尝试使妻子受孕
     Dead,               // 💀 已死亡 (饥荒或脱水致死)
+}
+
+impl PrimitiveActionState {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            PrimitiveActionState::RestingAtCamp => "RestingAtCamp",
+            PrimitiveActionState::SeekingWater => "SeekingWater",
+            PrimitiveActionState::SeekingFood => "SeekingFood",
+            PrimitiveActionState::DrinkingAtWater => "DrinkingAtWater",
+            PrimitiveActionState::ForagingFood => "ForagingFood",
+            PrimitiveActionState::SeekingWood => "SeekingWood",
+            PrimitiveActionState::GatheringWood => "GatheringWood",
+            PrimitiveActionState::SeekingStone => "SeekingStone",
+            PrimitiveActionState::MiningStone => "MiningStone",
+            PrimitiveActionState::SeekingGold => "SeekingGold",
+            PrimitiveActionState::MiningGold => "MiningGold",
+            PrimitiveActionState::ReturningToCamp => "ReturningToCamp",
+            PrimitiveActionState::ConstructingHouse => "ConstructingHouse",
+            PrimitiveActionState::RepairingHouse => "RepairingHouse",
+            PrimitiveActionState::OffRoadDetour => "OffRoadDetour",
+            PrimitiveActionState::SeekingThrone => "SeekingThrone",
+            PrimitiveActionState::SeekingMarket => "SeekingMarket",
+            PrimitiveActionState::BuyingAtMarket => "BuyingAtMarket",
+            PrimitiveActionState::SeekingCourtship => "SeekingCourtship",
+            PrimitiveActionState::RaiseChild => "RaiseChild",
+            PrimitiveActionState::Dead => "Dead",
+        }
+    }
 }
 
 /// 3D 动力学 Agent 实体
@@ -466,7 +505,7 @@ impl Agent3D {
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = config.agent_miscarriage_alert_duration;
                 self.miscarriage_cooldown_timer = config.agent_miscarriage_cooldown;
-                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 ({:.0}秒内休养不可受孕)！", self.id, miscarry_threshold, config.agent_miscarriage_cooldown));
+                return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 ({:.0}小时内休养不可受孕)！", self.id, miscarry_threshold, config.agent_miscarriage_cooldown));
             }
 
             self.pregnancy_progress += dt / config.agent_pregnancy_duration;
@@ -476,7 +515,7 @@ impl Agent3D {
                 self.ready_to_birth = true;
                 // ★ 分娩后进入产后休养冷却：期间禁止再次受孕
                 self.postpartum_cooldown_timer = config.agent_postpartum_cooldown;
-                return Some(format!("🍼 喜讯！女性部落民 #{} 历经{:.0}秒漫长孕期，顺利产下一名健康的新生儿！", self.id, config.agent_pregnancy_duration));
+                return Some(format!("🍼 喜讯！女性部落民 #{} 历经{:.0}小时漫长孕期，顺利产下一名健康的新生儿！", self.id, config.agent_pregnancy_duration));
             }
         }
 
@@ -528,16 +567,10 @@ impl Agent3D {
             return;
         };
 
-        let from_node = road_network.graph[edge_idx].from_node;
-        let to_node = road_network.graph[edge_idx].to_node;
-        let from_idx = road_network.node_map[&from_node];
-        let to_idx = road_network.node_map[&to_node];
-        let rev_edge_idx = road_network.graph.find_edge(to_idx, from_idx);
-
         let lane = &road_network.graph[edge_idx];
-        let wear = lane.wear;
+        let effective_wear = lane.wear.min(config.road_benefit_max_wear);
 
-        let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
+        let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * effective_wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
 
         // 坡度体力能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
@@ -553,13 +586,32 @@ impl Agent3D {
         self.distance_along_curve += self.current_velocity * dt;
 
         if self.distance_along_curve >= lane.curve.length {
-            // 踩踏拓路
+            // 踩踏拓路（仅在跨越车道时按需反查对偶反向边）
             {
+                let from_node = road_network.graph[edge_idx].from_node;
+                let to_node = road_network.graph[edge_idx].to_node;
+                let from_idx = road_network.node_map[&from_node];
+                let to_idx = road_network.node_map[&to_node];
+                let rev_edge_idx = road_network.graph.find_edge(to_idx, from_idx);
+
+                let old_bucket = LaneEdge3D::wear_tier_bucket(
+                    road_network.graph[edge_idx].wear,
+                    config.road_wear_tier_step,
+                    config.road_benefit_max_wear,
+                );
                 let edge = &mut road_network.graph[edge_idx];
                 let new_wear = (edge.wear + config.road_wear_step_inc).min(config.road_max_wear);
                 edge.wear = new_wear;
                 if let Some(rev_idx) = rev_edge_idx {
                     road_network.graph[rev_idx].wear = new_wear;
+                }
+                let new_bucket = LaneEdge3D::wear_tier_bucket(
+                    new_wear,
+                    config.road_wear_tier_step,
+                    config.road_benefit_max_wear,
+                );
+                if old_bucket != new_bucket {
+                    road_network.clear_path_cache();
                 }
             }
             self.advance_to_next_lane(road_network);

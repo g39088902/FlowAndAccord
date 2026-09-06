@@ -18,6 +18,8 @@ impl World3DEngine {
     /// 应用动态仿真配置
     pub fn apply_config(&mut self, config: SimConfig) {
         self.config = config;
+        // 配置更新后（可能变更寻路参数）清空路网路径缓存
+        self.network.clear_path_cache();
         // 同步刷新所有现有 POI 的产速基准与储量上限（v1.33.1 修复 max_stock 动态更新遗漏）
         for poi in &mut self.pois {
             match poi.poi_type {

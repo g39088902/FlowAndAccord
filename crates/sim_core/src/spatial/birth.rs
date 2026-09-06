@@ -198,6 +198,7 @@ impl World3DEngine {
                 // ★ M4 新生儿入父亲所在地区
                 if let Some(father_camp) = self.region_registry.region_of(fid) {
                     self.region_registry.add_member(father_camp, baby_id, tick, self.tick_counter);
+                    self.regions_arrival_dirty = true;
                 }
             }
 

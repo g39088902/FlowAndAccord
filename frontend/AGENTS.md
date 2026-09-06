@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：21 个 JS 文件 + index.html + style.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：22 个 JS 文件 + index.html + style.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照三处同步、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -31,7 +31,8 @@
 
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
-| `js/rustworld.js` | ~576 | `RustWorld` 类：加载 wasm / `world_create` / `tick()` 步进 / `_pullSnapshot()` 拉取 / `_applySnapshot()` 映射为 JS 对象 / `applyConfig()` 热注入 / agentArchive 全量档案库 / **存档桥接 `saveWorld()` · `loadWorld()` · `readSaveError()`**（v1.8.0） | Canvas 渲染、DOM 事件 |
+| `js/sim_worker.js` | ~280 | **仿真内核专用 Web Worker**（★ v1.38.0 Phase 1 解耦）：在独立 Worker 线程加载 WASM 引擎、自适应计时循环驱动 `world_tick_steps`、背压限频下发快照、管理历史检查点与时光倒流 | 任何 DOM 操作、Canvas 绘制 |
+| `js/rustworld.js` | ~576 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
 | `js/render_canvas.js` | ~226 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（调用各子模块绘制函数）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~490 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 | Canvas 绘制（在 render_canvas/render_world/render_agents） |
 | `js/render_world.js` | ~480 | **世界元素绘制**（v1.7.1 拆分）：drawTerrain（3D 地形网格）/ drawPois（POI 渲染与储量指示环）/ drawHouses（私宅渲染）/ drawLanes（动态踩踏道路网络渲染与悬浮 Tooltip） | 共享状态（在 render_canvas）、HUD（在 render_hud） |

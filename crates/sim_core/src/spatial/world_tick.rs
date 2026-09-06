@@ -21,10 +21,41 @@ const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
 /// - 步骤 7: `bookkeeping.rs::tick_bookkeeping`
 /// - 步骤 8/9: `ledger/clan.rs::tick_clan` / `ledger/region.rs::tick_region`
 impl World3DEngine {
-    /// 确定性仿真 Tick
+    /// 确定性仿真 Tick (按 AGENTS.md §4.3 严格顺次执行子阶段)
     pub fn tick(&mut self, dt: f32) {
         self.tick_counter += 1;
+        self.tick_phase_season_and_poi_regen(dt);
+        self.tick_phase_metabolism_and_child(dt);
+        self.tick_phase_poi_interactions(dt);
+        self.tick_phase_housing(dt);
+        self.tick_phase_road_decay(dt);
+        self.tick_phase_movement(dt);
+        self.tick_phase_decisions();
+        self.tick_phase_ledger(dt);
+        self.tick_phase_cleanup();
+    }
 
+    /// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~8）
+    pub fn tick_subphase(&mut self, phase_idx: u32, dt: f32) {
+        match phase_idx {
+            0 => {
+                self.tick_counter += 1;
+                self.tick_phase_season_and_poi_regen(dt);
+            }
+            1 => self.tick_phase_metabolism_and_child(dt),
+            2 => self.tick_phase_poi_interactions(dt),
+            3 => self.tick_phase_housing(dt),
+            4 => self.tick_phase_road_decay(dt),
+            5 => self.tick_phase_movement(dt),
+            6 => self.tick_phase_decisions(),
+            7 => self.tick_phase_ledger(dt),
+            8 => self.tick_phase_cleanup(),
+            _ => {}
+        }
+    }
+
+    /// 子阶段 0: 四季更迭与 POI 自然恢复
+    pub fn tick_phase_season_and_poi_regen(&mut self, dt: f32) {
         // 0. 四季更迭与宏观环境温度演化 (正弦周期拟合)
         self.tick_season(dt);
 
@@ -67,16 +98,16 @@ impl World3DEngine {
                 poi.tick_regenerate(dt * mult);
             }
         }
+    }
 
+    /// 子阶段 1: 生理代谢、养育受孕、胎儿位置跟随与金币遗产继承
+    pub fn tick_phase_metabolism_and_child(&mut self, dt: f32) {
         // 2. 代谢与繁衍（受孕瞬间需为胎儿占号，故将发号器取出循环外，循环结束回写）
-        // ★ 胎儿跳过代谢：不增长年龄、不衰减需求、不触发死亡判定（无需求消耗）
         let mut next_agent_id = self.next_agent_id;
         for agent in &mut self.agents {
             if agent.is_fetus {
                 continue;
             }
-            // ★ M6 起代谢层不再计算房屋/仓储 fertility_active 门禁；
-            //   ★ v1.28.0 受孕额外要求男方（户主）名下住宅 ≥1 级，该门槛在决策层 branches.rs::B18RaiseChild 判定
             if let Some(event) = agent.tick_metabolism(dt, &self.config, &mut next_agent_id) {
                 if !agent.is_alive {
                     self.total_deaths += 1;
@@ -85,7 +116,6 @@ impl World3DEngine {
                     } else {
                         self.total_deaths_unnatural += 1;
                     }
-                    // ★ v1.8.7 死亡墓碑：记录本 tick 刚死者的死因（前端即使高倍速跨过衰减窗口也不丢）
                     self.recent_deaths.push(RecentDeathSnapshot {
                         id: agent.id,
                         cause: agent.death_cause.clone().unwrap_or_else(|| "未知死因".to_string()),
@@ -102,47 +132,57 @@ impl World3DEngine {
                 self.last_event = Some(event);
             }
         }
-        self.next_agent_id = next_agent_id; // 回写发号器（受孕占号后递增）
+        self.next_agent_id = next_agent_id;
 
-        // ★ 生育改为马斯洛“养育小孩”行动：仅处理男性自主下达且妻子仍满足原受孕条件的意图。
+        // 生育改为马斯洛“养育小孩”行动：仅处理男性自主下达且妻子仍满足原受孕条件的意图
         self.execute_pending_childcare();
 
-        // ★ 2.3 受孕即建胎儿 agent（流产/母亡则移除，并同步胎儿位置跟随母亲）
+        // 2.3 受孕即建胎儿 agent（流产/母亡则移除，并同步胎儿位置跟随母亲）
         self.tick_fetus_reconcile();
 
         // 2.5 金币遗产继承结算 (死者金币平分给在世子一代子女)
         self.settle_gold_inheritance();
+    }
 
-        // 3. POI 实际提取、分娩与死亡尸骸消逝
+    /// 子阶段 2: POI 实际采收提取、分娩与死亡尸骸消逝
+    pub fn tick_phase_poi_interactions(&mut self, dt: f32) {
         self.tick_poi_interactions(dt);
+    }
 
-        // 4. 房屋折旧、消耗与代际继承
+    /// 子阶段 3: 房屋折旧、冬季供暖与代际继承
+    pub fn tick_phase_housing(&mut self, dt: f32) {
         self.tick_housing(dt);
+    }
 
-        // 5. 道路自然杂草丛生与退化衰减
+    /// 子阶段 4: 道路自然杂草丛生与退化衰减
+    pub fn tick_phase_road_decay(&mut self, dt: f32) {
         self.network.tick_wear_decay(dt, &self.config);
+    }
 
-        // 6. 动力学运动与踩踏拓路（★ 胎儿无地图实体，跳过运动）
+    /// 子阶段 5: 动力学运动与踩踏拓路
+    pub fn tick_phase_movement(&mut self, dt: f32) {
         for agent in &mut self.agents {
             if agent.is_fetus {
                 continue;
             }
             agent.tick_movement(dt, &mut self.network, &self.config);
         }
+    }
 
-        // 错峰决策
+    /// 子阶段 6: 错峰马斯洛决策与物理规则结算
+    pub fn tick_phase_decisions(&mut self) {
         self.tick_decisions();
+    }
 
-        // 7. M2 家庭生命周期结算（继承清算 + 分家抽资；卸货/吃喝/烧柴已由生态/维护层真实收付账本）
+    /// 子阶段 7: M2 家庭清算分家、M3 宗族互助与 M4 地区王国公仓税救济
+    pub fn tick_phase_ledger(&mut self, dt: f32) {
         self.tick_bookkeeping();
-
-        // 8. M3 宗族系统（族长顺位 → 族税征收 → 族内互助）
         self.tick_clan(dt);
-
-        // 9. M4 地区与王国系统（初王顺位 → 长子继承 → 公仓税 → 救济）
         self.tick_region(dt);
+    }
 
-        // ★ v1.8.7 墓碑滑动窗口清理：仅保留最近若干 tick 内的死亡/流产记录（覆盖 1024x 单帧推进与渲染间隙）
+    /// 子阶段 8: 墓碑滑动窗口清理
+    pub fn tick_phase_cleanup(&mut self) {
         self.recent_deaths
             .retain(|d| self.tick_counter.saturating_sub(d.tick) < RECENT_DEATH_RETAIN_TICKS);
     }

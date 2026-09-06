@@ -543,17 +543,21 @@ if (sim.showLanes) {
   const cfg = window.SIM_CONFIG || {};
   if (roadTooltip) {
     if (hoveredLane) {
-      const wear = Math.min(cfg.roadMaxWear || 5.0, hoveredLane.wear || 0.0);
+      const maxWear = cfg.roadMaxWear || 10.0;
+      const benefitMax = cfg.roadBenefitMaxWear || 5.0;
+      const rawWear = hoveredLane.wear || 0.0;
+      const wear = Math.min(maxWear, rawWear);
+      const effectiveWear = Math.min(benefitMax, wear);
       let levelName = '1级 踩踏细径 (泥土小道)';
       let levelColor = '#b45309';
       let barColor = '#f59e0b';
       let badgeText = '1级 初见成型';
 
       if (wear >= 4.0) {
-        levelName = '5级 极品帝国大道 (顶级通衢)';
+        levelName = wear > benefitMax ? `5级 极品帝国大道 (溢出储备 ${(wear - benefitMax).toFixed(2)})` : '5级 极品帝国大道 (顶级通衢)';
         levelColor = '#f59e0b';
         barColor = 'linear-gradient(90deg, #f59e0b, #ec4899)';
-        badgeText = '5级 极品通衢';
+        badgeText = wear > benefitMax ? '5级 满额溢出' : '5级 极品通衢';
       } else if (wear >= 3.0) {
         levelName = '4级 精修石板通衢 (坚固大道)';
         levelColor = '#38bdf8';
@@ -571,10 +575,17 @@ if (sim.showLanes) {
         badgeText = '2级 夯土土路';
       }
 
-      const speedFactor = (cfg.roadLevelFactorBase + cfg.roadLevelFactorWearCoef * wear);
+      const speedFactor = Math.min(
+        cfg.roadLevelFactorMax || 2.20,
+        Math.max(
+          cfg.roadLevelFactorMin || 0.50,
+          (cfg.roadLevelFactorBase || 0.50) + (cfg.roadLevelFactorWearCoef || 0.333) * effectiveWear
+        )
+      );
       const speedBonusPct = Math.round((speedFactor - 1.0) * 100);
       const speedText = speedBonusPct >= 0 ? `+${speedBonusPct}%` : `${speedBonusPct}%`;
-      const wearPct = Math.round((wear / (cfg.roadMaxWear || 5.0)) * 100);
+      const wearPct = Math.round((wear / maxWear) * 100);
+      const isOverflow = wear > benefitMax;
 
       roadTooltip.innerHTML = `
         <div class="road-tooltip-title">
@@ -583,17 +594,17 @@ if (sim.showLanes) {
         </div>
         <div style="display:flex; justify-content:space-between; margin-top:2px;">
           <span style="color:#94a3b8;">耐久度 / 踩踏值:</span>
-          <span style="color:#f8fafc; font-weight:700; font-family:monospace;">${wear.toFixed(2)} / ${(cfg.roadMaxWear || 5.0).toFixed(2)} (${wearPct}%)</span>
+          <span style="color:#f8fafc; font-weight:700; font-family:monospace;">${wear.toFixed(2)} / ${maxWear.toFixed(2)} (${wearPct}%)${isOverflow ? ` <span style="color:#a78bfa; font-size:10px;">(溢出 +${(wear - benefitMax).toFixed(2)})</span>` : ''}</span>
         </div>
         <div class="road-tooltip-bar-bg">
-          <div class="road-tooltip-bar-fill" style="width:${wearPct}%; background:${barColor};"></div>
+          <div class="road-tooltip-bar-fill" style="width:${wearPct}%; background:${isOverflow ? 'linear-gradient(90deg, #f59e0b, #ec4899, #a78bfa)' : barColor};"></div>
         </div>
         <div style="display:flex; justify-content:space-between; margin-top:3px;">
           <span style="color:#94a3b8;">移动速度加成:</span>
-          <span style="color:#38bdf8; font-weight:700; font-family:monospace;">${speedFactor.toFixed(2)}x (${speedText})</span>
+          <span style="color:#38bdf8; font-weight:700; font-family:monospace;">${speedFactor.toFixed(2)}x (${speedText}${isOverflow ? ' · 满额无额外增益' : ''})</span>
         </div>
         <div style="font-size:10px; color:#64748b; margin-top:3px; border-top:1px solid rgba(255,255,255,0.06); padding-top:4px;">
-          👟 步行通行: <span style="color:#10b981;">+${cfg.roadWearStepInc || 0.05}/次</span> · 闲置自然衰减: <span style="color:#f87171;">-${(wear * (cfg.roadWearDecayRate || 0.0067)).toFixed(4)}/s (${((cfg.roadWearDecayRate || 0.0067) * 100).toFixed(2)}%/s)</span>
+          👟 步行通行: <span style="color:#10b981;">+${cfg.roadWearStepInc || 0.1}/次</span> · 闲置自然衰减: <span style="color:#f87171;">-${(wear * (cfg.roadWearDecayRate || 0.005)).toFixed(4)}/h (${((cfg.roadWearDecayRate || 0.005) * 100).toFixed(2)}%/h)</span>
         </div>
       `;
 

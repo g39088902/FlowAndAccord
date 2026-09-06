@@ -16,9 +16,9 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 1. 引擎节拍与时间基准 (Simulation Time & Ticks)
   // ==========================================================================
-  simulationDt: 1.0 / 30.0,        // 单个 tick 对应的模拟秒数 (1/30)
-  ticksPerSecond: 30,              // 每秒 tick 数（决定模拟实时倍速基准）
-  agentDecisionIntervalTicks: 30,  // 每个族人错峰决策间隔 (tick)，平均 1 秒决策一次
+  simulationDt: 1.0 / 60.0,        // 单个 tick 对应的模拟小时数 (1/60)
+  ticksPerSecond: 60,              // 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准）
+  agentDecisionIntervalTicks: 60,  // 每个族人错峰决策间隔 (tick)，平均 1 游戏小时决策一次
 
   // ==========================================================================
   // 2. 部落民生理、代谢与生命周期 (Agent Physiology & Lifecycle)
@@ -95,15 +95,15 @@ window.SIM_CONFIG = {
   stockMaxWood: 200.0,            // 林木储量上限
   stockMaxStone: 200.0,           // 石矿储量上限
   stockMaxGold: 200.0,            // 金矿储量上限
-  regenBaseWater: 2.0,            // 清泉基础再生速率 (单位/秒)
+  regenBaseWater: 2.0,            // 清泉基础再生速率 (单位/小时)
   regenBaseBerry: 2.0,            // 浆果基础再生速率
   regenBaseWood: 2.0,             // 林木基础再生速率
   regenBaseStone: 2.0,            // 石矿基础再生速率
   regenBaseGold: 1.8,             // 金矿基础再生速率
-  poiInteractionRateResource: 10.0, // 资源 POI 现场采收速率 (单位/秒)
-  poiInteractionRateGold: 5.0,    // 金矿现场采收速率 (单位/秒)
-  poiUnloadRateResource: 10.0,    // 资源入库卸货速率 (单位/秒)
-  poiUnloadRateGold: 5.0,         // 黄金入库卸货速率 (单位/秒)
+  poiInteractionRateResource: 10.0, // 资源 POI 现场采收速率 (单位/小时)
+  poiInteractionRateGold: 5.0,    // 金矿现场采收速率 (单位/小时)
+  poiUnloadRateResource: 10.0,    // 资源入库卸货速率 (单位/小时)
+  poiUnloadRateGold: 5.0,         // 黄金入库卸货速率 (单位/小时)
   poiSpawnRadiusCamp: 0.70,       // 营地撒点半径占半图比例
   poiSpawnRadiusResource: 0.80,   // 资源 POI 撒点半径占半图比例
   poiSpawnFallbackRatio: 0.6,     // 紧密撒点回退最小间距比例 (min_distance × N)
@@ -113,7 +113,7 @@ window.SIM_CONFIG = {
   roadConnectFarDist: 320.0,      // 路网直连远距阈值 (≤ 单向泥径)
   roadGradePaveThreshold: 8.0,    // 坡度铺装阈值 (高差超过则盘山道，否则泥径)
   poiInteractionRadius: 22.0,     // 采收现场「已抵达 POI」判定半径 (m)
-  campHomeConsumeRate: 3.0,       // 营地/家宅休息自饮自食消耗速率 (单位/秒)
+  campHomeConsumeRate: 3.0,       // 营地/家宅休息自饮自食消耗速率 (单位/小时)
 
   // ==========================================================================
   // 5. 马斯洛需求与决策门槛 (Maslow Needs & Decision Thresholds)
@@ -172,9 +172,11 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
   // ==========================================================================
-  roadWearDecayRate: 0.0067,      // 道路自然杂草衰减速率 (%/秒,相对当前磨损比例衰减)
-  roadWearStepInc: 0.05,          // 族人单次通行踩踏增量 (等级/次)
-  roadMaxWear: 5.0,               // 道路磨损上限
+  roadWearDecayRate: 0.005,       // 道路自然杂草衰减速率 (%/小时,相对当前磨损比例衰减，0.005 即 0.5%/h)
+  roadWearStepInc: 0.1,           // 族人单次通行踩踏增量 (等级/次)
+  roadWearTierStep: 0.25,         // 道路等级阶梯步进 (用于 A* 寻路速度加成量化与端点对缓存跨阶失效)
+  roadBenefitMaxWear: 5.0,        // 道路移速增益上限磨损值 (超过此值无额外移速加成)
+  roadMaxWear: 10.0,              // 道路磨损/踩踏耐久度上限 (允许溢出至最多10)
   roadSpeedDirtTrack: 36.0,       // 泥泞小径限速
   roadSpeedCobblestone: 44.0,     // 碎石盘山道限速
   roadSpeedAsphaltUrban: 60.0,    // 城镇大道限速
@@ -208,20 +210,20 @@ window.SIM_CONFIG = {
   // 11. 宗族系统 (Clan System — M3)
   // ==========================================================================
   clanTributeRate: 0.05,          // 族税率：家户每周期向族库缴纳账面余额的比例
-  clanTributeIntervalTicks: 1800, // 族税征收周期 (tick)，每 N tick 全局统一征收一次
+  clanTributeIntervalTicks: 3600, // 族税征收周期 (tick)，每 N tick 全局统一征收一次 (60 游戏小时)
   clanMutualAidMinBalance: 50.0,  // 族内互助族库最低余额门槛
   clanMutualAidFamilyThreshold: 10.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
-  clanMutualAidCooldownTicks: 900, // 族内互助冷却 (tick)，每家户每 N tick 最多接收一次
+  clanMutualAidCooldownTicks: 1800, // 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 (30 游戏小时)
   prestigeClanElderBonus: 3,      // 宗族长老（族长）顺位任职威望奖励
 
   // ==========================================================================
   // 12. 地区与王国系统 (Region & Kingdom — M4)
   // ==========================================================================
   ledgerTaxRate: 0.03,              // 公仓税率：家户每周期向地区公仓缴纳账面余额的比例
-  ledgerTaxIntervalTicks: 2400,     // 公仓税征收周期 (tick)，每 N tick 全局统一征收一次
+  ledgerTaxIntervalTicks: 4800,     // 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 (80 游戏小时)
   ledgerReliefMinBalance: 30.0,     // 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济
   ledgerReliefFamilyThreshold: 8.0, // 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫
-  ledgerReliefCooldownTicks: 1200,  // 救济冷却 (tick)，每家户每 N tick 最多接收一次救济
+  ledgerReliefCooldownTicks: 2400,  // 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 (40 游戏小时)
   prestigeKingBonus: 3,             // 国王登基任职威望奖励
 
   // ==========================================================================
@@ -245,7 +247,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
   // ==========================================================================
-  houseAuctionBidCooldownTicks: 90,  // 买家全局出价冷却 (tick，默认 90 = 3 模拟秒，出价后对任何房屋都不再出价)
+  houseAuctionBidCooldownTicks: 180,  // 买家全局出价冷却 (tick，默认 180 = 3 游戏小时，出价后对任何房屋都不再出价)
   houseAuctionDeadlineDurability: 10.0,// 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交)
   houseAuctionObservationRatio: 0.37,  // 麦穗理论最优停止观察期比例 (37%)
   houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)

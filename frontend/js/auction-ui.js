@@ -13,7 +13,7 @@
   let currentHouseId = null;
   let currentTab = 'active'; // 'active' | 'history'
 
-  const TICK_PER_SEC = 30; // 30 ticks = 1 模拟秒
+  const TICK_PER_SEC = 60; // 60 ticks = 1 游戏小时
 
   // ★ v1.22.3 内容快照缓存：报价中心每帧高频刷新，仅当生成 HTML 与上次不一致时才重建 DOM，
   //   避免每帧销毁重建卡片导致 mousedown 与 mouseup 之间节点被替换、click 无法命中（点房屋无法切换/历史跳转失效）。
@@ -557,7 +557,7 @@
     if (countEl) countEl.textContent = house.bidsCount || bids.length;
 
     if (bids.length === 0) {
-      renderHtml(feedEl, `<div class="auction-empty-hint">等待营地中介开启报价轮询中… (每 3 秒评估一次)</div>`);
+      renderHtml(feedEl, `<div class="auction-empty-hint">等待营地中介开启报价轮询中… (每 3 小时评估一次)</div>`);
       return;
     }
 

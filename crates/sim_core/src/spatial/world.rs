@@ -72,8 +72,12 @@ pub struct World3DEngine {
     pub auction_flopped: u64,
     /// ★ 房屋报价中心历史受理记录 (256 容量环形缓冲区，成交与流拍全留痕)
     pub auction_history: VecDeque<HouseAuctionHistoryRecord>,
-    /// 上次国王内帑结算 tick；按 3000 tick（100 游戏秒）结算。
+    /// 上次国王内帑结算 tick；按 6000 tick（100 游戏小时）结算。
     pub last_royal_payout_tick: u64,
+    /// 地形快照脏位标记：仅在初次生成、载入存档或显式请求时为 true 并导出 3600 个网格单元
+    pub terrain_dirty: std::cell::Cell<bool>,
+    /// 地区居民到达时序脏位标记：仅在新成员加入/变动时置为 true 并按需排序
+    pub regions_arrival_dirty: bool,
 }
 
 impl World3DEngine {
@@ -131,6 +135,8 @@ impl World3DEngine {
             auction_flopped: 0,
             auction_history: VecDeque::with_capacity(AUCTION_HISTORY_CAPACITY),
             last_royal_payout_tick: 0,
+            terrain_dirty: std::cell::Cell::new(true),
+            regions_arrival_dirty: true,
         }
     }
 

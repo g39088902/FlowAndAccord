@@ -118,7 +118,8 @@ const IMPACT_PREFIX_RULES = [
   { prefix: 'roadLevelFactor', mod: 'graph.rs (等级速度加成)' },
   { prefix: 'roadSpeed', mod: 'graph.rs (各道路类型限速)' },
   { prefix: 'roadWear', mod: 'graph.rs (踩踏增长/自然衰减 §4.3)' },
-  { prefix: 'roadMaxWear', mod: 'graph.rs (最高磨损等级)' },
+  { prefix: 'roadBenefitMaxWear', mod: 'graph.rs (移速增益上限磨损值)' },
+  { prefix: 'roadMaxWear', mod: 'graph.rs (最高磨损等级/溢出上限)' },
 
   { prefix: 'season', mod: 'world_season.rs (四季周期)' },
   { prefix: 'temp', mod: 'world_season.rs (温度正弦曲线)' },

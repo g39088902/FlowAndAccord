@@ -237,7 +237,7 @@
       sideTitle.innerHTML = (n.gender === 'female' ? '👩' : '👦') + ' 部落民 #' + n.id + ' (第' + n.generation + '代)';
       sideBody.innerHTML =
         '<div style="margin-bottom:6px; color:#38bdf8; font-weight:600;">' +
-          (n.isAlive ? ('🟢 存活 · 年龄 ' + n.age + 's') : ('💀 已故 · 死因: ' + (n.deathCause || '寿终正寝'))) +
+          (n.isAlive ? ('🟢 存活 · 年龄 ' + n.age + 'h') : ('💀 已故 · 死因: ' + (n.deathCause || '寿终正寝'))) +
         '</div>' +
         '<div>🕐 出生 tick: ' + n.birthTick + (n.isSpine ? ' · 🟥 主干血脉' : '') + '</div>' +
         '<div>👴 父亲: ' + (n.fatherId ? '#' + n.fatherId : '无 (始祖)') + '</div>' +

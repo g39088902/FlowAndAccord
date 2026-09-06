@@ -4,12 +4,12 @@
     class RustWorld {
       constructor() {
         // 前端展示与交互状态 (与原 JS 引擎同构)
-        this.isPaused = false;
+        this._isPaused = false;
         this.headless = false; // 🧠 无头模式: 只推进模拟、跳过画布渲染
         this.debugMode = false; // 🐞 调试模式: 展示 Tick / CPU 耗时 / 内存占用
         this.tickMs = 0; // 内核步进耗时 (EMA 平滑, ms)
         this.snapMs = 0; // 快照解析耗时 (EMA 平滑, ms)
-        this.speedMult = 2;
+        this._speedMult = 2;
         this.showTerrain = true;
         this.showLanes = true;   // 🛣️ 路网显隐 (false = 隐藏全部车道与悬浮提示)
         this.showAgents = true;  // 👤 部落民显隐 (false = 隐藏全部族人，且不再参与点击拾取)
@@ -47,9 +47,8 @@
         // 榷场粮食再生复用 berry 槽位（内核无独立粮食倍率），见 world_tick.rs
         this.regenMultipliers = { water: 1.0, berry: 1.0, wood: 1.0, stone: 1.0, gold: 1.0 };
 
-        // 引擎状态 (以页面打开时间 Date.now() 作为随机种子)
-        this._wasm = null;
-        this._memory = null;
+        // 引擎状态与 Web Worker 架构
+        this._worker = null;
         this._ready = false;
         this._engineSeed = Date.now();
         this._terrainCached = false;
@@ -57,32 +56,151 @@
         this._trails = new Map();
         this._historyCheckpoints = [];
         this._lastCheckpointTick = -1;
-        this._setEngineStatus('正在加载生态演算引擎…', 'loading');
+        this._pendingRequests = new Map();
+        this._reqSeq = 0;
+        this._lastSaveJson = null;
+        this._lastSaveError = '';
+        this._appVersion = 'v1.38.0';
+        this._wasmBytes = 0;
+        this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
-        // 异步加载 Rust 引擎 (wasm)
-        this._loadWasm();
+        // 启动专用 Web Worker (Phase 1 独立仿真线程)
+        this._initWorker();
       }
 
-      async _loadWasm() {
+      get isPaused() {
+        return this._isPaused;
+      }
+
+      set isPaused(val) {
+        this._isPaused = !!val;
+        if (this._worker) {
+          this._worker.postMessage({ type: 'PAUSE', isPaused: this._isPaused });
+        }
+      }
+
+      get speedMult() {
+        return this._speedMult;
+      }
+
+      set speedMult(val) {
+        this._speedMult = Math.max(1, parseInt(val, 10) || 1);
+        if (this._worker) {
+          this._worker.postMessage({ type: 'SPEED', speedMult: this._speedMult });
+        }
+      }
+
+      _initWorker() {
         try {
-          const resp = await fetch('rust/sim_wasm.wasm?v=' + Date.now(), { cache: 'no-store' });
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          const bytes = await resp.arrayBuffer();
-          const result = await WebAssembly.instantiate(bytes, {});
-          this._wasm = result.instance.exports;
-          this._memory = this._wasm.memory;
-          this._wasm.world_create(60, 764.0, this._engineSeed, 20, this._campCountFromConfig());
-          this._ready = true;
-          this._setEngineStatus('', 'ready');
-          if (window.SIM_CONFIG) {
-            this.applyConfig(window.SIM_CONFIG);
+          this._worker = new Worker('js/sim_worker.js');
+          this._worker.onmessage = (e) => this._onWorkerMessage(e.data);
+          this._worker.onerror = (err) => {
+            console.error('[RustWorld] Web Worker 异常:', err);
+            this._setEngineStatus('Worker 异常: ' + (err.message || '请检查控制台'), 'error');
+          };
+
+          const wasmUrl = new URL('rust/sim_wasm.wasm?v=' + Date.now(), window.location.href).href;
+          const configObj = Object.assign({}, window.SIM_CONFIG);
+          if (window.SIM_HOUSE_UPGRADE_COST) {
+            Object.assign(configObj, window.SIM_HOUSE_UPGRADE_COST);
           }
-          this._pullSnapshot(true);
-          this._recordHistoryCheckpoint();
-          console.info(`[RustWorld] sim_core wasm 引擎已接管 AI 决策/寻路/运动 (开局种子: ${this._engineSeed})`);
+
+          this._worker.postMessage({
+            type: 'INIT',
+            wasmUrl,
+            seed: this._engineSeed,
+            agentCount: 20,
+            campCount: this._campCountFromConfig(),
+            config: configObj,
+          });
         } catch (e) {
-          this._setEngineStatus('生态演算引擎加载失败，请检查服务器或刷新重试。', 'error');
-          console.error('[RustWorld] 无法加载 Rust 引擎 (请通过 HTTP 服务访问):', e);
+          this._setEngineStatus('无法创建 Web Worker (请确保通过 HTTP 服务访问): ' + e.message, 'error');
+          console.error('[RustWorld] 初始化 Worker 失败:', e);
+        }
+      }
+
+      _onWorkerMessage(msg) {
+        if (!msg || typeof msg !== 'object') return;
+        switch (msg.type) {
+          case 'READY': {
+            this._ready = true;
+            this._engineSeed = msg.seed;
+            this._appVersion = msg.appVersion || 'v1.38.0';
+            this._wasmBytes = msg.wasmBytes || 0;
+            this._setEngineStatus('', 'ready');
+            if (msg.snapshot) {
+              this._applySnapshot(msg.snapshot, true);
+            }
+            console.info(`[RustWorld Worker] sim_core wasm 引擎已在 Worker 中接管计算 (开局种子: ${this._engineSeed})`);
+            if (this._isPaused) {
+              this._worker.postMessage({ type: 'PAUSE', isPaused: true });
+            }
+            this._worker.postMessage({ type: 'ACK' });
+            break;
+          }
+          case 'SNAPSHOT': {
+            this._wasmBytes = msg.wasmBytes || this._wasmBytes;
+            if (this.debugMode && typeof msg.tickMs === 'number') {
+              this.tickMs += (msg.tickMs - this.tickMs) * 0.15;
+            }
+            const t0 = performance.now();
+            if (msg.snapshot) {
+              this._applySnapshot(msg.snapshot, false);
+            }
+            const t1 = performance.now();
+            if (this.debugMode) {
+              this.snapMs += ((t1 - t0) - this.snapMs) * 0.15;
+            }
+            this._worker.postMessage({ type: 'ACK' });
+            break;
+          }
+          case 'SAVE_RESULT': {
+            if (msg.ok && msg.json) {
+              this._lastSaveJson = msg.json;
+            }
+            this._lastSaveError = msg.error || '';
+            const resolver = this._pendingRequests.get(msg.reqId);
+            if (resolver) {
+              this._pendingRequests.delete(msg.reqId);
+              resolver(msg.ok ? msg.json : null);
+            }
+            break;
+          }
+          case 'LOAD_RESULT': {
+            this._lastSaveError = msg.error || '';
+            const resolver = this._pendingRequests.get(msg.reqId);
+            if (resolver) {
+              this._pendingRequests.delete(msg.reqId);
+              resolver({ ok: msg.ok, error: msg.error });
+            }
+            if (msg.ok && msg.snapshot) {
+              this._applySnapshot(msg.snapshot, true);
+            }
+            break;
+          }
+          case 'REWIND_RESULT': {
+            const resolver = this._pendingRequests.get(msg.reqId);
+            if (resolver) {
+              this._pendingRequests.delete(msg.reqId);
+              resolver({ ok: msg.ok, error: msg.error, tick: msg.snapshot ? msg.snapshot.tick : undefined });
+            }
+            if (msg.ok && msg.snapshot) {
+              this._applySnapshot(msg.snapshot, true);
+            }
+            break;
+          }
+          case 'RESET_DONE': {
+            if (msg.snapshot) {
+              this._applySnapshot(msg.snapshot, true);
+            }
+            this._worker.postMessage({ type: 'ACK' });
+            break;
+          }
+          case 'ERROR': {
+            this._setEngineStatus(msg.error || 'Worker 运行时错误', 'error');
+            console.error('[RustWorld Worker]', msg.error);
+            break;
+          }
         }
       }
 
@@ -111,24 +229,9 @@
         if (window.SIM_HOUSE_UPGRADE_COST) {
           Object.assign(configObj, window.SIM_HOUSE_UPGRADE_COST);
         }
-        try {
-          const jsonStr = JSON.stringify(configObj);
-          const encoded = new TextEncoder().encode(jsonStr);
-          if (typeof this._wasm.world_config_buf_ptr === 'function' && typeof this._wasm.world_apply_config_buf === 'function') {
-            const ptr = this._wasm.world_config_buf_ptr(encoded.length);
-            new Uint8Array(this._memory.buffer, ptr, encoded.length).set(encoded);
-            const res = this._wasm.world_apply_config_buf(encoded.length);
-            if (res === 0) {
-              console.info('[RustWorld] 已成功同步并应用 JS 动态配置至 WASM 内核');
-              this._pullSnapshot(false);
-              return true;
-            } else {
-              console.warn('[RustWorld] 应用 JS 动态配置失败，状态码:', res);
-              return false;
-            }
-          }
-        } catch (e) {
-          console.error('[RustWorld] 序列化/发送配置至 WASM 失败:', e);
+        if (this._worker) {
+          this._worker.postMessage({ type: 'CONFIG', config: configObj });
+          return true;
         }
         return false;
       }
@@ -170,34 +273,19 @@
         return this.marriages.filter(m => m.husbandId === numId || m.wifeId === numId);
       }
 
-      // ============ 引擎驱动 ============
+      // ============ 引擎驱动 (Web Worker 异步解耦) ============
       tick() {
-        if (!this._ready || this.isPaused) return;
-        const dt = 1.0 / 30.0;
-        const t0 = performance.now();
-        this._wasm.world_tick_steps(Math.max(1, this.speedMult | 0), dt);
-        const t1 = performance.now();
-        this._pullSnapshot(false);
-        const t2 = performance.now();
-        if (this.tickCount - this._lastCheckpointTick >= 30 || this._lastCheckpointTick < 0) {
-          this._recordHistoryCheckpoint();
-        }
-        // 指数移动平均平滑，避免 HUD 数值抖动 (仅在调试模式下采样)
-        if (this.debugMode) {
-          this.tickMs += ((t1 - t0) - this.tickMs) * 0.15;
-          this.snapMs += ((t2 - t1) - this.snapMs) * 0.15;
-        }
+        // 仿真由 Worker 独立线程按 speedMult 自主推进与节流投递，主线程 tick 保持零阻塞
       }
 
       // ============ 🐞 调试统计 ============
       getDebugStats() {
-        const wasmBytes = (this._memory && this._memory.buffer) ? this._memory.buffer.byteLength : 0;
         const mem = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
         return {
           tick: this.tickCount,
           tickMs: this.tickMs,
           snapMs: this.snapMs,
-          wasmBytes,
+          wasmBytes: this._wasmBytes,
           jsHeapUsed: mem ? mem.usedJSHeapSize : 0,
           jsHeapLimit: mem ? mem.jsHeapSizeLimit : 0,
           memSupported: !!mem,
@@ -213,28 +301,27 @@
         this._consumedDeathIds.clear();
         this._historyCheckpoints = [];
         this._lastCheckpointTick = -1;
-        if (this._ready) {
-          this._wasm.world_create(60, 764.0, this._engineSeed, agentCount || 20, this._campCountFromConfig());
-          if (window.SIM_CONFIG) {
-            this.applyConfig(window.SIM_CONFIG);
+        this.deselect();
+        if (this._worker) {
+          const cfg = Object.assign({}, window.SIM_CONFIG);
+          if (window.SIM_HOUSE_UPGRADE_COST) {
+            Object.assign(cfg, window.SIM_HOUSE_UPGRADE_COST);
           }
-          this._pullSnapshot(true);
-          this._recordHistoryCheckpoint();
+          this._worker.postMessage({
+            type: 'RESET',
+            seed: this._engineSeed,
+            agentCount: agentCount || 20,
+            campCount: this._campCountFromConfig(),
+            config: cfg,
+          });
         }
       }
 
-      // ============ 💾 读档 / 存档 (v1.7.0) ============
-      // 存档：world_save_ptr/len 由内核导出全量世界状态 JSON（含 RNG 内部状态，强确定性）
-      // 读档：world_save_buf_ptr(len) 取可写缓冲 → 写入字节 → world_load(len) 覆盖内核世界
-      // 失败原因统一从 world_last_error_ptr/len 读取
+      // ============ 💾 读档 / 存档 (v1.7.0 / v1.38.0 Worker 适配) ============
 
       /** 读取内核最近一次存档/读档错误文本（无错误返回空串） */
       readSaveError() {
-        if (!this._ready || typeof this._wasm.world_last_error_len !== 'function') return '';
-        const len = this._wasm.world_last_error_len();
-        if (!len) return '';
-        const ptr = this._wasm.world_last_error_ptr();
-        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+        return this._lastSaveError || '';
       }
 
       /**
@@ -242,26 +329,20 @@
        * @returns {string}
        */
       getAppVersion() {
-        if (this._ready && typeof this._wasm.world_app_version_ptr === 'function') {
-          const ptr = this._wasm.world_app_version_ptr();
-          const len = this._wasm.world_app_version_len();
-          if (len > 0) {
-            return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
-          }
-        }
-        return '1.37.1';
+        return this._appVersion || 'v1.38.0';
       }
 
       /**
-       * 导出当前世界全量存档 JSON（失败返回 null，原因见 readSaveError()）
-       * @returns {string|null}
+       * 导出当前世界全量存档 JSON（Promise 异步返回；若未就绪返回 Promise<null>）
+       * @returns {Promise<string|null>}
        */
       saveWorld() {
-        if (!this._ready || typeof this._wasm.world_save_ptr !== 'function') return null;
-        const ptr = this._wasm.world_save_ptr();
-        const len = this._wasm.world_save_len();
-        if (!len) return null;
-        return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+        if (!this._ready || !this._worker) return Promise.resolve(this._lastSaveJson);
+        const reqId = ++this._reqSeq;
+        return new Promise((resolve) => {
+          this._pendingRequests.set(reqId, resolve);
+          this._worker.postMessage({ type: 'SAVE', reqId });
+        });
       }
 
       /**
@@ -273,30 +354,15 @@
        *
        * @param {string} jsonStr 存档 JSON 文本
        * @param {{seed?:number}} [meta] 可选槽位元信息（用于同步引擎种子展示）
-       * @returns {{ok:boolean, error?:string}}
+       * @returns {Promise<{ok:boolean, error?:string}>}
        */
       loadWorld(jsonStr, meta) {
-        if (!this._ready || typeof this._wasm.world_load !== 'function') {
-          return { ok: false, error: 'WASM 引擎尚未就绪' };
+        if (!this._ready || !this._worker) {
+          return Promise.resolve({ ok: false, error: 'WASM 引擎尚未就绪' });
         }
         if (typeof jsonStr !== 'string' || jsonStr.length === 0) {
-          return { ok: false, error: '存档内容为空' };
+          return Promise.resolve({ ok: false, error: '存档内容为空' });
         }
-        let encoded;
-        try {
-          encoded = new TextEncoder().encode(jsonStr);
-        } catch (e) {
-          return { ok: false, error: '存档编码失败: ' + e.message };
-        }
-        const ptr = this._wasm.world_save_buf_ptr(encoded.length);
-        new Uint8Array(this._memory.buffer, ptr, encoded.length).set(encoded);
-        const res = this._wasm.world_load(encoded.length);
-        if (res !== 0) {
-          const detail = this.readSaveError();
-          const codeMsg = { '-1': '存档长度越界', '-2': '存档不是合法 UTF-8 文本', '-3': '存档解析或校验失败' }[String(res)] || ('未知错误 ' + res);
-          return { ok: false, error: detail ? codeMsg + '：' + detail : codeMsg };
-        }
-        // 内核世界已被替换，清空前端全部派生缓存并以 forceTerrain 重建
         this._trails.clear();
         this.agentArchive.clear();
         this._consumedDeathIds.clear();
@@ -304,93 +370,54 @@
         this._terrainCached = false;
         this.deselect();
         if (meta && typeof meta.seed === 'number') this._engineSeed = meta.seed;
-        this._pullSnapshot(true);
-        this._historyCheckpoints = [];
-        this._lastCheckpointTick = -1;
-        this._recordHistoryCheckpoint();
-        return { ok: true };
+
+        const reqId = ++this._reqSeq;
+        return new Promise((resolve) => {
+          this._pendingRequests.set(reqId, (res) => {
+            if (res.ok) {
+              this._historyCheckpoints = [];
+              this._lastCheckpointTick = -1;
+            }
+            resolve(res);
+          });
+          this._worker.postMessage({ type: 'LOAD', reqId, jsonStr, meta });
+        });
       }
 
       // ============ ⏪ 时光倒流控制器支持 ============
       _recordHistoryCheckpoint() {
-        if (!this._ready) return;
-        const json = this.saveWorld();
-        if (!json) return;
-        const tick = this.tickCount || 0;
-        if (this._historyCheckpoints.length > 0 && this._historyCheckpoints[this._historyCheckpoints.length - 1].tick === tick) return;
-        this._historyCheckpoints.push({ tick, json });
-        this._lastCheckpointTick = tick;
-
-        // 内存与性能保护：最多保留 160 个历史检查点（~6MB），首档保留，近程密集，较早历史稀疏
-        if (this._historyCheckpoints.length > 160) {
-          const genesis = this._historyCheckpoints[0];
-          const recent = this._historyCheckpoints.slice(-60);
-          const middle = this._historyCheckpoints.slice(1, -60).filter((_, idx) => idx % 6 === 0);
-          this._historyCheckpoints = [genesis, ...middle, ...recent];
-        }
+        // 历史检查点由 Worker 在步进时自主录制与管理，主线程免重复开销
       }
 
       rewindToTick(targetTick) {
-        if (!this._ready) return { ok: false, error: 'WASM 引擎尚未就绪' };
+        if (!this._ready || !this._worker) return Promise.resolve({ ok: false, error: 'WASM 引擎尚未就绪' });
         targetTick = Math.round(Number(targetTick));
-        if (isNaN(targetTick) || targetTick < 0) return { ok: false, error: '目标 Tick 必须为非负整数' };
-        const currentTick = this.tickCount || 0;
-        if (targetTick > currentTick) {
-          return { ok: false, error: `目标 Tick (${targetTick}) 大于当前 Tick (${currentTick})，时光倒流仅支持向历史回滚` };
-        }
-        if (targetTick === currentTick) {
-          this.isPaused = true;
-          return { ok: true, tick: currentTick, message: '已位于目标 Tick' };
-        }
-        if (!this._historyCheckpoints || this._historyCheckpoints.length === 0) return { ok: false, error: '暂无可用的历史检查点' };
-        const minRecorded = this._historyCheckpoints[0].tick;
-        if (targetTick < minRecorded) return { ok: false, error: `目标 Tick (${targetTick}) 早于历史最早检查点 (${minRecorded})` };
-
-        // 1. 寻找 <= targetTick 的最近基准检查点
-        let bestCp = this._historyCheckpoints[0];
-        for (let i = this._historyCheckpoints.length - 1; i >= 0; i--) {
-          if (this._historyCheckpoints[i].tick <= targetTick) {
-            bestCp = this._historyCheckpoints[i];
-            break;
-          }
-        }
-
-        // 2. 加载基准检查点覆盖当前世界
-        const res = this.loadWorld(bestCp.json);
-        if (!res.ok) return { ok: false, error: `还原检查点失败: ${res.error}` };
-
-        // 3. 确定性步进微量余数 (delta)
-        const delta = targetTick - bestCp.tick;
-        if (delta > 0) {
-          this._wasm.world_tick_steps(delta, 1.0 / 30.0);
-          this._pullSnapshot(true);
-        }
-
-        // 4. 截断 targetTick 之后的分叉检查点并落盘当前目标刻
-        this._historyCheckpoints = this._historyCheckpoints.filter(cp => cp.tick <= targetTick);
-        this._lastCheckpointTick = targetTick;
-        const currentJson = this.saveWorld();
-        if (currentJson) this._historyCheckpoints.push({ tick: targetTick, json: currentJson });
-
-        // 5. 回滚后自动暂停模拟
-        this.isPaused = true;
-        const btnPause = document.getElementById('btn-pause');
-        if (btnPause) btnPause.textContent = '▶️ 继续模拟 (空格)';
-        this.logEvent(`⏪ 时光倒流：世界已成功回滚至 Tick ${targetTick}（第 ${(targetTick / 30).toFixed(1)} 模拟秒）`, 'camp');
-        return { ok: true, tick: targetTick };
+        if (isNaN(targetTick) || targetTick < 0) return Promise.resolve({ ok: false, error: '目标 Tick 必须为非负整数' });
+        const reqId = ++this._reqSeq;
+        return new Promise((resolve) => {
+          this._pendingRequests.set(reqId, (res) => {
+            if (res.ok) {
+              this.isPaused = true;
+              const btnPause = document.getElementById('btn-pause');
+              if (btnPause) btnPause.textContent = '▶️ 继续模拟 (空格)';
+              this.logEvent(`⏪ 时光倒流：世界已成功回滚至 Tick ${targetTick}（第 ${(targetTick / 60).toFixed(1)} 游戏小时）`, 'camp');
+            }
+            resolve(res);
+          });
+          this._worker.postMessage({ type: 'REWIND', reqId, targetTick });
+        });
       }
 
       getRewindInfo() {
         const currentTick = this.tickCount || 0;
-        const minTick = (this._historyCheckpoints && this._historyCheckpoints.length > 0) ? this._historyCheckpoints[0].tick : currentTick;
-        return { currentTick, minTick, maxTick: currentTick, checkpointCount: this._historyCheckpoints ? this._historyCheckpoints.length : 0 };
+        return { currentTick, minTick: 0, maxTick: currentTick, checkpointCount: 1 };
       }
 
-      setWaterRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(0, m); }
-      setBerryRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(1, m); }
-      setWoodRegenMultiplier(m)  { if (this._ready) this._wasm.world_set_regen_multiplier(2, m); }
-      setStoneRegenMultiplier(m) { if (this._ready) this._wasm.world_set_regen_multiplier(3, m); }
-      setGoldRegenMultiplier(m)  { if (this._ready) this._wasm.world_set_regen_multiplier(4, m); }
+      setWaterRegenMultiplier(m) { this.regenMultipliers.water = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 0, mult: m }); }
+      setBerryRegenMultiplier(m) { this.regenMultipliers.berry = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 1, mult: m }); }
+      setWoodRegenMultiplier(m)  { this.regenMultipliers.wood = m;  if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 2, mult: m }); }
+      setStoneRegenMultiplier(m) { this.regenMultipliers.stone = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 3, mult: m }); }
+      setGoldRegenMultiplier(m)  { this.regenMultipliers.gold = m;  if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 4, mult: m }); }
 
       logEvent(msg, type = '') {
         const list = document.getElementById('log-list');
@@ -404,22 +431,14 @@
 
       // ============ 快照拉取与视图映射 ============
       _pullSnapshot(forceTerrain) {
-        const ptr = this._wasm.world_snapshot_ptr();
-        const len = this._wasm.world_snapshot_len();
-        if (!len) return;
-        const bytes = new Uint8Array(this._memory.buffer, ptr, len);
-        let snap;
-        try {
-          snap = JSON.parse(new TextDecoder().decode(bytes));
-        } catch (e) {
-          console.error('[RustWorld] 快照解析失败', e);
-          return;
+        if (this._worker && forceTerrain) {
+          this._worker.postMessage({ type: 'REQUIRE_TERRAIN' });
         }
-        this.tickCount = snap.tick;
-        this._applySnapshot(snap, forceTerrain);
       }
 
       _applySnapshot(snap, forceTerrain) {
+        if (!snap) return;
+        this.tickCount = snap.tick;
         this.totalBirths = snap.total_births;
         this.totalDeaths = snap.total_deaths;
         this.totalDeathsNatural = snap.total_deaths_natural || 0;
@@ -455,8 +474,8 @@
           this.logEvent(snap.last_mutation_event, '');
         }
 
-        // --- 地形 (仅首次/重开时重建) ---
-        if (!this._terrainCached || forceTerrain) {
+        // --- 地形 (仅首次/重开时重建，静态网格空数组时跳过) ---
+        if ((!this._terrainCached || forceTerrain) && snap.terrain_cells && snap.terrain_cells.length > 0) {
           const w = snap.grid_w, h = snap.grid_h;
           const worldSize = snap.world_size || 764.0;
           const half = worldSize / 2;

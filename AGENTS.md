@@ -20,8 +20,10 @@
 | **docs/03-browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略 | 需要打开页面/渲染校验/截图/自动化交互时 |
 | **docs/04-cicd-guide.md** | CI/CD 部署指南：GitHub Actions 流水线、4 个 Secrets、COS MIME 排障 | 调整部署流程或排查部署失败时 |
 | **docs/05-headless-diagnostics-guide.md** | 确定性无头诊断指南：`tools/diagnose.js` 命令行用法、八大嗅探规则、Agent 五步排障 SOP | 需要使用指定 Seed/Tick 诊断 Bug 与回归验证时 |
+| **docs/15-profiling-and-benchmarking-guide.md** | 性能 Profiling 基准与确定性矩阵操作指南：`tools/profile-benchmark.js` 与 `tools/test-determinism.js` | 进行性能优化、寻路改进、多线程改造前建立基准与回归时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
 | **docs/12-plan-ledger-refactor.md** | 账本与仓库重构计划（M1~M4 已完成，M5 收尾 ✅） | 账本系统演进规划 |
+| **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（M1~M5：快照节流/稀疏路网衰减/A*查表/二进制快照/多线程） | 性能优化专项规划 |
 | **docs/10-architecture.md** | 宏观技术架构愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（多为规划态） |
 | **docs/11-plan.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观方向（多为规划态） |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
@@ -52,14 +54,15 @@
 graph TD
     A["crates/sim_core (Rust 确定性内核)"] -->|编译| B["crates/sim_wasm (wasm32)"]
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
-    C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
-    D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.37.3)"]
+    C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
+    D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
+    E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
+    F --> G["浏览器 UI (版本: v1.41.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（21 个 JS 文件），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+- **`frontend/`**：原生静态前端（22 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
 ---
 
@@ -85,10 +88,12 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 ```powershell
 cargo test --lib                  # 编译校验（源码无持久化单元测试，见 §4.10）
 node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳定
+node tools/test-determinism.js    # 增强型确定性矩阵测试 (6套件：多种子/分批独立性/快照无副作用/存读档)
+node tools/config-check.js        # 前后端数值配置一致性校验
 node tools/frontend-check.js      # 前端脚本语法与 DOM ID 完整性校验
 ```
 
-输出 `ALL_TESTS_DONE` 即全部通过。
+输出 `ALL_TESTS_DONE` 与 `确定性矩阵测试全通` 即全部通过。性能分析可运行 `node tools/profile-benchmark.js`。
 
 ### 步骤三：启动前端服务器
 
@@ -102,7 +107,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.37.3`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.41.0`**。
 
 ---
 
@@ -158,13 +163,14 @@ node frontend/server.js           # http://localhost:3000
 - **★ v1.35.0 单趟多品类连续采收**：现场采收某品类完成（装满、家宅补足或断流）后，若族人拥有私宅且体力 ≥ `config.decision_work_stamina_threshold`，由马斯洛引擎按当前编排顺序依次检索家宅短缺的其他品类（`b5/b6/b7/b9/b10`，分支内置行囊余量自检），有需求且行囊有空余则直接派发前往下一处 POI 继续采收，实现单趟出门连续多品类满载回宅；无短缺或体力不足时平滑返家。
 - **中途断流熔断与平滑重路由**：途中检测自身对目标的触发器关闭时，若有其他已开放同类 POI，立即原地掉头并重新规划路径；仅在无可用点或体力告警时折返。**严禁闪现瞬移**——掉头必须在当前车道反向平滑回走，保持坐标连续性。
 - **★ v1.27.0 / v1.36.0 断流直达榷场**：**水/粮/木**采集链路断流（无任何同类可用 POI）时，家户户主若家户账本金币 ≥ `config.market_min_family_gold` 且体力 ≥ `config.decision_work_stamina_threshold`，可直接原地掉头赴最近榷场交易——市场支付用家户账本**远程结算**（`try_route_to_market`，不要求随身携带金币）；石/金采集不享受该兜底。
+- **★ v1.40.3 A\* 道路速度加成与 0.25 级离散阶梯失效**：A\* 寻路通过 `LaneEdge3D::wear_tier_bucket`（以 `config.road_wear_tier_step` 0.25 级为阶梯步进）对道路踩踏加成（`road_level_factor` 0.50x~2.20x）进行量化，使寻路算法优先选择已踏宽的高速通衢；仅在通行踩踏或自然衰减发生跨桶跃迁（跨越 0.25 级）时触发 `clear_path_cache()`，同桶内微增保持 100% 缓存命中与长程确定性。
 - 实现细节见 `decisions/AGENTS.md` 与 `docs/current/06-motivation-ai.md`。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
-- **时间基准**：每 tick = `config.simulationDt`(1/30) 模拟秒，`config.agentDecisionIntervalTicks`(30) tick = 1 模拟秒；前端 30fps 每帧调一次 `sim.tick()`。
-- **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策，全员相位均摊错开。
-- **严禁修改 `config.simulationDt`**：倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
+- **时间基准**：每 tick = `config.simulationDt`(1/60) 游戏小时，`config.agentDecisionIntervalTicks`(60) tick = 1 游戏小时；在 1x 基础倍速下，现实 1 秒 = 游戏内 1 小时。仿真由独立 Web Worker `sim_worker.js` 驱动（约 60Hz 心跳步进）。
+- **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 60 == 0` 的相位上决策，全员相位均摊错开。
+- **严禁修改 `config.simulationDt`**：基准恒为 1/60 游戏小时，倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
 - **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
 - **★ v1.29.0 ⓪ 瞬间行为层（优先级高于生理需求）**：每名 agent 在自己的决策相位**最前**（`decide()` 顶部、全状态）先跑 `evaluate_instant_needs`——只遍历 `BranchId::is_instant()` 白名单分支（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅），命中即「只写决心 / pending、不 dispatch、不改运动状态、不消耗资源与 RNG」并 `continue` 继续遍历后续瞬发分支；随后才进入常规状态机。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。非瞬发分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。

@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 // 1. 引擎节拍与时间基准 (Simulation Time & Ticks)
 // ============================================================================
-pub const SIMULATION_DT: f32 = 1.0 / 30.0;
-pub const TICKS_PER_SECOND: u64 = 30;
-pub const AGENT_DECISION_INTERVAL_TICKS: u64 = 30;
+pub const SIMULATION_DT: f32 = 1.0 / 60.0;
+pub const TICKS_PER_SECOND: u64 = 60;
+pub const AGENT_DECISION_INTERVAL_TICKS: u64 = 60;
 
 // ============================================================================
 // 2. 部落民生理、代谢与生命周期 (Agent Physiology & Lifecycle)
@@ -239,11 +239,16 @@ pub const TEMP_EL_NINO_AMPLITUDE: f32 = 3.0;
 // ============================================================================
 // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)
 // ============================================================================
-/// 道路自然杂草丛生衰减速率 (%/秒,相对当前磨损的比例衰减)
-pub const ROAD_WEAR_DECAY_RATE: f32 = 0.0067;
-/// 族人单次通行踩踏增量 (等级/次)；注意：世界实际采用 0.05，const 须与此一致
-pub const ROAD_WEAR_STEP_INC: f32 = 0.05;
-pub const ROAD_MAX_WEAR: f32 = 5.0;
+/// 道路自然杂草丛生衰减速率 (%/小时,相对当前磨损的比例衰减，0.005 即 0.5%/h)
+pub const ROAD_WEAR_DECAY_RATE: f32 = 0.005;
+/// 族人单次通行踩踏增量 (等级/次)；注意：世界实际采用 0.1，const 须与此一致
+pub const ROAD_WEAR_STEP_INC: f32 = 0.1;
+/// 道路等级阶梯步进（用于 A* 寻路速度加成量化与端点对缓存跨阶失效，默认 0.25 级）
+pub const ROAD_WEAR_TIER_STEP: f32 = 0.25;
+/// 道路移速增益上限磨损值 (超过此值无额外移速加成)
+pub const ROAD_BENEFIT_MAX_WEAR: f32 = 5.0;
+/// 道路磨损/踩踏耐久度上限 (允许溢出至最多 10.0)
+pub const ROAD_MAX_WEAR: f32 = 10.0;
 pub const ROAD_SPEED_DIRT_TRACK: f32 = 36.0;
 pub const ROAD_SPEED_COBBLESTONE: f32 = 44.0;
 pub const ROAD_SPEED_ASPHALT_URBAN: f32 = 60.0;
@@ -290,14 +295,14 @@ pub const LEDGER_JOURNAL_CAPACITY: usize = 64;
 
 /// 族税率：家户每周期向族库缴纳账面余额的比例（默认 5%）
 pub const CLAN_TRIBUTE_RATE: f32 = 0.05;
-/// 族税征收周期（tick）：每 N tick 全局统一征收一次（默认 1800 = 60秒）
-pub const CLAN_TRIBUTE_INTERVAL_TICKS: u64 = 1800;
+/// 族税征收周期（tick）：每 N tick 全局统一征收一次（默认 3600 = 60游戏小时）
+pub const CLAN_TRIBUTE_INTERVAL_TICKS: u64 = 3600;
 /// 族内互助族库最低余额门槛：族库总余额 > 此值方可签发互助（默认 50.0）
 pub const CLAN_MUTUAL_AID_MIN_BALANCE: f32 = 50.0;
 /// 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫，可申请族内互助（默认 10.0）
 pub const CLAN_MUTUAL_AID_FAMILY_THRESHOLD: f32 = 10.0;
-/// 族内互助冷却（tick）：每家户每 N tick 最多接收一次互助（默认 900 = 30秒）
-pub const CLAN_MUTUAL_AID_COOLDOWN_TICKS: u64 = 900;
+/// 族内互助冷却（tick）：每家户每 N tick 最多接收一次互助（默认 1800 = 30游戏小时）
+pub const CLAN_MUTUAL_AID_COOLDOWN_TICKS: u64 = 1800;
 /// 宗族长老（族长）顺位任职威望奖励（默认 +3）
 pub const PRESTIGE_CLAN_ELDER_BONUS: u32 = 3;
 
@@ -306,14 +311,14 @@ pub const PRESTIGE_CLAN_ELDER_BONUS: u32 = 3;
 // ============================================================================
 /// 公仓税率：家户每周期向地区公仓缴纳账面余额的比例（默认 3%）
 pub const LEDGER_TAX_RATE: f32 = 0.03;
-/// 公仓税征收周期（tick）：每 N tick 全局统一征收一次（默认 2400 = 80秒）
-pub const LEDGER_TAX_INTERVAL_TICKS: u64 = 2400;
+/// 公仓税征收周期（tick）：每 N tick 全局统一征收一次（默认 4800 = 80游戏小时）
+pub const LEDGER_TAX_INTERVAL_TICKS: u64 = 4800;
 /// 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济（默认 30.0）
 pub const LEDGER_RELIEF_MIN_BALANCE: f32 = 30.0;
 /// 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫，可申请救济（默认 8.0）
 pub const LEDGER_RELIEF_FAMILY_THRESHOLD: f32 = 8.0;
-/// 救济冷却（tick）：每家户每 N tick 最多接收一次救济（默认 1200 = 40秒）
-pub const LEDGER_RELIEF_COOLDOWN_TICKS: u64 = 1200;
+/// 救济冷却（tick）：每家户每 N tick 最多接收一次救济（默认 2400 = 40游戏小时）
+pub const LEDGER_RELIEF_COOLDOWN_TICKS: u64 = 2400;
 /// 国王登基任职威望奖励（默认 +3）
 pub const PRESTIGE_KING_BONUS: u32 = 3;
 
@@ -352,8 +357,8 @@ pub const MARKET_MIN_DISPATCH_STAMINA: f32 = 15.0;
 // ============================================================================
 // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)
 // ============================================================================
-/// ★ v1.26.0 买家全局出价冷却（tick，默认 300 = 10 模拟秒）：出价后对任何在售房屋都不再出价
-pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 90;
+/// ★ v1.26.0 买家全局出价冷却（tick，默认 180 = 3 游戏小时）：出价后对任何在售房屋都不再出价
+pub const HOUSE_AUCTION_BID_COOLDOWN_TICKS: u64 = 180;
 /// 最晚出售修缮度时限（耐久度跌至此值时只要有新报价即成交，默认 10.0%）
 pub const HOUSE_AUCTION_DEADLINE_DURABILITY: f32 = 10.0;
 /// 麦穗理论最优停止观察期比例（默认 0.37 即 37%）
@@ -552,6 +557,8 @@ pub struct SimConfig {
     // 8. 空间路网、限速与踩踏演化
     pub road_wear_decay_rate: f32,
     pub road_wear_step_inc: f32,
+    pub road_wear_tier_step: f32,
+    pub road_benefit_max_wear: f32,
     pub road_max_wear: f32,
     pub road_speed_dirt_track: f32,
     pub road_speed_cobblestone: f32,
@@ -787,6 +794,8 @@ impl Default for SimConfig {
             // 8. 空间路网、限速与踩踏演化
             road_wear_decay_rate: ROAD_WEAR_DECAY_RATE,
             road_wear_step_inc: ROAD_WEAR_STEP_INC,
+            road_wear_tier_step: ROAD_WEAR_TIER_STEP,
+            road_benefit_max_wear: ROAD_BENEFIT_MAX_WEAR,
             road_max_wear: ROAD_MAX_WEAR,
             road_speed_dirt_track: ROAD_SPEED_DIRT_TRACK,
             road_speed_cobblestone: ROAD_SPEED_COBBLESTONE,

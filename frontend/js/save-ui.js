@@ -175,7 +175,7 @@
     if (!(await waitEngineReady(15000))) return false;
     const s = getSim();
     if (!s || !s._ready) return false;
-    const res = s.loadWorld(text, meta);
+    const res = await s.loadWorld(text, meta);
     if (!res.ok) {
       console.warn('[save-ui] 启动自动读档失败:', res.error);
       return false;
@@ -395,7 +395,7 @@
     }
     const s = getSim();
     if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return false; }
-    const json = s.saveWorld();
+    const json = await s.saveWorld();
     if (!json) {
       const detail = s.readSaveError ? s.readSaveError() : '';
       setStatus('存档失败：' + (detail || '未知错误'), 'err');
@@ -486,7 +486,7 @@
       setStatus(`存档版本 (v${meta.appVersion}) 与当前版本 (v${curVer}) 不一致，已自动废弃无法读取。请覆盖保存当前版本世界。`, 'err');
       return;
     }
-    applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
+    await applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
   }
 
   /** 断开槽位的文件连接（显式操作：删除内存状态与 IndexedDB 句柄记录） */
@@ -497,10 +497,10 @@
     setStatus(`已断开${SLOTS.find(s => s.id === slotId).name}的文件连接`, 'ok');
   }
 
-  function applySave(json, meta, label) {
+  async function applySave(json, meta, label) {
     const s = getSim();
     if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return; }
-    const res = s.loadWorld(json, meta);
+    const res = await s.loadWorld(json, meta);
     if (!res.ok) {
       setStatus('读档失败：' + (res.error || '未知错误'), 'err');
       return;
@@ -681,15 +681,15 @@
         const curVer = getCurrentAppVersion();
         if (meta.formatVersion !== SAVE_FORMAT_VERSION) throw new Error(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`);
         if (meta.appVersion !== curVer) throw new Error(`存档版本 v${meta.appVersion} 与当前应用版本 v${curVer} 不一致，旧版本存档已自动废弃`);
-        applySave(text, meta, `导入文件（${file.name}）`);
+        await applySave(text, meta, `导入文件（${file.name}）`);
       } catch (err) { setStatus('导入失败：' + err.message, 'err'); }
       fileInput.value = '';
     });
     const btnExport = document.getElementById('btn-export-save');
-    if (btnExport) btnExport.addEventListener('click', () => {
+    if (btnExport) btnExport.addEventListener('click', async () => {
       const s = getSim();
       if (!s || !s._ready) { setStatus('引擎尚未就绪，请稍候重试', 'err'); return; }
-      const json = s.saveWorld();
+      const json = await s.saveWorld();
       if (!json) { setStatus('导出失败：' + (s.readSaveError ? s.readSaveError() : '未知错误'), 'err'); return; }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));

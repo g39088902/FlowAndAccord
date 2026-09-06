@@ -93,41 +93,51 @@ impl World3DEngine {
     /// 房屋劳作修缮结算 (修缮由 agent 自主决策的 RepairHouse 需求触发, 系统仅推进进度, 不再扫描指挥)
     /// ★ v1.10.0 无主空置房（owner_id=None）不修缮；仅有主房屋可被户主/配偶修缮。
     pub(crate) fn tick_house_repair(&mut self, dt: f32) {
+        let max_durability = self.config.house_durability_max;
+        let repair_speed = self.config.house_repair_speed;
+        let mut completed_repairs: Vec<(u32, u32, Option<u32>)> = Vec::new(); // (house_id, agent_id, owner_id)
+
         for house in &mut self.houses {
             house.is_repairing = false;
-            if house.durability < self.config.house_durability_max {
+            let candidate_ids: [Option<u32>; 2] = [house.owner_id, house.spouse_id];
+
+            if house.durability < max_durability {
                 let owner_id = house.owner_id;
-                let spouse_id = house.spouse_id;
-                for agent in &mut self.agents {
-                    if agent.is_alive && (owner_id == Some(agent.id) || spouse_id == Some(agent.id)) {
-                        if agent.state == PrimitiveActionState::RepairingHouse {
-                            house.is_repairing = true;
-                            house.repair(self.config.house_repair_speed * dt, &self.config);
-                            if house.durability >= self.config.house_durability_max {
-                                agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
-                                agent.current_need = Some("Physiological·Rest".to_string());
-                                // ★ M2 Maintenance 事件：修缮完工记入家户团体事件（纯审计，无资源消耗）
-                                let tick = self.tick_counter;
-                                if let Some(oid) = owner_id {
-                                    if let Some(hid) = self.household_registry.household_of(oid) {
-                                        if let Some(hh) = self.household_registry.get_mut(hid) {
-                                            hh.group.ledger.push_event(tick, format!("🔧 修缮完工：房屋 #{} 耐久度恢复至 100%（修缮人 #{})", house.id, agent.id));
-                                        }
-                                    }
-                                }
-                                self.last_event = Some(format!("🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！", agent.id, house.id));
-                            }
+                for aid in candidate_ids.into_iter().flatten() {
+                    let Some(&idx) = self.agent_index.get(&aid) else { continue };
+                    let agent = &mut self.agents[idx];
+                    if agent.is_alive && agent.state == PrimitiveActionState::RepairingHouse {
+                        house.is_repairing = true;
+                        house.repair(repair_speed * dt, &self.config);
+                        if house.durability >= max_durability {
+                            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+                            agent.current_need = Some("Physiological·Rest".to_string());
+                            completed_repairs.push((house.id, agent.id, owner_id));
                         }
                     }
                 }
             } else {
-                for agent in &mut self.agents {
+                for aid in candidate_ids.into_iter().flatten() {
+                    let Some(&idx) = self.agent_index.get(&aid) else { continue };
+                    let agent = &mut self.agents[idx];
                     if agent.state == PrimitiveActionState::RepairingHouse && agent.home_house_id == Some(house.id) {
                         agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
                         agent.current_need = Some("Physiological·Rest".to_string());
                     }
                 }
             }
+        }
+
+        let tick = self.tick_counter;
+        for (house_id, agent_id, owner_id) in completed_repairs {
+            if let Some(oid) = owner_id {
+                if let Some(hid) = self.household_registry.household_of(oid) {
+                    if let Some(hh) = self.household_registry.get_mut(hid) {
+                        hh.group.ledger.push_event(tick, format!("🔧 修缮完工：房屋 #{} 耐久度恢复至 100%（修缮人 #{})", house_id, agent_id));
+                    }
+                }
+            }
+            self.last_event = Some(format!("🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！", agent_id, house_id));
         }
     }
 }

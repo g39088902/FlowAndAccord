@@ -7,9 +7,9 @@
 
 | 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `simulationDt` | f32 | 0.03333333333333333 | world_tick.rs / sim_wasm (§4.3 严禁改) | 单个 tick 对应的模拟秒数 (1/30) |
-| `ticksPerSecond` | u64 | 30 | world_tick.rs / rustworld.js | 每秒 tick 数（决定模拟实时倍速基准） |
-| `agentDecisionIntervalTicks` | u64 | 30 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 秒决策一次 |
+| `simulationDt` | f32 | 0.016666666666666666 | world_tick.rs / sim_wasm (§4.3 严禁改) | 单个 tick 对应的模拟小时数 (1/60) |
+| `ticksPerSecond` | u64 | 60 | world_tick.rs / rustworld.js | 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准） |
+| `agentDecisionIntervalTicks` | u64 | 60 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 游戏小时决策一次 |
 | `agentHungerCapacity` | f32 | 50 | agent.rs (饱食容量) | 饱食度容量上限 |
 | `agentThirstCapacity` | f32 | 50 | agent.rs (水分容量) | 水分容量上限 |
 | `agentInitialHunger` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
@@ -73,15 +73,15 @@
 | `stockMaxWood` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 林木储量上限 |
 | `stockMaxStone` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 石矿储量上限 |
 | `stockMaxGold` | f32 | 200 | poi.rs / ecology.rs (POI 储量上限) | 金矿储量上限 |
-| `regenBaseWater` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 清泉基础再生速率 (单位/秒) |
+| `regenBaseWater` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 清泉基础再生速率 (单位/小时) |
 | `regenBaseBerry` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 浆果基础再生速率 |
 | `regenBaseWood` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 林木基础再生速率 |
 | `regenBaseStone` | f32 | 2 | ecology.rs / world_tick.rs (POI 再生速率) | 石矿基础再生速率 |
 | `regenBaseGold` | f32 | 1.8 | ecology.rs / world_tick.rs (POI 再生速率) | 金矿基础再生速率 |
-| `poiInteractionRateResource` | f32 | 10 | ecology.rs (POI 交互采收/卸货) | 资源 POI 现场采收速率 (单位/秒) |
-| `poiInteractionRateGold` | f32 | 5 | ecology.rs (POI 交互采收/卸货) | 金矿现场采收速率 (单位/秒) |
-| `poiUnloadRateResource` | f32 | 10 | ecology.rs (回家卸货入账速率 §4.4) | 资源入库卸货速率 (单位/秒) |
-| `poiUnloadRateGold` | f32 | 5 | ecology.rs (回家卸货入账速率 §4.4) | 黄金入库卸货速率 (单位/秒) |
+| `poiInteractionRateResource` | f32 | 10 | ecology.rs (POI 交互采收/卸货) | 资源 POI 现场采收速率 (单位/小时) |
+| `poiInteractionRateGold` | f32 | 5 | ecology.rs (POI 交互采收/卸货) | 金矿现场采收速率 (单位/小时) |
+| `poiUnloadRateResource` | f32 | 10 | ecology.rs (回家卸货入账速率 §4.4) | 资源入库卸货速率 (单位/小时) |
+| `poiUnloadRateGold` | f32 | 5 | ecology.rs (回家卸货入账速率 §4.4) | 黄金入库卸货速率 (单位/小时) |
 | `poiSpawnRadiusCamp` | f32 | 0.7 | ecology.rs (POI 初始化播撒布局) | 营地撒点半径占半图比例 |
 | `poiSpawnRadiusResource` | f32 | 0.8 | ecology.rs (POI 初始化播撒布局) | 资源 POI 撒点半径占半图比例 |
 | `poiSpawnFallbackRatio` | f32 | 0.6 | ecology.rs (POI 初始化播撒布局) | 紧密撒点回退最小间距比例 (min_distance × N) |
@@ -91,7 +91,7 @@
 | `roadConnectFarDist` | f32 | 320 | ecology.rs (路网连接距离) | 路网直连远距阈值 (≤ 单向泥径) |
 | `roadGradePaveThreshold` | f32 | 8 | graph.rs (道路等级铺装阈值) | 坡度铺装阈值 (高差超过则盘山道，否则泥径) |
 | `poiInteractionRadius` | f32 | 22 | ecology.rs (POI 交互采收/卸货) | 采收现场「已抵达 POI」判定半径 (m) |
-| `campHomeConsumeRate` | f32 | 3 | ecology.rs (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/秒) |
+| `campHomeConsumeRate` | f32 | 3 | ecology.rs (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/小时) |
 | `decisionPoiSeekMinStockRatio` | f32 | 0.5 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
 | `decisionPoiAbandonStockRatio` | f32 | 0.1 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器关闭阈值 (库存 < 此比例) |
 | `decisionCriticalThirst` | f32 | 25 | decisions/ (生理临界阈值) | 临界口渴阈值 (触发寻水) |
@@ -149,9 +149,11 @@
 | `tempAmplitude` | f32 | 17 | world_season.rs (温度正弦曲线) | 季节温度振幅 (℃) |
 | `tempElNinoCycleYears` | f32 | 7 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦周期 (年) |
 | `tempElNinoAmplitude` | f32 | 3 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦振幅范围 (±℃) |
-| `roadWearDecayRate` | f32 | 0.0067 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路自然杂草衰减速率 (%/秒,相对当前磨损比例衰减) |
-| `roadWearStepInc` | f32 | 0.05 | graph.rs (踩踏增长/自然衰减 §4.3) | 族人单次通行踩踏增量 (等级/次) |
-| `roadMaxWear` | f32 | 5 | graph.rs (最高磨损等级) | 道路磨损上限 |
+| `roadWearDecayRate` | f32 | 0.005 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路自然杂草衰减速率 (%/小时,相对当前磨损比例衰减，0.005 即 0.5%/h) |
+| `roadWearStepInc` | f32 | 0.1 | graph.rs (踩踏增长/自然衰减 §4.3) | 族人单次通行踩踏增量 (等级/次) |
+| `roadWearTierStep` | f32 | 0.25 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路等级阶梯步进 (用于 A* 寻路速度加成量化与端点对缓存跨阶失效) |
+| `roadBenefitMaxWear` | f32 | 5 | graph.rs (移速增益上限磨损值) | 道路移速增益上限磨损值 (超过此值无额外移速加成) |
+| `roadMaxWear` | f32 | 10 | graph.rs (最高磨损等级/溢出上限) | 道路磨损/踩踏耐久度上限 (允许溢出至最多10) |
 | `roadSpeedDirtTrack` | f32 | 36 | graph.rs (各道路类型限速) | 泥泞小径限速 |
 | `roadSpeedCobblestone` | f32 | 44 | graph.rs (各道路类型限速) | 碎石盘山道限速 |
 | `roadSpeedAsphaltUrban` | f32 | 60 | graph.rs (各道路类型限速) | 城镇大道限速 |
@@ -173,16 +175,16 @@
 | `roadVisibleAvoidModifier` | f32 | 1 | graph.rs / decisions/ (可见道路偏好) | A* 非偏好隐秘时公开道路代价乘子 |
 | `ledgerJournalCapacity` | usize | 64 | ledger/ (所有账本容量) | 账本流水环形缓冲容量 (每团体/家户，条) |
 | `clanTributeRate` | f32 | 0.05 | ledger/clan.rs (族税征收) | 族税率：家户每周期向族库缴纳账面余额的比例 |
-| `clanTributeIntervalTicks` | u64 | 1800 | ledger/clan.rs (族税征收) | 族税征收周期 (tick)，每 N tick 全局统一征收一次 |
+| `clanTributeIntervalTicks` | u64 | 3600 | ledger/clan.rs (族税征收) | 族税征收周期 (tick)，每 N tick 全局统一征收一次 (60 游戏小时) |
 | `clanMutualAidMinBalance` | f32 | 50 | ledger/clan.rs (族内互助) | 族内互助族库最低余额门槛 |
 | `clanMutualAidFamilyThreshold` | f32 | 10 | ledger/clan.rs (族内互助) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
-| `clanMutualAidCooldownTicks` | u64 | 900 | ledger/clan.rs (族内互助) | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 |
+| `clanMutualAidCooldownTicks` | u64 | 1800 | ledger/clan.rs (族内互助) | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 (30 游戏小时) |
 | `prestigeClanElderBonus` | u32 | 3 | ledger/clan.rs (族长威望奖励) | 宗族长老（族长）顺位任职威望奖励 |
 | `ledgerTaxRate` | f32 | 0.03 | ledger/region.rs (公仓税) | 公仓税率：家户每周期向地区公仓缴纳账面余额的比例 |
-| `ledgerTaxIntervalTicks` | u64 | 2400 | ledger/region.rs (公仓税) | 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 |
+| `ledgerTaxIntervalTicks` | u64 | 4800 | ledger/region.rs (公仓税) | 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 (80 游戏小时) |
 | `ledgerReliefMinBalance` | f32 | 30 | ledger/region.rs (救济) | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
 | `ledgerReliefFamilyThreshold` | f32 | 8 | ledger/region.rs (救济) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
-| `ledgerReliefCooldownTicks` | u64 | 1200 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 |
+| `ledgerReliefCooldownTicks` | u64 | 2400 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 (40 游戏小时) |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
 | `marketStockMaxWater` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
@@ -198,7 +200,7 @@
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
 | `marketSettlementStep` | f32 | 5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场单次交易结算步长 (单位) |
-| `houseAuctionBidCooldownTicks` | u64 | 90 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 90 = 3 模拟秒，出价后对任何房屋都不再出价) |
+| `houseAuctionBidCooldownTicks` | u64 | 180 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 180 = 3 游戏小时，出价后对任何房屋都不再出价) |
 | `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
 | `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |
 | `houseAuctionMinBidGold` | f32 | 0.01 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次出价最低家户黄金门槛 (低于此值不出价) |

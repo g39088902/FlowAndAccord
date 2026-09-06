@@ -34,11 +34,14 @@
   let _lastHoverUpdateTick = 0;
 
   // ─── 工具函数 ───────────────────────────────────────────────
-  function tickToSec(t) { return t / 30.0; }
-  function fmtDur(sec) {
-    if (sec < 60) return sec.toFixed(0) + 's';
-    if (sec < 3600) return (sec / 60).toFixed(1) + 'min';
-    return (sec / 3600).toFixed(1) + 'h';
+  function tickToSec(t) { return t / 60.0; } // 换算为游戏小时
+  function fmtDur(hours) {
+    if (!hours || hours <= 0) return '0小时';
+    if (hours < 1) return (hours * 60).toFixed(0) + '分';
+    if (hours < 24) return hours.toFixed(1) + '小时';
+    const days = Math.floor(hours / 24);
+    const remHrs = Math.floor(hours % 24);
+    return remHrs > 0 ? `${days}天${remHrs}小时` : `${days}天`;
   }
   function agentName(sim, id) {
     if (id == null) return '—';
@@ -742,11 +745,11 @@
       force = true;
     }
 
-    // ★ 悬停节流：鼠标停留在大盘交互区时不再永久冻结，而是降频至 1秒/30 ticks 刷新一次，
+    // ★ 悬停节流：鼠标停留在大盘交互区时不再永久冻结，而是降频至 1秒/60 ticks (1 游戏小时) 刷新一次，
     //   兼顾交互防闪烁与数据实时更新。
     const currentTick = (sim && sim.tickCount) || 0;
     if (!force && _panelHovered) {
-      if (currentTick - _lastHoverUpdateTick < 30) {
+      if (currentTick - _lastHoverUpdateTick < 60) {
         return;
       }
     }

@@ -208,7 +208,7 @@ pub struct LaneSnapshot {
     pub p3: Vec3,
     pub road_class: String,
     pub speed_limit: f32,
-    pub wear: f32, // 踩踏等级连续浮点数 (0.0 ~ 5.0)
+    pub wear: f32, // 踩踏等级连续浮点数 (0.0 ~ 10.0，>5.0 为溢出耐久缓冲)
     pub is_hidden: bool,
     pub concealment: f32,
 }

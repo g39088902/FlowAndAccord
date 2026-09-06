@@ -25,6 +25,19 @@ pub enum NodeType {
     SecretHideout,      // 隐秘黑市据点/走私换装点
 }
 
+impl NodeType {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            NodeType::GroundIntersection => "GroundIntersection",
+            NodeType::ElevatedOverpass => "ElevatedOverpass",
+            NodeType::TunnelPortal => "TunnelPortal",
+            NodeType::CulDeSac => "CulDeSac",
+            NodeType::SecretHideout => "SecretHideout",
+        }
+    }
+}
+
 /// 道路等级
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoadClass {
@@ -33,6 +46,19 @@ pub enum RoadClass {
     AsphaltUrban,   // 沥青主干道
     SkywayElevated, // 悬空高架快速路
     SmugglerTrail,  // 走私暗道/避税密道
+}
+
+impl RoadClass {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            RoadClass::DirtTrack => "DirtTrack",
+            RoadClass::Cobblestone => "Cobblestone",
+            RoadClass::AsphaltUrban => "AsphaltUrban",
+            RoadClass::SkywayElevated => "SkywayElevated",
+            RoadClass::SmugglerTrail => "SmugglerTrail",
+        }
+    }
 }
 
 /// 3D 有向车道边 (包含隐秘属性)
@@ -51,6 +77,18 @@ pub struct LaneEdge3D {
     pub concealment: f32, // 隐秘度 0.0 (完全公开) ~ 1.0 (深度隐藏)
 }
 
+impl LaneEdge3D {
+    /// 计算以 tier_step 为阶梯步进的量化等级桶（上限为 benefit_max）
+    #[inline]
+    pub fn wear_tier_bucket(wear: f32, tier_step: f32, benefit_max: f32) -> u32 {
+        if tier_step <= 0.0 {
+            return 0;
+        }
+        let effective_wear = wear.min(benefit_max);
+        (effective_wear / tier_step).floor() as u32
+    }
+}
+
 /// 3D 路网拓扑有向图管理器
 #[derive(Debug, Clone)]
 pub struct LaneGraph3D {
@@ -59,6 +97,8 @@ pub struct LaneGraph3D {
     pub edge_map: HashMap<LaneId, EdgeIndex>,
     pub next_node_id: NodeId,
     pub next_lane_id: LaneId,
+    // ★ 静态端点对路径缓存：(from_node, to_node, prefer_hidden) -> Option<Vec<LaneId>>
+    pub path_cache: std::cell::RefCell<HashMap<(NodeId, NodeId, bool), Option<Vec<LaneId>>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,7 +118,13 @@ impl LaneGraph3D {
             edge_map: HashMap::new(),
             next_node_id: 1,
             next_lane_id: 1,
+            path_cache: std::cell::RefCell::new(HashMap::new()),
         }
+    }
+
+    /// 清空端点对路径缓存（拓扑变更或配置刷新时调用）
+    pub fn clear_path_cache(&self) {
+        self.path_cache.borrow_mut().clear();
     }
 
     pub fn add_node(&mut self, pos: Vec3, node_type: NodeType) -> NodeId {
@@ -144,13 +190,25 @@ impl LaneGraph3D {
 
         let edge_idx = self.graph.add_edge(from_idx, to_idx, edge_data);
         self.edge_map.insert(lane_id, edge_idx);
+        self.clear_path_cache();
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减
+    /// 道路自然杂草丛生与退化衰减（跨阶跌落时使端点对路径缓存失效）
     pub fn tick_wear_decay(&mut self, dt: f32, config: &SimConfig) {
+        let mut bucket_changed = false;
+        let tier_step = config.road_wear_tier_step;
+        let benefit_max = config.road_benefit_max_wear;
         for edge in self.graph.edge_weights_mut() {
+            let old_bucket = LaneEdge3D::wear_tier_bucket(edge.wear, tier_step, benefit_max);
             edge.wear = (edge.wear * (1.0 - config.road_wear_decay_rate * dt)).max(0.0);
+            let new_bucket = LaneEdge3D::wear_tier_bucket(edge.wear, tier_step, benefit_max);
+            if old_bucket != new_bucket {
+                bucket_changed = true;
+            }
+        }
+        if bucket_changed {
+            self.clear_path_cache();
         }
     }
 
@@ -163,8 +221,29 @@ impl LaneGraph3D {
         self.find_path_3d_with_preference(start, goal, false, config)
     }
 
-    /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路
+    /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路（带静态端点对路径缓存）
     pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
+        if start == goal {
+            return Some(Vec::new());
+        }
+
+        let key = (start, goal, prefer_hidden);
+        if let Some(cached) = self.path_cache.borrow().get(&key) {
+            return cached.clone();
+        }
+
+        let path = self.compute_path_3d_with_preference(start, goal, prefer_hidden, config);
+        // 限制缓存容量上限，防止极端情况下无界增长（正常规模 < 1000 对）
+        let mut cache = self.path_cache.borrow_mut();
+        if cache.len() >= 4096 {
+            cache.clear();
+        }
+        cache.insert(key, path.clone());
+        path
+    }
+
+    /// 内层加权 A* 拓扑路径搜索（基于离散阶梯限速与坡度，保证确定性与缓存稳定性）
+    fn compute_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
         let start_idx = *self.node_map.get(&start)?;
         let goal_idx = *self.node_map.get(&goal)?;
         let goal_pos = self.graph[goal_idx].pos;
@@ -178,7 +257,12 @@ impl LaneGraph3D {
                 let delta_z = (edge.curve.p3.z - edge.curve.p0.z).max(0.0);
                 let grade_penalty = if delta_z > 0.0 { delta_z * config.road_astar_grade_penalty_coef } else { 0.0 };
 
-                let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * edge.wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
+                // 阶梯量化有效速度：以 road_wear_tier_step (0.25) 为离散阶梯步进，
+                // 兼顾踏路成道（Stigmergy）动态涌现与端点对路径缓存（path_cache）高命中率
+                let bucket = LaneEdge3D::wear_tier_bucket(edge.wear, config.road_wear_tier_step, config.road_benefit_max_wear);
+                let quantized_wear = bucket as f32 * config.road_wear_tier_step;
+                let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * quantized_wear)
+                    .clamp(config.road_level_factor_min, config.road_level_factor_max);
                 let effective_speed = edge.speed_limit * road_level_factor;
 
                 let hidden_modifier = if prefer_hidden {

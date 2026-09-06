@@ -20,12 +20,15 @@ use super::world::World3DEngine;
 impl World3DEngine {
     /// 导出快照
     pub fn generate_snapshot(&self) -> WorldSnapshot3D {
-        let mut terrain_cells = Vec::with_capacity(self.terrain.cells.len());
-        for cell in &self.terrain.cells {
-            terrain_cells.push(GeoCellSnapshot {
-                elevation: cell.elevation,
-                slope_angle: cell.slope_angle_deg,
-            });
+        let need_terrain = self.terrain_dirty.replace(false);
+        let mut terrain_cells = Vec::with_capacity(if need_terrain { self.terrain.cells.len() } else { 0 });
+        if need_terrain {
+            for cell in &self.terrain.cells {
+                terrain_cells.push(GeoCellSnapshot {
+                    elevation: cell.elevation,
+                    slope_angle: cell.slope_angle_deg,
+                });
+            }
         }
 
         let mut pois = Vec::new();
@@ -41,7 +44,7 @@ impl World3DEngine {
             };
             pois.push(PoiSnapshot {
                 id: p.id,
-                poi_type: format!("{:?}", p.poi_type),
+                poi_type: p.poi_type.as_str().to_string(),
                 x: p.pos.x,
                 y: p.pos.y,
                 z: p.pos.z,
@@ -141,7 +144,7 @@ impl World3DEngine {
                 x: h.pos.x,
                 y: h.pos.y,
                 z: h.pos.z,
-                tier: format!("{:?}", h.tier),
+                tier: h.tier.as_str().to_string(),
                 durability: h.durability,
                 age: h.age,
                 construction_progress: h.construction_progress,
@@ -168,7 +171,7 @@ impl World3DEngine {
                 x: node.pos.x,
                 y: node.pos.y,
                 z: node.pos.z,
-                node_type: format!("{:?}", node.node_type),
+                node_type: node.node_type.as_str().to_string(),
             });
         }
 
@@ -183,7 +186,7 @@ impl World3DEngine {
                 p1: lane.curve.p1,
                 p2: lane.curve.p2,
                 p3: lane.curve.p3,
-                road_class: format!("{:?}", lane.road_class),
+                road_class: lane.road_class.as_str().to_string(),
                 speed_limit: lane.speed_limit,
                 wear: lane.wear,
                 is_hidden: lane.is_hidden,
@@ -195,7 +198,7 @@ impl World3DEngine {
         for agent in &self.agents {
             agents.push(AgentSnapshot {
                 id: agent.id,
-                gender: format!("{:?}", agent.gender),
+                gender: agent.gender.as_str().to_string(),
                 x: agent.world_pos.x,
                 y: agent.world_pos.y,
                 z: agent.world_pos.z,
@@ -218,7 +221,7 @@ impl World3DEngine {
                 cumulative_royal_privy: agent.cumulative_royal_privy,
                 build_timer: agent.build_timer,
                 miscarriage_alert_timer: agent.miscarriage_alert_timer,
-                state: format!("{:?}", agent.state),
+                state: agent.state.as_str().to_string(),
                 is_alive: agent.is_alive,
                 hunger: agent.hunger,
                 thirst: agent.thirst,

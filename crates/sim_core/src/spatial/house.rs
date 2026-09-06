@@ -15,6 +15,19 @@ pub enum HouseTier {
     Tier4Manor,       // 4级 氏族大庄园
 }
 
+impl HouseTier {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            HouseTier::Tier0Warehouse => "Tier0Warehouse",
+            HouseTier::Tier1ThatchedHut => "Tier1ThatchedHut",
+            HouseTier::Tier2LeanTo => "Tier2LeanTo",
+            HouseTier::Tier3Homestead => "Tier3Homestead",
+            HouseTier::Tier4Manor => "Tier4Manor",
+        }
+    }
+}
+
 /// 房屋本次拍卖会话的报价流水条目（v1.26.0：随会话创建、随成交归档，不跨场次）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HouseBidRecord {

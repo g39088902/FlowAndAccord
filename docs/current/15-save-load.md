@@ -87,13 +87,13 @@ World3DEngine
 
 ## 四、前端层
 
-### 4.1 适配层 `rustworld.js`
+### 4.1 适配层 `rustworld.js`（★ v1.38.0 Web Worker 消息桥接）
 
 | 方法 | 说明 |
 | :--- | :--- |
-| `saveWorld()` | 调 `world_save_ptr/len` 取回存档 JSON 字符串，失败返回 `null` |
-| `loadWorld(jsonStr, meta?)` | 编码 → `world_save_buf_ptr` → 写入 → `world_load`；成功后清空 `_trails` / `agentArchive` / `_lastEvent` / `_terrainCached`、`deselect()`，再 `_pullSnapshot(true)` 强制重建地形快照 |
-| `readSaveError()` | 读取内核错误文本 |
+| `saveWorld()` | 向 `sim_worker.js` 发送 `SAVE` 请求，返回 `Promise<string|null>` 异步解析为 JSON 字符串 |
+| `loadWorld(jsonStr, meta?)` | 向 `sim_worker.js` 发送 `LOAD` 请求，Worker 执行 `world_load` 并回传重构快照；成功后清空前端派生缓存（`_trails` / `agentArchive` / `_lastEvent` / `_terrainCached`、`deselect()`），返回 `Promise<{ok, error}>` |
+| `readSaveError()` | 读取 Worker 最近一次内核错误文本 |
 
 **读档后不重新注入 `window.SIM_CONFIG`**——存档自带 `SimConfig`，重注入会让前端热调参覆盖存档时的运行参数、破坏续演语义。
 

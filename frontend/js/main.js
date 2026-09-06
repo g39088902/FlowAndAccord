@@ -331,7 +331,7 @@
     // 滑块标签文案：生效产速 = 基准 × 倍率（与 POI 卡片「产出速率」同一算法）
     const ecoSliderLabel = (def, mult) => {
       const actualRate = ecoBaseRate(def) * (isFinite(mult) ? mult : 1.0);
-      return `${(isFinite(mult) ? mult : 1.0).toFixed(1)}x (${actualRate.toFixed(2)}/s)`;
+      return `${(isFinite(mult) ? mult : 1.0).toFixed(1)}x (${actualRate.toFixed(2)}/h)`;
     };
     // 用户拖拽期间禁止内核回写滑块，否则会与拖动打架
     let ecoSliderDragging = false;
@@ -663,7 +663,6 @@
     // ⏪ 时光倒流控制器交互绑定
     // ==========================================
     const rewindModal = document.getElementById('rewind-modal');
-    const btnOpenRewind = document.getElementById('btn-open-rewind');
     const btnOpenRewindCtrl = document.getElementById('btn-open-rewind-ctrl');
     const btnCloseRewind = document.getElementById('btn-close-rewind');
     const inputTargetTick = document.getElementById('input-target-tick');
@@ -682,7 +681,7 @@
       const sliderValEl = document.getElementById('rewind-slider-val');
 
       if (curTickEl) curTickEl.textContent = info.currentTick;
-      if (curTimeEl) curTimeEl.textContent = `${(info.currentTick / 30).toFixed(1)} 秒`;
+      if (curTimeEl) curTimeEl.textContent = `${(info.currentTick / 60).toFixed(1)} 小时`;
       if (rangeTextEl) rangeTextEl.textContent = `Tick ${info.minTick} ~ ${info.maxTick} (${info.checkpointCount} 个检查点)`;
       if (sliderMinEl) sliderMinEl.textContent = `Tick ${info.minTick}`;
       if (sliderMaxEl) sliderMaxEl.textContent = `Tick ${info.maxTick}`;
@@ -695,7 +694,6 @@
 
     const openRewindModal = () => { if (rewindModal) { updateRewindUI(); rewindModal.style.display = 'flex'; } };
     const closeRewindModal = () => { if (rewindModal) rewindModal.style.display = 'none'; };
-    if (btnOpenRewind) btnOpenRewind.addEventListener('click', openRewindModal);
     if (btnOpenRewindCtrl) btnOpenRewindCtrl.addEventListener('click', openRewindModal);
     if (btnCloseRewind) btnCloseRewind.addEventListener('click', closeRewindModal);
     if (rewindModal) rewindModal.addEventListener('click', (e) => { if (e.target === rewindModal) closeRewindModal(); });

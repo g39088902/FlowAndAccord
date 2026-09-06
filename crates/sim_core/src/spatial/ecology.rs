@@ -86,7 +86,9 @@ impl World3DEngine {
             let name_idx = (self.rng.gen_range(0.0, available_names.len() as f32) as usize).min(available_names.len().saturating_sub(1));
             let chosen_name = available_names.swap_remove(name_idx).to_string();
 
-            self.pois.push(PrimitivePoi::new_with_name((i + 1) as u32, PoiType::Camp, pos, chosen_name));
+            let mut poi = PrimitivePoi::new_with_name((i + 1) as u32, PoiType::Camp, pos, chosen_name);
+            poi.nearest_node_id = Some(node_id);
+            self.pois.push(poi);
         }
 
         // 2. 生成清泉水源
@@ -97,6 +99,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 10) as u32, PoiType::WaterSource, pos, format!("低洼清泉 #{}", i + 1));
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.stock_max_water;
             poi.current_stock = self.config.stock_max_water * 0.75;
             poi.regen_rate = self.config.regen_base_water;
@@ -111,6 +114,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 20) as u32, PoiType::BerryBush, pos, format!("缓坡浆果 #{}", i + 1));
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.stock_max_berry;
             poi.current_stock = self.config.stock_max_berry * 0.75;
             poi.regen_rate = self.config.regen_base_berry;
@@ -125,6 +129,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 30) as u32, PoiType::WoodForest, pos, format!("茂密林木 #{}", i + 1));
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.stock_max_wood;
             poi.current_stock = self.config.stock_max_wood * 0.75;
             poi.regen_rate = self.config.regen_base_wood;
@@ -139,6 +144,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 40) as u32, PoiType::StoneQuarry, pos, format!("嶙峋采石场 #{}", i + 1));
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.stock_max_stone;
             poi.current_stock = self.config.stock_max_stone * 0.75;
             poi.regen_rate = self.config.regen_base_stone;
@@ -153,6 +159,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 50) as u32, PoiType::GoldMine, pos, "璀璨金矿 #1".to_string());
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.stock_max_gold;
             poi.current_stock = self.config.stock_max_gold * 0.75;
             poi.regen_rate = self.config.regen_base_gold;
@@ -166,6 +173,7 @@ impl World3DEngine {
             all_node_ids.push(node_id);
 
             let mut poi = PrimitivePoi::new_with_name((i + 60) as u32, PoiType::Market, pos, format!("榷场互市 #{}", i + 1));
+            poi.nearest_node_id = Some(node_id);
             poi.max_stock = self.config.market_stock_max_water;
             poi.current_stock = self.config.market_stock_max_water * 0.75;
             poi.regen_rate = self.config.market_regen_base_water;
@@ -320,6 +328,8 @@ impl World3DEngine {
         self.last_event = Some("🏕️ 生态初始：20 位始祖族人（10男10女）成家配对，踏路筑室，社会演化开启！".to_string());
         // 初始化索引，使 agent_by_id 在本次 tick 后立即可用
         self.rebuild_agent_index();
+        self.regions_arrival_dirty = true;
+        self.terrain_dirty.set(true);
     }
 
     /// 真实有限资源交互结算与分娩
@@ -665,9 +675,12 @@ impl World3DEngine {
         // 出生结算委托给 birth.rs（内部使用 agent_index O(1) 查找，并增量更新索引）
         self.resolve_newborns(newborn_mothers);
 
-        // 清理已彻底消逝的尸骸，之后全量重建索引（retain 会改变所有幸存者下标）
+        // 清理已彻底消逝的尸骸，仅在尸骸彻底消散（长度变化）时重建索引
+        let prev_len = self.agents.len();
         self.agents.retain(|a| a.is_alive || a.death_decay_timer > 0.0);
-        self.rebuild_agent_index();
+        if self.agents.len() != prev_len {
+            self.rebuild_agent_index();
+        }
     }
 
     /// ★ v1.21.1 生成一个远离所有营地 POI 的野外道路交叉节点（始祖出生地兜底，严禁落营地）

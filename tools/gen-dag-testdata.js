@@ -20,7 +20,7 @@ const SEED = parseFloat(arg('seed', '2026'));
 const POLL = parseInt(arg('poll', '900'), 10);      // 每 POLL tick 读一次快照并入档
 const OUT_DIR = arg('out', '/tmp/dag-lab');
 const FOCUS_ID = arg('focus', '') ? parseInt(arg('focus', ''), 10) : null;
-const TD = 1 / 30; // simulationDt，严禁改动
+const TD = 1 / 60; // simulationDt，严禁改动
 
 const ROOT = path.resolve(__dirname, '..');
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');

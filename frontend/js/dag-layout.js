@@ -28,12 +28,12 @@
     //   · 亲子出生间隔 min 30,885 tick → 124px ≥ VNEAR(114)，任意亲子纵向不打架，连线基本垂直；
     //   · 同胞出生间隔 p50 27,007 tick → 108px < VNEAR，同父母子女自然横向并排成"同代行"；
     //   · 整图 50 万 tick → 约 2,000~2,400px 高，长宽比≈1.35，fit 缩放 0.32~0.34 为各焦点最优值。
-    PX_PER_TICK: 0.004,
+    PX_PER_TICK: 0.002,
     LOD_BLOCK: 0.45,      // scale <  → 概览档 (紧凑色块 + 直线边)
     LOD_SIMPLE: 0.75,     // scale <  → 简档 (头像+编号+世代)，否则全档
-    TICKS_PER_SEC: 30,    // 1 模拟秒
-    TICKS_PER_SEASON: 1800, // 1 季 (60 模拟秒)
-    TICKS_PER_YEAR: 7200    // 1 年 (240 模拟秒)
+    TICKS_PER_SEC: 60,    // 1 游戏小时
+    TICKS_PER_SEASON: 3600, // 1 季 (60 游戏小时)
+    TICKS_PER_YEAR: 14400   // 1 年 (240 游戏小时)
   };
 
   const VNEAR = LAYOUT_CONST.NODE_H + LAYOUT_CONST.GAP_Y; // 纵向判定贴邻: 114
