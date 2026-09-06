@@ -158,7 +158,7 @@ main.js::事件绑定
 | `debug-*` | render_hud.js / main.js | 调试监视器字段 |
 | `save-*` / `.save-slot-*` / `.save-tab-btn` | save-ui.js / index.html / style.css | 存档面板与槽位卡片（v1.8.0） |
 | `btn-pause` | main.js / save-ui.js | 暂停按钮（`togglePause()` 改文案，save-ui 读档后同步置为「▶️ 继续模拟」） |
-| `version-tag` | index.html | 版本徽章（每次发版须更新） |
+| `version-tag` | index.html | 版本徽章 · **版本号唯一真相源**（由 `node tools/bump-version.js --patch` 自动同步至 SAVE_APP_VERSION 等全部定义点，勿手工改） |
 
 **搜索方法**：改 ID 前用 `grep -r "旧ID" frontend/` 确认所有引用点。
 

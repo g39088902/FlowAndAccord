@@ -14,21 +14,32 @@
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
   const SAVE_FORMAT_VERSION = 3;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.37.1';
+  const DEFAULT_APP_VERSION = '1.44.3';
   const AUTO_SAVE_INTERVAL_MS = 30000;
+
+  /**
+   * ★ v1.44.2 版本字符串归一化（消除「版本相同却判定为旧档」的误判）
+   * 内核 SAVE_APP_VERSION 与存档 app_version 恒为 `1.44.1`（无 `v` 前缀），
+   * 而前端兜底串历史写法为 `v1.38.0`（带 `v`）。二者直接 `===` 比较必然不等，
+   * 导致启动门禁先误报「旧档已废弃」、等引擎 READY 后又能把同一份旧档读进来。
+   * 所有版本比较点必须先归一化：去首尾空白 + 去可选 `v`/`V` 前缀。
+   */
+  function normalizeVer(v) {
+    return String(v == null ? '' : v).trim().replace(/^[vV]\s*/, '');
+  }
 
   function getCurrentAppVersion() {
     const s = getSim();
     if (s && typeof s.getAppVersion === 'function') {
-      const v = s.getAppVersion();
+      const v = normalizeVer(s.getAppVersion());
       if (v) return v;
     }
     const tag = document.querySelector('.version-tag');
     if (tag && tag.textContent) {
       const m = tag.textContent.trim().match(/v?(\d+\.\d+\.\d+)/);
-      if (m) return m[1];
+      if (m) return normalizeVer(m[1]);
     }
-    return DEFAULT_APP_VERSION;
+    return normalizeVer(DEFAULT_APP_VERSION);
   }
 
   const SLOTS = [
@@ -170,7 +181,7 @@
     try { meta = extractMeta(text); }
     catch (e) { return false; }
     const curVer = getCurrentAppVersion();
-    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION || meta.appVersion !== curVer) return false;
+    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION || normalizeVer(meta.appVersion) !== curVer) return false;
     // 引擎就绪前不可读档（world_load 依赖 wasm）；等待加载完成
     if (!(await waitEngineReady(15000))) return false;
     const s = getSim();
@@ -203,9 +214,11 @@
       // 成功后自动读取默认存档续演；权限未持久化则提供「授权并读取」按钮（点击 = 用户手势）。
       const granted = await requestHandlePermission(st.handle);
       if (granted) {
+        // ★ v1.44.2：先等引擎 READY 再取版本号，避免用带 `v` 前缀的兜底串误判旧档
+        await waitEngineReady(15000);
         await refreshSlotMeta('save1');
         const curVer = getCurrentAppVersion();
-        const isCompatible = st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION && st.meta.appVersion === curVer;
+        const isCompatible = st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION && normalizeVer(st.meta.appVersion) === curVer;
         if (isCompatible) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
@@ -238,9 +251,10 @@
           setStartupGateMessage('授权被拒绝，无法访问该存档文件。', true);
           return;
         }
+        await waitEngineReady(15000);
         await refreshSlotMeta('save1');
         const curVerNow = getCurrentAppVersion();
-        const isCompatibleNow = st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION && st2.meta.appVersion === curVerNow;
+        const isCompatibleNow = st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION && normalizeVer(st2.meta.appVersion) === curVerNow;
         if (isCompatibleNow) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
@@ -372,7 +386,7 @@
       st.meta = meta;
       st.permError = false;
       st.lastSaved = file.lastModified;
-      st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || meta.appVersion !== curVer);
+      st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || normalizeVer(meta.appVersion) !== curVer);
     } catch (e) {
       if (e.name === 'NotAllowedError') {
         // 权限未持久化：保留槽位与 IndexedDB 记录，等待用户手势内重授
@@ -482,7 +496,7 @@
       setStatus(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`, 'err');
       return;
     }
-    if (meta.appVersion !== curVer) {
+    if (normalizeVer(meta.appVersion) !== curVer) {
       setStatus(`存档版本 (v${meta.appVersion}) 与当前版本 (v${curVer}) 不一致，已自动废弃无法读取。请覆盖保存当前版本世界。`, 'err');
       return;
     }
@@ -680,7 +694,7 @@
         const meta = extractMeta(text);
         const curVer = getCurrentAppVersion();
         if (meta.formatVersion !== SAVE_FORMAT_VERSION) throw new Error(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`);
-        if (meta.appVersion !== curVer) throw new Error(`存档版本 v${meta.appVersion} 与当前应用版本 v${curVer} 不一致，旧版本存档已自动废弃`);
+        if (normalizeVer(meta.appVersion) !== curVer) throw new Error(`存档版本 v${meta.appVersion} 与当前应用版本 v${curVer} 不一致，旧版本存档已自动废弃`);
         await applySave(text, meta, `导入文件（${file.name}）`);
       } catch (err) { setStatus('导入失败：' + err.message, 'err'); }
       fileInput.value = '';

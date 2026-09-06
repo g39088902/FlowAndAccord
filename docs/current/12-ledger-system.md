@@ -8,6 +8,8 @@
 > ⚡ **M7（v1.5.0）追加**：去采货触发改由**家庭库存施密特触发器**驱动（余额 <100 触发、≥200 停，五类统一，有房即可采）；升级就绪改按一次性材料成本（`needs::upgrade_material_cost`）。
 >
 > ⚡ **M8（v1.6.0）追加**：升级材料成本改**4×5 固定矩阵**（20 超参，`config.house-upgrade-cost.js` 权威值，Rust `config.rs` 平铺三处同步）；升 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，升级时从家户账本**一次性扣账**（Construction 流水）。本文件以下 M2~M4 记账机制描述中涉及「旁路观测/与物理仓库分离/等级备货目标/容量上限」的表述已过时，请以代码注释与 11-changelog v1.6.0 条目为准。
+>
+> ⚡ **v1.44.0 内部性能优化（行为逐拍等价，Phase 7 攻坚）**：`tick_household_split`（bookkeeping.rs）为 `Agent3D` 引入**纯性能缓存标志 `is_household_head`**（非业务真相源，可由 `hh.head == agent.id` 派生）——户主在世终生不分家，循环首部 O(1) 布尔短路，原幂等红黑树判断保留为兜底并在命中时**自愈回填**，旧档与继承/婚姻/分家等全部新增立户路径均无缝收敛，无需在立户调用点散落置位；`tick_clan_mutual_aid` / `tick_region_relief` 由「团体外层 × 全图家户内层」笛卡尔积**倒置为单次存续家户遍历**（先两浮点极贫门槛短路、再冷却、才反查归属核对族长/国王在位与族库/公仓资金），READ 后按（姓氏/camp_id, hid）排序保序派发，WRITE 原样，稳态零临时堆分配。确定性 6 套件全通；性能收益量化见 11-changelog v1.44.0 条目。
 
 ---
 
@@ -58,7 +60,7 @@
 - **族长顺位**：族长 = 同姓在世最年长男性，并列按 id 取小；顺位任职赋予 +3 威望（`prestigeClanElderBonus`，v1.18.0）；无在世男性则宗族无主（`leader=None`），账本冻结（不主动支出，可接收 Tribute）。
 - **★ v1.35.2 宗族绝嗣财产平分制度**：宗族无在世男性（`mark_clan_extinct`）→ 标记 `extinct`，族产（水/粮/木/石/金）严格平分给当前未标记绝嗣且仍有在世男性成员的存续宗族（`TransferReason::Legacy` 双向流水与承继大事记留痕；若无其他存续宗族则入 `public_granary` 兜底）；前端宗族页红色「⛩️ 绝嗣 · 无在世男性」标签，流水抽屉高亮展示承继与归并。
 - **族税 Tribute**：每 `clan_tribute_interval_ticks`(1800=60s) 全局统一征收，存续家户按账面余额 × `clan_tribute_rate`(5%) 向族库缴纳（只记账不扣物理库存）。
-- **族内互助 MutualAid**：族库总余额 > `clan_mutual_aid_min_balance`(50) 时，对水+粮 < `clan_mutual_aid_family_threshold`(10) 的极贫家户拨付 `min(族库×20%, 缺口×2)`，每家户每 `clan_mutual_aid_cooldown_ticks`(900=30s) 最多一次，族长签字。
+- **族内互助 MutualAid**：族库总余额 > `clan_mutual_aid_min_balance`(50) 时，对水+粮 < `clan_mutual_aid_family_threshold`(10) 的极贫家户拨付 `min(族库×20%, 缺口×2)`，每家户每 `clan_mutual_aid_cooldown_ticks`(900=30s) 最多一次，族长签字。★ v1.44.0 扫描实现倒置为单次存续家户遍历 + 极贫短路 + 按（姓氏, hid）排序保序派发，触发集合/金额/顺序与旧版逐拍一致。
 
 ### RegionRegistry（地区与王国体系 M4）
 - **按营地聚合**：每营地（camp_id 1-5）一册 Region 团体，政体=`Kingdom`，继承制=`Primogeniture`；始祖播撒时加入最近营地，新生儿随父加入父亲所在地区。
@@ -69,7 +71,7 @@
 - **★ v1.32.0 孤儿营地补王**：房屋辖区（`House.camp_id`，按「距宅址最近且未满」判定）与地区成员登记簿（`RegionRegistry`，按「始祖落位最近/新生儿随父」登记）是两套独立归属体系——某营地有房屋但从未有成员登记（始祖未落位附近、后代未迁入）时，该营地成为「有房无王」的孤儿营地且永不被夺位逻辑发现。修复：`eligible_leaderless_camp` 改为遍历完整营地列表（`camp_pois`），无 Region 实体一并视为空缺王位；途中与登基两处「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，孤儿营地可被 B14SeekThrone 正常远征登基（登基时 `add_member` 补建 Region 实体）。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
 - **公仓税 Tax 与国王内帑 RoyalPrivy**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 内帑，转入随身黄金并记 `RoyalPrivy` 流水；★ v1.35.2 内核在 Agent（一生累计）、Region（王国累计）与 World（全局累计）三层建立 `cumulative_royal_privy` / `total_royal_privy` 确定性统计，并在调试模式下展示。
-- **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。
+- **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。★ v1.44.0 扫描实现倒置为单次存续家户遍历 + 极贫短路 + 按（camp_id, hid）排序保序派发，触发集合/金额/顺序与旧版逐拍一致。
 
 ### 胎儿 Agent 身份（M1.7 受孕即建实体）
 - **受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿创建完整 Agent 实体**（`is_fetus=true`），而非仅预分配 ID：胎儿加入父母 `children_ids`、随父入父亲家户（`world.rs::tick_fetus_reconcile` 每 tick 对账）。

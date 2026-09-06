@@ -248,6 +248,13 @@ pub struct Agent3D {
     /// 出生时在 birth.rs::resolve_newborns 原位替换为新生儿。默认 false。
     #[serde(default)]
     pub is_fetus: bool,
+    /// ★ v1.44.0 家户户主性能缓存标志（仅为性能缓存、非业务真相源）：
+    /// 可由 `household_registry`（`hh.head == agent.id`）派生；用于 `tick_household_split`
+    /// 对全图在世男性的 O(1) 布尔短路（稳态下避免每 Tick 两次红黑树幂等回溯查询）。
+    /// 语义保证：男性一旦成为家户户主，存活期间终身不会再分家，故标志只升不复位；
+    /// 反序列化默认 false，由 split 循环首次命中幂等判断时自愈回填。
+    #[serde(default)]
+    pub is_household_head: bool,
     pub pregnancy_progress: f32,     // 孕期进度 (0.0 ~ 1.0)
     pub ready_to_birth: bool,        // 孕期满是否准备分娩
     pub miscarriage_alert_timer: f32,// 流产警报留存显示计时器 (秒)
@@ -345,6 +352,7 @@ impl Agent3D {
             pregnancy_father_id: None,
             pregnancy_child_id: None,
             is_fetus: false,
+            is_household_head: false,
             pregnancy_progress: 0.0,
             ready_to_birth: false,
             miscarriage_alert_timer: 0.0,

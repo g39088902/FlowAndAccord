@@ -22,7 +22,7 @@ let currentTick = 0;
 // 时光倒流历史检查点
 let historyCheckpoints = [];
 let lastCheckpointTick = -1;
-// 快照下发节流：距上次快照生成的现实时间戳（60Hz 严格锚定，见 M1）
+// 快照下发节流：距上次快照生成的现实时间戳（30Hz 锚定，与前端 30 FPS 渲染帧率对齐，见 M1）
 let lastSnapshotTime = 0;
 // 检查点写入节流：距上次 world_save 的现实时间戳（150ms 守卫，见 M1）
 let lastCheckpointRealTime = 0;
@@ -43,7 +43,9 @@ function getAppVersion() {
       return _textDecoder.decode(new Uint8Array(_memory.buffer, ptr, len));
     }
   }
-  return 'v1.38.0';
+  // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
+  // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
+  return '1.44.3';
 }
 
 function applyConfigInternal(configObj) {
@@ -166,11 +168,11 @@ function simulationStep() {
   const t1 = performance.now();
   tickMs = t1 - t0;
 
-  // 快照下发 60Hz 严格节流（M1）：距上次快照至少 16.6ms 才生成快照，
+  // 快照下发 30Hz 节流（M1，v1.44.3 起由 60Hz 下调至与前端 30 FPS 渲染帧率对齐）：距上次快照至少 33.3ms 才生成快照，
   // 窗口未到前专职推进 world_tick_steps，跳过 JSON 序列化与通信开销。
   // forceTerrain 立即下发（绕过窗口），保证地形网格必需场景不被延误。
   const now = performance.now();
-  const throttlePass = forceTerrain || (now - lastSnapshotTime >= 16.6);
+  const throttlePass = forceTerrain || (now - lastSnapshotTime >= 33.3);
   if (throttlePass && (ackReceived || forceTerrain)) {
     ackReceived = false;
     lastSnapshotTime = now;

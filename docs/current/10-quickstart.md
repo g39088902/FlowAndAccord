@@ -47,6 +47,13 @@ cargo build -p sim_core
 ```
 > 项目定位为混沌系统，不持久化保存单元测试脚本（详见根 AGENTS.md §4.10）。`cargo test --lib` 仅验证编译通过，无测试用例。
 
+## 方式 5：版本号统一升版与一致性校验
+```bash
+node tools/bump-version.js --patch      # 升版并同步全部 10 个版本号定义点
+node tools/bump-version.js --check      # 只校验一致性（漂移即 exit 1）
+```
+改过代码就必须升版（根 AGENTS.md §4.9）。升版器以 `index.html` 版本徽章为唯一真相源，自动同步 `SAVE_APP_VERSION` 等定义点；若 Rust 常量变更，按方式 1 重编译 WASM 并同步双副本。
+
 ## 常用交互
 | 操作 | 快捷键/方式 |
 | :--- | :--- |

@@ -60,7 +60,7 @@
         this._reqSeq = 0;
         this._lastSaveJson = null;
         this._lastSaveError = '';
-        this._appVersion = 'v1.38.0';
+        this._appVersion = '1.44.3';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -125,7 +125,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || 'v1.38.0';
+            this._appVersion = msg.appVersion || '1.44.3';
             this._wasmBytes = msg.wasmBytes || 0;
             this._setEngineStatus('', 'ready');
             if (msg.snapshot) {
@@ -329,7 +329,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || 'v1.38.0';
+        return this._appVersion || '1.44.3';
       }
 
       /**

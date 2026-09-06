@@ -404,7 +404,8 @@ impl World3DEngine {
         let family_threshold = self.config.clan_mutual_aid_family_threshold;
         let cooldown = self.config.clan_mutual_aid_cooldown_ticks;
 
-        // READ PHASE：收集待互助家户
+        // READ PHASE：单次遍历存续家户（★ v1.44.0 倒置驱动：家户 → 反查宗族，
+        // 消除旧版「宗族外层 × 家户内层」的 O(宗族数 × 家户数) 笛卡尔积冗余扫描）
         struct AidItem {
             hid: HouseholdId,
             surname: String,
@@ -412,14 +413,39 @@ impl World3DEngine {
         }
         let mut items: Vec<AidItem> = Vec::new();
 
-        // 按姓氏遍历宗族（BTreeMap 保序）
-        for (surname, clan) in &self.clan_registry.clans {
-            // 必须有族长才能签发互助（族长签字）
-            let Some(_leader_id) = clan.leader else {
+        // BTreeMap 保序单遍扫描存续家户（hid 升序）
+        for (hid, hh) in &self.household_registry.households {
+            if hh.is_dissolved {
+                continue;
+            }
+
+            // ① 极廉价极贫门槛检查（仅读两浮点；99% 家户在此 O(1) 退出，绝不触碰红黑树）
+            let water = hh.group.ledger.balance(ResourceKind::Water);
+            let food = hh.group.ledger.balance(ResourceKind::Food);
+            let total = water + food;
+            if total >= family_threshold {
+                continue;
+            }
+
+            // ② 冷却检查
+            if let Some(&last_tick) = self.mutual_aid_cooldown.get(hid) {
+                if tick.saturating_sub(last_tick) < cooldown {
+                    continue;
+                }
+            }
+
+            // ③ 仅对确实极贫且冷却完毕的家户反查宗族归属（无归属不签发）
+            let Some(surname) = self.clan_registry.clan_of(hh.head).cloned() else {
                 continue;
             };
-
-            // 族库总余额（5 类资源求和）
+            let Some(clan) = self.clan_registry.get(&surname) else {
+                continue;
+            };
+            // ④ 必须有族长才能签发互助（族长签字）
+            if clan.leader.is_none() {
+                continue;
+            }
+            // ⑤ 族库总余额（5 类资源求和；READ 期无写，与旧版外层预读值严格一致）
             let clan_total: f32 = RESOURCE_ORDER
                 .iter()
                 .map(|&rk| clan.ledger.balance(rk))
@@ -428,65 +454,44 @@ impl World3DEngine {
                 continue;
             }
 
-            // 遍历存续家户，优先以廉价浮点数比对极贫门槛，满足且冷却已过时再确认宗族归属
-            for (hid, hh) in &self.household_registry.households {
-                if hh.is_dissolved {
-                    continue;
-                }
-                let water = hh.group.ledger.balance(ResourceKind::Water);
-                let food = hh.group.ledger.balance(ResourceKind::Food);
-                let total = water + food;
-                if total >= family_threshold {
-                    continue; // 绝大多数家户水粮充足，O(1) 立即短路
-                }
+            // 计算互助总额 = min(族库余额 × 0.2, 缺口至 threshold 的 2倍)
+            let gap = family_threshold - total;
+            let aid_total = (clan_total * 0.2).min(gap * 2.0);
+            if aid_total <= 0.001 {
+                continue;
+            }
 
-                // 冷却检查
-                if let Some(&last_tick) = self.mutual_aid_cooldown.get(hid) {
-                    if tick.saturating_sub(last_tick) < cooldown {
-                        continue;
-                    }
-                }
+            // 按水/粮缺口比例分配互助额（确定性）
+            let water_need = (family_threshold - water).max(0.0);
+            let food_need = (family_threshold - food).max(0.0);
+            let need_sum = water_need + food_need;
+            let (water_share, food_share) = if need_sum > 0.001 {
+                (aid_total * water_need / need_sum, aid_total * food_need / need_sum)
+            } else {
+                (aid_total * 0.5, aid_total * 0.5)
+            };
 
-                // 仅对确实极贫且冷却完毕的家户确认是否属于本宗族
-                if self.clan_registry.clan_of(hh.head) != Some(surname) {
-                    continue;
-                }
+            // 实际拨付 = min(计划额, 族库该品类可用余额)
+            let mut amounts: Vec<(ResourceKind, f32)> = Vec::new();
+            let clan_water_avail = clan.ledger.balance(ResourceKind::Water);
+            let clan_food_avail = clan.ledger.balance(ResourceKind::Food);
+            let water_actual = water_share.min(clan_water_avail);
+            let food_actual = food_share.min(clan_food_avail);
+            if water_actual > 0.001 {
+                amounts.push((ResourceKind::Water, water_actual));
+            }
+            if food_actual > 0.001 {
+                amounts.push((ResourceKind::Food, food_actual));
+            }
 
-                // 计算互助总额 = min(族库余额 × 0.2, 缺口至 threshold 的 2倍)
-                let gap = family_threshold - total;
-                let aid_total = (clan_total * 0.2).min(gap * 2.0);
-                if aid_total <= 0.001 {
-                    continue;
-                }
-
-                // 按水/粮缺口比例分配互助额（确定性）
-                let water_need = (family_threshold - water).max(0.0);
-                let food_need = (family_threshold - food).max(0.0);
-                let need_sum = water_need + food_need;
-                let (water_share, food_share) = if need_sum > 0.001 {
-                    (aid_total * water_need / need_sum, aid_total * food_need / need_sum)
-                } else {
-                    (aid_total * 0.5, aid_total * 0.5)
-                };
-
-                // 实际拨付 = min(计划额, 族库该品类可用余额)
-                let mut amounts: Vec<(ResourceKind, f32)> = Vec::new();
-                let clan_water_avail = clan.ledger.balance(ResourceKind::Water);
-                let clan_food_avail = clan.ledger.balance(ResourceKind::Food);
-                let water_actual = water_share.min(clan_water_avail);
-                let food_actual = food_share.min(clan_food_avail);
-                if water_actual > 0.001 {
-                    amounts.push((ResourceKind::Water, water_actual));
-                }
-                if food_actual > 0.001 {
-                    amounts.push((ResourceKind::Food, food_actual));
-                }
-
-                if !amounts.is_empty() {
-                    items.push(AidItem { hid: *hid, surname: surname.clone(), amounts });
-                }
+            if !amounts.is_empty() {
+                items.push(AidItem { hid: *hid, surname, amounts });
             }
         }
+
+        // ★ v1.44.0 确定性保序：极贫家户极稀少，按 (姓氏, hid) 排序精确复现
+        // 旧版「外层姓氏升序 × 内层 hid 升序」的派发顺序，WRITE 流水逐拍一致
+        items.sort_by(|a, b| a.surname.cmp(&b.surname).then(a.hid.cmp(&b.hid)));
 
         // WRITE PHASE：执行互助转移（族库 debit → 家户 credit）+ 更新冷却
         for item in items {

@@ -43,6 +43,10 @@ jobs:
           cp target/wasm32-unknown-unknown/release/sim_wasm.wasm frontend/rust/sim_wasm.wasm
           cp target/wasm32-unknown-unknown/release/sim_wasm.wasm frontend/sim_wasm.wasm
 
+      # AGENTS.md §4.9：版本号定义点一致性门禁（SAVE_APP_VERSION 等漂移即失败）
+      - name: 版本号一致性门禁
+        run: node tools/bump-version.js --check
+
       # AGENTS.md §4.10：项目唯一长期保留的自动化验证，输出 ALL_TESTS_DONE 方可通过
       - name: WASM 回归测试门禁
         run: node tools/test-wasm.js

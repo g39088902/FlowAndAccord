@@ -19,7 +19,7 @@
 
 ### ★ Web Worker 独立仿真架构（★ v1.38.0 Phase 1 解耦）
 - **内核与渲染双核分离**：将计算密集型的 Rust WASM 确定性内核与状态快照生成完全移入专属 Web Worker（`frontend/js/sim_worker.js`），运行在独立的 CPU 核心上；主线程（`rustworld.js` 作为轻量 Facade 代理）专职负责 Canvas 视口绘制与用户事件。
-- **自适应计时循环与背压限频**：Worker 自主以 60Hz 循环步进 `world_tick_steps`（步长由 `speedMult` 驱动）。通过 `ackReceived` 握手锁实施背压控制——Worker 仅在主线程消费完上一帧快照并回传 ACK 后才下发最新快照（~30-60Hz）。高倍速（5x~100x）下 Worker 在后台吃满算力全速冲刺，主线程 Canvas 彻底免于消息堆积，始终稳定在 60 FPS 丝滑响应。
+- **自适应计时循环与背压限频**：Worker 自主以 60Hz 循环步进 `world_tick_steps`（步长由 `speedMult` 驱动）。通过 `ackReceived` 握手锁实施背压控制——Worker 仅在主线程消费完上一帧快照并回传 ACK 后才下发最新快照（★ v1.44.3 起锚定 ~30Hz，与前端 30 FPS 渲染帧率对齐）。高倍速（5x~100x）下 Worker 在后台吃满算力全速冲刺，主线程 Canvas 彻底免于消息堆积，始终稳定在 30 FPS（`TARGET_FPS = 30`）丝滑响应。
 - **异步存读档桥接**：`saveWorld()` 与 `loadWorld()` 升级为 Promise 异步桥接，完全适配 `save-ui.js` 的 File System Access API 异步读写流程，存读档操作零阻塞 Canvas 绘制。
 - **多核算力跃升**：彻底打破单核单线程瓶颈，多核 CPU 利用率由原本的 25% 跃升至 40%~50%（主线程与 Worker 各自跑满独立物理核），彻底根除了高倍速下的 UI 冻结与相机卡顿。
 

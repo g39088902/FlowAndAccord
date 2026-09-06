@@ -295,9 +295,18 @@ impl World3DEngine {
         }
 
         let mut candidates: Vec<SplitCandidate> = Vec::new();
+        // ★ v1.44.0 户主标志自愈收集：需将 `is_household_head` 置 true 的在世男性
+        // （幂等命中 = 旧档/新增立户路径首拍回填；新分家户主 = 立户即回填）
+        let mut head_flag_sync: Vec<AgentId> = Vec::new();
 
         for agent in &self.agents {
             if !agent.is_alive || agent.gender != Gender::Male || agent.is_fetus {
+                continue;
+            }
+
+            // ★ v1.44.0 O(1) 快速短路：户主在世期间终生不可能再分家（数学不变量），
+            // 稳态下全图绝大部分成年男性在此一次布尔判断退出，免去两次红黑树幂等回溯查询。
+            if agent.is_household_head {
                 continue;
             }
 
@@ -323,6 +332,9 @@ impl World3DEngine {
                 continue; // 无家户归属（始祖已在初始化时立户，不应到此）
             };
             if self.household_registry.get(old_hid).is_some_and(|hh| hh.head == agent.id) {
+                // ★ v1.44.0 已是户主（旧档反序列化默认 false / 未来新增立户路径）：
+                // 自愈回填标志，本拍起此后 O(1) 短路；语义与旧版 continue 完全等价
+                head_flag_sync.push(agent.id);
                 continue;
             }
 
@@ -396,6 +408,8 @@ impl World3DEngine {
                 spouse_id: agent.spouse_id,
                 children_ids: agent.children_ids.clone(),
             });
+            // 分家即成为新家户户主，WRITE 阶段统一回填标志
+            head_flag_sync.push(agent.id);
         }
 
         // WRITE PHASE：执行资源转移 + 成员迁移
@@ -419,6 +433,15 @@ impl World3DEngine {
                         }
                     }
                 }
+            }
+        }
+
+        // ★ v1.44.0 统一回填 `is_household_head`（幂等命中户主 + 新分家户主）。
+        // 回填后标志单向置 true、终生不复位：在世男性一旦成为户主即不再分家，
+        // 下一 tick 起在本函数首部 O(1) 短路，彻底免去红黑树幂等回溯。
+        for head_id in head_flag_sync {
+            if let Some(agent) = self.agent_by_id_mut(head_id) {
+                agent.is_household_head = true;
             }
         }
     }

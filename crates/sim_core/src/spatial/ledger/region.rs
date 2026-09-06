@@ -606,7 +606,8 @@ impl World3DEngine {
         let family_threshold = self.config.ledger_relief_family_threshold;
         let cooldown = self.config.ledger_relief_cooldown_ticks;
 
-        // READ PHASE：收集待救济家户
+        // READ PHASE：单次遍历存续家户（★ v1.44.0 倒置驱动：家户 → 反查地区，
+        // 消除旧版「地区外层 × 家户内层」的 O(地区数 × 家户数) 笛卡尔积冗余扫描）
         struct ReliefItem {
             hid: HouseholdId,
             camp_id: u32,
@@ -614,14 +615,39 @@ impl World3DEngine {
         }
         let mut items: Vec<ReliefItem> = Vec::new();
 
-        // 按 camp_id 遍历地区（BTreeMap 保序）
-        for (camp_id, region) in &self.region_registry.regions {
-            // 必须有国王才能签发救济（国王签字）
-            let Some(_leader_id) = region.group.leader else {
+        // BTreeMap 保序单遍扫描存续家户（hid 升序）
+        for (hid, hh) in &self.household_registry.households {
+            if hh.is_dissolved {
+                continue;
+            }
+
+            // ① 极廉价极贫门槛检查（仅读两浮点；99% 家户在此 O(1) 退出，绝不触碰红黑树）
+            let water = hh.group.ledger.balance(ResourceKind::Water);
+            let food = hh.group.ledger.balance(ResourceKind::Food);
+            let total = water + food;
+            if total >= family_threshold {
+                continue;
+            }
+
+            // ② 冷却检查
+            if let Some(&last_tick) = self.relief_cooldown.get(hid) {
+                if tick.saturating_sub(last_tick) < cooldown {
+                    continue;
+                }
+            }
+
+            // ③ 仅对确实极贫且冷却完毕的家户反查地区归属（无归属不签发）
+            let Some(camp_id) = self.region_registry.region_of(hh.head) else {
                 continue;
             };
-
-            // 地区公仓总余额（5 类资源求和）
+            let Some(region) = self.region_registry.get(camp_id) else {
+                continue;
+            };
+            // ④ 必须有国王才能签发救济（国王签字）
+            if region.group.leader.is_none() {
+                continue;
+            }
+            // ⑤ 地区公仓总余额（5 类资源求和；READ 期无写，与旧版外层预读值严格一致）
             let region_total: f32 = RESOURCE_ORDER
                 .iter()
                 .map(|&rk| region.group.ledger.balance(rk))
@@ -630,65 +656,44 @@ impl World3DEngine {
                 continue;
             }
 
-            // 遍历存续家户，优先以廉价浮点数比对极贫门槛，满足且冷却已过时再确认地区归属
-            for (hid, hh) in &self.household_registry.households {
-                if hh.is_dissolved {
-                    continue;
-                }
-                let water = hh.group.ledger.balance(ResourceKind::Water);
-                let food = hh.group.ledger.balance(ResourceKind::Food);
-                let total = water + food;
-                if total >= family_threshold {
-                    continue; // 绝大多数家户水粮充足，O(1) 立即短路
-                }
+            // 计算救济总额 = min(公仓余额 × 0.15, 缺口至 threshold 的 2倍)
+            let gap = family_threshold - total;
+            let relief_total = (region_total * 0.15).min(gap * 2.0);
+            if relief_total <= 0.001 {
+                continue;
+            }
 
-                // 冷却检查
-                if let Some(&last_tick) = self.relief_cooldown.get(hid) {
-                    if tick.saturating_sub(last_tick) < cooldown {
-                        continue;
-                    }
-                }
+            // 按水/粮缺口比例分配救济额（确定性）
+            let water_need = (family_threshold - water).max(0.0);
+            let food_need = (family_threshold - food).max(0.0);
+            let need_sum = water_need + food_need;
+            let (water_share, food_share) = if need_sum > 0.001 {
+                (relief_total * water_need / need_sum, relief_total * food_need / need_sum)
+            } else {
+                (relief_total * 0.5, relief_total * 0.5)
+            };
 
-                // 仅对确实极贫且冷却完毕的家户确认是否属于本地区
-                if self.region_registry.region_of(hh.head) != Some(*camp_id) {
-                    continue;
-                }
+            // 实际拨付 = min(计划额, 公仓该品类可用余额)
+            let mut amounts: Vec<(ResourceKind, f32)> = Vec::new();
+            let region_water_avail = region.group.ledger.balance(ResourceKind::Water);
+            let region_food_avail = region.group.ledger.balance(ResourceKind::Food);
+            let water_actual = water_share.min(region_water_avail);
+            let food_actual = food_share.min(region_food_avail);
+            if water_actual > 0.001 {
+                amounts.push((ResourceKind::Water, water_actual));
+            }
+            if food_actual > 0.001 {
+                amounts.push((ResourceKind::Food, food_actual));
+            }
 
-                // 计算救济总额 = min(公仓余额 × 0.15, 缺口至 threshold 的 2倍)
-                let gap = family_threshold - total;
-                let relief_total = (region_total * 0.15).min(gap * 2.0);
-                if relief_total <= 0.001 {
-                    continue;
-                }
-
-                // 按水/粮缺口比例分配救济额（确定性）
-                let water_need = (family_threshold - water).max(0.0);
-                let food_need = (family_threshold - food).max(0.0);
-                let need_sum = water_need + food_need;
-                let (water_share, food_share) = if need_sum > 0.001 {
-                    (relief_total * water_need / need_sum, relief_total * food_need / need_sum)
-                } else {
-                    (relief_total * 0.5, relief_total * 0.5)
-                };
-
-                // 实际拨付 = min(计划额, 公仓该品类可用余额)
-                let mut amounts: Vec<(ResourceKind, f32)> = Vec::new();
-                let region_water_avail = region.group.ledger.balance(ResourceKind::Water);
-                let region_food_avail = region.group.ledger.balance(ResourceKind::Food);
-                let water_actual = water_share.min(region_water_avail);
-                let food_actual = food_share.min(region_food_avail);
-                if water_actual > 0.001 {
-                    amounts.push((ResourceKind::Water, water_actual));
-                }
-                if food_actual > 0.001 {
-                    amounts.push((ResourceKind::Food, food_actual));
-                }
-
-                if !amounts.is_empty() {
-                    items.push(ReliefItem { hid: *hid, camp_id: *camp_id, amounts });
-                }
+            if !amounts.is_empty() {
+                items.push(ReliefItem { hid: *hid, camp_id, amounts });
             }
         }
+
+        // ★ v1.44.0 确定性保序：极贫家户极稀少，按 (camp_id, hid) 排序精确复现
+        // 旧版「外层地区升序 × 内层 hid 升序」的派发顺序，WRITE 流水逐拍一致
+        items.sort_by(|a, b| a.camp_id.cmp(&b.camp_id).then(a.hid.cmp(&b.hid)));
 
         // WRITE PHASE：执行救济转移（地区公仓 debit → 家户 credit）+ 更新冷却
         for item in items {

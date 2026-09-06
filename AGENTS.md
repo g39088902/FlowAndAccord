@@ -57,7 +57,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.43.0)"]
+    F --> G["浏览器 UI (版本: v1.44.3)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -107,7 +107,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.43.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.44.3`**。
 
 ---
 
@@ -133,7 +133,7 @@ node frontend/server.js           # http://localhost:3000
 > 详细版（含影响面说明）见 [`docs/current/13-impact-matrix.md` §五](docs/current/13-impact-matrix.md)。
 
 ```
-□ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增
+□ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9）
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
 □ 三处同步：快照字段变更时 snapshot.rs / world.rs / rustworld.js 一致
 □ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
@@ -213,10 +213,38 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.9 🟢 版本号自增规范（每次 AI 修改代码必改）
 
-每次 AI 修改代码（Rust 内核、前端 JS/CSS/HTML、文档配置）都必须自增版本号。必须同步更新：
-1. `frontend/index.html` 版本徽章 `<span class="version-tag">vX.Y.Z</span>`
-2. 本文档 §1 Mermaid 节点与 §2 步骤四的版本号
-3. 核心机制改动须在 `docs/current/` 对应模块更新功能描述，并在 `docs/current/11-changelog.md` 追加版本条目
+每次 AI 修改代码（Rust 内核、前端 JS/CSS/HTML、文档配置）都必须自增版本号。**严禁手工改版本号**——一律使用统一升版器，一次命令同步全部定义点：
+
+```powershell
+node tools/bump-version.js --patch          # 默认：1.44.1 → 1.44.2
+node tools/bump-version.js --minor          # 1.44.1 → 1.45.0
+node tools/bump-version.js 1.45.0           # 指定版本
+node tools/bump-version.js --check          # 只校验一致性（漂移即 exit 1，CI / 提交门禁）
+```
+
+**唯一真相源** = `frontend/index.html` 的版本徽章（`.version-tag`）。升版器自动同步的全部定义点（清单维护在 `tools/bump-version.js` 的 `SITES`）：
+
+| 定义点 | 说明 |
+| :--- | :--- |
+| `frontend/index.html` 徽章 | 唯一真相源（玩家可见） |
+| `crates/sim_core/src/spatial/world_save.rs` `SAVE_APP_VERSION` | **存档应用版本门禁**，编译进 WASM；经 `world_app_version_ptr` 回传前端 |
+| `frontend/js/save-ui.js` `DEFAULT_APP_VERSION` | 引擎未就绪时的版本兜底 |
+| `frontend/js/rustworld.js` 版本兜底串 | Worker READY 前的 `getAppVersion()` 返回值 |
+| `frontend/js/sim_worker.js` 版本兜底串 | Worker 侧 `world_app_version_*` 不可用时的返回值 |
+| `AGENTS.md` §1 Mermaid + §2 步骤四 | 本文档 |
+| `docs/01-current.md` 版本行 / `docs/current/11-changelog.md` 表头 | 现状文档 |
+| `docs/current/15-save-load.md` 存档版本说明 | 存档模块文档 |
+| `README.md` 版本徽章 | 对外宣传文档 |
+
+**升版后必做**：
+1. 若 `world_save.rs` 变更（几乎每次都会），必须重编译 WASM 并同步双副本（§4.1）——否则浏览器里仍是旧版本常量，存档门禁失效；
+2. `SAVE_APP_VERSION` 变更会**自动废弃全部旧存档**（v1.37.1 起的设计行为，见 `docs/current/15-save-load.md`）；
+3. 在 `docs/current/11-changelog.md` 追加该版本条目（表头已由升版器自动更新，正文条目需手写）；
+4. 跑 `node tools/bump-version.js --check` 确认零漂移。
+
+> ⚠️ `SAVE_FORMAT_VERSION`（存档**结构**版本，当前 3）**不随应用版本自增**，仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，且必须同改 `world_save.rs` 与 `save-ui.js`。
+
+> 🔤 **版本字符串格式铁律**：内核 `SAVE_APP_VERSION` 与存档 `app_version` **无 `v` 前缀**（`1.44.2`），`v` 只在 UI 文案里拼接显示。前端任何兜底串（`rustworld.js` / `sim_worker.js`）必须与内核同格式；新增版本比较点必须先过 `save-ui.js::normalizeVer()`，且废弃决策前 `await waitEngineReady()`——否则会重演 v1.44.2 事故（同版本被误判旧档、点「废弃」反而读回旧档）。
 
 ### 4.10 🟢 混沌系统定位与测试策略（持久化测试禁令）
 

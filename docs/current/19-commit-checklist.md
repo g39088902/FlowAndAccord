@@ -8,12 +8,14 @@
 git status --short
 git diff --check
 node tools/doc-maintenance-check.js
+node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS.md §4.9）
 ```
 
 - [ ] 工作区只有本次任务相关文件；没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本。
 - [ ] `git diff --check` 无空白错误，新增/删除/重命名文件和引用路径已核对。
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
-- [ ] 版本号、对应 `docs/current/` 文档、`11-changelog.md` 已按项目规范同步。
+- [ ] 改过代码已用 `node tools/bump-version.js --patch`（或 `--minor` / 指定版本）升版，`--check` 零漂移；**未手工编辑任何版本号定义点**。
+- [ ] `docs/current/11-changelog.md` 已追加该版本条目；对应 `docs/current/` 模块文档已同步。
 
 ## B. Rust、WASM 或快照改动
 
