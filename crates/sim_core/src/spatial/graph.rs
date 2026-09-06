@@ -99,8 +99,18 @@ pub struct LaneGraph3D {
     pub next_lane_id: LaneId,
     // ★ 静态端点对路径缓存：(from_node, to_node, prefer_hidden) -> Option<Vec<LaneId>>
     pub path_cache: std::cell::RefCell<HashMap<(NodeId, NodeId, bool), Option<Vec<LaneId>>>>,
+    // ★ 全源静态拓扑最短路矩阵查表 (APSP Table, M3 优化)
+    pub apsp_table: std::cell::RefCell<ApspTable>,
     // ★ 稀疏活跃磨损边集合 (wear > 0.0)，避免每拍遍历全图无路/荒野边 (M2 优化)
     pub active_wear_edges: BTreeSet<EdgeIndex>,
+}
+
+/// 全源静态拓扑最短路矩阵查表 (APSP Table, M3 优化)
+#[derive(Debug, Clone, Default)]
+pub struct ApspTable {
+    /// 静态拓扑端点对路径矩阵：(start, goal, prefer_hidden) -> Option<Vec<LaneId>>
+    pub routes: HashMap<(NodeId, NodeId, bool), Option<Vec<LaneId>>>,
+    pub is_initialized: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,6 +131,7 @@ impl LaneGraph3D {
             next_node_id: 1,
             next_lane_id: 1,
             path_cache: std::cell::RefCell::new(HashMap::new()),
+            apsp_table: std::cell::RefCell::new(ApspTable::default()),
             active_wear_edges: BTreeSet::new(),
         }
     }
@@ -128,6 +139,99 @@ impl LaneGraph3D {
     /// 清空端点对路径缓存（拓扑变更或配置刷新时调用）
     pub fn clear_path_cache(&self) {
         self.path_cache.borrow_mut().clear();
+        self.apsp_table.borrow_mut().is_initialized = false;
+    }
+
+    /// 局部失效：仅使经过指定车道集合的端点对缓存失效 (M3 优化)
+    pub fn invalidate_paths_containing_lanes(&self, lanes: &BTreeSet<LaneId>) {
+        if lanes.is_empty() {
+            return;
+        }
+        let mut cache = self.path_cache.borrow_mut();
+        cache.retain(|_, opt_path| {
+            if let Some(path) = opt_path {
+                !path.iter().any(|lane_id| lanes.contains(lane_id))
+            } else {
+                false
+            }
+        });
+    }
+
+    /// 局部失效：仅使经过指定车道的端点对缓存失效 (M3 优化)
+    pub fn invalidate_paths_containing_lane(&self, lane_id: LaneId) {
+        let mut cache = self.path_cache.borrow_mut();
+        cache.retain(|_, opt_path| {
+            if let Some(path) = opt_path {
+                !path.contains(&lane_id)
+            } else {
+                false
+            }
+        });
+    }
+
+    /// 当车道因踩踏提速跨阶时局部失效：仅失效可能受该车道提速影响的端点对路径 (M3 优化)
+    pub fn invalidate_paths_for_trampled_lanes(&self, lanes: &BTreeSet<LaneId>) {
+        if lanes.is_empty() {
+            return;
+        }
+        let mut lane_endpoints = Vec::new();
+        for &lane_id in lanes {
+            if let Some(&edge_idx) = self.edge_map.get(&lane_id) {
+                let edge = &self.graph[edge_idx];
+                if let (Some(&u_idx), Some(&v_idx)) = (self.node_map.get(&edge.from_node), self.node_map.get(&edge.to_node)) {
+                    let from_pos = self.graph[u_idx].pos;
+                    let to_pos = self.graph[v_idx].pos;
+                    lane_endpoints.push((from_pos, to_pos));
+                }
+            }
+        }
+
+        let mut cache = self.path_cache.borrow_mut();
+        cache.retain(|&(start, goal, _), opt_path| {
+            if let Some(path) = opt_path {
+                // 若该路径本身就包含跃迁车道，保留它（已走最优路，其耗时只会更短）
+                if path.iter().any(|lid| lanes.contains(lid)) {
+                    return true;
+                }
+                let (Some(&s_idx), Some(&g_idx)) = (self.node_map.get(&start), self.node_map.get(&goal)) else {
+                    return false;
+                };
+                let p_s = self.graph[s_idx].pos;
+                let p_g = self.graph[g_idx].pos;
+                let direct_dist = p_s.distance_to(&p_g);
+
+                // 三角不等式几何剪枝：检查是否有任何跃迁车道可能使当前路径获益
+                for (p_u, p_v) in &lane_endpoints {
+                    let detour_1 = p_s.distance_to(p_u) + p_v.distance_to(&p_g);
+                    let detour_2 = p_s.distance_to(p_v) + p_u.distance_to(&p_g);
+                    let min_detour = detour_1.min(detour_2);
+                    if min_detour < direct_dist * 1.5 {
+                        return false; // 处于几何影响范围内，失效并重寻
+                    }
+                }
+                true // 几何距离过远，绝无可能被该车道改善，保留
+            } else {
+                false
+            }
+        });
+    }
+
+    /// 预计算全源静态拓扑最短路矩阵 (APSP Table, M3 优化)
+    pub fn init_static_apsp(&self, config: &SimConfig) {
+        let mut table = self.apsp_table.borrow_mut();
+        table.routes.clear();
+        let nodes: Vec<NodeId> = self.node_map.keys().copied().collect();
+        for &start in &nodes {
+            for &goal in &nodes {
+                if start != goal {
+                    for &prefer_hidden in &[false, true] {
+                        let path = self.compute_path_3d_with_preference(start, goal, prefer_hidden, config);
+                        table.routes.insert((start, goal, prefer_hidden), path);
+                    }
+                }
+            }
+        }
+        table.is_initialized = true;
     }
 
     pub fn add_node(&mut self, pos: Vec3, node_type: NodeType) -> NodeId {
@@ -200,12 +304,12 @@ impl LaneGraph3D {
         Ok(lane_id)
     }
 
-    /// 道路自然杂草丛生与退化衰减（仅扫描稀疏活跃磨损边，跨阶跌落时使端点对路径缓存失效）
+    /// 道路自然杂草丛生与退化衰减（仅扫描稀疏活跃磨损边，跨阶跌落时仅对经过该边的端点对路径进行局部失效）
     pub fn tick_wear_decay(&mut self, dt: f32, config: &SimConfig) {
         if self.active_wear_edges.is_empty() {
             return;
         }
-        let mut bucket_changed = false;
+        let mut changed_lanes = BTreeSet::new();
         let tier_step = config.road_wear_tier_step;
         let benefit_max = config.road_benefit_max_wear;
         let decay_mult = (1.0 - config.road_wear_decay_rate * dt).max(0.0);
@@ -224,7 +328,7 @@ impl LaneGraph3D {
             edge.wear = new_wear;
             let new_bucket = LaneEdge3D::wear_tier_bucket(new_wear, tier_step, benefit_max);
             if old_bucket != new_bucket {
-                bucket_changed = true;
+                changed_lanes.insert(edge.id);
             }
         }
 
@@ -232,8 +336,8 @@ impl LaneGraph3D {
             self.active_wear_edges.remove(&edge_idx);
         }
 
-        if bucket_changed {
-            self.clear_path_cache();
+        if !changed_lanes.is_empty() {
+            self.invalidate_paths_containing_lanes(&changed_lanes);
         }
     }
 
@@ -246,7 +350,7 @@ impl LaneGraph3D {
         self.find_path_3d_with_preference(start, goal, false, config)
     }
 
-    /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路（带静态端点对路径缓存）
+    /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路（带局部失效端点对缓存与 APSP 静态查表）
     pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
         if start == goal {
             return Some(Vec::new());
@@ -255,6 +359,22 @@ impl LaneGraph3D {
         let key = (start, goal, prefer_hidden);
         if let Some(cached) = self.path_cache.borrow().get(&key) {
             return cached.clone();
+        }
+
+        // M3 优化：若全图无任何磨损踩踏边（纯静态拓扑），优先尝试从 APSP 表直接获取
+        if self.active_wear_edges.is_empty() {
+            let apsp = self.apsp_table.borrow();
+            if apsp.is_initialized {
+                if let Some(path) = apsp.routes.get(&key) {
+                    let path_clone = path.clone();
+                    let mut cache = self.path_cache.borrow_mut();
+                    if cache.len() >= 4096 {
+                        cache.clear();
+                    }
+                    cache.insert(key, path_clone.clone());
+                    return path_clone;
+                }
+            }
         }
 
         let path = self.compute_path_3d_with_preference(start, goal, prefer_hidden, config);

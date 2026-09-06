@@ -23,7 +23,6 @@ use crate::spatial::ledger::family::HouseholdId;
 use crate::spatial::ledger::group::{Group, GroupKind};
 use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use crate::spatial::world::World3DEngine;
-use crate::spatial::vec3::Vec3;
 
 /// 五类资源的固定顺序（保证遍历确定性）
 const RESOURCE_ORDER: [ResourceKind; 5] = [
@@ -322,16 +321,14 @@ impl World3DEngine {
     // ══════════════════════════════════════════════════════════
 
     fn update_kings(&mut self, tick: u64) {
+        // ★ 快速路径：若所有地区均已有国王，O(1) 立即返回（有主地区不在此处顺位）
+        let has_leaderless = self.region_registry.regions.values().any(|r| r.group.leader.is_none());
+        if !has_leaderless {
+            return;
+        }
+
         // READ PHASE：收集每个地区的新国王候选 + 前任国王死因
         let mut successions: Vec<(u32, Option<AgentId>, Option<String>)> = Vec::new();
-
-        // ★ v1.22.0 初王必须「物理抵达营地」：始祖出生已避让营地，不再于 tick 0 凭
-        //   arrival_order 秒封王；无主地区仅当候选者进入营地交互半径才可登基（沿路网走到营地后称王）。
-        //   有主地区交由 execute_pending_coronations / handle_king_deaths 处理，本方法只做「初王顺位」。
-        let camp_positions: BTreeMap<u32, Vec3> = self.pois.iter()
-            .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
-            .map(|p| (p.id, p.pos))
-            .collect();
         let interact_radius = self.config.poi_interaction_radius;
 
         for (camp_id, region) in &self.region_registry.regions {
@@ -340,7 +337,10 @@ impl World3DEngine {
                 continue;
             }
             let mut new_king: Option<AgentId> = None;
-            let camp_pos = camp_positions.get(camp_id).copied();
+            // 直接原位匹配营地 POI 坐标，零堆分配
+            let camp_pos = self.pois.iter()
+                .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == *camp_id)
+                .map(|p| p.pos);
 
             // arrival_order 已按 (arrival_tick, agent_id) 升序；初王 = 第一个「物理抵达营地」的在世男性
             for &member_id in &region.arrival_order {
@@ -630,34 +630,28 @@ impl World3DEngine {
                 continue;
             }
 
-            // 找出本地区的存续家户（户主属于本地区）
-            let mut region_households: Vec<HouseholdId> = Vec::new();
+            // 遍历存续家户，优先以廉价浮点数比对极贫门槛，满足且冷却已过时再确认地区归属
             for (hid, hh) in &self.household_registry.households {
                 if hh.is_dissolved {
                     continue;
                 }
-                if self.region_registry.region_of(hh.head) == Some(*camp_id) {
-                    region_households.push(*hid);
-                }
-            }
-
-            // 对每家户判定极贫 + 冷却
-            for hid in region_households {
-                // 冷却检查
-                if let Some(&last_tick) = self.relief_cooldown.get(&hid) {
-                    if tick - last_tick < cooldown {
-                        continue;
-                    }
-                }
-
-                let Some(hh) = self.household_registry.get(hid) else {
-                    continue;
-                };
                 let water = hh.group.ledger.balance(ResourceKind::Water);
                 let food = hh.group.ledger.balance(ResourceKind::Food);
                 let total = water + food;
                 if total >= family_threshold {
-                    continue; // 非极贫
+                    continue; // 绝大多数家户水粮充足，O(1) 立即短路
+                }
+
+                // 冷却检查
+                if let Some(&last_tick) = self.relief_cooldown.get(hid) {
+                    if tick.saturating_sub(last_tick) < cooldown {
+                        continue;
+                    }
+                }
+
+                // 仅对确实极贫且冷却完毕的家户确认是否属于本地区
+                if self.region_registry.region_of(hh.head) != Some(*camp_id) {
+                    continue;
                 }
 
                 // 计算救济总额 = min(公仓余额 × 0.15, 缺口至 threshold 的 2倍)
@@ -691,7 +685,7 @@ impl World3DEngine {
                 }
 
                 if !amounts.is_empty() {
-                    items.push(ReliefItem { hid, camp_id: *camp_id, amounts });
+                    items.push(ReliefItem { hid: *hid, camp_id: *camp_id, amounts });
                 }
             }
         }

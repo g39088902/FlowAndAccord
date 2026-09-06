@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, LaneId, NodeId, LaneEdge3D};
 use super::poi::PoiId;
@@ -620,7 +620,12 @@ impl Agent3D {
                     config.road_benefit_max_wear,
                 );
                 if old_bucket != new_bucket {
-                    road_network.clear_path_cache();
+                    let mut changed_lanes = BTreeSet::new();
+                    changed_lanes.insert(road_network.graph[edge_idx].id);
+                    if let Some(rev_idx) = rev_edge_idx {
+                        changed_lanes.insert(road_network.graph[rev_idx].id);
+                    }
+                    road_network.invalidate_paths_for_trampled_lanes(&changed_lanes);
                 }
             }
             self.advance_to_next_lane(road_network);

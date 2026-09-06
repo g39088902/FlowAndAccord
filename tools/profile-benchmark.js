@@ -134,12 +134,14 @@ async function runThroughputBench(ticks, seed, agents, camps, config) {
 }
 
 // 模块 B: 内核 8 大子阶段细粒度拆解
-async function runSubphaseBreakdown(ticks, seed, agents, camps, config) {
+async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup = 60) {
   const { ex } = await createEngine(seed, agents, camps, config);
   const dt = 1.0 / 60.0;
 
-  // 预热
-  ex.world_tick_steps(60, dt);
+  // 预热 (支持快速推进至稳态阶段再细粒度拆解)
+  if (warmup > 0) {
+    ex.world_tick_steps(warmup, dt);
+  }
 
   const phaseNames = [
     '0. 四季与POI恢复 (Season & Poi Regen)',
@@ -178,10 +180,12 @@ async function runSubphaseBreakdown(ticks, seed, agents, camps, config) {
 }
 
 // 模块 C: 快照序列化与解析开销
-async function runSnapshotBench(samples, seed, agents, camps, config) {
+async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 300) {
   const { ex, textDecoder } = await createEngine(seed, agents, camps, config);
   const dt = 1.0 / 60.0;
-  ex.world_tick_steps(300, dt);
+  if (warmup > 0) {
+    ex.world_tick_steps(warmup, dt);
+  }
 
   const rustSerializeNs = [];
   const jsParseNs = [];
@@ -281,6 +285,16 @@ async function runBatchBench(seed, agents, camps, config) {
   const doScale = hasFlag('--scale');
   const doBatch = hasFlag('--batch');
 
+  const breakdownTicksArg = getArg('--breakdown-ticks', null);
+  let breakdownTicks = 1200;
+  if (breakdownTicksArg) {
+    breakdownTicks = parseInt(breakdownTicksArg, 10);
+  } else if (hasFlag('--only-breakdown')) {
+    breakdownTicks = ticks;
+  }
+  const breakdownWarmup = parseInt(getArg('--breakdown-warmup', '60'), 10);
+  const snapshotWarmup = parseInt(getArg('--snapshot-warmup', '300'), 10);
+
   console.log(`╔════════════════════════════════════════════════════════════════════╗`);
   console.log(`║      Flow & Accord · WASM 仿真内核性能基准测试与分项分析器         ║`);
   console.log(`╚════════════════════════════════════════════════════════════════════╝`);
@@ -309,8 +323,9 @@ async function runBatchBench(seed, agents, camps, config) {
 
   // 2. 子阶段耗时拆解
   if (doBreakdown) {
-    process.stdout.write(`🔬 正在采样 8 大子阶段耗时分布 (1200 ticks)... `);
-    const bd = await runSubphaseBreakdown(1200, seed, agents, camps, simConfig);
+    const warmupMsg = breakdownWarmup > 60 ? ` (预热跳过 ${breakdownWarmup} ticks)` : '';
+    process.stdout.write(`🔬 正在采样 8 大子阶段耗时分布 (${breakdownTicks} ticks)${warmupMsg}... `);
+    const bd = await runSubphaseBreakdown(breakdownTicks, seed, agents, camps, simConfig, breakdownWarmup);
     report.breakdown = bd;
     console.log(`完成！\n`);
 
@@ -330,8 +345,9 @@ async function runBatchBench(seed, agents, camps, config) {
 
   // 3. 快照序列化与通信开销
   if (runAll) {
-    process.stdout.write(`📸 正在度量快照序列化与 JSON 解析开销 (50 采样)... `);
-    const snap = await runSnapshotBench(50, seed, agents, camps, simConfig);
+    const snapWarmupMsg = snapshotWarmup > 300 ? ` (预热跳过 ${snapshotWarmup} ticks)` : '';
+    process.stdout.write(`📸 正在度量快照序列化与 JSON 解析开销 (50 采样)${snapWarmupMsg}... `);
+    const snap = await runSnapshotBench(50, seed, agents, camps, simConfig, snapshotWarmup);
     report.snapshot = snap;
     console.log(`完成！\n`);
 

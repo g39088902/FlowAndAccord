@@ -144,6 +144,21 @@ impl World3DEngine {
         let mut extinct_candidates: Vec<String> = Vec::new();
 
         for (surname, clan) in &self.clan_registry.clans {
+            // 已绝嗣宗族直接跳过（已清算归档，无在世男性）
+            if self.clan_registry.extinct.contains(surname) {
+                continue;
+            }
+
+            // ★ 快速路径（Fast Path）：若宗族已有族长且族长依然在世存活，
+            // 全员等速衰老保证其最年长地位绝不会被超越，O(1) 直接跳过全员扫描！
+            if let Some(leader_id) = clan.leader {
+                let leader_alive = self.agent_by_id(leader_id).map_or(false, |a| a.is_alive && a.gender == Gender::Male);
+                if leader_alive {
+                    continue;
+                }
+            }
+
+            // 慢路径（Slow Path）：族长阵亡或宗族暂无族长，执行全员长幼顺位与绝嗣判定
             let mut best: Option<(AgentId, f32)> = None; // (id, age)
             let mut has_living_male = false;
 
@@ -413,34 +428,28 @@ impl World3DEngine {
                 continue;
             }
 
-            // 找出本宗族的存续家户（户主属于本宗族）
-            let mut clan_households: Vec<HouseholdId> = Vec::new();
+            // 遍历存续家户，优先以廉价浮点数比对极贫门槛，满足且冷却已过时再确认宗族归属
             for (hid, hh) in &self.household_registry.households {
                 if hh.is_dissolved {
                     continue;
                 }
-                if self.clan_registry.clan_of(hh.head) == Some(surname) {
-                    clan_households.push(*hid);
-                }
-            }
-
-            // 对每家户判定极贫 + 冷却
-            for hid in clan_households {
-                // 冷却检查
-                if let Some(&last_tick) = self.mutual_aid_cooldown.get(&hid) {
-                    if tick - last_tick < cooldown {
-                        continue;
-                    }
-                }
-
-                let Some(hh) = self.household_registry.get(hid) else {
-                    continue;
-                };
                 let water = hh.group.ledger.balance(ResourceKind::Water);
                 let food = hh.group.ledger.balance(ResourceKind::Food);
                 let total = water + food;
                 if total >= family_threshold {
-                    continue; // 非极贫
+                    continue; // 绝大多数家户水粮充足，O(1) 立即短路
+                }
+
+                // 冷却检查
+                if let Some(&last_tick) = self.mutual_aid_cooldown.get(hid) {
+                    if tick.saturating_sub(last_tick) < cooldown {
+                        continue;
+                    }
+                }
+
+                // 仅对确实极贫且冷却完毕的家户确认是否属于本宗族
+                if self.clan_registry.clan_of(hh.head) != Some(surname) {
+                    continue;
                 }
 
                 // 计算互助总额 = min(族库余额 × 0.2, 缺口至 threshold 的 2倍)
@@ -474,7 +483,7 @@ impl World3DEngine {
                 }
 
                 if !amounts.is_empty() {
-                    items.push(AidItem { hid, surname: surname.clone(), amounts });
+                    items.push(AidItem { hid: *hid, surname: surname.clone(), amounts });
                 }
             }
         }

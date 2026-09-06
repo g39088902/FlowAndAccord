@@ -301,18 +301,8 @@ impl World3DEngine {
                 continue;
             }
 
-            // 幂等：已是自己家户户主的男人不再分家
-            if let Some(hid) = self.household_registry.household_of(agent.id) {
-                if let Some(hh) = self.household_registry.get(hid) {
-                    if hh.head == agent.id {
-                        continue;
-                    }
-                }
-            } else {
-                continue; // 无家户归属（始祖已在初始化时立户，不应到此）
-            }
-
             // 条件A：成年；条件B：父亲已死亡（无论是否成年）
+            // 绝大多数未成年男童其父在世，廉价判断后立即跳过，不碰红黑树
             let is_adult = agent.age >= self.config.agent_adult_age;
             let father_dead = match agent.father_id {
                 Some(fid) => self
@@ -328,9 +318,13 @@ impl World3DEngine {
                 continue;
             }
 
+            // 幂等：已是自己家户户主的男人不再分家（单次查询并复用 old_hid）
             let Some(old_hid) = self.household_registry.household_of(agent.id) else {
-                continue;
+                continue; // 无家户归属（始祖已在初始化时立户，不应到此）
             };
+            if self.household_registry.get(old_hid).is_some_and(|hh| hh.head == agent.id) {
+                continue;
+            }
 
             // 计算子一代数量 n：父亲 children_ids 长度
             // ★ M1.7 受孕即建胎儿 agent 并加入父亲 children_ids，故不再单独 +1（否则重复计数）

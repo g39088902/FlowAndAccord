@@ -57,7 +57,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.42.1)"]
+    F --> G["浏览器 UI (版本: v1.43.0)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -107,7 +107,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.42.1`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.43.0`**。
 
 ---
 
@@ -163,7 +163,7 @@ node frontend/server.js           # http://localhost:3000
 - **★ v1.35.0 单趟多品类连续采收**：现场采收某品类完成（装满、家宅补足或断流）后，若族人拥有私宅且体力 ≥ `config.decision_work_stamina_threshold`，由马斯洛引擎按当前编排顺序依次检索家宅短缺的其他品类（`b5/b6/b7/b9/b10`，分支内置行囊余量自检），有需求且行囊有空余则直接派发前往下一处 POI 继续采收，实现单趟出门连续多品类满载回宅；无短缺或体力不足时平滑返家。
 - **中途断流熔断与平滑重路由**：途中检测自身对目标的触发器关闭时，若有其他已开放同类 POI，立即原地掉头并重新规划路径；仅在无可用点或体力告警时折返。**严禁闪现瞬移**——掉头必须在当前车道反向平滑回走，保持坐标连续性。
 - **★ v1.27.0 / v1.36.0 断流直达榷场**：**水/粮/木**采集链路断流（无任何同类可用 POI）时，家户户主若家户账本金币 ≥ `config.market_min_family_gold` 且体力 ≥ `config.decision_work_stamina_threshold`，可直接原地掉头赴最近榷场交易——市场支付用家户账本**远程结算**（`try_route_to_market`，不要求随身携带金币）；石/金采集不享受该兜底。
-- **★ v1.40.3 A\* 道路速度加成与 0.25 级离散阶梯失效**：A\* 寻路通过 `LaneEdge3D::wear_tier_bucket`（以 `config.road_wear_tier_step` 0.25 级为阶梯步进）对道路踩踏加成（`road_level_factor` 0.50x~2.20x）进行量化，使寻路算法优先选择已踏宽的高速通衢；仅在通行踩踏或自然衰减发生跨桶跃迁（跨越 0.25 级）时触发 `clear_path_cache()`，同桶内微增保持 100% 缓存命中与长程确定性。
+- **★ v1.40.3 / v1.43.0 A\* 局部失效与 APSP 静态查表 (M3 优化)**：A\* 寻路通过 `LaneEdge3D::wear_tier_bucket` 量化道路踩踏加成（0.50x~2.20x）。在 v1.43.0 (M3) 中：① **衰减局部失效**：自然衰减只会增加成本，因此 `tick_wear_decay` 仅对包含跌落车道的路径定向失效，未涉车道路径严格保持最优；② **踩踏几何剪枝**：车道踩踏跃迁仅基于三角不等式失效受影响范围内的路径，消除全图击穿；③ **全源静态查表 (APSP Table)**：未发生踩踏或远端拓扑直接查表获取，全内核吞吐达 97,792 TPS。
 - 实现细节见 `decisions/AGENTS.md` 与 `docs/current/06-motivation-ai.md`。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）

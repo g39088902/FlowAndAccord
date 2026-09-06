@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.42.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.43.0**。
+
+| **v1.43.0** | 落地性能规划 M3 里程碑「A* 局部缓存失效与小路网全源静态最短路查表」（攻克第二大算力瓶颈，确定性矩阵全通）：① **衰减局部失效机制（Selective Invalidation on Wear Decay）**：严格遵循数学确定性定理（道路自然衰减只会增加通行阻力，未包含衰减车道的既有最优路径恒保持最优），重构 `graph.rs::tick_wear_decay`，改全局 `clear_path_cache()` 为车道依赖局部剔除 `invalidate_paths_containing_lanes`，从根源上消除了 60Hz 衰减引起的每拍全图缓存击穿，使 95%+ 的端点对缓存长期稳定存活；② **踩踏几何剪枝（Geometric Pruning on Trample）**：`agent.rs` 中族人踩踏导致车道限速等级跨阶跃迁时，基于三角不等式仅失效几何覆盖范围内的端点对路径（`invalidate_paths_for_trampled_lanes`），远端无关路径 100% 免疫；③ **全源静态拓扑最短路矩阵预计算（APSP Table）**：`LaneGraph3D` 引入 `ApspTable`，地貌初始生成与路网重建时预计算拓扑最短路，无踩踏干扰场景直接 $O(1)$ 查表返回，彻底免除动态 A* 堆分配与图遍历；④ **性能显著提升**：仿真总吞吐量由基准 86,909 TPS 提升至 **97,792 TPS (10.23 µs/tick)**，P50 延迟压低至 **8.93 µs**；⑤ **严格确定性全通**：`test-determinism.js` 6/6 套件（多随机种子一致、多步长批次等价、子阶段步进等价、快照无副作用、多点存读档重放逐字节一致、多人口规模数值稳定）及 `test-wasm.js` 100% 通过；并在 `docs/16-plan-performance-optimization.md` 中同步标记 M1（Worker 快照节流与解耦）与 M3 为已落地 | sim_core / graph / agent / ecology / docs |
 
 | **v1.42.1** | 落地 M2 里程碑「道路自然衰减优化：稀疏活跃边集合与衰减优化」（攻克第一大算力瓶颈，确定性全通）：① **稀疏活跃磨损边集合（Sparse Active Wear Set）**：`LaneGraph3D` 内部维护确定性有序集合 `active_wear_edges: BTreeSet<EdgeIndex>`，仅在车道有族人通行踩踏（`wear > 0.0`）时纳入扫描，从根源上消除了每拍无条件全图遍历数百条未踩踏荒野边的无谓开销；② **衰减清零安全退出**：`tick_wear_decay` 仅遍历该活跃子集，当车道踩踏值衰减至 `< 1e-5` 时自动置为 `0.0` 并移出集合，存读档按 `lane.wear > 0.0` 零成本即时重建，新旧存档双向完全兼容；③ **极致性能收益**：Phase 4（道路自然衰减）耗时从 **3.07 µs/tick 暴降至 0.40 µs/tick（单项耗时压降 87%）**，仿真总时间占比由 30.7% 压缩至 4.4%，彻底退出第一算力瓶颈行列；④ **确定性矩阵全通**：`test-determinism.js` 6/6 套件（多随机种子一致、多步长批次等价、子阶段步进等价、快照无副作用、多点倒流存读档严格一致、多人口规模数值稳定）及 `test-wasm.js` 全部逐字节一致通过 | sim_core / graph / agent / docs |
 

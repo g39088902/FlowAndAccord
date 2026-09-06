@@ -330,6 +330,8 @@ impl World3DEngine {
         self.rebuild_agent_index();
         self.regions_arrival_dirty = true;
         self.terrain_dirty.set(true);
+        // ★ M3 预计算全源静态拓扑最短路矩阵
+        self.network.init_static_apsp(&self.config);
     }
 
     /// 真实有限资源交互结算与分娩
