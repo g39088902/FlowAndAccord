@@ -285,10 +285,11 @@ impl World3DEngine {
             });
         }
 
-        // ★ 家户登记簿快照（家庭跟着男人走）
+        // ★ 家户登记簿快照（家庭跟着男人走：仅导出存续活跃家户）
         let resource_kinds = [ResourceKind::Water, ResourceKind::Food, ResourceKind::Wood, ResourceKind::Stone, ResourceKind::Gold];
         let mut households = Vec::new();
-        for (_hid, hh) in &self.household_registry.households {
+        for hid in &self.household_registry.active_households {
+            let Some(hh) = self.household_registry.households.get(hid) else { continue; };
             let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
                 LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
@@ -471,9 +472,12 @@ impl World3DEngine {
                 death_cause: hk.death_cause.clone(),
             }).collect();
             let member_ids: Vec<u32> = region.group.members.iter().copied().collect();
-            let governed_households: Vec<u64> = self.household_registry.households.iter()
-                .filter(|(_, hh)| !hh.is_dissolved && self.region_registry.region_of(hh.head) == Some(*camp_id))
-                .map(|(hid, _)| *hid)
+            let governed_households: Vec<u64> = self.household_registry.active_households.iter()
+                .filter(|&&hid| {
+                    self.household_registry.get(hid)
+                        .is_some_and(|hh| self.region_registry.region_of(hh.head) == Some(*camp_id))
+                })
+                .copied()
                 .collect();
 
             regions.push(RegionSnapshot {
@@ -534,6 +538,7 @@ impl World3DEngine {
             total_deaths_natural: self.total_deaths_natural,
             total_deaths_unnatural: self.total_deaths_unnatural,
             total_miscarriages: self.total_miscarriages,
+            total_households: self.household_registry.households.len() as u64,
             auction_started: self.auction_started,
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,

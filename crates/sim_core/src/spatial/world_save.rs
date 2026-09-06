@@ -28,7 +28,7 @@ use super::world::World3DEngine;
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 3;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.44.3";
+pub const SAVE_APP_VERSION: &str = "1.44.5";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -249,5 +249,8 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic
     world.rebuild_agent_index();
+    if world.household_registry.active_households.is_empty() && !world.household_registry.households.is_empty() {
+        world.household_registry.rebuild_active_households();
+    }
     Ok(world)
 }

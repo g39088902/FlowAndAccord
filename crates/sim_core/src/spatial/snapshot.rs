@@ -44,6 +44,9 @@ pub struct WorldSnapshot3D {
     pub total_deaths_natural: u32,
     pub total_deaths_unnatural: u32,
     pub total_miscarriages: u32,
+    /// ★ 历史累计创建家户总数（含已解散；快照 households 仅导出存续活跃家户）
+    #[serde(default)]
+    pub total_households: u64,
     #[serde(default)]
     pub auction_started: u64,
     #[serde(default)]

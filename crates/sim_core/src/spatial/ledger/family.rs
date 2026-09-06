@@ -11,7 +11,7 @@
 //! - **确定性**：`next_id` 顺序发号、`BTreeMap` 保序、不消耗 `WorldRng`。
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::spatial::agent::AgentId;
 use super::group::{Group, GroupKind};
@@ -57,6 +57,9 @@ impl Household {
 pub struct HouseholdRegistry {
     /// 全部家户（含已解散归档）
     pub households: BTreeMap<HouseholdId, Household>,
+    /// 存续（未解散）家户索引（按 ID 升序，确定性遍历，避免每拍扫描已解散归档的陈旧家户）
+    #[serde(default)]
+    pub active_households: BTreeSet<HouseholdId>,
     /// 每人当前所属家户（唯一归属索引）
     pub by_agent: BTreeMap<AgentId, HouseholdId>,
     /// 确定性发号器（从 1 递增，不回退）
@@ -68,6 +71,7 @@ impl HouseholdRegistry {
     pub fn new(journal_capacity: usize) -> Self {
         Self {
             households: BTreeMap::new(),
+            active_households: BTreeSet::new(),
             by_agent: BTreeMap::new(),
             next_id: 1,
             journal_capacity: journal_capacity.max(1),
@@ -77,8 +81,19 @@ impl HouseholdRegistry {
     /// 清空登记簿（世界重置/重播种子时与 agents 清空同步）
     pub fn clear(&mut self) {
         self.households.clear();
+        self.active_households.clear();
         self.by_agent.clear();
         self.next_id = 1;
+    }
+
+    /// 全量重建 active_households 存续索引（读档后或批量恢复时调用）
+    pub fn rebuild_active_households(&mut self) {
+        self.active_households.clear();
+        for (hid, hh) in &self.households {
+            if !hh.is_dissolved {
+                self.active_households.insert(*hid);
+            }
+        }
     }
 
     /// 某人当前所属家户（仅返回存续家户，已解散家户返回 None）
@@ -119,6 +134,7 @@ impl HouseholdRegistry {
         self.next_id += 1;
         let household = Household::new(id, head, parent, tick, self.journal_capacity);
         self.households.insert(id, household);
+        self.active_households.insert(id);
         self.by_agent.insert(head, id);
         id
     }
@@ -166,6 +182,7 @@ impl HouseholdRegistry {
                     // 若原家户户主自立后改嫁/迁移，将原家户标记解散并卸下领导锁定
                     h.is_dissolved = true;
                     h.group.leader = None;
+                    self.active_households.remove(&from_id);
                 }
                 h.group.remove_member(agent, tick);
             }
@@ -192,6 +209,7 @@ impl HouseholdRegistry {
             return false;
         }
         household.is_dissolved = true;
+        self.active_households.remove(&household_id);
         household.group.ledger.push_event(
             tick,
             format!("⚰️ 家户 #{} 户主 #{} 亡故清算，家户解散归档", household_id, household.head),

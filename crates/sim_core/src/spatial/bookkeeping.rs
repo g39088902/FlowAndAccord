@@ -46,10 +46,10 @@ impl World3DEngine {
         // READ PHASE：收集待清算家户（户主已死亡）
         let mut pending: Vec<(HouseholdId, Vec<(ResourceKind, f32)>, Vec<AgentId>)> = Vec::new();
 
-        for (hid, hh) in &self.household_registry.households {
-            if hh.is_dissolved {
+        for hid in &self.household_registry.active_households {
+            let Some(hh) = self.household_registry.households.get(hid) else {
                 continue;
-            }
+            };
             // 户主是否已死亡（agent_index O(1) 查找；找不到视为死亡）
             let head_dead = self
                 .agent_index

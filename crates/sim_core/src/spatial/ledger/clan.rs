@@ -331,10 +331,10 @@ impl World3DEngine {
         }
         let mut items: Vec<TributeItem> = Vec::new();
 
-        for (hid, hh) in &self.household_registry.households {
-            if hh.is_dissolved {
+        for hid in &self.household_registry.active_households {
+            let Some(hh) = self.household_registry.get(*hid) else {
                 continue;
-            }
+            };
             // 取户主姓氏
             let Some(head_agent) = self.agent_by_id(hh.head) else {
                 continue;
@@ -413,11 +413,11 @@ impl World3DEngine {
         }
         let mut items: Vec<AidItem> = Vec::new();
 
-        // BTreeMap 保序单遍扫描存续家户（hid 升序）
-        for (hid, hh) in &self.household_registry.households {
-            if hh.is_dissolved {
+        // BTreeSet 保序单遍扫描存续家户（hid 升序）
+        for hid in &self.household_registry.active_households {
+            let Some(hh) = self.household_registry.get(*hid) else {
                 continue;
-            }
+            };
 
             // ① 极廉价极贫门槛检查（仅读两浮点；99% 家户在此 O(1) 退出，绝不触碰红黑树）
             let water = hh.group.ledger.balance(ResourceKind::Water);

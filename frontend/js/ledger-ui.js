@@ -118,12 +118,13 @@
     const households = sim.households || [];
     const marriages = sim.marriages || [];
     const activeHH = households.filter(h => !h.isDissolved);
-    const dissolvedHH = households.filter(h => h.isDissolved);
+    const totalHH = (sim.totalHouseholds != null && sim.totalHouseholds > 0) ? sim.totalHouseholds : households.length;
+    const dissolvedCount = Math.max(0, totalHH - activeHH.length);
     const activeMG = marriages.filter(m => m.isActive);
 
     // 概览统计
     setText('ledger-ov-active', activeHH.length);
-    setText('ledger-ov-dissolved', dissolvedHH.length);
+    setText('ledger-ov-dissolved', dissolvedCount);
     setText('ledger-ov-marriages', activeMG.length);
     setText('ledger-ov-marriages-total', marriages.length);
 
@@ -135,9 +136,8 @@
       renderHtml(avgEl, keys.map((k, i) => `<span>${icons[i]} ${(sums[i] / Math.max(1, activeHH.length)).toFixed(1)}</span>`).join(''));
     }
 
-    // 家户列表（存续优先，已解散附后；并列 id 小者在前）
-    const sorted = activeHH.slice().sort((a, b) => a.id - b.id)
-      .concat(dissolvedHH.slice().sort((a, b) => a.id - b.id));
+    // 家户列表（存续活跃家户；并列 id 小者在前）
+    const sorted = activeHH.slice().sort((a, b) => a.id - b.id);
 
     const list = document.getElementById('ledger-household-list');
     if (!list) return;

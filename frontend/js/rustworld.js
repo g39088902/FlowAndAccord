@@ -40,6 +40,7 @@
         this.totalDeathsNatural = 0;   // ☘️ 自然死亡 (寿终正寝 / 寿命耗尽)
         this.totalDeathsUnnatural = 0; // ⚡ 非自然死亡 (饥荒饿死 / 脱水渴死)
         this.totalMiscarriages = 0;
+        this.totalHouseholds = 0; // ★ 历史累计创建家户总数（含已解散；households 快照仅存续活跃家户）
         this.currentSeason = 'Spring';
         this.temperature = 20.0;
         this.tickCount = 0;
@@ -60,7 +61,7 @@
         this._reqSeq = 0;
         this._lastSaveJson = null;
         this._lastSaveError = '';
-        this._appVersion = '1.44.3';
+        this._appVersion = '1.44.5';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -125,7 +126,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.44.3';
+            this._appVersion = msg.appVersion || '1.44.5';
             this._wasmBytes = msg.wasmBytes || 0;
             this._setEngineStatus('', 'ready');
             if (msg.snapshot) {
@@ -329,7 +330,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.44.3';
+        return this._appVersion || '1.44.5';
       }
 
       /**
@@ -444,6 +445,7 @@
         this.totalDeathsNatural = snap.total_deaths_natural || 0;
         this.totalDeathsUnnatural = snap.total_deaths_unnatural || 0;
         this.totalMiscarriages = snap.total_miscarriages;
+        this.totalHouseholds = snap.total_households || (snap.households ? snap.households.length : 0);
         this.totalRoyalPrivy = snap.total_royal_privy || 0;
         this.auctionStats = {
           started: snap.auction_started || 0,

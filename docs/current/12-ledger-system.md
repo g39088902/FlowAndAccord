@@ -53,6 +53,7 @@
 - **改嫁先移后加**：女性改嫁时，先从原夫家家户移除，再加入新夫家家户，避免短暂双重归属。
 - 已婚女性随夫入家户；未成年子女随父入家户；新生儿出生即入父亲家户。
 - `parent_household` 血缘链字段用于追溯分家/继承的血缘关系。
+- **★ v1.44.4 存续家户索引（`active_households: BTreeSet<HouseholdId>`）**：`create()` 自动登记，`dissolve()` 与原户主自立迁移时自动注销；使 `tick_inheritance`、`collect_clan_tributes`、`distribute_mutual_aid`、`collect_regional_taxes`、`distribute_regional_relief` 等所有高频结算仅遍历在世存续家户（~30户），彻底杜绝长程超期演化下扫描数百个历史解散死家户的每拍空转开销。
 
 ### ClanRegistry（宗族体系 M3）
 - **按姓氏聚合**：同姓 agent 自动归入同一宗族（不要求同营地）；始祖播撒即入族，新生儿随父姓入族。
@@ -125,13 +126,13 @@
 | `decisions/scheduler.rs` | ★ M4 登基物理执行器 `execute_pending_coronations`（扫描 `coronation_pending` 校验王位仍空缺后 `coronate_king`）；`decisions/evaluate.rs` 决策器选定远征目标写入 `agent.expedition_target_camp` |
 | `ecology.rs` | 始祖播撒 → 入宗族（M3）+ 入最近营地地区（M4）+ `arrival_tick=0` |
 | `world.rs` | 世界重置 → 清空各登记簿/缓存；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
-| `snapshot.rs` | `HouseholdSnapshot` / `MarriageSnapshot` / `ClanSnapshot` / `RegionSnapshot` / `TransferRecordSnapshot` / `LedgerBalanceSnapshot` 快照结构 |
-| `rustworld.js` | 映射 `sim.households` / `sim.marriages` / `sim.clans` / `sim.regions` / `sim.publicGranaryBalances` |
+| `snapshot.rs` | `HouseholdSnapshot` / `MarriageSnapshot` / `ClanSnapshot` / `RegionSnapshot` / `TransferRecordSnapshot` / `LedgerBalanceSnapshot` 快照结构；`WorldSnapshot3D.total_households` 历史家户总数 |
+| `rustworld.js` | 映射 `sim.households`（存续家户）/ `sim.totalHouseholds` / `sim.marriages` / `sim.clans` / `sim.regions` / `sim.publicGranaryBalances` |
 | `ledger-ui.js` | ★ 4 标签页「社会与经济制度大盘」：家户 / 婚姻 / 宗族 / 王国 |
 
 ## 快照字段
 
-- **HouseholdSnapshot**：家户 ID、户主 ID、成员列表、账面 5 资源余额、最近团体事件、最近 8 笔资源流水（`recent_journal`）。
+- **HouseholdSnapshot**：家户 ID、户主 ID、成员列表、账面 5 资源余额、最近团体事件、最近 8 笔资源流水（`recent_journal`）。（★ v1.44.5：快照仅导出 `active_households` 存续活跃家户；历史累计家户总数由顶层 `total_households` 字段单独下发）。
 - **MarriageSnapshot**：婚姻 ID、夫妻双方 ID、婚龄、存续/封账状态、历史婚姻段。
 - **ClanSnapshot**（M3）：姓氏、族长 ID、族人数量与列表、族库 5 资源余额、最近流水与事件；v1.9.0 新增 `is_extinct`（绝嗣标记；v1.9.1 起宗族仅含男性成员）。
 - **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表；v1.9.0 新增 `history_kings`（历史国王档案）/ `member_ids`（成员列表）/ `governed_households`（管辖家户）；v1.12.0 `history_kings` 改为 `Vec<HistoryKingSnapshot>`（含在位起止 tick 与死因），新增 `current_reign_start`（现任国王登基 tick）。
