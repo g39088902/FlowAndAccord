@@ -54,7 +54,7 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|WebAssembly 内存快照| D["frontend/js/rustworld.js (适配层 & 动态 Config 注入)"]
     D -->|状态驱动渲染| E["frontend/js/render.js (Canvas 视口)"]
-    E --> F["浏览器 UI (版本: v1.34.1)"]
+    E --> F["浏览器 UI (版本: v1.37.3)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -85,6 +85,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 ```powershell
 cargo test --lib                  # 编译校验（源码无持久化单元测试，见 §4.10）
 node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳定
+node tools/frontend-check.js      # 前端脚本语法与 DOM ID 完整性校验
 ```
 
 输出 `ALL_TESTS_DONE` 即全部通过。
@@ -101,7 +102,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.34.1`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.37.3`**。
 
 ---
 
@@ -131,7 +132,7 @@ node frontend/server.js           # http://localhost:3000
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
 □ 三处同步：快照字段变更时 snapshot.rs / world.rs / rustworld.js 一致
 □ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
-□ 测试门禁：cargo build + test-wasm.js + config-check.js 全绿
+□ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md + 受影响的局部 AGENTS.md
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
 ```
@@ -154,8 +155,9 @@ node frontend/server.js           # http://localhost:3000
 
 - **Agent 私有 POI 施密特触发器**：开启 ≥ `config.decisionPoiSeekMinStockRatio`(0.50) / 关闭 < `config.decisionPoiAbandonStockRatio`(0.10) / 中间带保持前态。每名 Agent 维护私有锁存，相同 POI 可被不同 Agent 判为不同可用性；路由与重路由只读取触发器结论。
 - **连续采收**：现场采收时若目标触发器已关闭但行囊未满且家宅仍需，自动前往下一处自身触发器已开放的同类 POI，避免提前返家。
+- **★ v1.35.0 单趟多品类连续采收**：现场采收某品类完成（装满、家宅补足或断流）后，若族人拥有私宅且体力 ≥ `config.decision_work_stamina_threshold`，由马斯洛引擎按当前编排顺序依次检索家宅短缺的其他品类（`b5/b6/b7/b9/b10`，分支内置行囊余量自检），有需求且行囊有空余则直接派发前往下一处 POI 继续采收，实现单趟出门连续多品类满载回宅；无短缺或体力不足时平滑返家。
 - **中途断流熔断与平滑重路由**：途中检测自身对目标的触发器关闭时，若有其他已开放同类 POI，立即原地掉头并重新规划路径；仅在无可用点或体力告警时折返。**严禁闪现瞬移**——掉头必须在当前车道反向平滑回走，保持坐标连续性。
-- **★ v1.27.0 断流直达榷场**：**水/粮**采集链路断流（无任何同类可用 POI）时，家户户主若家户账本金币 ≥ `config.market_min_family_gold` 且体力 ≥ `config.decision_work_stamina_threshold`，可直接原地掉头赴最近榷场交易——市场支付用家户账本**远程结算**（`try_route_to_market`，不要求随身携带金币）；木/石/金采集不享受该兜底。
+- **★ v1.27.0 / v1.36.0 断流直达榷场**：**水/粮/木**采集链路断流（无任何同类可用 POI）时，家户户主若家户账本金币 ≥ `config.market_min_family_gold` 且体力 ≥ `config.decision_work_stamina_threshold`，可直接原地掉头赴最近榷场交易——市场支付用家户账本**远程结算**（`try_route_to_market`，不要求随身携带金币）；石/金采集不享受该兜底。
 - 实现细节见 `decisions/AGENTS.md` 与 `docs/current/06-motivation-ai.md`。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）

@@ -8,7 +8,7 @@ use super::evaluate::Decisioner;
 /// 原地掉头平滑重路由至就近同类可用 POI；仅当自身无可用品或体力告警时才折返回家。
 impl<'a> Decisioner<'a> {
     pub fn try_route_to_market(&mut self, agent: &mut Agent3D, pool: NodePool) -> bool {
-        if !matches!(pool, NodePool::Water | NodePool::Food) || self.ctx.market_nodes.is_empty() { return false; }
+        if !matches!(pool, NodePool::Water | NodePool::Food | NodePool::Wood) || self.ctx.market_nodes.is_empty() { return false; }
         let can_pay = self.households.household_of(agent.id)
             .and_then(|hid| self.households.get(hid))
             .map(|hh| hh.group.leader == Some(agent.id) && hh.group.ledger.balance(ResourceKind::Gold) >= self.config.market_min_family_gold)
@@ -39,6 +39,9 @@ impl<'a> Decisioner<'a> {
         }
 
         if !self.has_available_node(agent, pool) || target_unavailable {
+            // 伐木途中发现野外林木 POI 全部关闭时，直接原地掉头赴榷场买木头；
+            // 市场支付使用家户账本远程结算，不要求 agent 先回家或携带金币。
+            if pool == NodePool::Wood && !self.has_available_node(agent, pool) && self.try_route_to_market(agent, pool) { return; }
             if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {

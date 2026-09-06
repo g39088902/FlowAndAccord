@@ -7,39 +7,39 @@
 ## 模块定位
 
 随着部落人口增长、代际更替与氏族/王国社会分层形成，内部生态面临季节性或长期资源短缺危机。**外部市场（榷场互市）与幂律动态价格系统**为部落经济注入外部流通性与终极生存安全垫：
-1. **外部商贸地标**：建立常驻的榷场互市 POI，提供外部输入的水与粮食储备；
+1. **外部商贸地标**：建立常驻的榷场互市 POI，提供外部输入的水、粮与木材储备；
 2. **幂律动态计价**：根据市场存量实时推导黄金兑换单价，形成供需自调节的价格机制；
 3. **生死兜底 AI**：部落民在野外采集点枯竭、家境绝望时自主携带黄金前往榷场采购救命物资；
 4. **黄金流失闭环**：黄金从家户账本流出至系统虚空（`LedgerRef::Void`），回收流通货币，杜绝经济恶性通胀。
 
-v1.27.0 起，采水/采粮途中若目标 POI 触发器关闭且无同类可用点，**家户户主**（家户账本金币 ≥ `market_min_family_gold` 且体力 ≥ `decision_work_stamina_threshold`）可直接原地掉头改道榷场；交易从家户账本**远程结算**（户主无需先回家、不要求随身携带金币），仍只允许水和粮，不改变木石金采集规则。
+v1.27.0 起采水/采粮断流直达榷场；**v1.36.0** 起木材正式加入榷场互市供应物资，外部森林衰竭或采木途中/现场断流时，**家户户主**（家户账本金币 ≥ `market_min_family_gold` 且体力 ≥ `decision_work_stamina_threshold`）可直接原地掉头改道榷场采购木材；交易从家户账本**远程结算**，石/金采集不享受该兜底。
 
 ---
 
 ## 核心机制
 
-### 一、外部市场 POI 与次级库存设计
+### 一、外部市场 POI 与三级库存设计
 
 全图生成 **1 处**常驻外部市场地标（`PoiType::Market`，ID 60 段位，全图 POI 总数 23 处）：
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                   榷场互市 (Market, ID 60)                │
-├────────────────────────────┬─────────────────────────────┤
-│ 主库存: 清水 (Water)        │ 次级库存: 粮食 (Food)        │
-│ 储量上限: 200.0            │ 储量上限: 200.0             │
-│ 自然产速: 2.0/秒           │ 自然产速: 2.0/秒            │
-│ 提取接口: extract()        │ 提取接口: extract_secondary()│
-└────────────────────────────┴─────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        榷场互市 (Market, ID 60)                         │
+├──────────────────────────┬──────────────────────────┬──────────────────┤
+│ 主库存: 清水 (Water)      │ 次级库存: 粮食 (Food)     │ 第三库存: 木料(Wood)
+│ 储量上限: 400.0          │ 储量上限: 400.0          │ 储量上限: 400.0  │
+│ 自然产速: 2.0/秒         │ 自然产速: 2.0/秒         │ 自然产速: 2.0/秒 │
+│ 提取接口: extract()      │ 提取接口: extract_sec()  │ 提取: extract_ter()
+└──────────────────────────┴──────────────────────────┴──────────────────┘
 ```
 
-#### 1. 实体次级字段兼容
-`PrimitivePoi` 结构体扩充次级库存三元组字段：
-- `secondary_stock: f32`（当前次级库存，默认 75% 初始值）
-- `secondary_max_stock: f32`（次级库存容量上限）
-- `secondary_regen_rate: f32`（次级库存每秒自然再生速率）
+#### 1. 实体多库存字段兼容
+`PrimitivePoi` 结构体维护独立的三级库存字段：
+- `current_stock` / `max_stock` / `regen_rate`（主库存清水）
+- `secondary_stock` / `secondary_max_stock` / `secondary_regen_rate`（次级库存粮食）
+- `tertiary_stock` / `tertiary_max_stock` / `tertiary_regen_rate`（★ v1.36.0 第三库存木料）
 
-次级字段均打上 `#[serde(default)]` 特性，保证旧版本存档反序列化时零破坏、自动赋零平滑过渡。
+次级与第三级字段均打上 `#[serde(default)]` 特性，保证旧版本存档反序列化时零破坏、自动赋零平滑过渡。
 
 #### 2. 市场物理隔离原则（防公地悲剧）
 外部市场是**需要支付黄金的贸易点**，而非免费野外公地：
@@ -100,11 +100,11 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 - 优先从市场抽取资源直接注入户主自身生理槽，现场就地自饮/自食补满生命底线；
 - 扣减对应黄金。绝不发生「手握清水却因装袋规则渴死在货架前」的反直觉悲剧。
 
-### 2. 离散步长装袋购入（★ v1.33.0）
-自救满足后，族人按固定结算步长（`market_settlement_step = 2.0` 单位）离散购入物资装入行囊：
-- **三重离散约束**：`buy_amount = step (2.0)`，当且仅当 `剩余背包空间 >= step`、`市场实际库存 >= step` 且 `家户剩余黄金 >= step * 单价` 时触发结算；
+### 2. 离散步长装袋购入（★ v1.33.0 / v1.36.2）
+自救满足后，族人按固定结算步长（`market_settlement_step = 5.0` 单位）离散购入物资装入行囊：
+- **三重离散约束**：`buy_amount = step (5.0)`，当且仅当 `剩余背包空间 >= step`、`市场实际库存 >= step` 且 `家户剩余黄金 >= step * 单价` 时触发结算；
 - 弃用原本每 tick 微量浮点（`rate_res * dt` ~0.333 单位）交易，避免高频微额流水充斥环形缓冲；
-- 水粮并行装袋，互不冲突，直至背包满额（50.0）、市场售罄或黄金不足。
+- 水粮木并行装袋，互不冲突，直至背包满额（50.0）、市场售罄或黄金不足。
 
 ### 3. 黄金流失与记账闭环
 - **真实扣减**：交易消耗的黄金直接从户主所属家户账本中 debit 扣减；
@@ -127,13 +127,13 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | `tick` | 成交时的世界 tick |
 | `agent_id` | 采购人（赴市的家户户主） |
 | `household_id` | 采购人家户 ID |
-| `resource` | `"Water"` / `"Food"` |
+| `resource` | `"Water"` / `"Food"` / `"Wood"` |
 | `amount` | 成交数量 |
 | `unit_price` | 成交时单价（金/单位） |
 | `gold_cost` | 本次支出黄金总额 |
 
 - **容量复用** `config.ledger_journal_capacity`（64，**未新增超参**），超容量淘汰最旧（`PrimitivePoi::push_market_trade`）；
-- **只留痕、不记账**：黄金流出仍走家户账本 `TransferReason::Market` 流水，买入的水/粮仍走行囊 → 回家 `Deposit` 链路，杜绝账面与库存二次入账；
+- **只留痕、不记账**：黄金流出仍走家户账本 `TransferReason::Market` 流水，买入的水/粮/木仍走行囊 → 回家 `Deposit` 链路，杜绝账面与库存二次入账；
 - **随档持久化**：`world_save.rs` 全量克隆 `pois`，字段带 `#[serde(default)]`，旧档零破坏；
 - **确定性**：`VecDeque` 保序、不消耗 `WorldRng`、不新增决策相位；
 - **旧缺陷**：此前前端扫描全部家户流水并过滤 `reason === 'MarketTrade'`，而内核序列化为 `"Market"`，且家户账本只记黄金、水粮无记录——面板恒显示"暂无交易记录"。现改为直接读 POI 自带流水。
@@ -148,18 +148,27 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | `secondary_stock` | `f32` | 外部市场当前粮食储量 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `secondary_max_stock` | `f32` | 外部市场粮食储量上限 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `secondary_regen_rate`| `f32` | 外部市场粮食每秒再生速度 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `tertiary_stock` | `f32` | ★ v1.36.0 外部市场当前木料储量 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `tertiary_max_stock` | `f32` | ★ v1.36.0 外部市场木料储量上限 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `tertiary_regen_rate`| `f32` | ★ v1.36.0 外部市场木料每秒再生速度 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `water_price` | `f32` | 外部市场清水当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `food_price` | `f32` | 外部市场粮食当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `wood_price` | `f32` | ★ v1.36.0 外部市场木料当前实时单价 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `cumulative_sold_water` | `f32` | ★ v1.37.0 外部市场历史累计出售清水总量 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `cumulative_sold_food` | `f32` | ★ v1.37.0 外部市场历史累计出售粮食总量 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `cumulative_sold_wood` | `f32` | ★ v1.37.0 外部市场历史累计出售木料总量 | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
+| `cumulative_revenue` | `f32` | ★ v1.37.0 外部市场历史累计收款总额（黄金） | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 | `market_trades` | `Vec<MarketTradeSnapshot>` | ★ v1.28.0 榷场最近 8 笔交易流水（从新到旧） | `snapshot.rs` / `world_snapshot.rs` / `rustworld.js` |
 
 ### 2. 前端可视化渲染
 - **Canvas 视口** (`render_world.js`)：
   - 绘制 🏪 图标；
-  - 绘制蓝（水库存比）与粉（粮库存比）同心双指示环。
-- **Inspector 侧边栏** (`render_inspector.js`)：
-  - 展示「🏪 榷场互市 #1」；
-  - 状态栏显示实时水/粮黄金单价（如 `水:0.10金 | 粮:0.10金`）；
-  - 进度条显示水粮双储备，附带详细商贸说明。
+  - 绘制蓝（水库存比）、红（粮库存比）与棕（木库存比）同心三指示环。
+- **Inspector 侧边栏** (`render_inspector.js` ★ v1.37.0 全面重构)：
+  - 标题栏状态徽章精简为「🏪 边境榷市」，彻底消除文本溢出与截断问题；
+  - **经营数据总览卡片**：展示历史累计出售总量（支持水/粮/木分项明细）与累计收款总额（黄金货币回收总量）；
+  - **三商品行情牌价网格**：清水、粮食、木料 3 个独立商品卡片，实时高亮展示各自当前幂律单价（如 `0.41 金`）、库存进度条、储量数字与产出速率；
+  - 底部保留实时交易流水（最近 8 笔流水记录）。
 - **马斯洛决策引擎视图** (`decision-viz-*.js`)：
   - 支持拖动编排 `b15`（榷场商贸）卡片；
   - FSM 状态机芯片支持 `SeekingMarket`（奔赴榷场）与 `BuyingAtMarket`（榷场交易）。
@@ -173,16 +182,20 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 | 超参名称 | 默认值 | 物理含义与设计考量 |
 | :--- | :---: | :--- |
 | `countMarkets` | `1` | 全图生成外部市场 POI 数量 |
-| `marketStockMaxWater` | `200.0` | 外部市场清水储备容量上限 |
-| `marketStockMaxFood` | `200.0` | 外部市场粮食储备容量上限 |
+| `marketStockMaxWater` | `400.0` | 外部市场清水储备容量上限 |
+| `marketStockMaxFood` | `400.0` | 外部市场粮食储备容量上限 |
+| `marketStockMaxWood` | `400.0` | ★ v1.36.0 外部市场木材储备容量上限 |
 | `marketRegenBaseWater` | `2.0` | 外部市场清水每秒自然恢复速率 |
 | `marketRegenBaseFood` | `2.0` | 外部市场粮食每秒自然恢复速率 |
-| `marketPriceBase` | `0.1` | 满库存时的基础单价（黄金/单位） |
+| `marketRegenBaseWood` | `2.0` | ★ v1.36.0 外部市场木材每秒自然恢复速率 |
+| `marketPriceBase` | `0.1` | 满库存时的水/粮基础单价（黄金/单位） |
+| `marketPriceBaseWood` | `0.15` | ★ v1.36.0 满库存时的木材基础单价（黄金/单位） |
 | `marketPricePowerExponent` | `2.0` | 幂律定价指数（$k=2.0$ 平方反比敏感度） |
 | `marketPriceFloorStock` | `1.0` | 计价库存钳制下限（防除零，单价封顶 1000 金） |
 | `marketEmergencyFamilyStockThreshold` | `10.0` | 家户水或粮的绝境警戒阈值 |
 | `marketMinFamilyGold` | `0.5` | 户主出发前往市场的家财起步门槛 |
 | `marketMinDispatchStamina` | `15.0` | 户主出发前往市场的体能最低门槛 |
+| `marketSettlementStep` | `5.0` | ★ v1.36.2 外部市场单次交易结算步长（单位） |
 
 ---
 

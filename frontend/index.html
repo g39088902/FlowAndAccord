@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.34.1</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.37.3</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -397,6 +397,17 @@
           </div>
         </div>
 
+        <!-- ★ v1.35.2 调试模式: 国王收到的内帑总额（仅调试模式勾选时显示） -->
+        <div class="debug-mining-card" id="insp-debug-privy" style="display:none; margin-top:4px;">
+          <div class="mining-header">
+            <span style="font-weight:700; color:#fbbf24;">👑 累计内帑</span>
+            <span id="insp-debug-privy-val" class="mono-num" style="color:#fbbf24; font-weight:700;">0.0 🪙</span>
+          </div>
+          <div style="font-size:9.5px; color:#94a3b8; line-height:1.3; padding: 2px 0;">
+            一生作为国王从地区公仓领取的内帑黄金累计总量
+          </div>
+        </div>
+
         <!-- 2x2 紧凑型生存健康指标网格 -->
         <div class="vital-grid">
           <div class="vital-item">
@@ -529,21 +540,106 @@
           <div class="meter-label"><span id="lbl-poi-secondary-stock-title" style="color:#10b981;">🍒 榷场粮食储备</span><span id="insp-poi-secondary-stock-val">75.0 / 100.0 单位</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-poi-secondary-stock-fill" style="background:#10b981; width:75%;"></div></div>
         </div>
+        <!-- ★ v1.36.0 榷场互市第三库存：与水粮独立的木料储备（仅 Market 显示） -->
+        <div class="meter-row" id="insp-poi-tertiary-stock-row" style="display:none;">
+          <div class="meter-label"><span id="lbl-poi-tertiary-stock-title" style="color:#b45309;">🌲 榷场木料储备</span><span id="insp-poi-tertiary-stock-val">300.0 / 400.0 单位</span></div>
+          <div class="meter-bg"><div class="meter-fill" id="insp-poi-tertiary-stock-fill" style="background:#b45309; width:75%;"></div></div>
+        </div>
         <div class="meter-row" id="insp-camp-upgrade-row" style="display:none;">
           <div class="meter-label"><span id="lbl-camp-upgrade-title" style="color:#facc15;">🏛️ 辖区私宅与聚落晋升</span><span id="insp-camp-upgrade-val">0 / 6 间房</span></div>
           <div class="meter-bg"><div class="meter-fill" id="insp-camp-upgrade-fill" style="background:#facc15; width:0%;"></div></div>
         </div>
-        <!-- ★ v1.12.0 营地一级卡片仅展示国王 + 详情按钮；继承人/历史国王/管辖家庭/账本/空置房移入详情模态框 -->
+        <!-- ★ v1.37.2 营地一级卡片展示国王 + 地区国库公仓 + 详情按钮 -->
         <div id="insp-camp-kingdom-box" style="display:none; flex-direction:column; gap:6px; border-top:1px dashed rgba(148,163,184,0.25); padding-top:6px;">
           <div class="poi-info-badge">
             <div><strong>👑 国王:</strong> <span id="insp-camp-king">—</span></div>
           </div>
-          <button id="btn-camp-detail" class="camp-detail-btn" style="width:100%; padding:6px 10px; background:rgba(250,204,21,0.12); border:1px solid rgba(250,204,21,0.35); color:#facc15; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">📜 查看辖区详情（继承人/历史国王/管辖家庭/空置房/公仓）</button>
+          <!-- ★ v1.37.2 营地卡片国库信息展示（水/粮/木/石/金 五品类公仓余额与总存量） -->
+          <div class="poi-info-badge" id="insp-camp-treasury-box" style="display:flex; flex-direction:column; gap:4px; cursor:pointer;" title="点击查看公仓流水与辖区详情">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="color:#fbbf24;">💰 王国国库 (地区公仓):</strong>
+              <span id="insp-camp-treasury-total" class="mono-num" style="font-size:10px; color:#94a3b8;">总存量 0.0</span>
+            </div>
+            <div class="camp-treasury-grid" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; text-align:center; font-size:10px; background:rgba(0,0,0,0.25); padding:5px 3px; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+              <div><div style="color:#38bdf8;">💧水</div><div id="insp-camp-treasury-water" class="mono-num" style="font-weight:600; margin-top:2px;">0.0</div></div>
+              <div><div style="color:#10b981;">🍒粮</div><div id="insp-camp-treasury-food" class="mono-num" style="font-weight:600; margin-top:2px;">0.0</div></div>
+              <div><div style="color:#d97706;">🌲木</div><div id="insp-camp-treasury-wood" class="mono-num" style="font-weight:600; margin-top:2px;">0.0</div></div>
+              <div><div style="color:#94a3b8;">🪨石</div><div id="insp-camp-treasury-stone" class="mono-num" style="font-weight:600; margin-top:2px;">0.0</div></div>
+              <div><div style="color:#fbbf24;">🪙金</div><div id="insp-camp-treasury-gold" class="mono-num" style="font-weight:600; margin-top:2px;">0.0</div></div>
+            </div>
+          </div>
+          <button id="btn-camp-detail" class="camp-detail-btn" style="width:100%; padding:6px 10px; background:rgba(250,204,21,0.12); border:1px solid rgba(250,204,21,0.35); color:#facc15; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">📜 查看辖区详情（继承人/历史国王/管辖家庭/空置房/公仓流水）</button>
         </div>
         <div class="poi-info-badge" id="insp-poi-info-badge">
           <div><strong>🌱 产出速率:</strong> <span id="insp-poi-regen">+2.00 单位/秒</span></div>
           <!-- ★ v1.22.6 榷场互市第二条产速：粮食再生独立计数（仅 Market 显示） -->
           <div id="insp-poi-regen-secondary-row" style="display:none;"><strong>🌾 粮食产出:</strong> <span id="insp-poi-regen-secondary">+2.00 单位/秒</span></div>
+          <!-- ★ v1.36.0 榷场互市第三条产速：木材再生独立计数（仅 Market 显示） -->
+          <div id="insp-poi-regen-tertiary-row" style="display:none;"><strong>🌲 木材产出:</strong> <span id="insp-poi-regen-tertiary">+2.00 单位/秒</span></div>
+        </div>
+        <!-- ★ v1.37.0 榷场互市专属行情看板与经营统计卡片（三品类动态牌价、实时库存、累计售出与收款总览） -->
+        <div id="insp-market-box" style="display:none; flex-direction:column; gap:6px;">
+          <!-- 经营统计卡片 -->
+          <div class="market-summary-card">
+            <div class="market-stat-item">
+              <span class="market-stat-label">📦 累计出售总量</span>
+              <span class="market-stat-val mono-num" id="insp-market-total-sold">0.0 单位</span>
+              <span class="market-stat-sub mono-num" id="insp-market-sold-breakdown">💧0.0 · 🍒0.0 · 🌲0.0</span>
+            </div>
+            <div class="market-stat-item">
+              <span class="market-stat-label">🪙 累计收款总额</span>
+              <span class="market-stat-val mono-num" id="insp-market-total-revenue" style="color:#fbbf24;">0.00 金</span>
+              <span class="market-stat-sub" style="color:#94a3b8;">边境通缩回收</span>
+            </div>
+          </div>
+
+          <!-- 三商品行情与库存牌价网格 -->
+          <div class="market-goods-grid">
+            <!-- 💧 清水 -->
+            <div class="market-good-card">
+              <div class="market-good-header">
+                <span class="good-name" style="color:#38bdf8;">💧 清水</span>
+                <span class="good-price mono-num" id="insp-market-water-price">0.41 金</span>
+              </div>
+              <div class="meter-bg" style="height:5px; margin:4px 0 3px 0;">
+                <div class="meter-fill" id="insp-market-water-fill" style="background:#38bdf8; width:50%;"></div>
+              </div>
+              <div class="market-good-footer">
+                <span id="insp-market-water-stock">197.8/400</span>
+                <span id="insp-market-water-regen" style="color:#38bdf8;">+2.0/s</span>
+              </div>
+            </div>
+
+            <!-- 🍒 粮食 -->
+            <div class="market-good-card">
+              <div class="market-good-header">
+                <span class="good-name" style="color:#10b981;">🍒 粮食</span>
+                <span class="good-price mono-num" id="insp-market-food-price">0.30 金</span>
+              </div>
+              <div class="meter-bg" style="height:5px; margin:4px 0 3px 0;">
+                <div class="meter-fill" id="insp-market-food-fill" style="background:#10b981; width:50%;"></div>
+              </div>
+              <div class="market-good-footer">
+                <span id="insp-market-food-stock">232.4/400</span>
+                <span id="insp-market-food-regen" style="color:#10b981;">+2.0/s</span>
+              </div>
+            </div>
+
+            <!-- 🌲 木料 -->
+            <div class="market-good-card">
+              <div class="market-good-header">
+                <span class="good-name" style="color:#d97706;">🌲 木料</span>
+                <span class="good-price mono-num" id="insp-market-wood-price">0.15 金</span>
+              </div>
+              <div class="meter-bg" style="height:5px; margin:4px 0 3px 0;">
+                <div class="meter-fill" id="insp-market-wood-fill" style="background:#d97706; width:100%;"></div>
+              </div>
+              <div class="market-good-footer">
+                <span id="insp-market-wood-stock">400.0/400</span>
+                <span id="insp-market-wood-regen" style="color:#d97706;">+2.0/s</span>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="poi-info-badge" id="insp-market-trades" style="display:none;"><strong>🔄 交易流水:</strong><div id="insp-market-trades-list" style="margin-top:3px;"></div></div>
       </div>
@@ -657,6 +753,7 @@
     </div>
     <div class="debug-row"><span>⏱️ 模拟 Tick</span><span id="dbg-tick" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚡ 每秒 Tick</span><span id="dbg-tick-rate" class="mono-num">0</span></div>
+    <div class="debug-row"><span>👑 国王内帑总额</span><span id="dbg-royal-privy" class="mono-num">0.00 🪙</span></div>
     <div class="debug-row"><span>🖼️ 渲染 FPS</span><span id="dbg-fps" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚙️ 内核步进</span><span id="dbg-tick-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>📦 快照解析</span><span id="dbg-snap-ms" class="mono-num">0.00 ms</span></div>

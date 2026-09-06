@@ -30,6 +30,8 @@
 | `world_set_regen_multiplier` | `(which: i32, mult: f32)` | 设置某类 POI 再生倍率（0=水 1=果 2=木 3=石 4=金） |
 | `world_snapshot_ptr` | `() -> u32` | 序列化当前快照到 `SNAPSHOT_BUF`，返回起始指针 |
 | `world_snapshot_len` | `() -> u32` | 快照 JSON 字节长度 |
+| `world_app_version_ptr` | `() -> u32` | 内核应用版本号字符串指针（UTF-8，见 SAVE_APP_VERSION） |
+| `world_app_version_len` | `() -> u32` | 内核应用版本号字符串字节长度 |
 
 ## 4. ⚠️ 本目录易踩坑
 

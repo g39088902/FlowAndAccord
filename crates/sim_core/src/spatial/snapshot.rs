@@ -50,6 +50,9 @@ pub struct WorldSnapshot3D {
     pub auction_sold: u64,
     #[serde(default)]
     pub auction_flopped: u64,
+    /// ★ v1.35.2 全局所有国王累计收到的内帑总额（黄金）
+    #[serde(default)]
+    pub total_royal_privy: f32,
     /// ★ 房屋报价中心历史受理记录 (256 size 环形缓冲区快照)
     #[serde(default)]
     pub auction_history: Vec<HouseAuctionHistorySnapshot>,
@@ -155,9 +158,25 @@ pub struct PoiSnapshot {
     #[serde(default)]
     pub secondary_regen_rate: f32,
     #[serde(default)]
+    pub tertiary_stock: f32,
+    #[serde(default)]
+    pub tertiary_max_stock: f32,
+    #[serde(default)]
+    pub tertiary_regen_rate: f32,
+    #[serde(default)]
     pub water_price: f32,
     #[serde(default)]
     pub food_price: f32,
+    #[serde(default)]
+    pub wood_price: f32,
+    #[serde(default)]
+    pub cumulative_sold_water: f32,
+    #[serde(default)]
+    pub cumulative_sold_food: f32,
+    #[serde(default)]
+    pub cumulative_sold_wood: f32,
+    #[serde(default)]
+    pub cumulative_revenue: f32,
     pub name: String,
     pub camp_title: String,
     pub level: u8,
@@ -222,6 +241,8 @@ pub struct AgentSnapshot {
     pub cumulative_mined_wood: f32,
     pub cumulative_mined_stone: f32,
     pub cumulative_mined_gold: f32,
+    /// ★ v1.35.2 累计收到的内帑总额（黄金）：本 agent 一生作为国王从地区公仓领取的内帑累计总量
+    pub cumulative_royal_privy: f32,
     pub build_timer: f32,
     pub miscarriage_alert_timer: f32,
     pub state: String,
@@ -417,4 +438,6 @@ pub struct RegionSnapshot {
     pub governed_households: Vec<u64>,
     /// ★ v1.12.0 现任国王登基 tick（None = 王位空悬），前端计算在位时长
     pub current_reign_start: Option<u64>,
+    /// ★ v1.35.2 该地区王国累计拨付给国王的内帑总额（黄金）
+    pub cumulative_royal_privy: f32,
 }

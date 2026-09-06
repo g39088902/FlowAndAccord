@@ -462,8 +462,8 @@
       html += '</div>';
     }
 
-    // ── 近期流水（Tribute/MutualAid 高亮，最多3笔） ──
-    const recentClan = (clan.recentJournal || []).filter(r => r.reason === 'Tribute' || r.reason === 'MutualAid');
+    // ── 近期流水（Tribute/MutualAid/Legacy 高亮，最多3笔） ──
+    const recentClan = (clan.recentJournal || []).filter(r => r.reason === 'Tribute' || r.reason === 'MutualAid' || r.reason === 'Legacy');
     if (recentClan.length > 0) {
       html += '<div class="clan-recent-journal">';
       recentClan.slice(0, 3).forEach(r => {
@@ -543,7 +543,7 @@
         const rLabel = REASON_LABELS[r.reason] || r.reason;
         const resIcon = RES_ICONS[r.resource] || '📦';
         const resColor = RES_COLORS[r.resource] || '#94a3b8';
-        const isClanFlow = (r.reason === 'Tribute' || r.reason === 'MutualAid');
+        const isClanFlow = (r.reason === 'Tribute' || r.reason === 'MutualAid' || r.reason === 'Legacy');
         html += '<div class="ledger-journal-item"' + (isClanFlow ? ' style="background:rgba(16,185,129,0.06);"' : '') + '>';
         html += '<span class="journal-tick">t' + r.tick + '</span>';
         html += '<span class="journal-reason" title="' + esc(r.reason) + '">' + rIcon + ' ' + rLabel + '</span>';
@@ -625,6 +625,17 @@
       });
       html += '</div>';
     }
+
+    // 内帑动态气泡
+    const privyRecords = (region.recentJournal || []).filter(r => r.reason === 'RoyalPrivy');
+    if (privyRecords.length > 0 || (region.cumulativeRoyalPrivy || 0) > 0) {
+      const lastPrivy = privyRecords[0];
+      const cumuText = (region.cumulativeRoyalPrivy || 0).toFixed(1);
+      html += '<div class="kingdom-relief-bubble" style="background:rgba(251,191,36,0.06); border:1px solid rgba(251,191,36,0.2);">';
+      html += '<div class="kingdom-relief-item" style="color:#fbbf24;">👑 国王内帑制: 累计拨付 ' + cumuText + ' 🪙'
+        + (lastPrivy ? ' · 最近拨付 +' + (lastPrivy.amount || 0).toFixed(1) + ' 🪙' : '')
+        + '</div></div>';
+    }
     // 到达时序（可展开）
     html += '<div class="kingdom-arrival"><div class="kingdom-arrival-toggle" data-region-arrival="' + region.campId + '"><span class="kingdom-arrow">' + (arrivalOpen ? '▼' : '▶') + '</span><span>📜 到达时序（始祖优先）</span></div>';
     if (arrivalOpen) {
@@ -691,7 +702,7 @@
     else {
       html += '<div class="ledger-journal-list">';
       journal.slice(0, 8).forEach(r => {
-        const isRoyal = (r.reason === 'Tax' || r.reason === 'Relief');
+        const isRoyal = (r.reason === 'Tax' || r.reason === 'Relief' || r.reason === 'RoyalPrivy');
         html += '<div class="ledger-journal-item"' + (isRoyal ? ' style="background:rgba(251,191,36,0.06);"' : '') + '><span class="journal-tick">t' + r.tick + '</span><span class="journal-reason" title="' + esc(r.reason) + '">' + (REASON_ICONS[r.reason] || '📌') + ' ' + (REASON_LABELS[r.reason] || r.reason) + '</span><span class="journal-res" style="color:' + (RES_COLORS[r.resource] || '#94a3b8') + ';">' + (RES_ICONS[r.resource] || '📦') + ' ' + (r.amount || 0).toFixed(1) + '</span><span class="journal-flow">' + esc(r.from || '—') + ' → ' + esc(r.to || '—') + '</span></div>';
       });
       html += '</div>';

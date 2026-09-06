@@ -46,6 +46,8 @@ impl World3DEngine {
                     poi.max_stock = self.config.market_stock_max_water;
                     poi.secondary_regen_rate = self.config.market_regen_base_food;
                     poi.secondary_max_stock = self.config.market_stock_max_food;
+                    poi.tertiary_regen_rate = self.config.market_regen_base_wood;
+                    poi.tertiary_max_stock = self.config.market_stock_max_wood;
                 }
                 _ => {}
             }
@@ -54,6 +56,9 @@ impl World3DEngine {
             }
             if poi.secondary_max_stock.is_finite() && poi.secondary_stock > poi.secondary_max_stock {
                 poi.secondary_stock = poi.secondary_max_stock;
+            }
+            if poi.tertiary_max_stock.is_finite() && poi.tertiary_stock > poi.tertiary_max_stock {
+                poi.tertiary_stock = poi.tertiary_max_stock;
             }
         }
     }

@@ -89,6 +89,9 @@ pub struct Region {
     pub history_kings: Vec<HistoryKing>,
     /// ★ v1.12.0 现任国王登基 tick（None = 王位空悬），用于计算在位时长
     pub current_reign_start: Option<u64>,
+    /// ★ v1.35.2 该地区王国累计拨付给国王的内帑总额（黄金）
+    #[serde(default)]
+    pub cumulative_royal_privy: f32,
 }
 
 impl Region {
@@ -102,6 +105,7 @@ impl Region {
             arrival_order: Vec::new(),
             history_kings: Vec::new(),
             current_reign_start: None,
+            cumulative_royal_privy: 0.0,
         }
     }
 
@@ -297,12 +301,16 @@ impl World3DEngine {
         for (camp_id, king_id, amount) in payouts {
             if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
                 region.group.ledger.debit(ResourceKind::Gold, amount);
+                region.cumulative_royal_privy += amount;
                 region.group.ledger.push_transfer(TransferRecord {
                     tick, from: LedgerRef::Region(camp_id), to: LedgerRef::Personal(king_id),
                     resource: ResourceKind::Gold, amount, reason: TransferReason::RoyalPrivy,
                 });
             }
-            if let Some(king) = self.agent_by_id_mut(king_id) { king.carried_gold += amount; }
+            if let Some(king) = self.agent_by_id_mut(king_id) {
+                king.carried_gold += amount;
+                king.cumulative_royal_privy += amount;
+            }
         }
     }
 

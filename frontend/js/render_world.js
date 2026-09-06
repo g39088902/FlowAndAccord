@@ -218,6 +218,7 @@ for (const poi of sim.pois) {
   } else if (poi.type === 'Market') {
     const ratioWater = isFinite(poi.maxStock) && poi.maxStock > 0 ? (poi.currentStock / poi.maxStock) : 1.0;
     const ratioFood = isFinite(poi.secondaryMaxStock) && poi.secondaryMaxStock > 0 ? (poi.secondaryStock / poi.secondaryMaxStock) : 1.0;
+    const ratioWood = isFinite(poi.tertiaryMaxStock) && poi.tertiaryMaxStock > 0 ? (poi.tertiaryStock / poi.tertiaryMaxStock) : 1.0;
     const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 22 * camera.zoom);
     grad.addColorStop(0, 'rgba(245, 158, 11, 0.95)');
     grad.addColorStop(0.5, 'rgba(217, 119, 6, 0.50)');
@@ -229,16 +230,21 @@ for (const poi of sim.pois) {
     ctx.textAlign = 'center';
     ctx.fillText('🏪', p2D.x, p2D.y + 5);
 
-    // 双库存环：内环水 (天蓝色)，外环粮 (玫瑰红)
-    ctx.lineWidth = 2.0;
+    // 三库存环：内环水 (天蓝色)，中环粮 (玫瑰红)，外环木 (琥珀棕)
+    ctx.lineWidth = 1.8;
     ctx.strokeStyle = '#38bdf8';
     ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 15 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioWater * Math.PI * 2);
+    ctx.arc(p2D.x, p2D.y, 14 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioWater * Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = '#f43f5e';
     ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 18 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioFood * Math.PI * 2);
+    ctx.arc(p2D.x, p2D.y, 17 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioFood * Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#b45309';
+    ctx.beginPath();
+    ctx.arc(p2D.x, p2D.y, 20 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioWood * Math.PI * 2);
     ctx.stroke();
   }
 

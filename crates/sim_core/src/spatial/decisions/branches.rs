@@ -166,17 +166,21 @@ impl BranchId {
             }
             BranchId::B5StockWater => {
                 // ★ M7 去采与房屋等级脱钩：有房（含 0 级，非废墟）且家庭库存触发器 ON（账本水 < 下限）
-                if home_tier.is_some() && family_stock_on(a, ResourceKind::Water) && d.has_available_node(a, NodePool::Water) {
+                // ★ v1.35.0 行囊余量自检：行囊未满才产生采水备货需求
+                let bag_has_space = a.carried_water < cfg.carry_capacity_resource - 0.01;
+                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Water) && d.has_available_node(a, NodePool::Water) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockWater, target_state: PrimitiveActionState::SeekingWater });
                 }
             }
             BranchId::B6StockFood => {
-                if home_tier.is_some() && family_stock_on(a, ResourceKind::Food) && d.has_available_node(a, NodePool::Food) {
+                let bag_has_space = a.carried_food < cfg.carry_capacity_resource - 0.01;
+                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Food) && d.has_available_node(a, NodePool::Food) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockFood, target_state: PrimitiveActionState::SeekingFood });
                 }
             }
             BranchId::B7StockWood => {
-                if home_tier.is_some() && family_stock_on(a, ResourceKind::Wood) && d.has_available_node(a, NodePool::Wood) {
+                let bag_has_space = a.carried_wood < cfg.carry_capacity_resource - 0.01;
+                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Wood) && d.has_available_node(a, NodePool::Wood) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockWood, target_state: PrimitiveActionState::SeekingWood });
                 }
             }
@@ -190,13 +194,15 @@ impl BranchId {
             }
             BranchId::B9StockStone => {
                 // ★ M7 石料也因家庭储备不足而采（不再按房屋等级“升级建材”导向）
-                if home_tier.is_some() && family_stock_on(a, ResourceKind::Stone) && d.has_available_node(a, NodePool::Stone) {
+                let bag_has_space = a.carried_stone < cfg.carry_capacity_resource - 0.01;
+                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Stone) && d.has_available_node(a, NodePool::Stone) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockStone, target_state: PrimitiveActionState::SeekingStone });
                 }
             }
             BranchId::B10StockGold => {
                 // ★ M7 黄金也因家庭储备不足而采（保留淘金冷却节流）
-                if home_tier.is_some() && family_stock_on(a, ResourceKind::Gold) && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
+                let bag_has_space = a.carried_gold < cfg.agent_gold_load_full - 0.01;
+                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Gold) && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockGold, target_state: PrimitiveActionState::SeekingGold });
                 }
             }
@@ -225,11 +231,12 @@ impl BranchId {
             }
             BranchId::B13GoldWealth => {
                 // 4 级大庄园「万事俱备」门禁（M7 再锚）：庄园竣工 + 家户五类储备 trigger 全 OFF（余额均 ≥200）
-                // + 无修缮缺口 + 有金源 + 冷却结束
+                // + 无修缮缺口 + 有金源 + 冷却结束 + 行囊未满
                 if let Some(house) = home_house(d, a) {
                     let need_repair = house.durability < cfg.decision_house_repair_need_threshold;
                     let all_stocked = FAMILY_STOCK_ORDER.iter().all(|&rk| !family_stock_on(a, rk));
-                    let gated = house.tier != HouseTier::Tier4Manor || need_repair || !all_stocked;
+                    let bag_has_space = a.carried_gold < cfg.agent_gold_load_full - 0.01;
+                    let gated = house.tier != HouseTier::Tier4Manor || need_repair || !all_stocked || !bag_has_space;
                     if !gated && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
                         return Some(Need { level: MaslowLevel::SelfActualization, kind: NeedKind::GoldWealth, target_state: PrimitiveActionState::SeekingGold });
                     }

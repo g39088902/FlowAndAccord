@@ -230,15 +230,17 @@ window.SIM_CONFIG = {
   countMarkets: 1,                          // 全图生成外部市场 POI 数量
   marketStockMaxWater: 400.0,               // 外部市场清水储备容量上限
   marketStockMaxFood: 400.0,                // 外部市场粮食储备容量上限
+  marketStockMaxWood: 400.0,                // 外部市场木料储备容量上限
   marketRegenBaseWater: 2.0,                // 外部市场清水每秒自然再生速率
   marketRegenBaseFood: 2.0,                 // 外部市场粮食每秒自然再生速率
+  marketRegenBaseWood: 2.0,                 // 外部市场木料每秒自然再生速率
   marketPriceBase: 0.1,                     // 满库存起步基准单价 (黄金 / 单位资源)
   marketPricePowerExponent: 2.0,            // 幂律定价指数 k
   marketPriceFloorStock: 1.0,               // 计价库存钳制下限 (防除零与价格封顶)
   marketEmergencyFamilyStockThreshold: 10.0,// 家户物资绝境警戒线
   marketMinFamilyGold: 0.5,                 // 户主准入起步黄金底线
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
-  marketSettlementStep: 2.0,                // 外部市场单次交易结算步长 (单位)
+  marketSettlementStep: 5.0,                // 外部市场单次交易结算步长 (单位)
 
   // ==========================================================================
   // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)

@@ -330,8 +330,12 @@ pub const MARKET_STOCK_MAX_FOOD: f32 = 400.0;
 pub const MARKET_REGEN_BASE_WATER: f32 = 2.0;
 /// 外部市场粮食每秒自然再生速率
 pub const MARKET_REGEN_BASE_FOOD: f32 = 2.0;
-/// 外部市场（榷场互市）单次交易结算步长（单位，默认 2.0）
-pub const MARKET_SETTLEMENT_STEP: f32 = 2.0;
+/// 外部市场木料储备容量上限（等同于 1 座茂密林木）
+pub const MARKET_STOCK_MAX_WOOD: f32 = 400.0;
+/// 外部市场木料每秒自然再生速率
+pub const MARKET_REGEN_BASE_WOOD: f32 = 2.0;
+/// 外部市场（榷场互市）单次交易结算步长（单位，默认 5.0）
+pub const MARKET_SETTLEMENT_STEP: f32 = 5.0;
 /// 满库存起步基准单价（黄金 / 单位资源）
 pub const MARKET_PRICE_BASE: f32 = 0.1;
 /// 幂律定价指数 k（越大则低库存时价格飙升越剧烈）
@@ -594,8 +598,10 @@ pub struct SimConfig {
     pub count_markets: usize,
     pub market_stock_max_water: f32,
     pub market_stock_max_food: f32,
+    pub market_stock_max_wood: f32,
     pub market_regen_base_water: f32,
     pub market_regen_base_food: f32,
+    pub market_regen_base_wood: f32,
     pub market_price_base: f32,
     pub market_price_power_exponent: f32,
     pub market_price_floor_stock: f32,
@@ -827,8 +833,10 @@ impl Default for SimConfig {
             count_markets: COUNT_MARKETS,
             market_stock_max_water: MARKET_STOCK_MAX_WATER,
             market_stock_max_food: MARKET_STOCK_MAX_FOOD,
+            market_stock_max_wood: MARKET_STOCK_MAX_WOOD,
             market_regen_base_water: MARKET_REGEN_BASE_WATER,
             market_regen_base_food: MARKET_REGEN_BASE_FOOD,
+            market_regen_base_wood: MARKET_REGEN_BASE_WOOD,
             market_price_base: MARKET_PRICE_BASE,
             market_price_power_exponent: MARKET_PRICE_POWER_EXPONENT,
             market_price_floor_stock: MARKET_PRICE_FLOOR_STOCK,

@@ -159,8 +159,12 @@ impl World3DEngine {
 
             // ── 8. 新生儿实体落位：受孕时已建胎儿 agent → 原位替换为新生儿；否则新建 ──
             if let Some(fetus_idx) = self.agent_index.get(&baby_id).copied() {
-                // ★ M1.7 胎儿可能已通过金币继承携带随身黄金（father/mother 亡故清算），
-                // 出生时原位替换会丢弃胎儿实体字段，须先转移随身黄金给新生儿。
+                // ★ M1.7 胎儿可能已通过继承携带随身资源（father 亡故清算），
+                // 出生时原位替换会丢弃胎儿实体字段，须先转移随身资源给新生儿。
+                baby.carried_water += self.agents[fetus_idx].carried_water;
+                baby.carried_food += self.agents[fetus_idx].carried_food;
+                baby.carried_wood += self.agents[fetus_idx].carried_wood;
+                baby.carried_stone += self.agents[fetus_idx].carried_stone;
                 baby.carried_gold += self.agents[fetus_idx].carried_gold;
                 // 胎儿 agent 已在 agents 中（受孕即建）：用完整初始化的新生儿实体原位替换。
                 // 原位替换不改变其他 agent 下标，agent_index 条目（id→idx）保持有效。
@@ -174,12 +178,20 @@ impl World3DEngine {
             // ── 8.5 M2 新生儿入父亲家户（家庭跟着男人走：未成年子女归父亲家户）──
             if let Some(fid) = father_id {
                 let tick = self.tick_counter;
-                // 父亲若无家户则先为父亲立户（罕见边界：父亲未婚但有子）
-                if self.household_registry.household_of(fid).is_none() {
-                    self.household_registry.create(fid, None, tick);
-                }
-                if let Some(father_hid) = self.household_registry.household_of(fid) {
-                    self.household_registry.add_member(father_hid, baby_id, tick);
+                let father_alive = self
+                    .agent_index
+                    .get(&fid)
+                    .and_then(|&idx| self.agents.get(idx))
+                    .map(|a| a.is_alive)
+                    .unwrap_or(false);
+                if father_alive {
+                    // 父亲在世且无家户则先为父亲立户（罕见边界：父亲未婚但有子）
+                    if self.household_registry.household_of(fid).is_none() {
+                        self.household_registry.create(fid, None, tick);
+                    }
+                    if let Some(father_hid) = self.household_registry.household_of(fid) {
+                        self.household_registry.add_member(father_hid, baby_id, tick);
+                    }
                 }
                 // ★ M3 新生儿随父姓入宗族（v1.9.0 传性别：父姓宗族已存在，故不受纯女性不立宗门禁影响）
                 self.clan_registry.add_member(&baby_surname, baby_id, tick, baby_gender);

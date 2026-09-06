@@ -81,9 +81,14 @@ impl HouseholdRegistry {
         self.next_id = 1;
     }
 
-    /// 某人当前所属家户
+    /// 某人当前所属家户（仅返回存续家户，已解散家户返回 None）
     pub fn household_of(&self, agent: AgentId) -> Option<HouseholdId> {
-        self.by_agent.get(&agent).copied()
+        let hid = self.by_agent.get(&agent).copied()?;
+        if self.households.get(&hid).is_some_and(|h| !h.is_dissolved) {
+            Some(hid)
+        } else {
+            None
+        }
     }
 
     /// 只读取家户
@@ -178,7 +183,7 @@ impl HouseholdRegistry {
         true
     }
 
-    /// 户主死亡清算后解散家户（流水只读归档，成员保留清单供继承结算）
+    /// 户主死亡清算后解散家户（流水只读归档，清理所属索引，成员保留清单供审计）
     pub fn dissolve(&mut self, household_id: HouseholdId, tick: u64) -> bool {
         let Some(household) = self.households.get_mut(&household_id) else {
             return false;
@@ -191,6 +196,7 @@ impl HouseholdRegistry {
             tick,
             format!("⚰️ 家户 #{} 户主 #{} 亡故清算，家户解散归档", household_id, household.head),
         );
+        self.by_agent.retain(|_, v| *v != household_id);
         true
     }
 }

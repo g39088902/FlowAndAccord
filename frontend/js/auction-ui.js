@@ -666,7 +666,7 @@
     });
 
     // 画布双击在售房屋直接打开大盘
-    const canvas = document.getElementById('world-canvas');
+    const canvas = document.getElementById('sim-canvas');
     if (canvas) {
       canvas.addEventListener('dblclick', () => {
         const sim = getSim();

@@ -33,13 +33,18 @@ impl World3DEngine {
             if poi.poi_type == PoiType::Market {
                 poi.regen_rate = self.config.market_regen_base_water;
                 poi.secondary_regen_rate = self.config.market_regen_base_food;
+                poi.tertiary_regen_rate = self.config.market_regen_base_wood;
                 let mult_water = self.water_regen_multiplier;
                 let mult_food = self.berry_regen_multiplier;
+                let mult_wood = self.wood_regen_multiplier;
                 if poi.regen_rate > 0.0 && poi.current_stock.is_finite() {
                     poi.current_stock = (poi.current_stock + poi.regen_rate * dt * mult_water).min(poi.max_stock);
                 }
                 if poi.secondary_regen_rate > 0.0 && poi.secondary_max_stock > 0.0 {
                     poi.secondary_stock = (poi.secondary_stock + poi.secondary_regen_rate * dt * mult_food).min(poi.secondary_max_stock);
+                }
+                if poi.tertiary_regen_rate > 0.0 && poi.tertiary_max_stock > 0.0 {
+                    poi.tertiary_stock = (poi.tertiary_stock + poi.tertiary_regen_rate * dt * mult_wood).min(poi.tertiary_max_stock);
                 }
             } else {
                 let base_regen = match poi.poi_type {

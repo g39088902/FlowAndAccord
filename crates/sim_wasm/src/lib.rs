@@ -226,3 +226,15 @@ pub extern "C" fn world_last_error_ptr() -> u32 {
 pub extern "C" fn world_last_error_len() -> u32 {
     unsafe { ERROR_BUF.len() as u32 }
 }
+
+/// 返回内核应用版本号字符串指针
+#[no_mangle]
+pub extern "C" fn world_app_version_ptr() -> u32 {
+    sim_core::spatial::SAVE_APP_VERSION.as_ptr() as u32
+}
+
+/// 返回内核应用版本号字符串长度
+#[no_mangle]
+pub extern "C" fn world_app_version_len() -> u32 {
+    sim_core::spatial::SAVE_APP_VERSION.len() as u32
+}

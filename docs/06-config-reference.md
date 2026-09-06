@@ -187,15 +187,17 @@
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
 | `marketStockMaxWater` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
 | `marketStockMaxFood` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
+| `marketStockMaxWood` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场木料储备容量上限 |
 | `marketRegenBaseWater` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水每秒自然再生速率 |
 | `marketRegenBaseFood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食每秒自然再生速率 |
+| `marketRegenBaseWood` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场木料每秒自然再生速率 |
 | `marketPriceBase` | f32 | 0.1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 满库存起步基准单价 (黄金 / 单位资源) |
 | `marketPricePowerExponent` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 幂律定价指数 k |
 | `marketPriceFloorStock` | f32 | 1 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 计价库存钳制下限 (防除零与价格封顶) |
 | `marketEmergencyFamilyStockThreshold` | f32 | 10 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 家户物资绝境警戒线 |
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
-| `marketSettlementStep` | f32 | 2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场单次交易结算步长 (单位) |
+| `marketSettlementStep` | f32 | 5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场单次交易结算步长 (单位) |
 | `houseAuctionBidCooldownTicks` | u64 | 90 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 90 = 3 模拟秒，出价后对任何房屋都不再出价) |
 | `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
 | `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |

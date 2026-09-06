@@ -132,17 +132,28 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   if (snapContinuous !== snapReloaded) throw new Error('SAVE_LOAD_DETERMINISM_FAILED');
 
   // === Test 4: 版本不兼容必须拒绝加载（不静默降级、不破坏当前世界）===
-  const tampered = JSON.parse(savedJson);
-  tampered.format_version = 99;
-  let rejected = false;
+  const tamperedFormat = JSON.parse(savedJson);
+  tamperedFormat.format_version = 99;
+  let rejectedFormat = false;
   try {
-    loadFromString(JSON.stringify(tampered));
+    loadFromString(JSON.stringify(tamperedFormat));
   } catch (e) {
-    rejected = /format_version|版本|failed/.test(String(e.message));
+    rejectedFormat = /format_version|版本|failed/.test(String(e.message));
   }
+
+  const tamperedApp = JSON.parse(savedJson);
+  tamperedApp.app_version = '0.0.1';
+  let rejectedApp = false;
+  try {
+    loadFromString(JSON.stringify(tamperedApp));
+  } catch (e) {
+    rejectedApp = /app_version|应用版本|版本|failed/.test(String(e.message));
+  }
+
   const snapAfterReject = JSON.stringify(snapshot());
-  console.log('incompatible version rejected: ' + rejected + '  world intact: ' + (snapAfterReject === snapReloaded));
-  if (!rejected) throw new Error('INCOMPATIBLE_SAVE_NOT_REJECTED');
+  console.log('incompatible format_version rejected: ' + rejectedFormat + '  app_version rejected: ' + rejectedApp + '  world intact: ' + (snapAfterReject === snapReloaded));
+  if (!rejectedFormat) throw new Error('INCOMPATIBLE_FORMAT_VERSION_NOT_REJECTED');
+  if (!rejectedApp) throw new Error('INCOMPATIBLE_APP_VERSION_NOT_REJECTED');
   if (snapAfterReject !== snapReloaded) throw new Error('WORLD_MUTATED_BY_FAILED_LOAD');
 
   console.log('ALL_TESTS_DONE');

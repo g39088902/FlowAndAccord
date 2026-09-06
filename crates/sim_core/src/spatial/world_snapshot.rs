@@ -1,6 +1,6 @@
 use super::agent::{Gender, PrimitiveActionState};
 use super::ledger::journal::ResourceKind;
-use super::poi::{PoiType, market_unit_price};
+use super::poi::{PoiType, market_unit_price, market_unit_price_with_base};
 use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 use super::snapshot::{
     AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
@@ -30,13 +30,14 @@ impl World3DEngine {
 
         let mut pois = Vec::new();
         for p in &self.pois {
-            let (water_price, food_price) = if p.poi_type == PoiType::Market {
+            let (water_price, food_price, wood_price) = if p.poi_type == PoiType::Market {
                 (
                     market_unit_price(p.current_stock, p.max_stock, &self.config),
                     market_unit_price(p.secondary_stock, p.secondary_max_stock, &self.config),
+                    market_unit_price_with_base(p.tertiary_stock, p.tertiary_max_stock, self.config.market_price_base_wood, &self.config),
                 )
             } else {
-                (0.0, 0.0)
+                (0.0, 0.0, 0.0)
             };
             pois.push(PoiSnapshot {
                 id: p.id,
@@ -50,8 +51,16 @@ impl World3DEngine {
                 secondary_stock: p.secondary_stock,
                 secondary_max_stock: p.secondary_max_stock,
                 secondary_regen_rate: p.secondary_regen_rate,
+                tertiary_stock: p.tertiary_stock,
+                tertiary_max_stock: p.tertiary_max_stock,
+                tertiary_regen_rate: p.tertiary_regen_rate,
                 water_price,
                 food_price,
+                wood_price,
+                cumulative_sold_water: p.cumulative_sold_water,
+                cumulative_sold_food: p.cumulative_sold_food,
+                cumulative_sold_wood: p.cumulative_sold_wood,
+                cumulative_revenue: p.cumulative_revenue,
                 name: p.name.clone(),
                 camp_title: p.camp_title(),
                 level: p.level,
@@ -206,6 +215,7 @@ impl World3DEngine {
                 cumulative_mined_wood: agent.cumulative_mined_wood,
                 cumulative_mined_stone: agent.cumulative_mined_stone,
                 cumulative_mined_gold: agent.cumulative_mined_gold,
+                cumulative_royal_privy: agent.cumulative_royal_privy,
                 build_timer: agent.build_timer,
                 miscarriage_alert_timer: agent.miscarriage_alert_timer,
                 state: format!("{:?}", agent.state),
@@ -480,6 +490,7 @@ impl World3DEngine {
                 member_ids,
                 governed_households,
                 current_reign_start: region.current_reign_start,
+                cumulative_royal_privy: region.cumulative_royal_privy,
             });
         }
 
@@ -523,6 +534,7 @@ impl World3DEngine {
             auction_started: self.auction_started,
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,
+            total_royal_privy: self.region_registry.regions.values().map(|r| r.cumulative_royal_privy).sum(),
             auction_history: self.auction_history.iter().rev().map(|r| HouseAuctionHistorySnapshot {
                 tick: r.tick,
                 house_id: r.house_id,

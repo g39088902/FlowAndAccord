@@ -3,6 +3,7 @@ use super::super::poi::PoiType;
 use super::super::ledger::journal::ResourceKind;
 use super::needs::*;
 use super::evaluate::Decisioner;
+use super::branches::BranchId;
 
 /// 现场采收行为：饮水/觅食/伐木/采石/淘金在资源点的完成判定与去向，
 /// 以及家庭备料目标查询。均在 Agent 已抵达 POI 现场时由 decide 调度。
@@ -16,6 +17,59 @@ impl<'a> Decisioner<'a> {
             None => false,
         };
         !has_home || !family_stock_on(agent, kind)
+    }
+
+    /// ★ v1.35.0 单趟多品类连续采收：在某一 POI 采收完成（装满/断流/家宅该品类已补足）后，
+    /// 若有私宅且体力充沛（≥ decision_work_stamina_threshold），按编排顺序检查家宅是否短缺其他品类。
+    /// 若有其他品类短缺且自身行囊有余量、目标 POI 可用，则直接 dispatch 前往下一处 POI 继续采收；
+    /// 仅在无可采集短缺或体力不足时才返回 false（由调用方安排返家）。
+    pub fn try_continue_harvesting(&mut self, agent: &mut Agent3D) -> bool {
+        if agent.home_house_id.is_none() || agent.stamina < self.config.decision_work_stamina_threshold {
+            return false;
+        }
+        for branch in self.branch_order.iter() {
+            let is_harvest_branch = matches!(
+                branch,
+                BranchId::B1QuenchThirst
+                    | BranchId::B2SateHunger
+                    | BranchId::B5StockWater
+                    | BranchId::B6StockFood
+                    | BranchId::B7StockWood
+                    | BranchId::B9StockStone
+                    | BranchId::B10StockGold
+            );
+            if !is_harvest_branch {
+                continue;
+            }
+            let Some(need) = branch.evaluate(self, agent) else {
+                continue;
+            };
+            let pool = match need.kind {
+                NeedKind::QuenchThirst | NeedKind::StockWater => NodePool::Water,
+                NeedKind::SateHunger | NeedKind::StockFood => NodePool::Food,
+                NeedKind::StockWood => NodePool::Wood,
+                NeedKind::StockStone => NodePool::Stone,
+                NeedKind::StockGold => NodePool::Gold,
+                _ => continue,
+            };
+            if need.kind == NeedKind::StockGold {
+                agent.gold_mining_cooldown = self.config.decision_stock_gold_cooldown;
+            }
+            if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
+                let curr_node = self.start_node(agent);
+                if self.dispatch(agent, curr_node, target, need.target_state) {
+                    agent.current_need = state_need_label_with_agent(
+                        need.target_state,
+                        agent,
+                        self.houses,
+                        self.households,
+                        self.config,
+                    ).map(|(lvl, k)| format!("{}·{}", lvl, k));
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn decide_drinking(&mut self, agent: &mut Agent3D) {
@@ -39,16 +93,11 @@ impl<'a> Decisioner<'a> {
         let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || unavailable;
 
         if finished {
-            if agent.hunger < self.config.decision_critical_hunger && self.has_available_node(agent, NodePool::Food) {
-                let nodes = self.available_nodes(agent, NodePool::Food);
-                let target = nodes[self.rng.gen_range_usize(0, nodes.len())];
-                let curr_node = self.start_node(agent);
-                agent.current_need = Some("Physiological·SateHunger".to_string());
-                self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingFood);
-            } else {
-                agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
-                self.return_home(agent);
+            if self.try_continue_harvesting(agent) {
+                return;
             }
+            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            self.return_home(agent);
         }
     }
 
@@ -73,16 +122,11 @@ impl<'a> Decisioner<'a> {
         let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || unavailable;
 
         if finished {
-            if agent.thirst < self.config.decision_critical_thirst && self.has_available_node(agent, NodePool::Water) {
-                let nodes = self.available_nodes(agent, NodePool::Water);
-                let target = nodes[self.rng.gen_range_usize(0, nodes.len())];
-                let curr_node = self.start_node(agent);
-                agent.current_need = Some("Physiological·QuenchThirst".to_string());
-                self.dispatch(agent, curr_node, target, PrimitiveActionState::SeekingWater);
-            } else {
-                agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
-                self.return_home(agent);
+            if self.try_continue_harvesting(agent) {
+                return;
             }
+            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            self.return_home(agent);
         }
     }
 
@@ -101,9 +145,15 @@ impl<'a> Decisioner<'a> {
                     return;
                 }
             }
+            if pool == NodePool::Wood && self.try_route_to_market(agent, NodePool::Wood) { return; }
         }
 
-        if unavailable || fully_stocked || carry_full || agent.hunger < self.config.decision_critical_hunger || agent.thirst < self.config.decision_critical_thirst || agent.stamina < self.config.decision_work_stamina_threshold {
+        let finished = unavailable || fully_stocked || carry_full || agent.hunger < self.config.decision_critical_hunger || agent.thirst < self.config.decision_critical_thirst || agent.stamina < self.config.decision_work_stamina_threshold;
+
+        if finished {
+            if self.try_continue_harvesting(agent) {
+                return;
+            }
             agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);
         }
@@ -136,6 +186,9 @@ impl<'a> Decisioner<'a> {
             } else {
                 self.config.decision_stock_gold_cooldown
             };
+            if self.try_continue_harvesting(agent) {
+                return;
+            }
             agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
             self.return_home(agent);
         }

@@ -17,6 +17,7 @@
         this.selectedAgentId = 1;
         this.selectedPoiId = null;
         this.selectedHouseId = null;
+        this.totalRoyalPrivy = 0; // ★ v1.35.2 全局所有国王累计收到的内帑总额
 
         // 世界视图对象 (由快照映射而来)
         this.agents = [];
@@ -237,6 +238,21 @@
       }
 
       /**
+       * 获取内核应用版本号（与 SAVE_APP_VERSION 保持一致）
+       * @returns {string}
+       */
+      getAppVersion() {
+        if (this._ready && typeof this._wasm.world_app_version_ptr === 'function') {
+          const ptr = this._wasm.world_app_version_ptr();
+          const len = this._wasm.world_app_version_len();
+          if (len > 0) {
+            return new TextDecoder().decode(new Uint8Array(this._memory.buffer, ptr, len));
+          }
+        }
+        return '1.37.1';
+      }
+
+      /**
        * 导出当前世界全量存档 JSON（失败返回 null，原因见 readSaveError()）
        * @returns {string|null}
        */
@@ -409,6 +425,7 @@
         this.totalDeathsNatural = snap.total_deaths_natural || 0;
         this.totalDeathsUnnatural = snap.total_deaths_unnatural || 0;
         this.totalMiscarriages = snap.total_miscarriages;
+        this.totalRoyalPrivy = snap.total_royal_privy || 0;
         this.auctionStats = {
           started: snap.auction_started || 0,
           sold: snap.auction_sold || 0,
@@ -487,8 +504,16 @@
           secondaryStock: p.secondary_stock || 0,
           secondaryMaxStock: p.secondary_max_stock || 0,
           secondaryRegenRate: p.secondary_regen_rate || 0,
+          tertiaryStock: p.tertiary_stock || 0,
+          tertiaryMaxStock: p.tertiary_max_stock || 0,
+          tertiaryRegenRate: p.tertiary_regen_rate || 0,
           waterPrice: p.water_price || 0,
           foodPrice: p.food_price || 0,
+          woodPrice: p.wood_price || 0,
+          cumulativeSoldWater: p.cumulative_sold_water || 0,
+          cumulativeSoldFood: p.cumulative_sold_food || 0,
+          cumulativeSoldWood: p.cumulative_sold_wood || 0,
+          cumulativeRevenue: p.cumulative_revenue || 0,
           name: p.name || (p.poi_type === 'Camp' ? '聚落 #' + p.id : (poiTypeMap[p.poi_type] || p.poi_type) + ' #' + p.id),
           campTitle: p.camp_title || p.name || ('聚落 #' + p.id),
           level: p.level || 0,
@@ -620,6 +645,7 @@
             cumulativeMinedWater: a.cumulative_mined_water || 0, cumulativeMinedFood: a.cumulative_mined_food || 0,
             cumulativeMinedWood: a.cumulative_mined_wood || 0, cumulativeMinedStone: a.cumulative_mined_stone || 0,
             cumulativeMinedGold: a.cumulative_mined_gold || 0,
+            cumulativeRoyalPrivy: a.cumulative_royal_privy || 0,
             buildTimer: a.build_timer,
             isPregnant: a.is_pregnant,
             pregnancyProgress: a.pregnancy_progress,
@@ -768,7 +794,8 @@
           ),
           memberIds: r.member_ids || [],
           governedHouseholds: r.governed_households || [],
-          currentReignStart: r.current_reign_start != null ? r.current_reign_start : null
+          currentReignStart: r.current_reign_start != null ? r.current_reign_start : null,
+          cumulativeRoyalPrivy: r.cumulative_royal_privy || 0
         }));
 
         // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）

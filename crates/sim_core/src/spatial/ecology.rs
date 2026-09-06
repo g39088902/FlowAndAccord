@@ -2,7 +2,7 @@ use crate::rng::WorldRng;
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeType, RoadClass};
 use super::agent::{Agent3D, Gender, PrimitiveActionState, COMMON_SURNAMES};
-use super::poi::{MarketTradeRecord, PrimitivePoi, PoiType, market_unit_price};
+use super::poi::{MarketTradeRecord, PrimitivePoi, PoiType, market_unit_price, market_unit_price_with_base};
 use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::world::World3DEngine;
 
@@ -172,6 +172,9 @@ impl World3DEngine {
             poi.secondary_max_stock = self.config.market_stock_max_food;
             poi.secondary_stock = self.config.market_stock_max_food * 0.75;
             poi.secondary_regen_rate = self.config.market_regen_base_food;
+            poi.tertiary_max_stock = self.config.market_stock_max_wood;
+            poi.tertiary_stock = self.config.market_stock_max_wood * 0.75;
+            poi.tertiary_regen_rate = self.config.market_regen_base_wood;
             self.pois.push(poi);
         }
 
@@ -426,21 +429,28 @@ impl World3DEngine {
                         let step = self.config.market_settlement_step;
                         let p_water = market_unit_price(poi.current_stock, poi.max_stock, &self.config);
                         let p_food = market_unit_price(poi.secondary_stock, poi.secondary_max_stock, &self.config);
+                        let p_wood = market_unit_price_with_base(poi.tertiary_stock, poi.tertiary_max_stock, self.config.market_price_base_wood, &self.config);
                         // ★ v1.28.0 榷场流水环形缓冲容量（复用账本流水容量，未新增超参）
                         let market_trade_capacity = self.config.ledger_journal_capacity;
 
-                        let mut hh_gold = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
+                        let (hh_gold, hh_water, hh_food, hh_wood) = self.household_registry.get(hh_hid).map(|hh| (
+                            hh.group.ledger.balance(ResourceKind::Gold),
+                            hh.group.ledger.balance(ResourceKind::Water),
+                            hh.group.ledger.balance(ResourceKind::Food),
+                            hh.group.ledger.balance(ResourceKind::Wood),
+                        )).unwrap_or((0.0, 0.0, 0.0, 0.0));
+                        let mut current_hh_gold = hh_gold;
                         let mut total_gold_paid = 0.0;
 
                         // 步骤 A：现场濒危自救缓冲（thirst/hunger < 10.0 优先就地饮水/进食保命，固定以 step 为结算步长）
-                        if agent.thirst < 10.0 && poi.current_stock >= step && hh_gold >= step * p_water {
+                        if agent.thirst < 10.0 && poi.current_stock >= step && current_hh_gold >= step * p_water {
                             let thirst_deficit = self.config.agent_thirst_capacity - agent.thirst;
                             if thirst_deficit >= step {
                                 let buy_amount = step;
                                 let gold_cost = buy_amount * p_water;
                                 poi.extract(buy_amount);
                                 agent.thirst = (agent.thirst + buy_amount).min(self.config.agent_thirst_capacity);
-                                hh_gold -= gold_cost;
+                                current_hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
                                 // ★ v1.28.0 流水留痕（自救饮水）
                                 poi.push_market_trade(MarketTradeRecord {
@@ -454,14 +464,14 @@ impl World3DEngine {
                                 }, market_trade_capacity);
                             }
                         }
-                        if agent.hunger < 10.0 && poi.secondary_stock >= step && hh_gold >= step * p_food {
+                        if agent.hunger < 10.0 && poi.secondary_stock >= step && current_hh_gold >= step * p_food {
                             let hunger_deficit = self.config.agent_hunger_capacity - agent.hunger;
                             if hunger_deficit >= step {
                                 let buy_amount = step;
                                 let gold_cost = buy_amount * p_food;
                                 poi.extract_secondary(buy_amount);
                                 agent.hunger = (agent.hunger + buy_amount).min(self.config.agent_hunger_capacity);
-                                hh_gold -= gold_cost;
+                                current_hh_gold -= gold_cost;
                                 total_gold_paid += gold_cost;
                                 // ★ v1.28.0 流水留痕（自救进食）
                                 poi.push_market_trade(MarketTradeRecord {
@@ -476,15 +486,20 @@ impl World3DEngine {
                             }
                         }
 
-                        // 步骤 B：装袋购入（固定以 step 为离散结算步长：行囊容量 / 市场库存 / 剩余家财 三重约束）
+                        // 步骤 B：装袋购入（固定以 step 为离散结算步长：行囊容量 / 市场库存 / 剩余家财 / 家户需求 多重约束）
+                        let d_th = self.config.market_emergency_family_stock_threshold;
+                        let water_needed = agent.family_stock_active[0] || hh_water < d_th;
+                        let food_needed = agent.family_stock_active[1] || hh_food < d_th;
+                        let wood_needed = agent.family_stock_active[2] || hh_wood < d_th;
+
                         // 购水装袋
                         let water_space = carry_cap - agent.carried_water;
-                        if water_space >= step && poi.current_stock >= step && hh_gold >= step * p_water {
+                        if water_needed && water_space >= step && poi.current_stock >= step && current_hh_gold >= step * p_water {
                             let buy_amount = step;
                             let gold_cost = buy_amount * p_water;
                             poi.extract(buy_amount);
                             agent.carried_water = (agent.carried_water + buy_amount).min(carry_cap);
-                            hh_gold -= gold_cost;
+                            current_hh_gold -= gold_cost;
                             total_gold_paid += gold_cost;
                             // ★ v1.28.0 流水留痕（清水装袋）
                             poi.push_market_trade(MarketTradeRecord {
@@ -499,12 +514,12 @@ impl World3DEngine {
                         }
                         // 购粮装袋
                         let food_space = carry_cap - agent.carried_food;
-                        if food_space >= step && poi.secondary_stock >= step && hh_gold >= step * p_food {
+                        if food_needed && food_space >= step && poi.secondary_stock >= step && current_hh_gold >= step * p_food {
                             let buy_amount = step;
                             let gold_cost = buy_amount * p_food;
                             poi.extract_secondary(buy_amount);
                             agent.carried_food = (agent.carried_food + buy_amount).min(carry_cap);
-                            hh_gold -= gold_cost;
+                            current_hh_gold -= gold_cost;
                             total_gold_paid += gold_cost;
                             // ★ v1.28.0 流水留痕（粮食装袋）
                             poi.push_market_trade(MarketTradeRecord {
@@ -514,6 +529,26 @@ impl World3DEngine {
                                 resource: "Food".to_string(),
                                 amount: buy_amount,
                                 unit_price: p_food,
+                                gold_cost,
+                            }, market_trade_capacity);
+                        }
+                        // 购木装袋
+                        let wood_space = carry_cap - agent.carried_wood;
+                        if wood_needed && wood_space >= step && poi.tertiary_stock >= step && current_hh_gold >= step * p_wood {
+                            let buy_amount = step;
+                            let gold_cost = buy_amount * p_wood;
+                            poi.extract_tertiary(buy_amount);
+                            agent.carried_wood = (agent.carried_wood + buy_amount).min(carry_cap);
+                            current_hh_gold -= gold_cost;
+                            total_gold_paid += gold_cost;
+                            // ★ v1.36.0 流水留痕（木料装袋）
+                            poi.push_market_trade(MarketTradeRecord {
+                                tick,
+                                agent_id: agent.id,
+                                household_id: Some(hh_hid),
+                                resource: "Wood".to_string(),
+                                amount: buy_amount,
+                                unit_price: p_wood,
                                 gold_cost,
                             }, market_trade_capacity);
                         }

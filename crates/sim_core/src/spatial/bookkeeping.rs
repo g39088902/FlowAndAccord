@@ -39,7 +39,7 @@ impl World3DEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // Inheritance：户主死亡 → 资源平分在世妻子（如有）与子一代 / 绝嗣入公仓 → 解散家户
+    // Inheritance：户主死亡 → 资源平分在世妻子与子一代（女性入背包/超额入公仓，男性立新户/转存续户）/ 绝嗣入公仓 → 解散家户
     // ══════════════════════════════════════════════════════════════
 
     fn tick_inheritance(&mut self, tick: u64) {
@@ -118,27 +118,128 @@ impl World3DEngine {
                 // 有在世继承人（妻子/子女）：资源平分
                 let n = living_heirs.len() as f32;
                 for heir_id in &living_heirs {
-                    // 确定继承人的目标家户：若已属于其他独立家户则转入，否则立新户
-                    let target_hid = if let Some(chid) = self.household_registry.household_of(*heir_id) {
-                        if chid != hid {
-                            Some(chid)
-                        } else {
-                            None // 仍在已故家户中（如丧偶妻子或未立户子女），需立新户
+                    let heir_id = *heir_id;
+                    let heir_gender = self
+                        .agent_index
+                        .get(&heir_id)
+                        .and_then(|idx| self.agents.get(*idx))
+                        .map(|a| a.gender);
+
+                    if heir_gender == Some(Gender::Female) {
+                        // 女性继承人（妻子/女儿）：不能成立家户，遗产装入随身背包，超出背包容量入公仓
+                        let carry_cap = self.config.carry_capacity_resource;
+                        let mut transfers: Vec<(ResourceKind, f32, f32)> = Vec::new();
+
+                        if let Some(&agent_idx) = self.agent_index.get(&heir_id) {
+                            let heir_agent = &mut self.agents[agent_idx];
+                            for (resource, total_amt) in &balances {
+                                let share = total_amt / n;
+                                if share <= 0.001 {
+                                    continue;
+                                }
+                                let (to_bag, to_granary) = match resource {
+                                    ResourceKind::Water => {
+                                        let space = (carry_cap - heir_agent.carried_water).max(0.0);
+                                        let b = share.min(space);
+                                        heir_agent.carried_water += b;
+                                        (b, share - b)
+                                    }
+                                    ResourceKind::Food => {
+                                        let space = (carry_cap - heir_agent.carried_food).max(0.0);
+                                        let b = share.min(space);
+                                        heir_agent.carried_food += b;
+                                        (b, share - b)
+                                    }
+                                    ResourceKind::Wood => {
+                                        let space = (carry_cap - heir_agent.carried_wood).max(0.0);
+                                        let b = share.min(space);
+                                        heir_agent.carried_wood += b;
+                                        (b, share - b)
+                                    }
+                                    ResourceKind::Stone => {
+                                        let space = (carry_cap - heir_agent.carried_stone).max(0.0);
+                                        let b = share.min(space);
+                                        heir_agent.carried_stone += b;
+                                        (b, share - b)
+                                    }
+                                    ResourceKind::Gold => {
+                                        heir_agent.carried_gold += share;
+                                        (share, 0.0)
+                                    }
+                                };
+                                transfers.push((*resource, to_bag, to_granary));
+                            }
+                        }
+
+                        // 记账：扣减已故家户账本，写入个人背包（Personal）与公仓（PublicGranary）
+                        for (resource, to_bag, to_granary) in transfers {
+                            let total_share = to_bag + to_granary;
+                            if total_share <= 0.001 {
+                                continue;
+                            }
+                            if let Some(old_hh) = self.household_registry.get_mut(hid) {
+                                old_hh.group.ledger.debit(resource, total_share);
+                                if to_bag > 0.001 {
+                                    old_hh.group.ledger.push_transfer(TransferRecord {
+                                        tick,
+                                        from: LedgerRef::Family(hid),
+                                        to: LedgerRef::Personal(heir_id),
+                                        resource,
+                                        amount: to_bag,
+                                        reason: TransferReason::Inheritance,
+                                    });
+                                }
+                                if to_granary > 0.001 {
+                                    old_hh.group.ledger.push_transfer(TransferRecord {
+                                        tick,
+                                        from: LedgerRef::Family(hid),
+                                        to: LedgerRef::PublicGranary,
+                                        resource,
+                                        amount: to_granary,
+                                        reason: TransferReason::Inheritance,
+                                    });
+                                }
+                            }
+                            if to_granary > 0.001 {
+                                self.public_granary.credit(resource, to_granary);
+                                self.public_granary.push_transfer(TransferRecord {
+                                    tick,
+                                    from: LedgerRef::Family(hid),
+                                    to: LedgerRef::PublicGranary,
+                                    resource,
+                                    amount: to_granary,
+                                    reason: TransferReason::Inheritance,
+                                });
+                            }
+                        }
+
+                        // 若女性原属于该家户，从旧家户中移除归属（女性丧父或丧夫均不能自立家户）
+                        if self.household_registry.household_of(heir_id) == Some(hid) {
+                            self.household_registry.remove_member(heir_id, tick);
                         }
                     } else {
-                        None
-                    };
+                        // 男性继承人：若已属于其他独立家户则转入，否则立新户
+                        let target_hid = if let Some(chid) = self.household_registry.household_of(heir_id) {
+                            if chid != hid {
+                                Some(chid)
+                            } else {
+                                None // 仍在已故家户中（未立户子女），需立新户
+                            }
+                        } else {
+                            None
+                        };
 
-                    let target_hid = match target_hid {
-                        Some(h) => h,
-                        None => self.household_registry.create(*heir_id, Some(hid), tick),
-                    };
+                        let target_hid = match target_hid {
+                            Some(h) => h,
+                            None => self.household_registry.create(heir_id, Some(hid), tick),
+                        };
 
-                    // 按品类转入继承份额
-                    for (resource, total_amt) in &balances {
-                        let share = total_amt / n;
-                        if share > 0.001 {
-                            self.transfer_household_resource(hid, target_hid, *resource, share, TransferReason::Inheritance, tick);
+                        // 按品类转入继承份额
+                        for (resource, total_amt) in &balances {
+                            let share = total_amt / n;
+                            if share > 0.001 {
+                                self.transfer_household_resource(hid, target_hid, *resource, share, TransferReason::Inheritance, tick);
+                            }
                         }
                     }
                 }

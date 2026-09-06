@@ -45,7 +45,11 @@ function poiRegenMultiplier(poiType, slot) {
   if (poiType === 'Wood') return pick('wood');
   if (poiType === 'Stone') return pick('stone');
   if (poiType === 'Gold') return pick('gold');
-  if (poiType === 'Market') return slot === 'secondary' ? pick('berry') : pick('water');
+  if (poiType === 'Market') {
+    if (slot === 'tertiary') return pick('wood');
+    if (slot === 'secondary') return pick('berry');
+    return pick('water');
+  }
   return 1.0;
 }
 // 生效产速 = 内核基准产速 × 倍率（POI 卡片与生态大盘滑块标签共用，保证两处数字一致）
@@ -92,6 +96,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (dtHouse) dtHouse.style.display = '';
     const pibHouse = document.getElementById('insp-poi-info-badge');
     if (pibHouse) pibHouse.style.display = '';
+    const mbHouse = document.getElementById('insp-market-box');
+    if (mbHouse) mbHouse.style.display = 'none';
 
     const isWarehouse = house.tier === 'Tier0Warehouse';
     let tierTitle = '📦 0级 仓库';
@@ -321,8 +327,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       let stateBadge = '资源充足';
       let badgeColor = '#10b981';
       if (poi.type === 'Market') {
-        stateBadge = `水:${(poi.waterPrice || 0.1).toFixed(2)}金 | 粮:${(poi.foodPrice || 0.1).toFixed(2)}金`;
-        badgeColor = '#f59e0b';
+        stateBadge = '🏪 边境榷市';
+        badgeColor = '#10b981';
       } else if (!isFinite(poi.currentStock) || poi.maxStock <= 0) {
         stateBadge = '无限供应';
         badgeColor = '#f59e0b';
@@ -339,10 +345,15 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
     const stockRow = document.getElementById('insp-poi-stock-row');
     const secondaryStockRow = document.getElementById('insp-poi-secondary-stock-row');
+    const tertiaryStockRow = document.getElementById('insp-poi-tertiary-stock-row');
     const campUpgradeRow = document.getElementById('insp-camp-upgrade-row');
+    const marketBox = document.getElementById('insp-market-box');
+
     if (poi.type === 'Camp') {
+      if (marketBox) marketBox.style.display = 'none';
       stockRow.style.display = 'none';
       if (secondaryStockRow) secondaryStockRow.style.display = 'none';
+      if (tertiaryStockRow) tertiaryStockRow.style.display = 'none';
       if (campUpgradeRow) {
         campUpgradeRow.style.display = 'flex';
         const lvlNames = ['原始营地 (1阶)', '村落 (2阶)', '乡集 (3阶)', '集镇 (4阶)', '县邑 (5阶)'];
@@ -368,9 +379,70 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           document.getElementById('insp-camp-upgrade-fill').style.width = `${Math.max(0, ratio)}%`;
         }
       }
+    } else if (poi.type === 'Market') {
+      stockRow.style.display = 'none';
+      if (secondaryStockRow) secondaryStockRow.style.display = 'none';
+      if (tertiaryStockRow) tertiaryStockRow.style.display = 'none';
+      if (campUpgradeRow) campUpgradeRow.style.display = 'none';
+      if (marketBox) {
+        marketBox.style.display = 'flex';
+        const totalSold = (poi.cumulativeSoldWater || 0) + (poi.cumulativeSoldFood || 0) + (poi.cumulativeSoldWood || 0);
+        const totalRevenue = poi.cumulativeRevenue || 0;
+        const soldEl = document.getElementById('insp-market-total-sold');
+        if (soldEl) soldEl.textContent = `${totalSold.toFixed(1)} 单位`;
+        const breakdownEl = document.getElementById('insp-market-sold-breakdown');
+        if (breakdownEl) breakdownEl.textContent = `💧${(poi.cumulativeSoldWater || 0).toFixed(1)} · 🍒${(poi.cumulativeSoldFood || 0).toFixed(1)} · 🌲${(poi.cumulativeSoldWood || 0).toFixed(1)}`;
+        const revEl = document.getElementById('insp-market-total-revenue');
+        if (revEl) revEl.textContent = `${totalRevenue.toFixed(2)} 金`;
+
+        const multPrimary = poiRegenMultiplier(poi.type, 'primary');
+        const effPrimary = effectiveRegenRate(poi.regenRate, multPrimary);
+        const multSecondary = poiRegenMultiplier(poi.type, 'secondary');
+        const effSecondary = effectiveRegenRate(poi.secondaryRegenRate, multSecondary);
+        const multTertiary = poiRegenMultiplier(poi.type, 'tertiary');
+        const effTertiary = effectiveRegenRate(poi.tertiaryRegenRate, multTertiary);
+
+        // 💧 清水
+        const waterPriceEl = document.getElementById('insp-market-water-price');
+        if (waterPriceEl) waterPriceEl.textContent = `${(poi.waterPrice || 0.1).toFixed(2)} 金`;
+        const waterFillEl = document.getElementById('insp-market-water-fill');
+        const waterRatio = poi.maxStock > 0 ? Math.round((poi.currentStock / poi.maxStock) * 100) : 0;
+        if (waterFillEl) waterFillEl.style.width = `${Math.max(0, Math.min(100, waterRatio))}%`;
+        const waterStockEl = document.getElementById('insp-market-water-stock');
+        if (waterStockEl) waterStockEl.textContent = `${poi.currentStock.toFixed(1)}/${poi.maxStock.toFixed(0)}`;
+        const waterRegenEl = document.getElementById('insp-market-water-regen');
+        if (waterRegenEl) waterRegenEl.textContent = `+${effPrimary.toFixed(1)}/s`;
+
+        // 🍒 粮食
+        const foodPriceEl = document.getElementById('insp-market-food-price');
+        if (foodPriceEl) foodPriceEl.textContent = `${(poi.foodPrice || 0.1).toFixed(2)} 金`;
+        const foodFillEl = document.getElementById('insp-market-food-fill');
+        const foodMax = poi.secondaryMaxStock || 400;
+        const foodRatio = foodMax > 0 ? Math.round(((poi.secondaryStock || 0) / foodMax) * 100) : 0;
+        if (foodFillEl) foodFillEl.style.width = `${Math.max(0, Math.min(100, foodRatio))}%`;
+        const foodStockEl = document.getElementById('insp-market-food-stock');
+        if (foodStockEl) foodStockEl.textContent = `${(poi.secondaryStock || 0).toFixed(1)}/${foodMax.toFixed(0)}`;
+        const foodRegenEl = document.getElementById('insp-market-food-regen');
+        if (foodRegenEl) foodRegenEl.textContent = `+${effSecondary.toFixed(1)}/s`;
+
+        // 🌲 木料
+        const woodPriceEl = document.getElementById('insp-market-wood-price');
+        if (woodPriceEl) woodPriceEl.textContent = `${(poi.woodPrice || 0.15).toFixed(2)} 金`;
+        const woodFillEl = document.getElementById('insp-market-wood-fill');
+        const woodMax = poi.tertiaryMaxStock || 400;
+        const woodRatio = woodMax > 0 ? Math.round(((poi.tertiaryStock || 0) / woodMax) * 100) : 0;
+        if (woodFillEl) woodFillEl.style.width = `${Math.max(0, Math.min(100, woodRatio))}%`;
+        const woodStockEl = document.getElementById('insp-market-wood-stock');
+        if (woodStockEl) woodStockEl.textContent = `${(poi.tertiaryStock || 0).toFixed(1)}/${woodMax.toFixed(0)}`;
+        const woodRegenEl = document.getElementById('insp-market-wood-regen');
+        if (woodRegenEl) woodRegenEl.textContent = `+${effTertiary.toFixed(1)}/s`;
+      }
     } else {
+      if (marketBox) marketBox.style.display = 'none';
       if (campUpgradeRow) campUpgradeRow.style.display = 'none';
       stockRow.style.display = 'flex';
+      if (secondaryStockRow) secondaryStockRow.style.display = 'none';
+      if (tertiaryStockRow) tertiaryStockRow.style.display = 'none';
       const ratio = Math.round((poi.currentStock / poi.maxStock) * 100);
       // ★ v1.22.6 上限取快照真实 maxStock，避免标题写死 60.0 与下方数值自相矛盾
       const capText = `上限${poi.maxStock.toFixed(1)}`;
@@ -389,30 +461,12 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else if (poi.type === 'Gold') {
         document.getElementById('lbl-poi-stock-title').textContent = `璀璨金矿 (${capText})`;
         document.getElementById('insp-poi-stock-fill').style.background = '#fbbf24';
-      } else if (poi.type === 'Market') {
-        // ★ v1.22.6 榷场双商品：清水与粮食为两套独立库存，各占一条进度条
-        document.getElementById('lbl-poi-stock-title').textContent = `💧 榷场清水储备`;
-        document.getElementById('insp-poi-stock-fill').style.background = '#38bdf8';
       }
       document.getElementById('insp-poi-stock-val').textContent = `${poi.currentStock.toFixed(1)} / ${poi.maxStock.toFixed(1)} 单位`;
       document.getElementById('insp-poi-stock-fill').style.width = `${Math.max(0, Math.min(100, isFinite(ratio) ? ratio : 0))}%`;
-
-      // 第二条库存条：仅榷场（粮食）显示
-      if (secondaryStockRow) {
-        if (poi.type === 'Market') {
-          secondaryStockRow.style.display = 'flex';
-          const secMax = poi.secondaryMaxStock || 0;
-          const secRatio = secMax > 0 ? Math.round((poi.secondaryStock / secMax) * 100) : 0;
-          document.getElementById('lbl-poi-secondary-stock-title').textContent = `🍒 榷场粮食储备`;
-          document.getElementById('insp-poi-secondary-stock-val').textContent = `${poi.secondaryStock.toFixed(1)} / ${secMax.toFixed(1)} 单位`;
-          document.getElementById('insp-poi-secondary-stock-fill').style.width = `${Math.max(0, Math.min(100, secRatio))}%`;
-        } else {
-          secondaryStockRow.style.display = 'none';
-        }
-      }
     }
 
-    // ★ v1.12.0 营地一级卡片仅展示国王 + 详情按钮；继承人/历史国王/管辖家庭/账本/空置房移入详情模态框
+    // ★ v1.37.2 营地一级卡片展示国王 + 地区国库公仓 + 详情按钮
     const kingdomBox = document.getElementById('insp-camp-kingdom-box');
     if (kingdomBox) {
       const region = sim.regions.find(r => r.campId === poi.id);
@@ -421,11 +475,48 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         const kingEl = document.getElementById('insp-camp-king');
         if (kingEl) {
           if (region.kingId != null) {
-            kingEl.innerHTML = `<span class="lineage-chip" data-agent-id="${region.kingId}" title="点击追踪国王视角">👑 Agent #${region.kingId}</span>`;
+            const kingAgent = sim.getAgent ? sim.getAgent(region.kingId) : null;
+            const kingPrivy = kingAgent && kingAgent.cumulativeRoyalPrivy != null ? kingAgent.cumulativeRoyalPrivy : (region.cumulativeRoyalPrivy || 0);
+            const debugPrivyTag = sim.debugMode ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：现任国王收到内帑总额">内帑: ${kingPrivy.toFixed(1)} 🪙</span>` : '';
+            const kingLabel = `👑 Agent #${region.kingId}`;
+            const chipHtml = window.EntityLink
+              ? window.EntityLink.agent(region.kingId, kingLabel, { title: '点击追踪国王视角' })
+              : `<button type="button" class="entity-link entity-link-agent lineage-chip" data-entity-kind="agent" data-entity-id="${region.kingId}" data-agent-id="${region.kingId}" title="点击追踪国王视角">${kingLabel}</button>`;
+            const nextHtml = `${chipHtml}${debugPrivyTag}`;
+            if (kingEl.innerHTML !== nextHtml) {
+              kingEl.innerHTML = nextHtml;
+            }
           } else {
-            kingEl.innerHTML = `<span style="color:#ef4444;">王位空缺（可被夺位）</span>`;
+            const regionPrivy = region.cumulativeRoyalPrivy || 0;
+            const debugPrivyTag = (sim.debugMode && regionPrivy > 0) ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：该王国历史累计拨付内帑总额">内帑: ${regionPrivy.toFixed(1)} 🪙</span>` : '';
+            const nextHtml = `<span style="color:#ef4444;">王位空缺（可被夺位）</span>${debugPrivyTag}`;
+            if (kingEl.innerHTML !== nextHtml) {
+              kingEl.innerHTML = nextHtml;
+            }
           }
         }
+
+        // ★ v1.37.2 营地卡片国库信息展示（水/粮/木/石/金 五品类公仓余额与总存量）
+        const b = region.balances || {};
+        const wVal = (b.Water || 0);
+        const fVal = (b.Food || 0);
+        const wdVal = (b.Wood || 0);
+        const sVal = (b.Stone || 0);
+        const gVal = (b.Gold || 0);
+        const total = wVal + fVal + wdVal + sVal + gVal;
+
+        const totalEl = document.getElementById('insp-camp-treasury-total');
+        if (totalEl) totalEl.textContent = `总存量 ${total.toFixed(1)}`;
+        const twEl = document.getElementById('insp-camp-treasury-water');
+        if (twEl) twEl.textContent = wVal.toFixed(1);
+        const tfEl = document.getElementById('insp-camp-treasury-food');
+        if (tfEl) tfEl.textContent = fVal.toFixed(1);
+        const twdEl = document.getElementById('insp-camp-treasury-wood');
+        if (twdEl) twdEl.textContent = wdVal.toFixed(1);
+        const tsEl = document.getElementById('insp-camp-treasury-stone');
+        if (tsEl) tsEl.textContent = sVal.toFixed(1);
+        const tgEl = document.getElementById('insp-camp-treasury-gold');
+        if (tgEl) tgEl.textContent = gVal.toFixed(1);
       } else {
         kingdomBox.style.display = 'none';
       }
@@ -436,11 +527,13 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const poiInfoBadge = document.getElementById('insp-poi-info-badge');
     const detailTextEl = document.getElementById('insp-detail-text');
     const regenSecondaryRow = document.getElementById('insp-poi-regen-secondary-row');
+    const regenTertiaryRow = document.getElementById('insp-poi-regen-tertiary-row');
     const marketTrades = document.getElementById('insp-market-trades');
     if (poi.type === 'Camp') {
       if (poiInfoBadge) poiInfoBadge.style.display = 'none';
       if (detailTextEl) detailTextEl.style.display = 'none';
       if (regenSecondaryRow) regenSecondaryRow.style.display = 'none';
+      if (regenTertiaryRow) regenTertiaryRow.style.display = 'none';
       if (marketTrades) marketTrades.style.display = 'none';
     } else {
       if (poiInfoBadge) poiInfoBadge.style.display = poi.type === 'Market' ? 'none' : '';
@@ -463,27 +556,40 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else {
         regenSecondaryRow.style.display = 'none';
       }
+    }
+
+    // ★ v1.36.0 第三条产速：仅榷场（木材，复用林木倍率槽位）
+      if (regenTertiaryRow) {
+      if (poi.type === 'Market') {
+        regenTertiaryRow.style.display = '';
+        const multTertiary = poiRegenMultiplier(poi.type, 'tertiary');
+        const effTertiary = effectiveRegenRate(poi.tertiaryRegenRate, multTertiary);
+        document.getElementById('insp-poi-regen-tertiary').textContent =
+          `+${effTertiary.toFixed(2)} 单位/秒 (基准 ${poi.tertiaryRegenRate.toFixed(2)} × ${multTertiary.toFixed(1)}x)`;
+      } else {
+        regenTertiaryRow.style.display = 'none';
+      }
+    }
       if (marketTrades) {
         if (poi.type === 'Market') {
           marketTrades.style.display = '';
           const list = document.getElementById('insp-market-trades-list');
           if (list) {
             // ★ v1.28.0 数据源改为榷场自带环形流水（不再扫描家户账本；家户账本只记黄金流出且会被冲掉）
+            // ★ v1.35.1 榷场流水精简：仅保留资源 emoji（🍒/💧/🌲），省略文字描述
             const rows = (poi.marketTrades || []).slice(0, 8);
             const html = rows.length ? rows.map(t => {
-              const icon = t.resource === 'Food' ? '🍒' : '💧';
-              const name = t.resource === 'Food' ? '粮食' : '清水';
+              const icon = t.resource === 'Food' ? '🍒' : (t.resource === 'Wood' ? '🌲' : '💧');
               const hh = (t.householdId === null || t.householdId === undefined) ? '无家户' : ('家户#' + t.householdId);
-              return `<div style="font-size:10px;color:#fbbf24;">t${t.tick} · 族人#${t.agentId} · ${hh} · ${icon}${name} ${Number(t.amount || 0).toFixed(1)} · 单价 ${Number(t.unitPrice || 0).toFixed(2)}金 · 支出 ${Number(t.goldCost || 0).toFixed(2)}金</div>`;
+              return `<div style="font-size:10px;color:#fbbf24;">t${t.tick} · 族人#${t.agentId} · ${hh} · ${icon} ${Number(t.amount || 0).toFixed(1)} · 单价 ${Number(t.unitPrice || 0).toFixed(2)}金 · 支出 ${Number(t.goldCost || 0).toFixed(2)}金</div>`;
             }).join('') : '<span style="color:#64748b;">暂无交易记录</span>';
             // ★ 高频重建容器：内容快照缓存，避免每帧 innerHTML 重建打断交互（根 AGENTS.md §4.15）
             if (list.innerHTML !== html) list.innerHTML = html;
           }
         } else marketTrades.style.display = 'none';
       }
-    }
 
-    let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
+      let desc = `【${poi.campTitle || poi.name}】公共避风聚落(储量无限)，族人在此休养回体与繁衍。辖内已自发落成 ${poi.boundHouses || 0} 间私宅，随房屋增加逐步升级为【营地 → 村 → 乡 → 镇 → 县】！`;
     // ★ v1.22.6 产速不再写死，统一读 SIM_CONFIG 基准值（根 AGENTS.md §4.12 禁止散落字面量）
     const cfg = (typeof window !== 'undefined' && window.SIM_CONFIG) || {};
     const baseRateOf = key => (typeof cfg[key] === 'number' ? cfg[key] : 0);
@@ -492,7 +598,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     else if (poi.type === 'Wood') desc = `茂密原生林地(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseWood').toFixed(1)}/s)，伐木用于冬季房屋供暖与升级茅草房。`;
     else if (poi.type === 'Stone') desc = `嶙峋高地石矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseStone').toFixed(1)}/s)，采石仅用于私宅升级木石庄舍与大庄园。`;
     else if (poi.type === 'Gold') desc = `璀璨金矿(上限${poi.maxStock.toFixed(0)}单位,基准产速${baseRateOf('regenBaseGold').toFixed(1)}/s)，开采黄金装入随身行囊(黄金无限容量，单趟运满20回宅入库)，存入私宅金库用于晋升最高级氏族大庄园。`;
-    else if (poi.type === 'Market') desc = `外部边境榷场互市，清水与粮食是两套彼此独立的库存，分别独立再生与定价：清水单价 ${(poi.waterPrice || 0.1).toFixed(2)} 金、粮食单价 ${(poi.foodPrice || 0.1).toFixed(2)} 金。家户物资极度短缺且野外断流时，户主携金前往采买保命。`;
+    else if (poi.type === 'Market') desc = `外部边境常驻榷场互市，为部落提供清水、粮食与木材商贸。各物资牌价随供需幂律动态浮动，交易黄金由户主家户账本远程结算并回收。`;
     document.getElementById('insp-detail-text').textContent = desc;
     }
   }
@@ -511,6 +617,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
   if (pibAgent) pibAgent.style.display = '';
   const marketTradesAgent = document.getElementById('insp-market-trades');
   if (marketTradesAgent) marketTradesAgent.style.display = 'none';
+  const mbAgent = document.getElementById('insp-market-box');
+  if (mbAgent) mbAgent.style.display = 'none';
 
   let selAgent = null;
   if (sim.selectedAgentId !== null) {
@@ -778,6 +886,21 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         }
       } else {
         debugMiningEl.style.display = 'none';
+      }
+    }
+
+    // ★ v1.35.2 调试模式: 国王收到的内帑总额（仅调试模式勾选且该族人为国王/曾获内帑时显示）
+    const debugPrivyEl = document.getElementById('insp-debug-privy');
+    const debugPrivyValEl = document.getElementById('insp-debug-privy-val');
+    if (debugPrivyEl && debugPrivyValEl) {
+      const isKing = (sim.regions || []).some(r => r.kingId === selAgent.id);
+      const privyTotal = selAgent.cumulativeRoyalPrivy || 0;
+      if (sim.debugMode && (privyTotal > 0.001 || isKing)) {
+        debugPrivyEl.style.display = 'flex';
+        debugPrivyValEl.textContent = `${privyTotal.toFixed(1)} 🪙`;
+        debugPrivyValEl.title = `本族人一生作为国王从地区公仓累计领取的内帑总额${isKing ? '（现任国王）' : '（曾任国王）'}`;
+      } else {
+        debugPrivyEl.style.display = 'none';
       }
     }
 
@@ -1193,47 +1316,55 @@ canvas.addEventListener('click', e => {
     const kingEl = document.getElementById('camp-detail-king');
     if (region && region.kingId != null) {
       const reignSecs = region.currentReignStart != null ? fmtDuration(sim.tickCount - region.currentReignStart) : '—';
-      kingEl.innerHTML = `${agentChip(region.kingId, '', '点击追踪国王视角')} <span style="color:#94a3b8;font-size:11px;">· 在位 ${reignSecs}</span>`;
-    } else {
-      kingEl.innerHTML = '<span style="color:#ef4444;">王位空缺（可被夺位）</span>';
+      const nextHtml = `${agentChip(region.kingId, '', '点击追踪国王视角')} <span style="color:#94a3b8;font-size:11px;">· 在位 ${reignSecs}</span>`;
+      if (kingEl && kingEl.innerHTML !== nextHtml) kingEl.innerHTML = nextHtml;
+    } else if (kingEl) {
+      const nextHtml = '<span style="color:#ef4444;">王位空缺（可被夺位）</span>';
+      if (kingEl.innerHTML !== nextHtml) kingEl.innerHTML = nextHtml;
     }
 
     // 继承人
     const heirEl = document.getElementById('camp-detail-heir');
     const heirs = region ? (region.heirCandidates || []) : [];
     if (heirs.length > 0) {
-      heirEl.innerHTML = heirs.map((hid, i) =>
+      const nextHtml = heirs.map((hid, i) =>
         `${i === 0 ? '🫅 第一顺位：' : ''}${agentChip(hid, '', '点击追踪继承人')}`
       ).join('  ');
-    } else {
-      heirEl.textContent = '— 无明确继承人（绝嗣风险）';
+      if (heirEl && heirEl.innerHTML !== nextHtml) heirEl.innerHTML = nextHtml;
+    } else if (heirEl) {
+      const nextHtml = '— 无明确继承人（绝嗣风险）';
+      if (heirEl.textContent !== nextHtml) heirEl.textContent = nextHtml;
     }
 
     // 历史国王（含在位时长与死因）
     const histEl = document.getElementById('camp-detail-hist-kings');
     const hks = region ? (region.historyKings || []) : [];
     if (hks.length > 0) {
-      histEl.innerHTML = hks.map(hk => {
+      const nextHtml = hks.map(hk => {
         const dur = fmtDuration(hk.reignEndTick - hk.reignStartTick);
         const cause = hk.deathCause ? ` · 💀 ${hk.deathCause}` : ' · 被废黜/仍在世';
         return `<div style="margin-bottom:2px;">${agentChip(hk.agentId, 'dead', '点击查看先祖')} <span style="color:#94a3b8;font-size:11px;">在位 ${dur}${cause}</span></div>`;
       }).join('');
-    } else {
-      histEl.textContent = '— 暂无历史国王记录';
+      if (histEl && histEl.innerHTML !== nextHtml) histEl.innerHTML = nextHtml;
+    } else if (histEl) {
+      const nextHtml = '— 暂无历史国王记录';
+      if (histEl.textContent !== nextHtml) histEl.textContent = nextHtml;
     }
 
     // 管辖家庭
     const govEl = document.getElementById('camp-detail-governed');
     const ghs = region ? (region.governedHouseholds || []) : [];
     if (ghs.length > 0) {
-      govEl.innerHTML = ghs.map(hid => {
+      const nextHtml = ghs.map(hid => {
         const hh = (sim.households || []).find(h => h.id === hid);
         const n = hh && hh.members ? hh.members.length : '?';
         const head = hh && hh.headId != null ? `户主#${hh.headId}` : '';
         return `<span style="display:inline-block;margin:1px 4px 1px 0;">🏠 #${hid} (${n}人${head ? ' · ' + head : ''})</span>`;
       }).join('');
-    } else {
-      govEl.textContent = '— 暂无管辖家庭';
+      if (govEl && govEl.innerHTML !== nextHtml) govEl.innerHTML = nextHtml;
+    } else if (govEl) {
+      const nextHtml = '— 暂无管辖家庭';
+      if (govEl.textContent !== nextHtml) govEl.textContent = nextHtml;
     }
 
     // 辖区房屋：从实时房屋快照分为全部空置与已有人居住，避免只展示 vacant_houses 登记表。
@@ -1245,22 +1376,26 @@ canvas.addEventListener('click', e => {
     const vacantById = new Map((poi.vacantHouses || []).map(vh => [vh.houseId, vh]));
     const tierNames = { Tier0Warehouse: '仓库', Tier1ThatchedHut: '茅草房', Tier2LeanTo: '半棚屋', Tier3Homestead: '庄舍', Tier4Manor: '大庄园' };
     if (vacantHouses.length > 0) {
-      vacEl.innerHTML = `<div style="color:#f59e0b;margin-bottom:2px;">🏚️ 空置（${vacantHouses.length}）</div>` + vacantHouses.map(h => {
+      const nextVacHtml = `<div style="color:#f59e0b;margin-bottom:2px;">🏚️ 空置（${vacantHouses.length}）</div>` + vacantHouses.map(h => {
         const vh = vacantById.get(h.id);
         const ben = vh && vh.beneficiaryIds && vh.beneficiaryIds.length > 0
           ? ` · 受益人 ${vh.beneficiaryIds.map(bid => `#${bid}`).join('、')}` : '';
         const auction = h.auctionPhase ? ` · ${h.auctionPhase}` : '';
         return `<div style="margin-bottom:2px;">🏚️ #${h.id} ${tierNames[h.tier] || h.tier} · 耐久 ${Math.round(h.durability)}%${auction}${ben}</div>`;
       }).join('');
-    } else {
-      vacEl.innerHTML = '<div style="color:#94a3b8;">🏚️ 空置（0）</div>';
+      if (vacEl && vacEl.innerHTML !== nextVacHtml) vacEl.innerHTML = nextVacHtml;
+    } else if (vacEl) {
+      const nextVacHtml = '<div style="color:#94a3b8;">🏚️ 空置（0）</div>';
+      if (vacEl.innerHTML !== nextVacHtml) vacEl.innerHTML = nextVacHtml;
     }
     if (occupiedHouses.length > 0) {
-      occEl.innerHTML = `<div style="color:#38bdf8;margin-bottom:2px;">🏠 已有人居住（${occupiedHouses.length}）</div>` + occupiedHouses.map(h =>
+      const nextOccHtml = `<div style="color:#38bdf8;margin-bottom:2px;">🏠 已有人居住（${occupiedHouses.length}）</div>` + occupiedHouses.map(h =>
         `<div style="margin-bottom:2px;">🏠 #${h.id} ${tierNames[h.tier] || h.tier} · 户主 #${h.ownerId} · 耐久 ${Math.round(h.durability)}%</div>`
       ).join('');
-    } else {
-      occEl.innerHTML = '<div style="color:#94a3b8;">🏠 已有人居住（0）</div>';
+      if (occEl && occEl.innerHTML !== nextOccHtml) occEl.innerHTML = nextOccHtml;
+    } else if (occEl) {
+      const nextOccHtml = '<div style="color:#94a3b8;">🏠 已有人居住（0）</div>';
+      if (occEl.innerHTML !== nextOccHtml) occEl.innerHTML = nextOccHtml;
     }
 
     // 王国账本
@@ -1275,9 +1410,10 @@ canvas.addEventListener('click', e => {
         const jn = (region.recentJournal || []).slice(0, 6);
         if (jn.length > 0) {
           const reasonZh = { 'Tax': '公仓税', 'Relief': '王室救济', 'Legacy': '绝嗣归并', 'Tribute': '族税', 'Split': '分家', 'Inheritance': '继承', 'HousingPurchase': '房屋拍卖' };
-          jEl.innerHTML = jn.map(r => `<div>· ${reasonZh[r.reason] || r.reason} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`).join('');
+          const nextJournalHtml = jn.map(r => `<div>· ${reasonZh[r.reason] || r.reason} ${r.resource || ''} ${(r.amount || 0).toFixed(1)}${r.tick != null ? ' (Tick ' + r.tick + ')' : ''}</div>`).join('');
+          if (jEl.innerHTML !== nextJournalHtml) jEl.innerHTML = nextJournalHtml;
         } else {
-          jEl.textContent = '暂无流水记录';
+          if (jEl.textContent !== '暂无流水记录') jEl.textContent = '暂无流水记录';
         }
       }
     }
@@ -1303,14 +1439,25 @@ canvas.addEventListener('click', e => {
   window.closeCampDetail = closeCampDetail;
   window.isCampDetailOpen = isCampDetailOpen;
 
-  // 事件绑定：详情按钮（在营地渲染时动态存在，用事件委托）
+  // 事件绑定：详情按钮与国库点击（在营地渲染时动态存在，用事件委托）
   document.addEventListener('click', (e) => {
-    const btn = e.target.closest('#btn-camp-detail');
+    const btn = e.target.closest('#btn-camp-detail, #insp-camp-treasury-box');
     if (btn) {
       const sim = window.rustWorldSim;
       if (sim && sim.selectionType === 'poi' && sim.selectedPoiId != null) {
         const poi = sim.pois.find(p => p.id === sim.selectedPoiId);
         if (poi) openCampDetail(poi);
+      }
+    }
+  });
+
+  // ★ v1.37.2 点击营地卡片国王快速跳转角色卡片（兜底保障）
+  document.addEventListener('click', (e) => {
+    const kingChip = e.target.closest('#insp-camp-king .lineage-chip, #insp-camp-king [data-agent-id], #insp-camp-king [data-entity-id]');
+    if (kingChip) {
+      const agentId = kingChip.getAttribute('data-entity-id') || kingChip.getAttribute('data-agent-id');
+      if (agentId != null && typeof window.focusOnAgent === 'function') {
+        window.focusOnAgent(agentId);
       }
     }
   });

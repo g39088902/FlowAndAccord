@@ -224,9 +224,16 @@ impl World3DEngine {
             }
         }
 
-        // 收集其他存续宗族（非绝嗣、且仍留有成员）
+        // 收集其他存续宗族（非绝嗣、且当前拥有在世男性成员）
         let other_clans: Vec<String> = self.clan_registry.clans.iter()
-            .filter(|(s, c)| *s != surname && !self.clan_registry.extinct.contains(*s) && !c.members.is_empty())
+            .filter(|(s, c)| {
+                if *s == surname || self.clan_registry.extinct.contains(*s) {
+                    return false;
+                }
+                c.members.iter().any(|&m_id| {
+                    self.agent_by_id(m_id).map_or(false, |a| a.is_alive && a.gender == Gender::Male)
+                })
+            })
             .map(|(s, _)| s.clone())
             .collect();
 
@@ -271,6 +278,10 @@ impl World3DEngine {
                     if let Some(other_clan) = self.clan_registry.get_mut(other) {
                         other_clan.ledger.credit(*rk, share);
                         other_clan.ledger.push_transfer(record);
+                        other_clan.ledger.push_event(
+                            tick,
+                            format!("⛩️ 承继绝嗣宗族【{}】族产平分：{} +{:.1}", surname, rk.label(), share),
+                        );
                     }
                 }
             }

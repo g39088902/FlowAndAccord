@@ -56,7 +56,7 @@
 - **按姓氏聚合**：同姓 agent 自动归入同一宗族（不要求同营地）；始祖播撒即入族，新生儿随父姓入族。
 - **★ v1.9.1 宗族与女性无关（Task10/11）**：宗族 = 纯父系男性团体——女性一律不入族（`add_member` 对女性直接拒绝）；始祖仅男性入族，新生儿随父姓入族仅限男性子嗣。
 - **族长顺位**：族长 = 同姓在世最年长男性，并列按 id 取小；顺位任职赋予 +3 威望（`prestigeClanElderBonus`，v1.18.0）；无在世男性则宗族无主（`leader=None`），账本冻结（不主动支出，可接收 Tribute）。
-- **★ v1.9.0 绝嗣（Task11）**：宗族无在世男性（`mark_clan_extinct`）→ 标记 `extinct`，族产平分给其他存续宗族（无存续宗族则入 `public_granary` 兜底，`TransferReason::Legacy` 流水事由）；前端宗族页红色「⛩️ 绝嗣 · 无在世男性」标签（v1.9.1 起宗族仅含男性、不统计在世女性）。
+- **★ v1.35.2 宗族绝嗣财产平分制度**：宗族无在世男性（`mark_clan_extinct`）→ 标记 `extinct`，族产（水/粮/木/石/金）严格平分给当前未标记绝嗣且仍有在世男性成员的存续宗族（`TransferReason::Legacy` 双向流水与承继大事记留痕；若无其他存续宗族则入 `public_granary` 兜底）；前端宗族页红色「⛩️ 绝嗣 · 无在世男性」标签，流水抽屉高亮展示承继与归并。
 - **族税 Tribute**：每 `clan_tribute_interval_ticks`(1800=60s) 全局统一征收，存续家户按账面余额 × `clan_tribute_rate`(5%) 向族库缴纳（只记账不扣物理库存）。
 - **族内互助 MutualAid**：族库总余额 > `clan_mutual_aid_min_balance`(50) 时，对水+粮 < `clan_mutual_aid_family_threshold`(10) 的极贫家户拨付 `min(族库×20%, 缺口×2)`，每家户每 `clan_mutual_aid_cooldown_ticks`(900=30s) 最多一次，族长签字。
 
@@ -68,7 +68,7 @@
 - **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **★ v1.32.0 孤儿营地补王**：房屋辖区（`House.camp_id`，按「距宅址最近且未满」判定）与地区成员登记簿（`RegionRegistry`，按「始祖落位最近/新生儿随父」登记）是两套独立归属体系——某营地有房屋但从未有成员登记（始祖未落位附近、后代未迁入）时，该营地成为「有房无王」的孤儿营地且永不被夺位逻辑发现。修复：`eligible_leaderless_camp` 改为遍历完整营地列表（`camp_pois`），无 Region 实体一并视为空缺王位；途中与登基两处「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，孤儿营地可被 B14SeekThrone 正常远征登基（登基时 `add_member` 补建 Region 实体）。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
-- **公仓税 Tax**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 内帑，转入随身黄金并记 `RoyalPrivy` 流水。
+- **公仓税 Tax 与国王内帑 RoyalPrivy**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 内帑，转入随身黄金并记 `RoyalPrivy` 流水；★ v1.35.2 内核在 Agent（一生累计）、Region（王国累计）与 World（全局累计）三层建立 `cumulative_royal_privy` / `total_royal_privy` 确定性统计，并在调试模式下展示。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。
 
 ### 胎儿 Agent 身份（M1.7 受孕即建实体）
@@ -106,7 +106,7 @@
 - 胎儿在受孕时即建 agent 实体（`is_fetus=true`），分娩原位替换复用 ID，不消耗 RNG。
 - 账本流水环形缓冲容量固定（默认 64），超容量淘汰最旧记录。
 - 宗族/地区无主时账本冻结（只进不出）；族税/公仓税全局统一时点征收，保证确定性。
-- 分家/继承只记账本余额，不动物理库存；`Inheritance` 先于 `Split` 执行（Split 幂等跳过已立户者）。户主去世时，在世妻子（如有）与在世子女共同平分遗产并自立新户，仅在无妻子且无子女时绝嗣入公仓。
+- 分家/继承只记账本余额，不动物理库存；`Inheritance` 先于 `Split` 执行（Split 幂等跳过已立户者）。户主去世时，在世妻子（如有）与在世子女共同平分遗产。**女性即使丧父或丧夫也绝不能成立家户**（v1.37.3），其继承份额装入个人随身背包（容量受限品类水/粮/木/石超出部分入公仓，黄金无限装入）；男性继承人转入既有家户或自立新户并继承全额份额。无妻子且无子女时绝嗣全额入公仓。家户解散后，未立户成员归属清除（`household_of` 归 `None`）。
 - 分家权重：父亲在世权重 1，母亲（如有且在世）权重 1，子一代各权重 1，`W = 1(父) + 1(母) + n`；**丧父或丧母时亡者不占权重**。
 - **外部商贸结算（v1.13.0）**：`TransferReason::Market`，家户黄金直接划拨至 `LedgerRef::Void`（流出闭环），换取外部水粮装袋入囊，杜绝通胀循环。
 

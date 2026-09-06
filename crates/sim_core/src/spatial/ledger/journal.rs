@@ -21,6 +21,18 @@ pub enum ResourceKind {
     Gold,  // 🪙 黄金
 }
 
+impl ResourceKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Water => "清水",
+            Self::Food => "食物",
+            Self::Wood => "木材",
+            Self::Stone => "石料",
+            Self::Gold => "黄金",
+        }
+    }
+}
+
 /// 流水主体引用（账本一方的社会身份）
 ///
 /// M1 仅落地 Personal / Family 两级；Clan（M3 宗族）/ Region（M4 地区）/ Corporate

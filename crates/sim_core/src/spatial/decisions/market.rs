@@ -38,15 +38,17 @@ impl<'a> Decisioner<'a> {
             return None;
         }
 
-        // 5. 守卫五：存在急迫需求（OR 逻辑：水或粮短缺且对应野外点对该 Agent 全关）
+        // 5. 守卫五：存在急迫需求（OR 逻辑：水、粮或木短缺且对应野外点对该 Agent 全关）
         let dearth_th = cfg.market_emergency_family_stock_threshold;
         let hh_water = hh.group.ledger.balance(ResourceKind::Water);
         let hh_food = hh.group.ledger.balance(ResourceKind::Food);
+        let hh_wood = hh.group.ledger.balance(ResourceKind::Wood);
 
         let water_emergency = hh_water < dearth_th && !self.has_available_node(a, NodePool::Water);
         let food_emergency = hh_food < dearth_th && !self.has_available_node(a, NodePool::Food);
+        let wood_emergency = hh_wood < dearth_th && !self.has_available_node(a, NodePool::Wood);
 
-        if !water_emergency && !food_emergency {
+        if !water_emergency && !food_emergency && !wood_emergency {
             return None;
         }
 
@@ -102,7 +104,7 @@ impl<'a> Decisioner<'a> {
         };
         let hh_gold = self.households.get(hh_id).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
 
-        let bag_full = agent.carried_water >= carry_cap - 0.1 || agent.carried_food >= carry_cap - 0.1;
+        let bag_full = agent.carried_water >= carry_cap - 0.1 || agent.carried_food >= carry_cap - 0.1 || agent.carried_wood >= carry_cap - 0.1;
         let gold_exhausted = hh_gold < 0.05;
         let vitals_critical = agent.stamina < self.config.decision_work_stamina_threshold;
 

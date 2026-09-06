@@ -132,6 +132,10 @@ pub struct Agent3D {
     pub cumulative_mined_stone: f32,
     #[serde(default)]
     pub cumulative_mined_gold: f32,
+    /// ★ v1.35.2 累计收到的内帑总额（黄金）：本 agent 一生作为国王从地区公仓领取的内帑累计总量。
+    /// 纯累加、不消耗 WorldRng，确定性不受影响。调试模式前端展示用。
+    #[serde(default)]
+    pub cumulative_royal_privy: f32,
     pub home_camp_node: NodeId, // 所属归宿营地节点 (或房屋门前节点)
     pub target_poi_node: Option<NodeId>, // 当前行动目标节点
     /// 对各 POI 的私有可派遣性记忆；仅在本 Agent 的决策相位刷新。
@@ -268,6 +272,7 @@ impl Agent3D {
             cumulative_mined_wood: 0.0,
             cumulative_mined_stone: 0.0,
             cumulative_mined_gold: 0.0,
+            cumulative_royal_privy: 0.0,
             home_camp_node: home_camp,
             target_poi_node: None,
             poi_seekability: BTreeMap::new(),

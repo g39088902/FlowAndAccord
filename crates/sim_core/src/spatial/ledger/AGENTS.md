@@ -34,9 +34,9 @@
 - **胎儿 Agent 身份（M1.7 受孕即建实体）**：受孕瞬间由 `world.tick_fetus_reconcile` 为腹中胎儿创建完整 agent 实体（`is_fetus=true`），加入父母 `children_ids`、随父入家户——未出生孩子计入分家权重与**继承分配**（父亡清算不再误判"仅有胎儿"绝嗣入公仓）；胎儿无需求消耗/无地图实体/跳过决策，出生时 `resolve_newborns` 原位复用 ID 替换为新生儿。
 - **流水环形缓冲**：容量由 `config.ledger_journal_capacity`（默认 64）控制，超容量淘汰最旧。
 - **M2 分家权重**：父亲在世时权重 1，母亲（如有且在世）权重 1，子一代各权重 1，`W = 1(父) + 1(母) + n(子一代)`，分家男子抽走各类资源 `1/W`；丧父/丧母时亡者不占权重；`n = 父亲 children_ids.len()`（胎儿已在其中）；份额按**每类资源独立计算**，只记账本余额不动物理库存。
-- **M2 继承**：户主死亡 → 家户资源平分在世妻子（如有）与在世子一代；无在世妻子且无在世子女（绝嗣） → 全部转入 `public_granary` 公仓兜底账本；清算后 `dissolve`。
-- **M3 宗族**：按 `surname` 自动聚合（始祖播撒即入族、新生儿随父姓入族）；族长 = 同姓在世最年长男性（并列 id 小者），无在世男性则无主账本冻结；族税每 `clan_tribute_interval_ticks` 全局统一征收（账面余额 × `clan_tribute_rate`），族内互助有族库门槛与冷却。
-- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却；**★ v1.27.0 国王内帑**：每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 转入现任国王随身黄金（`tick_royal_privy`，`RoyalPrivy` 流水，`last_royal_payout_tick` 记录上次结算 tick 随档持久化）。
+- **M2 继承（★ v1.37.3 修订）**：户主死亡 → 家户资源平分在世妻子（如有）与在世子一代。女性继承人（丧夫遗孀或丧父未婚女儿）绝不能成立家户，其继承份额装入个人随身背包（水/粮/木/石超出容量部分入公仓，黄金无限装入）；男性继承人转入既有家户或自立新户并继承全额份额；无在世妻子且无在世子女（绝嗣） → 全部转入 `public_granary` 公仓兜底账本；清算后 `dissolve` 并清理家户归属索引。
+- **M3 宗族**：按 `surname` 自动聚合（始祖播撒即入族、新生儿随父姓入族）；族长 = 同姓在世最年长男性（并列 id 小者），无在世男性则绝嗣并转入绝嗣清算：族产平分给其他拥有在世男性的存续宗族（`Legacy` 双向流水与大事记），无存续宗族入公仓兜底；族税每 `clan_tribute_interval_ticks` 全局统一征收（账面余额 × `clan_tribute_rate`），族内互助有族库门槛与冷却。
+- **M4 地区**：每营地一册 `Region`（政体 `Kingdom`、继承制 `Primogeniture`）；初王 = `arrival_order` 中第一个**物理抵达营地**（距营地 < 交互半径 22m，且非远征别营过客）的在世男性（v1.22.0，杜绝 tick0 秒封未抵营始祖）；国王死亡按 长子→长孙→arrival_order 下一男性 继承，绝嗣王位空悬账本冻结；公仓税每 `ledger_tax_interval_ticks` 征收（账面余额 × `ledger_tax_rate`，有国王才征），救济有公仓门槛与冷却；**★ v1.27.0/v1.35.2 国王内帑**：每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 转入现任国王随身黄金（`tick_royal_privy`，`RoyalPrivy` 流水，`last_royal_payout_tick` 记录上次结算 tick 随档持久化），并在 Agent/Region/World 三层累计 `cumulative_royal_privy` / `total_royal_privy` 供调试模式展示。
 - **房屋拍卖分账（v1.26.0）**：成交价款按份额制分账——王国公户（`LedgerRef::Region`，权重 `house_auction_crown_share_weight`）与遗产受益人（在世配偶 1 份 + 每个在世子女 1 份）共分；新增流水 `TransferReason::EstateShare`（买方 → 受益人家户）与 `TransferReason::TransferTax`（买方 → 地区公仓）；无人类受益人时王国独得（天然兜底，零特判），金额严格守恒。
 
 ## 4. ⚠️ 本目录局部易踩坑

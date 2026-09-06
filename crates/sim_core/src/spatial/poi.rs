@@ -164,6 +164,13 @@ pub struct PrimitivePoi {
     pub secondary_max_stock: f32,
     #[serde(default)]
     pub secondary_regen_rate: f32,
+    /// 第三级库存（仅 Market 为外部木材储备 Wood，其他 POI 恒为 0.0）
+    #[serde(default)]
+    pub tertiary_stock: f32,
+    #[serde(default)]
+    pub tertiary_max_stock: f32,
+    #[serde(default)]
+    pub tertiary_regen_rate: f32,
     pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
     pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
     pub bound_houses_count: u32, // 当前绑定的房屋总数
@@ -173,6 +180,15 @@ pub struct PrimitivePoi {
     /// 容量复用 `config.ledger_journal_capacity`；随 pois 全量存档持久化）
     #[serde(default)]
     pub market_trades: VecDeque<MarketTradeRecord>,
+    /// ★ v1.37.0 榷场累计经营统计（仅 Market 有效，其它 POI 恒为 0.0；随 pois 序列化持久化）
+    #[serde(default)]
+    pub cumulative_sold_water: f32,
+    #[serde(default)]
+    pub cumulative_sold_food: f32,
+    #[serde(default)]
+    pub cumulative_sold_wood: f32,
+    #[serde(default)]
+    pub cumulative_revenue: f32,
 }
 
 impl PrimitivePoi {
@@ -206,6 +222,12 @@ impl PrimitivePoi {
             (0.0, 0.0, 0.0)
         };
 
+        let (ter_stock, ter_max, ter_regen) = if poi_type == PoiType::Market {
+            (POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO, POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WOOD)
+        } else {
+            (0.0, 0.0, 0.0)
+        };
+
         Self {
             id,
             poi_type,
@@ -216,11 +238,18 @@ impl PrimitivePoi {
             secondary_stock: sec_stock,
             secondary_max_stock: sec_max,
             secondary_regen_rate: sec_regen,
+            tertiary_stock: ter_stock,
+            tertiary_max_stock: ter_max,
+            tertiary_regen_rate: ter_regen,
             name,
             level: 0,
             bound_houses_count: 0,
             vacant_houses: Vec::new(),
             market_trades: VecDeque::new(),
+            cumulative_sold_water: 0.0,
+            cumulative_sold_food: 0.0,
+            cumulative_sold_wood: 0.0,
+            cumulative_revenue: 0.0,
         }
     }
 
@@ -273,6 +302,9 @@ impl PrimitivePoi {
         if self.secondary_regen_rate > 0.0 && self.secondary_max_stock > 0.0 {
             self.secondary_stock = (self.secondary_stock + self.secondary_regen_rate * dt).min(self.secondary_max_stock);
         }
+        if self.tertiary_regen_rate > 0.0 && self.tertiary_max_stock > 0.0 {
+            self.tertiary_stock = (self.tertiary_stock + self.tertiary_regen_rate * dt).min(self.tertiary_max_stock);
+        }
     }
 
     /// 提取主库存资源（水/粮/木/石/金）
@@ -295,6 +327,16 @@ impl PrimitivePoi {
         available
     }
 
+    /// 提取第三级库存资源（仅 Market 的木材有效）
+    pub fn extract_tertiary(&mut self, amount: f32) -> f32 {
+        if self.tertiary_max_stock <= 0.0 {
+            return 0.0;
+        }
+        let available = self.tertiary_stock.min(amount);
+        self.tertiary_stock -= available;
+        available
+    }
+
     /// ★ v1.28.0 追加一条榷场成交流水（环形缓冲，超容量淘汰最旧）
     ///
     /// 容量由调用方传入（`config.ledger_journal_capacity`，复用账本流水容量，未新增超参）。
@@ -304,6 +346,13 @@ impl PrimitivePoi {
         while self.market_trades.len() >= cap {
             self.market_trades.pop_front();
         }
+        match record.resource.as_str() {
+            "Water" => self.cumulative_sold_water += record.amount,
+            "Food" => self.cumulative_sold_food += record.amount,
+            "Wood" => self.cumulative_sold_wood += record.amount,
+            _ => {}
+        }
+        self.cumulative_revenue += record.gold_cost;
         self.market_trades.push_back(record);
     }
 }
@@ -312,6 +361,11 @@ impl PrimitivePoi {
 /// 公式: P(S) = P_0 * (S_max / max(S, S_floor))^k
 /// 当库存降低至 floor 以下时，单价封顶为 P_0 * (S_max / S_floor)^k，彻底消除除零与浮点溢出风险。
 pub fn market_unit_price(current: f32, max: f32, cfg: &crate::config::SimConfig) -> f32 {
+    market_unit_price_with_base(current, max, cfg.market_price_base, cfg)
+}
+
+/// 支持指定基准金价的外部市场幂律计价函数
+pub fn market_unit_price_with_base(current: f32, max: f32, base: f32, cfg: &crate::config::SimConfig) -> f32 {
     let eff = current.max(cfg.market_price_floor_stock);
-    cfg.market_price_base * (max / eff).powf(cfg.market_price_power_exponent)
+    base * (max / eff).powf(cfg.market_price_power_exponent)
 }

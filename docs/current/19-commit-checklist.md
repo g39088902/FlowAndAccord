@@ -31,6 +31,11 @@ node tools/test-wasm.js
 
 ## C. 前端 HTML / CSS / JS 改动
 
+```bash
+node tools/frontend-check.js
+```
+
+- [ ] `node tools/frontend-check.js` 语法与 DOM ID 完整性门禁全绿通过。
 - [ ] 新增或修改的 DOM ID 已搜索全部引用，事件委托和脚本加载顺序正确。
 - [ ] 高频刷新区域没有因 `innerHTML` 重建破坏点击、悬停或拖拽；必要时使用内容快照缓存。
 - [ ] Inspector 关闭、`Esc`、遮罩点击、模态返回和镜头跟随状态已检查。

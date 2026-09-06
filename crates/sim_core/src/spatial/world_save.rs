@@ -27,8 +27,8 @@ use super::world::World3DEngine;
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 3;
-/// 写入存档时附带的应用版本（仅供前端提示与人工排查，不作为加载门禁）
-pub const SAVE_APP_VERSION: &str = "1.28.1";
+/// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
+pub const SAVE_APP_VERSION: &str = "1.37.1";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -178,6 +178,12 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         return Err(format!(
             "存档格式版本不兼容：存档为 v{}，当前内核仅支持 v{}（请导出新版本存档）",
             save.format_version, SAVE_FORMAT_VERSION
+        ));
+    }
+    if save.app_version != SAVE_APP_VERSION {
+        return Err(format!(
+            "存档应用版本不兼容：存档为 v{}，当前内核为 v{}（版本变更已自动废弃旧档）",
+            save.app_version, SAVE_APP_VERSION
         ));
     }
     if save.grid_res == 0 || !save.world_size.is_finite() || save.world_size <= 0.0 {

@@ -13,7 +13,23 @@
 
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
   const SAVE_FORMAT_VERSION = 3;
+  /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
+  const DEFAULT_APP_VERSION = '1.37.1';
   const AUTO_SAVE_INTERVAL_MS = 30000;
+
+  function getCurrentAppVersion() {
+    const s = getSim();
+    if (s && typeof s.getAppVersion === 'function') {
+      const v = s.getAppVersion();
+      if (v) return v;
+    }
+    const tag = document.querySelector('.version-tag');
+    if (tag && tag.textContent) {
+      const m = tag.textContent.trim().match(/v?(\d+\.\d+\.\d+)/);
+      if (m) return m[1];
+    }
+    return DEFAULT_APP_VERSION;
+  }
 
   const SLOTS = [
     { id: 'save1', icon: '📁', name: '存档槽 1', desc: '自动保存默认写入此槽', suggestedName: 'flowaccord-save1.json', isAuto: true },
@@ -153,7 +169,8 @@
     let meta;
     try { meta = extractMeta(text); }
     catch (e) { return false; }
-    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION) return false;
+    const curVer = getCurrentAppVersion();
+    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION || meta.appVersion !== curVer) return false;
     // 引擎就绪前不可读档（world_load 依赖 wasm）；等待加载完成
     if (!(await waitEngineReady(15000))) return false;
     const s = getSim();
@@ -187,7 +204,9 @@
       const granted = await requestHandlePermission(st.handle);
       if (granted) {
         await refreshSlotMeta('save1');
-        if (st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION) {
+        const curVer = getCurrentAppVersion();
+        const isCompatible = st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION && st.meta.appVersion === curVer;
+        if (isCompatible) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
           if (loaded) {
@@ -195,8 +214,14 @@
             return;
           }
         }
-        // 存档为空/版本不兼容/读取失败：保留阻断，点击按钮可覆盖保存或重新连接
-        setStartupGateMessage('自动读取存档失败，点击下方按钮可覆盖保存当前世界或重新连接存档文件。', true);
+        if (st.isOutdated) {
+          // ★ v1.37.1：检测到旧版本存档，自动废弃，引导覆盖保存新建世界
+          setStartupGateMessage(`检测到旧版本存档「${st.fileName}」（存档版本 v${st.meta ? st.meta.appVersion : '未知'}，当前版本 v${curVer}），因版本更新已自动废弃旧档。点击下方按钮覆盖写入新版本初始世界开始模拟。`, true);
+          btn.textContent = '🆕 废弃旧档并新建世界';
+        } else {
+          // 存档为空/数据异常/读取失败：保留阻断，点击按钮可覆盖保存或重新连接
+          setStartupGateMessage('自动读取存档失败，点击下方按钮可覆盖保存当前世界或重新连接存档文件。', true);
+        }
       } else {
         setStartupGateMessage(`已找到上次的存档文件「${st.fileName}」，点击下方按钮授权读取后继续。`, false);
         btn.textContent = '🔓 授权并读取上次存档';
@@ -214,7 +239,9 @@
           return;
         }
         await refreshSlotMeta('save1');
-        if (st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION) {
+        const curVerNow = getCurrentAppVersion();
+        const isCompatibleNow = st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION && st2.meta.appVersion === curVerNow;
+        if (isCompatibleNow) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
           if (loaded) {
@@ -225,11 +252,12 @@
           setStartupGateMessage('存档读取失败，请重试。', true);
           return;
         }
-        // 文件为空或版本不兼容：覆盖保存当前世界（相当于新建存档）
+        // 文件为空或版本不兼容（含旧版本被自动废弃）：覆盖保存当前世界（相当于新建当前版本存档）
+        setStartupGateMessage('正在覆盖写入新版本初始世界…');
         const s = getSim();
         const saved = s && s._ready ? await saveToSlot('save1') : false;
         if (saved) {
-          releaseStartupGate('已建立存档文件，模拟开始');
+          releaseStartupGate('已废弃旧档并建立新版本存档，模拟开始');
         } else {
           btn.disabled = false;
           setStartupGateMessage('存档文件尚未成功写入，游戏仍被暂停。请重试。', true);
@@ -340,17 +368,18 @@
       const file = await st.handle.getFile();
       const text = await file.text();
       const meta = extractMeta(text);
-      if (meta.formatVersion === SAVE_FORMAT_VERSION) {
-        st.meta = meta;
-        st.permError = false;
-        st.lastSaved = file.lastModified;
-      } else {
-        st.meta = null; // 版本不兼容，不显示
-      }
+      const curVer = getCurrentAppVersion();
+      st.meta = meta;
+      st.permError = false;
+      st.lastSaved = file.lastModified;
+      st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || meta.appVersion !== curVer);
     } catch (e) {
       if (e.name === 'NotAllowedError') {
         // 权限未持久化：保留槽位与 IndexedDB 记录，等待用户手势内重授
         st.permError = true;
+      } else {
+        st.meta = null;
+        st.isOutdated = false;
       }
     }
   }
@@ -410,6 +439,7 @@
     meta.bytes = new Blob([json]).size;
     st.meta = meta;
     st.lastSaved = meta.savedAt;
+    st.isOutdated = false;
     lastAutoTick = meta.tick;
     renderList();
     const slot = SLOTS.find(s => s.id === slotId);
@@ -447,8 +477,13 @@
     let meta;
     try { meta = extractMeta(text); }
     catch (e) { setStatus('文件不是合法的存档 JSON', 'err'); return; }
+    const curVer = getCurrentAppVersion();
     if (meta.formatVersion !== SAVE_FORMAT_VERSION) {
       setStatus(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`, 'err');
+      return;
+    }
+    if (meta.appVersion !== curVer) {
+      setStatus(`存档版本 (v${meta.appVersion}) 与当前版本 (v${curVer}) 不一致，已自动废弃无法读取。请覆盖保存当前版本世界。`, 'err');
       return;
     }
     applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
@@ -510,24 +545,34 @@
       const head = document.createElement('div');
       head.className = 'save-slot-head';
       const autoBadge = slot.isAuto ? '<span class="save-slot-badge" style="color:#60a5fa; background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.3);">🤖 自动保存</span>' : '';
-      head.innerHTML = `<span class="save-slot-name">${slot.icon} ${slot.name}</span>` +
-        (st ? (st.permError
-          ? '<span class="save-slot-badge" style="color:#fbbf24; border-color:rgba(251,191,36,.4);">🔐 待授权</span>'
-          : `<span class="save-slot-badge">v${st.meta ? st.meta.appVersion : '—'}</span>`)
-          : autoBadge || `<span class="save-slot-badge muted">未连接</span>`);
+      let badgeHtml;
+      if (!st) {
+        badgeHtml = autoBadge || `<span class="save-slot-badge muted">未连接</span>`;
+      } else if (st.permError) {
+        badgeHtml = '<span class="save-slot-badge" style="color:#fbbf24; border-color:rgba(251,191,36,.4);">🔐 待授权</span>';
+      } else if (st.isOutdated) {
+        badgeHtml = `<span class="save-slot-badge" style="color:#f87171; background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4);">⚠️ 已废弃 (v${st.meta ? st.meta.appVersion : '—'})</span>`;
+      } else {
+        badgeHtml = `<span class="save-slot-badge">v${st.meta ? st.meta.appVersion : '—'}</span>`;
+      }
+      head.innerHTML = `<span class="save-slot-name">${slot.icon} ${slot.name}</span>` + badgeHtml;
       card.appendChild(head);
 
       const info = document.createElement('div');
       info.className = 'save-slot-meta';
-      if (st && st.meta) {
+      const curVer = getCurrentAppVersion();
+      if (st && st.meta && !st.isOutdated) {
         info.innerHTML =
           `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
           `<span title="模拟 Tick">⏱️ <b class="mono-num">${st.meta.tick}</b></span>` +
           `<span title="存活人口">👤 <b class="mono-num">${st.meta.population}</b> 人</span>` +
           `<span title="存续家户">🏠 <b class="mono-num">${st.meta.households}</b> 户</span>`;
+      } else if (st && st.isOutdated) {
+        info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+          `<div class="save-slot-desc" style="color:#fca5a5; margin-top:4px; line-height:1.5;">⚠️ 存档版本 (v${st.meta ? st.meta.appVersion : '—'}) 与当前版本 (v${curVer}) 不一致，已自动废弃。请点击下方「覆盖保存」重写为当前版本。</div>`;
       } else if (st) {
         info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
-          `<span class="save-slot-desc">文件为空或版本不兼容，点击下方「保存」写入当前世界</span>`;
+          `<span class="save-slot-desc">文件为空或数据异常，点击下方「保存」写入当前世界</span>`;
       } else {
         info.innerHTML = `<span class="save-slot-desc">${slot.desc}</span>`;
       }
@@ -555,7 +600,10 @@
           btn.className = 'save-slot-btn' + (kind ? ' ' + kind : '');
           btn.dataset.slot = slot.id;
           btn.dataset.act = act;
-          if (act === 'load' && (!st.meta)) btn.disabled = true;
+          if (act === 'load' && (!st.meta || st.isOutdated)) {
+            btn.disabled = true;
+            btn.title = st.isOutdated ? '旧版本存档已自动废弃，无法读取' : '无有效存档数据';
+          }
           btn.textContent = label;
           actions.appendChild(btn);
         }
@@ -630,7 +678,9 @@
       try {
         const text = await file.text();
         const meta = extractMeta(text);
+        const curVer = getCurrentAppVersion();
         if (meta.formatVersion !== SAVE_FORMAT_VERSION) throw new Error(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`);
+        if (meta.appVersion !== curVer) throw new Error(`存档版本 v${meta.appVersion} 与当前应用版本 v${curVer} 不一致，旧版本存档已自动废弃`);
         applySave(text, meta, `导入文件（${file.name}）`);
       } catch (err) { setStatus('导入失败：' + err.message, 'err'); }
       fileInput.value = '';
