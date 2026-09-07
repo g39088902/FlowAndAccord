@@ -85,6 +85,7 @@ window.SIM_CONFIG = {
   // ==========================================================================
   poiMinDistance: 70.0,           // POI 间最小排斥间距 (m)
   countCamps: 4,                  // 营地数量
+  countEmpires: 1,                // 帝国数量（自动钳制为 1..=营地数量；当前政体仅实现帝国）
   countWaterSources: 6,           // 清泉数量
   countBerryBushes: 6,            // 浆果数量
   countWoods: 3,                  // 林木数量

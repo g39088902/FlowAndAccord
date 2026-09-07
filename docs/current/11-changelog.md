@@ -1,7 +1,11 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.44.5**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.44.7**。
+
+| **v1.44.7** | 落地 M5 帝国上层政体：① 新增 `EmpireRegistry`，将全图营地按 `countEmpires` 做确定性连续分组，每个帝国至少辖 1 个营地；② 新增可扩展 `EmpireRegime`/`EmpireHeadTitle` 字段，当前实现 `Empire`/`Emperor`，为联邦/总统预留枚举位；③ 每 tick 在王国继承结算后，从下属王国现任国王中按威望最高、AgentId 最小打破平局自动加冕/更替皇帝；④ 新增帝国公帑结算，与国王内帑共用 6000 tick 周期，从每个下属王国公仓黄金余额抽取 5%，转入皇帝随身黄金并记 `ImperialPrivy` 流水；⑤ Agent/Empire/World 三层累计帝国公帑，存档格式升至 4，快照与前端王国看板新增帝国卡片；⑥ 配置、WASM 双副本、前端静态门禁同步 | sim_core / ledger(empire) / snapshot / world_save / frontend / config / docs |
+
+| **v1.44.6** | 完成荒地开垦农田与农业税经济系统设计稿：定义独立农田生产资产、家户资本投入、灌溉/农具/地力收益曲线、农业税流量税基、B19 自主投资决策分支、欠税处理、快照/存档/前端同步边界及 M1-M4 落地路线；本版本仅登记设计，不代表内核功能已实现 | docs |
 
 | **v1.44.5** | 快照 `households` 接入 `active_households` 存续过滤，杜绝长程运行下快照 JSON 数据膨胀与序列化微卡顿：① **快照家户过滤**：`world_snapshot.rs` 中 `households` 由遍历全量 `household_registry.households`（长程下可膨胀至 1600+ 个历史家户节点）改为仅遍历 `active_households`，只导出真实存续活跃家户（稳态约 20 户）；② **新增 `total_households` 字段**：`WorldSnapshot3D`（`snapshot.rs`）新增 `#[serde(default)] pub total_households: u64`，由 `household_registry.households.len()` 提供历史累计创设家户总数；三处同步至 `rustworld.js`（`this.totalHouseholds`）；③ **前端制度大盘适配**：`ledger-ui.js` 计算已解散家户总数由旧版依赖快照全量扫描改为 `Math.max(0, sim.totalHouseholds - activeHH.length)`，存续活跃家户列表直接升序渲染，兼顾长程统计准确性与零冗余传输；④ **快照体积与序列化开销暴降**：在 2000万 Tick（1680 个历史家户）极端长程推演下，快照家户节点数由 1680 降至 ~20 个，消除 1660 个死家户的余额、事件与流水冗余序列化开销；⑤ **门禁全通**：`test-determinism.js` 6/6 全套件通过，`test-wasm.js` 与 `snapshot-check.js` 0 错误通过 | sim_core / snapshot / world_snapshot / frontend(rustworld/ledger-ui) / docs |
 

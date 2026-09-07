@@ -7,6 +7,7 @@
 //! 3. 确定性红线：不消耗 WorldRng、不新增决策相位、所有集合用 BTree 保序。
 
 pub mod clan;
+pub mod empire;
 pub mod family;
 pub mod group;
 pub mod journal;
@@ -21,3 +22,4 @@ pub use journal::{
 };
 pub use marriage::{Marriage, MarriageEndReason, MarriageId, MarriageRegistry};
 pub use region::{Regime, Region, RegionRegistry, Succession};
+pub use empire::{Empire, EmpireHeadTitle, EmpireRegime, EmpireRegistry};

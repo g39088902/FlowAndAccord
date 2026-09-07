@@ -1,7 +1,7 @@
 # 12. 📒 账本与社会经济制度系统 (`ledger` + `bookkeeping`)
 
-> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/ledger/`（7 子模块）+ `crates/sim_core/src/spatial/bookkeeping.rs`
-> **里程碑状态**：M1~M4 已完整落地（M1 v1.0.0 / M2 v1.1.0 / M3 v1.2.0 / M4 v1.3.0），前端配套 4 标签页「社会与经济制度大盘」(`ledger-ui.js`)。
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/ledger/`（8 子模块）+ `crates/sim_core/src/spatial/bookkeeping.rs`
+> **里程碑状态**：M1~M5 已完整落地（M1 v1.0.0 / M2 v1.1.0 / M3 v1.2.0 / M4 v1.3.0 / M5 v1.44.7），前端配套 4 标签页「社会与经济制度大盘」(`ledger-ui.js`)。
 
 > ⚡ **M6（v1.4.0）语义升级：家户账本从「权责镜像」成为「家庭物资唯一真相源」**。房屋仓库已删除，卸货（Deposit）/在家吃喝（Consume）/冬季烧柴（Heating）在生态与维护层**真实收付**家户账本，`bookkeeping.rs` 仅保留继承清算（Inheritance）与分家抽资（Split）；决策层改读账本余额；账本无容量上限。
 >
@@ -15,7 +15,7 @@
 
 ## 模块定位
 
-独立经济账本子系统，与房屋物理仓库（`house.rs` pantry_*）和 Agent 随身行囊（`agent.rs` carried_*）完全分离。账本只记录"归谁、谁付谁收"的权责关系，不干预物理资源的装卸与搬运。同时承载婚姻登记簿、家户体系、宗族体系与地区王国政体，是社会经济结构的权责底座。
+独立经济账本子系统，与房屋物理仓库（`house.rs` pantry_*）和 Agent 随身行囊（`agent.rs` carried_*）完全分离。账本只记录"归谁、谁付谁收"的权责关系，不干预物理资源的装卸与搬运。同时承载婚姻登记簿、家户体系、宗族体系、地区王国与帝国上层政体，是社会经济结构的权责底座。
 
 ## 核心数据结构
 
@@ -74,6 +74,12 @@
 - **公仓税 Tax 与国王内帑 RoyalPrivy**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 内帑，转入随身黄金并记 `RoyalPrivy` 流水；★ v1.35.2 内核在 Agent（一生累计）、Region（王国累计）与 World（全局累计）三层建立 `cumulative_royal_privy` / `total_royal_privy` 确定性统计，并在调试模式下展示。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。★ v1.44.0 扫描实现倒置为单次存续家户遍历 + 极贫短路 + 按（camp_id, hid）排序保序派发，触发集合/金额/顺序与旧版逐拍一致。
 
+### EmpireRegistry（帝国上层政体 M5）
+- **营地分组**：全图营地按 `camp_id` 升序做连续切片，`countEmpires` 自动钳制为 `1..=营地数`，保证每个帝国至少拥有 1 个营地；不消耗 RNG，结构在世界重置/配置变化时确定性重建。
+- **可变政体字段**：`EmpireRegime` 当前实现 `Empire`，`EmpireHeadTitle` 当前实现 `Emperor`；枚举接口为后续联邦/总统保留扩展点。
+- **皇帝产生**：每个 tick 在王国初王/继承结算后，扫描本帝国所有下属王国现任国王，按 `prestige` 降序、`AgentId` 升序取最高者加冕；无在位国王则帝国首长空缺、帝国账本冻结。
+- **帝国公帑 ImperialPrivy**：与国王内帑共用 6000 tick 周期，每个下属王国公仓黄金余额的 5% 划转至皇帝随身黄金，王国公仓流水与帝国审计流水均记 `ImperialPrivy`；Agent/Empire/World 三层累计。
+
 ### 胎儿 Agent 身份（M1.7 受孕即建实体）
 - **受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿创建完整 Agent 实体**（`is_fetus=true`），而非仅预分配 ID：胎儿加入父母 `children_ids`、随父入父亲家户（`world.rs::tick_fetus_reconcile` 每 tick 对账）。
 - 未出生孩子计入 M2 分家权重（`W = 1(父) + 1(母) + n` 的 n）与**继承分配**（父亡清算不再把"仅有胎儿"误判绝嗣入公仓，而是为胎儿立户并转其份额）。
@@ -92,6 +98,7 @@
 | `ledger/family.rs` | 家户体系：家庭跟着男人走、户主锚定、改嫁先移后加、分家/继承血缘链 |
 | `ledger/clan.rs` | ★ M3 宗族：ClanRegistry、族长顺位、族税 Tribute、族内互助 MutualAid |
 | `ledger/region.rs` | ★ M4 地区与王国：RegionRegistry、初王顺位、长子继承、公仓税 Tax、救济 Relief、国王内帑 RoyalPrivy |
+| `ledger/empire.rs` | ★ M5 帝国上层政体：EmpireRegistry、营地分组、威望选皇帝、帝国公帑 ImperialPrivy |
 | `bookkeeping.rs` | ★ M2 旁路记账：`tick_bookkeeping`（Deposit/Consume/Heating 观测 → Inheritance 继承清算 → Split 分家抽资），`transfer_household_resource` 家户间转移辅助 |
 
 ## 世界 tick 挂载点
@@ -100,6 +107,7 @@
 1. `tick_bookkeeping(dt)` — M2 旁路记账（Deposit/Consume/Heating + Inheritance + Split）；
 2. `tick_clan(dt)` — M3 宗族（族长顺位 → 族税 → 族内互助）；
 3. `tick_region(dt)` — M4 地区与王国（arrival_order 重排 → 初王/国王更替 → 国王死亡继承 → 公仓税 → 救济）。
+4. `tick_empire(dt)` — M5 帝国（确保营地分组 → 威望选皇帝 → 下属王国公仓黄金 5% 帝国公帑）。
 
 ## 关键不变量
 - 账本与物理仓库完全分离：改账本不影响 `house.rs` pantry_* / `agent.rs` carried_* / `ecology.rs` 装卸逻辑。
@@ -136,7 +144,8 @@
 - **MarriageSnapshot**：婚姻 ID、夫妻双方 ID、婚龄、存续/封账状态、历史婚姻段。
 - **ClanSnapshot**（M3）：姓氏、族长 ID、族人数量与列表、族库 5 资源余额、最近流水与事件；v1.9.0 新增 `is_extinct`（绝嗣标记；v1.9.1 起宗族仅含男性成员）。
 - **RegionSnapshot**（M4）：营地 ID/名称、国王 ID、政体/继承制、成员数、到达时序前 10、顺位前 3 继承人、公仓 5 资源余额、最近流水与事件、夺位远征中族人列表；v1.9.0 新增 `history_kings`（历史国王档案）/ `member_ids`（成员列表）/ `governed_households`（管辖家户）；v1.12.0 `history_kings` 改为 `Vec<HistoryKingSnapshot>`（含在位起止 tick 与死因），新增 `current_reign_start`（现任国王登基 tick）。
-- **AgentSnapshot 新增**（M2/M4）：`marriage_history_count` / `household_id` / `household_role`（Head/Spouse/Child/None）/ `arrival_tick` / `is_on_expedition`；v1.9.0 新增 `expedition_target_camp`（远征目标营地）/ `coronation_pending`（待登基营地）。
+- **EmpireSnapshot**（M5）：帝国 ID、政体/首长称谓、皇帝 ID、下属营地 ID、下属国王候选、帝国审计流水/事件、皇帝在位起点与累计帝国公帑。
+- **AgentSnapshot 新增**（M2/M4/M5）：`marriage_history_count` / `household_id` / `household_role`（Head/Spouse/Child/None）/ `arrival_tick` / `is_on_expedition` / `cumulative_imperial_privy`；v1.9.0 新增 `expedition_target_camp`（远征目标营地）/ `coronation_pending`（待登基营地）。
 - **LedgerBalanceSnapshot**：团体账面对应的 5 资源余额；`public_granary_balances` 为公仓兜底账本余额。
 
 ## 前端展示
@@ -146,7 +155,7 @@
   - 🏠 **家户页**：分家公式气泡（W=2+n）、流水穿透抽屉、继承清算档案、公仓余额；
   - 💍 **婚姻页**：存续婚姻、终身多段历史留痕；
   - 🛡️ **宗族页**：宗族看板、族长顺位、族库仪表、族税进度、互助救济气泡；v1.9.0 绝嗣宗族红色卡片（`⛩️ 绝嗣 · 无在世男性`）；
-  - 👑 **王国页**：5 大营地王国、国王尊号、长子顺位链、到达时序、公仓赋税。
+  - 👑 **王国页**：帝国上层卡片（帝国/皇帝/辖属营地/累计帝国公帑）+ 营地王国、国王尊号、长子顺位链、到达时序、公仓赋税。
 - **Canvas 夺位特效**：金色战盔标牌 + 虚线光束 + 登基礼花粒子。
 - **Agent Inspector**：
   - 「🏠 家户归属」卡片：家户 ID/户主姓氏/成员数/角色徽章（👑户主·💍配偶·👶子女）/账面 5 资源/家户大事记/最近流水；

@@ -1,7 +1,7 @@
 # ledger · 独立经济账本子系统 (AGENTS.md)
 
 > 本目录局部操作指南。全局规则以根目录 `AGENTS.md` 为准（§4.3 确定性节拍 / §4.10 测试禁令 / §4.12 超参集中化），本文件只收录本目录的职责边界、文件清单与局部易踩坑。
-> 完整机制与里程碑见 `docs/12-plan-ledger-refactor.md`（账本与仓库重构计划，M1~M4 已完成，M5 收尾规划中）。
+> 完整机制与里程碑见 `docs/12-plan-ledger-refactor.md`（账本与仓库重构计划，M1~M5 已完成）。
 
 ---
 
@@ -9,13 +9,14 @@
 
 独立经济**账本层**（制度账本：记录"归谁、谁付的、谁收的"），与物理仓储层（`house.rs` pantry_* / `agent.rs` carried_* / `ecology.rs` 装卸）**完全分离**：
 - 账本记权责流水，物理库存记存量，二者**不强制相等**（前端分别标注"账面"与"库存"）；
-- **M1~M4 已完整落地**：
+- **M1~M5 已完整落地**：
   - M1（v0.9.72~v1.0.0）：账本内核 + 团体基类 + 婚姻登记簿 + 家户体系（家庭跟着男人走）+ 胎儿 Agent 身份（v1.3.5 起受孕即建实体）；
   - M2（v1.1.0）：旁路记账 `bookkeeping.rs` + 分家抽资 + 丧父继承清算 + 公仓兜底账本；
   - M3（v1.2.0）：宗族 `clan.rs`（按姓氏聚合、族长顺位、族税、族内互助）；
   - M4（v1.3.0）：地区与王国 `region.rs`（按营地聚合、初王、夺位远征、长子继承、公仓税、救济）。
+  - M5（v1.44.7）：帝国上层政体 `empire.rs`（按营地确定性分组、威望选皇帝、帝国公帑）。
 
-## 2. 📁 文件清单（7 个文件）
+## 2. 📁 文件清单（8 个文件）
 
 | 文件 | 职责 |
 | :--- | :--- |
@@ -23,6 +24,7 @@
 | `journal.rs` | 账本内核：`ResourceKind` / `Ledger`（分品类存量 + 环形流水）/ `TransferRecord` / `TransferReason` / `transfer()` 双向记账总线 + `record_consumption` 单边消耗记账 |
 | `group.rs` | 团体基类 `Group`（leader / members 含领导 / ledger）+ `add_member` / `remove_member` / `set_leader` 单点入口；`GroupKind` 含 `Family` / `Clan(String)` / `Region(u32)` |
 | `marriage.rs` | 婚姻登记簿 `MarriageRegistry`（多段婚姻留痕、存续唯一性、确定性发号）——**只记两性关系，不承载账本** |
+| `empire.rs` | ★ M5 帝国上层政体 `EmpireRegistry`（营地确定性分组、威望最高国王加冕皇帝、帝国公帑 `ImperialPrivy`；预留联邦/总统枚举） |
 | `family.rs` | ★ 家户体系 `HouseholdRegistry`（以男性户主为锚、`by_agent` 唯一归属、`parent_household` 血缘链） |
 | `clan.rs` | ★ M3 宗族系统 `ClanRegistry`（按姓氏聚合、族长顺位、族税 `Tribute`、族内互助 `MutualAid`） |
 | `region.rs` | ★ M4 地区与王国系统 `RegionRegistry`（按营地聚合、初王顺位、长子继承、公仓税 `Tax`、救济 `Relief`、★ v1.27.0 国王内帑 `RoyalPrivy`；夺位远征调度在 `decisions/scheduler.rs`） |

@@ -37,6 +37,9 @@ pub struct WorldSnapshot3D {
     pub clans: Vec<ClanSnapshot>,
     /// ★ 地区与王国快照（M4：按营地聚合的地区团体、国王、公仓与继承顺位）
     pub regions: Vec<RegionSnapshot>,
+    /// ★ 帝国/联邦上层政体快照（M5；当前仅实现帝国）
+    #[serde(default)]
+    pub empires: Vec<EmpireSnapshot>,
     /// ★ 公仓兜底账本余额（M2 绝嗣家户资产归集，预留 M4 Region 对接）
     pub public_granary_balances: Vec<LedgerBalanceSnapshot>,
     pub total_births: u32,
@@ -56,6 +59,9 @@ pub struct WorldSnapshot3D {
     /// ★ v1.35.2 全局所有国王累计收到的内帑总额（黄金）
     #[serde(default)]
     pub total_royal_privy: f32,
+    /// ★ M5 全图所有皇帝累计收到的帝国公帑总额（黄金）
+    #[serde(default)]
+    pub total_imperial_privy: f32,
     /// ★ 房屋报价中心历史受理记录 (256 size 环形缓冲区快照)
     #[serde(default)]
     pub auction_history: Vec<HouseAuctionHistorySnapshot>,
@@ -246,6 +252,9 @@ pub struct AgentSnapshot {
     pub cumulative_mined_gold: f32,
     /// ★ v1.35.2 累计收到的内帑总额（黄金）：本 agent 一生作为国王从地区公仓领取的内帑累计总量
     pub cumulative_royal_privy: f32,
+    /// ★ M5 累计收到的帝国公帑总额（黄金）：本 agent 一生作为皇帝从下属王国公仓领取的累计总量
+    #[serde(default)]
+    pub cumulative_imperial_privy: f32,
     pub build_timer: f32,
     pub miscarriage_alert_timer: f32,
     pub state: String,
@@ -443,4 +452,21 @@ pub struct RegionSnapshot {
     pub current_reign_start: Option<u64>,
     /// ★ v1.35.2 该地区王国累计拨付给国王的内帑总额（黄金）
     pub cumulative_royal_privy: f32,
+}
+
+/// 帝国快照（按帝国聚合营地与下属王国首长）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmpireSnapshot {
+    pub empire_id: u32,
+    pub regime: String,
+    pub head_title: String,
+    pub emperor_id: Option<AgentId>,
+    pub member_camp_ids: Vec<u32>,
+    pub member_count: u32,
+    pub king_candidates: Vec<AgentId>,
+    pub balances: Vec<LedgerBalanceSnapshot>,
+    pub recent_journal: Vec<TransferRecordSnapshot>,
+    pub recent_events: Vec<String>,
+    pub current_reign_start: Option<u64>,
+    pub cumulative_imperial_privy: f32,
 }

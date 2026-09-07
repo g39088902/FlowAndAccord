@@ -10,8 +10,8 @@
   // ─── 常量映射 ───────────────────────────────────────────────
   const RES_ICONS  = { Water: '💧', Food: '🍒', Wood: '🌲', Stone: '🪨', Gold: '🪙' };
   const RES_COLORS = { Water: '#38bdf8', Food: '#10b981', Wood: '#d97706', Stone: '#94a3b8', Gold: '#fbbf24' };
-  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️', HousingPurchase: '🏠', EstateShare: '⚖️', TransferTax: '🏛️', RoyalPrivy: '💰' };
-  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并', HousingPurchase: '购房', EstateShare: '遗产分账', TransferTax: '过户税', RoyalPrivy: '国王内帑' };
+  const REASON_ICONS = { Deposit: '📥', Consume: '🍽️', Heating: '🔥', Construction: '🔨', Maintenance: '🔧', Split: '✂️', Inheritance: '⚰️', Tribute: '🏛️', MutualAid: '🛡️', Tax: '👑', Relief: '🤲', Legacy: '⛩️', HousingPurchase: '🏠', EstateShare: '⚖️', TransferTax: '🏛️', RoyalPrivy: '💰', ImperialPrivy: '🌐' };
+  const REASON_LABELS = { Deposit: '存入', Consume: '消耗', Heating: '供暖', Construction: '营建', Maintenance: '修缮', Split: '分家', Inheritance: '继承', Tribute: '族税', MutualAid: '互助', Tax: '公仓税', Relief: '王室救济', Legacy: '绝嗣归并', HousingPurchase: '购房', EstateShare: '遗产分账', TransferTax: '过户税', RoyalPrivy: '国王内帑', ImperialPrivy: '帝国公帑' };
   const ROLE_LABELS = { Head: '👑 户主', Spouse: '💍 配偶', Child: '👶 子女', None: '—' };
 
   // ─── 模块状态 ───────────────────────────────────────────────
@@ -563,6 +563,7 @@
   // ─── 王国标签页渲染（M4） ────────────────────────────────────
   function renderRegionTab(sim) {
     const regions = sim.regions || [];
+    const empires = sim.empires || [];
     const crowned = regions.filter(r => r.kingId != null);
     const vacant = regions.filter(r => r.kingId == null);
     const totalPop = regions.reduce((s, r) => s + (r.memberCount || 0), 0);
@@ -573,6 +574,14 @@
     setText('ledger-region-ov-vacant', vacant.length);
     setText('ledger-region-ov-pop', totalPop);
     setText('ledger-region-ov-exped', totalExped);
+    setText('ledger-empire-ov-total', empires.length);
+
+    const empireList = document.getElementById('ledger-empire-list');
+    if (empireList) {
+      renderHtml(empireList, empires.length === 0
+        ? '<div class="ledger-empty">尚无帝国登记</div>'
+        : empires.slice().sort((a, b) => a.empireId - b.empireId).map(e => renderEmpireCard(sim, e)).join(''));
+    }
 
     const list = document.getElementById('ledger-region-list');
     if (!list) return;
@@ -583,6 +592,21 @@
     // 按 camp_id 升序（5个营地固定顺序）
     const sorted = regions.slice().sort((a, b) => a.campId - b.campId);
     renderHtml(list, sorted.map(r => renderKingdomCard(sim, r)).join(''));
+  }
+
+  function renderEmpireCard(sim, empire) {
+    const title = empire.headTitle === 'President' ? '总统' : '皇帝';
+    const regime = empire.regime === 'Federation' ? '联邦' : '帝国';
+    const head = empire.emperorId != null
+      ? '<span class="lineage-chip" data-agent-id="' + empire.emperorId + '">' + esc(agentName(sim, empire.emperorId)) + '</span>'
+      : '<span style="color:#94a3b8">首长空缺</span>';
+    let html = '<div class="kingdom-card" data-empire-id="' + empire.empireId + '" style="border-color:rgba(167,139,250,0.28);">';
+    html += '<div class="kingdom-header"><span class="kingdom-emblem">🌐</span><span class="kingdom-title">' + regime + ' #' + empire.empireId + '</span>';
+    html += '<span class="kingdom-king">' + title + ': ' + head + '</span></div>';
+    html += '<div class="kingdom-stats"><span>辖属营地: ' + (empire.memberCampIds || []).length + '</span><span>辖属人口: ' + (empire.memberCount || 0) + '</span><span>公帑来源: 下属王国公仓</span></div>';
+    html += '<div class="kingdom-relief-bubble" style="background:rgba(167,139,250,0.06); border:1px solid rgba(167,139,250,0.2);"><div class="kingdom-relief-item" style="color:#c4b5fd;">🌐 帝国公帑: 累计拨付 ' + (empire.cumulativeImperialPrivy || 0).toFixed(1) + ' 🪙（下属王国公仓每周期 5%）</div></div>';
+    html += '</div>';
+    return html;
   }
 
   function renderKingdomCard(sim, region) {

@@ -889,16 +889,18 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       }
     }
 
-    // ★ v1.35.2 调试模式: 国王收到的内帑总额（仅调试模式勾选且该族人为国王/曾获内帑时显示）
+    // ★ v1.35.2/M5 调试模式: 国王内帑与皇帝帝国公帑累计（仅调试模式勾选且该族人为相关首长/曾获拨付时显示）
     const debugPrivyEl = document.getElementById('insp-debug-privy');
     const debugPrivyValEl = document.getElementById('insp-debug-privy-val');
     if (debugPrivyEl && debugPrivyValEl) {
       const isKing = (sim.regions || []).some(r => r.kingId === selAgent.id);
       const privyTotal = selAgent.cumulativeRoyalPrivy || 0;
-      if (sim.debugMode && (privyTotal > 0.001 || isKing)) {
+      const isEmperor = (sim.empires || []).some(e => e.emperorId === selAgent.id);
+      const imperialTotal = selAgent.cumulativeImperialPrivy || 0;
+      if (sim.debugMode && (privyTotal > 0.001 || imperialTotal > 0.001 || isKing || isEmperor)) {
         debugPrivyEl.style.display = 'flex';
-        debugPrivyValEl.textContent = `${privyTotal.toFixed(1)} 🪙`;
-        debugPrivyValEl.title = `本族人一生作为国王从地区公仓累计领取的内帑总额${isKing ? '（现任国王）' : '（曾任国王）'}`;
+        debugPrivyValEl.textContent = `${privyTotal.toFixed(1)} + ${imperialTotal.toFixed(1)} 🪙`;
+        debugPrivyValEl.title = `国王内帑 ${privyTotal.toFixed(1)}；帝国公帑 ${imperialTotal.toFixed(1)}${isEmperor ? '（现任皇帝）' : ''}`;
       } else {
         debugPrivyEl.style.display = 'none';
       }

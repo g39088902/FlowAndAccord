@@ -63,6 +63,7 @@
 | `traitInheritClampMax` | f32 | 190 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取上限 |
 | `poiMinDistance` | f32 | 70 | ecology.rs (POI 空间排斥间距 §4.7) | POI 间最小排斥间距 (m) |
 | `countCamps` | usize | 4 | ecology.rs (POI 数量 §4.7) | 营地数量 |
+| `countEmpires` | usize | 1 | ledger/empire.rs (帝国数量与营地确定性分组) | 帝国数量（自动钳制为 1..=营地数量；当前政体仅实现帝国） |
 | `countWaterSources` | usize | 6 | ecology.rs (POI 数量 §4.7) | 清泉数量 |
 | `countBerryBushes` | usize | 6 | ecology.rs (POI 数量 §4.7) | 浆果数量 |
 | `countWoods` | usize | 3 | ecology.rs (POI 数量 §4.7) | 林木数量 |
@@ -216,3 +217,9 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
 | `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=⓪瞬间行为/1-5=①..⑤马斯洛层级/6=保留代码动态默认；空=全动态默认） |
+
+## ⚠ 校验错误
+
+- 数值漂移: roadWearDecayRate Rust 默认 0.005 ≠ 前端 0.0033
+- 数值漂移: roadWearStepInc Rust 默认 0.1 ≠ 前端 0.075
+- 数值漂移: roadMaxWear Rust 默认 10 ≠ 前端 20

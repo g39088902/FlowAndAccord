@@ -18,6 +18,7 @@
         this.selectedPoiId = null;
         this.selectedHouseId = null;
         this.totalRoyalPrivy = 0; // ★ v1.35.2 全局所有国王累计收到的内帑总额
+        this.totalImperialPrivy = 0; // ★ M5 全局所有皇帝累计收到的帝国公帑总额
 
         // 世界视图对象 (由快照映射而来)
         this.agents = [];
@@ -31,6 +32,7 @@
         this.publicGranaryBalances = {};  // ★ M2: 公仓兜底账本余额
         this.clans = [];                   // ★ M3: 宗族登记簿
         this.regions = [];                 // ★ M4: 地区/王国登记簿
+        this.empires = [];                 // ★ M5: 帝国/联邦上层登记簿
         this.expeditionTargets = new Map();// ★ M4: 远征目标反查表 agent_id -> camp_id
         this.auctionHistory = [];          // ★ 房屋报价中心历史受理记录 (256 环形缓冲区)
         this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
@@ -61,7 +63,7 @@
         this._reqSeq = 0;
         this._lastSaveJson = null;
         this._lastSaveError = '';
-        this._appVersion = '1.44.5';
+        this._appVersion = '1.44.7';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -126,7 +128,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.44.5';
+            this._appVersion = msg.appVersion || '1.44.7';
             this._wasmBytes = msg.wasmBytes || 0;
             this._setEngineStatus('', 'ready');
             if (msg.snapshot) {
@@ -330,7 +332,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.44.5';
+        return this._appVersion || '1.44.7';
       }
 
       /**
@@ -447,6 +449,7 @@
         this.totalMiscarriages = snap.total_miscarriages;
         this.totalHouseholds = snap.total_households || (snap.households ? snap.households.length : 0);
         this.totalRoyalPrivy = snap.total_royal_privy || 0;
+        this.totalImperialPrivy = snap.total_imperial_privy || 0;
         this.auctionStats = {
           started: snap.auction_started || 0,
           sold: snap.auction_sold || 0,
@@ -667,6 +670,7 @@
             cumulativeMinedWood: a.cumulative_mined_wood || 0, cumulativeMinedStone: a.cumulative_mined_stone || 0,
             cumulativeMinedGold: a.cumulative_mined_gold || 0,
             cumulativeRoyalPrivy: a.cumulative_royal_privy || 0,
+            cumulativeImperialPrivy: a.cumulative_imperial_privy || 0,
             buildTimer: a.build_timer,
             isPregnant: a.is_pregnant,
             pregnancyProgress: a.pregnancy_progress,
@@ -817,6 +821,22 @@
           governedHouseholds: r.governed_households || [],
           currentReignStart: r.current_reign_start != null ? r.current_reign_start : null,
           cumulativeRoyalPrivy: r.cumulative_royal_privy || 0
+        }));
+
+        // ★ M5: 帝国登记簿（当前政体仅为 Empire，首长称谓预留为 Emperor/President）
+        this.empires = (snap.empires || []).map(e => ({
+          empireId: e.empire_id,
+          regime: e.regime,
+          headTitle: e.head_title,
+          emperorId: e.emperor_id != null ? e.emperor_id : null,
+          memberCampIds: e.member_camp_ids || [],
+          memberCount: e.member_count || 0,
+          kingCandidates: e.king_candidates || [],
+          balances: (e.balances || []).reduce((acc, b) => { acc[b.resource] = b.amount; return acc; }, {}),
+          recentJournal: e.recent_journal || [],
+          recentEvents: e.recent_events || [],
+          currentReignStart: e.current_reign_start != null ? e.current_reign_start : null,
+          cumulativeImperialPrivy: e.cumulative_imperial_privy || 0
         }));
 
         // ★ M4: 远征目标反查表 agent_id -> camp_id（从 regions.activeExpeditionAgents 反查）

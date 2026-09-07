@@ -6,7 +6,7 @@ use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
 use super::poi::{PrimitivePoi, PoiType};
 use super::house::{House, HouseAuctionHistoryRecord, AUCTION_HISTORY_CAPACITY};
-use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
+use super::ledger::{ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
 use super::snapshot::{RecentDeathSnapshot, Season};
 use crate::geo::terrain::TerrainMap;
 
@@ -64,6 +64,8 @@ pub struct World3DEngine {
     pub mutual_aid_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
     /// ★ M4 地区与王国登记簿（按营地聚合的地区团体、国王、公仓与继承顺位）
     pub region_registry: RegionRegistry,
+    /// ★ M5 帝国登记簿（按营地聚合的帝国/联邦上层政体）
+    pub empire_registry: EmpireRegistry,
     /// ★ M4 救济冷却记录（每家户上次接受救济的 tick）
     pub relief_cooldown: std::collections::BTreeMap<HouseholdId, u64>,
     /// 房屋拍卖累计场次统计（started / sold / flopped）。
@@ -74,6 +76,8 @@ pub struct World3DEngine {
     pub auction_history: VecDeque<HouseAuctionHistoryRecord>,
     /// 上次国王内帑结算 tick；按 6000 tick（100 游戏小时）结算。
     pub last_royal_payout_tick: u64,
+    /// 上次帝国公帑结算 tick；与国王内帑使用相同的 6000 tick 周期但独立记账。
+    pub last_imperial_payout_tick: u64,
     /// 地形快照脏位标记：仅在初次生成、载入存档或显式请求时为 true 并导出 3600 个网格单元
     pub terrain_dirty: std::cell::Cell<bool>,
     /// 地区居民到达时序脏位标记：仅在新成员加入/变动时置为 true 并按需排序
@@ -129,12 +133,14 @@ impl World3DEngine {
             clan_registry: ClanRegistry::new(LEDGER_JOURNAL_CAPACITY),
             mutual_aid_cooldown: std::collections::BTreeMap::new(),
             region_registry: RegionRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            empire_registry: EmpireRegistry::new(LEDGER_JOURNAL_CAPACITY),
             relief_cooldown: std::collections::BTreeMap::new(),
             auction_started: 0,
             auction_sold: 0,
             auction_flopped: 0,
             auction_history: VecDeque::with_capacity(AUCTION_HISTORY_CAPACITY),
             last_royal_payout_tick: 0,
+            last_imperial_payout_tick: 0,
             terrain_dirty: std::cell::Cell::new(true),
             regions_arrival_dirty: true,
         }

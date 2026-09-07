@@ -267,7 +267,7 @@ graph TD
 1. **IndexedDB 持久化句柄**：数据库 `flowaccord-save-handles` / objectStore `handles` / keyPath `slotId`，存储 `{slotId, handle, fileName, savedAt}`。页面刷新后初始化时从 IDB 恢复全部槽位句柄并异步从文件头读取元信息。
 2. **自动保存**：`tickAutoSave()` 每 60 秒写入槽位 1（未连接则跳过），UI 标注「🤖 自动保存」徽章。
 3. **元信息缓存**：已连接槽位的元信息（Tick/人口/体积/保存时间）缓存在内存，刷新时从文件头提取，无需全量读取。
-4. **存档格式版本**：`SAVE_FORMAT_VERSION = 3`（v1.12.0 因 `history_kings` 结构变更从 2 升级），读档时版本不兼容即拒绝加载且不污染当前世界。
+4. **存档格式版本**：`SAVE_FORMAT_VERSION = 4`（v1.12.0 因 `history_kings` 结构变更从 2 升到 3；v1.44.7 因新增帝国登记簿 `empire_registry` 与帝国公帑结算状态 `last_imperial_payout_tick` 从 3 升至 4，不兼容旧档），读档时版本不兼容即拒绝加载且不污染当前世界。
 5. **权限失效处理**：写入/读取捕获 `NotAllowedError`，自动断开连接并提示重新授权。
 6. **旧导入按钮已隐藏**：`input[type=file]` 导入入口移除，统一走文件槽位体系。
 

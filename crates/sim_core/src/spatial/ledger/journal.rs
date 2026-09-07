@@ -51,6 +51,8 @@ pub enum LedgerRef {
     Clan(String),
     /// 🏛️ 地区公仓（M4：按营地聚合的王国团体账本，领导者=国王）
     Region(u32),
+    /// 🌐 帝国账本（M5：按帝国聚合，领导者=皇帝/总统）
+    Empire(u32),
     // 🏢 Corporate(CompanyId) —— 预留：公司资产
 }
 
@@ -99,6 +101,8 @@ pub enum TransferReason {
     TransferTax,
     /// 国王内帑（地区公仓按固定周期划转至国王随身黄金）
     RoyalPrivy,
+    /// 帝国公帑（下属王国公仓按固定周期划转至帝国首长随身黄金）
+    ImperialPrivy,
 }
 
 /// 单笔显式交易流水（可审计核心：每笔都写明谁→谁、什么资源、多少、为何）

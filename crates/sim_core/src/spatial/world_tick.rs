@@ -179,6 +179,7 @@ impl World3DEngine {
         self.tick_bookkeeping();
         self.tick_clan(dt);
         self.tick_region(dt);
+        self.tick_empire(dt);
     }
 
     /// 子阶段 8: 墓碑滑动窗口清理

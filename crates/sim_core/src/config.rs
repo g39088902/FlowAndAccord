@@ -102,6 +102,8 @@ pub const TRAIT_INHERIT_CLAMP_MAX: f32 = 190.0;
 // ============================================================================
 pub const POI_MIN_DISTANCE: f32 = 70.0;
 pub const COUNT_CAMPS: usize = 4;
+/// 帝国数量（默认 1；运行时会钳制到 1..=营地数）
+pub const COUNT_EMPIRES: usize = 1;
 pub const CAMP_MAX_HOUSES: u32 = 25;
 /// 营地行政级别升级所需的最低房屋数量（村、乡、镇、县）
 pub const CAMP_LEVEL_VILLAGE_MIN_HOUSES: u32 = 5;
@@ -448,6 +450,8 @@ pub struct SimConfig {
     // 4. 生态地标与 POI 采收交互
     pub poi_min_distance: f32,
     pub count_camps: usize,
+    /// 帝国数量（每个帝国至少辖 1 个营地）
+    pub count_empires: usize,
     pub count_water_sources: usize,
     pub count_berry_bushes: usize,
     pub count_woods: usize,
@@ -695,6 +699,7 @@ impl Default for SimConfig {
             // 4. 生态地标与 POI 采收交互
             poi_min_distance: POI_MIN_DISTANCE,
             count_camps: COUNT_CAMPS,
+            count_empires: COUNT_EMPIRES,
             count_water_sources: COUNT_WATER_SOURCES,
             count_berry_bushes: COUNT_BERRY_BUSHES,
             count_woods: COUNT_WOODS,

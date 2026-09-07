@@ -27,6 +27,10 @@ impl World3DEngine {
         self.mutual_aid_cooldown.clear();
         // ★ M4 地区登记簿同步清空
         self.region_registry.clear();
+        // ★ M5 帝国登记簿同步清空；营地生成后按配置确定性分组
+        self.empire_registry.clear();
+        self.last_royal_payout_tick = 0;
+        self.last_imperial_payout_tick = 0;
         self.relief_cooldown.clear();
         // ★ v1.8.7 死亡/流产墓碑同步清空（世界重置不留旧死亡记录）
         self.recent_deaths.clear();
@@ -323,6 +327,12 @@ impl World3DEngine {
                 self.region_registry.add_member(camp.id, agent.id, 0, 0);
             }
         }
+
+        let camp_ids: Vec<u32> = self.pois.iter()
+            .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
+            .map(|p| p.id)
+            .collect();
+        self.empire_registry.ensure_structure(&camp_ids, self.config.count_empires);
 
 
         self.last_event = Some("🏕️ 生态初始：20 位始祖族人（10男10女）成家配对，踏路筑室，社会演化开启！".to_string());

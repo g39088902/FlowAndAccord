@@ -20,6 +20,8 @@ pub enum GroupKind {
     Clan(String),
     /// 🏛️ 地区（M4：按营地聚合的王国团体，领导者=国王，独有政体与长子继承制）
     Region(u32),
+    /// 🌐 帝国（M5：按营地聚合的帝国团体，领导者=皇帝/总统）
+    Empire(u32),
     // 🏢 Corporate(CompanyId) —— 预留：商号/公司
 }
 
@@ -88,4 +90,3 @@ impl Group {
         self.members.contains(&agent)
     }
 }
-

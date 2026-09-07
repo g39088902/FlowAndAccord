@@ -19,16 +19,17 @@ use crate::rng::WorldRng;
 use super::agent::{Agent3D, AgentId};
 use super::graph::LaneGraph3D;
 use super::house::{House, HouseAuctionHistoryRecord};
-use super::ledger::{ClanRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
+use super::ledger::{ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
 use super::poi::PrimitivePoi;
 use super::snapshot::Season;
 use super::world::World3DEngine;
 
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
-pub const SAVE_FORMAT_VERSION: u32 = 3;
+/// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
+pub const SAVE_FORMAT_VERSION: u32 = 4;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.44.5";
+pub const SAVE_APP_VERSION: &str = "1.44.7";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -97,6 +98,8 @@ pub struct WorldSave {
     pub public_granary: Ledger,
     pub clan_registry: ClanRegistry,
     pub region_registry: RegionRegistry,
+    #[serde(default)]
+    pub empire_registry: EmpireRegistry,
 
     // ── 团体冷却表（保序 BTreeMap）──
     pub mutual_aid_cooldown: BTreeMap<HouseholdId, u64>,
@@ -111,6 +114,8 @@ pub struct WorldSave {
     pub auction_history: VecDeque<HouseAuctionHistoryRecord>,
     #[serde(default)]
     pub last_royal_payout_tick: u64,
+    #[serde(default)]
+    pub last_imperial_payout_tick: u64,
 }
 
 impl World3DEngine {
@@ -151,6 +156,7 @@ impl World3DEngine {
             public_granary: self.public_granary.clone(),
             clan_registry: self.clan_registry.clone(),
             region_registry: self.region_registry.clone(),
+            empire_registry: self.empire_registry.clone(),
             mutual_aid_cooldown: self.mutual_aid_cooldown.clone(),
             relief_cooldown: self.relief_cooldown.clone(),
             auction_started: self.auction_started,
@@ -158,6 +164,7 @@ impl World3DEngine {
             auction_flopped: self.auction_flopped,
             auction_history: self.auction_history.clone(),
             last_royal_payout_tick: self.last_royal_payout_tick,
+            last_imperial_payout_tick: self.last_imperial_payout_tick,
         }
     }
 }
@@ -237,12 +244,14 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         clan_registry: save.clan_registry,
         mutual_aid_cooldown: save.mutual_aid_cooldown,
         region_registry: save.region_registry,
+        empire_registry: save.empire_registry,
         relief_cooldown: save.relief_cooldown,
         auction_started: save.auction_started,
         auction_sold: save.auction_sold,
         auction_flopped: save.auction_flopped,
         auction_history: save.auction_history,
         last_royal_payout_tick: save.last_royal_payout_tick,
+        last_imperial_payout_tick: save.last_imperial_payout_tick,
         terrain_dirty: std::cell::Cell::new(true),
         regions_arrival_dirty: true,
     };

@@ -3,7 +3,7 @@ use super::ledger::journal::ResourceKind;
 use super::poi::{PoiType, market_unit_price, market_unit_price_with_base};
 use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 use super::snapshot::{
-    AgentSnapshot, ClanSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
+    AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
     MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
@@ -219,6 +219,7 @@ impl World3DEngine {
                 cumulative_mined_stone: agent.cumulative_mined_stone,
                 cumulative_mined_gold: agent.cumulative_mined_gold,
                 cumulative_royal_privy: agent.cumulative_royal_privy,
+                cumulative_imperial_privy: agent.cumulative_imperial_privy,
                 build_timer: agent.build_timer,
                 miscarriage_alert_timer: agent.miscarriage_alert_timer,
                 state: agent.state.as_str().to_string(),
@@ -501,6 +502,46 @@ impl World3DEngine {
             });
         }
 
+        let mut empires = Vec::new();
+        for (empire_id, empire) in &self.empire_registry.empires {
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| LedgerBalanceSnapshot {
+                resource: format!("{:?}", rk),
+                amount: empire.group.ledger.balance(rk),
+            }).collect();
+            let recent_events: Vec<String> = empire.group.ledger.events.iter().rev().take(8).map(|e| e.note.clone()).collect();
+            let recent_journal: Vec<TransferRecordSnapshot> = empire.group.ledger.journal.iter().rev().take(8).map(|r| TransferRecordSnapshot {
+                tick: r.tick,
+                resource: format!("{:?}", r.resource),
+                amount: r.amount,
+                from: format!("{:?}", r.from),
+                to: format!("{:?}", r.to),
+                reason: format!("{:?}", r.reason),
+            }).collect();
+            let member_camp_ids: Vec<u32> = empire.member_camps.iter().copied().collect();
+            let mut king_candidates: Vec<u32> = member_camp_ids.iter()
+                .filter_map(|camp_id| self.region_registry.get(*camp_id).and_then(|r| r.group.leader))
+                .collect();
+            king_candidates.sort_unstable();
+            let member_count: u32 = member_camp_ids.iter()
+                .filter_map(|camp_id| self.region_registry.get(*camp_id))
+                .map(|r| r.group.members.len() as u32)
+                .sum();
+            empires.push(EmpireSnapshot {
+                empire_id: *empire_id,
+                regime: format!("{:?}", empire.regime),
+                head_title: format!("{:?}", empire.head_title),
+                emperor_id: empire.group.leader,
+                member_camp_ids,
+                member_count,
+                king_candidates,
+                balances,
+                recent_journal,
+                recent_events,
+                current_reign_start: empire.current_reign_start,
+                cumulative_imperial_privy: empire.cumulative_imperial_privy,
+            });
+        }
+
         let season_str = match self.current_season {
             Season::Spring => "Spring",
             Season::Summer => "Summer",
@@ -527,6 +568,7 @@ impl World3DEngine {
             marriages,
             clans,
             regions,
+            empires,
             public_granary_balances: resource_kinds.iter().map(|&rk| {
                 LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
@@ -543,6 +585,7 @@ impl World3DEngine {
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,
             total_royal_privy: self.region_registry.regions.values().map(|r| r.cumulative_royal_privy).sum(),
+            total_imperial_privy: self.empire_registry.empires.values().map(|e| e.cumulative_imperial_privy).sum(),
             auction_history: self.auction_history.iter().rev().map(|r| HouseAuctionHistorySnapshot {
                 tick: r.tick,
                 house_id: r.house_id,
