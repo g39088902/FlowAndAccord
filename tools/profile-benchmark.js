@@ -47,14 +47,14 @@ async function createEngine(seed, agentCount, campCount, config) {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
-  ex.world_create(60, 764.0, seed, agentCount, campCount);
-
   // 注入配置
   const encoded = textEncoder.encode(JSON.stringify(config));
   const ptr = ex.world_config_buf_ptr(encoded.length);
   new Uint8Array(ex.memory.buffer, ptr, encoded.length).set(encoded);
   const res = ex.world_apply_config_buf(encoded.length);
   if (res !== 0) throw new Error('配置注入失败: ' + res);
+
+  ex.world_create(60, 764.0, seed, agentCount, campCount);
 
   // 消费初始创世快照
   const snapPtr = ex.world_snapshot_ptr();

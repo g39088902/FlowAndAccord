@@ -1,7 +1,7 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.44.7（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v1.44.9（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（195 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
 
 ---
@@ -67,6 +67,7 @@
 | 17 | 🌾 荒地开垦农田与农业税（设计稿） | [17-plan-farmland-agriculture.md](./17-plan-farmland-agriculture.md) | 农田生产资产、资本投资、农业税基、B19 自主投资分支与分阶段落地方案 |
 | 15+ | ⏱️ 性能 Profiling 基准与确定性矩阵 | [15-profiling-and-benchmarking-guide.md](./15-profiling-and-benchmarking-guide.md) | `profile-benchmark.js` 吞吐量/8大子阶段耗时拆解/快照序列化开销、`test-determinism.js` 6大确定性定理测试 |
 | 16+ | 🚀 仿真内核与全链路性能优化规划书 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | M1~M5 全链路性能优化路线图：快照节流/稀疏路网衰减/A*查表/二进制快照/多线程 |
+| 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 15 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
 | — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.41.0 各版本核心机制改动 |
 
 ---

@@ -7,9 +7,6 @@ use crate::config::*;
 
 pub type AgentId = u32;
 
-// Re-export for external and internal callers
-pub use crate::config::CARRY_CAPACITY_RESOURCE;
-
 /// Agent 对单个 POI 的库存施密特记忆：高阈值开启、低阈值关闭，中间区间保持前态。
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct StockSchmittTrigger {
@@ -291,10 +288,6 @@ pub struct Agent3D {
 }
 
 impl Agent3D {
-    pub fn new(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32, gender: Gender) -> Self {
-        Self::new_with_config(id, home_camp, max_speed, is_covert, initial_age, gender, &SimConfig::default())
-    }
-
     pub fn new_with_config(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32, gender: Gender, config: &SimConfig) -> Self {
         let quadrupled_speed = max_speed * config.agent_base_move_speed_mult;
         Self {

@@ -211,8 +211,22 @@ async function main() {
   const wasm = result.instance.exports;
   const memory = wasm.memory;
 
+  // 注入配置
+  const windowShim = {};
+  new Function('window', fs.readFileSync(path.join(__dirname, '..', 'frontend', 'js', 'config.js'), 'utf8'))(windowShim);
+  const costPath = path.join(__dirname, '..', 'frontend', 'js', 'config.house-upgrade-cost.js');
+  if (fs.existsSync(costPath)) {
+    new Function('window', fs.readFileSync(costPath, 'utf8'))(windowShim);
+    Object.assign(windowShim.SIM_CONFIG, windowShim.SIM_HOUSE_UPGRADE_COST || {});
+  }
+  const cfg = windowShim.SIM_CONFIG;
+  const encoded = new TextEncoder().encode(JSON.stringify(cfg));
+  const cfgPtr = wasm.world_config_buf_ptr(encoded.length);
+  new Uint8Array(memory.buffer, cfgPtr, encoded.length).set(encoded);
+  wasm.world_apply_config_buf(encoded.length);
+
   // 创建世界（与前端一致：grid=60, size=764, seed=42, 20人）
-  wasm.world_create(60, 764.0, 42, 20, 5);
+  wasm.world_create(60, 764.0, 42, 20, cfg.countCamps || 4);
 
   function getSnapshot() {
     const ptr = wasm.world_snapshot_ptr();

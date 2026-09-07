@@ -1,7 +1,11 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.44.7**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.44.9**。
+
+| **v1.44.9** | 彻底废除 Rust 内核冗余数值常量，确立前端 JS 为仿真超参数唯一真相源：① **Rust 内核数值常量清零**：删除 `crates/sim_core/src/config.rs` 中全部 200 余个 `pub const` 默认数值定义与 240 余行手写 `impl Default for SimConfig`，改为派生 `#[derive(Default)]` 零值中性兜底，代码精简 610 行；清理 `spatial/` 模块残留无效常数引用；② **WASM 持久配置注入机制**：`crates/sim_wasm` 引入 `ACTIVE_CONFIG` 持久全局配置暂存，`world_apply_config_buf` / `world_set_config` 在世界创建前或运行时均无缝更新暂存，彻底根治二次 `world_create` 因配置丢失退化至全零导致的 A* 除以零异常；③ **纯契约门禁与速查表生成**：`tools/config-check.js` 改造为纯契约门禁，专职校验 Rust 与 JS 间 205 个字段的名词契约与类型系统，速查表（`docs/06-config-reference.md`）数值 100% 提取自 JS 权威文件；④ **全链路工具兼容与确定性全通**：`sim_worker.js`、`test-wasm.js`、`test-determinism.js`（6/6 套件通过）、`diagnose.js`、`profile-benchmark.js` 均保证在 `world_create` 前可靠注入配置；双副本编译同步完成 | sim_core / sim_wasm / config / tools / frontend / docs |
+
+| **v1.44.8** | 沉淀仿真内核与工程工具箱综合操作指南，补全代码地图与文档索引：① **落地综合操作指南**：新增 `docs/current/20-tools-guide.md`，全面系统地收录 `tools/` 目录下全部 15 个工具（契约门禁、内核测试、性能基准、无头诊断、族谱生成、版本治理与离线依赖）的定位、核心参数、运行示例与退出码契约；② **代码地图全量对齐**：更新 `docs/current/09-code-map.md`，登记全部 15 个 tools 工具、拆分后的前端 Canvas 渲染管线文件（`render_canvas/world/agents/inspector/hud.js` 等）与内核拆分子文件，更新 `SimConfig` 为 205 个 pub 字段，`tools/code-map-check.js` 0 错误 0 警告全通；③ **文档健康体检与全景索引**：`docs/01-current.md`、`AGENTS.md` 与 `docs/doc-maintenance.json` 同步登记新指南；④ 升版至 v1.44.8，完成 WASM 双副本编译同步与确定性测试 | tools / docs / config |
 
 | **v1.44.7** | 落地 M5 帝国上层政体：① 新增 `EmpireRegistry`，将全图营地按 `countEmpires` 做确定性连续分组，每个帝国至少辖 1 个营地；② 新增可扩展 `EmpireRegime`/`EmpireHeadTitle` 字段，当前实现 `Empire`/`Emperor`，为联邦/总统预留枚举位；③ 每 tick 在王国继承结算后，从下属王国现任国王中按威望最高、AgentId 最小打破平局自动加冕/更替皇帝；④ 新增帝国公帑结算，与国王内帑共用 6000 tick 周期，从每个下属王国公仓黄金余额抽取 5%，转入皇帝随身黄金并记 `ImperialPrivy` 流水；⑤ Agent/Empire/World 三层累计帝国公帑，存档格式升至 4，快照与前端王国看板新增帝国卡片；⑥ 配置、WASM 双副本、前端静态门禁同步 | sim_core / ledger(empire) / snapshot / world_save / frontend / config / docs |
 

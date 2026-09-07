@@ -57,8 +57,30 @@ function summarize(arr) {
     const len = ex.world_snapshot_len();
     return JSON.parse(new TextDecoder().decode(new Uint8Array(ex.memory.buffer, ptr, len)));
   }
+  function loadSimConfig() {
+    const windowShim = {};
+    new Function('window', fs.readFileSync(path.join(ROOT, 'frontend', 'js', 'config.js'), 'utf8'))(windowShim);
+    const orderPath = path.join(ROOT, 'frontend', 'js', 'config.decision-order.js');
+    if (fs.existsSync(orderPath)) {
+      new Function('window', fs.readFileSync(orderPath, 'utf8'))(windowShim);
+      const o = windowShim.SIM_DECISION_ORDER;
+      if (o && Array.isArray(o.decisionEvalOrder)) windowShim.SIM_CONFIG.decisionEvalOrder = o.decisionEvalOrder;
+      if (o && Array.isArray(o.decisionEvalLevels)) windowShim.SIM_CONFIG.decisionEvalLevels = o.decisionEvalLevels;
+    }
+    const costPath = path.join(ROOT, 'frontend', 'js', 'config.house-upgrade-cost.js');
+    if (fs.existsSync(costPath)) {
+      new Function('window', fs.readFileSync(costPath, 'utf8'))(windowShim);
+      Object.assign(windowShim.SIM_CONFIG, windowShim.SIM_HOUSE_UPGRADE_COST || {});
+    }
+    return windowShim.SIM_CONFIG;
+  }
+  const cfg = loadSimConfig();
+  const encoded = new TextEncoder().encode(JSON.stringify(cfg));
+  const cfgPtr = ex.world_config_buf_ptr(encoded.length);
+  new Uint8Array(ex.memory.buffer, cfgPtr, encoded.length).set(encoded);
+  ex.world_apply_config_buf(encoded.length);
 
-  ex.world_create(60, 764.0, SEED, 20, 5);
+  ex.world_create(60, 764.0, SEED, 20, cfg.countCamps || 4);
 
   // archive: id -> 族人档案 (末次出现状态覆盖式写入)
   const archive = new Map();

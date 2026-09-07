@@ -30,40 +30,43 @@
 - 开发者直接编辑 `frontend/js/config.js` 并刷新浏览器（Ctrl+F5），即可即时生效，无需重编 WASM。
 - `config.js` 每个字段均带中文行内说明。
 
-### 新增超参三处同步
-在 `crates/sim_core/src/config.rs` 中必须同时出现：
-1. **命名 `const`**（默认值唯一真相源，如 `pub const FOO: f32 = 1.0;`）
-2. **`SimConfig` 字段**（如 `pub foo: f32,`）
-3. **`Default` 映射**（如 `foo: FOO,`）
+### 唯一数值真相源（v1.44.9 起）
+- **前端 JS (`frontend/js/config.js`) 为仿真超参数的唯一数值真相源**。
+- Rust 内核 `crates/sim_core/src/config.rs` 中的 200 余个 `pub const` 默认数值常量与手写 `impl Default` 已彻底废弃删除，`SimConfig` 纯净派生 `#[derive(Default)]`（零值中性兜底）。
+- WASM 初始化与世界创建前通过持久全局缓冲注入前端 `SimConfig`，仿真行为 100% 由前端 JS 传入的数值驱动。
 
-前端 `config.js` 同步添加对应 camelCase 字段与中文注释。
+### 免编译热调优
+- 前端 `rustworld.js` / `sim_worker.js` 在加载 WASM 及创建/重置模拟时，通过 `world_set_config` / `world_apply_config_buf` 将 `window.SIM_CONFIG` 动态序列化注入 Rust WASM 内存。
+- 开发者直接编辑 `frontend/js/config.js` 并刷新浏览器（Ctrl+F5），即可即时生效，无需重编 WASM。
+- `config.js` 每个字段均带中文行内说明。
+
+### 新增超参规范
+在新增仿真超参数时：
+1. **Rust 端**：在 `crates/sim_core/src/config.rs` 的 `SimConfig` 结构体中添加对应类型的 `pub` 字段（如 `pub foo: f32,`）。
+2. **前端**：在 `frontend/js/config.js` 对应模块中定义 camelCase 字段及权威数值，并配齐中文行内注释。
 
 ### 数组类型字段与「Rust 无顺序」例外（v1.3.6 起）
-- `decisionEvalOrder: Vec<String>` / `decisionEvalLevels: Vec<u8>` 支持数组类型：**Rust 默认空 Vec**，
-  策展顺序的权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。
-  这是「命名 const 默认值」一项的**文档化例外**——内核不持有策展优先级，空/非法注入仅按分支声明序中性兜底。
-- 决策引擎视图拖动后经 `POST /save-decision-order`（`frontend/server.js` 端点，校验 + 原子写）重写该文件；
-  静态部署无写文件能力时降级暂存 localStorage。
+- `decisionEvalOrder: Vec<String>` / `decisionEvalLevels: Vec<u8>` 支持数组类型：策展顺序的权威值存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。
+- 决策引擎视图拖动后经 `POST /save-decision-order`（`frontend/server.js` 端点，校验 + 原子写）重写该文件；静态部署无写文件能力时降级暂存 localStorage。
 
 ### 配置校验工具 `tools/config-check.js`
-零依赖纯 Node 脚本，交叉解析 `config.js` 与 `config.rs`，捕获四类问题并以退出码报错（数组类型逐元素比对）：
+零依赖纯 Node 脚本，作为**纯契约门禁**校验 `config.js` 与 `config.rs`：
 1. **孤儿字段**：前端有 / Rust 无
 2. **缺失字段**：Rust 有 / 前端无
-3. **类型错配**：`usize/u64` 与浮点、`Vec<String>`/`Vec<u8>` 与非数组
-4. **数值漂移**：默认值不一致（数组按 JSON 序列化比对）
+3. **类型错配**：`usize/u64`、浮点、布尔与 `Vec<String>`/`Vec<u8>` 数组类型严格一致
+4. **速查表生成**：数值 100% 提取自 `config.js` 唯一真相源，自动更新生成 `docs/06-config-reference.md`。
 
-任一报错即说明前后端已失同步，须先修复再发布。改参后必跑。
+任一报错即说明前后端契约未同步，须先修复再发布。改参或字段后必跑。
 
 ### 参数速查表 `docs/06-config-reference.md`
-- 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值、**影响模块**（v1.7.1 起新增）与中文说明。
-- **影响模块列**：169 个字段全部标注改动后会影响哪些 Rust/前端模块，由 `IMPACT_OVERRIDES`（12 个特殊字段显式覆盖）+ `IMPACT_PREFIX_RULES`（60+ 前缀规则）自动推导。示例：`carryCapacityResource`→`agent.rs / ecology.rs / decisions/`、`decisionPoiSeekMinStockRatio`→`decisions/routing.rs / decisions/harvest.rs`、`houseWinterWoodBurnRate`→`housing_system/maintenance.rs`。
-- 是用户检索/核对参数的唯一权威入口，**不要手工维护**。
-- 改 `config.rs` 后重跑 `node tools/config-check.js` 即可刷新。
+- 由 `config-check.js` 自动生成，按分区罗列每个字段的 camelCase 名、类型、默认值（取自 JS）、**影响模块**与中文说明。
+- 是用户检索/核对参数的权威速查表，**不要手工维护**。
+- 改字段后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 字段数为 **195**（v0.9.65 清理废弃超参后降至 154，v0.9.72 新增账本字段后为 153，v1.2.0 宗族 +5，v1.3.0 地区王国 +5，v1.3.6 决策顺序 +2，v1.6.0 M8 升级成本矩阵 +20 并删除 14 个废弃字段，后续清理/修正若干——以实际 `config.rs` 为准，`node tools/config-check.js` 输出为权威数字）。
-- 严禁在 Rust 逻辑层散落字面量或直引 `const`，一律通过 `self.config.<字段>` 引用。
-- `config.js` 字段集/类型/默认值必须与 `config.rs` 完全一致。
+- `SimConfig` 当前有效字段数为 **205 个**。
+- 前端 JS 为仿真超参数的唯一数值真相源，Rust 内核不保留数值字面量常量。
+- `config.js` 字段集与类型必须与 `config.rs` 契约严格 100% 吻合。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。
 
 ## 与其他模块接口

@@ -10,7 +10,7 @@ FlowAndAccord/
 ├── crates/
 │   ├── sim_core/                           # 纯 Rust 确定性模拟内核
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (181 字段) + 默认常量
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (205 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -28,7 +28,12 @@ FlowAndAccord/
 │   │           ├── ecology.rs              # 生态初始化、POI 采收装载、回家卸货入账、榷场交易结算
 │   │           ├── birth.rs                # 妊娠结算、分娩、新生儿属性遗传
 │   │           ├── bookkeeping.rs          # ★ M2 家庭生命周期结算 (继承清算 + 分家抽资；M6 起日常收付改由生态/维护层真实记账)
-│   │           ├── world.rs                # World3DEngine 世界调度、四季温度、快照生成、配置注入
+│   │           ├── world.rs                # World3DEngine 结构体定义与生命周期
+│   │           ├── world_config.rs         # 动态配置注入与 JSON 反序列化
+│   │           ├── world_save.rs           # 确定性存读档序列化与反序列化
+│   │           ├── world_season.rs         # 四季与宏观温度时变计算
+│   │           ├── world_snapshot.rs       # generate_snapshot 快照数据组装
+│   │           ├── world_tick.rs           # tick 管线调度（§4.3 固定顺序）+ 胎儿对账 + 金币继承
 │   │           ├── snapshot.rs             # 快照结构体定义 (Agent/House/POI/Household/Marriage/Clan/Region/Ledger)
 │   │           ├── decisions/              # 🧠 马斯洛决策子系统 (9 文件)
 │   │           │   ├── mod.rs              # 决策子模块入口与重新导出
@@ -42,19 +47,21 @@ FlowAndAccord/
 │   │           │   └── scheduler.rs        # tick_decisions + execute_pending_coronations(★M4登基) + build_decision_context
 │   │           ├── housing_system/         # 🏡 房屋全生命周期子系统 (7 文件)
 │   │           │   ├── mod.rs              # 房屋系统 tick 管线入口
+│   │           │   ├── auction.rs          # 营地麦穗 37% 拍卖机制与出价受理
 │   │           │   ├── maintenance.rs      # 冬季供暖与耐久修缮结算
 │   │           │   ├── construction.rs     # 升级瞬时竣工 (M6 起一次性扣账无工时) + 材料成本校验
 │   │           │   ├── marriage.rs         # 自动成婚与丧偶改嫁匹配 (M6 起遍历家户户主)
 │   │           │   ├── settlement.rs       # 立宅选址校验、路网接入、空置节点复用
 │   │           │   └── inheritance.rs      # 空置房登记（户主亡故→无主→营地列表+受益人）
-│   │           └── ledger/                  # 📒 账本与社会经济制度子系统 (7 文件, M1~M4)
+│   │           └── ledger/                  # 📒 账本与社会经济制度子系统 (8 文件, M1~M5)
 │   │               ├── mod.rs              # ledger 模块入口与重新导出
 │   │               ├── journal.rs          # 账本内核 (ResourceKind/Ledger/TransferRecord/TransferReason/LedgerRef)
 │   │               ├── group.rs            # 团体基类 (leader + members + ledger, GroupKind: Family/Clan/Region)
 │   │               ├── marriage.rs         # 婚姻登记簿 (终身多段婚姻全留痕、存续唯一性)
 │   │               ├── family.rs           # 家户体系 (家庭跟着男人走、户主男性锚定、改嫁先移后加)
 │   │               ├── clan.rs             # ★ M3 宗族系统 (ClanRegistry/族长顺位/族税/互助)
-│   │               └── region.rs           # ★ M4 地区与王国系统 (RegionRegistry/初王/继承/公仓税/救济)
+│   │               ├── region.rs           # ★ M4 地区与王国系统 (RegionRegistry/初王/继承/公仓税/救济)
+│   │               └── empire.rs           # ★ M5 帝国与联邦系统 (EmpireRegistry/上层政体)
 │   └── sim_wasm/                           # 🔌 WASM 零依赖 FFI 导出层
 │       └── src/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
@@ -66,6 +73,9 @@ FlowAndAccord/
 │   │   ├── math.js                         # 3D 向量与投影变换
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
+│   │   ├── decision-viz.js                 # 决策可视化窗口控制器与状态桥接
+│   │   ├── auction-ui.js                   # 房屋麦穗拍卖交易所大盘与竞价面板
+│   │   ├── entity-link.js                  # 跨面板族人/房屋/POI/团体实体下钻跳转交互
 │   │   ├── sim_worker.js                   # ★ v1.38.0 仿真内核专用 Web Worker (后台独立线程加载 WASM、自主步进与快照背压推送)
 │   │   ├── rustworld.js                    # ★ v1.38.0 主线程仿真代理层、快照映射、Worker 生命周期管理、agentArchive 全量档案库
 │   │   ├── dag-layout.js                   # 族谱时间轴布局数学 (纯函数, 零 DOM)
@@ -75,7 +85,11 @@ FlowAndAccord/
 │   │   ├── main.js                         # 页面交互、控制台、事件绑定、相机控制
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
-│   │   └── render.js                       # Canvas 渲染、Inspector、顶栏、大盘、调试监视器 (2130行，待拆分)
+│   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
+│   │   ├── render_world.js                 # 地形高程网格、车道贝塞尔曲线、POI 与私宅绘制
+│   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效
+│   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染
+│   │   └── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
 │   ├── rust/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本
@@ -83,13 +97,20 @@ FlowAndAccord/
 │   ├── index.html                          # 完整单页可视化仿真系统 (14 script 按序加载)
 │   └── style.css                           # 全局样式
 ├── tools/
-│   ├── test-wasm.js                        # WASM 回归测试 (确定性/防越界/防 NaN/长程稳定)
+│   ├── bump-version.js                     # 版本号统一升版器 (真相源对齐与 8+ 处定义点同步)
+│   ├── code-map-check.js                   # ★ 代码地图一致性校验 (实际文件 vs 09-code-map.md 登记 + 描述漂移检测)
 │   ├── config-check.js                     # 前后端配置一致性校验 (含 config.house-upgrade-cost.js) + 06-config-reference.md 自动生成
-│   ├── code-map-check.js                   # ★ 代码地图一致性校验 (实际文件 vs 09-code-map.md 登记 + 描述漂移检测 + 嵌套 AGENTS.md 覆盖)
-│   ├── snapshot-check.js                   # ★ 快照三处同步校验 (snapshot.rs定义 vs world.rs赋值 vs rustworld.js映射)
+│   ├── dag-shot.js                         # 族谱多档位无头截图验证 (Node 加载 FlowDag + Chrome headless)
+│   ├── diagnose.js                         # 确定性无头内核诊断与 Bug 嗅探工具 (指定 seed/tick 极速排障)
+│   ├── doc-maintenance-check.js            # 文档维护体检器 (新鲜度、复核周期与维护清单扫描)
+│   ├── frontend-check.js                   # 前端静态一致性与 JS 语法校验门禁 (含 getElementById DOM ID 存在性检查)
 │   ├── gen-dag-testdata.js                 # 族谱布局参数拟合测试数据生成 (驱动 sim_wasm 跑满 50 万 tick)
-│   ├── dag-shot.js                         # 族谱多档位截图验证 (Node 中 eval 加载 dag 模块 + Chrome headless)
-│   ├── rust-download.js                    # Rust 工具链下载器 (Node OpenSSL TLS, 下载 rustc/cargo/rust-std windows+wasm32)
+│   ├── gold_mining_analysis.js             # 淘金与货币经济行为专项分析脚本
+│   ├── profile-benchmark.js                # 性能 Profiling 基准测试与微秒级子阶段剖析器
+│   ├── rust-download.js                    # Rust 工具链下载器 (Node OpenSSL TLS 绕过系统证书异常)
+│   ├── snapshot-check.js                   # ★ 快照三处同步校验 (snapshot.rs定义 vs world_snapshot.rs赋值 vs rustworld.js映射)
+│   ├── test-determinism.js                 # 增强型确定性矩阵测试套件 (6 大数学不变量定理验证)
+│   ├── test-wasm.js                        # WASM 回归测试 (确定性/防越界/防 NaN/长程稳定)
 │   └── vendor-deps.js                      # 依赖图 BFS vendor 解析器 (crates.io API 发现并下载全部依赖到 .vendor/)
 ├── .github/
 │   └── workflows/
@@ -101,16 +122,23 @@ FlowAndAccord/
     ├── 02-build-guide.md                       # 编译与运行深度指南
     ├── 03-browser-guide.md                     # 浏览器自动化使用指南 (playwright-cli)
     ├── 04-cicd-guide.md                        # CI/CD 自动部署指南
+    ├── 05-headless-diagnostics-guide.md        # 确定性无头诊断指南 (diagnose.js SOP)
+    ├── 06-config-reference.md                  # 参数速查表 (由 config-check.js 自动生成, 勿手改)
     ├── 07-agent-ai-analysis.md                 # 部落民 AI 决策系统深度拆解
+    ├── 08-decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
+    ├── 09-ui-spec-and-ledger-design.md         # UI 全景剖析 + 制度大盘实现指南
     ├── 10-architecture.md                      # 系统技术架构设计愿景书
     ├── 11-plan.md                              # 项目长期规划书
     ├── 12-plan-ledger-refactor.md              # 账本系统重构规划 (M1~M4 已完成)
-    ├── 09-ui-spec-and-ledger-design.md         # UI 全景剖析 + 制度大盘实现指南
-    ├── 08-decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
+    ├── 13-plan-house-upgrade-auction.md        # 房屋升级与拍卖系统演进规划
+    ├── 14-plan-todo-followup-v1.27.md          # 待办事项后续跟进规划
+    ├── 15-profiling-and-benchmarking-guide.md  # 性能 Profiling 基准与确定性矩阵操作指南
+    ├── 16-plan-performance-optimization.md     # 仿真内核与全链路性能优化规划书 (M1~M5)
+    ├── 17-plan-farmland-agriculture.md         # 农田生产与农业税规划书
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图
-    ├── 06-config-reference.md                  # 参数速查表 (由 config-check.js 自动生成, 勿手改)
+    ├── doc-maintenance.json                 # 文档维护清单契约配置文件
     └── current/                             # 已实现功能按模块拆分文档
         ├── 01-spatial-network.md
         ├── 02-ecology-poi.md
@@ -127,7 +155,11 @@ FlowAndAccord/
         ├── 13-impact-matrix.md             # ★ 跨模块影响矩阵 (改 X 牵动哪些文件 + tick 顺序 + 数据流 + 自检清单)
         ├── 14-invariants.md                # ★ 核心不变量集中清单
         ├── 15-save-load.md                 # 读档 / 存档系统全量契约
-        └── 16-market-pricing.md            # 🏪 外部市场与动态价格系统
+        ├── 16-market-pricing.md            # 🏪 外部市场与动态价格系统
+        ├── 17-frontend-window-navigation.md # 前端窗口结构与跳转关系指南
+        ├── 18-doc-maintenance.md           # 文档维护发现机制
+        ├── 19-commit-checklist.md          # Commit 前检查单
+        └── 20-tools-guide.md               # 🛠️ 仿真内核与工程工具箱操作指南 (15 工具全貌)
 ```
 
 ## 目录级 AGENTS.md

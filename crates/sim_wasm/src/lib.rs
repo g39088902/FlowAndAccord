@@ -4,9 +4,11 @@
 //! 并从 wasm 线性内存读取 JSON 快照（不依赖 wasm-bindgen）。
 //! 所有导出均为 extern "C"，AOT 可解析；world_create 的 seed 参数保证可复现。
 
+use sim_core::config::SimConfig;
 use sim_core::spatial::{deserialize_save, serialize_save, World3DEngine};
 
 static mut WORLD: Option<World3DEngine> = None;
+static mut ACTIVE_CONFIG: Option<SimConfig> = None;
 static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
 static mut CONFIG_BUF: Vec<u8> = Vec::new();
 /// 存档 JSON 缓冲（world_save_ptr 写入 / world_load 读取）
@@ -24,11 +26,13 @@ fn clear_error() {
 }
 
 /// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
-/// camp_count: 营地数量，须在播种生态前注入（否则 countCamps 前端配置无法生效，见 §4.7）
+/// 优先使用前端通过 world_apply_config_buf / world_set_config 注入的持久配置 ACTIVE_CONFIG。
+/// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 #[no_mangle]
 pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32 {
     unsafe {
-        let mut w = World3DEngine::new_seeded(grid_res as usize, world_size, seed as u64);
+        let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
+        let mut w = World3DEngine::new_seeded_with_config(grid_res as usize, world_size, seed as u64, config);
         if camp_count > 0 {
             w.config.count_camps = camp_count as usize;
         }
@@ -48,23 +52,29 @@ pub extern "C" fn world_config_buf_ptr(len: u32) -> u32 {
 }
 
 /// 解析并应用 Config 内部缓冲区中的 JSON 数据 (返回 0 表示成功)
+/// 无论世界是否已创建，均持久保存至 ACTIVE_CONFIG，确保后续 world_create 始终复用最新配置。
 #[no_mangle]
 pub extern "C" fn world_apply_config_buf(len: u32) -> i32 {
     unsafe {
-        if let Some(w) = WORLD.as_mut() {
-            let len = len as usize;
-            if len > CONFIG_BUF.len() {
-                return -1;
-            }
-            if let Ok(json_str) = std::str::from_utf8(&CONFIG_BUF[..len]) {
-                if w.apply_config_json(json_str).is_ok() {
-                    return 0;
-                }
-                return -2;
-            }
-            return -3;
+        let len = len as usize;
+        if len > CONFIG_BUF.len() {
+            return -1;
         }
-        -4
+        let json_str = match std::str::from_utf8(&CONFIG_BUF[..len]) {
+            Ok(s) => s,
+            Err(_) => return -3,
+        };
+
+        match serde_json::from_str::<SimConfig>(json_str) {
+            Ok(cfg) => {
+                if let Some(w) = WORLD.as_mut() {
+                    let _ = w.apply_config(cfg.clone());
+                }
+                ACTIVE_CONFIG = Some(cfg);
+                0
+            }
+            Err(_) => -2,
+        }
     }
 }
 
@@ -72,17 +82,22 @@ pub extern "C" fn world_apply_config_buf(len: u32) -> i32 {
 #[no_mangle]
 pub extern "C" fn world_set_config(ptr: u32, len: u32) -> i32 {
     unsafe {
-        if let Some(w) = WORLD.as_mut() {
-            let slice = std::slice::from_raw_parts(ptr as *const u8, len as usize);
-            if let Ok(json_str) = std::str::from_utf8(slice) {
-                if w.apply_config_json(json_str).is_ok() {
-                    return 0;
+        let slice = std::slice::from_raw_parts(ptr as *const u8, len as usize);
+        let json_str = match std::str::from_utf8(slice) {
+            Ok(s) => s,
+            Err(_) => return -3,
+        };
+
+        match serde_json::from_str::<SimConfig>(json_str) {
+            Ok(cfg) => {
+                if let Some(w) = WORLD.as_mut() {
+                    let _ = w.apply_config(cfg.clone());
                 }
-                return -2;
+                ACTIVE_CONFIG = Some(cfg);
+                0
             }
-            return -3;
+            Err(_) => -2,
         }
-        -4
     }
 }
 

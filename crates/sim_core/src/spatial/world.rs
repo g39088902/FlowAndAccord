@@ -1,5 +1,5 @@
 use crate::rng::WorldRng;
-use crate::config::{SimConfig, LEDGER_JOURNAL_CAPACITY};
+use crate::config::SimConfig;
 use std::collections::{HashMap, VecDeque};
 use super::vec3::Vec3;
 use super::graph::{LaneGraph3D, NodeId};
@@ -99,6 +99,8 @@ impl World3DEngine {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
         terrain.generate_natural_landscape(seed);
 
+        let journal_cap = if config.ledger_journal_capacity > 0 { config.ledger_journal_capacity } else { 64 };
+
         Self {
             terrain,
             network: LaneGraph3D::new(),
@@ -127,13 +129,13 @@ impl World3DEngine {
             recent_deaths: Vec::new(),
             config,
             agent_index: HashMap::new(),
-            marriage_registry: MarriageRegistry::new(LEDGER_JOURNAL_CAPACITY),
-            household_registry: HouseholdRegistry::new(LEDGER_JOURNAL_CAPACITY),
-            public_granary: Ledger::new(LEDGER_JOURNAL_CAPACITY),
-            clan_registry: ClanRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            marriage_registry: MarriageRegistry::new(journal_cap),
+            household_registry: HouseholdRegistry::new(journal_cap),
+            public_granary: Ledger::new(journal_cap),
+            clan_registry: ClanRegistry::new(journal_cap),
             mutual_aid_cooldown: std::collections::BTreeMap::new(),
-            region_registry: RegionRegistry::new(LEDGER_JOURNAL_CAPACITY),
-            empire_registry: EmpireRegistry::new(LEDGER_JOURNAL_CAPACITY),
+            region_registry: RegionRegistry::new(journal_cap),
+            empire_registry: EmpireRegistry::new(journal_cap),
             relief_cooldown: std::collections::BTreeMap::new(),
             auction_started: 0,
             auction_sold: 0,

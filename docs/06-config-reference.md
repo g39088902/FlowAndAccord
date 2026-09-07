@@ -3,13 +3,18 @@
 > 本表由 `tools/config-check.js` 自动生成，反映 `config.js` 与 Rust `SimConfig` 的权威字段、类型、默认值与中文说明。
 > 调参只需修改 `frontend/js/config.js`（无需重编译），修改后运行 `node tools/config-check.js` 校验一致性。
 
-## 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+## 1. 引擎节拍与时间基准
 
-| 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `simulationDt` | f32 | 0.016666666666666666 | world_tick.rs / sim_wasm (§4.3 严禁改) | 单个 tick 对应的模拟小时数 (1/60) |
 | `ticksPerSecond` | u64 | 60 | world_tick.rs / rustworld.js | 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准） |
 | `agentDecisionIntervalTicks` | u64 | 60 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 游戏小时决策一次 |
+
+## 2. 部落民生理、代谢与生命周期
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `agentHungerCapacity` | f32 | 50 | agent.rs (饱食容量) | 饱食度容量上限 |
 | `agentThirstCapacity` | f32 | 50 | agent.rs (水分容量) | 水分容量上限 |
 | `agentInitialHunger` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
@@ -56,11 +61,21 @@
 | `agentSpawnStaminaClampMin` | f32 | 55 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取下限 |
 | `agentSpawnStaminaClampMax` | f32 | 100 | ecology.rs (始祖播撒) / agent.rs | 始祖初始体力夹取上限 |
 | `agentSpawnBaseSpeed` | f32 | 8.5 | agent.rs / graph.rs (寻路速度基准) | 所有 agent 共用的基础默认行走速度 |
+
+## 3. 先天禀赋与遗传演化
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `traitDefaultMean` | f32 | 100 | agent.rs / birth.rs (禀赋遗传演化) | 禀赋基准均值 |
 | `traitInitialStdDev` | f32 | 20 | agent.rs / birth.rs (禀赋遗传演化) | 始祖禀赋初始标准差 |
 | `traitMutationDelta` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传突变偏移量 |
 | `traitInheritClampMin` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取下限 |
 | `traitInheritClampMax` | f32 | 190 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取上限 |
+
+## 4. 生态地标与 POI 采收交互
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `poiMinDistance` | f32 | 70 | ecology.rs (POI 空间排斥间距 §4.7) | POI 间最小排斥间距 (m) |
 | `countCamps` | usize | 4 | ecology.rs (POI 数量 §4.7) | 营地数量 |
 | `countEmpires` | usize | 1 | ledger/empire.rs (帝国数量与营地确定性分组) | 帝国数量（自动钳制为 1..=营地数量；当前政体仅实现帝国） |
@@ -93,6 +108,11 @@
 | `roadGradePaveThreshold` | f32 | 8 | graph.rs (道路等级铺装阈值) | 坡度铺装阈值 (高差超过则盘山道，否则泥径) |
 | `poiInteractionRadius` | f32 | 22 | ecology.rs (POI 交互采收/卸货) | 采收现场「已抵达 POI」判定半径 (m) |
 | `campHomeConsumeRate` | f32 | 3 | ecology.rs (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/小时) |
+
+## 5. 马斯洛需求与决策门槛
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `decisionPoiSeekMinStockRatio` | f32 | 0.5 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器开启阈值 (库存 ≥ 此比例) |
 | `decisionPoiAbandonStockRatio` | f32 | 0.1 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器关闭阈值 (库存 < 此比例) |
 | `decisionCriticalThirst` | f32 | 25 | decisions/ (生理临界阈值) | 临界口渴阈值 (触发寻水) |
@@ -111,6 +131,13 @@
 | `decisionFamilyStockTriggerOn` | f32 | 100 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特触发下限：家户账本余额 < 此 → 去采 |
 | `decisionFamilyStockTriggerOff` | f32 | 200 | decisions/ (家户补货滞回触发器 §4.8) | M7 家庭库存施密特结束上限：一旦去采，余额 ≥ 此 → 补足停止 |
 | `decisionCourtshipMinFamilyGold` | f32 | 5 | — | 求偶发起最低家户金币（严格大于此值） |
+| `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
+| `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=⓪瞬间行为/1-5=①..⑤马斯洛层级/6=保留代码动态默认；空=全动态默认） |
+
+## 6. 私宅营造、代际传承与升级
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `houseDurabilityMax` | f32 | 100 | housing_system/ (耐久度上限) | 房屋耐久上限 |
 | `houseDepreciationRate` | f32 | 0.02 | housing_system/maintenance.rs (折旧) | 房屋耐久自然折旧速率 (每秒) |
 | `houseRepairTriggerThreshold` | f32 | 80 | housing_system/maintenance.rs (修缮) | 耐久低于此值允许修缮 |
@@ -145,16 +172,26 @@
 | `campLevelCountyMinHouses` | u32 | 20 | poi.rs (营地行政级别升级) | 营地升级为县的最低房屋数量 |
 | `houseNodeReuseRadius` | f32 | 20 | housing_system/founding.rs (立宅节点占用) | 立宅优先复用空置路网节点检索半径 (m) |
 | `houseNodePoiOccupyRadius` | f32 | 1.5 | housing_system/founding.rs (立宅节点占用) | 判定节点被 POI 占用的贴合半径 (m) |
+
+## 7. 四季更迭与宏观气候
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `seasonYearLength` | f32 | 240 | world_season.rs (四季周期) | 一年 (四季) 总时长 (模拟秒) |
 | `tempBaseMid` | f32 | 14 | world_season.rs (温度正弦曲线) | 年均基准温度 (℃) |
 | `tempAmplitude` | f32 | 17 | world_season.rs (温度正弦曲线) | 季节温度振幅 (℃) |
 | `tempElNinoCycleYears` | f32 | 7 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦周期 (年) |
 | `tempElNinoAmplitude` | f32 | 3 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦振幅范围 (±℃) |
-| `roadWearDecayRate` | f32 | 0.005 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路自然杂草衰减速率 (%/小时,相对当前磨损比例衰减，0.005 即 0.5%/h) |
-| `roadWearStepInc` | f32 | 0.1 | graph.rs (踩踏增长/自然衰减 §4.3) | 族人单次通行踩踏增量 (等级/次) |
+
+## 8. 空间路网、限速与踩踏演化
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `roadWearDecayRate` | f32 | 0.0033 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路自然杂草衰减速率 (%/小时,相对当前磨损比例衰减，0.005 即 0.5%/h) |
+| `roadWearStepInc` | f32 | 0.075 | graph.rs (踩踏增长/自然衰减 §4.3) | 族人单次通行踩踏增量 (等级/次) |
 | `roadWearTierStep` | f32 | 0.25 | graph.rs (踩踏增长/自然衰减 §4.3) | 道路等级阶梯步进 (用于 A* 寻路速度加成量化与端点对缓存跨阶失效) |
 | `roadBenefitMaxWear` | f32 | 5 | graph.rs (移速增益上限磨损值) | 道路移速增益上限磨损值 (超过此值无额外移速加成) |
-| `roadMaxWear` | f32 | 10 | graph.rs (最高磨损等级/溢出上限) | 道路磨损/踩踏耐久度上限 (允许溢出至最多10) |
+| `roadMaxWear` | f32 | 20 | graph.rs (最高磨损等级/溢出上限) | 道路磨损/踩踏耐久度上限 (允许溢出至最多10) |
 | `roadSpeedDirtTrack` | f32 | 36 | graph.rs (各道路类型限速) | 泥泞小径限速 |
 | `roadSpeedCobblestone` | f32 | 44 | graph.rs (各道路类型限速) | 碎石盘山道限速 |
 | `roadSpeedAsphaltUrban` | f32 | 60 | graph.rs (各道路类型限速) | 城镇大道限速 |
@@ -164,6 +201,11 @@
 | `roadLevelFactorWearCoef` | f32 | 0.333 | graph.rs (等级速度加成) | 道路等级影响移速磨损系数 |
 | `roadLevelFactorMin` | f32 | 0.5 | graph.rs (等级速度加成) | 道路等级移速乘子下限 |
 | `roadLevelFactorMax` | f32 | 2.2 | graph.rs (等级速度加成) | 道路等级移速乘子上限 |
+
+## 9. 动力学移动与寻路权重
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `agentMoveStaminaBase` | f32 | 0.6 | agent.rs (运动学) / graph.rs (寻路) | 移动基础体力消耗 (每秒) |
 | `agentMoveStaminaPregnant` | f32 | 0.3 | agent.rs (运动学) / graph.rs (寻路) | 孕期额外移动体力消耗 (每秒) |
 | `agentMoveStaminaGradeCoef` | f32 | 3.5 | agent.rs (运动学) / graph.rs (寻路) | 坡度对移动体力消耗加成系数 |
@@ -174,19 +216,39 @@
 | `roadVisiblePreferModifier` | f32 | 1.2 | graph.rs / decisions/ (可见道路偏好) | A* 偏好隐秘时公开道路代价乘子 |
 | `roadHiddenAvoidModifier` | f32 | 2.5 | graph.rs / decisions/ (隐秘道路偏好) | A* 非偏好隐秘时隐秘道路代价乘子 |
 | `roadVisibleAvoidModifier` | f32 | 1 | graph.rs / decisions/ (可见道路偏好) | A* 非偏好隐秘时公开道路代价乘子 |
+
+## 10. 账本与婚姻登记子系统
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `ledgerJournalCapacity` | usize | 64 | ledger/ (所有账本容量) | 账本流水环形缓冲容量 (每团体/家户，条) |
+
+## 11. 宗族系统
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `clanTributeRate` | f32 | 0.05 | ledger/clan.rs (族税征收) | 族税率：家户每周期向族库缴纳账面余额的比例 |
 | `clanTributeIntervalTicks` | u64 | 3600 | ledger/clan.rs (族税征收) | 族税征收周期 (tick)，每 N tick 全局统一征收一次 (60 游戏小时) |
 | `clanMutualAidMinBalance` | f32 | 50 | ledger/clan.rs (族内互助) | 族内互助族库最低余额门槛 |
 | `clanMutualAidFamilyThreshold` | f32 | 10 | ledger/clan.rs (族内互助) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `clanMutualAidCooldownTicks` | u64 | 1800 | ledger/clan.rs (族内互助) | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 (30 游戏小时) |
 | `prestigeClanElderBonus` | u32 | 3 | ledger/clan.rs (族长威望奖励) | 宗族长老（族长）顺位任职威望奖励 |
+
+## 12. 地区与王国系统
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `ledgerTaxRate` | f32 | 0.03 | ledger/region.rs (公仓税) | 公仓税率：家户每周期向地区公仓缴纳账面余额的比例 |
 | `ledgerTaxIntervalTicks` | u64 | 4800 | ledger/region.rs (公仓税) | 公仓税征收周期 (tick)，每 N tick 全局统一征收一次 (80 游戏小时) |
 | `ledgerReliefMinBalance` | f32 | 30 | ledger/region.rs (救济) | 救济公仓最低余额门槛：地区公仓总余额 > 此值方可签发救济 |
 | `ledgerReliefFamilyThreshold` | f32 | 8 | ledger/region.rs (救济) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `ledgerReliefCooldownTicks` | u64 | 2400 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 (40 游戏小时) |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
+
+## 13. 外部市场（榷场互市）与幂律动态定价
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `countMarkets` | usize | 1 | ecology.rs (POI 数量 §4.7) | 全图生成外部市场 POI 数量 |
 | `marketStockMaxWater` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场清水储备容量上限 |
 | `marketStockMaxFood` | f32 | 400 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场粮食储备容量上限 |
@@ -201,6 +263,11 @@
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
 | `marketSettlementStep` | f32 | 5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场单次交易结算步长 (单位) |
+
+## 14. 二手房屋市场、营地中介拍卖与麦穗竞价
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
 | `houseAuctionBidCooldownTicks` | u64 | 180 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 买家全局出价冷却 (tick，默认 180 = 3 游戏小时，出价后对任何房屋都不再出价) |
 | `houseAuctionDeadlineDurability` | f32 | 10 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 最晚出售修缮度时限 (耐久度跌至此值时只要有新报价即成交) |
 | `houseAuctionObservationRatio` | f32 | 0.37 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗理论最优停止观察期比例 (37%) |
@@ -210,16 +277,3 @@
 | `houseAuctionBenchmarkDecayRate` | f32 | 0.02 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭 |
 | `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
 | `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市扩展承载石料后作单价基准) |
-
-## 5. 马斯洛需求与决策门槛
-
-| 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |
-| :--- | :--- | :--- | :--- | :--- |
-| `decisionEvalOrder` | Vec<String> | [] | decisions/branches.rs (前端拖动热注入) | 决策分支评估顺序（空=基线；权威顺序在 config.decision-order.js，启动时由 decision-viz.js 合并覆盖） |
-| `decisionEvalLevels` | Vec<u8> | [] | decisions/branches.rs (层级覆盖) | 分支层级覆盖（与顺序下标并行，0=⓪瞬间行为/1-5=①..⑤马斯洛层级/6=保留代码动态默认；空=全动态默认） |
-
-## ⚠ 校验错误
-
-- 数值漂移: roadWearDecayRate Rust 默认 0.005 ≠ 前端 0.0033
-- 数值漂移: roadWearStepInc Rust 默认 0.1 ≠ 前端 0.075
-- 数值漂移: roadMaxWear Rust 默认 10 ≠ 前端 20

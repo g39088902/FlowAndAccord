@@ -73,20 +73,20 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   const simConfig = loadSimConfig();
 
   // === Test 1: 确定性 (同种子 -> 快照逐字节一致) ===
-  ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   applyConfig(simConfig);
+  ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   runSteps(600, 1 / 60);
   const snapA = JSON.stringify(snapshot());
-  ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   applyConfig(simConfig);
+  ex.world_create(60, 764.0, 777, 20, simConfig.countCamps);
   runSteps(600, 1 / 60);
   const snapB = JSON.stringify(snapshot());
   console.log('determinism (same seed):', snapA === snapB);
   if (snapA !== snapB) throw new Error('DETERMINISM FAILED');
 
   // === Test 2: 长程运行稳定性 (无 panic / 越界 / NaN) ===
-  ex.world_create(60, 764.0, 2026, 20, simConfig.countCamps);
   applyConfig(simConfig);
+  ex.world_create(60, 764.0, 2026, 20, simConfig.countCamps);
   runSteps(6000, 1 / 60); // ~100 小时
   const s = snapshot();
   let outOfBounds = 0, nanCount = 0;
@@ -108,8 +108,8 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   const SAVE_SEED = 31415;
 
   // 基准：连续不中断跑到 SAVE + POST
-  ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   applyConfig(simConfig);
+  ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   runSteps(SAVE_TICKS, 1 / 60);
   const savedJson = saveToString();
   const tickAtSave = snapshot().tick;
@@ -117,8 +117,8 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
   const snapContinuous = JSON.stringify(snapshot());
 
   // 对照：新建同种子世界 → 跑到存档点 → 读档覆盖 → 续演同样步数
-  ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   applyConfig(simConfig);
+  ex.world_create(60, 764.0, SAVE_SEED, 20, simConfig.countCamps);
   runSteps(SAVE_TICKS, 1 / 60);
   loadFromString(savedJson);
   const tickAfterLoad = snapshot().tick;

@@ -45,11 +45,11 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.44.7';
+  return '1.44.9';
 }
 
 function applyConfigInternal(configObj) {
-  if (!_ready || !configObj) return false;
+  if (!configObj || !_wasm) return false;
   try {
     const jsonStr = JSON.stringify(configObj);
     const encoded = _textEncoder.encode(jsonStr);
@@ -217,11 +217,11 @@ self.onmessage = async function(e) {
         const result = await WebAssembly.instantiate(bytes, {});
         _wasm = result.instance.exports;
         _memory = _wasm.memory;
-        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
-        _ready = true;
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
+        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        _ready = true;
         historyCheckpoints = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;
@@ -312,10 +312,10 @@ self.onmessage = async function(e) {
     case 'RESET': {
       if (_ready) {
         _engineSeed = msg.seed || Date.now();
-        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
+        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         historyCheckpoints = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;

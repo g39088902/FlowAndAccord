@@ -95,10 +95,6 @@ pub struct House {
 }
 
 impl House {
-    pub fn new(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier, camp_id: u32) -> Self {
-        Self::new_with_config(id, owner_id, pos, door_node_id, tier, camp_id, &SimConfig::default())
-    }
-
     pub fn new_with_config(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier, camp_id: u32, config: &SimConfig) -> Self {
         Self {
             id,

@@ -341,10 +341,6 @@ impl LaneGraph3D {
         }
     }
 
-    pub fn tick_wear_decay_default(&mut self, dt: f32) {
-        self.tick_wear_decay(dt, &SimConfig::default());
-    }
-
     /// 3D 拓扑加权 A* 寻路
     pub fn find_path_3d(&self, start: NodeId, goal: NodeId, config: &SimConfig) -> Option<Vec<LaneId>> {
         self.find_path_3d_with_preference(start, goal, false, config)

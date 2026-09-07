@@ -176,18 +176,10 @@ function snakeToCamel(s) {
 }
 
 function parseConfigRs(text) {
-  const fields = [];        // { name(camel), rustName, type }
-  const defaults = {};       // field(camel) -> constName
-  const consts = {};         // constName -> { type, raw, value, section }
+  const fields = []; // { name(camel), rustName, type, section }
 
   let currentSection = '';
   const sectionRe = /\/\/\s*(\d+)\.\s*([^\n(]+)/;
-  const defaultStart = text.indexOf('impl Default for SimConfig');
-  const fnDefaultPos = text.indexOf('fn default()', defaultStart);
-  const defaultEnd = text.indexOf('}', fnDefaultPos);
-  // 转行号（用于与逐行扫描的 i 比较，避免字符索引误判）
-  const defaultStartLine = text.slice(0, defaultStart).split('\n').length - 1;
-  const defaultEndLine = text.slice(0, defaultEnd).split('\n').length - 1;
 
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -200,48 +192,9 @@ function parseConfigRs(text) {
     if (f) {
       fields.push({ name: snakeToCamel(f[1]), rustName: f[1], type: f[2], section: currentSection });
     }
-
-    // Default 映射（仅捕获 `name: CONST,` 在 impl Default 块内）
-    const d = line.match(/^\s*(\w+)\s*:\s*([A-Z_][A-Z0-9_]*)\s*,/);
-    if (d && i >= defaultStartLine && i <= defaultEndLine) {
-      defaults[snakeToCamel(d[1])] = d[2];
-    }
-    // Default 映射（`name: Vec::new(),` → 空数组默认）
-    const dv = line.match(/^\s*(\w+)\s*:\s*Vec::new\(\)\s*,/);
-    if (dv && i >= defaultStartLine && i <= defaultEndLine) {
-      defaults[snakeToCamel(dv[1])] = '__VEC_EMPTY__';
-    }
   }
 
-  // const 定义（全文件，记录所属分区）
-  const constRe = /pub\s+const\s+(\w+)\s*:\s*([\w]+)\s*=\s*([^;]+);/g;
-  let c;
-  while ((c = constRe.exec(text)) !== null) {
-    const raw = c[3].trim();
-    let value;
-    try { value = eval(raw); } catch (e) { value = raw; }
-    consts[c[1]] = { type: c[2], raw, value, section: currentSection };
-  }
-
-  // 计算各字段默认值，并以「支撑 const 的分区」作为该字段的分区
-  const fieldDefaults = {};
-  const fieldSections = {};
-  for (const f of fields) {
-    const constName = defaults[f.name];
-    if (constName === '__VEC_EMPTY__') {
-      fieldDefaults[f.name] = [];
-      fieldSections[f.name] = f.section;
-    } else if (constName && consts[constName]) {
-      fieldDefaults[f.name] = consts[constName].value;
-      fieldSections[f.name] = consts[constName].section;
-    } else {
-      fieldDefaults[f.name] = undefined;
-      fieldSections[f.name] = f.section || currentSection;
-    }
-  }
-  // 把 section 挂回 fields
-  for (const f of fields) f.section = fieldSections[f.name];
-  return { fields, fieldDefaults, consts };
+  return { fields };
 }
 
 // ---------------------------------------------------------------------------
@@ -257,11 +210,10 @@ function main() {
   const errors = [];
   const warnings = [];
 
-  // ★ M8 升级材料成本矩阵拆分配置（config.house-upgrade-cost.js，20 字段）纳入字段集/类型/数值比对：
-  // Rust 侧 20 个 house_upgrade_cost_tier{1..4}_* 的权威默认值在此文件，须在孤儿/缺失检查前并入前端字段集。
+  // ★ M8 升级材料成本矩阵拆分配置（config.house-upgrade-cost.js，20 字段）纳入字段集与类型比对：
   const COST_JS = path.join(ROOT, 'frontend', 'js', 'config.house-upgrade-cost.js');
   if (!fs.existsSync(COST_JS)) {
-    errors.push('缺失拆分配置文件 config.house-upgrade-cost.js（Rust 侧 20 个 house_upgrade_cost_tier* 字段缺失权威默认值来源）');
+    errors.push('缺失拆分配置文件 config.house-upgrade-cost.js（Rust 侧 20 个 house_upgrade_cost_tier* 字段缺失前端定义）');
   } else {
     const costText = fs.readFileSync(COST_JS, 'utf8');
     const cost = parseConfigJs(costText, 'SIM_HOUSE_UPGRADE_COST');
@@ -288,12 +240,11 @@ function main() {
     }
   }
 
-  // 3) 类型与数值校验（已对齐的字段）
-  const EPS = 1e-6;
+  // 3) 契约与类型校验（已对齐的字段）
   for (const f of rs.fields) {
     if (!jsFieldNames.has(f.name)) continue;
     const jsVal = js.values[f.name];
-    // 数组类型字段（Vec<String>/Vec<u8>）：类型 + 逐元素比对
+    // 数组类型字段（Vec<String>/Vec<u8>）：类型校验
     if (f.type.startsWith('Vec<')) {
       if (!Array.isArray(jsVal)) {
         errors.push(`类型错配: ${f.name} 在 Rust 为 ${f.type}，但前端值非数组`);
@@ -305,22 +256,13 @@ function main() {
       if (f.type === 'Vec<String>' && !jsVal.every(v => typeof v === 'string')) {
         errors.push(`类型错配: ${f.name} 在 Rust 为 Vec<String>，但前端数组含非字符串元素`);
       }
-      const rsArr = rs.fieldDefaults[f.name];
-      if (Array.isArray(rsArr) && JSON.stringify(rsArr) !== JSON.stringify(jsVal)) {
-        errors.push(`数值漂移: ${f.name} Rust 默认 ${JSON.stringify(rsArr)} ≠ 前端 ${JSON.stringify(jsVal)}`);
-      }
       continue;
     }
-    // 类型校验
+    // 数值类型校验
     if ((f.type === 'usize' || f.type === 'u64') && !Number.isInteger(jsVal)) {
       errors.push(`类型错配: ${f.name} 在 Rust 为 ${f.type}，但前端值为浮点 ${jsVal}`);
-    }
-    // 数值校验
-    const rsVal = rs.fieldDefaults[f.name];
-    if (typeof rsVal === 'number' && typeof jsVal === 'number') {
-      if (Math.abs(rsVal - jsVal) > EPS) {
-        errors.push(`数值漂移: ${f.name} Rust 默认 ${rsVal} ≠ 前端 ${jsVal}`);
-      }
+    } else if (f.type === 'f32' && typeof jsVal !== 'number') {
+      errors.push(`类型错配: ${f.name} 在 Rust 为 f32，但前端值类型为 ${typeof jsVal}`);
     }
   }
 
@@ -349,10 +291,10 @@ function main() {
   }
 
   // 输出报告
-  console.log('=== Flow & Accord 配置一致性校验 ===');
+  console.log('=== Flow & Accord 配置一致性校验 (契约门禁) ===');
   console.log(`Rust 字段数: ${rs.fields.length}, 前端字段数: ${jsFieldNames.size}`);
   if (errors.length === 0) {
-    console.log('✅ 字段集、类型、默认值完全一致，无漂移。');
+    console.log('✅ 字段契约与类型完全一致，前端 JS 为唯一数值真相源。');
   } else {
     console.log(`❌ 发现 ${errors.length} 处错误：`);
     for (const e of errors) console.log('  - ' + e);
@@ -388,10 +330,10 @@ function generateReference(rs, js, errors) {
   for (const [section, fields] of sections) {
     lines.push(`## ${section}`);
     lines.push('');
-    lines.push('| 字段 (camelCase) | 类型 | 默认值 | 影响模块 | 中文说明 |');
+    lines.push('| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |');
     lines.push('| :--- | :--- | :--- | :--- | :--- |');
     for (const f of fields) {
-      const def = rs.fieldDefaults[f.name];
+      const def = js.values[f.name];
       const desc = js.descriptions[f.name] || '';
       const defStr = Array.isArray(def) ? JSON.stringify(def) : String(def);
       const impact = getImpactModule(f.name);
