@@ -1,0 +1,171 @@
+{
+  "timestamp": "2026-09-07T08:36:01.476Z",
+  "seed": 42,
+  "agents": 20,
+  "camps": 4,
+  "ticks": 800000,
+  "preset": "max-yield",
+  "configOverrides": [
+    {
+      "key": "regenBaseWater",
+      "from": 2,
+      "to": 24000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "regenBaseBerry",
+      "from": 2,
+      "to": 24000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "regenBaseWood",
+      "from": 2,
+      "to": 12000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "regenBaseStone",
+      "from": 2,
+      "to": 12000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "regenBaseGold",
+      "from": 1.8,
+      "to": 12000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "marketRegenBaseWater",
+      "from": 2,
+      "to": 24000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "marketRegenBaseFood",
+      "from": 2,
+      "to": 24000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "marketRegenBaseWood",
+      "from": 2,
+      "to": 24000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "poiInteractionRateResource",
+      "from": 10,
+      "to": 6000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "poiInteractionRateGold",
+      "from": 5,
+      "to": 1200,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "poiUnloadRateResource",
+      "from": 10,
+      "to": 6000,
+      "source": "preset:max-yield"
+    },
+    {
+      "key": "poiUnloadRateGold",
+      "from": 5,
+      "to": 1200,
+      "source": "preset:max-yield"
+    }
+  ],
+  "throughput": {
+    "ticks": 800000,
+    "durationMs": 25778.161583,
+    "tps": 31034.02069322036,
+    "usPerTick": 32.22270197875,
+    "gameHoursPerSec": 517.2336782203394,
+    "speedupMultiplier": 31034.02069322036,
+    "stats": {
+      "meanUs": 32.2094349875,
+      "p50Us": 31.858,
+      "p90Us": 55.4,
+      "p95Us": 61.041,
+      "p99Us": 70.32,
+      "maxUs": 2669.862
+    }
+  },
+  "breakdown": {
+    "grandTotalMs": 114.877086,
+    "breakdown": [
+      {
+        "name": "0. 四季与POI恢复 (Season & Poi Regen)",
+        "totalMs": 0.514178,
+        "usPerTick": 0.257089,
+        "pct": 0.44758969599907855
+      },
+      {
+        "name": "1. 代谢繁衍与继承 (Metabolism & Child)",
+        "totalMs": 18.57871,
+        "usPerTick": 9.289354999999999,
+        "pct": 16.172685647684343
+      },
+      {
+        "name": "2. POI交互卸货 (Poi Interactions)",
+        "totalMs": 17.202032,
+        "usPerTick": 8.601016,
+        "pct": 14.974293480947104
+      },
+      {
+        "name": "3. 房屋维护与折旧 (Housing & Auction)",
+        "totalMs": 9.079305,
+        "usPerTick": 4.5396525,
+        "pct": 7.903495219229359
+      },
+      {
+        "name": "4. 道路自然衰减 (Road Wear Decay)",
+        "totalMs": 3.496654,
+        "usPerTick": 1.748327,
+        "pct": 3.0438219855263386
+      },
+      {
+        "name": "5. 动力位移踩踏 (Movement & Trample)",
+        "totalMs": 5.562593,
+        "usPerTick": 2.7812965,
+        "pct": 4.842212832592219
+      },
+      {
+        "name": "6. 马斯洛决策寻路 (Decisions & A*)",
+        "totalMs": 36.53693,
+        "usPerTick": 18.268465,
+        "pct": 31.805237469202513
+      },
+      {
+        "name": "7. 账本宗族公仓 (Ledger, Clan, Region)",
+        "totalMs": 23.775618,
+        "usPerTick": 11.887809,
+        "pct": 20.696571290117856
+      },
+      {
+        "name": "8. 墓碑窗口清理 (Cleanup)",
+        "totalMs": 0.131066,
+        "usPerTick": 0.06553299999999998,
+        "pct": 0.11409237870117978
+      }
+    ]
+  },
+  "snapshot": {
+    "snapshotBytes": 1138740,
+    "snapshotKb": "1112.1",
+    "avgRustUs": 5336.861,
+    "avgJsUs": 5759.349,
+    "totalSnapshotUs": 11096.21,
+    "binBytes": 147892,
+    "binKb": "144.4",
+    "avgBinEncodeUs": 948.614,
+    "avgBinDecodeUs": 3658.91,
+    "binTotalUs": 4607.523999999999,
+    "jsonVsBinSize": 7.699807967976632,
+    "speedup": 2.4082804560540545
+  }
+}

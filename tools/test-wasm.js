@@ -5,17 +5,18 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = process.argv[2] || process.cwd();
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
+// ★ T1：统一走 tools/snapshot-reader.js（FABS 二进制优先，JSON 仅调试回退）
+const { createSnapshotReader } = require('./snapshot-reader.js');
 
 (async () => {
   if (!fs.existsSync(wasmPath)) throw new Error('wasm not found: ' + wasmPath);
   const bytes = fs.readFileSync(wasmPath);
   const { instance } = await WebAssembly.instantiate(bytes, {});
   const ex = instance.exports;
+  const reader = createSnapshotReader(ex);
 
   function snapshot() {
-    const ptr = ex.world_snapshot_ptr();
-    const len = ex.world_snapshot_len();
-    return JSON.parse(new TextDecoder().decode(new Uint8Array(ex.memory.buffer, ptr, len)));
+    return reader.getSnapshot();
   }
   function runSteps(worldTicks, dt) {
     for (let i = 0; i < worldTicks; i++) ex.world_tick_steps(2, dt);
@@ -40,6 +41,8 @@ const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
     new Uint8Array(ex.memory.buffer, ptr, encoded.length).set(encoded);
     const res = ex.world_load(encoded.length);
     if (res !== 0) throw new Error('world_load failed: ' + res + ' ' + saveError());
+    // 读档后引擎（含字符串驻留表）整体重建 → 解码器缓存必须清空，否则 strid 串味
+    reader.resetCaches();
   }
 
   // === 生产配置注入：config.js + config.decision-order.js 合并后经线性内存注入 WASM ===

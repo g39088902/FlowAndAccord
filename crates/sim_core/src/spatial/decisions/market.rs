@@ -94,7 +94,7 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 现场交易阶段的周期决策（若行囊装满、资金见底或已解渴饱腹，启程返航）
+    /// 现场交易阶段的周期决策（若行囊无法再完成一笔结算、资金见底或体力不足，启程返航）
     pub fn decide_buying_market(&mut self, agent: &mut Agent3D) {
         let carry_cap = self.config.carry_capacity_resource;
         let Some(hh_id) = self.households.household_of(agent.id) else {
@@ -104,11 +104,18 @@ impl<'a> Decisioner<'a> {
         };
         let hh_gold = self.households.get(hh_id).map(|hh| hh.group.ledger.balance(ResourceKind::Gold)).unwrap_or(0.0);
 
-        let bag_full = agent.carried_water >= carry_cap - 0.1 || agent.carried_food >= carry_cap - 0.1 || agent.carried_wood >= carry_cap - 0.1;
+        // Market settlement moves only whole `market_settlement_step` units. Keep
+        // this exit guard aligned with ecology's `space >= step` trade gate: an
+        // agent that cannot fit another settlement must return home instead of
+        // remaining at the market with no executable trade.
+        let settlement_step = self.config.market_settlement_step;
+        let bag_cannot_accept_settlement = carry_cap - agent.carried_water < settlement_step
+            || carry_cap - agent.carried_food < settlement_step
+            || carry_cap - agent.carried_wood < settlement_step;
         let gold_exhausted = hh_gold < 0.05;
         let vitals_critical = agent.stamina < self.config.decision_work_stamina_threshold;
 
-        if bag_full || gold_exhausted || vitals_critical {
+        if bag_cannot_accept_settlement || gold_exhausted || vitals_critical {
             agent.current_need = Some(if vitals_critical {
                 "Physiological·Rest"
             } else {

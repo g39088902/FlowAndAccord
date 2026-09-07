@@ -9,7 +9,6 @@ use sim_core::spatial::{deserialize_save, serialize_save, World3DEngine};
 
 static mut WORLD: Option<World3DEngine> = None;
 static mut ACTIVE_CONFIG: Option<SimConfig> = None;
-static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
 /// ★ M4 二进制快照缓冲（FABS 帧，由 world_snapshot_bin_ptr 写入 / world_snapshot_bin_len 读取）
 static mut SNAPSHOT_BIN_BUF: Vec<u8> = Vec::new();
 /// ★ M4 枚举名称表 JSON 缓冲（由 world_enum_table_ptr/len 读取，前端启动时取一次）
@@ -143,32 +142,41 @@ pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
     }
 }
 
-/// 序列化当前世界快照到内部缓冲，返回缓冲起始指针 (配合 world_snapshot_len 读取)
-///
-/// ⚠️ DEPRECATED(M4, v1.45.0)：M4 已提供二进制通道 `world_snapshot_bin_ptr/len`，
-/// 前端主链路已切换为二进制。本 JSON 通道**暂时保留**，仅服务两类用途：
-///   1. `tools/` 下 6 个依赖 JSON 快照的诊断/测试/性能工具；
-///   2. 二进制解码失败的自动回退（rustworld.js 按导出存在性做特性检测）。
-/// **移除条件**（高优先级技术债，见 docs/16-plan-performance-optimization.md 与 TODO.md）：
-/// M4 二进制快照稳定运行后，将 tools 改造为二进制取值，随即删除本导出与
-/// `world_snapshot_len`、`SNAPSHOT_BUF`。
+// ═══════════════════════════════════════════════════════════════
+// ★ T1（v1.46.0）JSON 快照通道已退化为「测试专用调试导出」
+//
+// 原 `world_snapshot_ptr/len` 是双通道并存时代的遗留：前端主链路与 tools/ 全部
+// 依赖它，B2 满载档下单帧代价高达 11,096 µs（编码 + 解析），且存在 JSON/FABS
+// 字段漂移风险。T1 之后：
+//   · 生产链路（sim_worker.js / rustworld.js）只有 FABS 一条通道；
+//   · tools/ 下 6 个工具统一走 tools/snapshot-reader.js（FABS 优先）；
+//   · **唯一**保留 JSON 的理由：`tools/test-snapshot-bin.js` 需要它作为
+//     「四处同步」防漂移门禁的**真值源**——没有它，二进制编码就失去了可比对基准。
+//
+// ⚠️ 因此本导出被重命名为 `world_snapshot_json_debug_*` 并明确标注 test-only。
+//    除 test-snapshot-bin.js 外，任何代码（前端或工具）都不得调用。
+// ═══════════════════════════════════════════════════════════════
+static mut SNAPSHOT_JSON_DEBUG_BUF: Vec<u8> = Vec::new();
+
+/// 【TEST-ONLY】序列化当前世界快照为 JSON，返回缓冲起始指针。
+/// 仅供 `tools/test-snapshot-bin.js` 做二进制↔JSON 深比较，禁止生产/工具调用。
 #[no_mangle]
-pub extern "C" fn world_snapshot_ptr() -> u32 {
+pub extern "C" fn world_snapshot_json_debug_ptr() -> u32 {
     unsafe {
         if let Some(w) = WORLD.as_ref() {
             let snap = w.generate_snapshot();
             if let Ok(json) = serde_json::to_string(&snap) {
-                SNAPSHOT_BUF = json.into_bytes();
+                SNAPSHOT_JSON_DEBUG_BUF = json.into_bytes();
             }
         }
-        SNAPSHOT_BUF.as_ptr() as u32
+        SNAPSHOT_JSON_DEBUG_BUF.as_ptr() as u32
     }
 }
 
-/// 返回快照 JSON 字节长度
+/// 【TEST-ONLY】返回上述 JSON 快照字节长度
 #[no_mangle]
-pub extern "C" fn world_snapshot_len() -> u32 {
-    unsafe { SNAPSHOT_BUF.len() as u32 }
+pub extern "C" fn world_snapshot_json_debug_len() -> u32 {
+    unsafe { SNAPSHOT_JSON_DEBUG_BUF.len() as u32 }
 }
 
 // ═══════════════════════════════════════════════════════════════

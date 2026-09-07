@@ -31,7 +31,7 @@
 | # | 不变量 | 来源 | 违反后果 |
 |---|---|---|---|
 | C1 | **家户账本是家庭储备唯一真相源**（M6 起已删除房屋仓库 `House.pantry_*`） | §4.8 | 吃喝/烧柴从错误来源扣减，库存与账本不一致 |
-| C2 | **快照三处同步**：新增 agent/house/poi 字段时必须同步修改 ① `snapshot.rs`（定义）② `world_snapshot.rs::generate_snapshot()`（赋值）③ `rustworld.js::_applySnapshot()`（前端映射） | §4.5 / spatial/AGENTS.md §3.3 | 前端读到 `undefined` 或展示旧值 |
+| C2 | **快照四处同步（★ M4 起）**：新增 agent/house/poi 字段时必须同步修改 ① `snapshot.rs`（定义）② `world_snapshot.rs::generate_snapshot()`（赋值）③ `snapshot_bin/encode.rs`（**FABS 二进制编码**，字段顺序/码位须与 ①②等价）④ `snapshot-bin.js`（解码）+ `rustworld.js::_applySnapshot()`（前端映射） | §4.5 / spatial/AGENTS.md §3.3 | 前端读到 `undefined`、展示旧值，或二进制与 JSON 不一致 |
 | C3 | **WASM 双副本同步**：改 Rust 后 `sim_wasm.wasm` 必须复制到 `frontend/rust/`（主路径）+ `frontend/`（备用） | §4.1 | 浏览器仍加载旧逻辑，行为与代码不符 |
 | C4 | **不要用 wasm 字节数判断是否更新**，以 `node tools/test-wasm.js` 实际输出为准 | §4.1 | 字节数相同但内容已变的假阴性 |
 | C5 | **`agent_index: HashMap<AgentId, usize>` 在 agents Vec 结构变更后必须调用 `rebuild_agent_index()` 刷新** | spatial/AGENTS.md §4.1 | `agent_by_id()` 返回错误下标或 panic |
@@ -134,7 +134,7 @@
 
 ```
 □ 确定性：新增 RNG 消费？改 simulationDt？遍历顺序变了？
-□ 数据一致：新快照字段三处同步？wasm 双副本？agent_index 刷新？
+□ 数据一致：新快照字段**四处**同步（含 `snapshot_bin/encode.rs` + `snapshot-bin.js`）？wasm 双副本？agent_index 刷新？
 □ 行为语义：tick 顺序打乱？决策相位改了？系统扫描指挥复活了？
 □ 构建部署：CI 用了便携工具链？wasm MIME 对吗？门禁过了吗？
 □ 代码组织：单文件超 800 行？临时测试没删？版本号自增了？

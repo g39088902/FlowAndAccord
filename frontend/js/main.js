@@ -722,7 +722,7 @@
     });
 
     if (btnExecuteRewind) {
-      btnExecuteRewind.addEventListener('click', () => {
+      btnExecuteRewind.addEventListener('click', async () => {
         const targetTick = parseInt(inputTargetTick.value, 10);
         if (isNaN(targetTick) || targetTick < 0) {
           if (rewindStatusMsg) {
@@ -732,9 +732,37 @@
           }
           return;
         }
+        const info = sim && typeof sim.getRewindInfo === 'function' ? sim.getRewindInfo() : null;
+        if (info && targetTick > info.maxTick) {
+          if (rewindStatusMsg) {
+            rewindStatusMsg.className = 'rewind-status-msg err';
+            rewindStatusMsg.textContent = `❌ 目标 Tick 不得超过当前 Tick ${info.maxTick}`;
+            rewindStatusMsg.style.display = 'block';
+          }
+          return;
+        }
         btnExecuteRewind.disabled = true;
-        const res = sim.rewindToTick(targetTick);
-        btnExecuteRewind.disabled = false;
+        if (rewindStatusMsg) {
+          rewindStatusMsg.className = 'rewind-status-msg';
+          rewindStatusMsg.textContent = '⏳ 正在恢复检查点并重演…';
+          rewindStatusMsg.style.display = 'block';
+        }
+        const previousProgressHandler = sim.onRewindProgress;
+        sim.onRewindProgress = ({ tick, targetTick: finalTick }) => {
+          if (rewindStatusMsg) {
+            rewindStatusMsg.className = 'rewind-status-msg';
+            rewindStatusMsg.textContent = `⏳ 正在重演：Tick ${tick} / ${finalTick}`;
+          }
+        };
+        let res;
+        try {
+          res = await sim.rewindToTick(targetTick);
+        } catch (err) {
+          res = { ok: false, error: err && err.message ? err.message : String(err) };
+        } finally {
+          sim.onRewindProgress = previousProgressHandler || null;
+          btnExecuteRewind.disabled = false;
+        }
         if (res.ok) {
           if (rewindStatusMsg) {
             rewindStatusMsg.className = 'rewind-status-msg ok';

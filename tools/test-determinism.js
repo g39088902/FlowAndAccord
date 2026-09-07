@@ -8,6 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
+// ★ T1：统一走 tools/snapshot-reader.js（FABS 二进制优先，JSON 仅调试回退）
+const { createSnapshotReader } = require('./snapshot-reader.js');
 
 function loadSimConfig() {
   const windowShim = {};
@@ -44,14 +46,16 @@ async function createInstance() {
     if (res !== 0) throw new Error('applyConfig 失败，错误码: ' + res);
   }
 
+  // ★ T1：快照取值统一由通用读取器提供（FABS 二进制解码；getSnapshotString 恒取全量帧，
+  //       保证「取快照历史」不影响字符串内容，Suite 4 才不会假阳性分叉）
+  const reader = createSnapshotReader(ex);
+
   function getSnapshotString() {
-    const ptr = ex.world_snapshot_ptr();
-    const len = ex.world_snapshot_len();
-    return textDecoder.decode(new Uint8Array(ex.memory.buffer, ptr, len));
+    return reader.getSnapshotString();
   }
 
   function getSnapshot() {
-    return JSON.parse(getSnapshotString());
+    return reader.getSnapshot();
   }
 
   function saveToString() {
@@ -67,6 +71,8 @@ async function createInstance() {
     new Uint8Array(ex.memory.buffer, ptr, encoded.length).set(encoded);
     const res = ex.world_load(encoded.length);
     if (res !== 0) throw new Error('world_load 失败: ' + res);
+    // 读档后引擎（含字符串驻留表）整体重建 → 解码器缓存必须清空，否则 strid 串味
+    reader.resetCaches();
   }
 
   function worldCreate(gridRes, worldSize, seed, agentCount, campCount, config) {

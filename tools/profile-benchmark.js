@@ -7,14 +7,19 @@
 //   node tools/profile-benchmark.js                          # 默认执行宏观基准 + 子阶段拆解
 //   node tools/profile-benchmark.js --ticks 6000 --breakdown # 跑 6000 tick 并输出 ASCII 耗时占比条形图
 //   node tools/profile-benchmark.js --scale                  # 运行 20/50/100 人口规模压测对比
+//   node tools/profile-benchmark.js --scale --pops 20,50,100,200,400 --scale-ticks 3000
 //   node tools/profile-benchmark.js --batch                  # 运行 1/16/64/256/1024 批次步长对比
 //   node tools/profile-benchmark.js --json baseline.json     # 导出基准数据供后续对比
 //   node tools/profile-benchmark.js --compare baseline.json  # 对比当前性能与 baseline.json 的加速比
+//   node tools/profile-benchmark.js --preset max-yield       # 物资产速拉满（单 tick 饱和）压力场景
+//   node tools/profile-benchmark.js --set regenBaseWater=100 # 逐字段覆写配置（可重复 / 逗号分隔）
 
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
+// ★ T1：统一快照取值入口（FABS 二进制优先，JSON 仅调试回退）
+const { createSnapshotReader } = require('./snapshot-reader.js');
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
 
 // ─────────────────────────────────────────────────────────────
@@ -38,6 +43,76 @@ function loadSimConfig() {
   return windowShim.SIM_CONFIG;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 1b. 产速档位预设与通用字段覆写 (Yield Presets & Field Overrides)
+// ─────────────────────────────────────────────────────────────
+// 目的：在不修改 frontend/js/config.js（仓库基线配置）的前提下，构造"物资产出拉满"的
+// 压力测试场景，避免为跑一次压测而污染玩家默认值，也避免手改配置后忘记回滚。
+//
+// 语义定义：max-yield = **单 tick 饱和档**。
+//   POI 再生：regen_rate 使任一 POI 在单个 tick 内即可从 0 回满至储量上限，
+//             即 regen_rate = stock_max / dt（dt = 1/60 游戏小时 → ×60）。
+//   采收/卸货：使单 tick 内即可装满一囊（资源按 carryCapacityResource，黄金按 agentGoldLoadFull）。
+// 该档位下「物资不再成为瓶颈」，人口与房屋将 Growth 到机制允许的上限，是内核的最坏负载画像。
+const YIELD_PRESETS = {
+  'max-yield': (cfg) => {
+    const dt = cfg.simulationDt || 1 / 60;
+    const sat = (maxStock) => maxStock / dt;
+    return {
+      // 生态 POI 自然再生（清泉/浆果/林木/石矿/金矿）
+      regenBaseWater: sat(cfg.stockMaxWater),
+      regenBaseBerry: sat(cfg.stockMaxBerry),
+      regenBaseWood: sat(cfg.stockMaxWood),
+      regenBaseStone: sat(cfg.stockMaxStone),
+      regenBaseGold: sat(cfg.stockMaxGold),
+      // 外部市场（榷场互市）三类物资产速
+      marketRegenBaseWater: sat(cfg.marketStockMaxWater),
+      marketRegenBaseFood: sat(cfg.marketStockMaxFood),
+      marketRegenBaseWood: sat(cfg.marketStockMaxWood),
+      // 现场采收速率：单 tick 装满一囊
+      poiInteractionRateResource: (cfg.carryCapacityResource || 100) / dt,
+      poiInteractionRateGold: (cfg.agentGoldLoadFull || 20) / dt,
+      // 入库卸货速率：单 tick 卸空一囊
+      poiUnloadRateResource: (cfg.carryCapacityResource || 100) / dt,
+      poiUnloadRateGold: (cfg.agentGoldLoadFull || 20) / dt,
+    };
+  },
+};
+
+// 应用「预设 + 命令行 --set 覆写」，返回实际生效的覆写清单（便于写入报告与审计）
+function applyConfigOverrides(cfg, presetName, args) {
+  const applied = [];
+  if (presetName) {
+    const fn = YIELD_PRESETS[presetName];
+    if (!fn) {
+      throw new Error(`未知产速预设: ${presetName}（可用: ${Object.keys(YIELD_PRESETS).join(', ')}）`);
+    }
+    const patch = fn(cfg);
+    for (const [k, v] of Object.entries(patch)) {
+      applied.push({ key: k, from: cfg[k], to: v, source: `preset:${presetName}` });
+      cfg[k] = v;
+    }
+  }
+  // 通用逐字段覆写：--set key=value（可重复，亦可逗号分隔多个）
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== '--set') continue;
+    const raw = args[i + 1];
+    if (!raw) continue;
+    for (const pair of raw.split(',')) {
+      const idx = pair.indexOf('=');
+      if (idx <= 0) throw new Error(`--set 语法错误: ${pair}（应为 key=value）`);
+      const key = pair.slice(0, idx).trim();
+      const val = pair.slice(idx + 1).trim();
+      if (!(key in cfg)) throw new Error(`--set 未知配置键: ${key}`);
+      const num = Number(val);
+      if (!Number.isFinite(num)) throw new Error(`--set 非数值: ${pair}`);
+      applied.push({ key, from: cfg[key], to: num, source: 'cli' });
+      cfg[key] = num;
+    }
+  }
+  return applied;
+}
+
 async function createEngine(seed, agentCount, campCount, config) {
   if (!fs.existsSync(wasmPath)) throw new Error('WASM 文件未找到: ' + wasmPath);
   const bytes = fs.readFileSync(wasmPath);
@@ -47,18 +122,22 @@ async function createEngine(seed, agentCount, campCount, config) {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
+  // ★ 重要修正：world_create 的 agent_count 形参在内核中实际被忽略
+  //   （sim_core::spatial::ecology::seed_primitive_ecology(&mut self, _agent_count: usize) 未使用该形参），
+  //   真实初始人口取自 config.agentSpawnCount。若不同步写入配置，--agents / --scale 将形同虚设
+  //   （历史上一度出现「400 人比 20 人还快」的假象，实为全部按 20 人跑）。
+  const cfg = agentCount > 0 && agentCount !== config.agentSpawnCount
+    ? { ...config, agentSpawnCount: agentCount }
+    : config;
+
   // 注入配置
-  const encoded = textEncoder.encode(JSON.stringify(config));
+  const encoded = textEncoder.encode(JSON.stringify(cfg));
   const ptr = ex.world_config_buf_ptr(encoded.length);
   new Uint8Array(ex.memory.buffer, ptr, encoded.length).set(encoded);
   const res = ex.world_apply_config_buf(encoded.length);
   if (res !== 0) throw new Error('配置注入失败: ' + res);
 
   ex.world_create(60, 764.0, seed, agentCount, campCount);
-
-  // 消费初始创世快照
-  const snapPtr = ex.world_snapshot_ptr();
-  const snapLen = ex.world_snapshot_len();
 
   return { ex, textDecoder, textEncoder };
 }
@@ -179,110 +258,112 @@ async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup =
   return { grandTotalMs, breakdown };
 }
 
-// 模块 C: 快照序列化与解析开销（★ M4 起同时度量 FABS 二进制通道）
-async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 300) {
+// 模块 C: 快照编码/解码开销
+// ★ T1：JSON 通道已从生产与工具链路移除，本模块只度量 FABS 二进制通道
+//   （Rust 编码 + 内存拷出 + SnapshotBin.decode，等价浏览器 transfer 路径）。
+//   加 `--with-legacy-json` 可额外度量已废弃的 JSON 调试通道，用于量化 T1 收益。
+async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 300, withLegacyJson = false) {
   const { ex, textDecoder } = await createEngine(seed, agents, camps, config);
   const dt = 1.0 / 60.0;
   if (warmup > 0) {
     ex.world_tick_steps(warmup, dt);
   }
 
-  // ★ M4：装载二进制解码器（复用前端 snapshot-bin.js），供解码耗时测量
-  let binDecoder = null;
-  if (typeof ex.world_snapshot_bin_ptr === 'function') {
-    const vm = require('vm');
-    const decPath = path.join(ROOT, 'frontend', 'js', 'snapshot-bin.js');
-    if (fs.existsSync(decPath)) {
-      const sandbox = { TextDecoder, TextEncoder, console };
-      vm.createContext(sandbox);
-      vm.runInContext(fs.readFileSync(decPath, 'utf8'), sandbox);
-      binDecoder = sandbox.SnapshotBin || null;
-      if (binDecoder && typeof ex.world_enum_table_ptr === 'function') {
-        const etp = ex.world_enum_table_ptr();
-        const etl = ex.world_enum_table_len();
-        if (etl > 0) {
-          binDecoder.setEnumTables(textDecoder.decode(new Uint8Array(ex.memory.buffer, etp, etl)));
-        }
-      }
-    }
+  // ★ T1：统一快照读取器。reuse 恒为 false —— 帧间对象池化已实测否决
+  //   （V8 新生代回收短命快照对象更快，且池化会让跨帧持有者读到静默变异的数据），
+  //   因此这里与浏览器生产链路完全一致：每帧产出全新对象。
+  const reader = createSnapshotReader(ex);
+  const binDecoder = reader.decoder;
+
+  // 预热一帧：消费创世地形脏位并同步字符串驻留表，保证 50 次采样都是稳态增量帧
+  {
+    const p0 = ex.world_snapshot_bin_ptr();
+    const l0 = ex.world_snapshot_bin_len();
+    if (l0) binDecoder.decode(new Uint8Array(ex.memory.buffer, p0, l0).slice());
   }
 
-  const rustSerializeNs = [];
-  const jsParseNs = [];
+  const legacyNs = [];
+  const legacyParseNs = [];
   const binEncodeNs = [];
   const binDecodeNs = [];
-  let snapshotBytes = 0;
   let binBytes = 0;
+  let legacyBytes = 0;
+  const hasLegacy = withLegacyJson
+    && typeof ex.world_snapshot_json_debug_ptr === 'function'
+    && typeof ex.world_snapshot_json_debug_len === 'function';
 
   for (let i = 0; i < samples; i++) {
     // 推进数步让快照产生自然微变
     ex.world_tick_steps(2, dt);
 
-    // Rust JSON 序列化
-    const t0 = process.hrtime.bigint();
-    const ptr = ex.world_snapshot_ptr();
-    const len = ex.world_snapshot_len();
-    const t1 = process.hrtime.bigint();
-    rustSerializeNs.push(t1 - t0);
-    snapshotBytes = len;
+    // Rust 二进制编码（FABS）
+    const b0 = process.hrtime.bigint();
+    const bptr = ex.world_snapshot_bin_ptr();
+    const blen = ex.world_snapshot_bin_len();
+    const b1 = process.hrtime.bigint();
+    binEncodeNs.push(b1 - b0);
+    binBytes = blen;
 
-    // JS 提取与解析
-    const t2 = process.hrtime.bigint();
-    const jsonStr = textDecoder.decode(new Uint8Array(ex.memory.buffer, ptr, len));
-    JSON.parse(jsonStr);
-    const t3 = process.hrtime.bigint();
-    jsParseNs.push(t3 - t2);
+    // JS 二进制解码
+    const b2 = process.hrtime.bigint();
+    const bytes = new Uint8Array(ex.memory.buffer, bptr, blen).slice();
+    binDecoder.decode(bytes);
+    const b3 = process.hrtime.bigint();
+    binDecodeNs.push(b3 - b2);
 
-    // ★ M4：Rust 二进制编码（FABS）
-    if (binDecoder) {
-      const b0 = process.hrtime.bigint();
-      const bptr = ex.world_snapshot_bin_ptr();
-      const blen = ex.world_snapshot_bin_len();
-      const b1 = process.hrtime.bigint();
-      binEncodeNs.push(b1 - b0);
-      binBytes = blen;
-
-      // ★ M4：JS 二进制解码（内存拷出 + SnapshotBin.decode，等价浏览器 transfer 路径）
-      const b2 = process.hrtime.bigint();
-      const bytes = new Uint8Array(ex.memory.buffer, bptr, blen).slice();
-      binDecoder.decode(bytes);
-      const b3 = process.hrtime.bigint();
-      binDecodeNs.push(b3 - b2);
+    // 可选：已废弃的 JSON 调试通道（仅用于 T1 收益量化）
+    if (hasLegacy) {
+      const t0 = process.hrtime.bigint();
+      const ptr = ex.world_snapshot_json_debug_ptr();
+      const len = ex.world_snapshot_json_debug_len();
+      const t1 = process.hrtime.bigint();
+      legacyNs.push(t1 - t0);
+      legacyBytes = len;
+      const t2 = process.hrtime.bigint();
+      JSON.parse(textDecoder.decode(new Uint8Array(ex.memory.buffer, ptr, len)));
+      const t3 = process.hrtime.bigint();
+      legacyParseNs.push(t3 - t2);
+      // JSON 通道与二进制通道共享 terrain_dirty：JSON 取走后需复位，避免污染下一帧二进制帧体积
+      if (typeof ex.world_require_terrain === 'function') ex.world_require_terrain();
     }
   }
 
-  const avgRustUs = Number(rustSerializeNs.reduce((a, b) => a + b, 0n) / BigInt(samples)) / 1000;
-  const avgJsUs = Number(jsParseNs.reduce((a, b) => a + b, 0n) / BigInt(samples)) / 1000;
-  const totalSnapshotUs = avgRustUs + avgJsUs;
+  const n = binEncodeNs.length;
+  const avgRustUs = Number(binEncodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
+  const avgJsUs = Number(binDecodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
 
   const out = {
-    snapshotBytes,
-    snapshotKb: (snapshotBytes / 1024).toFixed(1),
-    avgRustUs,
-    avgJsUs,
-    totalSnapshotUs,
+    channel: 'fabs',
+    snapshotBytes: binBytes,
+    snapshotKb: (binBytes / 1024).toFixed(1),
+    avgRustUs,   // Rust 侧 FABS 编码
+    avgJsUs,     // JS 侧拷贝 + 解码
+    totalSnapshotUs: avgRustUs + avgJsUs,
+    binBytes,
+    binKb: (binBytes / 1024).toFixed(1),
+    avgBinEncodeUs: avgRustUs,
+    avgBinDecodeUs: avgJsUs,
+    binTotalUs: avgRustUs + avgJsUs,
   };
-  if (binDecoder) {
-    const n = binEncodeNs.length;
-    const avgBinEncodeUs = Number(binEncodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
-    const avgBinDecodeUs = Number(binDecodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
-    out.binBytes = binBytes;
-    out.binKb = (binBytes / 1024).toFixed(1);
-    out.avgBinEncodeUs = avgBinEncodeUs;
-    out.avgBinDecodeUs = avgBinDecodeUs;
-    out.binTotalUs = avgBinEncodeUs + avgBinDecodeUs;
-    out.jsonVsBinSize = snapshotBytes / Math.max(1, binBytes);
-    out.speedup = totalSnapshotUs / Math.max(0.0001, out.binTotalUs);
+  if (hasLegacy) {
+    const avgLegacyEnc = Number(legacyNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
+    const avgLegacyParse = Number(legacyParseNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
+    out.legacyJsonBytes = legacyBytes;
+    out.legacyJsonKb = (legacyBytes / 1024).toFixed(1);
+    out.avgLegacyJsonEncodeUs = avgLegacyEnc;
+    out.avgLegacyJsonParseUs = avgLegacyParse;
+    out.legacyJsonTotalUs = avgLegacyEnc + avgLegacyParse;
+    out.jsonVsBinSize = legacyBytes / Math.max(1, binBytes);
+    out.speedup = out.legacyJsonTotalUs / Math.max(0.0001, out.binTotalUs);
   }
   return out;
 }
 
 // 模块 D: 人口规模压测 (Scale)
-async function runScaleBench(seed, camps, config) {
-  const pops = [20, 50, 100];
+async function runScaleBench(seed, camps, config, pops, scaleTicks) {
   const results = [];
   for (const pop of pops) {
-    const res = await runThroughputBench(1500, seed, pop, camps, config);
+    const res = await runThroughputBench(scaleTicks, seed, pop, camps, config);
     results.push({ pop, tps: res.tps, usPerTick: res.usPerTick });
   }
   return results;
@@ -347,6 +428,12 @@ async function runBatchBench(seed, agents, camps, config) {
   }
   const breakdownWarmup = parseInt(getArg('--breakdown-warmup', '60'), 10);
   const snapshotWarmup = parseInt(getArg('--snapshot-warmup', '300'), 10);
+  // 额外度量已废弃的 JSON 调试通道（仅用于量化 T1 收益，默认关闭）
+  const withLegacyJson = hasFlag('--with-legacy-json');
+  // 规模压测的人口档位与每组推进步数（用于绘制「单拍耗时 vs 人口」的扩展性曲线）
+  const pops = getArg('--pops', '20,50,100')
+    .split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n > 0);
+  const scaleTicks = parseInt(getArg('--scale-ticks', '1500'), 10);
 
   console.log(`╔════════════════════════════════════════════════════════════════════╗`);
   console.log(`║      Flow & Accord · WASM 仿真内核性能基准测试与分项分析器         ║`);
@@ -355,7 +442,24 @@ async function runBatchBench(seed, agents, camps, config) {
   console.log(`时间基准: dt = 1/60 游戏小时 | 60 tick = 1 游戏小时\n`);
 
   const simConfig = loadSimConfig();
-  const report = { timestamp: new Date().toISOString(), seed, agents, camps, ticks };
+  const presetName = getArg('--preset', null);
+  const overrides = applyConfigOverrides(simConfig, presetName, args);
+  const report = {
+    timestamp: new Date().toISOString(),
+    seed,
+    agents,
+    camps,
+    ticks,
+    preset: presetName || 'default',
+    configOverrides: overrides,
+  };
+  if (overrides.length) {
+    console.log(`⚙️  配置覆写 (${presetName ? `预设 ${presetName}` : '命令行'}，共 ${overrides.length} 项):`);
+    for (const o of overrides) {
+      console.log(`    ${o.key.padEnd(30)} ${String(o.from).padStart(10)} → ${String(o.to)}`);
+    }
+    console.log('');
+  }
 
   // 1. 宏观吞吐量
   process.stdout.write(`🚀 正在运行宏观内核吞吐量基准测试 (${ticks} ticks)... `);
@@ -399,38 +503,46 @@ async function runBatchBench(seed, agents, camps, config) {
   // 3. 快照序列化与通信开销
   if (runAll) {
     const snapWarmupMsg = snapshotWarmup > 300 ? ` (预热跳过 ${snapshotWarmup} ticks)` : '';
-    process.stdout.write(`📸 正在度量快照序列化与 JSON 解析开销 (50 采样)${snapWarmupMsg}... `);
-    const snap = await runSnapshotBench(50, seed, agents, camps, simConfig, snapshotWarmup);
+    process.stdout.write(`📸 正在度量快照编码/解码开销 (50 采样)${snapWarmupMsg}... `);
+    const snap = await runSnapshotBench(50, seed, agents, camps, simConfig, snapshotWarmup, withLegacyJson);
     report.snapshot = snap;
     console.log(`完成！\n`);
 
     const snapVsTick = (snap.totalSnapshotUs / tp.usPerTick).toFixed(1);
-    console.log(`┌────────────────────── 快照开销分析 ──────────────────────┐`);
-    console.log(`│ 快照 JSON 载荷体积:  ${snap.snapshotKb.padStart(8)} KB (${snap.snapshotBytes.toLocaleString()} 字节)`);
-    console.log(`│ Rust 序列化耗时:     ${snap.avgRustUs.toFixed(2).padStart(8)} µs (serde_json::to_string)`);
-    console.log(`│ JS 解析耗时:         ${snap.avgJsUs.toFixed(2).padStart(8)} µs (JSON.parse)`);
-    console.log(`│ 单次快照总代价:      ${snap.totalSnapshotUs.toFixed(2).padStart(8)} µs`);
-    console.log(`│ 等价计算步数:        生成 1 次快照耗时 ≈ 推进 ${snapVsTick} 个 Tick`);
-    if (typeof snap.binTotalUs === 'number') {
-      console.log(`├─────────────────── ★ M4 二进制通道 (FABS) ─────────────────┤`);
-      console.log(`│ 二进制载荷体积:     ${String(snap.binKb).padStart(8)} KB (${snap.binBytes.toLocaleString()} 字节)`);
-      console.log(`│ Rust 编码耗时:      ${snap.avgBinEncodeUs.toFixed(2).padStart(8)} µs (手写小端平铺)`);
-      console.log(`│ JS 解码耗时:        ${snap.avgBinDecodeUs.toFixed(2).padStart(8)} µs (SnapshotBin.decode)`);
-      console.log(`│ 二进制快照总代价:   ${snap.binTotalUs.toFixed(2).padStart(8)} µs`);
+    const hzOccupancy = (snap.totalSnapshotUs * 30 / 10000).toFixed(1); // 30Hz 节流下的算力占用 %
+    console.log(`┌────────────────── ★ 快照开销分析 (FABS 单通道) ─────────────────┐`);
+    console.log(`│ 二进制帧体积:       ${String(snap.binKb).padStart(8)} KB (${snap.binBytes.toLocaleString()} 字节)`);
+    console.log(`│ Rust 编码耗时:      ${snap.avgBinEncodeUs.toFixed(2).padStart(8)} µs (手写小端平铺)`);
+    console.log(`│ JS 解码耗时:        ${snap.avgBinDecodeUs.toFixed(2).padStart(8)} µs (拷贝 + SnapshotBin.decode)`);
+    console.log(`│ 单次快照总代价:     ${snap.binTotalUs.toFixed(2).padStart(8)} µs`);
+    console.log(`│ 30Hz 节流算力占用:  ${hzOccupancy.padStart(8)} %`);
+    console.log(`│ 等价计算步数:       生成 1 次快照耗时 ≈ 推进 ${snapVsTick} 个 Tick`);
+    if (typeof snap.legacyJsonTotalUs === 'number') {
+      console.log(`├──────────── 对照：已废弃 JSON 调试通道 (--with-legacy-json) ───────────┤`);
+      console.log(`│ JSON 载荷体积:      ${String(snap.legacyJsonKb).padStart(8)} KB`);
+      console.log(`│ JSON 序列化耗时:    ${snap.avgLegacyJsonEncodeUs.toFixed(2).padStart(8)} µs (serde_json::to_string)`);
+      console.log(`│ JSON 解析耗时:      ${snap.avgLegacyJsonParseUs.toFixed(2).padStart(8)} µs (JSON.parse)`);
+      console.log(`│ JSON 总代价:        ${snap.legacyJsonTotalUs.toFixed(2).padStart(8)} µs`);
       console.log(`│ 体积压缩倍率:       ${snap.jsonVsBinSize.toFixed(1).padStart(8)} 倍 (JSON/二进制)`);
-      console.log(`│ 解码提速倍率:       ${snap.speedup.toFixed(0).padStart(8)} 倍 (JSON 总代价/二进制总代价)`);
+      console.log(`│ 总代价提速倍率:     ${snap.speedup.toFixed(1).padStart(8)} 倍 (JSON/二进制)`);
     }
     console.log(`└──────────────────────────────────────────────────────────┘\n`);
   }
 
   // 4. 规模对比
   if (doScale) {
-    console.log(`👥 人口规模扩展性压测 (20 vs 50 vs 100 Agents):`);
-    const scale = await runScaleBench(seed, camps, simConfig);
+    console.log(`👥 人口规模扩展性压测 (${pops.join(' vs ')} Agents, 每组 ${scaleTicks} ticks 全新世界):`);
+    const scale = await runScaleBench(seed, camps, simConfig, pops, scaleTicks);
     report.scale = scale;
-    console.log(`  人口 20:   ${Math.round(scale[0].tps).toLocaleString()} TPS (${scale[0].usPerTick.toFixed(2)} µs/tick)`);
-    console.log(`  人口 50:   ${Math.round(scale[1].tps).toLocaleString()} TPS (${scale[1].usPerTick.toFixed(2)} µs/tick) [衰减至 ${(scale[1].tps/scale[0].tps*100).toFixed(1)}%]`);
-    console.log(`  人口 100:  ${Math.round(scale[2].tps).toLocaleString()} TPS (${scale[2].usPerTick.toFixed(2)} µs/tick) [衰减至 ${(scale[2].tps/scale[0].tps*100).toFixed(1)}%]\n`);
+    const p0 = scale[0];
+    for (const s of scale) {
+      const ratio = s.usPerTick / p0.usPerTick;
+      const linear = s.pop / p0.pop;
+      // 人效 = 单拍耗时/人口；超线性系数 = 实测倍数 / 线性倍数（>1 即存在超线性放大）
+      console.log(`  人口 ${String(s.pop).padStart(4)}: ${Math.round(s.tps).toLocaleString().padStart(9)} TPS | ${s.usPerTick.toFixed(2).padStart(7)} µs/tick` +
+        ` | 单拍 ${ratio.toFixed(2)}x@${p0.pop}人 | 人效 ${(s.usPerTick / s.pop).toFixed(3)} µs/人 | 超线性系数 ${(ratio / linear).toFixed(2)}`);
+    }
+    console.log('');
   }
 
   // 5. 批次对比

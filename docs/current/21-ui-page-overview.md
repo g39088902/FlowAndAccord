@@ -177,7 +177,7 @@ graph TD
 | 🏚️ 空置房屋 | `#camp-detail-vacant` | 无主房屋列表 + 受益人芯片（子女+配偶） |
 | 💰 王国公仓账本 | `#camp-detail-ledger-*` | 5 类资源余额（水/粮/木/石/金）+ 最近 6 笔流水 |
 
-- **在位时长换算**：60 tick = 1 模拟秒（`config.simulationDt=1/60`，`agentDecisionIntervalTicks=60`）；
+- **在位时长换算**：60 tick = 1 游戏小时（`config.simulationDt=1/60`）；Agent 默认每 120 tick（2 游戏小时）决策一次；
 - **死因来源**：内核 `HistoryKing.death_cause`，被废黜/夺位则为 None（显示「退位」）；
 - **样式族**：`.camp-detail-backdrop` / `.camp-detail-modal` / `.camp-detail-section` / `.camp-detail-king-row` 等，皇家金 `#fbbf24` 主题色。
 

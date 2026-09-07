@@ -1,8 +1,19 @@
 # 🗂️ TODO.md · 待办事项清单
 
-## 🔴 高优先级技术债（★ M4 v1.45.3 登记）
+## ✅ 已清偿技术债
 
-- [ ] **移除 JSON 快照通道 `world_snapshot_ptr/len`**（判定条件：M4 FABS 二进制快照已稳定运行数版本）：将 `tools/test-wasm.js` / `tools/test-determinism.js` / `tools/diagnose.js` / `tools/profile-benchmark.js` / `tools/gen-dag-testdata.js` / `tools/gold_mining_analysis.js` 六个工具的取值从 JSON 改造为二进制（或二进制↔JSON 通用读取），随后删除 `crates/sim_wasm/src/lib.rs` 的 `world_snapshot_ptr` / `world_snapshot_len` 与 `SNAPSHOT_BUF`（代码已标 `DEPRECATED(M4)` 注释），并同步 `sim_worker.js` 的 JSON 回退分支。设计详见 `docs/16-plan-performance-optimization.md` M4 与技术债说明。
+- [x] **移除 JSON 快照通道 `world_snapshot_ptr/len`**（★ T1，v1.46.0 完成）：
+  - 新增 `tools/snapshot-reader.js` 作为**唯一**快照取值入口（FABS 二进制优先，JSON 仅调试回退），
+    6 个工具（`test-wasm` / `test-determinism` / `diagnose` / `profile-benchmark` / `gen-dag-testdata` / `gold_mining_analysis`）全部改调它；
+  - `crates/sim_wasm/src/lib.rs` 的 `world_snapshot_ptr` / `world_snapshot_len` / `SNAPSHOT_BUF` 已删除，
+    取而代之的是 **test-only** 的 `world_snapshot_json_debug_ptr/len` —— 它是 `tools/test-snapshot-bin.js`
+    「四处同步防漂移」门禁的**唯一真值源**，除该门禁外禁止任何代码调用；
+  - `sim_worker.js` 的 JSON 回退分支已删除，快照链路收敛为单一 FABS 二进制通道。
+  - 详见 `docs/16-plan-performance-optimization.md` §5.1。
+- [x] **M5-0 快照桥接收尾**（★ v1.46.0 完成）：解码热路径去 BigInt、驻留表缓存改数组、清理对象池死代码、
+  `sim_worker.js` 按人口自适应降频（30/25/20/15Hz）。FABS 单帧 **4,607.5 → 1,837.9 µs（2.51x）**，
+  满载 442 人 30Hz 占用 **13.8% → 5.5%**（叠降频后 3.7%，< 5% 验收线）。详见 `docs/16-...md` §5.2。
+  - 顺带修复**跨世界驻留表串味**缺陷（`STR_TAB.start_index == 0` 判据 + `test-snapshot-bin.js` [4/4] 门禁）。
 
 ## 📋 常规待办
 

@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-09-07T08:37:52.737Z",
+  "seed": 42,
+  "agents": 20,
+  "camps": 4,
+  "ticks": 800000,
+  "preset": "default",
+  "configOverrides": [],
+  "throughput": {
+    "ticks": 800000,
+    "durationMs": 12638.591833,
+    "tps": 63298.1910145369,
+    "usPerTick": 15.798239791250001,
+    "gameHoursPerSec": 1054.9698502422816,
+    "speedupMultiplier": 63298.1910145369,
+    "stats": {
+      "meanUs": 15.7800219,
+      "p50Us": 15.495,
+      "p90Us": 21.012,
+      "p95Us": 23.616,
+      "p99Us": 39.912,
+      "maxUs": 4173.216
+    }
+  },
+  "breakdown": {
+    "grandTotalMs": 39.772891,
+    "breakdown": [
+      {
+        "name": "0. 四季与POI恢复 (Season & Poi Regen)",
+        "totalMs": 0.516627,
+        "usPerTick": 0.2583135,
+        "pct": 1.298942538524544
+      },
+      {
+        "name": "1. 代谢繁衍与继承 (Metabolism & Child)",
+        "totalMs": 3.529516,
+        "usPerTick": 1.764758,
+        "pct": 8.874175125967081
+      },
+      {
+        "name": "2. POI交互卸货 (Poi Interactions)",
+        "totalMs": 7.623518,
+        "usPerTick": 3.811759,
+        "pct": 19.167623495108764
+      },
+      {
+        "name": "3. 房屋维护与折旧 (Housing & Auction)",
+        "totalMs": 3.016124,
+        "usPerTick": 1.5080620000000002,
+        "pct": 7.583366268245372
+      },
+      {
+        "name": "4. 道路自然衰减 (Road Wear Decay)",
+        "totalMs": 3.29222,
+        "usPerTick": 1.64611,
+        "pct": 8.277547639169605
+      },
+      {
+        "name": "5. 动力位移踩踏 (Movement & Trample)",
+        "totalMs": 2.030609,
+        "usPerTick": 1.0153045,
+        "pct": 5.105510182802654
+      },
+      {
+        "name": "6. 马斯洛决策寻路 (Decisions & A*)",
+        "totalMs": 14.636231,
+        "usPerTick": 7.3181155,
+        "pct": 36.79951502645357
+      },
+      {
+        "name": "7. 账本宗族公仓 (Ledger, Clan, Region)",
+        "totalMs": 5.020404,
+        "usPerTick": 2.510202,
+        "pct": 12.622678094986858
+      },
+      {
+        "name": "8. 墓碑窗口清理 (Cleanup)",
+        "totalMs": 0.107642,
+        "usPerTick": 0.053821,
+        "pct": 0.2706416287415466
+      }
+    ]
+  },
+  "snapshot": {
+    "snapshotBytes": 548317,
+    "snapshotKb": "535.5",
+    "avgRustUs": 2969.009,
+    "avgJsUs": 3302.038,
+    "totalSnapshotUs": 6271.0470000000005,
+    "binBytes": 47156,
+    "binKb": "46.1",
+    "avgBinEncodeUs": 314.596,
+    "avgBinDecodeUs": 1394.96,
+    "binTotalUs": 1709.556,
+    "jsonVsBinSize": 11.62772499787938,
+    "speedup": 3.6682314004337973
+  }
+}

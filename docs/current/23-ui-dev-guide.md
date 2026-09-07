@@ -42,21 +42,26 @@ graph TD
 
 ---
 
-## 3.2 快照三处同步规范清单 (Rust -> Snapshot -> JS -> UI)
+## 3.2 快照四处同步规范清单 (★ M4 起 · Rust -> Snapshot -> FABS -> JS -> UI)
 
-新增任何账本、宗族或政体字段时，**必须且只能严格按照三处同步规范**（根 AGENTS.md §4.5）：
+新增任何账本、宗族或政体字段时，**必须且只能严格按照四处同步规范**（根 AGENTS.md §4.5）：
 
 ```mermaid
 sequenceDiagram
     participant Rust as 1. crates/sim_core/src/spatial/snapshot.rs
-    participant Gen as 2. crates/sim_core/src/spatial/world.rs
-    participant Adapt as 3. frontend/js/rustworld.js
-    participant UI as 4. frontend/js/ledger-ui.js & render_inspector.js
+    participant Gen as 2. crates/sim_core/src/spatial/world_snapshot.rs
+    participant Enc as 3. crates/sim_core/src/spatial/snapshot_bin/encode.rs (★M4)
+    participant Dec as 4. frontend/js/snapshot-bin.js (★M4 解码)
+    participant Adapt as 5. frontend/js/rustworld.js
+    participant UI as 6. frontend/js/ledger-ui.js & render_inspector.js
 
     Rust->>Gen: 声明快照 Struct (如 ClanSnapshot / RegionSnapshot)
-    Gen->>Adapt: generate_snapshot() 序列化输出 JSON
-    Adapt->>UI: _applySnapshot() 反序列化为 JS 对象数组
+    Gen->>Enc: generate_snapshot() 组装（真值源）
+    Enc->>Dec: FABS 定长二进制帧（生产唯一通道）
+    Dec->>Adapt: 解码为与 JSON 同构的 JS 对象
+    Adapt->>UI: _applySnapshot() 映射
     UI->>UI: DOM 绑定与 Canvas 矢量高亮
+    Note over Gen,Dec: 防漂移门禁 node tools/test-snapshot-bin.js<br/>（JSON 仅 test-only 真值源）
 ```
 
 ### M2~M4 快照结构体（已落地，与 `snapshot.rs` 实际定义一致）

@@ -1,7 +1,19 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.45.4**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.4**。
+
+| **v1.46.4** | 默认 Agent 决策频率减半：`agentDecisionIntervalTicks` 由 60 调整为 120，族人仍按 ID 相位错峰，但由每 1 游戏小时决策一次改为每 2 游戏小时一次；物理 tick（1/60 游戏小时）与模拟时基不变。 | frontend(config) / decisions / docs |
+
+| **v1.46.3** | 修复高产速长程演化中皇帝在榷场停滞的问题：市场现场交易按 `marketSettlementStep`（默认 5 单位）整步结算，而旧返航守卫仅在行囊近乎满载时离场；因此例如水袋已装 97.6/100、剩余 2.4 时无法再成交却不会返家。现在决策层与生态成交门槛对齐：任一待购行囊的剩余空间不足一笔结算即平滑返家卸货，避免无可执行交易时永久滞留。 | sim_core(decisions/market) / docs |
+
+| **v1.46.2** | POI 再生产速成为可复现的创世输入：① 新增版本化浏览器偏好 `flowaccord.poi-regen-rates.v1`（水/果/木/石/金五类倍率）；② 生态大盘滑块修改时同时更新当前内核与本地偏好；③ 页面加载时于 `rustworld.js` 前读取本地偏好，INIT/RESET 把它随配置发送到 Worker，Worker 在 `world_create` 后、首个快照和任意 tick 前写入内核；因此「世界种子 + POI 产速配置」可重建同一生态演化；④ 读档继续以档内持久倍率为准，不受浏览器偏好覆盖。 | frontend(config.poi-rates/rustworld/sim_worker) / docs |
+
+| **v1.46.1** | 修复时光倒流控制器并把回放提升为可审计的分支语义：① 回滚按钮正确等待 Worker 异步结果，消除 Promise 被同步读取导致的固定“未知错误”；② Worker 收到回滚指令即原子暂停，按每批 5,000 tick 重演并回传进度，杜绝回放期间被常规计时循环额外推进；③ 回滚完成后截断目标 tick 之后的检查点与玩家状态命令，避免从历史分叉后误用旧未来；④ 热配置与生态倍率调整附带发生 tick 和顺序游标，重演跨越检查点时按原顺序重新注入；⑤ Worker 下发真实最早可回滚 tick 与检查点数量，读入中途存档后 UI 不再虚报可回到 Tick 0；⑥ 禁止目标超出当前 tick 与回放期间的并发控制命令 | frontend(sim_worker/rustworld/main) / docs |
+
+| **v1.46.0** | 落地性能优化 **T1「移除 JSON 快照通道」+ M5-0「快照桥接收尾」**（`docs/16-plan-performance-optimization.md` §5.1/§5.2，确定性零风险）：① **T1 单一快照通道**：新增 `tools/snapshot-reader.js` 作为唯一取值入口（FABS 二进制优先、JSON 仅调试回退），`test-wasm` / `test-determinism` / `diagnose` / `profile-benchmark` / `gen-dag-testdata` / `gold_mining_analysis` 六工具统一改调；`crates/sim_wasm/src/lib.rs` 删除 `world_snapshot_ptr/len` 与 `SNAPSHOT_BUF`，代之以 **test-only** 的 `world_snapshot_json_debug_ptr/len`（仅作 `test-snapshot-bin.js` 防漂移真值源）；`sim_worker.js` 删除 JSON 回退分支；② **修复跨世界字符串驻留表串味缺陷**：`StrTab::new()` 恒以 `epoch=0` 起步，导致同一 wasm 实例新建第二个世界时解码器复用上一个世界的 `strid→字符串` 映射（浏览器等价于「点重置模拟后地名错乱」，并让 `test-wasm` 存读档确定性失败）——改以 STR_TAB 段 `start_index==0` 判定「全新驻留表」（不采用 epoch 全局递增，以免破坏逐字节确定性），并新增 `test-snapshot-bin.js` **[4/4] 换世界场景**回归门禁（回退修复后报 129 处不一致）；③ **M5-0 解码热路径去 BigInt**：`u64`/`optU64`/`listU64` 由 `DataView.getBigUint64()` 改为双 u32 合成，满载档每帧约 2,000+ 次 BigInt 分配清零，JS 解码 **3,658.9 → 1,046.9 µs（3.50x）**，FABS 单帧总代价 **4,607.5 → 1,837.9 µs（2.51x）**，30Hz 算力占用 **13.8% → 5.5%**；④ **M5-0.4 快照频率自适应**：`sim_worker.js` 按 FABS 帧内 AGENT 记录数分级降频（≤200 人 30Hz / ≤320 人 25Hz / ≤450 人 20Hz / 以上 15Hz），442 人稳态占用降至 **3.7%（< 5% 验收线）**；⑤ **否决并清理帧间对象池化**：实测 V8 新生代回收短命快照对象快于就地覆写，且池化会让跨帧持有者读到静默变异数据，`setReuse()` 退化为空操作并删除相关死代码；⑥ 门禁全通：`test-wasm` / `test-determinism`（6/6）/ `test-snapshot-bin`（4 场景）/ `config-check`（205 字段）/ `frontend-check` 全绿，B2 满载 800k tick 复测入库 `tools/baseline-maxyield-800k-m5.json` | sim_core(strtab) / sim_wasm / frontend(snapshot-bin/sim_worker) / tools / docs |
+
+| **v1.45.5** | 新增 GitHub 竞品与同类项目分析文档：横向比较 AEON、Genesis Engine、Dwarf Land、Civilization Simulator、Agent World、Oikoumene、life-simulation、Pixeldarium 与 Causafera，区分逐个体模拟/宏观文明/生态遗传/LLM 社会/工程平台等定位，记录完成度判断、Flow & Accord 的竞争位置与可借鉴研发方向 | docs |
 
 | **v1.45.4** | 文档 agent 适配第一阶段：新增 `00-agent-start.md` 任务路由与完成定义；四份关键局部指南补输入输出和交互边界；修正配置数量和决策节拍旧值；文档体检增加源码驱动的 `FACT_DRIFT` 检查，明确漂移失败及人工复核边界。 | docs / tools |
 

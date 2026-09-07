@@ -71,7 +71,7 @@
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
-   tick_decisions()                           错峰决策 ((tick + id) % 60 == 0)
+   tick_decisions()                           错峰决策 ((tick + id) % 120 == 0)
 7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
 8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
 9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济

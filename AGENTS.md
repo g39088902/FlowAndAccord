@@ -17,7 +17,7 @@
 | **docs/01-current.md** | 已实现功能索引入口 + 模块导航表（`01`空间路网 / `02`生态POI / `03`四季 / `04`代谢繁衍 / `05`房屋 / `06`决策AI / `07`前端 / `08`配置 / `09`代码地图 / `10`快速启动 / `11`版本演进 / `12`账本系统） | 快速了解现状；改动机制须同步更新对应 `docs/current/0X-*.md` 并在 `11-changelog.md` 追加条目 |
 | **docs/current/21-ui-page-overview.md** | UI 页面全景剖析：画布视口、顶栏状态栏、生态大盘、观察堆栈、模态弹窗、存档面板 | 了解当前 UI 页面布局与交互时 |
 | **docs/current/22-society-ledger-ui.md** | 制度大盘（M1-M4）界面实现说明：4 标签页枢纽、M2 分家继承、M3 宗族公库、M4 王国政体、ASCII 线框原型 | 了解制度大盘界面实现时 |
-| **docs/current/23-ui-dev-guide.md** | 前端开发实施指南：模块化分工、快照三处同步、CSS 设计系统、性能节流、验收门禁 | 开发新 UI 模块时 |
+| **docs/current/23-ui-dev-guide.md** | 前端开发实施指南：模块化分工、快照四处同步（★ M4）、CSS 设计系统、性能节流、验收门禁 | 开发新 UI 模块时 |
 | **docs/current/24-three-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 架构与不变量 | 查阅核心 FSM、状态转移方程与交互契约时 |
 | **docs/08-decision-viz-design.md** | 马斯洛决策引擎可视化设计方案：决策代码→图元映射、双视图三面板、交互能力预留、实现文件规划与里程碑 | 实现决策可视化网页（逻辑引擎图/实时监控）前必读；配套交互原型 `docs/decision-viz-prototype.html` |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份） | 改动 ledger/ 代码时查阅 |
@@ -29,7 +29,7 @@
 | **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 15 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
 | **docs/12-plan-ledger-refactor.md** | 账本与仓库重构计划（M1~M4 已完成，M5 收尾 ✅） | 账本系统演进规划 |
-| **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（M1~M5：快照节流/稀疏路网衰减/A*查表/二进制快照/多线程） | 性能优化专项规划 |
+| **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（M1~M4 已落地归档；**T1 移除 JSON 快照通道 ✅ v1.46.0**、**M5-0 快照桥接收尾 ✅ v1.46.0**；未完成：M5-1 消除超线性 / M5-2 多线程 Fork-Join） | 性能优化专项规划 |
 | **docs/10-architecture.md** | 宏观技术架构愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（多为规划态） |
 | **docs/11-plan.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观方向（多为规划态） |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
@@ -63,7 +63,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.45.4)"]
+    F --> G["浏览器 UI (版本: v1.46.4)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -113,7 +113,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.45.4`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.4`**。
 
 ---
 
@@ -142,6 +142,7 @@ node frontend/server.js           # http://localhost:3000
 □ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9）
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
 □ 四处同步（M4）：快照字段变更时 snapshot.rs / world.rs / snapshot_bin/encode.rs / rustworld.js+snapshot-bin.js 一致（防漂移门禁：node tools/test-snapshot-bin.js）
+□ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
 □ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md + 受影响的局部 AGENTS.md
@@ -174,8 +175,8 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
-- **时间基准**：每 tick = `config.simulationDt`(1/60) 游戏小时，`config.agentDecisionIntervalTicks`(60) tick = 1 游戏小时；在 1x 基础倍速下，现实 1 秒 = 游戏内 1 小时。仿真由独立 Web Worker `sim_worker.js` 驱动（约 60Hz 心跳步进）。
-- **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 60 == 0` 的相位上决策，全员相位均摊错开。
+- **时间基准**：每 tick = `config.simulationDt`(1/60) 游戏小时，`config.agentDecisionIntervalTicks`(120) tick = 2 游戏小时；在 1x 基础倍速下，现实 1 秒 = 游戏内 1 小时。仿真由独立 Web Worker `sim_worker.js` 驱动（约 60Hz 心跳步进）。
+- **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 120 == 0` 的相位上决策，全员相位均摊错开。
 - **严禁修改 `config.simulationDt`**：基准恒为 1/60 游戏小时，倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
 - **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
@@ -196,7 +197,17 @@ node frontend/server.js           # http://localhost:3000
 3. `crates/sim_core/src/spatial/snapshot_bin/encode.rs`（**M4 FABS 二进制编码**，字段顺序/枚举码位与 1、2 等价）
 4. `frontend/js/snapshot-bin.js`（二进制解码，产物与 JSON 同构）+ `frontend/js/rustworld.js`（`_applySnapshot()` 映射）
 
-**M4 二进制快照要点**：快照主链路已从「JSON 字符串 + `JSON.parse`」改为「FABS 定长二进制帧 + TypedArray 直读」（见 `docs/16-plan-performance-optimization.md` M4 与 `crates/sim_core/src/spatial/snapshot_bin/`）；路网几何/地形按版本号增量下发；枚举名称表由 `world_enum_table_ptr/len` 从 Rust `as_str()` 生成（新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`）；防漂移自动网 = `node tools/test-snapshot-bin.js`。`tools/` 下 6 工具与前端回退仍走 `world_snapshot_ptr` JSON 通道（**暂保留，标 `DEPRECATED(M4)`，稳定后移除**，见 TODO.md）。前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
+**M4 二进制快照要点**：快照主链路已从「JSON 字符串 + `JSON.parse`」改为「FABS 定长二进制帧 + TypedArray 直读」（见 `docs/16-plan-performance-optimization.md` M4 与 `crates/sim_core/src/spatial/snapshot_bin/`）；路网几何/地形按版本号增量下发；枚举名称表由 `world_enum_table_ptr/len` 从 Rust `as_str()` 生成（新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`）；防漂移自动网 = `node tools/test-snapshot-bin.js`。★ T1（v1.46.0）：JSON 快照通道已从生产与工具链路移除 —— `tools/` 全部工具统一走 `tools/snapshot-reader.js`（FABS 优先），前端 `sim_worker.js` 删除 JSON 回退；`crates/sim_wasm` 仅保留 **test-only** 的 `world_snapshot_json_debug_ptr/len`（仅供 `test-snapshot-bin.js` 做真值比对，**禁止**其它任何代码调用）。前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
+
+### 4.5.1 🔴 跨世界必须让驻留表缓存失效（★ T1 缺陷修复，v1.46.0）
+
+FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**（`snapshot-bin.js` 的 `_strCache`），靠增量 `start_index` 续喂。判定"这是不是一张全新的驻留表"的**唯一正确判据是 `STR_TAB.start_index == 0`**：
+
+- ❌ **不能用 `epoch` 判断换世界**——`StrTab::new()` 的 `epoch` 对任何新世界 / 读档重建都从 `0` 起步，恒为 0，用它做判据会**继续复用上一个世界的 `strid → string` 映射**，表现为重置模拟后地名/人名全部串味（`test-wasm` 的 `SAVE_LOAD_DETERMINISM_FAILED` 就是这样暴露的）。
+- ❌ **也不能改成"全局单调递增 epoch"**——那会让同种子两个世界的帧字节不再相等，直接击穿确定性矩阵。
+- ✅ 工具侧（`snapshot-reader.js`）在 `world_load` / `world_create` 之后必须显式 `reader.resetCaches()`；浏览器侧由 `start_index == 0` 自动清空。
+
+回归门禁 = `node tools/test-snapshot-bin.js` 场景 **[4/4] 换世界后**（去掉修复会报 129 处不一致）。
 
 ### 4.6 🟠 模块粒度与单文件行数规范
 

@@ -29,7 +29,7 @@ use super::world::World3DEngine;
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 4;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.45.4";
+pub const SAVE_APP_VERSION: &str = "1.46.4";
 
 /// 存档契约：世界全量可持久化状态
 ///

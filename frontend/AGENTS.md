@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：23 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + style.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：26 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + style.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -21,6 +21,7 @@
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
 | `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（205 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
+| `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（18 条 b1~b18，★ v1.29.0 起 b17 竞拍购房置于首位）。**启动注入权威默认值**；★ v1.27.0 起用户运行时调整保存到浏览器 localStorage（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1），不再写回本文件 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
 
@@ -71,7 +72,7 @@
 | 文件 | 行数 | 职责 |
 |---|---|---|
 | `server.js` | ~122 | 静态文件开发服务器（内置 `.wasm` MIME = application/wasm）/ `POST /save-decision-order` 端点（★ v1.27.0 起仅保留兼容迁移，决策顺序保存主路径已迁至浏览器 localStorage）/ 默认 3000 端口 |
-| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 22 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
+| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 24 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
 | `style.css` | — | 全局样式（顶栏/Inspector/大盘/决策视图/族谱/调试器） |
 | `rust/sim_wasm.wasm` | — | WASM 编译产物**主副本**（rustworld.js 实际 fetch 的路径） |
 | `sim_wasm.wasm` | — | WASM 编译产物**根目录备用副本** |
@@ -83,35 +84,36 @@
 ```
 1. math.js                    零依赖基础
 2. config.js                  SIM_CONFIG (205 字段，含拆分配置合计)
-3. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
-4. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)
-5. decision-viz-data.js       分支元数据
-6. decision-viz-view.js       决策视图 DOM 渲染
-7. decision-viz.js            集成层: mergeIntoSimConfig() ← 此时 SIM_CONFIG 才完整
-8. snapshot-bin.js            ★ M4 FABS 二进制快照解码器（必须在 rustworld.js 之前）
-9. rustworld.js               构造时读取 SIM_CONFIG 并 applyConfig ← 必须在 3/4/7 决策三件套及 8 snapshot-bin 之后
-10. dag-layout.js             族谱布局数学
-11. dag-view.js               族谱渲染
-12. dag-standalone.js         族谱独立页模板
-13. dag.js                    族谱数据构建+编排
-14. main.js                   事件绑定+初始化
-15. entity-link.js            统一实体跳转（依赖 main.js）
-16. ledger-ui.js              制度大盘
-17. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
-18. render_canvas.js           Canvas 主循环调度（v1.7.1 拆分）
-19. render_hud.js              HUD/大盘辅助函数（v1.7.1 拆分）
-20. render_world.js            地形/路网/POI/房屋绘制（v1.7.1 拆分）
-21. render_agents.js           族人/特效绘制（v1.7.1 拆分）
-22. render_inspector.js        Inspector 面板/点击拾取（v1.7.1 拆分）
-23. auction-ui.js              拍卖大盘（最后加载，独立模态）
+3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
+4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
+5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)
+6. decision-viz-data.js       分支元数据
+7. decision-viz-view.js       决策视图 DOM 渲染
+8. decision-viz.js            集成层: mergeIntoSimConfig() ← 此时 SIM_CONFIG 才完整
+9. snapshot-bin.js            ★ M4 FABS 二进制快照解码器（必须在 rustworld.js 之前）
+10. rustworld.js              构造时读取 SIM_CONFIG 并 applyConfig ← 必须在配置、决策三件套及 snapshot-bin 之后
+11. dag-layout.js             族谱布局数学
+12. dag-view.js               族谱渲染
+13. dag-standalone.js         族谱独立页模板
+14. dag.js                    族谱数据构建+编排
+15. main.js                   事件绑定+初始化
+16. entity-link.js            统一实体跳转（依赖 main.js）
+17. ledger-ui.js              制度大盘
+18. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
+19. render_canvas.js           Canvas 主循环调度（v1.7.1 拆分）
+20. render_hud.js              HUD/大盘辅助函数（v1.7.1 拆分）
+21. render_world.js            地形/路网/POI/房屋绘制（v1.7.1 拆分）
+22. render_agents.js           族人/特效绘制（v1.7.1 拆分）
+23. render_inspector.js        Inspector 面板/点击拾取（v1.7.1 拆分）
+24. auction-ui.js              拍卖大盘（最后加载，独立模态）
 ```
 
 **关键约束**：
-- 三个拆分配置/视图文件（3-7：config.decision-order.js、config.house-upgrade-cost.js + 决策三件套）必须在 `rustworld.js`（9）之前——否则 wasm 注入的是不含决策顺序/不含升级成本矩阵的不完整配置
-- ★ M4 `snapshot-bin.js`（8）必须在 `rustworld.js`（9）之前——否则 READY 首个二进制快照无法解码
+- 四个配置/视图准备文件（3-8：config.poi-rates.js、config.decision-order.js、config.house-upgrade-cost.js + 决策三件套）必须在 `rustworld.js`（10）之前——否则创世没有持久 POI 产速，或 WASM 注入的是不含决策顺序/升级成本矩阵的不完整配置
+- ★ M4 `snapshot-bin.js`（9）必须在 `rustworld.js`（10）之前——否则 READY 首个二进制快照无法解码
 - 改拆分配置 JS（新增全局对象）必须同步：`rustworld.js::applyConfig` 合并逻辑、`tools/config-check.js` 前端字段集、`tools/test-wasm.js` 注入
-- **`save-ui.js`（17）必须在 `main.js`（14）之后**——它读取 `window.rustWorldSim`（main.js 第 5 行挂载）调用 `saveWorld()/loadWorld()`
-- **render 五件套（18-22）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；五文件共享全局作用域，函数声明可提升，加载顺序为 canvas→hud→world→agents→inspector
+- **`save-ui.js`（18）必须在 `main.js`（15）之后**——它读取 `window.rustWorldSim`（main.js 第 5 行挂载）调用 `saveWorld()/loadWorld()`
+- **render 五件套（19-23）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；五文件共享全局作用域，函数声明可提升，加载顺序为 canvas→hud→world→agents→inspector
 
 ---
 
@@ -198,7 +200,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 拆分时保持 `render(now)` 作为入口函数，内部调用各子模块的绘制函数。全局对象 `window.render` 或直接函数挂载需保持兼容。
 
-### 5.2 快照三处同步（根 AGENTS.md §4.5）
+### 5.2 快照四处同步（★ M4 起；根 AGENTS.md §4.5）
 
 给 agent/house/poi 新增快照字段时，必须 **★ M4 起四处同步**：
 1. `crates/sim_core/src/spatial/snapshot.rs` — 结构体定义
@@ -210,7 +212,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 遗漏任何一处都会导致前端 `undefined` 或展示旧值；防漂移自动网 = `node tools/test-snapshot-bin.js`（二进制 ≡ JSON 逐字段深比较）。
 
-> ★ M4 相关派生缓存：`snapshot-bin.js` 维护跨帧字符串驻留缓存（引擎重建/读档/重置时必须调用 `SnapshotBin.resetCaches()`，rustworld 已在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 处理器调用）；`rustworld.js` 维护车道/节点几何缓存（`_laneCache`/`_geomVersion`），增量帧（`snap.lanes===null`）只覆写 `wear`。
+> ★ M4 相关派生缓存：`snapshot-bin.js` 维护跨帧字符串驻留缓存（引擎重建/读档/重置时必须调用 `SnapshotBin.resetCaches()`，rustworld 已在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 处理器调用）；**★ v1.46.0 起解码器自身也用 `STR_TAB.start_index == 0` 判「全新驻留表」自动清缓存**——判据**不能**用 `strtab_epoch`（新世界恒为 0，会导致换世界后 id→字符串串味，见根 AGENTS.md §4.5.1）；`rustworld.js` 维护车道/节点几何缓存（`_laneCache`/`_geomVersion`），增量帧（`snap.lanes===null`）只覆写 `wear`。
 
 ### 5.3 配置热注入的时序
 
@@ -227,7 +229,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 - 断代/绝嗣穿梭时不跳帧
 - 死亡族人的 Inspector 回溯
 
-**新增 agent 字段时**，除了快照三处同步，还须确认 `agentArchive` 的写入逻辑（在 `_applySnapshot` 中）是否正确归档新字段。
+**新增 agent 字段时**，除了快照四处同步，还须确认 `agentArchive` 的写入逻辑（在 `_applySnapshot` 中）是否正确归档新字段。
 
 **v1.8.7 墓碑补记**：`_applySnapshot` 消费 `snap.recent_deaths`（死亡/流产墓碑，`_consumedDeathIds` 幂等去重，`initEcology`/`loadWorld` 时清空）——①对档案库滞留"存活"的陈旧副本（高倍速 ≥512x 跨过衰减窗口所致）强制补记 `isAlive=false` + `deathCause`；②流产/随母亡故胎儿以"已故子嗣"身份入档（`isFetus=false`，血缘 `fatherId`/`motherId` 由墓碑携带——高倍速下胎儿整个生命周期可在单帧内，`prevAgents` 取不到，必须靠墓碑保血缘），族谱据此可画"💀 死因: 流产"节点。
 
@@ -272,7 +274,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 | `rustWorld._loadWasm()` | `world_create(grid, size, seed, agentCount, campCount)` | 创建世界实例（campCount 播种前注入，见根 AGENTS.md §4.7） |
 | `rustWorld.tick()` / 倍速多步 | `world_tick(dt)` | 推进模拟 |
 | `rustWorld.applyConfig(cfg)` | `world_apply_config(jsonPtr, len)` | 热注入配置 |
-| `sim_worker.pullSnapshot()` | ★ M4 `world_snapshot_bin_ptr/len` → FABS 二进制帧（`.slice()` 拷出 + `postMessage(transfer)`）；无导出回退 `world_snapshot_ptr/len` → JSON | 拉取快照 |
+| `sim_worker.pullSnapshot()` | ★ T1/M5 `world_snapshot_bin_ptr/len` → 唯一 FABS 二进制帧（`.slice()` 拷出 + `postMessage(transfer)`）；不再存在生产 JSON 回退 | 拉取快照 |
 | `SnapshotBin.setEnumTables()` | `world_enum_table_ptr/len` → 枚举名称表 JSON | M4 解码枚举码位（单一真相源，杜绝前后端漂移） |
 | `rustWorld.saveWorld()` | `world_save_ptr()` + `world_save_len()` | 导出全量存档 JSON（v1.8.0） |
 | `rustWorld.loadWorld(json)` | `world_save_buf_ptr(len)` + `world_load(len)` | 载入存档覆盖世界（0 成功 / -1 越界 / -2 非 UTF-8 / -3 解析或校验失败） |

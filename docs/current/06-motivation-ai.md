@@ -119,8 +119,8 @@ stateDiagram-v2
 ```
 
 ### 错峰决策节拍
-- 每个引擎 tick = 1/60 游戏小时，agent 每 60 tick（1.0 游戏小时）决策一次。
-- 错峰相位：`(tick_counter + agent.id) % 60 == 0`，全员相位均摊错开。
+- 每个引擎 tick = 1/60 游戏小时，agent 每 120 tick（2.0 游戏小时）决策一次。
+- 错峰相位：`(tick_counter + agent.id) % 120 == 0`，全员相位均摊错开。
 - `world.tick()` 内部顺序：POI 再生 → 代谢/繁衍 → POI 交互(装卸) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货发生在决策之前，决策看到的是卸货后的仓库状态。
 - 详见根 AGENTS.md §4.3。
 
@@ -149,7 +149,7 @@ stateDiagram-v2
 
 ## 关键不变量
 - 所有决策为确定性执行，无概率掷骰（v0.9.44 起全部收敛）。
-- 决策节拍固定 60 tick，不得修改 `simulation_dt`（=1/60）。
+- 决策节拍默认 120 tick；`simulation_dt` 固定为 1/60，不得修改。
 - 共享 RNG 按 agents 顺序依次消费，新增任何随机消耗必须保持确定性。
 - 中途掉头必须通过 `turn_around_and_route_to` 保持坐标连续性，严禁闪现瞬移。
 - ★ M4 夺位远征由决策分支 `B14SeekThrone` 在马斯洛引擎内驱动（生理层最高档），不消耗 `WorldRng`；登基由世界物理执行器 `execute_pending_coronations` 完成，夺位者登基/放弃后恢复正常决策。

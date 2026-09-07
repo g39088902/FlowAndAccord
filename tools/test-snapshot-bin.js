@@ -3,8 +3,12 @@
  * Flow & Accord · M4 二进制快照（FABS）↔ JSON 快照一致性门禁 (test-snapshot-bin.js)
  * ============================================================================
  * 用途：在同一 tick 下，用 `frontend/js/snapshot-bin.js` 解码二进制帧，与
- *       `world_snapshot_ptr` 的 JSON 快照做**深比较**（逐字段、逐数组元素、逐对象键），
- *       f32 用容差 |a-b| < 1e-6 比较。这是 M4「四处同步」防漂移的唯一自动保障网。
+ *       `world_snapshot_json_debug_ptr` 的 JSON 快照做**深比较**（逐字段、逐数组元素、
+ *       逐对象键），f32 用 `Math.fround` 还原位型后精确比较。
+ *       这是 M4「四处同步」防漂移的**唯一**自动保障网。
+ *
+ * ⚠️ T1 之后 JSON 通道已从生产与工具链路移除，仅保留本门禁所需的调试导出
+ *    `world_snapshot_json_debug_ptr/len` 作为「真值源」。禁止任何其它代码调用它。
  *
  * 用法：
  *   node tools/test-snapshot-bin.js            # 默认在仓库根目录运行
@@ -153,8 +157,11 @@ async function main() {
   SnapshotBin.setEnumTables(td.decode(new Uint8Array(ex.memory.buffer, etp, etl)));
 
   function jsonSnap() {
-    const p = ex.world_snapshot_ptr();
-    const l = ex.world_snapshot_len();
+    if (typeof ex.world_snapshot_json_debug_ptr !== 'function') {
+      throw new Error('wasm 缺少 JSON 调试导出 world_snapshot_json_debug_ptr，无法做真值比对');
+    }
+    const p = ex.world_snapshot_json_debug_ptr();
+    const l = ex.world_snapshot_json_debug_len();
     if (!l) throw new Error('JSON 快照为空');
     return JSON.parse(td.decode(new Uint8Array(ex.memory.buffer, p, l)));
   }
@@ -183,12 +190,12 @@ async function main() {
   // 场景 1：创世帧（世界刚创建，地形 + 全量路网 + 字符串驻留表初建）
   ex.world_create(60, 764.0, 42, 20, 4);
   SnapshotBin.resetCaches(); // 新引擎 → 清空字符串缓存（与浏览器读档/重置行为一致）
-  console.log('[1/3] 创世帧（地形+路网全量）...');
+  console.log('[1/4] 创世帧（地形+路网全量）...');
   compareBoth('genesis');
 
   // 场景 2：推进 3600 tick 后的稳态帧（无地形增量，仅 LANE_WEAR + 少量字符串增量）
   ex.world_tick_steps(3600, 1.0 / 60.0);
-  console.log('[2/3] 稳态帧（3600 tick 后）...');
+  console.log('[2/4] 稳态帧（3600 tick 后）...');
   compareBoth('steady');
 
   // 场景 2b：增量帧（同一引擎再取一帧，无地形/路网全量 → 校验 lanes=null + lane_wear 存在）
@@ -199,7 +206,7 @@ async function main() {
   else ok('增量帧（无地形/无路网几何，仅 LANE_WEAR）正确');
 
   // 场景 3：存读档后帧（验证读档后编码一致、字符串驻留表重建正确）
-  console.log('[3/3] 存读档后帧...');
+  console.log('[3/4] 存读档后帧...');
   const saveP = ex.world_save_ptr();
   const saveL = ex.world_save_len();
   if (!saveL) throw new Error('存档导出失败: ' + (ex.world_last_error_len ? td.decode(new Uint8Array(ex.memory.buffer, ex.world_last_error_ptr(), ex.world_last_error_len())) : ''));
@@ -210,6 +217,23 @@ async function main() {
   if (ex.world_load(saveEnc.length) !== 0) throw new Error('存档加载失败');
   SnapshotBin.resetCaches(); // 引擎重建 → 清空字符串缓存
   compareBoth('reload');
+
+  // 场景 4：跨世界驻留表缓存失效（★ T1 回归门禁，v1.46.0）
+  // 同一 wasm 实例上新建第二个世界（换种子），且**故意不**调用 resetCaches —— 这正是
+  // 浏览器「重置模拟」与 tools/ 每个用例的真实形态。若解码器不能识别「这是一张全新
+  // 驻留表」（判据：STR_TAB 的 start_index === 0，因为新世界的 epoch 恒为 0、无法用作
+  // 换世界信号），就会继续套用上一个世界的 strid→字符串映射，地名/姓氏整体串味。
+  // 本场景是该类缺陷的唯一自动防线。
+  console.log('[4/4] 换世界后（跨世界字符串驻留表缓存失效）...');
+  const prevNames = jsonSnap().pois.map((p) => p.name).join('|');
+  ex.world_create(60, 764.0, 2026, 20, 4);
+  const newNames = jsonSnap().pois.map((p) => p.name).join('|');
+  if (!prevNames || !newNames) {
+    fail('换世界场景取样失败：地名列表为空，无法验证缓存失效');
+  } else if (prevNames === newNames) {
+    fail('换世界后地名与上一个世界完全相同，本场景退化为恒真（请更换种子使地名不同）');
+  }
+  compareBoth('cross-world');
 
   console.log('\n' + (failures === 0 ? 'ALL_BIN_JSON_EQUAL ✅ 二进制与 JSON 快照完全一致' : `共 ${failures} 处不一致 ❌`));
   process.exit(failures === 0 ? 0 : 1);

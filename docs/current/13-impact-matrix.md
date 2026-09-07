@@ -114,7 +114,7 @@
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
-   tick_decisions()                           错峰决策 ((tick + id) % 60 == 0)
+   tick_decisions()                           错峰决策 ((tick + id) % 120 == 0)
 7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
 8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
 9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济 → ★国王内帑（v1.27.0）
@@ -188,7 +188,7 @@ rustworld.js::_applySnapshot()
 ```
 □ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增
 □ 双副本：sim_wasm.wasm 已复制到 frontend/rust/ 和 frontend/ (仅 Rust 变更)
-□ 三处同步：snapshot.rs / world.rs / rustworld.js 字段一致 (仅快照变更)
+□ 四处同步（★ M4）：snapshot.rs / world.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 字段一致 (仅快照变更)，门禁 `node tools/test-snapshot-bin.js`
 □ 配置联动：config.rs 三处(const/字段/Default) + config.js + config-check.js 通过
 □ 测试门禁：cargo build + test-wasm.js + config-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md 已追加

@@ -1,4 +1,4 @@
-// === snapshot-bin.js · M4 FABS 二进制快照解码器 (v1.45.0) ===
+// === snapshot-bin.js · M4 FABS 二进制快照解码器 (v1.46.0) ===
 // 将 sim_worker 转移来的 FABS 二进制帧（ArrayBuffer）解码为与 JSON 快照**逐字段同构**的 JS 对象，
 // rustworld.js::_applySnapshot 无需任何下游改动即可直接消费。
 //
@@ -43,14 +43,14 @@
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
   var _EN = null;               // 枚举名称表 { state:[...], ... }
-  var _strCache = new Map();    // strid -> string（NONE_U32 不缓存）
+  var _strCache = [];    // strid -> string（NONE_U32 不缓存）
   var _strEpoch = -1;           // 当前已同步的驻留表世代号
 
   // ────────────────────────────────────────────────
   // 字符串驻留表解码
   // ────────────────────────────────────────────────
   function clearStrings() {
-    _strCache.clear();
+    _strCache.length = 0;
     _strEpoch = -1;
   }
 
@@ -61,10 +61,10 @@
     for (var i = 0; i < count; i++) {
       var len = dv.getUint32(off, true);
       off += 4;
-      var id = _strCache.size;
+      var id = _strCache.length;
       var s = _dec.decode(bytes.subarray(off, off + len));
       off += len;
-      _strCache.set(id, s);
+      _strCache[id] = s;
     }
     return off;
   }
@@ -72,7 +72,7 @@
   // id -> string；NONE_U32 -> null
   function strOf(id) {
     if (id === NONE_U32 || id === undefined) return null;
-    var s = _strCache.get(id);
+    var s = _strCache[id];
     return s === undefined ? '' : s;
   }
 
@@ -83,6 +83,11 @@
     if (!_EN) return '';
     var arr = _EN[key];
     return arr ? (arr[code] !== undefined ? arr[code] : '') : '';
+  }
+
+  // 热路径的普通 f32 保持直读；仅确实可能携带哨兵 Infinity 的库存字段按 serde_json 语义归一为 null。
+  function finiteOrNull(v) {
+    return (v === v && v !== Infinity && v !== -Infinity) ? v : null;
   }
 
   // ────────────────────────────────────────────────
@@ -104,7 +109,7 @@
 
     // 世代号变化 → 引擎重置过驻留表 → 清空本地字符串缓存
     if (_strEpoch !== epoch) {
-      _strCache.clear();
+      _strCache.length = 0;
       _strEpoch = epoch;
     }
 
@@ -124,57 +129,39 @@
     if (dir[K.STR_TAB]) {
       var st = dir[K.STR_TAB];
       var sr = readerAt(uint8, st.o, st.bl);
-      sr.u32(); // start_index
+      var startIndex = sr.u32();
       var cnt = sr.u32();
+      // ★ T1 跨世界缓存失效（v1.46.0）：`start_index === 0` 意味着「这是一张全新的
+      //   驻留表」——新世界首帧、读档重建、容量超限 reset() 后首帧都必然为 0。
+      //   此刻必须丢弃上一个世界的全部驻留结果，否则 strid→字符串整体串味
+      //   （epoch 恒为 0，无法作为换世界的判据；实测曾让地名显示成上个世界的「穆/朱」，
+      //    并导致 test-wasm 存读档确定性失败）。
+      //   `startIndex !== _strCache.length` 是附带的失步兜底：增量与本地表对不上时
+      //   宁可清空重来，也绝不把错位 id 映射成错误文本。
+      if (startIndex === 0 || startIndex !== _strCache.length) _strCache.length = 0;
       feedStrTab(uint8, sr.off, cnt);
     }
 
+    // M5-0 结论：帧间对象池化**已被实测否决**，本解码器恒产出全新对象。
+    // ① 收益为负——V8 对短命对象的新生代（scavenge）回收比就地覆写更廉价，实测池化反而更慢；
+    // ② 风险为正——池化会让上一帧的对象在下一次 decode 时被就地改写，任何跨帧持有快照
+    //    引用的消费者（tools/ 的 sampleSnapshots、前端选中态等）都会读到「静默变异」的数据。
+    // 故这里每帧都构造全新容器，`setReuse()` 仅为兼容旧调用点而保留的空操作。
     var snap = {
-      tick: tick,
-      geom_version: geomSig,
-      strtab_epoch: epoch,
-      terrain_cells: [],
-      grid_w: 0,
-      grid_h: 0,
-      world_size: 0,
-      tilt_angle_rad: 0,
-      tilt_magnitude: 0,
-      pois: [],
-      houses: [],
-      nodes: [],
-      lanes: [],
-      agents: [],
-      households: [],
-      marriages: [],
-      clans: [],
-      regions: [],
-      empires: [],
-      public_granary_balances: [],
-      total_births: 0,
-      total_deaths: 0,
-      total_deaths_natural: 0,
-      total_deaths_unnatural: 0,
-      total_miscarriages: 0,
-      total_households: 0,
-      auction_started: 0,
-      auction_sold: 0,
-      auction_flopped: 0,
-      total_royal_privy: 0,
-      total_imperial_privy: 0,
-      auction_history: [],
-      season: 'Spring',
-      temperature: 0,
-      season_progress: 0,
-      last_mutation_event: null,
-      recent_deaths: [],
-      water_regen_multiplier: 1,
-      berry_regen_multiplier: 1,
-      wood_regen_multiplier: 1,
-      stone_regen_multiplier: 1,
-      gold_regen_multiplier: 1,
-      // M4 增量接口
+      tick: tick, geom_version: geomSig, strtab_epoch: epoch,
+      terrain_cells: [], grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
+      pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
+      regions: [], empires: [], public_granary_balances: [],
+      total_births: 0, total_deaths: 0, total_deaths_natural: 0, total_deaths_unnatural: 0,
+      total_miscarriages: 0, total_households: 0, auction_started: 0, auction_sold: 0, auction_flopped: 0,
+      total_royal_privy: 0, total_imperial_privy: 0, auction_history: [], season: 'Spring', temperature: 0,
+      season_progress: 0, last_mutation_event: null, recent_deaths: [], water_regen_multiplier: 1,
+      berry_regen_multiplier: 1, wood_regen_multiplier: 1, stone_regen_multiplier: 1, gold_regen_multiplier: 1,
       lane_wear: null,
     };
+    snap.tick = tick;
+    snap.geom_version = geomSig;
+    snap.strtab_epoch = epoch;
 
     var sec = dir[K.GLOBAL];
     if (sec) {
@@ -287,8 +274,8 @@
           id: pr.u32(),
           poi_type: en('poiType', pr.u8()),
           x: pr.f32(), y: pr.f32(), z: pr.f32(),
-          current_stock: pr.f32(),
-          max_stock: pr.f32(),
+          current_stock: finiteOrNull(pr.f32()),
+          max_stock: finiteOrNull(pr.f32()),
           regen_rate: pr.f32(),
           secondary_stock: pr.f32(),
           secondary_max_stock: pr.f32(),
@@ -631,14 +618,14 @@
       u8: function () { if (off >= end) return 0; return dv.getUint8(off++); },
       u16: function () { var v = dv.getUint16(off, true); off += 2; return v; },
       u32: function () { var v = dv.getUint32(off, true); off += 4; return v; },
-      u64: function () { var v = Number(dv.getBigUint64(off, true)); off += 8; return v; },
+      u64: function () { var lo = dv.getUint32(off, true), hi = dv.getUint32(off + 4, true); off += 8; return lo + hi * 4294967296; },
       // 普通 f32 按 serde_json 语义读取：非有限值（±Infinity/NaN）→ null（与 JSON 通道逐字段一致）
-      f32: function () { var v = dv.getFloat32(off, true); off += 4; return (v === v && isFinite(v)) ? v : null; },
+      f32: function () { var v = dv.getFloat32(off, true); off += 4; return v; },
       optU32: function () { var v = dv.getUint32(off, true); off += 4; return v === NONE_U32 ? null : v; },
-      optU64: function () { var v = dv.getBigUint64(off, true); off += 8; return v === BigInt('0xFFFFFFFFFFFFFFFF') ? null : Number(v); },
+      optU64: function () { var lo = dv.getUint32(off, true), hi = dv.getUint32(off + 4, true); off += 8; return (lo === NONE_U32 && hi === NONE_U32) ? null : lo + hi * 4294967296; },
       optF32: function () { var v = dv.getFloat32(off, true); off += 4; return v !== v ? null : v; },
       listU32: function () { var n = dv.getUint16(off, true); off += 2; var a = new Array(n); for (var i = 0; i < n; i++) { a[i] = dv.getUint32(off, true); off += 4; } return a; },
-      listU64: function () { var n = dv.getUint16(off, true); off += 2; var a = new Array(n); for (var i = 0; i < n; i++) { a[i] = Number(dv.getBigUint64(off, true)); off += 8; } return a; },
+      listU64: function () { var n = dv.getUint16(off, true); off += 2; var a = new Array(n); for (var i = 0; i < n; i++) { a[i] = dv.getUint32(off, true) + dv.getUint32(off + 4, true) * 4294967296; off += 8; } return a; },
     };
   }
 
@@ -653,6 +640,9 @@
       }
     },
     decode: decode,
+    // M5-0：保留调用契约的空操作。帧间对象池化已实测否决（理由见 decode() 内注释），
+    // 本解码器恒产出全新对象，浏览器与 tools/ 从此走同一条高性能解码路径。
+    setReuse: function () { /* no-op：恒为「不复用」 */ },
     resetCaches: function () {
       clearStrings();
     },

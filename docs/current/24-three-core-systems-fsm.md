@@ -135,6 +135,7 @@ stateDiagram-v2
 - **v1.45.2 榷场死锁防御与安全回退**：
   - `fulfill_resting_need` 在派发 `MarketTrade` 前首先检测距离：若小人已处于榷场交互半径内，直接无缝切入 `BuyingAtMarket` 静止交易态；
   - 若处于远距离，仅当 `self.dispatch` 真实寻路成功时才记录 `current_need = "Physiological·MarketTrade"`；若无可用路径，立即重置 `current_need = None`，杜绝“小人想买但卡在原地”的幽灵僵死。
+  - 现场交易时，任一待购资源的行囊剩余空间不足一笔 `marketSettlementStep` 即返家；该守卫与生态层的整步成交门槛对齐，避免无交易可执行时停滞在榷场。
 - **v1.45.2 私宅闲置回巢保障**：
   - 决策休整（`Physiological·Rest`）时，若 Agent 持有私宅且与自家大门节点距离 $> \text{poiInteractionRadius}$（例如完成夺位加冕后滞留营地），强制触发 `return_home()` 返回私宅，保障家庭团聚与育儿条件。
 

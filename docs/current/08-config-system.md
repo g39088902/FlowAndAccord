@@ -30,6 +30,11 @@
 - 开发者直接编辑 `frontend/js/config.js` 并刷新浏览器（Ctrl+F5），即可即时生效，无需重编 WASM。
 - `config.js` 每个字段均带中文行内说明。
 
+### POI 产速的本地创世偏好（v1.46.2）
+- `frontend/js/config.poi-rates.js` 在 `rustworld.js` 前运行，读取版本化键 `flowaccord.poi-regen-rates.v1`（schema 1；水/果/木/石/金各 0~5 倍）。
+- 滑块修改会立即写入当前世界，也会持久化此偏好；后续新开/重演世界在 `world_create` 前已携带该组值，并在第 0 帧快照、第一 tick 前写入内核。
+- 这不是存档配置替换：读档必须继续尊重档内已保存的倍率，确保存档续演不被浏览器偏好篡改。
+
 ### 唯一数值真相源（v1.44.9 起）
 - **前端 JS (`frontend/js/config.js`) 为仿真超参数的唯一数值真相源**。
 - Rust 内核 `crates/sim_core/src/config.rs` 中的 200 余个 `pub const` 默认数值常量与手写 `impl Default` 已彻底废弃删除，`SimConfig` 纯净派生 `#[derive(Default)]`（零值中性兜底）。

@@ -1,7 +1,7 @@
 # 20. 🛠️ 仿真内核与工程工具箱操作指南 (tools/)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
-> **工具定位**：`tools/` 目录下的 15 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
+> **工具定位**：`tools/` 目录下的 16 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
 
 ---
 
@@ -14,16 +14,17 @@
 | 3 | **`frontend-check.js`** | 契约门禁 | 前端全部 JS 语法检查 + `getElementById` DOM ID 存在性双向校验 | `node tools/frontend-check.js` | 0=通过, 1=语法/ID缺失 |
 | 4 | **`code-map-check.js`** | 契约门禁 | 实际文件树 vs `09-code-map.md` 登记清单交叉比对，捕获文档与代码漂移 | `node tools/code-map-check.js` | 0=通过, 1=未登记/无效登记 |
 | 5 | **`doc-maintenance-check.js`** | 契约门禁 | 依据 `docs/doc-maintenance.json` 检查各模块文档的新鲜度与复核周期 | `node tools/doc-maintenance-check.js` | 0=体检完成 (追加 `--strict` 时漂移报 1) |
-| 6 | **`test-wasm.js`** | 内核测试 | Node 无头运行 WASM，验证确定性、长程稳定（防越界/防NaN）、存读档状态一致 | `node tools/test-wasm.js` | 0=通过, 1=失败抛出 |
-| 7 | **`test-determinism.js`** | 内核测试 | **最高级确定性门禁**：验证 6 大数学定理（多种子/分批独立/快照只读/重放一致等） | `node tools/test-determinism.js` | 0=矩阵全通, 1=确定性分叉 |
-| 8 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 8 大子阶段耗时占比，支持优化前后加速比对比 | `node tools/profile-benchmark.js` | 0=完成采样 |
-| 9 | **`diagnose.js`** | 诊断排障 | 确定性无头诊断，指定种子与 Tick 极速复现并嗅探死因、贫困、行为卡死 | `node tools/diagnose.js -s 42 -t 3000` | 0=完成诊断 |
-| 10 | **`gold_mining_analysis.js`** | 专项分析 | 专门用于深入排查和追踪族人“为何不淘金/采金”的家户物资与马斯洛行为链路 | `node tools/gold_mining_analysis.js` | 0=完成分析 |
-| 11 | **`gen-dag-testdata.js`** | 族谱工具 | 驱动内核跑满数十万 Tick 累积族人档案库，裁剪直系血脉生成 DAG 测试集 | `node tools/gen-dag-testdata.js` | 0=生成完成 |
-| 12 | **`dag-shot.js`** | 族谱工具 | 加载前端真实的 `FlowDag` 算法，驱动无头 Chrome 多视角自动截取族谱图 | `node tools/dag-shot.js` | 0=完成截图 |
-| 13 | **`bump-version.js`** | 版本治理 | 版本号升版与一致性对齐，同步更新 `index.html` 徽章与全部 8+ 处定义点 | `node tools/bump-version.js --patch` | 0=同步成功, 1=校验漂移 |
-| 14 | **`rust-download.js`** | 环境构建 | 使用 Node 内置 OpenSSL TLS 下载便携 Rust 工具链（绕过系统证书异常） | `node tools/rust-download.js` | 0=下载完成 |
-| 15 | **`vendor-deps.js`** | 环境构建 | 基于 crates.io API BFS 遍历根依赖与传递依赖，离线下载至 `.vendor/` | `node tools/vendor-deps.js` | 0=完成打包 |
+| 6 | **`snapshot-reader.js`** | 工具公共模块 | ★ T1 的唯一快照访问入口：优先读取 FABS 并复用前端解码器；JSON 调试导出仅作为缺失二进制时的兼容降级 | 被 6 个快照工具 `require()` | 非独立 CLI |
+| 7 | **`test-wasm.js`** | 内核测试 | Node 无头运行 WASM，验证确定性、长程稳定（防越界/防NaN）、存读档状态一致 | `node tools/test-wasm.js` | 0=通过, 1=失败抛出 |
+| 8 | **`test-determinism.js`** | 内核测试 | **最高级确定性门禁**：验证 6 大数学定理（多种子/分批独立/快照只读/重放一致等） | `node tools/test-determinism.js` | 0=矩阵全通, 1=确定性分叉 |
+| 9 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 8 大子阶段耗时占比与 ★ T1 后的 FABS 编码/解码；支持优化前后加速比对比、`--with-legacy-json` 调试对照、`--preset max-yield` 压力场景、`--set` 覆写与 `--pops` 自定义规模档位 | `node tools/profile-benchmark.js` | 0=完成采样 |
+| 10 | **`diagnose.js`** | 诊断排障 | 确定性无头诊断，指定种子与 Tick 极速复现并嗅探死因、贫困、行为卡死 | `node tools/diagnose.js -s 42 -t 3000` | 0=完成诊断 |
+| 11 | **`gold_mining_analysis.js`** | 专项分析 | 专门用于深入排查和追踪族人“为何不淘金/采金”的家户物资与马斯洛行为链路 | `node tools/gold_mining_analysis.js` | 0=完成分析 |
+| 12 | **`gen-dag-testdata.js`** | 族谱工具 | 驱动内核跑满数十万 Tick 累积族人档案库，裁剪直系血脉生成 DAG 测试集 | `node tools/gen-dag-testdata.js` | 0=生成完成 |
+| 13 | **`dag-shot.js`** | 族谱工具 | 加载前端真实的 `FlowDag` 算法，驱动无头 Chrome 多视角自动截取族谱图 | `node tools/dag-shot.js` | 0=完成截图 |
+| 14 | **`bump-version.js`** | 版本治理 | 版本号升版与一致性对齐，同步更新 `index.html` 徽章与全部 8+ 处定义点 | `node tools/bump-version.js --patch` | 0=同步成功, 1=校验漂移 |
+| 15 | **`rust-download.js`** | 环境构建 | 使用 Node 内置 OpenSSL TLS 下载便携 Rust 工具链（绕过系统证书异常） | `node tools/rust-download.js` | 0=下载完成 |
+| 16 | **`vendor-deps.js`** | 环境构建 | 基于 crates.io API BFS 遍历根依赖与传递依赖，离线下载至 `.vendor/` | `node tools/vendor-deps.js` | 0=完成打包 |
 
 ---
 
@@ -41,14 +42,18 @@
   node tools/config-check.js
   ```
 
-### 2.2 `snapshot-check.js` · 快照三处同步校验
-- **目标**：保障快照三处同步不变量（`AGENTS.md` §4.5）：
+### 2.2 `snapshot-check.js` · 快照同步静态校验
+- **目标**：静态核对快照链路（`AGENTS.md` §4.5）：
   1. `crates/sim_core/src/spatial/snapshot.rs`（结构体定义）
   2. `crates/sim_core/src/spatial/world_snapshot.rs`（Rust 数据赋值）
   3. `frontend/js/rustworld.js`（前端接收与映射）
+- ⚠️ **★ M4 起真正的不变量是「四处同步」**：本工具只做静态登记核对；**二进制编码/解码是否漂移由
+  `tools/test-snapshot-bin.js`（§3.x）把关**——它把 FABS 帧与 JSON 真值逐字段深比较（4 场景，含跨世界驻留表）。
+  改动快照字段后**两者都要跑**。
 - **常用命令**：
   ```bash
   node tools/snapshot-check.js
+  node tools/test-snapshot-bin.js   # ★ M4 防漂移，必跑
   ```
 
 ### 2.3 `frontend-check.js` · 前端语法与 DOM 健全性门禁
@@ -82,7 +87,18 @@
 
 ## 3. 内核仿真测试与性能基准工具
 
-### 3.1 `test-wasm.js` · 基础回归与长程稳定性
+### 3.1 `snapshot-reader.js` · FABS 统一快照读取器
+- **目标**：让所有 Node 工具经同一条 FABS 解码链取得与旧 JSON 快照逐字段同构的对象，彻底消除工具侧双通道漂移。
+- **约束**（v1.46.0 起）：**不提供**解码对象复用——对象池化经实测为负收益（快照对象全部短命，V8 新生代回收更划算，池化只会导致对象晋升老生代），故 `setReuse()` 已退化为**空操作**，工具侧与浏览器共用同一条「每帧全新对象」路径。用于字符串确定性比对时，读取器会先请求全量地形，避免增量帧导致假分叉。
+- ⚠️ **跨世界缓存**：FABS 驻留表（`STR_TAB`）在前端解码器中**永久缓存**，判据是「`start_index == 0` 视为全新驻留表并清空缓存」——因为新世界 / 读档重建的 `epoch` 恒为 0，**不能**用 epoch 判断是否换世界。工具侧在 `world_load` / `world_create` 之后需显式调用 `reader.resetCaches()`。
+- **使用方式**：
+  ```js
+  const { createSnapshotReader } = require('./snapshot-reader.js');
+  const reader = createSnapshotReader(ex);
+  const snapshot = reader.getSnapshot();
+  ```
+
+### 3.2 `test-wasm.js` · 基础回归与长程稳定性
 - **目标**：轻量级快速回归，验证 WASM 二进制的基本运行质量。
 - **核心断言**：
   - 种子一致性：同种子下推进 1000 步生成的快照逐字节相等；
@@ -94,7 +110,7 @@
   node tools/test-wasm.js
   ```
 
-### 3.2 `test-determinism.js` · 增强型确定性矩阵测试套件
+### 3.3 `test-determinism.js` · 增强型确定性矩阵测试套件
 - **目标**：项目的“终极大闸”。任何涉及算法、调度、数据结构改动必须全部通过。
 - **六大定理门禁**：
   - **Suite 1 多种子基准**：Seed 42/1024/99999 分别推演，状态重放 100% 一致；
@@ -108,20 +124,48 @@
   node tools/test-determinism.js
   ```
 
-### 3.3 `profile-benchmark.js` · 性能 Profiling 与子阶段耗时剖析
+### 3.4 `test-snapshot-bin.js` · ★ M4 四处同步防漂移门禁
+- **目标**：把 FABS 二进制帧与 JSON 快照（test-only 真值源）**逐字段深比较**，是「四处同步」唯一的自动网。
+- **4 个场景**：`[1/4]` 创世帧（地形+路网全量）· `[2/4]` 稳态帧 + 增量帧（无地形/无路网几何，仅 LANE_WEAR）·
+  `[3/4]` 存读档后帧 · `[4/4]` **换世界后**（★ v1.46.0：不调 `resetCaches()` 直接建第二个世界，验证跨世界驻留表缓存失效；
+  回退该修复会报 129 处不一致）。
+- **常用命令**：
+  ```bash
+  node tools/test-snapshot-bin.js      # 全绿输出 ALL_BIN_JSON_EQUAL
+  ```
+
+### 3.5 `profile-benchmark.js` · 性能 Profiling 与子阶段耗时剖析
 - **目标**：微秒级精度度量内核性能，为优化提供量化基准。
 - **核心功能**：
   - 测算总体 TPS 与单 Tick 耗时（µs）；
   - 输出 8 大子阶段（Phase 0~8）的单拍物理耗时与百分比条形图；
-  - 测试 1x ~ 1024x 步长推进与 20/50/100 人口规模扩展性；
-  - 支持导出基准 JSON，并通过 `--compare` 生成优化前后的加速比对比表。
+  - 测试 1x ~ 1024x 步长推进与人口规模扩展性（档位可用 `--pops` 自定义）；
+  - 支持导出基准 JSON，并通过 `--compare` 生成优化前后的加速比对比表；
+  - ★ **产速预设与逐字段覆写**：无需修改 `frontend/js/config.js` 即可构造极端场景，覆写清单会写入报告 JSON 的 `configOverrides` 字段保证可复现。
 - **常用命令**：
   ```bash
   node tools/profile-benchmark.js                              # 默认基准
   node tools/profile-benchmark.js --ticks 6000 --breakdown     # 打印子阶段 ASCII 耗时条形图
   node tools/profile-benchmark.js --ticks 3000 --json base.json # 固化优化前基准
   node tools/profile-benchmark.js --ticks 3000 --compare base.json # 输出优化加速比
+
+  # ★ 产速拉满（单 tick 饱和档）压力场景：POI/市场的产速、采收与卸货速率全部拉到
+  #   「单 tick 内回满/装满一囊」，用于构造人口无约束增长的最坏负载画像
+  node tools/profile-benchmark.js --preset max-yield --ticks 800000 \
+       --breakdown --breakdown-warmup 700000 --breakdown-ticks 2000 \
+       --snapshot-warmup 700000 --json tools/baseline-maxyield-800k.json
+
+  # 逐字段覆写（可重复传参，亦可逗号分隔）；未知键或非数值会直接报错防手滑
+  node tools/profile-benchmark.js --set regenBaseWater=100,regenBaseGold=50
+
+  # 自定义规模档位，输出人效(µs/人)与超线性系数；用于定位超线性增长的阶段
+  node tools/profile-benchmark.js --scale --pops 20,50,100,200,400 --scale-ticks 3000
   ```
+- **⚠️ 已知修正**：`world_create` 的 `agent_count` 形参在内核中**并未被使用**（`seed_primitive_ecology(&mut self, _agent_count: usize)`），真实初始人口取自 `config.agentSpawnCount`。
+  早期版本因此出现"400 人比 20 人还快"的假象（实为全部按 20 人跑）。现已修复：当 `--agents` / `--pops` 与 `agentSpawnCount` 不一致时，工具会自动同步写入配置。
+  **引用 2026-09-07 之前的任何 `--scale` 结论前，必须重新测量。**
+- **长尾延迟测量警示**：不要用 `process.hrtime.bigint()` 做逐 tick 计时——它在循环内产生 BigInt 垃圾，会自己制造 GC 尖峰，污染 Max 值。
+  应改用 `performance.now()` + 预分配 `Float64Array` 的零分配探针。详见 `docs/16-plan-performance-optimization.md` §2.8 与 §6.1。
 
 ---
 

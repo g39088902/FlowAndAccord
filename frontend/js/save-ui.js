@@ -15,7 +15,7 @@
   /// ★ v1.44.7：M5 新增帝国登记簿与帝国公帑结算状态（WorldSave 字段增删），格式升至 4，不兼容旧档
   const SAVE_FORMAT_VERSION = 4;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.45.4';
+  const DEFAULT_APP_VERSION = '1.46.4';
   const AUTO_SAVE_INTERVAL_MS = 30000;
 
   /**

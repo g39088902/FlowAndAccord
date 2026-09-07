@@ -9,7 +9,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `simulationDt` | f32 | 0.016666666666666666 | world_tick.rs / sim_wasm (§4.3 严禁改) | 单个 tick 对应的模拟小时数 (1/60) |
 | `ticksPerSecond` | u64 | 60 | world_tick.rs / rustworld.js | 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准） |
-| `agentDecisionIntervalTicks` | u64 | 60 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 1 游戏小时决策一次 |
+| `agentDecisionIntervalTicks` | u64 | 120 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 2 游戏小时决策一次 |
 
 ## 2. 部落民生理、代谢与生命周期
 

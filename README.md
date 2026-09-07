@@ -9,7 +9,13 @@
 
 <div align="center">
 
-`v1.45.4` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.46.4` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+
+</div>
+
+<div align="center">
+
+**English** — *A deterministic civilization simulation: 20 founders, a living wilderness, and a thousand-year lineage they write themselves. No quests, no orders — just emergent society.* — [🇬🇧 English README →](./README.en.md)
 
 </div>
 
@@ -156,6 +162,8 @@ node frontend/server.js
 ```
 
 然后打开浏览器（推荐 Chrome 或 Edge）访问 `http://localhost:3000`。无需复杂打包、无需安装外部依赖。
+
+> 🎮 **不想本地搭建？在线直接游玩**：<https://xn--fiqs8s171bcnq.com>
 
 > - 首次进入或重置时，会弹出建立/连接本地存档文件的提示，选择或新建一个 `.json` 文件即可开启世界，数据永久保存在你的电脑磁盘中；
 > - 若 3000 端口已被占用，说明服务已在后台运行中，直接浏览器访问即可。

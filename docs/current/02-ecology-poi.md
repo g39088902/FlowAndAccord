@@ -41,6 +41,7 @@
 - 倍率槽位映射：水→`water`、浆果→`berry`、林木→`wood`、石矿→`stone`、金矿→`gold`。
   **⚠ 榷场特例**：清水走 `water` 槽位，**粮食再生复用 `berry` 槽位**，**木材再生复用 `wood` 槽位**。
 - 倍率唯一真相源为 `World3DEngine` 的 5 个 `*_regen_multiplier`（随存档持久化），经快照下发为前端 `sim.regenMultipliers`；生态大盘滑块与 POI 卡片均消费同一份数据。
+- **创世复现配置（v1.46.2）**：生态大盘滑块的五类倍率另以浏览器 `localStorage` 键 `flowaccord.poi-regen-rates.v1` 保存。`config.poi-rates.js` 在 `rustworld.js` 创建 Worker 前读取并随 `INIT`/`RESET` 发送；Worker 在 `world_create` 完成后、首个快照及任何 tick 之前写入内核。因此新世界的确定性输入为「世界种子 + 这组 POI 产速倍率」。读档仍以存档自身保存的倍率为准，不受本地偏好覆盖。
 
 ### Agent 私有施密特触发器
 每名 Agent 在自身决策相位观察 POI 库存，维护 `poi_seekability` 私有锁存：

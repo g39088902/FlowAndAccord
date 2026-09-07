@@ -27,7 +27,8 @@ node tools/test-wasm.js
 ```
 
 - [ ] WASM 双副本已同步。
-- [ ] 快照字段已同步 `snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `frontend/js/rustworld.js`。
+- [ ] 快照字段**四处同步**（★ M4）：`snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `snapshot_bin/encode.rs` / `frontend/js/snapshot-bin.js`+`rustworld.js`，并跑 `node tools/test-snapshot-bin.js`。
+- [ ] 若改动驻留表 / `STR_TAB` / 新增 `world_create` 调用点：跨世界缓存失效判据仍为 `start_index == 0`（根 `AGENTS.md` §4.5.1，勿改用 `epoch`）。
 - [ ] 同种子确定性、无 NaN、无越界、长程稳定性通过。
 - [ ] 若涉及配置，额外运行 `node tools/config-check.js`。
 

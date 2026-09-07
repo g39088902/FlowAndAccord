@@ -108,8 +108,10 @@ FlowAndAccord/
 │   ├── gold_mining_analysis.js             # 淘金与货币经济行为专项分析脚本
 │   ├── profile-benchmark.js                # 性能 Profiling 基准测试与微秒级子阶段剖析器
 │   ├── rust-download.js                    # Rust 工具链下载器 (Node OpenSSL TLS 绕过系统证书异常)
-│   ├── snapshot-check.js                   # ★ 快照三处同步校验 (snapshot.rs定义 vs world_snapshot.rs赋值 vs rustworld.js映射)
+│   ├── snapshot-check.js                   # ★ 快照同步静态校验 (snapshot.rs定义 vs world_snapshot.rs赋值 vs rustworld.js映射)
+│   ├── snapshot-reader.js                  # ★ T1(v1.46.0) FABS 统一快照读取器：tools/ 全部工具唯一取值入口（FABS 优先、JSON 仅调试回退）
 │   ├── test-determinism.js                 # 增强型确定性矩阵测试套件 (6 大数学不变量定理验证)
+│   ├── test-snapshot-bin.js                # ★ M4 四处同步防漂移门禁：FABS 二进制帧 vs JSON 真值逐字段深比较（4 场景，含跨世界驻留表）
 │   ├── test-wasm.js                        # WASM 回归测试 (确定性/防越界/防 NaN/长程稳定)
 │   └── vendor-deps.js                      # 依赖图 BFS vendor 解析器 (crates.io API 发现并下载全部依赖到 .vendor/)
 ├── .github/
@@ -132,7 +134,7 @@ FlowAndAccord/
     ├── 13-plan-house-upgrade-auction.md        # 房屋升级与拍卖系统演进规划
     ├── 14-plan-todo-followup-v1.27.md          # 待办事项后续跟进规划
     ├── 15-profiling-and-benchmarking-guide.md  # 性能 Profiling 基准与确定性矩阵操作指南
-    ├── 16-plan-performance-optimization.md     # 仿真内核与全链路性能优化规划书 (M1~M5)
+    ├── 16-plan-performance-optimization.md     # 仿真内核与全链路性能优化规划书 (M1~M4 已归档 / T1+M5 待办)
     ├── 17-plan-farmland-agriculture.md         # 农田生产与农业税规划书
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图

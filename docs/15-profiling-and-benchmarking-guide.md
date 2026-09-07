@@ -78,12 +78,22 @@ node tools/profile-benchmark.js --ticks 3000 --compare baseline.json
 > 💡 **性能优化热点指南**：
 > 从实测数据可知，**Phase 4（道路磨损衰减）** 与 **Phase 6（马斯洛决策与 A\* 寻路）** 合计占据了整个仿真周期的 **近 60% 算力**。优化重点应始终聚焦在这两个模块。
 
-#### C. 快照序列化与通信开销（Snapshot Overhead）
-基准工具会自动测量 `world_snapshot_ptr()`（Rust 序列化）与 `JSON.parse`（JS 反序列化）的时间与体积：
-- 单次快照大小约为 $250\sim 350\text{ KB}$；
-- Rust 序列化耗时约 $1.2\sim 1.5\text{ ms}$，JS 解析耗时约 $1.5\sim 1.8\text{ ms}$，合计约 $3.0\text{ ms}$；
-- **惊人事实**：**生成 1 次快照的耗时相当于推进约 $160\sim 200$ 个纯内核 Tick！**
-- **架构启示**：高倍速下卡顿的主要瓶颈不是内核 tick 跑不动，而是频繁生成与解析全量 JSON 快照挤占了主线程与 Worker 算力。后续进行**快照二进制零拷贝**与**自适应下发节流**能产生十倍级提升。
+#### C. 快照编码与通信开销（Snapshot Overhead）
+
+> ★ T1（v1.46.0）：JSON 快照通道已从生产与工具链路移除。基准工具现在**只**测量 FABS 二进制通道：
+> `world_snapshot_bin_ptr()`（Rust 编码）+ 内存拷出 + `SnapshotBin.decode`（JS 解码）。
+> 想同时量化已废弃 JSON 通道的代价，加 `--with-legacy-json`（会调用 test-only 的
+> `world_snapshot_json_debug_ptr`，仅供对照，不要用于生产结论）。
+
+- 默认配置（88 人）稳态帧约 $46\text{ KB}$；满载档（442 人）约 $144\text{ KB}$；
+- 体积相对同帧 JSON 压缩 **$8\sim 12$ 倍**；
+- **架构启示**：M4 把「帧体积」压下来之后，瓶颈转移到 **JS 侧解码**（满载档曾占 FABS 总代价的 79%），
+  M5-0 又通过**驻留表缓存改用数组 + 单一 DataView + 免 BigInt 的 u64 读取 + 清理死代码**把它压下去，
+  并配合 M5-0.4 的按人口自适应降频（≤200 人 30Hz / ≤320 人 25Hz / ≤450 人 20Hz / 更高 15Hz）。
+  最新实测见 `docs/16-plan-performance-optimization.md` §2.7.1。
+- ⚠️ **已否决项**：解码器**对象池化**（复用快照对象）曾被提出但实测**负收益**——生成的对象全为短命代，
+  V8 scavenge 回收成本极低，池化反而延长生命周期、加剧老生代压力。故 `setReuse()` 已退化为**空操作**，
+  工具侧与浏览器共用同一条「每帧全新对象」路径（不要再把 `reuse: true` 写回基准脚本）。
 
 ---
 

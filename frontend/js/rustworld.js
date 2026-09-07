@@ -48,7 +48,9 @@
         this.tickCount = 0;
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，随快照下发；读档后自动回填存档值）
         // 榷场粮食再生复用 berry 槽位（内核无独立粮食倍率），见 world_tick.rs
-        this.regenMultipliers = { water: 1.0, berry: 1.0, wood: 1.0, stone: 1.0, gold: 1.0 };
+        // ★ 创世配置：config.poi-rates.js 已在本脚本前读取 localStorage。
+        // 该值随 INIT/RESET 在 world_create 前发送给 Worker，并在第 0 帧快照前写入内核。
+        this.regenMultipliers = this._poiRegenMultipliersFromStorage();
 
         // 引擎状态与 Web Worker 架构
         this._worker = null;
@@ -59,6 +61,10 @@
         this._trails = new Map();
         this._historyCheckpoints = [];
         this._lastCheckpointTick = -1;
+        this._rewindMinTick = 0;
+        this._rewindCheckpointCount = 0;
+        this._rewindProgress = null;
+        this.onRewindProgress = null;
         this._pendingRequests = new Map();
         this._reqSeq = 0;
         this._lastSaveJson = null;
@@ -66,7 +72,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.45.4';
+        this._appVersion = '1.46.4';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -118,6 +124,7 @@
             agentCount: 20,
             campCount: this._campCountFromConfig(),
             config: configObj,
+            regenMultipliers: this._poiRegenMultipliersFromStorage(),
           });
         } catch (e) {
           this._setEngineStatus('无法创建 Web Worker (请确保通过 HTTP 服务访问): ' + e.message, 'error');
@@ -131,10 +138,13 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.45.4';
+            this._appVersion = msg.appVersion || '1.46.4';
             this._wasmBytes = msg.wasmBytes || 0;
+            this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
             // ★ M4：注入枚举名称表 + 清空解码器字符串缓存（引擎全新 → 缓存失效）
+            // ★ M5-0 结论：帧间对象池化为**负收益**（快照对象短命，V8 新生代回收更快，池化反致晋升老生代），
+            // 故 `setReuse()` 已退化为空操作，此处不再调用；引擎全新 → 必须清空驻留表缓存。
             if (window.SnapshotBin) {
               if (msg.enumTableJson) window.SnapshotBin.setEnumTables(msg.enumTableJson);
               window.SnapshotBin.resetCaches();
@@ -158,6 +168,7 @@
             if (msg.snapshot) {
               this._applySnapshot(msg.snapshot, false);
             }
+            this._applyRewindMeta(msg.rewind);
             const t1 = performance.now();
             if (this.debugMode) {
               this.snapMs += ((t1 - t0) - this.snapMs) * 0.15;
@@ -179,6 +190,7 @@
           }
           case 'LOAD_RESULT': {
             this._lastSaveError = msg.error || '';
+            this._applyRewindMeta(msg.rewind);
             const resolver = this._pendingRequests.get(msg.reqId);
             if (resolver) {
               this._pendingRequests.delete(msg.reqId);
@@ -192,6 +204,7 @@
             break;
           }
           case 'REWIND_RESULT': {
+            this._applyRewindMeta(msg.rewind);
             const resolver = this._pendingRequests.get(msg.reqId);
             if (resolver) {
               this._pendingRequests.delete(msg.reqId);
@@ -201,9 +214,18 @@
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               this._applySnapshot(msg.snapshot, true);
             }
+            // 回滚结果同样携带一帧完整快照；确认消费后解除 Worker 的背压，
+            // 否则从暂停恢复时可能因遗留 ACK 状态而继续演算却不再刷新画面。
+            this._worker.postMessage({ type: 'ACK' });
+            break;
+          }
+          case 'REWIND_PROGRESS': {
+            this._rewindProgress = { tick: msg.tick, targetTick: msg.targetTick };
+            if (typeof this.onRewindProgress === 'function') this.onRewindProgress(this._rewindProgress);
             break;
           }
           case 'RESET_DONE': {
+            this._applyRewindMeta(msg.rewind);
             if (msg.snapshot) {
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
@@ -228,11 +250,24 @@
         el.style.display = state === 'ready' ? 'none' : 'flex';
       }
 
+      _applyRewindMeta(meta) {
+        if (!meta || typeof meta !== 'object') return;
+        if (Number.isFinite(meta.minTick)) this._rewindMinTick = meta.minTick;
+        if (Number.isFinite(meta.checkpointCount)) this._rewindCheckpointCount = meta.checkpointCount;
+      }
+
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
       _campCountFromConfig() {
         const n = window.SIM_CONFIG && window.SIM_CONFIG.countCamps;
         if (typeof n === 'number' && n > 0) return n;
         return 4; // 与 Rust config.rs COUNT_CAMPS 默认一致
+      }
+
+      _poiRegenMultipliersFromStorage() {
+        if (window.FlowAccordPoiRates && typeof window.FlowAccordPoiRates.get === 'function') {
+          return window.FlowAccordPoiRates.get();
+        }
+        return { water: 1.0, berry: 1.0, wood: 1.0, stone: 1.0, gold: 1.0 };
       }
 
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
@@ -329,6 +364,7 @@
             agentCount: agentCount || 20,
             campCount: this._campCountFromConfig(),
             config: cfg,
+            regenMultipliers: this._poiRegenMultipliersFromStorage(),
           });
         }
       }
@@ -345,7 +381,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.45.4';
+        return this._appVersion || '1.46.4';
       }
 
       /**
@@ -426,14 +462,27 @@
 
       getRewindInfo() {
         const currentTick = this.tickCount || 0;
-        return { currentTick, minTick: 0, maxTick: currentTick, checkpointCount: 1 };
+        return {
+          currentTick,
+          minTick: Math.min(this._rewindMinTick || 0, currentTick),
+          maxTick: currentTick,
+          checkpointCount: this._rewindCheckpointCount || 0,
+        };
       }
 
-      setWaterRegenMultiplier(m) { this.regenMultipliers.water = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 0, mult: m }); }
-      setBerryRegenMultiplier(m) { this.regenMultipliers.berry = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 1, mult: m }); }
-      setWoodRegenMultiplier(m)  { this.regenMultipliers.wood = m;  if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 2, mult: m }); }
-      setStoneRegenMultiplier(m) { this.regenMultipliers.stone = m; if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 3, mult: m }); }
-      setGoldRegenMultiplier(m)  { this.regenMultipliers.gold = m;  if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which: 4, mult: m }); }
+      _setRegenMultiplier(key, which, value) {
+        const mult = Math.min(5.0, Math.max(0.0, Number(value) || 0.0));
+        this.regenMultipliers[key] = mult;
+        if (window.FlowAccordPoiRates && typeof window.FlowAccordPoiRates.save === 'function') {
+          window.FlowAccordPoiRates.save(this.regenMultipliers);
+        }
+        if (this._worker) this._worker.postMessage({ type: 'SET_REGEN', which, mult });
+      }
+      setWaterRegenMultiplier(m) { this._setRegenMultiplier('water', 0, m); }
+      setBerryRegenMultiplier(m) { this._setRegenMultiplier('berry', 1, m); }
+      setWoodRegenMultiplier(m)  { this._setRegenMultiplier('wood', 2, m); }
+      setStoneRegenMultiplier(m) { this._setRegenMultiplier('stone', 3, m); }
+      setGoldRegenMultiplier(m)  { this._setRegenMultiplier('gold', 4, m); }
 
       logEvent(msg, type = '') {
         const list = document.getElementById('log-list');
@@ -454,7 +503,7 @@
 
       _applySnapshot(snap, forceTerrain) {
         if (!snap) return;
-        // ★ M4：二进制快照帧（Uint8Array，worker 转移所有权）→ 解码为与 JSON 同构的对象
+        // ★ T1：快照通道已收敛为单一 FABS 二进制帧（worker 转移所有权）→ 解码为视图对象
         if (typeof ArrayBuffer !== 'undefined' && (snap instanceof ArrayBuffer || (ArrayBuffer.isView(snap) && snap.BYTES_PER_ELEMENT === 1))) {
           if (!window.SnapshotBin) return;
           const bytes = snap instanceof ArrayBuffer ? new Uint8Array(snap) : snap;
