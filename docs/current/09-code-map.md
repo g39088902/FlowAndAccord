@@ -136,6 +136,7 @@ FlowAndAccord/
     ├── 15-profiling-and-benchmarking-guide.md  # 性能 Profiling 基准与确定性矩阵操作指南
     ├── 16-plan-performance-optimization.md     # 仿真内核与全链路性能优化规划书 (M1~M4 已归档 / T1+M5 待办)
     ├── 17-plan-farmland-agriculture.md         # 农田生产与农业税规划书
+    ├── 18-plan-conflict-hunting-defense.md     # 生态狩猎、流寇危机与武力公约规划书
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图

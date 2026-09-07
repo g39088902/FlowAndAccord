@@ -70,6 +70,7 @@
 | 15 | 💾 读档 / 存档系统 | [15-save-load.md](./current/15-save-load.md) | `WorldSave` 全量状态契约、排除字段与重建方式、WASM 导出与错误码、三槽位 localStorage 与导入导出、确定性验证与易踩坑 |
 | 16 | 🏪 外部市场与动态价格系统 (`market`) | [16-market-pricing.md](./current/16-market-pricing.md) | 榷场互市 POI、次级库存、幂律动态定价、B15 榷场商贸决策、黄金流出虚空闭环 |
 | 17 | 🌾 荒地开垦农田与农业税（设计稿） | [17-plan-farmland-agriculture.md](./17-plan-farmland-agriculture.md) | 农田生产资产、资本投资、农业税基、B19 自主投资分支与分阶段落地方案 |
+| 18 | 🏹 打猎生态、防御流寇与武力公约（设计稿） | [18-plan-conflict-hunting-defense.md](./18-plan-conflict-hunting-defense.md) | 动态兽群狩猎、流民与外来流寇劫掠、民兵动员与公仓防御契约、生命力解耦与分阶段落地方案 |
 | 15+ | ⏱️ 性能 Profiling 基准与确定性矩阵 | [15-profiling-and-benchmarking-guide.md](./15-profiling-and-benchmarking-guide.md) | `profile-benchmark.js` 吞吐量/8大子阶段耗时拆解/快照序列化开销、`test-determinism.js` 6大确定性定理测试 |
 | 16+ | 🚀 仿真内核与全链路性能优化规划书 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | 仅保留未完成计划：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join（条件触发） |
 | 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 15 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
