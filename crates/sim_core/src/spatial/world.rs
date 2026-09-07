@@ -82,6 +82,15 @@ pub struct World3DEngine {
     pub terrain_dirty: std::cell::Cell<bool>,
     /// 地区居民到达时序脏位标记：仅在新成员加入/变动时置为 true 并按需排序
     pub regions_arrival_dirty: bool,
+    /// ★ M4 二进制快照：持久化字符串驻留表（自由文本跨帧稳定 id，前端永久缓存解码结果）
+    ///
+    /// 只服务快照输出，不参与内核演化、不消耗 `WorldRng`，故不影响确定性。
+    /// 由于 `write_snapshot_binary(&self)` 需要 `&self`，这里用 `RefCell` 做内部可变性。
+    pub strtab: std::cell::RefCell<super::snapshot_bin::StrTab>,
+    /// ★ M4 二进制快照：上一次已下发的路网拓扑签名 `(node_count << 32) | lane_count`。
+    /// 与当前签名不一致时才重发 `LANE_GEO`/`NODE`（建房会新增节点与车道）。
+    /// 初值 `u64::MAX` 保证首帧必然下发。
+    pub last_geom_sig: std::cell::Cell<u64>,
 }
 
 impl World3DEngine {
@@ -145,7 +154,18 @@ impl World3DEngine {
             last_imperial_payout_tick: 0,
             terrain_dirty: std::cell::Cell::new(true),
             regions_arrival_dirty: true,
+            strtab: std::cell::RefCell::new(super::snapshot_bin::StrTab::new()),
+            last_geom_sig: std::cell::Cell::new(u64::MAX),
         }
+    }
+
+    /// 强制下一帧二进制快照重发**全部**静态几何（地形 + 路网拓扑）。
+    ///
+    /// 用于初始化、读档、重置，以及前端显式请求地形时（`world_require_terrain`）。
+    /// 注意：JSON 通道不受本方法影响（它只看 `terrain_dirty`）。
+    pub fn require_full_geometry(&self) {
+        self.terrain_dirty.set(true);
+        self.last_geom_sig.set(u64::MAX);
     }
 
     /// 当前世界 tick 数（只读访问器：tick_counter 为私有字段，供 ledger / housing_system 钩子取时刻）

@@ -93,11 +93,17 @@ impl<'a> Decisioner<'a> {
                 } else if instant_label.is_none() {
                     // ★ v1.29.0 本拍已执行过瞬间行为且无常规需求：保留瞬间标签，避免行为不可见
                     agent.current_need = Some("Physiological·Rest".to_string());
-                    // 未婚且无房的女性没有可执行事务时回所属营地休息，避免长期停在道路节点。
-                    if agent.gender == super::super::agent::Gender::Female
+                    // 若有私宅且当前不在自家宅门附近，返家休整，避免长期停滞在营地或野外
+                    if agent.home_house_id.is_some() {
+                        let target_home = self.home_target(agent);
+                        let home_pos = self.node_pos(target_home);
+                        if agent.world_pos.distance_to(&home_pos) > self.config.poi_interaction_radius {
+                            self.return_home(agent);
+                        }
+                    } else if agent.gender == super::super::agent::Gender::Female
                         && agent.spouse_id.is_none()
-                        && agent.home_house_id.is_none()
                     {
+                        // 未婚且无房的女性没有可执行事务时回所属营地休息，避免长期停在道路节点。
                         self.return_home(agent);
                     }
                 }
@@ -414,9 +420,18 @@ impl<'a> Decisioner<'a> {
                 agent.current_need = None;
                 return;
             };
-            let start = self.start_node(agent);
-            agent.current_need = Some("Physiological·MarketTrade".to_string());
-            self.dispatch(agent, start, target, PrimitiveActionState::SeekingMarket);
+            let at_market = agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+            if at_market {
+                agent.enter_stationary_state(PrimitiveActionState::BuyingAtMarket);
+                agent.current_need = Some("Physiological·MarketTrade".to_string());
+            } else {
+                let start = self.start_node(agent);
+                if self.dispatch(agent, start, target, PrimitiveActionState::SeekingMarket) {
+                    agent.current_need = Some("Physiological·MarketTrade".to_string());
+                } else {
+                    agent.current_need = None;
+                }
+            }
             return;
         }
         if need.kind == NeedKind::Courtship {
@@ -450,7 +465,9 @@ impl<'a> Decisioner<'a> {
             NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship | NeedKind::BidHouse | NeedKind::RaiseChild => None,
         };
         if let Some(target) = target {
-            self.dispatch(agent, start, target, need.target_state);
+            if !self.dispatch(agent, start, target, need.target_state) {
+                agent.current_need = None;
+            }
         }
     }
 

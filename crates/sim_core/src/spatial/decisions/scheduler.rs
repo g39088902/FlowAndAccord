@@ -133,8 +133,10 @@ impl World3DEngine {
             if coronated {
                 agent.prestige = agent.prestige.saturating_add(bonus);
             }
-            if let Some(node) = camp_node {
-                agent.home_camp_node = node;
+            if agent.home_house_id.is_none() {
+                if let Some(node) = camp_node {
+                    agent.home_camp_node = node;
+                }
             }
         }
 

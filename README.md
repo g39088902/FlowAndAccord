@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.44.9` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.45.4` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 </div>
 
@@ -220,7 +220,7 @@ node frontend/server.js
 | [AGENTS.md](./AGENTS.md) | 开发操作指南与易踩坑清单（改代码前必读） |
 | [docs/01-current.md](./docs/01-current.md) | 已实现功能全景索引与模块导航 |
 | [docs/current/](./docs/current/) | 分模块机制文档（空间路网 / 生态 POI / 四季 / 代谢繁衍 / 房屋 / 决策 AI / 前端 / 配置 / 账本 / 市场 / 存档 / 影响矩阵） |
-| [docs/09-ui-spec-and-ledger-design.md](./docs/09-ui-spec-and-ledger-design.md) | UI 全景剖析与新功能界面设计规范 |
+| [docs/current/21-ui-page-overview.md](./docs/current/21-ui-page-overview.md) · [22-society-ledger-ui.md](./docs/current/22-society-ledger-ui.md) · [23-ui-dev-guide.md](./docs/current/23-ui-dev-guide.md) | UI 页面全景剖析 · 制度大盘界面实现 · 前端开发指南 |
 | [docs/11-plan.md](./docs/11-plan.md) | 项目长期规划书 |
 | [docs/06-config-reference.md](./docs/06-config-reference.md) | 200 个可调超参速查表（自动生成） |
 

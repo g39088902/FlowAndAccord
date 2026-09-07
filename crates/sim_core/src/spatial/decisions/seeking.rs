@@ -15,9 +15,14 @@ impl<'a> Decisioner<'a> {
             .unwrap_or(false);
         if !can_pay || agent.stamina < self.config.decision_work_stamina_threshold { return false; }
         let Some(target) = self.nearest_market_node(agent) else { return false; };
-        agent.current_need = Some("Physiological·MarketTrade".to_string());
-        self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingMarket)
+        if self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingMarket)
             || { let curr = self.start_node(agent); self.dispatch(agent, curr, target, PrimitiveActionState::SeekingMarket) }
+        {
+            agent.current_need = Some("Physiological·MarketTrade".to_string());
+            true
+        } else {
+            false
+        }
     }
     /// 建材途中转向与可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
     pub fn decide_seeking_material(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {

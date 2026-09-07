@@ -6,6 +6,13 @@
 
 ---
 
+## 0. Agent 交互契约
+
+- 输入：Agent、POI、房屋、路网、账本和配置；输出：状态转移、账本事件、快照数据。
+- 只允许由 `world_tick.rs` 编排阶段；各子系统不得扫描 Agent 强制派发任务。
+- `decisions/` 负责行为分派和 pending 意图；生态、房屋与账本层执行物理规则、生命周期和已提交意图的结算，不得借此生成新的 Agent 任务。
+- 任何新增实体字段、枚举或阶段依赖，都要更新影响矩阵并执行对应 Rust/WASM/快照门禁。
+
 ## 一、文件清单与职责边界
 
 ### 1.1 基础设施层（零业务逻辑）
@@ -38,6 +45,7 @@
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
 | `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology.rs / maintenance.rs 真实收付） |
 | `snapshot.rs` | ~290 | 全部快照结构体定义（WorldSnapshot3D / AgentSnapshot / HouseSnapshot / PoiSnapshot / NodeSnapshot / LaneSnapshot / HouseholdSnapshot / MarriageSnapshot / ClanSnapshot / RegionSnapshot / LedgerBalanceSnapshot / TransferRecordSnapshot / GeoCellSnapshot） | 快照赋值（在 world.rs）、前端映射（在 rustworld.js） |
+| `snapshot_bin/` | 4 | ★ M4 (v1.45.3) 二进制快照（FABS 帧）：`layout.rs` 格式常量、`dict.rs` 枚举码表、`strtab.rs` 持久化字符串驻留、`encode.rs` `write_snapshot_binary()` | JSON 快照通道（在 world_snapshot.rs） |
 
 ### 1.4 子目录（各有独立局部 AGENTS.md）
 
@@ -63,7 +71,7 @@
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
-   tick_decisions()                           错峰决策 ((tick + id) % 30 == 0)
+   tick_decisions()                           错峰决策 ((tick + id) % 60 == 0)
 7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
 8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
 9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济
@@ -110,15 +118,18 @@ ecology.rs::tick_poi_interactions(dt)
 
 **注意**：bookkeeping.rs 的 `RESOURCE_ORDER` 常量（水/粮/木/石/金）必须与 `ledger/journal.rs::ResourceKind` 枚举顺序一致。
 
-### 3.3 snapshot.rs 的映射责任
+### 3.3 snapshot.rs 的映射责任（★ M4 起为「四处同步」）
 
-snapshot.rs 只定义**数据结构**，不做任何赋值或转换。三处同步：
+snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.45.3) 二进制快照落地后，字段同步由「三处」扩为「四处」**：
 
 1. **定义**：`snapshot.rs` 中各 Snapshot 结构体的字段
-2. **赋值**：`world.rs::generate_snapshot()` 中从 World3DEngine 状态填充
-3. **映射**：`frontend/js/rustworld.js::_applySnapshot()` 中从 JSON 映射为 JS 对象
+2. **赋值**：`world.rs::generate_snapshot()` 中从 World3DEngine 状态填充（JSON 通道）
+3. **二进制编码**：`snapshot_bin/encode.rs::write_snapshot_binary()`（FABS 帧，字段顺序/枚举码位必须与 1、2 等价）
+4. **映射**：`frontend/js/rustworld.js::_applySnapshot()` + `frontend/js/snapshot-bin.js` 解码器（产物与 JSON 逐字段同构）
 
-新增字段时三处必须同步，否则前端读到 `undefined`。详见根 AGENTS.md §4.5。
+新增字段时**四处**必须同步，否则前端读到 `undefined`；防漂移自动网 = `tools/test-snapshot-bin.js`「二进制 ≡ JSON 深比较」门禁。详见根 AGENTS.md §4.5。
+
+> ⚠️ 枚举口径：二进制帧的闭集枚举（state/poiType/roadClass/houseTier/resourceKind/season/householdRole/gender/transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步修改 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 
 ---
 

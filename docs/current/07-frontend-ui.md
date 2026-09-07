@@ -1,7 +1,7 @@
 # 7. 🎨 交互式表现层与控制台 (`frontend`)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`ledger-ui.js`、`dag*.js`、`frontend/index.html`  
-> **UI 深度解剖与实现指南**：详见 [docs/09-ui-spec-and-ledger-design.md](../09-ui-spec-and-ledger-design.md)（含当前页面全景拆解、M1-M4 制度大盘 4 标签页实现说明与前端开发指南）。
+> **UI 深度解剖与实现指南**：详见 [21-ui-page-overview.md](./21-ui-page-overview.md)（页面全景拆解）· [22-society-ledger-ui.md](./22-society-ledger-ui.md)（M1-M4 制度大盘 4 标签页实现说明）· [23-ui-dev-guide.md](./23-ui-dev-guide.md)（前端开发指南）。
 > **窗口结构与跳转参考**：详见 [17-frontend-window-navigation.md](./17-frontend-window-navigation.md)。
 
 ---

@@ -19,6 +19,38 @@ function allFiles(dir) {
   return out;
 }
 const FILES = allFiles(ROOT);
+// 关键事实漂移检查：这些值会直接改变 agent 对项目的操作判断，不能只靠人工复核。
+function readText(relPath) { try { return fs.readFileSync(path.join(ROOT, relPath), 'utf8'); } catch (_) { return ''; } }
+function canonicalVersion() {
+  const html = readText('frontend/index.html');
+  const m = html.match(/class=["'][^"']*version-tag[^"']*["'][^>]*>\s*v?(\d+\.\d+\.\d+)\s*</i);
+  return m ? m[1] : null;
+}
+function factDrifts() {
+  const drifts = [], version = canonicalVersion();
+  const impact = readText('docs/current/13-impact-matrix.md');
+  const spatial = readText('crates/sim_core/src/spatial/AGENTS.md');
+  const core = readText('crates/sim_core/AGENTS.md');
+  const frontend = readText('frontend/AGENTS.md');
+  if (!version) drifts.push('无法读取 index.html 当前版本');
+  const fields = [...readText('crates/sim_core/src/config.rs').matchAll(/^\s*pub\s+\w+\s*:/gm)].length;
+  const interval = readText('frontend/js/config.js').match(/agentDecisionIntervalTicks:\s*(\d+)/)?.[1];
+  if (!fields || !interval) drifts.push('无法读取配置字段数或决策间隔');
+  for (const [name, text] of [['13-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
+    if (!text.includes(`(tick + id) % ${interval} == 0`)) drifts.push(`${name} 决策错峰与 config.js 不一致`);
+  }
+  for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['13-impact-matrix.md', impact]]) {
+    const declarations = [...text.matchAll(/(\d+)\s*个?字段/gm)];
+    if (!declarations.some(m => Number(m[1]) === fields)) drifts.push(`${name} 未声明配置字段总数 ${fields}`);
+  }
+  const stale = [/163 个字段/, /175 字段/, /148 字段/, /165\/165/, /% 30 == 0/];
+  for (const re of stale) {
+    for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['13-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
+      if (re.test(text)) drifts.push(`${name} 含已废弃事实 ${re}`);
+    }
+  }
+  return drifts;
+}
 function globRegex(pattern) {
   const s = pattern.split(path.sep).join('/'); let out = '^';
   for (let i=0;i<s.length;i++) {
@@ -50,8 +82,11 @@ for (const item of manifest.docs) {
   results.push({id:item.id,path:item.path,owner:item.owner||'—',status,lastReviewed:item.lastReviewed||null,reviewAgeDays:review?Math.floor(ageDays(review,now)):null,sourceCount:unique.length,missingPatterns:missing,docMtime:docTime?new Date(docTime).toISOString():null,newestSourceMtime:newest?new Date(newest).toISOString():null});
 }
 for (const p of FILES.filter(p=>rel(p).startsWith('docs/current/')&&p.endsWith('.md'))) { const rp=rel(p); if(!registered.has(rp)&&!ignored.has(rp)) results.push({id:null,path:rp,owner:'—',status:['UNTRACKED_DOC'],lastReviewed:null,reviewAgeDays:null,sourceCount:0,missingPatterns:[]}); }
+const factIssues = factDrifts();
+if (factIssues.length) results.push({id:'canonical-facts',path:'(cross-document facts)',owner:'engineering',status:['FACT_DRIFT'],lastReviewed:null,reviewAgeDays:null,sourceCount:0,missingPatterns:factIssues,docMtime:null,newestSourceMtime:null});
 const counts={}; for(const r of results) for(const s of r.status) counts[s]=(counts[s]||0)+1;
 const payload={schemaVersion:manifest.schemaVersion||1,checkedAt:new Date(now).toISOString(),reviewIntervalDays:interval,counts,results};
 if (process.argv.includes('--json')) console.log(JSON.stringify(payload,null,2));
 else { console.log('=== Flow & Accord · 文档维护体检 ==='); console.log(`复核周期: ${interval} 天 · 检查文档: ${results.length} 篇 · 时间: ${payload.checkedAt}`); for(const r of results) { const ok=r.status.includes('OK'); console.log(`${ok?'✓':'⚠'} ${r.status.join(', ').padEnd(30)} ${r.path} [${r.owner}]`); if(r.status.includes('NEEDS_REVIEW')) console.log(`    源码最新: ${r.newestSourceMtime} > 文档: ${r.docMtime}`); if(r.status.includes('OVERDUE')) console.log(`    最近复核: ${r.lastReviewed||'未填写'} (${r.reviewAgeDays==null?'未知':r.reviewAgeDays+'天前'})`); if(r.missingPatterns.length) console.log(`    未匹配来源: ${r.missingPatterns.join(', ')}`); } console.log('\n汇总: '+Object.entries(counts).map(([k,v])=>`${k}=${v}`).join(' · ')); }
 if (process.argv.includes('--strict') && results.some(r=>r.status.some(s=>s!=='OK'))) process.exitCode=1;
+if (factIssues.length) process.exitCode=1;

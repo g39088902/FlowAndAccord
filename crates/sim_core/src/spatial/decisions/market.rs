@@ -44,9 +44,9 @@ impl<'a> Decisioner<'a> {
         let hh_food = hh.group.ledger.balance(ResourceKind::Food);
         let hh_wood = hh.group.ledger.balance(ResourceKind::Wood);
 
-        let water_emergency = hh_water < dearth_th && !self.has_available_node(a, NodePool::Water);
-        let food_emergency = hh_food < dearth_th && !self.has_available_node(a, NodePool::Food);
-        let wood_emergency = hh_wood < dearth_th && !self.has_available_node(a, NodePool::Wood);
+        let water_emergency = (hh_water < dearth_th || family_stock_on(a, ResourceKind::Water)) && !self.has_available_node(a, NodePool::Water);
+        let food_emergency = (hh_food < dearth_th || family_stock_on(a, ResourceKind::Food)) && !self.has_available_node(a, NodePool::Food);
+        let wood_emergency = (hh_wood < dearth_th || family_stock_on(a, ResourceKind::Wood)) && !self.has_available_node(a, NodePool::Wood);
 
         if !water_emergency && !food_emergency && !wood_emergency {
             return None;

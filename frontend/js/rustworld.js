@@ -63,7 +63,10 @@
         this._reqSeq = 0;
         this._lastSaveJson = null;
         this._lastSaveError = '';
-        this._appVersion = '1.44.9';
+        // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
+        this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
+        this._geomVersion = null;
+        this._appVersion = '1.45.4';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -128,9 +131,14 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.44.9';
+            this._appVersion = msg.appVersion || '1.45.4';
             this._wasmBytes = msg.wasmBytes || 0;
             this._setEngineStatus('', 'ready');
+            // ★ M4：注入枚举名称表 + 清空解码器字符串缓存（引擎全新 → 缓存失效）
+            if (window.SnapshotBin) {
+              if (msg.enumTableJson) window.SnapshotBin.setEnumTables(msg.enumTableJson);
+              window.SnapshotBin.resetCaches();
+            }
             if (msg.snapshot) {
               this._applySnapshot(msg.snapshot, true);
             }
@@ -177,6 +185,8 @@
               resolver({ ok: msg.ok, error: msg.error });
             }
             if (msg.ok && msg.snapshot) {
+              // ★ M4：读档后引擎重建 → 清空解码器字符串缓存与车道几何缓存
+              if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               this._applySnapshot(msg.snapshot, true);
             }
             break;
@@ -185,15 +195,18 @@
             const resolver = this._pendingRequests.get(msg.reqId);
             if (resolver) {
               this._pendingRequests.delete(msg.reqId);
-              resolver({ ok: msg.ok, error: msg.error, tick: msg.snapshot ? msg.snapshot.tick : undefined });
+              resolver({ ok: msg.ok, error: msg.error, tick: msg.tick != null ? msg.tick : (msg.snapshot && msg.snapshot.tick !== undefined ? msg.snapshot.tick : undefined) });
             }
             if (msg.ok && msg.snapshot) {
+              if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               this._applySnapshot(msg.snapshot, true);
             }
             break;
           }
           case 'RESET_DONE': {
             if (msg.snapshot) {
+              // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
+              if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               this._applySnapshot(msg.snapshot, true);
             }
             this._worker.postMessage({ type: 'ACK' });
@@ -332,7 +345,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.44.9';
+        return this._appVersion || '1.45.4';
       }
 
       /**
@@ -441,6 +454,13 @@
 
       _applySnapshot(snap, forceTerrain) {
         if (!snap) return;
+        // ★ M4：二进制快照帧（Uint8Array，worker 转移所有权）→ 解码为与 JSON 同构的对象
+        if (typeof ArrayBuffer !== 'undefined' && (snap instanceof ArrayBuffer || (ArrayBuffer.isView(snap) && snap.BYTES_PER_ELEMENT === 1))) {
+          if (!window.SnapshotBin) return;
+          const bytes = snap instanceof ArrayBuffer ? new Uint8Array(snap) : snap;
+          snap = window.SnapshotBin.decode(bytes);
+          if (!snap) return;
+        }
         this.tickCount = snap.tick;
         this.totalBirths = snap.total_births;
         this.totalDeaths = snap.total_deaths;
@@ -598,32 +618,54 @@
         });
 
         // --- 路网 (车道 + 节点) ---
-        const lanes = new Map();
-        for (const l of snap.lanes) {
-          lanes.set(l.id, {
-            id: l.id,
-            from: l.from,
-            to: l.to,
-            wear: l.wear,
-            roadClass: l.road_class,
-            speedLimit: l.speed_limit,
-            isHidden: l.is_hidden,
-            concealment: l.concealment,
-            reverseId: null,
-            curve: makeBezierCurve(l.p0, l.p1, l.p2, l.p3)
-          });
-        }
-        for (const l of lanes.values()) {
-          for (const r of lanes.values()) {
-            if (r.from === l.to && r.to === l.from) { l.reverseId = r.id; break; }
+        // ★ M4：车道/节点几何按 geom_version 缓存。
+        //   · 快照携带完整几何（snap.lanes 为数组）：全量重建 Map + O(n) 反向车道查找；
+        //   · 增量帧（snap.lanes === null，仅 LANE_WEAR）：复用缓存对象，只覆写 wear ——
+        //     消灭每帧 812 个对象重建与 O(n²) 反查（812² ≈ 66 万次内层比较）。
+        if (snap.lanes) { // 携带完整几何（数组）；JSON 通道恒为数组
+          const lanes = new Map();
+          const laneOrder = [];
+          for (const l of snap.lanes) {
+            const obj = {
+              id: l.id,
+              from: l.from,
+              to: l.to,
+              wear: l.wear,
+              roadClass: l.road_class,
+              speedLimit: l.speed_limit,
+              isHidden: l.is_hidden,
+              concealment: l.concealment,
+              reverseId: null,
+              curve: makeBezierCurve(l.p0, l.p1, l.p2, l.p3)
+            };
+            lanes.set(l.id, obj);
+            laneOrder.push(obj);
           }
+          // O(n) 反向车道查找（原 O(n²)：812² ≈ 66 万次/帧，M4 一并消除）
+          const byKey = new Map();
+          for (const obj of laneOrder) byKey.set(obj.from + '|' + obj.to, obj.id);
+          for (const obj of laneOrder) {
+            const rid = byKey.get(obj.to + '|' + obj.from);
+            obj.reverseId = rid !== undefined && rid !== obj.id ? rid : null;
+          }
+          this.network.lanes = lanes;
+          this._laneCache = laneOrder;
+          this._geomVersion = snap.geom_version !== undefined ? snap.geom_version : null;
+        } else if (this._laneCache && snap.lane_wear) {
+          // 增量帧（二进制 lanes===null）：复用缓存对象，仅覆写 wear（原地修改，渲染侧零重建）
+          const wear = snap.lane_wear;
+          const cache = this._laneCache;
+          const n = Math.min(cache.length, wear.length);
+          for (let i = 0; i < n; i++) cache[i].wear = wear[i];
         }
-        this.network.lanes = lanes;
-        const nodes = new Map();
-        for (const n of snap.nodes) {
-          nodes.set(n.id, { id: n.id, pos: { x: n.x, y: n.y, z: n.z }, nodeType: n.node_type });
+        if (snap.nodes !== undefined && snap.nodes !== null) {
+          const nodes = new Map();
+          for (const n of snap.nodes) {
+            nodes.set(n.id, { id: n.id, pos: { x: n.x, y: n.y, z: n.z }, nodeType: n.node_type });
+          }
+          this.network.nodes = nodes;
         }
-        this.network.nodes = nodes;
+        // 注：增量帧（nodes===null）时保留 this.network.nodes 缓存；首个增量帧前必有全量帧建立缓存。
 
         // --- Agent ---
         const prevAgents = new Map(this.agents.map(a => [a.id, a]));

@@ -2,7 +2,7 @@
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
 > 本文档是 agent 设计方案时的最高价值单页参考：**改 X 会牵动哪些文件**。按"最常改动 → 最隐蔽联动"排序。
-> 最后核验：v1.27.0。
+> 最后核验：v1.45.3（关键事实由 `node tools/doc-maintenance-check.js` 校验）。
 
 ---
 
@@ -114,7 +114,7 @@
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
 6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
-   tick_decisions()                           错峰决策 ((tick + id) % 30 == 0)
+   tick_decisions()                           错峰决策 ((tick + id) % 60 == 0)
 7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
 8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
 9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济 → ★国王内帑（v1.27.0）
@@ -160,7 +160,7 @@ rustworld.js::_applySnapshot()
 
 ```
 1. math.js                    3D 向量与投影变换 (零依赖)
-2. config.js                  SIM_CONFIG 全局数值配置 (148 字段，主镜像)
+2. config.js                  SIM_CONFIG 全局数值配置 (205 字段，含拆分配置合计，主镜像)
 3. config.decision-order.js   决策分支顺序 (合并进 SIM_CONFIG，§4.14 例外)
 4. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段)
 5. decision-viz-data.js       决策分支元数据 (条件文案/层级/图标)

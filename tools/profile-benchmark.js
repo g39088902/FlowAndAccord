@@ -179,7 +179,7 @@ async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup =
   return { grandTotalMs, breakdown };
 }
 
-// 模块 C: 快照序列化与解析开销
+// 模块 C: 快照序列化与解析开销（★ M4 起同时度量 FABS 二进制通道）
 async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 300) {
   const { ex, textDecoder } = await createEngine(seed, agents, camps, config);
   const dt = 1.0 / 60.0;
@@ -187,15 +187,38 @@ async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 3
     ex.world_tick_steps(warmup, dt);
   }
 
+  // ★ M4：装载二进制解码器（复用前端 snapshot-bin.js），供解码耗时测量
+  let binDecoder = null;
+  if (typeof ex.world_snapshot_bin_ptr === 'function') {
+    const vm = require('vm');
+    const decPath = path.join(ROOT, 'frontend', 'js', 'snapshot-bin.js');
+    if (fs.existsSync(decPath)) {
+      const sandbox = { TextDecoder, TextEncoder, console };
+      vm.createContext(sandbox);
+      vm.runInContext(fs.readFileSync(decPath, 'utf8'), sandbox);
+      binDecoder = sandbox.SnapshotBin || null;
+      if (binDecoder && typeof ex.world_enum_table_ptr === 'function') {
+        const etp = ex.world_enum_table_ptr();
+        const etl = ex.world_enum_table_len();
+        if (etl > 0) {
+          binDecoder.setEnumTables(textDecoder.decode(new Uint8Array(ex.memory.buffer, etp, etl)));
+        }
+      }
+    }
+  }
+
   const rustSerializeNs = [];
   const jsParseNs = [];
+  const binEncodeNs = [];
+  const binDecodeNs = [];
   let snapshotBytes = 0;
+  let binBytes = 0;
 
   for (let i = 0; i < samples; i++) {
     // 推进数步让快照产生自然微变
     ex.world_tick_steps(2, dt);
 
-    // Rust 序列化
+    // Rust JSON 序列化
     const t0 = process.hrtime.bigint();
     const ptr = ex.world_snapshot_ptr();
     const len = ex.world_snapshot_len();
@@ -209,19 +232,49 @@ async function runSnapshotBench(samples, seed, agents, camps, config, warmup = 3
     JSON.parse(jsonStr);
     const t3 = process.hrtime.bigint();
     jsParseNs.push(t3 - t2);
+
+    // ★ M4：Rust 二进制编码（FABS）
+    if (binDecoder) {
+      const b0 = process.hrtime.bigint();
+      const bptr = ex.world_snapshot_bin_ptr();
+      const blen = ex.world_snapshot_bin_len();
+      const b1 = process.hrtime.bigint();
+      binEncodeNs.push(b1 - b0);
+      binBytes = blen;
+
+      // ★ M4：JS 二进制解码（内存拷出 + SnapshotBin.decode，等价浏览器 transfer 路径）
+      const b2 = process.hrtime.bigint();
+      const bytes = new Uint8Array(ex.memory.buffer, bptr, blen).slice();
+      binDecoder.decode(bytes);
+      const b3 = process.hrtime.bigint();
+      binDecodeNs.push(b3 - b2);
+    }
   }
 
   const avgRustUs = Number(rustSerializeNs.reduce((a, b) => a + b, 0n) / BigInt(samples)) / 1000;
   const avgJsUs = Number(jsParseNs.reduce((a, b) => a + b, 0n) / BigInt(samples)) / 1000;
   const totalSnapshotUs = avgRustUs + avgJsUs;
 
-  return {
+  const out = {
     snapshotBytes,
     snapshotKb: (snapshotBytes / 1024).toFixed(1),
     avgRustUs,
     avgJsUs,
     totalSnapshotUs,
   };
+  if (binDecoder) {
+    const n = binEncodeNs.length;
+    const avgBinEncodeUs = Number(binEncodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
+    const avgBinDecodeUs = Number(binDecodeNs.reduce((a, b) => a + b, 0n) / BigInt(n)) / 1000;
+    out.binBytes = binBytes;
+    out.binKb = (binBytes / 1024).toFixed(1);
+    out.avgBinEncodeUs = avgBinEncodeUs;
+    out.avgBinDecodeUs = avgBinDecodeUs;
+    out.binTotalUs = avgBinEncodeUs + avgBinDecodeUs;
+    out.jsonVsBinSize = snapshotBytes / Math.max(1, binBytes);
+    out.speedup = totalSnapshotUs / Math.max(0.0001, out.binTotalUs);
+  }
+  return out;
 }
 
 // 模块 D: 人口规模压测 (Scale)
@@ -358,6 +411,15 @@ async function runBatchBench(seed, agents, camps, config) {
     console.log(`│ JS 解析耗时:         ${snap.avgJsUs.toFixed(2).padStart(8)} µs (JSON.parse)`);
     console.log(`│ 单次快照总代价:      ${snap.totalSnapshotUs.toFixed(2).padStart(8)} µs`);
     console.log(`│ 等价计算步数:        生成 1 次快照耗时 ≈ 推进 ${snapVsTick} 个 Tick`);
+    if (typeof snap.binTotalUs === 'number') {
+      console.log(`├─────────────────── ★ M4 二进制通道 (FABS) ─────────────────┤`);
+      console.log(`│ 二进制载荷体积:     ${String(snap.binKb).padStart(8)} KB (${snap.binBytes.toLocaleString()} 字节)`);
+      console.log(`│ Rust 编码耗时:      ${snap.avgBinEncodeUs.toFixed(2).padStart(8)} µs (手写小端平铺)`);
+      console.log(`│ JS 解码耗时:        ${snap.avgBinDecodeUs.toFixed(2).padStart(8)} µs (SnapshotBin.decode)`);
+      console.log(`│ 二进制快照总代价:   ${snap.binTotalUs.toFixed(2).padStart(8)} µs`);
+      console.log(`│ 体积压缩倍率:       ${snap.jsonVsBinSize.toFixed(1).padStart(8)} 倍 (JSON/二进制)`);
+      console.log(`│ 解码提速倍率:       ${snap.speedup.toFixed(0).padStart(8)} 倍 (JSON 总代价/二进制总代价)`);
+    }
     console.log(`└──────────────────────────────────────────────────────────┘\n`);
   }
 

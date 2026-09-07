@@ -10,6 +10,10 @@ use sim_core::spatial::{deserialize_save, serialize_save, World3DEngine};
 static mut WORLD: Option<World3DEngine> = None;
 static mut ACTIVE_CONFIG: Option<SimConfig> = None;
 static mut SNAPSHOT_BUF: Vec<u8> = Vec::new();
+/// ★ M4 二进制快照缓冲（FABS 帧，由 world_snapshot_bin_ptr 写入 / world_snapshot_bin_len 读取）
+static mut SNAPSHOT_BIN_BUF: Vec<u8> = Vec::new();
+/// ★ M4 枚举名称表 JSON 缓冲（由 world_enum_table_ptr/len 读取，前端启动时取一次）
+static mut ENUM_TABLE_BUF: Vec<u8> = Vec::new();
 static mut CONFIG_BUF: Vec<u8> = Vec::new();
 /// 存档 JSON 缓冲（world_save_ptr 写入 / world_load 读取）
 static mut SAVE_BUF: Vec<u8> = Vec::new();
@@ -140,6 +144,14 @@ pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
 }
 
 /// 序列化当前世界快照到内部缓冲，返回缓冲起始指针 (配合 world_snapshot_len 读取)
+///
+/// ⚠️ DEPRECATED(M4, v1.45.0)：M4 已提供二进制通道 `world_snapshot_bin_ptr/len`，
+/// 前端主链路已切换为二进制。本 JSON 通道**暂时保留**，仅服务两类用途：
+///   1. `tools/` 下 6 个依赖 JSON 快照的诊断/测试/性能工具；
+///   2. 二进制解码失败的自动回退（rustworld.js 按导出存在性做特性检测）。
+/// **移除条件**（高优先级技术债，见 docs/16-plan-performance-optimization.md 与 TODO.md）：
+/// M4 二进制快照稳定运行后，将 tools 改造为二进制取值，随即删除本导出与
+/// `world_snapshot_len`、`SNAPSHOT_BUF`。
 #[no_mangle]
 pub extern "C" fn world_snapshot_ptr() -> u32 {
     unsafe {
@@ -159,12 +171,59 @@ pub extern "C" fn world_snapshot_len() -> u32 {
     unsafe { SNAPSHOT_BUF.len() as u32 }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ★ M4 快照零拷贝扁平二进制缓冲（FABS 帧，v1.45.0）
+//
+// 前端优先走二进制通道（见 sim_worker.js::pullSnapshotBin），本通道只是
+// 输出一个**只读**的自描述二进制帧；它等价于 JSON 快照，但体积小约 18 倍
+// 且无需 `JSON.parse`。两条通道都只读内核状态，不消耗 WorldRng。
+// 实现见 crates/sim_core/src/spatial/snapshot_bin/。
+// ═══════════════════════════════════════════════════════════════
+
+/// 编码当前世界 FABS 二进制帧到内部缓冲，返回起始指针（配合 world_snapshot_bin_len 读取）。
+/// 帧内含有 LANE_GEO/NODE/TERRAIN 的**增量判定**：仅在地形脏位或路网拓扑签名变化时输出。
+#[no_mangle]
+pub extern "C" fn world_snapshot_bin_ptr() -> u32 {
+    unsafe {
+        if let Some(w) = WORLD.as_ref() {
+            w.write_snapshot_binary(&mut SNAPSHOT_BIN_BUF);
+        }
+        SNAPSHOT_BIN_BUF.as_ptr() as u32
+    }
+}
+
+/// 返回二进制快照帧字节长度
+#[no_mangle]
+pub extern "C" fn world_snapshot_bin_len() -> u32 {
+    unsafe { SNAPSHOT_BIN_BUF.len() as u32 }
+}
+
+/// 返回枚举名称表 JSON 起始指针（懒生成并缓存；前端 INIT 时取一次，杜绝前后端枚举漂移）
+#[no_mangle]
+pub extern "C" fn world_enum_table_ptr() -> u32 {
+    unsafe {
+        if ENUM_TABLE_BUF.is_empty() {
+            ENUM_TABLE_BUF = sim_core::spatial::snapshot_bin::enum_table_json().into_bytes();
+        }
+        ENUM_TABLE_BUF.as_ptr() as u32
+    }
+}
+
+/// 返回枚举名称表 JSON 字节长度
+#[no_mangle]
+pub extern "C" fn world_enum_table_len() -> u32 {
+    unsafe { ENUM_TABLE_BUF.len() as u32 }
+}
+
 /// 强制下一帧快照输出完整地形网格 (例如初始化或前端重新加载时调用)
+///
+/// ★ M4：同时重置路网几何增量缓存（`require_full_geometry`），保证二进制通道
+/// 在下帧重发 LANE_GEO/NODE——前端 REQUIRE_TERRAIN 的语义就是"把全部静态几何重发一遍"。
 #[no_mangle]
 pub extern "C" fn world_require_terrain() {
     unsafe {
         if let Some(w) = WORLD.as_ref() {
-            w.terrain_dirty.set(true);
+            w.require_full_geometry();
         }
     }
 }

@@ -5,6 +5,13 @@
 
 ---
 
+## 0. Agent 交互契约
+
+- 输入：`SimConfig`、`WorldRng`、实体状态与 ledger 快照；输出：确定性的世界状态、事件和 `WorldSnapshot3D`。
+- 唯一调度入口：`World3DEngine::tick()`；不得绕过 tick 顺序直接驱动决策或制度结算。
+- 跨模块边界：决策负责行为分派及 pending 意图，系统结算不得派发新任务；快照须同步 `snapshot.rs`、`world_snapshot.rs`、`snapshot_bin/encode.rs`、`snapshot-bin.js` 与 `rustworld.js`。
+- 修改本 crate 后至少运行 `cargo test --lib` 与 `node tools/test-wasm.js`；涉及配置或快照时追加对应专项门禁。
+
 ## 1. 📂 目录职责
 
 Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依赖，仅 `petgraph`/`serde`/`serde_json`）。对外提供：统一动态超参配置（`SimConfig`）、零依赖确定性 PRNG（`WorldRng`）、地形与生物地理（`geo`）、空间仿真主体（`spatial`：世界推进 / 路网 / Agent / POI / 房屋 / 快照 / 决策 / 房屋系统 / 经济账本）。`sim_wasm` 桥接层直接消费本 crate 的 `World3DEngine` 与快照类型。
@@ -44,7 +51,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 ## 4. 🧱 关键类型不变量
 
 - **`WorldRng`**：xorshift64*，状态仅一个 u64。seed 0 被静默替换为黄金比例常数；`gen_normal`（Box-Muller）恰好消耗 2 个均匀数；`gen_range_usize` 在 `high <= low` 时返回 `low`（不 panic）。
-- **`SimConfig`**：163 个字段，前端 `config.js` 按 camelCase 键注入，缺省回落默认值。`config.rs` 是数值唯一真相源（见根 AGENTS.md §4.12）。
+- **`SimConfig`**：205 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
 - **`TerrainMap`**：`sample_elevation` 为最近邻采样（无插值），归一化坐标 clamp 到 [0.0, 0.999]。
 - **`World3DEngine`**：世界总管理器，一切世界级系统方法以 `impl World3DEngine` 分散挂载。
 - **`Agent3D`**：部落民实体（生理/行囊/血缘/禀赋/`poi_seekability` 私有触发器表）。

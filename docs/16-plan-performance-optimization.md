@@ -59,7 +59,7 @@
 graph TD
     M1["里程碑 M1 ✅<br/>Worker 快照节流与调度解耦<br/>(释放 3.0ms/帧通信开销)"] --> M2["里程碑 M2 ✅<br/>道路衰减稀疏集合与降频<br/>(攻克 30.7% 第 1 算力热点)"]
     M2 --> M3["里程碑 M3 ✅<br/>A* 局部失效与静态查表<br/>(攻克 27.0% 第 2 算力热点)"]
-    M3 --> M4["里程碑 M4<br/>快照零拷贝扁平二进制缓冲<br/>(消灭 JSON 解析与 GC 压力)"]
+    M3 --> M4["里程碑 M4 ✅<br/>快照零拷贝扁平二进制缓冲<br/>(FABS 帧 23.1x 压缩 · 消灭 JSON 序列化)"]
     M4 --> M5["里程碑 M5<br/>内核多线程 Fork-Join 架构<br/>(超大世界 200~500+ 人口演化)"]
 ```
 
@@ -109,10 +109,15 @@ graph TD
 
 ---
 
-### 里程碑 M4：快照零拷贝扁平二进制缓冲（彻底解放序列化）
+### 里程碑 M4：快照零拷贝扁平二进制缓冲（彻底解放序列化）✅ 已落地 (v1.45.3)
 
 - **优先级**：P2（架构级优化，中长期落地）
-- **涉及文件**：`crates/sim_wasm/src/lib.rs`、`crates/sim_core/src/spatial/snapshot.rs`、`frontend/js/rustworld.js`
+- **涉及文件**：`crates/sim_core/src/spatial/snapshot_bin/`（新增四子模块）、`crates/sim_core/src/spatial/world.rs`（挂字符串驻留表/几何签名）、`crates/sim_wasm/src/lib.rs`、`frontend/js/snapshot-bin.js`（新增解码器）、`frontend/js/sim_worker.js`、`frontend/js/rustworld.js`
+- **实际收益**（`tools/profile-benchmark.js` 实测，种子 42 / 20 人 / 3600 tick）：
+  - 稳态帧体积 **304,386 B → 13,184 B（压缩 23.1 倍）**——路网几何（占稳态 76%）与地形改为按版本号增量下发，每帧只传 `LANE_WEAR`；
+  - Rust 快照编码 **1,762.6 µs → 95.7 µs**（手写小端平铺，无 serde）；JS 解码 **1,625 µs → 592 µs**（同构对象，含驻留字符串零重复解码）；
+  - 顺带消除 `rustworld.js` 每帧 812 个车道对象重建与 **O(n²)（66 万次/帧）反向车道查找**（`geom_version` 缓存 + O(n) 单遍 Map）；
+  - 确定性 0 风险：快照层全程只读、不消耗 `WorldRng`，`test-determinism.js` 6/6 套件全通。
 
 #### 核心痛点与方案：
 1. **内存平铺结构体（Flat Binary Buffer）**：
@@ -128,10 +133,14 @@ graph TD
    - Rust 端仅做原地内存覆写；
    - 前端通过 `new Float32Array(_wasm.memory.buffer, agentPtr, count * 8)` 直接驱动 Canvas 视口绘制，彻底跳过 JSON 字符串拼接、内存复制与 `JSON.parse`。
 
-- **预期收益**：
-  - 快照读取与解析时间从 **3.0ms 降至 < 0.05ms**（近百倍提速）；
-  - 前端 JavaScript 堆内存分配与垃圾回收（GC）停顿彻底归零。
-- **确定性风险**：0 风险（快照层完全只读，不影响内核状态演化）。
+- **落地形态（v1.45.3 实际实现，与上述草案的差异）**：
+  1. 采用「Header + SectionDir + 顺序流」单帧自描述容器（非严格定长 stride），新增 section 前向兼容可跳过；
+  2. 自由文本走 **持久化 append-only 字符串驻留表**（`StrTab`，上限 8192 条 / 256 KB，超限重置并递增世代号），跨帧稳定 id、前端永久缓存解码结果——surname/current_need/death_cause/账本流水主体等仍是**真实 JS 字符串**，下游零改动；
+  3. 闭集枚举（state/poiType/nodeType/roadClass/houseTier/resourceKind/season/householdRole/gender/transferReason）以 u8 码位传输，名称表由 Rust `as_str()` 经 `world_enum_table_ptr/len` 导出，**单一真相源零漂移**；
+  4. 前端仍产出与 JSON 同构的对象（按用户决策**不**做渲染层直读 TypedArray 深水区），`render_*`/ledger-ui/dag/auction-ui 零改动；
+  5. `terrain_dirty` 与 `last_geom_sig` 为双通道共享快照脏位：前端只走二进制、工具只走 JSON，天然互不冲突（已在 `sim_wasm/AGENTS.md` 标注）。
+- **确定性风险**：0 风险（快照层完全只读，不消耗 `WorldRng`、不改演化字段）。
+- **⚠️ 高优先级技术债（JSON 通道移除）**：`world_snapshot_ptr/len` 现暂保留，仅服务 `tools/` 下 6 个依赖 JSON 快照的工具与前端回退。**M4 二进制通道稳定运行 N 个版本后，将 `tools/test-wasm.js` / `test-determinism.js` / `diagnose.js` / `profile-benchmark.js` / `gen-dag-testdata.js` / `gold_mining_analysis.js` 改造为二进制取值，随即删除 `world_snapshot_ptr/len` 与 `SNAPSHOT_BUF`**。已同步登记于 `TODO.md` 与 `crates/sim_wasm/AGENTS.md`。
 
 ---
 
@@ -163,7 +172,7 @@ graph TD
 | **M1: 快照节流** ✅ | 0.5 天 | `frontend/js/sim_worker.js` | 1024x 倍速无掉帧；快照开销降低 80% | **已落地 (v1.42.0)** |
 | **M2: 道路衰减** ✅ | 1 天 | `sim_core/graph.rs` | Phase 4 耗时从 30.7% (3.07µs) 暴降至 4.4% (0.40µs)，压降 87%；确定性 6 套件全通 | **已落地 (v1.42.1)** |
 | **M3: A* 查表** ✅ | 1.5 天 | `sim_core/graph.rs` | 局部失效+APSP查表；消除击穿毛刺；吞吐达 97,792 TPS；确定性 6 套件全通 | **已落地 (v1.43.0)** |
-| **M4: 二进制快照**| 2 天 | `sim_wasm`, `rustworld.js` | 快照耗时 < 0.1ms；消灭 JSON.parse 耗时 | 吞吐平稳，无帧周期挤压 |
+| **M4: 二进制快照** ✅ | 2 天 | `sim_core/snapshot_bin`, `sim_wasm`, `frontend(snapshot-bin/sim_worker/rustworld)` | 稳态帧 23.1x 压缩；Rust 编码 1,763→96 µs；确定性 6 套件 + `test-snapshot-bin.js` 深比较全通 | **已落地 (v1.45.3)** |
 | **M5: 多线程** | 3~5 天 | `sim_core/decisions`, Workers | 100~300 人口下吞吐随核心数线性缩放 | 超大规模下 > 150,000 TPS |
 
 ---

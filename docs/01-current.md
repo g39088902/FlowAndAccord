@@ -1,8 +1,10 @@
 # 📋 Flow & Accord（流动公约）已实现功能全景清单
 
+开发任务入口：[Agent 快速入口](./current/00-agent-start.md)，按改动类型选择指南、上下游同步链与验证命令。
+
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.44.9（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（195 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，前后端一致性由 `node tools/config-check.js` 校验。
+> **版本**：v1.45.4（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **超参配置**：全部可调超参（205 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -33,8 +35,8 @@
                                       │
                                       ▼
                        ┌──────────────────────────────────────────────┐
-                       │  📒 账本与社会经济制度系统 (M1~M4 已落地)    │
-                       │ (家户/婚姻/宗族/王国 · 旁路记账/分家继承/     │
+                       │  📒 账本与社会经济制度系统 (M1~M5 已落地)    │
+                       │ (家户/婚姻/宗族/王国/帝国 · 旁路记账/分家继承/│
                        │  族税互助/公仓赋税救济/夺位远征/榷场商贸)     │
                        └──────────────────────────────────────────────┘
 ```
@@ -51,15 +53,18 @@
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |
 | 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记、二手房屋市场与营地麦穗 37% 拍卖系统 |
 | 6 | 🧠 马斯洛需求层次与行动状态机 (Motivation AI) | [06-motivation-ai.md](./current/06-motivation-ai.md) | 6 层需求（⓪ 瞬间行为）、私有触发器、连续采收与平滑重路由、错峰决策节拍 |
+| 6.1 | 🔄 三大核心系统状态机架构全景 | [24-three-core-systems-fsm.md](./current/24-three-core-systems-fsm.md) | 马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 图解与契约 |
 | 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、在售呼吸图标、Inspector、族谱时间轴、账本大盘、房屋拍卖交易所大盘、调试监视器 |
 | 7.1 | 🧭 前端窗口结构与跳转关系 | [17-frontend-window-navigation.md](./current/17-frontend-window-navigation.md) | 主世界布局、常驻面板、模态窗口、独立族谱页、入口/返回/跨窗口跳转、设计契约 |
 | 7.2 | 🧭 文档维护发现机制 | [18-doc-maintenance.md](./current/18-doc-maintenance.md) | 维护清单、源码/文档新鲜度检测、复核周期、CI 严格模式与人工确认流程 |
 | 7.3 | ✅ Commit 前检查单 | [19-commit-checklist.md](./current/19-commit-checklist.md) | 提交前基础检查、Rust/WASM、前端、配置、诊断与最终 diff 审阅 |
-| 7+ | 📐 UI 全景剖析与制度大盘实现指南 | [09-ui-spec-and-ledger-design.md](./09-ui-spec-and-ledger-design.md) | UI 页面全景解剖、M1-M4 制度大盘（家户/婚姻/宗族/王国）已实现说明、前端开发实施规范 |
+| 7.4 | 🖥️ UI 页面全景剖析 | [21-ui-page-overview.md](./current/21-ui-page-overview.md) | Canvas 视口、顶栏状态栏、生态大盘、观察堆栈、控制台、模态弹窗、存档面板 |
+| 7.5 | 🏛️ 制度大盘 UI 实现 (M1~M4) | [22-society-ledger-ui.md](./current/22-society-ledger-ui.md) | 4 标签页枢纽、M2 旁路记账/分家继承、M3 宗族公库、M4 王国政体、ASCII 线框原型 |
+| 7.6 | 🛠️ 前端开发实施指南 | [23-ui-dev-guide.md](./current/23-ui-dev-guide.md) | 模块化分工、快照三处同步、CSS 设计系统、性能节流、验收门禁 |
 | 8 | ⚙️ JavaScript 动态数值配置系统 (`config.js`) | [08-config-system.md](./current/08-config-system.md) | `window.SIM_CONFIG` 全量抽取、免编译热调优、config-check 校验 |
 | 9 | 📂 核心代码目录与模块映射 | [09-code-map.md](./current/09-code-map.md) | `crates/` 与 `frontend/` 源码树结构 |
 | 10 | 🚀 快速启动与体验 | [10-quickstart.md](./current/10-quickstart.md) | 浏览器 / Node 回归 / Rust 编译三种启动方式 |
-| 12 | 📒 账本与社会经济制度系统 (`ledger`) | [12-ledger-system.md](./current/12-ledger-system.md) | 团体账本内核、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份 |
+| 12 | 📒 账本与社会经济制度系统 (`ledger`) | [12-ledger-system.md](./current/12-ledger-system.md) | 团体账本内核、婚姻登记簿、家户体系、宗族体系、地区王国政体、帝国上层政体 (M5)、胎儿 Agent 身份 |
 | 13 | 🔗 跨模块影响矩阵 | [13-impact-matrix.md](./current/13-impact-matrix.md) | 改 X 牵动哪些文件的速查表、tick 内部调用顺序、数据流向图、脚本加载顺序、改动前自检清单 |
 | 14 | 🔒 核心不变量集中清单 | [14-invariants.md](./current/14-invariants.md) | 确定性/数据一致性/行为语义/构建部署/代码组织/前端 DOM 六大类硬约束，每条标注来源与违反后果，末尾附 10 秒快速自检清单 |
 | 15 | 💾 读档 / 存档系统 | [15-save-load.md](./current/15-save-load.md) | `WorldSave` 全量状态契约、排除字段与重建方式、WASM 导出与错误码、三槽位 localStorage 与导入导出、确定性验证与易踩坑 |
@@ -68,7 +73,7 @@
 | 15+ | ⏱️ 性能 Profiling 基准与确定性矩阵 | [15-profiling-and-benchmarking-guide.md](./15-profiling-and-benchmarking-guide.md) | `profile-benchmark.js` 吞吐量/8大子阶段耗时拆解/快照序列化开销、`test-determinism.js` 6大确定性定理测试 |
 | 16+ | 🚀 仿真内核与全链路性能优化规划书 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | M1~M5 全链路性能优化路线图：快照节流/稀疏路网衰减/A*查表/二进制快照/多线程 |
 | 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 15 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
-| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.41.0 各版本核心机制改动 |
+| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.44.9 各版本核心机制改动 |
 
 ---
 

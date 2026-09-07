@@ -72,7 +72,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **触发（守卫全内联在分支内）**：在世成年男性、非现任国王、且 `Decisioner.eligible_leaderless_camp` 找到空缺王位营地——有房（含 0 级）者只能夺**自家房屋所在营地**的空缺王位，无房可夺**任意**空缺王位营地（Task6 语义）；
 - **选点写字段**：`fulfill_resting_need` 将选定营地写入 `agent.expedition_target_camp` 并 `dispatch` 为 `PrimitiveActionState::SeekingThrone`，`current_need = "Physiological·SeekThrone"`；
 - **途中状态机 `decide_seeking_throne`**（seeking.rs，寻路+运动系统，坐标连续不闪现）：体力告警 → 折返；抵达目标营地交互半径且王位仍空缺 → 写 `coronation_pending` 待世界登基；途中目标已易主 → 原地掉头重定向到新的空缺王位营地；无可夺位营地 → 放弃远征恢复常规决策；
-- **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；
+- **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；★ v1.45.2 登基时若族人已有私宅，严禁覆盖 `home_camp_node` 为营地中心 POI 节点，保留私宅大门连接以杜绝与配偶分居、无法育儿；
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
 - 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。
 - ★ v1.32.0 孤儿营地补王：`eligible_leaderless_camp` 遍历完整营地列表（`ctx.camp_pois`）而非 `regions`，无 Region 实体（有房无王）的营地一并视为空缺王位；`decide_seeking_throne` 与 `execute_pending_coronations` 的「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，修复房屋辖区与地区成员登记簿脱节导致的孤儿营地永无国王。

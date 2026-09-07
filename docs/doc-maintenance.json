@@ -3,6 +3,7 @@
   "reviewIntervalDays": 90,
   "ignoreDocs": ["docs/current/11-changelog.md"],
   "docs": [
+    {"id":"agent-start","path":"docs/current/00-agent-start.md","owner":"engineering","lastReviewed":"2026-09-07","sources":["AGENTS.md","crates/sim_core/AGENTS.md","crates/sim_core/src/spatial/AGENTS.md","crates/sim_wasm/AGENTS.md","frontend/AGENTS.md","docs/current/00-agent-start.md"]},
     {"id":"spatial-network","path":"docs/current/01-spatial-network.md","owner":"sim-core/spatial","lastReviewed":"2026-09-06","sources":["crates/sim_core/src/spatial/**/*.rs","docs/current/01-spatial-network.md"]},
     {"id":"ecology-poi","path":"docs/current/02-ecology-poi.md","owner":"sim-core/ecology","lastReviewed":"2026-09-06","sources":["crates/sim_core/src/spatial/ecology.rs","crates/sim_core/src/spatial/poi.rs","docs/current/02-ecology-poi.md"]},
     {"id":"seasons-climate","path":"docs/current/03-seasons-climate.md","owner":"sim-core/world","lastReviewed":"2026-09-06","sources":["crates/sim_core/src/spatial/world_season.rs","crates/sim_core/src/config.rs","docs/current/03-seasons-climate.md"]},
@@ -21,6 +22,10 @@
     {"id":"frontend-window-navigation","path":"docs/current/17-frontend-window-navigation.md","owner":"frontend","lastReviewed":"2026-09-06","sources":["frontend/index.html","frontend/js/**/*.js","docs/current/17-frontend-window-navigation.md"]},
     {"id":"doc-maintenance","path":"docs/current/18-doc-maintenance.md","owner":"engineering","lastReviewed":"2026-09-06","sources":["tools/doc-maintenance-check.js","docs/doc-maintenance.json","docs/current/18-doc-maintenance.md"]},
     {"id":"commit-checklist","path":"docs/current/19-commit-checklist.md","owner":"engineering","lastReviewed":"2026-09-06","sources":["AGENTS.md","tools/doc-maintenance-check.js","docs/current/19-commit-checklist.md"]},
-    {"id":"tools-guide","path":"docs/current/20-tools-guide.md","owner":"engineering","lastReviewed":"2026-09-07","sources":["tools/**/*.js","docs/current/20-tools-guide.md"]}
+    {"id":"tools-guide","path":"docs/current/20-tools-guide.md","owner":"engineering","lastReviewed":"2026-09-07","sources":["tools/**/*.js","docs/current/20-tools-guide.md"]},
+    {"id":"ui-page-overview","path":"docs/current/21-ui-page-overview.md","owner":"frontend","lastReviewed":"2026-09-07","sources":["frontend/index.html","frontend/style.css","frontend/js/**/*.js","docs/current/21-ui-page-overview.md"]},
+    {"id":"society-ledger-ui","path":"docs/current/22-society-ledger-ui.md","owner":"frontend","lastReviewed":"2026-09-07","sources":["frontend/js/ledger-ui.js","frontend/js/auction-ui.js","docs/current/22-society-ledger-ui.md"]},
+    {"id":"ui-dev-guide","path":"docs/current/23-ui-dev-guide.md","owner":"frontend","lastReviewed":"2026-09-07","sources":["frontend/js/**/*.js","frontend/style.css","frontend/index.html","docs/current/23-ui-dev-guide.md"]},
+    {"id":"three-core-systems-fsm","path":"docs/current/24-three-core-systems-fsm.md","owner":"sim-core/decisions","lastReviewed":"2026-09-07","sources":["crates/sim_core/src/spatial/decisions/**/*.rs","crates/sim_core/src/spatial/housing_system/**/*.rs","crates/sim_core/src/spatial/ledger/**/*.rs","docs/current/24-three-core-systems-fsm.md"]}
   ]
 }

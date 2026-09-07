@@ -29,7 +29,7 @@ use super::world::World3DEngine;
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
 pub const SAVE_FORMAT_VERSION: u32 = 4;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.44.9";
+pub const SAVE_APP_VERSION: &str = "1.45.4";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -254,6 +254,8 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         last_imperial_payout_tick: save.last_imperial_payout_tick,
         terrain_dirty: std::cell::Cell::new(true),
         regions_arrival_dirty: true,
+        strtab: std::cell::RefCell::new(super::snapshot_bin::StrTab::new()),
+        last_geom_sig: std::cell::Cell::new(u64::MAX),
     };
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic

@@ -39,6 +39,9 @@ node tools/doc-maintenance-check.js --strict
 | `MISSING_DOC` | 清单登记的文档不存在 | 修正路径或补回文档 |
 | `MISSING_SOURCE` | 来源通配没有匹配文件 | 修正清单，防止监控失效 |
 | `UNTRACKED_DOC` | `docs/current` 中有未登记文档 | 登记责任，或明确加入忽略列表 |
+| `FACT_DRIFT` | 核心指南配置字段数或决策间隔与源码不符，或版本源不可读取 | 根据源码复核修正；普通模式也返回 1 |
+
+关键事实从 config.rs 和 config.js 提取，检查 sim_core、spatial、frontend 指南与影响矩阵。历史 changelog 不参与旧值扫描；最后核验版本是人工记录，不随升版自动更新。版本定义点由 `bump-version.js --check` 校验。此检查不证明全部自然语言语义正确。
 
 源码和文档使用工作区修改时间，因此未提交的改动也会触发 `NEEDS_REVIEW`。`--json` 供 CI、仪表盘或 IDE 集成；`--strict` 在有任何问题时返回退出码 1。
 
@@ -69,4 +72,3 @@ flowchart LR
 - 为高风险文档增加必备章节检查；
 - 通过 Git 历史区分源码提交时间和工作区时间；
 - 在 IDE 或文档页显示健康徽章并直达待维护文档。
-

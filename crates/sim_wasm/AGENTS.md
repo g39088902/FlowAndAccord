@@ -4,6 +4,13 @@
 
 ---
 
+## 0. Agent 交互契约
+
+- 输入：前端传入的 Config JSON、seed 和 tick 参数；输出：错误码、WASM 线性内存中的快照/版本数据。
+- 指针协议固定为 `ptr → len → Uint8Array 拷贝`；不得返回 wasm 内存外指针或改变既有错误码语义。
+- JSON 与二进制快照通道不得在同一会话混用；导出变更必须同步 `rustworld.js`、Worker 与工具调用方。
+- 修改本层后必须重编译并同步 `frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm`，再运行 `node tools/test-wasm.js`。
+
 ## 1. 📂 目录职责
 
 将 `sim_core` 编译为 **`wasm32-unknown-unknown` 的零依赖桥接模块**：前端通过 `WebAssembly.instantiate` 加载 `.wasm` 后，直接调用 `extern "C"` 导出函数推进确定性仿真，并从 wasm 线性内存读取 JSON 快照。**不依赖 wasm-bindgen**，全部导出 AOT 可解析。
@@ -13,7 +20,7 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `Cargo.toml` | `crate-type = ["cdylib"]`（wasm 二进制），依赖 `sim_core` + `serde_json` |
-| `src/lib.rs` | 全部导出函数与 3 个静态缓冲区（`WORLD`/`SNAPSHOT_BUF`/`CONFIG_BUF`） |
+| `src/lib.rs` | 全部导出函数与 5 个静态缓冲区（`WORLD`/`SNAPSHOT_BUF`(JSON)/`SNAPSHOT_BIN_BUF`(M4 FABS)/`ENUM_TABLE_BUF`(M4)/`CONFIG_BUF`/`SAVE_BUF`/`ERROR_BUF`） |
 
 ## 3. 🧭 导出函数清单
 
@@ -28,15 +35,21 @@
 | `world_tick` | `(dt: f32)` | 推进一个确定性仿真步 |
 | `world_tick_steps` | `(steps: u32, dt: f32)` | 推进 N 步（对应前端 speedMult）；内部循环调 `world_tick` |
 | `world_set_regen_multiplier` | `(which: i32, mult: f32)` | 设置某类 POI 再生倍率（0=水 1=果 2=木 3=石 4=金） |
-| `world_snapshot_ptr` | `() -> u32` | 序列化当前快照到 `SNAPSHOT_BUF`，返回起始指针 |
-| `world_snapshot_len` | `() -> u32` | 快照 JSON 字节长度 |
+| `world_snapshot_ptr` | `() -> u32` | ⚠️ **DEPRECATED(M4, v1.45.3)** 序列化当前快照到 `SNAPSHOT_BUF`，返回起始指针（JSON 通道，仅服务 tools 与回退，见 §4） |
+| `world_snapshot_len` | `() -> u32` | ⚠️ DEPRECATED(M4) 快照 JSON 字节长度 |
+| `world_snapshot_bin_ptr` | `() -> u32` | ★ M4 编码 FABS 二进制帧到 `SNAPSHOT_BIN_BUF`，返回起始指针（含增量判定：地形/路网几何仅在脏位/签名变化时输出） |
+| `world_snapshot_bin_len` | `() -> u32` | ★ M4 二进制帧字节长度 |
+| `world_enum_table_ptr` | `() -> u32` | ★ M4 枚举名称表 JSON 起始指针（懒生成缓存；前端 INIT 取一次，杜绝前后端枚举漂移） |
+| `world_enum_table_len` | `() -> u32` | ★ M4 枚举名称表 JSON 字节长度 |
 | `world_app_version_ptr` | `() -> u32` | 内核应用版本号字符串指针（UTF-8，见 SAVE_APP_VERSION） |
 | `world_app_version_len` | `() -> u32` | 内核应用版本号字符串字节长度 |
 
 ## 4. ⚠️ 本目录易踩坑
 
-- **静态可变缓冲区是 unsafe 根源**：`WORLD`/`SNAPSHOT_BUF`/`CONFIG_BUF` 为 `static mut`，编译期产生 `static_mut_refs` 警告（既有、可接受）。新增共享状态仍须走静态缓冲区 + 指针传递，**禁止**引入运行时全局锁或线程（wasm32 单线程）。
+- **静态可变缓冲区是 unsafe 根源**：`WORLD`/`SNAPSHOT_BUF`/`CONFIG_BUF` 等为 `static mut`，编译期产生 `static_mut_refs` 警告（既有、可接受）。新增共享状态仍须走静态缓冲区 + 指针传递，**禁止**引入运行时全局锁或线程（wasm32 单线程）。
+- **★ M4 `terrain_dirty` 双通道互斥**：`world_snapshot_ptr`（JSON）与 `world_snapshot_bin_ptr`（二进制）**共享同一个 `terrain_dirty` 脏位**（`Cell<bool>`，被消费后清零）。浏览器前端只走二进制、tools 只走 JSON，天然互不冲突；**严禁在同一会话混调两条通道**，否则后调用方将拿不到地形。`world_require_terrain()` 现调用 `World3DEngine::require_full_geometry()`，同时复位地形脏位与路网几何签名（`last_geom_sig`），保证二进制下帧重发 `LANE_GEO`/`NODE`。
 - **指针约定**：所有跨边界数据都是"先调 `*_ptr`/`*_buf_ptr` 拿指针 + 对应 len"，前端用 `Uint8Array` 拷贝。**不要在 wasm 内存外返回指针**。`world_snapshot_ptr` 每次调用重新序列化；序列化失败时缓冲区保持旧内容、指针仍指向旧数据，前端须先读 `world_snapshot_len` 再按长度取 `world_snapshot_ptr`。
+- **★ M4 JSON 通道移除技术债（高优先级）**：`world_snapshot_ptr/len` 已标 `DEPRECATED(M4)`，目前**仅**服务 `tools/test-wasm.js`、`test-determinism.js`、`diagnose.js`、`profile-benchmark.js`、`gen-dag-testdata.js`、`gold_mining_analysis.js` 六工具与前端回退（`sim_worker.js` 按导出存在性探测）。**判定条件：M4 二进制通道稳定运行数版本后**，将上述 6 工具改造为二进制取值，随即删除 `world_snapshot_ptr`/`world_snapshot_len` 与 `SNAPSHOT_BUF`；已同步登记于 `docs/16-plan-performance-optimization.md` 与 `TODO.md`。
 - **错误码语义**：`world_apply_config_buf` 与 `world_set_config` 的返回码（0/-1/-2/-3/-4）已被前端依赖，**新增失败分支只能向后追加新负数**，不得改动既有语义。
 - **`dt` 语义**：`world_tick` 接收 dt；前端固定 1/60，倍速用 `world_tick_steps`，**严禁改动内核 dt=1/60**（根 AGENTS.md §4.3）。
 - **确定性**：`world_create` 的 seed 是复现入口；`tools/test-wasm.js` 的同种子逐字节校验覆盖本层，改动导出或序列化格式前先跑回归。

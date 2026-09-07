@@ -1,10 +1,12 @@
 # Flow & Accord · 智能体与模拟系统开发操作指南 (AGENTS.md)
 
-> ⚠️ **改代码前必读**：第 4 节「重要易踩坑清单」汇总了本项目最容易踩的坑（WASM 双向同步、决策节拍、随身搬运、POI 储量门槛、快照三处同步、确定性约束等），由历次开发踩坑沉淀而来。
+> ⚠️ **改代码前必读**：第 4 节「重要易踩坑清单」汇总了本项目最容易踩的坑（WASM 双向同步、决策节拍、随身搬运、POI 储量门槛、快照四处同步[M4]、确定性约束等），由历次开发踩坑沉淀而来。
 
 ---
 
 ## 0. 📚 项目文档地图
+
+开发任务从 [Agent 快速入口](docs/current/00-agent-start.md) 按改动类型选择局部指南和门禁；本文件仍为全局规则入口。
 
 除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下：`docs/01-current.md` + `docs/current/` 描述"现状"，`docs/11-plan.md` / `docs/10-architecture.md` 描述"愿景"。
 
@@ -13,7 +15,10 @@
 | **README.md** | 面向玩家的营销宣传文档：项目定位、八大核心看点、第一局观察指引、三分钟上手、路线图 | 对外宣传 / 新玩家入门时 |
 | **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
 | **docs/01-current.md** | 已实现功能索引入口 + 模块导航表（`01`空间路网 / `02`生态POI / `03`四季 / `04`代谢繁衍 / `05`房屋 / `06`决策AI / `07`前端 / `08`配置 / `09`代码地图 / `10`快速启动 / `11`版本演进 / `12`账本系统） | 快速了解现状；改动机制须同步更新对应 `docs/current/0X-*.md` 并在 `11-changelog.md` 追加条目 |
-| **docs/09-ui-spec-and-ledger-design.md** | UI 页面全景剖析 + 制度大盘（M1-M4）界面实现说明 + 多标签页规范 + 前端开发指南 | 了解前端 UI 交互架构、制度大盘界面实现或开发新 UI 模块时 |
+| **docs/current/21-ui-page-overview.md** | UI 页面全景剖析：画布视口、顶栏状态栏、生态大盘、观察堆栈、模态弹窗、存档面板 | 了解当前 UI 页面布局与交互时 |
+| **docs/current/22-society-ledger-ui.md** | 制度大盘（M1-M4）界面实现说明：4 标签页枢纽、M2 分家继承、M3 宗族公库、M4 王国政体、ASCII 线框原型 | 了解制度大盘界面实现时 |
+| **docs/current/23-ui-dev-guide.md** | 前端开发实施指南：模块化分工、快照三处同步、CSS 设计系统、性能节流、验收门禁 | 开发新 UI 模块时 |
+| **docs/current/24-three-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 架构与不变量 | 查阅核心 FSM、状态转移方程与交互契约时 |
 | **docs/08-decision-viz-design.md** | 马斯洛决策引擎可视化设计方案：决策代码→图元映射、双视图三面板、交互能力预留、实现文件规划与里程碑 | 实现决策可视化网页（逻辑引擎图/实时监控）前必读；配套交互原型 `docs/decision-viz-prototype.html` |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份） | 改动 ledger/ 代码时查阅 |
 | **docs/02-build-guide.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试与故障排查 | 深入构建与环境排障时 |
@@ -41,7 +46,7 @@
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
-| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：21 JS 文件职责边界、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
+| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：23 JS 文件职责边界（含 M4 `snapshot-bin.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -58,12 +63,12 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.44.9)"]
+    F --> G["浏览器 UI (版本: v1.45.4)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
-- **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（22 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+- **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化 + ★ M4 FABS 二进制帧快照、tick 步进、JS 动态配置注入；
+- **`frontend/`**：原生静态前端（23 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js` 与 M4 二进制解码器 `snapshot-bin.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
 ---
 
@@ -108,7 +113,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.44.9`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.45.4`**。
 
 ---
 
@@ -136,7 +141,7 @@ node frontend/server.js           # http://localhost:3000
 ```
 □ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9）
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
-□ 三处同步：快照字段变更时 snapshot.rs / world.rs / rustworld.js 一致
+□ 四处同步（M4）：快照字段变更时 snapshot.rs / world.rs / snapshot_bin/encode.rs / rustworld.js+snapshot-bin.js 一致（防漂移门禁：node tools/test-snapshot-bin.js）
 □ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md + 受影响的局部 AGENTS.md
@@ -183,14 +188,15 @@ node frontend/server.js           # http://localhost:3000
 - 无家宅（`home_house_id.is_none()`）的 agent 不装载行囊，只在现场就地自饮自食。
 - 改容量/装卸速率必须全链条联动：`agent.rs` → `ecology.rs` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`。
 
-### 4.5 🟠 快照与前端字段三处同步
+### 4.5 🟠 快照与前端字段四处同步（★ M4 起，v1.45.3）
 
-给 agent/house/poi 新增字段时，必须三处同步：
+给 agent/house/poi 新增字段时，必须**四处**同步：
 1. `crates/sim_core/src/spatial/snapshot.rs`（快照结构体定义）
-2. `crates/sim_core/src/spatial/world.rs`（`generate_snapshot()` 赋值）
-3. `frontend/js/rustworld.js`（`_applySnapshot()` 映射）
+2. `crates/sim_core/src/spatial/world.rs`（`generate_snapshot()` JSON 赋值）
+3. `crates/sim_core/src/spatial/snapshot_bin/encode.rs`（**M4 FABS 二进制编码**，字段顺序/枚举码位与 1、2 等价）
+4. `frontend/js/snapshot-bin.js`（二进制解码，产物与 JSON 同构）+ `frontend/js/rustworld.js`（`_applySnapshot()` 映射）
 
-前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
+**M4 二进制快照要点**：快照主链路已从「JSON 字符串 + `JSON.parse`」改为「FABS 定长二进制帧 + TypedArray 直读」（见 `docs/16-plan-performance-optimization.md` M4 与 `crates/sim_core/src/spatial/snapshot_bin/`）；路网几何/地形按版本号增量下发；枚举名称表由 `world_enum_table_ptr/len` 从 Rust `as_str()` 生成（新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`）；防漂移自动网 = `node tools/test-snapshot-bin.js`。`tools/` 下 6 工具与前端回退仍走 `world_snapshot_ptr` JSON 通道（**暂保留，标 `DEPRECATED(M4)`，稳定后移除**，见 TODO.md）。前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
 
 ### 4.6 🟠 模块粒度与单文件行数规范
 

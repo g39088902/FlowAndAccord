@@ -41,7 +41,10 @@ impl<'a> Decisioner<'a> {
     }
 
     pub fn home_target(&self, agent: &Agent3D) -> NodeId {
-        if agent.home_house_id.is_some() {
+        if let Some(house_id) = agent.home_house_id {
+            if let Some(h) = self.houses.iter().find(|h| h.id == house_id) {
+                return h.door_node_id;
+            }
             agent.home_camp_node
         } else {
             self.ctx.camp_positions.iter()

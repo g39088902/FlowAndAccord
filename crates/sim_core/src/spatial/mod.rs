@@ -17,6 +17,7 @@ pub mod world_snapshot;
 pub mod world_config;
 pub mod world_season;
 pub mod world_save;
+pub mod snapshot_bin;
 
 pub use vec3::Vec3;
 pub use curve::Curve3D;

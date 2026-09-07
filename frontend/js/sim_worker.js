@@ -27,6 +27,12 @@ let lastSnapshotTime = 0;
 // 检查点写入节流：距上次 world_save 的现实时间戳（150ms 守卫，见 M1）
 let lastCheckpointRealTime = 0;
 
+// ★ M4 (v1.45.0) 二进制快照（FABS）状态
+let binSupported = true;  // INIT 后探测；解码/拉取异常时回退 JSON 并置 false
+let warnedBinFallback = false; // 回退仅告警一次
+let enumTableJson = '';   // 枚举名称表 JSON（随 READY 下发主线程，供 SnapshotBin.setEnumTables）
+const _headerTickDv = new DataView(new ArrayBuffer(40)); // 读取 FABS 帧头 tick 用
+
 function readLastError() {
   if (!_ready || typeof _wasm.world_last_error_len !== 'function') return '';
   const len = _wasm.world_last_error_len();
@@ -45,7 +51,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.44.9';
+  return '1.45.4';
 }
 
 function applyConfigInternal(configObj) {
@@ -136,13 +142,46 @@ function rewindToTickInternal(targetTick) {
   if (delta > 0) {
     _wasm.world_tick_steps(delta, 1.0 / 60.0);
   }
-  const snap = pullSnapshot(true);
-  return { ok: true, snapshot: snap };
+  const res = pullSnapshot(true);
+  if (!res) return { ok: true, snapshot: null };
+  return {
+    ok: true,
+    snapshot: res.bin || res.snap,
+    snapshotBuf: res.bin || null, // REWIND_RESULT 转移用
+  };
 }
 
-function pullSnapshot(requireTerrain) {
+// 从 wasm 内存拷贝出二进制帧（Uint8Array，拥有独立 ArrayBuffer 可转移），并读取帧头 tick
+function pullSnapshotBin(requireTerrain) {
   if (requireTerrain && typeof _wasm.world_require_terrain === 'function') {
-    _wasm.world_require_terrain();
+    _wasm.world_require_terrain(); // M4：同时复位路网几何增量（见 lib.rs）
+  }
+  const ptr = _wasm.world_snapshot_bin_ptr();
+  const len = _wasm.world_snapshot_bin_len();
+  if (!len) return null;
+  const bytes = new Uint8Array(_memory.buffer, ptr, len).slice();
+  if (len >= 20) {
+    for (let i = 12; i < 20; i++) _headerTickDv.setUint8(i - 12, bytes[i]);
+    currentTick = Number(_headerTickDv.getBigUint64(0, true));
+  }
+  return bytes;
+}
+
+// 统一快照拉取：优先二进制（FABS），异常或缺失时回退 JSON（仅告警一次）。
+// 返回值：{ bin: Uint8Array }（二进制）或 { snap: object }（JSON）或 null。
+function pullSnapshot(requireTerrain) {
+  if (_ready && binSupported && typeof _wasm.world_snapshot_bin_ptr === 'function') {
+    try {
+      const bin = pullSnapshotBin(requireTerrain);
+      if (bin) return { bin: bin };
+      // bin len==0（理论不发生）：继续走 JSON 兜底
+    } catch (e) {
+      binSupported = false;
+      if (!warnedBinFallback) {
+        warnedBinFallback = true;
+        console.warn('[sim_worker] 二进制快照不可用，回退 JSON 通道:', e);
+      }
+    }
   }
   const ptr = _wasm.world_snapshot_ptr();
   const len = _wasm.world_snapshot_len();
@@ -151,11 +190,30 @@ function pullSnapshot(requireTerrain) {
   try {
     const snap = JSON.parse(_textDecoder.decode(bytes));
     currentTick = snap.tick;
-    return snap;
+    return { snap: snap };
   } catch (e) {
     console.error('[sim_worker] 快照解析失败', e);
     return null;
   }
+}
+
+// 拉取快照并 postMessage 给主线程（二进制帧转移 ArrayBuffer，零结构化克隆）
+// 返回是否成功产出并投递
+function pullAndPost(type, extra, requireTerrain) {
+  const res = pullSnapshot(requireTerrain);
+  if (!res) return false;
+  if (res.bin || res.snap) recordHistoryCheckpoint(currentTick);
+  const msg = Object.assign({
+    type: type,
+    snapshot: res.bin || res.snap,
+    wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
+  }, extra || {});
+  if (res.bin) {
+    self.postMessage(msg, [res.bin.buffer]);
+  } else {
+    self.postMessage(msg);
+  }
+  return true;
 }
 
 // 步进循环 (~60Hz 触发，1x 倍速下 1 秒现实时间 = 60 Tick = 1 游戏小时)
@@ -176,17 +234,8 @@ function simulationStep() {
   if (throttlePass && (ackReceived || forceTerrain)) {
     ackReceived = false;
     lastSnapshotTime = now;
-    const snap = pullSnapshot(forceTerrain);
+    pullAndPost('SNAPSHOT', { tickMs }, forceTerrain);
     forceTerrain = false;
-    if (snap) {
-      recordHistoryCheckpoint(snap.tick);
-      self.postMessage({
-        type: 'SNAPSHOT',
-        snapshot: snap,
-        tickMs,
-        wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
-      });
-    }
   }
 }
 
@@ -217,6 +266,17 @@ self.onmessage = async function(e) {
         const result = await WebAssembly.instantiate(bytes, {});
         _wasm = result.instance.exports;
         _memory = _wasm.memory;
+        // ★ M4：探测二进制快照与枚举名称表（旧 wasm 无导出则自动回退 JSON）
+        binSupported = typeof _wasm.world_snapshot_bin_ptr === 'function'
+          && typeof _wasm.world_snapshot_bin_len === 'function';
+        enumTableJson = '';
+        if (binSupported && typeof _wasm.world_enum_table_ptr === 'function') {
+          const etp = _wasm.world_enum_table_ptr();
+          const etl = _wasm.world_enum_table_len();
+          if (etl > 0) {
+            enumTableJson = _textDecoder.decode(new Uint8Array(_memory.buffer, etp, etl));
+          }
+        }
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
@@ -225,18 +285,25 @@ self.onmessage = async function(e) {
         historyCheckpoints = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;
-        const initialSnap = pullSnapshot(true);
+        const initialRes = pullSnapshot(true);
+        const initialSnap = initialRes ? (initialRes.bin || initialRes.snap) : null;
         if (initialSnap) {
-          recordHistoryCheckpoint(initialSnap.tick);
+          recordHistoryCheckpoint(currentTick);
         }
         startLoop();
-        self.postMessage({
+        const initMsg = {
           type: 'READY',
           seed: _engineSeed,
           appVersion: getAppVersion(),
+          enumTableJson,
           snapshot: initialSnap,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
-        });
+        };
+        if (initialRes && initialRes.bin) {
+          self.postMessage(initMsg, [initialRes.bin.buffer]);
+        } else {
+          self.postMessage(initMsg);
+        }
       } catch (err) {
         self.postMessage({
           type: 'ERROR',
@@ -260,16 +327,7 @@ self.onmessage = async function(e) {
       if (_ready) {
         const count = Math.max(1, parseInt(msg.count, 10) || 1);
         _wasm.world_tick_steps(count, 1.0 / 60.0);
-        const snap = pullSnapshot(false);
-        if (snap) {
-          recordHistoryCheckpoint(snap.tick);
-          self.postMessage({
-            type: 'SNAPSHOT',
-            snapshot: snap,
-            tickMs: 0,
-            wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
-          });
-        }
+        pullAndPost('SNAPSHOT', { tickMs: 0 }, false);
       }
       break;
     }
@@ -278,15 +336,7 @@ self.onmessage = async function(e) {
       if (_ready && msg.config) {
         const ok = applyConfigInternal(msg.config);
         if (ok) {
-          const snap = pullSnapshot(false);
-          if (snap) {
-            self.postMessage({
-              type: 'SNAPSHOT',
-              snapshot: snap,
-              tickMs: 0,
-              wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
-            });
-          }
+          pullAndPost('SNAPSHOT', { tickMs: 0 }, false);
         }
       }
       break;
@@ -319,16 +369,21 @@ self.onmessage = async function(e) {
         historyCheckpoints = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;
-        const snap = pullSnapshot(true);
-        if (snap) {
-          recordHistoryCheckpoint(snap.tick);
+        const res2 = pullSnapshot(true);
+        if (res2 && (res2.bin || res2.snap)) {
+          recordHistoryCheckpoint(currentTick);
         }
-        self.postMessage({
+        const resetMsg = {
           type: 'RESET_DONE',
           seed: _engineSeed,
-          snapshot: snap,
+          snapshot: res2 ? (res2.bin || res2.snap) : null,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
-        });
+        };
+        if (res2 && res2.bin) {
+          self.postMessage(resetMsg, [res2.bin.buffer]);
+        } else {
+          self.postMessage(resetMsg);
+        }
       }
       break;
     }
@@ -347,35 +402,48 @@ self.onmessage = async function(e) {
 
     case 'LOAD': {
       const res = loadWorldInternal(msg.jsonStr);
-      let snap = null;
+      let loadSnap = null;
+      let loadRes = null;
       if (res.ok) {
         historyCheckpoints = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;
-        snap = pullSnapshot(true);
-        if (snap) {
-          recordHistoryCheckpoint(snap.tick);
+        loadRes = pullSnapshot(true);
+        if (loadRes && (loadRes.bin || loadRes.snap)) {
+          recordHistoryCheckpoint(currentTick);
         }
+        loadSnap = loadRes ? (loadRes.bin || loadRes.snap) : null;
       }
-      self.postMessage({
+      const loadMsg = {
         type: 'LOAD_RESULT',
         reqId: msg.reqId,
         ok: res.ok,
         error: res.error || '',
-        snapshot: snap,
-      });
+        snapshot: loadSnap,
+      };
+      if (loadRes && loadRes.bin) {
+        self.postMessage(loadMsg, [loadRes.bin.buffer]);
+      } else {
+        self.postMessage(loadMsg);
+      }
       break;
     }
 
     case 'REWIND': {
       const res = rewindToTickInternal(msg.targetTick);
-      self.postMessage({
+      const rwMsg = {
         type: 'REWIND_RESULT',
         reqId: msg.reqId,
         ok: res.ok,
         error: res.error || '',
         snapshot: res.snapshot || null,
-      });
+        tick: currentTick, // ★ M4 二进制帧主线程无法直接读 snapshot.tick，由 Worker 附带
+      };
+      if (res.snapshotBuf) {
+        self.postMessage(rwMsg, [res.snapshotBuf.buffer]);
+      } else {
+        self.postMessage(rwMsg);
+      }
       break;
     }
   }
