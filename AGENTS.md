@@ -29,7 +29,7 @@
 | **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 15 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
 | **docs/12-plan-ledger-refactor.md** | 账本与仓库重构计划（M1~M4 已完成，M5 收尾 ✅） | 账本系统演进规划 |
-| **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（M1~M4 已落地归档；**T1 移除 JSON 快照通道 ✅ v1.46.0**、**M5-0 快照桥接收尾 ✅ v1.46.0**；未完成：M5-1 消除超线性 / M5-2 多线程 Fork-Join） | 性能优化专项规划 |
+| **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（仅保留未完成计划：M5-1 消除超线性 / M5-2 条件触发的多线程 Fork-Join） | 性能优化专项规划 |
 | **docs/10-architecture.md** | 宏观技术架构愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（多为规划态） |
 | **docs/11-plan.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观方向（多为规划态） |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
@@ -63,7 +63,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.4)"]
+    F --> G["浏览器 UI (版本: v1.46.5)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -113,7 +113,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.4`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.5`**。
 
 ---
 
