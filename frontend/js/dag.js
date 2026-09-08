@@ -41,31 +41,43 @@
       focusId = ids.find(id => lookup.get(id) && lookup.get(id).isAlive) || ids[0] || 1;
     }
 
+    const MAX_LINEAGE_DEPTH = 9; // 族谱直系血脉最大探索深度：往上9代，往下9代
+
     const ancestors = new Set();
     const descendants = new Set();
     const lineageIds = new Set();
     if (lookup.has(focusId)) {
       lineageIds.add(focusId);
-      const aq = [focusId];
+      // 向上溯源：最多 9 代祖先
+      const aq = [{ id: focusId, depth: 0 }];
       while (aq.length > 0) {
-        const cur = lookup.get(aq.shift());
+        const item = aq.shift();
+        if (item.depth >= MAX_LINEAGE_DEPTH) continue;
+        const cur = lookup.get(item.id);
         if (!cur) continue;
         for (const pId of [cur.fatherId, cur.motherId]) {
           if (pId && lookup.has(pId) && !ancestors.has(pId)) {
-            ancestors.add(pId); lineageIds.add(pId); aq.push(pId);
+            ancestors.add(pId);
+            lineageIds.add(pId);
+            aq.push({ id: pId, depth: item.depth + 1 });
           }
         }
       }
-      const dq = [focusId];
+      // 向下寻宗：最多 9 代后裔
+      const dq = [{ id: focusId, depth: 0 }];
       while (dq.length > 0) {
-        const cur = lookup.get(dq.shift());
+        const item = dq.shift();
+        if (item.depth >= MAX_LINEAGE_DEPTH) continue;
+        const cur = lookup.get(item.id);
         if (!cur) continue;
         const kids = new Set();
         if (Array.isArray(cur.children)) for (const c of cur.children) kids.add(c);
         if (reverseChildren.has(cur.id)) for (const c of reverseChildren.get(cur.id)) kids.add(c);
         for (const cId of kids) {
           if (lookup.has(cId) && !descendants.has(cId)) {
-            descendants.add(cId); lineageIds.add(cId); dq.push(cId);
+            descendants.add(cId);
+            lineageIds.add(cId);
+            dq.push({ id: cId, depth: item.depth + 1 });
           }
         }
       }

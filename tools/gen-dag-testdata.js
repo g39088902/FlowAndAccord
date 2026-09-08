@@ -180,24 +180,33 @@ function summarize(arr) {
   const tickMax = sortedByBirth.length ? sortedByBirth[sortedByBirth.length - 1].birthTick : 0;
 
   // ------------------------------ 焦点选择与直系子图裁剪 ------------------------------
-  // 复刻 frontend/js/dag.js::buildLineageDAG 的 BFS 规则（向上父/母链 + 向女儿孙链）
+  // 复刻 frontend/js/dag.js::buildLineageDAG 的 BFS 规则（向上父/母链最多9代 + 向女儿孙链最多9代）
+  const MAX_LINEAGE_DEPTH = 9;
   function lineageOf(focusId) {
     if (!archive.has(focusId)) return null;
     const ancestors = new Set(), descendants = new Set(), lineageIds = new Set([focusId]);
-    const aq = [focusId];
+    const aq = [{ id: focusId, depth: 0 }];
     while (aq.length) {
-      const cur = archive.get(aq.shift());
+      const item = aq.shift();
+      if (item.depth >= MAX_LINEAGE_DEPTH) continue;
+      const cur = archive.get(item.id);
       if (!cur) continue;
       for (const pId of [cur.fatherId, cur.motherId]) {
-        if (pId && archive.has(pId) && !ancestors.has(pId)) { ancestors.add(pId); lineageIds.add(pId); aq.push(pId); }
+        if (pId && archive.has(pId) && !ancestors.has(pId)) {
+          ancestors.add(pId); lineageIds.add(pId); aq.push({ id: pId, depth: item.depth + 1 });
+        }
       }
     }
-    const dq = [focusId];
+    const dq = [{ id: focusId, depth: 0 }];
     while (dq.length) {
-      const cur = archive.get(dq.shift());
+      const item = dq.shift();
+      if (item.depth >= MAX_LINEAGE_DEPTH) continue;
+      const cur = archive.get(item.id);
       if (!cur || !Array.isArray(cur.children)) continue;
       for (const cId of cur.children) {
-        if (archive.has(cId) && !descendants.has(cId)) { descendants.add(cId); lineageIds.add(cId); dq.push(cId); }
+        if (archive.has(cId) && !descendants.has(cId)) {
+          descendants.add(cId); lineageIds.add(cId); dq.push({ id: cId, depth: item.depth + 1 });
+        }
       }
     }
     return { focusId, ancestors, descendants, lineageIds };
