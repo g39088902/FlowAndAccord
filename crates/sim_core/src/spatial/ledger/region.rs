@@ -110,7 +110,13 @@ impl Region {
 
     /// 更替国王并记录历史国王（历史 = 所有离任/驾崩的前任国王；现任不入档）
     /// prev_death_cause：前任国王的死因（仅驾崩时有值，由调用方从 agent 读取）
-    pub fn set_king(&mut self, agent: AgentId, tick: u64, note: &str, prev_death_cause: Option<String>) -> bool {
+    pub fn set_king(
+        &mut self,
+        agent: AgentId,
+        tick: u64,
+        note: &str,
+        prev_death_cause: Option<String>,
+    ) -> bool {
         if !self.group.members.contains(&agent) {
             return false;
         }
@@ -138,11 +144,15 @@ impl Region {
             return;
         }
         // 找到第一个 (tick, id) > (arrival_tick, agent) 的位置插入
-        let _pos = self.arrival_order.iter().position(|&_a| {
-            // 比较逻辑：需要 world 中的 arrival_tick，但这里只按 id 辅助
-            // 实际排序由调用方在 add_member 时完成
-            false
-        }).unwrap_or(self.arrival_order.len());
+        let _pos = self
+            .arrival_order
+            .iter()
+            .position(|&_a| {
+                // 比较逻辑：需要 world 中的 arrival_tick，但这里只按 id 辅助
+                // 实际排序由调用方在 add_member 时完成
+                false
+            })
+            .unwrap_or(self.arrival_order.len());
         // 简化：直接 push，由 RegionRegistry::add_member 统一排序
         let _ = _pos;
         self.arrival_order.push(agent);
@@ -214,7 +224,13 @@ impl RegionRegistry {
 
     /// 加入地区成员（幂等：已是成员返回 false）。自动确保地区存在。
     /// arrival_tick 用于排序 arrival_order。
-    pub fn add_member(&mut self, camp_id: u32, agent: AgentId, tick: u64, _arrival_tick: u64) -> bool {
+    pub fn add_member(
+        &mut self,
+        camp_id: u32,
+        agent: AgentId,
+        tick: u64,
+        _arrival_tick: u64,
+    ) -> bool {
         self.ensure_region(camp_id);
         let region = self.regions.get_mut(&camp_id).expect("region just ensured");
         if !region.group.add_member(agent, tick) {
@@ -235,13 +251,10 @@ impl RegionRegistry {
         let Some(camp_id) = self.by_agent.remove(&agent) else {
             return false;
         };
-        let removed = self
-            .regions
-            .get_mut(&camp_id)
-            .is_some_and(|r| {
-                r.arrival_order.retain(|&a| a != agent);
-                r.group.remove_member(agent, tick)
-            });
+        let removed = self.regions.get_mut(&camp_id).is_some_and(|r| {
+            r.arrival_order.retain(|&a| a != agent);
+            r.group.remove_member(agent, tick)
+        });
         if !removed {
             // 团体侧拒绝移除（如试图移除国王）：恢复归属索引
             self.by_agent.insert(agent, camp_id);
@@ -251,8 +264,14 @@ impl RegionRegistry {
 
     /// 根据 arrival_ticks 映射重排指定地区的 arrival_order
     /// 调用方需先从 world 收集 arrival_ticks（避免借用冲突）
-    pub fn reorder_arrival(&mut self, camp_id: u32, arrival_ticks: &std::collections::BTreeMap<AgentId, u64>) {
-        let Some(region) = self.regions.get_mut(&camp_id) else { return };
+    pub fn reorder_arrival(
+        &mut self,
+        camp_id: u32,
+        arrival_ticks: &std::collections::BTreeMap<AgentId, u64>,
+    ) {
+        let Some(region) = self.regions.get_mut(&camp_id) else {
+            return;
+        };
         region.arrival_order.sort_by(|&a, &b| {
             let ta = arrival_ticks.get(&a).copied().unwrap_or(u64::MAX);
             let tb = arrival_ticks.get(&b).copied().unwrap_or(u64::MAX);
@@ -272,12 +291,12 @@ impl World3DEngine {
         let tick = self.tick_counter;
         // 仅在有新成员加入或变动时按需重排 arrival_order，消除每 Tick 无谓红黑树堆分配
         if self.regions_arrival_dirty {
-            let arrival_ticks: std::collections::BTreeMap<AgentId, u64> = self.agents.iter()
-                .map(|a| (a.id, a.arrival_tick))
-                .collect();
+            let arrival_ticks: std::collections::BTreeMap<AgentId, u64> =
+                self.agents.iter().map(|a| (a.id, a.arrival_tick)).collect();
             let camp_ids: Vec<u32> = self.region_registry.regions.keys().copied().collect();
             for camp_id in camp_ids {
-                self.region_registry.reorder_arrival(camp_id, &arrival_ticks);
+                self.region_registry
+                    .reorder_arrival(camp_id, &arrival_ticks);
             }
             self.regions_arrival_dirty = false;
         }
@@ -291,22 +310,32 @@ impl World3DEngine {
     /// 每 100 游戏小时从地区公仓拨付现任国王内帑，进入其随身黄金。
     fn tick_royal_privy(&mut self, tick: u64) {
         const INTERVAL_TICKS: u64 = 6000;
-        if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(INTERVAL_TICKS) { return; }
+        if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(INTERVAL_TICKS) {
+            return;
+        }
         self.last_royal_payout_tick = tick - (tick % INTERVAL_TICKS);
         let mut payouts: Vec<(u32, AgentId, f32)> = Vec::new();
         for (camp_id, region) in &self.region_registry.regions {
-            let Some(king_id) = region.group.leader else { continue };
+            let Some(king_id) = region.group.leader else {
+                continue;
+            };
             let gold = region.group.ledger.balance(ResourceKind::Gold);
             let amount = gold * 0.10;
-            if amount > 0.0 { payouts.push((*camp_id, king_id, amount)); }
+            if amount > 0.0 {
+                payouts.push((*camp_id, king_id, amount));
+            }
         }
         for (camp_id, king_id, amount) in payouts {
             if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
                 region.group.ledger.debit(ResourceKind::Gold, amount);
                 region.cumulative_royal_privy += amount;
                 region.group.ledger.push_transfer(TransferRecord {
-                    tick, from: LedgerRef::Region(camp_id), to: LedgerRef::Personal(king_id),
-                    resource: ResourceKind::Gold, amount, reason: TransferReason::RoyalPrivy,
+                    tick,
+                    from: LedgerRef::Region(camp_id),
+                    to: LedgerRef::Personal(king_id),
+                    resource: ResourceKind::Gold,
+                    amount,
+                    reason: TransferReason::RoyalPrivy,
                 });
             }
             if let Some(king) = self.agent_by_id_mut(king_id) {
@@ -322,7 +351,11 @@ impl World3DEngine {
 
     fn update_kings(&mut self, tick: u64) {
         // ★ 快速路径：若所有地区均已有国王，O(1) 立即返回（有主地区不在此处顺位）
-        let has_leaderless = self.region_registry.regions.values().any(|r| r.group.leader.is_none());
+        let has_leaderless = self
+            .region_registry
+            .regions
+            .values()
+            .any(|r| r.group.leader.is_none());
         if !has_leaderless {
             return;
         }
@@ -338,13 +371,17 @@ impl World3DEngine {
             }
             let mut new_king: Option<AgentId> = None;
             // 直接原位匹配营地 POI 坐标，零堆分配
-            let camp_pos = self.pois.iter()
+            let camp_pos = self
+                .pois
+                .iter()
                 .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == *camp_id)
                 .map(|p| p.pos);
 
             // arrival_order 已按 (arrival_tick, agent_id) 升序；初王 = 第一个「物理抵达营地」的在世男性
             for &member_id in &region.arrival_order {
-                let Some(agent) = self.agent_by_id(member_id) else { continue };
+                let Some(agent) = self.agent_by_id(member_id) else {
+                    continue;
+                };
                 if agent.is_alive && agent.gender == Gender::Male {
                     // 初王候选不能是正在远征别处的过客：
                     // （避免把奔赴他营的始祖错封为本站国王，导致一人双王）
@@ -353,7 +390,9 @@ impl World3DEngine {
                             continue;
                         }
                     }
-                    let arrived = camp_pos.map_or(false, |pos| agent.world_pos.distance_to(&pos) < interact_radius);
+                    let arrived = camp_pos.map_or(false, |pos| {
+                        agent.world_pos.distance_to(&pos) < interact_radius
+                    });
                     if arrived {
                         new_king = Some(member_id);
                         break;
@@ -365,7 +404,8 @@ impl World3DEngine {
             // 仅在国王实际变化时记录（避免每 tick 刷事件）
             if region.group.leader != new_king {
                 let prev_death_cause = region.group.leader.and_then(|prev_id| {
-                    self.agent_by_id(prev_id).and_then(|a| a.death_cause.clone())
+                    self.agent_by_id(prev_id)
+                        .and_then(|a| a.death_cause.clone())
                 });
                 successions.push((*camp_id, new_king, prev_death_cause));
             }
@@ -373,8 +413,12 @@ impl World3DEngine {
 
         // WRITE PHASE：应用国王更替
         for (camp_id, new_king, prev_death_cause) in successions {
-            let Some(region) = self.region_registry.regions.get_mut(&camp_id) else { continue };
-            let camp_name = self.pois.iter()
+            let Some(region) = self.region_registry.regions.get_mut(&camp_id) else {
+                continue;
+            };
+            let camp_name = self
+                .pois
+                .iter()
                 .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
                 .map(|p| p.camp_title())
                 .unwrap_or_else(|| format!("营地#{}", camp_id));
@@ -382,13 +426,29 @@ impl World3DEngine {
                 Some(id) => {
                     let ok = if region.group.leader.is_none() {
                         // 初王登基
-                        let ok = region.set_king(id, tick, &format!("初王登基：arrival_order 首位物理抵达在世男性，【{}】开国", camp_name), None);
+                        let ok = region.set_king(
+                            id,
+                            tick,
+                            &format!(
+                                "初王登基：arrival_order 首位物理抵达在世男性，【{}】开国",
+                                camp_name
+                            ),
+                            None,
+                        );
                         if ok {
-                            self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", id, camp_name));
+                            self.last_event = Some(format!(
+                                "👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！",
+                                id, camp_name
+                            ));
                         }
                         ok
                     } else {
-                        region.set_king(id, tick, &format!("国王更替：【{}】", camp_name), prev_death_cause)
+                        region.set_king(
+                            id,
+                            tick,
+                            &format!("国王更替：【{}】", camp_name),
+                            prev_death_cause,
+                        )
                     };
                     if ok {
                         let bonus = self.config.prestige_king_bonus;
@@ -399,7 +459,9 @@ impl World3DEngine {
                             agent.coronation_pending = None;
                             agent.expedition_target_camp = None;
                             agent.current_need = Some("SelfActualization·King".to_string());
-                            agent.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
+                            agent.enter_stationary_state(
+                                crate::spatial::agent::PrimitiveActionState::RestingAtCamp,
+                            );
                         }
                     }
                 }
@@ -407,7 +469,10 @@ impl World3DEngine {
                     // 无在世男性：王位空悬，账本冻结
                     region.group.leader = None;
                     region.current_reign_start = None;
-                    region.group.ledger.push_event(tick, format!("👑 【{}】无在世男性，王位空悬，公仓账本冻结", camp_name));
+                    region.group.ledger.push_event(
+                        tick,
+                        format!("👑 【{}】无在世男性，王位空悬，公仓账本冻结", camp_name),
+                    );
                 }
             }
         }
@@ -442,7 +507,9 @@ impl World3DEngine {
 
     /// 单个国王死亡的继承逻辑：长子 → 长孙 → arrival_order 下一男性 → 空悬
     fn handle_king_death(&mut self, camp_id: u32, dead_king_id: AgentId, tick: u64) {
-        let camp_name = self.pois.iter()
+        let camp_name = self
+            .pois
+            .iter()
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .map(|p| p.camp_title())
             .unwrap_or_else(|| format!("营地#{}", camp_id));
@@ -450,7 +517,10 @@ impl World3DEngine {
         // 1. 收集国王的所有在世儿子（father_id=king, gender=Male, is_alive）
         let mut sons: Vec<(AgentId, f32)> = Vec::new(); // (id, age)
         for agent in &self.agents {
-            if agent.is_alive && agent.gender == Gender::Male && agent.father_id == Some(dead_king_id) {
+            if agent.is_alive
+                && agent.gender == Gender::Male
+                && agent.father_id == Some(dead_king_id)
+            {
                 sons.push((agent.id, agent.age));
             }
         }
@@ -459,7 +529,10 @@ impl World3DEngine {
         let son_ids: std::collections::BTreeSet<AgentId> = sons.iter().map(|(id, _)| *id).collect();
         let mut grandsons: Vec<(AgentId, f32)> = Vec::new();
         for agent in &self.agents {
-            if agent.is_alive && agent.gender == Gender::Male && son_ids.contains(&agent.father_id.unwrap_or(0)) {
+            if agent.is_alive
+                && agent.gender == Gender::Male
+                && son_ids.contains(&agent.father_id.unwrap_or(0))
+            {
                 // 注意：father_id 是 Option，unwrap_or(0) 不会匹配任何真实儿子（id 从1开始）
                 if agent.father_id.is_some() && son_ids.contains(&agent.father_id.unwrap()) {
                     grandsons.push((agent.id, agent.age));
@@ -480,10 +553,15 @@ impl World3DEngine {
             // 绝嗣：arrival_order 中下一个最先到达的在世男性（跳过已死国王）
             let region = self.region_registry.regions.get(&camp_id);
             if let Some(region) = region {
-                region.arrival_order.iter()
+                region
+                    .arrival_order
+                    .iter()
                     .find(|&&id| {
                         id != dead_king_id
-                            && self.agent_by_id(id).map(|a| a.is_alive && a.gender == Gender::Male).unwrap_or(false)
+                            && self
+                                .agent_by_id(id)
+                                .map(|a| a.is_alive && a.gender == Gender::Male)
+                                .unwrap_or(false)
                     })
                     .copied()
             } else {
@@ -492,13 +570,26 @@ impl World3DEngine {
         };
 
         // WRITE：应用继承
-        let prev_death_cause = self.agent_by_id(dead_king_id).and_then(|a| a.death_cause.clone());
+        let prev_death_cause = self
+            .agent_by_id(dead_king_id)
+            .and_then(|a| a.death_cause.clone());
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
             match heir {
                 Some(heir_id) => {
-                    let ok = region.set_king(heir_id, tick, &format!("长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】", dead_king_id, heir_id, camp_name), prev_death_cause);
+                    let ok = region.set_king(
+                        heir_id,
+                        tick,
+                        &format!(
+                            "长子继承：先王 #{} 驾崩，继承人 #{} 登基【{}】",
+                            dead_king_id, heir_id, camp_name
+                        ),
+                        prev_death_cause,
+                    );
                     if ok {
-                        self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！", camp_name, dead_king_id, heir_id));
+                        self.last_event = Some(format!(
+                            "👑 【{}】先王 #{} 驾崩，长子继承制下 #{} 登基为新国王！",
+                            camp_name, dead_king_id, heir_id
+                        ));
                         let bonus = self.config.prestige_king_bonus;
                         if let Some(agent) = self.agent_by_id_mut(heir_id) {
                             agent.prestige = agent.prestige.saturating_add(bonus);
@@ -508,8 +599,17 @@ impl World3DEngine {
                 None => {
                     region.group.leader = None;
                     region.current_reign_start = None;
-                    region.group.ledger.push_event(tick, format!("👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬，公仓账本冻结", camp_name, dead_king_id));
-                    self.last_event = Some(format!("👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬！", camp_name, dead_king_id));
+                    region.group.ledger.push_event(
+                        tick,
+                        format!(
+                            "👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬，公仓账本冻结",
+                            camp_name, dead_king_id
+                        ),
+                    );
+                    self.last_event = Some(format!(
+                        "👑 【{}】先王 #{} 驾崩且绝嗣，王位空悬！",
+                        camp_name, dead_king_id
+                    ));
                 }
             }
         }
@@ -568,7 +668,11 @@ impl World3DEngine {
                 .collect();
 
             if !amounts.is_empty() {
-                items.push(TaxItem { hid: *hid, camp_id, amounts });
+                items.push(TaxItem {
+                    hid: *hid,
+                    camp_id,
+                    amounts,
+                });
             }
         }
 
@@ -668,7 +772,10 @@ impl World3DEngine {
             let food_need = (family_threshold - food).max(0.0);
             let need_sum = water_need + food_need;
             let (water_share, food_share) = if need_sum > 0.001 {
-                (relief_total * water_need / need_sum, relief_total * food_need / need_sum)
+                (
+                    relief_total * water_need / need_sum,
+                    relief_total * food_need / need_sum,
+                )
             } else {
                 (relief_total * 0.5, relief_total * 0.5)
             };
@@ -687,7 +794,11 @@ impl World3DEngine {
             }
 
             if !amounts.is_empty() {
-                items.push(ReliefItem { hid: *hid, camp_id, amounts });
+                items.push(ReliefItem {
+                    hid: *hid,
+                    camp_id,
+                    amounts,
+                });
             }
         }
 

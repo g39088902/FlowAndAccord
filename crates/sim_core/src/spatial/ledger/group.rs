@@ -7,9 +7,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-use crate::spatial::agent::AgentId;
 use super::family::HouseholdId;
 use super::journal::Ledger;
+use crate::spatial::agent::AgentId;
 
 /// 团体类型（五级产权账本的组织载体；M1 仅落地家庭，其余按计划逐期扩展）
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -44,7 +44,12 @@ impl Group {
         if let Some(l) = leader {
             members.insert(l);
         }
-        Self { kind, leader, members, ledger: Ledger::new(journal_capacity) }
+        Self {
+            kind,
+            leader,
+            members,
+            ledger: Ledger::new(journal_capacity),
+        }
     }
 
     /// 加入成员（幂等：已是成员返回 false）。留 Membership 审计事件。
@@ -52,7 +57,8 @@ impl Group {
         if !self.members.insert(agent) {
             return false;
         }
-        self.ledger.push_event(tick, format!("👥 成员 #{} 加入团体", agent));
+        self.ledger
+            .push_event(tick, format!("👥 成员 #{} 加入团体", agent));
         true
     }
 
@@ -64,7 +70,8 @@ impl Group {
         if !self.members.remove(&agent) {
             return false;
         }
-        self.ledger.push_event(tick, format!("🚪 成员 #{} 离开团体", agent));
+        self.ledger
+            .push_event(tick, format!("🚪 成员 #{} 离开团体", agent));
         true
     }
 
@@ -76,10 +83,14 @@ impl Group {
         let old = self.leader.replace(agent);
         match old {
             Some(old_leader) if old_leader != agent => {
-                self.ledger.push_event(tick, format!("👑 领导由 #{} 更替为 #{}：{}", old_leader, agent, note));
+                self.ledger.push_event(
+                    tick,
+                    format!("👑 领导由 #{} 更替为 #{}：{}", old_leader, agent, note),
+                );
             }
             _ => {
-                self.ledger.push_event(tick, format!("👑 领导确认为 #{}：{}", agent, note));
+                self.ledger
+                    .push_event(tick, format!("👑 领导确认为 #{}：{}", agent, note));
             }
         }
         true

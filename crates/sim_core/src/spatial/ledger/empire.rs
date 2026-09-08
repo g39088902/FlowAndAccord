@@ -65,7 +65,11 @@ pub struct EmpireRegistry {
 
 impl EmpireRegistry {
     pub fn new(journal_capacity: usize) -> Self {
-        Self { empires: BTreeMap::new(), camp_to_empire: BTreeMap::new(), journal_capacity: journal_capacity.max(1) }
+        Self {
+            empires: BTreeMap::new(),
+            camp_to_empire: BTreeMap::new(),
+            journal_capacity: journal_capacity.max(1),
+        }
     }
 
     pub fn clear(&mut self) {
@@ -95,7 +99,10 @@ impl EmpireRegistry {
         let mut camps: Vec<u32> = camp_ids.iter().copied().collect();
         camps.sort_unstable();
         camps.dedup();
-        if camps.is_empty() { self.clear(); return; }
+        if camps.is_empty() {
+            self.clear();
+            return;
+        }
         let count = requested_count.max(1).min(camps.len());
         let existing_camps: BTreeSet<u32> = self.camp_to_empire.keys().copied().collect();
         if existing_camps == camps.iter().copied().collect() && self.empires.len() == count {
@@ -148,11 +155,14 @@ impl World3DEngine {
     }
 
     fn ensure_empire_structure(&mut self) {
-        let camp_ids: Vec<u32> = self.pois.iter()
+        let camp_ids: Vec<u32> = self
+            .pois
+            .iter()
             .filter(|p| p.poi_type == crate::spatial::poi::PoiType::Camp)
             .map(|p| p.id)
             .collect();
-        self.empire_registry.ensure_structure(&camp_ids, self.config.count_empires);
+        self.empire_registry
+            .ensure_structure(&camp_ids, self.config.count_empires);
     }
 
     fn update_emperors(&mut self, tick: u64) {
@@ -160,11 +170,23 @@ impl World3DEngine {
         for (empire_id, empire) in &self.empire_registry.empires {
             let mut best: Option<(u32, AgentId)> = None;
             for camp_id in &empire.member_camps {
-                let Some(king_id) = self.region_registry.get(*camp_id).and_then(|r| r.group.leader) else { continue };
-                let Some(king) = self.agent_by_id(king_id) else { continue };
-                if !king.is_alive || king.gender != Gender::Male { continue; }
+                let Some(king_id) = self
+                    .region_registry
+                    .get(*camp_id)
+                    .and_then(|r| r.group.leader)
+                else {
+                    continue;
+                };
+                let Some(king) = self.agent_by_id(king_id) else {
+                    continue;
+                };
+                if !king.is_alive || king.gender != Gender::Male {
+                    continue;
+                }
                 let candidate = (king.prestige, king_id);
-                if best.map_or(true, |current| candidate.0 > current.0 || (candidate.0 == current.0 && candidate.1 < current.1)) {
+                if best.map_or(true, |current| {
+                    candidate.0 > current.0 || (candidate.0 == current.0 && candidate.1 < current.1)
+                }) {
                     best = Some(candidate);
                 }
             }
@@ -172,19 +194,30 @@ impl World3DEngine {
         }
 
         for (empire_id, chosen) in choices {
-            let Some(empire) = self.empire_registry.get_mut(empire_id) else { continue };
+            let Some(empire) = self.empire_registry.get_mut(empire_id) else {
+                continue;
+            };
             if let Some(id) = chosen {
                 empire.group.members.insert(id);
                 if empire.group.leader != Some(id) {
-                    if empire.group.set_leader(id, tick, "帝国内威望最高的下属国王加冕") {
+                    if empire
+                        .group
+                        .set_leader(id, tick, "帝国内威望最高的下属国王加冕")
+                    {
                         empire.current_reign_start = Some(tick);
-                        self.last_event = Some(format!("🌐 帝国 #{}：国王 #{} 以最高威望加冕为皇帝！", empire_id, id));
+                        self.last_event = Some(format!(
+                            "🌐 帝国 #{}：国王 #{} 以最高威望加冕为皇帝！",
+                            empire_id, id
+                        ));
                     }
                 }
             } else if empire.group.leader.is_some() {
                 empire.group.leader = None;
                 empire.current_reign_start = None;
-                empire.group.ledger.push_event(tick, "🌐 帝国内无在位国王，皇位空悬，帝国账本冻结");
+                empire
+                    .group
+                    .ledger
+                    .push_event(tick, "🌐 帝国内无在位国王，皇位空悬，帝国账本冻结");
             }
         }
     }
@@ -192,16 +225,29 @@ impl World3DEngine {
     /// 与国王内帑完全相同的 6000 tick 周期；每个帝国从每个下属王国公仓黄金余额抽取 5%。
     fn tick_imperial_privy(&mut self, tick: u64) {
         const INTERVAL_TICKS: u64 = 6000;
-        if tick == 0 || tick < self.last_imperial_payout_tick.saturating_add(INTERVAL_TICKS) { return; }
+        if tick == 0
+            || tick
+                < self
+                    .last_imperial_payout_tick
+                    .saturating_add(INTERVAL_TICKS)
+        {
+            return;
+        }
         self.last_imperial_payout_tick = tick - (tick % INTERVAL_TICKS);
 
         let mut payouts: Vec<(u32, u32, AgentId, f32)> = Vec::new();
         for (empire_id, empire) in &self.empire_registry.empires {
-            let Some(emperor_id) = empire.group.leader else { continue };
+            let Some(emperor_id) = empire.group.leader else {
+                continue;
+            };
             for camp_id in &empire.member_camps {
-                let Some(region) = self.region_registry.get(*camp_id) else { continue };
+                let Some(region) = self.region_registry.get(*camp_id) else {
+                    continue;
+                };
                 let amount = region.group.ledger.balance(ResourceKind::Gold) * 0.05;
-                if amount > 0.0 { payouts.push((*empire_id, *camp_id, emperor_id, amount)); }
+                if amount > 0.0 {
+                    payouts.push((*empire_id, *camp_id, emperor_id, amount));
+                }
             }
         }
 

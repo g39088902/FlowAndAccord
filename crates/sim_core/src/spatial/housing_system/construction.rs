@@ -1,6 +1,6 @@
 use crate::spatial::agent::PrimitiveActionState;
-use crate::spatial::house::HouseTier;
 use crate::spatial::decisions::needs::upgrade_material_cost;
+use crate::spatial::house::HouseTier;
 use crate::spatial::ledger::journal::{LedgerRef, TransferReason};
 use crate::spatial::world::World3DEngine;
 
@@ -20,20 +20,36 @@ impl World3DEngine {
         let pending: Vec<u32> = self
             .agents
             .iter()
-            .filter(|a| a.is_alive && !a.is_fetus && a.state == PrimitiveActionState::ConstructingHouse)
+            .filter(|a| {
+                a.is_alive && !a.is_fetus && a.state == PrimitiveActionState::ConstructingHouse
+            })
             .map(|a| a.id)
             .collect();
         for agent_id in pending {
-            let at_house = self.agents.iter().find(|a| a.id == agent_id)
+            let at_house = self
+                .agents
+                .iter()
+                .find(|a| a.id == agent_id)
                 .and_then(|a| a.home_house_id)
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| {
-                    let pos = self.network.graph[*self.network.node_map.get(&h.door_node_id).unwrap()].pos;
-                    self.agents.iter().find(|a| a.id == agent_id)
-                        .map(|a| a.current_lane_id.is_none() && a.world_pos.distance_to(&pos) <= self.config.poi_interaction_radius)
+                    let pos = self.network.graph
+                        [*self.network.node_map.get(&h.door_node_id).unwrap()]
+                    .pos;
+                    self.agents
+                        .iter()
+                        .find(|a| a.id == agent_id)
+                        .map(|a| {
+                            a.current_lane_id.is_none()
+                                && a.world_pos.distance_to(&pos)
+                                    <= self.config.poi_interaction_radius
+                        })
                         .unwrap_or(false)
-                }).unwrap_or(false);
-            if !at_house { continue; }
+                })
+                .unwrap_or(false);
+            if !at_house {
+                continue;
+            }
             self.try_instant_upgrade(agent_id);
         }
     }
@@ -46,7 +62,12 @@ impl World3DEngine {
             a.current_need = Some("Physiological·Rest".to_string());
         }
 
-        let Some(house_id) = self.agents.iter().find(|a| a.id == agent_id).and_then(|a| a.home_house_id) else {
+        let Some(house_id) = self
+            .agents
+            .iter()
+            .find(|a| a.id == agent_id)
+            .and_then(|a| a.home_house_id)
+        else {
             return;
         };
         let Some(owner_hid) = self.household_registry.household_of(agent_id) else {
@@ -68,7 +89,11 @@ impl World3DEngine {
         let ledger_ok = self
             .household_registry
             .get(owner_hid)
-            .map(|hh| costs.iter().all(|(rk, amt)| hh.group.ledger.balance(*rk) >= *amt - 1e-3))
+            .map(|hh| {
+                costs
+                    .iter()
+                    .all(|(rk, amt)| hh.group.ledger.balance(*rk) >= *amt - 1e-3)
+            })
             .unwrap_or(false);
         if !ledger_ok {
             return;
@@ -79,7 +104,13 @@ impl World3DEngine {
         for (rk, amt) in &costs {
             if *amt > 0.001 {
                 if let Some(hh) = self.household_registry.get_mut(owner_hid) {
-                    hh.group.ledger.record_consumption(LedgerRef::Family(owner_hid), *rk, *amt, TransferReason::Construction, tick);
+                    hh.group.ledger.record_consumption(
+                        LedgerRef::Family(owner_hid),
+                        *rk,
+                        *amt,
+                        TransferReason::Construction,
+                        tick,
+                    );
                 }
             }
         }
@@ -100,7 +131,11 @@ impl World3DEngine {
         }
 
         // ★ M6 威望·宅邸因子：房屋每晋升一级，户主威望 +1（最高 4 级宅邸累计 +4；纯立宅不计）
-        let owner_id = self.houses.iter().find(|h| h.id == house_id).and_then(|h| h.owner_id);
+        let owner_id = self
+            .houses
+            .iter()
+            .find(|h| h.id == house_id)
+            .and_then(|h| h.owner_id);
         if let Some(oid) = owner_id {
             if let Some(owner) = self.agents.iter_mut().find(|a| a.id == oid) {
                 owner.prestige = owner.prestige.saturating_add(1);

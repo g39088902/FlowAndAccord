@@ -1,10 +1,10 @@
-use std::collections::{BTreeSet, HashMap};
-use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use petgraph::algo::astar;
+use petgraph::graph::{DiGraph, EdgeIndex, NodeIndex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::{BTreeSet, HashMap};
 
-use super::vec3::Vec3;
 use super::curve::Curve3D;
+use super::vec3::Vec3;
 use crate::config::*;
 
 pub type NodeId = u32;
@@ -69,11 +69,11 @@ pub struct LaneEdge3D {
     pub to_node: NodeId,
     pub curve: Curve3D,
     pub road_class: RoadClass,
-    pub speed_limit: f32, // 限速 (m/s)
-    pub max_capacity: u32,// 理论承载力
-    pub health: f32,      // 耐久度 0.0 ~ 100.0
-    pub wear: f32,        // 动态踩踏等级 (连续浮点数 0.0=荒野无路, 1.0=土径, 2.0=夯土道, 3.0=平整石道, 4.0=石板通衢, 5.0=极品大道)
-    pub is_hidden: bool,  // 是否为隐藏道路/走私密道
+    pub speed_limit: f32,  // 限速 (m/s)
+    pub max_capacity: u32, // 理论承载力
+    pub health: f32,       // 耐久度 0.0 ~ 100.0
+    pub wear: f32, // 动态踩踏等级 (连续浮点数 0.0=荒野无路, 1.0=土径, 2.0=夯土道, 3.0=平整石道, 4.0=石板通衢, 5.0=极品大道)
+    pub is_hidden: bool, // 是否为隐藏道路/走私密道
     pub concealment: f32, // 隐秘度 0.0 (完全公开) ~ 1.0 (深度隐藏)
 }
 
@@ -178,7 +178,10 @@ impl LaneGraph3D {
         for &lane_id in lanes {
             if let Some(&edge_idx) = self.edge_map.get(&lane_id) {
                 let edge = &self.graph[edge_idx];
-                if let (Some(&u_idx), Some(&v_idx)) = (self.node_map.get(&edge.from_node), self.node_map.get(&edge.to_node)) {
+                if let (Some(&u_idx), Some(&v_idx)) = (
+                    self.node_map.get(&edge.from_node),
+                    self.node_map.get(&edge.to_node),
+                ) {
                     let from_pos = self.graph[u_idx].pos;
                     let to_pos = self.graph[v_idx].pos;
                     lane_endpoints.push((from_pos, to_pos));
@@ -193,7 +196,9 @@ impl LaneGraph3D {
                 if path.iter().any(|lid| lanes.contains(lid)) {
                     return true;
                 }
-                let (Some(&s_idx), Some(&g_idx)) = (self.node_map.get(&start), self.node_map.get(&goal)) else {
+                let (Some(&s_idx), Some(&g_idx)) =
+                    (self.node_map.get(&start), self.node_map.get(&goal))
+                else {
                     return false;
                 };
                 let p_s = self.graph[s_idx].pos;
@@ -225,7 +230,12 @@ impl LaneGraph3D {
             for &goal in &nodes {
                 if start != goal {
                     for &prefer_hidden in &[false, true] {
-                        let path = self.compute_path_3d_with_preference(start, goal, prefer_hidden, config);
+                        let path = self.compute_path_3d_with_preference(
+                            start,
+                            goal,
+                            prefer_hidden,
+                            config,
+                        );
                         table.routes.insert((start, goal, prefer_hidden), path);
                     }
                 }
@@ -292,7 +302,11 @@ impl LaneGraph3D {
             health: LANE_HEALTH_DEFAULT,
             wear: 0.0, // 初始地图完全无路 (wear = 0.0)
             is_hidden: is_hidden || road_class == RoadClass::SmugglerTrail,
-            concealment: if is_hidden { concealment.max(0.7) } else { concealment },
+            concealment: if is_hidden {
+                concealment.max(0.7)
+            } else {
+                concealment
+            },
         };
 
         let edge_idx = self.graph.add_edge(from_idx, to_idx, edge_data);
@@ -342,12 +356,23 @@ impl LaneGraph3D {
     }
 
     /// 3D 拓扑加权 A* 寻路
-    pub fn find_path_3d(&self, start: NodeId, goal: NodeId, config: &SimConfig) -> Option<Vec<LaneId>> {
+    pub fn find_path_3d(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        config: &SimConfig,
+    ) -> Option<Vec<LaneId>> {
         self.find_path_3d_with_preference(start, goal, false, config)
     }
 
     /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路（带局部失效端点对缓存与 APSP 静态查表）
-    pub fn find_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
+    pub fn find_path_3d_with_preference(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        prefer_hidden: bool,
+        config: &SimConfig,
+    ) -> Option<Vec<LaneId>> {
         if start == goal {
             return Some(Vec::new());
         }
@@ -384,7 +409,13 @@ impl LaneGraph3D {
     }
 
     /// 内层加权 A* 拓扑路径搜索（基于离散阶梯限速与坡度，保证确定性与缓存稳定性）
-    fn compute_path_3d_with_preference(&self, start: NodeId, goal: NodeId, prefer_hidden: bool, config: &SimConfig) -> Option<Vec<LaneId>> {
+    fn compute_path_3d_with_preference(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        prefer_hidden: bool,
+        config: &SimConfig,
+    ) -> Option<Vec<LaneId>> {
         let start_idx = *self.node_map.get(&start)?;
         let goal_idx = *self.node_map.get(&goal)?;
         let goal_pos = self.graph[goal_idx].pos;
@@ -396,20 +427,37 @@ impl LaneGraph3D {
             |edge_ref| {
                 let edge = edge_ref.weight();
                 let delta_z = (edge.curve.p3.z - edge.curve.p0.z).max(0.0);
-                let grade_penalty = if delta_z > 0.0 { delta_z * config.road_astar_grade_penalty_coef } else { 0.0 };
+                let grade_penalty = if delta_z > 0.0 {
+                    delta_z * config.road_astar_grade_penalty_coef
+                } else {
+                    0.0
+                };
 
                 // 阶梯量化有效速度：以 road_wear_tier_step (0.25) 为离散阶梯步进，
                 // 兼顾踏路成道（Stigmergy）动态涌现与端点对路径缓存（path_cache）高命中率
-                let bucket = LaneEdge3D::wear_tier_bucket(edge.wear, config.road_wear_tier_step, config.road_benefit_max_wear);
+                let bucket = LaneEdge3D::wear_tier_bucket(
+                    edge.wear,
+                    config.road_wear_tier_step,
+                    config.road_benefit_max_wear,
+                );
                 let quantized_wear = bucket as f32 * config.road_wear_tier_step;
-                let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * quantized_wear)
+                let road_level_factor = (config.road_level_factor_base
+                    + config.road_level_factor_wear_coef * quantized_wear)
                     .clamp(config.road_level_factor_min, config.road_level_factor_max);
                 let effective_speed = edge.speed_limit * road_level_factor;
 
                 let hidden_modifier = if prefer_hidden {
-                    if edge.is_hidden { config.road_hidden_prefer_modifier } else { config.road_visible_prefer_modifier }
+                    if edge.is_hidden {
+                        config.road_hidden_prefer_modifier
+                    } else {
+                        config.road_visible_prefer_modifier
+                    }
                 } else {
-                    if edge.is_hidden { config.road_hidden_avoid_modifier } else { config.road_visible_avoid_modifier }
+                    if edge.is_hidden {
+                        config.road_hidden_avoid_modifier
+                    } else {
+                        config.road_visible_avoid_modifier
+                    }
                 };
 
                 ((edge.curve.length / effective_speed) + grade_penalty) * hidden_modifier
@@ -472,7 +520,8 @@ impl LaneGraph3D {
         for lane in data.lanes {
             let (lane_id, from, to) = (lane.id, lane.from_node, lane.to_node);
             let has_wear = lane.wear > 0.0;
-            if let (Some(from_idx), Some(to_idx)) = (net.node_map.get(&from), net.node_map.get(&to)) {
+            if let (Some(from_idx), Some(to_idx)) = (net.node_map.get(&from), net.node_map.get(&to))
+            {
                 let from_idx = *from_idx;
                 let to_idx = *to_idx;
                 let edge_idx = net.graph.add_edge(from_idx, to_idx, lane);

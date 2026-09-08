@@ -129,7 +129,7 @@ window.SIM_CONFIG = {
   decisionCriticalHunger: 25.0,   // 临界饥饿阈值 (触发觅食)
   decisionRestStaminaTarget: 100.0, // 休息目标体力
   decisionStockGoldCooldown: 45.0,// 盖房备料淘金冷却 (秒)
-  decisionGoldWealthCooldown: 180.0, // 4 级庄园竣工前娱乐淘金冷却 (秒)
+  decisionGoldWealthCooldown: 180.0, // 4 级庄园积累财富的淘金策略冷却 (秒)
   decisionHouseRepairNeedThreshold: 50.0, // 房屋耐久低于此值触发修缮需求
   decisionFoundHomeHungerMin: 20.0, // 立宅所需最低饱食度
   decisionFoundHomeThirstMin: 20.0, // 立宅所需最低水分

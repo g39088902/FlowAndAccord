@@ -43,7 +43,7 @@ FlowAndAccord/
 │   │           │   ├── projection.rs       # M19.2 兼容视图纯投影 (compatible_legacy_state)
 │   │           │   ├── transition.rs       # M19.2/M19.3 统一生命周期转换器 (install_task / advance_stage / on_navigation_arrived / finish_task)
 │   │           │   ├── observation.rs      # 不可变执行观察与旧枚举无损视图 (observe_execution)
-│   │           │   ├── branches.rs         # ★ 18 条分支注册表 (BranchId ↔ b1~b18，自包含条件函数，Rust 侧无顺序)
+│   │           │   ├── branches.rs         # ★ 16 条活跃分支注册表（稳定 ID 保留 b11/b15 空位，自包含条件函数，Rust 侧无顺序）
 │   │           │   ├── needs.rs            # NeedKind 需求定义、升级材料成本 (upgrade_material_cost)、家户缺口计算
 │   │           │   ├── evaluate.rs         # Decisioner 结构体 + L1 持续仲裁 / 瞬发通道 + L2 策略派发 / 节拍推进
 │   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性 / 归家任务同步
@@ -74,7 +74,7 @@ FlowAndAccord/
 ├── frontend/
 │   ├── js/
 │   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 149 字段)
-│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源 (18 条 b1~b18 + 层级覆盖，b14 夺位置首，§4.12 文档化例外)
+│   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── math.js                         # 3D 向量与投影变换
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)

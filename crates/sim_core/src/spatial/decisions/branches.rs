@@ -1,6 +1,6 @@
 //! 需求判定分支注册表 (branches.rs)
 //!
-//! `evaluate_needs` 的 18 条分支抽为按稳定字符串 ID ("b1".."b18") 索引的自包含条件函数。
+//! `evaluate_needs` 的 16 条分支抽为稳定字符串 ID 索引的自包含条件函数。
 //! 本文件只描述「每条分支的语义」，**不持有任何策展优先级**：
 //! 评估顺序的唯一真相源是前端持久化配置文件 `frontend/js/config.decision-order.js`，
 //! 经 `SimConfig.decision_eval_order` 热注入；为空或非法时回退 `BranchId::ALL`
@@ -9,19 +9,20 @@
 //! 每条分支的条件函数自包含全部守卫（无家守卫 / b13 的 4 级庄园门禁 /
 //! b5~b7 的 family_level 动态默认），因此任意排列都语义安全，无需框架特判。
 //!
-//! ★ v1.29.0 瞬间行为（⓪ 层）：`is_instant()` 白名单内的分支（b16 求偶近距 / b17 竞拍购房 /
-//! b18 育儿在宅）可返回 `MaslowLevel::Instantaneous` 结论——命中即刻执行（只写决心，
+//! 瞬间行为（⓪ 层）：`is_instant()` 白名单内的分支（b8 在宅改善 / b16 求偶近距 /
+//! b17 竞购住宅 / b18 生育在宅）可返回 `MaslowLevel::Instantaneous` 结论——命中即刻执行（只写决心，
 //! 不移动、不消耗资源与 RNG）后继续遍历后续分支，见 `evaluate.rs::evaluate_instant_needs`。
 
-use serde::{Deserialize, Serialize};
 use super::super::agent::{Agent3D, Gender, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
 use super::super::ledger::journal::ResourceKind;
 use super::evaluate::Decisioner;
 use super::needs::*;
 use crate::config::SimConfig;
+use serde::{Deserialize, Serialize};
 
-/// 18 条需求判定分支的稳定标识（声明序即中性兜底序，不含语义优先级）
+/// 16 条需求判定分支的稳定标识（声明序即中性兜底序，不含语义优先级）。
+/// b11 已合并到 b8「改善住宅」，b15 已下沉为资源意图的市场采购策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BranchId {
     B1QuenchThirst,
@@ -31,14 +32,12 @@ pub enum BranchId {
     B5StockWater,
     B6StockFood,
     B7StockWood,
-    B8BuildHouseTier0,
+    B8ImproveHome,
     B9StockStone,
     B10StockGold,
-    B11BuildHouseUpgrade,
     B12FoundHome,
     B13GoldWealth,
     B14SeekThrone,
-    B15MarketTrade,
     B16Courtship,
     B17BidHouse,
     B18RaiseChild,
@@ -48,11 +47,9 @@ impl BranchId {
     /// 中性声明序（b1..b16）：仅作配置缺失/非法时的兜底遍历序，不携带语义优先级。
     /// 生产环境的策展优先级只存在于前端配置文件，严禁在此处写死。
     /// ★ M4 夺位远征 B14SeekThrone 声明在最前：第一层生存需求（生理层最高档），兜底序下亦优先于口渴/饥饿/休息。
-    pub const ALL: [BranchId; 18] = [
-        BranchId::B14SeekThrone,
+    pub const ALL: [BranchId; 16] = [
         BranchId::B1QuenchThirst,
         BranchId::B2SateHunger,
-        BranchId::B15MarketTrade,
         BranchId::B3Rest,
         BranchId::B17BidHouse,
         BranchId::B12FoundHome,
@@ -61,10 +58,10 @@ impl BranchId {
         BranchId::B6StockFood,
         BranchId::B7StockWood,
         BranchId::B16Courtship,
-        BranchId::B8BuildHouseTier0,
+        BranchId::B8ImproveHome,
         BranchId::B9StockStone,
         BranchId::B10StockGold,
-        BranchId::B11BuildHouseUpgrade,
+        BranchId::B14SeekThrone,
         BranchId::B13GoldWealth,
         BranchId::B18RaiseChild,
     ];
@@ -79,14 +76,12 @@ impl BranchId {
             BranchId::B5StockWater => "b5",
             BranchId::B6StockFood => "b6",
             BranchId::B7StockWood => "b7",
-            BranchId::B8BuildHouseTier0 => "b8",
+            BranchId::B8ImproveHome => "b8",
             BranchId::B9StockStone => "b9",
             BranchId::B10StockGold => "b10",
-            BranchId::B11BuildHouseUpgrade => "b11",
             BranchId::B12FoundHome => "b12",
             BranchId::B13GoldWealth => "b13",
             BranchId::B14SeekThrone => "b14",
-            BranchId::B15MarketTrade => "b15",
             BranchId::B16Courtship => "b16",
             BranchId::B17BidHouse => "b17",
             BranchId::B18RaiseChild => "b18",
@@ -103,14 +98,12 @@ impl BranchId {
             "b5" => BranchId::B5StockWater,
             "b6" => BranchId::B6StockFood,
             "b7" => BranchId::B7StockWood,
-            "b8" => BranchId::B8BuildHouseTier0,
+            "b8" => BranchId::B8ImproveHome,
             "b9" => BranchId::B9StockStone,
             "b10" => BranchId::B10StockGold,
-            "b11" => BranchId::B11BuildHouseUpgrade,
             "b12" => BranchId::B12FoundHome,
             "b13" => BranchId::B13GoldWealth,
             "b14" => BranchId::B14SeekThrone,
-            "b15" => BranchId::B15MarketTrade,
             "b16" => BranchId::B16Courtship,
             "b17" => BranchId::B17BidHouse,
             "b18" => BranchId::B18RaiseChild,
@@ -128,7 +121,10 @@ impl BranchId {
     pub fn is_instant(self) -> bool {
         matches!(
             self,
-            BranchId::B16Courtship | BranchId::B17BidHouse | BranchId::B18RaiseChild
+            BranchId::B8ImproveHome
+                | BranchId::B16Courtship
+                | BranchId::B17BidHouse
+                | BranchId::B18RaiseChild
         )
     }
 
@@ -143,18 +139,34 @@ impl BranchId {
         let home_tier = home_house(d, a).map(|h| h.tier);
         match self {
             BranchId::B1QuenchThirst => {
-                if a.thirst < cfg.decision_critical_thirst && d.has_available_node(a, NodePool::Water) {
-                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::QuenchThirst, target_state: PrimitiveActionState::SeekingWater });
+                if a.thirst < cfg.decision_critical_thirst
+                    && d.can_procure_resource(a, NodePool::Water)
+                {
+                    return Some(Need {
+                        level: MaslowLevel::Physiological,
+                        kind: NeedKind::QuenchThirst,
+                        target_state: PrimitiveActionState::SeekingWater,
+                    });
                 }
             }
             BranchId::B2SateHunger => {
-                if a.hunger < cfg.decision_critical_hunger && d.has_available_node(a, NodePool::Food) {
-                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SateHunger, target_state: PrimitiveActionState::SeekingFood });
+                if a.hunger < cfg.decision_critical_hunger
+                    && d.can_procure_resource(a, NodePool::Food)
+                {
+                    return Some(Need {
+                        level: MaslowLevel::Physiological,
+                        kind: NeedKind::SateHunger,
+                        target_state: PrimitiveActionState::SeekingFood,
+                    });
                 }
             }
             BranchId::B3Rest => {
                 if a.stamina < cfg.decision_rest_stamina_target {
-                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::Rest, target_state: PrimitiveActionState::RestingAtCamp });
+                    return Some(Need {
+                        level: MaslowLevel::Physiological,
+                        kind: NeedKind::Rest,
+                        target_state: PrimitiveActionState::RestingAtCamp,
+                    });
                 }
             }
             BranchId::B4RepairHouse => {
@@ -167,7 +179,11 @@ impl BranchId {
                     };
                     let need_repair = house.durability < threshold;
                     if need_repair && is_house_member(house, a) {
-                        return Some(Need { level: MaslowLevel::Safety, kind: NeedKind::RepairHouse, target_state: PrimitiveActionState::RepairingHouse });
+                        return Some(Need {
+                            level: MaslowLevel::Safety,
+                            kind: NeedKind::RepairHouse,
+                            target_state: PrimitiveActionState::RepairingHouse,
+                        });
                     }
                 }
             }
@@ -175,32 +191,70 @@ impl BranchId {
                 // ★ M7 去采与房屋等级脱钩：有房（含 0 级，非废墟）且家庭库存触发器 ON（账本水 < 下限）
                 // ★ v1.35.0 行囊余量自检：行囊未满才产生采水备货需求
                 let bag_has_space = a.carried_water < cfg.carry_capacity_resource - 0.01;
-                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Water) && d.has_available_node(a, NodePool::Water) {
-                    return Some(Need { level: family_level(a), kind: NeedKind::StockWater, target_state: PrimitiveActionState::SeekingWater });
+                if home_tier.is_some()
+                    && bag_has_space
+                    && family_stock_on(a, ResourceKind::Water)
+                    && d.can_procure_resource(a, NodePool::Water)
+                {
+                    return Some(Need {
+                        level: family_level(a),
+                        kind: NeedKind::StockWater,
+                        target_state: PrimitiveActionState::SeekingWater,
+                    });
                 }
             }
             BranchId::B6StockFood => {
                 let bag_has_space = a.carried_food < cfg.carry_capacity_resource - 0.01;
-                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Food) && d.has_available_node(a, NodePool::Food) {
-                    return Some(Need { level: family_level(a), kind: NeedKind::StockFood, target_state: PrimitiveActionState::SeekingFood });
+                if home_tier.is_some()
+                    && bag_has_space
+                    && family_stock_on(a, ResourceKind::Food)
+                    && d.can_procure_resource(a, NodePool::Food)
+                {
+                    return Some(Need {
+                        level: family_level(a),
+                        kind: NeedKind::StockFood,
+                        target_state: PrimitiveActionState::SeekingFood,
+                    });
                 }
             }
             BranchId::B7StockWood => {
                 let bag_has_space = a.carried_wood < cfg.carry_capacity_resource - 0.01;
-                // ★ M19.4c 豪绅家户阶层分化：家资充裕 (gold >= market_wealthy_family_gold) 的户主 80% 几率免于亲自伐木
-                let is_gentry_exempt = is_male_adult(a, cfg)
-                    && d.is_household_head(a)
-                    && d.ledger_balance(a, ResourceKind::Gold) >= cfg.market_wealthy_family_gold
-                    && gentry_labor_exemption_check(a.id, d.tick, cfg.agent_decision_interval_ticks);
-                if home_tier.is_some() && bag_has_space && !is_gentry_exempt && family_stock_on(a, ResourceKind::Wood) && d.has_available_node(a, NodePool::Wood) {
-                    return Some(Need { level: family_level(a), kind: NeedKind::StockWood, target_state: PrimitiveActionState::SeekingWood });
+                if home_tier.is_some()
+                    && bag_has_space
+                    && family_stock_on(a, ResourceKind::Wood)
+                    && d.can_procure_resource(a, NodePool::Wood)
+                {
+                    return Some(Need {
+                        level: family_level(a),
+                        kind: NeedKind::StockWood,
+                        target_state: PrimitiveActionState::SeekingWood,
+                    });
                 }
             }
-            BranchId::B8BuildHouseTier0 => {
-                // ★ M7 升级就绪 = 家庭账本余额覆盖该级一次性材料成本（0→1 无材料 → 恒就绪）
+            BranchId::B8ImproveHome => {
+                // 住宅改善统一意图：覆盖 0→1 到 3→4，材料成本由同一矩阵判定。
+                // 人已静止在宅门口且没有其他持续任务时走瞬发提交；否则生成返宅持续任务。
                 if let Some(house) = home_house(d, a) {
-                    if house.tier == HouseTier::Tier0Warehouse && upgrade_ready_by_cost(house.tier, cfg, |k| d.ledger_balance(a, k)) && is_house_member(house, a) && is_male_adult(a, cfg) {
-                        return Some(Need { level: MaslowLevel::Belonging, kind: NeedKind::BuildHouse, target_state: PrimitiveActionState::ConstructingHouse });
+                    if house.tier != HouseTier::Tier4Manor
+                        && upgrade_ready_by_cost(house.tier, cfg, |k| d.ledger_balance(a, k))
+                        && is_house_member(house, a)
+                        && is_male_adult(a, cfg)
+                    {
+                        let at_home = at_home_door(d, a, house)
+                            && a.active_task.is_none()
+                            && a.state == PrimitiveActionState::RestingAtCamp;
+                        let level = if at_home {
+                            MaslowLevel::Instantaneous
+                        } else if house.tier == HouseTier::Tier0Warehouse {
+                            MaslowLevel::Safety
+                        } else {
+                            MaslowLevel::Esteem
+                        };
+                        return Some(Need {
+                            level,
+                            kind: NeedKind::BuildHouse,
+                            target_state: PrimitiveActionState::ConstructingHouse,
+                        });
                     }
                 }
             }
@@ -211,30 +265,45 @@ impl BranchId {
                 let is_gentry_exempt = is_male_adult(a, cfg)
                     && d.is_household_head(a)
                     && d.ledger_balance(a, ResourceKind::Gold) >= cfg.market_wealthy_family_gold
-                    && gentry_labor_exemption_check(a.id, d.tick, cfg.agent_decision_interval_ticks);
+                    && gentry_labor_exemption_check(
+                        a.id,
+                        d.tick,
+                        cfg.agent_decision_interval_ticks,
+                    );
                 // ★ M19.4c 力量个性化：低力量族人视采石为沉重劳作，需体力充沛 (>= 75.0) 方去开采
                 let stamina_ok = if a.strength < cfg.trait_low_threshold {
                     a.stamina >= 75.0
                 } else {
                     true
                 };
-                if home_tier.is_some() && bag_has_space && !is_gentry_exempt && stamina_ok && family_stock_on(a, ResourceKind::Stone) && d.has_available_node(a, NodePool::Stone) {
-                    return Some(Need { level: family_level(a), kind: NeedKind::StockStone, target_state: PrimitiveActionState::SeekingStone });
+                if home_tier.is_some()
+                    && bag_has_space
+                    && !is_gentry_exempt
+                    && stamina_ok
+                    && family_stock_on(a, ResourceKind::Stone)
+                    && d.has_available_node(a, NodePool::Stone)
+                {
+                    return Some(Need {
+                        level: family_level(a),
+                        kind: NeedKind::StockStone,
+                        target_state: PrimitiveActionState::SeekingStone,
+                    });
                 }
             }
             BranchId::B10StockGold => {
                 // ★ M7 黄金也因家庭储备不足而采（保留淘金冷却节流）
                 let bag_has_space = a.carried_gold < cfg.agent_gold_load_full - 0.01;
-                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Gold) && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
-                    return Some(Need { level: family_level(a), kind: NeedKind::StockGold, target_state: PrimitiveActionState::SeekingGold });
-                }
-            }
-            BranchId::B11BuildHouseUpgrade => {
-                // ★ M7 升级就绪 = 家庭账本余额覆盖该级一次性材料成本（与 construction 共用公式）
-                if let Some(house) = home_house(d, a) {
-                    if upgrade_ready_by_cost(house.tier, cfg, |k| d.ledger_balance(a, k)) && house.tier != HouseTier::Tier4Manor && is_house_member(house, a) && is_male_adult(a, cfg) {
-                        return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::BuildHouse, target_state: PrimitiveActionState::ConstructingHouse });
-                    }
+                if home_tier.is_some()
+                    && bag_has_space
+                    && family_stock_on(a, ResourceKind::Gold)
+                    && d.has_available_node(a, NodePool::Gold)
+                    && a.gold_mining_cooldown <= 0.0
+                {
+                    return Some(Need {
+                        level: family_level(a),
+                        kind: NeedKind::StockGold,
+                        target_state: PrimitiveActionState::SeekingGold,
+                    });
                 }
             }
             BranchId::B12FoundHome => {
@@ -249,7 +318,11 @@ impl BranchId {
                     && a.stamina >= cfg.decision_found_home_stamina_min
                     && d.has_nonfull_camp()
                 {
-                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::FoundHome, target_state: PrimitiveActionState::RestingAtCamp });
+                    return Some(Need {
+                        level: MaslowLevel::Safety,
+                        kind: NeedKind::FoundHome,
+                        target_state: PrimitiveActionState::RestingAtCamp,
+                    });
                 }
             }
             BranchId::B13GoldWealth => {
@@ -259,9 +332,19 @@ impl BranchId {
                     let need_repair = house.durability < cfg.decision_house_repair_need_threshold;
                     let all_stocked = FAMILY_STOCK_ORDER.iter().all(|&rk| !family_stock_on(a, rk));
                     let bag_has_space = a.carried_gold < cfg.agent_gold_load_full - 0.01;
-                    let gated = house.tier != HouseTier::Tier4Manor || need_repair || !all_stocked || !bag_has_space;
-                    if !gated && d.has_available_node(a, NodePool::Gold) && a.gold_mining_cooldown <= 0.0 {
-                        return Some(Need { level: MaslowLevel::SelfActualization, kind: NeedKind::GoldWealth, target_state: PrimitiveActionState::SeekingGold });
+                    let gated = house.tier != HouseTier::Tier4Manor
+                        || need_repair
+                        || !all_stocked
+                        || !bag_has_space;
+                    if !gated
+                        && d.has_available_node(a, NodePool::Gold)
+                        && a.gold_mining_cooldown <= 0.0
+                    {
+                        return Some(Need {
+                            level: MaslowLevel::SelfActualization,
+                            kind: NeedKind::GoldWealth,
+                            target_state: PrimitiveActionState::SeekingGold,
+                        });
                     }
                 }
             }
@@ -275,20 +358,29 @@ impl BranchId {
                     return None;
                 }
                 // ★ M6 前提：空缺王位的营地 = 自家房屋（含 0 级仓库）所在地；或完全未建房未建仓
-                let home_camp_id = a.home_house_id
+                let home_camp_id = a
+                    .home_house_id
                     .and_then(|hid| d.houses.iter().find(|h| h.id == hid))
                     .map(|h| h.camp_id);
-                if d.eligible_leaderless_camp(a, home_camp_id.is_some(), home_camp_id).is_some() {
-                    return Some(Need { level: MaslowLevel::Physiological, kind: NeedKind::SeekThrone, target_state: PrimitiveActionState::SeekingThrone });
+                if d.eligible_leaderless_camp(a, home_camp_id.is_some(), home_camp_id)
+                    .is_some()
+                {
+                    return Some(Need {
+                        level: MaslowLevel::Esteem,
+                        kind: NeedKind::SeekThrone,
+                        target_state: PrimitiveActionState::SeekingThrone,
+                    });
                 }
-            }
-            BranchId::B15MarketTrade => {
-                return d.evaluate_market_trade(a);
             }
             BranchId::B16Courtship => {
                 // ★ 求偶：由马斯洛引擎驱动（第三层：归属与爱）
                 // 守卫（自包含）：仅在世成年单身男性发起，女性不执行求偶
-                if !a.is_alive || a.gender != Gender::Male || a.is_fetus || a.age < cfg.agent_adult_age || a.spouse_id.is_some() {
+                if !a.is_alive
+                    || a.gender != Gender::Male
+                    || a.is_fetus
+                    || a.age < cfg.agent_adult_age
+                    || a.spouse_id.is_some()
+                {
                     return None;
                 }
                 // 幂等守卫：已有未结算的求偶决心（世界执行器尚未落地）→ 本拍不再重复写
@@ -296,7 +388,8 @@ impl BranchId {
                     return None;
                 }
                 // 需存在至少一名合格单身女性且家户金币达标
-                if d.ledger_balance(a, ResourceKind::Gold) <= cfg.decision_courtship_min_family_gold {
+                if d.ledger_balance(a, ResourceKind::Gold) <= cfg.decision_courtship_min_family_gold
+                {
                     return None;
                 }
                 let Some(target) = d.best_courtship_target(a) else {
@@ -320,7 +413,11 @@ impl BranchId {
                 // ★ v1.26.0 竞购现房：成年男性自主对所有符合条件的在售空置房一次性出价
                 // ★ v1.31.0 出价范围：无房者→全部在售房；有房者→全部 tier 高于自宅的在售房（见 all_bid_candidates）
                 // 守卫全内联（任意排列语义安全）：在世 + 非胎儿 + 成年男性 + 无未结算 pending + 冷却结束 + 有在售房
-                if !a.is_alive || a.gender != Gender::Male || a.is_fetus || a.age < cfg.agent_adult_age {
+                if !a.is_alive
+                    || a.gender != Gender::Male
+                    || a.is_fetus
+                    || a.age < cfg.agent_adult_age
+                {
                     return None;
                 }
                 if !a.pending_bid_house_ids.is_empty() {
@@ -336,7 +433,7 @@ impl BranchId {
                 if all_bid_candidates(d, a).is_empty() {
                     return None;
                 }
-                // ★ v1.29.0 竞拍购房归入 ⓪ 瞬间行为：只写 pending，不移动、不扣账
+                // ★ v1.29.0 竞购住宅归入 ⓪ 瞬间行为：只写 pending，不移动、不扣账
                 return Some(Need {
                     level: MaslowLevel::Instantaneous,
                     kind: NeedKind::BidHouse,
@@ -362,7 +459,11 @@ impl BranchId {
                             target_state: PrimitiveActionState::RestingAtCamp, // 占位：瞬发只写 pending，不改运动状态
                         });
                     }
-                    return Some(Need { level: MaslowLevel::Esteem, kind: NeedKind::RaiseChild, target_state: PrimitiveActionState::RaiseChild });
+                    return Some(Need {
+                        level: MaslowLevel::Belonging,
+                        kind: NeedKind::RaiseChild,
+                        target_state: PrimitiveActionState::RaiseChild,
+                    });
                 }
             }
         }
@@ -372,11 +473,25 @@ impl BranchId {
 
 /// 家宅查找（存活房屋；v1.10.0 起无绝嗣废墟状态）
 fn home_house<'h>(d: &Decisioner<'h>, a: &Agent3D) -> Option<&'h House> {
-    a.home_house_id.and_then(|hid| d.houses.iter().find(|h| h.id == hid))
+    a.home_house_id
+        .and_then(|hid| d.houses.iter().find(|h| h.id == hid))
 }
 
 fn is_house_member(house: &House, a: &Agent3D) -> bool {
     house.owner_id == Some(a.id) || house.spouse_id == Some(a.id)
+}
+
+/// 是否静止在指定住宅门口。住宅改善的瞬发资格与施工结算共用这一空间语义。
+fn at_home_door(d: &Decisioner, a: &Agent3D, house: &House) -> bool {
+    if a.current_lane_id.is_some() {
+        return false;
+    }
+    d.network
+        .node_map
+        .get(&house.door_node_id)
+        .and_then(|idx| d.network.graph.node_weight(*idx))
+        .map(|node| a.world_pos.distance_to(&node.pos) <= d.config.poi_interaction_radius)
+        .unwrap_or(false)
 }
 
 /// ★ v1.31.0 竞拍候选全集：把所有符合条件的在售空置房一次性返回（升序、确定性、不耗 RNG）。
@@ -449,10 +564,10 @@ fn is_male_adult(a: &Agent3D, cfg: &SimConfig) -> bool {
 
 /// 解析注入的评估顺序：恰好 16 个互不重复的有效 ID 才采用，否则回退中性声明序。
 /// 解析结果为定长数组，热路径零分配。
-pub fn resolve_order(ids: &[String]) -> [BranchId; 18] {
-    if ids.len() == 18 {
+pub fn resolve_order(ids: &[String]) -> [BranchId; 16] {
+    if ids.len() == 16 {
         let mut parsed = BranchId::ALL;
-        let mut seen = [false; 18];
+        let mut seen = [false; 16];
         for (i, s) in ids.iter().enumerate() {
             match BranchId::from_str_id(s) {
                 Some(b) if !seen[b.index()] => {

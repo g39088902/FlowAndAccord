@@ -21,21 +21,36 @@ static mut ERROR_BUF: Vec<u8> = Vec::new();
 
 /// 记录最近一次错误文本（成功路径调用 clear_error）
 fn set_error(msg: &str) {
-    unsafe { ERROR_BUF = msg.as_bytes().to_vec(); }
+    unsafe {
+        ERROR_BUF = msg.as_bytes().to_vec();
+    }
 }
 
 fn clear_error() {
-    unsafe { ERROR_BUF.clear(); }
+    unsafe {
+        ERROR_BUF.clear();
+    }
 }
 
 /// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
 /// 优先使用前端通过 world_apply_config_buf / world_set_config 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 #[no_mangle]
-pub extern "C" fn world_create(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32 {
+pub extern "C" fn world_create(
+    grid_res: u32,
+    world_size: f32,
+    seed: f64,
+    agent_count: u32,
+    camp_count: u32,
+) -> i32 {
     unsafe {
         let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
-        let mut w = World3DEngine::new_seeded_with_config(grid_res as usize, world_size, seed as u64, config);
+        let mut w = World3DEngine::new_seeded_with_config(
+            grid_res as usize,
+            world_size,
+            seed as u64,
+            config,
+        );
         if camp_count > 0 {
             w.config.count_camps = camp_count as usize;
         }

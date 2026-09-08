@@ -64,7 +64,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.10)"]
+    F --> G["浏览器 UI (版本: v1.46.12)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -114,7 +114,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.10`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.12`**。
 
 ---
 
@@ -181,7 +181,7 @@ node frontend/server.js           # http://localhost:3000
 - **严禁修改 `config.simulationDt`**：基准恒为 1/60 游戏小时，倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
 - **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 道路衰减 → 运动 → 决策及提交结算 → 账本 → 清理。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
-- **★ v1.29.0 ⓪ 瞬间行为层（优先级高于生理需求）**：每名 agent 在自己的决策相位**最前**（`decide()` 顶部、全状态）先跑 `evaluate_instant_needs`——只遍历 `BranchId::is_instant()` 白名单分支（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅），命中即「只写决心 / pending、不 dispatch、不改运动状态、不消耗资源与 RNG」并 `continue` 继续遍历后续瞬发分支；随后才进入常规状态机。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。非瞬发分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。
+- **⓪ 瞬间行为通道**：每名 agent 在自己的决策相位最前运行 `arbitrate_instant_needs`，覆盖 b8 在宅改善、b16 近距求偶、b17 竞购住宅、b18 在宅生育。瞬发只提交或安装当拍可结算事务，不规划移动；b8 若人在异地仍是“返宅改善”的持续任务。需求层级与执行是否瞬发是两个维度。
 
 ### 4.4 🟠 随身搬运机制（真实背包，非瞬移）
 
@@ -225,9 +225,9 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 - **冬季供暖**：气温 < `config.houseWinterColdTemp`(8℃) 时（不再固定冬季消耗，低于阈值即烧），非 0 级有主房屋每秒消耗 `config.houseWinterWoodBurnRate`(0.12) 木材；家宅木材 < 10 时禁孕。
 - **家庭储备 = 家户账本（M6 起）**：`House.pantry_*`/仓储容量已删除，吃喝、冬季烧柴全部从**家户账本真实扣减**（账本余额即家庭实有物资，无容量上限）。
 - **去采货 = 施密特触发器（M7 起）**：有房（含 0 级）即可采，与房屋等级**彻底脱钩**——每类资源（水/粮/木/石/金统一）家户账本余额 < `decisionFamilyStockTriggerOn`(100) 触发去采，补到 ≥ `decisionFamilyStockTriggerOff`(200) 才停（滞回带）。无房者不触发补货、现场只自用不装袋。
-- **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，数值来自 **20 个超参**（`config.house-upgrade-cost.js` 的 `houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold}`，权威默认值三处同步于 `config.rs`）——升到 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125，该级不消耗的品类填 0（扣账自动跳过、就绪不阻塞）；b8/b11 就绪 = 每类 `ledger.balance ≥ cost`（0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50），升级时一次性扣账并户主威望+1。
-- **生育住宅门槛（★ v1.28.0 重新挂钩房屋等级）**：养育后代由男性户主在 `B18RaiseChild` 分支自主发起，除「已婚、妻子身体指标达标、流产冷却（450s）与产后休养冷却（900s，分娩后触发）均结束」外，**男方（户主）名下须有 ≥1 级私宅**（`tier != Tier0Warehouse`，0 级仓库与无房者不生育）；判定只写在分支内部（`d.houses.iter().any(|h| h.owner_id == Some(a.id) && ...)`），符合 §4.14 分支自包含铁律。
-- **淘金纪律**：4 级大庄园竣工前绝不娱乐淘金（`GoldWealth` 冷却 180s）；盖房备料淘金 `StockGold` 冷却 45s。
+- **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，数值来自 **20 个超参**（`config.house-upgrade-cost.js` 的 `houseUpgradeCostTier{1..4}{Water,Food,Wood,Stone,Gold}`，权威默认值三处同步于 `config.rs`）——升到 1 级水粮各 50、2 级木粮水各 75、3 级石木粮水各 100、4 级金石木粮水各 125。统一 b8「改善住宅」覆盖全部等级；在宅瞬发结算，异地先返宅，升级时一次性扣账并令户主威望 +1。
+- **生育住宅门槛（★ v1.28.0 重新挂钩房屋等级）**：生育后代由男性户主在 `B18RaiseChild` 分支自主发起，除「已婚、妻子身体指标达标、流产冷却（450s）与产后休养冷却（900s，分娩后触发）均结束」外，**男方（户主）名下须有 ≥1 级私宅**（`tier != Tier0Warehouse`，0 级仓库与无房者不生育）；判定只写在分支内部（`d.houses.iter().any(|h| h.owner_id == Some(a.id) && ...)`），符合 §4.14 分支自包含铁律。
+- **资金采集纪律**：4 级大庄园竣工前不触发 `B13AccumWealth`（积累财富，`GoldWealth` 冷却 180s）；家户资金补给由 `B10StockGold`（储备资金，`StockGold` 冷却 45s）负责。
 - **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随。
 
 ### 4.9 🟢 版本号自增规范（每次 AI 修改代码必改）
@@ -308,8 +308,8 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 
 ### 4.14 🧠 决策顺序可编排（Rust 无顺序 · 前端拖动热注入 · 落盘持久化）
 
-- **内核无序**：`evaluate_needs` 按 `Decisioner.branch_order` 迭代 `decisions/branches.rs` 的 18 条自包含条件函数；顺序来自 `SIM_CONFIG.decisionEvalOrder`，默认空 = 中性声明序兜底（见 §4.12 例外）。**严禁**在 Rust 写死策展优先级。
-- **真相源在文件**：策展顺序唯一真相源为 `frontend/js/config.decision-order.js`，启动时由 `decision-viz.js` 合并进 `SIM_CONFIG`（脚本顺序：config.js → config.decision-order.js → decision-viz 三件套 → rustworld.js，必早于首次 applyConfig）。
+- **内核无序**：`evaluate_needs` 按 `Decisioner.branch_order` 迭代 `decisions/branches.rs` 的 16 条自包含条件函数；b11 已合并到 b8「改善住宅」，b15 已下沉为水/粮/木资源意图的市场采购策略。顺序来自 `SIM_CONFIG.decisionEvalOrder`，默认空 = 中性声明序兜底（见 §4.12 例外）。**严禁**在 Rust 写死策展优先级。
+- **真相源在文件**：策展顺序唯一真相源为 `frontend/js/config.decision-order.js`，branch 中文名唯一真相源为 `frontend/js/decision-viz-data.js`。启动时由 `decision-viz.js` 合并进 `SIM_CONFIG`（脚本顺序：config.js → config.decision-order.js → decision-viz 三件套 → rustworld.js，必早于首次 applyConfig）。
 - **拖动生效链路**：决策引擎覆层（index.html「🧠 决策引擎」）拖卡/拖分界松手 → 改 `SIM_CONFIG` → `rustWorld.applyConfig()` 热注入运行中实例（与模拟共用引擎，故必须内嵌页面而非独立页）→ ★ v1.27.0 起保存到浏览器 `localStorage`（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1，含 `savedAt`；启动时自动把旧键 v1 的编码迁移为 0→6 后写入 v2）；`server.js` 的 `POST /save-decision-order` 端点保留但不再作为正常保存路径。
 - **分支自包含铁律**：新增/改分支时，无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认必须写在分支条件内部——否则重排顺序即破坏语义。层级覆盖（`decision_eval_levels`，★ v1.29.0 编码：`0`=⓪瞬间行为 / `1-5`=①..⑤马斯洛层级 / `6`=保留代码动态默认）与 `current_need` 标签共用 `level_override_for`；非瞬发分支被覆盖为 0 时自动回退代码默认层级。
 

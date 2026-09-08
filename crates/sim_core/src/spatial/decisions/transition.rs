@@ -1,10 +1,12 @@
 //! transition.rs · 统一活动任务生命周期转换器与状态同步
 //! 负责任务安装、阶段推进、运动到达与生命周期事件，消除多处双重状态写入。
 
-use crate::spatial::agent::{Agent3D, PrimitiveActionState};
-use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, ReturnStage, CommitStage, HomeStage};
 use super::primitive::{ActionPrimitive, HoldKind};
 use super::projection::compatible_legacy_state;
+use super::strategy::{
+    ActiveTask, CommitStage, ExecutionStrategy, HomeStage, ResourceStage, ReturnStage,
+};
+use crate::spatial::agent::{Agent3D, PrimitiveActionState};
 
 /// 安装新任务并同步兼容视图
 pub fn install_task(agent: &mut Agent3D, task: ActiveTask) {
@@ -25,34 +27,30 @@ pub fn advance_stage(agent: &mut Agent3D, update_fn: impl FnOnce(&mut ActiveTask
 pub fn on_navigation_arrived(agent: &mut Agent3D) {
     if let Some(task) = agent.active_task.as_mut() {
         match &mut task.strategy {
-            ExecutionStrategy::WildHarvest { poi, stage, .. } => {
-                match *stage {
-                    ResourceStage::Outbound => {
-                        *stage = ResourceStage::OnSite;
-                        if let Some(pid) = *poi {
-                            task.primitive = ActionPrimitive::Hold(HoldKind::ResourceSite(pid));
-                        }
+            ExecutionStrategy::WildHarvest { poi, stage, .. } => match *stage {
+                ResourceStage::Outbound => {
+                    *stage = ResourceStage::OnSite;
+                    if let Some(pid) = *poi {
+                        task.primitive = ActionPrimitive::Hold(HoldKind::ResourceSite(pid));
                     }
-                    ResourceStage::Returning => {
-                        *stage = ResourceStage::Unloading;
-                        task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
-                    }
-                    _ => {}
                 }
-            }
-            ExecutionStrategy::MarketTrade { market, stage } => {
-                match *stage {
-                    ResourceStage::Outbound => {
-                        *stage = ResourceStage::OnSite;
-                        task.primitive = ActionPrimitive::Hold(HoldKind::ResourceSite(*market));
-                    }
-                    ResourceStage::Returning => {
-                        *stage = ResourceStage::Unloading;
-                        task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
-                    }
-                    _ => {}
+                ResourceStage::Returning => {
+                    *stage = ResourceStage::Unloading;
+                    task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
                 }
-            }
+                _ => {}
+            },
+            ExecutionStrategy::MarketTrade { market, stage } => match *stage {
+                ResourceStage::Outbound => {
+                    *stage = ResourceStage::OnSite;
+                    task.primitive = ActionPrimitive::Hold(HoldKind::ResourceSite(*market));
+                }
+                ResourceStage::Returning => {
+                    *stage = ResourceStage::Unloading;
+                    task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
+                }
+                _ => {}
+            },
             ExecutionStrategy::ReturnToResidence { stage, .. } => {
                 if *stage == ReturnStage::Travelling {
                     *stage = ReturnStage::Recovering;

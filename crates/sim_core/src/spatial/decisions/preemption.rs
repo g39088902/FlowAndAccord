@@ -6,29 +6,37 @@ use super::super::agent::{Agent3D, PrimitiveActionState};
 use super::super::house::HouseTier;
 use super::super::ledger::journal::ResourceKind;
 use super::branches::BranchId;
-use super::needs::*;
 use super::evaluate::Decisioner;
-use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, HomeStage, CommitStage};
+use super::intent::{GoldPurpose, IntentKind};
+use super::needs::*;
 use super::primitive::{ActionPrimitive, ArrivalKind, HoldKind};
-use super::intent::{IntentKind, GoldPurpose};
+use super::strategy::{ActiveTask, CommitStage, ExecutionStrategy, HomeStage, ResourceStage};
 use super::transition;
 
 impl<'a> Decisioner<'a> {
-    /// 检查当前 agent 是否正在执行娱乐淘金（Tier 4 自我实现奢靡消遣）
+    /// 检查当前 agent 是否正在执行积累财富（Tier 4 庄园解锁的自我实现行为）
     pub fn is_executing_gold_wealth(&self, agent: &Agent3D) -> bool {
         if let Some(task) = &agent.active_task {
-            if matches!(task.intent.kind, IntentKind::AcquireGold(GoldPurpose::Wealth)) {
+            if matches!(
+                task.intent.kind,
+                IntentKind::AcquireGold(GoldPurpose::Wealth)
+            ) {
                 return true;
             }
         }
-        (agent.state == PrimitiveActionState::SeekingGold || agent.state == PrimitiveActionState::MiningGold)
+        (agent.state == PrimitiveActionState::SeekingGold
+            || agent.state == PrimitiveActionState::MiningGold)
             && !family_stock_on(agent, ResourceKind::Gold)
     }
 
     /// 检查当前 agent 是否正在采收集运建材（木/石）
     pub fn is_executing_building_material(&self, agent: &Agent3D) -> bool {
         if let Some(task) = &agent.active_task {
-            if matches!(task.intent.kind, IntentKind::StockHousehold(ResourceKind::Stone) | IntentKind::StockHousehold(ResourceKind::Wood)) {
+            if matches!(
+                task.intent.kind,
+                IntentKind::StockHousehold(ResourceKind::Stone)
+                    | IntentKind::StockHousehold(ResourceKind::Wood)
+            ) {
                 return true;
             }
         }
@@ -54,11 +62,17 @@ impl<'a> Decisioner<'a> {
     /// 检查当前 agent 是否正在房屋施工升级或修缮
     pub fn is_executing_construction_or_repair(&self, agent: &Agent3D) -> bool {
         if let Some(task) = &agent.active_task {
-            if matches!(task.intent.kind, IntentKind::RepairHome | IntentKind::UpgradeHome { .. }) {
+            if matches!(
+                task.intent.kind,
+                IntentKind::RepairHome | IntentKind::UpgradeHome { .. }
+            ) {
                 return true;
             }
         }
-        matches!(agent.state, PrimitiveActionState::ConstructingHouse | PrimitiveActionState::RepairingHouse)
+        matches!(
+            agent.state,
+            PrimitiveActionState::ConstructingHouse | PrimitiveActionState::RepairingHouse
+        )
     }
 
     /// ★ M19.4b 分级任务抢占核心仲裁器：
@@ -71,7 +85,7 @@ impl<'a> Decisioner<'a> {
         }
 
         // ──────────────────────────────────────────────────────────
-        // 矩阵行 1：娱乐淘金 (GoldWealth)
+        // 矩阵行 1：积累财富 (GoldWealth)
         // 允许被何种意图抢占：任何生理需求、安全储备、私宅修缮、登基远征
         // ──────────────────────────────────────────────────────────
         if self.is_executing_gold_wealth(agent) {
@@ -105,14 +119,20 @@ impl<'a> Decisioner<'a> {
                 return true;
             }
 
-            let home_house = agent.home_house_id
+            let home_house = agent
+                .home_house_id
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid));
 
             // 2. 冬季暴雪私宅断柴 (<10)：气温低于阈值、非 0 级仓库、且木材 < 10
             let is_freezing = self.ctx.temperature < self.config.house_winter_cold_temp;
-            let has_warm_house = home_house.map(|h| h.tier != HouseTier::Tier0Warehouse).unwrap_or(false);
+            let has_warm_house = home_house
+                .map(|h| h.tier != HouseTier::Tier0Warehouse)
+                .unwrap_or(false);
             let firewood_deficit = self.ledger_balance(agent, ResourceKind::Wood) < 10.0;
-            let not_already_wood = !matches!(agent.state, PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood);
+            let not_already_wood = !matches!(
+                agent.state,
+                PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood
+            );
 
             if is_freezing && has_warm_house && firewood_deficit && not_already_wood {
                 let need = Need {
@@ -124,7 +144,9 @@ impl<'a> Decisioner<'a> {
             }
 
             // 3. 私宅耐久危机 (< 20%)：私宅耐久濒临崩塌，抢修优先
-            let durability_critical = home_house.map(|h| h.durability < self.config.house_durability_max * 0.20).unwrap_or(false);
+            let durability_critical = home_house
+                .map(|h| h.durability < self.config.house_durability_max * 0.20)
+                .unwrap_or(false);
             if durability_critical {
                 let need = Need {
                     level: MaslowLevel::Safety,
@@ -212,8 +234,16 @@ impl<'a> Decisioner<'a> {
     /// 临界生理生存紧急抢占转向
     fn preempt_critical_survival(&mut self, agent: &mut Agent3D, kind: NeedKind) {
         let (branch, target_state, pool) = match kind {
-            NeedKind::QuenchThirst => (BranchId::B1QuenchThirst, PrimitiveActionState::SeekingWater, NodePool::Water),
-            NeedKind::SateHunger => (BranchId::B2SateHunger, PrimitiveActionState::SeekingFood, NodePool::Food),
+            NeedKind::QuenchThirst => (
+                BranchId::B1QuenchThirst,
+                PrimitiveActionState::SeekingWater,
+                NodePool::Water,
+            ),
+            NeedKind::SateHunger => (
+                BranchId::B2SateHunger,
+                PrimitiveActionState::SeekingFood,
+                NodePool::Food,
+            ),
             _ => return,
         };
         let need = Need {
@@ -230,13 +260,22 @@ impl<'a> Decisioner<'a> {
     }
 
     /// 执行抢占派发：清空旧任务控制器、保留背包、平滑重路由并安装新 ActiveTask
-    pub fn dispatch_preempted_task(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need) -> bool {
+    pub fn dispatch_preempted_task(
+        &mut self,
+        agent: &mut Agent3D,
+        branch: BranchId,
+        need: Need,
+    ) -> bool {
         transition::preempt_task(agent);
 
-        let home_house = agent.home_house_id
+        let home_house = agent
+            .home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid));
         let home_tier = home_house.map(|h| h.tier);
-        let intent = need.observe_intent(branch, home_tier).ok().and_then(|obs| obs.sustained());
+        let intent = need
+            .observe_intent(branch, home_tier)
+            .ok()
+            .and_then(|obs| obs.sustained());
 
         agent.current_need = state_need_label_with_agent(
             need.target_state,
@@ -244,18 +283,24 @@ impl<'a> Decisioner<'a> {
             self.houses,
             self.households,
             self.config,
-        ).map(|(lvl, k)| format!("{}·{}", lvl, k));
+        )
+        .map(|(lvl, k)| format!("{}·{}", lvl, k));
 
         match need.kind {
             NeedKind::QuenchThirst | NeedKind::StockWater => {
                 let pool = NodePool::Water;
                 if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
                     let at_target = agent.current_lane_id.is_none()
-                        && agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+                        && agent.world_pos.distance_to(&self.node_pos(target))
+                            <= self.config.poi_interaction_radius;
                     if at_target {
                         agent.enter_stationary_state(PrimitiveActionState::DrinkingAtWater);
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -263,7 +308,10 @@ impl<'a> Decisioner<'a> {
                                     poi,
                                     stage: ResourceStage::OnSite,
                                 },
-                                primitive: ActionPrimitive::Hold(poi.map(HoldKind::ResourceSite).unwrap_or(HoldKind::Residence)),
+                                primitive: ActionPrimitive::Hold(
+                                    poi.map(HoldKind::ResourceSite)
+                                        .unwrap_or(HoldKind::Residence),
+                                ),
                             };
                             transition::install_task(agent, task);
                         }
@@ -271,7 +319,11 @@ impl<'a> Decisioner<'a> {
                     }
                     if self.route_or_turn_around(agent, target, need.target_state) {
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -299,11 +351,16 @@ impl<'a> Decisioner<'a> {
                 let pool = NodePool::Food;
                 if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
                     let at_target = agent.current_lane_id.is_none()
-                        && agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+                        && agent.world_pos.distance_to(&self.node_pos(target))
+                            <= self.config.poi_interaction_radius;
                     if at_target {
                         agent.enter_stationary_state(PrimitiveActionState::ForagingFood);
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -311,7 +368,10 @@ impl<'a> Decisioner<'a> {
                                     poi,
                                     stage: ResourceStage::OnSite,
                                 },
-                                primitive: ActionPrimitive::Hold(poi.map(HoldKind::ResourceSite).unwrap_or(HoldKind::Residence)),
+                                primitive: ActionPrimitive::Hold(
+                                    poi.map(HoldKind::ResourceSite)
+                                        .unwrap_or(HoldKind::Residence),
+                                ),
                             };
                             transition::install_task(agent, task);
                         }
@@ -319,7 +379,11 @@ impl<'a> Decisioner<'a> {
                     }
                     if self.route_or_turn_around(agent, target, need.target_state) {
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -347,11 +411,16 @@ impl<'a> Decisioner<'a> {
                 let pool = NodePool::Wood;
                 if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
                     let at_target = agent.current_lane_id.is_none()
-                        && agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+                        && agent.world_pos.distance_to(&self.node_pos(target))
+                            <= self.config.poi_interaction_radius;
                     if at_target {
                         agent.enter_stationary_state(PrimitiveActionState::GatheringWood);
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -359,7 +428,10 @@ impl<'a> Decisioner<'a> {
                                     poi,
                                     stage: ResourceStage::OnSite,
                                 },
-                                primitive: ActionPrimitive::Hold(poi.map(HoldKind::ResourceSite).unwrap_or(HoldKind::Residence)),
+                                primitive: ActionPrimitive::Hold(
+                                    poi.map(HoldKind::ResourceSite)
+                                        .unwrap_or(HoldKind::Residence),
+                                ),
                             };
                             transition::install_task(agent, task);
                         }
@@ -367,7 +439,11 @@ impl<'a> Decisioner<'a> {
                     }
                     if self.route_or_turn_around(agent, target, need.target_state) {
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -395,11 +471,16 @@ impl<'a> Decisioner<'a> {
                 let pool = NodePool::Stone;
                 if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
                     let at_target = agent.current_lane_id.is_none()
-                        && agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+                        && agent.world_pos.distance_to(&self.node_pos(target))
+                            <= self.config.poi_interaction_radius;
                     if at_target {
                         agent.enter_stationary_state(PrimitiveActionState::MiningStone);
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -407,7 +488,10 @@ impl<'a> Decisioner<'a> {
                                     poi,
                                     stage: ResourceStage::OnSite,
                                 },
-                                primitive: ActionPrimitive::Hold(poi.map(HoldKind::ResourceSite).unwrap_or(HoldKind::Residence)),
+                                primitive: ActionPrimitive::Hold(
+                                    poi.map(HoldKind::ResourceSite)
+                                        .unwrap_or(HoldKind::Residence),
+                                ),
                             };
                             transition::install_task(agent, task);
                         }
@@ -415,7 +499,11 @@ impl<'a> Decisioner<'a> {
                     }
                     if self.route_or_turn_around(agent, target, need.target_state) {
                         if let Some(intent) = intent {
-                            let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                            let poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == target)
+                                .map(|rn| rn.poi_id);
                             let task = ActiveTask {
                                 intent,
                                 strategy: ExecutionStrategy::WildHarvest {
@@ -454,7 +542,11 @@ impl<'a> Decisioner<'a> {
                         };
                         transition::install_task(agent, task);
                     }
-                } else if self.route_or_turn_around(agent, target, PrimitiveActionState::RepairingHouse) {
+                } else if self.route_or_turn_around(
+                    agent,
+                    target,
+                    PrimitiveActionState::RepairingHouse,
+                ) {
                     if let Some(intent) = intent {
                         let task = ActiveTask {
                             intent,
@@ -473,17 +565,24 @@ impl<'a> Decisioner<'a> {
                 true
             }
             NeedKind::SeekThrone => {
-                let home_camp_id = agent.home_house_id
+                let home_camp_id = agent
+                    .home_house_id
                     .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                     .map(|h| h.camp_id);
-                let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id) else {
+                let Some(camp_id) =
+                    self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id)
+                else {
                     return false;
                 };
                 let Some(target_node) = self.camp_node_of(camp_id) else {
                     return false;
                 };
                 agent.expedition_target_camp = Some(camp_id);
-                if self.route_or_turn_around(agent, target_node, PrimitiveActionState::SeekingThrone) {
+                if self.route_or_turn_around(
+                    agent,
+                    target_node,
+                    PrimitiveActionState::SeekingThrone,
+                ) {
                     if let Some(intent) = intent {
                         let task = ActiveTask {
                             intent,

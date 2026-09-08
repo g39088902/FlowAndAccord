@@ -41,5 +41,5 @@ pub mod layout;
 pub mod strtab;
 
 pub use dict::enum_table_json;
-pub use layout::{BinWriter, SectionKind, FORMAT_VERSION, MAGIC, HEADER_LEN};
+pub use layout::{BinWriter, SectionKind, FORMAT_VERSION, HEADER_LEN, MAGIC};
 pub use strtab::StrTab;

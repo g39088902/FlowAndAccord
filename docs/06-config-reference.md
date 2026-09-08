@@ -123,7 +123,7 @@
 | `decisionCriticalHunger` | f32 | 25 | decisions/ (生理临界阈值) | 临界饥饿阈值 (触发觅食) |
 | `decisionRestStaminaTarget` | f32 | 100 | decisions/ (休息目标体力) | 休息目标体力 |
 | `decisionStockGoldCooldown` | f32 | 45 | decisions/ (备料淘金冷却) | 盖房备料淘金冷却 (秒) |
-| `decisionGoldWealthCooldown` | f32 | 180 | decisions/ (淘金冷却 §4.8) | 4 级庄园竣工前娱乐淘金冷却 (秒) |
+| `decisionGoldWealthCooldown` | f32 | 180 | decisions/ (淘金冷却 §4.8) | 4 级庄园积累财富的淘金策略冷却 (秒) |
 | `decisionHouseRepairNeedThreshold` | f32 | 50 | decisions/ (修缮触发) / housing_system/ | 房屋耐久低于此值触发修缮需求 |
 | `decisionFoundHomeHungerMin` | f32 | 20 | decisions/founding.rs (立宅选址) | 立宅所需最低饱食度 |
 | `decisionFoundHomeThirstMin` | f32 | 20 | decisions/founding.rs (立宅选址) | 立宅所需最低水分 |

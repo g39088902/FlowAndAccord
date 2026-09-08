@@ -19,7 +19,9 @@ impl World3DEngine {
         // 收集本拍需要转为空置的房屋索引（避免迭代中可变借用冲突）
         let mut to_vacate: Vec<usize> = Vec::new();
         for (idx, house) in self.houses.iter().enumerate() {
-            let Some(owner_id) = house.owner_id else { continue };
+            let Some(owner_id) = house.owner_id else {
+                continue;
+            };
             let owner_alive = self.agents.iter().any(|a| a.id == owner_id && a.is_alive);
             if !owner_alive {
                 to_vacate.push(idx);
@@ -84,7 +86,11 @@ impl World3DEngine {
             }
 
             // 登记到所属营地空置列表
-            if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == camp_id) {
+            if let Some(camp) = self
+                .pois
+                .iter_mut()
+                .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
+            {
                 camp.vacant_houses.push(VacantHouseEntry {
                     house_id,
                     beneficiary_ids: beneficiaries.clone(),
@@ -93,7 +99,9 @@ impl World3DEngine {
 
             self.last_event = Some(format!(
                 "🏚️ 户主 #{} 故去，#{} 号房屋成为无主空置房，登记受益人 {} 名（子女+配偶）！",
-                oid, house_id, beneficiaries.len()
+                oid,
+                house_id,
+                beneficiaries.len()
             ));
         }
     }

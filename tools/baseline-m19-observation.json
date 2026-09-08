@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "frozenAt": "2026-09-08T07:28:47.005Z",
+  "frozenAt": "2026-09-08T09:57:11.604Z",
   "frozenCommit": "af2d30e53810f4d625ce038cc846833549ab3b4a",
-  "targetWasmSha256": "ed593f1a8d68a632b72161b349debd52b6af1ab95241b4cf71282408611a07f7",
+  "targetWasmSha256": "72e5b6f35df776c3b2cc4e844e74736c30a76f52f45336bb1453c908048c6ebb",
   "sourceDigests": {
-    "crates/sim_core/src/spatial/decisions/intent.rs": "6264ee3ab99c54219b47cc7c61cf4700b17c72a56319f3937713b0528c205e77",
-    "crates/sim_core/src/spatial/decisions/strategy.rs": "3620c8358f68305815506b1590478da2b7ae91e3eb983af6619a438969dc6c4e",
-    "crates/sim_core/src/spatial/decisions/primitive.rs": "cef02951fd6efe0bed90e630c1f2356defd90e8e76a575de536e6ae6b0ace4d7",
-    "crates/sim_core/src/spatial/decisions/observation.rs": "35746f65e0a64e4fb9d144d905d49873d4c670e30aa23b706c2a6a61996e6e8e",
-    "crates/sim_core/src/spatial/decisions/branches.rs": "1aa14fe4f6b0303fd964720f5a6e4f90447550333c3d637b9a5877791beeb84a",
-    "crates/sim_core/src/spatial/decisions/evaluate.rs": "0e205395915328bbe4ac56e5cda220dd0227377a43d1fe6a8220e41fcb164759",
-    "crates/sim_core/src/spatial/agent.rs": "eb2c5a5b584bb1996c1caa35ec825c3714d6676e14bac3e541f492dd1f034c12",
-    "crates/sim_core/src/spatial/world_tick.rs": "cf78bc56eb49a6d522be27af9c372d3b8a4721d09f9194abdca47a01462908cd",
-    "crates/sim_wasm/src/lib.rs": "7e874daaf5f9b07c164babf907b542aad2fd8f4dcb6f898318e476a5104f15d8",
-    "frontend/rust/sim_wasm.wasm": "ed593f1a8d68a632b72161b349debd52b6af1ab95241b4cf71282408611a07f7"
+    "crates/sim_core/src/spatial/decisions/intent.rs": "5cd49bfde02d9d5a94d673949d75d7ec687301238a27d9280d400fb2a3f7132c",
+    "crates/sim_core/src/spatial/decisions/strategy.rs": "26a3f327ff47c01c8621764429fe2d215f45c4bbacd092a23109e7b0cf54ca2f",
+    "crates/sim_core/src/spatial/decisions/primitive.rs": "fd0ca5a0dadcd20a8355dbb7961767d692a79408343a3f2b20fa65f1ba877f81",
+    "crates/sim_core/src/spatial/decisions/observation.rs": "dd0ae87fc831d9b854a5c8b47967bb5ce059be3563014ad0eae3cc1f5a0537c2",
+    "crates/sim_core/src/spatial/decisions/branches.rs": "86058c553790d1fceea5dfc095a182bd545c4abea8e3536d3740cde4f3c388dd",
+    "crates/sim_core/src/spatial/decisions/evaluate.rs": "aca2d44ea396e97642e4a4a0897e6749ce428be2f334ecb5c838fd6315d4eefc",
+    "crates/sim_core/src/spatial/agent.rs": "0df2b3ccbedeba5db6d44167b8b7afee9d8275b11d082db792c61c4fc5b57e89",
+    "crates/sim_core/src/spatial/world_tick.rs": "320ff6ca3b6d4e28cbb3f9d675d271ffc5fcfb282b5fabe3af9e8a7b3819a2b9",
+    "crates/sim_wasm/src/lib.rs": "4f4dbe62868f0e4868d05ef5c27417269db139724ba1bc479e970937ebc9d722",
+    "frontend/rust/sim_wasm.wasm": "72e5b6f35df776c3b2cc4e844e74736c30a76f52f45336bb1453c908048c6ebb"
   },
   "toolchain": {
-    "node": "v24.20.0",
-    "platform": "win32",
-    "arch": "x64"
+    "node": "v24.14.1",
+    "platform": "darwin",
+    "arch": "arm64"
   },
   "layouts": {
     "Agent3D": {
@@ -50,7 +50,7 @@
       "align": 8
     }
   },
-  "probeChecksPassed": 239,
+  "probeChecksPassed": 226,
   "performanceBaseline": {
     "ticks": 3600,
     "throughputTps": 87631,
@@ -77,12 +77,12 @@
     "gridRes": 60,
     "worldSize": 764,
     "initialAgents": 20,
-    "saveHash1800": "0b6ceacdf9a48bf85ce0a492f799bc0acb2319da676769672cecc9ccc4c702b6",
-    "saveSize1800": 488390,
-    "saveHash3600": "55a98753947e5f13e9b70be4e715b5b324f1fe5988a9e96b1fe3553b5243ba03",
-    "saveSize3600": 491068,
-    "snapshotHash3600": "a4a257b321c7d3989dd90c2df2faa976b020e159434d18620486aa73dcf36b8d",
-    "snapshotSize3600": 106904
+    "saveHash1800": "1d05c444f58af0d4f8b31ed30295b778bfe555da42bdbc9287d9f7a8b11a4cd5",
+    "saveSize1800": 484824,
+    "saveHash3600": "2b3aaa88dbabdcb948301ee0fd0132eb6a956a7d5d615be23c74f6e6298156b5",
+    "saveSize3600": 487544,
+    "snapshotHash3600": "63ca6d6d6f833e26c065f553549c162cfc42c254c89f8197801088614de96876",
+    "snapshotSize3600": 106292
   },
   "configFieldsCount": 211
 }

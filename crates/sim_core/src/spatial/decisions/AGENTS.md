@@ -19,12 +19,12 @@
 | `transition.rs` | M19.2/M19.3 统一任务生命周期转换器：`install_task`、`advance_stage`、`on_navigation_arrived`、`on_offroad_detour`、`finish_task`、`cancel_task`、`on_agent_death` |
 | `observation.rs` | Agent3D::observe_execution 不可变借用事实；21 状态穷尽无损视图，pending 与持续活动分开 |
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
-| `branches.rs` | 18 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b18"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
+| `branches.rs` | 16 条活动分支注册表：b11 合并入 b8「改善住宅」，b15 下沉为资源意图的采购策略；包含 `BranchId`、中性声明序、自包含条件与层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
 | `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + ★ L1 持续仲裁 `arbitrate_sustained_task` + ★ L1 瞬发通道 `arbitrate_instant_needs` + ★ L2 策略派发 `dispatch_task` 与节拍推进 `step_in_progress_task` |
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询，任务归家同步 `sync_return_home_task` |
 | `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 / v1.36.0 `try_route_to_market`（水/粮/木断流时户主直接改道榷场，家户账本远程结算） |
-| `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 需求判定，支持水/粮/木急迫短缺赴市）+ `decide_seeking_market` / `decide_buying_market`（买满水/粮/木或资金见底返航） |
+| `market.rs` | 采购策略子模块：`can_procure_resource` / `should_buy_resource` 在水粮木意图下选择野外采集或市场采购；并负责市场途中与现场退出判定 |
 | `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询；★ L1 连续采收候选仲裁 `arbitrate_continuous_harvest_candidate`；★ v1.35.0 单趟多品类连续采收 `try_continue_harvesting`；★ M19.4d 多品类预排行程规划器 `plan_harvest_itinerary`（最近邻贪心 TSP，定长 4 站灌入 `Agent3D::harvest_queue`）；★ v1.27.0 / v1.36.0 水/粮/木目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`execute_pending_coronations`（★ M4 登基物理执行器）、`execute_pending_courtships`（★ 求偶成婚物理执行器）、`execute_pending_bids`（★ v1.26.0 竞拍出价物理执行器）与 `build_decision_context`（收集全图资源节点与单身女性候选） |
 
@@ -56,7 +56,7 @@
 
 ### 4.5 淘金冷却三处联动
 
-`GoldWealth`（娱乐淘金）冷却 180s，`StockGold`（备料）冷却 45s；`fulfill_resting_need` 与 `seeking.rs`/`harvest.rs` 三处按 `is_building_stock` 区分设置冷却，改动时三处联动。
+`GoldWealth`（积累财富意图，当前采用淘金策略）冷却 180s，`StockGold`（储备资金）冷却 45s；各处按活动任务真实来源区分，禁止按住宅等级反推。
 
 ### 4.6 无家宅 Agent
 
@@ -98,9 +98,9 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 ### 4.10 🔴 ⓪ 瞬间行为层（v1.29.0 起 · 优先级高于生理需求）
 
 - **语义**：`MaslowLevel::Instantaneous` 为 `MaslowLevel` 声明序**首位**变体（`Ord` 最小 = 优先级最高），编码 `0`；原「0=保留代码动态默认」迁移到哨兵 `6`。
-- **评估时机与续评估**：`decide()` 顶部 `evaluate_instant_needs` **全状态**、每拍最先执行，只遍历 `BranchId::is_instant()` 白名单（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅）；命中即 `apply_instant_need`（只写决心/pending，不 dispatch、不改 state、不消耗资源与 RNG）并 `continue` 继续遍历后续瞬发分支——因为本回合动作零消耗。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。
+- **评估时机与续评估**：`decide()` 顶部 `arbitrate_instant_needs` 全状态、每拍最先执行，只遍历 b8 在宅改善 / b16 近距求偶 / b17 竞购住宅 / b18 在宅生育。b8 安装可结算的升级任务，其余写 pending；异地变体仍交给持续任务仲裁。
 - **白名单与钳制**：只有 `is_instant()` 为 true 的分支可产出瞬间层结论；`level_override_for` 对「非瞬发分支被强制覆盖为 0」返回 None（回退代码默认层级），防止玩家在决策引擎 UI 把移动型分支（如 b1 解渴）拖进瞬间层破坏语义。
-- **瞬发变体写在分支内部（分支自包含铁律）**：b16 求偶「目标已在 `poi_interaction_radius` 内」、b18 育儿「夫妻已在自家宅门口（`couple_at_home_door`，判据与 `execute_pending_childcare` 的 at_home 一致）」返回 `Instantaneous` 结论；远距离仍返回原常规层结论走移动链路。b17 竞拍购房整体归入瞬间层。
+- **瞬发变体写在分支内部（分支自包含铁律）**：b8 本人静止在宅门、b16 目标在交互半径、b18 夫妻同在宅门时返回 `Instantaneous`；异地仍生成持续任务。b17 竞购住宅整体归入瞬发通道。
 - **幂等守卫**：b16 加 `courtship_pending.is_none()`、b18 加 `!raise_child_pending`、b17 加 `pending_bid_house_ids.is_empty()` + 冷却，避免每拍重复写。
 - **确定性**：瞬发链路不消耗 `WorldRng`（b17 用 `all_bid_candidates` 升序确定性枚举全部更高等级在售房，b16 用 `best_courtship_target` 的 `min_by`）。
 - **标签**：瞬发命中写 `"Instantaneous·BidHouse/Courtship/RaiseChild"`；本拍无常规需求时保留瞬间标签，否则被常规标签覆盖。
@@ -150,4 +150,3 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 若行囊未满且家户该品类仍短缺，`decide_drinking`/`decide_foraging` 的 `finished` 判据不成立，Agent 会在资源点**原地持续采集**，
 根本不会进入 `try_continue_harvesting`，表现为「预排队列不生效 / 行程不推进」的**假故障**。
 同类坑亦见于「家宅已备满」类场景——须同时把 `family_stock_active` 置位或直接给足账本余额。
-

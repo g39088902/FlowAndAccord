@@ -1,13 +1,15 @@
-use serde::{Deserialize, Serialize};
-use super::vec3::Vec3;
-use super::graph::{LaneId, NodeId};
 use super::agent::AgentId;
-use super::poi::PoiId;
-use super::decisions::strategy::{ActiveTask, ExecutionStrategy, ResidenceTarget};
-use super::decisions::intent::{IntentKind, CompletionPolicy};
-use super::decisions::primitive::{ActionPrimitive, HoldKind};
 use super::decisions::branches::BranchId;
-pub use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
+use super::decisions::intent::{CompletionPolicy, IntentKind};
+use super::decisions::primitive::{ActionPrimitive, HoldKind};
+use super::decisions::strategy::{ActiveTask, ExecutionStrategy, ResidenceTarget};
+use super::graph::{LaneId, NodeId};
+pub use super::house::{
+    HouseAuctionHistorySnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseSnapshot,
+};
+use super::poi::PoiId;
+use super::vec3::Vec3;
+use serde::{Deserialize, Serialize};
 
 /// 四季系统 (240秒完整年轮，每季60秒)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -266,7 +268,7 @@ pub struct AgentSnapshot {
     pub hunger: f32, // 0.0 ~ 25.0 单位
     pub thirst: f32, // 0.0 ~ 25.0 单位
     pub stamina: f32,
-    pub health: f32, // 健康需求值
+    pub health: f32,     // 健康需求值
     pub max_health: f32, // 健康上限/寿命基准
     pub is_pregnant: bool,
     pub pregnancy_progress: f32,
@@ -296,7 +298,7 @@ pub struct AgentSnapshot {
     pub sleep_efficiency: f32,
     pub life_expectancy: f32,
     // 姓氏宗族与威望
-    pub surname: String,   // 姓氏 (始祖随机赋予，后代父系继承)
+    pub surname: String, // 姓氏 (始祖随机赋予，后代父系继承)
     /// ★ M6 威望持久综合分值（所有影响因子集合体）：当前因子 = 子嗣活产 +1、宅邸每级 +1；
     /// 子女日后死亡不回减；随 agent 终身、不随房屋/家户转移（非"宗族声望"）
     pub prestige: u32,
@@ -345,25 +347,24 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
     fn from(t: &ActiveTask) -> Self {
         let branch = t.intent.source_branch.str_id().to_string();
         let branch_desc = match t.intent.source_branch {
-            BranchId::B1QuenchThirst => "渴饮",
-            BranchId::B2SateHunger => "饥食",
-            BranchId::B3Rest => "休息",
-            BranchId::B4RepairHouse => "修房",
-            BranchId::B5StockWater => "备水",
-            BranchId::B6StockFood => "备粮",
-            BranchId::B7StockWood => "备木",
-            BranchId::B8BuildHouseTier0 => "立宅",
-            BranchId::B9StockStone => "备石",
-            BranchId::B10StockGold => "备金",
-            BranchId::B11BuildHouseUpgrade => "升级",
-            BranchId::B12FoundHome => "自立",
-            BranchId::B13GoldWealth => "财富",
-            BranchId::B14SeekThrone => "夺位",
-            BranchId::B15MarketTrade => "榷市",
-            BranchId::B16Courtship => "求偶",
-            BranchId::B17BidHouse => "竞拍",
-            BranchId::B18RaiseChild => "育儿",
-        }.to_string();
+            BranchId::B1QuenchThirst => "饮水解渴",
+            BranchId::B2SateHunger => "进食充饥",
+            BranchId::B3Rest => "恢复体力",
+            BranchId::B4RepairHouse => "修缮住宅",
+            BranchId::B5StockWater => "储备饮水",
+            BranchId::B6StockFood => "储备食物",
+            BranchId::B7StockWood => "储备木材",
+            BranchId::B8ImproveHome => "改善住宅",
+            BranchId::B9StockStone => "储备石材",
+            BranchId::B10StockGold => "储备资金",
+            BranchId::B12FoundHome => "建立家宅",
+            BranchId::B13GoldWealth => "积累财富",
+            BranchId::B14SeekThrone => "争取王位",
+            BranchId::B16Courtship => "求偶成家",
+            BranchId::B17BidHouse => "竞购住宅",
+            BranchId::B18RaiseChild => "生育后代",
+        }
+        .to_string();
         let level = t.intent.level.as_str().to_string();
         let intent_kind = match t.intent.kind {
             IntentKind::SatisfySurvival(res) => format!("SatisfySurvival({:?})", res),
@@ -380,8 +381,12 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
         };
         let completion = match t.intent.completion {
             CompletionPolicy::SurvivalSatisfied(res) => format!("SurvivalSatisfied({:?})", res),
-            CompletionPolicy::HouseholdStockSatisfied(res) => format!("HouseholdStockSatisfied({:?})", res),
-            CompletionPolicy::GoldTripFinished(purpose) => format!("GoldTripFinished({:?})", purpose),
+            CompletionPolicy::HouseholdStockSatisfied(res) => {
+                format!("HouseholdStockSatisfied({:?})", res)
+            }
+            CompletionPolicy::GoldTripFinished(purpose) => {
+                format!("GoldTripFinished({:?})", purpose)
+            }
             CompletionPolicy::EmergencySupplyFinished => "EmergencySupplyFinished".to_string(),
             CompletionPolicy::RecoveryFinished => "RecoveryFinished".to_string(),
             CompletionPolicy::HomeRepaired => "HomeRepaired".to_string(),
@@ -401,7 +406,8 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
             ExecutionStrategy::FoundHome { .. } => "FoundHome",
             ExecutionStrategy::UpgradeHome { .. } => "UpgradeHome",
             ExecutionStrategy::RepairHome { .. } => "RepairHome",
-        }.to_string();
+        }
+        .to_string();
         let stage = match t.strategy {
             ExecutionStrategy::WildHarvest { stage, .. } => format!("{:?}", stage),
             ExecutionStrategy::MarketTrade { stage, .. } => format!("{:?}", stage),
@@ -414,7 +420,10 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
             ExecutionStrategy::RepairHome { stage, .. } => format!("{:?}", stage),
         };
         let (target_id, target_type) = match t.strategy {
-            ExecutionStrategy::WildHarvest { poi, .. } => (poi.map(|p| p as u32), if poi.is_some() { "Poi" } else { "None" }),
+            ExecutionStrategy::WildHarvest { poi, .. } => (
+                poi.map(|p| p as u32),
+                if poi.is_some() { "Poi" } else { "None" },
+            ),
             ExecutionStrategy::MarketTrade { market, .. } => (Some(market as u32), "Poi"),
             ExecutionStrategy::ReturnToResidence { destination, .. } => match destination {
                 ResidenceTarget::House(hid) => (Some(hid), "House"),
@@ -423,7 +432,9 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
             ExecutionStrategy::Courtship { female, .. } => (Some(female), "Agent"),
             ExecutionStrategy::ClaimThrone { camp, .. } => (Some(camp), "Camp"),
             ExecutionStrategy::Childcare { house, .. } => (Some(house), "House"),
-            ExecutionStrategy::FoundHome { route_target, .. } => (Some(route_target as u32), "Camp"),
+            ExecutionStrategy::FoundHome { route_target, .. } => {
+                (Some(route_target as u32), "Camp")
+            }
             ExecutionStrategy::UpgradeHome { house, .. } => (Some(house), "House"),
             ExecutionStrategy::RepairHome { house, .. } => (Some(house), "House"),
         };
@@ -442,10 +453,9 @@ impl From<&ActiveTask> for ActiveTaskSnapshot {
                     HoldKind::OffRoad => "OffRoad".to_string(),
                 },
             ),
-            ActionPrimitive::AwaitSettlement => (
-                "AwaitSettlement".to_string(),
-                "Settlement".to_string(),
-            ),
+            ActionPrimitive::AwaitSettlement => {
+                ("AwaitSettlement".to_string(), "Settlement".to_string())
+            }
         };
         ActiveTaskSnapshot {
             branch,
@@ -470,11 +480,11 @@ impl ActiveTaskSnapshot {
         let mut snap = Self::from(t);
         let mut stops = Vec::new();
         let cur = match t.intent.source_branch {
-            BranchId::B5StockWater => "💧备水",
-            BranchId::B6StockFood => "🍒备粮",
-            BranchId::B7StockWood => "🌲备木",
-            BranchId::B9StockStone => "🪨备石",
-            BranchId::B10StockGold => "🪙备金",
+            BranchId::B5StockWater => "💧储备饮水",
+            BranchId::B6StockFood => "🍒储备食物",
+            BranchId::B7StockWood => "🌲储备木材",
+            BranchId::B9StockStone => "🪨储备石材",
+            BranchId::B10StockGold => "🪙储备资金",
             _ => "",
         };
         if !cur.is_empty() {
@@ -482,11 +492,11 @@ impl ActiveTaskSnapshot {
         }
         for opt_b in queue.iter().flatten() {
             let name = match opt_b {
-                BranchId::B5StockWater => "💧备水",
-                BranchId::B6StockFood => "🍒备粮",
-                BranchId::B7StockWood => "🌲备木",
-                BranchId::B9StockStone => "🪨备石",
-                BranchId::B10StockGold => "🪙备金",
+                BranchId::B5StockWater => "💧储备饮水",
+                BranchId::B6StockFood => "🍒储备食物",
+                BranchId::B7StockWood => "🌲储备木材",
+                BranchId::B9StockStone => "🪨储备石材",
+                BranchId::B10StockGold => "🪙储备资金",
                 _ => "",
             };
             if !name.is_empty() {

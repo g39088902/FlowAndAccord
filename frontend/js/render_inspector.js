@@ -808,11 +808,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else if (selAgent.courtshipPending != null) {
         instMsg = `登记完婚 @ 伴侣 #${selAgent.courtshipPending}`;
       } else if (selAgent.raiseChildPending) {
-        instMsg = `自主育儿受孕结算`;
+        instMsg = `生育后代 · 受孕结算`;
       } else if (selAgent.pendingBidHouseIds && selAgent.pendingBidHouseIds.length > 0) {
-        instMsg = `麦穗竞拍出价 @ 房屋 #${selAgent.pendingBidHouseIds[0]}`;
+        instMsg = `竞购住宅 · 出价 @ 房屋 #${selAgent.pendingBidHouseIds[0]}`;
       } else if (selAgent.pendingHousePos) {
-        instMsg = `自立门户选址待落成`;
+        instMsg = `建立家宅 · 选址待落成`;
       }
       if (instMsg && selAgent.isAlive && !selAgent.isFetus) {
         instantText.textContent = instMsg;
@@ -837,7 +837,11 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     if (elBranch && elLevel && elCompletion && elStrategy && elTarget && elStage && elPrimitive && elPrimDetail && elStatus) {
       const task = selAgent.activeTask || selAgent.active_task;
       if (task) {
-        elBranch.textContent = `${task.branch} ${task.branchDesc || task.branch_desc || ''}`;
+        const branchMeta = window.SIM_DECISION_VIZ_DATA && window.SIM_DECISION_VIZ_DATA.BRANCH_MAP
+          ? window.SIM_DECISION_VIZ_DATA.BRANCH_MAP[task.branch]
+          : null;
+        const branchName = branchMeta ? branchMeta.zh : (task.branchDesc || task.branch_desc || '未知分支');
+        elBranch.textContent = `${task.branch} ${branchName}`;
         elBranch.title = `${task.branch} (${task.intentKind || task.intent_kind || ''})`;
         
         const lvlMap = {
@@ -868,14 +872,14 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
         const stratMap = {
           WildHarvest: '野外采收',
-          MarketTrade: '榷场商贸',
+          MarketTrade: '采购物资',
           ReturnToResidence: '返家休整',
-          Courtship: '寻访求偶',
-          ClaimThrone: '远征夺位',
-          Childcare: '居所育儿',
-          FoundHome: '自立营建',
-          UpgradeHome: '私宅升级',
-          RepairHome: '房屋修缮',
+          Courtship: '求偶成家',
+          ClaimThrone: '争取王位',
+          Childcare: '返宅生育',
+          FoundHome: '建立家宅',
+          UpgradeHome: '改善住宅',
+          RepairHome: '修缮住宅',
         };
         elStrategy.textContent = stratMap[task.strategyKind || task.strategy_kind] || task.strategyKind || task.strategy_kind || '--';
         
@@ -936,8 +940,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else if (selAgent.isAlive && !selAgent.isFetus) {
         if (elItineraryRow) elItineraryRow.style.display = 'none';
         // 闲适休养状态
-        elBranch.textContent = 'b3 休息';
-        elBranch.title = 'b3 闲适安居 / 营地休养';
+        elBranch.textContent = 'b3 恢复体力';
+        elBranch.title = 'b3 恢复体力 / 营地休养';
         elLevel.textContent = '① 生理';
         elLevel.title = 'Physiological';
         elCompletion.textContent = selAgent.stamina >= 99.5 ? '充沛满值' : '恢复中';

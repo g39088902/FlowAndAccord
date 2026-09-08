@@ -1,6 +1,6 @@
-use crate::config::SimConfig;
 use super::poi::PoiType;
 use super::world::World3DEngine;
+use crate::config::SimConfig;
 
 /// 配置注入与反序列化
 ///
@@ -56,7 +56,8 @@ impl World3DEngine {
             if poi.max_stock.is_finite() && poi.current_stock > poi.max_stock {
                 poi.current_stock = poi.max_stock;
             }
-            if poi.secondary_max_stock.is_finite() && poi.secondary_stock > poi.secondary_max_stock {
+            if poi.secondary_max_stock.is_finite() && poi.secondary_stock > poi.secondary_max_stock
+            {
                 poi.secondary_stock = poi.secondary_max_stock;
             }
             if poi.tertiary_max_stock.is_finite() && poi.tertiary_stock > poi.tertiary_max_stock {

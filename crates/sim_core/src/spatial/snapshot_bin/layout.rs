@@ -105,7 +105,9 @@ pub struct BinWriter {
 
 impl BinWriter {
     pub fn with_capacity(cap: usize) -> Self {
-        Self { buf: Vec::with_capacity(cap) }
+        Self {
+            buf: Vec::with_capacity(cap),
+        }
     }
 
     pub fn into_inner(self) -> Vec<u8> {

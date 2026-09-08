@@ -12,7 +12,8 @@
 
   var D = global.SIM_DECISION_VIZ_DATA;
   // ★ v1.29.0 编码迁移：0 由「保留代码动态默认」改为「⓪ 瞬间行为」，动态默认哨兵改为 6
-  var STORE_KEY = 'flowaccord.decision-order.v2';
+  var STORE_KEY = 'flowaccord.decision-order.v3';
+  var PREVIOUS_STORE_KEY = 'flowaccord.decision-order.v2';
   var LEGACY_STORE_KEY = 'flowaccord.decision-order.v1';
   var DYNAMIC_DEFAULT = 6;   // 层级覆盖哨兵：保留分支自带的代码动态默认
   var LV_MAX = 5;            // 最大合法层级码（⓪ 瞬间 … ⑤ 自我实现）
@@ -103,6 +104,27 @@
     } catch (e) { /* ignore */ }
     return null;
   }
+  /** 18→16 分支迁移：移除策略型 b15，将 b11 合并到已存在的 b8，并保留其余相对顺序与层级。 */
+  function loadPrevious() {
+    try {
+      var raw = localStorage.getItem(PREVIOUS_STORE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !Array.isArray(o.decisionEvalOrder)) return null;
+      var levelById = {};
+      o.decisionEvalOrder.forEach(function (id, i) {
+        levelById[id] = Array.isArray(o.decisionEvalLevels) ? o.decisionEvalLevels[i] : DYNAMIC_DEFAULT;
+      });
+      var order = o.decisionEvalOrder.filter(function (id) { return id !== 'b11' && id !== 'b15' && D.BRANCH_MAP[id]; });
+      D.DEFAULT_ORDER.forEach(function (id) { if (order.indexOf(id) < 0) order.push(id); });
+      if (!isValidOrder(order)) return null;
+      var levels = order.map(function (id) {
+        var value = levelById[id];
+        return Number.isInteger(value) && value >= 0 && value <= 6 ? value : DYNAMIC_DEFAULT;
+      });
+      return { decisionEvalOrder: order, decisionEvalLevels: levels };
+    } catch (e) { return null; }
+  }
   function savePending(o) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify({ schema: 1, decisionEvalOrder: o.decisionEvalOrder, decisionEvalLevels: o.decisionEvalLevels, savedAt: Date.now() })); } catch (e) { /* ignore */ }
   }
@@ -116,6 +138,15 @@
     if (!cfg) return;
     var file = global.SIM_DECISION_ORDER;
     var pending = loadPending();
+    if (!pending) {
+      var previous = loadPrevious();
+      if (previous) {
+        savePending(previous);
+        try { localStorage.removeItem(PREVIOUS_STORE_KEY); } catch (e) { /* ignore */ }
+        pending = previous;
+        console.info('[DecisionViz] 已迁移为 16 分支配置（b11→b8，b15→采购策略）');
+      }
+    }
     if (!pending) {
       // ★ v1.29.0 旧键（v1）迁移：0（动态默认）→ 6 后写入 v2 并清除旧键，避免重复迁移
       var legacy = loadLegacy();

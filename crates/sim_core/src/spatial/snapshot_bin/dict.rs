@@ -29,7 +29,10 @@ pub fn gender_code(g: Gender) -> u8 {
 }
 
 pub fn gender_table() -> Vec<&'static str> {
-    [Gender::Male, Gender::Female].iter().map(|g| g.as_str()).collect()
+    [Gender::Male, Gender::Female]
+        .iter()
+        .map(|g| g.as_str())
+        .collect()
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -66,11 +69,27 @@ pub fn state_code(s: PrimitiveActionState) -> u8 {
 pub fn state_table() -> Vec<&'static str> {
     use PrimitiveActionState as S;
     [
-        S::RestingAtCamp, S::SeekingWater, S::SeekingFood, S::DrinkingAtWater, S::ForagingFood,
-        S::SeekingWood, S::GatheringWood, S::SeekingStone, S::MiningStone, S::SeekingGold,
-        S::MiningGold, S::ReturningToCamp, S::ConstructingHouse, S::RepairingHouse,
-        S::OffRoadDetour, S::SeekingThrone, S::SeekingMarket, S::BuyingAtMarket,
-        S::SeekingCourtship, S::RaiseChild, S::Dead,
+        S::RestingAtCamp,
+        S::SeekingWater,
+        S::SeekingFood,
+        S::DrinkingAtWater,
+        S::ForagingFood,
+        S::SeekingWood,
+        S::GatheringWood,
+        S::SeekingStone,
+        S::MiningStone,
+        S::SeekingGold,
+        S::MiningGold,
+        S::ReturningToCamp,
+        S::ConstructingHouse,
+        S::RepairingHouse,
+        S::OffRoadDetour,
+        S::SeekingThrone,
+        S::SeekingMarket,
+        S::BuyingAtMarket,
+        S::SeekingCourtship,
+        S::RaiseChild,
+        S::Dead,
     ]
     .iter()
     .map(|s| s.as_str())
@@ -97,7 +116,13 @@ pub fn poi_type_code(p: PoiType) -> u8 {
 pub fn poi_type_table() -> Vec<&'static str> {
     use PoiType as P;
     [
-        P::Camp, P::WaterSource, P::BerryBush, P::WoodForest, P::StoneQuarry, P::GoldMine, P::Market,
+        P::Camp,
+        P::WaterSource,
+        P::BerryBush,
+        P::WoodForest,
+        P::StoneQuarry,
+        P::GoldMine,
+        P::Market,
     ]
     .iter()
     .map(|p| p.as_str())
@@ -122,7 +147,11 @@ pub fn node_type_code(n: NodeType) -> u8 {
 pub fn node_type_table() -> Vec<&'static str> {
     use NodeType as N;
     [
-        N::GroundIntersection, N::ElevatedOverpass, N::TunnelPortal, N::CulDeSac, N::SecretHideout,
+        N::GroundIntersection,
+        N::ElevatedOverpass,
+        N::TunnelPortal,
+        N::CulDeSac,
+        N::SecretHideout,
     ]
     .iter()
     .map(|n| n.as_str())
@@ -147,7 +176,11 @@ pub fn road_class_code(r: RoadClass) -> u8 {
 pub fn road_class_table() -> Vec<&'static str> {
     use RoadClass as R;
     [
-        R::DirtTrack, R::Cobblestone, R::AsphaltUrban, R::SkywayElevated, R::SmugglerTrail,
+        R::DirtTrack,
+        R::Cobblestone,
+        R::AsphaltUrban,
+        R::SkywayElevated,
+        R::SmugglerTrail,
     ]
     .iter()
     .map(|r| r.as_str())
@@ -172,7 +205,11 @@ pub fn house_tier_code(t: HouseTier) -> u8 {
 pub fn house_tier_table() -> Vec<&'static str> {
     use HouseTier as T;
     [
-        T::Tier0Warehouse, T::Tier1ThatchedHut, T::Tier2LeanTo, T::Tier3Homestead, T::Tier4Manor,
+        T::Tier0Warehouse,
+        T::Tier1ThatchedHut,
+        T::Tier2LeanTo,
+        T::Tier3Homestead,
+        T::Tier4Manor,
     ]
     .iter()
     .map(|t| t.as_str())
@@ -206,7 +243,11 @@ pub const RESOURCE_KIND_ORDER: [ResourceKind; 5] = [
 ];
 
 pub fn resource_kind_table() -> Vec<&'static str> {
-    RESOURCE_KIND_ORDER.iter().map(|r| format!("{:?}", r)).collect::<Vec<_>>().into_iter()
+    RESOURCE_KIND_ORDER
+        .iter()
+        .map(|r| format!("{:?}", r))
+        .collect::<Vec<_>>()
+        .into_iter()
         .map(|s| Box::leak(s.into_boxed_str()) as &'static str)
         .collect()
 }
@@ -284,10 +325,28 @@ pub fn transfer_reason_code(r: TransferReason) -> u8 {
 pub fn transfer_reason_table() -> Vec<&'static str> {
     use TransferReason as T;
     [
-        T::Harvest, T::Deposit, T::Consume, T::Heating, T::Construction, T::Maintenance,
-        T::Inheritance, T::Split, T::Tax, T::Tribute, T::Relief, T::MutualAid, T::Legacy,
-        T::Wage, T::Dividend, T::Investment, T::Market, T::HousingPurchase, T::EstateShare,
-        T::TransferTax, T::RoyalPrivy, T::ImperialPrivy,
+        T::Harvest,
+        T::Deposit,
+        T::Consume,
+        T::Heating,
+        T::Construction,
+        T::Maintenance,
+        T::Inheritance,
+        T::Split,
+        T::Tax,
+        T::Tribute,
+        T::Relief,
+        T::MutualAid,
+        T::Legacy,
+        T::Wage,
+        T::Dividend,
+        T::Investment,
+        T::Market,
+        T::HousingPurchase,
+        T::EstateShare,
+        T::TransferTax,
+        T::RoyalPrivy,
+        T::ImperialPrivy,
     ]
     .iter()
     .map(|r| format!("{:?}", r))

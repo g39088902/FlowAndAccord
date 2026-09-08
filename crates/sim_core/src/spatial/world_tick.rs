@@ -1,10 +1,10 @@
-use std::collections::{BTreeSet, HashMap};
 use super::agent::{Agent3D, AgentId, Gender};
 use super::graph::NodeId;
 use super::poi::PoiType;
+use super::snapshot::RecentDeathSnapshot;
 use super::vec3::Vec3;
 use super::world::World3DEngine;
-use super::snapshot::RecentDeathSnapshot;
+use std::collections::{BTreeSet, HashMap};
 
 /// 死亡/流产墓碑滑动窗口（tick）：覆盖前端最高倍速(1024x)单帧推进与任意渲染间隙
 const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
@@ -69,13 +69,18 @@ impl World3DEngine {
                 let mult_food = self.berry_regen_multiplier;
                 let mult_wood = self.wood_regen_multiplier;
                 if poi.regen_rate > 0.0 && poi.current_stock.is_finite() {
-                    poi.current_stock = (poi.current_stock + poi.regen_rate * dt * mult_water).min(poi.max_stock);
+                    poi.current_stock =
+                        (poi.current_stock + poi.regen_rate * dt * mult_water).min(poi.max_stock);
                 }
                 if poi.secondary_regen_rate > 0.0 && poi.secondary_max_stock > 0.0 {
-                    poi.secondary_stock = (poi.secondary_stock + poi.secondary_regen_rate * dt * mult_food).min(poi.secondary_max_stock);
+                    poi.secondary_stock = (poi.secondary_stock
+                        + poi.secondary_regen_rate * dt * mult_food)
+                        .min(poi.secondary_max_stock);
                 }
                 if poi.tertiary_regen_rate > 0.0 && poi.tertiary_max_stock > 0.0 {
-                    poi.tertiary_stock = (poi.tertiary_stock + poi.tertiary_regen_rate * dt * mult_wood).min(poi.tertiary_max_stock);
+                    poi.tertiary_stock = (poi.tertiary_stock
+                        + poi.tertiary_regen_rate * dt * mult_wood)
+                        .min(poi.tertiary_max_stock);
                 }
             } else {
                 let base_regen = match poi.poi_type {
@@ -118,7 +123,10 @@ impl World3DEngine {
                     }
                     self.recent_deaths.push(RecentDeathSnapshot {
                         id: agent.id,
-                        cause: agent.death_cause.clone().unwrap_or_else(|| "未知死因".to_string()),
+                        cause: agent
+                            .death_cause
+                            .clone()
+                            .unwrap_or_else(|| "未知死因".to_string()),
                         is_natural: agent.death_is_natural,
                         is_fetus: false,
                         father_id: agent.father_id,
@@ -193,12 +201,16 @@ impl World3DEngine {
         let mut pairs = Vec::new();
         for a in &self.agents {
             if a.raise_child_pending {
-                if let Some(wife_id) = a.spouse_id { pairs.push((a.id, wife_id)); }
+                if let Some(wife_id) = a.spouse_id {
+                    pairs.push((a.id, wife_id));
+                }
             }
         }
         let mut next_id = self.next_agent_id;
         for (male_id, wife_id) in pairs {
-            let Some(mi) = self.agents.iter().position(|a| a.id == male_id) else { continue };
+            let Some(mi) = self.agents.iter().position(|a| a.id == male_id) else {
+                continue;
+            };
             let Some(wi) = self.agents.iter().position(|a| a.id == wife_id) else {
                 self.agents[mi].raise_child_pending = false;
                 crate::spatial::decisions::transition::cancel_task(&mut self.agents[mi]);
@@ -207,27 +219,47 @@ impl World3DEngine {
             let eligible = {
                 let m = &self.agents[mi];
                 let w = &self.agents[wi];
-                m.is_alive && m.gender == Gender::Male && !m.is_fetus && m.age >= self.config.agent_adult_age
+                m.is_alive
+                    && m.gender == Gender::Male
+                    && !m.is_fetus
+                    && m.age >= self.config.agent_adult_age
                     && m.spouse_id == Some(wife_id)
-                    && w.is_alive && w.gender == Gender::Female && !w.is_fetus && w.age >= self.config.agent_adult_age
-                    && !w.is_pregnant && w.miscarriage_cooldown_timer <= 0.0 && w.postpartum_cooldown_timer <= 0.0
-                    && w.hunger >= self.config.agent_conception_hunger_min && w.thirst >= self.config.agent_conception_thirst_min
+                    && w.is_alive
+                    && w.gender == Gender::Female
+                    && !w.is_fetus
+                    && w.age >= self.config.agent_adult_age
+                    && !w.is_pregnant
+                    && w.miscarriage_cooldown_timer <= 0.0
+                    && w.postpartum_cooldown_timer <= 0.0
+                    && w.hunger >= self.config.agent_conception_hunger_min
+                    && w.thirst >= self.config.agent_conception_thirst_min
                     && w.stamina >= self.config.agent_conception_stamina_min
             };
             // 养育动作必须在夫妻回到户主住宅后才落地；未到家则保留意图，等待下一拍。
-            let at_home = self.houses.iter().find(|h| h.owner_id == Some(male_id))
+            let at_home = self
+                .houses
+                .iter()
+                .find(|h| h.owner_id == Some(male_id))
                 .map(|h| {
-                    let door = self.network.graph[*self.network.node_map.get(&h.door_node_id).unwrap()].pos;
-                    self.agents[mi].world_pos.distance_to(&door) <= self.config.poi_interaction_radius
-                        && self.agents[wi].world_pos.distance_to(&door) <= self.config.poi_interaction_radius
-                        && self.agents[mi].current_lane_id.is_none() && self.agents[wi].current_lane_id.is_none()
-                }).unwrap_or(false);
+                    let door = self.network.graph
+                        [*self.network.node_map.get(&h.door_node_id).unwrap()]
+                    .pos;
+                    self.agents[mi].world_pos.distance_to(&door)
+                        <= self.config.poi_interaction_radius
+                        && self.agents[wi].world_pos.distance_to(&door)
+                            <= self.config.poi_interaction_radius
+                        && self.agents[mi].current_lane_id.is_none()
+                        && self.agents[wi].current_lane_id.is_none()
+                })
+                .unwrap_or(false);
             if !eligible {
                 self.agents[mi].raise_child_pending = false;
                 crate::spatial::decisions::transition::cancel_task(&mut self.agents[mi]);
                 continue;
             }
-            if !at_home { continue; }
+            if !at_home {
+                continue;
+            }
             self.agents[mi].raise_child_pending = false;
             crate::spatial::decisions::transition::finish_task(&mut self.agents[mi]);
             self.agents[wi].is_pregnant = true;
@@ -235,7 +267,10 @@ impl World3DEngine {
             self.agents[wi].pregnancy_child_id = Some(next_id);
             self.agents[wi].pregnancy_progress = 0.0;
             next_id += 1;
-            self.last_event = Some(format!("🤰 女性部落民 #{} 在丈夫 #{} 的养育行动下成功受孕！", wife_id, male_id));
+            self.last_event = Some(format!(
+                "🤰 女性部落民 #{} 在丈夫 #{} 的养育行动下成功受孕！",
+                wife_id, male_id
+            ));
         }
         self.next_agent_id = next_id;
     }
@@ -243,7 +278,9 @@ impl World3DEngine {
     /// 结算已故族人的金币遗产：某人死后随身金币平分给在世妻子（如有）与在世子一代
     pub fn settle_gold_inheritance(&mut self) {
         loop {
-            let deceased_info = self.agents.iter_mut()
+            let deceased_info = self
+                .agents
+                .iter_mut()
                 .find(|a| !a.is_alive && a.carried_gold > 0.0001)
                 .map(|a| {
                     let gold = a.carried_gold;
@@ -260,7 +297,9 @@ impl World3DEngine {
                         if let Some(&mid) = mids.last() {
                             if let Some(m) = self.marriage_registry.get(mid) {
                                 if m.husband_id == deceased_id {
-                                    let wife_alive = self.agent_index.get(&m.wife_id)
+                                    let wife_alive = self
+                                        .agent_index
+                                        .get(&m.wife_id)
                                         .and_then(|idx| self.agents.get(*idx))
                                         .map(|a| a.is_alive)
                                         .unwrap_or(false);
@@ -274,7 +313,10 @@ impl World3DEngine {
 
                     // 2. 在世子女
                     for a in &self.agents {
-                        if a.is_alive && (a.father_id == Some(deceased_id) || a.mother_id == Some(deceased_id)) {
+                        if a.is_alive
+                            && (a.father_id == Some(deceased_id)
+                                || a.mother_id == Some(deceased_id))
+                        {
                             if !heirs.contains(&a.id) {
                                 heirs.push(a.id);
                             }
@@ -343,10 +385,13 @@ impl World3DEngine {
             //   father_id/mother_id 随墓碑入档——高倍速下胎儿整个生命周期（受孕→流产）可能都在单帧内，
             //   前端上一帧快照取不到该胎儿，血缘必须由墓碑携带，否则族谱节点画不出来。
             for rid in &to_remove {
-                let (cause, father_id, mother_id) = self.agents.iter()
+                let (cause, father_id, mother_id) = self
+                    .agents
+                    .iter()
                     .find(|a| a.id == *rid)
                     .map(|f| {
-                        let cause = f.mother_id
+                        let cause = f
+                            .mother_id
                             .and_then(|mid| self.agents.iter().find(|a| a.id == mid))
                             .map(|m| if m.is_alive { "流产" } else { "随母亡故" })
                             .unwrap_or("流产");
@@ -378,19 +423,27 @@ impl World3DEngine {
         // ── WRITE：创建新胎儿 ──
         if !to_create.is_empty() {
             // 先收集 (child_id, mother_id, father_id, surname, mother_camp, mother_pos)
-            let mut infos: Vec<(AgentId, AgentId, Option<AgentId>, String, NodeId, Vec3)> = Vec::new();
+            let mut infos: Vec<(AgentId, AgentId, Option<AgentId>, String, NodeId, Vec3)> =
+                Vec::new();
             for cid in &to_create {
-                if let Some(mother) = self
-                    .agents
-                    .iter()
-                    .find(|a| a.is_alive && (a.is_pregnant || a.ready_to_birth) && a.pregnancy_child_id == Some(*cid))
-                {
+                if let Some(mother) = self.agents.iter().find(|a| {
+                    a.is_alive
+                        && (a.is_pregnant || a.ready_to_birth)
+                        && a.pregnancy_child_id == Some(*cid)
+                }) {
                     let father_id = mother.pregnancy_father_id;
                     let surname = father_id
                         .and_then(|fid| self.agents.iter().find(|a| a.id == fid))
                         .map(|f| f.surname.clone())
                         .unwrap_or_else(|| mother.surname.clone());
-                    infos.push((*cid, mother.id, father_id, surname, mother.home_camp_node, mother.world_pos));
+                    infos.push((
+                        *cid,
+                        mother.id,
+                        father_id,
+                        surname,
+                        mother.home_camp_node,
+                        mother.world_pos,
+                    ));
                 }
             }
             for (cid, mother_id, father_id, surname, camp_node, mpos) in infos {

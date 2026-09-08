@@ -1,14 +1,14 @@
-use serde::{Deserialize, Serialize};
 use super::vec3::Vec3;
+use serde::{Deserialize, Serialize};
 
 /// 3D 三次贝塞尔曲线车道几何体（支持高架匝道、爬坡与复杂立体弯道）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Curve3D {
-    pub p0: Vec3,       // 起点 (From Node)
-    pub p1: Vec3,       // 起点切向控制点
-    pub p2: Vec3,       // 终点切向控制点
-    pub p3: Vec3,       // 终点 (To Node)
-    pub length: f32,    // 预计算的积分弧长 (米)
+    pub p0: Vec3,    // 起点 (From Node)
+    pub p1: Vec3,    // 起点切向控制点
+    pub p2: Vec3,    // 终点切向控制点
+    pub p3: Vec3,    // 终点 (To Node)
+    pub length: f32, // 预计算的积分弧长 (米)
 }
 
 impl Curve3D {
@@ -17,12 +17,24 @@ impl Curve3D {
         let p1 = Vec3::lerp(p0, p3, 0.333333);
         let p2 = Vec3::lerp(p0, p3, 0.666667);
         let length = p0.distance_to(&p3);
-        Self { p0, p1, p2, p3, length }
+        Self {
+            p0,
+            p1,
+            p2,
+            p3,
+            length,
+        }
     }
 
     /// 构造带曲率与高度梯度的 3D 贝塞尔车道
     pub fn new_bezier(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3) -> Self {
-        let mut curve = Self { p0, p1, p2, p3, length: 0.0 };
+        let mut curve = Self {
+            p0,
+            p1,
+            p2,
+            p3,
+            length: 0.0,
+        };
         curve.length = curve.calculate_arc_length(16);
         curve
     }
@@ -50,9 +62,18 @@ impl Curve3D {
         let ttt = tt * t;
 
         Vec3 {
-            x: uuu * self.p0.x + 3.0 * uu * t * self.p1.x + 3.0 * u * tt * self.p2.x + ttt * self.p3.x,
-            y: uuu * self.p0.y + 3.0 * uu * t * self.p1.y + 3.0 * u * tt * self.p2.y + ttt * self.p3.y,
-            z: uuu * self.p0.z + 3.0 * uu * t * self.p1.z + 3.0 * u * tt * self.p2.z + ttt * self.p3.z,
+            x: uuu * self.p0.x
+                + 3.0 * uu * t * self.p1.x
+                + 3.0 * u * tt * self.p2.x
+                + ttt * self.p3.x,
+            y: uuu * self.p0.y
+                + 3.0 * uu * t * self.p1.y
+                + 3.0 * u * tt * self.p2.y
+                + ttt * self.p3.y,
+            z: uuu * self.p0.z
+                + 3.0 * uu * t * self.p1.z
+                + 3.0 * u * tt * self.p2.z
+                + ttt * self.p3.z,
         }
     }
 
@@ -60,9 +81,15 @@ impl Curve3D {
     pub fn evaluate_tangent(&self, t: f32) -> Vec3 {
         let t = t.clamp(0.0, 1.0);
         let u = 1.0 - t;
-        let d_x = 3.0 * u * u * (self.p1.x - self.p0.x) + 6.0 * u * t * (self.p2.x - self.p1.x) + 3.0 * t * t * (self.p3.x - self.p2.x);
-        let d_y = 3.0 * u * u * (self.p1.y - self.p0.y) + 6.0 * u * t * (self.p2.y - self.p1.y) + 3.0 * t * t * (self.p3.y - self.p2.y);
-        let d_z = 3.0 * u * u * (self.p1.z - self.p0.z) + 6.0 * u * t * (self.p2.z - self.p1.z) + 3.0 * t * t * (self.p3.z - self.p2.z);
+        let d_x = 3.0 * u * u * (self.p1.x - self.p0.x)
+            + 6.0 * u * t * (self.p2.x - self.p1.x)
+            + 3.0 * t * t * (self.p3.x - self.p2.x);
+        let d_y = 3.0 * u * u * (self.p1.y - self.p0.y)
+            + 6.0 * u * t * (self.p2.y - self.p1.y)
+            + 3.0 * t * t * (self.p3.y - self.p2.y);
+        let d_z = 3.0 * u * u * (self.p1.z - self.p0.z)
+            + 6.0 * u * t * (self.p2.z - self.p1.z)
+            + 3.0 * t * t * (self.p3.z - self.p2.z);
         let mag = (d_x * d_x + d_y * d_y + d_z * d_z).sqrt().max(1e-6);
         Vec3::new(d_x / mag, d_y / mag, d_z / mag)
     }

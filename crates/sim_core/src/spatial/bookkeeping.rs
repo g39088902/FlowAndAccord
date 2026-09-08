@@ -11,9 +11,7 @@
 
 use crate::spatial::agent::{AgentId, Gender};
 use crate::spatial::ledger::family::HouseholdId;
-use crate::spatial::ledger::journal::{
-    LedgerRef, ResourceKind, TransferReason, TransferRecord,
-};
+use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use crate::spatial::world::World3DEngine;
 
 /// 五类资源的固定顺序（保证遍历确定性）
@@ -65,24 +63,30 @@ impl World3DEngine {
             let mut living_heirs: Vec<AgentId> = Vec::new();
 
             // 1. 妻子（若在世）
-            let surviving_wife = self.marriage_registry.by_agent.get(&hh.head).and_then(|mids| {
-                mids.last().and_then(|&mid| {
-                    let m = self.marriage_registry.get(mid)?;
-                    if m.husband_id == hh.head {
-                        let is_alive = self.agent_index.get(&m.wife_id)
-                            .and_then(|idx| self.agents.get(*idx))
-                            .map(|a| a.is_alive)
-                            .unwrap_or(false);
-                        if is_alive {
-                            Some(m.wife_id)
+            let surviving_wife = self
+                .marriage_registry
+                .by_agent
+                .get(&hh.head)
+                .and_then(|mids| {
+                    mids.last().and_then(|&mid| {
+                        let m = self.marriage_registry.get(mid)?;
+                        if m.husband_id == hh.head {
+                            let is_alive = self
+                                .agent_index
+                                .get(&m.wife_id)
+                                .and_then(|idx| self.agents.get(*idx))
+                                .map(|a| a.is_alive)
+                                .unwrap_or(false);
+                            if is_alive {
+                                Some(m.wife_id)
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    }
-                })
-            });
+                    })
+                });
             if let Some(wife_id) = surviving_wife {
                 living_heirs.push(wife_id);
             }
@@ -219,15 +223,16 @@ impl World3DEngine {
                         }
                     } else {
                         // 男性继承人：若已属于其他独立家户则转入，否则立新户
-                        let target_hid = if let Some(chid) = self.household_registry.household_of(heir_id) {
-                            if chid != hid {
-                                Some(chid)
+                        let target_hid =
+                            if let Some(chid) = self.household_registry.household_of(heir_id) {
+                                if chid != hid {
+                                    Some(chid)
+                                } else {
+                                    None // 仍在已故家户中（未立户子女），需立新户
+                                }
                             } else {
-                                None // 仍在已故家户中（未立户子女），需立新户
-                            }
-                        } else {
-                            None
-                        };
+                                None
+                            };
 
                         let target_hid = match target_hid {
                             Some(h) => h,
@@ -238,7 +243,14 @@ impl World3DEngine {
                         for (resource, total_amt) in &balances {
                             let share = total_amt / n;
                             if share > 0.001 {
-                                self.transfer_household_resource(hid, target_hid, *resource, share, TransferReason::Inheritance, tick);
+                                self.transfer_household_resource(
+                                    hid,
+                                    target_hid,
+                                    *resource,
+                                    share,
+                                    TransferReason::Inheritance,
+                                    tick,
+                                );
                             }
                         }
                     }
@@ -331,7 +343,11 @@ impl World3DEngine {
             let Some(old_hid) = self.household_registry.household_of(agent.id) else {
                 continue; // 无家户归属（始祖已在初始化时立户，不应到此）
             };
-            if self.household_registry.get(old_hid).is_some_and(|hh| hh.head == agent.id) {
+            if self
+                .household_registry
+                .get(old_hid)
+                .is_some_and(|hh| hh.head == agent.id)
+            {
                 // ★ v1.44.0 已是户主（旧档反序列化默认 false / 未来新增立户路径）：
                 // 自愈回填标志，本拍起此后 O(1) 短路；语义与旧版 continue 完全等价
                 head_flag_sync.push(agent.id);
@@ -357,7 +373,8 @@ impl World3DEngine {
 
             // 母亲（生母优先，若生母已故但父亲有在世续弦妻室则看续弦）是否在世
             let mother_alive = {
-                let bio_mother_alive = agent.mother_id
+                let bio_mother_alive = agent
+                    .mother_id
                     .and_then(|mid| self.agent_index.get(&mid))
                     .and_then(|idx| self.agents.get(*idx))
                     .map(|m| m.is_alive)
@@ -365,7 +382,8 @@ impl World3DEngine {
                 if bio_mother_alive {
                     true
                 } else {
-                    agent.father_id
+                    agent
+                        .father_id
                         .and_then(|fid| self.agent_index.get(&fid))
                         .and_then(|idx| self.agents.get(*idx))
                         .and_then(|f| f.spouse_id)
@@ -399,7 +417,9 @@ impl World3DEngine {
                 .collect();
 
             // 预先创建新家户（create 内部已处理 by_agent 归属与幂等）
-            let new_hid = self.household_registry.create(agent.id, Some(old_hid), tick);
+            let new_hid = self
+                .household_registry
+                .create(agent.id, Some(old_hid), tick);
 
             candidates.push(SplitCandidate {
                 old_hid,
@@ -416,12 +436,20 @@ impl World3DEngine {
         for c in candidates {
             // 资源从旧家户转到新家户（Split 流水）
             for (resource, amount) in c.amounts {
-                self.transfer_household_resource(c.old_hid, c.new_hid, resource, amount, TransferReason::Split, tick);
+                self.transfer_household_resource(
+                    c.old_hid,
+                    c.new_hid,
+                    resource,
+                    amount,
+                    TransferReason::Split,
+                    tick,
+                );
             }
 
             // 妻子从旧家户迁入新家户（transfer_member 先移后加，保证唯一归属）
             if let Some(wife_id) = c.spouse_id {
-                self.household_registry.transfer_member(wife_id, c.new_hid, tick);
+                self.household_registry
+                    .transfer_member(wife_id, c.new_hid, tick);
             }
 
             // 在世子女从旧家户迁入新家户
@@ -429,7 +457,8 @@ impl World3DEngine {
                 if let Some(cidx) = self.agent_index.get(child_id) {
                     if let Some(child) = self.agents.get(*cidx) {
                         if child.is_alive {
-                            self.household_registry.transfer_member(*child_id, c.new_hid, tick);
+                            self.household_registry
+                                .transfer_member(*child_id, c.new_hid, tick);
                         }
                     }
                 }

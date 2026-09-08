@@ -1,14 +1,16 @@
 use super::super::poi::PoiType;
 use super::super::world::World3DEngine;
 use super::branches;
-use super::needs::*;
 use super::evaluate::Decisioner;
+use super::needs::*;
 
 impl World3DEngine {
     /// 错峰决策调度: 每 tick 调用一次；每个 agent 仅在 (tick + id) % AGENT_DECISION_INTERVAL_TICKS 的相位上决策
     pub fn tick_decisions(&mut self) {
         let ctx = self.build_decision_context();
-        let poi_stock_observations: Vec<_> = self.pois.iter()
+        let poi_stock_observations: Vec<_> = self
+            .pois
+            .iter()
             .filter(|poi| poi.poi_type != PoiType::Camp)
             .map(|poi| (poi.id, poi.current_stock, poi.max_stock))
             .collect();
@@ -27,9 +29,18 @@ impl World3DEngine {
         };
         for agent in &mut self.agents {
             // ★ 胎儿跳过行动决策：无地图实体、无自主行动
-            if agent.is_alive && !agent.is_fetus && (self.tick_counter + agent.id as u64) % self.config.agent_decision_interval_ticks == 0 {
+            if agent.is_alive
+                && !agent.is_fetus
+                && (self.tick_counter + agent.id as u64) % self.config.agent_decision_interval_ticks
+                    == 0
+            {
                 for &(poi_id, current_stock, max_stock) in &poi_stock_observations {
-                    agent.observe_poi_stock_with_config(poi_id, current_stock, max_stock, &self.config);
+                    agent.observe_poi_stock_with_config(
+                        poi_id,
+                        current_stock,
+                        max_stock,
+                        &self.config,
+                    );
                 }
                 decisioner.decide(agent);
             }
@@ -88,14 +99,19 @@ impl World3DEngine {
 
     /// 登基（物理规则）：抵达无主营地后成为国王（地区成员变更 + 立王 + 状态落地）
     fn coronate_king(&mut self, agent_id: u32, camp_id: u32, tick: u64) {
-        let camp_name = self.pois.iter()
+        let camp_name = self
+            .pois
+            .iter()
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .map(|p| p.camp_title())
             .unwrap_or_else(|| format!("营地#{}", camp_id));
 
         // READ: 原地区
         let old_camp = self.region_registry.region_of(agent_id);
-        let arrival = self.agent_by_id(agent_id).map(|a| a.arrival_tick).unwrap_or(tick);
+        let arrival = self
+            .agent_by_id(agent_id)
+            .map(|a| a.arrival_tick)
+            .unwrap_or(tick);
 
         // WRITE: 地区成员变更
         if old_camp != Some(camp_id) {
@@ -106,23 +122,34 @@ impl World3DEngine {
                         a.coronation_pending = None;
                         a.expedition_target_camp = None;
                     }
-                    self.last_event = Some(format!("👑 #{} 已是别地国王，放弃对【{}】的登基", agent_id, camp_name));
+                    self.last_event = Some(format!(
+                        "👑 #{} 已是别地国王，放弃对【{}】的登基",
+                        agent_id, camp_name
+                    ));
                     return;
                 }
             }
-            self.region_registry.add_member(camp_id, agent_id, tick, arrival);
+            self.region_registry
+                .add_member(camp_id, agent_id, tick, arrival);
             self.regions_arrival_dirty = true;
         }
 
         // WRITE: 立王（历史国王入档，见 Region::set_king）
         let mut coronated = false;
         if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
-            coronated = region.set_king(agent_id, tick, &format!("夺位远征登基：【{}】", camp_name), None);
+            coronated = region.set_king(
+                agent_id,
+                tick,
+                &format!("夺位远征登基：【{}】", camp_name),
+                None,
+            );
         }
 
         // WRITE: agent 状态与威望加成
         let bonus = self.config.prestige_king_bonus;
-        let camp_node = self.pois.iter()
+        let camp_node = self
+            .pois
+            .iter()
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .and_then(|p| self.find_nearest_node(p.pos));
         if let Some(agent) = self.agent_by_id_mut(agent_id) {
@@ -140,7 +167,10 @@ impl World3DEngine {
             }
         }
 
-        self.last_event = Some(format!("👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！", agent_id, camp_name));
+        self.last_event = Some(format!(
+            "👑 胜者为王：部落民 #{} 率先抵达，登基为【{}】第一任国王！",
+            agent_id, camp_name
+        ));
     }
 
     // ══════════════════════════════════════════════════════════
@@ -169,12 +199,23 @@ impl World3DEngine {
             }
 
             // 资格二次原子核验
-            let male_eligible = self.agent_by_id(male_id).map(|a| {
-                a.is_alive && a.gender == crate::spatial::agent::Gender::Male && a.spouse_id.is_none()
-            }).unwrap_or(false);
-            let female_eligible = self.agent_by_id(female_id).map(|a| {
-                a.is_alive && a.gender == crate::spatial::agent::Gender::Female && a.spouse_id.is_none() && !a.is_pregnant
-            }).unwrap_or(false);
+            let male_eligible = self
+                .agent_by_id(male_id)
+                .map(|a| {
+                    a.is_alive
+                        && a.gender == crate::spatial::agent::Gender::Male
+                        && a.spouse_id.is_none()
+                })
+                .unwrap_or(false);
+            let female_eligible = self
+                .agent_by_id(female_id)
+                .map(|a| {
+                    a.is_alive
+                        && a.gender == crate::spatial::agent::Gender::Female
+                        && a.spouse_id.is_none()
+                        && !a.is_pregnant
+                })
+                .unwrap_or(false);
 
             if !male_eligible || !female_eligible {
                 if let Some(male) = self.agent_by_id_mut(male_id) {
@@ -187,7 +228,8 @@ impl World3DEngine {
             }
 
             // 登记婚姻（登记簿保证存续唯一性；失败则不结）
-            let Some(_marriage_id) = self.marriage_registry.register(male_id, female_id, tick) else {
+            let Some(_marriage_id) = self.marriage_registry.register(male_id, female_id, tick)
+            else {
                 if let Some(male) = self.agent_by_id_mut(male_id) {
                     male.courtship_target_id = None;
                     if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
@@ -204,7 +246,8 @@ impl World3DEngine {
             };
 
             // 女方转入男方家户（家庭跟着男人走）
-            self.household_registry.transfer_member(female_id, male_hid, tick);
+            self.household_registry
+                .transfer_member(female_id, male_hid, tick);
 
             // 更新男方状态
             if let Some(male) = self.agent_by_id_mut(male_id) {
@@ -216,10 +259,14 @@ impl World3DEngine {
             }
 
             // 更新女方状态与房产居住
-            let house_info = self.houses.iter_mut().find(|h| h.owner_id == Some(male_id)).map(|h| {
-                h.spouse_id = Some(female_id);
-                (h.id, h.door_node_id)
-            });
+            let house_info = self
+                .houses
+                .iter_mut()
+                .find(|h| h.owner_id == Some(male_id))
+                .map(|h| {
+                    h.spouse_id = Some(female_id);
+                    (h.id, h.door_node_id)
+                });
 
             let is_remarriage = if let Some(female) = self.agent_by_id_mut(female_id) {
                 female.spouse_id = Some(male_id);
@@ -258,8 +305,16 @@ impl World3DEngine {
         let mut poi_positions = Vec::new();
 
         for poi in &self.pois {
-            let Some(node) = poi.nearest_node_id.or_else(|| self.find_nearest_node(poi.pos)) else { continue };
-            let target = ResourceNode { poi_id: poi.id, node };
+            let Some(node) = poi
+                .nearest_node_id
+                .or_else(|| self.find_nearest_node(poi.pos))
+            else {
+                continue;
+            };
+            let target = ResourceNode {
+                poi_id: poi.id,
+                node,
+            };
             if poi.poi_type != PoiType::Camp {
                 poi_positions.push(poi.pos);
             }
@@ -281,10 +336,14 @@ impl World3DEngine {
         let mut eligible_females = Vec::new();
         let mut conception_ready_wives = Vec::new();
         for a in &self.agents {
-            if a.is_alive && a.gender == crate::spatial::agent::Gender::Female && !a.is_fetus
-                && a.spouse_id.is_some() && !a.is_pregnant
+            if a.is_alive
+                && a.gender == crate::spatial::agent::Gender::Female
+                && !a.is_fetus
+                && a.spouse_id.is_some()
+                && !a.is_pregnant
                 && a.age >= self.config.agent_adult_age
-                && a.miscarriage_cooldown_timer <= 0.0 && a.postpartum_cooldown_timer <= 0.0
+                && a.miscarriage_cooldown_timer <= 0.0
+                && a.postpartum_cooldown_timer <= 0.0
                 && a.hunger >= self.config.agent_conception_hunger_min
                 && a.thirst >= self.config.agent_conception_thirst_min
                 && a.stamina >= self.config.agent_conception_stamina_min

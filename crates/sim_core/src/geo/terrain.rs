@@ -1,16 +1,16 @@
+use super::biome::GeoCell;
 use crate::rng::WorldRng;
 use serde::{Deserialize, Serialize};
-use super::biome::GeoCell;
 
 /// 纯粹自然地形生成引擎 (全局随机倾斜大势 ±30m + 连续随机起伏)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerrainMap {
-    pub grid_width: usize,              // 网格宽度 (如 60)
-    pub grid_height: usize,             // 网格高度 (如 60)
-    pub world_size: f32,                // 世界物理跨度 (米, 如 764m)
-    pub cells: Vec<GeoCell>,            // 空间高程栅格
-    pub tilt_angle_rad: f32,            // 全局倾斜方向 (弧度)
-    pub tilt_magnitude: f32,            // 全局倾斜高差幅度 (米, 约 60m 即 ±30m)
+    pub grid_width: usize,   // 网格宽度 (如 60)
+    pub grid_height: usize,  // 网格高度 (如 60)
+    pub world_size: f32,     // 世界物理跨度 (米, 如 764m)
+    pub cells: Vec<GeoCell>, // 空间高程栅格
+    pub tilt_angle_rad: f32, // 全局倾斜方向 (弧度)
+    pub tilt_magnitude: f32, // 全局倾斜高差幅度 (米, 约 60m 即 ±30m)
     pub seed: u64,
 }
 
@@ -79,11 +79,19 @@ impl TerrainMap {
                 let elev = raw_elevations[idx];
 
                 let dz_dx = if gx > 0 && gx < self.grid_width - 1 {
-                    (raw_elevations[gy * self.grid_width + gx + 1] - raw_elevations[gy * self.grid_width + gx - 1]) / (2.0 * cell_step)
-                } else { 0.0 };
+                    (raw_elevations[gy * self.grid_width + gx + 1]
+                        - raw_elevations[gy * self.grid_width + gx - 1])
+                        / (2.0 * cell_step)
+                } else {
+                    0.0
+                };
                 let dz_dy = if gy > 0 && gy < self.grid_height - 1 {
-                    (raw_elevations[(gy + 1) * self.grid_width + gx] - raw_elevations[(gy - 1) * self.grid_width + gx]) / (2.0 * cell_step)
-                } else { 0.0 };
+                    (raw_elevations[(gy + 1) * self.grid_width + gx]
+                        - raw_elevations[(gy - 1) * self.grid_width + gx])
+                        / (2.0 * cell_step)
+                } else {
+                    0.0
+                };
                 let slope_deg = (dz_dx * dz_dx + dz_dy * dz_dy).sqrt().atan().to_degrees();
 
                 self.cells[idx] = GeoCell {

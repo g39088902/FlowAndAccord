@@ -77,9 +77,11 @@ impl MarriageRegistry {
 
     /// 某人当前存续婚姻（至多一段）
     pub fn active_marriage_of(&self, agent: AgentId) -> Option<MarriageId> {
-        self.by_agent.get(&agent)?.iter().copied().find(|&mid| {
-            self.marriages.get(&mid).is_some_and(Marriage::is_active)
-        })
+        self.by_agent
+            .get(&agent)?
+            .iter()
+            .copied()
+            .find(|&mid| self.marriages.get(&mid).is_some_and(Marriage::is_active))
     }
 
     /// 登记资格：双方均无存续婚姻且不为同一人
@@ -93,21 +95,29 @@ impl MarriageRegistry {
     ///
     /// 存续唯一性在登记簿单点校验（违反返回 None，调用方不应依赖此分支）；
     /// 丧偶女性的改嫁发生在旧婚姻封账之后，天然满足唯一性。
-    pub fn register(&mut self, husband_id: AgentId, wife_id: AgentId, tick: u64) -> Option<MarriageId> {
+    pub fn register(
+        &mut self,
+        husband_id: AgentId,
+        wife_id: AgentId,
+        tick: u64,
+    ) -> Option<MarriageId> {
         if !self.can_register(husband_id, wife_id) {
             return None;
         }
         let id = self.next_id;
         self.next_id += 1;
 
-        self.marriages.insert(id, Marriage {
+        self.marriages.insert(
             id,
-            husband_id,
-            wife_id,
-            start_tick: tick,
-            end_tick: None,
-            end_reason: None,
-        });
+            Marriage {
+                id,
+                husband_id,
+                wife_id,
+                start_tick: tick,
+                end_tick: None,
+                end_reason: None,
+            },
+        );
         self.by_agent.entry(husband_id).or_default().push(id);
         self.by_agent.entry(wife_id).or_default().push(id);
         Some(id)
@@ -131,4 +141,3 @@ impl MarriageRegistry {
         self.marriages.get(&marriage_id)
     }
 }
-

@@ -18,7 +18,11 @@ impl WorldRng {
     /// 以任意 u64 种子构造（种子 0 会被替换为黄金比例常数以避免退化状态）
     pub fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+            state: if seed == 0 {
+                0x9E37_79B9_7F4A_7C15
+            } else {
+                seed
+            },
         }
     }
 

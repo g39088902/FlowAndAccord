@@ -40,7 +40,7 @@
    - 处于决策相位的 Agent，在进入常规状态机之前**首先遍历瞬间分支**（`B16Courtship` 近距成婚、`B17BidHouse` 麦穗竞拍出价、`B18RaiseChild` 宅门受孕）。
    - 瞬发分支仅写决心标志位（`*_pending`），不移动、不改物理运动状态、不耗 RNG，命中后继续推进后续常规判定。
 3. **①~⑤ 常规需求逐级评估与 M19 任务控制器**：
-   - 包含 18 条具名分支（`b1`~`b18`），按注入顺序检索，首个命中即派发调度。
+   - 包含 16 条活跃具名分支（稳定 ID 为 `b1`~`b18`，其中 `b11`、`b15` 已合并留空），按注入顺序检索，首个命中即派发调度。
    - M19 架构下，`agent.active_task: Option<ActiveTask>` 为进行中持续任务单一真相源，`agent.state` 为严格一致的兼容投影。
    - 移动态一律经由 `dispatch(agent, start, target, state)` 规划 A* 路径并通过 `transition::install_task` 安装任务；静止态与退出一律调用 `transition::finish_task` / `agent.enter_stationary_state(state)` 清除运动残留。
 

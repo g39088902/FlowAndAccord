@@ -4,7 +4,7 @@
  * ============================================================================
  * 验证目标（M19.0 / M19.1）：
  *   1. 基线完整性：核验 baseline-m19-observation.json 完备定义；
- *   2. 探针全覆盖：运行 m19_probe 验证 18 分支、21 状态无副作用与零分配；
+ *   2. 探针全覆盖：运行 m19_probe 验证 16 个活动分支、21 状态无副作用与零分配；
  *   3. 内存预算：验证领域类型尺寸符合定长预算，无超额空间开销；
  *   4. 行为等价与确定性：在 seed 42 下重演 3600 tick，验证快照与存档哈希与基线逐字节一致；
  *   5. 零副作用：验证反复调用快照与只读观察不污染世界状态或消耗 RNG。
@@ -67,7 +67,7 @@ async function run() {
   }
   const probeOutputRaw = execSync('cargo run --example m19_probe --quiet', { cwd: ROOT, env, encoding: 'utf8' });
   const probeOutput = JSON.parse(probeOutputRaw.trim());
-  assert(probeOutput.checks >= 239, `探针断言通过数不足: ${probeOutput.checks} < 239`);
+  assert(probeOutput.checks >= 226, `探针断言通过数不足: ${probeOutput.checks} < 226`);
   console.log(`  ✅ 探针通过 ${probeOutput.checks} 项全分支、全状态、零分配与无副作用断言`);
 
   const [agentSize, agentAlign, intentSize, intentAlign, stratSize, stratAlign, primSize, primAlign, taskSize, taskAlign, optTaskSize, optTaskAlign, obsSize, obsAlign] = probeOutput.layout;

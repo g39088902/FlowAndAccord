@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
-use super::super::vec3::Vec3;
-use super::super::graph::NodeId;
 use super::super::agent::{Agent3D, AgentId, PrimitiveActionState};
+use super::super::graph::NodeId;
 use super::super::house::{House, HouseTier};
 use super::super::ledger::family::HouseholdRegistry;
 use super::super::ledger::journal::ResourceKind;
 use super::super::poi::PoiId;
+use super::super::vec3::Vec3;
 use super::branches::BranchId;
 use crate::config::*;
+use serde::{Deserialize, Serialize};
 
 /// 马斯洛需求层次 (低 → 高，低层绝对优先)
 ///
@@ -16,12 +16,12 @@ use crate::config::*;
 /// 声明序首位 ⇒ `Ord` 最小 ⇒ 优先级最高（本枚举沿用「越小越优先」约定）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MaslowLevel {
-    Instantaneous,      // ⓪ 瞬间行为 (最高优先级·不移动不消耗，命中后续评估下一分支)
-    Physiological,      // ① 生理需求 (生存底线)
-    Safety,             // ② 安全需求 (仓库水粮木储备填满 / 房屋修缮)
-    Belonging,          // ③ 归属与爱 (0级仓库升级成婚 / 家庭纽带)
-    Esteem,             // ④ 尊重需求 (建材储备 / 盖房淘金[45s] / 房屋施工升级)
-    SelfActualization,  // ⑤ 自我实现 (4级大庄园竣工后的娱乐淘金[180s])
+    Instantaneous,     // ⓪ 瞬间行为 (最高优先级·不移动不消耗，命中后续评估下一分支)
+    Physiological,     // ① 生理需求 (生存底线)
+    Safety,            // ② 安全需求 (仓库水粮木储备填满 / 房屋修缮)
+    Belonging,         // ③ 归属与爱 (0级仓库升级成婚 / 家庭纽带)
+    Esteem,            // ④ 尊重需求 (建材储备 / 储备资金[45s] / 改善住宅)
+    SelfActualization, // ⑤ 自我实现 (4级大庄园竣工后的积累财富[180s])
 }
 
 impl MaslowLevel {
@@ -57,23 +57,23 @@ impl MaslowLevel {
 /// 具体需求种类 (对应可执行的动作)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NeedKind {
-    QuenchThirst,   // 生理: 口渴 → 赶往水泉痛饮并带水补给家宅
-    SateHunger,     // 生理: 饥饿 → 赶往浆果丛觅食并带粮补给家宅
-    Rest,           // 生理: 归巢休养生息 (一旦开始休息充盈至100%)
-    RepairHouse,    // 安全: 房屋耐久<50%产生修缮需求，修缮至100%
-    StockWater,     // 安全: 家宅储水 (家庭生存储备，填满水库)
-    StockFood,      // 安全: 家宅储粮 (家庭生存储备，填满粮仓)
-    StockWood,      // 安全: 过冬木柴 / 私宅基础木料 (填满木仓)
-    BuildHouse,     // 归属/尊重: 材料备齐后施工升级房屋
-    FoundHome,      // 生理(末档): 无家成年男性自主“自立门户”选址立宅 (0级仓库)
-    StockStone,     // 尊重: 采石建材 (庄舍/庄园升级储备)
-    StockGold,      // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
-    GoldWealth,     // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
-    SeekThrone,     // 生理(第一层生存·最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基（夺位=资源分配权）
-    MarketTrade,    // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
-    Courtship,      // 归属: 寻找全图魅力最高单身女性求偶成婚
-    BidHouse,       // ★ v1.26.0 安全: 无房成年男性对随机一套在售空置房屋出价竞购（出价后进入全局冷却）
-    RaiseChild,     // 尊重: 已婚成年男性自主发起养育小孩行动
+    QuenchThirst, // 生理: 口渴 → 赶往水泉痛饮并带水补给家宅
+    SateHunger,   // 生理: 饥饿 → 赶往浆果丛觅食并带粮补给家宅
+    Rest,         // 生理: 归巢休养生息 (一旦开始休息充盈至100%)
+    RepairHouse,  // 安全: 房屋耐久<50%产生修缮需求，修缮至100%
+    StockWater,   // 安全: 家宅储水 (家庭生存储备，填满水库)
+    StockFood,    // 安全: 家宅储粮 (家庭生存储备，填满粮仓)
+    StockWood,    // 安全: 过冬木柴 / 私宅基础木料 (填满木仓)
+    BuildHouse,   // 归属/尊重: 材料备齐后施工升级房屋
+    FoundHome,    // 生理(末档): 无家成年男性自主“自立门户”选址立宅 (0级仓库)
+    StockStone,   // 尊重: 采石建材 (庄舍/庄园升级储备)
+    StockGold,    // 尊重: 为3级庄舍升级大庄园备金 (冷却 45s)
+    GoldWealth,   // 自我实现: 4级大庄园竣工后的娱乐性淘金 (冷却 180s)
+    SeekThrone, // 生理(第一层生存·最高档): 夺位远征 — 王位空缺且满足条件时自主出征夺位登基（夺位=资源分配权）
+    MarketTrade, // 生理(兜底): 榷场商贸 — 家户断水断粮且野外断流时以黄金换购水粮
+    Courtship,  // 归属: 寻找全图魅力最高单身女性求偶成婚
+    BidHouse,   // ★ v1.26.0 安全: 无房成年男性对随机一套在售空置房屋出价竞购（出价后进入全局冷却）
+    RaiseChild, // 尊重: 已婚成年男性自主发起养育小孩行动
 }
 
 /// 一条需求判定结论
@@ -290,37 +290,101 @@ pub fn upgrade_ready_by_cost(
         .all(|(rk, amt)| balance(*rk) >= *amt - 1e-3)
 }
 
-pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D, houses: &[House], _households: &HouseholdRegistry, config: &SimConfig) -> Option<(&'static str, &'static str)> {
+pub fn state_need_label_with_agent(
+    state: PrimitiveActionState,
+    agent: &Agent3D,
+    houses: &[House],
+    _households: &HouseholdRegistry,
+    config: &SimConfig,
+) -> Option<(&'static str, &'static str)> {
     // (层级, 需求名, 对应判定分支)；分支用于套用 decision_eval_levels 层级覆盖（与评估结论共用同一覆盖表）
     let (lvl, kind, branch) = match state {
         PrimitiveActionState::SeekingWater | PrimitiveActionState::DrinkingAtWater => {
-            if agent.thirst < config.decision_critical_thirst { ("Physiological", "QuenchThirst", Some(BranchId::B1QuenchThirst)) } else { ("Safety", "StockWater", Some(BranchId::B5StockWater)) }
+            if agent.thirst < config.decision_critical_thirst {
+                (
+                    "Physiological",
+                    "QuenchThirst",
+                    Some(BranchId::B1QuenchThirst),
+                )
+            } else {
+                ("Safety", "StockWater", Some(BranchId::B5StockWater))
+            }
         }
         PrimitiveActionState::SeekingFood | PrimitiveActionState::ForagingFood => {
-            if agent.hunger < config.decision_critical_hunger { ("Physiological", "SateHunger", Some(BranchId::B2SateHunger)) } else { ("Safety", "StockFood", Some(BranchId::B6StockFood)) }
+            if agent.hunger < config.decision_critical_hunger {
+                ("Physiological", "SateHunger", Some(BranchId::B2SateHunger))
+            } else {
+                ("Safety", "StockFood", Some(BranchId::B6StockFood))
+            }
         }
-        PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => ("Safety", "StockWood", Some(BranchId::B7StockWood)),
-        PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => ("Esteem", "StockStone", Some(BranchId::B9StockStone)),
+        PrimitiveActionState::SeekingWood | PrimitiveActionState::GatheringWood => {
+            ("Safety", "StockWood", Some(BranchId::B7StockWood))
+        }
+        PrimitiveActionState::SeekingStone | PrimitiveActionState::MiningStone => {
+            ("Esteem", "StockStone", Some(BranchId::B9StockStone))
+        }
         PrimitiveActionState::SeekingGold | PrimitiveActionState::MiningGold => {
-            // ★ M7 与房屋等级脱钩：家庭储备缺金（trigger ON）→ StockGold；已补足（4级庄园娱乐）→ GoldWealth
-            if family_stock_on(agent, ResourceKind::Gold) { ("Esteem", "StockGold", Some(BranchId::B10StockGold)) } else { ("SelfActualization", "GoldWealth", Some(BranchId::B13GoldWealth)) }
+            // 活动任务保存真实来源，不能再根据住宅等级或当前余额反推淘金动机。
+            if agent.active_task.as_ref().map(|t| t.intent.source_branch)
+                == Some(BranchId::B13GoldWealth)
+            {
+                (
+                    "SelfActualization",
+                    "GoldWealth",
+                    Some(BranchId::B13GoldWealth),
+                )
+            } else {
+                ("Esteem", "StockGold", Some(BranchId::B10StockGold))
+            }
         }
         PrimitiveActionState::ReturningToCamp => {
-            if agent.stamina < config.decision_work_stamina_threshold { ("Physiological", "Rest", Some(BranchId::B3Rest)) } else { ("Safety", "ReturnHome", None) }
+            if agent.stamina < config.decision_work_stamina_threshold {
+                ("Physiological", "Rest", Some(BranchId::B3Rest))
+            } else {
+                ("Safety", "ReturnHome", None)
+            }
         }
-        PrimitiveActionState::RepairingHouse => ("Safety", "RepairHouse", Some(BranchId::B4RepairHouse)),
+        PrimitiveActionState::RepairingHouse => {
+            ("Safety", "RepairHouse", Some(BranchId::B4RepairHouse))
+        }
         PrimitiveActionState::SeekingMarket | PrimitiveActionState::BuyingAtMarket => {
-            ("Physiological", "MarketTrade", Some(BranchId::B15MarketTrade))
+            match agent.active_task.as_ref().map(|t| t.intent.source_branch) {
+                Some(BranchId::B1QuenchThirst) => (
+                    "Physiological",
+                    "QuenchThirst",
+                    Some(BranchId::B1QuenchThirst),
+                ),
+                Some(BranchId::B2SateHunger) => {
+                    ("Physiological", "SateHunger", Some(BranchId::B2SateHunger))
+                }
+                Some(BranchId::B5StockWater) => {
+                    ("Safety", "StockWater", Some(BranchId::B5StockWater))
+                }
+                Some(BranchId::B6StockFood) => ("Safety", "StockFood", Some(BranchId::B6StockFood)),
+                _ => ("Safety", "StockWood", Some(BranchId::B7StockWood)),
+            }
         }
         PrimitiveActionState::ConstructingHouse => {
-            let is_tier0 = agent.home_house_id
+            let is_tier0 = agent
+                .home_house_id
                 .and_then(|hid| houses.iter().find(|h| h.id == hid))
                 .map(|h| h.tier == HouseTier::Tier0Warehouse)
                 .unwrap_or(false);
-            if is_tier0 { ("Belonging", "BuildHouse", Some(BranchId::B8BuildHouseTier0)) } else { ("Esteem", "BuildHouse", Some(BranchId::B11BuildHouseUpgrade)) }
+            if is_tier0 {
+                ("Safety", "BuildHouse", Some(BranchId::B8ImproveHome))
+            } else {
+                ("Esteem", "BuildHouse", Some(BranchId::B8ImproveHome))
+            }
         }
-        PrimitiveActionState::SeekingCourtship => ("Belonging", "Courtship", Some(BranchId::B16Courtship)),
-        PrimitiveActionState::RaiseChild => ("Esteem", "RaiseChild", Some(BranchId::B18RaiseChild)),
+        PrimitiveActionState::SeekingThrone => {
+            ("Esteem", "SeekThrone", Some(BranchId::B14SeekThrone))
+        }
+        PrimitiveActionState::SeekingCourtship => {
+            ("Belonging", "Courtship", Some(BranchId::B16Courtship))
+        }
+        PrimitiveActionState::RaiseChild => {
+            ("Belonging", "RaiseChild", Some(BranchId::B18RaiseChild))
+        }
         PrimitiveActionState::RestingAtCamp => ("Physiological", "Rest", Some(BranchId::B3Rest)),
         PrimitiveActionState::OffRoadDetour => ("Safety", "Detour", None),
         _ => return None,
@@ -339,6 +403,8 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
 pub fn gentry_labor_exemption_check(agent_id: u32, tick: u64, decision_interval: u64) -> bool {
     let interval = decision_interval.max(1);
     let step = tick / interval;
-    let h = (agent_id as u64).wrapping_mul(2654435761).wrapping_add(step);
+    let h = (agent_id as u64)
+        .wrapping_mul(2654435761)
+        .wrapping_add(step);
     (h % 10) < 8
 }

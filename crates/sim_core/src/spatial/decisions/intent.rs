@@ -1,9 +1,9 @@
 //! M19 意图与完成条件领域词汇；提供类型化 AgentIntent 与完成策略。
 //! 来源只能由实际调用方提供，不能从 state/current_need 反推。
-use serde::{Deserialize, Serialize};
 use super::{BranchId, MaslowLevel, Need, NeedKind};
 use crate::spatial::house::HouseTier;
 use crate::spatial::ledger::journal::ResourceKind;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SurvivalResource {
@@ -110,13 +110,12 @@ impl Need {
             B5StockWater => NeedKind::StockWater,
             B6StockFood => NeedKind::StockFood,
             B7StockWood => NeedKind::StockWood,
-            B8BuildHouseTier0 | B11BuildHouseUpgrade => NeedKind::BuildHouse,
+            B8ImproveHome => NeedKind::BuildHouse,
             B9StockStone => NeedKind::StockStone,
             B10StockGold => NeedKind::StockGold,
             B12FoundHome => NeedKind::FoundHome,
             B13GoldWealth => NeedKind::GoldWealth,
             B14SeekThrone => NeedKind::SeekThrone,
-            B15MarketTrade => NeedKind::MarketTrade,
             B16Courtship => NeedKind::Courtship,
             B17BidHouse => NeedKind::BidHouse,
             B18RaiseChild => NeedKind::RaiseChild,
@@ -175,11 +174,8 @@ impl Need {
                 I::AcquireGold(GoldPurpose::Wealth),
                 C::GoldTripFinished(GoldPurpose::Wealth),
             ),
-            B8BuildHouseTier0 | B11BuildHouseUpgrade => {
+            B8ImproveHome => {
                 let tier = home_tier.ok_or(E::MissingHomeTier)?;
-                if source_branch == B8BuildHouseTier0 && tier != HouseTier::Tier0Warehouse {
-                    return Err(E::InvalidUpgradeTier);
-                }
                 let target_tier = match tier {
                     HouseTier::Tier0Warehouse => HouseTier::Tier1ThatchedHut,
                     HouseTier::Tier1ThatchedHut => HouseTier::Tier2LeanTo,
@@ -191,7 +187,6 @@ impl Need {
             }
             B12FoundHome => (I::FoundNewHome, C::HomeFounded),
             B14SeekThrone => (I::ClaimThrone, C::CoronationRegistered),
-            B15MarketTrade => (I::EmergencySupply, C::EmergencySupplyFinished),
             B16Courtship => (I::SeekCourtship, C::MarriageRegistered),
             B18RaiseChild => (I::RaiseChild, C::ChildcareSettled),
             B17BidHouse => unreachable!("auction submission handled above"),

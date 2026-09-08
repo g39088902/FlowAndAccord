@@ -1,5 +1,4 @@
 //! M19 策略与阶段的领域词汇；ActiveTask 挂载于 Agent3D 作为持续任务唯一真相源。
-use serde::{Deserialize, Serialize};
 use super::intent::AgentIntent;
 use super::primitive::ActionPrimitive;
 use super::NodePool;
@@ -8,6 +7,7 @@ use crate::spatial::graph::NodeId;
 use crate::spatial::house::HouseTier;
 use crate::spatial::poi::PoiId;
 use crate::spatial::vec3::Vec3;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ActiveTask {

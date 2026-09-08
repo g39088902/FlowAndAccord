@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
-use crate::config::SimConfig;
-use super::vec3::Vec3;
 use super::agent::AgentId;
 use super::graph::NodeId;
+use super::vec3::Vec3;
+use crate::config::SimConfig;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 pub type PoiId = u32;
 
@@ -22,11 +22,11 @@ pub const POI_FALLBACK_REGEN_GOLD: f32 = 1.20;
 pub enum PoiType {
     Camp,        // 🏕️ 避风营地 (无限储量与无限庇护，休眠恢复体力、饱暖受孕与分娩)
     WaterSource, // 💧 低洼清泉 (储量上限与产速由 config.stock_max_water / config.regen_base_water 控制)
-    BerryBush,   // 🍒 缓坡浆果 (储量上限与产速由 config.stock_max_berry / config.regen_base_berry 控制)
-    WoodForest,  // 🌲 茂密林木 (储量上限与产速由 config.stock_max_wood / config.regen_base_wood 控制)
+    BerryBush, // 🍒 缓坡浆果 (储量上限与产速由 config.stock_max_berry / config.regen_base_berry 控制)
+    WoodForest, // 🌲 茂密林木 (储量上限与产速由 config.stock_max_wood / config.regen_base_wood 控制)
     StoneQuarry, // 🪨 嶙峋石矿 (储量上限与产速由 config.stock_max_stone / config.regen_base_stone 控制)
-    GoldMine,    // 🪙 璀璨金矿 (储量上限与产速由 config.stock_max_gold / config.regen_base_gold 控制)
-    Market,      // 🏪 榷场互市 (外部商贸枢纽，主库存承载水、次级库存承载粮，以黄金计价)
+    GoldMine, // 🪙 璀璨金矿 (储量上限与产速由 config.stock_max_gold / config.regen_base_gold 控制)
+    Market,   // 🏪 榷场互市 (外部商贸枢纽，主库存承载水、次级库存承载粮，以黄金计价)
 }
 
 impl PoiType {
@@ -47,44 +47,40 @@ impl PoiType {
 /// 全国县级行政区地名库 (240+ 处真实古雅县级行政区地名，营地生成时随机挑选)
 pub const COUNTY_NAMES: &[&str] = &[
     // 华东 / 江南 (浙、闽、赣、苏、皖)
-    "桃源", "江宁", "安吉", "淳安", "诸暨", "临海", "仙居", "长兴", "富阳", "余杭",
-    "德清", "婺源", "缙云", "青田", "遂昌", "松阳", "庆元", "泰顺", "兰溪", "义乌",
-    "东阳", "永康", "奉化", "宁海", "象山", "桐庐", "建德", "海盐", "嘉善", "平湖",
-    "嵊州", "新昌", "江山", "常山", "开化", "龙游", "玉环", "三门", "天台", "苍南",
-    "平阳", "文成", "武义", "磐安", "宜兴", "溧阳", "句容", "太仓", "昆山", "吴江",
-    "常熟", "江阴", "靖江", "泰兴", "如皋", "海安", "东台", "大丰", "建湖", "射阳",
-    "阜宁", "滨海", "响水", "涟水", "盱眙", "金湖", "宝应", "仪征", "高邮", "新安",
-    "休宁", "徽州", "祁门", "绩溪", "旌德", "泾川", "宁国", "广德", "郎溪", "青阳",
-    "石台", "东至", "怀宁", "潜山", "太湖", "宿松", "望江", "岳西", "桐城", "南陵",
+    "桃源", "江宁", "安吉", "淳安", "诸暨", "临海", "仙居", "长兴", "富阳", "余杭", "德清", "婺源",
+    "缙云", "青田", "遂昌", "松阳", "庆元", "泰顺", "兰溪", "义乌", "东阳", "永康", "奉化", "宁海",
+    "象山", "桐庐", "建德", "海盐", "嘉善", "平湖", "嵊州", "新昌", "江山", "常山", "开化", "龙游",
+    "玉环", "三门", "天台", "苍南", "平阳", "文成", "武义", "磐安", "宜兴", "溧阳", "句容", "太仓",
+    "昆山", "吴江", "常熟", "江阴", "靖江", "泰兴", "如皋", "海安", "东台", "大丰", "建湖", "射阳",
+    "阜宁", "滨海", "响水", "涟水", "盱眙", "金湖", "宝应", "仪征", "高邮", "新安", "休宁", "徽州",
+    "祁门", "绩溪", "旌德", "泾川", "宁国", "广德", "郎溪", "青阳", "石台", "东至", "怀宁", "潜山",
+    "太湖", "宿松", "望江", "岳西", "桐城", "南陵",
     // 华北 / 中原 (冀、鲁、晋、豫、京、津)
-    "平遥", "正定", "遵化", "迁安", "井陉", "磁州", "武安", "沙河", "清河", "宁晋",
-    "巨鹿", "隆尧", "柏乡", "临城", "广宗", "威州", "平乡", "临漳", "曲周", "馆陶",
-    "肥乡", "广平", "大名", "延庆", "密云", "怀柔", "昌平", "蓟州", "玉田", "乐亭",
-    "滦州", "昌黎", "卢龙", "抚宁", "青龙", "固安", "永清", "香河", "大城", "文安",
-    "曲阜", "兖州", "邹城", "微山", "鱼台", "金乡", "嘉祥", "汶上", "泗水", "梁山",
-    "青州", "诸城", "寿光", "安丘", "高密", "昌邑", "临朐", "昌乐", "蓬莱", "龙口",
-    "招远", "莱州", "栖霞", "海阳", "莱阳", "牟平", "荣成", "乳山", "文登", "广饶",
-    "新郑", "登封", "新密", "巩义", "荥阳", "中牟", "陈留", "通许", "尉氏", "兰考",
-    "朝歌", "栾川", "嵩阳", "汝阳", "宜阳", "洛宁", "伊川", "修武", "博爱", "武陟", "河内",
+    "平遥", "正定", "遵化", "迁安", "井陉", "磁州", "武安", "沙河", "清河", "宁晋", "巨鹿", "隆尧",
+    "柏乡", "临城", "广宗", "威州", "平乡", "临漳", "曲周", "馆陶", "肥乡", "广平", "大名", "延庆",
+    "密云", "怀柔", "昌平", "蓟州", "玉田", "乐亭", "滦州", "昌黎", "卢龙", "抚宁", "青龙", "固安",
+    "永清", "香河", "大城", "文安", "曲阜", "兖州", "邹城", "微山", "鱼台", "金乡", "嘉祥", "汶上",
+    "泗水", "梁山", "青州", "诸城", "寿光", "安丘", "高密", "昌邑", "临朐", "昌乐", "蓬莱", "龙口",
+    "招远", "莱州", "栖霞", "海阳", "莱阳", "牟平", "荣成", "乳山", "文登", "广饶", "新郑", "登封",
+    "新密", "巩义", "荥阳", "中牟", "陈留", "通许", "尉氏", "兰考", "朝歌", "栾川", "嵩阳", "汝阳",
+    "宜阳", "洛宁", "伊川", "修武", "博爱", "武陟", "河内",
     // 西南 / 荆楚巴蜀云贵 (川、渝、鄂、湘、滇、黔)
-    "阳朔", "腾冲", "敦煌", "玉龙", "凤凰", "武隆", "绥阳", "江津", "合川", "永川",
-    "綦江", "大足", "璧山", "铜梁", "潼南", "荣昌", "开州", "梁平", "城口", "丰都",
-    "垫江", "忠州", "云阳", "奉节", "巫山", "巫溪", "石柱", "秀山", "酉阳", "彭水",
-    "青城", "彭州", "邛崃", "崇州", "金堂", "大邑", "蒲江", "新津", "简阳", "广汉",
-    "什邡", "绵竹", "中江", "江油", "三台", "盐亭", "梓潼", "剑阁", "青川", "旺苍",
-    "大理", "丽江", "中甸", "剑川", "鹤庆", "洱源", "宾川", "祥云", "巍山", "弥渡",
+    "阳朔", "腾冲", "敦煌", "玉龙", "凤凰", "武隆", "绥阳", "江津", "合川", "永川", "綦江", "大足",
+    "璧山", "铜梁", "潼南", "荣昌", "开州", "梁平", "城口", "丰都", "垫江", "忠州", "云阳", "奉节",
+    "巫山", "巫溪", "石柱", "秀山", "酉阳", "彭水", "青城", "彭州", "邛崃", "崇州", "金堂", "大邑",
+    "蒲江", "新津", "简阳", "广汉", "什邡", "绵竹", "中江", "江油", "三台", "盐亭", "梓潼", "剑阁",
+    "青川", "旺苍", "大理", "丽江", "中甸", "剑川", "鹤庆", "洱源", "宾川", "祥云", "巍山", "弥渡",
     "南涧", "漾濞", "建水", "石屏", "蒙自", "个旧", "开远", "弥勒", "泸西", "元阳",
     // 华南 / 岭南 (粤、桂、琼)
-    "安溪", "德化", "永春", "南安", "晋江", "石狮", "惠安", "同安", "长泰", "华安",
-    "平和", "诏安", "云霄", "漳浦", "东山", "崇安", "建阳", "建瓯", "邵武", "顺昌",
-    "光泽", "松溪", "政和", "浦城", "顺德", "南海", "三水", "高明", "增城", "从化",
-    "番禺", "花都", "博罗", "惠东", "龙门", "台山", "开平", "鹤山", "恩平", "阳春",
-    "信宜", "高州", "化州", "廉江", "雷州", "吴川", "乐昌", "南雄", "仁化", "始兴",
-    // 西北 (陕、甘、宁、青、新)
-    "华阴", "韩城", "兴平", "彬州", "旬邑", "淳化", "永寿", "礼泉", "乾州", "泾阳",
-    "三原", "武功", "凤翔", "岐山", "扶风", "郿坞", "陇州", "千阳", "麟游", "太白",
-    "蓝田", "周至", "鄠邑", "高陵", "临潼", "略阳", "沔阳", "洋州", "城固", "西乡",
-    "镇安", "柞水", "商南", "山阳", "丹凤", "洛南", "旬阳", "白河", "平利", "镇坪"
+    "安溪", "德化", "永春", "南安", "晋江", "石狮", "惠安", "同安", "长泰", "华安", "平和", "诏安",
+    "云霄", "漳浦", "东山", "崇安", "建阳", "建瓯", "邵武", "顺昌", "光泽", "松溪", "政和", "浦城",
+    "顺德", "南海", "三水", "高明", "增城", "从化", "番禺", "花都", "博罗", "惠东", "龙门", "台山",
+    "开平", "鹤山", "恩平", "阳春", "信宜", "高州", "化州", "廉江", "雷州", "吴川", "乐昌", "南雄",
+    "仁化", "始兴", // 西北 (陕、甘、宁、青、新)
+    "华阴", "韩城", "兴平", "彬州", "旬邑", "淳化", "永寿", "礼泉", "乾州", "泾阳", "三原", "武功",
+    "凤翔", "岐山", "扶风", "郿坞", "陇州", "千阳", "麟游", "太白", "蓝田", "周至", "鄠邑", "高陵",
+    "临潼", "略阳", "沔阳", "洋州", "城固", "西乡", "镇安", "柞水", "商南", "山阳", "丹凤", "洛南",
+    "旬阳", "白河", "平利", "镇坪",
 ];
 
 /// 非有限浮点（Infinity / NaN）的保真序列化助手
@@ -122,7 +118,10 @@ pub(crate) mod finite_f32 {
                 "NaN" => Ok(f32::NAN),
                 "Infinity" => Ok(f32::INFINITY),
                 "-Infinity" => Ok(f32::NEG_INFINITY),
-                other => Err(serde::de::Error::custom(format!("无法解析的非有限数值: {}", other))),
+                other => Err(serde::de::Error::custom(format!(
+                    "无法解析的非有限数值: {}",
+                    other
+                ))),
             },
         }
     }
@@ -170,9 +169,9 @@ pub struct PrimitivePoi {
     #[serde(with = "finite_f32")]
     pub current_stock: f32, // 当前可用储量 (上限与产速由 config.stock_max_* / config.regen_base_* 控制，营地为无限)
     #[serde(with = "finite_f32")]
-    pub max_stock: f32,     // 储量上限 (营地为无限)
+    pub max_stock: f32, // 储量上限 (营地为无限)
     #[serde(with = "finite_f32")]
-    pub regen_rate: f32,    // 每秒自然再生速率
+    pub regen_rate: f32, // 每秒自然再生速率
     /// 次级库存（仅 Market 为外部粮食储备 Food，其他 POI 恒为 0.0）
     #[serde(default)]
     pub secondary_stock: f32,
@@ -187,8 +186,8 @@ pub struct PrimitivePoi {
     pub tertiary_max_stock: f32,
     #[serde(default)]
     pub tertiary_regen_rate: f32,
-    pub name: String,       // 地名库 roll 出的县级地名 (如 "桃源")
-    pub level: u8,          // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
+    pub name: String,            // 地名库 roll 出的县级地名 (如 "桃源")
+    pub level: u8, // 聚落等级 (0=营地[0-5房], 1=村[6-11房], 2=乡[12-17房], 3=镇[18-23房], 4=县[24+房])
     pub bound_houses_count: u32, // 当前绑定的房屋总数
     /// ★ v1.10.0 空置房屋列表（仅营地有意义；户主死亡后登记，房屋坍塌后移除）
     pub vacant_houses: Vec<VacantHouseEntry>,
@@ -227,22 +226,54 @@ impl PrimitivePoi {
     pub fn new_with_name(id: PoiId, poi_type: PoiType, pos: Vec3, name: String) -> Self {
         let (max_stock, regen_rate, initial_stock) = match poi_type {
             PoiType::Camp => (f32::INFINITY, 0.0, f32::INFINITY),
-            PoiType::WaterSource => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WATER, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
-            PoiType::BerryBush => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_BERRY, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
-            PoiType::WoodForest => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WOOD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
-            PoiType::StoneQuarry => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_STONE, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
-            PoiType::GoldMine => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_GOLD, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
-            PoiType::Market => (POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WATER, POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO),
+            PoiType::WaterSource => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_WATER,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
+            PoiType::BerryBush => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_BERRY,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
+            PoiType::WoodForest => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_WOOD,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
+            PoiType::StoneQuarry => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_STONE,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
+            PoiType::GoldMine => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_GOLD,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
+            PoiType::Market => (
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_WATER,
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+            ),
         };
 
         let (sec_stock, sec_max, sec_regen) = if poi_type == PoiType::Market {
-            (POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO, POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_BERRY)
+            (
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_BERRY,
+            )
         } else {
             (0.0, 0.0, 0.0)
         };
 
         let (ter_stock, ter_max, ter_regen) = if poi_type == PoiType::Market {
-            (POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO, POI_FALLBACK_STOCK_MAX, POI_FALLBACK_REGEN_WOOD)
+            (
+                POI_FALLBACK_STOCK_MAX * POI_FALLBACK_INITIAL_RATIO,
+                POI_FALLBACK_STOCK_MAX,
+                POI_FALLBACK_REGEN_WOOD,
+            )
         } else {
             (0.0, 0.0, 0.0)
         };
@@ -279,18 +310,20 @@ impl PrimitivePoi {
             return self.name.clone();
         }
         let suffix = match self.level {
-            0 => "营地",   // 0~5 间房 (原始营地)
-            1 => "村",     // 6~11 间房 (村落聚落)
-            2 => "乡",     // 12~17 间房 (乡集社区)
-            3 => "镇",     // 18~23 间房 (繁盛集镇)
-            _ => "县",     // 24+ 间房 (县级行政区)
+            0 => "营地", // 0~5 间房 (原始营地)
+            1 => "村",   // 6~11 间房 (村落聚落)
+            2 => "乡",   // 12~17 间房 (乡集社区)
+            3 => "镇",   // 18~23 间房 (繁盛集镇)
+            _ => "县",   // 24+ 间房 (县级行政区)
         };
         format!("{}{}", self.name, suffix)
     }
 
     /// 根据当前绑定的有效房屋数量更新营地等级并返回升级播报
     pub fn update_camp_level(&mut self, house_count: u32, config: &SimConfig) -> Option<String> {
-        if self.poi_type != PoiType::Camp { return None; }
+        if self.poi_type != PoiType::Camp {
+            return None;
+        }
         self.bound_houses_count = house_count;
         let old_level = self.level;
         let new_level = if house_count < config.camp_level_village_min_houses {
@@ -306,9 +339,24 @@ impl PrimitivePoi {
         };
         self.level = new_level;
         if new_level > old_level {
-            let old_title = match old_level { 0 => "营地", 1 => "村", 2 => "乡", 3 => "镇", _ => "县" };
-            let new_title = match new_level { 0 => "营地", 1 => "村", 2 => "乡", 3 => "镇", _ => "县" };
-            Some(format!("🏛️ 聚落繁盛晋升！【{}{}】辖内房屋达到 {} 间，正式升级为【{}{}】！", self.name, old_title, house_count, self.name, new_title))
+            let old_title = match old_level {
+                0 => "营地",
+                1 => "村",
+                2 => "乡",
+                3 => "镇",
+                _ => "县",
+            };
+            let new_title = match new_level {
+                0 => "营地",
+                1 => "村",
+                2 => "乡",
+                3 => "镇",
+                _ => "县",
+            };
+            Some(format!(
+                "🏛️ 聚落繁盛晋升！【{}{}】辖内房屋达到 {} 间，正式升级为【{}{}】！",
+                self.name, old_title, house_count, self.name, new_title
+            ))
         } else {
             None
         }
@@ -320,10 +368,12 @@ impl PrimitivePoi {
             self.current_stock = (self.current_stock + self.regen_rate * dt).min(self.max_stock);
         }
         if self.secondary_regen_rate > 0.0 && self.secondary_max_stock > 0.0 {
-            self.secondary_stock = (self.secondary_stock + self.secondary_regen_rate * dt).min(self.secondary_max_stock);
+            self.secondary_stock = (self.secondary_stock + self.secondary_regen_rate * dt)
+                .min(self.secondary_max_stock);
         }
         if self.tertiary_regen_rate > 0.0 && self.tertiary_max_stock > 0.0 {
-            self.tertiary_stock = (self.tertiary_stock + self.tertiary_regen_rate * dt).min(self.tertiary_max_stock);
+            self.tertiary_stock =
+                (self.tertiary_stock + self.tertiary_regen_rate * dt).min(self.tertiary_max_stock);
         }
     }
 
@@ -385,7 +435,12 @@ pub fn market_unit_price(current: f32, max: f32, cfg: &crate::config::SimConfig)
 }
 
 /// 支持指定基准金价的外部市场幂律计价函数
-pub fn market_unit_price_with_base(current: f32, max: f32, base: f32, cfg: &crate::config::SimConfig) -> f32 {
+pub fn market_unit_price_with_base(
+    current: f32,
+    max: f32,
+    base: f32,
+    cfg: &crate::config::SimConfig,
+) -> f32 {
     let eff = current.max(cfg.market_price_floor_stock);
     base * (max / eff).powf(cfg.market_price_power_exponent)
 }

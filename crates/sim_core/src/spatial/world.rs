@@ -1,14 +1,17 @@
-use crate::rng::WorldRng;
-use crate::config::SimConfig;
-use std::collections::{HashMap, VecDeque};
-use super::vec3::Vec3;
-use super::graph::{LaneGraph3D, NodeId};
 use super::agent::{Agent3D, AgentId};
-use super::poi::{PrimitivePoi, PoiType};
+use super::graph::{LaneGraph3D, NodeId};
 use super::house::{House, HouseAuctionHistoryRecord, AUCTION_HISTORY_CAPACITY};
-use super::ledger::{ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
+use super::ledger::{
+    ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry,
+    RegionRegistry,
+};
+use super::poi::{PoiType, PrimitivePoi};
 use super::snapshot::{RecentDeathSnapshot, Season};
+use super::vec3::Vec3;
+use crate::config::SimConfig;
 use crate::geo::terrain::TerrainMap;
+use crate::rng::WorldRng;
+use std::collections::{HashMap, VecDeque};
 
 /// 3D 空间世界与原始生态生存繁衍仿真管理器
 ///
@@ -104,11 +107,20 @@ impl World3DEngine {
     }
 
     /// 指定种子和自定义配置的确定性世界构建
-    pub fn new_seeded_with_config(grid_res: usize, world_size: f32, seed: u64, config: SimConfig) -> Self {
+    pub fn new_seeded_with_config(
+        grid_res: usize,
+        world_size: f32,
+        seed: u64,
+        config: SimConfig,
+    ) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
         terrain.generate_natural_landscape(seed);
 
-        let journal_cap = if config.ledger_journal_capacity > 0 { config.ledger_journal_capacity } else { 64 };
+        let journal_cap = if config.ledger_journal_capacity > 0 {
+            config.ledger_journal_capacity
+        } else {
+            64
+        };
 
         Self {
             terrain,
@@ -126,7 +138,8 @@ impl World3DEngine {
             season_timer: 0.0,
             current_season: Season::Spring,
             temperature: 20.0,
-            el_nino_phase: WorldRng::new(seed.wrapping_add(0x454c4e494e4f)).gen_range(0.0, std::f32::consts::TAU),
+            el_nino_phase: WorldRng::new(seed.wrapping_add(0x454c4e494e4f))
+                .gen_range(0.0, std::f32::consts::TAU),
             rng: WorldRng::new(seed),
             water_regen_multiplier: 1.0,
             berry_regen_multiplier: 1.0,
@@ -187,9 +200,16 @@ impl World3DEngine {
     }
 
     pub fn find_nearest_camp_node(&self, pos: Vec3) -> NodeId {
-        let nearest_camp = self.pois.iter()
+        let nearest_camp = self
+            .pois
+            .iter()
             .filter(|p| p.poi_type == PoiType::Camp)
-            .min_by(|a, b| a.pos.distance_to(&pos).partial_cmp(&b.pos.distance_to(&pos)).unwrap());
+            .min_by(|a, b| {
+                a.pos
+                    .distance_to(&pos)
+                    .partial_cmp(&b.pos.distance_to(&pos))
+                    .unwrap()
+            });
         if let Some(camp) = nearest_camp {
             self.find_nearest_node(camp.pos).unwrap_or(1)
         } else {

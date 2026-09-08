@@ -1,9 +1,9 @@
+use super::agent::AgentId;
+use super::graph::NodeId;
+use super::vec3::Vec3;
+use crate::config::*;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use super::vec3::Vec3;
-use super::graph::NodeId;
-use super::agent::AgentId;
-use crate::config::*;
 
 /// 房屋建筑等级（M6 起不再承载仓储容量——家庭物资唯一真相源为家户账本，等级仅作目标基准与威望因子）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -74,18 +74,18 @@ pub struct HouseAuctionState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct House {
     pub id: u32,
-    pub owner_id: Option<AgentId>,          // 户主 ID（None=无主空置房）
-    pub spouse_id: Option<AgentId>,         // 配偶共有人 ID（有房夫妇同住时登记）
-    pub camp_id: u32,                       // 归属行政管辖营地 ID (PoiId)
-    pub pos: Vec3,                          // 房屋世界坐标
-    pub door_node_id: NodeId,               // 房屋大门连接的路网节点
-    pub tier: HouseTier,                    // 房屋等级
-    pub durability: f32,                    // 耐久度 (0.0 ~ 100.0)
-    pub age: f32,                           // 房龄 (秒)
-    pub construction_progress: f32,         // 保留字段：历史施工进度（瞬时升级后恒为 1.0 由竣工置位，纯兼容保留）
-    pub is_repairing: bool,                 // 当前是否正在被族人劳作修缮
-    pub builder_id: AgentId,                // 修建者（立宅人）：立宅时即固定
-    pub last_upgrader_id: Option<AgentId>,  // 最近升级者：每次升级时更新；从未升级为 None
+    pub owner_id: Option<AgentId>,         // 户主 ID（None=无主空置房）
+    pub spouse_id: Option<AgentId>,        // 配偶共有人 ID（有房夫妇同住时登记）
+    pub camp_id: u32,                      // 归属行政管辖营地 ID (PoiId)
+    pub pos: Vec3,                         // 房屋世界坐标
+    pub door_node_id: NodeId,              // 房屋大门连接的路网节点
+    pub tier: HouseTier,                   // 房屋等级
+    pub durability: f32,                   // 耐久度 (0.0 ~ 100.0)
+    pub age: f32,                          // 房龄 (秒)
+    pub construction_progress: f32, // 保留字段：历史施工进度（瞬时升级后恒为 1.0 由竣工置位，纯兼容保留）
+    pub is_repairing: bool,         // 当前是否正在被族人劳作修缮
+    pub builder_id: AgentId,        // 修建者（立宅人）：立宅时即固定
+    pub last_upgrader_id: Option<AgentId>, // 最近升级者：每次升级时更新；从未升级为 None
 
     // ★ v1.26.0 拍卖与档案扩展（报价流水已移入拍卖会话，不跨场次）
     #[serde(default)]
@@ -95,7 +95,15 @@ pub struct House {
 }
 
 impl House {
-    pub fn new_with_config(id: u32, owner_id: AgentId, pos: Vec3, door_node_id: NodeId, tier: HouseTier, camp_id: u32, config: &SimConfig) -> Self {
+    pub fn new_with_config(
+        id: u32,
+        owner_id: AgentId,
+        pos: Vec3,
+        door_node_id: NodeId,
+        tier: HouseTier,
+        camp_id: u32,
+        config: &SimConfig,
+    ) -> Self {
         Self {
             id,
             owner_id: Some(owner_id),

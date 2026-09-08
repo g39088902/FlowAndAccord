@@ -41,29 +41,10 @@ const MASLOW_STYLE = {
   Physiological:     { level: 1, icon: '💧', name: '生理需求', color: '#38bdf8', desc: '生存底线：口渴饮水 / 饥饿进食 / 体力<50% 归巢休养' },
   Safety:            { level: 2, icon: '🏠', name: '安全需求', color: '#f59e0b', desc: '家宅安全：私宅水粮木储备填满 / 房屋耐久<50%修缮至100%' },
   Belonging:         { level: 3, icon: '👪', name: '归属与爱', color: '#ec4899', desc: '成家立业：0级仓库水粮填满升级成婚 / 家庭生存纽带' },
-  Esteem:            { level: 4, icon: '🏛️', name: '尊重需求', color: '#a78bfa', desc: '阶层跃升：建材采石 / 盖房淘金(45s冷却) / 房屋施工扩建' },
-  SelfActualization: { level: 5, icon: '👑', name: '自我实现', color: '#fbbf24', desc: '终极奢华：4级大庄园竣工后的娱乐淘金(180s冷却)' },
+  Esteem:            { level: 4, icon: '🏛️', name: '尊重需求', color: '#a78bfa', desc: '发展储备、改善住宅与争取社会地位' },
+  SelfActualization: { level: 5, icon: '👑', name: '自我实现', color: '#fbbf24', desc: '基本需求满足后的财富积累与长期追求' },
 };
-const NEED_KIND_LABEL = {
-  QuenchThirst: '口渴饮水',
-  SateHunger: '饥饿进食',
-  Rest: '休养生息',
-  ReturnHome: '送货回家',       // 专属标签: 安全需求 · 送货回家
-  StockWater: '仓库储水',
-  StockFood: '仓库储粮',
-  StockWood: '过冬木柴',
-  StockStone: '采石建材',
-  StockGold: '盖房淘金',       // 专属标签: ④ 尊重需求 · 盖房淘金 (45s冷却)
-  GoldWealth: '娱乐淘金',      // 专属标签: ⑤ 自我实现 · 娱乐淘金 (180s冷却)
-  RepairHouse: '修缮房屋',
-  BuildHouse: '施工建房',
-  Detour: '越野寻路',
-  Courtship: '求偶成婚',
-  SeekThrone: '夺位远征',
-  MarketTrade: '榷场贸易',
-  BidHouse: '竞拍购房',      // ★ v1.29.0 ⓪ 瞬间行为 · 竞拍购房
-  RaiseChild: '养育后代',    // ★ v1.29.0 ⓪ 瞬间行为 · 在宅养育（远距离变体仍属 ④ 尊重需求）
-};
+const NEED_KIND_LABEL = window.SIM_DECISION_VIZ_DATA.NEED_KIND_LABELS;
 const NEED_KIND_REASON = {
   QuenchThirst: '自身水分告急，前往水泉痛饮至满值并带回补给家户账本。',
   SateHunger: '自身饱食告急，前往浆果丛采食至满值并带回补给家户账本。',
@@ -76,7 +57,7 @@ const NEED_KIND_REASON = {
   BuildHouse: '家户账本可付本次升级材料（升1级水粮各50/升2级木粮水各75/升3级石木粮水各100/升4级金石木粮水各125）→ 一次性扣账并瞬时晋升，户主威望+1。',
   StockStone: '有房即可：家户账本石 < 100 触发去采，补到 ≥ 200 才停（不再以升级建材为唯一导向）。',
   StockGold: '有房即可：家户账本金 < 100 触发去采，补到 ≥ 200 才停（淘金冷却45小时）。',
-  GoldWealth: '4级庄园竣工且水/粮/木/石/金均 ≥ 200 后，娱乐性淘金积累随身财富（冷却180小时）。',
+  GoldWealth: '4级庄园竣工且五类家庭储备充足后，选择淘金策略继续积累财富（冷却180小时）。',
   Detour: '车道临时受阻，正在荒野中越野寻路。',
   Courtship: '寻访全图魅力最高的单身女性，前往求偶并迎娶入家户。',
   SeekThrone: '第一层生存需求（生理）：王位 = 全境资源的分配权，夺位为获取资源分配权而自主出征——在世成年男性非现任国王，向最近空缺王位的营地进军，率先物理抵达者登基为王；途中沿路网车道行走、坐标连续不瞬移。',
@@ -89,11 +70,12 @@ const LEVEL_NUMERALS = ['⓪', '①', '②', '③', '④', '⑤'];
 
 // 解析 Rust 侧 current_need 字符串 (如 "Physiological·QuenchThirst" -> 层级元数据)
 function parseMaslowNeed(needStr, agent) {
-  if (agent) {
+  // 活动任务已保存真实意图与来源；仅对没有任务控制器的旧状态使用兼容推断。
+  if (agent && !(agent.activeTask || agent.active_task)) {
     if (agent.state === 'ConstructingHouse') {
       const myHouse = sim.houses && sim.houses.find(h => h.id === agent.homeHouseId);
       const isTier0 = myHouse && (myHouse.tier === 'Tier0Warehouse' || myHouse.tier === 0);
-      needStr = isTier0 ? 'Belonging·BuildHouse' : 'Esteem·BuildHouse';
+      needStr = isTier0 ? 'Safety·BuildHouse' : 'Esteem·BuildHouse';
     } else if (agent.state === 'RepairingHouse') {
       needStr = 'Safety·RepairHouse';
     } else if (agent.state === 'ReturningToCamp') {
@@ -108,7 +90,7 @@ function parseMaslowNeed(needStr, agent) {
       if (isTier4) {
         needStr = 'SelfActualization·GoldWealth';
       } else {
-        // 房屋未达4级大庄园，所有的淘金行为均为建房备料（④ 尊重需求 · 盖房淘金）
+        // 房屋未达4级大庄园，淘金均属于家户资金补给（④ 尊重需求 · 储备资金）
         needStr = 'Esteem·StockGold';
       }
     }

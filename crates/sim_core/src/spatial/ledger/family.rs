@@ -13,8 +13,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::spatial::agent::AgentId;
 use super::group::{Group, GroupKind};
+use crate::spatial::agent::AgentId;
 
 pub type HouseholdId = u64;
 
@@ -44,11 +44,21 @@ impl Household {
     ) -> Self {
         let mut group = Group::new(GroupKind::Family(id), Some(head), journal_capacity);
         let note = match parent_household {
-            Some(parent) => format!("🏠 家户 #{} 成立：户主 #{} ♂（自分家 #{} 析出）", id, head, parent),
+            Some(parent) => format!(
+                "🏠 家户 #{} 成立：户主 #{} ♂（自分家 #{} 析出）",
+                id, head, parent
+            ),
             None => format!("🏠 家户 #{} 成立：户主 #{} ♂", id, head),
         };
         group.ledger.push_event(founded_tick, note);
-        Self { id, head, group, parent_household, founded_tick, is_dissolved: false }
+        Self {
+            id,
+            head,
+            group,
+            parent_household,
+            founded_tick,
+            is_dissolved: false,
+        }
     }
 }
 
@@ -117,15 +127,14 @@ impl HouseholdRegistry {
     }
 
     /// 为男性户主成立新家户（parent = 分家来源，可空）
-    pub fn create(
-        &mut self,
-        head: AgentId,
-        parent: Option<HouseholdId>,
-        tick: u64,
-    ) -> HouseholdId {
+    pub fn create(&mut self, head: AgentId, parent: Option<HouseholdId>, tick: u64) -> HouseholdId {
         // 已拥有自己家户者不重复建户（幂等：成年判定每 tick 为真）
         if let Some(existing) = self.by_agent.get(&head).copied() {
-            if self.households.get(&existing).is_some_and(|h| h.head == head) {
+            if self
+                .households
+                .get(&existing)
+                .is_some_and(|h| h.head == head)
+            {
                 return existing;
             }
             self.remove_member(head, tick);
@@ -212,10 +221,12 @@ impl HouseholdRegistry {
         self.active_households.remove(&household_id);
         household.group.ledger.push_event(
             tick,
-            format!("⚰️ 家户 #{} 户主 #{} 亡故清算，家户解散归档", household_id, household.head),
+            format!(
+                "⚰️ 家户 #{} 户主 #{} 亡故清算，家户解散归档",
+                household_id, household.head
+            ),
         );
         self.by_agent.retain(|_, v| *v != household_id);
         true
     }
 }
-

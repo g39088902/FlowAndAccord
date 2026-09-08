@@ -279,11 +279,12 @@ function main() {
         errors.push('config.decision-order.js: 对象字面量求值失败');
       } else {
         const ids = o.decisionEvalOrder, lv = o.decisionEvalLevels;
-        const idOk = Array.isArray(ids) && ids.length === 18 && new Set(ids).size === 18
-          && ids.every(s => /^b(?:[1-9]|1[0-8])$/.test(s));
-        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须为 18 个互不重复的 b1..b18');
-        const lvOk = Array.isArray(lv) && lv.length === 18 && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 6);
-        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 18 个 0-6 整数（0=⓪瞬间行为/1-5=马斯洛层级/6=保留动态默认）');
+        const activeIds = new Set(['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b12', 'b13', 'b14', 'b16', 'b17', 'b18']);
+        const idOk = Array.isArray(ids) && ids.length === activeIds.size && new Set(ids).size === activeIds.size
+          && ids.every(s => activeIds.has(s));
+        if (!idOk) errors.push('config.decision-order.js: decisionEvalOrder 必须包含 16 个活动分支（b11 已并入 b8，b15 已下沉为采购策略）');
+        const lvOk = Array.isArray(lv) && lv.length === activeIds.size && lv.every(v => Number.isInteger(v) && v >= 0 && v <= 6);
+        if (!lvOk) errors.push('config.decision-order.js: decisionEvalLevels 必须为 16 个 0-6 整数（0=⓪瞬间行为/1-5=马斯洛层级/6=保留动态默认）');
       }
     }
   } else {

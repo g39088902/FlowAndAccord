@@ -17,15 +17,28 @@ impl World3DEngine {
                 .houses
                 .iter()
                 .filter(|h| h.tier != HouseTier::Tier0Warehouse)
-                .filter_map(|h| h.owner_id.and_then(|oid| self.household_registry.household_of(oid)))
+                .filter_map(|h| {
+                    h.owner_id
+                        .and_then(|oid| self.household_registry.household_of(oid))
+                })
                 .collect();
             // WRITE：对每户家户账本真实扣柴
             for hh_hid in targets {
-                let ledger_wood = self.household_registry.get(hh_hid).map(|hh| hh.group.ledger.balance(ResourceKind::Wood)).unwrap_or(0.0);
+                let ledger_wood = self
+                    .household_registry
+                    .get(hh_hid)
+                    .map(|hh| hh.group.ledger.balance(ResourceKind::Wood))
+                    .unwrap_or(0.0);
                 let burn = wood_burn_rate.min(ledger_wood);
                 if burn > 0.001 {
                     if let Some(hh) = self.household_registry.get_mut(hh_hid) {
-                        hh.group.ledger.record_consumption(LedgerRef::Family(hh_hid), ResourceKind::Wood, burn, TransferReason::Heating, tick);
+                        hh.group.ledger.record_consumption(
+                            LedgerRef::Family(hh_hid),
+                            ResourceKind::Wood,
+                            burn,
+                            TransferReason::Heating,
+                            tick,
+                        );
                     }
                 }
             }
@@ -43,7 +56,10 @@ impl World3DEngine {
         }
 
         if !collapsed_house_ids.is_empty() {
-            let updates: Vec<(usize, NodeId)> = self.agents.iter().enumerate()
+            let updates: Vec<(usize, NodeId)> = self
+                .agents
+                .iter()
+                .enumerate()
                 .filter_map(|(i, agent)| {
                     if let Some(hid) = agent.home_house_id {
                         if collapsed_house_ids.contains(&hid) {
@@ -63,28 +79,38 @@ impl World3DEngine {
                 if let Some(h) = self.houses.iter().find(|h| h.id == *hid) {
                     if h.auction_state.is_some() {
                         self.auction_flopped = self.auction_flopped.saturating_add(1);
-                        let total_bids = h.auction_state.as_ref().map(|st| st.bids_history.len()).unwrap_or(0);
-                        self.push_auction_history(crate::spatial::house::HouseAuctionHistoryRecord {
-                            tick: self.tick_counter,
-                            house_id: h.id,
-                            tier: h.tier,
-                            camp_id: h.camp_id,
-                            durability: 0.0,
-                            is_flop: true,
-                            buyer_id: None,
-                            price: 0.0,
-                            total_bids_count: total_bids,
-                            reason: "耐久耗尽自然坍塌流拍".to_string(),
-                        });
+                        let total_bids = h
+                            .auction_state
+                            .as_ref()
+                            .map(|st| st.bids_history.len())
+                            .unwrap_or(0);
+                        self.push_auction_history(
+                            crate::spatial::house::HouseAuctionHistoryRecord {
+                                tick: self.tick_counter,
+                                house_id: h.id,
+                                tier: h.tier,
+                                camp_id: h.camp_id,
+                                durability: 0.0,
+                                is_flop: true,
+                                buyer_id: None,
+                                price: 0.0,
+                                total_bids_count: total_bids,
+                                reason: "耐久耗尽自然坍塌流拍".to_string(),
+                            },
+                        );
                     }
                 }
-                self.last_event = Some(format!("🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！", hid));
+                self.last_event = Some(format!(
+                    "🏚️ 房屋 #{} 因自然风化耐久耗尽归零，彻底坍塌消逝！",
+                    hid
+                ));
             }
             self.houses.retain(|h| h.durability > 0.0);
             // ★ v1.10.0 坍塌房屋从营地空置列表移除
             for camp in &mut self.pois {
                 if camp.poi_type == crate::spatial::poi::PoiType::Camp {
-                    camp.vacant_houses.retain(|vh| !collapsed_house_ids.contains(&vh.house_id));
+                    camp.vacant_houses
+                        .retain(|vh| !collapsed_house_ids.contains(&vh.house_id));
                 }
             }
         }
@@ -104,7 +130,9 @@ impl World3DEngine {
             if house.durability < max_durability {
                 let owner_id = house.owner_id;
                 for aid in candidate_ids.into_iter().flatten() {
-                    let Some(&idx) = self.agent_index.get(&aid) else { continue };
+                    let Some(&idx) = self.agent_index.get(&aid) else {
+                        continue;
+                    };
                     let agent = &mut self.agents[idx];
                     if agent.is_alive && agent.state == PrimitiveActionState::RepairingHouse {
                         house.is_repairing = true;
@@ -118,9 +146,13 @@ impl World3DEngine {
                 }
             } else {
                 for aid in candidate_ids.into_iter().flatten() {
-                    let Some(&idx) = self.agent_index.get(&aid) else { continue };
+                    let Some(&idx) = self.agent_index.get(&aid) else {
+                        continue;
+                    };
                     let agent = &mut self.agents[idx];
-                    if agent.state == PrimitiveActionState::RepairingHouse && agent.home_house_id == Some(house.id) {
+                    if agent.state == PrimitiveActionState::RepairingHouse
+                        && agent.home_house_id == Some(house.id)
+                    {
                         crate::spatial::decisions::transition::finish_task(agent);
                         agent.current_need = Some("Physiological·Rest".to_string());
                     }
@@ -133,11 +165,20 @@ impl World3DEngine {
             if let Some(oid) = owner_id {
                 if let Some(hid) = self.household_registry.household_of(oid) {
                     if let Some(hh) = self.household_registry.get_mut(hid) {
-                        hh.group.ledger.push_event(tick, format!("🔧 修缮完工：房屋 #{} 耐久度恢复至 100%（修缮人 #{})", house_id, agent_id));
+                        hh.group.ledger.push_event(
+                            tick,
+                            format!(
+                                "🔧 修缮完工：房屋 #{} 耐久度恢复至 100%（修缮人 #{})",
+                                house_id, agent_id
+                            ),
+                        );
                     }
                 }
             }
-            self.last_event = Some(format!("🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！", agent_id, house_id));
+            self.last_event = Some(format!(
+                "🔧 部落民 #{} 劳作修缮了 #{} 号房屋，耐久度已恢复至 100%！",
+                agent_id, house_id
+            ));
         }
     }
 }

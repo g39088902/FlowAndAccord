@@ -15,9 +15,9 @@ M19 架构实现了意图仲裁 (L1)、策略规划 (L2) 与原语执行 (L3) �
 - `agent.state` 降级为向后兼容的只读投影视图，与 `ActiveTask` 保持强一致；
 - L1 持续任务仲裁（`arbitrate_sustained_task`）、瞬发通道（`arbitrate_instant_needs`）与连续采收候选仲裁（`arbitrate_continuous_harvest_candidate`）职责清晰解耦；
 - L2 策略派发（`dispatch_task`）与节拍策略推进（`step_in_progress_task`）收口执行链路；
-- 存档结构升级为 `SAVE_FORMAT_VERSION = 5`，完整持久化 `ActiveTask`，读档零重新掷点、零重新寻路。
+- 存档结构 `SAVE_FORMAT_VERSION = 6`，完整持久化 `ActiveTask`；版本 6 对应 16 条活动 Branch。
 - ★ **M19.4a 表现层透视**：`AgentSnapshot` 扩充 `active_task: Option<ActiveTaskSnapshot>`（四处同步：snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js），前端 Inspector 呈现「🧠 决策行动中枢」三栏看板（🎯 意图 / 🧭 策略 / ⚡ 原语）与瞬发待结微光 Pill（`coronation_pending` / `courtship_pending` / `raise_child_pending` / `pending_bids` / `pending_house_pos`）。
-- ★ **M19.4b 分级任务抢占**（`preemption.rs`）：按「当前任务性质 × 抢占意图」矩阵裁决中断——娱乐淘金可被生理/安全/修缮/登基抢占，建材采收可被临界饥渴、冬季断柴与危房抢占，远征仅被濒死抢占，施工仅被求生与加冕抢占（进度冻结不回滚）；抢占一律沿原车道连续掉头平滑改道，行囊保全、严禁瞬移。
+- ★ **M19.4b 分级任务抢占**（`preemption.rs`）：按当前任务与抢占意图裁决中断；积累财富、建材采收和争取王位分别受不同生存与安全危机约束，抢占沿原车道连续掉头并保全行囊。
 - ★ **M19.4c 禀赋与家资个性化**：力量调节重体力采收装载速率与轻体力偏好；智力权衡「路途耗时 vs 榷场现货牌价」并偏好低磨损通衢；家户金币 ≥ `market_wealthy_family_gold` 的户主 80% 几率赴市现货采买、免于亲自挖矿伐木，平民家户则亲力亲为。
 - ★ **M19.4d 多品类预排采收行程**：`Agent3D::harvest_queue: [Option<BranchId>; 4]` 定长预排队列 + `plan_harvest_itinerary` 最近邻贪心（TSP 启发式）链路优化；出发即排最多 4 站「顺路多品类」行程，现场采满一站后消费队列转下一站，候选项失效自动跳过并回退 `branch_order` 兜底；`ActiveTaskSnapshot::itinerary`（如 `💧备水 → 🌲备木 → 🍒备粮`）透传至 Inspector。
 - 领域词汇、只读观察接口与 FSM 转换契约详见 [26-intent-observation.md](./26-intent-observation.md) 与 [24-three-core-systems-fsm.md](./24-three-core-systems-fsm.md)。
@@ -27,19 +27,19 @@ M19 架构实现了意图仲裁 (L1)、策略规划 (L2) 与原语执行 (L3) �
 ### 6 层需求层次
 
 ```
-⓪ 瞬间行为 (竞拍出价 / 就近求偶 / 在宅养育——零消耗即刻执行)
-⑤ 自我实现 (大庄园备金/娱乐淘金)
-④ 尊重需求 (建房施工/采石备料)
-③ 归属与爱 (0级仓库仓满升级成家/家庭供给)
-② 安全需求 (房屋修缮/私宅水粮储备)
-① 生理需求 (解渴/觅食/体力休养/末档立宅)
+⓪ 瞬间行为 (竞购住宅 / 在宅改善 / 近距求偶 / 在宅生育)
+⑤ 自我实现 (积累财富)
+④ 尊重需求 (改善住宅 / 发展储备 / 争取王位)
+③ 归属与爱 (求偶成家 / 生育后代)
+② 安全需求 (基本储备 / 建立家宅 / 修缮住宅)
+① 生理需求 (饮水解渴 / 进食充饥 / 恢复体力)
 ```
 
-低层级需求未满足时绝对阻断高层任务，严禁越级。生理层内部按「**夺位远征(最高档) → 解渴 → 觅食 → 体力休养 → 立宅(末档)**」短路判定：无家成年男性在饥渴 ≥ 20、体力 ≥ 60 的生理稳定态下，将 `FoundHome` 作为生理层最后一档必然触发自立门户（归属层不再承载建仓，仅保留 0 级仓库升级成家）。
+默认策展顺序先处理个人生存，再处理家庭保障、关系与发展。建立家宅属于安全需求；争取王位属于尊重需求，不再压过饮水、进食与恢复体力。
 
-> ⚡ **★ v1.29.0 ⓪ 瞬间行为（优先级高于生理需求）**：新增 `MaslowLevel::Instantaneous`（编码 0），收纳「满足条件即刻执行、不移动、不消耗任何资源」的决策——只写下决心/pending，由世界执行器落地。每拍 `decide()` 顶部 `evaluate_instant_needs` **全状态**先跑：只遍历 `BranchId::is_instant()` 白名单（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅），命中即 `apply_instant_need` 并 `continue` 继续遍历后续瞬发分支（本回合零消耗）；随后才进入常规状态机，常规 `evaluate_needs` 遇瞬发命中则跳过。首批三条瞬发：`b17 竞拍购房`（★ 放宽：无房 或 有更高等级在售房均可参与）、`b16 求偶`「目标已在交互半径内」、`b18 育儿`「夫妻已在自家宅门口」。非瞬发分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。层级覆盖编码迁移：`0`=瞬间行为 / `1-5`=①..⑤ / `6`=保留代码动态默认。
+> ⚡ **⓪ 瞬间行为通道**：每拍先检查 b8 在宅改善、b16 近距求偶、b17 竞购住宅和 b18 在宅生育。异地改善、求偶和生育仍生成持续任务；需求层级与能否立即提交分别表达。
 
-> ⚔️ **★ M4 夺位远征（v1.9.0 起决策引擎驱动，生理层最高档）**：不再由世界系统前置扫描触发，而是作为第 14 条决策分支 `B14SeekThrone`（`NeedKind::SeekThrone`，生理层最高档、策展序/兜底序均置首）在马斯洛引擎内评估——在世成年男性、非现任国王、且存在空缺王位营地（有房者只能夺自家房屋所在营地、无房可夺任意）时，决策器自主选定最近可夺位营地写入 `expedition_target_camp` 并 `dispatch` 为 `SeekingThrone` 冲向目标（可中断施工/修缮，进度冻结不回滚；途中目标易主原地掉头重定向，无可夺则放弃）；抵达且王位仍空缺 → 写 `coronation_pending`，由世界物理执行器 `execute_pending_coronations` 校验后登基。
+> 👑 **争取王位**：b14 属尊重需求。成年男性在存在符合房籍约束的空缺王位时前往最近目标；抵达后写加冕提交，由世界执行器二次校验并结算。
 
 ### 核心决策原则
 
@@ -50,7 +50,7 @@ M19 架构实现了意图仲裁 (L1)、策略规划 (L2) 与原语执行 (L3) �
 **原则 2：低层级绝对优先**
 - 仓库水/粮/过冬木柴低于 50% 时优先搬运填满，比盖房更优先。
 - 房屋耐久 < 50% 时产生修缮欲望，开工后一路修缮至 100%。
-- 区分盖房淘金（`StockGold`，冷却 45s）与娱乐淘金（`GoldWealth`，冷却 180s）；4 级大庄园竣工前绝不娱乐淘金。
+- 区分「储备资金」（`StockGold`，冷却 45s）与「积累财富」（`GoldWealth`，冷却 180s）；淘金是当前共用策略，显示以活动任务来源为准。
 
 **原则 3：私有施密特触发器 + 连续采收 + 断流重路由 + 断流直达榷场 + 单趟多品类连续采收**
 详见根 AGENTS.md §4.2。要点：
@@ -139,25 +139,25 @@ stateDiagram-v2
 - 详见根 AGENTS.md §4.3。
 
 ### 分支评估顺序（数据驱动，v1.3.6 起）
-- 18 条分支抽为 `branches.rs` 注册表（`BranchId::B14SeekThrone` + `B1QuenchThirst .. B13GoldWealth` + `B15MarketTrade` + `B16Courtship` + `B17BidHouse` + `B18RaiseChild` ↔ 字符串 ID `"b1".."b18"`），
-  每条分支是**自包含条件函数**（无家守卫、b13 的「4 级庄园万事俱备」门禁、b5/b6/b7 的 `family_level` 动态默认、b14 的夺位守卫、b15 的榷场商贸守卫、b16 的男性求偶守卫及家户金币门槛全部内建），
+- 16 条活动分支抽为 `branches.rs` 注册表；b11 合并入 b8「改善住宅」，b15 下沉为水粮木资源意图的采购策略。
+  每条分支是**自包含条件函数**，
   因此任意排列都语义安全。
 - `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
 - **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`
   声明序中性兜底；策展优先级权威默认值在 `frontend/js/config.decision-order.js`，
-  启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入（★ v1.27.0 起用户运行时调整保存到浏览器 localStorage，★ v1.29.0 起键 `flowaccord.decision-order.v2`，不再写回仓库文件）。
+  启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入；用户调整保存到 `flowaccord.decision-order.v3`，旧 v2 顺序按 ID 自动迁移。
 - ★ v1.19.0 生产策展序将 `b16`（男性求偶成婚）提升至 `b5/b6/b7/b9/b10`（收集资源入家户账本）之前：避免单身男性被安全/备料分支长期占满决策、求偶极少触发导致人口无法自我更替；决策序唯一真相源仍为 `config.decision-order.js`。
 
 ### decisions 子模块（9 个）
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 决策子模块入口与重新导出 |
-| `branches.rs` | 18 条分支注册表：`BranchId`（字符串互转/中性声明序 `ALL`）、自包含条件函数 `evaluate`、顺序解析 `resolve_order`、层级覆盖 `level_override_for` |
+| `branches.rs` | 16 条活动分支注册表：`BranchId`、自包含条件、顺序解析与层级覆盖 |
 | `needs.rs` | 需求定义（MaslowLevel/NeedKind）、节点池、家宅缺口计算、`state_need_label_with_agent` 层级覆盖 |
 | `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs（数据驱动）/fulfill_resting_need + ★ v1.29.0 ⓪瞬间层 evaluate_instant_needs/apply_instant_need |
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
 | `seeking.rs` | 途中熔断与平滑重路由（含 `decide_seeking_throne` 夺位远征与 `decide_seeking_courtship` 奔赴求偶途中状态机）；★ v1.27.0 `try_route_to_market`（水/粮断流时户主直接改道榷场） |
-| `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 自包含判定）+ 途中可用性检查与现场交易完成返家 |
+| `market.rs` | 采购策略：判断水粮木能否采购、在采集与采购间选策，并处理市场途中与现场阶段 |
 | `harvest.rs` | 现场采收判定 + 仓储满额查询；★ v1.27.0 水/粮目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | tick_decisions 调度 + ★M4 登基物理执行器 `execute_pending_coronations` + ★求偶结婚执行器 `execute_pending_courtships` / build_decision_context |
 

@@ -59,9 +59,9 @@ impl World3DEngine {
                 father_id.and_then(|fid| self.agent_by_id(fid).map(ParentSnapshot::from_agent));
 
             // ── 3. 确定出生节点 ────────────────────────────────────────────────
-            let family_house_id = mother_snap.home_house_id.or_else(|| {
-                father_snap.as_ref().and_then(|f| f.home_house_id)
-            });
+            let family_house_id = mother_snap
+                .home_house_id
+                .or_else(|| father_snap.as_ref().and_then(|f| f.home_house_id));
             let birth_node = if let Some(hid) = family_house_id {
                 self.houses
                     .iter()
@@ -92,7 +92,13 @@ impl World3DEngine {
             };
 
             let mut baby = Agent3D::new_with_config(
-                baby_id, birth_node, self.config.agent_spawn_base_speed, false, 0.0, baby_gender, &self.config,
+                baby_id,
+                birth_node,
+                self.config.agent_spawn_base_speed,
+                false,
+                0.0,
+                baby_gender,
+                &self.config,
             );
             // 记录婴儿出生时刻 (当前世界 tick 数), 供前端族谱按出生时序施加纵向重力
             baby.birth_tick = self.tick_counter;
@@ -117,12 +123,13 @@ impl World3DEngine {
             let mut inherit = |mv: f32, fv: f32| -> f32 {
                 ((mv + fv) * 0.5 + rng.gen_range(-delta, delta)).clamp(10.0, 190.0)
             };
-            baby.intelligence         = inherit(mother_snap.intelligence,         fs.intelligence);
-            baby.strength             = inherit(mother_snap.strength,             fs.strength);
-            baby.digestion_efficiency = inherit(mother_snap.digestion_efficiency, fs.digestion_efficiency);
-            baby.libido               = inherit(mother_snap.libido,               fs.libido);
-            baby.sleep_efficiency     = inherit(mother_snap.sleep_efficiency,     fs.sleep_efficiency);
-            baby.life_expectancy      = inherit(mother_snap.life_expectancy,      fs.life_expectancy);
+            baby.intelligence = inherit(mother_snap.intelligence, fs.intelligence);
+            baby.strength = inherit(mother_snap.strength, fs.strength);
+            baby.digestion_efficiency =
+                inherit(mother_snap.digestion_efficiency, fs.digestion_efficiency);
+            baby.libido = inherit(mother_snap.libido, fs.libido);
+            baby.sleep_efficiency = inherit(mother_snap.sleep_efficiency, fs.sleep_efficiency);
+            baby.life_expectancy = inherit(mother_snap.life_expectancy, fs.life_expectancy);
             baby.health = baby.life_expectancy;
             baby.max_health = baby.life_expectancy;
 
@@ -190,14 +197,17 @@ impl World3DEngine {
                         self.household_registry.create(fid, None, tick);
                     }
                     if let Some(father_hid) = self.household_registry.household_of(fid) {
-                        self.household_registry.add_member(father_hid, baby_id, tick);
+                        self.household_registry
+                            .add_member(father_hid, baby_id, tick);
                     }
                 }
                 // ★ M3 新生儿随父姓入宗族（v1.9.0 传性别：父姓宗族已存在，故不受纯女性不立宗门禁影响）
-                self.clan_registry.add_member(&baby_surname, baby_id, tick, baby_gender);
+                self.clan_registry
+                    .add_member(&baby_surname, baby_id, tick, baby_gender);
                 // ★ M4 新生儿入父亲所在地区
                 if let Some(father_camp) = self.region_registry.region_of(fid) {
-                    self.region_registry.add_member(father_camp, baby_id, tick, self.tick_counter);
+                    self.region_registry
+                        .add_member(father_camp, baby_id, tick, self.tick_counter);
                     self.regions_arrival_dirty = true;
                 }
             }

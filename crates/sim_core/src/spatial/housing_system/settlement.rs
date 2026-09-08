@@ -31,12 +31,19 @@ impl World3DEngine {
         if self.houses.iter().any(|h| h.door_node_id == node_id) {
             return false;
         }
-        !self.pois.iter().any(|p| p.pos.distance_to(&node_pos) < self.config.house_node_poi_occupy_radius)
+        !self
+            .pois
+            .iter()
+            .any(|p| p.pos.distance_to(&node_pos) < self.config.house_node_poi_occupy_radius)
     }
 
     /// 在候选宅址的合法半径内检索最近的空置节点。返回值已同时通过房屋最小间距校验；
     /// 距离并列时取节点 id 较小者，保证确定性。
-    pub(crate) fn find_vacant_node_near(&self, center: Vec3, radius: f32) -> Option<(NodeId, Vec3)> {
+    pub(crate) fn find_vacant_node_near(
+        &self,
+        center: Vec3,
+        radius: f32,
+    ) -> Option<(NodeId, Vec3)> {
         let mut best: Option<(NodeId, Vec3, f32)> = None;
         for node in self.network.graph.node_weights() {
             let dx = node.pos.x - center.x;
@@ -53,7 +60,9 @@ impl World3DEngine {
             }
             let is_better = match best {
                 None => true,
-                Some((best_id, _, best_dist)) => dist < best_dist || (dist == best_dist && node.id < best_id),
+                Some((best_id, _, best_dist)) => {
+                    dist < best_dist || (dist == best_dist && node.id < best_id)
+                }
             };
             if is_better {
                 best = Some((node.id, node.pos, dist));
@@ -64,22 +73,46 @@ impl World3DEngine {
 
     /// 将节点双向接入最近的 count 个既有节点（泥泞小径），排除自身
     fn connect_node_to_nearest(&mut self, node_id: NodeId, pos: Vec3, count: usize) {
-        let mut sorted_nearby_nodes: Vec<(NodeId, f32)> = self.network.graph.node_weights()
+        let mut sorted_nearby_nodes: Vec<(NodeId, f32)> = self
+            .network
+            .graph
+            .node_weights()
             .filter(|n| n.id != node_id)
             .map(|n| (n.id, n.pos.distance_to(&pos)))
             .collect();
         sorted_nearby_nodes.sort_by(|a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0))
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.cmp(&b.0))
         });
         for &(near_id, _) in sorted_nearby_nodes.iter().take(count) {
-            let _ = self.network.add_lane_with_options(node_id, near_id, None, RoadClass::DirtTrack, false, 1.0, &self.config);
-            let _ = self.network.add_lane_with_options(near_id, node_id, None, RoadClass::DirtTrack, false, 1.0, &self.config);
+            let _ = self.network.add_lane_with_options(
+                node_id,
+                near_id,
+                None,
+                RoadClass::DirtTrack,
+                false,
+                1.0,
+                &self.config,
+            );
+            let _ = self.network.add_lane_with_options(
+                near_id,
+                node_id,
+                None,
+                RoadClass::DirtTrack,
+                false,
+                1.0,
+                &self.config,
+            );
         }
     }
 
     /// 复用的空置节点若已彻底失联（无任何出边），补建接入路径，避免建出孤岛宅院
     fn ensure_node_connected(&mut self, node_id: NodeId, pos: Vec3) {
-        let has_lane = self.network.node_map.get(&node_id)
+        let has_lane = self
+            .network
+            .node_map
+            .get(&node_id)
             .map(|idx| self.network.graph.neighbors(*idx).next().is_some())
             .unwrap_or(false);
         if !has_lane {
@@ -114,7 +147,11 @@ impl World3DEngine {
         }
 
         for (i, chosen) in pending {
-            let cand_pos = Vec3::new(chosen.x, chosen.y, self.terrain.sample_elevation(chosen.x, chosen.y));
+            let cand_pos = Vec3::new(
+                chosen.x,
+                chosen.y,
+                self.terrain.sample_elevation(chosen.x, chosen.y),
+            );
 
             // 优先复用合法范围内最近的空置节点（房屋坍塌遗留的孤儿门节点 / 无主野外路口），
             // 无可复用节点时才新建，杜绝路网节点随代际更替无限膨胀。
@@ -128,7 +165,9 @@ impl World3DEngine {
                 if !self.is_house_site_valid(cand_pos) {
                     continue;
                 }
-                let node_id = self.network.add_node(cand_pos, NodeType::GroundIntersection);
+                let node_id = self
+                    .network
+                    .add_node(cand_pos, NodeType::GroundIntersection);
                 self.connect_node_to_nearest(node_id, cand_pos, 3);
                 (cand_pos, node_id, false)
             };
@@ -138,32 +177,38 @@ impl World3DEngine {
 
             let owner_id = self.agents[i].id;
             // ★ v1.9.0 无房国王盖房挂靠自己的王国（营地）：国王宅邸必属其治下营地
-            let king_camp_id = self.region_registry.regions.iter()
+            let king_camp_id = self
+                .region_registry
+                .regions
+                .iter()
                 .find(|(_, r)| r.group.leader == Some(owner_id))
                 .map(|(cid, _)| *cid);
             // ★ v1.10.0 营地房屋上限：只在未满（< camp_max_houses）的营地建设，所有营地满则放弃本次建房
             let max_houses = self.config.camp_max_houses as usize;
             // 按距宅址的距离排序所有营地（确定性：同距取 id 小）
-            let mut camps_by_dist: Vec<(u32, f32)> = self.pois.iter()
+            let mut camps_by_dist: Vec<(u32, f32)> = self
+                .pois
+                .iter()
                 .filter(|p| p.poi_type == PoiType::Camp)
                 .map(|p| (p.id, p.pos.distance_to(&site_pos)))
                 .collect();
             camps_by_dist.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)));
             // 统计各营地当前房屋数（含本拍已实体化的房屋，防止同拍超建）
-            let camp_house_count = |cid: u32| -> usize {
-                self.houses.iter().filter(|h| h.camp_id == cid).count()
-            };
+            let camp_house_count =
+                |cid: u32| -> usize { self.houses.iter().filter(|h| h.camp_id == cid).count() };
             // 选址：国王优先自己的王国营地（若未满），否则按距离尝试未满营地；全部满则放弃
             let camp_id = if let Some(kcid) = king_camp_id {
                 if camp_house_count(kcid) < max_houses {
                     Some(kcid)
                 } else {
-                    camps_by_dist.iter()
+                    camps_by_dist
+                        .iter()
                         .find(|(cid, _)| camp_house_count(*cid) < max_houses)
                         .map(|(cid, _)| *cid)
                 }
             } else {
-                camps_by_dist.iter()
+                camps_by_dist
+                    .iter()
                     .find(|(cid, _)| camp_house_count(*cid) < max_houses)
                     .map(|(cid, _)| *cid)
             };
@@ -171,11 +216,21 @@ impl World3DEngine {
                 // 所有营地均已满，放弃本次建房（agent 下拍重新决策）
                 continue;
             };
-            let camp_name = self.pois.iter()
+            let camp_name = self
+                .pois
+                .iter()
                 .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
                 .map(|p| p.camp_title())
                 .unwrap_or_else(|| "营地".to_string());
-            let house = House::new_with_config(house_id, owner_id, site_pos, door_node, HouseTier::Tier0Warehouse, camp_id, &self.config);
+            let house = House::new_with_config(
+                house_id,
+                owner_id,
+                site_pos,
+                door_node,
+                HouseTier::Tier0Warehouse,
+                camp_id,
+                &self.config,
+            );
             self.houses.push(house);
 
             let agent = &mut self.agents[i];
@@ -183,7 +238,10 @@ impl World3DEngine {
             agent.home_camp_node = door_node;
             agent.world_pos = site_pos;
             if let Some(task) = agent.active_task {
-                if matches!(task.strategy, crate::spatial::decisions::strategy::ExecutionStrategy::FoundHome { .. }) {
+                if matches!(
+                    task.strategy,
+                    crate::spatial::decisions::strategy::ExecutionStrategy::FoundHome { .. }
+                ) {
                     crate::spatial::decisions::transition::finish_task(agent);
                 }
             }
@@ -192,7 +250,10 @@ impl World3DEngine {
             } else {
                 String::new()
             };
-            self.last_event = Some(format!("📦 部落民 #{} ♂ 自主选址，于【{}】管辖区建立了第 #{} 号 0级仓库{}，开始搬运备货！", owner_id, camp_name, house_id, site_note));
+            self.last_event = Some(format!(
+                "📦 部落民 #{} ♂ 自主选址，于【{}】管辖区建立了第 #{} 号 0级仓库{}，开始搬运备货！",
+                owner_id, camp_name, house_id, site_note
+            ));
         }
     }
 

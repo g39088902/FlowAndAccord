@@ -11,7 +11,7 @@
 ```mermaid
 graph TD
     A["push master / 手动 workflow_dispatch"] --> B["checkout + Node 24 + rustup stable(wasm32) + rust-cache"]
-    B --> C["cargo build -p sim_wasm --target wasm32-unknown-unknown --release"]
+    B --> C["cargo build --locked -p sim_wasm --target wasm32-unknown-unknown --release"]
     C --> D["双副本同步: frontend/rust/ + frontend/"]
     D --> E["node tools/test-wasm.js 门禁"]
     E -->|ALL_TESTS_DONE| F["upload-artifact frontend/"]
@@ -26,12 +26,12 @@ graph TD
 | 环节 | 说明 |
 | :--- | :--- |
 | 触发 | `push` 到 `master`；支持 Actions 页手动 `Run workflow` |
-| 构建 | 标准 rustup（**非**便携 `.toolchain/`），`Swatinem/rust-cache` 加速增量编译 |
+| 构建 | 标准 rustup（**非**便携 `.toolchain/`），锁定 `Cargo.lock` 后从 crates.io 解析依赖，`Swatinem/rust-cache` 加速增量编译 |
 | 门禁 | `node tools/test-wasm.js`，不通过则不上线 |
 | 上传 | `coscmd upload -rsy --delete` 增量同步整目录 |
 | 并发 | 同分支连续 push 自动取消旧的进行中部署（`cancel-in-progress: true`） |
 
-> CI 运行在 `ubuntu-latest`，**严禁**在 workflow 中设置 `CARGO_HOME` 指向仓库 `.cargo-home` 或把 `.toolchain/` 加入 PATH——它们是 Windows 便携缓存，已被 gitignore 且与 ubuntu 不兼容。
+> CI 运行在 `ubuntu-latest`，**严禁**在 workflow 中设置 `CARGO_HOME` 指向仓库 `.cargo-home`、把 `.toolchain/` 加入 PATH，或把 crates.io 替换至未提交的 `.vendor/`——它们是本机缓存，GitHub 的全新 checkout 中不可用。
 
 ---
 
@@ -110,3 +110,4 @@ coscmd upload -f -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim
 | 页面能开但模拟器不运行 | MIME 问题（§4），或 `rust/sim_wasm.wasm` 未上传 |
 | 页面是旧版本 | 确认最新一次 Actions 运行成功；浏览器强刷 |
 | 编译缓慢 | 首次无缓存正常，后续 `rust-cache` 命中 |
+| `failed to read root of directory source: .vendor` | 仓库级 Cargo 配置误将 crates.io 替换为未提交的 `.vendor/`；移除该 replacement，让 CI 按 `Cargo.lock` 从 crates.io 下载依赖 |

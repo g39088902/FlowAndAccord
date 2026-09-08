@@ -20,7 +20,11 @@ use crate::spatial::world::World3DEngine;
 
 impl World3DEngine {
     /// 计算某空置房屋当前拍卖阶段名称（口径与 world_snapshot.rs 保持一致）
-    fn auction_phase_name(house_durability: f32, state: &HouseAuctionState, config: &SimConfig) -> String {
+    fn auction_phase_name(
+        house_durability: f32,
+        state: &HouseAuctionState,
+        config: &SimConfig,
+    ) -> String {
         let deadline = config.house_auction_deadline_durability;
         let obs_ratio = config.house_auction_observation_ratio;
         let obs_dur = if state.start_durability > deadline {
@@ -102,7 +106,10 @@ impl World3DEngine {
                         && a.gender == Gender::Male
                         && a.age >= self.config.agent_adult_age
                         && a.last_bid_tick
-                            .map(|t| tick >= t && tick - t >= self.config.house_auction_bid_cooldown_ticks)
+                            .map(|t| {
+                                tick >= t
+                                    && tick - t >= self.config.house_auction_bid_cooldown_ticks
+                            })
                             .unwrap_or(true)
                 })
                 .unwrap_or(false);
@@ -173,8 +180,7 @@ impl World3DEngine {
                     }
                     None
                 } else if phase == "决策期" {
-                    let bench = self
-                        .houses[house_idx]
+                    let bench = self.houses[house_idx]
                         .auction_state
                         .as_ref()
                         .map(|st| st.benchmark_bid)
@@ -234,7 +240,8 @@ impl World3DEngine {
             .map(|st| st.bids_history.len())
             .unwrap_or(0);
         let voluntary_seller_hh = self.houses[house_idx]
-            .auction_state.as_ref()
+            .auction_state
+            .as_ref()
             .and_then(|st| st.voluntary_seller_household_id);
 
         // 3. 主动换房旧房的成交款归原家户；遗产房沿用王国公户+受益人分账。
@@ -242,8 +249,12 @@ impl World3DEngine {
             if let Some(hh) = self.household_registry.get_mut(seller_hh) {
                 hh.group.ledger.credit(ResourceKind::Gold, price);
                 hh.group.ledger.push_transfer(TransferRecord {
-                    tick, from: LedgerRef::Family(buyer_hh), to: LedgerRef::Family(seller_hh),
-                    resource: ResourceKind::Gold, amount: price, reason: TransferReason::HousingPurchase,
+                    tick,
+                    from: LedgerRef::Family(buyer_hh),
+                    to: LedgerRef::Family(seller_hh),
+                    resource: ResourceKind::Gold,
+                    amount: price,
+                    reason: TransferReason::HousingPurchase,
                 });
             }
         }
@@ -252,89 +263,94 @@ impl World3DEngine {
         if voluntary_seller_hh.is_some() {
             // 主动出售已完成卖方入账，不再进入遗产受益人分账。
         } else {
-        let beneficiary_ids = self
-            .pois
-            .iter()
-            .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
-            .and_then(|p| p.vacant_houses.iter().find(|vh| vh.house_id == house_id))
-            .map(|vh| vh.beneficiary_ids.clone())
-            .unwrap_or_default();
+            let beneficiary_ids = self
+                .pois
+                .iter()
+                .find(|p| p.poi_type == PoiType::Camp && p.id == camp_id)
+                .and_then(|p| p.vacant_houses.iter().find(|vh| vh.house_id == house_id))
+                .map(|vh| vh.beneficiary_ids.clone())
+                .unwrap_or_default();
 
-        // 有效受益人 = 在世 + 非胎儿 + 有家户
-        let mut valid_beneficiaries: Vec<(AgentId, u64)> = Vec::new();
-        for &bid in &beneficiary_ids {
-            let alive = self
-                .agent_by_id(bid)
-                .map(|a| a.is_alive && !a.is_fetus)
-                .unwrap_or(false);
-            if !alive {
-                continue;
+            // 有效受益人 = 在世 + 非胎儿 + 有家户
+            let mut valid_beneficiaries: Vec<(AgentId, u64)> = Vec::new();
+            for &bid in &beneficiary_ids {
+                let alive = self
+                    .agent_by_id(bid)
+                    .map(|a| a.is_alive && !a.is_fetus)
+                    .unwrap_or(false);
+                if !alive {
+                    continue;
+                }
+                if let Some(hid) = self.household_registry.household_of(bid) {
+                    valid_beneficiaries.push((bid, hid));
+                }
             }
-            if let Some(hid) = self.household_registry.household_of(bid) {
-                valid_beneficiaries.push((bid, hid));
-            }
-        }
 
-        let crown_weight = self.config.house_auction_crown_share_weight.max(0.0);
-        let total_units = crown_weight + valid_beneficiaries.len() as f32;
-        let share = if total_units > 0.0 { price / total_units } else { 0.0 };
-        // 失效受益人（已故/无家户）的份额并入王国公户，保证金额守恒
-        let invalid_count = beneficiary_ids.len().saturating_sub(valid_beneficiaries.len()) as f32;
-        let crown_share = crown_weight * share + invalid_count * share;
+            let crown_weight = self.config.house_auction_crown_share_weight.max(0.0);
+            let total_units = crown_weight + valid_beneficiaries.len() as f32;
+            let share = if total_units > 0.0 {
+                price / total_units
+            } else {
+                0.0
+            };
+            // 失效受益人（已故/无家户）的份额并入王国公户，保证金额守恒
+            let invalid_count = beneficiary_ids
+                .len()
+                .saturating_sub(valid_beneficiaries.len()) as f32;
+            let crown_share = crown_weight * share + invalid_count * share;
 
-        // 王国公户份额入地区公仓
-        if crown_share > 0.001 {
-            if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
-                region.group.ledger.credit(ResourceKind::Gold, crown_share);
-                region.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Family(buyer_hh),
-                    to: LedgerRef::Region(camp_id),
-                    resource: ResourceKind::Gold,
-                    amount: crown_share,
-                    reason: TransferReason::TransferTax,
-                });
+            // 王国公户份额入地区公仓
+            if crown_share > 0.001 {
+                if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
+                    region.group.ledger.credit(ResourceKind::Gold, crown_share);
+                    region.group.ledger.push_transfer(TransferRecord {
+                        tick,
+                        from: LedgerRef::Family(buyer_hh),
+                        to: LedgerRef::Region(camp_id),
+                        resource: ResourceKind::Gold,
+                        amount: crown_share,
+                        reason: TransferReason::TransferTax,
+                    });
+                }
+                if let Some(hh) = self.household_registry.get_mut(buyer_hh) {
+                    hh.group.ledger.push_transfer(TransferRecord {
+                        tick,
+                        from: LedgerRef::Family(buyer_hh),
+                        to: LedgerRef::Region(camp_id),
+                        resource: ResourceKind::Gold,
+                        amount: crown_share,
+                        reason: TransferReason::TransferTax,
+                    });
+                }
             }
-            if let Some(hh) = self.household_registry.get_mut(buyer_hh) {
-                hh.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Family(buyer_hh),
-                    to: LedgerRef::Region(camp_id),
-                    resource: ResourceKind::Gold,
-                    amount: crown_share,
-                    reason: TransferReason::TransferTax,
-                });
-            }
-        }
 
-        // 受益人份额入各自家户
-        for &(_, hid) in &valid_beneficiaries {
-            if share <= 0.001 {
-                break;
+            // 受益人份额入各自家户
+            for &(_, hid) in &valid_beneficiaries {
+                if share <= 0.001 {
+                    break;
+                }
+                if let Some(hh) = self.household_registry.get_mut(hid) {
+                    hh.group.ledger.credit(ResourceKind::Gold, share);
+                    hh.group.ledger.push_transfer(TransferRecord {
+                        tick,
+                        from: LedgerRef::Family(buyer_hh),
+                        to: LedgerRef::Family(hid),
+                        resource: ResourceKind::Gold,
+                        amount: share,
+                        reason: TransferReason::EstateShare,
+                    });
+                }
+                if let Some(hh) = self.household_registry.get_mut(buyer_hh) {
+                    hh.group.ledger.push_transfer(TransferRecord {
+                        tick,
+                        from: LedgerRef::Family(buyer_hh),
+                        to: LedgerRef::Family(hid),
+                        resource: ResourceKind::Gold,
+                        amount: share,
+                        reason: TransferReason::EstateShare,
+                    });
+                }
             }
-            if let Some(hh) = self.household_registry.get_mut(hid) {
-                hh.group.ledger.credit(ResourceKind::Gold, share);
-                hh.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Family(buyer_hh),
-                    to: LedgerRef::Family(hid),
-                    resource: ResourceKind::Gold,
-                    amount: share,
-                    reason: TransferReason::EstateShare,
-                });
-            }
-            if let Some(hh) = self.household_registry.get_mut(buyer_hh) {
-                hh.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Family(buyer_hh),
-                    to: LedgerRef::Family(hid),
-                    resource: ResourceKind::Gold,
-                    amount: share,
-                    reason: TransferReason::EstateShare,
-                });
-            }
-        }
-
         }
 
         // 5. 房屋所有权变更（会话随 auction_state=None 一并归档，报价流水不跨场次）
@@ -362,7 +378,10 @@ impl World3DEngine {
 
         // 6. 买方与家属确权入住
         for a in &mut self.agents {
-            if a.id == buyer_id || Some(a.id) == spouse_id || (a.is_alive && a.father_id == Some(buyer_id)) {
+            if a.id == buyer_id
+                || Some(a.id) == spouse_id
+                || (a.is_alive && a.father_id == Some(buyer_id))
+            {
                 a.home_house_id = Some(house_id);
                 a.home_camp_node = door_node;
             }
@@ -385,7 +404,11 @@ impl World3DEngine {
         // 改善型换房：目标房成交后，原房屋才转为空置并延迟挂牌。
         if let Some(old_id) = replaced_house_id {
             if old_id != house_id {
-                if let Some(old_idx) = self.houses.iter().position(|h| h.id == old_id && h.owner_id == Some(buyer_id)) {
+                if let Some(old_idx) = self
+                    .houses
+                    .iter()
+                    .position(|h| h.id == old_id && h.owner_id == Some(buyer_id))
+                {
                     let old_durability = self.houses[old_idx].durability;
                     self.houses[old_idx].owner_id = None;
                     self.houses[old_idx].spouse_id = None;
@@ -398,8 +421,13 @@ impl World3DEngine {
                         voluntary_seller_household_id: Some(buyer_hh),
                     });
                     self.auction_started = self.auction_started.saturating_add(1);
-                    if let Some(camp) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::Camp && p.id == self.houses[old_idx].camp_id) {
-                        camp.vacant_houses.push(VacantHouseEntry { house_id: old_id, beneficiary_ids: Vec::new() });
+                    if let Some(camp) = self.pois.iter_mut().find(|p| {
+                        p.poi_type == PoiType::Camp && p.id == self.houses[old_idx].camp_id
+                    }) {
+                        camp.vacant_houses.push(VacantHouseEntry {
+                            house_id: old_id,
+                            beneficiary_ids: Vec::new(),
+                        });
                     }
                 }
             }

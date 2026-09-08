@@ -82,7 +82,11 @@ impl ClanRegistry {
     /// 确保宗族存在（不存在则创建空宗族，leader=None）
     pub fn ensure_clan(&mut self, surname: &str) {
         if !self.clans.contains_key(surname) {
-            let group = Group::new(GroupKind::Clan(surname.to_string()), None, self.journal_capacity);
+            let group = Group::new(
+                GroupKind::Clan(surname.to_string()),
+                None,
+                self.journal_capacity,
+            );
             self.clans.insert(surname.to_string(), group);
         }
     }
@@ -152,7 +156,9 @@ impl World3DEngine {
             // ★ 快速路径（Fast Path）：若宗族已有族长且族长依然在世存活，
             // 全员等速衰老保证其最年长地位绝不会被超越，O(1) 直接跳过全员扫描！
             if let Some(leader_id) = clan.leader {
-                let leader_alive = self.agent_by_id(leader_id).map_or(false, |a| a.is_alive && a.gender == Gender::Male);
+                let leader_alive = self
+                    .agent_by_id(leader_id)
+                    .map_or(false, |a| a.is_alive && a.gender == Gender::Male);
                 if leader_alive {
                     continue;
                 }
@@ -182,7 +188,10 @@ impl World3DEngine {
 
             let new_leader = best.map(|(id, _)| id);
             // 绝嗣判定：宗族已存在（成员非空）但已无在世男性，且尚未标记绝嗣
-            if !has_living_male && !clan.members.is_empty() && !self.clan_registry.extinct.contains(surname) {
+            if !has_living_male
+                && !clan.members.is_empty()
+                && !self.clan_registry.extinct.contains(surname)
+            {
                 extinct_candidates.push(surname.clone());
             }
             // 仅在族长实际变化时记录（避免每 tick 刷事件）
@@ -215,7 +224,10 @@ impl World3DEngine {
                     // 无在世男性：宗族无主，账本冻结（绝嗣宗族由 mark_clan_extinct 记录事件）
                     clan.leader = None;
                     if !self.clan_registry.extinct.contains(&surname) {
-                        clan.ledger.push_event(tick, format!("⛩️ 宗族【{}】无在世男性，族长之位空缺，账本冻结", surname));
+                        clan.ledger.push_event(
+                            tick,
+                            format!("⛩️ 宗族【{}】无在世男性，族长之位空缺，账本冻结", surname),
+                        );
                     }
                 }
             }
@@ -240,13 +252,17 @@ impl World3DEngine {
         }
 
         // 收集其他存续宗族（非绝嗣、且当前拥有在世男性成员）
-        let other_clans: Vec<String> = self.clan_registry.clans.iter()
+        let other_clans: Vec<String> = self
+            .clan_registry
+            .clans
+            .iter()
             .filter(|(s, c)| {
                 if *s == surname || self.clan_registry.extinct.contains(*s) {
                     return false;
                 }
                 c.members.iter().any(|&m_id| {
-                    self.agent_by_id(m_id).map_or(false, |a| a.is_alive && a.gender == Gender::Male)
+                    self.agent_by_id(m_id)
+                        .map_or(false, |a| a.is_alive && a.gender == Gender::Male)
                 })
             })
             .map(|(s, _)| s.clone())
@@ -295,7 +311,12 @@ impl World3DEngine {
                         other_clan.ledger.push_transfer(record);
                         other_clan.ledger.push_event(
                             tick,
-                            format!("⛩️ 承继绝嗣宗族【{}】族产平分：{} +{:.1}", surname, rk.label(), share),
+                            format!(
+                                "⛩️ 承继绝嗣宗族【{}】族产平分：{} +{:.1}",
+                                surname,
+                                rk.label(),
+                                share
+                            ),
                         );
                     }
                 }
@@ -305,9 +326,28 @@ impl World3DEngine {
         // WRITE：标记绝嗣 + 记录事件
         self.clan_registry.extinct.insert(surname.to_string());
         if let Some(clan) = self.clan_registry.get_mut(surname) {
-            clan.ledger.push_event(tick, format!("⛩️ 宗族【{}】所有男性已亡，转为【绝嗣】状态，族产{}归集", surname, if other_clans.is_empty() { "入公仓兜底".to_string() } else { format!("平分给其他 {} 个宗族", other_clans.len()) }));
+            clan.ledger.push_event(
+                tick,
+                format!(
+                    "⛩️ 宗族【{}】所有男性已亡，转为【绝嗣】状态，族产{}归集",
+                    surname,
+                    if other_clans.is_empty() {
+                        "入公仓兜底".to_string()
+                    } else {
+                        format!("平分给其他 {} 个宗族", other_clans.len())
+                    }
+                ),
+            );
         }
-        self.last_event = Some(format!("⛩️ 宗族【{}】绝嗣：所有男性已亡，族产{}归集", surname, if other_clans.is_empty() { "入公仓兜底".to_string() } else { format!("平分给其他 {} 个宗族", other_clans.len()) }));
+        self.last_event = Some(format!(
+            "⛩️ 宗族【{}】绝嗣：所有男性已亡，族产{}归集",
+            surname,
+            if other_clans.is_empty() {
+                "入公仓兜底".to_string()
+            } else {
+                format!("平分给其他 {} 个宗族", other_clans.len())
+            }
+        ));
     }
 
     // ══════════════════════════════════════════════════════════
@@ -366,7 +406,11 @@ impl World3DEngine {
                 .collect();
 
             if !amounts.is_empty() {
-                items.push(TributeItem { hid: *hid, surname, amounts });
+                items.push(TributeItem {
+                    hid: *hid,
+                    surname,
+                    amounts,
+                });
             }
         }
 
@@ -466,7 +510,10 @@ impl World3DEngine {
             let food_need = (family_threshold - food).max(0.0);
             let need_sum = water_need + food_need;
             let (water_share, food_share) = if need_sum > 0.001 {
-                (aid_total * water_need / need_sum, aid_total * food_need / need_sum)
+                (
+                    aid_total * water_need / need_sum,
+                    aid_total * food_need / need_sum,
+                )
             } else {
                 (aid_total * 0.5, aid_total * 0.5)
             };
@@ -485,7 +532,11 @@ impl World3DEngine {
             }
 
             if !amounts.is_empty() {
-                items.push(AidItem { hid: *hid, surname, amounts });
+                items.push(AidItem {
+                    hid: *hid,
+                    surname,
+                    amounts,
+                });
             }
         }
 

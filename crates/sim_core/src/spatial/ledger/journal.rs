@@ -8,8 +8,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 
-use crate::spatial::agent::AgentId;
 use super::family::HouseholdId;
+use crate::spatial::agent::AgentId;
 
 /// 统一资源类型（终结散落字段的抽象口径；M1 仅作账本记账维度，不改物理仓储）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -189,17 +189,34 @@ impl Ledger {
         if self.events.len() >= self.journal_capacity {
             self.events.pop_front();
         }
-        self.events.push_back(LedgerEvent { tick, note: note.into() });
+        self.events.push_back(LedgerEvent {
+            tick,
+            note: note.into(),
+        });
     }
 
     /// 单边消耗记账：debit 资源 + 记录 from -> Void 流水（无接收方账本）
     /// 用于 Consume（生活吃喝）、Heating（冬季烧柴）等资源灭失场景
-    pub fn record_consumption(&mut self, from: LedgerRef, resource: ResourceKind, amount: f32, reason: TransferReason, tick: u64) {
+    pub fn record_consumption(
+        &mut self,
+        from: LedgerRef,
+        resource: ResourceKind,
+        amount: f32,
+        reason: TransferReason,
+        tick: u64,
+    ) {
         if amount <= 0.0 {
             return;
         }
         self.debit(resource, amount);
-        let record = TransferRecord { tick, from, to: LedgerRef::Void, resource, amount, reason };
+        let record = TransferRecord {
+            tick,
+            from,
+            to: LedgerRef::Void,
+            resource,
+            amount,
+            reason,
+        };
         self.push_transfer(record);
     }
 
@@ -230,7 +247,14 @@ pub fn transfer(
     }
     from_ledger.debit(resource, amount);
     to_ledger.credit(resource, amount);
-    let record = TransferRecord { tick, from, to, resource, amount, reason };
+    let record = TransferRecord {
+        tick,
+        from,
+        to,
+        resource,
+        amount,
+        reason,
+    };
     from_ledger.push_transfer(record.clone());
     to_ledger.push_transfer(record);
 }

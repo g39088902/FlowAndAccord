@@ -35,7 +35,8 @@ impl World3DEngine {
         let base_temp = self.config.temp_base_mid + self.config.temp_amplitude * angle.sin();
         let enso_years = self.config.temp_el_nino_cycle_years.max(0.1);
         let enso_period = enso_years * year_length;
-        let enso_angle = self.el_nino_phase + (self.season_timer / enso_period) * std::f32::consts::TAU;
+        let enso_angle =
+            self.el_nino_phase + (self.season_timer / enso_period) * std::f32::consts::TAU;
         let enso_effect = self.config.temp_el_nino_amplitude * enso_angle.sin();
         self.temperature = base_temp + enso_effect;
     }

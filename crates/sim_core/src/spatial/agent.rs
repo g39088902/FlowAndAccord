@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-use super::decisions::strategy::ActiveTask;
 use super::decisions::branches::BranchId;
+use super::decisions::strategy::ActiveTask;
 use super::graph::{LaneEdge3D, LaneGraph3D, LaneId, NodeId};
 use super::poi::PoiId;
 use super::vec3::Vec3;
 use crate::config::*;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub type AgentId = u32;
 
@@ -19,39 +19,45 @@ pub struct StockSchmittTrigger {
 
 impl StockSchmittTrigger {
     pub fn new(initial_ratio: f32, activate_ratio: f32, deactivate_ratio: f32) -> Self {
-        assert!(deactivate_ratio <= activate_ratio, "施密特触发器的关闭阈值不能高于开启阈值");
-        Self { active: initial_ratio >= activate_ratio, activate_ratio, deactivate_ratio }
+        assert!(
+            deactivate_ratio <= activate_ratio,
+            "施密特触发器的关闭阈值不能高于开启阈值"
+        );
+        Self {
+            active: initial_ratio >= activate_ratio,
+            activate_ratio,
+            deactivate_ratio,
+        }
     }
 
     pub fn update(&mut self, ratio: f32) -> bool {
         if self.active {
-            if ratio < self.deactivate_ratio { self.active = false; }
+            if ratio < self.deactivate_ratio {
+                self.active = false;
+            }
         } else if ratio >= self.activate_ratio {
             self.active = true;
         }
         self.active
     }
 
-    pub fn is_active(&self) -> bool { self.active }
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
 }
 
 /// 百家姓（前150姓），用于始祖随机赋姓
 pub const COMMON_SURNAMES: &[&str] = &[
-    "赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈",
-    "褚", "卫", "蒋", "沈", "韩", "杨", "朱", "秦", "尤", "许",
-    "何", "吕", "施", "张", "孔", "曹", "严", "华", "金", "魏",
-    "陶", "姜", "戚", "谢", "邹", "喻", "柏", "水", "窦", "章",
-    "云", "苏", "潘", "葛", "奚", "范", "彭", "郎", "鲁", "韦",
-    "昌", "马", "苗", "凤", "花", "方", "俞", "任", "袁", "柳",
-    "酆", "鲍", "史", "唐", "费", "廉", "岑", "薛", "雷", "贺",
-    "倪", "汤", "滕", "殷", "罗", "毕", "郝", "邬", "安", "常",
-    "乐", "于", "时", "傅", "皮", "卞", "齐", "康", "伍", "余",
-    "元", "卜", "顾", "孟", "平", "黄", "和", "穆", "萧", "尹",
-    "姚", "邵", "湛", "汪", "祁", "毛", "禹", "狄", "米", "贝",
-    "明", "臧", "计", "伏", "成", "戴", "谈", "宋", "茅", "庞",
-    "熊", "纪", "舒", "屈", "项", "祝", "董", "梁", "杜", "阮",
-    "蓝", "闵", "席", "季", "麻", "强", "贾", "路", "娄", "危",
-    "江", "童", "颜", "郭", "梅", "盛", "林", "刁", "钟", "徐",
+    "赵", "钱", "孙", "李", "周", "吴", "郑", "王", "冯", "陈", "褚", "卫", "蒋", "沈", "韩", "杨",
+    "朱", "秦", "尤", "许", "何", "吕", "施", "张", "孔", "曹", "严", "华", "金", "魏", "陶", "姜",
+    "戚", "谢", "邹", "喻", "柏", "水", "窦", "章", "云", "苏", "潘", "葛", "奚", "范", "彭", "郎",
+    "鲁", "韦", "昌", "马", "苗", "凤", "花", "方", "俞", "任", "袁", "柳", "酆", "鲍", "史", "唐",
+    "费", "廉", "岑", "薛", "雷", "贺", "倪", "汤", "滕", "殷", "罗", "毕", "郝", "邬", "安", "常",
+    "乐", "于", "时", "傅", "皮", "卞", "齐", "康", "伍", "余", "元", "卜", "顾", "孟", "平", "黄",
+    "和", "穆", "萧", "尹", "姚", "邵", "湛", "汪", "祁", "毛", "禹", "狄", "米", "贝", "明", "臧",
+    "计", "伏", "成", "戴", "谈", "宋", "茅", "庞", "熊", "纪", "舒", "屈", "项", "祝", "董", "梁",
+    "杜", "阮", "蓝", "闵", "席", "季", "麻", "强", "贾", "路", "娄", "危", "江", "童", "颜", "郭",
+    "梅", "盛", "林", "刁", "钟", "徐",
 ];
 
 /// 性别系统
@@ -74,27 +80,27 @@ impl Gender {
 /// 原始生存与繁衍行为状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrimitiveActionState {
-    RestingAtCamp,      // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、消耗家宅储备)
-    SeekingWater,       // 🚶 正在赶往水源
-    SeekingFood,        // 🍒 正在赶往浆果丛觅食
-    DrinkingAtWater,    // 💧 正在水泉边痛饮
-    ForagingFood,       // 🍒 正在浆果丛觅食
-    SeekingWood,        // 🚶 正在赶往林地伐木
-    GatheringWood,      // 🌲 正在林地伐木并补给家宅
-    SeekingStone,       // 🚶 正在赶往石矿采石
-    MiningStone,        // 🪨 正在石矿采石并补给家宅
-    SeekingGold,        // 🚶 正在赶往金矿淘金
-    MiningGold,         // 🪙 正在金矿开采黄金(随身无限携带)
-    ReturningToCamp,    // 🏕️ 饱腹/解渴/采收返回营地或私宅
-    ConstructingHouse,  // 🔨 正在投入工时营建/升级房屋
-    RepairingHouse,     // 🔧 正在劳作修缮房屋耐久度
-    OffRoadDetour,      // ⚠️ 荒野越野寻路中
-    SeekingThrone,      // ⚔️ 夺位远征中（冲向无主营地登基）
-    SeekingMarket,      // 🚶 正在赶往外部市场求购水粮
-    BuyingAtMarket,     // ⚖️ 正在市场现场交易（就地自救与装载行囊）
-    SeekingCourtship,   // 💍 正在奔赴心仪女性求偶
-    RaiseChild,         // 👶 尊重需求：男性自主承担养育小孩并尝试使妻子受孕
-    Dead,               // 💀 已死亡 (饥荒或脱水致死)
+    RestingAtCamp,     // 🏕️ 营地/家宅休息 (恢复体力、饱暖受孕、消耗家宅储备)
+    SeekingWater,      // 🚶 正在赶往水源
+    SeekingFood,       // 🍒 正在赶往浆果丛觅食
+    DrinkingAtWater,   // 💧 正在水泉边痛饮
+    ForagingFood,      // 🍒 正在浆果丛觅食
+    SeekingWood,       // 🚶 正在赶往林地伐木
+    GatheringWood,     // 🌲 正在林地伐木并补给家宅
+    SeekingStone,      // 🚶 正在赶往石矿采石
+    MiningStone,       // 🪨 正在石矿采石并补给家宅
+    SeekingGold,       // 🚶 正在赶往金矿淘金
+    MiningGold,        // 🪙 正在金矿开采黄金(随身无限携带)
+    ReturningToCamp,   // 🏕️ 饱腹/解渴/采收返回营地或私宅
+    ConstructingHouse, // 🔨 正在投入工时营建/升级房屋
+    RepairingHouse,    // 🔧 正在劳作修缮房屋耐久度
+    OffRoadDetour,     // ⚠️ 荒野越野寻路中
+    SeekingThrone,     // ⚔️ 夺位远征中（冲向无主营地登基）
+    SeekingMarket,     // 🚶 正在赶往外部市场求购水粮
+    BuyingAtMarket,    // ⚖️ 正在市场现场交易（就地自救与装载行囊）
+    SeekingCourtship,  // 💍 正在奔赴心仪女性求偶
+    RaiseChild,        // 👶 尊重需求：男性自主承担养育小孩并尝试使妻子受孕
+    Dead,              // 💀 已死亡 (饥荒或脱水致死)
 }
 
 impl PrimitiveActionState {
@@ -142,17 +148,17 @@ pub struct Agent3D {
     pub arrival_tick: u64,
 
     // 统一生理指标 (0.0 ~ 50.0 单位，初始 50% 即 25.0 单位)
-    pub hunger: f32,          // 饱食度 (最大 50.0 单位)
-    pub thirst: f32,          // 水分值 (最大 50.0 单位)
-    pub stamina: f32,         // 体力值 (0.0 ~ 100.0%)
-    pub health: f32,          // ❤️ 健康需求值 (出生时为寿命属性值，不可补充，归零即老死)
-    pub max_health: f32,      // 健康值基准上限 (出生时记录的初始寿命)
+    pub hunger: f32,     // 饱食度 (最大 50.0 单位)
+    pub thirst: f32,     // 水分值 (最大 50.0 单位)
+    pub stamina: f32,    // 体力值 (0.0 ~ 100.0%)
+    pub health: f32,     // ❤️ 健康需求值 (出生时为寿命属性值，不可补充，归零即老死)
+    pub max_health: f32, // 健康值基准上限 (出生时记录的初始寿命)
     // 随身行囊: 水/粮/木/石 每类独立容量 50.0 单位 (互不共享)，黄金无限容量
-    pub carried_water: f32,   // 随身携带清水
-    pub carried_food: f32,    // 随身携带食物
-    pub carried_wood: f32,    // 随身携带木材
-    pub carried_stone: f32,   // 随身携带石料
-    pub carried_gold: f32,    // 随身携带黄金
+    pub carried_water: f32, // 随身携带清水
+    pub carried_food: f32,  // 随身携带食物
+    pub carried_wood: f32,  // 随身携带木材
+    pub carried_stone: f32, // 随身携带石料
+    pub carried_gold: f32,  // 随身携带黄金
     /// ★ v1.26.3 累计开采资源量（单位）：本 agent 一生从资源点装载入随身行囊的累计总量
     /// （水/粮/木/石/金五类合计）。口径 = 「开采搬运」：市场购买与就地自饮自食不计入。
     /// 纯累加、不消耗 WorldRng，确定性不受影响。调试模式前端卡片展示用。
@@ -217,16 +223,16 @@ pub struct Agent3D {
     /// ★ M19.4d 预排行程候选队列（定长 4 站）：多品类采收行程优化提示（可失效，零堆分配）
     #[serde(default)]
     pub harvest_queue: [Option<BranchId>; 4],
-    pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
+    pub build_timer: f32,          // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
     // 代际传承与家庭血缘
-    pub generation: u32,             // 世代代数 (始祖为第1代，子一代为第2代，依此类推)
-    pub spouse_id: Option<AgentId>,  // 配偶 ID (一夫一妻)
-    pub mother_id: Option<AgentId>,  // 生母 ID
-    pub father_id: Option<AgentId>,  // 生父 ID
-    pub children_ids: Vec<AgentId>,  // 子女列表
-    pub surname: String,             // 传承氏族姓氏 (如 "李"、"张")
+    pub generation: u32, // 世代代数 (始祖为第1代，子一代为第2代，依此类推)
+    pub spouse_id: Option<AgentId>, // 配偶 ID (一夫一妻)
+    pub mother_id: Option<AgentId>, // 生母 ID
+    pub father_id: Option<AgentId>, // 生父 ID
+    pub children_ids: Vec<AgentId>, // 子女列表
+    pub surname: String, // 传承氏族姓氏 (如 "李"、"张")
     /// ★ M6/v1.18.0 威望（所有影响因子的综合持久分，非"宗族声望"）：当前因子 = 子嗣（活产各 +1）
     ///   + 宅邸（房屋每晋升一级 +1）+ 担任国王（登基 +3）+ 担任宗族长老（任职 +3）。
     ///   子女日后死亡不回减；随 agent 终身、不随房屋/家户转移。
@@ -238,12 +244,12 @@ pub struct Agent3D {
     pub family_stock_active: [bool; 5],
 
     // 先天遗传基因指标 (禀赋均值 100.0，服从正态分布继承与变异)
-    pub intelligence: f32,           // 智力: 决策理性与技能领悟
-    pub strength: f32,               // 力量: 劳作与负重耐力
-    pub digestion_efficiency: f32,   // 消化代谢效率: 影响饱腹消耗速率 (高者抗饿)
-    pub libido: f32,                 // 繁衍意愿: 影响受孕倾向与求偶动力
-    pub sleep_efficiency: f32,       // 睡眠效率: 影响体力回血速率 (高者恢复快)
-    pub life_expectancy: f32,        // 预期基础寿命 (秒)
+    pub intelligence: f32,         // 智力: 决策理性与技能领悟
+    pub strength: f32,             // 力量: 劳作与负重耐力
+    pub digestion_efficiency: f32, // 消化代谢效率: 影响饱腹消耗速率 (高者抗饿)
+    pub libido: f32,               // 繁衍意愿: 影响受孕倾向与求偶动力
+    pub sleep_efficiency: f32,     // 睡眠效率: 影响体力回血速率 (高者恢复快)
+    pub life_expectancy: f32,      // 预期基础寿命 (秒)
 
     // 繁衍与生命周期
     pub is_pregnant: bool,
@@ -263,9 +269,9 @@ pub struct Agent3D {
     /// 反序列化默认 false，由 split 循环首次命中幂等判断时自愈回填。
     #[serde(default)]
     pub is_household_head: bool,
-    pub pregnancy_progress: f32,     // 孕期进度 (0.0 ~ 1.0)
-    pub ready_to_birth: bool,        // 孕期满是否准备分娩
-    pub miscarriage_alert_timer: f32,// 流产警报留存显示计时器 (秒)
+    pub pregnancy_progress: f32,         // 孕期进度 (0.0 ~ 1.0)
+    pub ready_to_birth: bool,            // 孕期满是否准备分娩
+    pub miscarriage_alert_timer: f32,    // 流产警报留存显示计时器 (秒)
     pub miscarriage_cooldown_timer: f32, // 流产后不可受孕的休养冷却计时器 (秒)
     /// ★ 产后休养冷却计时器 (秒)：分娩完成后置为 config.agent_postpartum_cooldown (900s)，期间禁止再次受孕
     #[serde(default)]
@@ -296,7 +302,15 @@ pub struct Agent3D {
 }
 
 impl Agent3D {
-    pub fn new_with_config(id: AgentId, home_camp: NodeId, max_speed: f32, is_covert: bool, initial_age: f32, gender: Gender, config: &SimConfig) -> Self {
+    pub fn new_with_config(
+        id: AgentId,
+        home_camp: NodeId,
+        max_speed: f32,
+        is_covert: bool,
+        initial_age: f32,
+        gender: Gender,
+        config: &SimConfig,
+    ) -> Self {
         let quadrupled_speed = max_speed * config.agent_base_move_speed_mult;
         Self {
             id,
@@ -375,7 +389,11 @@ impl Agent3D {
             route: Vec::new(),
             route_index: 0,
             is_covert,
-            stealth_visibility: if is_covert { config.agent_stealth_visibility_covert } else { config.agent_stealth_visibility_normal },
+            stealth_visibility: if is_covert {
+                config.agent_stealth_visibility_covert
+            } else {
+                config.agent_stealth_visibility_normal
+            },
             current_need: None,
             world_pos: Vec3::ZERO,
             forward_heading_rad: 0.0,
@@ -413,7 +431,13 @@ impl Agent3D {
         self.observe_poi_stock_with_config(poi_id, current_stock, max_stock, &SimConfig::default())
     }
 
-    pub fn observe_poi_stock_with_config(&mut self, poi_id: PoiId, current_stock: f32, max_stock: f32, config: &SimConfig) -> bool {
+    pub fn observe_poi_stock_with_config(
+        &mut self,
+        poi_id: PoiId,
+        current_stock: f32,
+        max_stock: f32,
+        config: &SimConfig,
+    ) -> bool {
         let ratio = if max_stock.is_finite() && max_stock > 0.0 {
             current_stock / max_stock
         } else {
@@ -421,13 +445,22 @@ impl Agent3D {
         };
         self.poi_seekability
             .entry(poi_id)
-            .or_insert_with(|| StockSchmittTrigger::new(0.0, config.decision_poi_seek_min_stock_ratio, config.decision_poi_abandon_stock_ratio))
+            .or_insert_with(|| {
+                StockSchmittTrigger::new(
+                    0.0,
+                    config.decision_poi_seek_min_stock_ratio,
+                    config.decision_poi_abandon_stock_ratio,
+                )
+            })
             .update(ratio)
     }
 
     /// 查询本 Agent 对某 POI 的可派遣结论；尚未观察到的 POI 默认为不可用。
     pub fn poi_is_seekable(&self, poi_id: PoiId) -> bool {
-        self.poi_seekability.get(&poi_id).map(StockSchmittTrigger::is_active).unwrap_or(false)
+        self.poi_seekability
+            .get(&poi_id)
+            .map(StockSchmittTrigger::is_active)
+            .unwrap_or(false)
     }
 
     /// 核心生命代谢 Tick (上限50.0单位；受孕由马斯洛“养育小孩”行动触发)
@@ -466,7 +499,11 @@ impl Agent3D {
         self.age += dt;
 
         let event_msg = None;
-        let mut metabolic_multiplier = if self.is_pregnant { config.agent_pregnant_metabolism_mult } else { 1.0 };
+        let mut metabolic_multiplier = if self.is_pregnant {
+            config.agent_pregnant_metabolism_mult
+        } else {
+            1.0
+        };
 
         // ★ M6 升级瞬时化：ConstructingHouse 已无体力/工时投入，不再计入劳动代谢加速
         if self.state == PrimitiveActionState::RepairingHouse
@@ -477,8 +514,12 @@ impl Agent3D {
             metabolic_multiplier *= config.agent_work_metabolism_mult; // 修缮与采矿劳动代谢加速
         }
 
-        let dig_ratio = (self.digestion_efficiency / 100.0).clamp(config.agent_digestion_ratio_min, config.agent_digestion_ratio_max);
-        let hunger_decay_per_sec = (config.agent_base_metabolism_decay * metabolic_multiplier) / dig_ratio;
+        let dig_ratio = (self.digestion_efficiency / 100.0).clamp(
+            config.agent_digestion_ratio_min,
+            config.agent_digestion_ratio_max,
+        );
+        let hunger_decay_per_sec =
+            (config.agent_base_metabolism_decay * metabolic_multiplier) / dig_ratio;
         let thirst_decay_per_sec = config.agent_base_metabolism_decay * metabolic_multiplier;
         self.hunger = (self.hunger - hunger_decay_per_sec * dt).max(0.0);
         self.thirst = (self.thirst - thirst_decay_per_sec * dt).max(0.0);
@@ -528,7 +569,10 @@ impl Agent3D {
         // 妊娠与流产判定
         if self.is_pregnant {
             let miscarry_threshold = config.agent_miscarriage_threshold;
-            if self.hunger < miscarry_threshold || self.thirst < miscarry_threshold || self.stamina < config.agent_miscarriage_stamina_threshold {
+            if self.hunger < miscarry_threshold
+                || self.thirst < miscarry_threshold
+                || self.stamina < config.agent_miscarriage_stamina_threshold
+            {
                 self.is_pregnant = false;
                 self.pregnancy_father_id = None;
                 self.pregnancy_child_id = None; // 流产：释放胎儿占用的 ID
@@ -545,18 +589,26 @@ impl Agent3D {
                 self.ready_to_birth = true;
                 // ★ 分娩后进入产后休养冷却：期间禁止再次受孕
                 self.postpartum_cooldown_timer = config.agent_postpartum_cooldown;
-                return Some(format!("🍼 喜讯！女性部落民 #{} 历经{:.0}小时漫长孕期，顺利产下一名健康的新生儿！", self.id, config.agent_pregnancy_duration));
+                return Some(format!(
+                    "🍼 喜讯！女性部落民 #{} 历经{:.0}小时漫长孕期，顺利产下一名健康的新生儿！",
+                    self.id, config.agent_pregnancy_duration
+                ));
             }
         }
 
         // 休息、修缮与采集体力结算（★ M6 升级瞬时化：ConstructingHouse 不再消耗体力）
         if self.state == PrimitiveActionState::RestingAtCamp {
-            let recovery_rate = config.agent_rest_stamina_recovery_rate * (self.sleep_efficiency / 100.0);
+            let recovery_rate =
+                config.agent_rest_stamina_recovery_rate * (self.sleep_efficiency / 100.0);
             self.stamina = (self.stamina + recovery_rate * dt).min(config.agent_stamina_capacity);
         } else if self.state == PrimitiveActionState::RepairingHouse {
-            self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt).max(config.agent_labor_stamina_floor);
-        } else if self.state == PrimitiveActionState::GatheringWood || self.state == PrimitiveActionState::MiningStone {
-            self.stamina = (self.stamina - config.agent_gather_stamina_burn * dt).max(config.agent_labor_stamina_floor);
+            self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt)
+                .max(config.agent_labor_stamina_floor);
+        } else if self.state == PrimitiveActionState::GatheringWood
+            || self.state == PrimitiveActionState::MiningStone
+        {
+            self.stamina = (self.stamina - config.agent_gather_stamina_burn * dt)
+                .max(config.agent_labor_stamina_floor);
         }
 
         event_msg
@@ -600,12 +652,24 @@ impl Agent3D {
         let lane = &road_network.graph[edge_idx];
         let effective_wear = lane.wear.min(config.road_benefit_max_wear);
 
-        let road_level_factor = (config.road_level_factor_base + config.road_level_factor_wear_coef * effective_wear).clamp(config.road_level_factor_min, config.road_level_factor_max);
+        let road_level_factor = (config.road_level_factor_base
+            + config.road_level_factor_wear_coef * effective_wear)
+            .clamp(config.road_level_factor_min, config.road_level_factor_max);
 
         // 坡度体力能耗
         let delta_z = lane.curve.p3.z - lane.curve.p0.z;
-        let uphill_penalty = if delta_z > 0.0 { (delta_z / lane.curve.length).max(0.0) } else { 0.0 };
-        let stamina_burn = (config.agent_move_stamina_base + if self.is_pregnant { config.agent_move_stamina_pregnant } else { 0.0 }) * (1.0 + uphill_penalty * config.agent_move_stamina_grade_coef);
+        let uphill_penalty = if delta_z > 0.0 {
+            (delta_z / lane.curve.length).max(0.0)
+        } else {
+            0.0
+        };
+        let stamina_burn = (config.agent_move_stamina_base
+            + if self.is_pregnant {
+                config.agent_move_stamina_pregnant
+            } else {
+                0.0
+            })
+            * (1.0 + uphill_penalty * config.agent_move_stamina_grade_coef);
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
         // 💪 力量禀赋直接决定步速: 行走速度 = 默认速度 × 道路质量 × (力量/100)，全员共用默认速度、不受体力影响、不加 clamp

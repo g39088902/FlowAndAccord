@@ -20,9 +20,14 @@ impl World3DEngine {
             // ★ 丧偶：婚姻登记簿封账归档（真实来源为登记簿，spouse_id 为缓存）
             let tick = self.current_tick();
             if let Some(mid) = self.marriage_registry.active_marriage_of(deceased_id) {
-                self.marriage_registry.close(mid, MarriageEndReason::Bereaved, tick);
+                self.marriage_registry
+                    .close(mid, MarriageEndReason::Bereaved, tick);
             }
-            let partner_pos = self.agents.iter().find(|a| a.id == sp_id).map(|a| a.world_pos);
+            let partner_pos = self
+                .agents
+                .iter()
+                .find(|a| a.id == sp_id)
+                .map(|a| a.world_pos);
             if let Some(pos) = partner_pos {
                 let c_node = self.find_nearest_camp_node(pos);
                 if let Some(partner) = self.agents.iter_mut().find(|a| a.id == sp_id) {

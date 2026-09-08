@@ -1,10 +1,9 @@
-pub mod maintenance;
+pub mod auction;
 pub mod construction;
+pub mod inheritance;
+pub mod maintenance;
 pub mod marriage;
 pub mod settlement;
-pub mod inheritance;
-pub mod auction;
-
 
 use crate::spatial::world::World3DEngine;
 

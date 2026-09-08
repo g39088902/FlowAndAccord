@@ -13,24 +13,27 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use crate::config::SimConfig;
-use crate::geo::terrain::TerrainMap;
-use crate::rng::WorldRng;
 use super::agent::{Agent3D, AgentId};
 use super::graph::LaneGraph3D;
 use super::house::{House, HouseAuctionHistoryRecord};
-use super::ledger::{ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry, RegionRegistry};
+use super::ledger::{
+    ClanRegistry, EmpireRegistry, HouseholdId, HouseholdRegistry, Ledger, MarriageRegistry,
+    RegionRegistry,
+};
 use super::poi::PrimitivePoi;
 use super::snapshot::Season;
 use super::world::World3DEngine;
+use crate::config::SimConfig;
+use crate::geo::terrain::TerrainMap;
+use crate::rng::WorldRng;
 
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
-/// v1.46.9 (M19.2): Agent3D 新增活动任务 active_task 持久化，不兼容旧档
-pub const SAVE_FORMAT_VERSION: u32 = 5;
+/// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
+pub const SAVE_FORMAT_VERSION: u32 = 6;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.46.10";
+pub const SAVE_APP_VERSION: &str = "1.46.12";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -179,8 +182,7 @@ pub fn serialize_save(world: &World3DEngine) -> Result<String, String> {
 ///
 /// 返回 Err 时**绝不**部分替换世界状态，调用方应保持原世界继续运行。
 pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
-    let save: WorldSave =
-        serde_json::from_str(json).map_err(|e| format!("存档解析失败: {}", e))?;
+    let save: WorldSave = serde_json::from_str(json).map_err(|e| format!("存档解析失败: {}", e))?;
 
     if save.format_version != SAVE_FORMAT_VERSION {
         return Err(format!(
@@ -261,7 +263,9 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic
     world.rebuild_agent_index();
-    if world.household_registry.active_households.is_empty() && !world.household_registry.households.is_empty() {
+    if world.household_registry.active_households.is_empty()
+        && !world.household_registry.households.is_empty()
+    {
         world.household_registry.rebuild_active_households();
     }
     Ok(world)

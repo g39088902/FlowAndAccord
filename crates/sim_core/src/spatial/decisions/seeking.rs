@@ -1,35 +1,109 @@
 use super::super::agent::{Agent3D, PrimitiveActionState};
-use super::super::poi::PoiType;
 use super::super::ledger::journal::ResourceKind;
-use super::needs::*;
-use super::evaluate::Decisioner;
-use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, CommitStage};
-use super::primitive::{ActionPrimitive, ArrivalKind};
-use super::intent::{AgentIntent, IntentKind, CompletionPolicy};
+use super::super::poi::PoiType;
 use super::branches::BranchId;
+use super::evaluate::Decisioner;
+use super::intent::{AgentIntent, CompletionPolicy, IntentKind};
+use super::needs::*;
+use super::primitive::{ActionPrimitive, ArrivalKind};
+use super::strategy::{ActiveTask, CommitStage, ExecutionStrategy, ResourceStage};
 use super::transition;
 
 /// 途中转向与可用性检查（§4.2）：目标 POI 被 Agent 私有施密特触发器关闭时，
 /// 原地掉头平滑重路由至就近同类可用 POI；仅当自身无可用品或体力告警时才折返回家。
 impl<'a> Decisioner<'a> {
     pub fn try_route_to_market(&mut self, agent: &mut Agent3D, pool: NodePool) -> bool {
-        if !matches!(pool, NodePool::Water | NodePool::Food | NodePool::Wood) || self.ctx.market_nodes.is_empty() { return false; }
-        let can_pay = self.households.household_of(agent.id)
-            .and_then(|hid| self.households.get(hid))
-            .map(|hh| hh.group.leader == Some(agent.id) && hh.group.ledger.balance(ResourceKind::Gold) >= self.config.market_min_family_gold)
-            .unwrap_or(false);
-        if !can_pay || agent.stamina < self.config.decision_work_stamina_threshold { return false; }
-        let Some(target) = self.nearest_market_node(agent) else { return false; };
-        if self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingMarket)
-            || { let curr = self.start_node(agent); self.dispatch(agent, curr, target, PrimitiveActionState::SeekingMarket) }
+        if !matches!(pool, NodePool::Water | NodePool::Food | NodePool::Wood)
+            || self.ctx.market_nodes.is_empty()
         {
-            agent.current_need = Some("Physiological·MarketTrade".to_string());
-            let market_poi = self.ctx.market_nodes.iter().find(|rn| rn.node == target).map(|rn| rn.poi_id).unwrap_or(0);
+            return false;
+        }
+        let can_pay = self
+            .households
+            .household_of(agent.id)
+            .and_then(|hid| self.households.get(hid))
+            .map(|hh| {
+                hh.group.leader == Some(agent.id)
+                    && hh.group.ledger.balance(ResourceKind::Gold)
+                        >= self.config.market_min_family_gold
+            })
+            .unwrap_or(false);
+        if !can_pay || agent.stamina < self.config.decision_work_stamina_threshold {
+            return false;
+        }
+        let Some(target) = self.nearest_market_node(agent) else {
+            return false;
+        };
+        if self.turn_around_and_route_to(agent, target, PrimitiveActionState::SeekingMarket) || {
+            let curr = self.start_node(agent);
+            self.dispatch(agent, curr, target, PrimitiveActionState::SeekingMarket)
+        } {
+            let branch = match pool {
+                NodePool::Water if agent.thirst < self.config.decision_critical_thirst => {
+                    BranchId::B1QuenchThirst
+                }
+                NodePool::Food if agent.hunger < self.config.decision_critical_hunger => {
+                    BranchId::B2SateHunger
+                }
+                NodePool::Water => BranchId::B5StockWater,
+                NodePool::Food => BranchId::B6StockFood,
+                NodePool::Wood => BranchId::B7StockWood,
+                _ => return false,
+            };
+            let (kind, completion, default_level) = match branch {
+                BranchId::B1QuenchThirst => (
+                    IntentKind::SatisfySurvival(super::intent::SurvivalResource::Water),
+                    CompletionPolicy::SurvivalSatisfied(super::intent::SurvivalResource::Water),
+                    MaslowLevel::Physiological,
+                ),
+                BranchId::B2SateHunger => (
+                    IntentKind::SatisfySurvival(super::intent::SurvivalResource::Food),
+                    CompletionPolicy::SurvivalSatisfied(super::intent::SurvivalResource::Food),
+                    MaslowLevel::Physiological,
+                ),
+                BranchId::B5StockWater => (
+                    IntentKind::StockHousehold(ResourceKind::Water),
+                    CompletionPolicy::HouseholdStockSatisfied(ResourceKind::Water),
+                    MaslowLevel::Safety,
+                ),
+                BranchId::B6StockFood => (
+                    IntentKind::StockHousehold(ResourceKind::Food),
+                    CompletionPolicy::HouseholdStockSatisfied(ResourceKind::Food),
+                    MaslowLevel::Safety,
+                ),
+                BranchId::B7StockWood => (
+                    IntentKind::StockHousehold(ResourceKind::Wood),
+                    CompletionPolicy::HouseholdStockSatisfied(ResourceKind::Wood),
+                    MaslowLevel::Safety,
+                ),
+                _ => unreachable!(),
+            };
+            let level =
+                super::branches::level_override_for(self.config, branch).unwrap_or(default_level);
+            agent.current_need = Some(format!(
+                "{}·{}",
+                level.as_str(),
+                match branch {
+                    BranchId::B1QuenchThirst => "QuenchThirst",
+                    BranchId::B2SateHunger => "SateHunger",
+                    BranchId::B5StockWater => "StockWater",
+                    BranchId::B6StockFood => "StockFood",
+                    BranchId::B7StockWood => "StockWood",
+                    _ => unreachable!(),
+                }
+            ));
+            let market_poi = self
+                .ctx
+                .market_nodes
+                .iter()
+                .find(|rn| rn.node == target)
+                .map(|rn| rn.poi_id)
+                .unwrap_or(0);
             let intent = AgentIntent {
-                source_branch: BranchId::B15MarketTrade,
-                level: MaslowLevel::Physiological,
-                kind: IntentKind::EmergencySupply,
-                completion: CompletionPolicy::EmergencySupplyFinished,
+                source_branch: branch,
+                level,
+                kind,
+                completion,
             };
             let task = ActiveTask {
                 intent,
@@ -49,20 +123,33 @@ impl<'a> Decisioner<'a> {
         }
     }
     /// 建材途中转向与可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
-    pub fn decide_seeking_material(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
+    pub fn decide_seeking_material(
+        &mut self,
+        agent: &mut Agent3D,
+        pool: NodePool,
+        poi_type: PoiType,
+    ) {
         let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
-        let gold_interrupted = pool == NodePool::Gold && (!self.has_available_node(agent, NodePool::Gold) || target_unavailable);
+        let gold_interrupted = pool == NodePool::Gold
+            && (!self.has_available_node(agent, NodePool::Gold) || target_unavailable);
 
         if agent.stamina < self.config.decision_work_stamina_threshold || gold_interrupted {
             if gold_interrupted {
-                // ★ M7 冷却区分：家庭储备缺金（trigger ON）→ StockGold；已补足（4级庄园娱乐淘金）→ GoldWealth
+                // ★ M7 冷却区分：家庭储备缺金（trigger ON）→ StockGold；已补足（4级庄园积累财富）→ GoldWealth
                 agent.gold_mining_cooldown = if family_stock_on(agent, ResourceKind::Gold) {
                     self.config.decision_stock_gold_cooldown
                 } else {
                     self.config.decision_gold_wealth_cooldown
                 };
             }
-            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            agent.current_need = Some(
+                if agent.stamina < self.config.decision_work_stamina_threshold {
+                    "Physiological·Rest"
+                } else {
+                    "Safety·ReturnHome"
+                }
+                .to_string(),
+            );
             self.return_home(agent);
             return;
         }
@@ -70,7 +157,12 @@ impl<'a> Decisioner<'a> {
         if !self.has_available_node(agent, pool) || target_unavailable {
             // 伐木途中发现野外林木 POI 全部关闭时，直接原地掉头赴榷场买木头；
             // 市场支付使用家户账本远程结算，不要求 agent 先回家或携带金币。
-            if pool == NodePool::Wood && !self.has_available_node(agent, pool) && self.try_route_to_market(agent, pool) { return; }
+            if pool == NodePool::Wood
+                && !self.has_available_node(agent, pool)
+                && self.try_route_to_market(agent, pool)
+            {
+                return;
+            }
             if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {
@@ -87,11 +179,20 @@ impl<'a> Decisioner<'a> {
                     };
                     if redirected {
                         if let Some(task) = agent.active_task.as_mut() {
-                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                                *poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == new_target).map(|rn| rn.poi_id);
+                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                                &mut task.strategy
+                            {
+                                *poi = pool
+                                    .nodes(self.ctx)
+                                    .iter()
+                                    .find(|rn| rn.node == new_target)
+                                    .map(|rn| rn.poi_id);
                                 *stage = ResourceStage::Outbound;
                             }
-                            task.primitive = ActionPrimitive::Navigate { target: new_target, arrival: ArrivalKind::ResourceSite };
+                            task.primitive = ActionPrimitive::Navigate {
+                                target: new_target,
+                                arrival: ArrivalKind::ResourceSite,
+                            };
                         }
                         return;
                     }
@@ -103,7 +204,12 @@ impl<'a> Decisioner<'a> {
     }
 
     /// 生存资源途中可用性检查（目标 POI 被施密特触发器关闭时就近重路由或放弃）
-    pub fn decide_seeking_survival(&mut self, agent: &mut Agent3D, pool: NodePool, poi_type: PoiType) {
+    pub fn decide_seeking_survival(
+        &mut self,
+        agent: &mut Agent3D,
+        pool: NodePool,
+        poi_type: PoiType,
+    ) {
         let target_unavailable = self.is_target_poi_unavailable(agent, poi_type);
 
         // 临界口渴/饥饿属于更高优先级的生理需求，不能被普通疲劳熔断强制打断；
@@ -122,7 +228,9 @@ impl<'a> Decisioner<'a> {
         if !self.has_available_node(agent, pool) || target_unavailable {
             // 采集途中发现同类野外 POI 全部关闭时，直接原地掉头赴榷场；
             // 市场支付使用家户账本远程结算，不要求 agent 先回家或携带金币。
-            if !self.has_available_node(agent, pool) && self.try_route_to_market(agent, pool) { return; }
+            if !self.has_available_node(agent, pool) && self.try_route_to_market(agent, pool) {
+                return;
+            }
             if let Some(new_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 if Some(new_target) != agent.target_poi_node {
                     let state = match poi_type {
@@ -138,11 +246,20 @@ impl<'a> Decisioner<'a> {
                     };
                     if redirected {
                         if let Some(task) = agent.active_task.as_mut() {
-                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                                *poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == new_target).map(|rn| rn.poi_id);
+                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                                &mut task.strategy
+                            {
+                                *poi = pool
+                                    .nodes(self.ctx)
+                                    .iter()
+                                    .find(|rn| rn.node == new_target)
+                                    .map(|rn| rn.poi_id);
                                 *stage = ResourceStage::Outbound;
                             }
-                            task.primitive = ActionPrimitive::Navigate { target: new_target, arrival: ArrivalKind::ResourceSite };
+                            task.primitive = ActionPrimitive::Navigate {
+                                target: new_target,
+                                arrival: ArrivalKind::ResourceSite,
+                            };
                         }
                         return;
                     }
@@ -169,17 +286,24 @@ impl<'a> Decisioner<'a> {
 
         let interact_radius = self.config.poi_interaction_radius;
         let home_camp_id = || -> Option<u32> {
-            agent.home_house_id
+            agent
+                .home_house_id
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| h.camp_id)
         };
 
         let Some(target_camp) = agent.expedition_target_camp else {
             // 无目标记录：重新按资格找目标，找不到则放弃
-            if let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id()) {
+            if let Some(camp_id) =
+                self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id())
+            {
                 agent.expedition_target_camp = Some(camp_id);
                 if let Some(node) = self.camp_node_of(camp_id) {
-                    let redirected = if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                    let redirected = if self.turn_around_and_route_to(
+                        agent,
+                        node,
+                        PrimitiveActionState::SeekingThrone,
+                    ) {
                         true
                     } else {
                         let curr = self.start_node(agent);
@@ -187,11 +311,16 @@ impl<'a> Decisioner<'a> {
                     };
                     if redirected {
                         if let Some(task) = agent.active_task.as_mut() {
-                            if let ExecutionStrategy::ClaimThrone { camp, stage } = &mut task.strategy {
+                            if let ExecutionStrategy::ClaimThrone { camp, stage } =
+                                &mut task.strategy
+                            {
                                 *camp = camp_id;
                                 *stage = CommitStage::Travelling;
                             }
-                            task.primitive = ActionPrimitive::Navigate { target: node, arrival: ArrivalKind::SocialTarget };
+                            task.primitive = ActionPrimitive::Navigate {
+                                target: node,
+                                arrival: ArrivalKind::SocialTarget,
+                            };
                         }
                         return;
                     }
@@ -222,7 +351,7 @@ impl<'a> Decisioner<'a> {
                 if agent.world_pos.distance_to(&pos) < interact_radius {
                     // 已抵达且王位空缺：写下登基决心，交由世界物理规则执行登基
                     agent.coronation_pending = Some(target_camp);
-                    agent.current_need = Some("Physiological·SeekThrone".to_string());
+                    agent.current_need = Some("Esteem·SeekThrone".to_string());
                     transition::advance_stage(agent, |t| {
                         if let ExecutionStrategy::ClaimThrone { stage, .. } = &mut t.strategy {
                             *stage = CommitStage::Ready;
@@ -236,11 +365,17 @@ impl<'a> Decisioner<'a> {
         }
 
         // 目标易主：重定向至最近仍空缺的可夺位营地；无则放弃
-        if let Some(new_camp) = self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id()) {
+        if let Some(new_camp) =
+            self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id())
+        {
             if new_camp != target_camp {
                 agent.expedition_target_camp = Some(new_camp);
                 if let Some(node) = self.camp_node_of(new_camp) {
-                    let redirected = if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                    let redirected = if self.turn_around_and_route_to(
+                        agent,
+                        node,
+                        PrimitiveActionState::SeekingThrone,
+                    ) {
                         true
                     } else {
                         let curr = self.start_node(agent);
@@ -248,11 +383,16 @@ impl<'a> Decisioner<'a> {
                     };
                     if redirected {
                         if let Some(task) = agent.active_task.as_mut() {
-                            if let ExecutionStrategy::ClaimThrone { camp, stage } = &mut task.strategy {
+                            if let ExecutionStrategy::ClaimThrone { camp, stage } =
+                                &mut task.strategy
+                            {
                                 *camp = new_camp;
                                 *stage = CommitStage::Travelling;
                             }
-                            task.primitive = ActionPrimitive::Navigate { target: node, arrival: ArrivalKind::SocialTarget };
+                            task.primitive = ActionPrimitive::Navigate {
+                                target: node,
+                                arrival: ArrivalKind::SocialTarget,
+                            };
                         }
                         return;
                     }
@@ -282,7 +422,10 @@ impl<'a> Decisioner<'a> {
         }
 
         // 2. 身份资格校验（若自身已婚或死亡，立刻清空并恢复营地）
-        if agent.spouse_id.is_some() || !agent.is_alive || agent.gender != crate::spatial::agent::Gender::Male {
+        if agent.spouse_id.is_some()
+            || !agent.is_alive
+            || agent.gender != crate::spatial::agent::Gender::Male
+        {
             agent.courtship_target_id = None;
             agent.courtship_pending = None;
             transition::cancel_task(agent);
@@ -294,7 +437,11 @@ impl<'a> Decisioner<'a> {
 
         // 检查原目标女性是否仍处于候选集合中
         let current_target = target_female_id.and_then(|tid| {
-            self.ctx.eligible_females.iter().find(|f| f.id == tid).copied()
+            self.ctx
+                .eligible_females
+                .iter()
+                .find(|f| f.id == tid)
+                .copied()
         });
 
         if let Some(target) = current_target {
@@ -313,9 +460,17 @@ impl<'a> Decisioner<'a> {
             if agent.route.is_empty() || agent.current_lane_id.is_none() {
                 let curr = self.start_node(agent);
                 if curr != target.nearest_node {
-                    if self.dispatch(agent, curr, target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                    if self.dispatch(
+                        agent,
+                        curr,
+                        target.nearest_node,
+                        PrimitiveActionState::SeekingCourtship,
+                    ) {
                         if let Some(task) = agent.active_task.as_mut() {
-                            task.primitive = ActionPrimitive::Navigate { target: target.nearest_node, arrival: ArrivalKind::SocialTarget };
+                            task.primitive = ActionPrimitive::Navigate {
+                                target: target.nearest_node,
+                                arrival: ArrivalKind::SocialTarget,
+                            };
                         }
                     }
                 }
@@ -337,11 +492,20 @@ impl<'a> Decisioner<'a> {
                 });
                 return;
             }
-            let redirected = if self.turn_around_and_route_to(agent, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+            let redirected = if self.turn_around_and_route_to(
+                agent,
+                new_target.nearest_node,
+                PrimitiveActionState::SeekingCourtship,
+            ) {
                 true
             } else {
                 let curr = self.start_node(agent);
-                self.dispatch(agent, curr, new_target.nearest_node, PrimitiveActionState::SeekingCourtship)
+                self.dispatch(
+                    agent,
+                    curr,
+                    new_target.nearest_node,
+                    PrimitiveActionState::SeekingCourtship,
+                )
             };
             if redirected {
                 if let Some(task) = agent.active_task.as_mut() {
@@ -349,7 +513,10 @@ impl<'a> Decisioner<'a> {
                         *female = new_target.id;
                         *stage = CommitStage::Travelling;
                     }
-                    task.primitive = ActionPrimitive::Navigate { target: new_target.nearest_node, arrival: ArrivalKind::SocialTarget };
+                    task.primitive = ActionPrimitive::Navigate {
+                        target: new_target.nearest_node,
+                        arrival: ArrivalKind::SocialTarget,
+                    };
                 }
                 return;
             }

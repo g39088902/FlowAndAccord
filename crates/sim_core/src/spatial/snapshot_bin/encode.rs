@@ -72,8 +72,20 @@ impl World3DEngine {
             w.u64(self.auction_started);
             w.u64(self.auction_sold);
             w.u64(self.auction_flopped);
-            w.f32(self.region_registry.regions.values().map(|r| r.cumulative_royal_privy).sum::<f32>());
-            w.f32(self.empire_registry.empires.values().map(|e| e.cumulative_imperial_privy).sum::<f32>());
+            w.f32(
+                self.region_registry
+                    .regions
+                    .values()
+                    .map(|r| r.cumulative_royal_privy)
+                    .sum::<f32>(),
+            );
+            w.f32(
+                self.empire_registry
+                    .empires
+                    .values()
+                    .map(|e| e.cumulative_imperial_privy)
+                    .sum::<f32>(),
+            );
             w.f32(self.water_regen_multiplier);
             w.f32(self.berry_regen_multiplier);
             w.f32(self.wood_regen_multiplier);
@@ -146,12 +158,13 @@ impl World3DEngine {
                 w.f32(agent.life_expectancy);
                 w.u32(tab.intern(agent.surname.as_str()));
                 w.u32(agent.prestige);
-                w.u32(self
-                    .marriage_registry
-                    .by_agent
-                    .get(&agent.id)
-                    .map(|v| v.len() as u32)
-                    .unwrap_or(0));
+                w.u32(
+                    self.marriage_registry
+                        .by_agent
+                        .get(&agent.id)
+                        .map(|v| v.len() as u32)
+                        .unwrap_or(0),
+                );
                 let hid = self.household_registry.household_of(agent.id);
                 w.opt_u64(hid);
                 // 家户角色推导口径与 world_snapshot.rs 保持一致
@@ -199,7 +212,11 @@ impl World3DEngine {
                 }
             }
             w.align4();
-            secs.push(Sec::new(SectionKind::Agent, self.agents.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::Agent,
+                self.agents.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ POI ══════════════
@@ -269,7 +286,11 @@ impl World3DEngine {
                 }
             }
             w.align4();
-            secs.push(Sec::new(SectionKind::Poi, self.pois.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::Poi,
+                self.pois.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ HOUSE ══════════════
@@ -349,7 +370,11 @@ impl World3DEngine {
                 }
             }
             w.align4();
-            secs.push(Sec::new(SectionKind::House, self.houses.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::House,
+                self.houses.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ LANE_GEO / LANE_WEAR / NODE（增量） ══════════════
@@ -387,12 +412,20 @@ impl World3DEngine {
                 }
             }
             wear.align4();
-            secs.push(Sec::new(SectionKind::LaneWear, lane_count as u32, wear.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::LaneWear,
+                lane_count as u32,
+                wear.into_inner(),
+            ));
             if let Some(g) = geo {
                 let mut g = g;
                 g.align4();
                 flags |= flag::HAS_LANE_GEO;
-                secs.push(Sec::new(SectionKind::LaneGeo, lane_count as u32, g.into_inner()));
+                secs.push(Sec::new(
+                    SectionKind::LaneGeo,
+                    lane_count as u32,
+                    g.into_inner(),
+                ));
             }
             if need_geom {
                 let node_count = self.network.graph.node_count();
@@ -406,7 +439,11 @@ impl World3DEngine {
                     n.u8(node_type_code(node.node_type));
                 }
                 n.align4();
-                secs.push(Sec::new(SectionKind::Node, node_count as u32, n.into_inner()));
+                secs.push(Sec::new(
+                    SectionKind::Node,
+                    node_count as u32,
+                    n.into_inner(),
+                ));
             }
         }
 
@@ -419,15 +456,23 @@ impl World3DEngine {
             }
             w.align4();
             flags |= flag::HAS_TERRAIN;
-            secs.push(Sec::new(SectionKind::Terrain, self.terrain.cells.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::Terrain,
+                self.terrain.cells.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ HOUSEHOLD ══════════════
         {
-            let mut w = BinWriter::with_capacity(self.household_registry.active_households.len() * 512 + 128);
+            let mut w = BinWriter::with_capacity(
+                self.household_registry.active_households.len() * 512 + 128,
+            );
             let mut n = 0u32;
             for hid in &self.household_registry.active_households {
-                let Some(hh) = self.household_registry.households.get(hid) else { continue };
+                let Some(hh) = self.household_registry.households.get(hid) else {
+                    continue;
+                };
                 n += 1;
                 w.u64(hh.id);
                 w.u32(hh.head);
@@ -482,7 +527,11 @@ impl World3DEngine {
                 w.u8(self.clan_registry.extinct.contains(surname) as u8);
             }
             w.align4();
-            secs.push(Sec::new(SectionKind::Clan, self.clan_registry.clans.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::Clan,
+                self.clan_registry.clans.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ REGION ══════════════
@@ -523,7 +572,8 @@ impl World3DEngine {
                                 }
                             }
                         }
-                        grandsons.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
+                        grandsons
+                            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
                         for (gid, _) in grandsons.iter() {
                             if heir_candidates.len() >= 3 {
                                 break;
@@ -548,9 +598,9 @@ impl World3DEngine {
                     .active_households
                     .iter()
                     .filter(|&&hid| {
-                        self.household_registry
-                            .get(hid)
-                            .is_some_and(|hh| self.region_registry.region_of(hh.head) == Some(*camp_id))
+                        self.household_registry.get(hid).is_some_and(|hh| {
+                            self.region_registry.region_of(hh.head) == Some(*camp_id)
+                        })
                     })
                     .copied()
                     .collect();
@@ -647,7 +697,11 @@ impl World3DEngine {
                 w.u64(d.tick);
             }
             w.align4();
-            secs.push(Sec::new(SectionKind::Death, self.recent_deaths.len() as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::Death,
+                self.recent_deaths.len() as u32,
+                w.into_inner(),
+            ));
         }
 
         // ══════════════ AUCTION_HIST（房屋报价中心历史受理，从新到旧） ══════════════
@@ -690,7 +744,11 @@ impl World3DEngine {
             if delta_len > 0 {
                 flags |= flag::HAS_STR_TAB;
             }
-            secs.push(Sec::new(SectionKind::StrTab, delta_len as u32, w.into_inner()));
+            secs.push(Sec::new(
+                SectionKind::StrTab,
+                delta_len as u32,
+                w.into_inner(),
+            ));
             let total_len = tab.len() as u32;
             tab.mark_sent(total_len);
         }
@@ -726,7 +784,7 @@ impl World3DEngine {
         out.extend_from_slice(&(secs.len() as u16).to_le_bytes());
         out.extend_from_slice(&0u16.to_le_bytes()); // reserved
         out.extend_from_slice(&0u32.to_le_bytes()); // reserved2
-        // SectionDir
+                                                    // SectionDir
         out.extend_from_slice(&dir);
         // Sections
         for s in &secs {
@@ -742,8 +800,18 @@ impl World3DEngine {
     }
 
     /// 最近 8 条团体事件（从新到旧）
-    fn write_events(w: &mut BinWriter, ledger: &crate::spatial::ledger::Ledger, tab: &mut super::strtab::StrTab) {
-        let notes: Vec<&String> = ledger.events.iter().rev().take(8).map(|e| &e.note).collect();
+    fn write_events(
+        w: &mut BinWriter,
+        ledger: &crate::spatial::ledger::Ledger,
+        tab: &mut super::strtab::StrTab,
+    ) {
+        let notes: Vec<&String> = ledger
+            .events
+            .iter()
+            .rev()
+            .take(8)
+            .map(|e| &e.note)
+            .collect();
         w.u16(notes.len() as u16);
         for n in notes {
             w.u32(tab.intern(n.as_str()));
@@ -751,7 +819,11 @@ impl World3DEngine {
     }
 
     /// 最近 8 笔资源流水（从新到旧）
-    fn write_journal(w: &mut BinWriter, ledger: &crate::spatial::ledger::Ledger, tab: &mut super::strtab::StrTab) {
+    fn write_journal(
+        w: &mut BinWriter,
+        ledger: &crate::spatial::ledger::Ledger,
+        tab: &mut super::strtab::StrTab,
+    ) {
         let recs: Vec<_> = ledger.journal.iter().rev().take(8).collect();
         w.u16(recs.len() as u16);
         for r in recs {

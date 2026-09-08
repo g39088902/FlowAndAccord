@@ -1,11 +1,11 @@
 use super::super::agent::{Agent3D, PrimitiveActionState};
-use super::super::poi::PoiType;
 use super::super::ledger::journal::ResourceKind;
-use super::needs::*;
-use super::evaluate::Decisioner;
+use super::super::poi::PoiType;
 use super::branches::BranchId;
-use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage};
+use super::evaluate::Decisioner;
+use super::needs::*;
 use super::primitive::{ActionPrimitive, ArrivalKind};
+use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage};
 use super::transition;
 
 use crate::spatial::graph::NodeId;
@@ -25,7 +25,11 @@ impl<'a> Decisioner<'a> {
     }
 
     /// ★ L1 连续采收候选分支意图仲裁：检查单个分支是否满足连续采收资格并返回其 Need 与对应 POI 池
-    pub fn arbitrate_continuous_harvest_candidate(&self, agent: &Agent3D, branch: BranchId) -> Option<(Need, NodePool)> {
+    pub fn arbitrate_continuous_harvest_candidate(
+        &self,
+        agent: &Agent3D,
+        branch: BranchId,
+    ) -> Option<(Need, NodePool)> {
         let is_harvest_branch = matches!(
             branch,
             BranchId::B1QuenchThirst
@@ -51,20 +55,33 @@ impl<'a> Decisioner<'a> {
         Some((need, pool))
     }
 
-    fn install_continuous_harvest_task(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need, pool: NodePool, target: NodeId) {
+    fn install_continuous_harvest_task(
+        &mut self,
+        agent: &mut Agent3D,
+        branch: BranchId,
+        need: Need,
+        pool: NodePool,
+        target: NodeId,
+    ) {
         agent.current_need = state_need_label_with_agent(
             need.target_state,
             agent,
             self.houses,
             self.households,
             self.config,
-        ).map(|(lvl, k)| format!("{}·{}", lvl, k));
-        let home_tier = agent.home_house_id
+        )
+        .map(|(lvl, k)| format!("{}·{}", lvl, k));
+        let home_tier = agent
+            .home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
             .map(|h| h.tier);
         if let Ok(obs) = need.observe_intent(branch, home_tier) {
             if let Some(intent) = obs.sustained() {
-                let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                let poi = pool
+                    .nodes(self.ctx)
+                    .iter()
+                    .find(|rn| rn.node == target)
+                    .map(|rn| rn.poi_id);
                 let task = ActiveTask {
                     intent,
                     strategy: ExecutionStrategy::WildHarvest {
@@ -86,7 +103,9 @@ impl<'a> Decisioner<'a> {
     /// 预排多品类连续采收候选队列（最多 4 站，定长数组，零堆分配）。
     pub fn plan_harvest_itinerary(&self, agent: &Agent3D) -> [Option<BranchId>; 4] {
         let mut queue = [None; 4];
-        if agent.home_house_id.is_none() || agent.stamina < self.config.decision_work_stamina_threshold {
+        if agent.home_house_id.is_none()
+            || agent.stamina < self.config.decision_work_stamina_threshold
+        {
             return queue;
         }
 
@@ -112,7 +131,11 @@ impl<'a> Decisioner<'a> {
             if let Some((_need, pool)) = self.arbitrate_continuous_harvest_candidate(agent, b) {
                 if let Some(target) = self.nearest_of(agent, pool, agent.world_pos) {
                     let pos = self.node_pos(target);
-                    candidates[count] = Some(CandidateStop { branch: b, pool, pos });
+                    candidates[count] = Some(CandidateStop {
+                        branch: b,
+                        pool,
+                        pos,
+                    });
                     count += 1;
                 }
             }
@@ -161,7 +184,9 @@ impl<'a> Decisioner<'a> {
     /// 优先沿用/就地规划预排候选队列，按就近链路依次派发下一处 POI 继续采收；
     /// 候选失效时自动尝试下一站，队列耗尽时回退至 branch_order 兜底。
     pub fn try_continue_harvesting(&mut self, agent: &mut Agent3D) -> bool {
-        if agent.home_house_id.is_none() || agent.stamina < self.config.decision_work_stamina_threshold {
+        if agent.home_house_id.is_none()
+            || agent.stamina < self.config.decision_work_stamina_threshold
+        {
             agent.clear_harvest_queue();
             return false;
         }
@@ -173,7 +198,8 @@ impl<'a> Decisioner<'a> {
 
         // 2. 优先消费预排行程候选队列
         while let Some(branch) = agent.pop_harvest_queue() {
-            let Some((need, pool)) = self.arbitrate_continuous_harvest_candidate(agent, branch) else {
+            let Some((need, pool)) = self.arbitrate_continuous_harvest_candidate(agent, branch)
+            else {
                 continue;
             };
             if need.kind == NeedKind::StockGold {
@@ -190,7 +216,8 @@ impl<'a> Decisioner<'a> {
 
         // 3. 队列耗尽后回退至静态 branch_order 兜底遍历
         for &branch in self.branch_order.iter() {
-            let Some((need, pool)) = self.arbitrate_continuous_harvest_candidate(agent, branch) else {
+            let Some((need, pool)) = self.arbitrate_continuous_harvest_candidate(agent, branch)
+            else {
                 continue;
             };
             if need.kind == NeedKind::StockGold {
@@ -217,30 +244,57 @@ impl<'a> Decisioner<'a> {
         let unavailable = self.is_target_poi_unavailable(agent, PoiType::WaterSource);
 
         let needs_more_water = !self_satisfied || (can_stock && !house_water_full && !carry_full);
-        if unavailable && needs_more_water && agent.stamina >= self.config.decision_work_stamina_threshold {
+        if unavailable
+            && needs_more_water
+            && agent.stamina >= self.config.decision_work_stamina_threshold
+        {
             if let Some(next_target) = self.nearest_of(agent, NodePool::Water, agent.world_pos) {
                 let curr_node = self.start_node(agent);
-                if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingWater) {
+                if self.dispatch(
+                    agent,
+                    curr_node,
+                    next_target,
+                    PrimitiveActionState::SeekingWater,
+                ) {
                     if let Some(task) = agent.active_task.as_mut() {
-                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                            *poi = NodePool::Water.nodes(self.ctx).iter().find(|rn| rn.node == next_target).map(|rn| rn.poi_id);
+                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                            &mut task.strategy
+                        {
+                            *poi = NodePool::Water
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == next_target)
+                                .map(|rn| rn.poi_id);
                             *stage = ResourceStage::Outbound;
                         }
-                        task.primitive = ActionPrimitive::Navigate { target: next_target, arrival: ArrivalKind::ResourceSite };
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: next_target,
+                            arrival: ArrivalKind::ResourceSite,
+                        };
                     }
                     return;
                 }
             }
-            if self.try_route_to_market(agent, NodePool::Water) { return; }
+            if self.try_route_to_market(agent, NodePool::Water) {
+                return;
+            }
         }
 
-        let finished = (self_satisfied && (!can_stock || house_water_full)) || carry_full || unavailable;
+        let finished =
+            (self_satisfied && (!can_stock || house_water_full)) || carry_full || unavailable;
 
         if finished {
             if self.try_continue_harvesting(agent) {
                 return;
             }
-            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            agent.current_need = Some(
+                if agent.stamina < self.config.decision_work_stamina_threshold {
+                    "Physiological·Rest"
+                } else {
+                    "Safety·ReturnHome"
+                }
+                .to_string(),
+            );
             self.return_home(agent);
         }
     }
@@ -253,86 +307,169 @@ impl<'a> Decisioner<'a> {
         let unavailable = self.is_target_poi_unavailable(agent, PoiType::BerryBush);
 
         let needs_more_food = !self_satisfied || (can_stock && !house_food_full && !carry_full);
-        if unavailable && needs_more_food && agent.stamina >= self.config.decision_work_stamina_threshold {
+        if unavailable
+            && needs_more_food
+            && agent.stamina >= self.config.decision_work_stamina_threshold
+        {
             if let Some(next_target) = self.nearest_of(agent, NodePool::Food, agent.world_pos) {
                 let curr_node = self.start_node(agent);
-                if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingFood) {
+                if self.dispatch(
+                    agent,
+                    curr_node,
+                    next_target,
+                    PrimitiveActionState::SeekingFood,
+                ) {
                     if let Some(task) = agent.active_task.as_mut() {
-                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                            *poi = NodePool::Food.nodes(self.ctx).iter().find(|rn| rn.node == next_target).map(|rn| rn.poi_id);
+                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                            &mut task.strategy
+                        {
+                            *poi = NodePool::Food
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == next_target)
+                                .map(|rn| rn.poi_id);
                             *stage = ResourceStage::Outbound;
                         }
-                        task.primitive = ActionPrimitive::Navigate { target: next_target, arrival: ArrivalKind::ResourceSite };
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: next_target,
+                            arrival: ArrivalKind::ResourceSite,
+                        };
                     }
                     return;
                 }
             }
-            if self.try_route_to_market(agent, NodePool::Food) { return; }
+            if self.try_route_to_market(agent, NodePool::Food) {
+                return;
+            }
         }
 
-        let finished = (self_satisfied && (!can_stock || house_food_full)) || carry_full || unavailable;
+        let finished =
+            (self_satisfied && (!can_stock || house_food_full)) || carry_full || unavailable;
 
         if finished {
             if self.try_continue_harvesting(agent) {
                 return;
             }
-            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            agent.current_need = Some(
+                if agent.stamina < self.config.decision_work_stamina_threshold {
+                    "Physiological·Rest"
+                } else {
+                    "Safety·ReturnHome"
+                }
+                .to_string(),
+            );
             self.return_home(agent);
         }
     }
 
     pub fn decide_harvest(&mut self, agent: &mut Agent3D, poi_type: PoiType, fully_stocked: bool) {
         let (pool, state, carry_full) = match poi_type {
-            PoiType::WoodForest => (NodePool::Wood, PrimitiveActionState::SeekingWood, agent.carried_wood >= self.config.carry_capacity_resource),
-            PoiType::StoneQuarry => (NodePool::Stone, PrimitiveActionState::SeekingStone, agent.carried_stone >= self.config.carry_capacity_resource),
+            PoiType::WoodForest => (
+                NodePool::Wood,
+                PrimitiveActionState::SeekingWood,
+                agent.carried_wood >= self.config.carry_capacity_resource,
+            ),
+            PoiType::StoneQuarry => (
+                NodePool::Stone,
+                PrimitiveActionState::SeekingStone,
+                agent.carried_stone >= self.config.carry_capacity_resource,
+            ),
             _ => (NodePool::Wood, PrimitiveActionState::SeekingWood, false),
         };
         let unavailable = self.is_target_poi_unavailable(agent, poi_type);
 
-        if unavailable && !fully_stocked && !carry_full && agent.hunger >= self.config.decision_critical_hunger && agent.thirst >= self.config.decision_critical_thirst && agent.stamina >= self.config.decision_work_stamina_threshold {
+        if unavailable
+            && !fully_stocked
+            && !carry_full
+            && agent.hunger >= self.config.decision_critical_hunger
+            && agent.thirst >= self.config.decision_critical_thirst
+            && agent.stamina >= self.config.decision_work_stamina_threshold
+        {
             if let Some(next_target) = self.nearest_of(agent, pool, agent.world_pos) {
                 let curr_node = self.start_node(agent);
                 if self.dispatch(agent, curr_node, next_target, state) {
                     if let Some(task) = agent.active_task.as_mut() {
-                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                            *poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == next_target).map(|rn| rn.poi_id);
+                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                            &mut task.strategy
+                        {
+                            *poi = pool
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == next_target)
+                                .map(|rn| rn.poi_id);
                             *stage = ResourceStage::Outbound;
                         }
-                        task.primitive = ActionPrimitive::Navigate { target: next_target, arrival: ArrivalKind::ResourceSite };
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: next_target,
+                            arrival: ArrivalKind::ResourceSite,
+                        };
                     }
                     return;
                 }
             }
-            if pool == NodePool::Wood && self.try_route_to_market(agent, NodePool::Wood) { return; }
+            if pool == NodePool::Wood && self.try_route_to_market(agent, NodePool::Wood) {
+                return;
+            }
         }
 
-        let finished = unavailable || fully_stocked || carry_full || agent.hunger < self.config.decision_critical_hunger || agent.thirst < self.config.decision_critical_thirst || agent.stamina < self.config.decision_work_stamina_threshold;
+        let finished = unavailable
+            || fully_stocked
+            || carry_full
+            || agent.hunger < self.config.decision_critical_hunger
+            || agent.thirst < self.config.decision_critical_thirst
+            || agent.stamina < self.config.decision_work_stamina_threshold;
 
         if finished {
             if self.try_continue_harvesting(agent) {
                 return;
             }
-            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            agent.current_need = Some(
+                if agent.stamina < self.config.decision_work_stamina_threshold {
+                    "Physiological·Rest"
+                } else {
+                    "Safety·ReturnHome"
+                }
+                .to_string(),
+            );
             self.return_home(agent);
         }
     }
 
     pub fn decide_mining_gold(&mut self, agent: &mut Agent3D) {
-        // ★ M7 金与房屋等级脱钩：家庭储备缺金（trigger ON）或 4 级庄园娱乐淘金（trigger OFF）
+        // ★ M7 金与房屋等级脱钩：家庭储备缺金（trigger ON）或 4 级庄园积累财富（trigger OFF）
         // 都同样采到行囊满/源不可用/生理危机才收工；冷却在收尾时按“是否仍缺金”区分。
         let gold_load_full = agent.carried_gold >= self.config.agent_gold_load_full;
         let unavailable = self.is_target_poi_unavailable(agent, PoiType::GoldMine);
 
-        if unavailable && !gold_load_full && agent.hunger >= self.config.decision_critical_hunger && agent.thirst >= self.config.decision_critical_thirst && agent.stamina >= self.config.decision_work_stamina_threshold {
+        if unavailable
+            && !gold_load_full
+            && agent.hunger >= self.config.decision_critical_hunger
+            && agent.thirst >= self.config.decision_critical_thirst
+            && agent.stamina >= self.config.decision_work_stamina_threshold
+        {
             if let Some(next_target) = self.nearest_of(agent, NodePool::Gold, agent.world_pos) {
                 let curr_node = self.start_node(agent);
-                if self.dispatch(agent, curr_node, next_target, PrimitiveActionState::SeekingGold) {
+                if self.dispatch(
+                    agent,
+                    curr_node,
+                    next_target,
+                    PrimitiveActionState::SeekingGold,
+                ) {
                     if let Some(task) = agent.active_task.as_mut() {
-                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
-                            *poi = NodePool::Gold.nodes(self.ctx).iter().find(|rn| rn.node == next_target).map(|rn| rn.poi_id);
+                        if let ExecutionStrategy::WildHarvest { poi, stage, .. } =
+                            &mut task.strategy
+                        {
+                            *poi = NodePool::Gold
+                                .nodes(self.ctx)
+                                .iter()
+                                .find(|rn| rn.node == next_target)
+                                .map(|rn| rn.poi_id);
                             *stage = ResourceStage::Outbound;
                         }
-                        task.primitive = ActionPrimitive::Navigate { target: next_target, arrival: ArrivalKind::ResourceSite };
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: next_target,
+                            arrival: ArrivalKind::ResourceSite,
+                        };
                     }
                     return;
                 }
@@ -345,7 +482,7 @@ impl<'a> Decisioner<'a> {
             || agent.thirst < self.config.decision_critical_thirst
             || agent.stamina < self.config.decision_work_stamina_threshold
         {
-            // 收尾冷却：家庭储备仍缺金（stock_met=false，补金之旅）→ StockGold 45；家庭已足（娱乐淘金）→ GoldWealth 180
+            // 收尾冷却：家庭储备仍缺金（stock_met=false，资金补给）→ StockGold 45；家庭已足（积累财富）→ GoldWealth 180
             agent.gold_mining_cooldown = if self.stock_met(agent, ResourceKind::Gold) {
                 self.config.decision_gold_wealth_cooldown
             } else {
@@ -354,7 +491,14 @@ impl<'a> Decisioner<'a> {
             if self.try_continue_harvesting(agent) {
                 return;
             }
-            agent.current_need = Some(if agent.stamina < self.config.decision_work_stamina_threshold { "Physiological·Rest" } else { "Safety·ReturnHome" }.to_string());
+            agent.current_need = Some(
+                if agent.stamina < self.config.decision_work_stamina_threshold {
+                    "Physiological·Rest"
+                } else {
+                    "Safety·ReturnHome"
+                }
+                .to_string(),
+            );
             self.return_home(agent);
         }
     }

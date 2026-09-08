@@ -134,7 +134,7 @@
 | `config.js` | 全局动态数值配置（window.SIM_CONFIG） |
 | `config.decision-order.js` | 决策分支评估顺序持久化配置（启动注入权威默认值；★ v1.27.0 起用户调整保存到浏览器 localStorage） |
 | `config.house-upgrade-cost.js` | 房屋升级材料成本矩阵 20 字段（M8 拆分） |
-| `decision-viz-data.js` | 决策引擎 18 条分支元数据（含 b14 夺位与 b15 榷场商贸） |
+| `decision-viz-data.js` | 决策引擎 16 条活动分支的统一名称与元数据（b11 已并入 b8，采购为资源策略） |
 | `decision-viz-view.js` | 决策引擎视图层：单列布局、拖拽换序、分界线吸附、缩放平移、检查器 |
 | `decision-viz.js` | 决策引擎集成层：启动合并顺序配置 → SIM_CONFIG；拖动热注入 + ★ v1.27.0 保存到 localStorage |
 | `math.js` | 3D 向量与投影变换 |

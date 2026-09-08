@@ -45,9 +45,9 @@ cargo build -p sim_wasm --target wasm32-unknown-unknown --release --offline
 
 > `$MSVCBIN` 必须排在 `$PATH` **最前**才能压过 coreutils 的 `link`；`$LIB` 用 Windows 风格分号分隔路径。
 
-### 1.1.2 ★ 离线 vendor 依赖源（网络不可用时）
+### 1.1.2 ★ 本地离线 vendor 依赖源（网络不可用时）
 
-`.cargo/config.toml` 已配置 `source.crates-io → vendored-sources`（directory = `.vendor`），可在**零网络**下编译：
+仓库**不会**全局配置 `source.crates-io → vendored-sources`，因为 `.vendor/` 未纳入版本控制；在 GitHub Actions 等全新 checkout 中启用它会导致 Cargo 找不到目录而失败。需要本地离线构建时，先确认 `.vendor/` 已完整生成，再仅在本机通过命令行临时启用：
 
 ```toml
 [source.crates-io]
@@ -58,8 +58,8 @@ directory = ".vendor"
 ```
 
 - `.vendor/` 由 `.cargo-home/registry/src` 的解压目录 + 逐个 `.crate` 的 sha256 写入 `.cargo-checksum.json` 生成（与 `Cargo.lock` 校验一致）。
-- **新增/升级依赖时必须**：临时注释掉这段 source replacement → 联网 `cargo fetch` → 重新生成 `.vendor` → 再放开注释。否则新依赖会因 vendor 缺失而报 `no matching package`。
-- 只要 `.vendor/` 完整，加 `--offline` 即可完全绕开 index.crates.io（沙箱/代理阻断网络时唯一可行路径）。
+- **新增/升级依赖时必须**：联网 `cargo fetch` 后重新生成 `.vendor`；否则新依赖会因 vendor 缺失而报 `no matching package`。
+- 只要 `.vendor/` 完整，即可在本地加入上述 replacement 并加 `--offline`，完全绕开 index.crates.io（沙箱/代理阻断网络时唯一可行路径）。
 
 ### 1.2 macOS / Linux（标准 rustup）
 

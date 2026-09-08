@@ -1,13 +1,7 @@
-# 临时启用网络以便 cargo fetch 下载依赖
-# fetch 完成后切回 vendor 模式
-
-[net]
-offline = false
-
-# ★ 离线 vendor 模式：依赖已固化在 .vendor/（由 .cargo-home 缓存生成），
-#   网络不可用时开启下行 source replacement 即可零网络编译。
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = ".vendor"
+# Keep crates.io as the default source.  The repository does not track a
+# `.vendor/` directory, so a global source replacement would make fresh CI
+# checkouts fail before Cargo can download dependencies.
+#
+# Developers who have a complete local vendor directory and need an offline
+# build may opt in locally (for example with `cargo --config ...`), rather
+# than committing that machine-specific source replacement.

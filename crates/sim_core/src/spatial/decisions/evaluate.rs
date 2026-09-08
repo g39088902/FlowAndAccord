@@ -1,15 +1,15 @@
-use super::super::vec3::Vec3;
-use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::agent::{Agent3D, PrimitiveActionState};
-use super::super::poi::PoiType;
+use super::super::graph::{LaneGraph3D, NodeId};
 use super::super::house::{House, HouseTier};
 use super::super::ledger::family::HouseholdRegistry;
-use super::super::ledger::region::RegionRegistry;
 use super::super::ledger::journal::ResourceKind;
+use super::super::ledger::region::RegionRegistry;
+use super::super::poi::PoiType;
+use super::super::vec3::Vec3;
 use super::branches::{self, BranchId};
 use super::needs::*;
-use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, CommitStage, HomeStage};
 use super::primitive::{ActionPrimitive, ArrivalKind, HoldKind};
+use super::strategy::{ActiveTask, CommitStage, ExecutionStrategy, HomeStage, ResourceStage};
 use crate::config::*;
 use crate::rng::WorldRng;
 
@@ -25,9 +25,19 @@ pub struct Decisioner<'a> {
     pub rng: &'a mut WorldRng,
     pub config: &'a SimConfig,
     /// 本拍使用的分支评估顺序（由 config.decision_eval_order 解析，见 branches.rs）
-    pub branch_order: &'a [BranchId; 18],
+    pub branch_order: &'a [BranchId; 16],
     /// ★ v1.26.0 当前世界 tick（用于竞拍冷却判定，见 B17BidHouse）
     pub tick: u64,
+}
+
+fn next_house_tier(tier: HouseTier) -> HouseTier {
+    match tier {
+        HouseTier::Tier0Warehouse => HouseTier::Tier1ThatchedHut,
+        HouseTier::Tier1ThatchedHut => HouseTier::Tier2LeanTo,
+        HouseTier::Tier2LeanTo => HouseTier::Tier3Homestead,
+        HouseTier::Tier3Homestead => HouseTier::Tier4Manor,
+        HouseTier::Tier4Manor => HouseTier::Tier4Manor,
+    }
 }
 
 impl<'a> Decisioner<'a> {
@@ -35,12 +45,16 @@ impl<'a> Decisioner<'a> {
     pub fn best_courtship_target(&self, agent: &Agent3D) -> Option<&EligibleFemale> {
         self.ctx.eligible_females.iter().min_by(|a, b| {
             // 1. 魅力 libido 降序（最高优先）
-            b.libido.partial_cmp(&a.libido).unwrap_or(std::cmp::Ordering::Equal)
+            b.libido
+                .partial_cmp(&a.libido)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| {
                     // 2. 距离当前 agent 空间位置升序（最近优先）
                     let dist_a = a.pos.distance_to(&agent.world_pos);
                     let dist_b = b.pos.distance_to(&agent.world_pos);
-                    dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                    dist_a
+                        .partial_cmp(&dist_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 })
                 // 3. ID 升序
                 .then_with(|| a.id.cmp(&b.id))
@@ -59,7 +73,8 @@ impl<'a> Decisioner<'a> {
         let off = self.config.decision_family_stock_trigger_off;
         for (i, &rk) in FAMILY_STOCK_ORDER.iter().enumerate() {
             let bal = self.ledger_balance(agent, rk);
-            agent.family_stock_active[i] = family_stock_update(agent.family_stock_active[i], bal, on, off);
+            agent.family_stock_active[i] =
+                family_stock_update(agent.family_stock_active[i], bal, on, off);
         }
     }
 
@@ -79,6 +94,12 @@ impl<'a> Decisioner<'a> {
         if let Some(label) = &instant_label {
             agent.current_need = Some(label.clone());
         }
+        // 在宅改善已安装一个可由下一房屋阶段原子结算的短任务；本拍不再进入
+        // 持续任务抢占，避免社会任务在扣账前覆盖 ConstructingHouse 标记。
+        if agent.state == PrimitiveActionState::ConstructingHouse {
+            agent.current_need = Some("Instantaneous·BuildHouse".to_string());
+            return;
+        }
 
         // 若处于休整/营地空闲状态，尝试卸货收尾或发起新的持续任务仲裁
         if agent.state == PrimitiveActionState::RestingAtCamp {
@@ -91,8 +112,20 @@ impl<'a> Decisioner<'a> {
             // ★ M19.2/M19.3 任务控制器：若已有活跃任务且已卸货完成/归家，在此收尾
             if let Some(task) = &agent.active_task {
                 if matches!(task.strategy, ExecutionStrategy::ReturnToResidence { .. })
-                    || matches!(task.strategy, ExecutionStrategy::WildHarvest { stage: ResourceStage::Unloading, .. })
-                    || matches!(task.strategy, ExecutionStrategy::MarketTrade { stage: ResourceStage::Unloading, .. })
+                    || matches!(
+                        task.strategy,
+                        ExecutionStrategy::WildHarvest {
+                            stage: ResourceStage::Unloading,
+                            ..
+                        }
+                    )
+                    || matches!(
+                        task.strategy,
+                        ExecutionStrategy::MarketTrade {
+                            stage: ResourceStage::Unloading,
+                            ..
+                        }
+                    )
                 {
                     agent.active_task = None;
                     agent.clear_harvest_queue();
@@ -100,8 +133,14 @@ impl<'a> Decisioner<'a> {
             }
             // ★ L1 统一持续任务仲裁
             if let Some((branch, need)) = self.arbitrate_sustained_task(agent) {
-                agent.current_need = state_need_label_with_agent(need.target_state, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    need.target_state,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.dispatch_task(agent, branch, need);
             } else if instant_label.is_none() {
                 // ★ v1.29.0 本拍已执行过瞬间行为且无常规需求：保留瞬间标签，避免行为不可见
@@ -136,13 +175,25 @@ impl<'a> Decisioner<'a> {
     pub fn step_in_progress_task(&mut self, agent: &mut Agent3D) {
         match agent.state {
             PrimitiveActionState::SeekingWater => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingWater, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::SeekingWater,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_survival(agent, NodePool::Water, PoiType::WaterSource);
             }
             PrimitiveActionState::SeekingFood => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingFood, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::SeekingFood,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_survival(agent, NodePool::Food, PoiType::BerryBush);
             }
             PrimitiveActionState::SeekingWood => {
@@ -154,22 +205,40 @@ impl<'a> Decisioner<'a> {
                 self.decide_seeking_material(agent, NodePool::Stone, PoiType::StoneQuarry);
             }
             PrimitiveActionState::SeekingGold => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingGold, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::SeekingGold,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_material(agent, NodePool::Gold, PoiType::GoldMine);
             }
             PrimitiveActionState::SeekingThrone => {
-                agent.current_need = Some("Physiological·SeekThrone".to_string());
+                agent.current_need = Some("Esteem·SeekThrone".to_string());
                 self.decide_seeking_throne(agent);
             }
             PrimitiveActionState::DrinkingAtWater => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::DrinkingAtWater, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::DrinkingAtWater,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_drinking(agent);
             }
             PrimitiveActionState::ForagingFood => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ForagingFood, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::ForagingFood,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_foraging(agent);
             }
             PrimitiveActionState::GatheringWood => {
@@ -183,38 +252,74 @@ impl<'a> Decisioner<'a> {
                 self.decide_harvest(agent, PoiType::StoneQuarry, stocked);
             }
             PrimitiveActionState::MiningGold => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::MiningGold, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::MiningGold,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_mining_gold(agent);
             }
             PrimitiveActionState::ConstructingHouse => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ConstructingHouse, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::ConstructingHouse,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
             }
             PrimitiveActionState::RepairingHouse => {
                 agent.current_need = Some("Safety·RepairHouse".to_string());
             }
             PrimitiveActionState::ReturningToCamp => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::ReturningToCamp, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::ReturningToCamp,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
             }
             PrimitiveActionState::SeekingMarket => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingMarket, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::SeekingMarket,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_market(agent);
             }
             PrimitiveActionState::BuyingAtMarket => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::BuyingAtMarket, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::BuyingAtMarket,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_buying_market(agent);
             }
             PrimitiveActionState::SeekingCourtship => {
-                agent.current_need = state_need_label_with_agent(PrimitiveActionState::SeekingCourtship, agent, self.houses, self.households, self.config)
-                    .map(|(lvl, k)| format!("{}·{}", lvl, k));
+                agent.current_need = state_need_label_with_agent(
+                    PrimitiveActionState::SeekingCourtship,
+                    agent,
+                    self.houses,
+                    self.households,
+                    self.config,
+                )
+                .map(|(lvl, k)| format!("{}·{}", lvl, k));
                 self.decide_seeking_courtship(agent);
             }
             PrimitiveActionState::RaiseChild => {
-                agent.current_need = Some("Esteem·RaiseChild".to_string());
+                agent.current_need = Some("Belonging·RaiseChild".to_string());
                 // 行动在世界结算阶段完成；下一决策拍重新评估。
                 agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             }
@@ -231,20 +336,23 @@ impl<'a> Decisioner<'a> {
     /// 确定性：全链路不消耗 `WorldRng`（选房与选偶都用确定性排序）。
     /// 返回最后一条瞬间需求的标签（如 "Instantaneous·BidHouse"），供本拍无常规需求时保留显示。
     pub fn arbitrate_instant_needs(&mut self, agent: &mut Agent3D) -> Option<String> {
-        let order: &'a [BranchId; 18] = self.branch_order;
+        let order: &'a [BranchId; 16] = self.branch_order;
         let mut label: Option<String> = None;
         for branch in order.iter() {
             if !branch.is_instant() {
                 continue;
             }
-            let Some(need) = branch.evaluate(self, agent) else {
+            let Some(mut need) = branch.evaluate(self, agent) else {
                 continue;
             };
+            if let Some(level) = branches::level_override_for(self.config, *branch) {
+                need.level = level;
+            }
             if !need.is_instant() {
                 continue; // 被层级覆盖降级为常规需求 → 交给常规状态机处理
             }
             label = Some(need.instant_label());
-            self.apply_instant_need(agent, need);
+            self.apply_instant_need(agent, *branch, need);
         }
         label
     }
@@ -258,7 +366,7 @@ impl<'a> Decisioner<'a> {
     /// ★ v1.29.0 瞬发落地：只写「决心 / pending」，**不 dispatch、不改运动状态、不消耗资源与 RNG**。
     /// 物理结算由世界执行器（`execute_pending_bids` / `execute_pending_courtships` /
     /// `execute_pending_childcare`）在随后完成——系统照例只当物理规则执行者。
-    fn apply_instant_need(&mut self, agent: &mut Agent3D, need: Need) {
+    fn apply_instant_need(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need) {
         match need.kind {
             NeedKind::BidHouse => self.write_bid_pending(agent),
             NeedKind::Courtship => {
@@ -271,6 +379,39 @@ impl<'a> Decisioner<'a> {
             NeedKind::RaiseChild => {
                 // 夫妻已在自家宅门口：就地写下养育决心，下一拍由 childcare 执行器受孕
                 agent.raise_child_pending = true;
+            }
+            NeedKind::BuildHouse => {
+                let home_tier = agent
+                    .home_house_id
+                    .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                    .map(|h| h.tier);
+                let intent = need
+                    .observe_intent(branch, home_tier)
+                    .ok()
+                    .and_then(|obs| obs.sustained());
+                let Some(house) = agent
+                    .home_house_id
+                    .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
+                else {
+                    return;
+                };
+                let target_tier = next_house_tier(house.tier);
+                agent.enter_stationary_state(PrimitiveActionState::ConstructingHouse);
+                agent.build_timer = 0.0;
+                if let Some(intent) = intent {
+                    super::transition::install_task(
+                        agent,
+                        ActiveTask {
+                            intent,
+                            strategy: ExecutionStrategy::UpgradeHome {
+                                house: house.id,
+                                target_tier,
+                                stage: HomeStage::Working,
+                            },
+                            primitive: ActionPrimitive::Hold(HoldKind::Upgrade),
+                        },
+                    );
+                }
             }
             _ => {}
         }
@@ -288,7 +429,7 @@ impl<'a> Decisioner<'a> {
     /// 命中后套用 decision_eval_levels 层级覆盖（6/缺失 = 保留分支自带的代码动态默认）。
     /// 瞬发分支（已在顶部结算）直接跳过。
     pub fn arbitrate_sustained_task(&mut self, agent: &Agent3D) -> Option<(BranchId, Need)> {
-        let order: &'a [BranchId; 18] = self.branch_order;
+        let order: &'a [BranchId; 16] = self.branch_order;
         for branch in order.iter() {
             if let Some(mut need) = branch.evaluate(self, agent) {
                 if let Some(lv) = branches::level_override_for(self.config, *branch) {
@@ -327,15 +468,21 @@ impl<'a> Decisioner<'a> {
     pub fn dispatch_task(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need) {
         // ★ v1.29.0 瞬发需求不得走常规落地链路（会派发移动/改状态）
         if need.is_instant() {
-            self.apply_instant_need(agent, need);
+            self.apply_instant_need(agent, branch, need);
             return;
         }
-        if need.kind == NeedKind::Rest { return; }
+        if need.kind == NeedKind::Rest {
+            return;
+        }
 
-        let home_house = agent.home_house_id
+        let home_house = agent
+            .home_house_id
             .and_then(|hid| self.houses.iter().find(|h| h.id == hid));
         let home_tier = home_house.map(|h| h.tier);
-        let intent = need.observe_intent(branch, home_tier).ok().and_then(|obs| obs.sustained());
+        let intent = need
+            .observe_intent(branch, home_tier)
+            .ok()
+            .and_then(|obs| obs.sustained());
 
         if need.kind == NeedKind::RaiseChild {
             agent.raise_child_pending = true;
@@ -344,11 +491,18 @@ impl<'a> Decisioner<'a> {
                 let target = h.door_node_id;
                 let start = self.start_node(agent);
                 let at_home = agent.current_lane_id.is_none()
-                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
-                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                    && self
+                        .network
+                        .graph
+                        .node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| {
+                            agent.world_pos.distance_to(&n.pos)
+                                <= self.config.poi_interaction_radius
+                        })
                         .unwrap_or(false);
-                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::RaiseChild) {
-                    agent.current_need = Some("Esteem·RaiseChild·ReturningHome".to_string());
+                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::RaiseChild)
+                {
+                    agent.current_need = Some("Belonging·RaiseChild·ReturningHome".to_string());
                     if let Some(intent) = intent {
                         let task = ActiveTask {
                             intent,
@@ -367,7 +521,7 @@ impl<'a> Decisioner<'a> {
                 }
             }
             agent.enter_stationary_state(PrimitiveActionState::RaiseChild);
-            agent.current_need = Some("Esteem·RaiseChild".to_string());
+            agent.current_need = Some("Belonging·RaiseChild".to_string());
             if let Some(intent) = intent {
                 let task = ActiveTask {
                     intent,
@@ -412,17 +566,24 @@ impl<'a> Decisioner<'a> {
                 let target = h.door_node_id;
                 let start = self.start_node(agent);
                 let at_home = agent.current_lane_id.is_none()
-                    && self.network.graph.node_weight(*self.network.node_map.get(&target).unwrap())
-                        .map(|n| agent.world_pos.distance_to(&n.pos) <= self.config.poi_interaction_radius)
+                    && self
+                        .network
+                        .graph
+                        .node_weight(*self.network.node_map.get(&target).unwrap())
+                        .map(|n| {
+                            agent.world_pos.distance_to(&n.pos)
+                                <= self.config.poi_interaction_radius
+                        })
                         .unwrap_or(false);
-                let target_tier = match h.tier {
-                    HouseTier::Tier0Warehouse => HouseTier::Tier1ThatchedHut,
-                    HouseTier::Tier1ThatchedHut => HouseTier::Tier2LeanTo,
-                    HouseTier::Tier2LeanTo => HouseTier::Tier3Homestead,
-                    HouseTier::Tier3Homestead => HouseTier::Tier4Manor,
-                    HouseTier::Tier4Manor => HouseTier::Tier4Manor,
-                };
-                if !at_home && self.dispatch(agent, start, target, PrimitiveActionState::ConstructingHouse) {
+                let target_tier = next_house_tier(h.tier);
+                if !at_home
+                    && self.dispatch(
+                        agent,
+                        start,
+                        target,
+                        PrimitiveActionState::ConstructingHouse,
+                    )
+                {
                     agent.current_need = Some("Esteem·BuildHouse·ReturningHome".to_string());
                     if let Some(intent) = intent {
                         let task = ActiveTask {
@@ -463,13 +624,17 @@ impl<'a> Decisioner<'a> {
         }
         if need.kind == NeedKind::FoundHome {
             // ★ M4 无房国王立宅约束：只能盖在自己的王国（营地）附近（复用 poiMinDistance）
-            let king_camp_pos = self.king_camp_of(agent)
+            let king_camp_pos = self
+                .king_camp_of(agent)
                 .and_then(|kcid| self.ctx.camp_pois.iter().find(|(id, _)| *id == kcid))
                 .map(|(_, p)| *p);
             // 系统仅在实体化阶段执行放置校验与路网接入（见 materialize_founded_houses）。
             for _ in 0..self.config.decision_found_home_candidates {
                 let angle = self.rng.gen_range(0.0, std::f32::consts::TAU);
-                let dist = self.rng.gen_range(self.config.decision_found_home_dist_min, self.config.decision_found_home_dist_max);
+                let dist = self.rng.gen_range(
+                    self.config.decision_found_home_dist_min,
+                    self.config.decision_found_home_dist_max,
+                );
                 let cand = Vec3::new(
                     agent.world_pos.x + angle.cos() * dist,
                     agent.world_pos.y + angle.sin() * dist,
@@ -506,16 +671,25 @@ impl<'a> Decisioner<'a> {
                     }
                 }
                 if is_valid {
-                    agent.current_need = Some("Physiological·FoundHome".to_string());
+                    agent.current_need = Some("Safety·FoundHome".to_string());
                     // 先沿路网走到候选宅址附近，抵达后 settlement 才实体化房屋。
-                    if let Some((target, _)) = self.network.graph.node_weights()
+                    if let Some((target, _)) = self
+                        .network
+                        .graph
+                        .node_weights()
                         .map(|n| (n.id, n.pos))
-                        .min_by(|(_, a), (_, b)| a.distance_to(&cand).partial_cmp(&b.distance_to(&cand)).unwrap()) {
+                        .min_by(|(_, a), (_, b)| {
+                            a.distance_to(&cand)
+                                .partial_cmp(&b.distance_to(&cand))
+                                .unwrap()
+                        })
+                    {
                         let start = self.start_node(agent);
                         // 存已通过校验的候选点 cand 本身，而非「离 cand 最近的路网节点」——
                         // 后者可能是别人家门节点/营地节点，会导致实体化阶段 is_house_site_valid 校验失败、房子盖不起来。
                         agent.pending_house_pos = Some(cand);
-                        if self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp) {
+                        if self.dispatch(agent, start, target, PrimitiveActionState::RestingAtCamp)
+                        {
                             if let Some(intent) = intent {
                                 let task = ActiveTask {
                                     intent,
@@ -538,15 +712,18 @@ impl<'a> Decisioner<'a> {
                     return;
                 }
             }
-            agent.current_need = Some("Physiological·FoundHome".to_string());
+            agent.current_need = Some("Safety·FoundHome".to_string());
             return;
         }
         if need.kind == NeedKind::SeekThrone {
             // ★ M4 夺位远征：目标 = 最近的可夺位营地（资格规则与分支守卫一致）
-            let home_camp_id = agent.home_house_id
+            let home_camp_id = agent
+                .home_house_id
                 .and_then(|hid| self.houses.iter().find(|h| h.id == hid))
                 .map(|h| h.camp_id);
-            let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id) else {
+            let Some(camp_id) =
+                self.eligible_leaderless_camp(agent, home_camp_id.is_some(), home_camp_id)
+            else {
                 agent.current_need = None;
                 return;
             };
@@ -556,8 +733,13 @@ impl<'a> Decisioner<'a> {
             };
             let start = self.start_node(agent);
             agent.expedition_target_camp = Some(camp_id);
-            agent.current_need = Some("Physiological·SeekThrone".to_string());
-            if self.dispatch(agent, start, target_node, PrimitiveActionState::SeekingThrone) {
+            agent.current_need = Some("Esteem·SeekThrone".to_string());
+            if self.dispatch(
+                agent,
+                start,
+                target_node,
+                PrimitiveActionState::SeekingThrone,
+            ) {
                 if let Some(intent) = intent {
                     let task = ActiveTask {
                         intent,
@@ -580,8 +762,15 @@ impl<'a> Decisioner<'a> {
                 agent.current_need = None;
                 return;
             };
-            let market_poi = self.ctx.market_nodes.iter().find(|rn| rn.node == target).map(|rn| rn.poi_id).unwrap_or(0);
-            let at_market = agent.world_pos.distance_to(&self.node_pos(target)) <= self.config.poi_interaction_radius;
+            let market_poi = self
+                .ctx
+                .market_nodes
+                .iter()
+                .find(|rn| rn.node == target)
+                .map(|rn| rn.poi_id)
+                .unwrap_or(0);
+            let at_market = agent.world_pos.distance_to(&self.node_pos(target))
+                <= self.config.poi_interaction_radius;
             if at_market {
                 agent.enter_stationary_state(PrimitiveActionState::BuyingAtMarket);
                 agent.current_need = Some("Physiological·MarketTrade".to_string());
@@ -642,7 +831,12 @@ impl<'a> Decisioner<'a> {
                 }
             } else {
                 let start = self.start_node(agent);
-                if self.dispatch(agent, start, target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                if self.dispatch(
+                    agent,
+                    start,
+                    target.nearest_node,
+                    PrimitiveActionState::SeekingCourtship,
+                ) {
                     if let Some(intent) = intent {
                         let task = ActiveTask {
                             intent,
@@ -674,8 +868,19 @@ impl<'a> Decisioner<'a> {
             NeedKind::StockWood => NodePool::Wood,
             NeedKind::StockStone => NodePool::Stone,
             NeedKind::StockGold | NeedKind::GoldWealth => NodePool::Gold,
-            NeedKind::Rest | NeedKind::RepairHouse | NeedKind::BuildHouse | NeedKind::FoundHome | NeedKind::SeekThrone | NeedKind::MarketTrade | NeedKind::Courtship | NeedKind::BidHouse | NeedKind::RaiseChild => return,
+            NeedKind::Rest
+            | NeedKind::RepairHouse
+            | NeedKind::BuildHouse
+            | NeedKind::FoundHome
+            | NeedKind::SeekThrone
+            | NeedKind::MarketTrade
+            | NeedKind::Courtship
+            | NeedKind::BidHouse
+            | NeedKind::RaiseChild => return,
         };
+        if self.should_buy_resource(agent, pool) && self.try_route_to_market(agent, pool) {
+            return;
+        }
         let target = self.nearest_of(agent, pool, agent.world_pos);
         if let Some(target) = target {
             if self.dispatch(agent, start, target, need.target_state) {
@@ -694,7 +899,11 @@ impl<'a> Decisioner<'a> {
                     agent.harvest_queue = q;
                 }
                 if let Some(intent) = intent {
-                    let poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == target).map(|rn| rn.poi_id);
+                    let poi = pool
+                        .nodes(self.ctx)
+                        .iter()
+                        .find(|rn| rn.node == target)
+                        .map(|rn| rn.poi_id);
                     let task = ActiveTask {
                         intent,
                         strategy: ExecutionStrategy::WildHarvest {
@@ -721,20 +930,26 @@ impl<'a> Decisioner<'a> {
 
     /// 本 agent 是否已是一地之王
     pub fn is_king(&self, agent: &Agent3D) -> bool {
-        self.regions.regions.iter().any(|(_, r)| r.group.leader == Some(agent.id))
+        self.regions
+            .regions
+            .iter()
+            .any(|(_, r)| r.group.leader == Some(agent.id))
     }
 
     /// ★ v1.10.0 是否存在未满（< camp_max_houses）的营地（B12FoundHome 预检用）
     pub fn has_nonfull_camp(&self) -> bool {
         let max = self.config.camp_max_houses as usize;
-        self.ctx.camp_pois.iter().any(|(cid, _)| {
-            self.houses.iter().filter(|h| h.camp_id == *cid).count() < max
-        })
+        self.ctx
+            .camp_pois
+            .iter()
+            .any(|(cid, _)| self.houses.iter().filter(|h| h.camp_id == *cid).count() < max)
     }
 
     /// 本 agent 若为王，返回其王国的营地 ID
     pub fn king_camp_of(&self, agent: &Agent3D) -> Option<u32> {
-        self.regions.regions.iter()
+        self.regions
+            .regions
+            .iter()
             .find(|(_, r)| r.group.leader == Some(agent.id))
             .map(|(cid, _)| *cid)
     }
@@ -743,11 +958,21 @@ impl<'a> Decisioner<'a> {
     /// has_house=true 时仅自家营地王位空缺才可夺；无房（含废墟）则可夺任意空缺王位营地。
     /// ★ 遍历完整营地列表（camp_pois）：无 Region 实体的营地（有房无王的孤儿营地）也视为空缺王位，
     ///   避免房屋辖区（House.camp_id）与地区成员登记簿（RegionRegistry）脱节导致永无国王。
-    pub fn eligible_leaderless_camp(&self, agent: &Agent3D, has_house: bool, home_camp_id: Option<u32>) -> Option<u32> {
+    pub fn eligible_leaderless_camp(
+        &self,
+        agent: &Agent3D,
+        has_house: bool,
+        home_camp_id: Option<u32>,
+    ) -> Option<u32> {
         let mut best: Option<(u32, f32)> = None;
         for &(cid, pos) in &self.ctx.camp_pois {
             // 有王（region 存在且 leader 非空）→ 跳过；无 region 或 leader 为空 → 空缺王位
-            if self.regions.regions.get(&cid).is_some_and(|r| r.group.leader.is_some()) {
+            if self
+                .regions
+                .regions
+                .get(&cid)
+                .is_some_and(|r| r.group.leader.is_some())
+            {
                 continue; // 王位未空缺
             }
             if has_house && Some(cid) != home_camp_id {
@@ -763,9 +988,20 @@ impl<'a> Decisioner<'a> {
 
     /// 营地 ID → 最近路网节点（夺位远征目标节点）
     pub fn camp_node_of(&self, camp_id: u32) -> Option<NodeId> {
-        let pos = self.ctx.camp_pois.iter().find(|(id, _)| *id == camp_id).map(|(_, p)| *p)?;
-        self.ctx.camp_positions.iter()
-            .min_by(|a, b| a.1.distance_to(&pos).partial_cmp(&b.1.distance_to(&pos)).unwrap())
+        let pos = self
+            .ctx
+            .camp_pois
+            .iter()
+            .find(|(id, _)| *id == camp_id)
+            .map(|(_, p)| *p)?;
+        self.ctx
+            .camp_positions
+            .iter()
+            .min_by(|a, b| {
+                a.1.distance_to(&pos)
+                    .partial_cmp(&b.1.distance_to(&pos))
+                    .unwrap()
+            })
             .map(|(n, _)| *n)
     }
 }

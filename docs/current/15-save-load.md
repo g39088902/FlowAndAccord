@@ -122,7 +122,7 @@ World3DEngine
 - **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟。**★ v1.28.0 自动读档**：已连接自动槽（默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复，无需用户手势）时，打开游戏直接读取其内容续演（自动解除暂停、同步暂停按钮文案），**不再开新世界等自动保存覆盖旧档**；读取失败（权限失效/文件损坏/版本不兼容）保持阻断并回退手动连接。**★ v1.28.1**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动时先静默重授（授权已持久化立即成功），失败则提供「🔓 授权并读取上次存档」按钮（点击 = 用户手势内 `requestPermission` 弹授权）；保存/读取遇 `NotAllowedError` 亦就地重授后重试一次，仅显式「断开」才删除句柄记录。
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.46.10**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.46.12**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
 
@@ -147,7 +147,7 @@ World3DEngine
 2. **非有限浮点必须走 `finite_f32`**：任何可能为 `INFINITY`/`NaN` 的入库 f32 字段都要加 `#[serde(with = "finite_f32")]`，否则存得进、读不回。
 3. **读档必须重建 `agent_index`**：遗漏会导致 `agent_by_id()` 返回错误下标或 panic。
 4. **读档必须强制重建地形快照**：不同种子的档地形不同，`_terrainCached` 不清会沿用旧地形。
-5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（当前 5，v1.44.7 升级至 4，M19.2 因持久化 `ActiveTask` 控制器升级至 5），仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，**不随应用版本自增**——应用版本是 `SAVE_APP_VERSION`，由 `tools/bump-version.js` 自动同步。
+5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（当前 6；M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**。
 6. **本地文件句柄不跨页面刷新持久化**（v1.11.0）：`FileSystemFileHandle` 仅在当前页面生命周期内有效，刷新后必须重新连接；不可假设句柄持久化，也不要尝试把句柄存入 localStorage（它不可序列化）。
 7. **`showSaveFilePicker`/`showOpenFilePicker` 必须在用户手势中调用**：不能在 `setInterval` 或异步回调中间接触发，否则浏览器会报 `SecurityError`。`connectLocalFile()` 和 `loadFromLocalFilePicker()` 均由按钮点击直接触发。
 8. **自动保存切换本地文件后不再写 localStorage**：已连接本地文件时 `tickAutoSave()` 直写磁盘，localStorage 自动槽不再更新——这是有意行为（避免双倍写入且大存档会撑爆 localStorage），断开连接后自动恢复 localStorage 模式。

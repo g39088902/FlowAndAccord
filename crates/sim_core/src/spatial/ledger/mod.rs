@@ -15,6 +15,7 @@ pub mod marriage;
 pub mod region;
 
 pub use clan::ClanRegistry;
+pub use empire::{Empire, EmpireHeadTitle, EmpireRegime, EmpireRegistry};
 pub use family::{Household, HouseholdId, HouseholdRegistry};
 pub use group::{Group, GroupKind};
 pub use journal::{
@@ -22,4 +23,3 @@ pub use journal::{
 };
 pub use marriage::{Marriage, MarriageEndReason, MarriageId, MarriageRegistry};
 pub use region::{Regime, Region, RegionRegistry, Succession};
-pub use empire::{Empire, EmpireHeadTitle, EmpireRegime, EmpireRegistry};

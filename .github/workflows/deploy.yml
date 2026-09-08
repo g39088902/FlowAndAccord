@@ -35,7 +35,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: 编译 sim_wasm (release)
-        run: cargo build -p sim_wasm --target wasm32-unknown-unknown --release
+        run: cargo build --locked -p sim_wasm --target wasm32-unknown-unknown --release
 
       # AGENTS.md §4.1：WASM 产物必须同步到前端双副本
       - name: 同步 wasm 至前端双副本

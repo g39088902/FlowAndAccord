@@ -1,10 +1,14 @@
 use super::agent::{Gender, PrimitiveActionState};
+use super::house::{
+    HouseAuctionHistorySnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseSnapshot,
+};
 use super::ledger::journal::ResourceKind;
-use super::poi::{PoiType, market_unit_price, market_unit_price_with_base};
-use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
+use super::poi::{market_unit_price, market_unit_price_with_base, PoiType};
 use super::snapshot::{
-    ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
-    MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
+    ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot,
+    HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
+    MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
+    TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -21,7 +25,11 @@ impl World3DEngine {
     /// 导出快照
     pub fn generate_snapshot(&self) -> WorldSnapshot3D {
         let need_terrain = self.terrain_dirty.replace(false);
-        let mut terrain_cells = Vec::with_capacity(if need_terrain { self.terrain.cells.len() } else { 0 });
+        let mut terrain_cells = Vec::with_capacity(if need_terrain {
+            self.terrain.cells.len()
+        } else {
+            0
+        });
         if need_terrain {
             for cell in &self.terrain.cells {
                 terrain_cells.push(GeoCellSnapshot {
@@ -37,7 +45,12 @@ impl World3DEngine {
                 (
                     market_unit_price(p.current_stock, p.max_stock, &self.config),
                     market_unit_price(p.secondary_stock, p.secondary_max_stock, &self.config),
-                    market_unit_price_with_base(p.tertiary_stock, p.tertiary_max_stock, self.config.market_price_base_wood, &self.config),
+                    market_unit_price_with_base(
+                        p.tertiary_stock,
+                        p.tertiary_max_stock,
+                        self.config.market_price_base_wood,
+                        &self.config,
+                    ),
                 )
             } else {
                 (0.0, 0.0, 0.0)
@@ -68,21 +81,30 @@ impl World3DEngine {
                 camp_title: p.camp_title(),
                 level: p.level,
                 bound_houses: p.bound_houses_count,
-                vacant_houses: p.vacant_houses.iter().map(|vh| VacantHouseSnapshot {
-                    house_id: vh.house_id,
-                    beneficiary_ids: vh.beneficiary_ids.clone(),
-                }).collect(),
+                vacant_houses: p
+                    .vacant_houses
+                    .iter()
+                    .map(|vh| VacantHouseSnapshot {
+                        house_id: vh.house_id,
+                        beneficiary_ids: vh.beneficiary_ids.clone(),
+                    })
+                    .collect(),
                 // ★ v1.28.0 榷场交易流水：仅 Market 输出最近 8 条（从新到旧），其余类型空数组
                 market_trades: if p.poi_type == PoiType::Market {
-                    p.market_trades.iter().rev().take(8).map(|t| MarketTradeSnapshot {
-                        tick: t.tick,
-                        agent_id: t.agent_id,
-                        household_id: t.household_id,
-                        resource: t.resource.clone(),
-                        amount: t.amount,
-                        unit_price: t.unit_price,
-                        gold_cost: t.gold_cost,
-                    }).collect()
+                    p.market_trades
+                        .iter()
+                        .rev()
+                        .take(8)
+                        .map(|t| MarketTradeSnapshot {
+                            tick: t.tick,
+                            agent_id: t.agent_id,
+                            household_id: t.household_id,
+                            resource: t.resource.clone(),
+                            amount: t.amount,
+                            unit_price: t.unit_price,
+                            gold_cost: t.gold_cost,
+                        })
+                        .collect()
                 } else {
                     Vec::new()
                 },
@@ -107,7 +129,11 @@ impl World3DEngine {
                     } else {
                         "出清期"
                     };
-                    (Some(phase.to_string()), st.benchmark_bid, st.current_highest_bid)
+                    (
+                        Some(phase.to_string()),
+                        st.benchmark_bid,
+                        st.current_highest_bid,
+                    )
                 }
                 None => (None, 0.0, 0.0),
             };
@@ -128,13 +154,19 @@ impl World3DEngine {
                 }
             }
 
-            let recent_deals: Vec<HouseDealSnapshot> = h.deal_history.iter().rev().take(5).map(|d| HouseDealSnapshot {
-                tick: d.deal_tick,
-                buyer_id: d.buyer_id,
-                price: d.price,
-                durability: d.durability,
-                reason: d.reason.clone(),
-            }).collect();
+            let recent_deals: Vec<HouseDealSnapshot> = h
+                .deal_history
+                .iter()
+                .rev()
+                .take(5)
+                .map(|d| HouseDealSnapshot {
+                    tick: d.deal_tick,
+                    buyer_id: d.buyer_id,
+                    price: d.price,
+                    durability: d.durability,
+                    reason: d.reason.clone(),
+                })
+                .collect();
 
             houses.push(HouseSnapshot {
                 id: h.id,
@@ -257,7 +289,12 @@ impl World3DEngine {
                 // ★ M6 威望改为 Agent 持久综合分值（透传存储值，不再由子嗣数派生）
                 prestige: agent.prestige,
                 // ★ M2 婚姻与家户归属
-                marriage_history_count: self.marriage_registry.by_agent.get(&agent.id).map(|v| v.len() as u32).unwrap_or(0),
+                marriage_history_count: self
+                    .marriage_registry
+                    .by_agent
+                    .get(&agent.id)
+                    .map(|v| v.len() as u32)
+                    .unwrap_or(0),
                 household_id: self.household_registry.household_of(agent.id),
                 household_role: {
                     if let Some(hid) = self.household_registry.household_of(agent.id) {
@@ -278,35 +315,56 @@ impl World3DEngine {
                 },
                 // ★ M4 到达时刻与夺位远征状态
                 arrival_tick: agent.arrival_tick,
-                is_on_expedition: matches!(agent.state, crate::spatial::agent::PrimitiveActionState::SeekingThrone),
+                is_on_expedition: matches!(
+                    agent.state,
+                    crate::spatial::agent::PrimitiveActionState::SeekingThrone
+                ),
                 expedition_target_camp: agent.expedition_target_camp,
                 coronation_pending: agent.coronation_pending,
                 courtship_target_id: agent.courtship_target_id,
                 family_stock_active: agent.family_stock_active,
-                active_task: agent.active_task.as_ref().map(|t| ActiveTaskSnapshot::from_task_and_queue(t, &agent.harvest_queue)),
+                active_task: agent
+                    .active_task
+                    .as_ref()
+                    .map(|t| ActiveTaskSnapshot::from_task_and_queue(t, &agent.harvest_queue)),
             });
         }
 
         // ★ 家户登记簿快照（家庭跟着男人走：仅导出存续活跃家户）
-        let resource_kinds = [ResourceKind::Water, ResourceKind::Food, ResourceKind::Wood, ResourceKind::Stone, ResourceKind::Gold];
+        let resource_kinds = [
+            ResourceKind::Water,
+            ResourceKind::Food,
+            ResourceKind::Wood,
+            ResourceKind::Stone,
+            ResourceKind::Gold,
+        ];
         let mut households = Vec::new();
         for hid in &self.household_registry.active_households {
-            let Some(hh) = self.household_registry.households.get(hid) else { continue; };
-            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
-                LedgerBalanceSnapshot {
+            let Some(hh) = self.household_registry.households.get(hid) else {
+                continue;
+            };
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds
+                .iter()
+                .map(|&rk| LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
                     amount: hh.group.ledger.balance(rk),
-                }
-            }).collect();
+                })
+                .collect();
             // 取最近8条团体事件（从新到旧；直接访问 VecDeque 字段以获得 DoubleEndedIterator）
-            let recent_events: Vec<String> = hh.group.ledger.events
+            let recent_events: Vec<String> = hh
+                .group
+                .ledger
+                .events
                 .iter()
                 .rev()
                 .take(8)
                 .map(|e| e.note.clone())
                 .collect();
             // 取最近8笔资源流水（从新到旧）
-            let recent_journal: Vec<TransferRecordSnapshot> = hh.group.ledger.journal
+            let recent_journal: Vec<TransferRecordSnapshot> = hh
+                .group
+                .ledger
+                .journal
                 .iter()
                 .rev()
                 .take(8)
@@ -349,19 +407,24 @@ impl World3DEngine {
         // ★ M3 宗族登记簿快照
         let mut clans = Vec::new();
         for (surname, clan) in &self.clan_registry.clans {
-            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
-                LedgerBalanceSnapshot {
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds
+                .iter()
+                .map(|&rk| LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
                     amount: clan.ledger.balance(rk),
-                }
-            }).collect();
-            let recent_events: Vec<String> = clan.ledger.events
+                })
+                .collect();
+            let recent_events: Vec<String> = clan
+                .ledger
+                .events
                 .iter()
                 .rev()
                 .take(8)
                 .map(|e| e.note.clone())
                 .collect();
-            let recent_journal: Vec<TransferRecordSnapshot> = clan.ledger.journal
+            let recent_journal: Vec<TransferRecordSnapshot> = clan
+                .ledger
+                .journal
                 .iter()
                 .rev()
                 .take(8)
@@ -391,24 +454,33 @@ impl World3DEngine {
         // ★ M4 地区与王国快照
         let mut regions = Vec::new();
         for (camp_id, region) in &self.region_registry.regions {
-            let camp_name = self.pois.iter()
+            let camp_name = self
+                .pois
+                .iter()
                 .find(|p| p.poi_type == PoiType::Camp && p.id == *camp_id)
                 .map(|p| p.camp_title())
                 .unwrap_or_else(|| format!("营地#{}", camp_id));
 
-            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| {
-                LedgerBalanceSnapshot {
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds
+                .iter()
+                .map(|&rk| LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
                     amount: region.group.ledger.balance(rk),
-                }
-            }).collect();
-            let recent_events: Vec<String> = region.group.ledger.events
+                })
+                .collect();
+            let recent_events: Vec<String> = region
+                .group
+                .ledger
+                .events
                 .iter()
                 .rev()
                 .take(8)
                 .map(|e| e.note.clone())
                 .collect();
-            let recent_journal: Vec<TransferRecordSnapshot> = region.group.ledger.journal
+            let recent_journal: Vec<TransferRecordSnapshot> = region
+                .group
+                .ledger
+                .journal
                 .iter()
                 .rev()
                 .take(8)
@@ -441,7 +513,8 @@ impl World3DEngine {
                 }
                 // 若儿子不足3个，补孙子
                 if heir_candidates.len() < 3 {
-                    let son_ids: std::collections::BTreeSet<u32> = sons.iter().map(|(id, _)| *id).collect();
+                    let son_ids: std::collections::BTreeSet<u32> =
+                        sons.iter().map(|(id, _)| *id).collect();
                     let mut grandsons: Vec<(u32, f32)> = Vec::new();
                     for a in &self.agents {
                         if a.is_alive && a.gender == Gender::Male {
@@ -454,29 +527,45 @@ impl World3DEngine {
                     }
                     grandsons.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
                     for (gid, _) in grandsons.iter() {
-                        if heir_candidates.len() >= 3 { break; }
+                        if heir_candidates.len() >= 3 {
+                            break;
+                        }
                         heir_candidates.push(*gid);
                     }
                 }
             }
 
             // 正在冲向该营地夺位的族人（决策引擎驱动的远征：agent 自主持有目标营地）
-            let active_expedition_agents: Vec<u32> = self.agents.iter()
-                .filter(|a| a.is_alive && a.state == PrimitiveActionState::SeekingThrone && a.expedition_target_camp == Some(*camp_id))
+            let active_expedition_agents: Vec<u32> = self
+                .agents
+                .iter()
+                .filter(|a| {
+                    a.is_alive
+                        && a.state == PrimitiveActionState::SeekingThrone
+                        && a.expedition_target_camp == Some(*camp_id)
+                })
                 .map(|a| a.id)
                 .collect();
 
             // ★ v1.12.0 历史国王（含在位时长与死因）/ 居民列表 / 管辖家庭
-            let history_kings: Vec<HistoryKingSnapshot> = region.history_kings.iter().map(|hk| HistoryKingSnapshot {
-                agent_id: hk.agent_id,
-                reign_start_tick: hk.reign_start_tick,
-                reign_end_tick: hk.reign_end_tick,
-                death_cause: hk.death_cause.clone(),
-            }).collect();
+            let history_kings: Vec<HistoryKingSnapshot> = region
+                .history_kings
+                .iter()
+                .map(|hk| HistoryKingSnapshot {
+                    agent_id: hk.agent_id,
+                    reign_start_tick: hk.reign_start_tick,
+                    reign_end_tick: hk.reign_end_tick,
+                    death_cause: hk.death_cause.clone(),
+                })
+                .collect();
             let member_ids: Vec<u32> = region.group.members.iter().copied().collect();
-            let governed_households: Vec<u64> = self.household_registry.active_households.iter()
+            let governed_households: Vec<u64> = self
+                .household_registry
+                .active_households
+                .iter()
                 .filter(|&&hid| {
-                    self.household_registry.get(hid)
+                    self.household_registry
+                        .get(hid)
                         .is_some_and(|hh| self.region_registry.region_of(hh.head) == Some(*camp_id))
                 })
                 .copied()
@@ -505,25 +594,50 @@ impl World3DEngine {
 
         let mut empires = Vec::new();
         for (empire_id, empire) in &self.empire_registry.empires {
-            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds.iter().map(|&rk| LedgerBalanceSnapshot {
-                resource: format!("{:?}", rk),
-                amount: empire.group.ledger.balance(rk),
-            }).collect();
-            let recent_events: Vec<String> = empire.group.ledger.events.iter().rev().take(8).map(|e| e.note.clone()).collect();
-            let recent_journal: Vec<TransferRecordSnapshot> = empire.group.ledger.journal.iter().rev().take(8).map(|r| TransferRecordSnapshot {
-                tick: r.tick,
-                resource: format!("{:?}", r.resource),
-                amount: r.amount,
-                from: format!("{:?}", r.from),
-                to: format!("{:?}", r.to),
-                reason: format!("{:?}", r.reason),
-            }).collect();
+            let balances: Vec<LedgerBalanceSnapshot> = resource_kinds
+                .iter()
+                .map(|&rk| LedgerBalanceSnapshot {
+                    resource: format!("{:?}", rk),
+                    amount: empire.group.ledger.balance(rk),
+                })
+                .collect();
+            let recent_events: Vec<String> = empire
+                .group
+                .ledger
+                .events
+                .iter()
+                .rev()
+                .take(8)
+                .map(|e| e.note.clone())
+                .collect();
+            let recent_journal: Vec<TransferRecordSnapshot> = empire
+                .group
+                .ledger
+                .journal
+                .iter()
+                .rev()
+                .take(8)
+                .map(|r| TransferRecordSnapshot {
+                    tick: r.tick,
+                    resource: format!("{:?}", r.resource),
+                    amount: r.amount,
+                    from: format!("{:?}", r.from),
+                    to: format!("{:?}", r.to),
+                    reason: format!("{:?}", r.reason),
+                })
+                .collect();
             let member_camp_ids: Vec<u32> = empire.member_camps.iter().copied().collect();
-            let mut king_candidates: Vec<u32> = member_camp_ids.iter()
-                .filter_map(|camp_id| self.region_registry.get(*camp_id).and_then(|r| r.group.leader))
+            let mut king_candidates: Vec<u32> = member_camp_ids
+                .iter()
+                .filter_map(|camp_id| {
+                    self.region_registry
+                        .get(*camp_id)
+                        .and_then(|r| r.group.leader)
+                })
                 .collect();
             king_candidates.sort_unstable();
-            let member_count: u32 = member_camp_ids.iter()
+            let member_count: u32 = member_camp_ids
+                .iter()
                 .filter_map(|camp_id| self.region_registry.get(*camp_id))
                 .map(|r| r.group.members.len() as u32)
                 .sum();
@@ -550,7 +664,8 @@ impl World3DEngine {
             Season::Winter => "Winter",
         };
         let quarter_length = self.config.season_quarter_length();
-        let season_progress = ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
+        let season_progress =
+            ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
 
         WorldSnapshot3D {
             tick: self.tick_counter,
@@ -570,12 +685,13 @@ impl World3DEngine {
             clans,
             regions,
             empires,
-            public_granary_balances: resource_kinds.iter().map(|&rk| {
-                LedgerBalanceSnapshot {
+            public_granary_balances: resource_kinds
+                .iter()
+                .map(|&rk| LedgerBalanceSnapshot {
                     resource: format!("{:?}", rk),
                     amount: self.public_granary.balance(rk),
-                }
-            }).collect(),
+                })
+                .collect(),
             total_births: self.total_births,
             total_deaths: self.total_deaths,
             total_deaths_natural: self.total_deaths_natural,
@@ -585,20 +701,35 @@ impl World3DEngine {
             auction_started: self.auction_started,
             auction_sold: self.auction_sold,
             auction_flopped: self.auction_flopped,
-            total_royal_privy: self.region_registry.regions.values().map(|r| r.cumulative_royal_privy).sum(),
-            total_imperial_privy: self.empire_registry.empires.values().map(|e| e.cumulative_imperial_privy).sum(),
-            auction_history: self.auction_history.iter().rev().map(|r| HouseAuctionHistorySnapshot {
-                tick: r.tick,
-                house_id: r.house_id,
-                tier: format!("{:?}", r.tier),
-                camp_id: r.camp_id,
-                durability: r.durability,
-                is_flop: r.is_flop,
-                buyer_id: r.buyer_id,
-                price: r.price,
-                total_bids_count: r.total_bids_count,
-                reason: r.reason.clone(),
-            }).collect(),
+            total_royal_privy: self
+                .region_registry
+                .regions
+                .values()
+                .map(|r| r.cumulative_royal_privy)
+                .sum(),
+            total_imperial_privy: self
+                .empire_registry
+                .empires
+                .values()
+                .map(|e| e.cumulative_imperial_privy)
+                .sum(),
+            auction_history: self
+                .auction_history
+                .iter()
+                .rev()
+                .map(|r| HouseAuctionHistorySnapshot {
+                    tick: r.tick,
+                    house_id: r.house_id,
+                    tier: format!("{:?}", r.tier),
+                    camp_id: r.camp_id,
+                    durability: r.durability,
+                    is_flop: r.is_flop,
+                    buyer_id: r.buyer_id,
+                    price: r.price,
+                    total_bids_count: r.total_bids_count,
+                    reason: r.reason.clone(),
+                })
+                .collect(),
             season: season_str.to_string(),
             temperature: self.temperature,
             season_progress,

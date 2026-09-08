@@ -1,7 +1,7 @@
 //! M19 原语描述类型；ActionPrimitive 描述当前行动原语并投射兼容状态。
-use serde::{Deserialize, Serialize};
 use crate::spatial::graph::NodeId;
 use crate::spatial::poi::PoiId;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionPrimitive {
