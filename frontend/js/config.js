@@ -79,6 +79,10 @@ window.SIM_CONFIG = {
   traitMutationDelta: 10.0,       // 遗传突变偏移量
   traitInheritClampMin: 10.0,     // 遗传继承单项禀赋夹取下限
   traitInheritClampMax: 190.0,    // 遗传继承单项禀赋夹取上限
+  traitHighThreshold: 110.0,      // 先天卓越禀赋门槛 (力量/智力高于此值触发卓越特化)
+  traitLowThreshold: 90.0,        // 先天劣势禀赋门槛 (力量/智力低于此值触发避重就轻特化)
+  traitStrengthLoadBonus: 0.25,   // 高力量重体力装载速率加成 (+25%)
+  traitStrengthLoadPenalty: 0.15, // 低力量重体力装载速率惩罚 (-15%)
 
   // ==========================================================================
   // 4. 生态地标与 POI 采收交互 (POI & Ecology Generation)
@@ -244,6 +248,8 @@ window.SIM_CONFIG = {
   marketMinFamilyGold: 0.5,                 // 户主准入起步黄金底线
   marketMinDispatchStamina: 15.0,           // 户主出发前往市场的最低体力门槛
   marketSettlementStep: 5.0,                // 外部市场单次交易结算步长 (单位)
+  marketWealthyFamilyGold: 200.0,           // 豪绅家户黄金门槛 (≥此值户主面临物资短缺时80%几率赴榷场现货采购)
+  marketPoorFamilyGold: 50.0,               // 平民家户黄金门槛 (<此值严格野外自力更生，非绝境不赴榷场)
 
   // ==========================================================================
   // 14. 二手房屋市场、营地中介拍卖与麦穗竞价 (Housing Market & Auction)

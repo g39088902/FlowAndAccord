@@ -77,6 +77,10 @@ pub struct SimConfig {
     pub trait_mutation_delta: f32,
     pub trait_inherit_clamp_min: f32,
     pub trait_inherit_clamp_max: f32,
+    pub trait_high_threshold: f32,
+    pub trait_low_threshold: f32,
+    pub trait_strength_load_bonus: f32,
+    pub trait_strength_load_penalty: f32,
 
     // 4. 生态地标与 POI 采收交互
     pub poi_min_distance: f32,
@@ -251,6 +255,8 @@ pub struct SimConfig {
     pub market_min_family_gold: f32,
     pub market_min_dispatch_stamina: f32,
     pub market_settlement_step: f32,
+    pub market_wealthy_family_gold: f32,
+    pub market_poor_family_gold: f32,
 
     // 14. 二手房屋市场、营地中介拍卖与麦穗竞价
     pub house_auction_bid_cooldown_ticks: u64,

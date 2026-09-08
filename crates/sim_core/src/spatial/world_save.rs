@@ -27,9 +27,10 @@ use super::world::World3DEngine;
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
-pub const SAVE_FORMAT_VERSION: u32 = 4;
+/// v1.46.9 (M19.2): Agent3D 新增活动任务 active_task 持久化，不兼容旧档
+pub const SAVE_FORMAT_VERSION: u32 = 5;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.46.8";
+pub const SAVE_APP_VERSION: &str = "1.46.10";
 
 /// 存档契约：世界全量可持久化状态
 ///

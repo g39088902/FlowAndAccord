@@ -11,8 +11,12 @@ pub use needs::*;
 pub use branches::*;
 pub use evaluate::*;
 
-// M19.1: read-only vocabulary and observation; the legacy dispatcher remains authoritative.
+// M19: 意图-策略-原语三层解耦架构，ActiveTask 统一生命周期转换器与兼容投影。
 pub mod intent;
 pub mod strategy;
 pub mod primitive;
 pub mod observation;
+pub mod projection;
+pub mod transition;
+pub mod preemption;
+

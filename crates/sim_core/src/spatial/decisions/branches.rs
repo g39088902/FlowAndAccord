@@ -13,6 +13,7 @@
 //! b18 育儿在宅）可返回 `MaslowLevel::Instantaneous` 结论——命中即刻执行（只写决心，
 //! 不移动、不消耗资源与 RNG）后继续遍历后续分支，见 `evaluate.rs::evaluate_instant_needs`。
 
+use serde::{Deserialize, Serialize};
 use super::super::agent::{Agent3D, Gender, PrimitiveActionState};
 use super::super::house::{House, HouseTier};
 use super::super::ledger::journal::ResourceKind;
@@ -21,7 +22,7 @@ use super::needs::*;
 use crate::config::SimConfig;
 
 /// 18 条需求判定分支的稳定标识（声明序即中性兜底序，不含语义优先级）
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BranchId {
     B1QuenchThirst,
     B2SateHunger,
@@ -158,7 +159,13 @@ impl BranchId {
             }
             BranchId::B4RepairHouse => {
                 if let Some(house) = home_house(d, a) {
-                    let need_repair = house.durability < cfg.decision_house_repair_need_threshold;
+                    // ★ M19.4c 力量个性化：低力量族人（< trait_low_threshold）专注家政维护，房屋耐久低于 90% 即主动修缮；常规族人低于 80%
+                    let threshold = if a.strength < cfg.trait_low_threshold {
+                        (cfg.decision_house_repair_need_threshold + 0.10).min(0.95)
+                    } else {
+                        cfg.decision_house_repair_need_threshold
+                    };
+                    let need_repair = house.durability < threshold;
                     if need_repair && is_house_member(house, a) {
                         return Some(Need { level: MaslowLevel::Safety, kind: NeedKind::RepairHouse, target_state: PrimitiveActionState::RepairingHouse });
                     }
@@ -180,7 +187,12 @@ impl BranchId {
             }
             BranchId::B7StockWood => {
                 let bag_has_space = a.carried_wood < cfg.carry_capacity_resource - 0.01;
-                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Wood) && d.has_available_node(a, NodePool::Wood) {
+                // ★ M19.4c 豪绅家户阶层分化：家资充裕 (gold >= market_wealthy_family_gold) 的户主 80% 几率免于亲自伐木
+                let is_gentry_exempt = is_male_adult(a, cfg)
+                    && d.is_household_head(a)
+                    && d.ledger_balance(a, ResourceKind::Gold) >= cfg.market_wealthy_family_gold
+                    && gentry_labor_exemption_check(a.id, d.tick, cfg.agent_decision_interval_ticks);
+                if home_tier.is_some() && bag_has_space && !is_gentry_exempt && family_stock_on(a, ResourceKind::Wood) && d.has_available_node(a, NodePool::Wood) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockWood, target_state: PrimitiveActionState::SeekingWood });
                 }
             }
@@ -195,7 +207,18 @@ impl BranchId {
             BranchId::B9StockStone => {
                 // ★ M7 石料也因家庭储备不足而采（不再按房屋等级“升级建材”导向）
                 let bag_has_space = a.carried_stone < cfg.carry_capacity_resource - 0.01;
-                if home_tier.is_some() && bag_has_space && family_stock_on(a, ResourceKind::Stone) && d.has_available_node(a, NodePool::Stone) {
+                // ★ M19.4c 豪绅家户阶层分化：家资充裕 (gold >= market_wealthy_family_gold) 的户主 80% 几率免于亲自采石
+                let is_gentry_exempt = is_male_adult(a, cfg)
+                    && d.is_household_head(a)
+                    && d.ledger_balance(a, ResourceKind::Gold) >= cfg.market_wealthy_family_gold
+                    && gentry_labor_exemption_check(a.id, d.tick, cfg.agent_decision_interval_ticks);
+                // ★ M19.4c 力量个性化：低力量族人视采石为沉重劳作，需体力充沛 (>= 75.0) 方去开采
+                let stamina_ok = if a.strength < cfg.trait_low_threshold {
+                    a.stamina >= 75.0
+                } else {
+                    true
+                };
+                if home_tier.is_some() && bag_has_space && !is_gentry_exempt && stamina_ok && family_stock_on(a, ResourceKind::Stone) && d.has_available_node(a, NodePool::Stone) {
                     return Some(Need { level: family_level(a), kind: NeedKind::StockStone, target_state: PrimitiveActionState::SeekingStone });
                 }
             }

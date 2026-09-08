@@ -25,6 +25,9 @@
 | 14 | **`bump-version.js`** | 版本治理 | 版本号升版与一致性对齐，同步更新 `index.html` 徽章与全部 8+ 处定义点 | `node tools/bump-version.js --patch` | 0=同步成功, 1=校验漂移 |
 | 15 | **`rust-download.js`** | 环境构建 | 使用 Node 内置 OpenSSL TLS 下载便携 Rust 工具链（绕过系统证书异常） | `node tools/rust-download.js` | 0=下载完成 |
 | 16 | **`vendor-deps.js`** | 环境构建 | 基于 crates.io API BFS 遍历根依赖与传递依赖，离线下载至 `.vendor/` | `node tools/vendor-deps.js` | 0=完成打包 |
+| 17 | **`test-preemption.js`** | 行为矩阵 | ★ M19.4b 分级任务抢占验证：危机抢占、平滑中断、行囊保全、进度冻结五大场景 | `node tools/test-preemption.js` | 0=矩阵全通, 1=断言失败 |
+| 18 | **`test-personalization.js`** | 行为矩阵 | ★ M19.4c 禀赋与家资个性化选策验证：力量/智力/家户财富三大分化维度五大场景 | `node tools/test-personalization.js` | 0=矩阵全通, 1=断言失败 |
+| 19 | **`test-itinerary.js`** | 行为矩阵 | ★ M19.4d 多品类预排采收行程验证：链路生成 / TSP 最近邻排序 / 多站顺路推进 / 异常清空 / 多种子长程确定性 | `node tools/test-itinerary.js` | 0=矩阵全通, 1=断言失败 |
 
 ---
 
@@ -268,4 +271,13 @@ node tools/test-determinism.js
 node tools/bump-version.js --check
 node tools/code-map-check.js
 node tools/doc-maintenance-check.js
+
+# 5. 决策行为改动（M19.4b/c/d）专项矩阵回归：
+node tools/test-preemption.js        # 分级任务抢占
+node tools/test-personalization.js   # 禀赋与家资个性化选策
+node tools/test-itinerary.js         # 多品类预排采收行程
 ```
+
+> **⚠️ 编写 M19.4 系列行为矩阵测试的通用前提**：这三个工具都通过「改存档 JSON → `world_load` → 推进到决策相位」构造场景，
+> 构造「行囊已装满 / 家宅已备满」这类前置条件时，阈值必须从 `SIM_CONFIG` 读取（如 `carryCapacityResource`，当前 **100.0**），
+> 严禁写死常量——写错会导致 Agent 在资源点原地采集、永远不进入目标代码路径，表现为难以定位的「功能没生效」假故障。

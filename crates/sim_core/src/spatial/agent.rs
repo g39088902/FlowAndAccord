@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use super::vec3::Vec3;
-use super::graph::{LaneGraph3D, LaneId, NodeId, LaneEdge3D};
+use super::decisions::strategy::ActiveTask;
+use super::decisions::branches::BranchId;
+use super::graph::{LaneEdge3D, LaneGraph3D, LaneId, NodeId};
 use super::poi::PoiId;
+use super::vec3::Vec3;
 use crate::config::*;
 
 pub type AgentId = u32;
@@ -209,6 +211,12 @@ pub struct Agent3D {
     /// ★ v1.26.0 上次出价的世界 tick（None = 从未出价），用于全局出价冷却
     #[serde(default)]
     pub last_bid_tick: Option<u64>,
+    /// ★ M19.2 活动任务控制器：意图-策略-原语三元组控制状态，持续任务的唯一控制真相源
+    #[serde(default)]
+    pub active_task: Option<ActiveTask>,
+    /// ★ M19.4d 预排行程候选队列（定长 4 站）：多品类采收行程优化提示（可失效，零堆分配）
+    #[serde(default)]
+    pub harvest_queue: [Option<BranchId>; 4],
     pub build_timer: f32,     // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
 
@@ -329,6 +337,8 @@ impl Agent3D {
             pending_bid_house_ids: Vec::new(),
             pending_bid_upgrade: false,
             last_bid_tick: None,
+            active_task: None,
+            harvest_queue: [None; 4],
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
             generation: 1,
@@ -336,7 +346,7 @@ impl Agent3D {
             mother_id: None,
             father_id: None,
             children_ids: Vec::new(),
-            surname: String::new(), // 由调用方（ecology.rs）赋值
+            surname: String::new(),
             prestige: 0,
             family_stock_active: [false; 5],
             intelligence: config.trait_default_mean,
@@ -371,6 +381,21 @@ impl Agent3D {
             forward_heading_rad: 0.0,
             pitch_rad: 0.0,
         }
+    }
+
+    /// ★ M19.4d 弹出下一个预排采收分支（FIFO 平移，末尾填 None）
+    pub fn pop_harvest_queue(&mut self) -> Option<BranchId> {
+        let first = self.harvest_queue[0];
+        self.harvest_queue[0] = self.harvest_queue[1];
+        self.harvest_queue[1] = self.harvest_queue[2];
+        self.harvest_queue[2] = self.harvest_queue[3];
+        self.harvest_queue[3] = None;
+        first
+    }
+
+    /// ★ M19.4d 清空预排采收队列
+    pub fn clear_harvest_queue(&mut self) {
+        self.harvest_queue = [None; 4];
     }
 
     /// 随身行囊当前总装载量 (水+粮+木+石，黄金不计入容量)
@@ -462,7 +487,7 @@ impl Agent3D {
         // 死亡判定 (归 0 即死亡)
         if self.hunger <= 0.0 {
             self.is_alive = false;
-            self.state = PrimitiveActionState::Dead;
+            crate::spatial::decisions::transition::on_agent_death(self);
             self.death_cause = Some("饥荒饿死".to_string());
             self.death_is_natural = false;
             self.is_pregnant = false;
@@ -475,7 +500,7 @@ impl Agent3D {
         }
         if self.thirst <= 0.0 {
             self.is_alive = false;
-            self.state = PrimitiveActionState::Dead;
+            crate::spatial::decisions::transition::on_agent_death(self);
             self.death_cause = Some("脱水渴死".to_string());
             self.death_is_natural = false;
             self.is_pregnant = false;
@@ -488,7 +513,7 @@ impl Agent3D {
         }
         if self.health <= 0.0 {
             self.is_alive = false;
-            self.state = PrimitiveActionState::Dead;
+            crate::spatial::decisions::transition::on_agent_death(self);
             self.death_cause = Some("寿终正寝".to_string());
             self.death_is_natural = true;
             self.is_pregnant = false;
@@ -656,9 +681,10 @@ impl Agent3D {
             } else {
                 // 下一条车道在路网中消失：进入越野静止态，清空车道等待决策器重路由
                 self.enter_stationary_state(PrimitiveActionState::OffRoadDetour);
+                crate::spatial::decisions::transition::on_offroad_detour(self);
             }
         } else {
-            // 路线走完：统一通过 enter_stationary_state 切到对应静止态，确保车道/速度清零
+            // 统一通过 enter_stationary_state 切到对应静止态，确保车道/速度清零
             match self.state {
                 PrimitiveActionState::SeekingWater => {
                     self.enter_stationary_state(PrimitiveActionState::DrinkingAtWater);
@@ -689,6 +715,8 @@ impl Agent3D {
                     self.route_index = 0;
                 }
             }
+            // 路线走完：通知活动任务生命周期推进
+            crate::spatial::decisions::transition::on_navigation_arrived(self);
         }
     }
 }

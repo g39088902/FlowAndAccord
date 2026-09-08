@@ -5,6 +5,13 @@ use super::super::poi::PoiType;
 use super::needs::*;
 use super::evaluate::Decisioner;
 
+use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, ReturnStage, ResidenceTarget};
+use super::primitive::{ActionPrimitive, ArrivalKind, HoldKind};
+use super::intent::{AgentIntent, IntentKind, CompletionPolicy};
+use super::branches::BranchId;
+use super::projection::compatible_legacy_state;
+use super::transition;
+
 /// 路由/导航层：寻路、原地掉头、返家与 POI 私有触发器可用性查询。
 ///
 /// 本模块只提供"怎么走"的机制，不产生任何需求判定；所有方法只读上下文，
@@ -25,12 +32,58 @@ impl<'a> Decisioner<'a> {
         pool.nodes(self.ctx).iter().any(|target| agent.poi_is_seekable(target.poi_id))
     }
 
+    /// 评估节点周边连接道路的通行质量（踏路加成系数，加权平均）
+    pub fn estimate_path_quality(&self, node: NodeId) -> f32 {
+        let Some(&idx) = self.network.node_map.get(&node) else { return 1.0; };
+        let mut total_factor = 0.0;
+        let mut count = 0;
+        for edge in self.network.graph.edges(idx) {
+            let w = edge.weight();
+            let bucket = super::super::graph::LaneEdge3D::wear_tier_bucket(
+                w.wear,
+                self.config.road_wear_tier_step,
+                self.config.road_benefit_max_wear,
+            );
+            let quantized_wear = bucket as f32 * self.config.road_wear_tier_step;
+            let factor = (self.config.road_level_factor_base + self.config.road_level_factor_wear_coef * quantized_wear)
+                .clamp(self.config.road_level_factor_min, self.config.road_level_factor_max);
+            total_factor += factor;
+            count += 1;
+        }
+        if count > 0 {
+            total_factor / count as f32
+        } else {
+            self.config.road_level_factor_base
+        }
+    }
+
+    /// 核验族人是否为家户户主
+    #[inline]
+    pub fn is_household_head(&self, a: &Agent3D) -> bool {
+        self.households.household_of(a.id)
+            .and_then(|hid| self.households.get(hid))
+            .map(|hh| hh.group.leader == Some(a.id))
+            .unwrap_or(false)
+    }
+
     pub fn nearest_of(&self, agent: &Agent3D, pool: NodePool, pos: Vec3) -> Option<NodeId> {
-        self.available_nodes(agent, pool).into_iter().min_by(|&a, &b| {
-            self.node_pos(a).distance_to(&pos)
-                .partial_cmp(&self.node_pos(b).distance_to(&pos))
-                .unwrap()
-        })
+        let nodes = self.available_nodes(agent, pool);
+        if agent.intelligence >= self.config.trait_high_threshold && nodes.len() > 1 {
+            // ★ M19.4c 智力驱动选点：高智力族人避开减速严重的荒野泥泞路，优先选择沿线道路踩踏成熟、通行高效的 POI
+            nodes.into_iter().min_by(|&a, &b| {
+                let da = self.node_pos(a).distance_to(&pos);
+                let db = self.node_pos(b).distance_to(&pos);
+                let qa = self.estimate_path_quality(a).max(0.1);
+                let qb = self.estimate_path_quality(b).max(0.1);
+                (da / qa).partial_cmp(&(db / qb)).unwrap_or(std::cmp::Ordering::Equal)
+            })
+        } else {
+            nodes.into_iter().min_by(|&a, &b| {
+                self.node_pos(a).distance_to(&pos)
+                    .partial_cmp(&self.node_pos(b).distance_to(&pos))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        }
     }
 
     pub fn start_node(&self, agent: &Agent3D) -> NodeId {
@@ -108,11 +161,22 @@ impl<'a> Decisioner<'a> {
         false
     }
 
+    /// 平滑寻路与转向：若小人正在车道上移动，优先原地掉头反向平滑往回走；否则从最近节点派发新路线
+    pub fn route_or_turn_around(&self, agent: &mut Agent3D, target_node: NodeId, state: PrimitiveActionState) -> bool {
+        if self.turn_around_and_route_to(agent, target_node, state) {
+            true
+        } else {
+            let curr = self.start_node(agent);
+            self.dispatch(agent, curr, target_node, state)
+        }
+    }
+
     pub fn return_home(&self, agent: &mut Agent3D) {
         let target_home = self.home_target(agent);
         // 若小人正在途中移动，优先原地掉头沿原车道反向往回走，绝不瞬移
         if self.turn_around_and_route_to(agent, target_home, PrimitiveActionState::ReturningToCamp) {
             agent.home_camp_node = target_home;
+            self.sync_return_home_task(agent, target_home, false);
             return;
         }
 
@@ -120,13 +184,74 @@ impl<'a> Decisioner<'a> {
         if curr_node == target_home {
             agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
             agent.home_camp_node = target_home;
+            self.sync_return_home_task(agent, target_home, true);
             return;
         }
-        if self.dispatch(agent, curr_node, target_home, PrimitiveActionState::ReturningToCamp) {
-            agent.home_camp_node = target_home;
+        self.dispatch(agent, curr_node, target_home, PrimitiveActionState::ReturningToCamp);
+        agent.home_camp_node = target_home;
+        self.sync_return_home_task(agent, target_home, false);
+    }
+
+    fn sync_return_home_task(&self, agent: &mut Agent3D, target_home: NodeId, at_home: bool) {
+        if let Some(task) = agent.active_task.as_mut() {
+            match &mut task.strategy {
+                ExecutionStrategy::WildHarvest { stage, .. } => {
+                    if at_home {
+                        *stage = ResourceStage::Unloading;
+                        task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
+                    } else {
+                        *stage = ResourceStage::Returning;
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: target_home,
+                            arrival: ArrivalKind::Residence,
+                        };
+                    }
+                    agent.state = compatible_legacy_state(task);
+                    return;
+                }
+                ExecutionStrategy::MarketTrade { stage, .. } => {
+                    if at_home {
+                        *stage = ResourceStage::Unloading;
+                        task.primitive = ActionPrimitive::Hold(HoldKind::Residence);
+                    } else {
+                        *stage = ResourceStage::Returning;
+                        task.primitive = ActionPrimitive::Navigate {
+                            target: target_home,
+                            arrival: ArrivalKind::Residence,
+                        };
+                    }
+                    agent.state = compatible_legacy_state(task);
+                    return;
+                }
+                _ => {}
+            }
+        }
+        if at_home {
+            agent.active_task = None;
+            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
         } else {
-            agent.state = PrimitiveActionState::ReturningToCamp;
-            agent.home_camp_node = target_home;
+            let destination = if let Some(hid) = agent.home_house_id {
+                ResidenceTarget::House(hid)
+            } else {
+                ResidenceTarget::Camp(target_home)
+            };
+            let task = ActiveTask {
+                intent: AgentIntent {
+                    source_branch: BranchId::B3Rest,
+                    level: MaslowLevel::Physiological,
+                    kind: IntentKind::RestAndRecover,
+                    completion: CompletionPolicy::RecoveryFinished,
+                },
+                strategy: ExecutionStrategy::ReturnToResidence {
+                    destination,
+                    stage: ReturnStage::Travelling,
+                },
+                primitive: ActionPrimitive::Navigate {
+                    target: target_home,
+                    arrival: ArrivalKind::Residence,
+                },
+            };
+            transition::install_task(agent, task);
         }
     }
 

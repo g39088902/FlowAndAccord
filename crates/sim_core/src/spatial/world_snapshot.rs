@@ -3,7 +3,7 @@ use super::ledger::journal::ResourceKind;
 use super::poi::{PoiType, market_unit_price, market_unit_price_with_base};
 use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 use super::snapshot::{
-    AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
+    ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot, HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot, RegionSnapshot,
     MarriageSnapshot, MarketTradeSnapshot, NodeSnapshot, PoiSnapshot, Season, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
@@ -283,6 +283,7 @@ impl World3DEngine {
                 coronation_pending: agent.coronation_pending,
                 courtship_target_id: agent.courtship_target_id,
                 family_stock_active: agent.family_stock_active,
+                active_task: agent.active_task.as_ref().map(|t| ActiveTaskSnapshot::from_task_and_queue(t, &agent.harvest_queue)),
             });
         }
 

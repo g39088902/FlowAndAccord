@@ -777,7 +777,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       } else {
         const need = parseMaslowNeed(selAgent.currentNeed, selAgent);
         if (need) {
-          maslowBox.style.display = 'block';
+          maslowBox.style.display = 'flex';
           maslowBox.style.borderColor = need.color + '66';
           maslowBadge.textContent = `${need.icon} ${need.numeral} ${need.name} · ${need.kindLabel}`;
           maslowBadge.style.color = need.color;
@@ -785,7 +785,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           maslowBadge.style.background = need.color + '1a';
           maslowReason.textContent = need.reason;
         } else if (selAgent.state === 'RestingAtCamp') {
-          maslowBox.style.display = 'block';
+          maslowBox.style.display = 'flex';
           maslowBox.style.borderColor = 'rgba(16, 185, 129, 0.4)';
           maslowBadge.textContent = selAgent.homeHouseId ? '🏡 闲适安居 · 需求充盈' : '🏕️ 营地休养 · 暂无急需';
           maslowBadge.style.color = '#10b981';
@@ -795,6 +795,172 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
         } else {
           maslowBox.style.display = 'none';
         }
+      }
+    }
+
+    // ★ M19.4a 决策与行动中枢三栏透视与瞬发高亮更新
+    const instantPill = document.getElementById('insp-instant-pill');
+    const instantText = document.getElementById('insp-instant-text');
+    if (instantPill && instantText) {
+      let instMsg = null;
+      if (selAgent.coronationPending != null) {
+        instMsg = `加冕登基 @ 营地 #${selAgent.coronationPending}`;
+      } else if (selAgent.courtshipPending != null) {
+        instMsg = `登记完婚 @ 伴侣 #${selAgent.courtshipPending}`;
+      } else if (selAgent.raiseChildPending) {
+        instMsg = `自主育儿受孕结算`;
+      } else if (selAgent.pendingBidHouseIds && selAgent.pendingBidHouseIds.length > 0) {
+        instMsg = `麦穗竞拍出价 @ 房屋 #${selAgent.pendingBidHouseIds[0]}`;
+      } else if (selAgent.pendingHousePos) {
+        instMsg = `自立门户选址待落成`;
+      }
+      if (instMsg && selAgent.isAlive && !selAgent.isFetus) {
+        instantText.textContent = instMsg;
+        instantPill.style.display = 'inline-flex';
+      } else {
+        instantPill.style.display = 'none';
+      }
+    }
+
+    const elBranch = document.getElementById('insp-task-branch');
+    const elLevel = document.getElementById('insp-task-level');
+    const elCompletion = document.getElementById('insp-task-completion');
+    const elStrategy = document.getElementById('insp-task-strategy');
+    const elTarget = document.getElementById('insp-task-target');
+    const elStage = document.getElementById('insp-task-stage');
+    const elPrimitive = document.getElementById('insp-task-primitive');
+    const elPrimDetail = document.getElementById('insp-task-prim-detail');
+    const elStatus = document.getElementById('insp-task-status');
+    const elItineraryRow = document.getElementById('insp-task-itinerary-row');
+    const elItinerary = document.getElementById('insp-task-itinerary');
+
+    if (elBranch && elLevel && elCompletion && elStrategy && elTarget && elStage && elPrimitive && elPrimDetail && elStatus) {
+      const task = selAgent.activeTask || selAgent.active_task;
+      if (task) {
+        elBranch.textContent = `${task.branch} ${task.branchDesc || task.branch_desc || ''}`;
+        elBranch.title = `${task.branch} (${task.intentKind || task.intent_kind || ''})`;
+        
+        const lvlMap = {
+          Physiological: '① 生理',
+          Safety: '② 安全',
+          Belonging: '③ 归属',
+          Esteem: '④ 尊重',
+          SelfActualization: '⑤ 实现',
+          Instantaneous: '⓪ 瞬发',
+        };
+        elLevel.textContent = lvlMap[task.level] || task.level || '--';
+        elLevel.title = task.level || '';
+
+        // 判据友好化展示
+        let compText = task.completion || '--';
+        if (compText.includes('HouseholdStockSatisfied')) compText = '储备补足';
+        else if (compText.includes('SurvivalSatisfied')) compText = '饱渴满足';
+        else if (compText.includes('GoldTripFinished')) compText = '运金满载';
+        else if (compText.includes('RecoveryFinished')) compText = '休养充沛';
+        else if (compText.includes('HomeRepaired')) compText = '修缮竣工';
+        else if (compText.includes('HomeAtTier')) compText = '晋升落成';
+        else if (compText.includes('HomeFounded')) compText = '立宅完成';
+        else if (compText.includes('MarriageRegistered')) compText = '结为连理';
+        else if (compText.includes('CoronationRegistered')) compText = '登基为王';
+        else if (compText.includes('ChildcareSettled')) compText = '养育落实';
+        elCompletion.textContent = compText;
+        elCompletion.title = task.completion || '';
+
+        const stratMap = {
+          WildHarvest: '野外采收',
+          MarketTrade: '榷场商贸',
+          ReturnToResidence: '返家休整',
+          Courtship: '寻访求偶',
+          ClaimThrone: '远征夺位',
+          Childcare: '居所育儿',
+          FoundHome: '自立营建',
+          UpgradeHome: '私宅升级',
+          RepairHome: '房屋修缮',
+        };
+        elStrategy.textContent = stratMap[task.strategyKind || task.strategy_kind] || task.strategyKind || task.strategy_kind || '--';
+        
+        let targetText = '--';
+        const tid = task.targetId !== undefined ? task.targetId : task.target_id;
+        const ttype = task.targetType || task.target_type;
+        if (ttype === 'Poi' && tid != null) {
+          const poi = (sim.pois || []).find(p => p.id === tid);
+          targetText = poi ? `${poi.name || poi.campTitle || ('POI #' + tid)}` : `POI #${tid}`;
+        } else if (ttype === 'House' && tid != null) {
+          targetText = `私宅 #${tid}`;
+        } else if (ttype === 'Camp' && tid != null) {
+          targetText = `营地 #${tid}`;
+        } else if (ttype === 'Agent' && tid != null) {
+          targetText = `族人 #${tid}`;
+        }
+        elTarget.textContent = targetText;
+        elTarget.title = `${ttype || 'None'}: ${tid != null ? tid : '无'}`;
+
+        const stageMap = {
+          Outbound: '去程在途',
+          OnSite: '现场作业',
+          Returning: '携货返程',
+          Unloading: '入库卸货',
+          Travelling: '在途奔赴',
+          Recovering: '驻留恢复',
+          Ready: '就绪结算',
+          AwaitingSettlement: '等待世界',
+          Working: '施工劳作',
+        };
+        elStage.textContent = stageMap[task.stage] || task.stage || '--';
+        elStage.title = `阶段: ${task.stage || ''}`;
+
+        const primMap = {
+          Navigate: '沿路导航',
+          Hold: '驻留作业',
+          AwaitSettlement: '物理结算',
+        };
+        elPrimitive.textContent = primMap[task.primitiveKind || task.primitive_kind] || task.primitiveKind || task.primitive_kind || '--';
+        
+        const pDetail = task.primitiveDetail || task.primitive_detail || '--';
+        elPrimDetail.textContent = pDetail.length > 9 ? pDetail.substring(0, 9) + '…' : pDetail;
+        elPrimDetail.title = pDetail;
+
+        elStatus.textContent = selAgent.velocity > 0.01 ? `${selAgent.velocity.toFixed(1)}m/s` : '原地进行';
+        elStatus.style.color = selAgent.velocity > 0.01 ? '#38bdf8' : '#34d399';
+
+        if (elItineraryRow && elItinerary) {
+          const itin = task.itinerary || '--';
+          if (itin && itin !== '--') {
+            elItineraryRow.style.display = 'flex';
+            elItinerary.textContent = itin;
+            elItinerary.title = `多品类预排采收链路: ${itin}`;
+          } else {
+            elItineraryRow.style.display = 'none';
+          }
+        }
+      } else if (selAgent.isAlive && !selAgent.isFetus) {
+        if (elItineraryRow) elItineraryRow.style.display = 'none';
+        // 闲适休养状态
+        elBranch.textContent = 'b3 休息';
+        elBranch.title = 'b3 闲适安居 / 营地休养';
+        elLevel.textContent = '① 生理';
+        elLevel.title = 'Physiological';
+        elCompletion.textContent = selAgent.stamina >= 99.5 ? '充沛满值' : '恢复中';
+        elStrategy.textContent = selAgent.homeHouseId ? '私宅安居' : '营地驻留';
+        elTarget.textContent = selAgent.homeHouseId ? `私宅 #${selAgent.homeHouseId}` : '露天营地';
+        elStage.textContent = selAgent.stamina >= 99.5 ? '安居静候' : '休养回体';
+        elPrimitive.textContent = '静止驻留';
+        elPrimDetail.textContent = selAgent.homeHouseId ? 'Residence' : 'Camp';
+        elStatus.textContent = `${Math.round(selAgent.stamina)}% 体力`;
+        elStatus.style.color = '#10b981';
+      } else {
+        if (elItineraryRow) elItineraryRow.style.display = 'none';
+        // 胎儿或亡故
+        elBranch.textContent = '--';
+        elLevel.textContent = selAgent.isFetus ? '孕育' : '终态';
+        elCompletion.textContent = selAgent.isFetus ? '待分娩' : '入土长眠';
+        elStrategy.textContent = selAgent.isFetus ? '母腹中' : '长眠先祖';
+        elTarget.textContent = '--';
+        elStage.textContent = '--';
+        elPrimitive.textContent = '--';
+        elPrimDetail.textContent = '--';
+        elStatus.textContent = selAgent.isFetus ? '胎儿' : '已故';
+        elStatus.style.color = '#94a3b8';
       }
     }
 

@@ -409,7 +409,15 @@ impl World3DEngine {
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::WoodForest && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
                         if agent_hid.is_some() && agent.carried_wood < carry_cap && poi.current_stock > 0.01 {
-                            let load = (carry_cap - agent.carried_wood).min(rate_res * dt);
+                            // ★ M19.4c 力量禀赋加成：高力量(>=110)装载速率+25%，低力量(<=90)惩罚-15%
+                            let rate_heavy = if agent.strength >= self.config.trait_high_threshold {
+                                rate_res * (1.0 + self.config.trait_strength_load_bonus)
+                            } else if agent.strength <= self.config.trait_low_threshold {
+                                rate_res * (1.0 - self.config.trait_strength_load_penalty)
+                            } else {
+                                rate_res
+                            };
+                            let load = (carry_cap - agent.carried_wood).min(rate_heavy * dt);
                             let extracted = poi.extract(load);
                             agent.carried_wood = (agent.carried_wood + extracted).min(carry_cap);
                             agent.cumulative_mined += extracted;
@@ -422,7 +430,15 @@ impl World3DEngine {
                     let agent_hid = agent.home_house_id;
                     if let Some(poi) = self.pois.iter_mut().find(|p| p.poi_type == PoiType::StoneQuarry && p.pos.distance_to(&agent_pos) < self.config.poi_interaction_radius) {
                         if agent_hid.is_some() && agent.carried_stone < carry_cap && poi.current_stock > 0.01 {
-                            let load = (carry_cap - agent.carried_stone).min(rate_res * dt);
+                            // ★ M19.4c 力量禀赋加成：高力量(>=110)装载速率+25%，低力量(<=90)惩罚-15%
+                            let rate_heavy = if agent.strength >= self.config.trait_high_threshold {
+                                rate_res * (1.0 + self.config.trait_strength_load_bonus)
+                            } else if agent.strength <= self.config.trait_low_threshold {
+                                rate_res * (1.0 - self.config.trait_strength_load_penalty)
+                            } else {
+                                rate_res
+                            };
+                            let load = (carry_cap - agent.carried_stone).min(rate_heavy * dt);
                             let extracted = poi.extract(load);
                             agent.carried_stone = (agent.carried_stone + extracted).min(carry_cap);
                             agent.cumulative_mined += extracted;

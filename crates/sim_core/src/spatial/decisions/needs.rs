@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use super::super::vec3::Vec3;
 use super::super::graph::NodeId;
 use super::super::agent::{Agent3D, AgentId, PrimitiveActionState};
@@ -13,7 +14,7 @@ use crate::config::*;
 /// ★ v1.29.0 新增 ⓪ 瞬间行为：优先级高于生理需求——条件满足即刻执行（只写决心 / pending），
 /// 不移动、不消耗任何资源，因此命中后**不占用本回合**，同一 tick 内继续向后遍历其余分支。
 /// 声明序首位 ⇒ `Ord` 最小 ⇒ 优先级最高（本枚举沿用「越小越优先」约定）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MaslowLevel {
     Instantaneous,      // ⓪ 瞬间行为 (最高优先级·不移动不消耗，命中后续评估下一分支)
     Physiological,      // ① 生理需求 (生存底线)
@@ -101,7 +102,7 @@ impl Need {
 }
 
 /// 资源节点池 (供给类型 → 节点表)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodePool {
     Water,
     Food,
@@ -165,6 +166,8 @@ pub struct DecisionContext {
     pub eligible_females: Vec<EligibleFemale>,
     /// 满足原受孕条件的已婚女性快照（供“养育小孩”分支核验配偶资格与在宅状态）
     pub conception_ready_wives: Vec<ReadyWife>,
+    /// 当前环境气温（供暴雪断柴危机判定使用）
+    pub temperature: f32,
 }
 
 /// 便捷读取某 agent 所属家户账本的品类余额（无家户返回 0.0）
@@ -327,4 +330,15 @@ pub fn state_need_label_with_agent(state: PrimitiveActionState, agent: &Agent3D,
         .map(|lv| lv.as_str())
         .unwrap_or(lvl);
     Some((lvl, kind))
+}
+
+/// ★ M19.4c 豪绅家户劳作免除判定（确定性伪随机散列，零 RNG 消耗）：
+/// 输入为 (agent_id, tick, decision_interval)；
+/// 每决策相位离散步进，返回真概率严格为 80%（散列余数 < 8）。
+#[inline]
+pub fn gentry_labor_exemption_check(agent_id: u32, tick: u64, decision_interval: u64) -> bool {
+    let interval = decision_interval.max(1);
+    let step = tick / interval;
+    let h = (agent_id as u64).wrapping_mul(2654435761).wrapping_add(step);
+    (h % 10) < 8
 }

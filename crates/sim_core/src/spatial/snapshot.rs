@@ -3,6 +3,10 @@ use super::vec3::Vec3;
 use super::graph::{LaneId, NodeId};
 use super::agent::AgentId;
 use super::poi::PoiId;
+use super::decisions::strategy::{ActiveTask, ExecutionStrategy, ResidenceTarget};
+use super::decisions::intent::{IntentKind, CompletionPolicy};
+use super::decisions::primitive::{ActionPrimitive, HoldKind};
+use super::decisions::branches::BranchId;
 pub use super::house::{HouseSnapshot, HouseBidSnapshot, HouseDealSnapshot, HouseAuctionHistorySnapshot};
 
 /// 四季系统 (240秒完整年轮，每季60秒)
@@ -315,6 +319,187 @@ pub struct AgentSnapshot {
     pub courtship_target_id: Option<u32>,
     /// ★ M7/诊断 透传家庭库存施密特触发器（水/粮/木/石/金，true=需补采，false=充足）
     pub family_stock_active: [bool; 5],
+    /// ★ M19.4 活动任务透视快照（意图-策略-原语三栏透视与决策可解释性）
+    #[serde(default)]
+    pub active_task: Option<ActiveTaskSnapshot>,
+}
+
+/// ★ M19.4 活动任务快照（意图-策略-原语三栏透视与决策可解释性）
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActiveTaskSnapshot {
+    pub branch: String,
+    pub branch_desc: String,
+    pub level: String,
+    pub intent_kind: String,
+    pub completion: String,
+    pub strategy_kind: String,
+    pub stage: String,
+    pub target_id: Option<u32>,
+    pub target_type: String,
+    pub primitive_kind: String,
+    pub primitive_detail: String,
+    pub itinerary: String,
+}
+
+impl From<&ActiveTask> for ActiveTaskSnapshot {
+    fn from(t: &ActiveTask) -> Self {
+        let branch = t.intent.source_branch.str_id().to_string();
+        let branch_desc = match t.intent.source_branch {
+            BranchId::B1QuenchThirst => "渴饮",
+            BranchId::B2SateHunger => "饥食",
+            BranchId::B3Rest => "休息",
+            BranchId::B4RepairHouse => "修房",
+            BranchId::B5StockWater => "备水",
+            BranchId::B6StockFood => "备粮",
+            BranchId::B7StockWood => "备木",
+            BranchId::B8BuildHouseTier0 => "立宅",
+            BranchId::B9StockStone => "备石",
+            BranchId::B10StockGold => "备金",
+            BranchId::B11BuildHouseUpgrade => "升级",
+            BranchId::B12FoundHome => "自立",
+            BranchId::B13GoldWealth => "财富",
+            BranchId::B14SeekThrone => "夺位",
+            BranchId::B15MarketTrade => "榷市",
+            BranchId::B16Courtship => "求偶",
+            BranchId::B17BidHouse => "竞拍",
+            BranchId::B18RaiseChild => "育儿",
+        }.to_string();
+        let level = t.intent.level.as_str().to_string();
+        let intent_kind = match t.intent.kind {
+            IntentKind::SatisfySurvival(res) => format!("SatisfySurvival({:?})", res),
+            IntentKind::StockHousehold(res) => format!("StockHousehold({:?})", res),
+            IntentKind::AcquireGold(purpose) => format!("AcquireGold({:?})", purpose),
+            IntentKind::EmergencySupply => "EmergencySupply".to_string(),
+            IntentKind::RestAndRecover => "RestAndRecover".to_string(),
+            IntentKind::RepairHome => "RepairHome".to_string(),
+            IntentKind::UpgradeHome { target_tier } => format!("UpgradeHome({:?})", target_tier),
+            IntentKind::FoundNewHome => "FoundNewHome".to_string(),
+            IntentKind::SeekCourtship => "SeekCourtship".to_string(),
+            IntentKind::ClaimThrone => "ClaimThrone".to_string(),
+            IntentKind::RaiseChild => "RaiseChild".to_string(),
+        };
+        let completion = match t.intent.completion {
+            CompletionPolicy::SurvivalSatisfied(res) => format!("SurvivalSatisfied({:?})", res),
+            CompletionPolicy::HouseholdStockSatisfied(res) => format!("HouseholdStockSatisfied({:?})", res),
+            CompletionPolicy::GoldTripFinished(purpose) => format!("GoldTripFinished({:?})", purpose),
+            CompletionPolicy::EmergencySupplyFinished => "EmergencySupplyFinished".to_string(),
+            CompletionPolicy::RecoveryFinished => "RecoveryFinished".to_string(),
+            CompletionPolicy::HomeRepaired => "HomeRepaired".to_string(),
+            CompletionPolicy::HomeAtTier(tier) => format!("HomeAtTier({:?})", tier),
+            CompletionPolicy::HomeFounded => "HomeFounded".to_string(),
+            CompletionPolicy::MarriageRegistered => "MarriageRegistered".to_string(),
+            CompletionPolicy::CoronationRegistered => "CoronationRegistered".to_string(),
+            CompletionPolicy::ChildcareSettled => "ChildcareSettled".to_string(),
+        };
+        let strategy_kind = match t.strategy {
+            ExecutionStrategy::WildHarvest { .. } => "WildHarvest",
+            ExecutionStrategy::MarketTrade { .. } => "MarketTrade",
+            ExecutionStrategy::ReturnToResidence { .. } => "ReturnToResidence",
+            ExecutionStrategy::Courtship { .. } => "Courtship",
+            ExecutionStrategy::ClaimThrone { .. } => "ClaimThrone",
+            ExecutionStrategy::Childcare { .. } => "Childcare",
+            ExecutionStrategy::FoundHome { .. } => "FoundHome",
+            ExecutionStrategy::UpgradeHome { .. } => "UpgradeHome",
+            ExecutionStrategy::RepairHome { .. } => "RepairHome",
+        }.to_string();
+        let stage = match t.strategy {
+            ExecutionStrategy::WildHarvest { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::MarketTrade { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::ReturnToResidence { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::Courtship { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::ClaimThrone { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::Childcare { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::FoundHome { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::UpgradeHome { stage, .. } => format!("{:?}", stage),
+            ExecutionStrategy::RepairHome { stage, .. } => format!("{:?}", stage),
+        };
+        let (target_id, target_type) = match t.strategy {
+            ExecutionStrategy::WildHarvest { poi, .. } => (poi.map(|p| p as u32), if poi.is_some() { "Poi" } else { "None" }),
+            ExecutionStrategy::MarketTrade { market, .. } => (Some(market as u32), "Poi"),
+            ExecutionStrategy::ReturnToResidence { destination, .. } => match destination {
+                ResidenceTarget::House(hid) => (Some(hid), "House"),
+                ResidenceTarget::Camp(nid) => (Some(nid as u32), "Camp"),
+            },
+            ExecutionStrategy::Courtship { female, .. } => (Some(female), "Agent"),
+            ExecutionStrategy::ClaimThrone { camp, .. } => (Some(camp), "Camp"),
+            ExecutionStrategy::Childcare { house, .. } => (Some(house), "House"),
+            ExecutionStrategy::FoundHome { route_target, .. } => (Some(route_target as u32), "Camp"),
+            ExecutionStrategy::UpgradeHome { house, .. } => (Some(house), "House"),
+            ExecutionStrategy::RepairHome { house, .. } => (Some(house), "House"),
+        };
+        let (primitive_kind, primitive_detail) = match t.primitive {
+            ActionPrimitive::Navigate { target, arrival } => (
+                "Navigate".to_string(),
+                format!("Node #{} ({:?})", target, arrival),
+            ),
+            ActionPrimitive::Hold(hold) => (
+                "Hold".to_string(),
+                match hold {
+                    HoldKind::ResourceSite(poi) => format!("ResourceSite #{}", poi),
+                    HoldKind::Residence => "Residence".to_string(),
+                    HoldKind::Repair => "Repair".to_string(),
+                    HoldKind::Upgrade => "Upgrade".to_string(),
+                    HoldKind::OffRoad => "OffRoad".to_string(),
+                },
+            ),
+            ActionPrimitive::AwaitSettlement => (
+                "AwaitSettlement".to_string(),
+                "Settlement".to_string(),
+            ),
+        };
+        ActiveTaskSnapshot {
+            branch,
+            branch_desc,
+            level,
+            intent_kind,
+            completion,
+            strategy_kind,
+            stage,
+            target_id,
+            target_type: target_type.to_string(),
+            primitive_kind,
+            primitive_detail,
+            itinerary: "--".to_string(),
+        }
+    }
+}
+
+impl ActiveTaskSnapshot {
+    /// ★ M19.4d 结合当前进行中任务与预排采收队列生成快照透视图
+    pub fn from_task_and_queue(t: &ActiveTask, queue: &[Option<BranchId>; 4]) -> Self {
+        let mut snap = Self::from(t);
+        let mut stops = Vec::new();
+        let cur = match t.intent.source_branch {
+            BranchId::B5StockWater => "💧备水",
+            BranchId::B6StockFood => "🍒备粮",
+            BranchId::B7StockWood => "🌲备木",
+            BranchId::B9StockStone => "🪨备石",
+            BranchId::B10StockGold => "🪙备金",
+            _ => "",
+        };
+        if !cur.is_empty() {
+            stops.push(cur);
+        }
+        for opt_b in queue.iter().flatten() {
+            let name = match opt_b {
+                BranchId::B5StockWater => "💧备水",
+                BranchId::B6StockFood => "🍒备粮",
+                BranchId::B7StockWood => "🌲备木",
+                BranchId::B9StockStone => "🪨备石",
+                BranchId::B10StockGold => "🪙备金",
+                _ => "",
+            };
+            if !name.is_empty() {
+                stops.push(name);
+            }
+        }
+        snap.itinerary = if stops.len() > 1 {
+            stops.join(" → ")
+        } else {
+            "--".to_string()
+        };
+        snap
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

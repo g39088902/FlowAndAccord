@@ -23,6 +23,44 @@ $env:CARGO_HOME = "$PWD\.cargo-home"
 
 > ⚠️ CI 中**禁止**使用便携链——CI 运行在 ubuntu-latest，用标准 rustup（见 [04-cicd-guide.md](./04-cicd-guide.md)）。`.toolchain/` 与 `.cargo-home/` 已被 gitignore。
 
+### 1.1.1 ★ 宿主 linker 环境（MSVC）：Git Bash 下必配 `LIB` 与 linker 优先级
+
+`wasm32-unknown-unknown` 是**纯静态目标、无需 linker**，但 proc-macro 依赖（`serde_derive` / `proc-macro2` / `quote` 等）的 **build script 必须按宿主 `x86_64-pc-windows-msvc` 编译并链接**，因此仍需 MSVC `link.exe` 与 Windows SDK 导入库。
+
+在 **Git Bash** 中编译时会踩两个连环坑（PowerShell / VS 开发人员终端不会遇到）：
+
+1. `link: extra operand '...rcgu.o'` → Git Bash 的 `/usr/bin/link`（GNU coreutils）抢在 MSVC `link.exe` 之前；
+2. `LINK : fatal error LNK1181: 无法打开输入文件“kernel32.lib”` → `LIB` 未指向 MSVC 与 Windows SDK 的 x64 库目录。
+
+完整可用的 Git Bash 编译前缀（版本号按本机实际安装调整）：
+
+```bash
+cd /c/Users/<你>/RustroverProjects/FlowAndAccord
+export MSVCBIN="/c/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.39.33519/bin/Hostx64/x64"
+export PATH="$PWD/.toolchain/cargo/bin:$PWD/.toolchain/rustc/bin:$MSVCBIN:$PATH"
+export CARGO_HOME="$PWD/.cargo-home"
+export LIB="C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.39.33519\\lib\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x64;C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x64"
+cargo build -p sim_wasm --target wasm32-unknown-unknown --release --offline
+```
+
+> `$MSVCBIN` 必须排在 `$PATH` **最前**才能压过 coreutils 的 `link`；`$LIB` 用 Windows 风格分号分隔路径。
+
+### 1.1.2 ★ 离线 vendor 依赖源（网络不可用时）
+
+`.cargo/config.toml` 已配置 `source.crates-io → vendored-sources`（directory = `.vendor`），可在**零网络**下编译：
+
+```toml
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = ".vendor"
+```
+
+- `.vendor/` 由 `.cargo-home/registry/src` 的解压目录 + 逐个 `.crate` 的 sha256 写入 `.cargo-checksum.json` 生成（与 `Cargo.lock` 校验一致）。
+- **新增/升级依赖时必须**：临时注释掉这段 source replacement → 联网 `cargo fetch` → 重新生成 `.vendor` → 再放开注释。否则新依赖会因 vendor 缺失而报 `no matching package`。
+- 只要 `.vendor/` 完整，加 `--offline` 即可完全绕开 index.crates.io（沙箱/代理阻断网络时唯一可行路径）。
+
 ### 1.2 macOS / Linux（标准 rustup）
 
 ```bash
@@ -114,6 +152,9 @@ node frontend/server.js
 | :--- | :--- |
 | `cargo: command not found` | 便携工具链环境变量未注入，执行 §1.1 的两条 `$env:` 命令 |
 | 编译报依赖下载失败 | `CARGO_HOME` 未指向 `.cargo-home`，或离线缓存缺失；确认 `$env:CARGO_HOME = "$PWD\.cargo-home"` |
+| `failed to get petgraph / unable to update registry crates-io` | 网络被代理/沙箱阻断。改走离线 vendor 源（§1.1.2）+ `--offline` |
+| `link: extra operand '...rcgu.o'` | Git Bash 的 coreutils `link` 抢先；把 MSVC `bin/Hostx64/x64` 置于 `PATH` 最前（§1.1.1） |
+| `LNK1181: 无法打开输入文件“kernel32.lib”` | `LIB` 未含 MSVC / Windows SDK 的 x64 库目录（§1.1.1） |
 | 浏览器加载旧逻辑 | WASM 双副本未同步（§2），或浏览器缓存未清（`Ctrl+F5`） |
 | `CompileError: Invalid WebAssembly` | MIME 不对。本地 server.js 已内置正确 MIME；若用其他服务器需确保 `.wasm → application/wasm` |
 | `test-wasm.js` 确定性失败 | 新增随机消耗破坏了 WorldRng 确定性顺序（AGENTS.md §4.3）；检查新增的 `rng` 调用是否按 agent 顺序消费 |

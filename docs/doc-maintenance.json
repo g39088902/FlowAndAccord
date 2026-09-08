@@ -28,5 +28,6 @@
     {"id":"ui-dev-guide","path":"docs/current/23-ui-dev-guide.md","owner":"frontend","lastReviewed":"2026-09-07","sources":["frontend/js/**/*.js","frontend/style.css","frontend/index.html","docs/current/23-ui-dev-guide.md"]},
     {"id":"three-core-systems-fsm","path":"docs/current/24-three-core-systems-fsm.md","owner":"sim-core/decisions","lastReviewed":"2026-09-07","sources":["crates/sim_core/src/spatial/decisions/**/*.rs","crates/sim_core/src/spatial/housing_system/**/*.rs","crates/sim_core/src/spatial/ledger/**/*.rs","docs/current/24-three-core-systems-fsm.md"]}
     ,{"id":"competitor-analysis","path":"docs/current/25-competitor-analysis.md","owner":"product/research","lastReviewed":"2026-09-07","sources":["docs/current/25-competitor-analysis.md"]}
+    ,{"id":"intent-observation","path":"docs/current/26-intent-observation.md","owner":"sim-core/decisions","lastReviewed":"2026-09-08","sources":["crates/sim_core/src/spatial/decisions/**/*.rs","docs/current/26-intent-observation.md"]}
   ]
 }

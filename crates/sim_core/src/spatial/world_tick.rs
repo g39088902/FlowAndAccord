@@ -201,6 +201,7 @@ impl World3DEngine {
             let Some(mi) = self.agents.iter().position(|a| a.id == male_id) else { continue };
             let Some(wi) = self.agents.iter().position(|a| a.id == wife_id) else {
                 self.agents[mi].raise_child_pending = false;
+                crate::spatial::decisions::transition::cancel_task(&mut self.agents[mi]);
                 continue;
             };
             let eligible = {
@@ -223,10 +224,12 @@ impl World3DEngine {
                 }).unwrap_or(false);
             if !eligible {
                 self.agents[mi].raise_child_pending = false;
+                crate::spatial::decisions::transition::cancel_task(&mut self.agents[mi]);
                 continue;
             }
             if !at_home { continue; }
             self.agents[mi].raise_child_pending = false;
+            crate::spatial::decisions::transition::finish_task(&mut self.agents[mi]);
             self.agents[wi].is_pregnant = true;
             self.agents[wi].pregnancy_father_id = Some(male_id);
             self.agents[wi].pregnancy_child_id = Some(next_id);

@@ -35,13 +35,14 @@
 
 1. **时间节拍与错峰调度**：
    - 全局仿真步长 `dt = 1/60` 游戏小时（1 tick）。
-   - 个体决策相位严格固定为 `(tick_counter + agent.id) % 60 == 0`，实现全员相位均匀平铺（均摊 A* 寻路算力，杜绝群体同步共振抢点）。
+   - 个体决策相位严格固定为 `(tick_counter + agent.id) % 120 == 0`（v1.46.4 起默认 120 tick = 2 游戏小时），实现全员相位均匀平铺（均摊 A* 寻路算力，杜绝群体同步共振抢点）。
 2. **⓪ 瞬间行为层 (Instantaneous Level)**：
    - 处于决策相位的 Agent，在进入常规状态机之前**首先遍历瞬间分支**（`B16Courtship` 近距成婚、`B17BidHouse` 麦穗竞拍出价、`B18RaiseChild` 宅门受孕）。
    - 瞬发分支仅写决心标志位（`*_pending`），不移动、不改物理运动状态、不耗 RNG，命中后继续推进后续常规判定。
-3. **①~⑤ 常规需求逐级评估**：
+3. **①~⑤ 常规需求逐级评估与 M19 任务控制器**：
    - 包含 18 条具名分支（`b1`~`b18`），按注入顺序检索，首个命中即派发调度。
-   - 移动态一律经由 `dispatch(agent, start, target, state)` 规划 A* 路径，静止态一律调用 `agent.enter_stationary_state(state)` 清除运动残留。
+   - M19 架构下，`agent.active_task: Option<ActiveTask>` 为进行中持续任务单一真相源，`agent.state` 为严格一致的兼容投影。
+   - 移动态一律经由 `dispatch(agent, start, target, state)` 规划 A* 路径并通过 `transition::install_task` 安装任务；静止态与退出一律调用 `transition::finish_task` / `agent.enter_stationary_state(state)` 清除运动残留。
 
 ### 1.2 状态机图元与核心转移 (Mermaid FSM)
 

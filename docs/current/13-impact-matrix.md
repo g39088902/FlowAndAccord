@@ -162,7 +162,7 @@ rustworld.js::_applySnapshot()
 
 ```
 1. math.js                    3D 向量与投影变换 (零依赖)
-2. config.js                  SIM_CONFIG 全局数值配置 (205 字段，含拆分配置合计，主镜像)
+2. config.js                  SIM_CONFIG 全局数值配置 (211 字段，含拆分配置合计，主镜像)
 3. config.decision-order.js   决策分支顺序 (合并进 SIM_CONFIG，§4.14 例外)
 4. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段)
 5. decision-viz-data.js       决策分支元数据 (条件文案/层级/图标)

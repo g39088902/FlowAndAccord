@@ -38,7 +38,7 @@ impl<'a> Decisioner<'a> {
             return None;
         }
 
-        // 5. 守卫五：存在急迫需求（OR 逻辑：水、粮或木短缺且对应野外点对该 Agent 全关）
+        // 5. 守卫五：急迫需求或禀赋/阶层分化驱动
         let dearth_th = cfg.market_emergency_family_stock_threshold;
         let hh_water = hh.group.ledger.balance(ResourceKind::Water);
         let hh_food = hh.group.ledger.balance(ResourceKind::Food);
@@ -47,8 +47,51 @@ impl<'a> Decisioner<'a> {
         let water_emergency = (hh_water < dearth_th || family_stock_on(a, ResourceKind::Water)) && !self.has_available_node(a, NodePool::Water);
         let food_emergency = (hh_food < dearth_th || family_stock_on(a, ResourceKind::Food)) && !self.has_available_node(a, NodePool::Food);
         let wood_emergency = (hh_wood < dearth_th || family_stock_on(a, ResourceKind::Wood)) && !self.has_available_node(a, NodePool::Wood);
+        let is_emergency = water_emergency || food_emergency || wood_emergency;
 
-        if !water_emergency && !food_emergency && !wood_emergency {
+        let has_deficit = family_stock_on(a, ResourceKind::Water)
+            || family_stock_on(a, ResourceKind::Food)
+            || family_stock_on(a, ResourceKind::Wood);
+
+        // ★ M19.4c 豪绅家户阶层分化：家资充裕 (gold >= market_wealthy_family_gold) 时，80% 几率赴市现货采买
+        let is_gentry_trade = hh_gold >= cfg.market_wealthy_family_gold
+            && has_deficit
+            && gentry_labor_exemption_check(a.id, self.tick, cfg.agent_decision_interval_ticks);
+
+        // ★ M19.4c 智力驱动理性商贸：高智力族人权衡路途耗时与市场现货，野外过远或市场更近时直接赴市
+        let is_intelligent_trade = if a.intelligence >= cfg.trait_high_threshold && has_deficit && hh_gold >= cfg.market_poor_family_gold {
+            if let Some(mn) = self.nearest_market_node(a) {
+                let market_dist = self.node_pos(mn).distance_to(&a.world_pos);
+                [
+                    (ResourceKind::Water, NodePool::Water),
+                    (ResourceKind::Food, NodePool::Food),
+                    (ResourceKind::Wood, NodePool::Wood),
+                ].iter()
+                    .filter(|(rk, _)| family_stock_on(a, *rk))
+                    .any(|(_, pool)| {
+                        if let Some(wn) = self.nearest_of(a, *pool, a.world_pos) {
+                            let wild_dist = self.node_pos(wn).distance_to(&a.world_pos);
+                            market_dist < wild_dist || wild_dist > 70.0
+                        } else {
+                            true
+                        }
+                    })
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // 平民家户 (gold < market_poor_family_gold) 严格自力更生，非绝境不进市场
+        let is_poor = hh_gold < cfg.market_poor_family_gold;
+        let can_trade = if is_poor {
+            is_emergency
+        } else {
+            is_emergency || is_gentry_trade || is_intelligent_trade
+        };
+
+        if !can_trade {
             return None;
         }
 
@@ -57,8 +100,14 @@ impl<'a> Decisioner<'a> {
             return None;
         }
 
+        let level = if is_emergency {
+            MaslowLevel::Physiological
+        } else {
+            MaslowLevel::Safety
+        };
+
         Some(Need {
-            level: MaslowLevel::Physiological,
+            level,
             kind: NeedKind::MarketTrade,
             target_state: PrimitiveActionState::SeekingMarket,
         })

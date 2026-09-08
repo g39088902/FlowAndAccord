@@ -6,7 +6,6 @@ use sim_core::spatial::decisions::strategy::*;
 use sim_core::spatial::decisions::primitive::*;
 use sim_core::spatial::decisions::observation::*;
 use sim_core::spatial::house::HouseAuctionState;
-use sim_core::spatial::ledger::journal::ResourceKind;
 use std::mem::{size_of,align_of};
 use std::sync::atomic::{AtomicUsize,Ordering};
 struct Counting;
@@ -23,7 +22,7 @@ unsafe impl std::alloc::GlobalAlloc for Counting {
 #[no_mangle]pub extern "C" fn m19_probe()->u32 {
  use PrimitiveActionState as S;
  let states=[S::RestingAtCamp,S::SeekingWater,S::SeekingFood,S::DrinkingAtWater,S::ForagingFood,S::SeekingWood,S::GatheringWood,S::SeekingStone,S::MiningStone,S::SeekingGold,S::MiningGold,S::ReturningToCamp,S::ConstructingHouse,S::RepairingHouse,S::OffRoadDetour,S::SeekingThrone,S::SeekingMarket,S::BuyingAtMarket,S::SeekingCourtship,S::RaiseChild,S::Dead];
- let cfg:SimConfig=serde_json::from_str(include_str!("/tmp/flowaccord-m19/config.json")).unwrap();let mut a=Agent3D::new_with_config(1,1,1.,false,50.,Gender::Male,&cfg);let mut checks=0;
+ let cfg:SimConfig=serde_json::from_str(include_str!("config.json")).unwrap();let mut a=Agent3D::new_with_config(1,1,1.,false,50.,Gender::Male,&cfg);let mut checks=0;
  a.pending_bid_house_ids=(1..101).collect();a.courtship_pending=Some(22);a.coronation_pending=Some(4);a.raise_child_pending=true;a.pending_house_pos=Some(Vec3::new(5.,6.,7.));a.route=vec![1,2,3];a.route_index=3;a.current_need=Some("Instantaneous·BidHouse".into());
  for state in states {for lane in [None,Some(2)]{for lifecycle in 0..3 {
  a.state=state;a.current_lane_id=lane;a.is_alive=lifecycle!=2;a.is_fetus=lifecycle==1;
@@ -70,3 +69,4 @@ unsafe impl std::alloc::GlobalAlloc for Counting {
  checks+5
 }
 fn main(){let n=m19_probe();println!("{}",serde_json::json!({"checks":n,"layout":(0..14).map(|i| m19_layout(i)).collect::<Vec<_>>()}));}
+

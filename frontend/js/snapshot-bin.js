@@ -262,6 +262,7 @@
           coronation_pending: ar.optU32(),
           courtship_target_id: ar.optU32(),
           family_stock_active: [ar.u8() === 1, ar.u8() === 1, ar.u8() === 1, ar.u8() === 1, ar.u8() === 1],
+          active_task: readActiveTask(ar),
         };
         snap.agents.push(a);
       }
@@ -574,6 +575,24 @@
   // ────────────────────────────────────────────────
   // 子结构解码助手（返回与 JSON 快照同构的形状）
   // ────────────────────────────────────────────────
+  function readActiveTask(r) {
+    if (r.u8() !== 1) return null;
+    return {
+      branch: strOf(r.u32()),
+      branch_desc: strOf(r.u32()),
+      level: strOf(r.u32()),
+      intent_kind: strOf(r.u32()),
+      completion: strOf(r.u32()),
+      strategy_kind: strOf(r.u32()),
+      stage: strOf(r.u32()),
+      target_id: r.optU32(),
+      target_type: strOf(r.u32()),
+      primitive_kind: strOf(r.u32()),
+      primitive_detail: strOf(r.u32()),
+      itinerary: strOf(r.u32()),
+    };
+  }
+
   function readBalances(r) {
     var out = [];
     for (var i = 0; i < 5; i++) {

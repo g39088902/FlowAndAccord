@@ -71,6 +71,10 @@
 | `traitMutationDelta` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传突变偏移量 |
 | `traitInheritClampMin` | f32 | 10 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取下限 |
 | `traitInheritClampMax` | f32 | 190 | agent.rs / birth.rs (禀赋遗传演化) | 遗传继承单项禀赋夹取上限 |
+| `traitHighThreshold` | f32 | 110 | agent.rs / birth.rs (禀赋遗传演化) | 先天卓越禀赋门槛 (力量/智力高于此值触发卓越特化) |
+| `traitLowThreshold` | f32 | 90 | agent.rs / birth.rs (禀赋遗传演化) | 先天劣势禀赋门槛 (力量/智力低于此值触发避重就轻特化) |
+| `traitStrengthLoadBonus` | f32 | 0.25 | agent.rs / birth.rs (禀赋遗传演化) | 高力量重体力装载速率加成 (+25%) |
+| `traitStrengthLoadPenalty` | f32 | 0.15 | agent.rs / birth.rs (禀赋遗传演化) | 低力量重体力装载速率惩罚 (-15%) |
 
 ## 4. 生态地标与 POI 采收交互
 
@@ -263,6 +267,8 @@
 | `marketMinFamilyGold` | f32 | 0.5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主准入起步黄金底线 |
 | `marketMinDispatchStamina` | f32 | 15 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 户主出发前往市场的最低体力门槛 |
 | `marketSettlementStep` | f32 | 5 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 外部市场单次交易结算步长 (单位) |
+| `marketWealthyFamilyGold` | f32 | 200 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 豪绅家户黄金门槛 (≥此值户主面临物资短缺时80%几率赴榷场现货采购) |
+| `marketPoorFamilyGold` | f32 | 50 | poi.rs / ecology.rs / market.rs (外部市场与动态定价) | 平民家户黄金门槛 (<此值严格野外自力更生，非绝境不赴榷场) |
 
 ## 14. 二手房屋市场、营地中介拍卖与麦穗竞价
 

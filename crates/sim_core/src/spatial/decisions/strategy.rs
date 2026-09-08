@@ -1,4 +1,5 @@
-//! M19.1 策略与阶段的领域词汇；尚未挂载到 Agent 或驱动旧状态机。
+//! M19 策略与阶段的领域词汇；ActiveTask 挂载于 Agent3D 作为持续任务唯一真相源。
+use serde::{Deserialize, Serialize};
 use super::intent::AgentIntent;
 use super::primitive::ActionPrimitive;
 use super::NodePool;
@@ -8,13 +9,13 @@ use crate::spatial::house::HouseTier;
 use crate::spatial::poi::PoiId;
 use crate::spatial::vec3::Vec3;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ActiveTask {
     pub intent: AgentIntent,
     pub strategy: ExecutionStrategy,
     pub primitive: ActionPrimitive,
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ExecutionStrategy {
     WildHarvest {
         pool: NodePool,
@@ -56,36 +57,36 @@ pub enum ExecutionStrategy {
         stage: HomeStage,
     },
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceStage {
     Outbound,
     OnSite,
     Returning,
     Unloading,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReturnStage {
     Travelling,
     Recovering,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommitStage {
     Travelling,
     Ready,
     AwaitingSettlement,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HomeStage {
     Returning,
     Working,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResidenceTarget {
     House(u32),
     Camp(NodeId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StrategyFailureReason {
     TargetPoiClosed,
     NoAvailablePoi,
@@ -97,7 +98,7 @@ pub enum StrategyFailureReason {
     HouseholdInvalid,
     SubmissionRejected,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StrategyFeasibility {
     Applicable,
     NotApplicable,

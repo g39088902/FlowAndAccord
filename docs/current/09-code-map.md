@@ -10,7 +10,7 @@ FlowAndAccord/
 ├── crates/
 │   ├── sim_core/                           # 纯 Rust 确定性模拟内核
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (205 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (211 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -35,13 +35,19 @@ FlowAndAccord/
 │   │           ├── world_snapshot.rs       # generate_snapshot 快照数据组装
 │   │           ├── world_tick.rs           # tick 管线调度（§4.3 固定顺序）+ 胎儿对账 + 金币继承
 │   │           ├── snapshot.rs             # 快照结构体定义 (Agent/House/POI/Household/Marriage/Clan/Region/Ledger)
-│   │           ├── decisions/              # 🧠 马斯洛决策子系统 (9 文件)
+│   │           ├── decisions/              # 🧠 马斯洛决策子系统 (15 文件, M19 意图-策略-原语解耦)
 │   │           │   ├── mod.rs              # 决策子模块入口与重新导出
-│   │           │   ├── branches.rs         # ★ 18 条分支注册表 (BranchId ↔ b1~b18，含 b14 夺位、b15 榷场商贸、b17 竞拍、b18 养育，自包含条件函数，Rust 侧无顺序)
+│   │           │   ├── intent.rs           # M19 意图与完成条件类型 (AgentIntent / IntentKind / CompletionPolicy)
+│   │           │   ├── strategy.rs         # M19 策略与阶段类型 (ActiveTask / ExecutionStrategy / ResourceStage / CommitStage)
+│   │           │   ├── primitive.rs        # M19 动作原语描述类型 (ActionPrimitive / ArrivalKind / HoldKind)
+│   │           │   ├── projection.rs       # M19.2 兼容视图纯投影 (compatible_legacy_state)
+│   │           │   ├── transition.rs       # M19.2/M19.3 统一生命周期转换器 (install_task / advance_stage / on_navigation_arrived / finish_task)
+│   │           │   ├── observation.rs      # 不可变执行观察与旧枚举无损视图 (observe_execution)
+│   │           │   ├── branches.rs         # ★ 18 条分支注册表 (BranchId ↔ b1~b18，自包含条件函数，Rust 侧无顺序)
 │   │           │   ├── needs.rs            # NeedKind 需求定义、升级材料成本 (upgrade_material_cost)、家户缺口计算
-│   │           │   ├── evaluate.rs         # Decisioner 结构体 + decide/evaluate_needs (按配置顺序迭代分支)
-│   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性
-│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 (M7 起读 family_stock_active；★v1.27.0 水/粮断流转榷场)
+│   │           │   ├── evaluate.rs         # Decisioner 结构体 + L1 持续仲裁 / 瞬发通道 + L2 策略派发 / 节拍推进
+│   │           │   ├── routing.rs          # 导航/寻路/原地掉头/返家/POI 触发器可用性 / 归家任务同步
+│   │           │   ├── harvest.rs          # 现场采收判定 + 行囊满额查询 + L1 连续采收候选仲裁 + 单趟多品类连续采收
 │   │           │   ├── seeking.rs          # 途中熔断与平滑重路由 (★v1.27.0 try_route_to_market 断流直达榷场)
 │   │           │   ├── market.rs           # 外部商贸决策子模块 (evaluate_market_trade / 途中可用性 / 现场交易完成返家)
 │   │           │   └── scheduler.rs        # tick_decisions + execute_pending_coronations(★M4登基) + build_decision_context

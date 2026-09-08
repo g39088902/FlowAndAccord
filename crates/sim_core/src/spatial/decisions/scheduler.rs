@@ -126,7 +126,7 @@ impl World3DEngine {
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .and_then(|p| self.find_nearest_node(p.pos));
         if let Some(agent) = self.agent_by_id_mut(agent_id) {
-            agent.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
+            super::transition::finish_task(agent);
             agent.current_need = Some("SelfActualization·King".to_string());
             agent.coronation_pending = None;
             agent.expedition_target_camp = None;
@@ -180,7 +180,7 @@ impl World3DEngine {
                 if let Some(male) = self.agent_by_id_mut(male_id) {
                     male.courtship_target_id = None;
                     if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
-                        male.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
+                        super::transition::finish_task(male);
                     }
                 }
                 continue;
@@ -191,7 +191,7 @@ impl World3DEngine {
                 if let Some(male) = self.agent_by_id_mut(male_id) {
                     male.courtship_target_id = None;
                     if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
-                        male.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
+                        super::transition::finish_task(male);
                     }
                 }
                 continue;
@@ -211,7 +211,7 @@ impl World3DEngine {
                 male.spouse_id = Some(female_id);
                 male.courtship_target_id = None;
                 if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
-                    male.enter_stationary_state(crate::spatial::agent::PrimitiveActionState::RestingAtCamp);
+                    super::transition::finish_task(male);
                 }
             }
 
@@ -325,6 +325,7 @@ impl World3DEngine {
             poi_positions,
             eligible_females,
             conception_ready_wives,
+            temperature: self.temperature,
         }
     }
 }

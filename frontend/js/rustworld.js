@@ -46,6 +46,8 @@
         this.currentSeason = 'Spring';
         this.temperature = 20.0;
         this.tickCount = 0;
+        this.tickRate = 0;
+        this._lastSnapshotRealTime = performance.now();
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，随快照下发；读档后自动回填存档值）
         // 榷场粮食再生复用 berry 槽位（内核无独立粮食倍率），见 world_tick.rs
         // ★ 创世配置：config.poi-rates.js 已在本脚本前读取 localStorage。
@@ -72,7 +74,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.46.8';
+        this._appVersion = '1.46.10';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -86,6 +88,9 @@
 
       set isPaused(val) {
         this._isPaused = !!val;
+        if (this._isPaused) {
+          this.tickRate = 0;
+        }
         if (this._worker) {
           this._worker.postMessage({ type: 'PAUSE', isPaused: this._isPaused });
         }
@@ -138,7 +143,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.46.8';
+            this._appVersion = msg.appVersion || '1.46.10';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -160,9 +165,13 @@
             break;
           }
           case 'SNAPSHOT': {
+            this._lastSnapshotRealTime = performance.now();
             this._wasmBytes = msg.wasmBytes || this._wasmBytes;
             if (this.debugMode && typeof msg.tickMs === 'number') {
               this.tickMs += (msg.tickMs - this.tickMs) * 0.15;
+            }
+            if (typeof msg.tickRate === 'number') {
+              this.tickRate = msg.tickRate;
             }
             const t0 = performance.now();
             if (msg.snapshot) {
@@ -332,8 +341,10 @@
       // ============ 🐞 调试统计 ============
       getDebugStats() {
         const mem = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
+        const isStalled = !this._isPaused && this._lastSnapshotRealTime && (performance.now() - this._lastSnapshotRealTime > 1500);
         return {
           tick: this.tickCount,
+          tickRate: (this._isPaused || isStalled) ? 0 : (this.tickRate || 0),
           tickMs: this.tickMs,
           snapMs: this.snapMs,
           wasmBytes: this._wasmBytes,
@@ -381,7 +392,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.46.8';
+        return this._appVersion || '1.46.10';
       }
 
       /**
@@ -798,6 +809,22 @@
             expeditionTargetCamp: a.expedition_target_camp ?? null,
             coronationPending: a.coronation_pending ?? null,
             courtshipTargetId: a.courtship_target_id ?? null,
+            // ★ M19.4 活动任务透视快照
+            activeTask: a.active_task ? {
+              branch: a.active_task.branch,
+              branchDesc: a.active_task.branch_desc,
+              level: a.active_task.level,
+              intentKind: a.active_task.intent_kind,
+              completion: a.active_task.completion,
+              strategyKind: a.active_task.strategy_kind,
+              stage: a.active_task.stage,
+              targetId: a.active_task.target_id,
+              targetType: a.active_task.target_type,
+              primitiveKind: a.active_task.primitive_kind,
+              primitiveDetail: a.active_task.primitive_detail,
+              itinerary: a.active_task.itinerary,
+            } : null,
+            active_task: a.active_task || null,
             trail
           };
         });

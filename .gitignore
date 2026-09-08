@@ -8,4 +8,5 @@
 .vendor/
 target/
 .codebuddy
+.workbuddy/
 .playwright-cli/

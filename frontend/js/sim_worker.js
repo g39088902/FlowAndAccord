@@ -20,6 +20,11 @@ let tickMs = 0;
 let currentTick = 0;
 let rewindInProgress = false;
 
+// ⚡ 现实世界实际推进 Tick 速率统计（500ms 滑动窗口，平滑统计，消除主线程离散采样抖动）
+let tpsTicks = 0;
+let tpsLastTime = performance.now();
+let currentTps = 0;
+
 // 时光倒流历史检查点
 let historyCheckpoints = [];
 let lastCheckpointTick = -1;
@@ -54,7 +59,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.46.8';
+  return '1.46.10';
 }
 
 function applyConfigInternal(configObj) {
@@ -314,16 +319,26 @@ function simulationStep() {
   const t1 = performance.now();
   tickMs = t1 - t0;
 
+  tpsTicks += steps;
+  const now = performance.now();
+  const tpsElapsed = now - tpsLastTime;
+  if (tpsElapsed >= 500) {
+    currentTps = (tpsTicks * 1000) / tpsElapsed;
+    tpsTicks = 0;
+    tpsLastTime = now;
+  } else if (currentTps === 0 && tpsElapsed >= 100 && tpsTicks > 0) {
+    currentTps = (tpsTicks * 1000) / tpsElapsed;
+  }
+
   // 快照下发节流（M1）：默认 30Hz 与前端渲染帧率对齐；★ M5-0.4 起按人口自适应降频
   // （间隔由 applyThrottleTier 依据 FABS 帧内 AGENT 记录数设定）。
   // 窗口未到前专职推进 world_tick_steps，跳过编码与通信开销。
   // forceTerrain 立即下发（绕过窗口），保证地形网格必需场景不被延误。
-  const now = performance.now();
   const throttlePass = forceTerrain || (now - lastSnapshotTime >= snapshotIntervalMs);
   if (throttlePass && (ackReceived || forceTerrain)) {
     ackReceived = false;
     lastSnapshotTime = now;
-    pullAndPost('SNAPSHOT', { tickMs }, forceTerrain);
+    pullAndPost('SNAPSHOT', { tickMs, tickRate: isPaused ? 0 : currentTps }, forceTerrain);
     forceTerrain = false;
   }
 }
@@ -416,6 +431,11 @@ self.onmessage = async function(e) {
 
     case 'PAUSE': {
       isPaused = !!msg.isPaused;
+      if (isPaused) {
+        currentTps = 0;
+        tpsTicks = 0;
+      }
+      tpsLastTime = performance.now();
       break;
     }
 
@@ -475,6 +495,9 @@ self.onmessage = async function(e) {
         historyCommands = [];
         lastCheckpointTick = -1;
         lastCheckpointRealTime = 0;
+        currentTps = 0;
+        tpsTicks = 0;
+        tpsLastTime = performance.now();
         const res2 = pullSnapshot(true);
         if (res2 && res2.bin) {
           recordHistoryCheckpoint(currentTick);

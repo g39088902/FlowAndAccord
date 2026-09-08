@@ -8,9 +8,19 @@
 
 部落民的层次化动机决策引擎，基于马斯洛需求层次驱动行为状态机。低层级需求绝对优先阻断高层任务，决策执行保持确定性（立宅选址按固定顺序消费共享 RNG），决策节拍错峰均摊以保证帧率均匀。
 
-## 只读意图与执行观察
+## 意图-策略-原语三层架构与生命周期收口 (M19)
 
-现有状态机仍是执行真相源；M19.1 的领域类型和按需观察接口见 [26-intent-observation.md](./26-intent-observation.md)。观察不会重跑决策、推测来源分支或覆盖 state，不增加 Agent/存档字段。
+M19 架构实现了意图仲裁 (L1)、策略规划 (L2) 与原语执行 (L3) 的分层解耦：
+- `agent.active_task: Option<ActiveTask>` 作为进行中持续任务的单一真相源，由 `transition.rs` 统一管理安装、推进与退出；
+- `agent.state` 降级为向后兼容的只读投影视图，与 `ActiveTask` 保持强一致；
+- L1 持续任务仲裁（`arbitrate_sustained_task`）、瞬发通道（`arbitrate_instant_needs`）与连续采收候选仲裁（`arbitrate_continuous_harvest_candidate`）职责清晰解耦；
+- L2 策略派发（`dispatch_task`）与节拍策略推进（`step_in_progress_task`）收口执行链路；
+- 存档结构升级为 `SAVE_FORMAT_VERSION = 5`，完整持久化 `ActiveTask`，读档零重新掷点、零重新寻路。
+- ★ **M19.4a 表现层透视**：`AgentSnapshot` 扩充 `active_task: Option<ActiveTaskSnapshot>`（四处同步：snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js），前端 Inspector 呈现「🧠 决策行动中枢」三栏看板（🎯 意图 / 🧭 策略 / ⚡ 原语）与瞬发待结微光 Pill（`coronation_pending` / `courtship_pending` / `raise_child_pending` / `pending_bids` / `pending_house_pos`）。
+- ★ **M19.4b 分级任务抢占**（`preemption.rs`）：按「当前任务性质 × 抢占意图」矩阵裁决中断——娱乐淘金可被生理/安全/修缮/登基抢占，建材采收可被临界饥渴、冬季断柴与危房抢占，远征仅被濒死抢占，施工仅被求生与加冕抢占（进度冻结不回滚）；抢占一律沿原车道连续掉头平滑改道，行囊保全、严禁瞬移。
+- ★ **M19.4c 禀赋与家资个性化**：力量调节重体力采收装载速率与轻体力偏好；智力权衡「路途耗时 vs 榷场现货牌价」并偏好低磨损通衢；家户金币 ≥ `market_wealthy_family_gold` 的户主 80% 几率赴市现货采买、免于亲自挖矿伐木，平民家户则亲力亲为。
+- ★ **M19.4d 多品类预排采收行程**：`Agent3D::harvest_queue: [Option<BranchId>; 4]` 定长预排队列 + `plan_harvest_itinerary` 最近邻贪心（TSP 启发式）链路优化；出发即排最多 4 站「顺路多品类」行程，现场采满一站后消费队列转下一站，候选项失效自动跳过并回退 `branch_order` 兜底；`ActiveTaskSnapshot::itinerary`（如 `💧备水 → 🌲备木 → 🍒备粮`）透传至 Inspector。
+- 领域词汇、只读观察接口与 FSM 转换契约详见 [26-intent-observation.md](./26-intent-observation.md) 与 [24-three-core-systems-fsm.md](./24-three-core-systems-fsm.md)。
 
 ## 核心机制
 

@@ -3,6 +3,11 @@ use super::super::poi::PoiType;
 use super::super::ledger::journal::ResourceKind;
 use super::needs::*;
 use super::evaluate::Decisioner;
+use super::strategy::{ActiveTask, ExecutionStrategy, ResourceStage, CommitStage};
+use super::primitive::{ActionPrimitive, ArrivalKind};
+use super::intent::{AgentIntent, IntentKind, CompletionPolicy};
+use super::branches::BranchId;
+use super::transition;
 
 /// 途中转向与可用性检查（§4.2）：目标 POI 被 Agent 私有施密特触发器关闭时，
 /// 原地掉头平滑重路由至就近同类可用 POI；仅当自身无可用品或体力告警时才折返回家。
@@ -19,6 +24,25 @@ impl<'a> Decisioner<'a> {
             || { let curr = self.start_node(agent); self.dispatch(agent, curr, target, PrimitiveActionState::SeekingMarket) }
         {
             agent.current_need = Some("Physiological·MarketTrade".to_string());
+            let market_poi = self.ctx.market_nodes.iter().find(|rn| rn.node == target).map(|rn| rn.poi_id).unwrap_or(0);
+            let intent = AgentIntent {
+                source_branch: BranchId::B15MarketTrade,
+                level: MaslowLevel::Physiological,
+                kind: IntentKind::EmergencySupply,
+                completion: CompletionPolicy::EmergencySupplyFinished,
+            };
+            let task = ActiveTask {
+                intent,
+                strategy: ExecutionStrategy::MarketTrade {
+                    market: market_poi,
+                    stage: ResourceStage::Outbound,
+                },
+                primitive: ActionPrimitive::Navigate {
+                    target,
+                    arrival: ArrivalKind::ResourceSite,
+                },
+            };
+            transition::install_task(agent, task);
             true
         } else {
             false
@@ -55,11 +79,20 @@ impl<'a> Decisioner<'a> {
                         PoiType::GoldMine => PrimitiveActionState::SeekingGold,
                         _ => PrimitiveActionState::ReturningToCamp,
                     };
-                    if self.turn_around_and_route_to(agent, new_target, state) {
-                        return;
-                    }
-                    let curr_node = self.start_node(agent);
-                    if self.dispatch(agent, curr_node, new_target, state) {
+                    let redirected = if self.turn_around_and_route_to(agent, new_target, state) {
+                        true
+                    } else {
+                        let curr_node = self.start_node(agent);
+                        self.dispatch(agent, curr_node, new_target, state)
+                    };
+                    if redirected {
+                        if let Some(task) = agent.active_task.as_mut() {
+                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
+                                *poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == new_target).map(|rn| rn.poi_id);
+                                *stage = ResourceStage::Outbound;
+                            }
+                            task.primitive = ActionPrimitive::Navigate { target: new_target, arrival: ArrivalKind::ResourceSite };
+                        }
                         return;
                     }
                 }
@@ -97,11 +130,20 @@ impl<'a> Decisioner<'a> {
                         PoiType::BerryBush => PrimitiveActionState::SeekingFood,
                         _ => PrimitiveActionState::ReturningToCamp,
                     };
-                    if self.turn_around_and_route_to(agent, new_target, state) {
-                        return;
-                    }
-                    let curr_node = self.start_node(agent);
-                    if self.dispatch(agent, curr_node, new_target, state) {
+                    let redirected = if self.turn_around_and_route_to(agent, new_target, state) {
+                        true
+                    } else {
+                        let curr_node = self.start_node(agent);
+                        self.dispatch(agent, curr_node, new_target, state)
+                    };
+                    if redirected {
+                        if let Some(task) = agent.active_task.as_mut() {
+                            if let ExecutionStrategy::WildHarvest { poi, stage, .. } = &mut task.strategy {
+                                *poi = pool.nodes(self.ctx).iter().find(|rn| rn.node == new_target).map(|rn| rn.poi_id);
+                                *stage = ResourceStage::Outbound;
+                            }
+                            task.primitive = ActionPrimitive::Navigate { target: new_target, arrival: ArrivalKind::ResourceSite };
+                        }
                         return;
                     }
                 }
@@ -137,18 +179,27 @@ impl<'a> Decisioner<'a> {
             if let Some(camp_id) = self.eligible_leaderless_camp(agent, home_camp_id().is_some(), home_camp_id()) {
                 agent.expedition_target_camp = Some(camp_id);
                 if let Some(node) = self.camp_node_of(camp_id) {
-                    if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
-                        return;
-                    }
-                    let curr = self.start_node(agent);
-                    if self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone) {
+                    let redirected = if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                        true
+                    } else {
+                        let curr = self.start_node(agent);
+                        self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone)
+                    };
+                    if redirected {
+                        if let Some(task) = agent.active_task.as_mut() {
+                            if let ExecutionStrategy::ClaimThrone { camp, stage } = &mut task.strategy {
+                                *camp = camp_id;
+                                *stage = CommitStage::Travelling;
+                            }
+                            task.primitive = ActionPrimitive::Navigate { target: node, arrival: ArrivalKind::SocialTarget };
+                        }
                         return;
                     }
                 }
             }
             agent.expedition_target_camp = None;
             agent.current_need = None;
-            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+            transition::cancel_task(agent);
             return;
         };
 
@@ -172,6 +223,11 @@ impl<'a> Decisioner<'a> {
                     // 已抵达且王位空缺：写下登基决心，交由世界物理规则执行登基
                     agent.coronation_pending = Some(target_camp);
                     agent.current_need = Some("Physiological·SeekThrone".to_string());
+                    transition::advance_stage(agent, |t| {
+                        if let ExecutionStrategy::ClaimThrone { stage, .. } = &mut t.strategy {
+                            *stage = CommitStage::Ready;
+                        }
+                    });
                     return;
                 }
             }
@@ -184,11 +240,20 @@ impl<'a> Decisioner<'a> {
             if new_camp != target_camp {
                 agent.expedition_target_camp = Some(new_camp);
                 if let Some(node) = self.camp_node_of(new_camp) {
-                    if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
-                        return;
-                    }
-                    let curr = self.start_node(agent);
-                    if self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone) {
+                    let redirected = if self.turn_around_and_route_to(agent, node, PrimitiveActionState::SeekingThrone) {
+                        true
+                    } else {
+                        let curr = self.start_node(agent);
+                        self.dispatch(agent, curr, node, PrimitiveActionState::SeekingThrone)
+                    };
+                    if redirected {
+                        if let Some(task) = agent.active_task.as_mut() {
+                            if let ExecutionStrategy::ClaimThrone { camp, stage } = &mut task.strategy {
+                                *camp = new_camp;
+                                *stage = CommitStage::Travelling;
+                            }
+                            task.primitive = ActionPrimitive::Navigate { target: node, arrival: ArrivalKind::SocialTarget };
+                        }
                         return;
                     }
                 }
@@ -200,7 +265,7 @@ impl<'a> Decisioner<'a> {
         agent.expedition_target_camp = None;
         agent.coronation_pending = None;
         agent.current_need = None;
-        agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+        transition::cancel_task(agent);
     }
 
     /// ★ 求偶途中状态机：奔赴心仪女性
@@ -220,7 +285,7 @@ impl<'a> Decisioner<'a> {
         if agent.spouse_id.is_some() || !agent.is_alive || agent.gender != crate::spatial::agent::Gender::Male {
             agent.courtship_target_id = None;
             agent.courtship_pending = None;
-            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+            transition::cancel_task(agent);
             return;
         }
 
@@ -237,15 +302,22 @@ impl<'a> Decisioner<'a> {
                 // 已抵达且满足互动半径：写下求偶决心，待世界调度执行结婚
                 agent.courtship_pending = Some(target.id);
                 agent.current_need = Some("Belonging·Courtship".to_string());
+                transition::advance_stage(agent, |t| {
+                    if let ExecutionStrategy::Courtship { stage, .. } = &mut t.strategy {
+                        *stage = CommitStage::Ready;
+                    }
+                });
                 return;
             }
             // 仍在途中：若路径走完但尚未进入互动半径（如目标略有移动），向其最新最近路网节点重补路径
-            // 注：advance_to_next_lane 走完路线后 route Vec 未清空（仅 route_index 越界、current_lane_id 置 None），
-            //     故必须同时以 current_lane_id.is_none() 判断"已停在目标节点附近"，否则不会重补路径而站死。
             if agent.route.is_empty() || agent.current_lane_id.is_none() {
                 let curr = self.start_node(agent);
                 if curr != target.nearest_node {
-                    self.dispatch(agent, curr, target.nearest_node, PrimitiveActionState::SeekingCourtship);
+                    if self.dispatch(agent, curr, target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                        if let Some(task) = agent.active_task.as_mut() {
+                            task.primitive = ActionPrimitive::Navigate { target: target.nearest_node, arrival: ArrivalKind::SocialTarget };
+                        }
+                    }
                 }
             }
             return;
@@ -257,13 +329,28 @@ impl<'a> Decisioner<'a> {
             if agent.world_pos.distance_to(&new_target.pos) <= interact_radius {
                 agent.courtship_pending = Some(new_target.id);
                 agent.current_need = Some("Belonging·Courtship".to_string());
+                transition::advance_stage(agent, |t| {
+                    if let ExecutionStrategy::Courtship { female, stage } = &mut t.strategy {
+                        *female = new_target.id;
+                        *stage = CommitStage::Ready;
+                    }
+                });
                 return;
             }
-            if self.turn_around_and_route_to(agent, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
-                return;
-            }
-            let curr = self.start_node(agent);
-            if self.dispatch(agent, curr, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+            let redirected = if self.turn_around_and_route_to(agent, new_target.nearest_node, PrimitiveActionState::SeekingCourtship) {
+                true
+            } else {
+                let curr = self.start_node(agent);
+                self.dispatch(agent, curr, new_target.nearest_node, PrimitiveActionState::SeekingCourtship)
+            };
+            if redirected {
+                if let Some(task) = agent.active_task.as_mut() {
+                    if let ExecutionStrategy::Courtship { female, stage } = &mut task.strategy {
+                        *female = new_target.id;
+                        *stage = CommitStage::Travelling;
+                    }
+                    task.primitive = ActionPrimitive::Navigate { target: new_target.nearest_node, arrival: ArrivalKind::SocialTarget };
+                }
                 return;
             }
         }

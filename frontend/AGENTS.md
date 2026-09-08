@@ -20,7 +20,7 @@
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
-| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（205 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
+| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（211 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
 | `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：决策分支顺序 + 层级覆盖（18 条 b1~b18，★ v1.29.0 起 b17 竞拍购房置于首位）。**启动注入权威默认值**；★ v1.27.0 起用户运行时调整保存到浏览器 localStorage（★ v1.29.0 起键 `flowaccord.decision-order.v2`，schema 1），不再写回本文件 | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
@@ -83,7 +83,7 @@
 
 ```
 1. math.js                    零依赖基础
-2. config.js                  SIM_CONFIG (205 字段，含拆分配置合计)
+2. config.js                  SIM_CONFIG (211 字段，含拆分配置合计)
 3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
 4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
 5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)

@@ -34,13 +34,13 @@
 - `primitive.rs`：ActionPrimitive、ArrivalKind、HoldKind；只有描述，没有第二套物理执行器。
 - `observation.rs`：不可变执行观察与旧枚举的无损视图。
 
-M19.1 按需读取，不在 tick 中反复影子规划，不向 Agent 增加持久化或缓存字段。Agent 内存布局、FABS 格式和存档结构不变，`SAVE_FORMAT_VERSION` 仍为 4；应用版本按通常规范递增。新类型尚未用于存档，故没有为了默认恢复而添加 serde(default)。M19.2 若挂载权威任务状态，必须另行完成结构升版和中途恢复契约。
+M19.1 阶段按需读取，不在 tick 中反复影子规划。M19.2/M19.3 已正式将 `ActiveTask` 控制器挂载至 `Agent3D`，作为进行中持续任务单一真相源，并通过 `transition.rs` 统一管理生命周期与兼容视图同步；存档格式版本 `SAVE_FORMAT_VERSION` 升至 5，完整持久化持续任务，读档零重新规划、零重新掷点。
 
-当前初始类型使用平铺文件，待迁移行为实现增长时再按[技术规格](../19-1-spec-intent-strategy-split-result.md)拆目录。不会为了空模块先搬迁原 18 分支或建立第二个调度入口。
+当前决策系统平铺于 `crates/sim_core/src/spatial/decisions/`（共 15 个 Rust 文件），L1 持续仲裁、瞬发通道与连续采收候选仲裁完成解耦，L2 策略与 L3 原语派发收口。
 
 ## 3. 使用与验证边界
 
-调用方有原 Need 和 source_branch 时可观察意图；只有 Agent 时调用执行观察，不能补造缺失来源。两种观察结果都不允许反向覆盖 Agent。活动控制器接管、自动策略选择、任务暂停/恢复及 UI 展示尚属 M19.2 之后工作。
+调用方有原 Need 和 source_branch 时可观察意图；只有 Agent 时调用执行观察，不能补造缺失来源。活动控制器已接管全部持续任务，`agent.state` 为纯兼容视图。各阶段事件（到达、断流重路由、离路绕行、死亡、完成、取消）均通过 `transition.rs` 统一同步。
 
 新增旧枚举时同步 ActivityObservation 的两个穷尽匹配；新增 NeedKind/BranchId 时同步分支结果适配。调整真实执行行为时仍必须检查原状态写入者，而不是只更新观察映射。
 

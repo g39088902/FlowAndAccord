@@ -95,12 +95,13 @@ function updateDebugHud(now) {
   if (typeof sim.getDebugStats !== 'function') return;
   const s = sim.getDebugStats();
 
-  // ⚡ 现实世界每秒实际推进的模拟 Tick 数 (含倍速加成)
+  // ⚡ 现实世界每秒实际推进的模拟 Tick 数 (含倍速加成；优先读取 Worker 500ms 滑动窗口权威统计，平滑无离散抖动)
   const realNow = performance.now();
   const dtSec = Math.max(0.001, (realNow - dbgLastTickSec) / 1000);
-  const tickRate = Math.max(0, (s.tick - dbgLastTick) / dtSec);
+  const fallbackTickRate = Math.max(0, (s.tick - dbgLastTick) / dtSec);
   dbgLastTick = s.tick;
   dbgLastTickSec = realNow;
+  const tickRate = (typeof s.tickRate === 'number') ? s.tickRate : fallbackTickRate;
 
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
@@ -143,6 +144,22 @@ function updateTopBarStats(now) {
   document.getElementById('stat-deaths-natural').textContent = sim.totalDeathsNatural;
   document.getElementById('stat-deaths-unnatural').textContent = sim.totalDeathsUnnatural;
   document.getElementById('stat-miscarriages').textContent = sim.totalMiscarriages;
+
+  // ⚡ 控制台实际演化倍速展示
+  const actualSpeedEl = document.getElementById('stat-actual-speed');
+  if (actualSpeedEl) {
+    if (sim.isPaused) {
+      actualSpeedEl.textContent = '0.0x (已暂停)';
+      actualSpeedEl.style.color = '#94a3b8';
+    } else {
+      const isStalled = sim._lastSnapshotRealTime && (performance.now() - sim._lastSnapshotRealTime > 1500);
+      const rate = (isStalled || typeof sim.tickRate !== 'number') ? 0 : sim.tickRate;
+      const mult = rate / 60;
+      const multStr = mult >= 10 ? Math.round(mult) + 'x' : mult.toFixed(1) + 'x';
+      actualSpeedEl.textContent = `${multStr} (${Math.round(rate)} tick/s)`;
+      actualSpeedEl.style.color = '#38bdf8';
+    }
+  }
 
   // 顶栏四季与气温展示
   const seasonIcons = { 'Spring': '🌸 春季', 'Summer': '☀️ 夏季', 'Autumn': '🍂 秋季', 'Winter': '❄️ 冬季' };

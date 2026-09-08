@@ -1,21 +1,22 @@
-//! M19.1 领域词汇与已知分支结果的只读转换；不评估分支、不选择任务。
+//! M19 意图与完成条件领域词汇；提供类型化 AgentIntent 与完成策略。
 //! 来源只能由实际调用方提供，不能从 state/current_need 反推。
+use serde::{Deserialize, Serialize};
 use super::{BranchId, MaslowLevel, Need, NeedKind};
 use crate::spatial::house::HouseTier;
 use crate::spatial::ledger::journal::ResourceKind;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SurvivalResource {
     Water,
     Food,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GoldPurpose {
     BuildingReserve,
     Wealth,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntentKind {
     SatisfySurvival(SurvivalResource),
     StockHousehold(ResourceKind),
@@ -31,7 +32,7 @@ pub enum IntentKind {
 }
 
 /// 判据的类型名称，不在观察路径重新检查是否完成或锁存配置阈值。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CompletionPolicy {
     SurvivalSatisfied(SurvivalResource),
     HouseholdStockSatisfied(ResourceKind),
@@ -46,7 +47,7 @@ pub enum CompletionPolicy {
     ChildcareSettled,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AgentIntent {
     pub source_branch: BranchId,
     pub level: MaslowLevel,
@@ -54,7 +55,7 @@ pub struct AgentIntent {
     pub completion: CompletionPolicy,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubmissionKind {
     Courtship,
     AuctionBids,
@@ -62,7 +63,7 @@ pub enum SubmissionKind {
 }
 
 /// b17 即使被覆盖为常规层也只提交；不生成占位持续任务。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntentObservation {
     Sustained(AgentIntent),
     Submission {
@@ -72,7 +73,16 @@ pub enum IntentObservation {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl IntentObservation {
+    pub fn sustained(&self) -> Option<AgentIntent> {
+        match self {
+            Self::Sustained(intent) => Some(*intent),
+            Self::Submission { .. } => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntentObservationError {
     BranchKindMismatch,
     NonInstantBranch,

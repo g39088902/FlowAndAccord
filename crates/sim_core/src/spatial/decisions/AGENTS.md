@@ -8,22 +8,24 @@
 
 单名族人的**马斯洛需求决策状态机**：从"生理自救 → 安全备货 → 归属成家 → 尊重建材 → 自我实现淘金"逐层评估需求，并以 `PrimitiveActionState` 状态机驱动寻路、途中重路由、现场采收等动作。本目录**只产出"做什么/去哪"的决策**，不负责数值结算（代谢/装卸/施工/修缮的结算分别在 `ecology.rs` 与 `housing_system/`）。
 
-## 2. 📁 文件清单（13 个 Rust 文件）
+## 2. 📁 文件清单（15 个 Rust 文件）
 
 | 文件 | 职责 |
 | :--- | :--- |
-| `intent.rs` | M19.1 意图/完成条件类型，Need::observe_intent 只转换已知来源结果，不重评估 |
-| `strategy.rs` | M19.1 策略/阶段/失败类型，尚未挂载 Agent 或接管执行 |
-| `primitive.rs` | M19.1 导航/驻留/等待描述，尚无新物理执行器 |
+| `intent.rs` | M19 意图与完成条件类型：`AgentIntent`、`IntentKind`、`CompletionPolicy`，`Need::observe_intent` 纯只读转换 |
+| `strategy.rs` | M19 策略与阶段类型：`ActiveTask`、`ExecutionStrategy`、`ResourceStage`、`CommitStage`、`HomeStage`、`ReturnStage` |
+| `primitive.rs` | M19 动作原语描述类型：`ActionPrimitive`、`ArrivalKind`、`HoldKind`，配合运动与驻留 |
+| `projection.rs` | M19.2 执行状态纯视图：`compatible_legacy_state` 将 `ActiveTask` 无损映射到兼容的 `PrimitiveActionState` |
+| `transition.rs` | M19.2/M19.3 统一任务生命周期转换器：`install_task`、`advance_stage`、`on_navigation_arrived`、`on_offroad_detour`、`finish_task`、`cancel_task`、`on_agent_death` |
 | `observation.rs` | Agent3D::observe_execution 不可变借用事实；21 状态穷尽无损视图，pending 与持续活动分开 |
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
 | `branches.rs` | 18 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b18"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
-| `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + ★ v1.29.0 ⓪瞬间层调度 `evaluate_instant_needs`/`apply_instant_need`/`write_bid_pending`（全状态、每拍最先、命中即执行并续评估）+ **数据驱动**评估 `evaluate_needs`（按 `branch_order` 迭代注册表）+ 需求落地 `fulfill_resting_need`（含立宅自主选址） |
-| `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询 |
+| `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + ★ L1 持续仲裁 `arbitrate_sustained_task` + ★ L1 瞬发通道 `arbitrate_instant_needs` + ★ L2 策略派发 `dispatch_task` 与节拍推进 `step_in_progress_task` |
+| `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询，任务归家同步 `sync_return_home_task` |
 | `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 / v1.36.0 `try_route_to_market`（水/粮/木断流时户主直接改道榷场，家户账本远程结算） |
 | `market.rs` | 外部商贸决策子模块：`evaluate_market_trade`（B15 需求判定，支持水/粮/木急迫短缺赴市）+ `decide_seeking_market` / `decide_buying_market`（买满水/粮/木或资金见底返航） |
-| `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询；★ v1.35.0 单趟多品类连续采收 `try_continue_harvesting`；★ v1.27.0 / v1.36.0 水/粮/木目标关闭时优先转 `try_route_to_market` 再折返 |
+| `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询；★ L1 连续采收候选仲裁 `arbitrate_continuous_harvest_candidate`；★ v1.35.0 单趟多品类连续采收 `try_continue_harvesting`；★ M19.4d 多品类预排行程规划器 `plan_harvest_itinerary`（最近邻贪心 TSP，定长 4 站灌入 `Agent3D::harvest_queue`）；★ v1.27.0 / v1.36.0 水/粮/木目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`execute_pending_coronations`（★ M4 登基物理执行器）、`execute_pending_courtships`（★ 求偶成婚物理执行器）、`execute_pending_bids`（★ v1.26.0 竞拍出价物理执行器）与 `build_decision_context`（收集全图资源节点与单身女性候选） |
 
 ## 3. 🧱 关键结构
@@ -106,3 +108,46 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 ### 4.11 M19.1 观察边界
 
 意图/策略/原语为非持久化词汇；旧 Agent 状态和 pending 继续权威。`Need::observe_intent` 要求实际来源分支及评估时家宅等级，`Agent3D::observe_execution` 不根据标签反推来源，不构造 ActiveTask。观察借用路线/候选/标签，不写 state、不耗 RNG、不分配。完整 API 契约见 [26-intent-observation.md](../../../../../docs/current/26-intent-observation.md)。
+
+### 4.12 M19.2/M19.3 意图-策略-原语三层架构与生命周期收口
+
+- **持续任务单一真相源**：`agent.active_task: Option<ActiveTask>` 成为进行中持续任务的唯一控制实体，`agent.state` 仅作为兼容视图由 `transition.rs` 同步。
+- **生命周期统一转换器 (`transition.rs`)**：
+  - 任务安装：`transition::install_task(agent, task)`；
+  - 内部阶段推进：`transition::advance_stage(agent, update_fn)`；
+  - 导航到达物理事件：`transition::on_navigation_arrived(agent)` 将阶段推入 `OnSite`/`Unloading`/`Ready`/`Working`；
+  - 路线失效/绕行：`transition::on_offroad_detour(agent)`；
+  - 任务完成与取消：`transition::finish_task(agent)` / `transition::cancel_task(agent)` 清空任务并置回 `RestingAtCamp`；
+  - 死亡终态：`transition::on_agent_death(agent)` 清空任务并置 `Dead`。
+- **三层解耦职责划分**：
+  - **L1 意图仲裁**：`arbitrate_instant_needs`（瞬发通道）+ `arbitrate_sustained_task`（持续任务仲裁）+ `arbitrate_continuous_harvest_candidate`（连续采收候选分支仲裁）；
+  - **L2 策略规划**：`dispatch_task`（将成立意图转化为执行策略并计算路线/目标）+ `step_in_progress_task`（进行中任务的途中断流重路由与现场策略驱动）；
+  - **L3 原语适配**：`routing.rs`（导航与原语派发）+ `projection.rs`（兼容状态映射）+ `transition.rs`（状态同步）。
+- **存档持久化升级**：`SAVE_FORMAT_VERSION = 5`，完整持久化 `ActiveTask`，读档零重新掷点、零重新寻路。
+
+### 4.13 ★ M19.4 独立增强三件套（抢占矩阵 / 禀赋个性化 / 预排行程）
+
+- **M19.4b 分级抢占（`preemption.rs`）**：`preemption.rs` 提供抢占矩阵与 `preempt_task`，按「当前任务性质 × 抢占意图」裁决是否中断；
+  中断一律沿原车道连续掉头平滑重路由（`turn_around_and_route_to`），**严禁瞬移**，随身行囊完整保全，禁止清空已采物资。
+- **M19.4c 禀赋与家资个性化（`branches.rs` / `market.rs`）**：力量驱动重体力装载速率与轻体力偏好、智力驱动「路途耗时 vs 榷场现货牌价」权衡、
+  家户金币 ≥ `market_wealthy_family_gold` 的户主按 80% 几率免于亲自伐木采石（赴市现货采买）。个性化**只影响选策，不得破坏确定性**——
+  所有概率判定一律走 `gentry_labor_exemption_check(agent_id, tick, interval)` 这类**纯函数 + 共享 RNG 顺序**的确定性掷点，禁止引入墙钟时间或哈希顺序依赖。
+- **M19.4d 预排采收行程（`harvest.rs` + `agent.rs`）**：
+  - `Agent3D::harvest_queue: [Option<BranchId>; 4]` 为**定长 4 站**预排队列（零堆分配、`#[serde(default)]` 向后兼容读旧档）；
+    配套 `pop_harvest_queue()`（FIFO 平移，末尾补 `None`）与 `clear_harvest_queue()`。
+  - `plan_harvest_itinerary(&self, agent) -> [Option<BranchId>; 4]`：仅遍历 5 条备料分支（b5/b6/b7/b9/b10），
+    逐条 `arbitrate_continuous_harvest_candidate` 验资格 + `nearest_of` 定位最近 POI，再按**最近邻贪心（TSP 启发式）**从当前位置串成总路程最短链路。
+  - `try_continue_harvesting` 消费顺序：**预排队列优先 → 逐站重验资格（失效即跳过）→ 队列耗尽回退 `branch_order` 兜底 → 全失败才 `return_home`**。
+  - 队列生命周期：出发时由 `evaluate.rs` 在 `dispatch` 成功后灌入（**剔除当前分支自身**）；体力低于 `decision_work_stamina_threshold`、
+    无家宅、抢占/取消/回宅卸货时必须 `clear_harvest_queue()` 安全清空，杜绝跨任务串味。
+  - 可观测性：`ActiveTaskSnapshot::itinerary` 字符串（如 `💧备水 → 🌲备木 → 🍒备粮`，少于 2 站时为 `--`），
+    已纳入**四处同步**（`snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/encode.rs` / `snapshot-bin.js`），Inspector 元素 `insp-task-itinerary`。
+
+### 4.14 🔴 验证「行囊已装满」必须用配置容量，禁止硬编码 50
+
+`carry_capacity_resource`（前端 `carryCapacityResource`）当前为 **100.0**，是判定 `carry_full` 的唯一权威阈值。
+构造「某品类已装满 → 现场转站」的测试或诊断场景时，必须从 `SIM_CONFIG.carryCapacityResource` 取值而非写死 50.0：
+若行囊未满且家户该品类仍短缺，`decide_drinking`/`decide_foraging` 的 `finished` 判据不成立，Agent 会在资源点**原地持续采集**，
+根本不会进入 `try_continue_harvesting`，表现为「预排队列不生效 / 行程不推进」的**假故障**。
+同类坑亦见于「家宅已备满」类场景——须同时把 `family_stock_active` 置位或直接给足账本余额。
+

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-09-08T07:28:47.005Z",
+  "frozenCommit": "af2d30e53810f4d625ce038cc846833549ab3b4a",
+  "targetWasmSha256": "ed593f1a8d68a632b72161b349debd52b6af1ab95241b4cf71282408611a07f7",
+  "sourceDigests": {
+    "crates/sim_core/src/spatial/decisions/intent.rs": "6264ee3ab99c54219b47cc7c61cf4700b17c72a56319f3937713b0528c205e77",
+    "crates/sim_core/src/spatial/decisions/strategy.rs": "3620c8358f68305815506b1590478da2b7ae91e3eb983af6619a438969dc6c4e",
+    "crates/sim_core/src/spatial/decisions/primitive.rs": "cef02951fd6efe0bed90e630c1f2356defd90e8e76a575de536e6ae6b0ace4d7",
+    "crates/sim_core/src/spatial/decisions/observation.rs": "35746f65e0a64e4fb9d144d905d49873d4c670e30aa23b706c2a6a61996e6e8e",
+    "crates/sim_core/src/spatial/decisions/branches.rs": "1aa14fe4f6b0303fd964720f5a6e4f90447550333c3d637b9a5877791beeb84a",
+    "crates/sim_core/src/spatial/decisions/evaluate.rs": "0e205395915328bbe4ac56e5cda220dd0227377a43d1fe6a8220e41fcb164759",
+    "crates/sim_core/src/spatial/agent.rs": "eb2c5a5b584bb1996c1caa35ec825c3714d6676e14bac3e541f492dd1f034c12",
+    "crates/sim_core/src/spatial/world_tick.rs": "cf78bc56eb49a6d522be27af9c372d3b8a4721d09f9194abdca47a01462908cd",
+    "crates/sim_wasm/src/lib.rs": "7e874daaf5f9b07c164babf907b542aad2fd8f4dcb6f898318e476a5104f15d8",
+    "frontend/rust/sim_wasm.wasm": "ed593f1a8d68a632b72161b349debd52b6af1ab95241b4cf71282408611a07f7"
+  },
+  "toolchain": {
+    "node": "v24.20.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "layouts": {
+    "Agent3D": {
+      "size": 560,
+      "align": 8
+    },
+    "AgentIntent": {
+      "size": 6,
+      "align": 1
+    },
+    "ExecutionStrategy": {
+      "size": 20,
+      "align": 4
+    },
+    "ActionPrimitive": {
+      "size": 12,
+      "align": 4
+    },
+    "ActiveTask": {
+      "size": 40,
+      "align": 4
+    },
+    "OptionActiveTask": {
+      "size": 40,
+      "align": 4
+    },
+    "ExecutionObservation": {
+      "size": 168,
+      "align": 8
+    }
+  },
+  "probeChecksPassed": 239,
+  "performanceBaseline": {
+    "ticks": 3600,
+    "throughputTps": 87631,
+    "tickMeanMicroseconds": 11.41,
+    "phaseBreakdownMicroseconds": {
+      "phase0SeasonPoiRegen": 0.69,
+      "phase1MetabolismChild": 0.39,
+      "phase2PoiInteractions": 0.75,
+      "phase3HousingAuction": 0.82,
+      "phase4RoadWearDecay": 0.23,
+      "phase5MovementTrample": 0.78,
+      "phase6DecisionsAstar": 2.75,
+      "phase7LedgerClanRegion": 2.42,
+      "phase8Cleanup": 0.08
+    },
+    "fabsSnapshot": {
+      "frameBytes": 13184,
+      "encodeMicroseconds": 57.53,
+      "decodeMicroseconds": 175.41
+    }
+  },
+  "simulationBaseline": {
+    "seed": 42,
+    "gridRes": 60,
+    "worldSize": 764,
+    "initialAgents": 20,
+    "saveHash1800": "0b6ceacdf9a48bf85ce0a492f799bc0acb2319da676769672cecc9ccc4c702b6",
+    "saveSize1800": 488390,
+    "saveHash3600": "55a98753947e5f13e9b70be4e715b5b324f1fe5988a9e96b1fe3553b5243ba03",
+    "saveSize3600": 491068,
+    "snapshotHash3600": "a4a257b321c7d3989dd90c2df2faa976b020e159434d18620486aa73dcf36b8d",
+    "snapshotSize3600": 106904
+  },
+  "configFieldsCount": 211
+}

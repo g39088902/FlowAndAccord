@@ -110,7 +110,7 @@ impl World3DEngine {
                         house.is_repairing = true;
                         house.repair(repair_speed * dt, &self.config);
                         if house.durability >= max_durability {
-                            agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+                            crate::spatial::decisions::transition::finish_task(agent);
                             agent.current_need = Some("Physiological·Rest".to_string());
                             completed_repairs.push((house.id, agent.id, owner_id));
                         }
@@ -121,7 +121,7 @@ impl World3DEngine {
                     let Some(&idx) = self.agent_index.get(&aid) else { continue };
                     let agent = &mut self.agents[idx];
                     if agent.state == PrimitiveActionState::RepairingHouse && agent.home_house_id == Some(house.id) {
-                        agent.enter_stationary_state(PrimitiveActionState::RestingAtCamp);
+                        crate::spatial::decisions::transition::finish_task(agent);
                         agent.current_need = Some("Physiological·Rest".to_string());
                     }
                 }

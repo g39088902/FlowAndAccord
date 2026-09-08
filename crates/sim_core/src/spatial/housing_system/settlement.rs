@@ -182,6 +182,11 @@ impl World3DEngine {
             agent.home_house_id = Some(house_id);
             agent.home_camp_node = door_node;
             agent.world_pos = site_pos;
+            if let Some(task) = agent.active_task {
+                if matches!(task.strategy, crate::spatial::decisions::strategy::ExecutionStrategy::FoundHome { .. }) {
+                    crate::spatial::decisions::transition::finish_task(agent);
+                }
+            }
             let site_note = if is_reused {
                 format!("（复用空置门径节点 #{}）", door_node)
             } else {

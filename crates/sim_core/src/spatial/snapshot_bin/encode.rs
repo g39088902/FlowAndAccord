@@ -16,6 +16,7 @@ use super::dict::*;
 use super::layout::*;
 use crate::spatial::agent::PrimitiveActionState;
 use crate::spatial::poi::{market_unit_price, market_unit_price_with_base, PoiType};
+use crate::spatial::snapshot::ActiveTaskSnapshot;
 use crate::spatial::world::World3DEngine;
 
 /// 已编码的一个 section（kind / 记录数 / 字节流）
@@ -177,6 +178,24 @@ impl World3DEngine {
                 w.opt_u32(agent.courtship_target_id);
                 for &b in agent.family_stock_active.iter() {
                     w.u8(b as u8);
+                }
+                if let Some(task) = &agent.active_task {
+                    let snap = ActiveTaskSnapshot::from_task_and_queue(task, &agent.harvest_queue);
+                    w.u8(1);
+                    w.u32(tab.intern(&snap.branch));
+                    w.u32(tab.intern(&snap.branch_desc));
+                    w.u32(tab.intern(&snap.level));
+                    w.u32(tab.intern(&snap.intent_kind));
+                    w.u32(tab.intern(&snap.completion));
+                    w.u32(tab.intern(&snap.strategy_kind));
+                    w.u32(tab.intern(&snap.stage));
+                    w.opt_u32(snap.target_id);
+                    w.u32(tab.intern(&snap.target_type));
+                    w.u32(tab.intern(&snap.primitive_kind));
+                    w.u32(tab.intern(&snap.primitive_detail));
+                    w.u32(tab.intern(&snap.itinerary));
+                } else {
+                    w.u8(0);
                 }
             }
             w.align4();

@@ -3,3 +3,11 @@
 
 [net]
 offline = false
+
+# ★ 离线 vendor 模式：依赖已固化在 .vendor/（由 .cargo-home 缓存生成），
+#   网络不可用时开启下行 source replacement 即可零网络编译。
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = ".vendor"

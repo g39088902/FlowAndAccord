@@ -1,8 +1,9 @@
-//! M19.1 原语描述类型；没有执行器，也不会改变现有物理结算。
+//! M19 原语描述类型；ActionPrimitive 描述当前行动原语并投射兼容状态。
+use serde::{Deserialize, Serialize};
 use crate::spatial::graph::NodeId;
 use crate::spatial::poi::PoiId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionPrimitive {
     Navigate {
         target: NodeId,
@@ -11,14 +12,14 @@ pub enum ActionPrimitive {
     Hold(HoldKind),
     AwaitSettlement,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArrivalKind {
     ResourceSite,
     Residence,
     SocialTarget,
     FoundSite,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HoldKind {
     ResourceSite(PoiId),
     Residence,
