@@ -300,6 +300,7 @@ impl World3DEngine {
         let mut stone_nodes = Vec::new();
         let mut gold_nodes = Vec::new();
         let mut market_nodes = Vec::new();
+        let mut markets = Vec::new();
         let mut camp_positions = Vec::new();
         let mut camp_pois = Vec::new();
         let mut poi_positions = Vec::new();
@@ -324,7 +325,36 @@ impl World3DEngine {
                 PoiType::WoodForest => wood_nodes.push(target),
                 PoiType::StoneQuarry => stone_nodes.push(target),
                 PoiType::GoldMine => gold_nodes.push(target),
-                PoiType::Market => market_nodes.push(target),
+                PoiType::Market => {
+                    market_nodes.push(target);
+                    let p_water = crate::spatial::poi::market_unit_price(
+                        poi.current_stock,
+                        poi.max_stock,
+                        &self.config,
+                    );
+                    let p_food = crate::spatial::poi::market_unit_price(
+                        poi.secondary_stock,
+                        poi.secondary_max_stock,
+                        &self.config,
+                    );
+                    let p_wood = crate::spatial::poi::market_unit_price_with_base(
+                        poi.tertiary_stock,
+                        poi.tertiary_max_stock,
+                        self.config.market_price_base_wood,
+                        &self.config,
+                    );
+                    markets.push(MarketInfo {
+                        poi_id: poi.id,
+                        node,
+                        pos: poi.pos,
+                        water_stock: poi.current_stock,
+                        food_stock: poi.secondary_stock,
+                        wood_stock: poi.tertiary_stock,
+                        water_price: p_water,
+                        food_price: p_food,
+                        wood_price: p_wood,
+                    });
+                }
                 PoiType::Camp => {
                     camp_positions.push((node, poi.pos));
                     camp_pois.push((poi.id, poi.pos));
@@ -379,6 +409,7 @@ impl World3DEngine {
             stone_nodes,
             gold_nodes,
             market_nodes,
+            markets,
             camp_positions,
             camp_pois,
             poi_positions,

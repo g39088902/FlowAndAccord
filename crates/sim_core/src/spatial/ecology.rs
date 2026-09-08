@@ -684,12 +684,14 @@ impl World3DEngine {
                             })
                             .unwrap_or((0.0, 0.0, 0.0, 0.0));
                         let mut current_hh_gold = hh_gold;
-                        let mut total_gold_paid = 0.0;
+                        let mut current_carried_gold = agent.carried_gold;
+                        let mut total_hh_gold_paid = 0.0;
 
                         // 步骤 A：现场濒危自救缓冲（thirst/hunger < 10.0 优先就地饮水/进食保命，固定以 step 为结算步长）
+                        let cost_water_rescue = step * p_water;
                         if agent.thirst < 10.0
                             && poi.current_stock >= step
-                            && current_hh_gold >= step * p_water
+                            && (current_hh_gold + current_carried_gold) >= cost_water_rescue
                         {
                             let thirst_deficit = self.config.agent_thirst_capacity - agent.thirst;
                             if thirst_deficit >= step {
@@ -698,8 +700,13 @@ impl World3DEngine {
                                 poi.extract(buy_amount);
                                 agent.thirst = (agent.thirst + buy_amount)
                                     .min(self.config.agent_thirst_capacity);
-                                current_hh_gold -= gold_cost;
-                                total_gold_paid += gold_cost;
+                                let from_hh = current_hh_gold.min(gold_cost);
+                                current_hh_gold -= from_hh;
+                                total_hh_gold_paid += from_hh;
+                                let from_carried = gold_cost - from_hh;
+                                current_carried_gold =
+                                    (current_carried_gold - from_carried).max(0.0);
+                                agent.carried_gold = current_carried_gold;
                                 // ★ v1.28.0 流水留痕（自救饮水）
                                 poi.push_market_trade(
                                     MarketTradeRecord {
@@ -715,9 +722,10 @@ impl World3DEngine {
                                 );
                             }
                         }
+                        let cost_food_rescue = step * p_food;
                         if agent.hunger < 10.0
                             && poi.secondary_stock >= step
-                            && current_hh_gold >= step * p_food
+                            && (current_hh_gold + current_carried_gold) >= cost_food_rescue
                         {
                             let hunger_deficit = self.config.agent_hunger_capacity - agent.hunger;
                             if hunger_deficit >= step {
@@ -726,8 +734,13 @@ impl World3DEngine {
                                 poi.extract_secondary(buy_amount);
                                 agent.hunger = (agent.hunger + buy_amount)
                                     .min(self.config.agent_hunger_capacity);
-                                current_hh_gold -= gold_cost;
-                                total_gold_paid += gold_cost;
+                                let from_hh = current_hh_gold.min(gold_cost);
+                                current_hh_gold -= from_hh;
+                                total_hh_gold_paid += from_hh;
+                                let from_carried = gold_cost - from_hh;
+                                current_carried_gold =
+                                    (current_carried_gold - from_carried).max(0.0);
+                                agent.carried_gold = current_carried_gold;
                                 // ★ v1.28.0 流水留痕（自救进食）
                                 poi.push_market_trade(
                                     MarketTradeRecord {
@@ -744,7 +757,7 @@ impl World3DEngine {
                             }
                         }
 
-                        // 步骤 B：装袋购入（固定以 step 为离散结算步长：行囊容量 / 市场库存 / 剩余家财 / 家户需求 多重约束）
+                        // 步骤 B：装袋购入（固定以 step 为离散结算步长：行囊容量 / 市场库存 / 剩余家财+随身金 / 家户需求 多重约束）
                         let d_th = self.config.market_emergency_family_stock_threshold;
                         let water_needed = agent.family_stock_active[0] || hh_water < d_th;
                         let food_needed = agent.family_stock_active[1] || hh_food < d_th;
@@ -752,17 +765,22 @@ impl World3DEngine {
 
                         // 购水装袋
                         let water_space = carry_cap - agent.carried_water;
+                        let cost_water = step * p_water;
                         if water_needed
                             && water_space >= step
                             && poi.current_stock >= step
-                            && current_hh_gold >= step * p_water
+                            && (current_hh_gold + current_carried_gold) >= cost_water
                         {
                             let buy_amount = step;
                             let gold_cost = buy_amount * p_water;
                             poi.extract(buy_amount);
                             agent.carried_water = (agent.carried_water + buy_amount).min(carry_cap);
-                            current_hh_gold -= gold_cost;
-                            total_gold_paid += gold_cost;
+                            let from_hh = current_hh_gold.min(gold_cost);
+                            current_hh_gold -= from_hh;
+                            total_hh_gold_paid += from_hh;
+                            let from_carried = gold_cost - from_hh;
+                            current_carried_gold = (current_carried_gold - from_carried).max(0.0);
+                            agent.carried_gold = current_carried_gold;
                             // ★ v1.28.0 流水留痕（清水装袋）
                             poi.push_market_trade(
                                 MarketTradeRecord {
@@ -779,17 +797,22 @@ impl World3DEngine {
                         }
                         // 购粮装袋
                         let food_space = carry_cap - agent.carried_food;
+                        let cost_food = step * p_food;
                         if food_needed
                             && food_space >= step
                             && poi.secondary_stock >= step
-                            && current_hh_gold >= step * p_food
+                            && (current_hh_gold + current_carried_gold) >= cost_food
                         {
                             let buy_amount = step;
                             let gold_cost = buy_amount * p_food;
                             poi.extract_secondary(buy_amount);
                             agent.carried_food = (agent.carried_food + buy_amount).min(carry_cap);
-                            current_hh_gold -= gold_cost;
-                            total_gold_paid += gold_cost;
+                            let from_hh = current_hh_gold.min(gold_cost);
+                            current_hh_gold -= from_hh;
+                            total_hh_gold_paid += from_hh;
+                            let from_carried = gold_cost - from_hh;
+                            current_carried_gold = (current_carried_gold - from_carried).max(0.0);
+                            agent.carried_gold = current_carried_gold;
                             // ★ v1.28.0 流水留痕（粮食装袋）
                             poi.push_market_trade(
                                 MarketTradeRecord {
@@ -806,17 +829,23 @@ impl World3DEngine {
                         }
                         // 购木装袋
                         let wood_space = carry_cap - agent.carried_wood;
+                        let cost_wood = step * p_wood;
                         if wood_needed
                             && wood_space >= step
                             && poi.tertiary_stock >= step
-                            && current_hh_gold >= step * p_wood
+                            && (current_hh_gold + current_carried_gold) >= cost_wood
                         {
                             let buy_amount = step;
                             let gold_cost = buy_amount * p_wood;
                             poi.extract_tertiary(buy_amount);
                             agent.carried_wood = (agent.carried_wood + buy_amount).min(carry_cap);
-                            current_hh_gold -= gold_cost;
-                            total_gold_paid += gold_cost;
+                            let from_hh = current_hh_gold.min(gold_cost);
+                            current_hh_gold -= from_hh;
+                            total_hh_gold_paid += from_hh;
+                            let from_carried = gold_cost - from_hh;
+                            current_carried_gold = (current_carried_gold - from_carried).max(0.0);
+                            agent.carried_gold = current_carried_gold;
+                            let _ = (current_hh_gold, current_carried_gold);
                             // ★ v1.36.0 流水留痕（木料装袋）
                             poi.push_market_trade(
                                 MarketTradeRecord {
@@ -832,16 +861,16 @@ impl World3DEngine {
                             );
                         }
 
-                        // 步骤 C：扣减黄金记账流水（Transfer to Void, Reason = Market）
-                        if total_gold_paid > 0.001 {
+                        // 步骤 C：扣减家户黄金记账流水（Transfer to Void, Reason = Market）
+                        if total_hh_gold_paid > 0.001 {
                             if let Some(hh) = self.household_registry.get_mut(hh_hid) {
-                                hh.group.ledger.debit(ResourceKind::Gold, total_gold_paid);
+                                hh.group.ledger.debit(ResourceKind::Gold, total_hh_gold_paid);
                                 hh.group.ledger.push_transfer(TransferRecord {
                                     tick,
                                     from: LedgerRef::Family(hh_hid),
                                     to: LedgerRef::Void,
                                     resource: ResourceKind::Gold,
-                                    amount: total_gold_paid,
+                                    amount: total_hh_gold_paid,
                                     reason: TransferReason::Market,
                                 });
                             }

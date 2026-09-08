@@ -35,7 +35,8 @@ impl<'a> Decisioner<'a> {
             .and_then(|hid| self.households.get(hid))
             .map(|hh| {
                 hh.group.leader == Some(a.id)
-                    && hh.group.ledger.balance(ResourceKind::Gold) >= cfg.market_min_family_gold
+                    && (hh.group.ledger.balance(ResourceKind::Gold) + a.carried_gold)
+                        >= cfg.market_min_family_gold
             })
             .unwrap_or(false)
     }
@@ -54,7 +55,7 @@ impl<'a> Decisioner<'a> {
         let Some(hh) = self.households.get(hh_id) else {
             return false;
         };
-        let gold = hh.group.ledger.balance(ResourceKind::Gold);
+        let gold = hh.group.ledger.balance(ResourceKind::Gold) + a.carried_gold;
         let wealthy = gold >= self.config.market_wealthy_family_gold
             && gentry_labor_exemption_check(
                 a.id,
@@ -95,6 +96,16 @@ impl<'a> Decisioner<'a> {
             .map(|rn| rn.node)
     }
 
+    /// 获取离 Agent 最近的外部市场行情快照
+    pub fn nearest_market_info(&self, agent: &Agent3D) -> Option<&MarketInfo> {
+        self.ctx.markets.iter().min_by(|a, b| {
+            a.pos
+                .distance_to(&agent.world_pos)
+                .partial_cmp(&b.pos.distance_to(&agent.world_pos))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+    }
+
     /// 赶往市场途中的决策检查（若体力过低或家户资金耗尽则折返回家）
     pub fn decide_seeking_market(&mut self, agent: &mut Agent3D) {
         let Some(hh_id) = self.households.household_of(agent.id) else {
@@ -107,10 +118,22 @@ impl<'a> Decisioner<'a> {
             .get(hh_id)
             .map(|hh| hh.group.ledger.balance(ResourceKind::Gold))
             .unwrap_or(0.0);
+        let available_gold = hh_gold + agent.carried_gold;
+        let vitals_critical = agent.stamina < self.config.decision_work_stamina_threshold;
 
-        if agent.stamina < self.config.decision_work_stamina_threshold || hh_gold < 0.05 {
+        let min_step_cost = self
+            .nearest_market_info(agent)
+            .map(|m| {
+                let step = self.config.market_settlement_step;
+                (step * m.water_price)
+                    .min(step * m.food_price)
+                    .min(step * m.wood_price)
+            })
+            .unwrap_or(0.05);
+
+        if vitals_critical || available_gold < min_step_cost {
             agent.current_need = Some(
-                if agent.stamina < self.config.decision_work_stamina_threshold {
+                if vitals_critical {
                     "Physiological·Rest"
                 } else {
                     "Safety·ReturnHome"
@@ -121,40 +144,78 @@ impl<'a> Decisioner<'a> {
         }
     }
 
-    /// 现场交易阶段的周期决策（若行囊无法再完成一笔结算、资金见底或体力不足，启程返航）
+    /// 现场交易阶段的周期决策（若行囊无法再完成一笔结算、资金不足或无可执行交易，启程返航）
     pub fn decide_buying_market(&mut self, agent: &mut Agent3D) {
-        let carry_cap = self.config.carry_capacity_resource;
         let Some(hh_id) = self.households.household_of(agent.id) else {
             agent.current_need = Some("Safety·ReturnHome".to_string());
             self.return_home(agent);
             return;
         };
-        let hh_gold = self
+        let (hh_gold, hh_water, hh_food, hh_wood) = self
             .households
             .get(hh_id)
-            .map(|hh| hh.group.ledger.balance(ResourceKind::Gold))
-            .unwrap_or(0.0);
+            .map(|hh| {
+                (
+                    hh.group.ledger.balance(ResourceKind::Gold),
+                    hh.group.ledger.balance(ResourceKind::Water),
+                    hh.group.ledger.balance(ResourceKind::Food),
+                    hh.group.ledger.balance(ResourceKind::Wood),
+                )
+            })
+            .unwrap_or((0.0, 0.0, 0.0, 0.0));
+        let available_gold = hh_gold + agent.carried_gold;
 
-        // Market settlement moves only whole `market_settlement_step` units. Keep
-        // this exit guard aligned with ecology's `space >= step` trade gate: an
-        // agent that cannot fit another settlement must return home instead of
-        // remaining at the market with no executable trade.
-        let settlement_step = self.config.market_settlement_step;
-        let bag_cannot_accept_settlement = carry_cap - agent.carried_water < settlement_step
-            || carry_cap - agent.carried_food < settlement_step
-            || carry_cap - agent.carried_wood < settlement_step;
-        let gold_exhausted = hh_gold < 0.05;
         let vitals_critical = agent.stamina < self.config.decision_work_stamina_threshold;
+        if vitals_critical {
+            agent.current_need = Some("Physiological·Rest".to_string());
+            self.return_home(agent);
+            return;
+        }
 
-        if bag_cannot_accept_settlement || gold_exhausted || vitals_critical {
-            agent.current_need = Some(
-                if vitals_critical {
-                    "Physiological·Rest"
-                } else {
-                    "Safety·ReturnHome"
-                }
-                .to_string(),
-            );
+        let Some(market) = self.nearest_market_info(agent) else {
+            agent.current_need = Some("Safety·ReturnHome".to_string());
+            self.return_home(agent);
+            return;
+        };
+
+        let carry_cap = self.config.carry_capacity_resource;
+        let step = self.config.market_settlement_step;
+        let d_th = self.config.market_emergency_family_stock_threshold;
+
+        // 判定各品类在现场是否还能发生任何一笔可执行交易（采购或自救）
+        // 1. 水
+        let water_needed = agent.family_stock_active[0] || hh_water < d_th || agent.thirst < 10.0;
+        let water_space = (carry_cap - agent.carried_water >= step)
+            || (agent.thirst < 10.0 && self.config.agent_thirst_capacity - agent.thirst >= step);
+        let water_cost = step * market.water_price;
+        let can_trade_water = water_needed
+            && water_space
+            && market.water_stock >= step
+            && available_gold >= water_cost;
+
+        // 2. 粮
+        let food_needed = agent.family_stock_active[1] || hh_food < d_th || agent.hunger < 10.0;
+        let food_space = (carry_cap - agent.carried_food >= step)
+            || (agent.hunger < 10.0 && self.config.agent_hunger_capacity - agent.hunger >= step);
+        let food_cost = step * market.food_price;
+        let can_trade_food = food_needed
+            && food_space
+            && market.food_stock >= step
+            && available_gold >= food_cost;
+
+        // 3. 木
+        let wood_needed = agent.family_stock_active[2] || hh_wood < d_th;
+        let wood_space = carry_cap - agent.carried_wood >= step;
+        let wood_cost = step * market.wood_price;
+        let can_trade_wood = wood_needed
+            && wood_space
+            && market.wood_stock >= step
+            && available_gold >= wood_cost;
+
+        let has_executable_trade = can_trade_water || can_trade_food || can_trade_wood;
+
+        if !has_executable_trade {
+            agent.current_need = Some("Safety·ReturnHome".to_string());
             self.return_home(agent);
         }
     }

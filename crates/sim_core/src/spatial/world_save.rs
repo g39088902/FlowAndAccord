@@ -33,7 +33,7 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 6;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.46.12";
+pub const SAVE_APP_VERSION: &str = "1.46.16";
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -78,6 +78,8 @@ pub struct WorldSave {
     pub temperature: f32,
     #[serde(default)]
     pub el_nino_phase: f32,
+    #[serde(default)]
+    pub climate_epoch_phase: f32,
 
     // ── 全局 RNG 内部状态（确定性核心）──
     pub rng: WorldRng,
@@ -146,6 +148,7 @@ impl World3DEngine {
             current_season: self.current_season,
             temperature: self.temperature,
             el_nino_phase: self.el_nino_phase,
+            climate_epoch_phase: self.climate_epoch_phase,
             rng: self.rng,
             water_regen_multiplier: self.water_regen_multiplier,
             berry_regen_multiplier: self.berry_regen_multiplier,
@@ -229,6 +232,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         current_season: save.current_season,
         temperature: save.temperature,
         el_nino_phase: save.el_nino_phase,
+        climate_epoch_phase: save.climate_epoch_phase,
         rng: save.rng,
         water_regen_multiplier: save.water_regen_multiplier,
         berry_regen_multiplier: save.berry_regen_multiplier,

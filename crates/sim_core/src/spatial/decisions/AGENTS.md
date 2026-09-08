@@ -23,8 +23,8 @@
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
 | `evaluate.rs` | `Decisioner` 结构体 + 核心调度 `decide` + ★ L1 持续仲裁 `arbitrate_sustained_task` + ★ L1 瞬发通道 `arbitrate_instant_needs` + ★ L2 策略派发 `dispatch_task` 与节拍推进 `step_in_progress_task` |
 | `routing.rs` | 导航层：寻路派发、`turn_around_and_route_to`（原地掉头）、`return_home`、POI 私有触发器查询，任务归家同步 `sync_return_home_task` |
-| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 / v1.36.0 `try_route_to_market`（水/粮/木断流时户主直接改道榷场，家户账本远程结算） |
-| `market.rs` | 采购策略子模块：`can_procure_resource` / `should_buy_resource` 在水粮木意图下选择野外采集或市场采购；并负责市场途中与现场退出判定 |
+| `seeking.rs` | 途中熔断与平滑重路由：`decide_seeking_material`/`decide_seeking_survival`（根 AGENTS.md §4.2 核心）+ `decide_seeking_throne`（★ M4 夺位远征途中状态机）+ `decide_seeking_courtship`（★ 求偶途中状态机）+ ★ v1.27.0 / v1.36.0 `try_route_to_market`（水/粮/木断流时户主直接改道榷场，家户账本+随身黄金协同远程结算） |
+| `market.rs` | 采购策略子模块：`can_procure_resource` / `should_buy_resource` 在水粮木意图下选择野外采集或市场采购；支持家户账本+随身黄金协同支付；负责市场途中及现场基于实时牌价与可执行性的退出判定（无力支付或无成交项即刻返家，杜绝卡死） |
 | `harvest.rs` | 现场采收完成判定：饮水/采食/伐木/采石/淘金 + 仓储满额查询；★ L1 连续采收候选仲裁 `arbitrate_continuous_harvest_candidate`；★ v1.35.0 单趟多品类连续采收 `try_continue_harvesting`；★ M19.4d 多品类预排行程规划器 `plan_harvest_itinerary`（最近邻贪心 TSP，定长 4 站灌入 `Agent3D::harvest_queue`）；★ v1.27.0 / v1.36.0 水/粮/木目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | World 级调度：`tick_decisions`（错峰决策 + POI 观测推送）、`execute_pending_coronations`（★ M4 登基物理执行器）、`execute_pending_courtships`（★ 求偶成婚物理执行器）、`execute_pending_bids`（★ v1.26.0 竞拍出价物理执行器）与 `build_decision_context`（收集全图资源节点与单身女性候选） |
 

@@ -130,17 +130,35 @@
     };
   }
 
-  // 在整数列网格上由 idealCol 向两侧探测最近的无冲突列
+  function isFemale(n) {
+    return !!(n && n.gender === 'female');
+  }
+
+  // 将 idealCol 对齐到符合自身性别的奇偶列 (男奇 1, 3, 5... / 女偶 0, 2, 4...)
+  function alignColumnToGender(ideal, isFem) {
+    const p = isFem ? 0 : 1;
+    const r = Math.round(ideal);
+    if (((r % 2) + 2) % 2 === p) return r;
+    const dLeft = Math.abs((r - 1) - ideal);
+    const dRight = Math.abs((r + 1) - ideal);
+    if (Math.abs(dLeft - dRight) < 1e-4) {
+      return isFem ? (r + 1) : (r - 1);
+    }
+    return dLeft < dRight ? (r - 1) : (r + 1);
+  }
+
+  // 在整数列网格上由 idealCol 向两侧探测最近的无冲突列 (步长 2 保持性别单双奇偶不串列)
   function probeColumn(occ, idealCol, y, selfId, maxSpan) {
     if (!occ.collides(idealCol, y, selfId)) return idealCol;
-    for (let d = 1; d <= maxSpan; d++) {
+    for (let step = 1; step <= maxSpan; step++) {
+      const d = step * 2;
       if (!occ.collides(idealCol + d, y, selfId)) return idealCol + d;
       if (!occ.collides(idealCol - d, y, selfId)) return idealCol - d;
     }
-    return idealCol + maxSpan + 1; // 理论上不会走到 (网格足够宽)
+    return idealCol + (maxSpan + 1) * 2;
   }
 
-  // 亲属 (父母 + 子女) 横向偏移代价，用于局部优化
+  // 亲属 (父母 + 子女 + 配偶) 横向偏移代价，用于局部优化
   function relativeCost(n, col, nodeMap) {
     let cost = 0, cnt = 0;
     for (const pId of [n.fatherId, n.motherId]) {
@@ -151,6 +169,8 @@
       const c = nodeMap.get(cId);
       if (c && c._placed) { cost += Math.abs(c.col - col); cnt++; }
     }
+    const sp = n.spouseId && nodeMap.get(n.spouseId);
+    if (sp && sp._placed) { cost += Math.abs(sp.col - col); cnt++; }
     return cnt ? cost / cnt : 0;
   }
 
@@ -159,37 +179,51 @@
     const birthOrder = nodes.slice().sort((a, b) => (a.birthTick - b.birthTick) || (a.id - b.id));
     const maxSpan = Math.max(8, birthOrder.length);
 
-    // —— 第一遍: 主干优先落位 (全部锚定第 0 列，形成贯穿全图的垂直主脉)
+    // —— 第一遍: 主干优先落位 (男性锚定第 1 列单数，女性锚定第 0 列双数)
     for (const n of birthOrder) {
       if (!spine.has(n.id)) continue;
-      n.col = probeColumn(occ, 0, n.y, n.id, maxSpan);
+      const spineIdeal = isFemale(n) ? 0 : 1;
+      n.col = probeColumn(occ, spineIdeal, n.y, n.id, maxSpan);
       n.x = n.col * HNEAR;
       n._placed = true;
       occ.add(n);
     }
-    // —— 第二遍: 其余节点按出生顺序落位，理想列 = 双亲中点 + 同胞序号偏移
+    // —— 第二遍: 其余节点按出生顺序落位，理想列 = 双亲中点 (或配偶) + 同胞序号偏移 (步长 2)
     for (const n of birthOrder) {
       if (n._placed) continue;
       const f = n.familyKey ? families.get(n.familyKey) : null;
       const father = n.fatherId && nodeMap.get(n.fatherId);
       const mother = n.motherId && nodeMap.get(n.motherId);
-      let base = 0, hasParent = false;
-      if (father && father._placed && mother && mother._placed) { base = (father.col + mother.col) / 2; hasParent = true; }
-      else if (father && father._placed) { base = father.col; hasParent = true; }
-      else if (mother && mother._placed) { base = mother.col; hasParent = true; }
-      // 同父母子女整体以双亲中点为中心向两侧铺开，长幼自左向右
+      const spouse = n.spouseId && nodeMap.get(n.spouseId);
+      let base = isFemale(n) ? 0 : 1, hasAnchor = false;
+      if (father && father._placed && mother && mother._placed) {
+        base = (father.col + mother.col) / 2;
+        hasAnchor = true;
+      } else if (father && father._placed) {
+        base = father.col;
+        hasAnchor = true;
+      } else if (mother && mother._placed) {
+        base = mother.col;
+        hasAnchor = true;
+      } else if (spouse && spouse._placed) {
+        base = spouse.col;
+        hasAnchor = true;
+      }
+      // 同父母子女整体以双亲中点为中心向两侧铺开，同性别步长为 2
       let ideal = base;
       if (f && f.children.length > 1) {
-        ideal = base + (n.siblingIx - (f.children.length - 1) / 2) * 1;
+        ideal = base + (n.siblingIx - (f.children.length - 1) / 2) * 2;
+      } else if (!hasAnchor) {
+        ideal = isFemale(n) ? 0 : 1;
       }
-      if (!hasParent) ideal = f && f.children.length > 1 ? (n.siblingIx - (f.children.length - 1) / 2) : 0;
-      n.col = probeColumn(occ, Math.round(ideal), n.y, n.id, maxSpan);
+      const aligned = alignColumnToGender(ideal, isFemale(n));
+      n.col = probeColumn(occ, aligned, n.y, n.id, maxSpan);
       n.x = n.col * HNEAR;
       n._placed = true;
       occ.add(n);
     }
 
-    // —— 第三遍: 局部松弛 (父向子女质心靠拢 → 子向双亲中点靠拢)，仅在不冲突且代价下降时接受
+    // —— 第三遍: 局部松弛 (父向子女质心靠拢 → 子向双亲/配偶中点靠拢)，仅在保持性别奇偶、不冲突且代价下降时接受
     for (let pass = 0; pass < 2; pass++) {
       for (let i = birthOrder.length - 1; i >= 0; i--) {
         const n = birthOrder[i];
@@ -197,7 +231,8 @@
         const kids = (n.children || []).map(id => nodeMap.get(id)).filter(c => c && c._placed);
         if (!kids.length) continue;
         const target = kids.reduce((s, k) => s + k.col, 0) / kids.length;
-        const cand = probeColumn(occ, Math.round(target), n.y, n.id, maxSpan);
+        const aligned = alignColumnToGender(target, isFemale(n));
+        const cand = probeColumn(occ, aligned, n.y, n.id, maxSpan);
         if (cand !== n.col && !occ.collides(cand, n.y, n.id) && relativeCost(n, cand, nodeMap) < relativeCost(n, n.col, nodeMap)) {
           n.col = cand; n.x = cand * HNEAR;
         }
@@ -206,11 +241,13 @@
         if (spine.has(n.id)) continue;
         const father = n.fatherId && nodeMap.get(n.fatherId);
         const mother = n.motherId && nodeMap.get(n.motherId);
-        if (!father && !mother) continue;
-        const cols = [father, mother].filter(p => p && p._placed).map(p => p.col);
-        if (!cols.length) continue;
-        const target = cols.reduce((s, c) => s + c, 0) / cols.length;
-        const cand = probeColumn(occ, Math.round(target), n.y, n.id, maxSpan);
+        const spouse = n.spouseId && nodeMap.get(n.spouseId);
+        if (!father && !mother && (!spouse || !spouse._placed)) continue;
+        const anchors = [father, mother, spouse].filter(p => p && p._placed).map(p => p.col);
+        if (!anchors.length) continue;
+        const target = anchors.reduce((s, c) => s + c, 0) / anchors.length;
+        const aligned = alignColumnToGender(target, isFemale(n));
+        const cand = probeColumn(occ, aligned, n.y, n.id, maxSpan);
         if (cand !== n.col && !occ.collides(cand, n.y, n.id) && relativeCost(n, cand, nodeMap) < relativeCost(n, n.col, nodeMap)) {
           n.col = cand; n.x = cand * HNEAR;
         }
@@ -245,17 +282,26 @@
     assignTimelineY(nodes, pxPerTick, tickMin, pad);
     packHorizontal(nodes, nodeMap, spine, families, pxPerTick, tickMin, pad);
 
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minCol = Infinity, maxCol = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const n of nodes) {
       n.isSpine = spine.has(n.id);
-      if (n.x < minX) minX = n.x;
-      if (n.x + C.NODE_W > maxX) maxX = n.x + C.NODE_W;
+      if (n.col < minCol) minCol = n.col;
+      if (n.col > maxCol) maxCol = n.col;
       if (n.y < minY) minY = n.y;
       if (n.y + C.NODE_H > maxY) maxY = n.y + C.NODE_H;
     }
-    for (const n of nodes) { n.x = n.x - minX + pad; n.y = n.y - minY + pad; }
 
-    const width = Math.max(1400, (maxX - minX) + pad * 2);
+    // 偶数平移基准：确保所有节点的最终列号为严格正整数 (>= 1)，且奇偶性严格不变
+    // 使得：男性始终进入第 1, 3, 5, 7, ... 单数格子；女性始终进入第 2, 4, 6, 8, ... 双数格子
+    const baseCol = (((minCol % 2) + 2) % 2 === 1) ? (minCol - 1) : (minCol - 2);
+    for (const n of nodes) {
+      n.col = n.col - baseCol; // 最终整数格子编号 (单数=男, 双数=女)
+      n.x = pad + (n.col - 1) * HNEAR;
+      n.y = n.y - minY + pad;
+    }
+
+    const finalMaxCol = Math.max(...nodes.map(n => n.col));
+    const width = Math.max(1400, pad * 2 + finalMaxCol * HNEAR);
     const height = Math.max(1000, (maxY - minY) + pad * 2);
     // y ↔ tick 互转 (供时间刻度尺使用)
     const toY = (tick) => pad + (tick - tickMin) * pxPerTick - minY + pad;
@@ -344,6 +390,7 @@
   }
 
   const SRC_FNS = [
+    isFemale, alignColumnToGender,
     markSpine, buildFamilies, assignTimelineY, makeOccupancy, probeColumn,
     relativeCost, packHorizontal, layoutTimelineDag, edgePathTimeline, edgePathFlat,
     lodLevel, tickToTimeLabel, rulerMarks
@@ -351,6 +398,7 @@
 
   return {
     LAYOUT_CONST, VNEAR, HNEAR,
+    isFemale, alignColumnToGender,
     markSpine, buildFamilies, assignTimelineY, packHorizontal, layoutTimelineDag,
     edgePathTimeline, edgePathFlat, lodLevel, tickToTimeLabel, rulerMarks,
     // standalone 独立新标签页内嵌同源源码 (含常量字面量，杜绝作用域缺失)

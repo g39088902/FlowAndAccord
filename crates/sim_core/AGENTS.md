@@ -51,7 +51,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 ## 4. 🧱 关键类型不变量
 
 - **`WorldRng`**：xorshift64*，状态仅一个 u64。seed 0 被静默替换为黄金比例常数；`gen_normal`（Box-Muller）恰好消耗 2 个均匀数；`gen_range_usize` 在 `high <= low` 时返回 `low`（不 panic）。
-- **`SimConfig`**：211 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
+- **`SimConfig`**：215 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
 - **`TerrainMap`**：`sample_elevation` 为最近邻采样（无插值），归一化坐标 clamp 到 [0.0, 0.999]。
 - **`World3DEngine`**：世界总管理器，一切世界级系统方法以 `impl World3DEngine` 分散挂载。
 - **`Agent3D`**：部落民实体（生理/行囊/血缘/禀赋/`poi_seekability` 私有触发器表）。

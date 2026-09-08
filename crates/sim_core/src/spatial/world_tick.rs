@@ -91,7 +91,22 @@ impl World3DEngine {
                     PoiType::GoldMine => self.config.regen_base_gold,
                     _ => 1.0,
                 };
-                poi.regen_rate = base_regen;
+                let temp_factor = if poi.poi_type == PoiType::BerryBush {
+                    let decline = self.config.berry_frost_decline_temp;
+                    let zero = self.config.berry_frost_zero_temp;
+                    if self.temperature <= zero {
+                        0.0
+                    } else if self.temperature >= decline {
+                        1.0
+                    } else {
+                        let span = (decline - zero).max(0.001);
+                        let t = ((self.temperature - zero) / span).clamp(0.0, 1.0);
+                        3.0 * t * t - 2.0 * t * t * t
+                    }
+                } else {
+                    1.0
+                };
+                poi.regen_rate = base_regen * temp_factor;
                 let mult = match poi.poi_type {
                     PoiType::WaterSource => self.water_regen_multiplier,
                     PoiType::BerryBush => self.berry_regen_multiplier,

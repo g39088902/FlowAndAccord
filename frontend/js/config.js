@@ -28,7 +28,7 @@ window.SIM_CONFIG = {
   agentInitialHunger: 45.0,       // 始祖/新生儿初始饱食度
   agentInitialThirst: 45.0,       // 始祖/新生儿初始水分
   agentInitialStamina: 95.0,      // 始祖初始体力
-  agentBaseMetabolismDecay: 0.10, // 基础代谢消耗速率 (饱食/水分 每秒)
+  agentBaseMetabolismDecay: 0.20, // 基础代谢消耗速率 (饱食/水分 每秒)
   agentHealthDecayPerSec: 0.01,   // 濒死健康衰减速率 (每秒)
   agentPregnantMetabolismMult: 1.25, // 孕期代谢消耗倍率
   agentWorkMetabolismMult: 1.0,   // 劳作代谢消耗倍率
@@ -172,7 +172,11 @@ window.SIM_CONFIG = {
   tempBaseMid: 14.0,              // 年均基准温度 (℃)
   tempAmplitude: 17.0,            // 季节温度振幅 (℃)
   tempElNinoCycleYears: 7.0,      // 厄尔尼诺叠加正弦周期 (年)
-  tempElNinoAmplitude: 3.0,       // 厄尔尼诺叠加正弦振幅范围 (±℃)
+  tempElNinoAmplitude: 5.0,       // 厄尔尼诺叠加正弦振幅范围 (±℃)
+  tempClimateEpochCycleYears: 49.0, // 纪元候波叠加正弦长周期 (年)
+  tempClimateEpochAmplitude: 5.0,  // 纪元候波正弦振幅范围 (±℃)
+  berryFrostDeclineTemp: 8.0,      // 浆果开始减产的霜降气温阈值 (℃)
+  berryFrostZeroTemp: 0.0,         // 浆果彻底绝收休眠的冰封气温阈值 (℃)
 
   // ==========================================================================
   // 8. 空间路网、限速与踩踏演化 (Roads & Wear Evolution)

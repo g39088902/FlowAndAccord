@@ -149,6 +149,20 @@ pub struct ReadyWife {
     pub stationary: bool,
 }
 
+/// 外部市场（榷场互市）当前供求与牌价上下文快照
+#[derive(Debug, Clone, Copy)]
+pub struct MarketInfo {
+    pub poi_id: PoiId,
+    pub node: NodeId,
+    pub pos: Vec3,
+    pub water_stock: f32,
+    pub food_stock: f32,
+    pub wood_stock: f32,
+    pub water_price: f32,
+    pub food_price: f32,
+    pub wood_price: f32,
+}
+
 /// 决策上下文：收集资源节点；是否可用由每个 Agent 的私有触发器决定。
 pub struct DecisionContext {
     pub water_nodes: Vec<ResourceNode>,
@@ -157,6 +171,7 @@ pub struct DecisionContext {
     pub stone_nodes: Vec<ResourceNode>,
     pub gold_nodes: Vec<ResourceNode>,
     pub market_nodes: Vec<ResourceNode>,
+    pub markets: Vec<MarketInfo>,
     pub camp_positions: Vec<(NodeId, Vec3)>,
     /// 全部营地 POI：(camp_id, 营地坐标)（夺位远征目标定位与国王立宅约束使用）
     pub camp_pois: Vec<(u32, Vec3)>,

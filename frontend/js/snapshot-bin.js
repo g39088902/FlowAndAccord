@@ -157,6 +157,7 @@
       total_royal_privy: 0, total_imperial_privy: 0, auction_history: [], season: 'Spring', temperature: 0,
       season_progress: 0, last_mutation_event: null, recent_deaths: [], water_regen_multiplier: 1,
       berry_regen_multiplier: 1, wood_regen_multiplier: 1, stone_regen_multiplier: 1, gold_regen_multiplier: 1,
+      season_timer: 0, el_nino_phase: 0, climate_epoch_phase: 0,
       lane_wear: null,
     };
     snap.tick = tick;
@@ -191,6 +192,9 @@
       snap.stone_regen_multiplier = gr.f32();
       snap.gold_regen_multiplier = gr.f32();
       snap.last_mutation_event = strOf(gr.u32());
+      snap.season_timer = gr.f32();
+      snap.el_nino_phase = gr.f32();
+      snap.climate_epoch_phase = gr.f32();
     }
 
     if (dir[K.AGENT]) {

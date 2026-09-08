@@ -541,9 +541,19 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
 
     const multPrimary = poiRegenMultiplier(poi.type, 'primary');
     const effPrimary = effectiveRegenRate(poi.regenRate, multPrimary);
-    document.getElementById('insp-poi-regen').textContent = poi.regenRate > 0
-      ? `+${effPrimary.toFixed(2)} 单位/小时 (基准 ${poi.regenRate.toFixed(2)} × ${multPrimary.toFixed(1)}x)`
-      : `无限储量 (公共避风聚落)`;
+    let regenText;
+    if (poi.type === 'Camp') {
+      regenText = `无限储量 (公共避风聚落)`;
+    } else if (poi.type === 'Berry' && poi.regenRate <= 0.0001) {
+      regenText = `❄️ 冰封绝收 (0.00 单位/小时 · 气温≤0℃)`;
+    } else if (poi.type === 'Berry' && window.SIM_CONFIG && (window.SIM_CONFIG.berryFrostDeclineTemp || 8.0) > (sim.temperature ?? 20)) {
+      regenText = `+${effPrimary.toFixed(2)} 单位/小时 (🍂 霜冻减产 · 当前气温 ${(sim.temperature ?? 0).toFixed(1)}℃)`;
+    } else if (poi.regenRate > 0) {
+      regenText = `+${effPrimary.toFixed(2)} 单位/小时 (基准 ${poi.regenRate.toFixed(2)} × ${multPrimary.toFixed(1)}x)`;
+    } else {
+      regenText = `+${effPrimary.toFixed(2)} 单位/小时 (停止产出)`;
+    }
+    document.getElementById('insp-poi-regen').textContent = regenText;
 
     // 第二条产速：仅榷场（粮食，复用浆果倍率槽位）
       if (regenSecondaryRow) {

@@ -20,7 +20,7 @@
 | `agentInitialHunger` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始饱食度 |
 | `agentInitialThirst` | f32 | 45 | agent.rs (初始属性) | 始祖/新生儿初始水分 |
 | `agentInitialStamina` | f32 | 95 | agent.rs (初始属性) | 始祖初始体力 |
-| `agentBaseMetabolismDecay` | f32 | 0.1 | agent.rs (基础代谢/速度) | 基础代谢消耗速率 (饱食/水分 每秒) |
+| `agentBaseMetabolismDecay` | f32 | 0.2 | agent.rs (基础代谢/速度) | 基础代谢消耗速率 (饱食/水分 每秒) |
 | `agentHealthDecayPerSec` | f32 | 0.01 | agent.rs (健康衰减) | 濒死健康衰减速率 (每秒) |
 | `agentPregnantMetabolismMult` | f32 | 1.25 | agent.rs (妊娠代谢) | 孕期代谢消耗倍率 |
 | `agentWorkMetabolismMult` | f32 | 1 | agent.rs (劳作代谢) | 劳作代谢消耗倍率 |
@@ -185,7 +185,11 @@
 | `tempBaseMid` | f32 | 14 | world_season.rs (温度正弦曲线) | 年均基准温度 (℃) |
 | `tempAmplitude` | f32 | 17 | world_season.rs (温度正弦曲线) | 季节温度振幅 (℃) |
 | `tempElNinoCycleYears` | f32 | 7 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦周期 (年) |
-| `tempElNinoAmplitude` | f32 | 3 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦振幅范围 (±℃) |
+| `tempElNinoAmplitude` | f32 | 5 | world_season.rs (温度正弦曲线) | 厄尔尼诺叠加正弦振幅范围 (±℃) |
+| `tempClimateEpochCycleYears` | f32 | 49 | world_season.rs (温度正弦曲线) | 纪元候波叠加正弦长周期 (年) |
+| `tempClimateEpochAmplitude` | f32 | 5 | world_season.rs (温度正弦曲线) | 纪元候波正弦振幅范围 (±℃) |
+| `berryFrostDeclineTemp` | f32 | 8 | — | 浆果开始减产的霜降气温阈值 (℃) |
+| `berryFrostZeroTemp` | f32 | 0 | — | 浆果彻底绝收休眠的冰封气温阈值 (℃) |
 
 ## 8. 空间路网、限速与踩踏演化
 

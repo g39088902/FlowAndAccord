@@ -741,6 +741,9 @@ impl World3DEngine {
             wood_regen_multiplier: self.wood_regen_multiplier,
             stone_regen_multiplier: self.stone_regen_multiplier,
             gold_regen_multiplier: self.gold_regen_multiplier,
+            season_timer: self.season_timer,
+            el_nino_phase: self.el_nino_phase,
+            climate_epoch_phase: self.climate_epoch_phase,
         }
     }
 }

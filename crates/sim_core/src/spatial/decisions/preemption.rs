@@ -228,6 +228,56 @@ impl<'a> Decisioner<'a> {
             }
         }
 
+        // ──────────────────────────────────────────────────────────
+        // 矩阵行 5：榷场采买 (MarketTrade) 遇临界饥渴
+        // 若在现场且能够自救（有可用资金且市场有存量），可由现场自救覆盖；
+        // 但若在途中，或在现场无法自救（资金不足或市场售罄），
+        // 必须立即抢占转向野外求生或返家休整，杜绝因商贸策略停滞而渴死/饿死。
+        // ──────────────────────────────────────────────────────────
+        if matches!(
+            agent.active_task.as_ref().map(|t| &t.strategy),
+            Some(ExecutionStrategy::MarketTrade { .. })
+        ) {
+            let critical_thirst = agent.thirst < self.config.decision_critical_thirst;
+            let critical_hunger = agent.hunger < self.config.decision_critical_hunger;
+            if critical_thirst || critical_hunger {
+                let (is_thirst, kind) = if critical_thirst {
+                    (true, NeedKind::QuenchThirst)
+                } else {
+                    (false, NeedKind::SateHunger)
+                };
+
+                let can_self_rescue_at_market =
+                    if agent.state == PrimitiveActionState::BuyingAtMarket {
+                        if let Some(m) = self.nearest_market_info(agent) {
+                            let step = self.config.market_settlement_step;
+                            let (stock, price) = if is_thirst {
+                                (m.water_stock, m.water_price)
+                            } else {
+                                (m.food_stock, m.food_price)
+                            };
+                            let available_gold = self
+                                .households
+                                .household_of(agent.id)
+                                .and_then(|hid| self.households.get(hid))
+                                .map(|hh| hh.group.ledger.balance(ResourceKind::Gold))
+                                .unwrap_or(0.0)
+                                + agent.carried_gold;
+                            stock >= step && available_gold >= step * price
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                if !can_self_rescue_at_market {
+                    self.preempt_critical_survival(agent, kind);
+                    return true;
+                }
+            }
+        }
+
         false
     }
 

@@ -192,6 +192,13 @@ pub struct SimConfig {
     pub temp_amplitude: f32,
     pub temp_el_nino_cycle_years: f32,
     pub temp_el_nino_amplitude: f32,
+    /// 纪元候波（大世纪极值波动，49年长周期）
+    pub temp_climate_epoch_cycle_years: f32,
+    pub temp_climate_epoch_amplitude: f32,
+    /// 浆果霜冻减产起始气温阈值 (℃)
+    pub berry_frost_decline_temp: f32,
+    /// 浆果冰封彻底绝收气温阈值 (℃)
+    pub berry_frost_zero_temp: f32,
 
     // 8. 空间路网、限速与踩踏演化
     pub road_wear_decay_rate: f32,

@@ -167,6 +167,12 @@ function updateTopBarStats(now) {
   document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
   document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
 
+  // 气温预测浮窗如果在展开状态，每 30 帧刷新一次以跟随时间平滑演化
+  if (_climatePopupVisible && sim && (sim.tickCount - _lastClimateChartRenderTick >= 30)) {
+    _lastClimateChartRenderTick = sim.tickCount;
+    renderClimateForecastChart();
+  }
+
   // ★ M2: 账本与社会制度 UI 更新（与顶栏统计同一 10FPS 节流）
   if (window.LedgerUI && typeof window.LedgerUI.update === 'function') {
     window.LedgerUI.update(sim);
@@ -567,4 +573,303 @@ function updateLedgerPanel() {
       mgList.innerHTML = '<div class="ledger-empty">尚无婚姻登记</div>';
     }
   }
+}
+
+// ============================================================================
+// 🌡️ 宏观气候演化预测折线图 (未来 49 年纪元候波)
+// ============================================================================
+
+let _climatePopupTimer = null;
+let _climatePopupVisible = false;
+let _lastClimateChartRenderTick = -1;
+
+function predictClimateTemperature(seasonTimer, elNinoPhase, epochPhase, dtHours) {
+  const cfg = window.SIM_CONFIG || {};
+  const yearLength = cfg.seasonYearLength || 240.0;
+  const t = seasonTimer + dtHours;
+
+  const seasonTime = ((t % yearLength) + yearLength) % yearLength;
+  const angle = (seasonTime / yearLength) * (Math.PI * 2);
+  const baseMid = cfg.tempBaseMid != null ? cfg.tempBaseMid : 14.0;
+  const baseAmp = cfg.tempAmplitude != null ? cfg.tempAmplitude : 17.0;
+  const baseTemp = baseMid + baseAmp * Math.sin(angle);
+
+  const ensoYears = Math.max(0.1, cfg.tempElNinoCycleYears != null ? cfg.tempElNinoCycleYears : 7.0);
+  const ensoPeriod = ensoYears * yearLength;
+  const ensoAngle = elNinoPhase + (t / ensoPeriod) * (Math.PI * 2);
+  const ensoAmp = cfg.tempElNinoAmplitude != null ? cfg.tempElNinoAmplitude : 5.0;
+  const ensoEffect = ensoAmp * Math.sin(ensoAngle);
+
+  const epochYears = Math.max(0.1, cfg.tempClimateEpochCycleYears != null ? cfg.tempClimateEpochCycleYears : 49.0);
+  const epochPeriod = epochYears * yearLength;
+  const epochAngle = epochPhase + (t / epochPeriod) * (Math.PI * 2);
+  const epochAmp = cfg.tempClimateEpochAmplitude != null ? cfg.tempClimateEpochAmplitude : 5.0;
+  const epochEffect = epochAmp * Math.sin(epochAngle);
+
+  return baseTemp + ensoEffect + epochEffect;
+}
+
+function renderClimateForecastChart() {
+  const canvas = document.getElementById('climate-forecast-canvas');
+  if (!canvas || !sim) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = 480;
+  const h = 200;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const cfg = window.SIM_CONFIG || {};
+  const yearLength = cfg.seasonYearLength || 240.0;
+  const seasonTimer = sim.seasonTimer || 0;
+  const elNinoPhase = sim.elNinoPhase || 0;
+  const epochPhase = sim.climateEpochPhase || 0;
+  const currentYear = seasonTimer / yearLength;
+
+  // 预测未来 49 年 (49 * yearLength 小时)
+  const totalYears = 49.0;
+  const totalDuration = totalYears * yearLength;
+  const sampleSteps = 392; // 采样密度高精度平滑曲线
+  const samples = new Array(sampleSteps + 1);
+
+  let minTemp = Infinity;
+  let maxTemp = -Infinity;
+  let minYear = 0;
+  let maxYear = 0;
+
+  for (let i = 0; i <= sampleSteps; i++) {
+    const fraction = i / sampleSteps;
+    const dtHours = fraction * totalDuration;
+    const tVal = predictClimateTemperature(seasonTimer, elNinoPhase, epochPhase, dtHours);
+    const yr = currentYear + fraction * totalYears;
+    samples[i] = { fraction, dtHours, temp: tVal, year: yr };
+    if (tVal > maxTemp) {
+      maxTemp = tVal;
+      maxYear = yr;
+    }
+    if (tVal < minTemp) {
+      minTemp = tVal;
+      minYear = yr;
+    }
+  }
+
+  // 坐标系边距
+  const padLeft = 38;
+  const padRight = 16;
+  const padTop = 18;
+  const padBottom = 26;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  // 纵轴范围固定或安全自适应 [-16, 45] 保证 0℃ 与 8℃ 及极端震荡在图内
+  const yMin = Math.min(-16, Math.floor(minTemp - 2));
+  const yMax = Math.max(45, Math.ceil(maxTemp + 2));
+  const tempToY = (t) => padTop + plotH - ((t - yMin) / (yMax - yMin)) * plotH;
+  const xToX = (frac) => padLeft + frac * plotW;
+
+  // 1. 背景网格与温度刻度线 (每 10℃ 一道)
+  ctx.lineWidth = 1;
+  ctx.font = '9px "SFMono-Regular", Consolas, monospace';
+  for (let t = Math.ceil(yMin / 10) * 10; t <= yMax; t += 10) {
+    const py = tempToY(t);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+    ctx.beginPath();
+    ctx.moveTo(padLeft, py);
+    ctx.lineTo(w - padRight, py);
+    ctx.stroke();
+
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t + '°', padLeft - 6, py);
+  }
+
+  // 2. 关键基准警戒线
+  // 14℃ 年均中线
+  const y14 = tempToY(14.0);
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(padLeft, y14);
+  ctx.lineTo(w - padRight, y14);
+  ctx.stroke();
+
+  // 8℃ 霜降供暖警戒线
+  const y8 = tempToY(cfg.berryFrostDeclineTemp || 8.0);
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(padLeft, y8);
+  ctx.lineTo(w - padRight, y8);
+  ctx.stroke();
+  ctx.fillStyle = '#fbbf24';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('8℃ 霜降供暖', w - padRight - 4, y8 - 2);
+
+  // 0℃ 绝收冰封警戒线
+  const y0 = tempToY(cfg.berryFrostZeroTemp || 0.0);
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.85)';
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(padLeft, y0);
+  ctx.lineTo(w - padRight, y0);
+  ctx.stroke();
+  ctx.fillStyle = '#60a5fa';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('0℃ 绝收冰封', w - padRight - 4, y0 - 2);
+
+  ctx.setLineDash([]); // 还原实线
+
+  // 3. 横轴时间刻度 (以 7 年为一个厄尔尼诺周期)
+  ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let yr = 0; yr <= 49; yr += 7) {
+    const frac = yr / 49.0;
+    const px = xToX(frac);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.moveTo(px, padTop);
+    ctx.lineTo(px, h - padBottom);
+    ctx.stroke();
+
+    const label = yr === 0 ? '现' : `+${yr}y`;
+    ctx.fillText(label, px, h - padBottom + 6);
+  }
+
+  // 4. 气温曲线下部填充渐变
+  const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+  grad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+  grad.addColorStop(0.7, 'rgba(56, 189, 248, 0.05)');
+  grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+  ctx.beginPath();
+  ctx.moveTo(xToX(0), tempToY(samples[0].temp));
+  for (let i = 1; i <= sampleSteps; i++) {
+    ctx.lineTo(xToX(samples[i].fraction), tempToY(samples[i].temp));
+  }
+  ctx.lineTo(xToX(1), padTop + plotH);
+  ctx.lineTo(xToX(0), padTop + plotH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // 5. 绘制综合气温主曲线
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(xToX(0), tempToY(samples[0].temp));
+  for (let i = 1; i <= sampleSteps; i++) {
+    ctx.lineTo(xToX(samples[i].fraction), tempToY(samples[i].temp));
+  }
+  ctx.stroke();
+
+  // 6. 标记极值点与起点
+  // 起点 (当前温度)
+  const startX = xToX(0);
+  const startY = tempToY(samples[0].temp);
+  ctx.fillStyle = '#38bdf8';
+  ctx.beginPath();
+  ctx.arc(startX, startY, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 最高温点
+  const maxSample = samples.find(s => s.temp === maxTemp) || samples[0];
+  const maxPx = xToX(maxSample.fraction);
+  const maxPy = tempToY(maxSample.temp);
+  ctx.fillStyle = '#f87171';
+  ctx.beginPath();
+  ctx.arc(maxPx, maxPy, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 最低温点
+  const minSample = samples.find(s => s.temp === minTemp) || samples[0];
+  const minPx = xToX(minSample.fraction);
+  const minPy = tempToY(minSample.temp);
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(minPx, minPy, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // 7. 更新浮窗 DOM 信息指标
+  const nowEl = document.getElementById('climate-popup-now');
+  if (nowEl) {
+    nowEl.textContent = `当前: ${(sim.temperature || 0).toFixed(1)}°C (第 ${currentYear.toFixed(1)} 年)`;
+  }
+  const maxEl = document.getElementById('climate-stat-max');
+  if (maxEl) {
+    maxEl.textContent = `${maxTemp.toFixed(1)}°C (+${(maxYear - currentYear).toFixed(1)}y)`;
+  }
+  const minEl = document.getElementById('climate-stat-min');
+  if (minEl) {
+    minEl.textContent = `${minTemp.toFixed(1)}°C (+${(minYear - currentYear).toFixed(1)}y)`;
+  }
+}
+
+// 绑定气温浮窗鼠标悬停事件
+function setupClimateForecastPopup() {
+  const trigger = document.getElementById('stat-item-season');
+  const popup = document.getElementById('climate-forecast-popup');
+  if (!trigger || !popup) return;
+
+  function showPopup() {
+    if (_climatePopupTimer) {
+      clearTimeout(_climatePopupTimer);
+      _climatePopupTimer = null;
+    }
+    const rect = trigger.getBoundingClientRect();
+    const popupW = 508;
+    let left = rect.left + rect.width / 2 - popupW / 2;
+    // 边界检测防溢出
+    if (left < 10) left = 10;
+    if (left + popupW > window.innerWidth - 10) left = window.innerWidth - popupW - 10;
+    const top = rect.bottom + 8;
+
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+    popup.style.display = 'block';
+    _climatePopupVisible = true;
+    renderClimateForecastChart();
+  }
+
+  function hidePopup() {
+    _climatePopupTimer = setTimeout(() => {
+      popup.style.display = 'none';
+      _climatePopupVisible = false;
+      _climatePopupTimer = null;
+    }, 120);
+  }
+
+  trigger.addEventListener('mouseenter', showPopup);
+  trigger.addEventListener('mouseleave', hidePopup);
+  popup.addEventListener('mouseenter', () => {
+    if (_climatePopupTimer) {
+      clearTimeout(_climatePopupTimer);
+      _climatePopupTimer = null;
+    }
+  });
+  popup.addEventListener('mouseleave', hidePopup);
+}
+
+// DOM 加载完成后自动初始化气温浮窗
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupClimateForecastPopup);
+} else {
+  setupClimateForecastPopup();
 }

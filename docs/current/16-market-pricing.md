@@ -107,16 +107,16 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 - 水粮木并行装袋，互不冲突，直至背包满额（50.0）、市场售罄或黄金不足。
 
 ### 3. 黄金流失与记账闭环
-- **真实扣减**：交易消耗的黄金直接从户主所属家户账本中 debit 扣减；
-- **流向虚空**：生成记账凭证 `TransferRecord`：
-  - `from`: `LedgerRef::Family(hh_id)`
-  - `to`: `LedgerRef::Void`
-  - `resource`: `ResourceKind::Gold`
-  - `reason`: `TransferReason::Market`
+- **协同结算（★ v1.46.13）**：交易优先消耗家户账本黄金（远程结算），若家户不足则由随身携带黄金（`carried_gold`）差额补足；
+- **真实扣减与流向虚空**：从家户账本扣除的黄金生成记账凭证 `TransferRecord`（`from: LedgerRef::Family`, `to: LedgerRef::Void`, `reason: TransferReason::Market`），随身黄金直接自减并流向虚空，保持通缩闭环；
 - **宏观效应**：黄金作为一般等价物向外部大世界流失，沉淀了货币蓄水池，为后续由营地中介驱动的二手房屋竞价交易提供了紧缩锚。
 
-### 4. 平滑返航与卸货
-当任一待采购行囊已满、剩余空间不足一笔 `marketSettlementStep`、家财耗尽（`< 0.05` 金）或体力见底时，决策器平滑切换为 `PrimitiveActionState::ReturningToCamp` 返家。市场成交按固定步长结算；将“空间不足一笔成交”视为返航条件，使其与成交门槛一致，避免尚未达到背包容量上限却无法再完成下一笔交易而滞留在榷场。回家休整时，购入的水粮按正常物理卸货速率卸入家户账本（Deposit 流水），拯救阖家老小。
+### 4. 平滑返航与防滞留守卫（★ v1.46.13）
+当族人在现场面临以下任一情况时，决策器平滑切换为 `PrimitiveActionState::ReturningToCamp` 启程返家（`Safety·ReturnHome`）：
+1. **无可执行交易**：水、粮、木三个品类中没有任何一项同时满足「有需求且空间足够（$\ge \text{step}$）且市场有货（$\ge \text{step}$）且总可用资金能够支付一笔结算（$\text{available\_gold} \ge \text{step} \times \text{单价}$）」；
+2. **体力告警**：`agent.stamina < decision_work_stamina_threshold`（返回休整 `Physiological·Rest`）；
+3. **紧急求生抢占**：在途中或在现场遭遇临界饥渴且无法在现场自救时，立即抢占转向野外自然点或返家。
+彻底根除了以往因「家财或随身资金不足以支持一整步结算、但未达到旧 0.05 枯竭线」而卡死在榷场的 Bug。回家休整时，购入的物资按正常物理速率卸入家户账本。
 
 ### 5. 交易流水环形缓冲（★ v1.28.0）
 

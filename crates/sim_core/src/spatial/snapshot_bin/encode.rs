@@ -92,6 +92,9 @@ impl World3DEngine {
             w.f32(self.stone_regen_multiplier);
             w.f32(self.gold_regen_multiplier);
             w.u32(tab.intern_opt(&self.last_event));
+            w.f32(self.season_timer);
+            w.f32(self.el_nino_phase);
+            w.f32(self.climate_epoch_phase);
             w.align4();
             secs.push(Sec::new(SectionKind::Global, 1, w.into_inner()));
         }

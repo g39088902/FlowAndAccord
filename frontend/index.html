@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.46.12</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.46.16</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -49,7 +49,7 @@
         <div class="stat-val" id="stat-pregnant" style="color:#ec4899;">0</div>
         <div class="stat-lbl">🤰 孕妇数</div>
       </div>
-      <div class="stat-item">
+      <div class="stat-item stat-item-interactive" id="stat-item-season" title="鼠标悬停查看未来 49 年气候演化折线图">
         <div class="stat-val" id="stat-season" style="color:#f59e0b;">🌸 春季</div>
         <div class="stat-lbl" id="stat-temp" style="color:#e2e8f0; font-weight:600;">21.5°C</div>
       </div>
@@ -74,6 +74,41 @@
       <button class="save-bar-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动 Branch 分支调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）">🧠 决策引擎</button>
       <button class="save-bar-btn auction-bar-btn" id="btn-open-auction-modal" title="查看全图房屋拍卖大盘与连续报价过程">🏛️ 报价 (<span id="top-auction-count">0</span>)</button>
       <button class="save-bar-btn" id="btn-toggle-theme" title="切换明亮/暗色主题">☀️ 主题</button>
+    </div>
+  </div>
+
+  <!-- 🌡️ 未来 49 年宏观气候温度折线图悬浮窗 -->
+  <div id="climate-forecast-popup" class="climate-popup" style="display: none;">
+    <div class="climate-popup-header">
+      <div class="climate-popup-title">
+        <span class="climate-popup-icon">🌡️</span>
+        <span style="font-weight: 700; color: #f8fafc;">宏观气候演化预测</span>
+        <span class="climate-popup-badge">未来 49 年纪元候波</span>
+      </div>
+      <div class="climate-popup-now" id="climate-popup-now">当前: 21.5°C</div>
+    </div>
+    <div class="climate-chart-container">
+      <canvas id="climate-forecast-canvas" width="480" height="200"></canvas>
+    </div>
+    <div class="climate-popup-legend">
+      <div class="legend-item"><span class="legend-line line-curve"></span> 综合气温</div>
+      <div class="legend-item"><span class="legend-line line-frost"></span> 8℃ 霜降供暖</div>
+      <div class="legend-item"><span class="legend-line line-freeze"></span> 0℃ 绝收冰封</div>
+      <div class="legend-item"><span class="legend-line line-base"></span> 14℃ 年均基准</div>
+    </div>
+    <div class="climate-popup-stats" id="climate-popup-stats">
+      <div class="cstat-col">
+        <span class="cstat-lbl">盛夏极热</span>
+        <span class="cstat-val val-hot" id="climate-stat-max">--</span>
+      </div>
+      <div class="cstat-col">
+        <span class="cstat-lbl">寒冬极冷</span>
+        <span class="cstat-val val-cold" id="climate-stat-min">--</span>
+      </div>
+      <div class="cstat-col">
+        <span class="cstat-lbl">三大气候周期</span>
+        <span class="cstat-val" id="climate-stat-cycle">1y 四季 / 7y 厄尔尼诺 / 49y 候波</span>
+      </div>
     </div>
   </div>
 

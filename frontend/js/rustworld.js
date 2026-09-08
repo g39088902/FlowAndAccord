@@ -45,6 +45,9 @@
         this.totalHouseholds = 0; // ★ 历史累计创建家户总数（含已解散；households 快照仅存续活跃家户）
         this.currentSeason = 'Spring';
         this.temperature = 20.0;
+        this.seasonTimer = 0.0;
+        this.elNinoPhase = 0.0;
+        this.climateEpochPhase = 0.0;
         this.tickCount = 0;
         this.tickRate = 0;
         this._lastSnapshotRealTime = performance.now();
@@ -74,7 +77,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.46.12';
+        this._appVersion = '1.46.16';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -143,7 +146,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.46.12';
+            this._appVersion = msg.appVersion || '1.46.16';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -392,7 +395,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.46.12';
+        return this._appVersion || '1.46.16';
       }
 
       /**
@@ -542,6 +545,9 @@
         }));
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
+        this.seasonTimer = snap.season_timer != null ? snap.season_timer : 0.0;
+        this.elNinoPhase = snap.el_nino_phase != null ? snap.el_nino_phase : 0.0;
+        this.climateEpochPhase = snap.climate_epoch_phase != null ? snap.climate_epoch_phase : 0.0;
 
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
         // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致

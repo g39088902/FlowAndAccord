@@ -24,7 +24,7 @@ impl<'a> Decisioner<'a> {
             .and_then(|hid| self.households.get(hid))
             .map(|hh| {
                 hh.group.leader == Some(agent.id)
-                    && hh.group.ledger.balance(ResourceKind::Gold)
+                    && (hh.group.ledger.balance(ResourceKind::Gold) + agent.carried_gold)
                         >= self.config.market_min_family_gold
             })
             .unwrap_or(false);

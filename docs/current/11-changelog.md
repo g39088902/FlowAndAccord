@@ -1,7 +1,15 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.12**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.16**。
+
+| **v1.46.16** | 宏观气候厄尔尼诺与纪元候波振幅放大至 ±5℃：① **振幅调优**：将前端 `config.js` 的 `tempElNinoAmplitude` 与 `tempClimateEpochAmplitude` 默认超参从 3.0 上调至 5.0（厄尔尼诺与纪元候波正弦波动振幅分别由 ±3℃ 增至 ±5℃），宏观综合极端气温范围拓展至 -13℃ ~ 41℃；② **预测图表与示例同步**：更新 `crates/sim_core/examples/config.json` 与 `render_hud.js` 折线图坐标自适应极值与 fallback；更新气候机制文档；参数速查表与确定性门禁全量通过。 | config / docs / sim_wasm |
+
+| **v1.46.15** | 顶栏气温窗口悬停未来 49 年气候折线图与快照四处同步：① **快照四处同步 (M4)**：`WorldSnapshot3D`、`world_snapshot.rs`、`snapshot_bin/encode.rs` 与前端解码器 `snapshot-bin.js` + `rustworld.js` 同步新增 `season_timer`、`el_nino_phase` 与 `climate_epoch_phase` 三大气候外推时基与初始随机相位字段；② **未来 49 年宏观气候演化预测浮窗**：在顶栏气温卡片（`#stat-item-season`）绑定悬停交互，动态滑出半透明毛玻璃悬浮窗 `#climate-forecast-popup`，由高分辨率 Canvas 精确渲染未来 49 年（11,760 游戏小时）叠加 1 年基准正弦、7 年厄尔尼诺与 49 年纪元候波的平滑全频温度折线图；③ **警戒线与极值预警**：图表清晰标注 `0℃ 绝收冰封`、`8℃ 霜降供暖` 与 `14℃ 年均基准` 辅助线，实时预测标出未来 49 年盛夏极热与寒冬极冷极值及发生年份；④ **门禁全通**：`test-snapshot-bin.js` 100% 一致通过，确定性矩阵、WASM 及前端静态门禁全绿。 | sim_core(snapshot) / frontend(render_hud/style/snapshot-bin/rustworld) / docs |
+
+| **v1.46.14** | 水与食物基础代谢消耗速率翻倍调优：将 `agentBaseMetabolismDecay` 从 0.10 上调至 0.20（饱食与水分基准消耗速率 0.20 点/游戏小时，孕期 1.25 倍对应 0.25 点/游戏小时）；同步更新前端配置 `frontend/js/config.js`、示例配置 `crates/sim_core/examples/config.json` 及生理代谢文档 `docs/current/04-agent-life.md`；参数速查表与确定性门禁全量通过。 | config / docs / sim_wasm |
+
+| **v1.46.13** | 修复族人资金不足时在榷场永久停滞的 Bug：① **家户账本与随身黄金协同支付**：`ecology.rs` 榷场交易结算优先扣减家户账本黄金，不足部分允许由族人随身黄金（`agent.carried_gold`）协同补足，保持黄金流向 Void 的通缩闭环；赴市资格与重路由门槛同步计入随身黄金；② **现场可执行交易完备判定与即刻返航**：`market.rs::decide_buying_market` 引入基于实时榷场牌价与库存（`MarketInfo`）的交易可行性全景判定，若当前水/粮/木三品类均无任何一项同时满足「有需求且行囊有整步空间（$\ge \text{step}$）且市场有货（$\ge \text{step}$）且总可用资金能够支付一笔结算（$\text{available\_gold} \ge \text{step} \times \text{单价}$）」，或体力告警，立即判定无可执行交易并平滑启程返家（`Safety·ReturnHome`），彻底根除因单笔资金不足却未跌破旧 0.05 枯竭线导致马斯洛状态停留在「储备食物/储备饮用水」而永久卡死在榷场的缺陷；③ **途中与紧急求生分级抢占联动**：`decide_seeking_market` 途中资金不足时提前掉头折返；`preemption.rs::try_preempt_task` 补全 `MarketTrade` 处于途中或在现场无法自救时的临界饥渴（$\text{thirst/hunger} < 15$）求生抢占，优先转向野外自然点或返家，杜绝活活饿死渴死。 | sim_core(decisions/market/seeking/preemption/ecology/scheduler) / docs |
 
 | **v1.46.12** | 马斯洛引擎按意图/策略/原语边界收敛为 16 条活动分支：b11 合并入 b8「改善住宅」，人在宅门口时走瞬发升级、异地时先返宅；b15 榷场贸易移出需求层，成为饮水/食物/木材意图可选择的「采购物资」策略。默认顺序改为个人生存 → 家庭保障 → 关系 → 发展，建立家宅归安全、争取王位归尊重、生育后代归归属。统一前端分支命名：GoldWealth 改称「积累财富」，并修复四级住宅淘金时按住宅等级误判动机的问题；决策卡、Inspector、需求徽章和预排行程使用一致名称。浏览器顺序配置升至 v3 并迁移旧 18 分支配置；持久化 BranchId 变化使存档格式升至 6。 | sim_core(decisions/save/snapshot) / frontend(decision-viz/render/config) / tools / docs |
 

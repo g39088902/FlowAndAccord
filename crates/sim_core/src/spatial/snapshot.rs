@@ -93,6 +93,15 @@ pub struct WorldSnapshot3D {
     pub stone_regen_multiplier: f32,
     #[serde(default = "default_regen_multiplier")]
     pub gold_regen_multiplier: f32,
+    /// ★ 气候演化内部时钟 (游戏小时，供前端外推预测未来气温折线)
+    #[serde(default)]
+    pub season_timer: f32,
+    /// ★ 厄尔尼诺周期初始随机相位
+    #[serde(default)]
+    pub el_nino_phase: f32,
+    /// ★ 纪元候波大周期初始随机相位 (49年长周期)
+    #[serde(default)]
+    pub climate_epoch_phase: f32,
 }
 
 /// 产速倍率的 serde 默认值：1.0（未注入倍率时等同基准产速）

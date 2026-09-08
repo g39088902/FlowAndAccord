@@ -162,7 +162,10 @@
       }
       return edgeSlots[i];
     }
-    function invalidateKeys() { for (const s of cardSlots) s.key = ''; }
+    function invalidateKeys() {
+      for (const s of cardSlots) s.key = '';
+      for (const s of edgeSlots) s.key = '';
+    }
 
     // -------------------------------------------------- 刷新 (虚拟化 + LOD + 刻度尺 + 亲属高亮)
     function refresh() {
@@ -221,7 +224,7 @@
         const e = visEdges[i];
         const slot = ensurePath(i);
         const rel = relSet ? (relSet.has(e.parent.id) && relSet.has(e.child.id)) : false;
-        const key = e.__ix + '|' + lod + '|' + (relSet ? (rel ? 1 : 0) : 0);
+        const key = e.__ix + '|' + lod;
         if (slot.key !== key) {
           if (lod === 'block') {
             if (e.__flat === undefined) e.__flat = L.edgePathFlat(e, 0, 0);
@@ -232,9 +235,14 @@
           }
           let cls = 'dag-edge ' + (e.parentType === 'father' ? 'father-edge' : 'mother-edge');
           if (e.child.isDescendant || e.child.id === dag.focusId) cls += ' descendant';
-          if (relSet) cls += rel ? ' rel' : ' faded';
           slot.el.setAttribute('class', cls);
           slot.key = key;
+        }
+        if (relSet) {
+          slot.el.classList.toggle('rel', rel);
+          slot.el.classList.toggle('faded', !rel);
+        } else if (slot.el.classList.contains('rel') || slot.el.classList.contains('faded')) {
+          slot.el.classList.remove('rel', 'faded');
         }
         slot.el.style.display = '';
       }

@@ -38,6 +38,14 @@ impl World3DEngine {
         let enso_angle =
             self.el_nino_phase + (self.season_timer / enso_period) * std::f32::consts::TAU;
         let enso_effect = self.config.temp_el_nino_amplitude * enso_angle.sin();
-        self.temperature = base_temp + enso_effect;
+
+        // 纪元候波（49年大尺度气候周期震荡）
+        let epoch_years = self.config.temp_climate_epoch_cycle_years.max(0.1);
+        let epoch_period = epoch_years * year_length;
+        let epoch_angle =
+            self.climate_epoch_phase + (self.season_timer / epoch_period) * std::f32::consts::TAU;
+        let epoch_effect = self.config.temp_climate_epoch_amplitude * epoch_angle.sin();
+
+        self.temperature = base_temp + enso_effect + epoch_effect;
     }
 }

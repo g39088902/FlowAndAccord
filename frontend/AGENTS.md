@@ -20,7 +20,7 @@
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
-| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（211 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
+| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（215 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
 | `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：16 条活动分支顺序 + 层级覆盖。用户调整保存到 `flowaccord.decision-order.v3`；启动时迁移 v2（b11→b8、移除 b15） | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
@@ -43,7 +43,7 @@
 | `js/sim_worker.js` | ~300 | **仿真内核专用 Web Worker**（★ v1.38.0 Phase 1 解耦）：在独立 Worker 线程加载 WASM 引擎、自适应计时循环驱动 `world_tick_steps`、背压限频下发快照（**★ M4 优先二进制 FABS 帧 `.slice()` 后 `postMessage(transfer)` 转移**，wasm 无导出自动回退 JSON）、管理历史检查点与时光倒流 | 任何 DOM 操作、Canvas 绘制 |
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
 | `js/render_canvas.js` | ~226 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（调用各子模块绘制函数）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
-| `js/render_hud.js` | ~490 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 | Canvas 绘制（在 render_canvas/render_world/render_agents） |
+| `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
 | `js/render_world.js` | ~480 | **世界元素绘制**（v1.7.1 拆分）：drawTerrain（3D 地形网格）/ drawPois（POI 渲染与储量指示环）/ drawHouses（私宅渲染）/ drawLanes（动态踩踏道路网络渲染与悬浮 Tooltip） | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~210 | **族人与特效绘制**（v1.7.1 拆分）：drawAgents（部落民 Agent 渲染 + 选中高亮 + 状态气泡 + 死亡骷髅）/ drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |

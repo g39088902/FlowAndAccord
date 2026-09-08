@@ -41,6 +41,8 @@ pub struct World3DEngine {
     pub temperature: f32,
     /// 厄尔尼诺现象随机初始相位
     pub el_nino_phase: f32,
+    /// 纪元候波（49年周期）随机初始相位
+    pub climate_epoch_phase: f32,
     pub rng: WorldRng,
     pub water_regen_multiplier: f32,
     pub berry_regen_multiplier: f32,
@@ -139,6 +141,8 @@ impl World3DEngine {
             current_season: Season::Spring,
             temperature: 20.0,
             el_nino_phase: WorldRng::new(seed.wrapping_add(0x454c4e494e4f))
+                .gen_range(0.0, std::f32::consts::TAU),
+            climate_epoch_phase: WorldRng::new(seed.wrapping_add(0x434c494d45504f43))
                 .gen_range(0.0, std::f32::consts::TAU),
             rng: WorldRng::new(seed),
             water_regen_multiplier: 1.0,
