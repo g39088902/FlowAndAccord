@@ -1,486 +1,150 @@
-# 🧠 部落民 AI 决策架构重构规划：意图与执行策略解耦 (Intent-Strategy Decoupling Plan)
+# 部落民 AI 决策架构重构规划：意图与执行策略解耦（M19）
 
-> **状态**：**规划态 / 核心架构设计稿 (M19)**
+> **状态**：规划态，尚未实施。
 >
-> **定位**：阐明如何将《Flow & Accord》部落民现行的“马斯洛需求-状态机强耦合”模型，重构解耦为“**意图仲裁层 (Intent) — 策略规划层 (Strategy) — 原语执行层 (Primitive)**”三层架构。在严格保持内核**强确定性（Determinism）、零堆分配极速吞吐（Zero Allocations）与 120 Tick 错峰节拍**的前提下，彻底消除途中打补丁与逻辑扩散，赋能多策略涌现与个性化社会行为。
+> **源码审查基准**：v1.46.6。本文规定架构边界与实施范围；[技术规格书](./19-1-spec-intent-strategy-split-result.md) 是类型、分支映射、阶段时序和验收条件的唯一详细定义，本文不重复维护 Rust 枚举。
 >
-> **版本基准**：v1.46.5 · **主要源码关联**：`crates/sim_core/src/spatial/decisions/`、`crates/sim_core/src/spatial/agent.rs`
->
-> **关联文档**：
-> - [19-1-spec-intent-strategy-split-result.md](./19-1-spec-intent-strategy-split-result.md) (详细技术规格书与预期拆分结果清单)
-> - [06-motivation-ai.md](./current/06-motivation-ai.md) (当前马斯洛决策状态机现状)
-> - [24-three-core-systems-fsm.md](./current/24-three-core-systems-fsm.md) (三大核心系统状态机全景)
-> - [07-agent-ai-analysis.md](./07-agent-ai-analysis.md) (部落民 AI 深度拆解)
-> - [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) (内核性能优化规划)
+> **目标**：将需求仲裁、策略选择和执行适配分离，同时保留确定性、错峰决策、真实搬运与现有世界结算规则。先完成行为等价重构，再单独评审批量规划、个性化选择等行为增强。
 
----
+相关入口：[决策现状](./current/06-motivation-ai.md)、[核心 FSM](./current/24-three-core-systems-fsm.md)、[决策局部规则](../crates/sim_core/src/spatial/decisions/AGENTS.md)、[性能验证指南](./15-profiling-and-benchmarking-guide.md)。
 
-## 1. 现状痛点与重构动机
+## 1. 问题与范围
 
-当前 `decisions/` 模块在经过 M1~M4 账本革命、断流赴榷场、夺位远征及单趟多品类采收等多次机制演进后，暴露出深层次的**结构性耦合**：
+当前 `Need { level, kind, target_state }` 同时描述需求与动作，`seeking.rs`、`harvest.rs`、`market.rs` 分别处理选点、断流、返航和需求标签，修改一种兜底规则常需要检查多个入口。拆分的价值是让这些规则有明确的所有者和反馈接口，而不是删除所有跨模块调用。
 
-```
-【当前架构】：
-[马斯洛分支评估] ──直接产出──> Need { target_state: PrimitiveActionState::SeekingWater }
-                                            │
-                                            ▼ (强耦合：意图即物理动作)
-[途中遇变故/断流] ──局部打补丁──> seeking.rs::try_route_to_market (强行覆写 state = SeekingMarket)
-                                            │
-                                            ▼ (跳板穿透：采收现场重新迭代分支)
-[采收完成连环转] ──现场侵入──> harvest.rs::try_continue_harvesting (强行重新 dispatch)
-```
+现有连续采收再次调用分支评估，承担了根据最新生理、家户储备及配置顺序重新选择任务的职责；瞬发前置遍历承担了“多个瞬发与一个持续行动并行”的职责。两者都必须保留语义，只调整接口和组织方式。立宅 RNG 目前在 `fulfill_resting_need` 内消费，并非分支条件函数直接掷点。
 
-### 1.1 核心结构痛点
+### 1.1 M19 基础重构范围
 
-1. **“意图（What & Why）”与“物理动作（How & Do）”强绑定**：
-   - 现有 `BranchId::evaluate()` 命中时，直接产出 `Need { kind, target_state }`，把“想要满足口渴”与“迈开双腿奔向水泉”一步定死。
-   - 实际上，“口渴”是**意图（Intent）**；“去水泉采水”、“去榷场买水”、“在私宅喝家庭账本存水”或“让配偶分水”是**策略（Strategy）**；而“寻路走车道”、“掉头”、“现场饮水”才是**执行原语（Action Primitive）**。
-2. **异常响应与降级逻辑碎片化（打补丁式蔓延）**：
-   - 当资源点枯竭或施密特触发器关闭时，重路由逻辑散落在 `seeking.rs`（`decide_seeking_material`、`decide_seeking_survival`、`decide_seeking_throne`、`decide_seeking_courtship`）和 `harvest.rs` 中，到处存在相似又微异的掉头与状态重置逻辑。
-   - “断流改赴榷场”逻辑被硬编码在 `seeking.rs` 和 `harvest.rs` 的各处局部分支中，违背“单一权责”原则。
-3. **复合任务与连续规划脆弱**：
-   - v1.35.0 的“单趟多品类连续采收”目前是在 `harvest.rs` 采收完毕瞬间，强行迭代 `branch_order` 寻找下一个满足条件的采收分支并立即 `dispatch`。由于缺乏策略级流水线（Pipeline），任务无法中途暂停、无法做跨品类容量统筹，容易在边缘条件下产生预期外状态。
-4. **社会个性与多策略演化受限**：
-   - 在现有体系下，所有族人面对同一种需求只能走完全相同的执行路径。无法实现“富商优先赴市采购、农夫倾向野外采集”、“高智力族人优先规划最短环路”、“勇者冒险涉远、懦者就近求全”等基于基因（智力/力量/资本）的个性化策略选择。
+- 保留 b1～b18 的稳定 ID、条件守卫、层级覆盖、配置顺序、选择规则与冷却语义。
+- 集中同一意图内部的选点、策略失败和重路由处理。
+- 显式区分瞬发提交、持续任务、物理动作和结算反馈。
+- 分阶段收口状态写入，覆盖运动、生态、房屋、生命周期、存档和快照消费者。
+- 记录现有行为基线，证明迁移未改变资源流、RNG 消费和行动时点。
 
----
+### 1.2 后续行为增强（不混入等价重构）
 
-## 2. 全新三层解耦架构模型
+- 新增跨任务抢占规则、重试冷却或长期暂停/恢复。
+- 多品类预排队列、距离成本优化、基于个性或资本的策略选择。
+- 新增家庭饮食路径、配偶分水等现有机制之外的策略。
+- Inspector 意图／策略／动作三栏展示。
 
-新架构将部落民的认知与行动划分为正交的三层：
+这些功能可使用本架构扩展，但必须明确行为差异、配置来源与独立验收。不能用“重构后确定性测试通过”代替行为变更审查。
+
+## 2. 三层架构与并行瞬发通道
 
 ```mermaid
 graph TD
-    subgraph L1["Layer 1: 意图仲裁层 (Intent Layer) —— What & Why"]
-        Bio["生理代谢指标<br/>(饥渴/体力/健康)"] & Ledger["家户账本储备<br/>(水粮木石金余额)"] & Social["社会身份与关系<br/>(夫妻/王位/房产)"] --> Arbiter["意图仲裁器 (Intent Arbiter)<br/>• 基于数据驱动优先级 (decision_eval_order)<br/>• 判定当前最迫切目标<br/>• 确立意图达成与放弃指标"]
-        Arbiter --> IntentOut["产出: AgentIntent<br/>(纯目标声明，无路网/无POI/无动作)"]
-    end
-
-    subgraph L2["Layer 2: 策略规划层 (Strategy / Planner Layer) —— How"]
-        IntentOut --> Selector["策略选择器 (Strategy Selector)<br/>根据环境现实、成本与个性评估候选策略"]
-        Selector --> ActiveStrat["当前执行策略 (ExecutionStrategy)<br/>• 策略A: 野外采收 (WildHarvest)<br/>• 策略B: 榷场交易 (MarketTrade)<br/>• 策略C: 居家直取 (HomeConsumption)<br/>• 策略D: 远征/求偶/营建"]
-        ActiveStrat -.->|"目标关闭/全图枯竭<br/>(策略失败)"| Fallback["策略降级管道 (Fallback Pipeline)<br/>野外枯竭 ➔ 自动降级榷场 ➔ 降级返家"]
-    end
-
-    subgraph L3["Layer 3: 原语执行层 (Action Primitive Layer) —— Do"]
-        ActiveStrat --> Driver["步进驱动器 (Step Driver)"]
-        Driver --> Nav["原语: 路径导航 NavigateTo<br/>(A*寻路 / APSP静态查表)"]
-        Driver --> Uturn["原语: 原地掉头 UturnTo<br/>(沿当前车道平滑反向，绝不瞬移)"]
-        Driver --> Work["原语: 现场作业 InteractOnSite<br/>(采收/装袋/修缮/施工/市集)"]
-        Driver --> Commit["原语: 物理决意 CommitPending<br/>(登基/成婚/出价，等待世界执行器落地)"]
-    end
-
-    L3 --> Feedback["原语执行结果反馈 (Done / Blocked / Interrupted)"]
-    Feedback --> ActiveStrat
-    ActiveStrat -->|"意图达成 / 致命熔断"| Arbiter
+    S[错峰决策调度] --> I[瞬发意图遍历：可多次命中]
+    I --> P[仅写现有 pending]
+    I --> L1[L1 持续意图仲裁]
+    L1 --> L2[L2 可行性探测与策略规划]
+    L2 -->|不可执行／需要重新仲裁| L1
+    L2 --> L3[L3 执行适配：导航／驻留／提交]
+    L3 --> W[既有运动与世界物理结算]
+    P --> W
+    W -->|到达／作业结果／提交结果| L2
+    W --> V[兼容状态与快照]
 ```
 
-### 2.1 各层职责与边界契约
+| 层级 | 拥有的决策 | 不拥有的决策 |
+|---|---|---|
+| L1 意图仲裁 | 需求是否成立、完成条件、顺序与层级、是否保持或取消当前目标、允许的抢占、失败后下一需求 | 具体 POI、路线、移动积分、资源扣账 |
+| L2 策略规划 | 合法目标与可行性、同一目标的实现方式、阶段推进、同意图内重选与策略替代 | 越过 L1 新增返家任务、忽略分支守卫、直接改变资源或亲属关系 |
+| L3 执行适配 | 安装导航命令、沿原车道改道、进入驻留、写 pending、转述物理结果 | 需求排序、世界资源结算、系统扫描后派发任务 |
+| 世界系统 | 代谢、移动、真实采收与卸货、升级修缮、婚姻与政体等结算、生命周期 | 替 Agent 决定新的任务 |
 
-| 层级 | 名称 | 核心关注点 | 输入 | 输出 | 关键不变量与禁忌 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Layer 1** | **意图仲裁层**<br/>(Intent) | **What & Why**<br/>（我想要什么、为什么想要、何时满足） | 自身生理、家户账本、亲族关系、社会地位 | `AgentIntent` | **绝对禁止触碰空间路网与 POI**。不关心目标在何处、不关心怎么去。 |
-| **Layer 2** | **策略规划层**<br/>(Strategy) | **How**<br/>（我通过什么方案达成目标、遇阻如何降级） | `AgentIntent`、环境 POI 施密特可用性、市场价格、随身行囊 | `ExecutionStrategy` 及阶段状态 | **负责弹性应变**。单点受阻时在策略内重选；整体受阻时降级备选策略。 |
-| **Layer 3** | **原语执行层**<br/>(Primitive) | **Do**<br/>（当前物理微步与运动学状态） | 目标车道、速度、交互计时器、待结标记 | 动力学运动、现场交互吞吐、`CommitPending` | **绝对保证物理连续性**。掉头必走原车道平滑回走，静止必须清车道；严禁跨层篡改意图。 |
+L1 不依赖路网算法、不选择具体 POI，但可以读取由只读查询提供的“是否存在合法候选”“是否满足近距瞬发条件”等语义事实。近距求偶和在宅育儿的资格仍属于分支自包含守卫。不能为了层间纯度删除条件或让不可执行的高优先级意图永久阻塞其他需求。
 
----
+瞬发通道不占用持续任务槽位，也不替换活动原语。命中后只写决心/pending，不改运动状态、不扣资源、不消费 RNG，继续检查后续瞬发分支，再执行持续任务决策。最终物理结算可改变婚姻、住宅或行动状态；这种变化来自既有结算规则，必须回写控制状态，不能与“提交不打断”混为一谈。
 
-## 3. 核心数据模型设计 (Rust Data-Oriented Design)
+## 3. 持续任务生命周期
 
-> 遵循零堆分配原则：全部采用定长栈枚举与结构体，零动态 `Box<dyn Any>` 分配，保证 10 万级 TPS 满载吞吐。
+### 3.1 需求成立不等于策略可执行
 
-### 3.1 Layer 1: 意图层数据结构
+L1 按配置顺序评估分支。L2 只读探测候选返回可执行、当前受阻或不适用；候选未选中前不得消费 RNG、扣款、写 pending 或安装路线。同一仲裁回合内每个分支最多尝试一次，尝试数受注册表长度限制，避免 L1/L2 无限互调。
 
-```rust
-use crate::spatial::house::HouseTier;
-use crate::spatial::ledger::journal::ResourceKind;
+基础重构保留原来的仲裁入口与状态保持规则，不把所有状态改为每个决策相位全量抢占。某个旧入口原本会继续分支遍历，新的不可执行反馈也继续；原本会等待、重新寻路或返家，则由 L1 的兼容政策产生相同结果。更积极的全局抢占或自动重试属于后续增强。
 
-/// 意图类别：仅表达纯粹目标与诉求，不含任何执行手段
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IntentKind {
-    /// 生理生存自救 (水 / 食物)
-    SatisfySurvival(SurvivalResource),
-    /// 为家户账本补充物资储备 (水/粮/木/石/金)
-    StockHousehold(ResourceKind),
-    /// 营建/晋升私宅至目标等级
-    UpgradeHome { target_tier: HouseTier },
-    /// 修缮私宅耐久度至 100%
-    RepairHome,
-    /// 成年自立门户，选址创立新仓库
-    FoundNewHome,
-    /// 寻找配偶成婚
-    SeekCourtship,
-    /// 养育小孩并促成配偶受孕
-    RaiseChild,
-    /// 参与二手在售房屋拍卖出价
-    BidAuctionHouse,
-    /// 远征争夺无主营地王位
-    ClaimThrone,
-    /// 疲劳归巢休养生息
-    RestAndRecover,
-}
+### 3.2 目标、策略、动作分别终止
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SurvivalResource {
-    Water,
-    Food,
-}
+- **动作完成**：例如到达 POI，只结束导航原语，尚未满足解渴或补货意图。
+- **策略阶段完成**：例如背包装满，转入后续仲裁或返家卸货，不能当成家庭储备已达标。
+- **目标满足**：由最新生理值、家户触发器、房屋/婚姻/政体事实等类型化条件判断。
+- **策略失败**：同意图内可重选目标或备选手段；没有可行策略时交回 L1。
+- **任务取消**：死亡、失去资格或 L1 允许的抢占。清理本任务控制字段，不删除已携带资源，不撤销已完成的账本结算。
 
-/// 意图实例：挂载于 Agent 实体上
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AgentIntent {
-    pub kind: IntentKind,
-    pub level: MaslowLevel,          // 马斯洛层级（⓪瞬发 或 ①~⑤）
-    pub satisfy_threshold: f32,     // 意图达成目标（如渴度恢复至 45.0，或搬回 50 木材）
-    pub critical_abort_stamina: f32,// 体力下限熔断阈值（低于此值立即放弃当前意图转入休息）
-}
-```
+补货可能需要多趟；不能为了“达成意图”无条件锁住 Agent 直到家户余额补满。保持原有返家、卸货与再次评估行为，任务关闭后需求仍可能再次成立。基础阶段不引入暂停任务栈；再次执行时用最新世界事实重建方案。
 
-### 3.2 Layer 2: 策略规划层数据结构
+### 3.3 生存优先级与失败边界
 
-```rust
-use super::super::graph::NodeId;
-use super::super::poi::PoiId;
+普通体力不足是 L2 向 L1 提供的事实，不是统一切换为休息的命令。临界口渴/饥饿仍受既有求生守卫保护。市场准入仍检查户主身份、家户账本金余额、体力及资源品类；失败原因不豁免这些条件。
 
-/// 执行策略：达成意图的具体方案
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ExecutionStrategy {
-    /// 策略 1：野外 POI 采收与回搬
-    WildHarvest {
-        pool: NodePool,
-        target_poi_id: Option<PoiId>,
-        stage: HarvestStage,
-    },
-    /// 策略 2：榷场商贸远程换购
-    MarketTrade {
-        resource: ResourceKind,
-        target_market_node: NodeId,
-        stage: TradeStage,
-    },
-    /// 策略 3：居家直取消耗（若已在家门口，直接从家户账本结算，免跑图）
-    HomeDirectConsume {
-        resource: SurvivalResource,
-    },
-    /// 策略 4：定向奔赴与提交（夺位远征、求偶追赶、返家育儿）
-    ExpeditionCommit {
-        target_node: NodeId,
-        commit_type: PendingCommitKind,
-    },
-    /// 策略 5：选址与安家营建
-    SurveyAndSettle {
-        candidate_pos: Vec3,
-        target_node: NodeId,
-    },
-    /// 策略 6：原地静止施工作业（修缮、升级）
-    StationaryWork {
-        work_type: StationaryWorkKind,
-    },
-    /// 策略 7：返家归巢
-    ReturnHome {
-        target_door_node: NodeId,
-    },
-}
+| 情形 | L2 的权限 | 需要 L1 决定的事项 |
+|---|---|---|
+| 单点 POI 关闭 | 在本人的触发器开放集合内重选同类点 | 无合法手段时是否等待、返家或转其他需求 |
+| 水/粮/木同类点全部关闭 | 按既有资格尝试市场策略 | 市场不可达/不准入后的目标选择 |
+| 石/金断流 | 按既有规则报告受阻，保留淘金用途与冷却 | 不得自行新增市场兜底 |
+| 求偶/夺位目标失效 | 在原分支全部资格约束内重选 | 无目标时结束任务及下一行动 |
+| 体力告警 | 报告当前策略不能继续的原因 | 结合临界求生守卫和既有入口决定下一任务 |
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HarvestStage {
-    NavigatingToPoi,      // 奔赴资源点
-    HarvestingOnSite,     // 现场采收
-    ReturningHomeToUnload,// 返家卸货入账
-}
+有房者夺位仍受自家营地限制，求偶仍使用现有合法候选与选择规则；不能用泛化的“全图最优”替代。
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TradeStage {
-    NavigatingToMarket,   // 奔赴榷场
-    TradingOnSite,        // 现场交易与结算
-    ReturningHomeToUnload,// 返家
-}
+## 4. 连续采收
 
-/// 策略执行状态与失败诊断
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StrategyStatus {
-    Running,
-    Completed,
-    Failed(StrategyFailureReason),
-}
+基础阶段保留动态连续采收，不引入 `Batch` 意图或预排队列。L2 在采收完成/断流的原时点请求 L1 的“连续采收仲裁入口”；该入口仍按配置顺序检查现有允许分支，包括当前源码中已有的 b1/b2 生存分支。
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StrategyFailureReason {
-    TargetPoiDepleted,      // 目标 POI 被施密特触发器关闭
-    AllPoiExhausted,        // 全图同类 POI 全部断流
-    InsufficientFunds,      // 家户金币不足以支付市场采购
-    TargetUnavailable,      // 目标女性已婚 / 王位已被抢占
-    StaminaExhausted,       // 体力告警熔断
-}
-```
+每次转换必须重新检查私宅有效性、家户补货触发器、自身生理、各品类独立行囊容量、POI 私有可用性与体力。金币保留无限容量、单趟采集目标和两类冷却的区别。回到家门只表示抵达，卸货仍按速率逐 tick 入家户账本。
 
-### 3.3 Layer 3: 原语执行层数据结构
+后续若增加预排队列，队列只是可失效的候选提示：每次转阶段仍需上述仲裁；还需定义定长容量、重规划、保存恢复及取消规则，另行扩展技术规格。
 
-```rust
-/// 原子动作原语：驱动物理、动力学与微步结算的最小单元
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ActionPrimitive {
-    /// 1. 沿路网奔向目标节点
-    NavigateTo {
-        target_node: NodeId,
-        arrival_radius: f32,
-    },
-    /// 2. 原地掉头沿原车道反向平滑往回走（严格杜绝坐标闪现）
-    UturnTo {
-        target_node: NodeId,
-    },
-    /// 3. 现场作业与资源交互
-    InteractOnSite {
-        poi_id: PoiId,
-    },
-    /// 4. 驻留静止劳作（清空车道，停在原地）
-    StationaryHold,
-    /// 5. 提交结算决意（当 tick 写入 pending，等待 world 执行器原子物理落地）
-    CommitPending(PendingCommitKind),
-}
+## 5. 状态所有权与运行时频率
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PendingCommitKind {
-    Coronation { camp_id: u32 },
-    Courtship { target_female_id: AgentId },
-    RaiseChild,
-    AuctionBids,
-    FoundHomeSite { site_pos: Vec3 },
-}
-```
+### 5.1 渐进迁移
 
-### 3.4 实体字段升级与快照向下兼容映射
+`PrimitiveActionState` 当前被代谢、运动到达、POI 交互、房屋结算和快照共同读写，不是单纯 UI 字段。因此不在 M19.1 新增三个字段后就每 tick 覆盖 `state`。
 
-在 `Agent3D` 中引入新字段，同时**保留 `state: PrimitiveActionState` 作为对外投影值**，实现对 Canvas 渲染管线、FABS 二进制快照编码器以及前端 Inspector 的**零破坏兼容**：
+1. **迁移期**：现有状态、路线、pending 为执行真相源；新控制记录只观察和验证，不反向驱动物理。影子路径不得调用有副作用的规划器。
+2. **接管期**：逐条迁移任务，每条任务及其世界写入点全部接入同一个转换接口后才接管，旧实现只服务未迁移任务，不能双驱动。
+3. **完成期**：控制器是持续任务真相源；位置/车道仍归运动系统、pending 与结算仍归世界系统。`state` 为执行兼容视图，由转换接口在实际事件时同步。投影只读、不调用导航、不清车道、不消费 RNG。
 
-```rust
-pub struct Agent3D {
-    // ... 既有生理、账本、路网循迹、遗传基因等字段保持不变 ...
+死亡和胎儿生命周期优先于任务投影；返家阶段必须投影为返家；到达/离路/结算结果不能等到下一个 120 tick 相位才同步。具体映射与合法组合见规格书。
 
-    // ===== 新解耦架构状态机 =====
-    /// 【意图层】当前追求的目标（None 表示无特定任务，处于怠速休养）
-    pub current_intent: Option<AgentIntent>,
-    /// 【策略层】当前采用的实现策略及其阶段
-    pub current_strategy: Option<ExecutionStrategy>,
-    /// 【原语层】当前正在执行的物理原语
-    pub active_primitive: ActionPrimitive,
+### 5.2 决策与物理结算分频
 
-    // ===== 向下兼容投影字段 =====
-    /// 对外依然投递此枚举，由 active_primitive + current_strategy 自动派生投影！
-    pub state: PrimitiveActionState,
-}
-```
+- 决策相位使用 `agent_decision_interval_ticks`（当前默认 120），不得改 `simulationDt`。
+- L1/L2 在原错峰决策入口运行；每 tick 的运动、代谢、装卸、交易、房屋结算维持既有频率。
+- 原语适配不新增第二套物理步进，也不把结算移进 `decisions/`。
+- 到达事件在原运动阶段更新执行视图；阶段事件反馈不能提前触发下一轮需求选择或多消耗一次 RNG。
+- 写 pending 不代表当场成功，消费时必须重查资格；成功/失败结果与对应请求关联，避免重复消费。
 
-#### 投影映射方程 (`project_to_primitive_action_state`)
+**已识别的文档与源码差异**：根 AGENTS §4.3 的概括顺序将决策写在道路衰减/运动之前，而审查基准 `world_tick.rs::tick()` 实际先道路衰减、运动，后决策。M19 不借此调整管线；实施 M19.0 时先核实并同步现状说明，再冻结具体阶段基线。源码逐阶段清单和 pending 时点见规格 §5。
 
-```rust
-impl Agent3D {
-    /// 将内部细粒度策略与原语，确定性投影为外部契约状态
-    pub fn update_projected_state(&mut self) {
-        self.state = match self.active_primitive {
-            ActionPrimitive::NavigateTo { .. } | ActionPrimitive::UturnTo { .. } => {
-                match self.current_strategy {
-                    Some(ExecutionStrategy::WildHarvest { pool, .. }) => match pool {
-                        NodePool::Water => PrimitiveActionState::SeekingWater,
-                        NodePool::Food => PrimitiveActionState::SeekingFood,
-                        NodePool::Wood => PrimitiveActionState::SeekingWood,
-                        NodePool::Stone => PrimitiveActionState::SeekingStone,
-                        NodePool::Gold => PrimitiveActionState::SeekingGold,
-                    },
-                    Some(ExecutionStrategy::MarketTrade { .. }) => PrimitiveActionState::SeekingMarket,
-                    Some(ExecutionStrategy::ExpeditionCommit { commit_type, .. }) => match commit_type {
-                        PendingCommitKind::Coronation { .. } => PrimitiveActionState::SeekingThrone,
-                        PendingCommitKind::Courtship { .. } => PrimitiveActionState::SeekingCourtship,
-                        PendingCommitKind::RaiseChild => PrimitiveActionState::RaiseChild,
-                        _ => PrimitiveActionState::RestingAtCamp,
-                    },
-                    Some(ExecutionStrategy::ReturnHome { .. }) => PrimitiveActionState::ReturningToCamp,
-                    _ => PrimitiveActionState::RestingAtCamp,
-                }
-            }
-            ActionPrimitive::InteractOnSite { poi_id: _ } => {
-                // 根据当前策略投射为现场作业态
-                match self.current_strategy {
-                    Some(ExecutionStrategy::WildHarvest { pool, .. }) => match pool {
-                        NodePool::Water => PrimitiveActionState::DrinkingAtWater,
-                        NodePool::Food => PrimitiveActionState::ForagingFood,
-                        NodePool::Wood => PrimitiveActionState::GatheringWood,
-                        NodePool::Stone => PrimitiveActionState::MiningStone,
-                        NodePool::Gold => PrimitiveActionState::MiningGold,
-                    },
-                    Some(ExecutionStrategy::MarketTrade { .. }) => PrimitiveActionState::BuyingAtMarket,
-                    _ => PrimitiveActionState::RestingAtCamp,
-                }
-            }
-            ActionPrimitive::StationaryHold => {
-                match self.current_strategy {
-                    Some(ExecutionStrategy::StationaryWork { work_type }) => match work_type {
-                        StationaryWorkKind::Repair => PrimitiveActionState::RepairingHouse,
-                        StationaryWorkKind::Construct => PrimitiveActionState::ConstructingHouse,
-                    },
-                    _ => PrimitiveActionState::RestingAtCamp,
-                }
-            }
-            ActionPrimitive::CommitPending(..) => PrimitiveActionState::RestingAtCamp,
-        };
-    }
-}
-```
+## 6. 外部契约、存档和可观测性
 
----
+基础重构保持 WASM 导出签名、FABS 字段布局及枚举码位；这不自动等于新旧运行结果逐字节一致。状态/目标/需求标签及派生统计必须做行为差分，快照生产与解码的同构性另由快照门禁证明。
 
-## 4. 运行时生命周期与降级流水线 (Fallback Pipeline)
+旧应用版本存档仍明确拒绝。新增持久化控制状态时按项目规则升级存档结构版本；不能用 `serde(default)` 默默恢复一个未知的进行中任务。新版本必须完整保存任务、策略阶段、活动原语、未消费结果及既有路线/pending/RNG/触发器，读档不能重新规划或重新掷点。当前源码 `SAVE_FORMAT_VERSION` 为 4，实施时重新核实，不采用历史说明中的 3。
 
-### 4.1 错峰决策主干流转
+Inspector 三栏属于后续展示增强；基础阶段保留 `current_need` 的来源分支和标签规则，包括瞬发标签被常规标签覆盖的原时序。新增可见字段时完成快照结构、生产者、二进制编码、JS 解码与映射全链路同步。
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant W as World / Scheduler
-    participant L1 as 意图仲裁器 (L1)
-    participant L2 as 策略规划器 (L2)
-    participant L3 as 原语执行器 (L3)
-    participant Agent as Agent3D
+## 7. 里程碑与退出条件
 
-    Note over W: 错峰节拍: (tick + id) % 120 == 0
-    W->>L1: 1. 刷新施密特触发器并评估主导需求
-    L1-->>Agent: 确定或保持 current_intent
-    
-    W->>L2: 2. 检查策略健康度 (Strategy Step)
-    alt 当前策略正常推进
-        L2->>L3: 驱动下一步物理原语 (Nav / Interact)
-    else 遇到变故 (目标枯竭 / 途中断流)
-        L2->>L2: 触发 Fallback 降级管道 (重选 POI 或改走榷场)
-        L2->>L3: 下发 UturnTo 原地平滑掉头
-    else 所有策略失效 / 体力熔断
-        L2->>L2: 策略宣告终止
-        L2->>L3: 下发 ReturnHome 优雅折返
-    end
-    
-    L3-->>Agent: 更新位置、行囊、步进车道并投影 state
-```
+| 阶段 | 交付 | 退出条件 |
+|---|---|---|
+| M19.0 基线与契约冻结 | 所有状态/pending 读写者、现有时序、分支资格/失败路径清单；修正现状文档漂移 | 固定 seed/config/tick 的差分样本、RNG 与性能基线可复现；未覆盖的分支不能进入接管 |
+| M19.1 类型与观察适配 | 引入规格中的领域类型及只读执行视图，保留旧驱动 | 不新增任务选择或 RNG 消费；观察结果与现状逐项一致；若入档则完成结构版本与恢复验证 |
+| M19.2 策略与执行收口 | 先资源链，再社会/房屋链；逐条移交写入权 | 每条链路的状态、物理结算、到达、失败与读档门禁通过；无双驱动 |
+| M19.3 仲裁独立 | L1 统一持续任务入口、瞬发旁路与连续采收请求；清理迁移桥梁 | 全部 18 分支及重排/覆盖语义保持；全套验收通过；更新模块地图与局部 AGENTS |
+| M19.4 独立增强 | 另行规格化个性化策略、预排队列、抢占增强、Inspector | 明确获接受的行为差异；不再声称相对旧版本行为等价 |
 
-### 4.2 核心策略回退表 (Fallback Matrix)
+## 8. 验收原则
 
-不再在代码各处穿插 `if market ...` 补丁，策略规划器统一根据下表进行**确定性策略路由与降级**：
+[规格 §8](./19-1-spec-intent-strategy-split-result.md#8-验收矩阵) 为唯一详细验收清单。
 
-| 意图 (`IntentKind`) | 首选策略 (`Primary`) | 失败触发条件 | 降级策略 (`Fallback 1`) | 次级降级 (`Fallback 2`) | 最终保底 (`Abort`) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`SatisfySurvival(Water)`** | `WildHarvest(Water)` (就近水泉) | 目标单点枯竭 | 切换至下一处可用水泉继续采水 | 全图水泉断流 ➔ 户主且有金 ➔ `MarketTrade(Water)` | 强制返家休息，等待天降甘霖 |
-| **`SatisfySurvival(Food)`** | `HomeDirectConsume` (若在宅门口且粮仓充足) | 粮仓见底或离家过远 | `WildHarvest(Food)` (就近果丛) | 全图果丛断流 ➔ 户主且有金 ➔ `MarketTrade(Food)` | 强制返家休息 |
-| **`StockHousehold(Wood)`** | `WildHarvest(Wood)` | 全图林木枯竭 | 户主且账本金币达标 ➔ `MarketTrade(Wood)` | — | 立即停止采伐，返家卸载已有物资 |
-| **`SeekCourtship`** | `ExpeditionCommit(Courtship)` (奔赴目标) | 目标女性中途成婚/身故 | 重选全图下一位魅力最高单身女性 | 全图无可用合格单身女性 | 清除求偶意图，返回归宿营地 |
-| **`ClaimThrone`** | `ExpeditionCommit(Coronation)` (远征) | 目标营地中途易主 | 原地掉头改赴下一个空缺王位营地 | 全图无任何可夺位营地 | 放弃出征，平滑返家恢复常规生活 |
-
----
-
-## 5. 关键用例推演与架构重构收益
-
-### 5.1 场景 A：口渴寻水遇干涸，改道榷场
-
-* **旧架构现状**：
-  在 `seeking.rs` 的 `decide_seeking_survival` 中，检测到无可用水泉后，调用 `try_route_to_market`；该函数不仅判定资格、还直接改写 `agent.state = PrimitiveActionState::SeekingMarket` 并执行寻路。如果又没钱，又在当前方法里塞回 `ReturningToCamp`。**寻路、业务状态、商业逻辑、生理判定死缠在一起**。
-* **新架构表现**：
-  1. **意图层**：维持 `AgentIntent { kind: SatisfySurvival(Water) }` 不动；
-  2. **策略层**：
-     - 原语层上报目标水泉关闭（`TargetPoiDepleted`）；
-     - 策略器检测全图水泉可用节点为空（`AllPoiExhausted`）；
-     - 策略器查询降级管道：切换为 `ExecutionStrategy::MarketTrade(Water)`；
-  3. **原语层**：策略器指令原语层下达 `ActionPrimitive::UturnTo(MarketNode)`，原地平滑掉头奔向榷场；
-  4. **收益**：意图清晰纯粹，策略状态切换由规则表驱动，彻底消灭孤岛跳转代码。
-
-### 5.2 场景 B：单趟多品类连续采收流水线 (Multi-Harvest Pipeline)
-
-* **旧架构现状**：
-  v1.35.0 的 `try_continue_harvesting` 是在现场采收完毕后，强行跨函数调用 `branch.evaluate()` 尝试找下一个可采分支。如果命中，直接在局部 `dispatch` 出去。
-* **新架构表现**：
-  1. **意图层**：意图仲裁器支持组合意图 `IntentKind::StockHousehold(Batch([Wood, Food]))`；
-  2. **策略层**：规划为复合流水线策略 `ExecutionStrategy::PipelineHarvest`，持有待采品类队列；
-  3. **执行流**：
-     - 伐木完成 ➔ 策略自驱动：行囊未满、体力充足 ➔ 自动装配下一任务（采摘果丛）；
-     - 下达 `ActionPrimitive::NavigateTo(BerryNode)`；
-     - 全部品类装满或体力跌破安全线 ➔ 统一流转至 `ReturnHomeToUnload`；
-  4. **收益**：彻底消除跨分支穿透调用，多品类采收具备完备的流水线生命周期。
-
-### 5.3 场景 C：社会行为个性化涌现（基于特质的分流）
-
-在旧架构中，所有族人的分支与执行逻辑整齐划一。在新架构下，**同样的意图可以根据族人禀赋选择不同策略**：
-
-```rust
-impl StrategySelector {
-    pub fn select_survival_food_strategy(agent: &Agent3D, ctx: &DecisionContext) -> ExecutionStrategy {
-        let is_wealthy = agent.is_household_head && agent.family_gold >= 100.0;
-        let is_intelligent = agent.intelligence > 115.0;
-
-        // 特质 1：富裕户主且智力高者，不愿亲自涉险采摘，优先赴榷场购买
-        if is_wealthy && is_intelligent && ctx.market_has_food() {
-            return ExecutionStrategy::MarketTrade { resource: ResourceKind::Food, ... };
-        }
-
-        // 特质 2：普通族人优先就近野外采收
-        ExecutionStrategy::WildHarvest { pool: NodePool::Food, ... }
-    }
-}
-```
-* **收益**：无缝支持部落社会的“社会阶层分化”与“职业倾向涌现”。
-
----
-
-## 6. 前端表现层升级：认知三栏 Inspector
-
-重构后，前端族人观察面板（Inspector）可从原来简陋的一行标签 `current_need: "Physiological·QuenchThirst"` 升级为**三层认知面板**，极大提升模拟游戏的可读性与观赏深度：
-
-```
-┌────────────────────────────────────────────────────────┐
-│  🧑 族人 #12 李铁柱 (成年男性 · 32岁)                   │
-├────────────────────────────────────────────────────────┤
-│  🎯 核心动机 (Intent):                                 │
-│     [ 生理层 · 迫切口渴 ] (指标: 14.2 / 50.0)          │
-│                                                        │
-│  📋 执行策略 (Strategy):                               │
-│     [ 榷场商贸换购 ] (野外水泉已干涸，已自动降级赴市)  │
-│     • 备选方案: 强制返家休养 (若资金不足)             │
-│                                                        │
-│  ⚡ 当前动作 (Action):                                  │
-│     [ 沿车道 #84 奔赴榷场 ] (距离 12.8m，无瞬移)       │
-└────────────────────────────────────────────────────────┘
-```
-
----
-
-## 7. 分阶段实施路线图 (Milestones)
-
-为确保整个过程不破坏现有 6 大测试套件与确定性矩阵，建议分四期平稳落地：
-
-```mermaid
-timeline
-    title 决策解耦演进里程碑
-    M19.1 (数据模型与投影适配) : 定义 Intent / Strategy / Primitive 枚举
-                               : 在 Agent3D 增加新字段并实现向 PrimitiveActionState 的自动投影
-                               : 保持既有分支 evaluate 逻辑，仅在输出端适配，确保 CI 100% 全绿
-    M19.2 (策略层抽取与重路由收敛) : 将 seeking.rs 与 harvest.rs 中的重路由与掉头抽为策略 Fallback
-                               : 统一收敛 try_route_to_market 与 try_continue_harvesting
-                               : 消除跨分支硬跳转
-    M19.3 (意图仲裁层独立)     : 改造 branches.rs，仅产出 AgentIntent，剥离 target_state
-                               : 建立专门的 StrategySelector 模块
-    M19.4 (个性化与前端可视化) : 接入基于特质（智力/阶层）的策略选择
-                               : 前端 Inspector 支持意图-策略-动作三栏可视化展示
-```
-
----
-
-## 8. 验收门禁与核心不变量
-
-任何阶段的代码提交均须遵守以下门禁，杜绝架构回退：
-
-1. **确定性定理保持**：
-   - 必须通过 `node tools/test-determinism.js`（6 套矩阵测试全通）；
-   - 策略选择排序必须严格使用确定性规则（距离升序 + ID 升序打破并列），严禁出现集合迭代随机性。
-2. **零堆内存分配**：
-   - 热路径 `tick_decisions()` 内严禁出现任何 `Box<dyn Strategy>`、动态 `Vec` 扩展；
-   - 必须通过 `node tools/profile-benchmark.js`，稳态单拍耗时不得增加超过 2 µs。
-3. **坐标连续性禁令**：
-   - 策略降级导致的航向变更，必须百分之百走 `ActionPrimitive::UturnTo`（`turn_around_and_route_to`）在原车道平滑掉头，严禁坐标闪现；
-   - 静止态转换必须通过 `enter_stationary_state()` 清空车道。
-4. **快照与自动化门禁**：
-   - `node tools/test-snapshot-bin.js`（FABS 帧快照比对无漂移）；
-   - `node tools/config-check.js` 与 `node tools/frontend-check.js` 全绿。
+- 分别证明同版本确定性、新旧行为等价、快照同构、同版本存读档连续性，不能互相替代。
+- 基础重构保留 RNG 消费顺序与既有候选并列规则；不能一律改成“距离 + ID”后仍宣称等价。
+- 导航成功才安装新任务执行状态；车道上重定向沿现有车道连续处理，节点/现场出发正常 dispatch，无车道时不强制 U-turn。
+- 固定枚举只约束新增控制对象不使用动态派发；不承诺现有上下文、路线和 pending 集合全部零分配。
+- 内存大小用目标平台布局实测，性能以同机器同配置的配对基线判断，不采用跨机器绝对 TPS 或未经测量的缓存驻留结论。
+- 临时差分脚本/断言按项目规则验证后删除，不新增持久化单元测试。

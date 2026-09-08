@@ -27,6 +27,8 @@
 
 ### 1.3 决策系统
 
+M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`observation.rs` 仅提供类型/只读适配，不变更 Agent 存储、WASM 导出或 FABS。新增旧动作/分支时同步观察映射；接管期须重新审计全部 state/pending 写入点。详见 [26-intent-observation.md](./26-intent-observation.md)。
+
 | 改动对象 | 必须同步改动 | 原因 |
 |---|---|---|
 | `decisions/branches.rs` 新增分支 (b14+) | `needs.rs` NeedKind 枚举 / `config.decision-order.js` 排序注册 / `decision-viz-data.js` 分支元数据(条件文案/层级/图标) / `render.js` NEED_KIND_REASON 状态标签 / `decisions/AGENTS.md` | §4.14 分支自包含铁律 + 决策顺序可编排：新分支必须在前端注册才能被拖动排序和可视化 |

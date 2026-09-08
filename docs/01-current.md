@@ -3,7 +3,7 @@
 开发任务入口：[Agent 快速入口](./current/00-agent-start.md)，按改动类型选择指南、上下游同步链与验证命令。
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.46.6（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v1.46.8（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（205 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
@@ -53,6 +53,7 @@
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |
 | 5 | 🏡 多级私产房屋与建材升级体系 (`house`) | [05-house-system.md](./current/05-house-system.md) | 5 级建筑形态、自然折旧修缮、空置房登记、二手房屋市场与营地麦穗 37% 拍卖系统 |
 | 6 | 🧠 马斯洛需求层次与行动状态机 (Motivation AI) | [06-motivation-ai.md](./current/06-motivation-ai.md) | 6 层需求（⓪ 瞬间行为）、私有触发器、连续采收与平滑重路由、错峰决策节拍 |
+| 6.2 | 意图类型与只读执行观察（M19.1） | [26-intent-observation.md](./current/26-intent-observation.md) | 已知分支转换、执行事实借用；原调度仍权威，无持久化字段 |
 | 6.1 | 🔄 三大核心系统状态机架构全景 | [24-three-core-systems-fsm.md](./current/24-three-core-systems-fsm.md) | 马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 图解与契约 |
 | 7 | 🎨 交互式表现层与控制台 (`frontend`) | [07-frontend-ui.md](./current/07-frontend-ui.md) | Canvas 渲染管线、在售呼吸图标、Inspector、族谱时间轴、账本大盘、房屋拍卖交易所大盘、调试监视器 |
 | 7.1 | 🧭 前端窗口结构与跳转关系 | [17-frontend-window-navigation.md](./current/17-frontend-window-navigation.md) | 主世界布局、常驻面板、模态窗口、独立族谱页、入口/返回/跨窗口跳转、设计契约 |

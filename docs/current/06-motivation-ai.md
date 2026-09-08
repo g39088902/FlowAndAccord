@@ -1,12 +1,16 @@
 # 6. 🧠 马斯洛需求层次与行动状态机 (Motivation AI)
 
-> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（7 子模块）· 深度拆解见 [`docs/07-agent-ai-analysis.md`](../07-agent-ai-analysis.md)
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/decisions/`（模块地图见局部 AGENTS）· 深度拆解见 [`docs/07-agent-ai-analysis.md`](../07-agent-ai-analysis.md)
 
 ---
 
 ## 模块定位
 
-部落民的层次化动机决策引擎，基于马斯洛需求层次驱动行为状态机。低层级需求绝对优先阻断高层任务，所有决策为确定性执行（无概率掷骰），决策节拍错峰均摊以保证帧率均匀。
+部落民的层次化动机决策引擎，基于马斯洛需求层次驱动行为状态机。低层级需求绝对优先阻断高层任务，决策执行保持确定性（立宅选址按固定顺序消费共享 RNG），决策节拍错峰均摊以保证帧率均匀。
+
+## 只读意图与执行观察
+
+现有状态机仍是执行真相源；M19.1 的领域类型和按需观察接口见 [26-intent-observation.md](./26-intent-observation.md)。观察不会重跑决策、推测来源分支或覆盖 state，不增加 Agent/存档字段。
 
 ## 核心机制
 
@@ -121,7 +125,7 @@ stateDiagram-v2
 ### 错峰决策节拍
 - 每个引擎 tick = 1/60 游戏小时，agent 每 120 tick（2.0 游戏小时）决策一次。
 - 错峰相位：`(tick_counter + agent.id) % 120 == 0`，全员相位均摊错开。
-- `world.tick()` 内部顺序：POI 再生 → 代谢/繁衍 → POI 交互(装卸) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货发生在决策之前，决策看到的是卸货后的仓库状态。
+- `world.tick()` 内部顺序：POI 再生 → 代谢/繁衍 → POI 交互(装卸) → 房屋系统 → 道路衰减 → 运动 → 决策及提交结算 → 账本 → 清理。卸货发生在决策之前，决策读取卸货后的家户账本和本 tick 运动后的位置。
 - 详见根 AGENTS.md §4.3。
 
 ### 分支评估顺序（数据驱动，v1.3.6 起）

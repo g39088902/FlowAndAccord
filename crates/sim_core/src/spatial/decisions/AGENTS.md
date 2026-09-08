@@ -8,10 +8,14 @@
 
 单名族人的**马斯洛需求决策状态机**：从"生理自救 → 安全备货 → 归属成家 → 尊重建材 → 自我实现淘金"逐层评估需求，并以 `PrimitiveActionState` 状态机驱动寻路、途中重路由、现场采收等动作。本目录**只产出"做什么/去哪"的决策**，不负责数值结算（代谢/装卸/施工/修缮的结算分别在 `ecology.rs` 与 `housing_system/`）。
 
-## 2. 📁 文件清单（9 个文件）
+## 2. 📁 文件清单（13 个 Rust 文件）
 
 | 文件 | 职责 |
 | :--- | :--- |
+| `intent.rs` | M19.1 意图/完成条件类型，Need::observe_intent 只转换已知来源结果，不重评估 |
+| `strategy.rs` | M19.1 策略/阶段/失败类型，尚未挂载 Agent 或接管执行 |
+| `primitive.rs` | M19.1 导航/驻留/等待描述，尚无新物理执行器 |
+| `observation.rs` | Agent3D::observe_execution 不可变借用事实；21 状态穷尽无损视图，pending 与持续活动分开 |
 | `mod.rs` | 模块声明与重导出（对外暴露 `needs::*`、`branches::*` 与 `evaluate::*` 的类型） |
 | `branches.rs` | 18 条分支注册表：`BranchId` 枚举（↔ 字符串 ID `"b1".."b18"`）、`ALL` 中性声明序、自包含条件函数 `evaluate`、`resolve_order` 解析、`level_override_for` 层级覆盖 |
 | `needs.rs` | 需求领域模型：`MaslowLevel`/`NeedKind`/`Need`/`NodePool`/`DecisionContext`/`ResourceNode`，以及家宅缺料查询与前端需求标签（标签亦应用层级覆盖） |
@@ -38,7 +42,7 @@
 
 ### 4.2 RNG 消费点
 
-`Decisioner.rng` 指向全局 `WorldRng`，按 agents 顺序依次消费。本目录内 RNG 消费只在三处：`evaluate.rs`（立宅掷点 / ★ v1.26.0 竞拍随机选房）与 `harvest.rs`（随机挑同类 POI）。新增随机消耗必须保持确定性顺序。竞拍随机选房在 `fulfill_resting_need` 内消费 `gen_range_usize`（候选 >1 才消费，候选按 `self.houses` 原序不排序）。
+`Decisioner.rng` 指向全局 `WorldRng`，按 agents 顺序消费。当前本目录实际 RNG 调用只有 `evaluate.rs::fulfill_resting_need` 的立宅候选 angle/dist；竞拍候选按 ID 升序全集枚举，资源/市场选最近点均不耗 RNG。资源/市场并列沿用输入遍历顺序；夺位只在距离严格更小时替换候选，保留先遇到的营地。只读观察模块不得重新调用评估、选址或派发。
 
 ### 4.3  dispatch 成功才改写状态
 
@@ -74,7 +78,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **途中状态机 `decide_seeking_throne`**（seeking.rs，寻路+运动系统，坐标连续不闪现）：体力告警 → 折返；抵达目标营地交互半径且王位仍空缺 → 写 `coronation_pending` 待世界登基；途中目标已易主 → 原地掉头重定向到新的空缺王位营地；无可夺位营地 → 放弃远征恢复常规决策；
 - **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；★ v1.45.2 登基时若族人已有私宅，严禁覆盖 `home_camp_node` 为营地中心 POI 节点，保留私宅大门连接以杜绝与配偶分居、无法育儿；
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
-- 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地并列取 id 小者。
+- 确定性：分支评估不消耗 `WorldRng`；`eligible_leaderless_camp` 选最近营地，距离相同保留输入列表先遇到的候选。
 - ★ v1.32.0 孤儿营地补王：`eligible_leaderless_camp` 遍历完整营地列表（`ctx.camp_pois`）而非 `regions`，无 Region 实体（有房无王）的营地一并视为空缺王位；`decide_seeking_throne` 与 `execute_pending_coronations` 的「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，修复房屋辖区与地区成员登记簿脱节导致的孤儿营地永无国王。
 
 ### 4.9 🔴 决策层非移动态切换必须走 `enter_stationary_state()` · 移动态由 dispatch 自动驱动（v1.25.0 起）
@@ -98,3 +102,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 - **幂等守卫**：b16 加 `courtship_pending.is_none()`、b18 加 `!raise_child_pending`、b17 加 `pending_bid_house_ids.is_empty()` + 冷却，避免每拍重复写。
 - **确定性**：瞬发链路不消耗 `WorldRng`（b17 用 `all_bid_candidates` 升序确定性枚举全部更高等级在售房，b16 用 `best_courtship_target` 的 `min_by`）。
 - **标签**：瞬发命中写 `"Instantaneous·BidHouse/Courtship/RaiseChild"`；本拍无常规需求时保留瞬间标签，否则被常规标签覆盖。
+
+### 4.11 M19.1 观察边界
+
+意图/策略/原语为非持久化词汇；旧 Agent 状态和 pending 继续权威。`Need::observe_intent` 要求实际来源分支及评估时家宅等级，`Agent3D::observe_execution` 不根据标签反推来源，不构造 ActiveTask。观察借用路线/候选/标签，不写 state、不耗 RNG、不分配。完整 API 契约见 [26-intent-observation.md](../../../../../docs/current/26-intent-observation.md)。

@@ -18,6 +18,7 @@
 | **docs/current/21-ui-page-overview.md** | UI 页面全景剖析：画布视口、顶栏状态栏、生态大盘、观察堆栈、模态弹窗、存档面板 | 了解当前 UI 页面布局与交互时 |
 | **docs/current/22-society-ledger-ui.md** | 制度大盘（M1-M4）界面实现说明：4 标签页枢纽、M2 分家继承、M3 宗族公库、M4 王国政体、ASCII 线框原型 | 了解制度大盘界面实现时 |
 | **docs/current/23-ui-dev-guide.md** | 前端开发实施指南：模块化分工、快照四处同步（★ M4）、CSS 设计系统、性能节流、验收门禁 | 开发新 UI 模块时 |
+| **docs/current/26-intent-observation.md** | M19.1 意图类型与只读执行观察：分支结果转换、执行事实与非持久化边界 | 使用意图/策略/原语类型及观察 API 时 |
 | **docs/current/24-three-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 架构与不变量 | 查阅核心 FSM、状态转移方程与交互契约时 |
 | **docs/archive/08-decision-viz-design.md** | 历史马斯洛决策可视化设计方案 | 追溯既有图元/交互设计时参考；当前实现以 `docs/current/06-motivation-ai.md`、`23-ui-dev-guide.md` 为准 |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份） | 改动 ledger/ 代码时查阅 |
@@ -63,7 +64,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.6)"]
+    F --> G["浏览器 UI (版本: v1.46.8)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -113,7 +114,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.6`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.8`**。
 
 ---
 
@@ -178,7 +179,7 @@ node frontend/server.js           # http://localhost:3000
 - **时间基准**：每 tick = `config.simulationDt`(1/60) 游戏小时，`config.agentDecisionIntervalTicks`(120) tick = 2 游戏小时；在 1x 基础倍速下，现实 1 秒 = 游戏内 1 小时。仿真由独立 Web Worker `sim_worker.js` 驱动（约 60Hz 心跳步进）。
 - **错峰决策**：每个 agent 仅在 `(tick_counter + agent.id) % 120 == 0` 的相位上决策，全员相位均摊错开。
 - **严禁修改 `config.simulationDt`**：基准恒为 1/60 游戏小时，倍速通过 `world_tick_steps(N, dt)` 同帧多步实现，改动 dt 会导致数值积分发散。
-- **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 决策 → 道路衰减 → 运动。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
+- **`world.tick()` 内部顺序（勿打乱）**：POI 再生 → 代谢/繁衍 → POI 交互(装载/卸货入账) → 房屋系统 → 道路衰减 → 运动 → 决策及提交结算 → 账本 → 清理。卸货入账在决策之前，决策读到的是卸货后的**家户账本**余额（M6 起决策读账本，不再读房屋仓库）。
 - **共享 RNG 确定性**：`WorldRng` 全局共享，按 agents 顺序依次消费。新增任何随机消耗必须保持确定性，否则同种子逐字节一致性校验失败。
 - **★ v1.29.0 ⓪ 瞬间行为层（优先级高于生理需求）**：每名 agent 在自己的决策相位**最前**（`decide()` 顶部、全状态）先跑 `evaluate_instant_needs`——只遍历 `BranchId::is_instant()` 白名单分支（b16 求偶近距 / b17 竞拍购房 / b18 育儿在宅），命中即「只写决心 / pending、不 dispatch、不改运动状态、不消耗资源与 RNG」并 `continue` 继续遍历后续瞬发分支；随后才进入常规状态机。常规 `evaluate_needs` 遇瞬发命中则 `continue`（本拍已在顶部结算）。非瞬发分支被强制覆盖为 0 时由 `level_override_for` 钳制回代码默认层级。
 
@@ -260,7 +261,7 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 3. 在 `docs/current/11-changelog.md` 追加该版本条目（表头已由升版器自动更新，正文条目需手写）；
 4. 跑 `node tools/bump-version.js --check` 确认零漂移。
 
-> ⚠️ `SAVE_FORMAT_VERSION`（存档**结构**版本，当前 3）**不随应用版本自增**，仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，且必须同改 `world_save.rs` 与 `save-ui.js`。
+> ⚠️ `SAVE_FORMAT_VERSION`（存档**结构**版本，当前 4）**不随应用版本自增**，仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，且必须同改 `world_save.rs` 与 `save-ui.js`。
 
 > 🔤 **版本字符串格式铁律**：内核 `SAVE_APP_VERSION` 与存档 `app_version` **无 `v` 前缀**（`1.44.2`），`v` 只在 UI 文案里拼接显示。前端任何兜底串（`rustworld.js` / `sim_worker.js`）必须与内核同格式；新增版本比较点必须先过 `save-ui.js::normalizeVer()`，且废弃决策前 `await waitEngineReady()`——否则会重演 v1.44.2 事故（同版本被误判旧档、点「废弃」反而读回旧档）。
 

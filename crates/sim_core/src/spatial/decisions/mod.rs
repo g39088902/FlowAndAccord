@@ -10,3 +10,9 @@ pub mod market;
 pub use needs::*;
 pub use branches::*;
 pub use evaluate::*;
+
+// M19.1: read-only vocabulary and observation; the legacy dispatcher remains authoritative.
+pub mod intent;
+pub mod strategy;
+pub mod primitive;
+pub mod observation;
