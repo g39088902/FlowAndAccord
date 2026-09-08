@@ -23,7 +23,10 @@
 ## 在办设计
 
 - [性能优化](./16-plan-performance-optimization.md)
+- [地形美术与世界景观提升（方向设计，未排期）](./21-plan-terrain-art.md)：当前画面诊断、短中长期方案、首期切片与验收预算。
+- [新地形特征与地理玩法（方向设计，未排期）](./22-plan-terrain-features.md)：八类地形、三种地图组合，以及生成、通行、取水和选址契约。
 - [农田与农业税](./17-plan-farmland-agriculture.md)
+- [人物日常生活细化（方向设计，未排期）](./20-plan-everyday-life.md)：八个生活深化方向、首期“一家人的一天”与分阶段建议。
 
 ## 归档准则
 

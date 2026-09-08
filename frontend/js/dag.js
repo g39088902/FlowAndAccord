@@ -178,7 +178,7 @@
 
     const statsEl = document.getElementById('dag-modal-stats');
     if (statsEl) {
-      const years = ((inPageDag.tickMax - inPageDag.tickMin) / 7200).toFixed(1);
+      const years = ((inPageDag.tickMax - inPageDag.tickMin) / window.FlowDagLayout.LAYOUT_CONST.TICKS_PER_YEAR).toFixed(1);
       statsEl.textContent = '直系 ' + inPageDag.nodes.length + ' 人 · 亲子边 ' +
         inPageDag.edges.length + ' · 跨度 ' + years + ' 年';
     }
@@ -206,7 +206,7 @@
       '</div>' +
       '<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">' +
         '<div>🕐 出生 tick: ' + n.birthTick + '</div>' +
-        '<div>' + (n.isSpine ? '🟥 位于主干血脉' : '〰️ 旁支血脉') + '</div>' +
+        '<div>' + (n.isSpine ? '亮边 · 主干血脉' : '〰️ 旁支血脉') + '</div>' +
         '<div>👴 父亲: ' + (n.fatherId ? '#' + n.fatherId : '无 (始祖)') + '</div>' +
         '<div>👩 母亲: ' + (n.motherId ? '#' + n.motherId : '无 (始祖)') + '</div>' +
         '<div>💍 配偶: ' + (n.spouseId ? '#' + n.spouseId : '未婚') + '</div>' +

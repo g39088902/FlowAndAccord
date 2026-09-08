@@ -44,6 +44,7 @@
   }
   function nodeClasses(n, lod, selectedId) {
     let cls = 'dag-node dag-node--' + lod;
+    if (n.gender === 'female') cls += ' female';
     if (n.isSpine) cls += ' spine';
     if (n.isAncestor) cls += ' ancestor';
     else if (n.isDescendant) cls += ' descendant';
@@ -62,7 +63,7 @@
         '<span class="dag-node-gen">' + genText(n) + '</span></div>';
     }
     const statusText = n.isAlive
-      ? ('🟢 ' + n.age + 's · 心' + n.health)
+      ? ('🟢 ' + n.age + 'h · 心' + n.health)
       : ('💀 ' + (n.deathCause || '仙逝'));
     return '' +
       '<div class="dag-node-header">' +
@@ -189,6 +190,7 @@
           slot.el.className = nodeClasses(n, lod, selectedId);
           slot.el.innerHTML = cardHtml(n, lod);
           slot.el.__nid = n.id;
+          slot.el.title = '#' + n.id + ' · ' + genText(n) + (n.isAlive ? ' · 存活' : ' · 已故');
           slot.key = key;
         }
         slot.el.style.left = n.x + 'px';
@@ -340,6 +342,8 @@
       applyTransform();
     }
     function relayout(pxPerTick) {
+      const anchor = dag.nodes.find(n => n.id === selectedId);
+      const oldX = anchor ? anchor.x : 0, oldY = anchor ? anchor.y : 0;
       const nd = L.layoutTimelineDag(dag.nodes, dag.edges, { pxPerTick: pxPerTick, focusId: dag.focusId });
       dag.width = nd.width; dag.height = nd.height; dag.pxPerTick = nd.pxPerTick;
       dag.tickToY = nd.tickToY; dag.yToTick = nd.yToTick; dag.spine = nd.spine;
@@ -347,8 +351,12 @@
       ySorted = dag.nodes.slice().sort((a, b) => (a.y - b.y) || (a.id - b.id));
       svg.setAttribute('width', dag.width);
       svg.setAttribute('height', dag.height);
+      if (anchor) {
+        panX += (oldX - anchor.x) * scale;
+        panY += (oldY - anchor.y) * scale;
+      }
       invalidateKeys();
-      invalidate();
+      applyTransform();
     }
     function setSelected(id) {
       selectedId = id;
@@ -372,32 +380,39 @@
     }
 
     // -------------------------------------------------- 交互 (拖拽 / 滚轮 / 点击 / 悬停)
+    let pressedId = null, activePointer = null;
     let dragging = false, moved = false, sx = 0, sy = 0, spx = 0, spy = 0;
     function onDown(e) {
-      if (e.target.closest && e.target.closest('button')) return;
+      if (dragging || e.button !== 0 || (e.target.closest && e.target.closest('button'))) return;
+      const card = e.target.closest ? e.target.closest('.dag-node') : null;
+      pressedId = card ? card.__nid : null;
+      activePointer = e.pointerId;
+      hoverId = null;
       dragging = true; moved = false;
       sx = e.clientX; sy = e.clientY; spx = panX; spy = panY;
       try { container.setPointerCapture(e.pointerId); } catch (_) {}
     }
     function onMove(e) {
-      if (!dragging) return;
+      if (!dragging || e.pointerId !== activePointer) return;
       const dx = e.clientX - sx, dy = e.clientY - sy;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
       panX = spx + dx; panY = spy + dy;
       applyTransform();
     }
     function onUp(e) {
-      if (!dragging) return;
+      if (!dragging || e.pointerId !== activePointer) return;
       dragging = false;
       try { if (container.hasPointerCapture(e.pointerId)) container.releasePointerCapture(e.pointerId); } catch (_) {}
-      const el = e.target.closest ? e.target.closest('.dag-node') : null;
-      if (!moved && el && el.__nid !== undefined) {
-        selectedId = el.__nid;
+      if (Math.abs(e.clientX - sx) > 3 || Math.abs(e.clientY - sy) > 3) moved = true;
+      if (e.type !== 'pointercancel' && !moved && pressedId != null) {
+        selectedId = pressedId;
         invalidateKeys();
         invalidate();
         const n = dag.nodes.find(x => x.id === selectedId);
         if (n) onSelect(n);
       }
+      pressedId = null; activePointer = null;
+      invalidate();
     }
     function onWheel(e) {
       e.preventDefault();
@@ -411,12 +426,13 @@
       applyTransform();
     }
     function onOver(e) {
+      if (dragging) return;
       const el = e.target.closest ? e.target.closest('.dag-node') : null;
       const id = el && el.__nid !== undefined ? el.__nid : null;
-      if (id !== hoverId) { hoverId = id; invalidateKeys(); invalidate(); }
+      if (id !== hoverId) { hoverId = id; invalidate(); }
     }
     function onLeave() {
-      if (hoverId !== null) { hoverId = null; invalidateKeys(); invalidate(); }
+      if (hoverId !== null) { hoverId = null; invalidate(); }
     }
 
     container.style.touchAction = 'none';

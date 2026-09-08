@@ -22,7 +22,7 @@
     const dagJson = JSON.stringify(ser);
     const layoutSrc = window.FlowDagLayout.SRC;
     const viewSrc = window.FlowDagView.SRC;
-    const years = ((dag.tickMax - dag.tickMin) / 7200).toFixed(1);
+    const years = ((dag.tickMax - dag.tickMin) / window.FlowDagLayout.LAYOUT_CONST.TICKS_PER_YEAR).toFixed(1);
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -109,7 +109,7 @@
     .dag-node:hover { border-color: #38bdf8; box-shadow: 0 10px 24px rgba(56,189,248,0.25); z-index: 10; }
     .dag-node.ancestor { border-color: rgba(251,191,36,0.8); background: rgba(36,28,12,0.94); }
     .dag-node.descendant { border-color: rgba(56,189,248,0.7); background: rgba(12,32,48,0.94); }
-    .dag-node.spine { box-shadow: 0 0 0 2px rgba(239,68,68,0.35), 0 6px 18px rgba(0,0,0,0.5); }
+    .dag-node.spine { box-shadow: 0 0 0 2px rgba(226,232,240,0.35), 0 6px 18px rgba(0,0,0,0.5); }
     .dag-node.dead { opacity: 0.72; filter: grayscale(0.4); }
     .dag-node.focus { border: 2px solid #ef4444; box-shadow: 0 0 22px rgba(239,68,68,0.55), 0 8px 24px rgba(0,0,0,0.6); background: rgba(48,14,18,0.98); z-index: 20; }
     .dag-node.rel { opacity: 1; border-color: #38bdf8; }
@@ -118,9 +118,11 @@
       padding: 0; border-radius: 8px; background: #1e3a5f; border-color: rgba(255,255,255,0.18);
       box-shadow: none;
     }
+    .dag-node--block.ancestor, .dag-node--block.descendant { background: #1e3a5f; }
+    .dag-node.focus { border-color: #ef4444; box-shadow: 0 0 22px rgba(239,68,68,0.55); background: rgba(48,14,18,0.98); }
     .dag-node--block.female { background: #4c1d3a; }
     .dag-node--block.dead { background: #334155; opacity: 0.55; }
-    .dag-node--block.spine { background: #7f1d1d; border-color: rgba(248,113,113,0.8); }
+    .dag-node--block.spine { border-color: #e2e8f0; box-shadow: 0 0 0 1px rgba(226,232,240,0.5); }
     .dag-node--block.focus { background: #ef4444; border-color: #fecaca; }
     .dag-node--block .dag-node-dot { display: none; }
     .dag-node--simple { justify-content: center; }
@@ -174,7 +176,7 @@
     <div class="dag-actions">
       <div class="dag-density">
         <span>时间密度</span>
-        <input type="range" id="density" min="0.25" max="4" step="0.05" value="1" />
+        <input type="range" id="density" title="调整出生时间间距；低于亲子最小间距时自动保持安全距离" min="0.25" max="4" step="0.05" value="1" />
         <b id="density-val">1.00x</b>
       </div>
       <button class="dag-btn" id="btn-focus-center">🎯 定位焦点</button>
@@ -187,7 +189,7 @@
     <div class="dag-view-host" id="workspace"></div>
     <div class="dag-help-bar">🖱️ 拖拽平移 · 滚轮缩放 · 纵向 = 出生时间 (上=先祖 / 下=后裔) · 蓝👨父 / 粉👩母</div>
     <div class="dag-legend">
-      <span>🟥 主干血脉</span><span>🟨 祖先链</span><span>🟦 后代链</span><span>🟪 女性</span><span>🟦 男性</span><span>灰 = 已故</span>
+      <span>🟥 当前选中</span><span>亮边 = 主干血脉</span><span>🟨 祖先链</span><span>🟦 后代链</span><span>🟪 女性</span><span>🟦 男性</span><span>灰 = 已故</span>
     </div>
     <div class="dag-sidebar" id="sidebar">
       <div class="dag-sidebar-title">
@@ -239,7 +241,7 @@
         '<div style="margin-bottom:6px; color:#38bdf8; font-weight:600;">' +
           (n.isAlive ? ('🟢 存活 · 年龄 ' + n.age + 'h') : ('💀 已故 · 死因: ' + (n.deathCause || '寿终正寝'))) +
         '</div>' +
-        '<div>🕐 出生 tick: ' + n.birthTick + (n.isSpine ? ' · 🟥 主干血脉' : '') + '</div>' +
+        '<div>🕐 出生 tick: ' + n.birthTick + (n.isSpine ? ' · 亮边 = 主干血脉' : '') + '</div>' +
         '<div>👴 父亲: ' + (n.fatherId ? '#' + n.fatherId : '无 (始祖)') + '</div>' +
         '<div>👩 母亲: ' + (n.motherId ? '#' + n.motherId : '无 (始祖)') + '</div>' +
         '<div>💍 配偶: ' + (n.spouseId ? '#' + n.spouseId : '未婚') + '</div>' +

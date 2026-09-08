@@ -23,11 +23,7 @@
     GAP_X: 28,            // 横向间隙
     GAP_Y: 34,            // 纵向间隙
     PAD: 180,             // 画布留白
-    // 时间密度: 每 tick 映射的像素。
-    // 拟合依据 (50 万 tick / 333 人真实数据, 见 tools/gen-dag-testdata.js 统计报告):
-    //   · 亲子出生间隔 min 30,885 tick → 124px ≥ VNEAR(114)，任意亲子纵向不打架，连线基本垂直；
-    //   · 同胞出生间隔 p50 27,007 tick → 108px < VNEAR，同父母子女自然横向并排成"同代行"；
-    //   · 整图 50 万 tick → 约 2,000~2,400px 高，长宽比≈1.35，fit 缩放 0.32~0.34 为各焦点最优值。
+    // 默认时间密度；布局时按实际亲子出生间隔设置下限，保持线性时间轴和代际留白。
     PX_PER_TICK: 0.002,
     LOD_BLOCK: 0.45,      // scale <  → 概览档 (紧凑色块 + 直线边)
     LOD_SIMPLE: 0.75,     // scale <  → 简档 (头像+编号+世代)，否则全档
@@ -262,7 +258,13 @@
   function layoutTimelineDag(nodes, edges, opts) {
     const C = LAYOUT_CONST;
     const o = opts || {};
-    const pxPerTick = o.pxPerTick !== undefined ? o.pxPerTick : C.PX_PER_TICK;
+    let pxPerTick = Number.isFinite(o.pxPerTick) && o.pxPerTick > 0 ? o.pxPerTick : C.PX_PER_TICK;
+    // 横向避碰只能防止卡片相交，无法保证子代在父辈卡片下方。
+    // 同时放大整条时间轴，使每条有效亲子边至少留出 GAP_Y，刻度仍严格线性。
+    for (const e of edges) {
+      const delta = e.child.birthTick - e.parent.birthTick;
+      if (delta > 0) pxPerTick = Math.max(pxPerTick, (VNEAR + 1) / delta);
+    }
     const pad = o.pad !== undefined ? o.pad : C.PAD;
 
     if (!nodes.length) {
@@ -300,7 +302,7 @@
       n.y = n.y - minY + pad;
     }
 
-    const finalMaxCol = Math.max(...nodes.map(n => n.col));
+    const finalMaxCol = maxCol - baseCol;
     const width = Math.max(1400, pad * 2 + finalMaxCol * HNEAR);
     const height = Math.max(1000, (maxY - minY) + pad * 2);
     // y ↔ tick 互转 (供时间刻度尺使用)
