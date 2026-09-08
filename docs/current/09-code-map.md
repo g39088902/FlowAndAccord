@@ -120,6 +120,7 @@ FlowAndAccord/
 ├── AGENTS.md                                # 📖 智能体操作指南 (唯一保留在根目录的文档)
 ├── TODO.md                                  # 待办事项清单
 └── docs/                                    # 📚 全部项目文档
+    ├── README.md                              # 文档导航与归档规则
     ├── 01-current.md                           # 已实现功能「索引入口」(模块导航表)
     ├── 02-build-guide.md                       # 编译与运行深度指南
     ├── 03-browser-guide.md                     # 浏览器自动化使用指南 (playwright-cli)
@@ -127,12 +128,7 @@ FlowAndAccord/
     ├── 05-headless-diagnostics-guide.md        # 确定性无头诊断指南 (diagnose.js SOP)
     ├── 06-config-reference.md                  # 参数速查表 (由 config-check.js 自动生成, 勿手改)
     ├── 07-agent-ai-analysis.md                 # 部落民 AI 决策系统深度拆解
-    ├── 08-decision-viz-design.md               # 马斯洛决策引擎可视化设计方案
-    ├── 10-architecture.md                      # 系统技术架构设计愿景书
     ├── 11-plan.md                              # 项目长期规划书
-    ├── 12-plan-ledger-refactor.md              # 账本系统重构规划 (M1~M4 已完成)
-    ├── 13-plan-house-upgrade-auction.md        # 房屋升级与拍卖系统演进规划
-    ├── 14-plan-todo-followup-v1.27.md          # 待办事项后续跟进规划
     ├── 15-profiling-and-benchmarking-guide.md  # 性能 Profiling 基准与确定性矩阵操作指南
     ├── 16-plan-performance-optimization.md     # 仿真内核与全链路性能优化规划书 (M1~M4 已归档 / T1+M5 待办)
     ├── 17-plan-farmland-agriculture.md         # 农田生产与农业税规划书
@@ -141,6 +137,13 @@ FlowAndAccord/
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图
     ├── doc-maintenance.json                 # 文档维护清单契约配置文件
+    ├── archive/                              # 已完成或被替代的历史设计稿
+    │   ├── README.md
+    │   ├── 08-decision-viz-design.md
+    │   ├── 10-architecture.md
+    │   ├── 12-plan-ledger-refactor.md
+    │   ├── 13-plan-house-upgrade-auction.md
+    │   └── 14-plan-todo-followup-v1.27.md
     └── current/                             # 已实现功能按模块拆分文档
         ├── 01-spatial-network.md
         ├── 02-ecology-poi.md

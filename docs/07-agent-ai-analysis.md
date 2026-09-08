@@ -9,7 +9,7 @@
 
 ## 1. 核心结论
 
-当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + 加权 A* 寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM / 神经网络 / 学习成分**（[10-architecture.md](./10-architecture.md) 中规划的 LLM 认知层为愿景设计）。
+当前 Agent 的"AI"是**纯确定性规则系统**——层次化动机有限状态机 (FSM) + 加权 A* 寻路 + 踩踏拓路涌现 (Stigmergy) + 生理/家庭/房屋生命周期闭环。**不包含任何 LLM / 神经网络 / 学习成分**（[历史架构愿景](./archive/10-architecture.md)中的 LLM 认知层尚未实现）。
 
 Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/test-wasm.js` 同种子逐字节一致性验证；前端 `frontend/js/` 仅为表现与交互层，不存在独立 JS 移植版仿真逻辑。
 

@@ -23,11 +23,11 @@
 >
 > （施密特触发器 / PrimitiveActionState）・深度拆解见 
 >
-> [docs/07-agent-ai-analysis.md](./07-agent-ai-analysis.md)
+> [docs/07-agent-ai-analysis.md](../07-agent-ai-analysis.md)
 >
 >  与 
 >
-> [docs/current/06-motivation-ai.md](./current/06-motivation-ai.md)
+> [docs/current/06-motivation-ai.md](../current/06-motivation-ai.md)
 > **可复用前端基建**
 >
 > ：

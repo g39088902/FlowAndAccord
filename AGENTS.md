@@ -8,7 +8,7 @@
 
 开发任务从 [Agent 快速入口](docs/current/00-agent-start.md) 按改动类型选择局部指南和门禁；本文件仍为全局规则入口。
 
-除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下：`docs/01-current.md` + `docs/current/` 描述"现状"，`docs/11-plan.md` / `docs/10-architecture.md` 描述"愿景"。
+除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下：先从 `docs/README.md` 选择入口；`docs/01-current.md` + `docs/current/` 描述"现状"，`docs/11-plan.md` 描述在办愿景，历史设计稿归档于 `docs/archive/`。
 
 | 文件 | 定位 | 何时阅读 |
 | :--- | :--- | :--- |
@@ -19,7 +19,7 @@
 | **docs/current/22-society-ledger-ui.md** | 制度大盘（M1-M4）界面实现说明：4 标签页枢纽、M2 分家继承、M3 宗族公库、M4 王国政体、ASCII 线框原型 | 了解制度大盘界面实现时 |
 | **docs/current/23-ui-dev-guide.md** | 前端开发实施指南：模块化分工、快照四处同步（★ M4）、CSS 设计系统、性能节流、验收门禁 | 开发新 UI 模块时 |
 | **docs/current/24-three-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化三大 FSM 架构与不变量 | 查阅核心 FSM、状态转移方程与交互契约时 |
-| **docs/08-decision-viz-design.md** | 马斯洛决策引擎可视化设计方案：决策代码→图元映射、双视图三面板、交互能力预留、实现文件规划与里程碑 | 实现决策可视化网页（逻辑引擎图/实时监控）前必读；配套交互原型 `docs/decision-viz-prototype.html` |
+| **docs/archive/08-decision-viz-design.md** | 历史马斯洛决策可视化设计方案 | 追溯既有图元/交互设计时参考；当前实现以 `docs/current/06-motivation-ai.md`、`23-ui-dev-guide.md` 为准 |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份） | 改动 ledger/ 代码时查阅 |
 | **docs/02-build-guide.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试与故障排查 | 深入构建与环境排障时 |
 | **docs/03-browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略 | 需要打开页面/渲染校验/截图/自动化交互时 |
@@ -28,9 +28,9 @@
 | **docs/15-profiling-and-benchmarking-guide.md** | 性能 Profiling 基准与确定性矩阵操作指南：`tools/profile-benchmark.js` 与 `tools/test-determinism.js` | 进行性能优化、寻路改进、多线程改造前建立基准与回归时 |
 | **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 15 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
-| **docs/12-plan-ledger-refactor.md** | 账本与仓库重构计划（M1~M4 已完成，M5 收尾 ✅） | 账本系统演进规划 |
+| **docs/archive/12-plan-ledger-refactor.md** | 已完成的账本与仓库重构计划 | 仅追溯里程碑；改动账本以 `docs/current/12-ledger-system.md` 和局部 AGENTS 为准 |
 | **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（仅保留未完成计划：M5-1 消除超线性 / M5-2 条件触发的多线程 Fork-Join） | 性能优化专项规划 |
-| **docs/10-architecture.md** | 宏观技术架构愿景书（ECS 内核 / 零拷贝快照 / LLM 认知总线） | 参考分层架构愿景（多为规划态） |
+| **docs/archive/10-architecture.md** | 历史宏观架构愿景书 | 仅作远期参考；当前架构以本文 §1 和 `docs/01-current.md` 为准 |
 | **docs/11-plan.md** | 项目长期规划书（空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解未来宏观方向（多为规划态） |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
 
@@ -63,7 +63,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.5)"]
+    F --> G["浏览器 UI (版本: v1.46.6)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -113,7 +113,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.5`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.6`**。
 
 ---
 
