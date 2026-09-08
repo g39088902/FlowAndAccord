@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.16**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.17**。
+
+| **v1.46.17** | 国王内帑与皇帝公帑结算机制重构：① **结算周期统一调整**：国王内帑与皇帝公帑由 100 游戏小时（6000 tick）调整为 **120 游戏小时（7200 tick）**；② **全品类物资纳税与拨付**：提取范围由单一黄金扩展至全品类 5 种物资（水/粮/木/石/金），国王从营地公仓各提取 1%（`royal_privy_rate = 0.01`），皇帝从下属各营地公仓各提取 0.5%（`imperial_privy_rate = 0.005`）；③ **资产归入家户私库**：拨付物资优先直接划入国王/皇帝名下的家户账本（`Family Ledger`，若无家户则进入随身背包），避免大宗木石背包超载违和感，回流府库与供暖/吃喝/升级消耗形成闭环；④ **前后端超参数契约化**：新增 `royalPrivyIntervalTicks`、`royalPrivyRate`、`imperialPrivyIntervalTicks`、`imperialPrivyRate` 四项超参，三处同步；⑤ **UI与调试模式适配**：调试模式 HUD 与 Inspector 内帑单位由固定金币更正为物资总量；⑥ 门禁全绿，确定性矩阵 6/6 套件全通。 | sim_core(ledger/config) / frontend(config/render_hud/render_inspector) / tools / docs |
 
 | **v1.46.16** | 宏观气候厄尔尼诺与纪元候波振幅放大至 ±5℃：① **振幅调优**：将前端 `config.js` 的 `tempElNinoAmplitude` 与 `tempClimateEpochAmplitude` 默认超参从 3.0 上调至 5.0（厄尔尼诺与纪元候波正弦波动振幅分别由 ±3℃ 增至 ±5℃），宏观综合极端气温范围拓展至 -13℃ ~ 41℃；② **预测图表与示例同步**：更新 `crates/sim_core/examples/config.json` 与 `render_hud.js` 折线图坐标自适应极值与 fallback；更新气候机制文档；参数速查表与确定性门禁全量通过。 | config / docs / sim_wasm |
 

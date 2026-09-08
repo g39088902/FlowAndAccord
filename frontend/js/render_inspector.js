@@ -477,7 +477,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
           if (region.kingId != null) {
             const kingAgent = sim.getAgent ? sim.getAgent(region.kingId) : null;
             const kingPrivy = kingAgent && kingAgent.cumulativeRoyalPrivy != null ? kingAgent.cumulativeRoyalPrivy : (region.cumulativeRoyalPrivy || 0);
-            const debugPrivyTag = sim.debugMode ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：现任国王收到内帑总额">内帑: ${kingPrivy.toFixed(1)} 🪙</span>` : '';
+            const debugPrivyTag = sim.debugMode ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：现任国王收到内帑总物资">内帑: ${kingPrivy.toFixed(1)} 📦</span>` : '';
             const kingLabel = `👑 Agent #${region.kingId}`;
             const chipHtml = window.EntityLink
               ? window.EntityLink.agent(region.kingId, kingLabel, { title: '点击追踪国王视角' })
@@ -488,7 +488,7 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
             }
           } else {
             const regionPrivy = region.cumulativeRoyalPrivy || 0;
-            const debugPrivyTag = (sim.debugMode && regionPrivy > 0) ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：该王国历史累计拨付内帑总额">内帑: ${regionPrivy.toFixed(1)} 🪙</span>` : '';
+            const debugPrivyTag = (sim.debugMode && regionPrivy > 0) ? `<span style="margin-left:6px; font-size:10px; color:#fbbf24; font-weight:600;" title="🐞 调试模式：该王国历史累计拨付内帑总物资">内帑: ${regionPrivy.toFixed(1)} 📦</span>` : '';
             const nextHtml = `<span style="color:#ef4444;">王位空缺（可被夺位）</span>${debugPrivyTag}`;
             if (kingEl.innerHTML !== nextHtml) {
               kingEl.innerHTML = nextHtml;
@@ -1079,8 +1079,8 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
       const imperialTotal = selAgent.cumulativeImperialPrivy || 0;
       if (sim.debugMode && (privyTotal > 0.001 || imperialTotal > 0.001 || isKing || isEmperor)) {
         debugPrivyEl.style.display = 'flex';
-        debugPrivyValEl.textContent = `${privyTotal.toFixed(1)} + ${imperialTotal.toFixed(1)} 🪙`;
-        debugPrivyValEl.title = `国王内帑 ${privyTotal.toFixed(1)}；帝国公帑 ${imperialTotal.toFixed(1)}${isEmperor ? '（现任皇帝）' : ''}`;
+        debugPrivyValEl.textContent = `${privyTotal.toFixed(1)} + ${imperialTotal.toFixed(1)} 📦`;
+        debugPrivyValEl.title = `国王内帑 ${privyTotal.toFixed(1)}；帝国公帑 ${imperialTotal.toFixed(1)}${isEmperor ? '（现任皇帝）' : ''}（全品类物资总量）`;
       } else {
         debugPrivyEl.style.display = 'none';
       }

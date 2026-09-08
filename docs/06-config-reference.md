@@ -252,6 +252,10 @@
 | `ledgerReliefFamilyThreshold` | f32 | 8 | ledger/region.rs (救济) | 极贫家庭门槛：家户账面水+粮总额 < 此值视为极贫 |
 | `ledgerReliefCooldownTicks` | u64 | 2400 | ledger/region.rs (救济) | 救济冷却 (tick)，每家户每 N tick 最多接收一次救济 (40 游戏小时) |
 | `prestigeKingBonus` | u32 | 3 | ledger/region.rs / decisions/scheduler.rs (国王登基威望奖励) | 国王登基任职威望奖励 |
+| `royalPrivyIntervalTicks` | u64 | 7200 | — | 国王内帑结算周期 (tick)，每 N tick 结算一次 (120 游戏小时) |
+| `royalPrivyRate` | f32 | 0.01 | — | 国王内帑提取比例：从地区公仓各品类物资中提取比例 (1%) |
+| `imperialPrivyIntervalTicks` | u64 | 7200 | — | 皇帝公帑结算周期 (tick)，每 N tick 结算一次 (120 游戏小时) |
+| `imperialPrivyRate` | f32 | 0.005 | — | 皇帝公帑提取比例：从下属王国公仓各品类物资中提取比例 (0.5%) |
 
 ## 13. 外部市场（榷场互市）与幂律动态定价
 

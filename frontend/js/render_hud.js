@@ -105,7 +105,7 @@ function updateDebugHud(now) {
 
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
-  dbgSetText('dbg-royal-privy', ((sim.totalRoyalPrivy || 0).toFixed(2)) + ' 🪙');
+  dbgSetText('dbg-royal-privy', ((sim.totalRoyalPrivy || 0).toFixed(1)) + ' 单位');
   dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
   dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
   dbgSetText('dbg-snap-ms', s.snapMs.toFixed(2) + ' ms');

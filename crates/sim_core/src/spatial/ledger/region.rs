@@ -25,7 +25,7 @@ use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, T
 use crate::spatial::world::World3DEngine;
 
 /// 五类资源的固定顺序（保证遍历确定性）
-const RESOURCE_ORDER: [ResourceKind; 5] = [
+pub const RESOURCE_ORDER: [ResourceKind; 5] = [
     ResourceKind::Water,
     ResourceKind::Food,
     ResourceKind::Wood,
@@ -307,40 +307,93 @@ impl World3DEngine {
         self.tick_royal_privy(tick);
     }
 
-    /// 每 100 游戏小时从地区公仓拨付现任国王内帑，进入其随身黄金。
+    /// 每 120 游戏小时从地区公仓拨付现任国王内帑，各品类物资（水/粮/木/石/金）提取 1% 转入其家户私库（若无家户则进入随身）。
     fn tick_royal_privy(&mut self, tick: u64) {
-        const INTERVAL_TICKS: u64 = 6000;
-        if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(INTERVAL_TICKS) {
+        let interval_ticks = self.config.royal_privy_interval_ticks.max(1);
+        if tick == 0 || tick < self.last_royal_payout_tick.saturating_add(interval_ticks) {
             return;
         }
-        self.last_royal_payout_tick = tick - (tick % INTERVAL_TICKS);
-        let mut payouts: Vec<(u32, AgentId, f32)> = Vec::new();
+        self.last_royal_payout_tick = tick - (tick % interval_ticks);
+        let rate = self.config.royal_privy_rate;
+        if rate <= 0.0 {
+            return;
+        }
+
+        struct RoyalPrivyPayout {
+            camp_id: u32,
+            king_id: AgentId,
+            target_hid: Option<HouseholdId>,
+            items: Vec<(ResourceKind, f32)>,
+        }
+
+        let mut payouts: Vec<RoyalPrivyPayout> = Vec::new();
         for (camp_id, region) in &self.region_registry.regions {
             let Some(king_id) = region.group.leader else {
                 continue;
             };
-            let gold = region.group.ledger.balance(ResourceKind::Gold);
-            let amount = gold * 0.10;
-            if amount > 0.0 {
-                payouts.push((*camp_id, king_id, amount));
+            let target_hid = self.household_registry.household_of(king_id);
+            let mut items = Vec::new();
+            for &rk in &RESOURCE_ORDER {
+                let bal = region.group.ledger.balance(rk);
+                let amount = bal * rate;
+                if amount > 0.001 {
+                    items.push((rk, amount));
+                }
             }
-        }
-        for (camp_id, king_id, amount) in payouts {
-            if let Some(region) = self.region_registry.regions.get_mut(&camp_id) {
-                region.group.ledger.debit(ResourceKind::Gold, amount);
-                region.cumulative_royal_privy += amount;
-                region.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Region(camp_id),
-                    to: LedgerRef::Personal(king_id),
-                    resource: ResourceKind::Gold,
-                    amount,
-                    reason: TransferReason::RoyalPrivy,
+            if !items.is_empty() {
+                payouts.push(RoyalPrivyPayout {
+                    camp_id: *camp_id,
+                    king_id,
+                    target_hid,
+                    items,
                 });
             }
-            if let Some(king) = self.agent_by_id_mut(king_id) {
-                king.carried_gold += amount;
-                king.cumulative_royal_privy += amount;
+        }
+
+        for payout in payouts {
+            let mut total_amount = 0.0f32;
+            let to_ref = match payout.target_hid {
+                Some(hid) => LedgerRef::Family(hid),
+                None => LedgerRef::Personal(payout.king_id),
+            };
+
+            for &(resource, amount) in &payout.items {
+                total_amount += amount;
+                let record = TransferRecord {
+                    tick,
+                    from: LedgerRef::Region(payout.camp_id),
+                    to: to_ref.clone(),
+                    resource,
+                    amount,
+                    reason: TransferReason::RoyalPrivy,
+                };
+
+                if let Some(region) = self.region_registry.regions.get_mut(&payout.camp_id) {
+                    region.group.ledger.debit(resource, amount);
+                    region.group.ledger.push_transfer(record.clone());
+                }
+
+                if let Some(hid) = payout.target_hid {
+                    if let Some(hh) = self.household_registry.get_mut(hid) {
+                        hh.group.ledger.credit(resource, amount);
+                        hh.group.ledger.push_transfer(record);
+                    }
+                } else if let Some(king) = self.agent_by_id_mut(payout.king_id) {
+                    match resource {
+                        ResourceKind::Water => king.carried_water += amount,
+                        ResourceKind::Food => king.carried_food += amount,
+                        ResourceKind::Wood => king.carried_wood += amount,
+                        ResourceKind::Stone => king.carried_stone += amount,
+                        ResourceKind::Gold => king.carried_gold += amount,
+                    }
+                }
+            }
+
+            if let Some(region) = self.region_registry.regions.get_mut(&payout.camp_id) {
+                region.cumulative_royal_privy += total_amount;
+            }
+            if let Some(king) = self.agent_by_id_mut(payout.king_id) {
+                king.cumulative_royal_privy += total_amount;
             }
         }
     }

@@ -246,6 +246,10 @@ pub struct SimConfig {
     pub ledger_relief_family_threshold: f32,
     pub ledger_relief_cooldown_ticks: u64,
     pub prestige_king_bonus: u32,
+    pub royal_privy_interval_ticks: u64,
+    pub royal_privy_rate: f32,
+    pub imperial_privy_interval_ticks: u64,
+    pub imperial_privy_rate: f32,
 
     // 13. 外部市场（榷场互市）与幂律动态定价
     pub count_markets: usize,

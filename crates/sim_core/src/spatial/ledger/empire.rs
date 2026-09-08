@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::spatial::agent::{AgentId, Gender};
+use crate::spatial::ledger::family::HouseholdId;
 use crate::spatial::ledger::group::{Group, GroupKind};
 use crate::spatial::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
+use crate::spatial::ledger::region::RESOURCE_ORDER;
 use crate::spatial::world::World3DEngine;
 
 /// 帝国上层政体。只落地 Empire，保留 Federation 扩展位。
@@ -222,61 +224,107 @@ impl World3DEngine {
         }
     }
 
-    /// 与国王内帑完全相同的 6000 tick 周期；每个帝国从每个下属王国公仓黄金余额抽取 5%。
+    /// 每 120 游戏小时从每个下属王国公仓抽取各物资 0.5% 作为皇帝公帑，存入皇帝家户私库（若无家户则进入随身）。
     fn tick_imperial_privy(&mut self, tick: u64) {
-        const INTERVAL_TICKS: u64 = 6000;
+        let interval_ticks = self.config.imperial_privy_interval_ticks.max(1);
         if tick == 0
             || tick
                 < self
                     .last_imperial_payout_tick
-                    .saturating_add(INTERVAL_TICKS)
+                    .saturating_add(interval_ticks)
         {
             return;
         }
-        self.last_imperial_payout_tick = tick - (tick % INTERVAL_TICKS);
+        self.last_imperial_payout_tick = tick - (tick % interval_ticks);
+        let rate = self.config.imperial_privy_rate;
+        if rate <= 0.0 {
+            return;
+        }
 
-        let mut payouts: Vec<(u32, u32, AgentId, f32)> = Vec::new();
+        struct ImperialPrivyPayout {
+            empire_id: u32,
+            camp_id: u32,
+            emperor_id: AgentId,
+            target_hid: Option<HouseholdId>,
+            items: Vec<(ResourceKind, f32)>,
+        }
+
+        let mut payouts: Vec<ImperialPrivyPayout> = Vec::new();
         for (empire_id, empire) in &self.empire_registry.empires {
             let Some(emperor_id) = empire.group.leader else {
                 continue;
             };
+            let target_hid = self.household_registry.household_of(emperor_id);
             for camp_id in &empire.member_camps {
                 let Some(region) = self.region_registry.get(*camp_id) else {
                     continue;
                 };
-                let amount = region.group.ledger.balance(ResourceKind::Gold) * 0.05;
-                if amount > 0.0 {
-                    payouts.push((*empire_id, *camp_id, emperor_id, amount));
+                let mut items = Vec::new();
+                for &rk in &RESOURCE_ORDER {
+                    let bal = region.group.ledger.balance(rk);
+                    let amount = bal * rate;
+                    if amount > 0.001 {
+                        items.push((rk, amount));
+                    }
+                }
+                if !items.is_empty() {
+                    payouts.push(ImperialPrivyPayout {
+                        empire_id: *empire_id,
+                        camp_id: *camp_id,
+                        emperor_id,
+                        target_hid,
+                        items,
+                    });
                 }
             }
         }
 
-        for (empire_id, camp_id, emperor_id, amount) in payouts {
-            if let Some(region) = self.region_registry.get_mut(camp_id) {
-                region.group.ledger.debit(ResourceKind::Gold, amount);
-                region.group.ledger.push_transfer(TransferRecord {
+        for payout in payouts {
+            let mut total_amount = 0.0f32;
+            let to_ref = match payout.target_hid {
+                Some(hid) => LedgerRef::Family(hid),
+                None => LedgerRef::Personal(payout.emperor_id),
+            };
+
+            for &(resource, amount) in &payout.items {
+                total_amount += amount;
+                let record = TransferRecord {
                     tick,
-                    from: LedgerRef::Region(camp_id),
-                    to: LedgerRef::Personal(emperor_id),
-                    resource: ResourceKind::Gold,
+                    from: LedgerRef::Region(payout.camp_id),
+                    to: to_ref.clone(),
+                    resource,
                     amount,
                     reason: TransferReason::ImperialPrivy,
-                });
+                };
+
+                if let Some(region) = self.region_registry.get_mut(payout.camp_id) {
+                    region.group.ledger.debit(resource, amount);
+                    region.group.ledger.push_transfer(record.clone());
+                }
+
+                if let Some(empire) = self.empire_registry.get_mut(payout.empire_id) {
+                    empire.cumulative_imperial_privy += amount;
+                    empire.group.ledger.push_transfer(record.clone());
+                }
+
+                if let Some(hid) = payout.target_hid {
+                    if let Some(hh) = self.household_registry.get_mut(hid) {
+                        hh.group.ledger.credit(resource, amount);
+                        hh.group.ledger.push_transfer(record);
+                    }
+                } else if let Some(emperor) = self.agent_by_id_mut(payout.emperor_id) {
+                    match resource {
+                        ResourceKind::Water => emperor.carried_water += amount,
+                        ResourceKind::Food => emperor.carried_food += amount,
+                        ResourceKind::Wood => emperor.carried_wood += amount,
+                        ResourceKind::Stone => emperor.carried_stone += amount,
+                        ResourceKind::Gold => emperor.carried_gold += amount,
+                    }
+                }
             }
-            if let Some(empire) = self.empire_registry.get_mut(empire_id) {
-                empire.cumulative_imperial_privy += amount;
-                empire.group.ledger.push_transfer(TransferRecord {
-                    tick,
-                    from: LedgerRef::Region(camp_id),
-                    to: LedgerRef::Personal(emperor_id),
-                    resource: ResourceKind::Gold,
-                    amount,
-                    reason: TransferReason::ImperialPrivy,
-                });
-            }
-            if let Some(emperor) = self.agent_by_id_mut(emperor_id) {
-                emperor.carried_gold += amount;
-                emperor.cumulative_imperial_privy += amount;
+
+            if let Some(emperor) = self.agent_by_id_mut(payout.emperor_id) {
+                emperor.cumulative_imperial_privy += total_amount;
             }
         }
     }

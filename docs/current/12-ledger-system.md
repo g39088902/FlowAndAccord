@@ -71,14 +71,14 @@
 - **夺位远征（v1.9.0 起决策引擎驱动，见 [06-motivation-ai.md](./06-motivation-ai.md)）**：决策分支 `B14SeekThrone`（生理层最高档）自主触发——在世成年男性非国王且存在空缺王位营地（有房者仅夺自家房屋所在营地、无房可夺任意）时，选定最近可夺位营地写入 `agent.expedition_target_camp` 并冲向目标（走现有寻路+运动系统坐标连续不闪现，施工进度冻结不回滚）；抵达且王位仍空缺写 `coronation_pending`，由世界 `execute_pending_coronations` 校验后 `set_king` 登基。
 - **★ v1.32.0 孤儿营地补王**：房屋辖区（`House.camp_id`，按「距宅址最近且未满」判定）与地区成员登记簿（`RegionRegistry`，按「始祖落位最近/新生儿随父」登记）是两套独立归属体系——某营地有房屋但从未有成员登记（始祖未落位附近、后代未迁入）时，该营地成为「有房无王」的孤儿营地且永不被夺位逻辑发现。修复：`eligible_leaderless_camp` 改为遍历完整营地列表（`camp_pois`），无 Region 实体一并视为空缺王位；途中与登基两处「无 region」校验由 `unwrap_or(false)` 修正为 `unwrap_or(true)`，孤儿营地可被 B14SeekThrone 正常远征登基（登基时 `add_member` 补建 Region 实体）。
 - **长子继承制**：国王死亡 → 在世最年长儿子 → 孙子 → arrival_order 下一男性 → 绝嗣空悬账本冻结（胎儿不计入继承）。
-- **公仓税 Tax 与国王内帑 RoyalPrivy**：每 `ledger_tax_interval_ticks`(2400=80s) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 3000 tick（100 游戏秒）从地区公仓金币提取 10% 内帑，转入随身黄金并记 `RoyalPrivy` 流水；★ v1.35.2 内核在 Agent（一生累计）、Region（王国累计）与 World（全局累计）三层建立 `cumulative_royal_privy` / `total_royal_privy` 确定性统计，并在调试模式下展示。
+- **公仓税 Tax 与国王内帑 RoyalPrivy**：每 `ledger_tax_interval_ticks`(4800=80h) 全局统一征收，存续家户按账面余额 × `ledger_tax_rate`(3%) 向地区公仓缴纳（只记账不扣物理库存，有国王地区才征收）。现任国王另按每 `royal_privy_interval_ticks`(7200=120h) 从地区公仓各品类物资（水/粮/木/石/金）提取 `royal_privy_rate`(1%) 内帑，转入其家户私库（若无家户则进入随身行囊）并记 `RoyalPrivy` 流水；★ 内核在 Agent（一生累计）、Region（王国累计）与 World（全局累计）三层建立 `cumulative_royal_privy` / `total_royal_privy` 确定性统计，并在调试模式下展示。
 - **救济 Relief**：公仓总余额 > `ledger_relief_min_balance`(30) 时，对水+粮 < `ledger_relief_family_threshold`(8) 的极贫家户拨付 `min(公仓×15%, 缺口×2)`，每家户每 `ledger_relief_cooldown_ticks`(1200=40s) 最多一次，国王签字。★ v1.44.0 扫描实现倒置为单次存续家户遍历 + 极贫短路 + 按（camp_id, hid）排序保序派发，触发集合/金额/顺序与旧版逐拍一致。
 
 ### EmpireRegistry（帝国上层政体 M5）
 - **营地分组**：全图营地按 `camp_id` 升序做连续切片，`countEmpires` 自动钳制为 `1..=营地数`，保证每个帝国至少拥有 1 个营地；不消耗 RNG，结构在世界重置/配置变化时确定性重建。
 - **可变政体字段**：`EmpireRegime` 当前实现 `Empire`，`EmpireHeadTitle` 当前实现 `Emperor`；枚举接口为后续联邦/总统保留扩展点。
 - **皇帝产生**：每个 tick 在王国初王/继承结算后，扫描本帝国所有下属王国现任国王，按 `prestige` 降序、`AgentId` 升序取最高者加冕；无在位国王则帝国首长空缺、帝国账本冻结。
-- **帝国公帑 ImperialPrivy**：与国王内帑共用 6000 tick 周期，每个下属王国公仓黄金余额的 5% 划转至皇帝随身黄金，王国公仓流水与帝国审计流水均记 `ImperialPrivy`；Agent/Empire/World 三层累计。
+- **帝国公帑 ImperialPrivy**：按每 `imperial_privy_interval_ticks`(7200=120h) 周期，每个下属王国公仓各品类物资（水/粮/木/石/金）的 `imperial_privy_rate`(0.5%) 划转至皇帝家户私库（若无家户则进入随身行囊），王国公仓流水与帝国审计流水均记 `ImperialPrivy`；Agent/Empire/World 三层累计。
 
 ### 胎儿 Agent 身份（M1.7 受孕即建实体）
 - **受孕瞬间（`agent.rs::tick_metabolism`）即为腹中胎儿创建完整 Agent 实体**（`is_fetus=true`），而非仅预分配 ID：胎儿加入父母 `children_ids`、随父入父亲家户（`world.rs::tick_fetus_reconcile` 每 tick 对账）。
