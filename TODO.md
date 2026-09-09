@@ -17,6 +17,6 @@
 
 ## 📋 常规待办
 
-- [ ] 落地荒地开垦农田与农业税经济系统：农田资产、资本投资、农业产出、农业税与 B19 自主投资决策（设计稿：docs/17-plan-farmland-agriculture.md）
-- [ ] 落地生态狩猎、流寇危机与武力公约系统：动态漫游兽群、流民落草与外部掠夺、民兵动员与公仓防御契约、生命力(Vitality)解耦（设计稿：docs/18-plan-conflict-hunting-defense.md）
+- [ ] 落地荒地开垦农田与农业税经济系统：农田资产、自主投资运料、真实劳作与收获搬运、卸货产出税与库存税并存（设计稿：[农业方案](docs/17-plan-farmland-agriculture.md)；共享前置：[融合设计](docs/25-plan-system-integration.md)）
+- [ ] 落地生态狩猎、流寇危机与武力公约系统：动态漫游兽群、流民落草与外部掠夺、民兵动员与公仓防御契约、生命力(Vitality)解耦（设计稿：[狩猎防御](docs/18-plan-conflict-hunting-defense.md)；物资/身体及土地通行前置见[融合设计](docs/25-plan-system-integration.md)）
 - [ ] 整理相关代码逻辑，告诉我目前是怎么实现时光倒流的

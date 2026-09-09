@@ -34,6 +34,8 @@
 - [世界元素绘制](../frontend/js/render_world.js) / [帧循环](../frontend/js/render_canvas.js)。
 - [存读档](../crates/sim_core/src/spatial/world_save.rs)：地形由种子重建，未来改变生成算法必须评估重建兼容性。
 
+农田、哨塔和路卡的占地与通行均消费22及[融合设计 §6](./25-plan-system-integration.md#6-土地设施与通行)的内核事实；视觉样板不得提前画出不存在的生产、阻路或防御效果。S1～S3 仍可独立推进，不以农业、市场或记忆上线为前提。
+
 ## 3. 统一美术规则
 
 ### 3.1 色彩与材质
