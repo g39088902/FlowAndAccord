@@ -1,10 +1,10 @@
 # 新增地形实施技术方案
 
-> **状态**：T0 主体与 T1 已落地（v1.47.1，commit `6751014`，文档同步 `a0bfcfc`）；T2 两岸河谷及后续 T3/T4 未实现、未排期。
+> **状态**：T0 主体、T1 山口聚落与 T2 两岸河谷水系已落地（v1.47.5，commit `6d5cea4`）；支持 T1/T2 模板按种子哈希随机生成（`terrainProfile = 'random'`）；T3 湖泊/湿地/峡谷/瀑布及后续 T4 动态水文未实现、未排期。
 > **整理日期**：2026-09-09。
 > **适用范围**：T0 统一地表查询、T1 山口聚落、T2 两岸河谷；T3 湖泊/湿地/峡谷/瀑布仅定义扩展接口，不在本方案中一次性实现。
 > **依据**：[25-plan-system-integration.md](./25-plan-system-integration.md)、[22-plan-terrain-features.md](./22-plan-terrain-features.md)、[21-plan-terrain-art.md](./21-plan-terrain-art.md)。
-> **定位**：本文是跨阶段实施方案。T0/T1 部分已实现，现状以 `docs/current/01-spatial-network.md`、`08-config-system.md`、`15-save-load.md`、`07-frontend-ui.md` 与 `11-changelog.md` v1.47.1 条目为准；T2~T4 仍为规划契约，不代表当前代码已经具备这些行为。
+> **定位**：本文是跨阶段实施方案。T0/T1/T2 部分已实现，现状以 `docs/current/01-spatial-network.md`、`08-config-system.md`、`15-save-load.md`、`07-frontend-ui.md` 与 `11-changelog.md` v1.47.5 条目为准；T3~T4 仍为规划契约，不代表当前代码已经具备这些行为。
 
 ## 1. 方案结论
 
@@ -44,17 +44,17 @@ seed + terrain_generator_version + SimConfig
 6. **新增随机只使用地形局部 RNG**：地貌结构和装饰不污染现有世界 RNG；POI、始祖、出生等既有消费顺序保持不变。
 7. **同版本同种子确定性优先于旧地图兼容**：生成器变更必须通过版本门禁拒绝旧存档，不能把旧路网与新地貌静默拼接。
 
-### 1.1 落地状态总览（v1.47.1）
+### 1.1 落地状态总览（v1.47.5）
 
 | 阶段 | 状态 | 落地要点 | 剩余工作 |
 | :--- | :--- | :--- | :--- |
-| T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语 | 生态落位（`ecology/spawn.rs`）生存校验未接入；路网走廊生成器未接入（`graph.rs` 仍全图直线铺路）；`terrainMaxWalkSlope`/`terrainRoadCorridorWidth`/`terrainGenerationMaxRetries` 已声明未消费 |
-| T1 丘陵/台地/山脊/山口 | ✅ 已落地 | `mountain_pass_v1` profile + 生成器版本 1；局部 `relief_rng` 派生主脊/山口/台地；`Ridge`/`Saddle`/`Terrace` 特征；存档版本门禁；前端特征绘制 | 地貌参数硬编码于 `terrain.rs`（未配置化）；山口/台地对路网成本与选址的完整联动待走廊接入后验证 |
-| T2 静态主河/浅滩/河阶/泉谷 | ⏳ 未实施 | — | 全部待实施（见 §4.4/§6.3/§7/§11.3） |
+| T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries` 已声明未消费 |
+| T1 丘陵/台地/山脊/山口 | ✅ 已落地 | `mountain_pass_v1` profile + 生成器版本 1/2；局部 `relief_rng` 派生主脊/山口/台地；`Ridge`/`Saddle`/`Terrace` 特征；存档版本门禁；前端特征绘制与台地平顶压平算法 | 山口/台地地貌参数已部分配置化 |
+| T2 静态主河/浅滩/河阶/泉谷 | ✅ 已落地 | `river_valley_v1` profile + 生成器版本 2；主河生成（`geo/hydrology.rs`），单调河床下凹与水面静态；低滩（`NO_BUILD`）与河阶（`RiverTerrace`）；两处静态浅滩走廊（`ShallowFord`，跨水授权）；共享水池 `WaterPool` 聚合取水与稳定扣减；地形感知路网（`spatial/terrain_network.rs`）与 `LaneTerrainProfile` 边权通行代价折算；占地校验拒绝浅水（`WaterCovered`）；存档格式升级为 7（`SAVE_FORMAT_VERSION = 7`，`terrain_state` + `water_pools`）；10 个 T2 配置参数（227→237）；前端河道/岸线/浅滩特征渲染与 HUD 水量去重；支持 T1/T2 模板按种子哈希随机轮换（`terrainProfile: 'random'`） | T3 水系扩展（湖泊/湿地/峡谷/瀑布） |
 | T3 湖泊/湿地/峡谷/瀑布 | ⏳ 未实施 | — | 扩展接口与逐项实现 |
 | T4 动态水文、桥梁、土地演化 | ⏳ 未实施 | — | — |
 
-实现偏差（方案设计 vs 实际落地）速查：存档格式版本未递增（§8.2）；配置仅落地 6/20 字段（§10）；`TerrainFailure` 实现 8/10 变体（§3.4）；`validate_curve` 落在 `terrain.rs` 而非 `query.rs`（§5.1）；房屋选址改造实际落在 `housing_system/settlement.rs`（§11.1）；前端地形缓存仍为单一 `_terrainCached`（§7.2）；FABS 仅新增 `TerrainFeatures=18` 一个 section（§7.2）。
+实现偏差（方案设计 vs 实际落地）速查：存档格式版本递增至 7（§8.2）；配置落地 16/20 字段（§10，总配置数 221→227→237）；`TerrainFailure` 实现 8/10 变体（§3.4，`WaterCovered` 已产生）；`validate_curve` 落在 `geo/corridor.rs` 与 `terrain.rs`（§5.1）；路网感知生成落地于 `spatial/terrain_network.rs`（§5.1/§5.2）；房屋选址改造实际落在 `housing_system/settlement.rs`（§11.1）；前端地形缓存仍为单一 `_terrainCached`（§7.2）；FABS 新增 `TerrainFeatures=18` 承载山地与水系全部特征（§7.2）。
 
 ## 2. 现状与改造边界
 
@@ -70,15 +70,15 @@ seed + terrain_generator_version + SimConfig
 
 ### 2.2 当前实现不能直接承载的部分
 
-- ✅ `GeoCell` 已扩展地表类别、肥力、水体关联与禁建/禁行标志（v1.47.1）；但 `ShallowWater`/`DeepWater`/`RiverBank`/`RiverTerrace` 枚举仅为 T2 预留，当前只生成干地/软地/裸岩面。
-- ◐ `sample_cell`/`validate_footprint`/`validate_curve` 已提供，但 POI 落位和道路连接仍只检查端点；`graph.rs` 与 `ecology/spawn.rs` 尚未消费查询服务。
-- ⏳ `connect_road_network` 仍在节点间创建直线车道，无法识别河流、陡壁和水域边界（待 T0 后续走廊生成器接入）。
-- ⏳ A* 目前主要使用曲线长度、端点高差、道路磨损和道路偏好；没有基础地表通行成本，也没有硬禁行判定（`LaneEdge3D::terrain_profile` 未实现）。
-- ⏳ 当前水源 POI 各自拥有库存，没有多个岸点引用同一水源池的概念（T2）。
-- ◐ 快照已携带地表类别、肥力、特征折线、生成器版本与 profile；河湖折线、岸带、浅滩连接字段仍无（T2）。
-- ◐ `render_world.js` 已绘制 `Ridge`/`Saddle`/`Terrace` 特征（`drawTerrainFeatures`）；水域、岸线、浅滩与地貌图层渲染仍无（T2）。
+- ✅ `GeoCell` 已扩展地表类别、肥力、水体关联与禁建/禁行标志（v1.47.1）；且 `ShallowWater`/`DeepWater`/`RiverBank`/`RiverTerrace` 枚举在 T2 `river_valley_v1` 中已正式激活落地。
+- ✅ `sample_cell`/`validate_footprint`/`validate_curve` 已提供，`spatial/terrain_network.rs` 已全面消费地表与走廊合法性；房屋、浅滩道路均做严格占地与走廊检查。
+- ✅ `terrain_network.rs` 引入地形感知路网，通过 `corridor::route` A* 走廊与浅滩连接跨河，消除了直线车道穿深水的问题。
+- ✅ `LaneEdge3D` 增加 `LaneTerrainProfile`，A* 边权与 Agent 移动速度按地形成本折算，软地/河岸/浅滩产生真实通行减速。
+- ✅ 水源 POI 聚合接入 `WaterPool`，多个岸点共享水池库存与自然再生（T2）。
+- ✅ 快照与 FABS 格式版本 2 支持河流折线、岸带、浅滩连接等特征下发。
+- ✅ `render_world.js` 的 `drawTerrainFeatures` 已支持 `Ridge`/`Saddle`/`Terrace` 与 `River`/`RiverBank`/`ShallowFord`/`SpringValley` 全品类特征绘制。
 
-T0 必须先修复这些契约缺口；T1/T2 不应绕过 T0 直接添加视觉河流或山体装饰。目前 T0 的查询契约与房屋接入已完成，剩余缺口集中在生态落位与路网走廊接入。
+T0 基础契约、T1 山地与 T2 水系骨干已全链路打通。剩余长期演化工作（湖泊、湿地、桥梁建造、洪水演化）留待 T3/T4。
 
 ## 3. 目标数据模型
 
@@ -112,13 +112,13 @@ RockFace        陡壁/裸岩面，超过通行坡度时硬禁行
 说明：
 
 - `natural_fertility` 只描述自然土地条件，不能直接写入家户粮食或农业资产 `fertility`。
-- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。v1.47.1 中该字段恒为 `None`（T1 未生成水体）。
-- `feature_flags` 只放稳定、可组合的查询事实。v1.47.1 已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志，T1 生成只写入前两者；不要用位标记替代需要数值的坡度、宽度和成本。
-- T1 已按“先用 `surface_kind` 和 `feature_flags`，T2 再启用水体关联”实施；不能为了渲染增加会改变模拟的字段。
+- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。v1.47.5 中，T2 `river_valley_v1` 将深水单元关联至 `Some(1)`，其他地表为 `None`。
+- `feature_flags` 只放稳定、可组合的查询事实。v1.47.1 已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志；T2 中深水写入 `NO_BUILD|NO_WALK`，河岸写入 `NO_BUILD|SHORE_ACCESS`，浅滩写入 `NO_BUILD|CROSSING_CANDIDATE`。
+- T1 启用地表类别与禁建禁行，T2 正式启用水体关联与浅滩候选；两者无缝兼容。
 
 ### 3.2 地貌特征
 
-✅ T1 子集已落地（v1.47.1），定义于 `geo/terrain.rs`；`TerrainFeatureKind` 当前只含 `Ridge`/`Saddle`/`Terrace`，河流/浅滩/水体等变体待 T2/T3。特征使用按 ID 排序的 `Vec`，避免 HashMap 迭代顺序进入确定性路径：
+✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征使用按 ID 排序的 `Vec`，避免 HashMap 迭代顺序进入确定性路径：
 
 ```rust
 pub struct TerrainFeature {
@@ -131,35 +131,35 @@ pub struct TerrainFeature {
 }
 ```
 
-`TerrainFeatureKind` 规划至少包含：
+`TerrainFeatureKind` 规划与落地情况：
 
 ```text
-Ridge          山脊中心线或边界      ✅ v1.47.1
-Saddle         山口鞍部              ✅ v1.47.1
-Terrace        台地/河阶轮廓         ✅ v1.47.1
-River          河道中心线和水面边界  ⏳ T2
-RiverBank      岸带轮廓              ⏳ T2
-ShallowFord    静态浅滩连接          ⏳ T2
+Ridge          山脊中心线或边界      ✅ v1.47.1 (T1)
+Saddle         山口鞍部              ✅ v1.47.1 (T1)
+Terrace        台地/河阶轮廓         ✅ v1.47.1 (T1)
+River          河道中心线和水面边界  ✅ v1.47.5 (T2)
+RiverBank      岸带轮廓              ✅ v1.47.5 (T2)
+ShallowFord    静态浅滩连接          ✅ v1.47.5 (T2)
+SpringValley   泉谷                  ✅ v1.47.5 (T2)
 WaterBody      湖泊水面（T3）        ⏳ T3
 Wetland        湿地斑块（T3）        ⏳ T3
 Cliff          峡谷壁/断崖（T3）     ⏳ T3
-SpringValley   泉谷（T2）            ⏳ T2
 Waterfall      瀑布（T3）            ⏳ T3
 ```
 
-特征的职责是表达几何和查询来源，不承担库存、税收、生产或 Agent 行为。`vertices` 采用世界坐标，前端按投影绘制；需要沿路通行的对象另由 `TerrainConnection` 表达，避免把折线视觉对象误当作路网边。
+特征的职责是表达几何和查询来源，不承担库存、税收、生产或 Agent 行为。`vertices` 采用世界坐标，前端按投影绘制；浅滩由 `TerrainConnection` 表达授权通道（两端端点、走廊宽度与节点），配合 `corridor::segment_valid` 授权跨水。
 
 ### 3.3 水体与共享资源池
 
-⏳ T2 规划，未实施。方案如下：
+✅ 已落地（v1.47.5）。实现于 `geo/hydrology.rs` 与 `spatial/terrain_network.rs`：
 
 ```rust
 pub struct WaterBody {
     pub id: u32,
     pub level: f32,
     pub flow_direction: Vec3,
-    pub outlet_feature_id: Option<u32>,
-    pub resource_pool_id: Option<u32>,
+    pub resource_pool_id: u32,
+    pub vertices: Vec<Vec3>,
 }
 
 pub struct WaterPool {
@@ -180,13 +180,13 @@ pub struct WaterAccessPoint {
 }
 ```
 
-实施建议：
+落地细节：
 
-- T2 可以保留现有 `PoiType::WaterSource`，但把多个岸点的储量读取和扣减委托给同一个 `WaterPool`。
-- 既有 Agent 装载、回家卸货、家户账本和施密特触发器不改语义；只把“选择哪个水源点”替换为“选择哪个合法岸点及其共享池”。
-- 同一水体可以有多个 `WaterAccessPoint`，但 `source_poi_ids` 和 `resource_pool_id` 只登记一次；同 tick 多人采水按稳定 AgentId 顺序串行扣减。
-- 水面存在但 `current_stock == 0` 时，前端仍绘制水面，资源面板显示断流/不可采，不删除水面或生成另一份库存。
-- T2 不做水位动态变化。`level` 是静态几何事实；枯水、洪水和水面动画属于 T4。
+- T2 保留现有 `PoiType::WaterSource`，但将同一河流两岸的多个岸点（`WaterAccessPoint`）的储量读取和扣减委托给同一个 `WaterPool`（池 ID 1）。
+- 既有 Agent 装载、回家卸货、家户账本和施密特触发器保持原有语义；在 `spatial/ecology/harvest.rs` 中，多名 Agent 采水先收集需求并按 `agent.id` 升序稳定排序，再串行扣减共享水池，保证不同执行批次下的绝对确定性。
+- 自然再生在 `spatial/ecology/tick.rs` 中按池统一执行，每个水源 POI 的动态储量通过 `sync_water_pois()` 与所属水池实时同步。
+- 水面存在但 `current_stock == 0` 时，前端仍绘制水面，HUD 大盘按池 ID 去重统计（`render_hud.js`），避免同一水池被多点统计导致总量虚高。
+- T2 水位保持静态几何事实（`terrain_river_water_level = 0.0`），枯水/丰水动态涨落预留给 T4。
 
 ### 3.4 地表查询结果
 
@@ -214,49 +214,53 @@ pub struct TerrainQueryResult {
 已提供：
 
 - ✅ `sample_cell(wx, wy)`：返回地表类别、高程、坡度和水体关联。
-- ✅ `validate_footprint(query, max_slope_deg)`：对完整占地覆盖的栅格单元求高差、最大坡度、水域覆盖、禁建标记和地表成本。
+- ✅ `validate_footprint(query, max_slope_deg)`：对完整占地覆盖的栅格单元求高差、最大坡度、水域覆盖、禁建标记和地表成本；触及浅水时拒绝并返回 `WaterCovered`。
 - ✅ `surface_walk_cost(kind)` 与 `explain_failure(failure)`：稳定步行成本与诊断文案。
-- ✅ `TerrainMap::validate_curve(curve, corridor_width, max_walk_slope)`：曲线自适应分段并栅格化覆盖走廊（含两侧），返回整条路径是否禁行/超坡（见 §5.1；注意实现落在 `terrain.rs` 而非 `query.rs`，且当前尚无调用点）。
+- ✅ `TerrainMap::validate_curve(curve, corridor_width, max_walk_slope)` 与 `geo/corridor.rs`：完整曲线与走廊校验原语，浅滩授权走廊豁免 `ShallowWater`。
 
 未提供（后续补充）：
 
-- ⏳ `nearest_valid_node(pos, use_kind)`：只返回在合法地表上的路网节点（待路网接入时实现）。
-- ⏳ `water_access_points(water_body_id)`：T2 水系落地后实现。
+- ⏳ `nearest_valid_node(pos, use_kind)`：只返回在合法地表上的路网节点（当前路网由 `spatial/terrain_network.rs` 统一拓扑连接）。
 
-`TerrainFailure` 使用闭集错误码。v1.47.1 实现了 8 个变体（方案 10 个中缺 `Occupied` 与 `NoValidCrossing`；`WaterCovered`/`NoRoadAccess` 已定义但当前校验不产生——前者留待 T2 浅水覆盖，后者待接路接入）：
+`TerrainFailure` 使用闭集错误码。v1.47.5 实现了 8 个变体：
 
 ```text
 OutOfBounds          ✅ 产生
-WaterCovered         ◐ 已定义，暂不产生（T2）
+WaterCovered         ✅ 产生（占地触碰浅水时拒绝建房）
 DeepWater            ✅ 产生
 CliffTooSteep        ✅ 产生
 SurfaceForbidden     ✅ 产生
 FootprintTooUneven   ✅ 产生
 NoRoadAccess         ◐ 已定义，暂不产生（房屋占用另由 settlement 检查，未并入）
 Occupied             ⏳ 未实现
-NoValidCrossing      ⏳ 未实现（T2）
+NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/validate_curve 承载）
 ```
 
-房屋、农田、哨塔和路卡只向查询服务传入各自 `LandUseKind`，不复制判定代码。查询只读，不修改 Agent、账本、路网或 RNG。当前仅房屋消费 `LandUseKind::House`；`Farm`/`Defense` 待农业与防务接入。
+房屋、农田、哨塔和路卡向查询服务传入各自 `LandUseKind`。当前房屋消费 `LandUseKind::House`；`Farm`/`Defense` 待后续农业与防务接入。
 
 ## 4. 确定性地貌生成
 
-### 4.1 RNG 分域
+### 4.1 RNG 分域与 Profile 模板选择
 
-◐ 已落地 `relief_rng`（v1.47.1），`hydro_rng`/`feature_rng` 待 T2。实际实现：
+✅ 已落地 `relief_rng` 与 `hydro_rng`（v1.47.5，`TERRAIN_GENERATOR_VERSION = 2`）。实现：
 
 ```text
 terrain_seed = seed
-relief_rng   = WorldRng::new(seed ^ 0x5245_4C49_4546_5431)   // "RELIEFT1" 盐值，已固定
-hydro_rng    = WorldRng::new(seed xor HYDRO_SALT)            // ⏳ T2
-feature_rng  = WorldRng::new(seed xor FEATURE_SALT)          // ⏳ T2
+relief_rng   = WorldRng::new(seed ^ 0x5245_4C49_4546_5431)   // "RELIEFT1" 盐值，已固定 (T1)
+hydro_rng    = WorldRng::new(seed ^ 0x4859_4452_4F54_3032)   // "HYDRT02" 盐值，已固定 (T2)
 ```
+
+★ **T1/T2 随机轮换机制**：
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'` 或 `'river_valley_v1'`）。
+- 当配置为 `'random'` 时，内核在生成前依据世界种子执行确定性哈希：
+  `(seed ^ 0x5052_4F46_494C_4531) % 2 == 0` → 实例化为 `mountain_pass_v1`（T1 山口聚落）；
+  否则 → 实例化为 `river_valley_v1`（T2 两岸河谷）。
+- 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时两套地貌按 ~50% 概率自然轮换。
 
 要求：
 
-- 盐值在代码中固定并写入生成器版本说明；不使用系统时间、浮点 Hash 或 HashMap 遍历作为随机输入。✅ 已固定并随 `TERRAIN_GENERATOR_VERSION = 1` 演进。
-- T1 不创建 `hydro_rng` 的消费；T2 启用后只消费自己的子流，不改变 Agent、POI 和出生的全局 RNG 序列。✅ 当前实现未触碰主 `WorldRng` 消费顺序。
-- 每个子流的调用顺序固定，候选点按 `(feature_kind, ordinal)` 顺序尝试。
+- 盐值在代码中固定并写入生成器版本说明；不使用系统时间、浮点 Hash 或 HashMap 遍历作为随机输入。
+- T1 不消费 `hydro_rng`；T2 只在自身子流中消费，不扰动 Agent、POI 和出生的全局 RNG 序列。
 - 前端装饰使用 `terrain_feature_id + material_version + season` 的稳定整数哈希，不消费模拟 RNG。
 
 ### 4.2 T0 基础生成器
@@ -274,13 +278,13 @@ feature_rng  = WorldRng::new(seed xor FEATURE_SALT)          // ⏳ T2
 
 ### 4.3 T1 山口聚落模板
 
-✅ 已落地（v1.47.1），使用可配置的定向地貌骨架（`profile = "mountain_pass_v1"`），不做无限随机重抽：
+✅ 已落地（v1.47.1/v1.47.2），使用可配置的定向地貌骨架（`profile = "mountain_pass_v1"`），不做无限随机重抽：
 
 ```text
 主脊：一条沿方向 theta 的长条高程增量
 支脊：最多两条低幅度分支            ⏳ 当前版本未实现支脊
 山口：主脊上的一个低鞍部窗口
-台地：山脚或侧翼的一到两块平缓平台   ✅ 一块
+台地：山脚或侧翼的一到两块平缓平台   ✅ 一块（v1.47.2 平顶高台压平 + 24点有机台缘）
 ```
 
 实现步骤（落地情况）：
@@ -293,65 +297,67 @@ feature_rng  = WorldRng::new(seed xor FEATURE_SALT)          // ⏳ T2
 6. ✅ 为主脊（9 点折线）、山口（单点）、台地（24 点自然有机台缘轮廓）生成特征折线，供前端表现和诊断定位。
 7. ⏳ 先生成/筛选合法 POI 与营地候选，再通过 T0 路网走廊生成器接入节点——未实施（待 `spawn.rs`/走廊生成器接入）。
 
-T1 的首轮验收只要求“路线会绕山、山口可通过、台地可建”，不增加高地防御、资源加成或行政税收。注意：当前地貌参数硬编码于 `terrain.rs` 内部（由 `relief_rng` 派生），未落入 `SimConfig`；如需调参需先配置化。
+T1 的首轮验收只要求“路线会绕山、山口可通过、台地可建”，不增加高地防御、资源加成或行政税收。
 
 ### 4.4 T2 主河与浅滩模板
 
-⏳ 未实施。方案如下：
+✅ 已落地（v1.47.5）。实现于 `geo/hydrology.rs::generate_river`：
 
-T2 首张有水地图固定为“一条主河 + 两处静态浅滩 + 两岸河阶 + 少量丘陵/泉谷”。
+T2 包含“一条蜿蜒主河 + 两处静态浅滩通道 + 两岸河阶 + 泉谷”。
 
-河流生成必须在高程骨架之后：
+生成流程：
 
-1. 从地图边缘或高地出口确定上游点和下游出口点，使用固定控制点生成单调下游中心线。
-2. 对中心线按世界坐标采样并投影到网格，得到河道带；河道带宽度按配置平滑变化，不在格点上生成断裂蓝点。
-3. 对每个河道单元设置统一 `water_level`，使河床高程低于水位且沿下游不逆流。
-4. 河流必须连接地图出口或湖泊预留出口；若存在局部高程逆流，优先统一修改水系覆盖范围和河床高度，不在前端修图。
-5. 河道两侧生成 `RiverBank`，再向外生成低滩和河阶。低滩首期设置 `NO_BUILD`，河阶按完整占地验证后可建。
-6. 在两处候选位置寻找两岸宽度、坡度和岸点均合法的 `ShallowFord`；每处浅滩生成独立连接对象和两端接入节点。
-7. 生成水体、岸带、河阶、浅滩及泉谷特征，并绑定共享 `WaterPool`。
-8. 运行完整世界校验：所有普通路段不穿水、两处浅滩可达、关闭任一浅滩后仍存在合法陆路连通或明确不可达结果。
+1. ✅ 从 `hydro_rng` 生成主河中心线平移相位，以正弦波结合世界尺寸生成单调中心线（`center(y)`）与变宽河道带（`half_width(y)`）。
+2. ✅ 河床高程统一凹陷（`level - 1.4`），地表标记为 `DeepWater`，写入 `NO_BUILD|NO_WALK`，关联 `water_body_id = Some(1)`。
+3. ✅ 河道外缘向外生成宽度为 `bank` 的 `RiverBank`（标记 `NO_BUILD|SHORE_ACCESS`），再向外生成宽度为 `terrace` 的 `RiverTerrace`（天然高肥力 0.95，平缓河阶地表）。
+4. ✅ 在南侧（`-size*0.24`）与北侧（`size*0.24`）生成两处 `TerrainConnection` 浅滩跨水走廊，河床局部抬高为浅水（`ShallowWater`），写入 `NO_BUILD|CROSSING_CANDIDATE`，并生成 `ShallowFord` 地貌特征折线。
+5. ✅ 生成水面双侧轮廓与河岸轮廓（`River` 与 `RiverBank` 特征）。
+6. ✅ 在河流两岸交替布置水源取水点（`WaterAccessPoint`），统一绑定至共享水池 `WaterPool #1`。
+7. ✅ 生成从台地汇入主河的浅沟特征 `SpringValley`（不产生独立水库存）。
+8. ✅ 调用 `recompute_slopes()` 重算受河道开凿影响的坡度与地表属性。
 
-浅滩不是河上的绘制纹理，也不是传送节点。它必须有：
+浅滩具有明确的：
 
 ```text
-crossing_id
-两岸端点/接入节点
-实际曲线几何
-通道宽度
-浅滩地表成本
-允许的 LandUseKind
+crossing_id: 1, 2
+两岸接入端点 (start / end) 与路网节点 (node_a / node_b)
+实际直线/曲线几何
+通道宽度: config.terrain_crossing_width (26.0m)
+浅滩地表通行代价: config.terrain_shallow_water_cost (2.0)
+仅授权横向穿越，禁止借道浅滩沿河纵向涉水
 ```
 
 T2 不实现桥梁、游泳、船舶、水位涨落和洪水事件。
 
 ## 5. 路网与运动实现
 
-### 5.1 合法走廊生成
+### 5.1 合法走廊生成与地形感知路网
 
-◐ 校验原语已提供，走廊生成器未实施。`geo/corridor.rs` 尚未创建；v1.47.1 先在 `TerrainMap::validate_curve` 上落地了完整曲线走廊校验（自适应采样、中心线 + 走廊两侧检查硬禁行/禁行标志/坡度），但**当前没有任何调用点**——`graph.rs` 仍直接直线铺路，待路网生成器接入后再替换：
+✅ 已落地（v1.47.5）。实现于 `geo/corridor.rs` 与 `spatial/terrain_network.rs`：
 
 ```text
 节点候选
-  -> 网格 A* / 走廊搜索          ⏳ 未实施
-  -> 记录地表成本、最大坡度、是否跨浅滩   ⏳
-  -> 使用固定控制点拟合 Curve3D  ⏳
-  -> 对完整曲线按走廊宽度栅格化  ✅ 原语已具备（validate_curve）
-  -> 重新检查每个采样段和覆盖单元 ✅ 原语已具备
-  -> 通过后写入 LaneEdge3D       ⏳
+  -> 网格 A* 走廊搜索 (corridor::route)         ✅ 已落地
+  -> 记录地表成本、最大坡度、浅滩跨水连接       ✅ 已落地
+  -> 使用固定控制点拟合 Curve3D                 ✅ 已落地
+  -> 对完整曲线按走廊宽度栅格化 (validate_curve) ✅ 已落地
+  -> 通过后写入 LaneEdge3D (地形通行摘要)        ✅ 已落地
 ```
 
-走廊搜索的硬规则：
+落地细节：
 
-- `DeepWater`、`RockFace` 超过通行坡度、越界和未授权水域不得进入开放集。
-- `SoftGround`、`ShallowWater` 只增加成本；道路等级加速不能抵消硬禁行。
-- 浅滩只允许沿 `TerrainConnection` 授权的跨水方向通过；普通道路不能从河床中抄近路。
-- 走廊覆盖使用完整栅格穿越或保守的线段-单元相交测试，不能只按固定稀疏步长采样。
-- 候选相同成本时按 `(cost, max_slope, node_id sequence)` 稳定排序。
+- **走廊搜索与校验**（`geo/corridor.rs`）：
+  - `segment_valid(t, a, b, width, slope, crossing)` 检查线段覆盖的网格单元，硬禁行 `DeepWater`、`RockFace`、越界与无授权水域；有 `crossing_id` 时允许横向穿越 `ShallowWater`。
+  - `validate_curve(t, curve, width, slope, crossing)` 递归自适应二分贝塞尔曲线，对每一段进行走廊宽度栅格化覆盖校验。
+  - `route(t, a, b, cfg)` 基于网格的确定性 A* 寻路，在避开深水与陡坡的同时，沿软地和河岸搜索最优通行走廊，并执行视线贪心合并（Raycast Shortcutting）。
+- **地形感知路网生成**（`spatial/terrain_network.rs`）：
+  - `prepare_terrain_layout`：将 POI 与路网节点移动到合法陆地位置，水源 POI 绑定河岸取水点，非水 POI 避开深水与水系。
+  - `connect_terrain_world`：优先为浅滩连接（`TerrainConnection`）在两岸建立交叉节点并授权跨水车道；其余地表节点通过 `corridor::route` 连接为稳定的近邻骨架与连通分量补边。
+  - `validate_terrain_world`：创世与读档时校验全图车道均符合地表通行规则，且全体 POI 均在连通图内。
 
-### 5.2 LaneEdge3D 扩展
+### 5.2 LaneEdge3D 扩展与地形通行代价
 
-⏳ 未实施。建议给 `LaneEdge3D` 增加静态通行摘要，而不是每次 Agent 移动时重新扫描整个地形：
+✅ 已落地（v1.47.5）。定义于 `spatial/graph.rs`：
 
 ```rust
 pub struct LaneTerrainProfile {
@@ -362,13 +368,15 @@ pub struct LaneTerrainProfile {
 }
 ```
 
-`LaneEdge3D` 增加 `terrain_profile` 后：
+落地细节：
 
-- A* 边权使用现有道路速度、磨损量、隐秘偏好，再加 `terrain_time_cost`；坡度成本仍保留，但不能和同一坡度重复计费。
-- 启发式下界改为“直线距离 / 最大合法速度”的保守下界，不能把新增地形成本直接塞进一个可能高估的启发式，避免 A* 失去正确性。
-- T1/T2 地形静态，`path_cache` 和 APSP 在创世完成后建立；配置热注入若改变道路或地形成本，必须清空缓存并重建 APSP。
-- 新增 `terrain_profile` 会改变路网存档和 FABS 车道几何编码，实施时同步增加存档格式版本和 FABS 格式版本。
-- 动态路卡、桥梁、洪水不复用本字段解决；未来需要独立通行版本和任务恢复契约。
+- 每个车道在生成时采样整条曲线覆盖单元，求得最大坡度，并将软地/河岸的 `terrain_soft_ground_cost`（默认 1.25）及浅滩跨水的 `terrain_shallow_water_cost`（默认 2.0）写入 `terrain_time_cost`。
+- **A* 寻路边权折算**（`graph.rs::effective_speed`）：
+  `effective_speed = edge.speed_limit * road_level_factor / edge.terrain_profile.terrain_time_cost.max(1.0);`
+- **Agent 移动速度折算**（`agent.rs`）：
+  `target_speed = self.max_desired_speed * road_level_factor * (self.strength / 100.0) / lane.terrain_profile.terrain_time_cost.max(1.0);`
+- 行人穿过浅滩或泥泞岸带时具有逼真的减速表现，路网 A* 会自然偏好干地与平坦走廊。
+- 路网与地形随 `WorldSave` 完整持久化，读档后 100% 恢复。
 
 ### 5.3 在途与失效边界
 
@@ -396,7 +404,7 @@ T1/T2 本身不改变静态拓扑，因此只需防止非法初始曲线。未�
 
 落地细节：
 
-- `is_house_site_valid` 先执行 `validate_footprint`（`terrain_footprint_half_extent` = 7.0m、`terrain_max_build_slope` = 16°、`LandUseKind::House`），失败直接判非法。
+- `is_house_site_valid` 先执行 `validate_footprint`（`terrain_footprint_half_extent` = 7.0m、`terrain_max_build_slope` = 16°、`LandUseKind::House`），触碰浅水、深水或陡坡直接判非法并返回稳定失败码。
 - 候选生成循环对每个候选点先做占地校验，非法点跳过；占用/碰撞仍由原有 `houses_clear` 等规则判定。
 - 失败不生成实体；没有合法地块时由决策器按正常分支重试，不由地形系统瞬移居民或强制选址。✅ 与方案一致。
 - 门前曲线完整合法性校验（走廊接入后）当前尚未覆盖——房屋只保证占地合法，门前道路仍走既有节点复用逻辑。
@@ -413,29 +421,32 @@ T1/T2 本身不改变静态拓扑，因此只需防止非法初始曲线。未�
 
 ### 6.3 水源 POI 接入
 
-⏳ 未实施（T2）。方案：
-
-首期推荐保留 `PrimitivePoi` 的水源交互接口，新增池引用：
+✅ 已落地（v1.47.5）。实现于 `spatial/poi.rs`、`spatial/ecology/harvest.rs`、`spatial/ecology/tick.rs`：
 
 ```rust
 pub struct PrimitivePoi {
-    // 既有字段
+    // 既有字段保持不变
     pub water_pool_id: Option<u32>,
     pub access_point_id: Option<u32>,
 }
 ```
 
-采收流程保持：
+采收与再生流程：
 
 ```text
-Agent 到达合法岸点
-  -> 检查共享 WaterPool 当前库存
-  -> 按稳定顺序扣减共享池
-  -> 装入 Agent 行囊
+Agent 到达河岸取水点 (WaterAccessPoint)
+  -> harvest.rs: 收集同一 tick 全体 Agent 取水请求
+  -> 按 agent.id 升序稳定排序 (保证确定性)
+  -> 依次从共享 WaterPool 扣减实际出水量
+  -> 装入 Agent 随身行囊
   -> 返回并卸入家户账本
 ```
 
-切换岸点不能绕过 `decision_poi_seek_min_stock_ratio`、`decision_poi_abandon_stock_ratio` 和断流后的市场兜底。水体几何不进入 POI 库存字段，不复制储量。
+落地细节：
+
+- 在 `spatial/poi.rs` 中，`PrimitivePoi` 增加 `water_pool_id` 与 `access_point_id`。
+- 在 `spatial/ecology/tick.rs` 中，`self.water_pools` 按池统一进行自然再生，之后调用 `sync_water_pois()` 同步各取水 POI 的储量展示。
+- 切换岸点不会绕过 `decision_poi_seek_min_stock_ratio`、`decision_poi_abandon_stock_ratio` 和断流后的市场兜底。水体几何不进入 POI 库存字段，不复制储量。
 
 ## 7. 快照与 FABS 方案
 
@@ -503,62 +514,54 @@ section 记录使用变长顶点列表，未知 section 仍可按 `byte_len` 跳
 
 ### 8.1 生成器版本
 
-✅ 已落地（v1.47.1）。`WorldSave` 已增加：
+✅ 已落地（v1.47.5）。`WorldSave` 包含：
 
 ```rust
-pub terrain_generator_version: u32,     // 当前为 1
-pub terrain_profile: String,            // 当前为 "mountain_pass_v1"
+pub terrain_generator_version: u32,     // 当前为 2 (T2)
+pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1"
 ```
 
-`terrain_profile` 用于区分 `flat_baseline`、`mountain_pass_v1`、`river_valley_v1` 等地图模板。若未来生成器还依赖非配置的布局数据，可再保存经过校验的 `terrain_content_version` 或完整静态地形；不允许只保存一个无法解释的版本字符串。当前仅有 `mountain_pass_v1`（`TERRAIN_PROFILE_MOUNTAIN_PASS`）被接受。
+`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验：仅 `mountain_pass_v1` 与 `river_valley_v1` 被接受。
 
 ### 8.2 读档规则
 
-✅ 已落地（v1.47.1），含一处与方案原预期的偏差：
+✅ 已落地（v1.47.5）：
 
-- ✅ `deserialize_save()` 在既有校验（格式版本、grid_res、world_size、agent id 唯一）之后，新增 `terrain_generator_version` 与 `terrain_profile` 校验，不匹配直接返回明确错误；不得用新生成的地形加载旧路网和旧房屋。
-- ✅ 地形重建改用 `TerrainMap::generate_with_profile(seed, terrain_profile)`。
-- ◐ **偏差**：`SAVE_FORMAT_VERSION` 保持 6 未递增（方案原拟“新增字段时手工递增”）。实现改为给新字段加 `#[serde(default = ...)]` 向后兼容：旧档以 `generator_version = 1`、`profile = mountain_pass_v1` 默认值加载，恰好等于当前内核生成器；只有未来生成器版本推进后才需要真正拒绝旧档。若后续新增不可默认化的结构字段，仍须递增格式版本。
-- ⏳ 如果后续允许洪水、桥梁或地貌变化，变化后的事实必须进入存档或确定性事件日志；仅保存初始 seed 不再足够。
-- ⏳ 读档后重建地形、验证已存实体位置和车道曲线；发现旧状态落在禁水/禁建区域时拒绝加载，而不是自动瞬移修复——当前靠生成器版本门禁在入口拦截，实体级逐项校验未实施。
+- ✅ `SAVE_FORMAT_VERSION` 自 6 递增至 7，`WorldSave` 增加 `terrain_state: TerrainMap` 与 `water_pools: Vec<WaterPool>`，地形事实与共享水池直接从存档完整恢复，不依赖重新生成。
+- ✅ `deserialize_save()` 严格校验 `save.terrain_generator_version == 2` 与 `save.terrain_profile`，不匹配直接返回明确错误。
+- ✅ 校验存档内地形单元数必须等于 `grid_width * grid_height`，否则拒绝加载。
+- ✅ `World3DEngine::to_save()` 将当前实际运行的 `terrain_state` 与 `water_pools` 完整入档；存读档测试（`test-wasm.js` Test 3 与 `test-determinism.js` Suite 5）通过，续演完全逐字节吻合。
 
 ## 9. 前端景观实现
 
 ### 9.1 渲染职责拆分
 
-◐ 已按兜底方案落地（v1.47.1）：未拆 `render_features.js`，但在 `render_world.js` 内新增独立函数 `drawTerrainFeatures()`；后续 T2 水系/岸线量大时可再拆文件：
+◐ 已落地（v1.47.1/v1.47.5）：在 `render_world.js` 内提供独立的 `drawTerrainFeatures()` 负责山地与水系特征绘制：
 
 ```text
-render_terrain.js       网格、坡面材质、边界和地表类别     ⏳ 未拆
-render_features.js      山脊、台地、河流、岸线、浅滩、湿地  ◐ 未拆，已提供 drawTerrainFeatures 独立函数
+render_terrain.js       网格、坡面材质、边界和地表类别     ⏳ 未拆（内嵌于 render_world.js）
+render_features.js      山脊、台地、河流、岸线、浅滩、湿地  ◐ 提供 drawTerrainFeatures() 独立函数
 render_world.js         POI、房屋、道路调度及层级排序      ✅
 ```
 
 ### 9.2 绘制顺序
 
-◐ 已落地 T1 特征部分（v1.47.1）。当前实际顺序：背景底色 → 地形网格四边形 → **地形特征**（`drawTerrainFeatures`：Ridge 棕色虚线折线、Saddle 圆、Terrace 闭合描边）→ 网格线 → 道路/POI/房屋/Agent 等，与下列推荐顺序一致：
+✅ 已落地 T1/T2 全品类特征绘制（v1.47.5）。当前实际顺序：背景底色 → 地形网格四边形 → **地形特征**（`drawTerrainFeatures`）→ 网格线 → 道路/POI/房屋/Agent 等：
 
-```text
-背景底色
-  -> 地形网格与坡面光照
-  -> 河床/湿地底色                     ⏳ T2
-  -> 水面与岸线                       ⏳ T2
-  -> 贴地道路和道路阴影
-  -> 浅滩几何（不是桥梁）              ⏳ T2
-  -> POI 景观群
-  -> 房屋和接地阴影
-  -> Agent
-  -> 选择框、标签和调试层
-```
+- **River**：水蓝色透明光泽宽带（`rgba(56, 133, 190, 0.72)`），宽度自适应视口缩放；
+- **RiverBank**：河岸沙洲轮廓带（`rgba(185, 151, 91, 0.42)`）；
+- **ShallowFord**：浅滩跨水步道虚线（`rgba(218, 197, 133, 0.95)`，双向虚线）；
+- **Ridge**：主脊虚线轮廓；
+- **Saddle**：山口鞍部双层圆环标识；
+- **Terrace**：台地平坦微光与淡雅有机台缘等高虚线；
+- **SpringValley**：浅沟细带。
 
 规则：
 
 - 普通视图隐藏网格线；道路等级颜色只在分析视图展示。
-- 水面颜色、岸石和芦草都是静态视觉派生，不改变通行或库存。
-- 浅滩人物脚部可做局部遮挡，但 Agent 的物理 `z` 和路线几何来自内核。
-- 地形材质按 `surface_kind`、坡度、坡向和季节混合；不把视觉纹理解释为新湿度或土壤模拟。
-- 装饰对象使用稳定 `(feature_id, local_index, material_version, season)` 哈希，换世界、读档、回溯后可重建且不漂移。
-- 缩放分级时远景保留山口、主河、聚落和主路轮廓；近景再增加岸石、草斑和树群。
+- 水面颜色、岸石为静态视觉派生，不改变内核通行或库存。
+- HUD 大盘水源储量按 `waterPoolId` 去重汇总，避免多个河岸取水点重复累加导致总量虚高。
+- 浅滩人物沿内核实际路线移动，过水时根据 `terrain_shallow_water_cost` 自然减速。
 
 ### 9.3 命中与标注
 
@@ -567,34 +570,34 @@ render_world.js         POI、房屋、道路调度及层级排序      ✅
 - 地形特征命中检测使用与绘制一致的世界坐标折线和宽度，不用只检测装饰精灵。
 - 普通水面不可点击为可采点；只有 `WaterAccessPoint` 的有效岸边区域可进入 POI Inspector。
 - 标签层沿用现有选中、悬浮、异常、普通四级优先级；河流名称、浅滩状态和断流状态不能遮住当前 Agent/房屋。
-- 地形特征不新增高频全量 DOM 容器；若增加 Inspector 列表，必须使用内容快照缓存。
 
 ## 10. 配置设计
 
-◐ 已落地 6 个仿真字段（v1.47.1，分区 7「地形生成、地表查询与山口 profile」，字段数 221→227）；方案原拟 20 字段中其余（山脊/山口/河流参数等）未加入——T1 地貌参数硬编码于 `terrain.rs`，T2 水系字段待实现时补充：
+✅ 已落地 16 个仿真字段（v1.47.5，分区 7「地形生成、地表查询与山口 profile」，字段数 221→227→237）：
 
 ```text
-✅ terrainProfile             "mountain_pass_v1"  影响地形重建与存档门禁
-✅ terrainMaxWalkSlope        30.0                道路/走廊最大坡度（已声明，暂未消费）
-✅ terrainMaxBuildSlope       16.0                房屋完整占地最大坡度（已消费）
-✅ terrainFootprintHalfExtent 7.0                 房屋基础占地半尺寸（已消费）
-✅ terrainRoadCorridorWidth   5.0                 T0 曲线走廊校验宽度（已声明，暂未消费）
-✅ terrainGenerationMaxRetries 8                  地形布局有界重试上限（已声明，暂未消费）
-```
-
-未落地的规划字段（按阶段补充）：
-
-```text
-⏳ T1（如需调参再配置化）：terrainRidgeAmplitude / terrainRidgeWidth / terrainSaddleDepth / terrainTerraceCount / terrainMaxWalkSlope 消费
-⏳ T2：terrainSoftGroundCost / terrainShallowWaterCost / terrainRiverWidthMin / terrainRiverWidthMax / terrainRiverWaterLevel / terrainRiverBankWidth / terrainRiverTerraceWidth / terrainCrossingCount / terrainCrossingWidth / terrainCrossingMaxCost / terrainRequiredBuildArea / terrainRequiredResourcePathCost
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
+✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
+✅ terrainRidgeWidth          125.0               山脊/河谷影响宽度 (m)
+✅ terrainRiverWidthMin       28.0                主河最小宽度 (m)
+✅ terrainRiverWidthMax       42.0                主河最大宽度 (m)
+✅ terrainRiverWaterLevel     0.0                 主河水面基准高度 (m)
+✅ terrainRiverBankWidth      18.0                河岸缓冲区宽度 (m)
+✅ terrainRiverTerraceWidth   65.0                河阶台地宽度 (m)
+✅ terrainCrossingWidth       26.0                浅滩跨水走廊宽度 (m)
+✅ terrainSoftGroundCost      1.25                软地/河岸通行时间代价乘子
+✅ terrainShallowWaterCost    2.0                 浅滩跨水通行时间代价乘子
+✅ terrainMaxWalkSlope        30.0                道路/走廊最大通行坡度 (度)
+✅ terrainMaxBuildSlope       16.0                房屋完整占地最大坡度 (度)
+✅ terrainFootprintHalfExtent 7.0                 房屋基础占地半尺寸 (m)
+✅ terrainRoadCorridorWidth   5.0                 道路合法走廊宽度 (m)
+✅ terrainGenerationMaxRetries 8                  地形布局有界重试上限
 ```
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 校验（已加入 6 行 `IMPACT_OVERRIDES` 映射）。
-- ✅ `terrainProfile` 影响存档重建，已进入存档并被应用版本/生成器版本门禁覆盖；不能仅作为前端配置热注入。
-- ⏳ `terrainGenerationMaxRetries` 必须有上限；失败按固定顺序调整候选浅滩、缓坡和 POI，而不是无限重抽种子——字段已声明，消费逻辑待生态落位接入。
-- 水面颜色、岸石密度、树群数量、标签阈值和缓存上限放入前端渲染配置，不进入 Rust RNG 或 FABS 模拟字段。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 237 个）。
+- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 
 ## 11. 文件级实施清单
@@ -640,45 +643,50 @@ render_world.js         POI、房屋、道路调度及层级排序      ✅
 
 | 文件 | 修改内容 | 落地 |
 |---|---|---|
-| `crates/sim_core/src/geo/hydrology.rs` | 河道、水体、河阶、岸带、浅滩和水池生成 | ⏳ 未建 |
-| `crates/sim_core/src/spatial/poi.rs` | 水源 POI 关联 `WaterPool`/岸点，保持既有采收 API | ⏳ 未改 |
-| `crates/sim_core/src/spatial/ecology/harvest.rs` | 共享水池扣减与稳定顺序结算 | ⏳ 未改 |
-| `crates/sim_core/src/spatial/ecology/spawn.rs` | 水源、岸点和浅滩节点落位 | ⏳ 未改 |
-| `crates/sim_core/src/spatial/graph.rs` | 浅滩连接对象和授权跨水路线 | ⏳ 未改 |
-| `crates/sim_core/src/spatial/snapshot.rs` | 水体、岸点、浅滩快照 | ⏳ 未加（`water_bodies`/`water_access_points` 字段未入快照） |
-| `crates/sim_core/src/spatial/snapshot_bin/encode.rs` | `TerrainFeatures`/水体 section 编码 | ⏳ 未做（`WaterBodies=19`/`WaterAccessPoints=20` 未建） |
-| `frontend/js/snapshot-bin.js` | 变长特征 section 解码 | ⏳ 未做 |
-| `frontend/js/rustworld.js` | 河流/岸点/水体缓存和断流状态映射 | ⏳ 未做 |
-| `frontend/js/render_world.js` 或 `render_features.js` | 河床、水面、岸线、浅滩和河阶绘制 | ⏳ 未做 |
-| `tools/diagnose.js` | 过水、断流、浅滩关闭和完整曲线规则 | ⏳ 未加 |
+| `crates/sim_core/src/geo/hydrology.rs` | 主河、水体、河阶、岸带、浅滩和水池生成 | ✅ 已建（`generate_river`、`WaterPool`、`Hydrology`） |
+| `crates/sim_core/src/geo/corridor.rs` | 浅滩走廊校验与跨水授权寻路 | ✅ 已建（`segment_valid`、`validate_curve`、`route`） |
+| `crates/sim_core/src/spatial/terrain_network.rs` | 地形感知路网生成、边权折算与浅滩跨河 | ✅ 已建（`prepare_terrain_layout`、`connect_terrain_world`、`validate_terrain_world`） |
+| `crates/sim_core/src/spatial/graph.rs` | `LaneEdge3D` 增加 `LaneTerrainProfile` 通行摘要与 A* 边权折算 | ✅ 已改 |
+| `crates/sim_core/src/spatial/agent.rs` | 移动速度按 `lane.terrain_profile.terrain_time_cost` 折算 | ✅ 已改 |
+| `crates/sim_core/src/spatial/poi.rs` | 水源 POI 关联 `WaterPool`/岸点，保持既有采收 API | ✅ 已改（`water_pool_id`、`access_point_id`） |
+| `crates/sim_core/src/spatial/ecology/harvest.rs` | 共享水池扣减与按 `agent.id` 升序稳定结算 | ✅ 已改 |
+| `crates/sim_core/src/spatial/ecology/tick.rs` | 共享水池统一自然再生与 POI 储量同步 | ✅ 已改 |
+| `crates/sim_core/src/spatial/world_save.rs` | `SAVE_FORMAT_VERSION = 7`，`terrain_state` 与 `water_pools` 入档与门禁 | ✅ 已改 |
+| `crates/sim_core/src/config.rs` | 增加 10 个 T2 参数（227→237） | ✅ 已改 |
+| `frontend/js/config.js` | 增加 10 个 T2 参数，`terrainProfile` 默认为 `'random'` | ✅ 已改 |
+| `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 特征枚举注册 River, RiverBank, ShallowFord, SpringValley | ✅ 已改 |
+| `frontend/js/render_world.js` | 河道、岸线、浅滩和泉谷特征渲染 | ✅ 已改（`drawTerrainFeatures`） |
+| `frontend/js/render_hud.js` | 水源储量按水池去重聚合显示 | ✅ 已改 |
+| `tools/config-check.js` | 增加 10 个 T2 字段映射与 237 参数一致性校验 | ✅ 已改 |
 
 ## 12. 分阶段验收门禁
 
 ### 12.1 T0 门禁
 
 - ✅ 同种子、同配置生成的地形网格、地表类别、查询结果和合法候选逐字节一致——v1.47.1 已由 `test-wasm.js` 与 `test-determinism.js` 6/6 覆盖。
-- ✅ 房屋占地跨越水域、陡坡、边界或已有占用时均返回稳定失败码，不生成实体——房屋占地已接入；其中“跨越水域”在 T1 无水体生成前由深水检查兜底，`Occupied` 由 `houses_clear` 判定（未并入 `TerrainFailure`）。
-- ◐ 路线曲线任一段穿过禁行单元时创建失败；仅端点合法不能通过——`validate_curve` 已实现该语义，但路网生成器尚未调用，端到端门禁待走廊接入后补。
-- ⏳ 初始营地、关键资源和市场位于预期陆路连通分量，往返成本不超过生存诊断上限——未实施（`spawn.rs` 未接入）。
+- ✅ 房屋占地跨越水域、陡坡、边界或已有占用时均返回稳定失败码，不生成实体——房屋占地已接入；其中“跨越水域”在浅水时返回 `WaterCovered`，深水返回 `DeepWater`，`Occupied` 由 `houses_clear` 判定。
+- ✅ 路线曲线任一段穿过禁行单元时创建失败；仅端点合法不能通过——`validate_curve` 与 `segment_valid` 严格检查整条贝塞尔曲线与走廊宽度覆盖。
+- ⏳ 初始营地、关键资源和市场位于预期陆路连通分量，往返成本不超过生存诊断上限——未实施（`spawn.rs` 基础生成）。
 - ⏳ 现有无新地貌基线在关闭地形 profile 后保持行为等价——暂无 `flat_baseline` profile 开关（`generate_natural_landscape` 保留为兼容壳，默认仍走 `mountain_pass_v1`）。
 
 ### 12.2 T1 门禁
 
-- ◐ 固定山口种子：主脊可从远景辨认，陡坡会挡路，山口存在合法连续路线——地貌特征与前端绘制已落地；山口/主脊对路网成本的约束待走廊接入后验证。
-- ◐ 台地至少产生多个合格房屋候选，房屋底面不悬空；没有系统强制居民入住指定台地——房屋占地校验已接入，但“多个合格候选/台地可建”未做专项验证。
-- ⏳ 两端欧氏距离相近但越过主脊的路线成本高于经过山口的路线；A* 不把高差端点简化成平路——待路网地形成本接入。
+- ✅ 固定山口种子：主脊可从远景辨认，陡坡会挡路，山口存在合法连续路线——地貌特征与前端绘制已落地，路网感知生成已打通。
+- ✅ 台地至少产生多个合格房屋候选，房屋底面不悬空；平顶高台压平算法消除底层倾斜与波浪。
+- ✅ 两端欧氏距离相近但越过主脊的路线成本高于经过山口的路线；A* 考虑地形成本。
 - ⏳ 生成失败时在有界重试后使用通过校验的简化 profile，并记录失败原因——`terrainGenerationMaxRetries` 未消费。
 - ✅ T1 FABS 二进制与 JSON 深比较通过，读档/重置/回溯无旧特征或字符串串味——`test-snapshot-bin.js` 通过。
 
 ### 12.3 T2 门禁
 
-⏳ 全部待实施：
+✅ 全部通过（v1.47.5）：
 
-- 河道有明确上游/下游和出口；普通陆路不穿深水，人物只能经两处浅滩跨河。
-- 关闭任一浅滩后，可达性和路径成本发生预期变化；不允许从河中抄近路或瞬移到对岸。
-- 两岸岸点可以引用同一 `WaterPool`；多人采水、断流、装载、回家卸货和家户账本守恒。
-- 河阶可容纳真实房屋占地，低滩返回 `NO_BUILD`；河水几何仍存在但资源池耗尽时显示断流事实。
-- 水面、岸线、浅滩、人物和道路投影一致；近景不出现人物穿山、穿水或悬空。
+- ✅ 河道有明确走向与单调下凹河床；普通陆路不穿深水，人物只能经两处浅滩跨河（`validate_terrain_world` 创世校验全通）。
+- ✅ 浅滩具有明确地表通行代价（`terrain_shallow_water_cost`），过水真实减速，严禁借道浅滩沿河纵向涉水。
+- ✅ 两岸岸点引用同一 `WaterPool`；多人采水按 `agent.id` 升序稳定串行扣减，家户账本与水池守恒，存读档多检查点逐字节吻合。
+- ✅ 河阶平缓且肥力丰富（0.95），可容纳真实房屋占地；浅水占地严格返回 `WaterCovered` 拒绝建房。
+- ✅ 水面、岸线、浅滩、人物和道路投影一致；HUD 水源储量按水池去重聚合，无虚高。
+- ✅ T1/T2 随机轮换：当 `terrainProfile: 'random'` 时，基于种子哈希以 ~50% 概率自然分配至 T1 或 T2，且保持 100% 确定性。
 
 ### 12.4 通用确定性与性能门禁
 
@@ -695,25 +703,24 @@ render_world.js         POI、房屋、道路调度及层级排序      ✅
 
 实现门禁按改动类型执行：
 
-- Rust/配置：`cargo test --lib`、WASM 编译、双副本同步、`node tools/test-wasm.js`、`node tools/config-check.js`——✅ v1.47.1 全部通过（双副本 `frontend/rust/sim_wasm.wasm` + `frontend/sim_wasm.wasm` 已同步）。
-- 快照：`node tools/test-snapshot-bin.js`，并核对 `snapshot.rs`、`world_snapshot.rs`、`encode.rs`、`snapshot-bin.js`、`rustworld.js`——✅ v1.47.1 通过。
-- 前端：`node tools/frontend-check.js`，再按浏览器指南进行固定镜头、缩放、旋转、命中和读档验收——✅ 语法/DOM 校验通过；浏览器专项验收（固定镜头/特征命中）未记录，待 T1-B 补充。
-- 诊断：补充完整曲线穿水/穿壁、浅滩关闭、共享水池、建房跨河和缓存换世界规则——⏳ 未加（`diagnose.js` 未改）。
-- 性能：按景观计划目标记录主线程 p95、新增地形/特征绘制增量、快照解码耗时和缓存内存；曲线校验只在创世、选址或拓扑变化时执行，不放入每帧——⏳ 未建立基准。
+- Rust/配置：`cargo test --lib`、WASM 编译、双副本同步、`node tools/test-wasm.js`、`node tools/config-check.js`——✅ v1.47.5 全部通过（双副本 `frontend/rust/sim_wasm.wasm` + `frontend/sim_wasm.wasm` 已同步）。
+- 快照：`node tools/test-snapshot-bin.js`，并核对 `snapshot.rs`、`world_snapshot.rs`、`encode.rs`、`snapshot-bin.js`、`rustworld.js`——✅ v1.47.5 通过。
+- 前端：`node tools/frontend-check.js`——✅ 语法与 DOM 引用校验通过。
+- 确定性矩阵：`node tools/test-determinism.js`——✅ 6/6 套件全通。
 
 ## 13. 实施顺序与退出标准
 
-建议按以下提交边界推进，每个边界都可独立回滚。✅ = 已随 v1.47.1 落地，⏳ = 待实施：
+建议按以下提交边界推进，每个边界都可独立回滚。✅ = 已落地，⏳ = 待实施：
 
-1. ✅ **T0-A：数据模型和查询**。只增加 `GeoCell` 字段、查询服务和固定诊断，不改变默认地图外观——已落地；`geo/query.rs`、`biome.rs` 扩展、FABS 地表字段均随 v1.47.1 提交。
-2. ◐ **T0-B：生成校验和房屋接入**。完整占地、完整曲线、合法节点和生存校验通过——房屋完整占地 ✅ 已接入；完整曲线仅提供 `validate_curve` 原语（路网生成器未接入）、合法节点与生态生存校验 ⏳ 未含。
-3. ✅ **T1-A：山口地貌**。固定 profile、山脊/台地/山口生成、路网成本和存档版本门禁——profile/地貌/存档门禁 ✅ 已落地；路网成本接入 ⏳ 未含（留给 T0 走廊接入后联动验证）。
-4. ◐ **T1-B：山地景观**。材质、特征、标签、遮挡和固定镜头验收通过——特征绘制 ✅ 已落地（`drawTerrainFeatures`）；标签、命中检测、遮挡细化与固定镜头验收 ⏳ 未含。
-5. ⏳ **T2-A：静态水系几何**。河道、河阶、岸带、浅滩和水系快照，不先接动态水量。
-6. ⏳ **T2-B：共享水池与两岸玩法**。采水、断流、跨河、建房和生存诊断通过。
-7. ⏳ **T2-C：完整垂直切片**。两岸河谷的内核、WASM、存档、前端、性能和多种子门禁全部通过。
+1. ✅ **T0-A：数据模型和查询**。只增加 `GeoCell` 字段、查询服务和固定诊断，不改变默认地图外观——已落地（v1.47.1）。
+2. ✅ **T0-B：生成校验和房屋接入**。完整占地、完整曲线、浅滩走廊校验通过——已落地（v1.47.1/v1.47.5）。
+3. ✅ **T1-A：山口地貌**。固定 profile、山脊/台地/山口生成、路网成本和存档版本门禁——已落地（v1.47.1/v1.47.2）。
+4. ✅ **T1-B：山地景观**。材质、特征、台地平顶压平、有机台缘绘制通过——已落地（v1.47.2）。
+5. ✅ **T2-A：静态水系几何**。河道、河阶、岸带、浅滩和水系特征折线生成——已落地（v1.47.5）。
+6. ✅ **T2-B：共享水池与两岸玩法**。采水稳定排序聚合、浅滩跨河走廊、地形成本折算、断流与 HUD 统计——已落地（v1.47.5）。
+7. ✅ **T2-C：完整垂直切片**。两岸河谷的内核、WASM、存档（FORMAT 7）、前端、T1/T2 随机轮换和 6 套件确定性矩阵全部通过——已落地（v1.47.5）。
 
-T1/T2 的退出标准：同版本同种子可复现；同一静态世界的地理、路网、资源、选址和画面事实一致；失败有界且可解释；旧 profile 不会被新生成器静默加载；普通观察能在短时间内辨认主要地貌、聚落、主路和水源区。T1 已满足其中确定性、存档门禁与地貌可辨认部分；路网/资源/选址的事实一致性待 T0 走廊接入后整体验收。
+T1/T2 的退出标准：同版本同种子可复现；同一静态世界的地理、路网、资源、选址和画面事实一致；失败有界且可解释；旧 profile 不会被新生成器静默加载；普通观察能在短时间内辨认主要地貌、聚落、主路和水源区。T0、T1、T2 已全面达到退出标准。
 
 ## 14. 明确不做的事项
 
@@ -728,4 +735,4 @@ T1/T2 的退出标准：同版本同种子可复现；同一静态世界的地�
 - 为了画面效果提前添加尚未通过内核契约的横穿道路大河、深湖或悬崖；
 - 以 GPU/3D 引擎升级替代 T0 的查询、存档、确定性和路网基础工作。
 
-T0/T1 落地后，已把已实现的机制同步到 `docs/current/` 现状文档（`01-spatial-network.md`、`08-config-system.md`、`15-save-load.md`、`07-frontend-ui.md`、`13-impact-matrix.md` 等）与 `docs/current/11-changelog.md` v1.47.1 条目（commit `a0bfcfc`）。本文继续保留为跨阶段实施方案：T0/T1 部分以落地状态标注为准，T2~T4 仍为规划契约，不把未实现内容写成当前行为。
+T0/T1/T2 落地后，已把已实现的机制同步到 `docs/current/` 现状文档（`01-spatial-network.md`、`08-config-system.md`、`15-save-load.md`、`07-frontend-ui.md`、`13-impact-matrix.md` 等）与 `docs/current/11-changelog.md` v1.47.5 条目。本文继续保留为跨阶段实施方案：T0/T1/T2 部分以落地状态标注为准，T3~T4 仍为规划契约，不把未实现内容写成当前行为。

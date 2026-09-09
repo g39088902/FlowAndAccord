@@ -116,8 +116,10 @@ impl World3DEngine {
         seed: u64,
         config: SimConfig,
     ) -> Self {
+        let mut config = config;
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
         terrain.generate_with_config(seed, &config);
+        config.terrain_profile = terrain.profile.clone();
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
             config.ledger_journal_capacity

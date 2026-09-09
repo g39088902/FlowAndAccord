@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
   // 地形生成、地表查询与山口 profile
-  terrainProfile: 'river_valley_v1', // T1 地貌模板；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   terrainRidgeWidth: 125.0, // T2 地貌 / 通行参数
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数

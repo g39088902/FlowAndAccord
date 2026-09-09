@@ -42,6 +42,7 @@ pub struct TerrainFeature {
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
 pub const TERRAIN_GENERATOR_VERSION: u32 = 2;
+pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
 
@@ -100,8 +101,12 @@ impl TerrainMap {
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
-        self.profile = if profile.is_empty() {
-            TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
+        self.profile = if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
+            if (seed ^ 0x5052_4F46_494C_4531) % 2 == 0 {
+                TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
+            } else {
+                TERRAIN_PROFILE_RIVER_VALLEY.to_string()
+            }
         } else {
             profile.to_string()
         };
@@ -222,7 +227,9 @@ impl TerrainMap {
                 };
             }
         }
-        self.build_t1_features(theta, ridge_offset, saddle_along, terrace_along, terrace_across, terrace_a, terrace_b);
+        if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
+            self.build_t1_features(theta, ridge_offset, saddle_along, terrace_along, terrace_across, terrace_a, terrace_b);
+        }
     }
 
     fn build_t1_features(
