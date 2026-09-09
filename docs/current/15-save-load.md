@@ -123,7 +123,7 @@ World3DEngine
 - **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟。**★ v1.28.0 自动读档**：已连接自动槽（默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复，无需用户手势）时，打开游戏直接读取其内容续演（自动解除暂停、同步暂停按钮文案），**不再开新世界等自动保存覆盖旧档**；读取失败（权限失效/文件损坏/版本不兼容）保持阻断并回退手动连接。**★ v1.28.1**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动时先静默重授（授权已持久化立即成功），失败则提供「🔓 授权并读取上次存档」按钮（点击 = 用户手势内 `requestPermission` 弹授权）；保存/读取遇 `NotAllowedError` 亦就地重授后重试一次，仅显式「断开」才删除句柄记录。
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.47.1**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.47.2**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
 

@@ -100,6 +100,10 @@ function drawTerrainFeatures() {
       ctx.strokeStyle = 'rgba(91, 75, 52, 0.30)';
       ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.08);
       ctx.setLineDash([8 * camera.zoom, 9 * camera.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
     } else if (feature.kind === 'Saddle') {
       const p = points[0];
       ctx.fillStyle = 'rgba(183, 142, 85, 0.28)';
@@ -108,18 +112,27 @@ function drawTerrainFeatures() {
       ctx.lineWidth = Math.max(1, camera.zoom * 1.5);
       ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(5, feature.width * camera.zoom * 0.10), 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-      continue;
+    } else if (feature.kind === 'Terrace') {
+      // ★ 自然平坦高台：柔和的平原微光与淡雅有机台缘等高虚线，告别生硬实线几何正方形
+      ctx.fillStyle = 'rgba(165, 192, 115, 0.07)';
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(132, 112, 65, 0.18)';
+      ctx.lineWidth = Math.max(1, camera.zoom * 0.8);
+      ctx.setLineDash([4 * camera.zoom, 5 * camera.zoom]);
+      ctx.stroke();
     } else {
       ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
       ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.06);
       ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
     }
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-    if (feature.kind === 'Terrace') ctx.closePath();
-    ctx.stroke();
     ctx.restore();
   }
 }

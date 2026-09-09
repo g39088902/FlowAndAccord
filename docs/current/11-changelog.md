@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.47.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.47.2**。
+
+| **v1.47.2** | T1 台地「有机化」迭代：① `terrain.rs` 台地生成算法由矩形 `smooth_box` 平台重构为**平顶高台压平算法（Tableland Flattening）**——以 24 点有机扰动轮廓（`perturb = 1 + 0.08·sin(3φ) − 0.05·cos(2φ)`，台地半轴 a=0.14×、b=0.11×世界尺寸）定义台地边界，核心区（r ≤ 0.55）完全拉平至 +8m 标高（底层倾斜与波浪归零，坡度严格消除为 0°），台缘（0.55 < r < 1.0）经 Hermite smoothstep 平滑跌落回自然地貌；删除 `TERRAIN_FLAG_NO_BUILD`（台地恢复可建，与 T1 验收「台地可建」一致）；② `render_world.js` 特征渲染重构：Terrace 由生硬实线闭合矩形改为柔和微光填充 + 淡雅有机台缘等高虚线，Ridge/Saddle 绘制路径独立成块并补齐虚线设置；③ 文档同步：`26-plan-terrain-implementation.md` T1 步骤 4/6 更新为压平算法与 24 点自然有机台缘轮廓描述；④ 升版 v1.47.2 重编译 WASM 双副本。 | sim_core(geo/terrain) / frontend(render_world) / docs / version |
 
 | **v1.47.1** | 落地 T0/T1 静态地形系统并同步文档：① `GeoCell` 扩展 `SurfaceKind`、自然土地适宜性、水体关联与地表标志；② 新增 `geo/query.rs`，提供完整占地校验、地表采样、地形失败码和贝塞尔走廊校验原语，房屋实体化消费完整占地规则；③ 新增确定性 `mountain_pass_v1` profile，以局部 RNG 生成主脊、山口鞍部、台地与 `Ridge`/`Saddle`/`Terrace` 特征；④ FABS 地形 section 升级为格式版本 2，快照同步地表字段、地貌特征、生成器版本和 profile，前端 Canvas 绘制 T1 特征；⑤ `WorldSave` 增加 `terrain_generator_version` 与 `terrain_profile` 门禁，防止旧路网和新地貌静默组合；⑥ 新增 6 个地形配置字段，配置速查表字段数由 221 增至 227；⑦ release WASM 双副本同步；门禁全通：`test-snapshot-bin`、`test-wasm`、`test-determinism` 6/6、`config-check`、`frontend-check`。 | sim_core(geo/housing/snapshot/save/config) / sim_wasm / frontend / tools / docs |
 

@@ -10,3 +10,4 @@ target/
 .codebuddy
 .workbuddy-ai
 .playwright-cli/
+.workbuddy
