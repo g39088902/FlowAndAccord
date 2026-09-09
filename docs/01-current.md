@@ -4,7 +4,7 @@
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
 > **版本**：v1.47.1（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（219 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
+> **超参配置**：全部可调超参（227 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -47,7 +47,7 @@
 
 | # | 功能模块 | 文档路径 | 主要内容 |
 | :--- | :--- | :--- | :--- |
-| 1 | 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`) | [01-spatial-network.md](./current/01-spatial-network.md) | 连续 3D 地形、贝塞尔路网、A\* 寻路、踏路成道、5 阶恒宽色彩 |
+| 1 | 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`) | [01-spatial-network.md](./current/01-spatial-network.md) | T0 地表查询、T1 山口/山脊/台地 profile、完整占地校验、连续 3D 地形、贝塞尔路网、A\* 寻路、踏路成道、5 阶恒宽色彩 |
 | 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 23 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
 | 3 | ❄️ 四季更替与热力学供暖系统 (`seasons`) | [03-seasons-climate.md](./current/03-seasons-climate.md) | 240s 四季年轮模型、冬季供暖消耗、低温受孕安全红线 |
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |

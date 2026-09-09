@@ -83,7 +83,16 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 | `config.js` 数值调整 | 浏览器 Ctrl+F5 即生效 / `node tools/config-check.js` 校验 / 如影响机制须更新文档 | 调参不需重编译，但须通过一致性校验 |
 | `config.decision-order.js` 分支顺序变更 | `decision-viz.js` 合并进 SIM_CONFIG / `rustworld.js` applyConfig 热注入 / `server.js` POST save-decision-order 写盘 | §4.14 决策顺序真相源在文件，拖动即热注入 |
 
-### 1.9 构建与部署
+### 1.9 地形与空间事实
+
+| 改动对象 | 必须同步改动 | 原因 |
+|---|---|---|
+| `geo/biome.rs` `GeoCell` / `SurfaceKind` | `geo/terrain.rs` 生成与采样 / `geo/query.rs` 查询 / `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/dict.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` / `render_world.js` | 地表类别是内核事实，快照与前端必须保持同构 |
+| T0 占地或曲线合法性规则 | `geo/query.rs` / `housing_system/settlement.rs` / 后续 `ecology/spawn.rs` 与路网走廊生成器 / `config.rs` + `config.js` / `06-config-reference.md` | 房屋、道路、农业和防务应消费统一查询，不能复制坡度/禁行判据 |
+| T1 地形 profile / 生成器算法 | `geo/terrain.rs` / `world.rs` 创世 / `world_save.rs` 生成器版本门禁 / `snapshot.rs` / `snapshot_bin` / 前端特征渲染 / 确定性矩阵 | seed 重建依赖生成器版本，旧路网不得与新地貌静默组合 |
+| `TerrainFeature` 或 FABS `Terrain` section | `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/layout.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` / `test-snapshot-bin.js` | FABS 是定长/变长顺序流，字段或 section 变化必须四处同步并升格式版本 |
+
+### 1.10 构建与部署
 
 | 改动对象 | 必须同步改动 | 原因 |
 |---|---|---|
@@ -134,7 +143,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 ## 三、数据流向图（Rust → 前端）
 
 ```
-SimConfig (config.rs + config.house-upgrade-cost.js，共 221 字段)
+SimConfig (config.rs + config.house-upgrade-cost.js，共 227 字段)
     │  序列化
     ▼
 sim_wasm.wasm (world_create / world_tick / world_apply_config)

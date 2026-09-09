@@ -32,8 +32,9 @@ World3DEngine
                                   ① 校验 format_version
                                   ② 校验 grid_res / world_size
                                   ③ 校验 agent id 唯一（防脏档让 agent_index 错乱）
-                                  ④ TerrainMap::new + generate_natural_landscape(seed) 重建地形
-                                  ⑤ rebuild_agent_index() 重建派生索引
+                                  ④ 校验 terrain_generator_version / terrain_profile
+                                  ⑤ TerrainMap::new + generate_with_profile(seed, terrain_profile) 重建地形
+                                  ⑥ rebuild_agent_index() 重建派生索引
 ```
 
 ### 2.1 入库字段清单
@@ -41,7 +42,7 @@ World3DEngine
 | 分组 | 字段 |
 | :--- | :--- |
 | 元信息 | `format_version` / `app_version` |
-| 重建参数 | `seed` / `grid_res` / `world_size` |
+| 重建参数 | `seed` / `grid_res` / `world_size` / `terrain_generator_version` / `terrain_profile` |
 | 基础实体 | `network` / `pois` / `houses` / `agents` |
 | 发号器 | `next_agent_id` / `next_house_id`（各登记簿的 `next_id` 内嵌在自身结构里） |
 | 计数器 | `total_births` / `total_deaths` / `total_deaths_natural` / `total_deaths_unnatural` / `total_miscarriages` / `auction_started` / `auction_sold` / `auction_flopped` |
@@ -59,7 +60,7 @@ World3DEngine
 
 | 字段 | 排除理由 | 恢复方式 |
 | :--- | :--- | :--- |
-| `terrain` | 3600 栅格完全由 `seed` 确定性生成，入库约百 KB 纯冗余 | `TerrainMap::generate_natural_landscape(seed)` |
+| `terrain` | 地形网格与 T1 特征由 seed + profile 确定性重建，入库仍属可重建数据 | `TerrainMap::generate_with_profile(seed, terrain_profile)` |
 | `agent_index` | `AgentId → Vec 下标` 的派生索引，入库即冗余真相源 | `rebuild_agent_index()` |
 
 ### 2.3 序列化能力补齐
