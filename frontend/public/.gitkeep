@@ -1,0 +1,1 @@
+# Keep this directory in Git so that CI/CD does not treat /public on COS as orphaned files.
