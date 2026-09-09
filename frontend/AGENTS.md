@@ -42,10 +42,10 @@
 | `js/snapshot-bin.js` | ~520 | **★ M4 (v1.45.3) FABS 二进制快照解码器**：`window.SnapshotBin.decode(Uint8Array) → 与 JSON 快照逐字段同构的 JS 对象`；维护持久化字符串驻留缓存与枚举名称表（`setEnumTables`/`resetCaches`）。**必须在 rustworld.js 之前加载** | 任何 DOM 操作、Canvas 绘制 |
 | `js/sim_worker.js` | ~300 | **仿真内核专用 Web Worker**（★ v1.38.0 Phase 1 解耦）：在独立 Worker 线程加载 WASM 引擎、自适应计时循环驱动 `world_tick_steps`、背压限频下发快照（**★ M4 优先二进制 FABS 帧 `.slice()` 后 `postMessage(transfer)` 转移**，wasm 无导出自动回退 JSON）、管理历史检查点与时光倒流 | 任何 DOM 操作、Canvas 绘制 |
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
-| `js/render_canvas.js` | ~226 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（调用各子模块绘制函数）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
+| `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.47.9 调用顺序：地形 → 路网 → 贴地图元 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
-| `js/render_world.js` | ~480 | **世界元素绘制**（v1.7.1 拆分）：drawTerrain（3D 地形网格）/ drawPois（POI 渲染与储量指示环）/ drawHouses（私宅渲染）/ drawLanes（动态踩踏道路网络渲染与悬浮 Tooltip） | 共享状态（在 render_canvas）、HUD（在 render_hud） |
-| `js/render_agents.js` | ~210 | **族人与特效绘制**（v1.7.1 拆分）：drawAgents（部落民 Agent 渲染 + 选中高亮 + 状态气泡 + 死亡骷髅）/ drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas） |
+| `js/render_world.js` | ~767 | **世界元素绘制**（v1.7.1 拆分）：drawTerrain（3D 地形网格）/ drawLanes（踩踏路网与悬浮 Tooltip）/ drawSelectedCampHouseLinks（营地辖区虚线）/ drawPoiGroundBases + drawPoiGroundBase（POI 贴地底座与营地暖光）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型）/ **★ v1.47.9 `drawWorldEntities()`（POI 标记 + 房屋 + 族人统一按相机深度远 → 近绘制）** | 共享状态（在 render_canvas）、HUD（在 render_hud） |
+| `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
 | `js/main.js` | ~574 | 全局初始化 / 相机控制（缩放/平移/跟随）/ 事件绑定（点击拾取/快捷键 Space/Esc/重置按钮/倍速切换）/ 控制台日志 / 无头模式切换 / **★ v1.27.0 启动即暂停**（`sim.isPaused=true`，由 save-ui.js 完成存档连接后解除） | Canvas 绘制（在 render.js）、wasm 交互（在 rustworld.js） |
 | `js/entity-link.js` | — | **统一 Agent/房屋实体跳转**：生成实体链接并以唯一捕获阶段委托路由到世界 Inspector | 业务卡片数据、Canvas 绘制 |
@@ -264,6 +264,12 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 - `loadWorld()` 成功后会清空 `_trails` / `agentArchive` / `_lastEvent` / `_terrainCached` 并 `deselect()`，**任何新增的派生缓存都必须同步清空**，否则读档后残留旧世界的可视化状态。
 - 读档后**不重新注入 `window.SIM_CONFIG`**：存档自带 `SimConfig`，重注入会让前端热调参覆盖存档时的运行参数。
 - 自动槽每 60 秒覆盖一次，世界 tick 未推进时跳过（`lastAutoTick` 守卫），暂停时不会空写。
+
+### 5.9 世界图层顺序与统一相机深度绘制（★ v1.47.9）
+
+- **固定图层顺序**（`render_canvas.js::render`）：`drawTerrain` → `drawLanes` → `drawSelectedCampHouseLinks` + `drawPoiGroundBases` → `drawWorldEntities` → `drawCoronationEffects`。道路是贴地踩踏纹理必须先于建筑（否则「路切屋顶」倒错）；POI 底座/营地暖光是贴地绘制物，必须留在立体实体之前，否则暖光会糊在近处建筑上。
+- **立体实体共用一个深度队列**：Canvas 2D 无深度缓冲，任何同层按数组原序绘制都会出现「远物压近物」。`render_world.js::drawWorldEntities()` 每帧把 **POI 标记（`drawPoiMarker`）+ 房屋（`drawHouse`）+ 族人（`render_agents.js::drawAgent`）** 收进同一个列表，按 `project3D().depth`（= `ry·sinX + z·cosX`，数值越大越靠近视点）**升序**绘制（远 → 近）；同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性。每帧重算，相机旋转后不残留旧序；排序只作用于绘制队列，`sim.pois`/`sim.houses`/`sim.agents` 顺序与点击拾取/Inspector 遍历逻辑均不变。
+- **新增世界实体（树木/农田/哨塔等）必须挂进同一队列**：在 `drawWorldEntities()` 的 collect 阶段登记种类 + 提供单实体绘制函数即可，**严禁**在 `render()` 里新增独立的整层绘制调用（那会立刻退回「远物压近物」）。历史教训：v1.47.8 只修了房屋层，POI 与族人仍按固定图层顺序绘制。
 
 ---
 

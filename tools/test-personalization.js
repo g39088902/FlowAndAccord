@@ -96,7 +96,7 @@ async function run() {
   // ==========================================================================
   console.log('[1/5] 验证先天力量对重体力伐木采石装载速率的加成与惩罚...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 60; i++) ex.world_tick(1.0 / 60.0);
 
@@ -140,7 +140,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[2/5] 验证力量禀赋偏好特化 (低力量家政修缮与采石体力门槛)...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -149,26 +149,33 @@ async function run() {
     const h = save.houses[0];
     h.durability = 0.85; // 85% 耐久度 (常规门槛 80% 不触发，低力量门槛 90% 触发)
 
-    // Agent 1 设为低力量 (80.0)，作为户主
-    save.agents[0].strength = 80.0;
-    save.agents[0].home_house_id = h.id;
-    h.owner_id = save.agents[0].id;
-    save.agents[0].state = 'RestingAtCamp';
-    save.agents[0].carried_water = 0.0;
-    save.agents[0].carried_food = 0.0;
-    save.agents[0].carried_wood = 0.0;
-    save.agents[0].carried_stone = 0.0;
-    save.agents[0].carried_gold = 0.0;
-    save.agents[0].thirst = 45.0;
-    save.agents[0].hunger = 45.0;
-    save.agents[0].stamina = 90.0;
+    // 选择男性户主设为低力量 (80.0)
+    const targetAgent = save.agents.find(a => a.gender === 'Male' && a.is_alive && !a.is_fetus) || save.agents[0];
+    targetAgent.strength = 80.0;
+    targetAgent.home_house_id = h.id;
+    h.owner_id = targetAgent.id;
+    targetAgent.state = 'RestingAtCamp';
+    targetAgent.carried_water = 0.0;
+    targetAgent.carried_food = 0.0;
+    targetAgent.carried_wood = 0.0;
+    targetAgent.carried_stone = 0.0;
+    targetAgent.carried_gold = 0.0;
+    targetAgent.thirst = 45.0;
+    targetAgent.hunger = 45.0;
+    targetAgent.stamina = 90.0;
+    targetAgent.family_stock_active = [false, false, false, false, false];
+    const hhId = save.household_registry ? save.household_registry.by_agent[targetAgent.id] : null;
+    const hh = hhId && save.household_registry.households ? save.household_registry.households[hhId] : null;
+    if (hh && hh.group && hh.group.ledger) {
+      hh.group.ledger.balances = { Water: 250, Food: 250, Wood: 100, Stone: 100, Gold: 100 };
+    }
 
     restoreSaveState(save);
 
     // 运行至下一个决策相位
     let currentTick = save.tick_counter;
     let stepCount = 0;
-    while ((currentTick + save.agents[0].id) % 120 !== 0 || stepCount === 0) {
+    while ((currentTick + targetAgent.id) % 120 !== 0 || stepCount === 0) {
       ex.world_tick(1.0 / 60.0);
       currentTick++;
       stepCount++;
@@ -176,7 +183,7 @@ async function run() {
     }
 
     const snap = reader.getSnapshot();
-    const a1 = snap.agents.find(a => a.id === save.agents[0].id);
+    const a1 = snap.agents.find(a => a.id === targetAgent.id);
     console.log(`  🏠 耐久度 85% 房屋: 低力量族人主导需求 = "${a1.current_need || '无'}", 状态 = ${a1.state}`);
     assert(
       (a1.current_need && a1.current_need.includes('RepairHouse')) || a1.state === 'RepairingHouse',
@@ -190,7 +197,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[3/5] 验证智力驱动理性商贸与通衢选点...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -226,8 +233,9 @@ async function run() {
     male.thirst = 45.0;
     male.hunger = 45.0;
     male.stamina = 90.0;
-    // 将其放置在离市场很近的位置 (离市场 15m，而野外果丛通常在 70m+)
-    male.world_pos = { x: market.pos.x + 15.0, y: market.pos.y, z: market.pos.z };
+    // 选取离市场较近的营地 (Camp 4，离市场 90m，离野外果丛 146m)
+    const camp4 = save.pois.find(p => p.id === 4) || market;
+    male.world_pos = { ...camp4.pos };
 
     restoreSaveState(save);
 
@@ -256,7 +264,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[4/5] 验证豪绅家户阶层分化与劳作免除...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -315,7 +323,7 @@ async function run() {
   const seeds = [101, 202, 303];
   for (const s of seeds) {
     // 运行第 1 遍
-    ex.world_create(60, 764.0, s, 20, 4);
+    ex.world_create(120, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const snap1 = reader.getSnapshot();
@@ -329,7 +337,7 @@ async function run() {
     }
 
     // 运行第 2 遍验证重放一致性
-    ex.world_create(60, 764.0, s, 20, 4);
+    ex.world_create(120, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const hash2 = crypto.createHash('sha256').update(new Uint8Array(ex.memory.buffer, ex.world_save_ptr(), ex.world_save_len())).digest('hex');

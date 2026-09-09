@@ -83,7 +83,7 @@ function summarize(arr) {
   new Uint8Array(ex.memory.buffer, cfgPtr, encoded.length).set(encoded);
   ex.world_apply_config_buf(encoded.length);
 
-  ex.world_create(60, 764.0, SEED, 20, cfg.countCamps || 4);
+  ex.world_create(120, 764.0, SEED, 20, cfg.countCamps || 4);
 
   // archive: id -> 族人档案 (末次出现状态覆盖式写入)
   const archive = new Map();
@@ -180,8 +180,8 @@ function summarize(arr) {
   const tickMax = sortedByBirth.length ? sortedByBirth[sortedByBirth.length - 1].birthTick : 0;
 
   // ------------------------------ 焦点选择与直系子图裁剪 ------------------------------
-  // 复刻 frontend/js/dag.js::buildLineageDAG 的 BFS 规则（向上父/母链最多9代 + 向女儿孙链最多9代）
-  const MAX_LINEAGE_DEPTH = 9;
+  // 复刻 frontend/js/dag.js::buildLineageDAG 的 BFS 规则（向上父/母链最多5代 + 向女儿孙链最多5代）
+  const MAX_LINEAGE_DEPTH = 5;
   function lineageOf(focusId) {
     if (!archive.has(focusId)) return null;
     const ancestors = new Set(), descendants = new Set(), lineageIds = new Set([focusId]);

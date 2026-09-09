@@ -1,59 +1,67 @@
 // === 族人与特效绘制 (从 render.js 拆分) ===
-// 部落民 Agent 渲染 / 选中高亮 / 状态气泡 / 登基礼花特效
+// 部落民单实体渲染 drawAgent（由 drawWorldEntities 统一深度调度）/ 选中高亮 / 状态气泡 / 登基礼花特效
 // 依赖全局: ctx, camera, sim, project3D, MASLOW_STYLE, NEED_KIND_LABEL, parseMaslowNeed, coronationEffects, prevKingsMap, CORONATION_DURATION
 
-function drawAgents() {
-const agentsToRender = sim.showAgents ? sim.agents : [];
-for (const agent of agentsToRender) {
+// ★ v1.47.9 单实体绘制入口：由 render_world.js::drawWorldEntities() 按相机深度统一调度。
+function drawAgent(agent) {
   // ★ M1.7 胎儿不设置地图实体：不在地图上渲染
-  if (agent.isFetus) continue;
+  if (agent.isFetus) return;
   const p2D = project3D(agent.pos);
   const isSelectedAgent = sim.selectionType === 'agent' && sim.selectedAgentId === agent.id;
 
   if (!agent.isAlive) {
     const deathAlpha = Math.max(0, Math.min(1.0, agent.deathDecayTimer / 4.0));
     ctx.save();
-    ctx.globalAlpha = deathAlpha;
-    ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('💀', p2D.x, p2D.y);
+    ctx.globalAlpha = deathAlpha * 0.75;
+    // 宁静小石堆/墓石标记，替代刺眼的白色骷髅贴图
+    const stoneR = 3.0 * camera.zoom;
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.arc(p2D.x - stoneR * 0.6, p2D.y + stoneR * 0.2, stoneR * 0.8, 0, Math.PI * 2);
+    ctx.arc(p2D.x + stoneR * 0.6, p2D.y + stoneR * 0.2, stoneR * 0.7, 0, Math.PI * 2);
+    ctx.arc(p2D.x, p2D.y - stoneR * 0.4, stoneR * 0.9, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
-    continue;
+    return;
   }
 
-  let stateColor = '#facc15';
-  if (agent.state === 'SeekingWater' || agent.state === 'DrinkingAtWater') stateColor = '#38bdf8';
-  else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#10b981';
-  else if (agent.state === 'SeekingWood' || agent.state === 'GatheringWood') stateColor = '#eab308';
-  else if (agent.state === 'SeekingStone' || agent.state === 'MiningStone') stateColor = '#94a3b8';
-  else if (agent.state === 'SeekingGold' || agent.state === 'MiningGold') stateColor = '#fbbf24';
-  else if (agent.state === 'ReturningToCamp') stateColor = '#f59e0b';
-  else if (agent.state === 'ConstructingHouse') stateColor = '#f59e0b';
+  // 温润低饱和服饰色系，融入沙盘大地质感
+  let stateColor = '#d97706'; // 默认暖赭色
+  if (agent.state === 'SeekingWater' || agent.state === 'DrinkingAtWater') stateColor = '#0284c7'; // 澄澈湖蓝
+  else if (agent.state === 'SeekingFood' || agent.state === 'ForagingFood') stateColor = '#15803d'; // 沉稳林绿
+  else if (agent.state === 'SeekingWood' || agent.state === 'GatheringWood') stateColor = '#b45309'; // 暖木土黄
+  else if (agent.state === 'SeekingStone' || agent.state === 'MiningStone') stateColor = '#64748b'; // 风化岩灰
+  else if (agent.state === 'SeekingGold' || agent.state === 'MiningGold') stateColor = '#d97706'; // 沉淀暖金
+  else if (agent.state === 'ReturningToCamp') stateColor = '#c2410c'; // 归巢土红
+  else if (agent.state === 'ConstructingHouse') stateColor = '#b45309';
 
   // 幼年期标识 (未满 1800s)
   const isAdult = agent.age >= 1800.0;
 
   if (agent.state === 'ConstructingHouse') {
-    // 绘制 🔨 施工标识与进度环 (30s 成本翻倍)
-    ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
+    // 绘制 🔨 施工标识与细线进度环
+    ctx.font = `${Math.floor(12 * camera.zoom)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('🔨', p2D.x, p2D.y - 12 * camera.zoom);
+    ctx.fillText('🔨', p2D.x, p2D.y - 10 * camera.zoom);
 
     const progress = Math.min(1.0, agent.buildTimer / 30.0);
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2.0;
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 8.5 * camera.zoom, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.arc(p2D.x, p2D.y, 7.0 * camera.zoom, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
     ctx.stroke();
   }
 
   if (agent.isPregnant) {
-    stateColor = '#ec4899';
-    ctx.strokeStyle = '#ec4899';
-    ctx.lineWidth = 1.8;
+    stateColor = '#be185d'; // 沉着柔和的胭红，告别荧光刺眼感
+    ctx.save();
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.40)';
+    ctx.lineWidth = 1.0;
+    ctx.setLineDash([3 * camera.zoom, 3 * camera.zoom]);
     ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, (8 + agent.pregnancyProgress * 6) * camera.zoom, 0, Math.PI * 2);
+    ctx.arc(p2D.x, p2D.y, (5.0 + agent.pregnancyProgress * 3.5) * camera.zoom, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
   }
 
   if (agent.miscarriageTimer > 0) {
@@ -61,20 +69,21 @@ for (const agent of agentsToRender) {
     const floatY = (5.0 - agent.miscarriageTimer) * 7.0;
     ctx.save();
     ctx.globalAlpha = mAlpha;
-    ctx.font = `${Math.floor(15 * camera.zoom)}px sans-serif`;
+    ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('🥀', p2D.x, p2D.y - 12 * camera.zoom - floatY);
     ctx.restore();
   }
 
+  // 行走微弱尘土轨迹 (大幅降低透明度，杜绝满屏荧光毛毛虫)
   if (agent.trail.length > 1) {
     ctx.save();
-    ctx.lineWidth = 1.4 * camera.zoom;
+    ctx.lineWidth = 0.9 * camera.zoom;
     ctx.lineCap = 'round';
     for (let t = 0; t < agent.trail.length - 1; t++) {
       const pA = project3D(agent.trail[t]);
       const pB = project3D(agent.trail[t + 1]);
-      const alpha = ((t + 1) / agent.trail.length) * 0.45;
+      const alpha = ((t + 1) / agent.trail.length) * 0.14;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = stateColor;
       ctx.beginPath();
@@ -85,11 +94,23 @@ for (const agent of agentsToRender) {
     ctx.restore();
   }
 
-  // 幼体稍小 (3.0px)，成体标准 (4.5px)
-  const agentRadius = (isAdult ? 4.5 : 3.2) * camera.zoom;
+  // 1. 族人地面微接触阴影 (Drop Shadow，扎根沙盘感)
+  const agentRadius = (isAdult ? 3.6 : 2.5) * camera.zoom;
+  ctx.fillStyle = 'rgba(20, 15, 10, 0.24)';
+  ctx.beginPath();
+  ctx.ellipse(p2D.x + 0.8 * camera.zoom, p2D.y + 1.8 * camera.zoom, agentRadius * 1.05, agentRadius * 0.55, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. 实体人偶点 (主体与微小头部)
   ctx.fillStyle = stateColor;
   ctx.beginPath();
   ctx.arc(p2D.x, p2D.y, agentRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 族人头部微光点
+  ctx.fillStyle = '#fce7f3';
+  ctx.beginPath();
+  ctx.arc(p2D.x - 0.5 * camera.zoom, p2D.y - 0.7 * camera.zoom, agentRadius * 0.45, 0, Math.PI * 2);
   ctx.fill();
 
   if (isSelectedAgent) {
@@ -155,8 +176,6 @@ for (const agent of agentsToRender) {
       }
     }
   }
-}
-
 }
 
 function drawCoronationEffects(now) {

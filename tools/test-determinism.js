@@ -97,12 +97,12 @@ async function createInstance() {
   const seeds = [42, 101, 777, 2026, 31415];
   for (const seed of seeds) {
     const runA = await createInstance();
-    runA.worldCreate(60, 764.0, seed, 20, simConfig.countCamps, simConfig);
+    runA.worldCreate(120, 764.0, seed, 20, simConfig.countCamps, simConfig);
     runA.ex.world_tick_steps(600, dt);
     const snapA = runA.getSnapshotString();
 
     const runB = await createInstance();
-    runB.worldCreate(60, 764.0, seed, 20, simConfig.countCamps, simConfig);
+    runB.worldCreate(120, 764.0, seed, 20, simConfig.countCamps, simConfig);
     runB.ex.world_tick_steps(600, dt);
     const snapB = runB.getSnapshotString();
 
@@ -121,25 +121,25 @@ async function createInstance() {
   const batchSeed = 8888;
   // A: 1 步 * 600
   const instA = await createInstance();
-  instA.worldCreate(60, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
+  instA.worldCreate(120, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
   for (let i = 0; i < 600; i++) instA.ex.world_tick(dt);
   const snapBatch1 = instA.getSnapshotString();
 
   // B: 10 步 * 60
   const instB = await createInstance();
-  instB.worldCreate(60, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
+  instB.worldCreate(120, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
   for (let i = 0; i < 60; i++) instB.ex.world_tick_steps(10, dt);
   const snapBatch10 = instB.getSnapshotString();
 
   // C: 100 步 * 6
   const instC = await createInstance();
-  instC.worldCreate(60, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
+  instC.worldCreate(120, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
   for (let i = 0; i < 6; i++) instC.ex.world_tick_steps(100, dt);
   const snapBatch100 = instC.getSnapshotString();
 
   // D: 600 步 * 1
   const instD = await createInstance();
-  instD.worldCreate(60, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
+  instD.worldCreate(120, 764.0, batchSeed, 20, simConfig.countCamps, simConfig);
   instD.ex.world_tick_steps(600, dt);
   const snapBatch600 = instD.getSnapshotString();
 
@@ -156,12 +156,12 @@ async function createInstance() {
   process.stdout.write('[Suite 3/6] 子阶段步进与标准步进等价性验证... ');
   const subphaseSeed = 9999;
   const instMono = await createInstance();
-  instMono.worldCreate(60, 764.0, subphaseSeed, 20, simConfig.countCamps, simConfig);
+  instMono.worldCreate(120, 764.0, subphaseSeed, 20, simConfig.countCamps, simConfig);
   instMono.ex.world_tick_steps(300, dt);
   const snapMono = instMono.getSnapshotString();
 
   const instSub = await createInstance();
-  instSub.worldCreate(60, 764.0, subphaseSeed, 20, simConfig.countCamps, simConfig);
+  instSub.worldCreate(120, 764.0, subphaseSeed, 20, simConfig.countCamps, simConfig);
   for (let t = 0; t < 300; t++) {
     for (let p = 0; p <= 8; p++) {
       instSub.ex.world_tick_subphase(p, dt);
@@ -183,7 +183,7 @@ async function createInstance() {
   const sideEffectSeed = 54321;
   // 路径 A: 创世拉取地形快照后，每 20 tick 提取一次快照
   const instA4 = await createInstance();
-  instA4.worldCreate(60, 764.0, sideEffectSeed, 20, simConfig.countCamps, simConfig);
+  instA4.worldCreate(120, 764.0, sideEffectSeed, 20, simConfig.countCamps, simConfig);
   instA4.getSnapshot(); // 模拟生产环境 tick 0 提取创世快照（消费一次性静态地形数据）
   for (let i = 0; i < 30; i++) {
     instA4.ex.world_tick_steps(20, dt);
@@ -193,7 +193,7 @@ async function createInstance() {
 
   // 路径 B: 创世拉取地形快照后，一口气连续跑完 600 tick 不提取任何中间快照
   const instB4 = await createInstance();
-  instB4.worldCreate(60, 764.0, sideEffectSeed, 20, simConfig.countCamps, simConfig);
+  instB4.worldCreate(120, 764.0, sideEffectSeed, 20, simConfig.countCamps, simConfig);
   instB4.getSnapshot(); // 模拟生产环境 tick 0 提取创世快照
   instB4.ex.world_tick_steps(600, dt);
   const snapDirect = instB4.getSnapshotString();
@@ -210,7 +210,7 @@ async function createInstance() {
   process.stdout.write('[Suite 5/6] 多时间切片存读档连续性验证 (多点倒流重放)... ');
   const slSeed = 12345;
   const instSL = await createInstance();
-  instSL.worldCreate(60, 764.0, slSeed, 20, simConfig.countCamps, simConfig);
+  instSL.worldCreate(120, 764.0, slSeed, 20, simConfig.countCamps, simConfig);
 
   // 推进到 300 并保存
   instSL.ex.world_tick_steps(300, dt);
@@ -249,7 +249,7 @@ async function createInstance() {
   const popSeed = 76543;
   for (const pop of [10, 20, 50]) {
     const instPopA = await createInstance();
-    instPopA.worldCreate(60, 764.0, popSeed, pop, simConfig.countCamps, simConfig);
+    instPopA.worldCreate(120, 764.0, popSeed, pop, simConfig.countCamps, simConfig);
     instPopA.ex.world_tick_steps(1200, dt);
     const snapPopAStr = instPopA.getSnapshotString();
     const snapPopA = JSON.parse(snapPopAStr);
@@ -266,7 +266,7 @@ async function createInstance() {
 
     // 重跑一次核对确定性
     const instPopB = await createInstance();
-    instPopB.worldCreate(60, 764.0, popSeed, pop, simConfig.countCamps, simConfig);
+    instPopB.worldCreate(120, 764.0, popSeed, pop, simConfig.countCamps, simConfig);
     instPopB.ex.world_tick_steps(1200, dt);
     const snapPopBStr = instPopB.getSnapshotString();
     if (snapPopAStr !== snapPopBStr) {

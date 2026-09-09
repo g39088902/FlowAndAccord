@@ -92,7 +92,7 @@ async function run() {
   new Uint8Array(ex.memory.buffer, cfgPtr, cfgBytes.length).set(cfgBytes);
   ex.world_apply_config_buf(cfgBytes.length);
 
-  ex.world_create(60, 764.0, 42.0, 20, 4);
+  ex.world_create(120, 764.0, 42.0, 20, 4);
 
   // 步进 1800 ticks
   for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);

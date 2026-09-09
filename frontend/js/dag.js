@@ -41,14 +41,14 @@
       focusId = ids.find(id => lookup.get(id) && lookup.get(id).isAlive) || ids[0] || 1;
     }
 
-    const MAX_LINEAGE_DEPTH = 9; // 族谱直系血脉最大探索深度：往上9代，往下9代
+    const MAX_LINEAGE_DEPTH = 5; // 族谱直系血脉最大探索深度：往上5代，往下5代
 
     const ancestors = new Set();
     const descendants = new Set();
     const lineageIds = new Set();
     if (lookup.has(focusId)) {
       lineageIds.add(focusId);
-      // 向上溯源：最多 9 代祖先
+      // 向上溯源：最多 5 代祖先
       const aq = [{ id: focusId, depth: 0 }];
       while (aq.length > 0) {
         const item = aq.shift();
@@ -63,7 +63,7 @@
           }
         }
       }
-      // 向下寻宗：最多 9 代后裔
+      // 向下寻宗：最多 5 代后裔
       const dq = [{ id: focusId, depth: 0 }];
       while (dq.length > 0) {
         const item = dq.shift();

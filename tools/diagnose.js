@@ -247,9 +247,9 @@ async function main() {
   const simConfig = loadSimConfig();
   const detector = new AnomalyDetector(simConfig);
 
-  // 初始化世界：grid=60, size=764, seed, 20人
+  // 初始化世界：grid=120, size=764, seed, 20人
   applyConfig(simConfig);
-  ex.world_create(60, 764.0, opts.seed, 20, simConfig.countCamps);
+  ex.world_create(120, 764.0, opts.seed, 20, simConfig.countCamps);
 
   const DT = 1.0 / 60.0;
   const SUBSTEPS = 10;

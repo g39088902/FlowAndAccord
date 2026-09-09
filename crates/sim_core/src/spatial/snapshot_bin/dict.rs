@@ -33,21 +33,15 @@ pub fn surface_kind_code(kind: SurfaceKind) -> u8 {
 #[inline]
 pub fn terrain_feature_kind_code(kind: crate::geo::TerrainFeatureKind) -> u8 {
     match kind {
-        crate::geo::TerrainFeatureKind::Ridge => 0,
-        crate::geo::TerrainFeatureKind::Saddle => 1,
-        crate::geo::TerrainFeatureKind::Terrace => 2,
-        crate::geo::TerrainFeatureKind::River => 3,
-        crate::geo::TerrainFeatureKind::RiverBank => 4,
-        crate::geo::TerrainFeatureKind::ShallowFord => 5,
-        crate::geo::TerrainFeatureKind::SpringValley => 6,
+        crate::geo::TerrainFeatureKind::River => 0,
+        crate::geo::TerrainFeatureKind::RiverBank => 1,
+        crate::geo::TerrainFeatureKind::ShallowFord => 2,
+        crate::geo::TerrainFeatureKind::SpringValley => 3,
     }
 }
 
 pub fn terrain_feature_kind_table() -> Vec<&'static str> {
     [
-        crate::geo::TerrainFeatureKind::Ridge,
-        crate::geo::TerrainFeatureKind::Saddle,
-        crate::geo::TerrainFeatureKind::Terrace,
         crate::geo::TerrainFeatureKind::River,
         crate::geo::TerrainFeatureKind::RiverBank,
         crate::geo::TerrainFeatureKind::ShallowFord,

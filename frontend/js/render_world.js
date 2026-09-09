@@ -27,7 +27,87 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
     terrainProjY[i] = cy + y2 * scale;
   }
 
-  // 视口裁剪绘制地形四边形
+  // 1. 微缩沙盘地景投影与四周厚度剖面 (Diorama Skirt)
+  const minZ = sim.terrain.minZ != null ? sim.terrain.minZ : 0;
+  const skirtElev = minZ - 16;
+  const dropOffset = 8 * scale;
+  const elevDropFactor = sinX * scale;
+
+  // 1.1 沙盘基底下方的柔和地底投影
+  const idxNW = 0;
+  const idxNE = gSize - 1;
+  const idxSE = totalVertices - 1;
+  const idxSW = (gSize - 1) * gSize;
+  const bNW_Y = terrainProjY[idxNW] + (sim.terrain.cells[idxNW].elev - skirtElev) * elevDropFactor + dropOffset;
+  const bNE_Y = terrainProjY[idxNE] + (sim.terrain.cells[idxNE].elev - skirtElev) * elevDropFactor + dropOffset;
+  const bSE_Y = terrainProjY[idxSE] + (sim.terrain.cells[idxSE].elev - skirtElev) * elevDropFactor + dropOffset;
+  const bSW_Y = terrainProjY[idxSW] + (sim.terrain.cells[idxSW].elev - skirtElev) * elevDropFactor + dropOffset;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+  ctx.beginPath();
+  ctx.moveTo(terrainProjX[idxNW], bNW_Y);
+  ctx.lineTo(terrainProjX[idxNE], bNE_Y);
+  ctx.lineTo(terrainProjX[idxSE], bSE_Y);
+  ctx.lineTo(terrainProjX[idxSW], bSW_Y);
+  ctx.closePath();
+  ctx.fill();
+
+  // 1.2 四周边沿垂直剖面侧壁 (根据太阳方位计算冷暖明暗)
+  // 北侧壁 (受光偏暖)
+  ctx.fillStyle = '#5A5043';
+  ctx.beginPath();
+  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
+  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[gx], terrainProjY[gx]);
+  for (let gx = gSize - 1; gx >= 0; gx--) {
+    ctx.lineTo(terrainProjX[gx], terrainProjY[gx] + (sim.terrain.cells[gx].elev - skirtElev) * elevDropFactor);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 西侧壁 (受光偏暖)
+  ctx.fillStyle = '#50463B';
+  ctx.beginPath();
+  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
+  for (let gy = 1; gy < gSize; gy++) {
+    const idx = gy * gSize;
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
+  }
+  for (let gy = gSize - 1; gy >= 0; gy--) {
+    const idx = gy * gSize;
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 南侧壁 (背阴沉稳)
+  ctx.fillStyle = '#38322B';
+  ctx.beginPath();
+  const rowOffsetS = (gSize - 1) * gSize;
+  ctx.moveTo(terrainProjX[rowOffsetS], terrainProjY[rowOffsetS]);
+  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[rowOffsetS + gx], terrainProjY[rowOffsetS + gx]);
+  for (let gx = gSize - 1; gx >= 0; gx--) {
+    const idx = rowOffsetS + gx;
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 东侧壁 (背阴偏冷)
+  ctx.fillStyle = '#3D362E';
+  ctx.beginPath();
+  ctx.moveTo(terrainProjX[gSize - 1], terrainProjY[gSize - 1]);
+  for (let gy = 1; gy < gSize; gy++) {
+    const idx = gy * gSize + (gSize - 1);
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
+  }
+  for (let gy = gSize - 1; gy >= 0; gy--) {
+    const idx = gy * gSize + (gSize - 1);
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. 视口裁剪绘制地形四边形
   for (let gy = 0; gy < gSize - 1; gy++) {
     const rowOffset0 = gy * gSize;
     const rowOffset1 = (gy + 1) * gSize;
@@ -66,24 +146,26 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 
   drawTerrainFeatures();
 
-  // 批处理绘制地形网格线 (1 次 GPU Stroke 替代原 3481 次独立 Stroke)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
-  ctx.lineWidth = 0.4;
-  ctx.beginPath();
-  for (let gy = 0; gy < gSize; gy++) {
-    const rowOffset = gy * gSize;
-    ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
-    for (let gx = 1; gx < gSize; gx++) {
-      ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
+  // 3. 批处理绘制地形网格线 (仅在 sim.showGrid 为 true 时绘制，默认隐藏以呈现自然地貌，按 'G' 键切换)
+  if (sim.showGrid) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 0.4;
+    ctx.beginPath();
+    for (let gy = 0; gy < gSize; gy++) {
+      const rowOffset = gy * gSize;
+      ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
+      for (let gx = 1; gx < gSize; gx++) {
+        ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
+      }
     }
-  }
-  for (let gx = 0; gx < gSize; gx++) {
-    ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
-    for (let gy = 1; gy < gSize; gy++) {
-      ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
+    for (let gx = 0; gx < gSize; gx++) {
+      ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
+      for (let gy = 1; gy < gSize; gy++) {
+        ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
+      }
     }
+    ctx.stroke();
   }
-  ctx.stroke();
 }
 }
 
@@ -97,58 +179,63 @@ function drawTerrainFeatures() {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     if (feature.kind === 'River') {
-      ctx.strokeStyle = 'rgba(56, 133, 190, 0.72)';
-      ctx.lineWidth = Math.max(10, feature.width * camera.zoom * 0.32);
+      // 1. 底层深潭幽蓝 (基底深度阴影)
+      ctx.strokeStyle = 'rgba(32, 86, 122, 0.45)';
+      ctx.lineWidth = Math.max(12, feature.width * camera.zoom * 0.36);
       ctx.setLineDash([]);
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
+
+      // 2. 主流水体：清透碧蓝山泉流
+      ctx.strokeStyle = 'rgba(56, 158, 202, 0.82)';
+      ctx.lineWidth = Math.max(8, feature.width * camera.zoom * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+
+      // 3. 水面阳光折射波光线 (中心浅蓝白反射细线)
+      ctx.strokeStyle = 'rgba(235, 248, 255, 0.65)';
+      ctx.lineWidth = Math.max(1.2, feature.width * camera.zoom * 0.06);
+      ctx.setLineDash([14 * camera.zoom, 10 * camera.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
     } else if (feature.kind === 'RiverBank') {
-      ctx.strokeStyle = 'rgba(185, 151, 91, 0.42)';
-      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.10);
+      // 湿润河岸：柔和浅金砂漫滩过渡
+      ctx.strokeStyle = 'rgba(188, 160, 120, 0.48)';
+      ctx.lineWidth = Math.max(3, feature.width * camera.zoom * 0.12);
       ctx.setLineDash([]);
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
     } else if (feature.kind === 'ShallowFord') {
-      ctx.strokeStyle = 'rgba(218, 197, 133, 0.95)';
-      ctx.lineWidth = Math.max(5, feature.width * camera.zoom * 0.18);
-      ctx.setLineDash([5 * camera.zoom, 4 * camera.zoom]);
+      // 浅滩涉渡：卵石踏道质感
+      ctx.strokeStyle = 'rgba(215, 196, 142, 0.90)';
+      ctx.lineWidth = Math.max(5, feature.width * camera.zoom * 0.20);
+      ctx.setLineDash([6 * camera.zoom, 4 * camera.zoom]);
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
-    } else if (feature.kind === 'Ridge') {
-      ctx.strokeStyle = 'rgba(91, 75, 52, 0.30)';
-      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.08);
-      ctx.setLineDash([8 * camera.zoom, 9 * camera.zoom]);
+      // 浅水反光微斑
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = Math.max(1.5, feature.width * camera.zoom * 0.08);
+      ctx.setLineDash([2 * camera.zoom, 8 * camera.zoom]);
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
-    } else if (feature.kind === 'Saddle') {
-      const p = points[0];
-      ctx.fillStyle = 'rgba(183, 142, 85, 0.28)';
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(5, feature.width * camera.zoom * 0.10), 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(120, 85, 45, 0.55)';
-      ctx.lineWidth = Math.max(1, camera.zoom * 1.5);
       ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(5, feature.width * camera.zoom * 0.10), 0, Math.PI * 2); ctx.stroke();
-    } else if (feature.kind === 'Terrace') {
-      // ★ 自然平坦高台：柔和的平原微光与淡雅有机台缘等高虚线，告别生硬实线几何正方形
-      ctx.fillStyle = 'rgba(165, 192, 115, 0.07)';
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(132, 112, 65, 0.18)';
-      ctx.lineWidth = Math.max(1, camera.zoom * 0.8);
-      ctx.setLineDash([4 * camera.zoom, 5 * camera.zoom]);
-      ctx.stroke();
     } else {
+      // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
+      // v1.47.7：Ridge/Saddle/Terrace 台地轮廓绘制已随特征整体删除
+      ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
       ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
       ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.06);
       ctx.setLineDash([]);
@@ -161,312 +248,285 @@ function drawTerrainFeatures() {
   }
 }
 
-function drawPois() {
-for (const poi of sim.pois) {
+// ★ v1.47.9 POI 拆为「贴地底座（地面层）」与「标记（立体实体层）」两段：
+// 底座/营地暖光是贴地绘制物，必须先于全部立体实体落笔，否则暖光会糊在近处房屋与族人身上。
+function drawPoiGroundBases() {
+  for (const poi of sim.pois || []) drawPoiGroundBase(poi);
+}
+
+function drawPoiGroundBase(poi) {
+  const z = camera.zoom;
   const p2D = project3D(poi.pos);
-  const isSelectedPoi = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
+  const x = p2D.x, y = p2D.y;
 
   if (poi.type === 'Camp') {
-    const campRadius = (22 + (poi.level || 0) * 4) * camera.zoom;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, campRadius);
-    grad.addColorStop(0, 'rgba(245, 158, 11, 0.9)');
-    grad.addColorStop(0.45, 'rgba(239, 68, 68, 0.5)');
-    grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, campRadius, 0, Math.PI * 2); ctx.fill();
+    const campR = (16 + (poi.level || 0) * 3) * z;
+    // 1. 营地地面阴影
+    ctx.fillStyle = 'rgba(20, 15, 10, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(x + 1.5 * z, y + 3.0 * z, campR * 1.1, campR * 0.55, -0.1, 0, Math.PI * 2);
+    ctx.fill();
 
+    // 2. 营地篝火与暖石基地 (温润暖赭底座，告别刺眼红黄色斑)
+    const grad = ctx.createRadialGradient(x, y, 1, x, y, campR);
+    grad.addColorStop(0, 'rgba(217, 119, 6, 0.75)');
+    grad.addColorStop(0.65, 'rgba(180, 83, 9, 0.35)');
+    grad.addColorStop(1, 'rgba(180, 83, 9, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(x, y, campR, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+
+  // 自然资源与市场 POI (统一温润水墨/沙盘手办基座，彻底消除大光圈污染)
+  const baseR = 12 * z;
+  ctx.fillStyle = 'rgba(20, 15, 10, 0.20)';
+  ctx.beginPath();
+  ctx.ellipse(x + 1.2 * z, y + 2.5 * z, baseR * 1.1, baseR * 0.55, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = poiTintColor(poi);
+  ctx.beginPath(); ctx.arc(x, y, baseR, 0, Math.PI * 2); ctx.fill();
+}
+
+// POI 底色（地面底座与图标共用，避免两段绘制各写一套色值）
+function poiTintColor(poi) {
+  if (poi.type === 'Water') return 'rgba(2, 132, 199, 0.28)';
+  if (poi.type === 'Berry') return 'rgba(21, 128, 61, 0.28)';
+  if (poi.type === 'Wood') return 'rgba(180, 83, 9, 0.28)';
+  if (poi.type === 'Stone') return 'rgba(100, 116, 139, 0.28)';
+  if (poi.type === 'Gold') return 'rgba(217, 119, 6, 0.28)';
+  if (poi.type === 'Market') return 'rgba(217, 119, 6, 0.32)';
+  return 'rgba(2, 132, 199, 0.25)';
+}
+
+// POI 标记（图标 / 门牌 / 储量环 / 选中环）：参与统一深度排序，被近处实体正常遮挡。
+function drawPoiMarker(poi) {
+  const z = camera.zoom;
+  const showDetailRings = z >= 0.70;
+  const p2D = project3D(poi.pos);
+  const isSelected = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
+  const x = p2D.x, y = p2D.y;
+
+  if (poi.type === 'Camp') {
     const campIcon = (poi.level || 0) >= 4 ? '🏛️' : ((poi.level || 0) >= 2 ? '🏘️' : '🏕️');
-    ctx.font = `${Math.floor((15 + (poi.level || 0) * 2) * camera.zoom)}px sans-serif`;
+    ctx.font = `${Math.floor((13 + (poi.level || 0) * 2) * z)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(campIcon, p2D.x, p2D.y + 4);
+    ctx.fillStyle = '#d97706';
+    ctx.fillText(campIcon, x, y + 4 * z);
 
-    // 营地地名与等级徽章标注 (随缩放自适应显示)
-    if (camera.zoom > 0.45) {
-      ctx.font = `bold ${Math.max(9, Math.floor(11 * camera.zoom))}px sans-serif`;
+    if (z > 0.50) {
+      ctx.font = `bold ${Math.max(9, Math.floor(10 * z))}px sans-serif`;
       ctx.fillStyle = '#fef08a';
-      ctx.fillText(poi.campTitle || poi.name, p2D.x, p2D.y - (14 + (poi.level || 0) * 2) * camera.zoom);
+      ctx.fillText(poi.campTitle || poi.name, x, y - (11 + (poi.level || 0) * 2) * z);
       if (poi.boundHouses > 0) {
-        ctx.font = `${Math.max(8, Math.floor(9 * camera.zoom))}px sans-serif`;
-        ctx.fillStyle = '#93c5fd';
-        ctx.fillText(`${poi.boundHouses}舍`, p2D.x, p2D.y + (16 + (poi.level || 0) * 2) * camera.zoom);
+        ctx.font = `${Math.max(8, Math.floor(9 * z))}px sans-serif`;
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(`${poi.boundHouses}舍`, x, y + (14 + (poi.level || 0) * 2) * z);
       }
-    }
-  } else if (poi.type === 'Water') {
-    const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom);
-    grad.addColorStop(0, 'rgba(2, 132, 199, 0.9)');
-    grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.5)');
-    grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('💧', p2D.x, p2D.y + 4);
-
-    if (isFinite(poi.maxStock)) {
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (poi.type === 'Berry') {
-    const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom);
-    grad.addColorStop(0, 'rgba(16, 185, 129, 0.85)');
-    grad.addColorStop(0.6, 'rgba(5, 150, 105, 0.4)');
-    grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('🍒', p2D.x, p2D.y + 4);
-
-    if (isFinite(poi.maxStock)) {
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, 15 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (poi.type === 'Wood') {
-    const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (11 + ratio * 13) * camera.zoom);
-    grad.addColorStop(0, 'rgba(180, 83, 9, 0.90)');
-    grad.addColorStop(0.6, 'rgba(146, 64, 14, 0.45)');
-    grad.addColorStop(1, 'rgba(120, 53, 15, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (11 + ratio * 13) * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(13 * camera.zoom)}px -apple-system, "Segoe UI", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('🌲', p2D.x, p2D.y + 4);
-
-    if (isFinite(poi.maxStock)) {
-      ctx.strokeStyle = '#b45309';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, 15 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (poi.type === 'Stone') {
-    const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom);
-    grad.addColorStop(0, 'rgba(148, 163, 184, 0.85)');
-    grad.addColorStop(0.6, 'rgba(100, 116, 139, 0.4)');
-    grad.addColorStop(1, 'rgba(148, 163, 184, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (10 + ratio * 12) * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(13 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('🪨', p2D.x, p2D.y + 4);
-
-    if (isFinite(poi.maxStock)) {
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, 15 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (poi.type === 'Gold') {
-    const ratio = isFinite(poi.maxStock) ? (poi.currentStock / poi.maxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom);
-    grad.addColorStop(0, 'rgba(251, 191, 36, 0.95)');
-    grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.55)');
-    grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, (12 + ratio * 14) * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('🪙', p2D.x, p2D.y + 4);
-
-    if (isFinite(poi.maxStock)) {
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratio * Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (poi.type === 'Market') {
-    const ratioWater = isFinite(poi.maxStock) && poi.maxStock > 0 ? (poi.currentStock / poi.maxStock) : 1.0;
-    const ratioFood = isFinite(poi.secondaryMaxStock) && poi.secondaryMaxStock > 0 ? (poi.secondaryStock / poi.secondaryMaxStock) : 1.0;
-    const ratioWood = isFinite(poi.tertiaryMaxStock) && poi.tertiaryMaxStock > 0 ? (poi.tertiaryStock / poi.tertiaryMaxStock) : 1.0;
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 22 * camera.zoom);
-    grad.addColorStop(0, 'rgba(245, 158, 11, 0.95)');
-    grad.addColorStop(0.5, 'rgba(217, 119, 6, 0.50)');
-    grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 22 * camera.zoom, 0, Math.PI * 2); ctx.fill();
-
-    ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('🏪', p2D.x, p2D.y + 5);
-
-    // 三库存环：内环水 (天蓝色)，中环粮 (玫瑰红)，外环木 (琥珀棕)
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = '#38bdf8';
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 14 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioWater * Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#f43f5e';
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 17 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioFood * Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#b45309';
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 20 * camera.zoom, -Math.PI/2, -Math.PI/2 + ratioWood * Math.PI * 2);
-    ctx.stroke();
-  }
-
-  if (isSelectedPoi) {
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-    ctx.lineWidth = 4.0 * camera.zoom;
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 22 * camera.zoom, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.8 * camera.zoom;
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 22 * camera.zoom, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-}
-}
-
-function drawHouses() {
-drawSelectedCampHouseLinks();
-for (const house of sim.houses) {
-  const p2D = project3D(house.pos);
-  const isSelectedHouse = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
-  const isWarehouse = house.tier === 'Tier0Warehouse';
-  let tierIcon = '📦';
-  let tierLabel = '仓';
-  if (house.tier === 'Tier1ThatchedHut') { tierIcon = '🛖'; tierLabel = '茅'; }
-  else if (house.tier === 'Tier2LeanTo') { tierIcon = '🏡'; tierLabel = '宅'; }
-  else if (house.tier === 'Tier3Homestead') { tierIcon = '🏯'; tierLabel = '庄'; }
-  else if (house.tier === 'Tier4Manor') { tierIcon = '🏰'; tierLabel = '堡'; }
-
-  if (house.ownerId == null) {
-    const isAuction = house.auctionPhase != null;
-    if (isAuction) {
-      // ★ v1.15.0 独特在售动效：金色脉冲呼吸光晕
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005);
-      const auraR = (16 + 5 * pulse) * camera.zoom;
-      const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, auraR);
-      grad.addColorStop(0, `rgba(245, 158, 11, ${0.4 + 0.25 * pulse})`);
-      grad.addColorStop(0.7, `rgba(217, 119, 6, ${0.15 + 0.15 * pulse})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p2D.x, p2D.y, auraR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 房屋图标
-      ctx.globalAlpha = 0.95;
-      ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
-      ctx.globalAlpha = 1.0;
-
-      // 悬浮拍卖标牌 (Floating Auction Plaque)
-      const phaseColor = (house.auctionPhase === '观察期') ? '#f59e0b' : ((house.auctionPhase === '决策期') ? '#38bdf8' : '#ef4444');
-      const phaseText = house.auctionPhase === '观察期' ? '🌾摸底' : (house.auctionPhase === '决策期' ? '🎯竞价' : '⚠️出清');
-      const priceVal = house.highestBid || 0;
-      const plaqueLabel = priceVal > 0 ? `🔨 ${phaseText} · ${priceVal.toFixed(1)}G` : `🔨 ${phaseText}`;
-
-      ctx.font = 'bold 9px sans-serif';
-      const textW = ctx.measureText(plaqueLabel).width;
-      const badgeW = textW + 10;
-      const badgeH = 15;
-      const badgeX = p2D.x - badgeW / 2;
-      const badgeY = p2D.y - (18 * camera.zoom) - badgeH;
-
-      // 标牌背景与描边
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-      ctx.strokeStyle = phaseColor;
-      ctx.lineWidth = 1.2;
-      if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4);
-        ctx.fill();
-        ctx.stroke();
-      } else {
-        ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
-        ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
-      }
-
-      // 指向屋顶的小三角
-      ctx.fillStyle = phaseColor;
-      ctx.beginPath();
-      ctx.moveTo(p2D.x - 3, badgeY + badgeH);
-      ctx.lineTo(p2D.x + 3, badgeY + badgeH);
-      ctx.lineTo(p2D.x, badgeY + badgeH + 3);
-      ctx.closePath();
-      ctx.fill();
-
-      // 标牌文字
-      ctx.fillStyle = '#f8fafc';
-      ctx.textAlign = 'center';
-      ctx.fillText(plaqueLabel, p2D.x, badgeY + 11);
-
-      // 门牌号与修缮度
-      ctx.font = '8px sans-serif';
-      ctx.fillStyle = phaseColor;
-      ctx.fillText(`#${house.id}在售 (${Math.round(house.durability)}%)`, p2D.x, p2D.y + 16 * camera.zoom);
-    } else {
-      // 常规空置房屋
-      ctx.globalAlpha = 0.55;
-      ctx.font = `${Math.floor(14 * camera.zoom)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
-      ctx.font = '9px sans-serif';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(`#${house.id}空`, p2D.x, p2D.y + 16 * camera.zoom);
-      ctx.globalAlpha = 1.0;
     }
   } else {
-    // 居所光晕与图标
-    const glowColor = isWarehouse ? 'rgba(217, 119, 6, 0.45)' : (house.tier === 'Tier4Manor' ? 'rgba(168, 85, 247, 0.45)' : 'rgba(245, 158, 11, 0.45)');
-    const grad = ctx.createRadialGradient(p2D.x, p2D.y, 2, p2D.x, p2D.y, 18 * camera.zoom);
-    grad.addColorStop(0, glowColor);
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p2D.x, p2D.y, 18 * camera.zoom, 0, Math.PI * 2); ctx.fill();
+    let poiIcon = '💧', borderCol = '#0284c7';
+    const ratio = isFinite(poi.maxStock) && poi.maxStock > 0 ? (poi.currentStock / poi.maxStock) : 1.0;
 
-    ctx.font = `${Math.floor(16 * camera.zoom)}px sans-serif`;
+    if (poi.type === 'Water') { poiIcon = '💧'; borderCol = '#0284c7'; }
+    else if (poi.type === 'Berry') { poiIcon = '🍒'; borderCol = '#15803d'; }
+    else if (poi.type === 'Wood') { poiIcon = '🌲'; borderCol = '#b45309'; }
+    else if (poi.type === 'Stone') { poiIcon = '🪨'; borderCol = '#64748b'; }
+    else if (poi.type === 'Gold') { poiIcon = '🪙'; borderCol = '#d97706'; }
+    else if (poi.type === 'Market') { poiIcon = '🏪'; borderCol = '#d97706'; }
+
+    // 图标
+    ctx.font = `${Math.floor(12 * z)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(tierIcon, p2D.x, p2D.y + 4);
+    ctx.fillStyle = poiTintColor(poi);
+    ctx.fillText(poiIcon, x, y + 4 * z);
 
-    // 门牌与耐久提示（M6：房屋不再显示库存，家庭储备见家户账本）
-    ctx.font = '8px sans-serif';
-    if (house.isRepairing) {
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`🔧修缮(${Math.round(house.durability)}%)`, p2D.x, p2D.y + 16 * camera.zoom);
-    } else {
-      ctx.fillStyle = '#fde68a';
-      ctx.fillText(`#${house.id}${tierLabel}`, p2D.x, p2D.y + 16 * camera.zoom);
+    // 仅在局部放大或选中时才展示细线库存环，全景视口保持整洁
+    if ((showDetailRings || isSelected) && poi.type !== 'Market') {
+      const baseR = 12 * z;
+      ctx.strokeStyle = borderCol;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.arc(x, y, baseR + 2 * z, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2);
+      ctx.stroke();
     }
   }
 
-  if (isSelectedHouse) {
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-    ctx.lineWidth = 4.0 * camera.zoom;
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, 0, Math.PI * 2);
-    ctx.stroke();
+  if (isSelected) {
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.lineWidth = 3.5 * z;
+    ctx.beginPath(); ctx.arc(x, y, 18 * z, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.8 * camera.zoom;
-    ctx.beginPath();
-    ctx.arc(p2D.x, p2D.y, 16 * camera.zoom, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.lineWidth = 1.6 * z;
+    ctx.beginPath(); ctx.arc(x, y, 18 * z, 0, Math.PI * 2); ctx.stroke();
   }
 }
+
+// ==========================================
+// ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 / 私产宅舍 / 部落民）
+// ==========================================
+// Canvas 2D 无深度缓冲：同一 pass 内必须按相机深度升序落笔（远 → 近），近处实体才能压住远处实体。
+// 相机深度 = project3D().depth = ry·sinX + z·cosX，数值越大越靠近视点；每帧重建，相机旋转后不残留旧序。
+// 同深度保持快照原序（Array.sort 稳定），渲染确定性不变。贴地图元（地形/道路/POI 底座）在更早的 pass 绘制。
+const WORLD_ENTITY_POI = 0;
+const WORLD_ENTITY_HOUSE = 1;
+const WORLD_ENTITY_AGENT = 2;
+let _worldDrawList = [];
+
+function drawWorldEntities() {
+  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+  const list = _worldDrawList;
+  list.length = 0;
+
+  const collect = (kind, entity) => {
+    const p = entity.pos;
+    entity._drawDepth = (p.x * sinZ + p.y * cosZ) * sinX + (p.z || 0) * cosX;
+    entity._drawKind = kind;
+    list.push(entity);
+  };
+
+  for (const poi of sim.pois || []) collect(WORLD_ENTITY_POI, poi);
+  for (const house of sim.houses || []) collect(WORLD_ENTITY_HOUSE, house);
+  if (sim.showAgents) {
+    for (const agent of sim.agents || []) {
+      if (agent.isFetus) continue; // ★ M1.7 胎儿无地图实体，不参与渲染
+      collect(WORLD_ENTITY_AGENT, agent);
+    }
+  }
+
+  list.sort((a, b) => a._drawDepth - b._drawDepth);
+
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i];
+    if (e._drawKind === WORLD_ENTITY_POI) drawPoiMarker(e);
+    else if (e._drawKind === WORLD_ENTITY_HOUSE) drawHouse(e);
+    else drawAgent(e);
+  }
+}
+
+function drawHouse(house) {
+  const z = camera.zoom;
+  const showLabels = z > 1.05;
+
+  const p2D = project3D(house.pos);
+  const isSelected = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
+  const isWarehouse = house.tier === 'Tier0Warehouse';
+  const isVacant = house.ownerId == null;
+  const isAuction = isVacant && house.auctionPhase != null;
+  const x = p2D.x, y = p2D.y;
+
+  // 1. 地面柔和接触阴影 (Drop Shadow) - 按 70% 等比微缩
+  const sW = (house.tier === 'Tier4Manor' ? 10 : (house.tier === 'Tier3Homestead' ? 8.5 : 6.5)) * z;
+  const sH = sW * 0.52;
+  ctx.fillStyle = 'rgba(22, 18, 14, 0.26)';
+  ctx.beginPath();
+  ctx.ellipse(x + 1.4 * z, y + 2.1 * z, sW, sH, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. 2.5D 微缩建筑模型体块 (宽高缩小至原来的 70%)
+  const hw = (isWarehouse ? 5.25 : (house.tier === 'Tier4Manor' ? 8.4 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
+  const hh = (isWarehouse ? 4.55 : (house.tier === 'Tier4Manor' ? 9.1 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
+
+  // 墙体配色：空置房为古朴风化灰，有主房为温润奶油白/木质暖色
+  const wallFront = isVacant ? '#d1c7b7' : (isWarehouse ? '#b8966c' : '#ede3d1');
+  const wallSide = isVacant ? '#a89e8f' : (isWarehouse ? '#8c6f4b' : '#c4b8a3');
+
+  // 屋顶配色 (层级分明)
+  let roofFront, roofSide;
+  if (isWarehouse) { roofFront = '#825f38'; roofSide = '#5c4122'; }
+  else if (house.tier === 'Tier1ThatchedHut') { roofFront = '#c9a654'; roofSide = '#9e8038'; } // 茅草顶
+  else if (house.tier === 'Tier2LeanTo') { roofFront = '#bf5737'; roofSide = '#8c3b22'; } // 暖陶瓦红
+  else if (house.tier === 'Tier3Homestead') { roofFront = '#475569'; roofSide = '#334155'; } // 青石黛瓦庄院
+  else { roofFront = '#334155'; roofSide = '#1e293b'; } // 城堡深石板青
+
+  // 墙体受光面 (南/东) 与 背光面 (西)
+  ctx.fillStyle = wallSide;
+  ctx.beginPath();
+  ctx.moveTo(x - hw, y);
+  ctx.lineTo(x, y + hh * 0.4);
+  ctx.lineTo(x, y - hh * 0.5);
+  ctx.lineTo(x - hw, y - hh * 0.9);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = wallFront;
+  ctx.beginPath();
+  ctx.moveTo(x, y + hh * 0.4);
+  ctx.lineTo(x + hw, y);
+  ctx.lineTo(x + hw, y - hh * 0.9);
+  ctx.lineTo(x, y - hh * 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // 门洞微缩细节
+  ctx.fillStyle = '#4a3828';
+  ctx.beginPath();
+  ctx.moveTo(x + hw * 0.2, y + hh * 0.15);
+  ctx.lineTo(x + hw * 0.6, y - hh * 0.05);
+  ctx.lineTo(x + hw * 0.6, y - hh * 0.5);
+  ctx.lineTo(x + hw * 0.2, y - hh * 0.3);
+  ctx.closePath();
+  ctx.fill();
+
+  // 双坡/四阿微缩屋顶 (具有太阳漫反射明暗)
+  ctx.fillStyle = roofSide;
+  ctx.beginPath();
+  ctx.moveTo(x - hw * 1.15, y - hh * 0.85);
+  ctx.lineTo(x, y - hh * 0.45);
+  ctx.lineTo(x, y - hh * 1.35);
+  ctx.lineTo(x - hw * 0.8, y - hh * 1.6);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = roofFront;
+  ctx.beginPath();
+  ctx.moveTo(x, y - hh * 0.45);
+  ctx.lineTo(x + hw * 1.15, y - hh * 0.85);
+  ctx.lineTo(x + hw * 0.8, y - hh * 1.6);
+  ctx.lineTo(x, y - hh * 1.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // 庄院飞檐或城堡塔楼细节
+  if (house.tier === 'Tier3Homestead' || house.tier === 'Tier4Manor') {
+    ctx.strokeStyle = roofSide;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(x - hw * 1.25, y - hh * 0.95);
+    ctx.lineTo(x, y - hh * 0.42);
+    ctx.lineTo(x + hw * 1.25, y - hh * 0.95);
+    ctx.stroke();
+  }
+
+  // 3. 悬浮拍卖标牌或修缮标识 (全景降噪，仅在近景/选中或关键状态展示)
+  if (isAuction) {
+    const plaqueLabel = house.highestBid > 0 ? `🔨 ${house.auctionPhase || '竞价'} · ${house.highestBid.toFixed(0)}G` : `🔨 ${house.auctionPhase || '招租'}`;
+    ctx.font = 'bold 8px sans-serif';
+    ctx.fillStyle = '#f59e0b';
+    ctx.textAlign = 'center';
+    ctx.fillText(plaqueLabel, x, y - hh * 1.7);
+  } else if (house.isRepairing) {
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'center';
+    ctx.fillText(`🔧修缮 (${Math.round(house.durability)}%)`, x, y - hh * 1.6);
+  } else if (showLabels || isSelected) {
+    const tierLabel = isWarehouse ? '仓' : (house.tier === 'Tier1ThatchedHut' ? '茅' : (house.tier === 'Tier2LeanTo' ? '宅' : (house.tier === 'Tier3Homestead' ? '庄' : '堡')));
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = isVacant ? '#94a3b8' : '#e2e8f0';
+    ctx.textAlign = 'center';
+    ctx.fillText(`#${house.id}${tierLabel}`, x, y + hh * 0.8);
+  }
+
+  if (isSelected) {
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+    ctx.lineWidth = 3.5 * z;
+    ctx.beginPath(); ctx.arc(x, y, sW * 1.1, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6 * z;
+    ctx.beginPath(); ctx.arc(x, y, sW * 1.1, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 
 // 选中营地时，用特殊虚线把辖区内的全部房屋连回营地；线段置于房屋图标下方避免遮挡信息。
@@ -542,31 +602,38 @@ if (sim.showLanes) {
 
     const isHovered = hoveredLane && (lane.id === hoveredLane.id || (hoveredLane.reverseId && lane.id === hoveredLane.reverseId));
 
-    const lineWidth = 2.0 * camera.zoom;
+    let lineWidth = 2.0 * camera.zoom;
     let strokeColor, lineDash;
-    if (wear < 1.0) {
-      // 1级 踩踏初现细径 (泥土细道虚线，0.3 ~ 1.0 级平滑淡出)
-      const t = (wear - 0.3) / 0.7;
-      const alpha = Math.min(0.75, 0.20 + t * 0.45);
-      strokeColor = `rgba(180, 83, 9, ${alpha})`;
-      lineDash = [3, 4];
-    } else if (wear < 2.0) {
-      // 2级 夯土小道 (常通行道路，琥珀暖橙)
-      const alpha = Math.min(0.85, 0.45 + (wear - 1.0) * 0.35);
-      strokeColor = `rgba(245, 158, 11, ${alpha})`;
-      lineDash = [];
-    } else if (wear < 3.0) {
-      // 3级 平整硬质石道 (高频主干道，明黄金色)
-      strokeColor = 'rgba(250, 204, 21, 0.95)';
-      lineDash = [];
-    } else if (wear < 4.0) {
-      // 4级 精修石板通衢 (坚固大道，冰蓝青色)
-      strokeColor = 'rgba(56, 189, 248, 0.95)';
-      lineDash = [];
+    if (sim.showRoadHeatmap) {
+      // 道路等级分析热力图模式 (按 R 键切换开启): 高饱和色彩与外圈分析光晕
+      if (wear < 1.0) { strokeColor = `rgba(180, 83, 9, ${Math.min(0.75, 0.20 + (wear - 0.3) * 0.64)})`; lineDash = [3, 4]; }
+      else if (wear < 2.0) { strokeColor = `rgba(245, 158, 11, ${Math.min(0.85, 0.45 + (wear - 1.0) * 0.35)})`; lineDash = []; }
+      else if (wear < 3.0) { strokeColor = 'rgba(250, 204, 21, 0.95)'; lineDash = []; }
+      else if (wear < 4.0) { strokeColor = 'rgba(56, 189, 248, 0.95)'; lineDash = []; }
+      else { strokeColor = 'rgba(217, 70, 239, 1.0)'; lineDash = []; }
     } else {
-      // 5级 极品帝国大道 (最高等级通衢，尊贵紫粉金)
-      strokeColor = 'rgba(217, 70, 239, 1.0)';
-      lineDash = [];
+      // 自然地表踩踏小径模式 (普通观察默认): 低饱和自然泥土、夯土与石板，消除高光割裂
+      if (wear < 1.0) {
+        lineWidth = 1.2 * camera.zoom;
+        strokeColor = `rgba(142, 115, 84, ${Math.min(0.55, 0.12 + (wear - 0.3) * 0.50)})`;
+        lineDash = [3, 4];
+      } else if (wear < 2.0) {
+        lineWidth = 1.6 * camera.zoom;
+        strokeColor = `rgba(122, 98, 72, ${Math.min(0.75, 0.35 + (wear - 1.0) * 0.30)})`;
+        lineDash = [];
+      } else if (wear < 3.0) {
+        lineWidth = 2.0 * camera.zoom;
+        strokeColor = 'rgba(108, 95, 80, 0.85)';
+        lineDash = [];
+      } else if (wear < 4.0) {
+        lineWidth = 2.4 * camera.zoom;
+        strokeColor = 'rgba(132, 128, 120, 0.90)';
+        lineDash = [];
+      } else {
+        lineWidth = 2.8 * camera.zoom;
+        strokeColor = 'rgba(158, 154, 144, 0.95)';
+        lineDash = [];
+      }
     }
 
     // 鼠标悬浮高亮光晕
@@ -584,8 +651,8 @@ if (sim.showLanes) {
       ctx.stroke();
     }
 
-    // 高等级大道外圈微光
-    if (wear >= 4.0) {
+    // 高等级大道外圈微光 (仅在热力图模式下显示，自然模式保持地表克制)
+    if (sim.showRoadHeatmap && wear >= 4.0) {
       ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
       ctx.lineWidth = lineWidth + 3.0 * camera.zoom;
       ctx.beginPath();

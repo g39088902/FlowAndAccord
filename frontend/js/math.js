@@ -46,28 +46,81 @@
     }
 
     function computeElevationColor(cell, minZ, maxZ) {
-      const { elev, dzdx, dzdy } = cell;
+      const { elev, dzdx = 0, dzdy = 0, surfaceKind, naturalFertility = 1.0 } = cell;
       const range = Math.max(1, maxZ - minZ);
       const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
-      const lightFactor = Math.max(0.70, Math.min(1.30, 1.0 + (-dzdx * 0.35 - dzdy * 0.35)));
+
+      // 连续坡度计算 (度数)
+      const gradMag = Math.hypot(dzdx, dzdy);
+      const slopeDeg = Math.atan(gradMag) * (180 / Math.PI);
+
+      // 统一太阳主光源与物理法线漫反射 (Lambertian Diffuse + Ambient)
+      // 光源来自左上方俯视: L = normalize(-0.45, -0.60, 0.66)
+      // 单位法线: N = normalize(-dzdx, -dzdy, 1.0)
+      const normLen = Math.hypot(-dzdx, -dzdy, 1.0) || 1.0;
+      const dot = (0.45 * dzdx + 0.60 * dzdy + 0.66) / normLen;
+      const diffuse = Math.max(0, dot);
+
+      // 地形微环境光遮蔽 (Ambient Occlusion): 陡峭山谷/深沟采光受限，平原开阔通透
+      const ao = Math.max(0.70, 1.0 - (slopeDeg / 65.0) * 0.30);
+      const lightFactor = Math.max(0.52, Math.min(1.22, (0.54 + 0.46 * diffuse) * ao));
 
       let r, g, b;
-      if (normZ < 0.45) {
-        const t = normZ / 0.45;
-        r = Math.floor(16 + t * (40 - 16));
-        g = Math.floor(150 + t * (180 - 150));
-        b = Math.floor(100 + t * (70 - 100));
-      } else if (normZ < 0.75) {
-        const t = (normZ - 0.45) / 0.30;
-        r = Math.floor(40 + t * (190 - 40));
-        g = Math.floor(180 + t * (160 - 180));
-        b = Math.floor(70 + t * (40 - 70));
+
+      // 特殊水体与河岸处理 (P1: 清澈碧蓝山泉与湿润细金沙滩，告别发黑枯水感)
+      if (surfaceKind === 'ShallowWater') {
+        r = 62; g = 152; b = 176;
+      } else if (surfaceKind === 'DeepWater') {
+        r = 36; g = 104; b = 138;
+      } else if (surfaceKind === 'RiverBank') {
+        r = 168; g = 152; b = 126;
       } else {
-        const t = (normZ - 0.75) / 0.25;
-        r = Math.floor(190 + t * (160 - 190));
-        g = Math.floor(160 + t * (165 - 160));
-        b = Math.floor(40 + t * (170 - 40));
+        // 核心大地色系：连续平滑过渡，彻底消除因离散枚举阈值导致的生硬锯齿台阶
+        const fert = Math.max(0, Math.min(1, naturalFertility));
+
+        // 1. 基底草甸色 (随海拔在温润苔绿 -> 阳光灰绿 -> 高山暖草黄之间自然呼吸)
+        let baseR, baseG, baseB;
+        if (normZ < 0.50) {
+          const t = normZ / 0.50;
+          baseR = 108 + t * 24 - fert * 10;
+          baseG = 138 + t * 18 + fert * 14;
+          baseB = 88 + t * 14 - fert * 12;
+        } else {
+          const t = (normZ - 0.50) / 0.50;
+          baseR = 132 + t * 24 - fert * 6;
+          baseG = 156 - t * 8 + fert * 10;
+          baseB = 102 + t * 12 - fert * 8;
+        }
+
+        // 2. 坡度风化与泥石过渡 (Smoothstep 消除生硬断崖)
+        // 12° 以下为平坦草地，12°~28° 逐渐露出温暖土层，28°~45° 逐渐过渡为冷暖岩石
+        if (slopeDeg < 12.0) {
+          r = baseR; g = baseG; b = baseB;
+        } else if (slopeDeg < 28.0) {
+          const t = (slopeDeg - 12.0) / 16.0;
+          const s = t * t * (3.0 - 2.0 * t); // smoothstep
+          const soilR = 152 - fert * 8;
+          const soilG = 138 - fert * 4;
+          const soilB = 114 - fert * 6;
+          r = baseR * (1 - s) + soilR * s;
+          g = baseG * (1 - s) + soilG * s;
+          b = baseB * (1 - s) + soilB * s;
+        } else {
+          const t = Math.min(1.0, (slopeDeg - 28.0) / 18.0);
+          const s = t * t * (3.0 - 2.0 * t);
+          const soilR = 152; const soilG = 138; const soilB = 114;
+          const rockR = 130 + normZ * 15;
+          const rockG = 126 + normZ * 14;
+          const rockB = 118 + normZ * 16;
+          r = soilR * (1 - s) + rockR * s;
+          g = soilG * (1 - s) + rockG * s;
+          b = soilB * (1 - s) + rockB * s;
+        }
       }
 
-      return `rgba(${Math.floor(r * lightFactor)}, ${Math.floor(g * lightFactor)}, ${Math.floor(b * lightFactor)}, 0.55)`;
+      const finalR = Math.min(255, Math.max(0, Math.floor(r * lightFactor)));
+      const finalG = Math.min(255, Math.max(0, Math.floor(g * lightFactor)));
+      const finalB = Math.min(255, Math.max(0, Math.floor(b * lightFactor)));
+
+      return `rgb(${finalR}, ${finalG}, ${finalB})`;
     }

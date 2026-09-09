@@ -4,12 +4,10 @@ use crate::spatial::curve::Curve3D;
 use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// T1 静态地貌特征。只描述几何，不携带资源、税收或行为语义。
+/// 静态地貌特征。只描述几何，不携带资源、税收或行为语义。
+/// v1.47.7：删除 T1 的 Ridge/Saddle/Terrace 三特征（含台地压平），仅保留水系地貌特征。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TerrainFeatureKind {
-    Ridge,
-    Saddle,
-    Terrace,
     River,
     RiverBank,
     ShallowFord,
@@ -19,9 +17,6 @@ pub enum TerrainFeatureKind {
 impl TerrainFeatureKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Ridge => "Ridge",
-            Self::Saddle => "Saddle",
-            Self::Terrace => "Terrace",
             Self::River => "River",
             Self::RiverBank => "RiverBank",
             Self::ShallowFord => "ShallowFord",
@@ -41,7 +36,8 @@ pub struct TerrainFeature {
 }
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 2;
+/// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 3;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -97,7 +93,7 @@ impl TerrainMap {
         self.generate_with_profile(seed, TERRAIN_PROFILE_MOUNTAIN_PASS);
     }
 
-    /// 生成 T0 基础高程与 T1 山脊/山口/台地地貌。
+    /// 生成 T0 基础高程与 T1 山脊/山口连续起伏地貌（v1.47.7 起不再生成台地/高台）。
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
@@ -129,20 +125,6 @@ impl TerrainMap {
         let ridge_amplitude = relief_rng.gen_range(24.0, 34.0);
         let saddle_along = relief_rng.gen_range(-0.12, 0.12) * self.world_size;
         let saddle_width = relief_rng.gen_range(0.10, 0.15) * self.world_size;
-        let terrace_along = relief_rng.gen_range(-0.30, 0.05) * self.world_size;
-        let terrace_across = relief_rng.gen_range(0.20, 0.32) * self.world_size;
-        let terrace_a = self.world_size * 0.14;
-        let terrace_b = self.world_size * 0.11;
-        let terrace_center_wx = terrace_along * theta.cos() - (terrace_across + ridge_offset) * theta.sin();
-        let terrace_center_wy = terrace_along * theta.sin() + (terrace_across + ridge_offset) * theta.cos();
-        let center_proj = (terrace_center_wx * tilt_cos + terrace_center_wy * tilt_sin) / half_size.max(1.0);
-        let center_base_tilt = center_proj * (self.tilt_magnitude * 0.5);
-        let center_wave_large = ((terrace_center_wx * 0.006 + p1_x).sin() * (terrace_center_wy * 0.006 + p1_y).cos()) * 5.0;
-        let center_wave_medium = ((terrace_center_wx * 0.014 + p2_x).cos() + (terrace_center_wy * 0.014 + p2_y).sin()) * 2.5;
-        let center_ridge = ridge_amplitude * (-((terrace_across) / ridge_width.max(1.0)).powi(2)).exp();
-        let center_saddle = (-((terrace_along - saddle_along) / saddle_width.max(1.0)).powi(2)).exp();
-        let center_ambient = center_base_tilt + center_wave_large + center_wave_medium + center_ridge - center_ridge * 0.90 * center_saddle;
-        let plateau_elev = center_ambient + 5.0;
 
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
@@ -167,35 +149,12 @@ impl TerrainMap {
                 let mut elev = base_tilt + wave_large + wave_medium;
 
                 if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
+                    // v1.47.7：删除平顶高台（台地压平）。只保留主脊与山口鞍部的连续起伏地貌。
                     let along = wx * theta.cos() + wy * theta.sin();
                     let across = -wx * theta.sin() + wy * theta.cos() - ridge_offset;
                     let ridge = ridge_amplitude * (-(across / ridge_width.max(1.0)).powi(2)).exp();
                     let saddle = (-((along - saddle_along) / saddle_width.max(1.0)).powi(2)).exp();
-                    let ambient_elev = elev + ridge - ridge * 0.90 * saddle;
-
-                    let du = (along - terrace_along) / terrace_a;
-                    let dv = (across - terrace_across) / terrace_b;
-                    let r_raw = (du * du + dv * dv).sqrt();
-                    if r_raw < 1.25 {
-                        let phi = dv.atan2(du);
-                        let perturb = 1.0 + 0.08 * (3.0 * phi).sin() - 0.05 * (2.0 * phi).cos();
-                        let r = r_raw / perturb;
-                        if r < 1.0 {
-                            // 核心平坦台面 (r <= 0.55): 100% 削平至 plateau_elev，坡度严格消除为 0°
-                            // 台缘过渡陡坡 (0.55 < r < 1.0): smoothstep 平滑过渡回周围自然地貌
-                            let w = if r <= 0.55 {
-                                1.0
-                            } else {
-                                let t = (1.0 - r) / 0.45;
-                                t * t * (3.0 - 2.0 * t)
-                            };
-                            elev = (1.0 - w * 0.85) * ambient_elev + w * 0.85 * (plateau_elev + 0.7 * (du * 2.0).sin());
-                        } else {
-                            elev = ambient_elev;
-                        }
-                    } else {
-                        elev = ambient_elev;
-                    }
+                    elev = elev + ridge - ridge * 0.90 * saddle;
                 }
                 raw[gy * self.grid_width + gx] = elev;
             }
@@ -227,45 +186,6 @@ impl TerrainMap {
                 };
             }
         }
-        if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
-            self.build_t1_features(theta, ridge_offset, saddle_along, terrace_along, terrace_across, terrace_a, terrace_b);
-        }
-    }
-
-    fn build_t1_features(
-        &mut self,
-        theta: f32,
-        ridge_offset: f32,
-        saddle_along: f32,
-        terrace_along: f32,
-        terrace_across: f32,
-        terrace_a: f32,
-        terrace_b: f32,
-    ) {
-        let half = self.world_size / 2.0;
-        let dir = Vec3::new(theta.cos(), theta.sin(), 0.0);
-        let side = Vec3::new(-theta.sin(), theta.cos(), 0.0);
-        let mut ridge_points = Vec::new();
-        for i in 0..=8 {
-            let along = -half * 0.82 + (i as f32 / 8.0) * self.world_size * 0.82;
-            let p = add_vec(scale_vec(dir, along), scale_vec(side, ridge_offset));
-            ridge_points.push(Vec3::new(p.x, p.y, self.sample_elevation(p.x, p.y)));
-        }
-        let saddle_pos = add_vec(scale_vec(dir, saddle_along), scale_vec(side, ridge_offset));
-        let terrace_center = add_vec(scale_vec(dir, terrace_along), scale_vec(side, terrace_across + ridge_offset));
-        let num_rim_points = 24;
-        let mut terrace_points = Vec::with_capacity(num_rim_points);
-        for i in 0..num_rim_points {
-            let phi = i as f32 * std::f32::consts::TAU / num_rim_points as f32;
-            let perturb = 1.0 + 0.08 * (3.0 * phi).sin() - 0.05 * (2.0 * phi).cos();
-            let du = terrace_a * phi.cos() * perturb;
-            let dv = terrace_b * phi.sin() * perturb;
-            let p = add_vec(terrace_center, add_vec(scale_vec(dir, du), scale_vec(side, dv)));
-            terrace_points.push(Vec3::new(p.x, p.y, self.sample_elevation(p.x, p.y)));
-        }
-        self.features.push(TerrainFeature { id: 1, kind: TerrainFeatureKind::Ridge, vertices: ridge_points, elevation: 0.0, width: self.world_size * 0.18, flags: 0 });
-        self.features.push(TerrainFeature { id: 2, kind: TerrainFeatureKind::Saddle, vertices: vec![Vec3::new(saddle_pos.x, saddle_pos.y, self.sample_elevation(saddle_pos.x, saddle_pos.y))], elevation: self.sample_elevation(saddle_pos.x, saddle_pos.y), width: self.world_size * 0.12, flags: 0 });
-        self.features.push(TerrainFeature { id: 3, kind: TerrainFeatureKind::Terrace, vertices: terrace_points, elevation: self.sample_elevation(terrace_center.x, terrace_center.y), width: terrace_a * 2.0, flags: 0 });
     }
 
     #[inline]
@@ -306,14 +226,4 @@ impl TerrainMap {
         super::corridor::validate_curve(self, curve, corridor_width, max_walk_slope, None)
     }
 
-}
-
-#[inline]
-fn scale_vec(v: Vec3, scalar: f32) -> Vec3 {
-    Vec3::new(v.x * scalar, v.y * scalar, v.z * scalar)
-}
-
-#[inline]
-fn add_vec(a: Vec3, b: Vec3) -> Vec3 {
-    Vec3::new(a.x + b.x, a.y + b.y, a.z + b.z)
 }

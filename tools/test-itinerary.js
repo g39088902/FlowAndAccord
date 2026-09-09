@@ -140,7 +140,7 @@ async function run() {
   // ==========================================================================
   console.log('[1/5] 验证多品类短缺下的预排行程链路生成 (Itinerary Chain Planning)...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -177,7 +177,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[2/5] 验证 TSP 最近邻贪心链路排序 (Nearest Neighbor Ordering)...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -188,9 +188,9 @@ async function run() {
     hh.group.ledger.balances = { Water: 250, Food: 0, Wood: 0, Stone: 250, Gold: 150 };
     male.family_stock_active = [false, true, true, false, false];
 
-    // 从 Water 10 处出发 (Berry 199.8m < Wood 313.7m → 应先选 Food)
-    const water10 = save.pois.find(p => p.id === 10);
-    male.world_pos = { x: water10.pos.x, y: water10.pos.y, z: water10.pos.z };
+    // 从 Water 15 处出发 (Berry 81.6m < Wood 163.0m → 应先选 Food)
+    const water15 = save.pois.find(p => p.id === 15);
+    male.world_pos = { x: water15.pos.x, y: water15.pos.y, z: water15.pos.z };
     male.state = 'DrinkingAtWater';
     male.carried_water = CARRY_CAP; // 水已装满，触发 finished → try_continue_harvesting
 
@@ -199,10 +199,10 @@ async function run() {
 
     const snap = reader.getSnapshot();
     const a = snap.agents.find(ag => ag.id === male.id);
-    console.log(`  🍒 从 Water 10 出发: branch = ${a.active_task ? a.active_task.branch : '无'}, state = ${a.state}`);
+    console.log(`  🍒 从 Water 15 出发: branch = ${a.active_task ? a.active_task.branch : '无'}, state = ${a.state}`);
     assert(
       a.state === 'SeekingFood' || (a.active_task && a.active_task.branch === 'b6'),
-      `从 Water 10 出发（Berry 更近）应优先选 b6 备粮: state=${a.state}, branch=${a.active_task ? a.active_task.branch : '无'}`
+      `从 Water 15 出发（Berry 更近）应优先选 b6 备粮: state=${a.state}, branch=${a.active_task ? a.active_task.branch : '无'}`
     );
     console.log('  ✅ [2/5] TSP 最近邻贪心链路排序验证通过');
   }
@@ -212,7 +212,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[3/5] 验证连续采收多站顺路推进 (Multi-stop Continuous Harvest)...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -250,7 +250,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[4/5] 验证异常中断与体力告警清空队列 (Queue Invalidation & Safety Return)...');
   {
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -294,7 +294,7 @@ async function run() {
   console.log('\n[5/5] 验证多随机种子长程确定性矩阵与数值稳定性...');
   const seeds = [101, 202, 303];
   for (const s of seeds) {
-    ex.world_create(60, 764.0, s, 20, 4);
+    ex.world_create(120, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const snap1 = reader.getSnapshot();
@@ -310,7 +310,7 @@ async function run() {
       assert(a.x >= -500 && a.x <= 500 && a.y >= -500 && a.y <= 500, `Seed ${s} Agent ${a.id} 坐标严重越界: (${a.x}, ${a.y})`);
     }
 
-    ex.world_create(60, 764.0, s, 20, 4);
+    ex.world_create(120, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const savePtr2 = ex.world_save_ptr();

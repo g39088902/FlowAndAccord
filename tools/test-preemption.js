@@ -59,7 +59,7 @@ async function run() {
     const cfgPtr = ex.world_config_buf_ptr(cfgBytes.length);
     new Uint8Array(ex.memory.buffer, cfgPtr, cfgBytes.length).set(cfgBytes);
     ex.world_apply_config_buf(cfgBytes.length);
-    ex.world_create(60, 764.0, 42.0, 20, 4);
+    ex.world_create(120, 764.0, 42.0, 20, 4);
   }
 
   const reader = createSnapshotReader(ex);
@@ -251,7 +251,7 @@ async function run() {
   // [测试场景 5] 验证多轮不同种子步进中的抢占零死锁
   console.log('\n[5/5] 验证多种子下抢占机制零死锁与零停滞...');
   for (const seed of [101, 202, 303]) {
-    ex.world_create(60, 764.0, seed, 20, 4);
+    ex.world_create(120, 764.0, seed, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1200; i++) {
       ex.world_tick(1.0 / 60.0);

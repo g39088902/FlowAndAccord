@@ -11,12 +11,12 @@
 ## 核心机制
 
 ### 连续 3D 地形与 T0/T1 静态地貌
-- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认 profile 为 `mountain_pass_v1`。
+- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 `mountain_pass_v1` 与 `river_valley_v1` 间随机轮换。
 - `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面，水体相关枚举为 T2 预留。
-- T1 profile 由局部 RNG 派生主脊、山口鞍部和台地；生成后输出稳定的 `Ridge`、`Saddle`、`Terrace` 地貌特征折线，前端只消费这些内核事实进行绘制。
+- T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
 - `TerrainMap::validate_curve` 对贝塞尔路线进行按长度自适应采样并检查走廊两侧地表；当前已提供 T0 校验原语，后续路网生成器接入后再替换现有全图直线铺路。
-- 地形生成器版本为 `1`，profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
+- 地形生成器版本为 `3`（v1.47.7，删除台地压平后递增），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
 
 ### 贝塞尔曲线 3D 路网 (`LaneGraph3D`)
 - 节点与双向三次贝塞尔曲线车道构成拓扑网络，曲线定义见 `curve.rs`。
@@ -45,7 +45,7 @@
 ### 地形与房屋选址接口
 - 房屋候选和最终实体化均使用 `validate_footprint`，完整占地由 `terrainFootprintHalfExtent`、`terrainMaxBuildSlope` 控制；不再只凭中心点高度判断地块合法。
 - 查询失败使用稳定原因：越界、深水、陡壁、地表禁用或完整占地坡度过大。没有合法地块时交由 Agent 正常重选，不由地形系统强制搬迁。
-- T1 尚未提供河流/浅滩和动态通行；`ShallowWater`、`DeepWater` 等枚举及水体 ID 仅作为 T2 扩展契约。
+- T1 山口 profile 只提供连续起伏地貌与选址/路网约束，不生成河流/浅滩特征（属 T2 河谷）；动态通行仍待后续扩展。
 
 ## 关键不变量
 - 路网节点从不删除；房屋坍塌后，其大门节点可被新立宅复用（`house_node_reuse_radius`）。

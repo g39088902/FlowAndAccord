@@ -27,7 +27,7 @@
 | **docs/04-cicd-guide.md** | CI/CD 部署指南：GitHub Actions 流水线、4 个 Secrets、COS MIME 排障 | 调整部署流程或排查部署失败时 |
 | **docs/05-headless-diagnostics-guide.md** | 确定性无头诊断指南：`tools/diagnose.js` 命令行用法、八大嗅探规则、Agent 五步排障 SOP | 需要使用指定 Seed/Tick 诊断 Bug 与回归验证时 |
 | **docs/15-profiling-and-benchmarking-guide.md** | 性能 Profiling 基准与确定性矩阵操作指南：`tools/profile-benchmark.js` 与 `tools/test-determinism.js` | 进行性能优化、寻路改进、多线程改造前建立基准与回归时 |
-| **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 23 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
+| **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 24 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
 | **docs/archive/12-plan-ledger-refactor.md** | 已完成的账本与仓库重构计划 | 仅追溯里程碑；改动账本以 `docs/current/12-ledger-system.md` 和局部 AGENTS 为准 |
 | **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（仅保留未完成计划：M5-1 消除超线性 / M5-2 条件触发的多线程 Fork-Join） | 性能优化专项规划 |
@@ -65,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.47.5)"]
+    F --> G["浏览器 UI (版本: v1.47.9)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -115,7 +115,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.47.5`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.47.9`**。
 
 ---
 

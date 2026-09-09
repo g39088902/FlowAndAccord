@@ -32,7 +32,7 @@ fn clear_error() {
     }
 }
 
-/// 创建世界并注入初始生态 (grid_res=60, world_size=764, seed 可复现，agent_count=20)
+/// 创建世界并注入初始生态 (grid_res=120, world_size=764, seed 可复现，agent_count=20)
 /// 优先使用前端通过 world_apply_config_buf / world_set_config 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 #[no_mangle]

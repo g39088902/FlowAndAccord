@@ -59,7 +59,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.47.5';
+  return '1.47.9';
 }
 
 function applyConfigInternal(configObj) {
@@ -393,7 +393,7 @@ self.onmessage = async function(e) {
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
-        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         applyInitialRegenMultipliers(msg.regenMultipliers);
         _ready = true;
         historyCheckpoints = [];
@@ -489,7 +489,7 @@ self.onmessage = async function(e) {
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
-        _wasm.world_create(60, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         applyInitialRegenMultipliers(msg.regenMultipliers);
         historyCheckpoints = [];
         historyCommands = [];

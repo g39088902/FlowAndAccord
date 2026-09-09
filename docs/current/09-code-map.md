@@ -142,6 +142,7 @@ FlowAndAccord/
 │   ├── rust-download.js                    # Rust 工具链下载器 (Node OpenSSL TLS 绕过系统证书异常)
 │   ├── snapshot-check.js                   # ★ 快照同步静态校验 (snapshot.rs定义 vs world_snapshot.rs赋值 vs rustworld.js映射)
 │   ├── snapshot-reader.js                  # ★ T1(v1.46.0) FABS 统一快照读取器：tools/ 全部工具唯一取值入口（FABS 优先、JSON 仅调试回退）
+│   ├── test-dag.js                         # 族谱上下 5 代范围截断与布局确定性自动化测试套件
 │   ├── test-determinism.js                 # 增强型确定性矩阵测试套件 (6 大数学不变量定理验证)
 │   ├── test-itinerary.js                   # ★ M19.4d 多品类预排采收行程验证 (链路/TSP 排序/多站推进/长程确定性)
 │   ├── test-m19-differential.js            # ★ M19 差分回归 (3600 tick 存档与快照哈希逐字节一致性)

@@ -170,23 +170,21 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   }
 }
 
-w = window.innerWidth;
-h = window.innerHeight;
-ctx.clearRect(0, 0, w, h);
+  w = window.innerWidth;
+  h = window.innerHeight;
+  ctx.clearRect(0, 0, w, h);
   // 1. 3D 地形网格渲染
   drawTerrain();
 
-  // 2. 原始生态 POI 渲染
-  drawPois();
-
-  // 2.5 自建私产宅舍渲染
-  drawHouses();
-
-  // 3. 动态踩踏道路网络渲染
+  // 2. 动态踩踏道路网络渲染（贴地表面先画，避免遮挡建筑）
   drawLanes();
 
-  // 4. 部落民 Agent 渲染
-  drawAgents();
+  // 3. 贴地图元补充层：选中营地的辖区连线 + POI 底座/营地暖光（必须在立体实体之前落笔）
+  drawSelectedCampHouseLinks();
+  drawPoiGroundBases();
+
+  // 4. ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 + 私产宅舍 + 部落民，远 → 近依次落笔）
+  drawWorldEntities();
 
   // ★ M4: 登基礼花特效
   drawCoronationEffects(now);
