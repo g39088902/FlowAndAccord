@@ -36,7 +36,7 @@
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
 | `world.rs` | ~170 | World3DEngine 结构体定义 + 构造函数 + agent_index 工具 + 节点查找。**业务逻辑已拆分到同目录 4 个子文件**（v1.7.1） | 具体业务逻辑（委托给 world_tick/world_snapshot/world_config/world_season） |
-| `world_tick.rs` | ~275 | tick() 管线调度（§4.3 固定顺序）+ settle_gold_inheritance + tick_fetus_reconcile | 具体子系统 tick（委托给 ecology/housing_system/decisions/bookkeeping/ledger） |
+| `world_tick.rs` | ~275 | tick() 管线调度（§4.3 固定顺序）+ settle_death_cargo（★ v1.47.0 逝者随身遗物归户）+ tick_fetus_reconcile | 具体子系统 tick（委托给 ecology/housing_system/decisions/bookkeeping/ledger） |
 | `world_snapshot.rs` | ~415 | generate_snapshot() 快照生成（地形/POI/房屋/路网/agent/家户/婚姻/宗族/地区） | 快照结构体定义（在 snapshot.rs）、前端映射（在 rustworld.js） |
 | `world_config.rs` | ~50 | 配置注入与反序列化（apply_config_json / apply_config / set_regen_multiplier） | 配置结构体定义（在 config.rs） |
 | `world_season.rs` | ~40 | 四季更迭与宏观环境温度演化（正弦周期拟合） | tick 调度（在 world_tick.rs） |
@@ -67,7 +67,7 @@
 1. POI 自然恢复 (for poi in pois)           按类型应用产速倍率
 2. 代谢与繁衍 (for agent in agents)          agent.tick_metabolism (胎儿跳过)
    2.3 tick_fetus_reconcile()                受孕建胎儿/流产移除/位置跟随
-   2.5 settle_gold_inheritance()              死者金币平分给在世子一代
+   2.5 settle_death_cargo()                   ★ v1.47.0 逝者随身五类物资瞬移归入其家户账本（无家户→公仓）
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减

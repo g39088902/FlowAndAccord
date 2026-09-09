@@ -66,6 +66,15 @@ impl<'a> Decisioner<'a> {
         ledger_balance_of(self.households, agent, kind)
     }
 
+    /// ★ v1.47.0 能否在宅解决该品类饮食：有实体住宅且家户账本余额 ≥ `decision_home_meal_min_stock`。
+    ///
+    /// 供衰弱族人（健康值 < `agent_frail_health_threshold`）的饮食派发使用：
+    /// 满足则返家由 `ecology/home.rs::rest_at_camp` 从家户账本吃喝，不再外出就源。
+    pub fn can_home_meal(&self, agent: &Agent3D, kind: ResourceKind) -> bool {
+        agent.home_house_id.is_some()
+            && self.ledger_balance(agent, kind) >= self.config.decision_home_meal_min_stock
+    }
+
     /// ★ M7 每拍刷新五类家庭库存施密特触发器（输入 = 家户账本余额；滞回，不耗 RNG）。
     /// 在 `decide()` 开头统一调用一次，保证本拍内各分支读取到一致状态。
     pub fn refresh_family_stock(&mut self, agent: &mut Agent3D) {
@@ -473,6 +482,18 @@ impl<'a> Decisioner<'a> {
         }
         if need.kind == NeedKind::Rest {
             return;
+        }
+
+        // ★ v1.47.0 衰弱（风烛残年）族人饮食优先在家解决：
+        // 家户账本该品类余额充足则返家，由 `rest_at_camp` 从家户账本吃喝；不足才按原逻辑外出就源。
+        if is_frail(agent, self.config) {
+            if let Some(rk) = meal_resource(need.kind) {
+                if self.can_home_meal(agent, rk) {
+                    agent.current_need = Some("Physiological·HomeMeal".to_string());
+                    self.return_home(agent);
+                    return;
+                }
+            }
         }
 
         let home_house = agent

@@ -198,6 +198,26 @@ pub fn ledger_balance_of(
         .unwrap_or(0.0)
 }
 
+/// ★ v1.47.0 衰弱（风烛残年）判定：健康值低于 `agent_frail_health_threshold` 即视为濒死。
+///
+/// 衰弱族人行为约束：
+/// - 不再响应储备类需求（b5 储水 / b6 储粮 / b7 储木 / b9 储石 / b10 储金）；
+/// - 饮食优先返家从家户账本解决（家户余额充足时不再外出就源）。
+#[inline]
+pub fn is_frail(agent: &Agent3D, config: &SimConfig) -> bool {
+    agent.health < config.agent_frail_health_threshold
+}
+
+/// ★ v1.47.0 饮食需求 → 对应资源品类（衰弱者在宅进食判定使用）
+#[inline]
+pub fn meal_resource(kind: NeedKind) -> Option<ResourceKind> {
+    match kind {
+        NeedKind::QuenchThirst => Some(ResourceKind::Water),
+        NeedKind::SateHunger => Some(ResourceKind::Food),
+        _ => None,
+    }
+}
+
 // ════════════════════════════════════════════════════════════════
 // ★ M7 家庭库存施密特触发器（与房屋等级彻底脱钩）
 // ════════════════════════════════════════════════════════════════

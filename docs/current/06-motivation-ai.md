@@ -63,6 +63,21 @@ M19 架构实现了意图仲裁 (L1)、策略规划 (L2) 与原语执行 (L3) �
 **原则 4：执行中生理熔断**
 - 外出任何高层任务途中，饥渴 < 25.0 或体力 < 50.0 时立即中断并降级折返。
 
+**原则 5：★ v1.47.0 / v1.47.1 衰弱（风烛残年）行为约束**
+- 健康值 `health` 随 `agentHealthDecayPerSec` 单调递减且**永不回复**，归零即寿终正寝；
+  `health < agentFrailHealthThreshold`（默认 **2.0**）进入「衰弱」状态（默认配置下约为生命最后 200 模拟秒）。
+- **不再响应储备需求**：`b5 储水 / b6 储粮 / b7 储木 / b9 储石 / b10 储金 / b13 积累财富` 六条分支对衰弱者一律不触发
+  （★ v1.47.1 起 b13 淘金也纳入守卫）；
+  多品类预排行程（`plan_harvest_itinerary`）因此自动为空，在手任务收尾后即返家，不再为家户囤货。
+  （`b4 修缮`、`b8 改善住宅` 等不属于储备需求，不受此约束。）
+- **饮食优先在家解决**：衰弱者产生饮水/进食需求时，若拥有私宅且家户账本该品类余额
+  ≥ `decisionHomeMealMinStock`（默认 **1.0**），则显示 `Physiological·HomeMeal` 并返家，
+  由在宅进食链路（`ecology/home.rs::rest_at_camp`）从家户账本取用；余额不足才按原逻辑外出就源。
+  抢占链路（`preemption.rs::preempt_critical_survival`）对在途衰弱者同样优先掉头返家，绝不瞬移。
+- ★ v1.47.1 触发缺口修复：`B1QuenchThirst` / `B2SateHunger` 分支条件对衰弱者追加
+  `is_frail && can_home_meal` 或条件——野外断流且市场不可购时，「家户账本余额充足」本身即成为
+  需求命中依据（原实现 B1/B2 因 `can_procure_resource` 前置不命中，衰弱者即使家户有余粮也不会被派发返家）。
+
 ### 行动状态机总图（`PrimitiveActionState` · 20 态）
 
 > 状态集权威定义在 `agent.rs::PrimitiveActionState`（共 20 态）；转移由 `evaluate.rs::decide` 按状态分发、`agent.rs::advance_to_next_lane` 在路线走完时自动切换、世界执行器（scheduler / housing_system）完成登基/成婚/升级等物理结算。移动唯一由 `current_lane_id.is_some()` 驱动，移动态→静止态必须走 `enter_stationary_state()`（根 AGENTS.md §4.16）。

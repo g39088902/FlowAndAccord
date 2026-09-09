@@ -301,6 +301,18 @@ impl<'a> Decisioner<'a> {
             kind,
             target_state,
         };
+        // ★ v1.47.0 衰弱（风烛残年）族人临界饥渴优先返家解决：
+        // 家户账本该品类余额充足则平滑掉头返家吃喝，不再前往野外水源/果丛。
+        if is_frail(agent, self.config) {
+            if let Some(rk) = meal_resource(kind) {
+                if self.can_home_meal(agent, rk) {
+                    transition::preempt_task(agent);
+                    agent.current_need = Some("Physiological·HomeMeal".to_string());
+                    self.return_home(agent);
+                    return;
+                }
+            }
+        }
         if self.has_available_node(agent, pool) {
             self.dispatch_preempted_task(agent, branch, need);
         } else if !self.try_route_to_market(agent, pool) {

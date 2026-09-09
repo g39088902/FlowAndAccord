@@ -111,7 +111,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 1. POI 自然恢复 (for poi in pois)           按类型应用产速倍率
 2. 代谢与繁衍 (for agent in agents)          agent.tick_metabolism (胎儿跳过)
    2.3 tick_fetus_reconcile()                受孕建胎儿/流产移除/位置跟随
-   2.5 settle_gold_inheritance()              死者金币平分给在世子一代
+   2.5 settle_death_cargo()                  ★ v1.47.0 逝者随身五类物资归入其家户账本（无家户→公仓）
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
@@ -134,7 +134,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 ## 三、数据流向图（Rust → 前端）
 
 ```
-SimConfig (config.rs + config.house-upgrade-cost.js，共 219 字段)
+SimConfig (config.rs + config.house-upgrade-cost.js，共 221 字段)
     │  序列化
     ▼
 sim_wasm.wasm (world_create / world_tick / world_apply_config)
@@ -162,7 +162,7 @@ rustworld.js::_applySnapshot()
 
 ```
 1. math.js                    3D 向量与投影变换 (零依赖)
-2. config.js                  SIM_CONFIG 全局数值配置 (219 字段，含拆分配置合计，主镜像)
+2. config.js                  SIM_CONFIG 全局数值配置 (221 字段，含拆分配置合计，主镜像)
 3. config.decision-order.js   决策分支顺序 (合并进 SIM_CONFIG，§4.14 例外)
 4. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段)
 5. decision-viz-data.js       决策分支元数据 (条件文案/层级/图标)

@@ -51,6 +51,7 @@
     GoldWealth: '积累财富', RepairHouse: '修缮住宅', BuildHouse: '改善住宅',
     FoundHome: '建立家宅', Courtship: '求偶成家', SeekThrone: '争取王位',
     MarketTrade: '采购物资', BidHouse: '竞购住宅', RaiseChild: '生育后代',
+    HomeMeal: '在宅进食',
     Detour: '越野寻路'
   };
 

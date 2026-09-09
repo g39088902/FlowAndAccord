@@ -51,7 +51,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 ## 4. 🧱 关键类型不变量
 
 - **`WorldRng`**：xorshift64*，状态仅一个 u64。seed 0 被静默替换为黄金比例常数；`gen_normal`（Box-Muller）恰好消耗 2 个均匀数；`gen_range_usize` 在 `high <= low` 时返回 `low`（不 panic）。
-- **`SimConfig`**：219 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
+- **`SimConfig`**：221 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
 - **`TerrainMap`**：`sample_elevation` 为最近邻采样（无插值），归一化坐标 clamp 到 [0.0, 0.999]。
 - **`World3DEngine`**：世界总管理器，一切世界级系统方法以 `impl World3DEngine` 分散挂载。
 - **`Agent3D`**：部落民实体（生理/行囊/血缘/禀赋/`poi_seekability` 私有触发器表）。
@@ -63,7 +63,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 
 ### 5.1 tick 全序的子步骤细节
 
-根 AGENTS.md §4.3 给出了大顺序。本 crate 内需注意：金币遗产继承（`settle_gold_inheritance`）在代谢/繁衍之后、POI 交互之前执行；POI 交互中的分娩委托会 push 新 agent，**push 后必须 `rebuild_agent_index()`**。
+根 AGENTS.md §4.3 给出了大顺序。本 crate 内需注意：逝者随身遗物归集（`settle_death_cargo`，★ v1.47.0 取代原 `settle_gold_inheritance`）在代谢/繁衍之后、POI 交互之前执行，随后在 `tick_housing` 内再执行一次以覆盖本阶段过世者（如冬季冻毙）；POI 交互中的分娩委托会 push 新 agent，**push 后必须 `rebuild_agent_index()`**。
 
 ### 5.2 RNG 消费者的确定性分布
 

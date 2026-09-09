@@ -31,6 +31,9 @@ pub struct SimConfig {
     pub agent_initial_stamina: f32,
     pub agent_base_metabolism_decay: f32,
     pub agent_health_decay_per_sec: f32,
+    /// ★ v1.47.0 衰弱（风烛残年）健康阈值：健康值 < 此值即视为濒死——
+    /// 不再响应储备类需求（b5/b6/b7/b9/b10），饮食优先返家从家户账本解决。
+    pub agent_frail_health_threshold: f32,
     pub agent_pregnant_metabolism_mult: f32,
     pub agent_work_metabolism_mult: f32,
     pub agent_death_decay_duration: f32,
@@ -122,6 +125,9 @@ pub struct SimConfig {
     pub decision_poi_abandon_stock_ratio: f32,
     pub decision_critical_thirst: f32,
     pub decision_critical_hunger: f32,
+    /// ★ v1.47.0 衰弱族人「在家解决饮食」的家户账本余额门槛：
+    /// 家户该品类余额 ≥ 此值才派发返家吃喝，余额不足仍按原逻辑外出就源。
+    pub decision_home_meal_min_stock: f32,
     pub decision_rest_stamina_target: f32,
     pub decision_stock_gold_cooldown: f32,
     pub decision_gold_wealth_cooldown: f32,

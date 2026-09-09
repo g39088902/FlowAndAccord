@@ -29,8 +29,8 @@ impl World3DEngine {
         //    ★ v1.26.0 挂牌瞬间清空居住者 + 新建携带空报价队列的拍卖会话（见 inheritance.rs）
         self.tick_vacant_house_tracking();
 
-        // 8. 金币遗产继承机制 (死者金币平分给在世子一代子女)
-        self.settle_gold_inheritance();
+        // 8. ★ v1.47.0 逝者随身遗物归集 (本阶段过世者，如冬季冻毙，其随身物资同拍归入家户)
+        self.settle_death_cargo();
 
         // 9. 统计各营地绑定的有效房屋数量并执行行政区阶梯升级
         self.tick_camp_administrative_upgrades();

@@ -17,12 +17,12 @@
 | `construction.rs` | 施工计时与瞬时升级（★M6 一次性从户主家户账本扣除建材，瞬时晋升） |
 | `marriage.rs` | 丧偶解除婚姻（成婚已迁移至马斯洛决策引擎 B16Courtship 与 execute_pending_courtships 物理执行器） |
 | `settlement.rs` | `materialize_founded_houses`（立宅实体化：空置节点复用 → 放置校验 → 建门接入 → 营地绑定）+ 空置节点检索 + 营地行政区阶梯升级 |
-| `inheritance.rs` | 空置房登记（户主亡故→无主空置→★挂牌瞬间清空居住者→新建携带空报价队列的拍卖会话→营地 vacant_houses 列表+受益人），取代原父系继承；金币继承在 `world.rs::settle_gold_inheritance` |
+| `inheritance.rs` | 空置房登记（户主亡故→无主空置→★挂牌瞬间清空居住者→新建携带空报价队列的拍卖会话→营地 vacant_houses 列表+受益人），取代原父系继承；逝者随身物资归户在 `world_tick.rs::settle_death_cargo`（★ v1.47.0） |
 | `auction.rs` | ★ v1.26.0 决策相位出价执行器 `execute_pending_bids`、麦穗 37% 竞价、份额制分账（王国公户+受益人）与成交交割；★ v1.27.0 世界级统计（挂牌/成交计 `auction_started` / `auction_sold`）；★ v1.30.0 决策期标杆衰减 `tick_auction_benchmark_decay` |
 
 ## 3. ⚙️ tick_housing 内部顺序（勿打乱）
 
-`world.tick()` 中"房屋系统"环节调用本管线，顺序固定：冬季供暖 → 折旧坍塌 → 丧偶解婚 → 修缮结算 → 施工计时与竣工 → 空置房登记（户主亡故→无主→清空居住者→营地列表）→ 金币遗产继承（`world.rs`）→ 营地行政区升级。
+`world.tick()` 中"房屋系统"环节调用本管线，顺序固定：冬季供暖 → 折旧坍塌 → 丧偶解婚 → 修缮结算 → 施工计时与竣工 → 空置房登记（户主亡故→无主→清空居住者→营地列表）→ 逝者随身遗物归户（`settle_death_cargo`，★ v1.47.0）→ 营地行政区升级。
 
 > ★ v1.26.0 起「竞价」已不在本管线：出价下沉到决策引擎 `B17BidHouse` 分支，成交由 `decisions/scheduler.rs` 末尾的世界物理执行器 `execute_pending_bids`（`auction.rs`）落地，发生在 `tick_decisions`（步骤 6）而非房屋系统（步骤 4）。
 

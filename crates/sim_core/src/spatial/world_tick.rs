@@ -1,5 +1,6 @@
 use super::agent::{Agent3D, AgentId, Gender};
 use super::graph::NodeId;
+use super::ledger::journal::{LedgerRef, ResourceKind, TransferReason, TransferRecord};
 use super::poi::PoiType;
 use super::snapshot::RecentDeathSnapshot;
 use super::vec3::Vec3;
@@ -9,12 +10,43 @@ use std::collections::{BTreeSet, HashMap};
 /// 死亡/流产墓碑滑动窗口（tick）：覆盖前端最高倍速(1024x)单帧推进与任意渲染间隙
 const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
 
+/// ★ v1.47.0 逝者随身遗物归集的固定品类顺序（保证遍历与流水写入确定性）
+const DEATH_CARGO_ORDER: [ResourceKind; 5] = [
+    ResourceKind::Water,
+    ResourceKind::Food,
+    ResourceKind::Wood,
+    ResourceKind::Stone,
+    ResourceKind::Gold,
+];
+
+/// ★ v1.47.0 读取 agent 随身某品类数量（遗物归集使用）
+#[inline]
+fn death_cargo_amount(agent: &Agent3D, kind: ResourceKind) -> f32 {
+    match kind {
+        ResourceKind::Water => agent.carried_water,
+        ResourceKind::Food => agent.carried_food,
+        ResourceKind::Wood => agent.carried_wood,
+        ResourceKind::Stone => agent.carried_stone,
+        ResourceKind::Gold => agent.carried_gold,
+    }
+}
+
+/// ★ v1.47.0 清空 agent 随身全部物资（遗物归集后不再背包残留）
+#[inline]
+fn clear_death_cargo(agent: &mut Agent3D) {
+    agent.carried_water = 0.0;
+    agent.carried_food = 0.0;
+    agent.carried_wood = 0.0;
+    agent.carried_stone = 0.0;
+    agent.carried_gold = 0.0;
+}
+
 /// Tick 管线调度
 ///
 /// `tick()` 内部顺序是本项目核心不变量之一（根 AGENTS.md §4.3），
 /// 调整顺序会破坏确定性或行为语义。各子步骤委托给对应模块：
 /// - 步骤 0: `world_season.rs::tick_season`
-/// - 步骤 2.3/2.5: 本文件 `tick_fetus_reconcile` / `settle_gold_inheritance`
+/// - 步骤 2.3/2.5: 本文件 `tick_fetus_reconcile` / `settle_death_cargo`
 /// - 步骤 3: `ecology/tick.rs::tick_poi_interactions`
 /// - 步骤 4: `housing_system/mod.rs::tick_housing`
 /// - 步骤 6 决策: `decisions/scheduler.rs::tick_decisions`
@@ -163,8 +195,8 @@ impl World3DEngine {
         // 2.3 受孕即建胎儿 agent（流产/母亡则移除，并同步胎儿位置跟随母亲）
         self.tick_fetus_reconcile();
 
-        // 2.5 金币遗产继承结算 (死者金币平分给在世子一代子女)
-        self.settle_gold_inheritance();
+        // 2.5 ★ v1.47.0 逝者随身遗物归集 (全部物资瞬移入家户账本，参与后续遗产分配)
+        self.settle_death_cargo();
     }
 
     /// 子阶段 2: POI 实际采收提取、分娩与死亡尸骸消逝
@@ -290,70 +322,102 @@ impl World3DEngine {
         self.next_agent_id = next_id;
     }
 
-    /// 结算已故族人的金币遗产：某人死后随身金币平分给在世妻子（如有）与在世子一代
-    pub fn settle_gold_inheritance(&mut self) {
-        loop {
-            let deceased_info = self
-                .agents
-                .iter_mut()
-                .find(|a| !a.is_alive && a.carried_gold > 0.0001)
-                .map(|a| {
-                    let gold = a.carried_gold;
-                    a.carried_gold = 0.0;
-                    (a.id, gold)
-                });
+    /// ★ v1.47.0 逝者随身遗物归集（「瞬移入家户」）
+    ///
+    /// 族人死亡的同一拍，其随身全部资源（水 / 粮 / 木 / 石 / 金）立即转入**其所属家户账本**，
+    /// 与家户既有余额合并后一并参与随后的继承分配（见 `bookkeeping::tick_inheritance`）；
+    /// 无家户归属者（无房未婚女性、无户流浪者等）转入**公仓**兜底。
+    ///
+    /// 取代旧的 `settle_gold_inheritance`（仅金币 → 继承人背包）：随身物资先归家户再分配，
+    /// 语义与 M6「家户账本 = 家庭物资唯一真相源」一致，且水粮木石亦能真正进入继承链条。
+    ///
+    /// 确定性约定：按 `agents` 数组顺序遍历、品类按 `DEATH_CARGO_ORDER` 固定顺序，
+    /// 不消耗 RNG；清零与入账分离为 READ / WRITE 两段，避免遍历期间重复借用。
+    pub fn settle_death_cargo(&mut self) {
+        let tick = self.tick_counter;
 
-            match deceased_info {
-                Some((deceased_id, gold)) => {
-                    let mut heirs: Vec<AgentId> = Vec::new();
+        // ── READ 阶段：按数组顺序收集逝者随身物资并立即清零（保证只结算一次）──
+        let mut pending: Vec<(AgentId, Vec<(ResourceKind, f32)>)> = Vec::new();
+        for agent in self.agents.iter_mut() {
+            if agent.is_alive {
+                continue;
+            }
+            let cargo: Vec<(ResourceKind, f32)> = DEATH_CARGO_ORDER
+                .iter()
+                .map(|&rk| (rk, death_cargo_amount(agent, rk)))
+                .filter(|(_, amt)| *amt > 0.001)
+                .collect();
+            if cargo.is_empty() {
+                continue;
+            }
+            clear_death_cargo(agent);
+            pending.push((agent.id, cargo));
+        }
+        if pending.is_empty() {
+            return;
+        }
 
-                    // 1. 妻子（若在世）
-                    if let Some(mids) = self.marriage_registry.by_agent.get(&deceased_id) {
-                        if let Some(&mid) = mids.last() {
-                            if let Some(m) = self.marriage_registry.get(mid) {
-                                if m.husband_id == deceased_id {
-                                    let wife_alive = self
-                                        .agent_index
-                                        .get(&m.wife_id)
-                                        .and_then(|idx| self.agents.get(*idx))
-                                        .map(|a| a.is_alive)
-                                        .unwrap_or(false);
-                                    if wife_alive {
-                                        heirs.push(m.wife_id);
-                                    }
-                                }
-                            }
+        // ── WRITE 阶段：转入所属家户账本（无家户 → 公仓）──
+        for (deceased_id, cargo) in pending {
+            let target_hid = self.household_registry.household_of(deceased_id);
+            let mut detail = String::new();
+            for (rk, amt) in &cargo {
+                if !detail.is_empty() {
+                    detail.push('、');
+                }
+                detail.push_str(&format!("{} {:.1}", rk.label(), amt));
+            }
+
+            for (rk, amt) in &cargo {
+                match target_hid {
+                    Some(hid) => {
+                        if let Some(hh) = self.household_registry.get_mut(hid) {
+                            hh.group.ledger.credit(*rk, *amt);
+                            hh.group.ledger.push_transfer(TransferRecord {
+                                tick,
+                                from: LedgerRef::Personal(deceased_id),
+                                to: LedgerRef::Family(hid),
+                                resource: *rk,
+                                amount: *amt,
+                                reason: TransferReason::Inheritance,
+                            });
+                        } else {
+                            // 家户已解散（极端时序）：退回公仓兜底
+                            self.public_granary.credit(*rk, *amt);
+                            self.public_granary.push_transfer(TransferRecord {
+                                tick,
+                                from: LedgerRef::Personal(deceased_id),
+                                to: LedgerRef::PublicGranary,
+                                resource: *rk,
+                                amount: *amt,
+                                reason: TransferReason::Inheritance,
+                            });
                         }
                     }
-
-                    // 2. 在世子女
-                    for a in &self.agents {
-                        if a.is_alive
-                            && (a.father_id == Some(deceased_id)
-                                || a.mother_id == Some(deceased_id))
-                        {
-                            if !heirs.contains(&a.id) {
-                                heirs.push(a.id);
-                            }
-                        }
-                    }
-
-                    if !heirs.is_empty() {
-                        let count = heirs.len();
-                        let share = gold / (count as f32);
-                        for hid in &heirs {
-                            if let Some(heir) = self.agents.iter_mut().find(|a| a.id == *hid) {
-                                heir.carried_gold += share;
-                            }
-                        }
-                        self.last_event = Some(format!(
-                            "💰 遗产继承: 逝者 Agent #{} 遗留 {:.1} 黄金，由在世的 {} 位继承人平分 (每人继承 {:.1} 黄金)！",
-                            deceased_id, gold, count, share
-                        ));
+                    None => {
+                        self.public_granary.credit(*rk, *amt);
+                        self.public_granary.push_transfer(TransferRecord {
+                            tick,
+                            from: LedgerRef::Personal(deceased_id),
+                            to: LedgerRef::PublicGranary,
+                            resource: *rk,
+                            amount: *amt,
+                            reason: TransferReason::Inheritance,
+                        });
                     }
                 }
-                None => break,
             }
+
+            self.last_event = Some(match target_hid {
+                Some(hid) => format!(
+                    "🎒 遗物归户: 逝者 Agent #{} 随身【{}】瞬移归入家户 #{}，参与遗产分配！",
+                    deceased_id, detail, hid
+                ),
+                None => format!(
+                    "🎒 遗物充公: 逝者 Agent #{} 无家户归属，随身【{}】转入公仓！",
+                    deceased_id, detail
+                ),
+            });
         }
     }
 

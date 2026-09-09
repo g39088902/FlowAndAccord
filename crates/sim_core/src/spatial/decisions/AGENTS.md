@@ -143,7 +143,42 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
   - 可观测性：`ActiveTaskSnapshot::itinerary` 字符串（如 `💧备水 → 🌲备木 → 🍒备粮`，少于 2 站时为 `--`），
     已纳入**四处同步**（`snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/encode.rs` / `snapshot-bin.js`），Inspector 元素 `insp-task-itinerary`。
 
-### 4.14 🔴 验证「行囊已装满」必须用配置容量，禁止硬编码常量
+### 4.14 🔴 ★ v1.47.0 / v1.47.1 衰弱（风烛残年）守卫：储备分支与在宅进食
+
+健康值 `agent.health < cfg.agent_frail_health_threshold`（前端 `agentFrailHealthThreshold`，默认 **2.0**）即判定为**衰弱**——
+健康值随 `agent_health_decay_per_sec` 单调递减、永不回复，故该区间是生命的最后一段（默认配置下约最后 200 模拟秒）。
+
+两条硬规则（改动前必读）：
+
+1. **不响应储备需求**：`branches.rs::BranchId::evaluate` 在函数最顶部（**任何 RNG / 散列消费之前**）对
+   `b5 储水 / b6 储粮 / b7 储木 / b9 储石 / b10 储金 / b13 积累财富` 六条分支直接 `return None`
+   （★ v1.47.1 起 b13 `GoldWealth` 淘金也纳入守卫，避免濒死老人仍被派去淘金）。
+   - 守卫位置不可下移：b9 内部有 `gentry_labor_exemption_check` 等确定性散列调用，
+     若把守卫放在其后，衰弱与否会改变求值路径（虽不耗 RNG，但破坏「守卫前置」这一可审计约定）。
+   - 由于 `plan_harvest_itinerary` / `try_continue_harvesting` 均经 `arbitrate_continuous_harvest_candidate`
+     → `branch.evaluate`，衰弱者自然拿到空队列 → 采收完毕即返家，**无需额外特判**。
+   - ⚠️ 存量 `current_need` 仍可能显示 `Safety·StockWood` 之类标签：那是 `step_in_progress_task`
+     按**状态**（`SeekingWood`…）贴的兼容标签，代表「切换前已出发的旧任务正在收尾」，不是新起的储备需求。
+2. **饮食优先在家解决**：`evaluate.rs::dispatch_task` 在 `NeedKind::Rest` 早退之后插入衰弱判定，
+   若 `meal_resource(need.kind)`（b1→水 / b2→粮）非空且 `can_home_meal()` 成立
+   （有私宅 **且** 家户账本该品类余额 ≥ `decision_home_meal_min_stock`，默认 **1.0**），
+   则写 `current_need = "Physiological·HomeMeal"` 并 `return_home()`，不再派发野外水源/果丛。
+   - 抢占链路同样生效：`preemption.rs::preempt_critical_survival` 在查询 POI 可用性之前先判衰弱，
+     命中则 `preempt_task()` + `return_home()`（平滑掉头，绝不瞬移）。
+   - ★ v1.47.1 触发缺口修复：`B1QuenchThirst` / `B2SateHunger` 的分支条件对衰弱者追加
+     `is_frail && can_home_meal` **或条件**（见 `branches.rs::evaluate`）——原实现因 `can_procure_resource`
+     前置（野外可用节点或市场可购）在**野外断流且市场不可购**时 B1/B2 不命中，`dispatch_task` 的
+     HomeMeal 分支永远不可达，衰弱者即使家户水粮充足也可能在静止/施工/远征中渴死饿死；
+     修复后「家户账本余额 ≥ 阈值」本身即成为需求命中依据，断流场景同样触发返家。
+     非衰弱者不受影响（`is_frail=false` 时或条件短路）。
+   - 到家后由 `ecology/home.rs::rest_at_camp` 从家户账本吃喝（`Consume` 流水），与既有在宅进食链路完全复用。
+   - 余额不足（< 阈值）时自动回落原逻辑外出就源，不会把衰弱者困死在家中。
+
+调试/验证提示：默认 `campHomeConsumeRate = 3.0`（每秒），在宅者会被持续顶到满值，
+因此「衰弱 + 饥饿」很难自然同时出现，`HomeMeal` 观测样本天然稀少。
+要复现该分支，可临时把 `campHomeConsumeRate` 调到 0.05 并热注入 `agentFrailHealthThreshold`。
+
+### 4.15 🔴 验证「行囊已装满」必须用配置容量，禁止硬编码常量
 
 `carry_capacity_resource`（前端 `carryCapacityResource`）当前为 **100.0**，是判定 `carry_full` 的唯一权威阈值。
 构造「某品类已装满 → 现场转站」的测试或诊断场景时，必须从 `SIM_CONFIG.carryCapacityResource` 取值而非写死旧值常量：

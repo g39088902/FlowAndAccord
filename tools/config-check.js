@@ -37,6 +37,8 @@ const IMPACT_OVERRIDES = {
   carryCapacityResource: 'agent.rs / ecology/ / decisions/',
   campHomeConsumeRate: 'ecology/ (营地在家吃喝)',
   agentSpawnBaseSpeed: 'agent.rs / graph.rs (寻路速度基准)',
+  agentFrailHealthThreshold: 'agent.rs / decisions/branches.rs (衰弱阈值 · 不响应储备需求/在家进食)',
+  decisionHomeMealMinStock: 'decisions/branches.rs + evaluate.rs (衰弱者在家解决饮食门槛)',
   decisionEvalOrder: 'decisions/branches.rs (前端拖动热注入)',
   decisionEvalLevels: 'decisions/branches.rs (层级覆盖)',
   ledgerJournalCapacity: 'ledger/ (所有账本容量)',

@@ -52,7 +52,7 @@
 1. POI 自然恢复                        按类型应用产速倍率
 2. 代谢与繁衍 (胎儿跳过)               agent.tick_metabolism
    2.3 tick_fetus_reconcile()          受孕建胎儿/流产移除/位置跟随
-   2.5 settle_gold_inheritance()        死者金币平分给在世子一代
+   2.5 settle_death_cargo()             ★ v1.47.0 逝者随身五类物资归入其家户账本（无家户→公仓）
 3. tick_poi_interactions(dt)           POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                     房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)         道路自然衰减
@@ -88,6 +88,7 @@
 | B13 | **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随 | §4.8 | 镜头持续跟随已取消选中的族人 |
 | B14 | **外部市场隔离与单向流失（v1.13.0，v1.27.0 扩展）**：榷场互市不进入 `NodePool`，不设公地施密特触发器，由 B15 专用派发；★ v1.27.0 起水/粮采集断流时家户户主（账本黄金 ≥ `market_min_family_gold` 且体力达标）可由 `try_route_to_market` 直接改道榷场——仍是**家户账本远程结算付费**，不改变市场支付与黄金单向扣入 `LedgerRef::Void` 的通缩闭环；到达后先濒危自救再装袋购入 | 16-market-pricing.md | 族人蹭吃蹭喝破坏公地平衡或黄金通缩机制失效 |
 | B15 | **决策分支数组定长联动（18分支）**：内核 `BranchId::ALL`、`resolve_order`、`seen` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / 16-market-pricing.md | 决策分支越界、反序列化 panic 或写盘校验失败 |
+| B16 | **衰弱守卫（★ v1.47.0 / v1.47.1）**：健康值 < `agentFrailHealthThreshold`（默认 2.0）即衰弱——`branches.rs::evaluate` 在**任何 RNG/散列消费之前**对 `b5/b6/b7/b9/b10/b13` 六条储备分支直接 `return None`（★ v1.47.1 起含 b13 淘金）；B1/B2 分支条件对衰弱者追加 `is_frail && can_home_meal` 或条件（家户账本余额 ≥ `decisionHomeMealMinStock` 即算可满足，野外断流也能派发返家） | decisions/AGENTS.md §4.14 | 衰弱者继续囤货/淘金违背「安度晚年」意图，或断流时家户有余粮却无人返家吃喝 |
 
 ---
 

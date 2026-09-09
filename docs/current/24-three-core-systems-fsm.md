@@ -71,6 +71,10 @@ stateDiagram-v2
     RestingAtCamp --> SeekingCourtship : Courtship (远距寻偶)
     RestingAtCamp --> RepairingHouse : RepairHouse (修缮私宅)
     RestingAtCamp --> ConstructingHouse : BuildHouse (营建/升级)
+    %% ★ v1.47.0 / v1.47.1 衰弱守卫：健康值 < agentFrailHealthThreshold 的衰弱者
+    %% 不响应 StockWater/StockFood/StockWood/StockStone/StockGold/GoldWealth 六条储备分支；
+    %% 饥渴需求优先转入 Homebound（Physiological·HomeMeal，家户账本余额 ≥ decisionHomeMealMinStock 即触发，
+    %% 野外断流时亦可派发返家，见 branches.rs::evaluate 与 decisions/AGENTS.md §4.14）
     RestingAtCamp --> RaiseChild : RaiseChild (自宅育儿)
 
     %% 移动途中的熔断与重路由

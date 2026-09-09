@@ -22,6 +22,7 @@
 | `agentInitialStamina` | f32 | 95 | agent.rs (初始属性) | 始祖初始体力 |
 | `agentBaseMetabolismDecay` | f32 | 0.2 | agent.rs (基础代谢/速度) | 基础代谢消耗速率 (饱食/水分 每秒) |
 | `agentHealthDecayPerSec` | f32 | 0.01 | agent.rs (健康衰减) | 濒死健康衰减速率 (每秒) |
+| `agentFrailHealthThreshold` | f32 | 2 | agent.rs / decisions/branches.rs (衰弱阈值 · 不响应储备需求/在家进食) | 衰弱(风烛残年)健康阈值：健康值 < 此值不再响应储备需求、饮食优先在家解决 |
 | `agentPregnantMetabolismMult` | f32 | 1.25 | agent.rs (妊娠代谢) | 孕期代谢消耗倍率 |
 | `agentWorkMetabolismMult` | f32 | 1 | agent.rs (劳作代谢) | 劳作代谢消耗倍率 |
 | `agentDeathDecayDuration` | f32 | 12 | agent.rs (死亡衰减) | 生命耗尽后彻底消亡的衰减时长 (秒) |
@@ -121,6 +122,7 @@
 | `decisionPoiAbandonStockRatio` | f32 | 0.1 | decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2) | POI 私有施密特触发器关闭阈值 (库存 < 此比例) |
 | `decisionCriticalThirst` | f32 | 25 | decisions/ (生理临界阈值) | 临界口渴阈值 (触发寻水) |
 | `decisionCriticalHunger` | f32 | 25 | decisions/ (生理临界阈值) | 临界饥饿阈值 (触发觅食) |
+| `decisionHomeMealMinStock` | f32 | 1 | decisions/branches.rs + evaluate.rs (衰弱者在家解决饮食门槛) | 衰弱族人在家解决饮食的家户账本余额门槛 (该品类余额 ≥ 此值才返家吃喝) |
 | `decisionRestStaminaTarget` | f32 | 100 | decisions/ (休息目标体力) | 休息目标体力 |
 | `decisionStockGoldCooldown` | f32 | 45 | decisions/ (备料淘金冷却) | 盖房备料淘金冷却 (秒) |
 | `decisionGoldWealthCooldown` | f32 | 180 | decisions/ (淘金冷却 §4.8) | 4 级庄园积累财富的淘金策略冷却 (秒) |

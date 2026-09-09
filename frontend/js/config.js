@@ -30,6 +30,7 @@ window.SIM_CONFIG = {
   agentInitialStamina: 95.0,      // 始祖初始体力
   agentBaseMetabolismDecay: 0.20, // 基础代谢消耗速率 (饱食/水分 每秒)
   agentHealthDecayPerSec: 0.01,   // 濒死健康衰减速率 (每秒)
+  agentFrailHealthThreshold: 2.0, // 衰弱(风烛残年)健康阈值：健康值 < 此值不再响应储备需求、饮食优先在家解决
   agentPregnantMetabolismMult: 1.25, // 孕期代谢消耗倍率
   agentWorkMetabolismMult: 1.0,   // 劳作代谢消耗倍率
   agentDeathDecayDuration: 12.0,  // 生命耗尽后彻底消亡的衰减时长 (秒)
@@ -127,6 +128,7 @@ window.SIM_CONFIG = {
   decisionPoiAbandonStockRatio: 0.10,// POI 私有施密特触发器关闭阈值 (库存 < 此比例)
   decisionCriticalThirst: 25.0,   // 临界口渴阈值 (触发寻水)
   decisionCriticalHunger: 25.0,   // 临界饥饿阈值 (触发觅食)
+  decisionHomeMealMinStock: 1.0,  // 衰弱族人在家解决饮食的家户账本余额门槛 (该品类余额 ≥ 此值才返家吃喝)
   decisionRestStaminaTarget: 100.0, // 休息目标体力
   decisionStockGoldCooldown: 45.0,// 盖房备料淘金冷却 (秒)
   decisionGoldWealthCooldown: 180.0, // 4 级庄园积累财富的淘金策略冷却 (秒)

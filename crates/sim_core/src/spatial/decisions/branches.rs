@@ -137,10 +137,31 @@ impl BranchId {
         let cfg = d.config;
         // 家宅等级（有房且非废墟）→ 备料/升级阈值基准等级
         let home_tier = home_house(d, a).map(|h| h.tier);
+        // ★ v1.47.0 / v1.47.1 衰弱（风烛残年）族人不再响应储备类需求：
+        // b5 储水 / b6 储粮 / b7 储木 / b9 储石 / b10 储金 / b13 积累财富 一律不触发，
+        // 让其安心在宅度过最后时光（★ v1.47.1 起 b13 淘金也纳入守卫，避免濒死老人被派去淘金）。
+        // 守卫置于任何 RNG/散列消费之前，确保衰弱与否不改变 RNG 消费序列。
+        if is_frail(a, cfg)
+            && matches!(
+                self,
+                BranchId::B5StockWater
+                    | BranchId::B6StockFood
+                    | BranchId::B7StockWood
+                    | BranchId::B9StockStone
+                    | BranchId::B10StockGold
+                    | BranchId::B13GoldWealth
+            )
+        {
+            return None;
+        }
         match self {
             BranchId::B1QuenchThirst => {
+                // ★ v1.47.1 衰弱者「家户有余粮即算可满足」：野外断流且市场不可购时，
+                // B1 原先因 can_procure_resource=false 不命中，导致家户有水也无人被派发返家；
+                // 现对衰弱者追加 can_home_meal 或条件，让「家户账本余额充足」本身即可命中需求。
                 if a.thirst < cfg.decision_critical_thirst
-                    && d.can_procure_resource(a, NodePool::Water)
+                    && (d.can_procure_resource(a, NodePool::Water)
+                        || (is_frail(a, cfg) && d.can_home_meal(a, ResourceKind::Water)))
                 {
                     return Some(Need {
                         level: MaslowLevel::Physiological,
@@ -151,7 +172,8 @@ impl BranchId {
             }
             BranchId::B2SateHunger => {
                 if a.hunger < cfg.decision_critical_hunger
-                    && d.can_procure_resource(a, NodePool::Food)
+                    && (d.can_procure_resource(a, NodePool::Food)
+                        || (is_frail(a, cfg) && d.can_home_meal(a, ResourceKind::Food)))
                 {
                     return Some(Need {
                         level: MaslowLevel::Physiological,

@@ -101,6 +101,30 @@
 | `ledger/empire.rs` | ★ M5 帝国上层政体：EmpireRegistry、营地分组、威望选皇帝、帝国公帑 ImperialPrivy |
 | `bookkeeping.rs` | ★ M2 旁路记账：`tick_bookkeeping`（Deposit/Consume/Heating 观测 → Inheritance 继承清算 → Split 分家抽资），`transfer_household_resource` 家户间转移辅助 |
 
+## ★ v1.47.0 逝者随身遗物归户（`settle_death_cargo`）
+
+族人死亡的**同一拍**，其随身全部资源（水 / 粮 / 木 / 石 / 金）立即「瞬移」转入**其所属家户账本**，
+与家户既有余额合并后一并参与随后的继承分配（`bookkeeping::tick_inheritance`）——即**先归户、再分配**。
+
+- **位置**：`world_tick.rs::tick_phase_metabolism_and_child` 步骤 2.5（代谢之后、POI 交互之前）；
+  `tick_housing` 末尾再执行一次。★ v1.47.1 澄清：死亡判定仅发生在代谢阶段（`agent.rs` 三处 `is_alive=false`，
+  房屋坍塌/冬季烧柴不直接致死），步骤 2.5 总能捕获当拍死者，因此 `tick_housing` 内的第二次调用是
+  **防御性冗余兜底**（幂等，随身已在首次清零），并非覆盖「房屋阶段过世者」。
+- **必须早于阶段 7 `tick_bookkeeping`**：户主亡故时 `tick_inheritance` 会在同拍解散家户，
+  若遗物晚于该步入账将无处可归，只能充公。
+- **归属判定**：`household_registry.household_of(deceased_id)`；无家户者（无房未婚女性、无户流浪者）转入**公仓**兜底；
+  家户已解散的极端时序同样退回公仓。
+- **确定性**：按 `agents` 数组顺序遍历、品类按 `DEATH_CARGO_ORDER`（水→粮→木→石→金）固定顺序；
+  READ（收集并清零）与 WRITE（入账）两段分离，避免遍历期间重复借用；不消耗 RNG。
+- **流水**：`TransferReason::Inheritance`，`from: LedgerRef::Personal(deceased_id)`
+  → `to: LedgerRef::Family(hid)` 或 `LedgerRef::PublicGranary`。世界事件 `🎒 遗物归户 / 🎒 遗物充公`。
+- **取代关系**：旧的 `settle_gold_inheritance`（仅金币 → 继承人随身背包）已被取代；
+  金币现随其他品类一并先入家户账本，再由继承清算分给妻子/子女，与 M6「家户账本 = 家庭物资唯一真相源」一致。
+  两处**行为变化**（★ v1.47.1 显式登记）：
+  - 无家户者（无房未婚女性、无户流浪者）的遗产由「平分给在世子一代」改为「充公」；
+  - 已婚女性的遗物由旧「平分给其子女个人」改为「入夫家家户集体」——其随身物资随
+    `household_of`（家庭跟着男人走）归入夫家家户，由家户账本统一支配，子女不再单独继承其随身物资。
+
 ## 世界 tick 挂载点
 
 `world.tick()` 在**错峰决策之后**依次追加（勿打乱）：
