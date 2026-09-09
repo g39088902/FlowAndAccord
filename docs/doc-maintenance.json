@@ -35,7 +35,7 @@
       "owner": "sim-core/ecology",
       "lastReviewed": "2026-09-06",
       "sources": [
-        "crates/sim_core/src/spatial/ecology.rs",
+        "crates/sim_core/src/spatial/ecology/**/*.rs",
         "crates/sim_core/src/spatial/poi.rs",
         "docs/current/02-ecology-poi.md"
       ]

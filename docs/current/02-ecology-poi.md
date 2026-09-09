@@ -1,6 +1,6 @@
 # 2. 🌲 全局有限生态与 POI 资源体系 (`poi`)
 
-> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`ecology/`
 
 > ⚡ **v1.9.0（Task4）出生地**：开局始祖不再落在 POI/营地节点，而是随机落在**普通道路节点**（`road_nodes` = `countTerrainTransitionNodes`(17) 个地形过渡 `GroundIntersection` 节点，非 POI），每名始祖消耗 1 次共享 `WorldRng` 确定性抽选；`home_camp` = 离出生地最近的营地（保证 `home_camp_node` 与地区归属一致）。
 > ⚡ **v1.21.1 始祖出生地去营地化**：播撒始祖时先过滤出**距离任何营地 POI 均 ≥ 安全距离**（`max(poi_interaction_radius, poi_min_distance × 0.5)`，默认 35m）的普通道路节点候选集 `valid_spawn_nodes`，每名始祖仍消耗 1 次共享 `WorldRng` 确定性抽选；无候选集（极端/无道路节点）时在远离营地的野外坐标生成道路交叉节点（`make_far_spawn_node` 就近接入路网），**严禁任何始祖直接出生于营地节点或营地建筑范围内**。
@@ -67,13 +67,13 @@
 每座私宅选址时自动绑定最近营地（`house.camp_id`），达成门槛时全图广播晋升。
 
 ## 关键不变量
-- POI 数量由 `config.rs` COUNT_* 常量控制，改数量须同步 `ecology.rs` 与前端面板文案。
+- POI 数量由 `config.rs` COUNT_* 常量控制，改数量须同步 `ecology/` 与前端面板文案。
 - 储量上限 stock_max 均为 200.0（config.rs），不存在 60.0 的旧值。
 - 施密特触发器是 Agent 私有的，不存在全局 POI 可用性状态。
 
 ## 与其他模块接口
 - `agent.rs` / `decisions/`：读取触发器结论进行选点与重路由。
-- `ecology.rs`：POI 初始化、采收装载、回家卸货。
+- `ecology/`：POI 初始化、采收装载、回家卸货。
 - `housing_system/settlement.rs`：房屋绑定最近营地。
 - `snapshot.rs`：POI 储量与产速随快照下发。
 

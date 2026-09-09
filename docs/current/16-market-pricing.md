@@ -1,6 +1,6 @@
 # 16. 🏪 外部市场与动态价格系统 (`market`)
 
-> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`decisions/market.rs`、`ecology.rs`、`ledger/journal.rs`
+> **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md) · 主要源码：`crates/sim_core/src/spatial/poi.rs`、`decisions/market.rs`、`ecology/`、`ledger/journal.rs`
 
 ---
 
@@ -93,7 +93,7 @@ $$P(S) = P_0 \times \left(\frac{S_{max}}{\max(S, S_{floor})}\right)^k$$
 
 ## 四、现场交易、自救缓冲与黄金流出
 
-族人抵达市场后进入 `PrimitiveActionState::BuyingAtMarket` 状态，由 `ecology.rs::tick_poi_interactions` 执行每拍结算：
+族人抵达市场后进入 `PrimitiveActionState::BuyingAtMarket` 状态，由 `ecology/tick.rs::tick_poi_interactions` 执行每拍结算：
 
 ### 1. 现场濒危自救缓冲（先吃喝保命）
 如果出发赶路的户主在途中体能严重消耗，抵达市场时处于濒死线（`thirst < 10.0` 或 `hunger < 10.0`）：

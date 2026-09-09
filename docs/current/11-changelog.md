@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.21**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.22**。
+
+| **v1.46.22** | `ecology.rs` 单文件拆分（**阶段一 · 纯代码搬运，行为零变更**）：原 `crates/sim_core/src/spatial/ecology.rs`（**1107 行**，超根 AGENTS.md §4.6 的 800 行规范 38%，且近 12 次提交由 643 行膨胀至此）按职责拆为 `spatial/ecology/` 7 个单一职责子模块——`seed.rs` 世界重置与播撒步骤编排、`spawn.rs` POI 落位/全图路网连接/始祖出生地兜底节点、`founder.rs` 始祖生成与家户/宗族/地区/帝国登记、`tick.rs` `tick_poi_interactions` 调度壳、`harvest.rs` 现场采收与榷场采购结算、`home.rs` 卸货入账与在家吃喝、`mod.rs` 声明；**等价性证明**：RNG 消费顺序、账本流水顺序与 tick 管线位置完全保持，重构前后 3 seed × 4 检查点（最长 6000 tick）的存档 SHA256 与快照摘要**逐字节一致**；② **新增局部指南** `spatial/ecology/AGENTS.md`（7 文件职责表 / RNG 消费顺序契约 / 榷场支付顺序 / 阶段二去重待办）并登记入根 AGENTS.md §0.1；③ **文档同步**：`spatial/AGENTS.md`（14→13 散文件、3→4 子目录、§1.3 行与 §1.4 子目录表）、`sim_core/AGENTS.md` 模块地图、根 AGENTS.md §0.1/§4.6、`docs/doc-maintenance.json` sources（`ecology.rs` → `ecology/**/*.rs`）、`tools/config-check.js` 归属映射（并重新生成 `06-config-reference.md`）与 8 篇文档的 `ecology.rs` 路径引用；④ 升版重编译 WASM 双副本；门禁全通（`cargo test --lib`、`test-wasm`、`test-determinism` 6/6、`test-snapshot-bin` 100%、`config-check` 219 字段、`frontend-check`、`doc-maintenance-check`、`cross-doc-check`）。 | sim_core(ecology) / docs / tools / version |
 
 | **v1.46.21** | 代码地图完整性修复：① **屏蔽 `frontend/public/`**——该目录为借用对象存储的测试页（`elder.html`），非本项目产物，`tools/code-map-check.js` 扫描排除并在 09-code-map.md 注释说明；② **补登记 25 个漏登记文件**使 `code-map-check` 由 26 警告归零（✅ `CODE_MAP_CHECK_PASSED`）：Rust 侧 `examples/config.json`、`examples/m19_probe.rs`、`decisions/preemption.rs`（M19.4b）、`snapshot_bin/` 五件套（M4 FABS 编码层，decisions 文件数注释 15→16）；前端 `config.poi-rates.js`、`snapshot-bin.js`（M4 解码器）；tools 侧 4 个 baseline-*.json；docs 侧 00-agent-start / 24-three-core-systems-fsm / 25-competitor-analysis / 26-intent-observation 与 7 篇 plan/spec 文档 + archive 基线审计；③ 升版 v1.46.21 重编译 WASM 双副本。 | tools / docs / ci |
 

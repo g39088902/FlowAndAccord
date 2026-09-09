@@ -39,7 +39,7 @@ crates/sim_core/src/spatial/decisions/
     └── adapter.rs          # 接入既有交互与 pending，不实现第二套结算
 ```
 
-`ecology.rs`、`housing_system/`、`world_tick.rs` 和账本系统继续拥有物理结算。`primitive/adapter.rs` 只安装或解释执行意图，不新增 `tick_onsite()` 再次装袋、扣账、施工。类型提取先于目录搬迁；一次迁移一条行为链，避免纯搬文件与行为变化混在一起。
+`ecology/`、`housing_system/`、`world_tick.rs` 和账本系统继续拥有物理结算。`primitive/adapter.rs` 只安装或解释执行意图，不新增 `tick_onsite()` 再次装袋、扣账、施工。类型提取先于目录搬迁；一次迁移一条行为链，避免纯搬文件与行为变化混在一起。
 
 ## 2. 领域类型与数据所有权
 
@@ -267,7 +267,7 @@ pub enum HoldKind { ResourceSite(PoiId), Residence, Repair, Upgrade, OffRoad }
 
 ### 6.1 写入权移交
 
-M19.0 搜索并分类所有 `state` 写入、`enter_stationary_state`、路线到达、死亡、房产/婚姻/政体变化和 pending 消费点，范围包括 `agent.rs`、`decisions/`、`ecology.rs`、`housing_system/`、`world_tick.rs`、`ledger/`、初始化/出生及存档。不能只改 `decisions/`。
+M19.0 搜索并分类所有 `state` 写入、`enter_stationary_state`、路线到达、死亡、房产/婚姻/政体变化和 pending 消费点，范围包括 `agent.rs`、`decisions/`、`ecology/`、`housing_system/`、`world_tick.rs`、`ledger/`、初始化/出生及存档。不能只改 `decisions/`。
 
 - M19.1：旧字段权威，新记录为只读观察；不得每 tick 用观察值覆盖旧状态，不影子运行会消费 RNG 的选址或派发。
 - M19.2：按行为链启用新控制，迁移开关仅作临时开发机制；一次安装新任务成功后该链不再经过旧状态机驱动。所有物理结果入口同步新控制记录。

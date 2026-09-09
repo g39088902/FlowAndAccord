@@ -41,7 +41,7 @@ impl ParentSnapshot {
 impl World3DEngine {
     /// 结算所有待产母亲：生成新生儿、继承遗传特征、注册亲子关系，并维护 agent_index。
     ///
-    /// 调用方（ecology.rs）负责在收集 newborn_mothers 列表后调用本方法；
+    /// 调用方（ecology/）负责在收集 newborn_mothers 列表后调用本方法；
     /// 本方法内部在每次 push 后进行增量索引更新，调用方无需再次 rebuild。
     pub fn resolve_newborns(&mut self, newborn_mothers: Vec<(AgentId, NodeId)>) {
         for (mother_id, camp_node) in newborn_mothers {

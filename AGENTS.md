@@ -43,7 +43,8 @@
 | :--- | :--- | :--- |
 | `crates/sim_core/` | `crates/sim_core/AGENTS.md` | sim_core 内核：crate 布局、SimConfig、WorldRng 确定性、geo/spatial 模块地图 |
 | `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | WASM 导出层：导出函数清单、静态缓冲区、错误码、指针约定 |
-| `crates/sim_core/src/spatial/` | `crates/sim_core/src/spatial/AGENTS.md` | spatial 核心层：14 散文件 + 3 子目录职责边界、world.rs tick 调用顺序、agent↔ecology 装载卸货契约、bookkeeping 与 ledger 分工、快照映射责任 |
+| `crates/sim_core/src/spatial/` | `crates/sim_core/src/spatial/AGENTS.md` | spatial 核心层：13 散文件 + 4 子目录职责边界、world.rs tick 调用顺序、agent↔ecology 装载卸货契约、bookkeeping 与 ledger 分工、快照映射责任 |
+| `crates/sim_core/src/spatial/ecology/` | `crates/sim_core/src/spatial/ecology/AGENTS.md` | 生态子模块：7 个单一职责子模块（播撒/落位/始祖/调度/采收/卸货）、RNG 消费顺序契约、榷场支付顺序 |
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
@@ -64,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.21)"]
+    F --> G["浏览器 UI (版本: v1.46.22)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -114,7 +115,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.21`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.22`**。
 
 ---
 
@@ -191,7 +192,7 @@ node frontend/server.js           # http://localhost:3000
 - 水/粮/木/石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(100.0)，互不共享），回家休整时按 `config.poiUnloadRateResource`/s(10) 卸货**入家户账本**（M6 起：家户账本为家庭储备唯一真相源，房屋仓库已删除）；行囊满即返家。
 - 金：容量无限，单趟运满 20 回宅存入金库（5/s）。
 - 无家宅（`home_house_id.is_none()`）的 agent 不装载行囊，只在现场就地自饮自食。
-- 改容量/装卸速率必须全链条联动：`agent.rs` → `ecology.rs` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`。
+- 改容量/装卸速率必须全链条联动：`agent.rs` → `ecology/` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`。
 
 ### 4.5 🟠 快照与前端字段四处同步（★ M4 起，v1.45.3）
 
@@ -215,13 +216,13 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 
 ### 4.6 🟠 模块粒度与单文件行数规范
 
-单文件严控在 800 行以内，功能膨胀时及时子目录模块化拆分。参考实践：`decisions/` 拆为 7 个文件、`housing_system/` 拆为 6 个文件。
+单文件严控在 800 行以内，功能膨胀时及时子目录模块化拆分。参考实践：`decisions/` 拆为 7 个文件、`housing_system/` 拆为 6 个文件、`ecology/` 拆为 7 个文件（原 1107 行单文件）。
 
 ### 4.7 🟡 POI 数量、ID 段位与营地行政区升级
 
 - **共 23 处 POI**：营地 4 / 清泉 6 / 浆果 6 / 林木 3 / 石矿 2 / 金矿 1 / 榷场互市 1，由 `config.countCamps` 等字段控制。ID 段位：营地 1-4 / 清泉 10-15 / 浆果 20-25 / 林木 30-32 / 石矿 40-41 / 金矿 50 / 榷场互市 60。空间排斥间距 `config.poiMinDistance`(70m)。
 - **营地行政区升级**：随辖内有效房屋数量自动升级——0~4 营地 / 5~9 村 / 10~14 乡 / 15~19 镇 / 20+ 县；门槛由 `campLevel*MinHouses` 配置。
-- 改 POI 数量须同步：`ecology.rs` → `index.html` 面板文案 → `docs/current/02-ecology-poi.md`。
+- 改 POI 数量须同步：`ecology/` → `index.html` 面板文案 → `docs/current/02-ecology-poi.md`。
 
 ### 4.8 🟡 行为与生理硬约束
 

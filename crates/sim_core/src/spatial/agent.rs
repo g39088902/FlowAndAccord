@@ -318,8 +318,8 @@ impl Agent3D {
             state: PrimitiveActionState::RestingAtCamp,
             is_alive: true,
             age: initial_age,
-            birth_tick: 0, // 默认 0; 由调用方 (ecology.rs 始祖初始化 / birth.rs 分娩) 覆写为当前 tick_counter
-            arrival_tick: 0, // 默认 0; 由调用方 (ecology.rs 始祖 / birth.rs 分娩) 覆写
+            birth_tick: 0, // 默认 0; 由调用方 (ecology/ 始祖初始化 / birth.rs 分娩) 覆写为当前 tick_counter
+            arrival_tick: 0, // 默认 0; 由调用方 (ecology/ 始祖 / birth.rs 分娩) 覆写
             hunger: config.agent_initial_hunger,
             thirst: config.agent_initial_thirst,
             stamina: config.agent_initial_stamina,

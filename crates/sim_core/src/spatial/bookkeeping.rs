@@ -2,7 +2,7 @@
 //!
 //! 隶属「账本与仓库重构」计划 M2，M6（账本化改造）阶段一修订：
 //! - **旧旁路观测已删除**：Deposit（卸货差分）/ Consume（在家吃喝）/ Heating（冬季烧柴）
-//!   三条观测自 M6 阶段一起改由生态层/维护层**真实收付**家户账本（见 ecology.rs RestingAtCamp、
+//!   三条观测自 M6 阶段一起改由生态层/维护层**真实收付**家户账本（见 ecology/ RestingAtCamp、
 //!   maintenance.rs tick_winter_heating），此处不再重复记账，避免双写。
 //! - 本文件仍承担**家庭生命周期结算**：Inheritance（户主死亡继承清算）+ Split（成年/丧父分家抽资），
 //!   二者只记账本余额（credit/debit + 流水），不动物理库存。

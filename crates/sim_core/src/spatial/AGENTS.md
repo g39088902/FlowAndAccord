@@ -1,6 +1,6 @@
 # spatial 模块 · 局部操作指南
 
-> 本目录是 sim_core 的空间模拟核心层，包含 14 个散文件 + 3 个子目录（decisions / housing_system / ledger）。
+> 本目录是 sim_core 的空间模拟核心层，包含 13 个散文件 + 4 个子目录（ecology / decisions / housing_system / ledger）。
 > 改本目录代码前：先读根 AGENTS.md §4，再读本文件，最后读对应子目录的局部 AGENTS.md（如有）。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -29,7 +29,7 @@
 |---|---|---|---|
 | `poi.rs` | ~235 | PrimitivePoi 实体定义（23 处 POI：营地4/泉6/果6/木3/石2/金1/榷场互市1）、ID 段位、储量再生与水粮木三库存计价、★ v1.28.0 `MarketTradeRecord` 与榷场流水环形缓冲 | 采收逻辑、初始化布局 |
 | `house.rs` | ~115 | House 实体（5 阶等级、耐久度、户主绑定）、HouseSnapshot | 施工计时、升级判定、继承（这些在 housing_system/） |
-| `agent.rs` | ~530 | Agent3D 实体（生理代谢、随身行囊、状态机、运动、施密特触发器、威望）、百家姓库、Gender/PrimitiveActionState 枚举 | 决策逻辑（在 decisions/）、POI 交互（在 ecology.rs） |
+| `agent.rs` | ~530 | Agent3D 实体（生理代谢、随身行囊、状态机、运动、施密特触发器、威望）、百家姓库、Gender/PrimitiveActionState 枚举 | 决策逻辑（在 decisions/）、POI 交互（在 ecology/） |
 
 ### 1.3 系统层（tick 调度 + 跨实体逻辑）
 
@@ -41,9 +41,9 @@
 | `world_config.rs` | ~50 | 配置注入与反序列化（apply_config_json / apply_config / set_regen_multiplier） | 配置结构体定义（在 config.rs） |
 | `world_season.rs` | ~40 | 四季更迭与宏观环境温度演化（正弦周期拟合） | tick 调度（在 world_tick.rs） |
 | `world_save.rs` | ~205 | **读档/存档契约（v1.8.0）**：`WorldSave` 全量状态结构体 + `to_save()` + `serialize_save()` / `deserialize_save()`（格式版本门禁 + 参数校验 + agent id 唯一性校验 + 按 seed 重建地形 + `rebuild_agent_index()`） | 各实体自身的 serde 实现（在各自文件：`graph.rs` 手写路网 serde、`poi.rs` 的 `finite_f32` 助手、`rng.rs` 的 WorldRng） |
-| `ecology.rs` | ~445 | 生态初始化（POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝、榷场互市）、分娩结算 | 决策（decisions/）、账本结构（ledger/） |
+| `ecology/` | 7 文件 | 生态初始化（世界重置 + POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝、榷场互市）、分娩结算。子模块：`seed.rs` 步骤编排 / `spawn.rs` POI 落位与路网 / `founder.rs` 始祖与制度登记 / `tick.rs` 交互调度壳 / `harvest.rs` 采收与采购 / `home.rs` 卸货与吃喝 | 决策（decisions/）、账本结构（ledger/） |
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
-| `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology.rs / maintenance.rs 真实收付） |
+| `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology/ 与 maintenance.rs 真实收付） |
 | `snapshot.rs` | ~290 | 全部快照结构体定义（WorldSnapshot3D / AgentSnapshot / HouseSnapshot / PoiSnapshot / NodeSnapshot / LaneSnapshot / HouseholdSnapshot / MarriageSnapshot / ClanSnapshot / RegionSnapshot / LedgerBalanceSnapshot / TransferRecordSnapshot / GeoCellSnapshot） | 快照赋值（在 world.rs）、前端映射（在 rustworld.js） |
 | `snapshot_bin/` | 4 | ★ M4 (v1.45.3) 二进制快照（FABS 帧）：`layout.rs` 格式常量、`dict.rs` 枚举码表、`strtab.rs` 持久化字符串驻留、`encode.rs` `write_snapshot_binary()` | JSON 快照通道（在 world_snapshot.rs） |
 
@@ -51,6 +51,7 @@
 
 | 子目录 | 文件数 | 职责 | 局部指南 |
 |---|---|---|---|
+| `ecology/` | 7 | 生态初始化（世界重置 + POI 播撒 + 路网构建 + 始祖生成）与 POI 物理交互（采收装载、卸货入账、在家吃喝、榷场互市） | `ecology/AGENTS.md` |
 | `decisions/` | 13 | 马斯洛决策状态机：需求评估、分支注册表、寻路路由、采收判定、途中重路由、商贸决策、错峰调度；M19.1 领域类型与只读观察（未接管） | `decisions/AGENTS.md` |
 | `housing_system/` | 7 | 房屋全生命周期：施工升级、冬季供暖、耐久修缮、自动成婚、立宅选址、空置房登记 | `housing_system/AGENTS.md` |
 | `ledger/` | 8 | 账本与社会经济制度：账本内核、团体基类、婚姻登记簿、家户体系、宗族、地区王国 | `ledger/AGENTS.md` |
@@ -88,13 +89,13 @@
 
 ## 三、核心接口契约
 
-### 3.1 agent.rs ↔ ecology.rs 装载/卸货契约
+### 3.1 agent.rs ↔ ecology/ 装载/卸货契约
 
 ```
 agent.carry_water / carry_food / carry_wood / carry_stone  (每类独立容量 50.0)
 agent.carry_gold                                              (容量无限)
 
-ecology.rs::tick_poi_interactions(dt)
+ecology/tick.rs::tick_poi_interactions(dt)
   ├─ 现场采收 (DrinkingAtWater / ForagingFood / GatheringWood / MiningStone / MiningGold)
   │    └─ 从 POI 储量扣减 → 装入 agent 行囊 (受 carryCapacityResource 限制)
   │    └─ 无家宅者不装袋，只就地自饮自食
@@ -104,7 +105,7 @@ ecology.rs::tick_poi_interactions(dt)
        └─ 行囊满即触发 ReturningToCamp 返家
 ```
 
-**改容量/装卸速率必须全链条联动**：`agent.rs` → `ecology.rs` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`（根 AGENTS.md §4.4）。
+**改容量/装卸速率必须全链条联动**：`agent.rs` → `ecology/` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`（根 AGENTS.md §4.4）。
 
 ### 3.2 bookkeeping.rs 与 ledger/ 的分工边界
 
@@ -112,7 +113,7 @@ ecology.rs::tick_poi_interactions(dt)
 |---|---|---|
 | 定位 | 家庭生命周期**结算触发器** | 账本与社会制度**数据结构 + 规则** |
 | 内容 | 继承清算 (Inheritance) + 分家抽资 (Split) | 账本内核 / 家户 / 婚姻 / 宗族 / 地区王国 |
-| 调用方 | world.rs::tick() 步骤 7 | 被 bookkeeping.rs / ecology.rs / housing_system / birth.rs / decisions 调用 |
+| 调用方 | world.rs::tick() 步骤 7 | 被 bookkeeping.rs / ecology/ / housing_system / birth.rs / decisions 调用 |
 | 日常收付 | **不负责**（M6 起已删除 Deposit/Consume/Heating 旁路观测） | 提供 Ledger::transfer() 接口，由生态/维护层直接调用 |
 | 确定性 | 不消耗 WorldRng，按 id 保序遍历 | 内核操作确定性，不消耗 RNG |
 
@@ -150,7 +151,7 @@ snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.4
 - `world.rs::tick()` 代谢（步骤 2）
 - `world.rs::tick()` 运动（步骤 6）
 - `decisions/scheduler.rs::tick_decisions()` 决策
-- `ecology.rs` POI 交互和渲染
+- `ecology/` POI 交互和渲染
 - `render.js` Canvas 绘制和点击拾取
 
 胎儿**参与**：家户成员计数、继承清算（`children_ids` 已包含胎儿）、宗族成员、族谱数据。
@@ -179,7 +180,7 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 
 **改"快照相关"只需读 `world_snapshot.rs`**，改"tick 调度"只需读 `world_tick.rs`，不用在 880 行里翻。
 
-### 4.5 ecology.rs 的世界重置全量清空
+### 4.5 ecology/ 的世界重置全量清空
 
 `seed_primitive_ecology()` 是世界重置入口，必须清空**所有**与 agents 相关的状态：
 - agents / pois / network / houses（基础实体）
@@ -211,7 +212,7 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 ```
 world.rs (tick 调度)
   ├─→ agent.rs        (代谢/运动/状态机)
-  ├─→ ecology.rs      (POI 交互/装载/卸货)
+  ├─→ ecology/      (POI 交互/装载/卸货)
   ├─→ birth.rs        (妊娠/分娩/遗传)
   ├─→ bookkeeping.rs  (继承/分家)
   ├─→ graph.rs        (路网/寻路/衰减)
@@ -222,7 +223,7 @@ world.rs (tick 调度)
   ├─→ housing_system/ (施工/供暖/修缮/成婚/选址/继承) ← 有局部 AGENTS.md
   └─→ ledger/         (账本/家户/婚姻/宗族/地区) ← 有局部 AGENTS.md
 
-ecology.rs → ledger/    (卸货入账 Deposit、在家吃喝 Consume)
+ecology/ → ledger/    (卸货入账 Deposit、在家吃喝 Consume)
 housing_system/ → ledger/ (冬季烧柴 Heating、升级扣账 Construction)
 bookkeeping.rs → ledger/ (继承 Inheritance、分家 Split)
 birth.rs → ledger/       (新生儿入家户、入宗族)

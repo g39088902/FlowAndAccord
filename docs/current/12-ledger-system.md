@@ -110,7 +110,7 @@
 4. `tick_empire(dt)` — M5 帝国（确保营地分组 → 威望选皇帝 → 下属王国公仓黄金 5% 帝国公帑）。
 
 ## 关键不变量
-- 账本与物理仓库完全分离：改账本不影响 `house.rs` pantry_* / `agent.rs` carried_* / `ecology.rs` 装卸逻辑。
+- 账本与物理仓库完全分离：改账本不影响 `house.rs` pantry_* / `agent.rs` carried_* / `ecology/` 装卸逻辑。
 - 一人同时只属于一个家户（`by_agent` 唯一索引）。
 - 一人同时只能有一段存续婚姻（存续唯一性校验）。
 - 婚姻记录不持有 `house_id`，与房产所有权解耦。
@@ -132,7 +132,7 @@
 | `world.rs` | `tick_fetus_reconcile` 受孕即建胎儿实体 / 流产移除 / 位置随母；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
 | `birth.rs` | 分娩 → 原位复用胎儿 ID 替换为新生儿；新生儿入父亲家户（M2）/随父姓入宗族（M3）/入父亲地区（M4） |
 | `decisions/scheduler.rs` | ★ M4 登基物理执行器 `execute_pending_coronations`（扫描 `coronation_pending` 校验王位仍空缺后 `coronate_king`）；`decisions/evaluate.rs` 决策器选定远征目标写入 `agent.expedition_target_camp` |
-| `ecology.rs` | 始祖播撒 → 入宗族（M3）+ 入最近营地地区（M4）+ `arrival_tick=0` |
+| `ecology/` | 始祖播撒 → 入宗族（M3）+ 入最近营地地区（M4）+ `arrival_tick=0` |
 | `world.rs` | 世界重置 → 清空各登记簿/缓存；`generate_snapshot()` 序列化家户/婚姻/宗族/地区/公仓余额 |
 | `snapshot.rs` | `HouseholdSnapshot` / `MarriageSnapshot` / `ClanSnapshot` / `RegionSnapshot` / `TransferRecordSnapshot` / `LedgerBalanceSnapshot` 快照结构；`WorldSnapshot3D.total_households` 历史家户总数 |
 | `rustworld.js` | 映射 `sim.households`（存续家户）/ `sim.totalHouseholds` / `sim.marriages` / `sim.clans` / `sim.regions` / `sim.publicGranaryBalances` |

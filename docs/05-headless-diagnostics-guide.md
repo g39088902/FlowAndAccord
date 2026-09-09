@@ -104,7 +104,7 @@ node tools/diagnose.js --seed <SEED> --tick <TICK> --agent <ID> --trace-window 2
 - **补货施密特触发器异常** $\rightarrow$ `crates/sim_core/src/spatial/decisions/evaluate.rs`
 - **建房 / 升级门槛** $\rightarrow$ `crates/sim_core/src/spatial/decisions/needs.rs` 与 `config.house-upgrade-cost.js`
 - **婚姻 / 繁衍 / 冷却** $\rightarrow$ `crates/sim_core/src/spatial/housing_system/marriage.rs` 与 `birth.rs`
-- **采收与行囊装卸** $\rightarrow$ `crates/sim_core/src/spatial/ecology.rs`
+- **采收与行囊装卸** $\rightarrow$ `crates/sim_core/src/spatial/ecology/`
 
 ### 步骤 4：代码修复与双副本同步
 编辑 Rust 代码。必须严格遵守 `AGENTS.md` 第 4 节易踩坑清单：

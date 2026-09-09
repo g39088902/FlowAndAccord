@@ -15,7 +15,7 @@ const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
 /// 调整顺序会破坏确定性或行为语义。各子步骤委托给对应模块：
 /// - 步骤 0: `world_season.rs::tick_season`
 /// - 步骤 2.3/2.5: 本文件 `tick_fetus_reconcile` / `settle_gold_inheritance`
-/// - 步骤 3: `ecology.rs::tick_poi_interactions`
+/// - 步骤 3: `ecology/tick.rs::tick_poi_interactions`
 /// - 步骤 4: `housing_system/mod.rs::tick_housing`
 /// - 步骤 6 决策: `decisions/scheduler.rs::tick_decisions`
 /// - 步骤 7: `bookkeeping.rs::tick_bookkeeping`

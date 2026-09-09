@@ -103,7 +103,7 @@ impl<'a> Decisioner<'a> {
 
         // 若处于休整/营地空闲状态，尝试卸货收尾或发起新的持续任务仲裁
         if agent.state == PrimitiveActionState::RestingAtCamp {
-            // ecology.rs 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
+            // ecology/ 在本阶段按速率卸货；卸完前禁止重新评估采集/远征需求，
             // 否则决策节拍可能在半卸货时把 agent 再次派出，造成“送货未完就出门”。
             if agent.home_house_id.is_some() && agent.has_cargo_to_unload() {
                 agent.current_need = Some("Safety·UnloadCargo".to_string());

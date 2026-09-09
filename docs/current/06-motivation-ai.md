@@ -172,7 +172,7 @@ stateDiagram-v2
 ## 与其他模块接口
 - `frontend/js/decision-viz*.js` + `config.decision-order.js`：决策引擎可视化视图拖动卡片/分界线 → ★ v1.27.0 起保存到浏览器 localStorage（★ v1.29.0 起键 `flowaccord.decision-order.v2`，旧键 v1 启动时自动迁移 0→6）→ `rustWorld.applyConfig()` 热注入本模块 `decision_eval_order`（顺序+层级覆盖）。
 - `agent.rs`：读取生理指标与行囊状态，写入 agent.state（含 `SeekingThrone`）与路径。
-- `ecology.rs`：采收与卸货的物理执行。
+- `ecology/`：采收与卸货的物理执行。
 - `housing_system/`：FoundHome/BuildHouse/RepairHouse 的物理执行。
 - `graph.rs`：A\* 寻路与路径规划。
 - `ledger/region.rs`：登基/迁籍读写 `region_registry`（`set_king` 旧王入档 `history_kings`）；夺位远征目标营地记录在 `agent.expedition_target_camp`。

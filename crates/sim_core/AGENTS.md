@@ -35,7 +35,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 | :--- | :--- |
 | `world.rs` | `World3DEngine` 主结构；`tick()` 全序推进；`generate_snapshot()` 快照导出；确定性构建；季节/温度；金币遗产继承 |
 | `agent.rs` | `Agent3D` 字段、`PrimitiveActionState` 状态机、代谢/运动、施密特触发器 |
-| `ecology.rs` | 生态初始播撒（POI + 路网 + 20 名始祖）、POI 交互（装载/卸货/吃喝/淘金/分娩委托） |
+| `ecology/` | 生态初始播撒（POI + 路网 + 20 名始祖）、POI 交互（装载/卸货/吃喝/淘金/分娩委托） |
 | `graph.rs` | 路网数据与加权 A* 寻路、道路衰减 |
 | `poi.rs` | `PrimitivePoi`（储量/再生/提取/营地行政级别） |
 | `house.rs` | `House`/`HouseTier`（容量/耐久/`is_pantry_full` 升级门槛） |
