@@ -78,10 +78,14 @@ pub fn sample_cell(terrain: &TerrainMap, wx: f32, wy: f32) -> &GeoCell {
 
 pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope_deg: f32) -> TerrainQueryResult {
     let (hx, hy) = query.half_extents;
-    let radius = (hx * hx + hy * hy).sqrt();
-    let step = (terrain.world_size / terrain.grid_width.max(1) as f32).max(1.0);
-    let samples = ((radius / step).ceil() as i32).clamp(1, 32);
+    let step = terrain.world_size / (terrain.grid_width-1).max(1) as f32;
     let (sin_r, cos_r) = query.rotation_rad.sin_cos();
+    let ex=hx*cos_r.abs()+hy*sin_r.abs(); let ey=hx*sin_r.abs()+hy*cos_r.abs();
+    if query.center.x.abs()+ex>terrain.world_size*0.5 || query.center.y.abs()+ey>terrain.world_size*0.5 {
+        return TerrainQueryResult::invalid(TerrainFailure::OutOfBounds);
+    }
+    let (x0,y0)=terrain.grid_index(query.center.x-ex-step*0.5,query.center.y-ey-step*0.5);
+    let (x1,y1)=terrain.grid_index(query.center.x+ex+step*0.5,query.center.y+ey+step*0.5);
     let mut result = TerrainQueryResult {
         valid: true,
         failure: TerrainFailure::None,
@@ -91,19 +95,10 @@ pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope
         surface_mask: 0,
         walk_cost: 1.0,
     };
-    for iy in -samples..=samples {
-        for ix in -samples..=samples {
-            let local_x = ix as f32 * step;
-            let local_y = iy as f32 * step;
-            if local_x.abs() > hx || local_y.abs() > hy {
-                continue;
-            }
-            let wx = query.center.x + local_x * cos_r - local_y * sin_r;
-            let wy = query.center.y + local_x * sin_r + local_y * cos_r;
-            if wx.abs() > terrain.world_size * 0.5 || wy.abs() > terrain.world_size * 0.5 {
-                return TerrainQueryResult::invalid(TerrainFailure::OutOfBounds);
-            }
-            let cell = terrain.sample_cell(wx, wy);
+    for iy in y0..=y1 {
+        for ix in x0..=x1 {
+            let cell = &terrain.cells[iy*terrain.grid_width+ix];
+            if cell.surface_kind == SurfaceKind::ShallowWater {return TerrainQueryResult::invalid(TerrainFailure::WaterCovered);}
             result.min_elevation = result.min_elevation.min(cell.elevation);
             result.max_elevation = result.max_elevation.max(cell.elevation);
             result.max_slope_deg = result.max_slope_deg.max(cell.slope_angle_deg);

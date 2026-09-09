@@ -20,7 +20,10 @@ impl World3DEngine {
         let unload_res = self.config.poi_unload_rate_resource;
         let unload_gold = self.config.poi_unload_rate_gold;
 
-        for agent in &mut self.agents {
+        let mut order:Vec<_>=(0..self.agents.len()).collect();
+        order.sort_by_key(|&i|self.agents[i].id);
+        for i in order {
+            let agent=&mut self.agents[i];
             if !agent.is_alive {
                 continue;
             }
@@ -39,6 +42,7 @@ impl World3DEngine {
                     harvest::harvest_water(
                         agent,
                         &mut self.pois,
+                        &mut self.water_pools,
                         &self.config,
                         carry_cap,
                         rate_res,
@@ -103,6 +107,7 @@ impl World3DEngine {
             }
         }
 
+        self.sync_water_pois();
         // 出生结算委托给 birth.rs（内部使用 agent_index O(1) 查找，并增量更新索引）
         self.resolve_newborns(newborn_mothers);
 

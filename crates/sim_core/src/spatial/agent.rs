@@ -673,7 +673,7 @@ impl Agent3D {
         self.stamina = (self.stamina - stamina_burn * dt).max(0.0);
 
         // 💪 力量禀赋直接决定步速: 行走速度 = 默认速度 × 道路质量 × (力量/100)，全员共用默认速度、不受体力影响、不加 clamp
-        let target_speed = self.max_desired_speed * road_level_factor * (self.strength / 100.0);
+        let target_speed = self.max_desired_speed * road_level_factor * (self.strength / 100.0) / lane.terrain_profile.terrain_time_cost.max(1.0);
 
         let accel = (target_speed - self.current_velocity) * config.agent_move_accel_coef;
         self.current_velocity = (self.current_velocity + accel * dt).max(0.0);

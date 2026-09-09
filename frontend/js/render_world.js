@@ -96,7 +96,31 @@ function drawTerrainFeatures() {
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    if (feature.kind === 'Ridge') {
+    if (feature.kind === 'River') {
+      ctx.strokeStyle = 'rgba(56, 133, 190, 0.72)';
+      ctx.lineWidth = Math.max(10, feature.width * camera.zoom * 0.32);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    } else if (feature.kind === 'RiverBank') {
+      ctx.strokeStyle = 'rgba(185, 151, 91, 0.42)';
+      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.10);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    } else if (feature.kind === 'ShallowFord') {
+      ctx.strokeStyle = 'rgba(218, 197, 133, 0.95)';
+      ctx.lineWidth = Math.max(5, feature.width * camera.zoom * 0.18);
+      ctx.setLineDash([5 * camera.zoom, 4 * camera.zoom]);
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    } else if (feature.kind === 'Ridge') {
       ctx.strokeStyle = 'rgba(91, 75, 52, 0.30)';
       ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.08);
       ctx.setLineDash([8 * camera.zoom, 9 * camera.zoom]);

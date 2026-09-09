@@ -92,7 +92,11 @@ impl World3DEngine {
         self.tick_season(dt);
 
         // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
+        for pool in &mut self.water_pools {
+            pool.current_stock=(pool.current_stock+pool.regen_rate*dt*self.water_regen_multiplier).min(pool.max_stock);
+        }
         for poi in &mut self.pois {
+            if poi.water_pool_id.is_some(){continue;}
             if poi.poi_type == PoiType::Market {
                 poi.regen_rate = self.config.market_regen_base_water;
                 poi.secondary_regen_rate = self.config.market_regen_base_food;
@@ -150,6 +154,7 @@ impl World3DEngine {
                 poi.tick_regenerate(dt * mult);
             }
         }
+        self.sync_water_pois();
     }
 
     /// 子阶段 1: 生理代谢、养育受孕、胎儿位置跟随与金币遗产继承

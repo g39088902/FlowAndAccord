@@ -168,7 +168,17 @@ window.SIM_CONFIG = {
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
   // 地形生成、地表查询与山口 profile
-  terrainProfile: 'mountain_pass_v1', // T1 地貌模板；影响地形重建与存档门禁
+  terrainProfile: 'river_valley_v1', // T1 地貌模板；影响地形重建与存档门禁
+  terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
+  terrainRidgeWidth: 125.0, // T2 地貌 / 通行参数
+  terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数
+  terrainRiverWidthMax: 42.0, // T2 地貌 / 通行参数
+  terrainRiverWaterLevel: 0.0, // T2 地貌 / 通行参数
+  terrainRiverBankWidth: 18.0, // T2 地貌 / 通行参数
+  terrainRiverTerraceWidth: 65.0, // T2 地貌 / 通行参数
+  terrainCrossingWidth: 26.0, // T2 地貌 / 通行参数
+  terrainSoftGroundCost: 1.25, // T2 地貌 / 通行参数
+  terrainShallowWaterCost: 2.0, // T2 地貌 / 通行参数
   terrainMaxWalkSlope: 30.0,          // 普通道路允许的最大坡度 (度)
   terrainMaxBuildSlope: 16.0,         // 房屋/设施完整占地允许的最大坡度 (度)
   terrainFootprintHalfExtent: 7.0,    // 房屋基础完整占地半径 (m)

@@ -18,6 +18,7 @@ pub mod world_save;
 pub mod world_season;
 pub mod world_snapshot;
 pub mod world_tick;
+pub mod terrain_network;
 
 pub use agent::{Agent3D, AgentId, Gender, PrimitiveActionState};
 pub use curve::Curve3D;

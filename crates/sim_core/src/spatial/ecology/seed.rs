@@ -28,7 +28,8 @@ impl World3DEngine {
         // 7. 地形过渡节点
         self.spawn_terrain_transition_nodes(&mut layout);
         // 8. 全图路网连接
-        self.connect_road_network(&layout.all_node_ids);
+        self.prepare_terrain_layout();
+        self.connect_terrain_world(&layout.all_node_ids);
         // 9. 播撒初始 20 名原始小人 (10男10女)
         self.spawn_founders(&layout);
         // 始祖制度登记：家户 / 宗族 / 地区 / 帝国

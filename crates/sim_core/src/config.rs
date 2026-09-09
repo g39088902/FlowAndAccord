@@ -194,6 +194,17 @@ pub struct SimConfig {
 
     // 7. 地形生成、地表查询与山口 profile
     pub terrain_profile: String,
+    pub terrain_ridge_amplitude: f32,
+    pub terrain_ridge_width: f32,
+    pub terrain_river_width_min: f32,
+    pub terrain_river_width_max: f32,
+    pub terrain_river_water_level: f32,
+    pub terrain_river_bank_width: f32,
+    pub terrain_river_terrace_width: f32,
+    pub terrain_crossing_width: f32,
+    pub terrain_soft_ground_cost: f32,
+    pub terrain_shallow_water_cost: f32,
+
     pub terrain_max_walk_slope: f32,
     pub terrain_max_build_slope: f32,
     pub terrain_footprint_half_extent: f32,

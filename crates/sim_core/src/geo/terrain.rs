@@ -10,6 +10,10 @@ pub enum TerrainFeatureKind {
     Ridge,
     Saddle,
     Terrace,
+    River,
+    RiverBank,
+    ShallowFord,
+    SpringValley,
 }
 
 impl TerrainFeatureKind {
@@ -18,6 +22,10 @@ impl TerrainFeatureKind {
             Self::Ridge => "Ridge",
             Self::Saddle => "Saddle",
             Self::Terrace => "Terrace",
+            Self::River => "River",
+            Self::RiverBank => "RiverBank",
+            Self::ShallowFord => "ShallowFord",
+            Self::SpringValley => "SpringValley",
         }
     }
 }
@@ -33,7 +41,8 @@ pub struct TerrainFeature {
 }
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 1;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 2;
+pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
 
 /// 纯确定性自然地形生成引擎。
@@ -52,6 +61,7 @@ pub struct TerrainMap {
     pub profile: String,
     #[serde(default)]
     pub features: Vec<TerrainFeature>,
+    pub hydrology: super::hydrology::Hydrology,
 }
 
 impl TerrainMap {
@@ -77,6 +87,7 @@ impl TerrainMap {
             generator_version: TERRAIN_GENERATOR_VERSION,
             profile: TERRAIN_PROFILE_MOUNTAIN_PASS.to_string(),
             features: Vec::new(),
+            hydrology: Default::default(),
         }
     }
 
@@ -126,7 +137,7 @@ impl TerrainMap {
         let center_ridge = ridge_amplitude * (-((terrace_across) / ridge_width.max(1.0)).powi(2)).exp();
         let center_saddle = (-((terrace_along - saddle_along) / saddle_width.max(1.0)).powi(2)).exp();
         let center_ambient = center_base_tilt + center_wave_large + center_wave_medium + center_ridge - center_ridge * 0.90 * center_saddle;
-        let plateau_elev = center_ambient + 8.0;
+        let plateau_elev = center_ambient + 5.0;
 
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
@@ -173,7 +184,7 @@ impl TerrainMap {
                                 let t = (1.0 - r) / 0.45;
                                 t * t * (3.0 - 2.0 * t)
                             };
-                            elev = (1.0 - w) * ambient_elev + w * plateau_elev;
+                            elev = (1.0 - w * 0.85) * ambient_elev + w * 0.85 * (plateau_elev + 0.7 * (du * 2.0).sin());
                         } else {
                             elev = ambient_elev;
                         }
@@ -192,8 +203,8 @@ impl TerrainMap {
                 let right = raw[gy * self.grid_width + (gx + 1).min(self.grid_width - 1)];
                 let up = raw[gy.saturating_sub(1) * self.grid_width + gx];
                 let down = raw[(gy + 1).min(self.grid_height - 1) * self.grid_width + gx];
-                let dx = if self.grid_width <= 1 { 0.0 } else { (right - left) / (2.0 * cell_step_x.max(0.001)) };
-                let dy = if self.grid_height <= 1 { 0.0 } else { (down - up) / (2.0 * cell_step_y.max(0.001)) };
+                let dx = if self.grid_width <= 1 { 0.0 } else { (right - left) / (((gx + 1).min(self.grid_width - 1) - gx.saturating_sub(1)) as f32 * cell_step_x.max(0.001)) };
+                let dy = if self.grid_height <= 1 { 0.0 } else { (down - up) / (((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)) as f32 * cell_step_y.max(0.001)) };
                 let slope = (dx * dx + dy * dy).sqrt().atan().to_degrees();
                 let normalized_height = ((raw[idx] + 45.0) / 100.0).clamp(0.0, 1.0);
                 let fertility = (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0);
@@ -230,10 +241,10 @@ impl TerrainMap {
         let mut ridge_points = Vec::new();
         for i in 0..=8 {
             let along = -half * 0.82 + (i as f32 / 8.0) * self.world_size * 0.82;
-            let p = scale_vec(dir, along);
+            let p = add_vec(scale_vec(dir, along), scale_vec(side, ridge_offset));
             ridge_points.push(Vec3::new(p.x, p.y, self.sample_elevation(p.x, p.y)));
         }
-        let saddle_pos = scale_vec(dir, saddle_along);
+        let saddle_pos = add_vec(scale_vec(dir, saddle_along), scale_vec(side, ridge_offset));
         let terrace_center = add_vec(scale_vec(dir, terrace_along), scale_vec(side, terrace_across + ridge_offset));
         let num_rim_points = 24;
         let mut terrace_points = Vec::with_capacity(num_rim_points);
@@ -252,7 +263,13 @@ impl TerrainMap {
 
     #[inline]
     pub fn sample_elevation(&self, wx: f32, wy: f32) -> f32 {
-        self.sample_cell(wx, wy).elevation
+        let (x, y) = self.grid_coords(wx, wy);
+        let (ix, iy) = (x.floor() as usize, y.floor() as usize);
+        let (jx, jy) = ((ix + 1).min(self.grid_width - 1), (iy + 1).min(self.grid_height - 1));
+        let (u, v) = (x - ix as f32, y - iy as f32);
+        let a = self.cells[iy * self.grid_width + ix].elevation * (1.0-u) + self.cells[iy * self.grid_width+jx].elevation*u;
+        let b = self.cells[jy * self.grid_width + ix].elevation * (1.0-u) + self.cells[jy * self.grid_width+jx].elevation*u;
+        a*(1.0-v)+b*v
     }
 
     #[inline]
@@ -263,35 +280,25 @@ impl TerrainMap {
 
     #[inline]
     pub fn grid_index(&self, wx: f32, wy: f32) -> (usize, usize) {
-        let half_size = self.world_size / 2.0;
-        let norm_x = ((wx + half_size) / self.world_size.max(0.001)).clamp(0.0, 0.999_999);
-        let norm_y = ((wy + half_size) / self.world_size.max(0.001)).clamp(0.0, 0.999_999);
-        let gx = (norm_x * self.grid_width as f32) as usize;
-        let gy = (norm_y * self.grid_height as f32) as usize;
-        (gx.min(self.grid_width - 1), gy.min(self.grid_height - 1))
+        let (x,y) = self.grid_coords(wx, wy);
+        (x.round() as usize, y.round() as usize)
+    }
+
+    pub fn grid_coords(&self, x: f32, y: f32) -> (f32, f32) {
+        (((x/self.world_size+0.5)*(self.grid_width-1) as f32).clamp(0.0,(self.grid_width-1) as f32),
+         ((y/self.world_size+0.5)*(self.grid_height-1) as f32).clamp(0.0,(self.grid_height-1) as f32))
+    }
+    pub fn grid_pos(&self, x: usize, y: usize) -> Vec3 {
+        Vec3::new((x as f32/(self.grid_width-1).max(1) as f32-0.5)*self.world_size,
+                  (y as f32/(self.grid_height-1).max(1) as f32-0.5)*self.world_size,
+                  self.cells[y*self.grid_width+x].elevation)
     }
 
     /// 对整条三次贝塞尔曲线做自适应密度采样；用于 T0 路网合法性门禁。
     pub fn validate_curve(&self, curve: &Curve3D, corridor_width: f32, max_walk_slope: f32) -> bool {
-        let step = (self.world_size / self.grid_width.max(1) as f32).max(0.5);
-        let samples = ((curve.length / step).ceil() as usize * 2).clamp(16, 256);
-        for i in 0..=samples {
-            let t = i as f32 / samples as f32;
-            let p = curve.evaluate_pos(t);
-            let cell = self.sample_cell(p.x, p.y);
-            if cell.surface_kind.is_hard_blocked() || cell.feature_flags & TERRAIN_FLAG_NO_WALK != 0 || cell.slope_angle_deg > max_walk_slope { return false; }
-            if corridor_width > 0.0 {
-                let tangent = curve.evaluate_tangent(t);
-                    let normal = Vec3::new(-tangent.y, tangent.x, 0.0).normalize();
-                for side in [-1.0f32, 1.0] {
-                    let q = add_vec(p, scale_vec(normal, corridor_width * 0.5 * side));
-                    let side_cell = self.sample_cell(q.x, q.y);
-                    if side_cell.surface_kind.is_hard_blocked() || side_cell.feature_flags & TERRAIN_FLAG_NO_WALK != 0 || side_cell.slope_angle_deg > max_walk_slope { return false; }
-                }
-            }
-        }
-        true
+        super::corridor::validate_curve(self, curve, corridor_width, max_walk_slope, None)
     }
+
 }
 
 #[inline]

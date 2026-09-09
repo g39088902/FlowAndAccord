@@ -61,9 +61,20 @@ impl RoadClass {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaneTerrainProfile {
+    pub max_slope_deg: f32,
+    pub terrain_time_cost: f32,
+    pub surface_mask: u16,
+    pub crossing_id: Option<u32>,
+}
+impl Default for LaneTerrainProfile {
+    fn default()->Self {Self{max_slope_deg:0.0,terrain_time_cost:1.0,surface_mask:1,crossing_id:None}}
+}
 /// 3D 有向车道边 (包含隐秘属性)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LaneEdge3D {
+    pub terrain_profile: LaneTerrainProfile,
     pub id: LaneId,
     pub from_node: NodeId,
     pub to_node: NodeId,
@@ -292,6 +303,7 @@ impl LaneGraph3D {
         };
 
         let edge_data = LaneEdge3D {
+            terrain_profile: LaneTerrainProfile::default(),
             id: lane_id,
             from_node: from,
             to_node: to,
@@ -444,7 +456,7 @@ impl LaneGraph3D {
                 let road_level_factor = (config.road_level_factor_base
                     + config.road_level_factor_wear_coef * quantized_wear)
                     .clamp(config.road_level_factor_min, config.road_level_factor_max);
-                let effective_speed = edge.speed_limit * road_level_factor;
+                let effective_speed = edge.speed_limit * road_level_factor / edge.terrain_profile.terrain_time_cost.max(1.0);
 
                 let hidden_modifier = if prefer_hidden {
                     if edge.is_hidden {
@@ -464,7 +476,7 @@ impl LaneGraph3D {
             },
             |node_idx| {
                 let pos = self.graph[node_idx].pos;
-                pos.distance_to(&goal_pos) / config.road_astar_heuristic_divisor
+                pos.distance_to(&goal_pos) / [config.road_speed_dirt_track, config.road_speed_cobblestone, config.road_speed_asphalt_urban, config.road_speed_skyway_elevated, config.road_speed_smuggler_trail].into_iter().fold(1.0f32,f32::max) / config.road_level_factor_max.max(1.0) * [config.road_hidden_prefer_modifier,config.road_visible_prefer_modifier,config.road_hidden_avoid_modifier,config.road_visible_avoid_modifier].into_iter().fold(1.0f32,f32::min).max(0.0)
             },
         )?;
 

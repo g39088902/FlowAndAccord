@@ -18,6 +18,7 @@ use crate::config::SimConfig;
 pub(super) fn harvest_water(
     agent: &mut Agent3D,
     pois: &mut [PrimitivePoi],
+    pools: &mut [crate::geo::hydrology::WaterPool],
     config: &SimConfig,
     carry_cap: f32,
     rate_res: f32,
@@ -29,14 +30,16 @@ pub(super) fn harvest_water(
         p.poi_type == PoiType::WaterSource
             && p.pos.distance_to(&agent_pos) < config.poi_interaction_radius
     }) {
+        let mut pool = poi.water_pool_id.and_then(|id|pools.iter_mut().find(|w|w.id==id));
+        if let Some(ref p)=pool {poi.current_stock=p.current_stock;}
         let need = (config.agent_thirst_capacity - agent.thirst).max(0.0);
         if need > 0.01 {
-            let extracted = poi.extract(need.min(rate_res * dt));
+            let extracted = if let Some(ref mut p)=pool {p.extract(need.min(rate_res*dt))}else{poi.extract(need.min(rate_res*dt))};
             agent.thirst = (agent.thirst + extracted).min(config.agent_thirst_capacity);
         }
         if agent_hid.is_some() && agent.carried_water < carry_cap && poi.current_stock > 0.01 {
             let load = (carry_cap - agent.carried_water).min(rate_res * dt);
-            let extracted = poi.extract(load);
+            let extracted = if let Some(ref mut p)=pool {p.extract(load)}else{poi.extract(load)};
             agent.carried_water = (agent.carried_water + extracted).min(carry_cap);
             agent.cumulative_mined += extracted;
             agent.cumulative_mined_water += extracted;

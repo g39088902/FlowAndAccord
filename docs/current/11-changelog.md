@@ -1,7 +1,13 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.47.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.47.5**。
+
+| **v1.47.5** | T2 共享水池聚合与前端渲染落地：① 新增 `geo/hydrology.rs` `WaterPool` 共享水池——河谷水源 POI 按池聚合统一储量/再生（`tick_regenerate` 跳过池属水源、`world_tick.rs` 池级再生、`world_config.rs` 配置热更新同步池储量上限），取水/装载改走池级结算（`harvest_water` 按池 `extract`，`ecology/tick.rs` 采收改按 agent.id 稳定排序）；② `poi.rs` 新增 `water_pool_id`/`access_point_id`，`render_hud.js` 水源储量按池去重统计（旧档以库存对为回退键）；③ `TerrainFeatureKind` 新增 `River`/`RiverBank`/`ShallowFord`/`SpringValley` 四类地貌，`render_world.js` 新增河道/河岸/浅滩渲染，`dict.rs` 同步新增 4 个枚举码位；④ T1 连续高程修正：台地标高 +5m 并叠加正弦起伏、坡道中心差分计算修正、山脊沿侧向偏移采样；⑤ 配置新增 10 个 T2 字段（`terrainRidgeAmplitude` 等，227→**237**），`terrainProfile` 默认切为 `river_valley_v1`；⑥ `SAVE_FORMAT_VERSION` 6→7。 | sim_core(geo/hydrology/terrain/poi/ecology/config) / sim_wasm / frontend / docs / version |
+
+| **v1.47.4** | T2 地形感知路网与通行成本：① 新增 `spatial/terrain_network.rs` 取代旧 `connect_road_network`——`prepare_terrain_layout` + `connect_terrain_world` 按地形布局连接全图路网，立宅门节点/野外节点改走 `connect_land_nodes`（合法地块落位校正 + 走廊可达校验），`validate_terrain_world` 读档后校验；② `LaneEdge3D` 新增 `LaneTerrainProfile`（`max_slope_deg`/`terrain_time_cost`/`surface_mask`/`crossing_id`），寻路有效速度与 agent 步速按 `terrain_time_cost` 折算、启发式按最高路速归一；③ `geo/query.rs` 占地校验重写为网格矩形采样并拒绝浅水占地（`WaterCovered`）、越界提前返回；④ 新增 `terrainSoftGroundCost`/`terrainShallowWaterCost` 等通行成本配置；⑤ `WorldSave` 增加 `terrain_state`（完整地形存档）与 `water_pools`，读档改为恢复存档地形并校验 profile/生成器版本/网格尺寸一致性。 | sim_core(geo/query/spatial/network/save/config) / sim_wasm / frontend / docs / version |
+
+| **v1.47.3** | T2 两岸河谷静态水系、浅滩走廊与共享水池；T1 山脊/台地连续高程与地貌标记修正。 | sim_core(geo/terrain/network/ecology/save/config) / sim_wasm / frontend / docs |
 
 | **v1.47.2** | T1 台地「有机化」迭代：① `terrain.rs` 台地生成算法由矩形 `smooth_box` 平台重构为**平顶高台压平算法（Tableland Flattening）**——以 24 点有机扰动轮廓（`perturb = 1 + 0.08·sin(3φ) − 0.05·cos(2φ)`，台地半轴 a=0.14×、b=0.11×世界尺寸）定义台地边界，核心区（r ≤ 0.55）完全拉平至 +8m 标高（底层倾斜与波浪归零，坡度严格消除为 0°），台缘（0.55 < r < 1.0）经 Hermite smoothstep 平滑跌落回自然地貌；删除 `TERRAIN_FLAG_NO_BUILD`（台地恢复可建，与 T1 验收「台地可建」一致）；② `render_world.js` 特征渲染重构：Terrace 由生硬实线闭合矩形改为柔和微光填充 + 淡雅有机台缘等高虚线，Ridge/Saddle 绘制路径独立成块并补齐虚线设置；③ 文档同步：`26-plan-terrain-implementation.md` T1 步骤 4/6 更新为压平算法与 24 点自然有机台缘轮廓描述；④ 升版 v1.47.2 重编译 WASM 双副本。 | sim_core(geo/terrain) / frontend(render_world) / docs / version |
 

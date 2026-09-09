@@ -162,6 +162,8 @@ pub struct MarketTradeRecord {
 /// 有限生态地标实体 (清泉/浆果/林木/石矿/金矿的储量上限与产速均由 SimConfig 的 stock_max_* / regen_base_* 控制；营地无限)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimitivePoi {
+    pub water_pool_id: Option<u32>,
+    pub access_point_id: Option<u32>,
     pub id: PoiId,
     pub poi_type: PoiType,
     pub pos: Vec3,
@@ -279,6 +281,8 @@ impl PrimitivePoi {
         };
 
         Self {
+            water_pool_id: None,
+            access_point_id: None,
             id,
             poi_type,
             pos,

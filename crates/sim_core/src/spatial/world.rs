@@ -23,6 +23,7 @@ use std::collections::{HashMap, VecDeque};
 /// - `world_season.rs`：四季温度计算
 pub struct World3DEngine {
     pub terrain: TerrainMap,
+    pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
     pub network: LaneGraph3D,
     pub pois: Vec<PrimitivePoi>,
     pub houses: Vec<House>,
@@ -116,7 +117,7 @@ impl World3DEngine {
         config: SimConfig,
     ) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_with_profile(seed, &config.terrain_profile);
+        terrain.generate_with_config(seed, &config);
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
             config.ledger_journal_capacity
@@ -126,6 +127,7 @@ impl World3DEngine {
 
         Self {
             terrain,
+            water_pools: Vec::new(),
             network: LaneGraph3D::new(),
             pois: Vec::new(),
             houses: Vec::new(),

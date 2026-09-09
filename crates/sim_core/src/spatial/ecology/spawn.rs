@@ -6,7 +6,7 @@
 //! ⚠️ POI 播撒顺序即 RNG 消费顺序（营地→泉→果→木→石→金→榷场互市→过渡节点），
 //! 任何重排都会改变同种子随机序列，详见 `spatial/AGENTS.md` §4.3。
 
-use super::super::graph::{NodeType, RoadClass};
+use super::super::graph::{NodeType};
 use super::super::poi::{PoiType, PrimitivePoi};
 use super::super::vec3::Vec3;
 use super::super::world::World3DEngine;
@@ -247,41 +247,6 @@ impl World3DEngine {
         }
     }
 
-    /// 8. 全图路网连接（近距走铺装/土路，远距走土路，均为双向车道）
-    pub(super) fn connect_road_network(&mut self, all_node_ids: &[u32]) {
-        for i in 0..all_node_ids.len() {
-            for j in (i + 1)..all_node_ids.len() {
-                let id_a = all_node_ids[i];
-                let id_b = all_node_ids[j];
-                let pos_a = self.network.graph[*self.network.node_map.get(&id_a).unwrap()].pos;
-                let pos_b = self.network.graph[*self.network.node_map.get(&id_b).unwrap()].pos;
-                let dist = pos_a.distance_to(&pos_b);
-
-                if dist < self.config.road_connect_near_dist {
-                    let delta_z = (pos_a.z - pos_b.z).abs();
-                    let road_class = if delta_z > self.config.road_grade_pave_threshold {
-                        RoadClass::Cobblestone
-                    } else {
-                        RoadClass::DirtTrack
-                    };
-                    let _ = self
-                        .network
-                        .add_lane(id_a, id_b, None, road_class, &self.config);
-                    let _ = self
-                        .network
-                        .add_lane(id_b, id_a, None, road_class, &self.config);
-                } else if dist < self.config.road_connect_far_dist {
-                    let _ =
-                        self.network
-                            .add_lane(id_a, id_b, None, RoadClass::DirtTrack, &self.config);
-                    let _ =
-                        self.network
-                            .add_lane(id_b, id_a, None, RoadClass::DirtTrack, &self.config);
-                }
-            }
-        }
-    }
-
     /// ★ v1.21.1 生成一个远离所有营地 POI 的野外道路交叉节点（始祖出生地兜底，严禁落营地）
     pub(super) fn make_far_spawn_node(&mut self, camp_positions: &[Vec3], safe_dist: f32) -> u32 {
         let half_size = self.terrain.world_size / 2.0;
@@ -315,7 +280,9 @@ impl World3DEngine {
 
     /// ★ v1.21.1 将新生成的野外节点就近接入既有路网（双向车道），保证始祖出生后即可寻路
     pub(super) fn connect_spawn_node(&mut self, nid: u32) {
-        let pos = self.network.graph[*self.network.node_map.get(&nid).unwrap()].pos;
+        let idx=self.network.node_map[&nid];
+        let pos = self.legal_land_position(self.network.graph[idx].pos,&[]).unwrap_or(self.network.graph[idx].pos);
+        self.network.graph[idx].pos=pos;
         let mut nearest: Vec<(f32, u32)> = self
             .network
             .graph
@@ -325,17 +292,8 @@ impl World3DEngine {
             .collect();
         nearest.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         for (dist, other) in nearest.into_iter().take(2) {
-            let road_class = if dist > self.config.road_grade_pave_threshold {
-                RoadClass::Cobblestone
-            } else {
-                RoadClass::DirtTrack
-            };
-            let _ = self
-                .network
-                .add_lane(nid, other, None, road_class, &self.config);
-            let _ = self
-                .network
-                .add_lane(other, nid, None, road_class, &self.config);
+            let _ = dist;
+            self.connect_land_nodes(nid, other);
         }
     }
 }

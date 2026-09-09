@@ -23,10 +23,16 @@ let totalWoodCur = 0, totalWoodMax = 0;
 let totalStoneCur = 0, totalStoneMax = 0;
 let totalGoldCur = 0, totalGoldMax = 0;
 
+const seenWaterPools = new Set();
 for (const p of sim.pois) {
   if (p.type === 'Water') {
-    totalWaterCur += p.currentStock;
-    totalWaterMax += p.maxStock;
+    // 河谷水源 POI 共享同一池；旧存档/山口地图没有 pool id，使用库存对作为稳定回退键。
+    const poolKey = p.waterPoolId ?? `${p.currentStock}|${p.maxStock}`;
+    if (!seenWaterPools.has(poolKey)) {
+      seenWaterPools.add(poolKey);
+      totalWaterCur += p.currentStock;
+      totalWaterMax += p.maxStock;
+    }
   } else if (p.type === 'Berry') {
     totalBerryCur += p.currentStock;
     totalBerryMax += p.maxStock;

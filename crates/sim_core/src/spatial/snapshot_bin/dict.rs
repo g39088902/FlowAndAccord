@@ -36,6 +36,10 @@ pub fn terrain_feature_kind_code(kind: crate::geo::TerrainFeatureKind) -> u8 {
         crate::geo::TerrainFeatureKind::Ridge => 0,
         crate::geo::TerrainFeatureKind::Saddle => 1,
         crate::geo::TerrainFeatureKind::Terrace => 2,
+        crate::geo::TerrainFeatureKind::River => 3,
+        crate::geo::TerrainFeatureKind::RiverBank => 4,
+        crate::geo::TerrainFeatureKind::ShallowFord => 5,
+        crate::geo::TerrainFeatureKind::SpringValley => 6,
     }
 }
 
@@ -44,6 +48,10 @@ pub fn terrain_feature_kind_table() -> Vec<&'static str> {
         crate::geo::TerrainFeatureKind::Ridge,
         crate::geo::TerrainFeatureKind::Saddle,
         crate::geo::TerrainFeatureKind::Terrace,
+        crate::geo::TerrainFeatureKind::River,
+        crate::geo::TerrainFeatureKind::RiverBank,
+        crate::geo::TerrainFeatureKind::ShallowFord,
+        crate::geo::TerrainFeatureKind::SpringValley,
     ]
     .iter()
     .map(|k| k.as_str())

@@ -183,7 +183,17 @@
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `terrainProfile` | String | mountain_pass_v1 | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | T1 地貌模板；影响地形重建与存档门禁 |
+| `terrainProfile` | String | river_valley_v1 | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | T1 地貌模板；影响地形重建与存档门禁 |
+| `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
+| `terrainRidgeWidth` | f32 | 125 | — | T2 地貌 / 通行参数 |
+| `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
+| `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
+| `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |
+| `terrainRiverBankWidth` | f32 | 18 | — | T2 地貌 / 通行参数 |
+| `terrainRiverTerraceWidth` | f32 | 65 | — | T2 地貌 / 通行参数 |
+| `terrainCrossingWidth` | f32 | 26 | — | T2 地貌 / 通行参数 |
+| `terrainSoftGroundCost` | f32 | 1.25 | — | T2 地貌 / 通行参数 |
+| `terrainShallowWaterCost` | f32 | 2 | — | T2 地貌 / 通行参数 |
 | `terrainMaxWalkSlope` | f32 | 30 | geo/query.rs / graph.rs (道路完整曲线校验) | 普通道路允许的最大坡度 (度) |
 | `terrainMaxBuildSlope` | f32 | 16 | geo/query.rs / housing_system/settlement.rs (房屋完整占地) | 房屋/设施完整占地允许的最大坡度 (度) |
 | `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |

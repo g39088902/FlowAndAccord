@@ -13,7 +13,7 @@ FlowAndAccord/
 │   │   │   ├── config.json                 # 示例配置（M19 探针用）
 │   │   │   └── m19_probe.rs                # M19 行为探针示例
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (227 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (237 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系

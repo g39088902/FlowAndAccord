@@ -31,9 +31,9 @@ use crate::rng::WorldRng;
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
-pub const SAVE_FORMAT_VERSION: u32 = 6;
+pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.47.2";
+pub const SAVE_APP_VERSION: &str = "1.47.5";
 
 fn default_terrain_generator_version() -> u32 {
     TERRAIN_GENERATOR_VERSION
@@ -68,6 +68,8 @@ pub struct WorldSave {
     /// 地形 profile，例如 mountain_pass_v1。
     #[serde(default = "default_terrain_profile")]
     pub terrain_profile: String,
+    pub terrain_state: TerrainMap,
+    pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
 
     // ── 基础实体 ──
     pub network: LaneGraph3D,
@@ -149,6 +151,8 @@ impl World3DEngine {
             world_size: self.terrain.world_size,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
+            terrain_state: self.terrain.clone(),
+            water_pools: self.water_pools.clone(),
             network: self.network.clone(),
             pois: self.pois.clone(),
             houses: self.houses.clone(),
@@ -224,7 +228,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
             save.terrain_generator_version, TERRAIN_GENERATOR_VERSION
         ));
     }
-    if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS {
+    if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY {
         return Err(format!("地形 profile 不受支持：{}", save.terrain_profile));
     }
 
@@ -237,11 +241,12 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     }
 
     // 地形按种子确定性重建（不消耗世界 RNG）
-    let mut terrain = TerrainMap::new(save.grid_res, save.grid_res, save.world_size);
-    terrain.generate_with_profile(save.seed, &save.terrain_profile);
+    let terrain = save.terrain_state;
+    if terrain.profile != save.terrain_profile || terrain.generator_version != save.terrain_generator_version || terrain.cells.len()!=terrain.grid_width*terrain.grid_height { return Err("存档地形不一致".into()); }
 
     let mut world = World3DEngine {
         terrain,
+        water_pools: save.water_pools,
         network: save.network,
         pois: save.pois,
         houses: save.houses,
@@ -297,5 +302,6 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     {
         world.household_registry.rebuild_active_households();
     }
+    world.validate_terrain_world()?;
     Ok(world)
 }

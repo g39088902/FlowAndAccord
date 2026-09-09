@@ -1,5 +1,5 @@
 use crate::geo::{validate_footprint, FootprintQuery, LandUseKind};
-use crate::spatial::graph::{NodeId, NodeType, RoadClass};
+use crate::spatial::graph::{NodeId, NodeType};
 use crate::spatial::house::{House, HouseTier};
 use crate::spatial::poi::PoiType;
 use crate::spatial::vec3::Vec3;
@@ -103,24 +103,7 @@ impl World3DEngine {
                 .then(a.0.cmp(&b.0))
         });
         for &(near_id, _) in sorted_nearby_nodes.iter().take(count) {
-            let _ = self.network.add_lane_with_options(
-                node_id,
-                near_id,
-                None,
-                RoadClass::DirtTrack,
-                false,
-                1.0,
-                &self.config,
-            );
-            let _ = self.network.add_lane_with_options(
-                near_id,
-                node_id,
-                None,
-                RoadClass::DirtTrack,
-                false,
-                1.0,
-                &self.config,
-            );
+            self.connect_land_nodes(node_id,near_id);
         }
     }
 
@@ -175,6 +158,8 @@ impl World3DEngine {
 
             // 优先复用合法范围内最近的空置节点（房屋坍塌遗留的孤儿门节点 / 无主野外路口），
             // 无可复用节点时才新建，杜绝路网节点随代际更替无限膨胀。
+            let has_access=self.network.graph.node_weights().any(|n| crate::geo::corridor::route(&self.terrain,cand_pos,n.pos,&self.config).is_some());
+            if !has_access {continue;}
             let reuse = self.find_vacant_node_near(cand_pos, self.config.house_node_reuse_radius);
 
             let (site_pos, door_node, is_reused) = if let Some((node_id, node_pos)) = reuse {

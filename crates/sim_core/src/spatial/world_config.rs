@@ -18,10 +18,17 @@ impl World3DEngine {
     /// 应用动态仿真配置
     pub fn apply_config(&mut self, config: SimConfig) {
         self.config = config;
+        for pool in &mut self.water_pools {
+            let n=pool.source_poi_ids.len() as f32;
+            pool.max_stock=self.config.stock_max_water*n;
+            pool.regen_rate=self.config.regen_base_water*n;
+            pool.current_stock=pool.current_stock.min(pool.max_stock);
+        }
         // 配置更新后（可能变更寻路参数）清空路网路径缓存
         self.network.clear_path_cache();
         // 同步刷新所有现有 POI 的产速基准与储量上限（v1.33.1 修复 max_stock 动态更新遗漏）
         for poi in &mut self.pois {
+            if poi.water_pool_id.is_some(){continue;}
             match poi.poi_type {
                 PoiType::WaterSource => {
                     poi.regen_rate = self.config.regen_base_water;
@@ -64,6 +71,7 @@ impl World3DEngine {
                 poi.tertiary_stock = poi.tertiary_max_stock;
             }
         }
+        self.sync_water_pois();
     }
 
     /// 设置某类 POI 的自然再生倍率 (0=水泉, 1=浆果, 2=林木, 3=石矿, 4=金矿)
