@@ -14,6 +14,7 @@
 | 配置 / 超参 | `docs/current/08-config-system.md`、影响矩阵 §1.8 | `node tools/config-check.js` |
 | 前端 / DOM / UI | `frontend/AGENTS.md`、`docs/current/23-ui-dev-guide.md` | `node tools/frontend-check.js` |
 | WASM / 导出 / 存档 | `crates/sim_wasm/AGENTS.md`、`docs/current/15-save-load.md` | WASM 双副本、`node tools/test-wasm.js` |
+| 仅文档 / AGENTS.md 内容 | 根 `AGENTS.md` §4.0.1、`docs/current/19-commit-checklist.md` §G | `node tools/doc-maintenance-check.js`（不升版、不跑测试） |
 
 ## 2. 修改前四问
 
@@ -27,7 +28,7 @@
 - 代码、WASM 双副本（如适用）和文档已同步；
 - 运行与改动类型匹配的专项门禁；
 - 运行 `node tools/doc-maintenance-check.js`；发布追加 `--strict`，提交按 `19-commit-checklist.md` 执行；
-- 使用 `node tools/bump-version.js --patch` 统一升版，并用 `--check` 验证零漂移；
+- 使用 `node tools/bump-version.js --patch` 统一升版，并用 `--check` 验证零漂移（**仅代码/配置/契约变化时**；纯文档变更跳过升版与测试，按 `19-commit-checklist.md` §G 执行）；
 - 在 `docs/current/11-changelog.md` 记录行为或契约变化。
 
 ## 4. 交互遗漏排查顺序

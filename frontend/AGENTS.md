@@ -83,7 +83,7 @@
 
 ```
 1. math.js                    零依赖基础
-2. config.js                  SIM_CONFIG (211 字段，含拆分配置合计)
+2. config.js                  SIM_CONFIG (219 字段，含拆分配置合计)
 3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
 4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
 5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)

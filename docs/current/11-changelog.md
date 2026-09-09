@@ -1,7 +1,13 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.18**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.46.21**。
+
+| **v1.46.21** | 代码地图完整性修复：① **屏蔽 `frontend/public/`**——该目录为借用对象存储的测试页（`elder.html`），非本项目产物，`tools/code-map-check.js` 扫描排除并在 09-code-map.md 注释说明；② **补登记 25 个漏登记文件**使 `code-map-check` 由 26 警告归零（✅ `CODE_MAP_CHECK_PASSED`）：Rust 侧 `examples/config.json`、`examples/m19_probe.rs`、`decisions/preemption.rs`（M19.4b）、`snapshot_bin/` 五件套（M4 FABS 编码层，decisions 文件数注释 15→16）；前端 `config.poi-rates.js`、`snapshot-bin.js`（M4 解码器）；tools 侧 4 个 baseline-*.json；docs 侧 00-agent-start / 24-three-core-systems-fsm / 25-competitor-analysis / 26-intent-observation 与 7 篇 plan/spec 文档 + archive 基线审计；③ 升版 v1.46.21 重编译 WASM 双副本。 | tools / docs / ci |
+
+| **v1.46.20** | 将跨文档一致性门禁接入提交前与 CI：① `cross-doc-check.js` 加入 `20-tools-guide.md` §7 提交前门禁组合；② 加入 `.github/workflows/deploy.yml`（WASM 回归门禁之后、上传产物之前，不通过不部署，并同步 `04-cicd-guide.md` 流水线图 / 门禁表 / 排障表，文档版 v1.0.2）；③ 同步门禁权威位置：根 AGENTS.md §4.0 自检清单新增「跨文档一致性」项、§4.13 CI 流程描述补门禁、§4.0.1 纯文档提交「只需」列表加 cross-doc-check，`19-commit-checklist.md` A/G 节必做命令同步。 | tools / docs / ci |
+
+| **v1.46.19** | 新增跨文档事实指纹一致性检查器 `tools/cross-doc-check.js` 并修复全库文档间冲突：① **新工具**：不做 O(N²) 全文比对，把可枚举事实（配置字段值 / 关键常量 / 结构数字）提取为「指纹」，同一指纹键在 ≥2 篇文档中值不同即 CONFLICT；配置字段值 vs `config.js`、SimConfig 字段总数 vs `config.rs`、工具数 vs `tools/` 实际脚本数运行时读取比对即 DRIFT；扫描根与局部 AGENTS.md + `docs/` 全量 markdown（排除 archive / changelog / 规划态文档），存在冲突或漂移即 exit 1；② **修复 12 处文档间/文档-权威冲突**：`carryCapacityResource` 由 50.0 修正为 100.0；决策错峰相位 `% 30 == 0` 全部修正为 `% 120 == 0`（07-agent-ai-analysis / housing_system/AGENTS / 05-house-system / 14-invariants）；SimConfig 字段总数 163/168/205/211 统一修正为 **219**（08-config-system 分区表同步 12 分区 → 14 分区、09-code-map、13-impact-matrix、frontend/AGENTS、01-current、23-ui-dev-guide）；config.js 主配置字段数 149 → 199；tools 工具数 15/16 → **23**（20-tools-guide 补登记 gen-m19-baseline / test-m19-differential / test-snapshot-bin / cross-doc-check 四工具，09-code-map 补登记 6 个既有工具）；③ **登记与文档**：`doc-maintenance.json` 同步 sources 与 lastReviewed，18-doc-maintenance.md 新增 §3.1 跨文档指纹检查说明，20-tools-guide.md 新增 §2.6 与全景表条目；④ 升版 v1.46.19 重编译 WASM 双副本。 | tools / docs |
 
 | **v1.46.18** | 完整族谱布局与交互修复：亲子出生间隔自适应约束时间轴最小密度，避免子代贴入父辈卡片高度；概览 LOD 主干改为亮边、红色仅用于当前选中，补齐女性配色；修复指针捕获后的卡片点击与取消误选，悬停不重建 DOM，密度重排保留选中人物位置；统一年龄小时与年度跨度口径。页内与独立页同步，重编译 WASM 双副本。 | frontend(dag) / docs / version |
 

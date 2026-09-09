@@ -3,8 +3,8 @@
 开发任务入口：[Agent 快速入口](./current/00-agent-start.md)，按改动类型选择指南、上下游同步链与验证命令。
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.46.18（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
-> **超参配置**：全部可调超参（205 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
+> **版本**：v1.46.21（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **超参配置**：全部可调超参（219 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
 
@@ -75,7 +75,7 @@
 | 19 | 🧠 决策架构重构：意图与执行策略解耦（M19 落地规划与技术规格） | [19-plan-agent-intent-strategy-decoupling.md](./19-plan-agent-intent-strategy-decoupling.md)<br/>[19-1-spec-intent-strategy-split-result.md](./19-1-spec-intent-strategy-split-result.md) | 意图仲裁-策略规划-原语执行三层解耦、ActiveTask 单一真相源、分级抢占、禀赋家资个性化、多品类预排队列与行程优化全落地 |
 | 15+ | ⏱️ 性能 Profiling 基准与确定性矩阵 | [15-profiling-and-benchmarking-guide.md](./15-profiling-and-benchmarking-guide.md) | `profile-benchmark.js` 吞吐量/8大子阶段耗时拆解/快照序列化开销、`test-determinism.js` 6大确定性定理测试 |
 | 16+ | 🚀 仿真内核与全链路性能优化规划书 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | 仅保留未完成计划：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join（条件触发） |
-| 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 15 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
+| 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 23 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
 | 25 | 🧭 竞品与同类项目分析 | [25-competitor-analysis.md](./current/25-competitor-analysis.md) | GitHub 同类项目横向比较、完成度判断、竞争位置与可借鉴研发方向 |
 | — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.46.0 各版本核心机制改动 |
 

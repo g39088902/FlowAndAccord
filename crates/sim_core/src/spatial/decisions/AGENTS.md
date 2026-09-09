@@ -143,10 +143,10 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
   - 可观测性：`ActiveTaskSnapshot::itinerary` 字符串（如 `💧备水 → 🌲备木 → 🍒备粮`，少于 2 站时为 `--`），
     已纳入**四处同步**（`snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/encode.rs` / `snapshot-bin.js`），Inspector 元素 `insp-task-itinerary`。
 
-### 4.14 🔴 验证「行囊已装满」必须用配置容量，禁止硬编码 50
+### 4.14 🔴 验证「行囊已装满」必须用配置容量，禁止硬编码常量
 
 `carry_capacity_resource`（前端 `carryCapacityResource`）当前为 **100.0**，是判定 `carry_full` 的唯一权威阈值。
-构造「某品类已装满 → 现场转站」的测试或诊断场景时，必须从 `SIM_CONFIG.carryCapacityResource` 取值而非写死 50.0：
+构造「某品类已装满 → 现场转站」的测试或诊断场景时，必须从 `SIM_CONFIG.carryCapacityResource` 取值而非写死旧值常量：
 若行囊未满且家户该品类仍短缺，`decide_drinking`/`decide_foraging` 的 `finished` 判据不成立，Agent 会在资源点**原地持续采集**，
 根本不会进入 `try_continue_harvesting`，表现为「预排队列不生效 / 行程不推进」的**假故障**。
 同类坑亦见于「家宅已备满」类场景——须同时把 `family_stock_active` 置位或直接给足账本余额。

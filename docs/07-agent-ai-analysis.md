@@ -47,10 +47,10 @@ Rust 内核 `crates/sim_core` 是唯一真实仿真实现，通过 `node tools/t
 
 ## 3. 为什么是错峰决策，而非全员同拍
 
-`scheduler.rs::tick_decisions()` 每 tick 被调用，但每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 相位上决策（30 tick = 1.0 模拟秒）。三个理由：
-1. **性能均摊**：20+ agent 同时决策会导致单 tick 耗时尖峰（A* 寻路是主要开销）；错峰后每 tick 仅约 1/30 agent 决策，帧率稳定；
+`scheduler.rs::tick_decisions()` 每 tick 被调用，但每个 agent 仅在 `(tick_counter + agent.id) % 120 == 0` 相位上决策（120 tick = 2 游戏小时）。三个理由：
+1. **性能均摊**：20+ agent 同时决策会导致单 tick 耗时尖峰（A* 寻路是主要开销）；错峰后每 tick 仅约 1/120 agent 决策，帧率稳定；
 2. **避免共振**：全员同拍会导致"同步出发→同步到达→同步争抢同一 POI"；错峰让行为自然分散；
-3. **确定性保持**：相位由 `(tick_counter + agent.id) % 30` 确定性计算，不消耗 `WorldRng`。
+3. **确定性保持**：相位由 `(tick_counter + agent.id) % 120` 确定性计算，不消耗 `WorldRng`。
 
 ---
 

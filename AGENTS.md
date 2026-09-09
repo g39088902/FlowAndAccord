@@ -27,7 +27,7 @@
 | **docs/04-cicd-guide.md** | CI/CD 部署指南：GitHub Actions 流水线、4 个 Secrets、COS MIME 排障 | 调整部署流程或排查部署失败时 |
 | **docs/05-headless-diagnostics-guide.md** | 确定性无头诊断指南：`tools/diagnose.js` 命令行用法、八大嗅探规则、Agent 五步排障 SOP | 需要使用指定 Seed/Tick 诊断 Bug 与回归验证时 |
 | **docs/15-profiling-and-benchmarking-guide.md** | 性能 Profiling 基准与确定性矩阵操作指南：`tools/profile-benchmark.js` 与 `tools/test-determinism.js` | 进行性能优化、寻路改进、多线程改造前建立基准与回归时 |
-| **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 15 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
+| **docs/current/20-tools-guide.md** | 仿真内核与工程工具箱操作指南：`tools/` 目录下全部 23 个工具（门禁/测试/性能/诊断/族谱/版本治理）速查手册 | 查阅 tools 工具箱功能、参数用法与标准工作流时 |
 | **docs/07-agent-ai-analysis.md** | 部落民 AI 决策系统深度拆解：马斯洛 FSM、加权 A*、踏路涌现与生命周期闭环 | 理解 AI 状态机与寻路逻辑时 |
 | **docs/archive/12-plan-ledger-refactor.md** | 已完成的账本与仓库重构计划 | 仅追溯里程碑；改动账本以 `docs/current/12-ledger-system.md` 和局部 AGENTS 为准 |
 | **docs/16-plan-performance-optimization.md** | 仿真内核与全链路性能优化规划书（仅保留未完成计划：M5-1 消除超线性 / M5-2 条件触发的多线程 Fork-Join） | 性能优化专项规划 |
@@ -64,7 +64,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.46.18)"]
+    F --> G["浏览器 UI (版本: v1.46.21)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -114,7 +114,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.18`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.46.21`**。
 
 ---
 
@@ -140,7 +140,7 @@ node frontend/server.js           # http://localhost:3000
 > 详细版（含影响面说明）见 [`docs/current/13-impact-matrix.md` §五](docs/current/13-impact-matrix.md)。
 
 ```
-□ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9）
+□ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9；仅文档变更可跳过，见 §4.0.1）
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
 □ 四处同步（M4）：快照字段变更时 snapshot.rs / world.rs / snapshot_bin/encode.rs / rustworld.js+snapshot-bin.js 一致（防漂移门禁：node tools/test-snapshot-bin.js）
 □ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
@@ -148,6 +148,7 @@ node frontend/server.js           # http://localhost:3000
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + 11-changelog.md + 受影响的局部 AGENTS.md
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
+□ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
 ```
 
 ### 4.0.1 ✅ Commit 前检查单（提交前必做）
@@ -155,6 +156,8 @@ node frontend/server.js           # http://localhost:3000
 详细清单已拆分至 [`docs/current/19-commit-checklist.md`](docs/current/19-commit-checklist.md)。准备 `git commit` 时必须执行该清单：所有提交先做工作区、diff 和文档维护体检；命中 Rust/WASM、前端、配置或行为机制改动时，再执行对应专项门禁。
 
 **最低标准**：基础项全部通过，专项项按改动类型通过；发布或 CI 追加 `node tools/doc-maintenance-check.js --strict`。未执行的门禁必须在提交说明或 PR 中注明原因。
+
+**⚡ 仅文档变更例外（纯文档提交）**：若 diff 只涉及 `docs/`、根/局部 `AGENTS.md` 等纯文档内容（**不含** Rust / 前端 / 配置 / 版本号定义点等任何代码或行为/契约改动），则 commit 时**不需要升版**（跳过 `bump-version.js --patch/--minor`）也**不需要重跑任何测试门禁**（`cargo build/test`、`test-wasm.js`、`config-check.js`、`frontend-check.js`、`test-snapshot-bin.js`、`diagnose.js --check all` 等）。此时只需：① 工作区/diff 检查；② `node tools/doc-maintenance-check.js` 通过；③ `node tools/cross-doc-check.js` 无文档间冲突/权威漂移；④ `node tools/bump-version.js --check` 零漂移（纯一致性校验，非升版）。详细清单见 [`docs/current/19-commit-checklist.md`](docs/current/19-commit-checklist.md) §G。
 
 ### 4.1 🔴 WASM 编译与双副本同步（最常踩）
 
@@ -185,7 +188,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.4 🟠 随身搬运机制（真实背包，非瞬移）
 
-- 水/粮/木/石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(50.0)，互不共享），回家休整时按 `config.poiUnloadRateResource`/s(10) 卸货**入家户账本**（M6 起：家户账本为家庭储备唯一真相源，房屋仓库已删除）；行囊满即返家。
+- 水/粮/木/石：在资源点**只装入随身行囊**（每类独立容量 `config.carryCapacityResource`(100.0)，互不共享），回家休整时按 `config.poiUnloadRateResource`/s(10) 卸货**入家户账本**（M6 起：家户账本为家庭储备唯一真相源，房屋仓库已删除）；行囊满即返家。
 - 金：容量无限，单趟运满 20 回宅存入金库（5/s）。
 - 无家宅（`home_house_id.is_none()`）的 agent 不装载行囊，只在现场就地自饮自食。
 - 改容量/装卸速率必须全链条联动：`agent.rs` → `ecology.rs` → `decisions/` → `snapshot.rs` → `rustworld.js` → `render.js`。
@@ -233,6 +236,8 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 ### 4.9 🟢 版本号自增规范（每次 AI 修改代码必改）
 
 每次 AI 修改代码（Rust 内核、前端 JS/CSS/HTML、文档配置）都必须自增版本号。**严禁手工改版本号**——一律使用统一升版器，一次命令同步全部定义点：
+
+> ⚡ **仅文档变更例外**：diff 只涉及纯文档（`docs/`、根/局部 `AGENTS.md` 内容，不含代码/配置/版本号定义点）时**不升版、不重跑测试**，只需 `doc-maintenance-check` 通过 + `bump-version.js --check` 零漂移（见 §4.0.1 与 `19-commit-checklist.md` §G）。升版只针对会改变行为、契约或版本定义点本身的改动。
 
 ```powershell
 node tools/bump-version.js --patch          # 默认：1.44.1 → 1.44.2
@@ -301,7 +306,7 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 
 ### 4.13 🚀 CI/CD 流水线（GitHub Actions → 腾讯云 COS）
 
-- **触发与门禁**：`.github/workflows/deploy.yml` 仅在 push `master`（或手动 `workflow_dispatch`）时运行；流程为编译 WASM → 双副本同步 → `test-wasm.js` 门禁 → `coscmd` 增量上传 `frontend/`。门禁不过不部署。详见 `docs/04-cicd-guide.md`。
+- **触发与门禁**：`.github/workflows/deploy.yml` 仅在 push `master`（或手动 `workflow_dispatch`）时运行；流程为编译 WASM → 双副本同步 → `test-wasm.js` 门禁 → `cross-doc-check.js` 跨文档一致性门禁 → `coscmd` 增量上传 `frontend/`。门禁不过不部署。详见 `docs/04-cicd-guide.md`。
 - **CI 工具链**：使用标准 rustup，**严禁**在 workflow 中设置 `CARGO_HOME` 指向 `.cargo-home` 或把 `.toolchain/` 加入 PATH——它们是 Windows 便携缓存，与 ubuntu-latest 不兼容。
 - **wasm MIME**：`.wasm` 必须 `Content-Type: application/wasm`，workflow 上传后对双副本强制覆写 Header。
 - **密钥安全**：桶地址/密钥一律走 GitHub Secrets（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`），严禁明文写入。

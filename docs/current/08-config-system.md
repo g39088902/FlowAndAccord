@@ -6,24 +6,26 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**200 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**219 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
 ### 全量超参数抽取
-- `SimConfig` 共 **163 个字段**，按 12 个分区组织：
+- `SimConfig` 共 **219 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [06-config-reference.md](../06-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（3 字段）
   2. 部落民生理、代谢与生命周期（46 字段）
-  3. 先天禀赋与遗传演化（5 字段）
-  4. 生态地标与 POI 采收交互（31 字段）
-  5. 马斯洛需求与决策门槛（15 字段）
-  6. 私宅营造、代际传承与升级（27 字段）
-  7. 四季更迭与宏观气候（3 字段）
-  8. 空间路网、限速与踩踏演化（12 字段）
+  3. 先天禀赋与遗传演化（9 字段）
+  4. 生态地标与 POI 采收交互（32 字段）
+  5. 马斯洛需求与决策门槛（20 字段）
+  6. 私宅营造、代际传承与升级（34 字段）
+  7. 四季更迭与宏观气候（9 字段）
+  8. 空间路网、限速与踩踏演化（14 字段）
   9. 动力学移动与寻路权重（10 字段）
   10. 账本与婚姻登记子系统（1 字段）
-  11. 宗族系统 M3（5 字段）
-  12. 地区与王国系统 M4（5 字段）
+  11. 宗族系统 (M3)（6 字段）
+  12. 地区与王国系统 (M4)（10 字段）
+  13. 外部市场（榷场互市）与幂律动态定价（16 字段）
+  14. 二手房屋市场、营地中介拍卖与麦穗竞价（9 字段）
 
 ### 免编译热调优
 - 前端 `rustworld.js` 在加载 WASM 及重置模拟时，通过 `world_set_config` / `world_apply_config_buf` 将 `window.SIM_CONFIG` 动态序列化注入 Rust WASM 内存。
@@ -69,7 +71,7 @@
 - 改字段后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 当前有效字段数为 **205 个**。
+- `SimConfig` 当前有效字段数为 **219 个**。
 - 前端 JS 为仿真超参数的唯一数值真相源，Rust 内核不保留数值字面量常量。
 - `config.js` 字段集与类型必须与 `config.rs` 契约严格 100% 吻合。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

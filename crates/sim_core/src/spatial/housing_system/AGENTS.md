@@ -63,7 +63,7 @@
 
 ### 4.7 决策相位出价与麦穗 37% 竞价（auction.rs，v1.26.0 重构）
 
-1. **出价下沉到决策引擎**：无房成年男性或有房户主在自己的决策相位（`(tick+id)%30==0`）命中 `B17BidHouse` 分支 → `write_bid_pending` 复用 `branches::all_bid_candidates` 一次性写入升序目标集合 `pending_bid_house_ids`（不改变运动状态、不耗 RNG）；世界执行器 `execute_pending_bids` 按 agent id / 房屋 id 双升序逐个落地：**金额 = 家户账本全部黄金（倾囊，无上限）**，首套成交即停（一人一房铁律），出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却；★ v1.31.0 无房者对全部在售房、有房者对全部 `tier > 自宅` 在售房一次性倾囊出价；
+1. **出价下沉到决策引擎**：无房成年男性或有房户主在自己的决策相位（`(tick+id)%120==0`）命中 `B17BidHouse` 分支 → `write_bid_pending` 复用 `branches::all_bid_candidates` 一次性写入升序目标集合 `pending_bid_house_ids`（不改变运动状态、不耗 RNG）；世界执行器 `execute_pending_bids` 按 agent id / 房屋 id 双升序逐个落地：**金额 = 家户账本全部黄金（倾囊，无上限）**，首套成交即停（一人一房铁律），出价后进入 `houseAuctionBidCooldownTicks`(300) 全局冷却；★ v1.31.0 无房者对全部在售房、有房者对全部 `tier > 自宅` 在售房一次性倾囊出价；
 2. **麦穗 37% 最优停止博弈**（成交判定只看新报价，不回溯历史）：
    - 观察期（起拍至 37% 损耗点）：只记录报价、树立最高标杆 `benchmark_bid`，不成交；
    - 决策期（37% 损耗点至 10% 修缮度）：新报价 `> benchmark_bid` 即成交；★ v1.30.0 无人击穿时标杆按 `houseAuctionBenchmarkDecayRate`(0.02 金/模拟秒) 线性衰减至出价底价（`tick_auction_benchmark_decay`，每 tick 在 `execute_pending_bids` 之前调用）；

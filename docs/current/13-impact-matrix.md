@@ -134,7 +134,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 ## 三、数据流向图（Rust → 前端）
 
 ```
-SimConfig (config.rs + config.house-upgrade-cost.js，共 168 字段)
+SimConfig (config.rs + config.house-upgrade-cost.js，共 219 字段)
     │  序列化
     ▼
 sim_wasm.wasm (world_create / world_tick / world_apply_config)
@@ -188,7 +188,7 @@ rustworld.js::_applySnapshot()
 ## 五、快速自检清单（改代码前对照）
 
 ```
-□ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增
+□ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增（仅文档变更可跳过，见 AGENTS.md §4.0.1）
 □ 双副本：sim_wasm.wasm 已复制到 frontend/rust/ 和 frontend/ (仅 Rust 变更)
 □ 四处同步（★ M4）：snapshot.rs / world.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 字段一致 (仅快照变更)，门禁 `node tools/test-snapshot-bin.js`
 □ 配置联动：config.rs 三处(const/字段/Default) + config.js + config-check.js 通过

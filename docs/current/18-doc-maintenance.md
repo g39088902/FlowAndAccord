@@ -45,6 +45,16 @@ node tools/doc-maintenance-check.js --strict
 
 源码和文档使用工作区修改时间，因此未提交的改动也会触发 `NEEDS_REVIEW`。`--json` 供 CI、仪表盘或 IDE 集成；`--strict` 在有任何问题时返回退出码 1。
 
+### 3.1 跨文档事实指纹检查（`tools/cross-doc-check.js`）
+
+上述体检器回答「文档 vs 源码」的时效；本文档另设一层回答「**N 份文档两两之间是否有冲突**」的机检部分：
+
+- **原理**：不做 O(N²) 全文比对，把可枚举事实（配置字段值 / 关键常量 / 结构数字）提取为「指纹」，同一指纹键在 ≥2 篇文档中值不同即 CONFLICT；
+- **权威比对**：配置字段值 vs `frontend/js/config.js`、SimConfig 字段总数 vs `config.rs`、工具数 vs `tools/` 实际脚本数，不一致即 DRIFT（权威值运行时读取，不硬编码）；
+- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `docs/archive/`、`docs/current/11-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态数值）；
+- **用法**：`node tools/cross-doc-check.js`（存在冲突/漂移即 exit 1），`--json` 供 CI 与仪表盘；
+- **边界**：语义型冲突（机制描述 / 因果 / 归属自相矛盾）无法机检，仍靠维护清单 + 人工复核兜底。
+
 ## 4. 推荐工作流
 
 ```mermaid

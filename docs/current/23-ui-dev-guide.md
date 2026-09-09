@@ -193,7 +193,7 @@ gantt
 ```
 
 ### 交付门禁（每次代码提交前必检）
-1. **配置一致性校验**：`node tools/config-check.js` 必须 205 个超参字段完全匹配；
+1. **配置一致性校验**：`node tools/config-check.js` 必须 219 个超参字段完全匹配；
 2. **WASM 与引擎确定性测试**：`node tools/test-wasm.js` 必须输出 `ALL_TESTS_DONE`（0 越界、0 NaN、同种子逐字节一致、存档读档确定性、版本不兼容拒绝）；
 3. **WASM 双副本同步**：`frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm` 必须同步更新；
 4. **版本号自增与文档同步**：同步更新 `index.html`、`AGENTS.md`、`docs/current/11-changelog.md`、受影响的 `docs/current/0X-*.md`。

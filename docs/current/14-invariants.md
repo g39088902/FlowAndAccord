@@ -57,7 +57,7 @@
 4. tick_housing(dt)                     房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)         道路自然衰减
 6. 运动 (胎儿跳过)                      agent.tick_movement
-   tick_decisions()                     错峰决策 ((tick + id) % 30 == 0)
+   tick_decisions()                     错峰决策 ((tick + id) % 120 == 0)
 7. tick_bookkeeping()                   M2 继承清算 + 分家抽资
 8. tick_clan(dt)                        M3 族长顺位 → 族税 → 族内互助
 9. tick_region(dt)                      M4 初王顺位 → 长子继承 → 公仓税 → 救济
@@ -73,7 +73,7 @@
 
 | # | 不变量 | 来源 | 违反后果 |
 |---|---|---|---|
-| B1 | **决策错峰相位**：每个 agent 仅在 `(tick_counter + agent.id) % 30 == 0` 的相位上决策，全员相位均摊错开 | §4.3 | 全员同拍决策导致性能尖峰和行为同步化 |
+| B1 | **决策错峰相位**：每个 agent 仅在 `(tick_counter + agent.id) % 120 == 0` 的相位上决策，全员相位均摊错开 | §4.3 | 全员同拍决策导致性能尖峰和行为同步化 |
 | B2 | **建房/升级/修缮均为 Agent 自主决策**，严禁系统扫描指挥（`tick_warehouse_founding` / `check_start_house_upgrades` 等旧扫描器已删除，勿复活） | §4.11 | 破坏"系统只当物理规则执行者"的设计原则 |
 | B3 | **掉头必须平滑回走**（中途重路由时在当前车道反向平滑回走），严禁闪现瞬移 | §4.2 | 坐标不连续，渲染跳变 |
 | B4 | **Agent 私有 POI 施密特触发器**：开启 ≥ 0.30 / 关闭 < 0.10 / 中间带保持前态，每名 Agent 维护私有锁存 | §4.2 | 相同 POI 被不同 Agent 判为不同可用性是预期行为 |
@@ -113,7 +113,7 @@
 | O3 | **同一事实只在一个权威位置出现**，其余用交叉引用，禁止多处复制粘贴导致漂移 | AGENTS.md §5 | 文档与代码不一致 |
 | O4 | **新增模块时**先建 `docs/current/0X-*.md` + 对应目录 `AGENTS.md`，再在根 AGENTS.md §0 加索引，最后在 `11-changelog.md` 追加条目 | AGENTS.md §5 | 文档缺失，后续 agent 无指南可依 |
 | O5 | **改机制时同步更新**对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新 | AGENTS.md §5 | 文档滞后于代码 |
-| O6 | **版本号自增**：每次 AI 修改代码必须同步更新 ① `index.html` 版本徽章 ② 根 AGENTS.md §1/§2 版本号 ③ changelog 条目 | §4.9 | 版本混乱，无法追踪变更 |
+| O6 | **版本号自增**：每次 AI 修改代码必须同步更新 ① `index.html` 版本徽章 ② 根 AGENTS.md §1/§2 版本号 ③ changelog 条目（**仅文档变更除外**：`docs/` / `AGENTS.md` 纯内容改动不升版、不重跑测试，见 §4.0.1） | §4.9 | 版本混乱，无法追踪变更 |
 
 ---
 

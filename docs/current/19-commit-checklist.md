@@ -8,6 +8,7 @@
 git status --short
 git diff --check
 node tools/doc-maintenance-check.js
+node tools/cross-doc-check.js          # 跨文档事实指纹：文档间冲突 / 配置权威漂移
 node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS.md §4.9）
 ```
 
@@ -16,6 +17,7 @@ node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
 - [ ] 改过代码已用 `node tools/bump-version.js --patch`（或 `--minor` / 指定版本）升版，`--check` 零漂移；**未手工编辑任何版本号定义点**。
 - [ ] `docs/current/11-changelog.md` 已追加该版本条目；对应 `docs/current/` 模块文档已同步。
+- [ ] **仅纯文档变更**（diff 只含 `docs/` 或根/局部 `AGENTS.md` 内容）：跳过升版与全部测试门禁，改按 §G 执行（A 的工作区/diff/文档维护体检照常）。
 
 ## B. Rust、WASM 或快照改动
 
@@ -72,7 +74,24 @@ node tools/diagnose.js --check all
 - [ ] 对外文案、错误提示和空态与当前机制一致。
 - [ ] 提交说明包含“改了什么 / 为什么改 / 如何验证”；未执行的门禁已说明原因。
 
+## G. 仅文档变更（纯文档提交）
+
+diff 只涉及 `docs/` 或根/局部 `AGENTS.md` 内容（不含 Rust / 前端 / 配置 / 版本号定义点等任何代码或行为/契约改动）时的专用通道：
+
+```bash
+git status --short
+git diff --check
+node tools/doc-maintenance-check.js
+node tools/cross-doc-check.js          # 跨文档事实指纹（纯文档提交正是其主战场）
+node tools/bump-version.js --check        # 一致性校验，非升版
+```
+
+- [ ] **不升版**：跳过 `node tools/bump-version.js --patch / --minor / <版本>`，也不得手工改动任何版本号定义点。
+- [ ] **不重跑测试**：跳过 `cargo build / cargo test`、`node tools/test-wasm.js`、`config-check.js`、`frontend-check.js`、`test-snapshot-bin.js`、`diagnose.js --check all` 等全部测试门禁（无行为/契约变化，测试结果不受影响）。
+- [ ] 文档维护体检通过；`bump-version.js --check` 零漂移（确认本次文档改动未波及版本号定义点）。
+- [ ] 不新增 changelog 版本条目（`11-changelog.md` 按版本归档，无升版即无条目）；若修订了机制描述，仍按根 `AGENTS.md` §5 分层守则同步对应 `docs/current/` 模块文档与局部 AGENTS.md。
+
 ## 允许提交的最低标准
 
-A 必须全部通过；命中 B/C/D/E 时，对应专项项必须通过。`--strict` 主要用于发布或 CI；本地小改动可以暂不阻塞，但报告中的问题必须有明确归属和处理计划。
+A 必须全部通过（纯文档提交按 §G 走：跳过升版与测试，工作区 / diff / 文档维护体检照常）；命中 B/C/D/E 时，对应专项项必须通过。`--strict` 主要用于发布或 CI；本地小改动可以暂不阻塞，但报告中的问题必须有明确归属和处理计划。
 

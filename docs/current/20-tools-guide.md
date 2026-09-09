@@ -1,7 +1,7 @@
 # 20. 🛠️ 仿真内核与工程工具箱操作指南 (tools/)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../01-current.md)
-> **工具定位**：`tools/` 目录下的 16 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
+> **工具定位**：`tools/` 目录下的 23 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
 
 ---
 
@@ -28,6 +28,10 @@
 | 17 | **`test-preemption.js`** | 行为矩阵 | ★ M19.4b 分级任务抢占验证：危机抢占、平滑中断、行囊保全、进度冻结五大场景 | `node tools/test-preemption.js` | 0=矩阵全通, 1=断言失败 |
 | 18 | **`test-personalization.js`** | 行为矩阵 | ★ M19.4c 禀赋与家资个性化选策验证：力量/智力/家户财富三大分化维度五大场景 | `node tools/test-personalization.js` | 0=矩阵全通, 1=断言失败 |
 | 19 | **`test-itinerary.js`** | 行为矩阵 | ★ M19.4d 多品类预排采收行程验证：链路生成 / TSP 最近邻排序 / 多站顺路推进 / 异常清空 / 多种子长程确定性 | `node tools/test-itinerary.js` | 0=矩阵全通, 1=断言失败 |
+| 20 | **`gen-m19-baseline.js`** | 基线工具 | ★ M19.0 冻结基线生成：长程演化导出观察基线（`tools/baseline-m19-observation.json`） | `node tools/gen-m19-baseline.js` | 0=生成完成 |
+| 21 | **`test-m19-differential.js`** | 行为矩阵 | ★ M19 差分回归：3600 tick 存档与快照哈希逐字节一致性（M19 基线回归） | `node tools/test-m19-differential.js` | 0=矩阵全通, 1=断言失败 |
+| 22 | **`test-snapshot-bin.js`** | 契约门禁 | ★ M4 四处同步防漂移门禁：FABS 二进制帧 vs JSON 真值逐字段深比较（4 场景，含跨世界驻留表） | `node tools/test-snapshot-bin.js` | 0=全绿, 1=不一致 |
+| 23 | **`cross-doc-check.js`** | 契约门禁 | 跨文档事实指纹一致性：同一事实在多篇文档值不同即冲突，配置字段另与 config.js / config.rs 权威比对 | `node tools/cross-doc-check.js` | 0=全部一致, 1=冲突/漂移 |
 
 ---
 
@@ -85,6 +89,18 @@
   node tools/doc-maintenance-check.js           # 日常只读体检
   node tools/doc-maintenance-check.js --strict  # CI/发版严格模式（源码领先或超期阻断）
   ```
+
+### 2.6 `cross-doc-check.js` · 跨文档事实指纹一致性检查
+- **目标**：机检「N 份文档两两之间没有冲突」——不做 O(N²) 全文比对，而是把可枚举事实（配置字段值 / 关键常量 / 结构数字）提取为指纹：
+  1. **CONFLICT（文档 vs 文档）**：同一指纹键（如 `carryCapacityResource`、决策错峰相位 `% N == 0`、SimConfig 字段总数）在 ≥2 篇文档中值不同；
+  2. **DRIFT（文档 vs 权威）**：配置字段值与 `frontend/js/config.js`、字段总数与 `config.rs`、工具数与 `tools/` 实际脚本数不一致（权威值运行时读取，不硬编码）。
+- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `docs/archive/`、`11-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态）。
+- **常用命令**：
+  ```bash
+  node tools/cross-doc-check.js            # 常规检查（冲突/漂移即退出码 1）
+  node tools/cross-doc-check.js --json     # 结构化输出（CI / 仪表盘）
+  ```
+- **与 doc-maintenance-check.js 的分工**：后者管「文档 vs 源码」的时效与责任（时间戳 + 维护清单）；本工具管「文档 vs 文档」与「文档 vs 权威配置」的事实一致性。两者互补，发布前都跑。
 
 ---
 
@@ -271,6 +287,7 @@ node tools/test-determinism.js
 node tools/bump-version.js --check
 node tools/code-map-check.js
 node tools/doc-maintenance-check.js
+node tools/cross-doc-check.js        # 跨文档事实指纹（文档间冲突 / 配置权威漂移）
 
 # 5. 决策行为改动（M19.4b/c/d）专项矩阵回归：
 node tools/test-preemption.js        # 分级任务抢占

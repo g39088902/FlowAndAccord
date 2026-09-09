@@ -51,6 +51,10 @@ jobs:
       - name: WASM 回归测试门禁
         run: node tools/test-wasm.js
 
+      # 跨文档事实指纹一致性：文档间冲突或配置权威漂移（config.js/config.rs/tools 实际数量）即失败
+      - name: 跨文档一致性门禁
+        run: node tools/cross-doc-check.js
+
       - name: 上传构建产物 (供部署 Job 使用)
         uses: actions/upload-artifact@v4
         with:

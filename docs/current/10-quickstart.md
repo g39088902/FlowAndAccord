@@ -54,6 +54,8 @@ node tools/bump-version.js --check      # 只校验一致性（漂移即 exit 1�
 ```
 改过代码就必须升版（根 AGENTS.md §4.9）。升版器以 `index.html` 版本徽章为唯一真相源，自动同步 `SAVE_APP_VERSION` 等定义点；若 Rust 常量变更，按方式 1 重编译 WASM 并同步双副本。
 
+> ⚡ **仅文档变更例外**：diff 只含 `docs/` 或根/局部 `AGENTS.md` 内容时，commit **不需要升版、不需要重跑测试**，只需 `doc-maintenance-check` 通过 + `--check` 零漂移（详见根 AGENTS.md §4.0.1 与 `19-commit-checklist.md` §G）。
+
 ## 常用交互
 | 操作 | 快捷键/方式 |
 | :--- | :--- |

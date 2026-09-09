@@ -45,12 +45,15 @@ function scanActualFiles() {
   }
 
   function walk(dir) {
+    const relDir = path.relative(ROOT, dir).replace(/\\/g, '/');
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const e of entries) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         // 跳过构建产物和缓存
         if (e.name === 'target' || e.name === 'node_modules' || e.name === '.cargo-home') continue;
+        // frontend/public/ 为借用对象存储的测试页目录（elder.html），非本项目产物，屏蔽扫描
+        if (relDir === 'frontend' && e.name === 'public') continue;
         walk(full);
       } else if (e.isFile()) {
         const rel = path.relative(ROOT, full).replace(/\\/g, '/');
