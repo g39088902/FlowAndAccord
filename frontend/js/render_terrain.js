@@ -6,6 +6,43 @@
 //   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color，本文件只负责绘制；
 //   天空背景与大气色洗是两个固定的氛围插入点，不得在此新增整层立体实体绘制。
 
+// ★ v1.48.1 地形格间抗锯齿缝隙补偿量（屏幕像素）：相邻格共享边各只覆盖约半像素，
+//   不补偿会露出背景色 1px 网格线。0.75px 经像素采样验证可把缝隙残差压到 1/255 以内。
+const TERRAIN_SEAM_PX = 0.75;
+
+// ★ v1.48.2 边界墙（沙盘侧壁）深度排序：
+//   四面墙都是沿世界 z 轴垂直下垂的幕布，下垂只改变 z（屏幕 y 与相机深度），不改变旋转后的 ry。
+//   同一屏幕点上的两面墙，深度差 = (ry_a − ry_b) / sinX ⇒「谁在前面」只由 ry = wx·sinZ + wy·cosZ
+//   决定，与墙高无关。故按各墙边界中点的 ry 升序（远 → 近）落笔，取代旧的固定 N/W/S/E 顺序。
+const BOUNDARY_WALL_BASE = '#5A5043'; // 基准色 = v1.47.11 北侧壁色（关闭动态光照时的观感基准）
+const BOUNDARY_WALLS = [
+  { nx: 0, ny: -1, nz: 0, first: 0, step: 1, ry: 0 }, // 北（世界 -y，受光面）
+  { nx: -1, ny: 0, nz: 0, first: 0, step: 1, ry: 0 }, // 西（世界 -x）
+  { nx: 0, ny: 1, nz: 0, first: 0, step: 1, ry: 0 },  // 南（世界 +y，背阴）
+  { nx: 1, ny: 0, nz: 0, first: 0, step: 1, ry: 0 },  // 东（世界 +x）
+];
+const _wallDrawOrder = [0, 1, 2, 3]; // 每帧按 ry 重排（持久数组，零分配）
+
+// 单面边界墙：沿边界顶点序列走上沿，再折返走下沿（按各格高程下垂）后闭合填充
+// first/step 定位该墙在 terrainProjX/Y 中的顶点序列；外法线参与季节光照
+function drawBoundaryWall(first, step, count, nx, ny, nz, skirtElev, elevDropFactor) {
+  const cells = sim.terrain.cells;
+  const L = window.SimLighting;
+  ctx.fillStyle = (L && L.enabled()) ? L.shadeFace(BOUNDARY_WALL_BASE, nx, ny, nz) : BOUNDARY_WALL_BASE;
+  ctx.beginPath();
+  ctx.moveTo(terrainProjX[first], terrainProjY[first]);
+  for (let k = 1; k < count; k++) {
+    const idx = first + k * step;
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
+  }
+  for (let k = count - 1; k >= 0; k--) {
+    const idx = first + k * step;
+    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (cells[idx].elev - skirtElev) * elevDropFactor);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 // 天空/地平渐变 + 逆光光晕（光源对侧偏亮，光晕随四季方位绕地平线移动）
 function drawSkyBackdrop() {
   const L = window.SimLighting;
@@ -112,63 +149,26 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 
   // 1.2 四周边沿垂直剖面侧壁：外法线参与季节光照，明暗随光向旋转
   //     基准色取 v1.47.11 北侧壁色，相对旧固定光归一化 ⇒ 关闭动态光照时观感与原版一致
-  const L = window.SimLighting;
-  const wallBase = '#5A5043';
-  const wallColor = (nx, ny, nz) => (L && L.enabled()) ? L.shadeFace(wallBase, nx, ny, nz) : wallBase;
-
-  // 北侧壁 (世界 -y，受光面)
-  ctx.fillStyle = wallColor(0, -1, 0);
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
-  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[gx], terrainProjY[gx]);
-  for (let gx = gSize - 1; gx >= 0; gx--) {
-    ctx.lineTo(terrainProjX[gx], terrainProjY[gx] + (sim.terrain.cells[gx].elev - skirtElev) * elevDropFactor);
+  //     ★ v1.48.2 按相机距离排序（远 → 近）绘制，取代旧的固定 N/W/S/E 顺序，
+  //       使较近的边界墙遮盖较远的边界墙（判据推导见文件头 BOUNDARY_WALLS 注释）。
+  const cells = sim.terrain.cells;
+  const lastIdx = gSize - 1;
+  const rowOffsetS = lastIdx * gSize;
+  BOUNDARY_WALLS[0].first = 0;          BOUNDARY_WALLS[0].step = 1;     // 北
+  BOUNDARY_WALLS[1].first = 0;          BOUNDARY_WALLS[1].step = gSize; // 西
+  BOUNDARY_WALLS[2].first = rowOffsetS; BOUNDARY_WALLS[2].step = 1;     // 南
+  BOUNDARY_WALLS[3].first = lastIdx;    BOUNDARY_WALLS[3].step = gSize; // 东
+  for (let wi = 0; wi < 4; wi++) {
+    const wd = BOUNDARY_WALLS[wi];
+    const ca = cells[wd.first], cb = cells[wd.first + lastIdx * wd.step];
+    wd.ry = (ca.wx + cb.wx) * 0.5 * sinZ + (ca.wy + cb.wy) * 0.5 * cosZ;
   }
-  ctx.closePath();
-  ctx.fill();
-
-  // 西侧壁 (世界 -x)
-  ctx.fillStyle = wallColor(-1, 0, 0);
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
-  for (let gy = 1; gy < gSize; gy++) {
-    const idx = gy * gSize;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
+  // 稳定排序：ry 相同（墙在屏幕上退化为零面积）时保持 N/W/S/E 原序，渲染确定性不变
+  _wallDrawOrder.sort((a, b) => (BOUNDARY_WALLS[a].ry - BOUNDARY_WALLS[b].ry) || (a - b));
+  for (let oi = 0; oi < 4; oi++) {
+    const wd = BOUNDARY_WALLS[_wallDrawOrder[oi]];
+    drawBoundaryWall(wd.first, wd.step, gSize, wd.nx, wd.ny, wd.nz, skirtElev, elevDropFactor);
   }
-  for (let gy = gSize - 1; gy >= 0; gy--) {
-    const idx = gy * gSize;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 南侧壁 (世界 +y，背阴)
-  ctx.fillStyle = wallColor(0, 1, 0);
-  ctx.beginPath();
-  const rowOffsetS = (gSize - 1) * gSize;
-  ctx.moveTo(terrainProjX[rowOffsetS], terrainProjY[rowOffsetS]);
-  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[rowOffsetS + gx], terrainProjY[rowOffsetS + gx]);
-  for (let gx = gSize - 1; gx >= 0; gx--) {
-    const idx = rowOffsetS + gx;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 东侧壁 (世界 +x)
-  ctx.fillStyle = wallColor(1, 0, 0);
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[gSize - 1], terrainProjY[gSize - 1]);
-  for (let gy = 1; gy < gSize; gy++) {
-    const idx = gy * gSize + (gSize - 1);
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
-  }
-  for (let gy = gSize - 1; gy >= 0; gy--) {
-    const idx = gy * gSize + (gSize - 1);
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
 
   // 2. 视口裁剪绘制地形四边形
   for (let gy = 0; gy < gSize - 1; gy++) {
@@ -197,11 +197,32 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 
       const c00 = sim.terrain.cells[i00];
       ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
+
+      // ★ v1.48.1 无缝拼接：相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，
+      //   两者叠加后仍留约 25% 的透光率，深色天空背景便从缝隙里透出 1px 网格线
+      //   （表现为「地形漏出后面的边界线条」）。把四条边各自沿外法线平移 TERRAIN_SEAM_PX，
+      //   使相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度。
+      const mx = (p00x + p10x + p11x + p01x) * 0.25;
+      const my = (p00y + p10y + p11y + p01y) * 0.25;
+      const e0x = p10x - p00x, e0y = p10y - p00y;
+      const e1x = p11x - p10x, e1y = p11y - p10y;
+      const e2x = p01x - p11x, e2y = p01y - p11y;
+      const e3x = p00x - p01x, e3y = p00y - p01y;
+      const l0 = Math.sqrt(e0x * e0x + e0y * e0y) || 1;
+      const l1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
+      const l2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
+      const l3 = Math.sqrt(e3x * e3x + e3y * e3y) || 1;
+      // 固定旋向法线 (ey, -ex)/l，再用质心方向确定指向"外"侧
+      const sgn = (e0y * ((p00x + p10x) * 0.5 - mx) - e0x * ((p00y + p10y) * 0.5 - my)) > 0 ? 1 : -1;
+      const n0x = sgn * e0y / l0, n0y = -sgn * e0x / l0;
+      const n1x = sgn * e1y / l1, n1y = -sgn * e1x / l1;
+      const n2x = sgn * e2y / l2, n2y = -sgn * e2x / l2;
+      const n3x = sgn * e3y / l3, n3y = -sgn * e3x / l3;
       ctx.beginPath();
-      ctx.moveTo(p00x, p00y);
-      ctx.lineTo(p10x, p10y);
-      ctx.lineTo(p11x, p11y);
-      ctx.lineTo(p01x, p01y);
+      ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
+      ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
+      ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
+      ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
       ctx.closePath();
       ctx.fill();
     }

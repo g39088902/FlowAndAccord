@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.48.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.48.1**。
+
+| **v1.48.1** | 修复地形网格「漏出后面的边界线条」（格间抗锯齿缝隙）：① **根因**：`drawTerrain` 逐格填充四边形，相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，两者叠加后仍留约 25% 透光率，深色天空背景从缝隙透出，整片地形浮现 1px 深色网格（像素实验：缝隙处 `#46613a` vs 填充色 `#5a7c43`）；② **修复**：`render_terrain.js` 新增文件级常量 `TERRAIN_SEAM_PX`(0.75)，绘制时把每格四条边沿各自**外法线**平移该像素量——法线由边向量 `(ey,-ex)/l` 归一化、以质心方向定外向，逐格计算以适配起伏地形，相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度，故不影响格内着色；③ **验证**：像素采样残差由 1px 深线（Δ≈20/255）压到 1/255 以内，Playwright 实测 zoom 0.32 / 1.15 / 2.6 / 6 四档视角网格线全部消失，地形轮廓、沙盘侧壁与水面特征无回归；④ **代价**：每格新增 4 次 `sqrt` + 约 24 次浮点运算（14161 格实测 +1.7ms，约为 `drawTerrain` 耗时的 2%，无额外绘制调用）；⑤ 纯前端表现层，不消耗 `WorldRng`、不写模拟状态、不进存档、不参与确定性承诺。升版 v1.48.1 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更）。 | frontend(render_terrain) / docs / version |
 
 | **v1.48.0** | 新增「动态季节光照」纯表现层引擎（方案 `docs/27-plan-seasonal-lighting.md`）：① **光相引擎** `frontend/js/lighting.js`——光位唯一来源为快照 `season / season_progress / season_timer / temperature`（严禁自建计时器），一年扫 360°、四季节气各占一象限（春=东 / 夏=南 / 秋=西 / 冬=北），高度角 22°~72° 随年相连续演化，盛夏光强最亮、隆冬最弱，色温按四季节气连续插值 + 气温（含厄尔尼诺/纪元候波）冷暖微调；② **前端独立配置** `frontend/js/config.lighting.js`（挂 `window.SIM_LIGHTING`，**不注入 WASM、不并入 SIM_CONFIG**，避免 SimConfig 字段集比对冲突），加载顺序早于 rustworld.js；③ **地形渲染拆分**：`frontend/js/render_terrain.js`（v1.48.0 起从 `render_world.js` 拆出，地形网格/水系地貌/天空背景与大气色洗），地形网格在 `rustworld.js` 重建时一次性预存单位法线/无光反照率/AO 三组 Float32Array，光档变化由 `SimLighting.relightTerrain()` 只重算光因子并原地写回 `cell.color`，避免整片重建颜色与字符串；④ **开关与观察**：控制台「☀️ 动态季节光照（一年一圈）」复选框（`#chk-dynamic-light`，默认开）+ 快捷键 **L** 同源切换，关闭即退回 v1.47.11 固定光（西北 41°）并立即整片重着色；顶栏「🧭 当前光位」实时读数（罗盘方位 + 高度角），调试 HUD 新增「光照重着色」耗时与「光相/光档」；读档 / 重置 / 时光回滚后引擎重建 → `resync()` 光相立即对齐（不做平滑）；⑤ **确定性**：纯表现层，不消耗 `WorldRng`、不写模拟状态、不进存档、不参与内核确定性承诺；浅色主题已适配（`#fbbf24`/`#stat-sun` 高对比映射）。本次仅前端 JS/CSS/HTML + 文档 + 版本号（`SAVE_APP_VERSION` 随升版变更 → 重编译 WASM 双副本），Rust 内核逻辑零改动；门禁：`frontend-check` 29 文件语法 + DOM 引用全绿、`bump-version --check` 零漂移、`cross-doc-check` 冲突 0 漂移 0。 | frontend(lighting/render_terrain/render_world/render_hud/main/rustworld/style/index) / docs / version |
 
