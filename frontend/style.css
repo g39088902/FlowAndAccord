@@ -4063,10 +4063,11 @@ body.theme-light .brand-card,
 body.theme-light .stats-card,
 body.theme-light .save-bar-card,
 body.theme-light .global-resource-panel,
-body.theme-light .control-panel,
 body.theme-light .event-log,
 body.theme-light .debug-hud,
-body.theme-light .inspector-card {
+body.theme-light .inspector-card,
+body.theme-light .global-averages-card,
+body.theme-light .ledger-panel {
   background: rgba(255, 255, 255, 0.94);
   border-color: rgba(0, 0, 0, 0.12);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
@@ -4076,11 +4077,49 @@ body.theme-light .brand-desc,
 body.theme-light .stat-lbl,
 body.theme-light .meter-label,
 body.theme-light .log-title,
+body.theme-light .panel-title,
 body.theme-light .panel-title span:last-child {
   color: #475569;
 }
+/* 「生态时钟与倍速控制台」浅色适配：底色与「族群动态播报」正文区（.log-list #f8fafc）完全同色，
+   避免纯白浮窗在浅色画布上刺眼；标题色同步为 .log-title 的 #475569。 */
+body.theme-light .control-panel {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  color: #0f172a;
+}
+body.theme-light .control-panel .panel-title {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+/* 面板内动态注入的内联色在浅色底上过浅/刺眼，统一加深 */
+body.theme-light .control-panel .toggle-row > span[style*="#facc15"] { color: #b45309 !important; }
+body.theme-light .control-panel .toggle-row > span[style*="#38bdf8"] { color: #0284c7 !important; }
+body.theme-light #stat-actual-speed { color: #475569 !important; }
+body.theme-light #btn-open-rewind-ctrl {
+  color: #b45309 !important;
+  border-color: rgba(180, 83, 9, 0.45) !important;
+  background: rgba(245, 158, 11, 0.16) !important;
+}
+body.theme-light #btn-open-rewind-ctrl:hover {
+  background: rgba(245, 158, 11, 0.28) !important;
+}
 body.theme-light .stat-val {
   color: #0284c7;
+}
+body.theme-light #stat-temp {
+  color: #334155 !important;
+}
+body.theme-light #stat-deaths-natural {
+  color: #16a34a !important;
+}
+body.theme-light #stat-deaths-unnatural {
+  color: #dc2626 !important;
+}
+body.theme-light .version-tag {
+  background: rgba(59, 130, 246, 0.1) !important;
+  color: #2563eb !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
 }
 body.theme-light .save-bar-btn {
   background: #f1f5f9;
@@ -4109,6 +4148,22 @@ body.theme-light .headless-btn:hover {
   background: rgba(148, 163, 184, 0.25);
   color: #0f172a;
 }
+body.theme-light .reset-rate-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+body.theme-light .reset-rate-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+body.theme-light #lbl-water-rate { color: #0284c7 !important; }
+body.theme-light #lbl-food-rate { color: #16a34a !important; }
+body.theme-light #lbl-wood-rate { color: #65a30d !important; }
+body.theme-light #lbl-stone-rate { color: #475569 !important; }
+body.theme-light #lbl-gold-rate { color: #d97706 !important; }
+body.theme-light .slider-header span[style*="#cbd5e1"] { color: #475569 !important; }
 body.theme-light .meter-bg {
   background: #e2e8f0;
 }
@@ -4137,19 +4192,463 @@ body.theme-light select#sel-speed {
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
 }
+
+/* 📊 全局族人均值大盘浅色适配 */
+body.theme-light .legend-title {
+  color: #334155;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.theme-light .legend-collapse-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+body.theme-light .legend-collapse-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+body.theme-light .avg-section-title {
+  color: #475569;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.theme-light .avg-stat-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .avg-lbl {
+  color: #64748b;
+}
+body.theme-light .avg-carry-chip {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .avg-trait-box {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .avg-trait-box strong {
+  color: #0284c7;
+}
+
+/* 📒 家户与账本大盘浅色适配 */
+body.theme-light .ledger-tab-switcher {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.theme-light .ledger-tab-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+body.theme-light .ledger-tab-btn:hover:not(.disabled) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+body.theme-light .ledger-tab-btn.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+body.theme-light .ledger-tab-btn[data-tab="marriage"].active {
+  background: #fce7f3;
+  border-color: #ec4899;
+  color: #be185d;
+}
+body.theme-light .ledger-tab-btn[data-tab="clan"].active {
+  background: #dcfce7;
+  border-color: #10b981;
+  color: #047857;
+}
+body.theme-light .ledger-tab-btn[data-tab="region"].active {
+  background: #fef9c3;
+  border-color: #eab308;
+  color: #a16207;
+}
+body.theme-light .ledger-overview-row {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.theme-light .ledger-ov-lbl {
+  color: #64748b;
+}
+body.theme-light .ledger-ov-val {
+  color: #0f172a;
+}
+body.theme-light .ledger-section-title {
+  color: #475569;
+}
+body.theme-light .ledger-household-list,
+body.theme-light .ledger-marriage-list {
+  color: #334155;
+}
+body.theme-light .ledger-hh-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .ledger-hh-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+body.theme-light .ledger-hh-head-name {
+  color: #0f172a;
+}
+body.theme-light .ledger-hh-members {
+  color: #64748b;
+}
+body.theme-light .ledger-hh-id {
+  color: #b45309;
+}
+body.theme-light .ledger-hh-bal-total {
+  color: #d97706;
+}
+body.theme-light .ledger-hh-item.ledger-dissolved {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+body.theme-light .ledger-dissolved-tag {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+body.theme-light .ledger-split-badge {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #b45309;
+}
+body.theme-light .ledger-mg-item {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+  color: #334155;
+}
+body.theme-light .ledger-mg-id {
+  color: #be185d;
+}
+body.theme-light .ledger-mg-dur {
+  color: #64748b;
+}
+body.theme-light .clan-card {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #334155;
+}
+body.theme-light .clan-card:hover {
+  border-color: #86efac;
+}
+body.theme-light .clan-card.clan-extinct {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+body.theme-light .clan-extinct-badge {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+body.theme-light .region-card {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #334155;
+}
+body.theme-light .ledger-public-granary-card {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #334155;
+}
+body.theme-light .pg-title {
+  color: #b45309;
+}
+body.theme-light .pg-total {
+  color: #78350f;
+}
+body.theme-light .ledger-journal-drawer,
+body.theme-light .ledger-inherit-archive {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+body.theme-light .ledger-journal-header {
+  background: #fef3c7;
+  border-bottom-color: #fde68a;
+  color: #92400e;
+}
+body.theme-light .ledger-journal-item {
+  border-bottom-color: #e2e8f0;
+}
+body.theme-light .journal-tick {
+  color: #64748b;
+}
+body.theme-light .journal-reason {
+  color: #0f172a;
+}
+body.theme-light .journal-flow {
+  color: #475569;
+}
+body.theme-light .ledger-inherit-header {
+  color: #334155;
+  border-bottom-color: #e2e8f0;
+}
+body.theme-light .ledger-inherit-row {
+  color: #475569;
+}
+body.theme-light .ledger-inherit-row b {
+  color: #0f172a;
+}
+
+/* 🔍 Inspector 详情卡片浅色与高对比文字适配 */
 body.theme-light .inspector {
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(0, 0, 0, 0.12);
   color: #0f172a;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.08);
 }
-body.theme-light .insp-header {
+body.theme-light .inspector-title {
   border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.theme-light .insp-title-left #insp-title-name {
+  color: #0f172a !important;
+}
+body.theme-light .state-badge {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fcd34d;
+}
+body.theme-light .state-badge[style*="#f59e0b"] { color: #b45309 !important; }
+body.theme-light .state-badge[style*="#38bdf8"] { color: #0284c7 !important; }
+body.theme-light .state-badge[style*="#10b981"] { color: #15803d !important; }
+body.theme-light .state-badge[style*="#ef4444"] { color: #dc2626 !important; }
+body.theme-light .insp-close-btn {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+body.theme-light .insp-close-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+body.theme-light .insp-subbar {
+  color: #64748b;
+}
+body.theme-light .insp-home-chip {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #bae6fd;
+}
+body.theme-light #insp-age-val[style*="#38bdf8"] { color: #0284c7 !important; }
+body.theme-light #insp-age-val[style*="#ec4899"] { color: #be185d !important; }
+body.theme-light #insp-age-val[style*="#a78bfa"] { color: #6d28d9 !important; }
+body.theme-light .insp-prestige-chip {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fcd34d;
 }
 body.theme-light .insp-section-title {
   color: #334155;
   border-bottom-color: rgba(0, 0, 0, 0.08);
 }
+
+/* 决策行动中枢高对比度优化 */
+body.theme-light .decision-hub-badge {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #7dd3fc;
+}
+body.theme-light #insp-maslow-reason {
+  color: #1e293b !important;
+}
+body.theme-light #insp-maslow-box > div > span:first-child {
+  color: #475569 !important;
+}
+body.theme-light .decision-col-title.col-intent {
+  color: #0284c7;
+}
+body.theme-light .decision-col-title.col-strategy {
+  color: #7c3aed;
+}
+body.theme-light .decision-col-title.col-primitive {
+  color: #059669;
+}
+body.theme-light #insp-task-itinerary-row {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+body.theme-light #insp-task-itinerary {
+  color: #0f172a !important;
+}
+body.theme-light #insp-task-itinerary-row span:first-child {
+  color: #0284c7 !important;
+}
+body.theme-light #insp-task-status[style*="#38bdf8"] { color: #0284c7 !important; }
+body.theme-light #insp-task-status[style*="#34d399"] { color: #059669 !important; }
+body.theme-light #insp-task-status[style*="#10b981"] { color: #15803d !important; }
+body.theme-light #insp-maslow-badge {
+  font-weight: 700;
+  filter: contrast(1.3) brightness(0.85);
+}
+
+/* 2x2 生存指标网格修复白底白字 */
+body.theme-light .vital-grid {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .vital-header {
+  color: #475569;
+}
+body.theme-light .vital-header span:first-child {
+  color: #475569;
+}
+body.theme-light .vital-header span:last-child,
+body.theme-light .vital-header .mono-num {
+  color: #0f172a !important;
+}
+body.theme-light .vital-item {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .vital-item .vital-label {
+  color: #64748b;
+}
+body.theme-light .vital-item .vital-value {
+  color: #0f172a;
+}
+
+/* 🎒 随身行囊卡片 */
+body.theme-light .carry-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .carry-header {
+  color: #334155;
+}
+body.theme-light #insp-carry-cap {
+  color: #b45309 !important;
+}
+body.theme-light .carry-chip {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+body.theme-light .carry-chip.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+body.theme-light .carry-hint {
+  color: #64748b;
+}
+body.theme-light .carry-haul {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+body.theme-light #insp-carry-haul-text {
+  color: #0f172a !important;
+}
+
+/* Inspector 内的家户与婚姻卡片 */
+body.theme-light .ledger-household-card,
+body.theme-light .ledger-marriage-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+body.theme-light .ledger-card-title {
+  color: #0f172a;
+}
+body.theme-light .ledger-role-badge {
+  background: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .ledger-hh-info {
+  color: #475569;
+}
+body.theme-light .ledger-hh-info b {
+  color: #0f172a;
+}
+body.theme-light .ledger-balances-title {
+  color: #64748b;
+}
+body.theme-light .ledger-balance-chip {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+body.theme-light .ledger-balance-chip .mono-num {
+  color: #0f172a;
+}
+body.theme-light .ledger-events-title {
+  color: #64748b;
+}
+body.theme-light .ledger-event-item {
+  color: #475569;
+  border-bottom-color: #e2e8f0;
+}
+body.theme-light .ledger-mg-row {
+  color: #475569;
+}
+body.theme-light .ledger-mg-row b {
+  color: #0f172a;
+}
+body.theme-light .ledger-mg-history-title {
+  color: #64748b;
+}
+body.theme-light .ledger-mg-history-item {
+  color: #64748b;
+}
+
+/* 调试卡片与文字描述 */
+body.theme-light .debug-mining-card {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+body.theme-light .debug-mining-card .mining-header span:first-child {
+  color: #6d28d9;
+}
+body.theme-light .debug-mining-card .mining-header span:last-child {
+  color: #b45309;
+}
+body.theme-light #insp-detail-text {
+  color: #475569 !important;
+}
+
+/* 底部操作按钮 */
+body.theme-light .insp-btn {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0284c7;
+}
+body.theme-light .insp-btn:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+  color: #0369a1;
+}
+body.theme-light .insp-btn.house-btn {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #b45309;
+}
+body.theme-light .insp-btn.house-btn:hover {
+  background: #fde68a;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+body.theme-light .insp-btn.detail-btn {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #6d28d9;
+}
+body.theme-light .insp-btn.detail-btn:hover {
+  background: #ede9fe;
+  border-color: #7c3aed;
+  color: #5b21b6;
+}
+body.theme-light .insp-btn.following {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+
 body.theme-light .poi-info-badge,
 body.theme-light .insp-house-card,
 body.theme-light .insp-market-trades {
@@ -4157,11 +4656,14 @@ body.theme-light .insp-market-trades {
   border-color: #e2e8f0;
   color: #334155;
 }
+
+/* 🏛️ 模态大窗整体浅色适配 */
 body.theme-light .rewind-modal-card,
 body.theme-light .lineage-modal-card,
 body.theme-light .save-modal,
 body.theme-light .camp-detail-modal,
-body.theme-light .house-auction-card {
+body.theme-light .house-auction-modal,
+body.theme-light .dag-modal-window {
   background: #ffffff;
   border-color: #cbd5e1;
   color: #0f172a;
@@ -4171,7 +4673,8 @@ body.theme-light .rewind-modal-header,
 body.theme-light .lineage-modal-header,
 body.theme-light .save-modal-header,
 body.theme-light .camp-detail-header,
-body.theme-light .house-auction-header {
+body.theme-light .house-auction-header,
+body.theme-light .dag-modal-header {
   background: #f8fafc;
   border-bottom-color: #e2e8f0;
 }
@@ -4232,16 +4735,6 @@ body.theme-light .lineage-self-avatar {
 body.theme-light .lineage-self-name {
   color: #0f172a;
 }
-body.theme-light .vital-item {
-  background: #ffffff;
-  border-color: #e2e8f0;
-}
-body.theme-light .vital-item .vital-label {
-  color: #64748b;
-}
-body.theme-light .vital-item .vital-value {
-  color: #0f172a;
-}
 body.theme-light .lineage-traits-block,
 body.theme-light .lineage-section {
   background: #f8fafc;
@@ -4251,6 +4744,163 @@ body.theme-light .lineage-trait {
   background: #ffffff;
   border-color: #e2e8f0;
 }
+
+/* 房屋拍卖大盘内部组件 */
+body.theme-light .auction-hero-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .auction-hero-title {
+  color: #0f172a;
+}
+body.theme-light .auction-hero-sub {
+  color: #64748b;
+}
+body.theme-light .auction-hero-price {
+  color: #d97706;
+}
+body.theme-light .auction-timeline-box {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .auction-timeline-title strong {
+  color: #0f172a;
+}
+body.theme-light .auction-timeline-track {
+  background: #e2e8f0;
+}
+body.theme-light .auction-col {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .auction-col-title {
+  color: #334155;
+  border-bottom-color: #e2e8f0;
+}
+body.theme-light .auction-buyer-card,
+body.theme-light .auction-bid-card,
+body.theme-light .auction-deal-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .auction-empty-hint {
+  color: #94a3b8;
+}
+body.theme-light .auction-strip-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .auction-footer-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+/* 营地详情弹窗内部 */
+body.theme-light .camp-detail-header {
+  background: #fef9c3;
+  border-bottom-color: #fde68a;
+}
+body.theme-light .camp-detail-header span {
+  color: #a16207;
+}
+body.theme-light .camp-detail-section-title {
+  color: #b45309;
+  border-bottom-color: #fde68a;
+}
+body.theme-light .camp-detail-content {
+  color: #334155;
+}
+
+/* 世系图与决策可视化大窗口 */
+body.theme-light .dag-modal-header div > div:first-child {
+  color: #0284c7 !important;
+}
+body.theme-light .dag-modal-header div > div:last-child {
+  color: #64748b !important;
+}
+body.theme-light .dag-tool-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+body.theme-light .dag-tool-btn:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+  color: #0284c7;
+}
+body.theme-light .dag-modal-close {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+body.theme-light .dag-modal-close:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #dc2626;
+}
+body.theme-light .dag-modal-body {
+  background: #f1f5f9;
+}
+body.theme-light .dviz-left,
+body.theme-light .dviz-right {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .dviz-panel-title {
+  color: #0f172a;
+}
+body.theme-light .dviz-legend-item b {
+  color: #0f172a;
+}
+body.theme-light .dviz-legend-item div > span {
+  color: #64748b;
+}
+body.theme-light .dviz-toolbar {
+  border-bottom-color: #e2e8f0;
+}
+body.theme-light .dviz-status {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+body.theme-light .dviz-viewport {
+  background: #f8fafc;
+}
+body.theme-light .dviz-insp-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+body.theme-light .dviz-insp-head {
+  border-bottom-color: #e2e8f0;
+  background: #f1f5f9;
+}
+body.theme-light .dviz-insp-title b {
+  color: #0f172a;
+}
+body.theme-light .dviz-k {
+  color: #64748b;
+}
+body.theme-light .dviz-v {
+  color: #0f172a;
+}
+body.theme-light .dv-node {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+/* 道路悬浮提示 */
+body.theme-light .road-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
 body.theme-light .market-summary-card {
   background: rgba(255, 251, 235, 0.85);
   border-color: rgba(217, 119, 6, 0.35);
@@ -4375,19 +5025,27 @@ body.theme-light .market-good-footer {
 
 /* 浅色主题适配 */
 body.theme-light .decision-hub-card {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(56, 189, 248, 0.4);
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 body.theme-light .decision-hub-title {
-  color: #475569;
+  color: #334155;
+}
+body.theme-light .decision-hub-badge {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #7dd3fc;
 }
 body.theme-light .decision-col {
-  background: #f8fafc;
+  background: #ffffff;
   border-color: #e2e8f0;
 }
 body.theme-light .decision-col-title {
   border-bottom-color: #e2e8f0;
 }
+body.theme-light .decision-col-title.col-intent { color: #0284c7; }
+body.theme-light .decision-col-title.col-strategy { color: #7c3aed; }
+body.theme-light .decision-col-title.col-primitive { color: #059669; }
 body.theme-light .decision-col-row {
   color: #64748b;
 }
