@@ -20,7 +20,7 @@
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 1;
+  var FORMAT_VERSION = 2;
   var NONE_U32 = 0xffffffff;
   var NONE_F32_NAN = NaN;
 
@@ -38,7 +38,7 @@
   var K = {
     GLOBAL: 1, AGENT: 2, POI: 3, HOUSE: 4, LANE_GEO: 5, LANE_WEAR: 6, NODE: 7, TERRAIN: 8,
     HOUSEHOLD: 9, MARRIAGE: 10, CLAN: 11, REGION: 12, EMPIRE: 13, GRANARY: 14, DEATH: 15,
-    AUCTION_HIST: 16, STR_TAB: 17,
+    AUCTION_HIST: 16, STR_TAB: 17, TERRAIN_FEATURES: 18,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -149,7 +149,7 @@
     // 故这里每帧都构造全新容器，`setReuse()` 仅为兼容旧调用点而保留的空操作。
     var snap = {
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
-      terrain_cells: [], grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
+      terrain_cells: [], terrain_features: [], terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
       total_births: 0, total_deaths: 0, total_deaths_natural: 0, total_deaths_unnatural: 0,
@@ -195,6 +195,8 @@
       snap.season_timer = gr.f32();
       snap.el_nino_phase = gr.f32();
       snap.climate_epoch_phase = gr.f32();
+      snap.terrain_generator_version = gr.u32();
+      snap.terrain_profile = strOf(gr.u32()) || '';
     }
 
     if (dir[K.AGENT]) {
@@ -423,9 +425,43 @@
       var tr = readerAt(uint8, dir[K.TERRAIN].o, dir[K.TERRAIN].bl);
       var cells = new Array(dir[K.TERRAIN].c);
       for (var ci = 0; ci < dir[K.TERRAIN].c; ci++) {
-        cells[ci] = { elevation: tr.f32(), slope_angle: tr.f32() };
+        var elevation = tr.f32();
+        var slopeAngle = tr.f32();
+        var surfaceCode = tr.u8();
+        var fertility = tr.f32();
+        var waterBodyId = tr.optU32();
+        var featureFlags = tr.u16();
+        tr.align4();
+        cells[ci] = {
+          elevation: elevation,
+          slope_angle: slopeAngle,
+          surface_kind: en('surfaceKind', surfaceCode),
+          natural_fertility: fertility,
+          water_body_id: waterBodyId,
+          feature_flags: featureFlags,
+        };
       }
       snap.terrain_cells = cells;
+    }
+    if (dir[K.TERRAIN_FEATURES]) {
+      var fr = readerAt(uint8, dir[K.TERRAIN_FEATURES].o, dir[K.TERRAIN_FEATURES].bl);
+      snap.terrain_features = [];
+      for (var fi = 0; fi < dir[K.TERRAIN_FEATURES].c; fi++) {
+        var feature = {
+          id: fr.u32(),
+          kind: en('terrainFeatureKind', fr.u8()),
+          flags: fr.u16(),
+          elevation: fr.f32(),
+          width: fr.f32(),
+          vertices: [],
+        };
+        var vertexCount = fr.u16();
+        for (var vi = 0; vi < vertexCount; vi++) {
+          feature.vertices.push({ x: fr.f32(), y: fr.f32(), z: fr.f32() });
+        }
+        fr.align4();
+        snap.terrain_features.push(feature);
+      }
     }
 
     if (dir[K.HOUSEHOLD]) {
@@ -647,6 +683,7 @@
       optU32: function () { var v = dv.getUint32(off, true); off += 4; return v === NONE_U32 ? null : v; },
       optU64: function () { var lo = dv.getUint32(off, true), hi = dv.getUint32(off + 4, true); off += 8; return (lo === NONE_U32 && hi === NONE_U32) ? null : lo + hi * 4294967296; },
       optF32: function () { var v = dv.getFloat32(off, true); off += 4; return v !== v ? null : v; },
+      align4: function () { off = (off + 3) & ~3; },
       listU32: function () { var n = dv.getUint16(off, true); off += 2; var a = new Array(n); for (var i = 0; i < n; i++) { a[i] = dv.getUint32(off, true); off += 4; } return a; },
       listU64: function () { var n = dv.getUint16(off, true); off += 2; var a = new Array(n); for (var i = 0; i < n; i++) { a[i] = dv.getUint32(off, true) + dv.getUint32(off + 4, true) * 4294967296; off += 8; } return a; },
     };

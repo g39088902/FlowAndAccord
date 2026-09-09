@@ -192,7 +192,15 @@ pub struct SimConfig {
     pub house_node_reuse_radius: f32,
     pub house_node_poi_occupy_radius: f32,
 
-    // 7. 四季更迭与宏观气候
+    // 7. 地形生成、地表查询与山口 profile
+    pub terrain_profile: String,
+    pub terrain_max_walk_slope: f32,
+    pub terrain_max_build_slope: f32,
+    pub terrain_footprint_half_extent: f32,
+    pub terrain_road_corridor_width: f32,
+    pub terrain_generation_max_retries: usize,
+
+    // 8. 四季更迭与宏观气候
     pub season_year_length: f32,
     pub temp_base_mid: f32,
     pub temp_amplitude: f32,

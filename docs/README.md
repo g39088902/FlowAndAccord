@@ -25,6 +25,7 @@
 - [性能优化](./16-plan-performance-optimization.md)
 - [地形美术与世界景观提升（方向设计，未排期）](./21-plan-terrain-art.md)：当前画面诊断、短中长期方案、首期切片与验收预算。
 - [新地形特征与地理玩法（方向设计，未排期）](./22-plan-terrain-features.md)：八类地形、三种地图组合，以及生成、通行、取水和选址契约。
+- [新增地形实施技术方案（实施方案，未实现）](./26-plan-terrain-implementation.md)：将 T0～T2 收敛为地表查询、合法走廊、水系资源池、快照、存档与 Canvas 的分阶段技术契约。
 - [农田与农业税](./17-plan-farmland-agriculture.md)：真实劳动与搬运、卸货时产出税、产出税与库存税并存。
 - [狩猎、流寇与防御](./18-plan-conflict-hunting-defense.md)：共用物资/身体模型，防务设施接入统一土地与通行规则。
 - [人物日常生活细化（方向设计，未排期）](./20-plan-everyday-life.md)：八个生活深化方向、首期“一家人的一天”与分阶段建议。

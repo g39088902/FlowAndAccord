@@ -95,6 +95,8 @@ impl World3DEngine {
             w.f32(self.season_timer);
             w.f32(self.el_nino_phase);
             w.f32(self.climate_epoch_phase);
+            w.u32(self.terrain.generator_version);
+            w.u32(tab.intern(self.terrain.profile.as_str()));
             w.align4();
             secs.push(Sec::new(SectionKind::Global, 1, w.into_inner()));
         }
@@ -452,10 +454,15 @@ impl World3DEngine {
 
         // ══════════════ TERRAIN（脏帧） ══════════════
         if need_terrain {
-            let mut w = BinWriter::with_capacity(self.terrain.cells.len() * 8 + 16);
+            let mut w = BinWriter::with_capacity(self.terrain.cells.len() * 24 + 16);
             for cell in &self.terrain.cells {
                 w.f32(cell.elevation);
                 w.f32(cell.slope_angle_deg);
+                w.u8(surface_kind_code(cell.surface_kind));
+                w.f32(cell.natural_fertility);
+                w.opt_u32(cell.water_body_id);
+                w.u16(cell.feature_flags);
+                w.align4();
             }
             w.align4();
             flags |= flag::HAS_TERRAIN;
@@ -463,6 +470,28 @@ impl World3DEngine {
                 SectionKind::Terrain,
                 self.terrain.cells.len() as u32,
                 w.into_inner(),
+            ));
+
+            let mut f = BinWriter::with_capacity(self.terrain.features.len() * 96 + 16);
+            for feature in &self.terrain.features {
+                f.u32(feature.id);
+                f.u8(terrain_feature_kind_code(feature.kind));
+                f.u16(feature.flags);
+                f.f32(feature.elevation);
+                f.f32(feature.width);
+                f.u16(feature.vertices.len() as u16);
+                for vertex in &feature.vertices {
+                    f.f32(vertex.x);
+                    f.f32(vertex.y);
+                    f.f32(vertex.z);
+                }
+                f.align4();
+            }
+            f.align4();
+            secs.push(Sec::new(
+                SectionKind::TerrainFeatures,
+                self.terrain.features.len() as u32,
+                f.into_inner(),
             ));
         }
 

@@ -27,7 +27,7 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 
 /// 帧格式版本。**结构性**变更（增删 section 或改字段编码）时必须 +1；
 /// 前端 `snapshot-bin.js` 校验不匹配即回退 JSON 通道。
-pub const FORMAT_VERSION: u16 = 1;
+pub const FORMAT_VERSION: u16 = 2;
 
 /// Header 定长（字节）
 ///
@@ -79,6 +79,7 @@ pub enum SectionKind {
     Death = 15,
     AuctionHist = 16,
     StrTab = 17,
+    TerrainFeatures = 18,
 }
 
 impl SectionKind {

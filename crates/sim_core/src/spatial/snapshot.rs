@@ -25,6 +25,12 @@ pub enum Season {
 pub struct WorldSnapshot3D {
     pub tick: u64,
     pub terrain_cells: Vec<GeoCellSnapshot>,
+    #[serde(default)]
+    pub terrain_features: Vec<TerrainFeatureSnapshot>,
+    #[serde(default)]
+    pub terrain_generator_version: u32,
+    #[serde(default)]
+    pub terrain_profile: String,
     pub grid_w: usize,
     pub grid_h: usize,
     pub world_size: f32,
@@ -137,6 +143,24 @@ pub struct RecentDeathSnapshot {
 pub struct GeoCellSnapshot {
     pub elevation: f32,
     pub slope_angle: f32,
+    #[serde(default)]
+    pub surface_kind: String,
+    #[serde(default)]
+    pub natural_fertility: f32,
+    #[serde(default)]
+    pub water_body_id: Option<u32>,
+    #[serde(default)]
+    pub feature_flags: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainFeatureSnapshot {
+    pub id: u32,
+    pub kind: String,
+    pub vertices: Vec<Vec3>,
+    pub elevation: f32,
+    pub width: f32,
+    pub flags: u16,
 }
 
 /// ★ v1.10.0 空置房屋快照条目（营地空置房屋列表：房屋 ID + 受益人 ID 列表）

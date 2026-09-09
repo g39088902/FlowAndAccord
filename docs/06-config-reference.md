@@ -179,7 +179,18 @@
 | `houseNodeReuseRadius` | f32 | 20 | housing_system/founding.rs (立宅节点占用) | 立宅优先复用空置路网节点检索半径 (m) |
 | `houseNodePoiOccupyRadius` | f32 | 1.5 | housing_system/founding.rs (立宅节点占用) | 判定节点被 POI 占用的贴合半径 (m) |
 
-## 7. 四季更迭与宏观气候
+## 7. 地形生成、地表查询与山口 profile
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `terrainProfile` | String | mountain_pass_v1 | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | T1 地貌模板；影响地形重建与存档门禁 |
+| `terrainMaxWalkSlope` | f32 | 30 | geo/query.rs / graph.rs (道路完整曲线校验) | 普通道路允许的最大坡度 (度) |
+| `terrainMaxBuildSlope` | f32 | 16 | geo/query.rs / housing_system/settlement.rs (房屋完整占地) | 房屋/设施完整占地允许的最大坡度 (度) |
+| `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |
+| `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
+| `terrainGenerationMaxRetries` | usize | 8 | ecology/seed.rs (地形布局有界重试) | 地形/布局校验的有界重试次数 |
+
+## 8. 四季更迭与宏观气候
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |

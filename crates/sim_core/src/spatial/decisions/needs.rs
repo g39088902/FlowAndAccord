@@ -112,7 +112,7 @@ pub enum NodePool {
 }
 
 impl NodePool {
-    pub fn nodes(self, ctx: &DecisionContext) -> &[ResourceNode] {
+    pub fn nodes<'a>(self, ctx: &'a DecisionContext) -> &'a [ResourceNode] {
         match self {
             NodePool::Water => &ctx.water_nodes,
             NodePool::Food => &ctx.food_nodes,

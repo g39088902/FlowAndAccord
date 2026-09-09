@@ -49,6 +49,12 @@ const IMPACT_OVERRIDES = {
   campLevelTownshipMinHouses: 'poi.rs (营地行政级别升级)',
   campLevelTownMinHouses: 'poi.rs (营地行政级别升级)',
   campLevelCountyMinHouses: 'poi.rs (营地行政级别升级)',
+  terrainProfile: 'geo/terrain.rs / world_save.rs (地形生成器版本门禁)',
+  terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',
+  terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
+  terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',
+  terrainRoadCorridorWidth: 'geo/terrain.rs / graph.rs (道路走廊宽度)',
+  terrainGenerationMaxRetries: 'ecology/seed.rs (地形布局有界重试)',
 };
 
 const IMPACT_PREFIX_RULES = [

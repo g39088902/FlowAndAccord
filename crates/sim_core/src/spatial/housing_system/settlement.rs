@@ -1,3 +1,4 @@
+use crate::geo::{validate_footprint, FootprintQuery, LandUseKind};
 use crate::spatial::graph::{NodeId, NodeType, RoadClass};
 use crate::spatial::house::{House, HouseTier};
 use crate::spatial::poi::PoiType;
@@ -7,6 +8,22 @@ use crate::spatial::world::World3DEngine;
 impl World3DEngine {
     /// 宅址放置校验：避让现有房屋、营地占用点与非营地 POI 交互范围。
     pub(crate) fn is_house_site_valid(&self, pos: Vec3) -> bool {
+        let terrain = validate_footprint(
+            &self.terrain,
+            FootprintQuery {
+                center: pos,
+                half_extents: (
+                    self.config.terrain_footprint_half_extent,
+                    self.config.terrain_footprint_half_extent,
+                ),
+                rotation_rad: 0.0,
+                use_kind: LandUseKind::House,
+            },
+            self.config.terrain_max_build_slope,
+        );
+        if !terrain.valid {
+            return false;
+        }
         let houses_clear = self.houses.iter().all(|h| {
             let dx = h.pos.x - pos.x;
             let dy = h.pos.y - pos.y;
@@ -152,6 +169,9 @@ impl World3DEngine {
                 chosen.y,
                 self.terrain.sample_elevation(chosen.x, chosen.y),
             );
+            if !self.is_house_site_valid(cand_pos) {
+                continue;
+            }
 
             // 优先复用合法范围内最近的空置节点（房屋坍塌遗留的孤儿门节点 / 无主野外路口），
             // 无可复用节点时才新建，杜绝路网节点随代际更替无限膨胀。

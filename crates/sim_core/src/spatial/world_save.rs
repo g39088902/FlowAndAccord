@@ -24,7 +24,7 @@ use super::poi::PrimitivePoi;
 use super::snapshot::Season;
 use super::world::World3DEngine;
 use crate::config::SimConfig;
-use crate::geo::terrain::TerrainMap;
+use crate::geo::terrain::{TerrainMap, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS};
 use crate::rng::WorldRng;
 
 /// 存档格式版本（结构字段增删时自增；与旧版本不兼容时拒绝加载）
@@ -34,6 +34,14 @@ use crate::rng::WorldRng;
 pub const SAVE_FORMAT_VERSION: u32 = 6;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
 pub const SAVE_APP_VERSION: &str = "1.47.1";
+
+fn default_terrain_generator_version() -> u32 {
+    TERRAIN_GENERATOR_VERSION
+}
+
+fn default_terrain_profile() -> String {
+    TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
+}
 
 /// 存档契约：世界全量可持久化状态
 ///
@@ -54,6 +62,12 @@ pub struct WorldSave {
     pub grid_res: usize,
     /// 世界物理跨度（米，如 764.0）
     pub world_size: f32,
+    /// 地形生成器版本；与 profile 一起防止旧路网和新地貌静默拼接。
+    #[serde(default = "default_terrain_generator_version")]
+    pub terrain_generator_version: u32,
+    /// 地形 profile，例如 mountain_pass_v1。
+    #[serde(default = "default_terrain_profile")]
+    pub terrain_profile: String,
 
     // ── 基础实体 ──
     pub network: LaneGraph3D,
@@ -133,6 +147,8 @@ impl World3DEngine {
             seed: self.terrain.seed,
             grid_res: self.terrain.grid_width,
             world_size: self.terrain.world_size,
+            terrain_generator_version: self.terrain.generator_version,
+            terrain_profile: self.terrain.profile.clone(),
             network: self.network.clone(),
             pois: self.pois.clone(),
             houses: self.houses.clone(),
@@ -202,6 +218,15 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     if save.grid_res == 0 || !save.world_size.is_finite() || save.world_size <= 0.0 {
         return Err("存档世界参数非法（grid_res 为 0 或 world_size 非正）".to_string());
     }
+    if save.terrain_generator_version != TERRAIN_GENERATOR_VERSION {
+        return Err(format!(
+            "地形生成器版本不兼容：存档为 v{}，当前内核为 v{}",
+            save.terrain_generator_version, TERRAIN_GENERATOR_VERSION
+        ));
+    }
+    if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS {
+        return Err(format!("地形 profile 不受支持：{}", save.terrain_profile));
+    }
 
     // agent id 唯一性校验：重复 id 会让 agent_index 重建出错，宁可拒绝加载
     let mut seen: BTreeSet<AgentId> = BTreeSet::new();
@@ -213,7 +238,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
 
     // 地形按种子确定性重建（不消耗世界 RNG）
     let mut terrain = TerrainMap::new(save.grid_res, save.grid_res, save.world_size);
-    terrain.generate_natural_landscape(save.seed);
+    terrain.generate_with_profile(save.seed, &save.terrain_profile);
 
     let mut world = World3DEngine {
         terrain,

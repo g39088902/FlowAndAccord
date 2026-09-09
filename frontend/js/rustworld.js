@@ -577,12 +577,18 @@
               const idx = gy * w + gx;
               const wx = (gx / (w - 1)) * worldSize - half;
               const wy = (gy / (h - 1)) * worldSize - half;
-              const cellData = snap.terrain_cells[idx] || { elevation: 0, slope_angle: 0 };
+              const cellData = snap.terrain_cells[idx] || { elevation: 0, slope_angle: 0, surface_kind: 'DryGround', natural_fertility: 1, water_body_id: null, feature_flags: 0 };
               const e = cellData.elevation;
               const slopeAngle = cellData.slope_angle;
               if (e < minZ) minZ = e;
               if (e > maxZ) maxZ = e;
-              cells[idx] = { wx, wy, elev: e, slopeAngle, dzdx: 0, dzdy: 0 };
+              cells[idx] = {
+                wx, wy, elev: e, slopeAngle, dzdx: 0, dzdy: 0,
+                surfaceKind: cellData.surface_kind || 'DryGround',
+                naturalFertility: cellData.natural_fertility != null ? cellData.natural_fertility : 1,
+                waterBodyId: cellData.water_body_id != null ? cellData.water_body_id : null,
+                featureFlags: cellData.feature_flags || 0,
+              };
             }
           }
           const step = worldSize / (w - 1);
@@ -598,7 +604,16 @@
               cells[idx].color = computeElevationColor(cells[idx], minZ, maxZ);
             }
           }
-          this.terrain = { gridSize: w, worldSize, minZ, maxZ, cells };
+          this.terrain = {
+            gridSize: w,
+            worldSize,
+            minZ,
+            maxZ,
+            cells,
+            features: snap.terrain_features || [],
+            generatorVersion: snap.terrain_generator_version || 0,
+            profile: snap.terrain_profile || '',
+          };
           this._terrainCached = true;
         }
 

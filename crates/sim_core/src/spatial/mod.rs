@@ -32,7 +32,7 @@ pub use ledger::{
 pub use poi::{PoiId, PoiType, PrimitivePoi};
 pub use snapshot::{
     AgentSnapshot, GeoCellSnapshot, LaneSnapshot, NodeSnapshot, PoiSnapshot, Season,
-    WorldSnapshot3D,
+    TerrainFeatureSnapshot, WorldSnapshot3D,
 };
 pub use vec3::Vec3;
 pub use world::World3DEngine;

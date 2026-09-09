@@ -116,7 +116,7 @@ impl World3DEngine {
         config: SimConfig,
     ) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_natural_landscape(seed);
+        terrain.generate_with_profile(seed, &config.terrain_profile);
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
             config.ledger_journal_capacity

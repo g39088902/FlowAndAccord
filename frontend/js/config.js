@@ -167,8 +167,16 @@ window.SIM_CONFIG = {
   houseNodeReuseRadius: 20.0,     // 立宅优先复用空置路网节点检索半径 (m)
   houseNodePoiOccupyRadius: 1.5,  // 判定节点被 POI 占用的贴合半径 (m)
 
+  // 地形生成、地表查询与山口 profile
+  terrainProfile: 'mountain_pass_v1', // T1 地貌模板；影响地形重建与存档门禁
+  terrainMaxWalkSlope: 30.0,          // 普通道路允许的最大坡度 (度)
+  terrainMaxBuildSlope: 16.0,         // 房屋/设施完整占地允许的最大坡度 (度)
+  terrainFootprintHalfExtent: 7.0,    // 房屋基础完整占地半径 (m)
+  terrainRoadCorridorWidth: 5.0,      // 道路合法走廊宽度 (m)
+  terrainGenerationMaxRetries: 8,     // 地形/布局校验的有界重试次数
+
   // ==========================================================================
-  // 7. 四季更迭与宏观气候 (Seasons & Macro Climate)
+  // 8. 四季更迭与宏观气候 (Seasons & Macro Climate)
   // ==========================================================================
   seasonYearLength: 240.0,        // 一年 (四季) 总时长 (模拟秒)
   tempBaseMid: 14.0,              // 年均基准温度 (℃)

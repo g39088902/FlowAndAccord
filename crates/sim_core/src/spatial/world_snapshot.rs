@@ -8,7 +8,7 @@ use super::snapshot::{
     ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot,
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
-    TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
+    TerrainFeatureSnapshot, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -35,6 +35,10 @@ impl World3DEngine {
                 terrain_cells.push(GeoCellSnapshot {
                     elevation: cell.elevation,
                     slope_angle: cell.slope_angle_deg,
+                    surface_kind: cell.surface_kind.as_str().to_string(),
+                    natural_fertility: cell.natural_fertility,
+                    water_body_id: cell.water_body_id,
+                    feature_flags: cell.feature_flags,
                 });
             }
         }
@@ -667,9 +671,29 @@ impl World3DEngine {
         let season_progress =
             ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
 
+        let terrain_features = if need_terrain {
+            self.terrain
+                .features
+                .iter()
+                .map(|feature| TerrainFeatureSnapshot {
+                    id: feature.id,
+                    kind: feature.kind.as_str().to_string(),
+                    vertices: feature.vertices.clone(),
+                    elevation: feature.elevation,
+                    width: feature.width,
+                    flags: feature.flags,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         WorldSnapshot3D {
             tick: self.tick_counter,
             terrain_cells,
+            terrain_features,
+            terrain_generator_version: self.terrain.generator_version,
+            terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,
             grid_h: self.terrain.grid_height,
             world_size: self.terrain.world_size,

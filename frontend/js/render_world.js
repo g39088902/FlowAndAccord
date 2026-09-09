@@ -64,6 +64,8 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
     }
   }
 
+  drawTerrainFeatures();
+
   // 批处理绘制地形网格线 (1 次 GPU Stroke 替代原 3481 次独立 Stroke)
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
   ctx.lineWidth = 0.4;
@@ -83,6 +85,43 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
   }
   ctx.stroke();
 }
+}
+
+function drawTerrainFeatures() {
+  const features = (sim.terrain && sim.terrain.features) || [];
+  if (!features.length) return;
+  for (const feature of features) {
+    if (!feature.vertices || !feature.vertices.length) continue;
+    const points = feature.vertices.map(project3D);
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (feature.kind === 'Ridge') {
+      ctx.strokeStyle = 'rgba(91, 75, 52, 0.30)';
+      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.08);
+      ctx.setLineDash([8 * camera.zoom, 9 * camera.zoom]);
+    } else if (feature.kind === 'Saddle') {
+      const p = points[0];
+      ctx.fillStyle = 'rgba(183, 142, 85, 0.28)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(5, feature.width * camera.zoom * 0.10), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(120, 85, 45, 0.55)';
+      ctx.lineWidth = Math.max(1, camera.zoom * 1.5);
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(5, feature.width * camera.zoom * 0.10), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      continue;
+    } else {
+      ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
+      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.06);
+      ctx.setLineDash([]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    if (feature.kind === 'Terrace') ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawPois() {
