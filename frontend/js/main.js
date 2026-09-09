@@ -524,6 +524,19 @@
           || (t.isContentEditable === true);
         if (isTextEntry) return;
         sim.showRoadHeatmap = !sim.showRoadHeatmap;
+      } else if (e.code === 'KeyL' || e.key === 'l' || e.key === 'L') {
+        // ★ 动态季节光照开关（与控制台复选框同源）
+        const t = e.target;
+        const tag = t.tagName;
+        const isTextEntry = (tag === 'TEXTAREA')
+          || (tag === 'INPUT' && /^(text|search|password|email|number|tel|url)$/i.test(t.type || ''))
+          || (t.isContentEditable === true);
+        if (isTextEntry) return;
+        const chk = document.getElementById('chk-dynamic-light');
+        if (chk) {
+          chk.checked = !chk.checked;
+          chk.dispatchEvent(new Event('change'));
+        }
       }
     });
 
@@ -552,6 +565,22 @@
     if (chkHideLanes) {
       chkHideLanes.addEventListener('change', e => {
         sim.showLanes = !e.target.checked;
+      });
+    }
+
+    // ==========================================
+    // ★ 动态季节光照开关（docs/27-plan-seasonal-lighting.md）
+    //   关闭即退回 v1.47.11 的固定光并立即整片重着色；开启后光相立即对齐当前季节
+    // ==========================================
+    const chkDynamicLight = document.getElementById('chk-dynamic-light');
+    if (chkDynamicLight) {
+      if (window.SIM_LIGHTING) chkDynamicLight.checked = !!window.SIM_LIGHTING.enabled;
+      chkDynamicLight.addEventListener('change', e => {
+        if (window.SIM_LIGHTING) window.SIM_LIGHTING.enabled = e.target.checked;
+        if (window.SimLighting) {
+          window.SimLighting.resync();
+          window.SimLighting.markDirty();
+        }
       });
     }
 

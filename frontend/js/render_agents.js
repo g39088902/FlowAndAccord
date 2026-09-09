@@ -94,11 +94,12 @@ function drawAgent(agent) {
     ctx.restore();
   }
 
-  // 1. 族人地面微接触阴影 (Drop Shadow，扎根沙盘感)
+  // 1. 族人地面微接触阴影 (Drop Shadow，扎根沙盘感) — 方向/长度随季节光位
   const agentRadius = (isAdult ? 3.6 : 2.5) * camera.zoom;
-  ctx.fillStyle = 'rgba(20, 15, 10, 0.24)';
+  const aShadow = lightShadowOffset(0.8, 1.8, (window.SimLighting && window.SimLighting.cfg().agentShadowHeight) || 1.6);
+  ctx.fillStyle = `rgba(20, 15, 10, ${(0.24 * aShadow.alphaScale).toFixed(3)})`;
   ctx.beginPath();
-  ctx.ellipse(p2D.x + 0.8 * camera.zoom, p2D.y + 1.8 * camera.zoom, agentRadius * 1.05, agentRadius * 0.55, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(p2D.x + aShadow.x, p2D.y + aShadow.y, agentRadius * 1.05, agentRadius * 0.55, -0.2, 0, Math.PI * 2);
   ctx.fill();
 
   // 2. 实体人偶点 (主体与微小头部)
@@ -106,6 +107,16 @@ function drawAgent(agent) {
   ctx.beginPath();
   ctx.arc(p2D.x, p2D.y, agentRadius, 0, Math.PI * 2);
   ctx.fill();
+
+  // 2.5 受光侧微高光 (随季节光向绕人偶转动；取负高度即光源方向)
+  const LS = window.SimLighting;
+  if (LS && LS.enabled()) {
+    const lit = LS.shadowOffset(-0.55);
+    ctx.fillStyle = 'rgba(255, 246, 224, 0.15)';
+    ctx.beginPath();
+    ctx.arc(p2D.x + lit.dx, p2D.y + lit.dy - agentRadius * 0.2, agentRadius * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 族人头部微光点
   ctx.fillStyle = '#fce7f3';

@@ -1,251 +1,23 @@
 // === 世界元素绘制 (从 render.js 拆分) ===
-// 地形 / 路网 / POI / 房屋绘制函数
-// 依赖全局: ctx, camera, sim, project3D, getElevationColor, mousePos, isDragging, hoveredLane, terrainProjX, terrainProjY
+// 路网 / POI 底座与标记 / 私产宅舍 / 世界立体实体统一深度绘制
+// 地形与水系地貌已拆出到 render_terrain.js（v1.48.0，含天空氛围）
+// 依赖全局: ctx, camera, sim, project3D, getElevationColor, mousePos, isDragging, hoveredLane, SimLighting
 
-function drawTerrain() {
-if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
-  const gSize = sim.terrain.gridSize;
-  const totalVertices = gSize * gSize;
-  if (terrainProjX.length !== totalVertices) {
-    terrainProjX = new Float32Array(totalVertices);
-    terrainProjY = new Float32Array(totalVertices);
+// ★ 动态季节光照：贴地阴影偏移 = 世界空间光向 → 屏幕投影（随相机旋转）
+//   关闭动态光照时回退 v1.47.11 的固定屏幕偏移，保证 A/B 对照
+function lightShadowOffset(legacyX, legacyY, height) {
+  const L = window.SimLighting;
+  if (L && L.enabled()) {
+    const o = L.shadowOffset(height);
+    return { x: o.dx, y: o.dy, alphaScale: Math.max(0.75, Math.min(1.5, L.shadowAlpha() / 0.24)) };
   }
-
-  const cx = w / 2 + camera.panX;
-  const cy = h / 2 + camera.panY;
-  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
-  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-  const scale = camera.zoom;
-
-  // 单次全网格顶点投影 (3600 次 vs 原 13924 次)
-  for (let i = 0; i < totalVertices; i++) {
-    const c = sim.terrain.cells[i];
-    const rx = c.wx * cosZ - c.wy * sinZ;
-    const ry = c.wx * sinZ + c.wy * cosZ;
-    const y2 = ry * cosX - c.elev * sinX;
-    terrainProjX[i] = cx + rx * scale;
-    terrainProjY[i] = cy + y2 * scale;
-  }
-
-  // 1. 微缩沙盘地景投影与四周厚度剖面 (Diorama Skirt)
-  const minZ = sim.terrain.minZ != null ? sim.terrain.minZ : 0;
-  const skirtElev = minZ - 16;
-  const dropOffset = 8 * scale;
-  const elevDropFactor = sinX * scale;
-
-  // 1.1 沙盘基底下方的柔和地底投影
-  const idxNW = 0;
-  const idxNE = gSize - 1;
-  const idxSE = totalVertices - 1;
-  const idxSW = (gSize - 1) * gSize;
-  const bNW_Y = terrainProjY[idxNW] + (sim.terrain.cells[idxNW].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bNE_Y = terrainProjY[idxNE] + (sim.terrain.cells[idxNE].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bSE_Y = terrainProjY[idxSE] + (sim.terrain.cells[idxSE].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bSW_Y = terrainProjY[idxSW] + (sim.terrain.cells[idxSW].elev - skirtElev) * elevDropFactor + dropOffset;
-
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[idxNW], bNW_Y);
-  ctx.lineTo(terrainProjX[idxNE], bNE_Y);
-  ctx.lineTo(terrainProjX[idxSE], bSE_Y);
-  ctx.lineTo(terrainProjX[idxSW], bSW_Y);
-  ctx.closePath();
-  ctx.fill();
-
-  // 1.2 四周边沿垂直剖面侧壁 (根据太阳方位计算冷暖明暗)
-  // 北侧壁 (受光偏暖)
-  ctx.fillStyle = '#5A5043';
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
-  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[gx], terrainProjY[gx]);
-  for (let gx = gSize - 1; gx >= 0; gx--) {
-    ctx.lineTo(terrainProjX[gx], terrainProjY[gx] + (sim.terrain.cells[gx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 西侧壁 (受光偏暖)
-  ctx.fillStyle = '#50463B';
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[0], terrainProjY[0]);
-  for (let gy = 1; gy < gSize; gy++) {
-    const idx = gy * gSize;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
-  }
-  for (let gy = gSize - 1; gy >= 0; gy--) {
-    const idx = gy * gSize;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 南侧壁 (背阴沉稳)
-  ctx.fillStyle = '#38322B';
-  ctx.beginPath();
-  const rowOffsetS = (gSize - 1) * gSize;
-  ctx.moveTo(terrainProjX[rowOffsetS], terrainProjY[rowOffsetS]);
-  for (let gx = 1; gx < gSize; gx++) ctx.lineTo(terrainProjX[rowOffsetS + gx], terrainProjY[rowOffsetS + gx]);
-  for (let gx = gSize - 1; gx >= 0; gx--) {
-    const idx = rowOffsetS + gx;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 东侧壁 (背阴偏冷)
-  ctx.fillStyle = '#3D362E';
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[gSize - 1], terrainProjY[gSize - 1]);
-  for (let gy = 1; gy < gSize; gy++) {
-    const idx = gy * gSize + (gSize - 1);
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
-  }
-  for (let gy = gSize - 1; gy >= 0; gy--) {
-    const idx = gy * gSize + (gSize - 1);
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (sim.terrain.cells[idx].elev - skirtElev) * elevDropFactor);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 2. 视口裁剪绘制地形四边形
-  for (let gy = 0; gy < gSize - 1; gy++) {
-    const rowOffset0 = gy * gSize;
-    const rowOffset1 = (gy + 1) * gSize;
-    for (let gx = 0; gx < gSize - 1; gx++) {
-      const i00 = rowOffset0 + gx;
-      const i10 = rowOffset0 + (gx + 1);
-      const i11 = rowOffset1 + (gx + 1);
-      const i01 = rowOffset1 + gx;
-
-      const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
-      const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
-      const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
-      const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
-
-      // 视口边界快速剔除
-      const minX = Math.min(p00x, p10x, p11x, p01x);
-      const maxX = Math.max(p00x, p10x, p11x, p01x);
-      const minY = Math.min(p00y, p10y, p11y, p01y);
-      const maxY = Math.max(p00y, p10y, p11y, p01y);
-
-      if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) {
-        continue;
-      }
-
-      const c00 = sim.terrain.cells[i00];
-      ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
-      ctx.beginPath();
-      ctx.moveTo(p00x, p00y);
-      ctx.lineTo(p10x, p10y);
-      ctx.lineTo(p11x, p11y);
-      ctx.lineTo(p01x, p01y);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  drawTerrainFeatures();
-
-  // 3. 批处理绘制地形网格线 (仅在 sim.showGrid 为 true 时绘制，默认隐藏以呈现自然地貌，按 'G' 键切换)
-  if (sim.showGrid) {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 0.4;
-    ctx.beginPath();
-    for (let gy = 0; gy < gSize; gy++) {
-      const rowOffset = gy * gSize;
-      ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
-      for (let gx = 1; gx < gSize; gx++) {
-        ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
-      }
-    }
-    for (let gx = 0; gx < gSize; gx++) {
-      ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
-      for (let gy = 1; gy < gSize; gy++) {
-        ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
-      }
-    }
-    ctx.stroke();
-  }
-}
+  return { x: legacyX * camera.zoom, y: legacyY * camera.zoom, alphaScale: 1 };
 }
 
-function drawTerrainFeatures() {
-  const features = (sim.terrain && sim.terrain.features) || [];
-  if (!features.length) return;
-  for (const feature of features) {
-    if (!feature.vertices || !feature.vertices.length) continue;
-    const points = feature.vertices.map(project3D);
-    ctx.save();
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    if (feature.kind === 'River') {
-      // 1. 底层深潭幽蓝 (基底深度阴影)
-      ctx.strokeStyle = 'rgba(32, 86, 122, 0.45)';
-      ctx.lineWidth = Math.max(12, feature.width * camera.zoom * 0.36);
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-
-      // 2. 主流水体：清透碧蓝山泉流
-      ctx.strokeStyle = 'rgba(56, 158, 202, 0.82)';
-      ctx.lineWidth = Math.max(8, feature.width * camera.zoom * 0.28);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-
-      // 3. 水面阳光折射波光线 (中心浅蓝白反射细线)
-      ctx.strokeStyle = 'rgba(235, 248, 255, 0.65)';
-      ctx.lineWidth = Math.max(1.2, feature.width * camera.zoom * 0.06);
-      ctx.setLineDash([14 * camera.zoom, 10 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else if (feature.kind === 'RiverBank') {
-      // 湿润河岸：柔和浅金砂漫滩过渡
-      ctx.strokeStyle = 'rgba(188, 160, 120, 0.48)';
-      ctx.lineWidth = Math.max(3, feature.width * camera.zoom * 0.12);
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-    } else if (feature.kind === 'ShallowFord') {
-      // 浅滩涉渡：卵石踏道质感
-      ctx.strokeStyle = 'rgba(215, 196, 142, 0.90)';
-      ctx.lineWidth = Math.max(5, feature.width * camera.zoom * 0.20);
-      ctx.setLineDash([6 * camera.zoom, 4 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-      // 浅水反光微斑
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-      ctx.lineWidth = Math.max(1.5, feature.width * camera.zoom * 0.08);
-      ctx.setLineDash([2 * camera.zoom, 8 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else {
-      // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
-      // v1.47.7：Ridge/Saddle/Terrace 台地轮廓绘制已随特征整体删除
-      ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
-      ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
-      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.06);
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
+// ★ 动态季节光照：立体面受光（法线 → 色值），关闭时原样返回基色
+function shadeHex(baseHex, nx, ny, nz) {
+  const L = window.SimLighting;
+  return (L && L.enabled()) ? L.shadeFace(baseHex, nx, ny, nz) : baseHex;
 }
 
 // ★ v1.47.9 POI 拆为「贴地底座（地面层）」与「标记（立体实体层）」两段：
@@ -261,10 +33,11 @@ function drawPoiGroundBase(poi) {
 
   if (poi.type === 'Camp') {
     const campR = (16 + (poi.level || 0) * 3) * z;
-    // 1. 营地地面阴影
-    ctx.fillStyle = 'rgba(20, 15, 10, 0.22)';
+    // 1. 营地地面阴影（方向与长度随季节光位）
+    const campShadow = lightShadowOffset(1.5, 3.0, (window.SimLighting && window.SimLighting.cfg().campShadowHeight) || 1.2);
+    ctx.fillStyle = `rgba(20, 15, 10, ${(0.22 * campShadow.alphaScale).toFixed(3)})`;
     ctx.beginPath();
-    ctx.ellipse(x + 1.5 * z, y + 3.0 * z, campR * 1.1, campR * 0.55, -0.1, 0, Math.PI * 2);
+    ctx.ellipse(x + campShadow.x, y + campShadow.y, campR * 1.1, campR * 0.55, -0.1, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. 营地篝火与暖石基地 (温润暖赭底座，告别刺眼红黄色斑)
@@ -279,9 +52,10 @@ function drawPoiGroundBase(poi) {
 
   // 自然资源与市场 POI (统一温润水墨/沙盘手办基座，彻底消除大光圈污染)
   const baseR = 12 * z;
-  ctx.fillStyle = 'rgba(20, 15, 10, 0.20)';
+  const poiShadow = lightShadowOffset(1.2, 2.5, (window.SimLighting && window.SimLighting.cfg().poiShadowHeight) || 0.9);
+  ctx.fillStyle = `rgba(20, 15, 10, ${(0.20 * poiShadow.alphaScale).toFixed(3)})`;
   ctx.beginPath();
-  ctx.ellipse(x + 1.2 * z, y + 2.5 * z, baseR * 1.1, baseR * 0.55, -0.1, 0, Math.PI * 2);
+  ctx.ellipse(x + poiShadow.x, y + poiShadow.y, baseR * 1.1, baseR * 0.55, -0.1, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = poiTintColor(poi);
@@ -416,12 +190,13 @@ function drawHouse(house) {
   const isAuction = isVacant && house.auctionPhase != null;
   const x = p2D.x, y = p2D.y;
 
-  // 1. 地面柔和接触阴影 (Drop Shadow) - 按 70% 等比微缩
+  // 1. 地面柔和接触阴影 (Drop Shadow) - 按 70% 等比微缩，方向/长度随季节光位
   const sW = (house.tier === 'Tier4Manor' ? 10 : (house.tier === 'Tier3Homestead' ? 8.5 : 6.5)) * z;
   const sH = sW * 0.52;
-  ctx.fillStyle = 'rgba(22, 18, 14, 0.26)';
+  const hShadow = lightShadowOffset(1.4, 2.1, (window.SimLighting && window.SimLighting.cfg().houseShadowHeight) || 3.0);
+  ctx.fillStyle = `rgba(22, 18, 14, ${(0.26 * hShadow.alphaScale).toFixed(3)})`;
   ctx.beginPath();
-  ctx.ellipse(x + 1.4 * z, y + 2.1 * z, sW, sH, -0.12, 0, Math.PI * 2);
+  ctx.ellipse(x + hShadow.x, y + hShadow.y, sW, sH, -0.12, 0, Math.PI * 2);
   ctx.fill();
 
   // 2. 2.5D 微缩建筑模型体块 (宽高缩小至原来的 70%)
@@ -441,7 +216,9 @@ function drawHouse(house) {
   else { roofFront = '#334155'; roofSide = '#1e293b'; } // 城堡深石板青
 
   // 墙体受光面 (南/东) 与 背光面 (西)
-  ctx.fillStyle = wallSide;
+  // ★ 动态季节光照：面法线参与光向计算（左墙 = 西、右墙 = 南、左坡 = 西向上、右坡 = 南向上）；
+  //   相对旧固定光归一化 ⇒ 关闭动态光照或光位回到西北 41° 时与 v1.47.11 配色一致。
+  ctx.fillStyle = shadeHex(wallSide, -1, 0, 0);
   ctx.beginPath();
   ctx.moveTo(x - hw, y);
   ctx.lineTo(x, y + hh * 0.4);
@@ -450,7 +227,7 @@ function drawHouse(house) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = wallFront;
+  ctx.fillStyle = shadeHex(wallFront, 0, 1, 0);
   ctx.beginPath();
   ctx.moveTo(x, y + hh * 0.4);
   ctx.lineTo(x + hw, y);
@@ -470,7 +247,7 @@ function drawHouse(house) {
   ctx.fill();
 
   // 双坡/四阿微缩屋顶 (具有太阳漫反射明暗)
-  ctx.fillStyle = roofSide;
+  ctx.fillStyle = shadeHex(roofSide, -0.45, 0, 0.89);
   ctx.beginPath();
   ctx.moveTo(x - hw * 1.15, y - hh * 0.85);
   ctx.lineTo(x, y - hh * 0.45);
@@ -479,7 +256,7 @@ function drawHouse(house) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = roofFront;
+  ctx.fillStyle = shadeHex(roofFront, 0, 0.45, 0.89);
   ctx.beginPath();
   ctx.moveTo(x, y - hh * 0.45);
   ctx.lineTo(x + hw * 1.15, y - hh * 0.85);

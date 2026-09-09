@@ -115,6 +115,11 @@ function updateDebugHud(now) {
   dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
   dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
   dbgSetText('dbg-snap-ms', s.snapMs.toFixed(2) + ' ms');
+  // ★ 动态季节光照：整片重着色耗时 + 光相/光档（验收取证用）
+  if (window.SimLighting) {
+    dbgSetText('dbg-light-ms', SimLighting.lastMs().toFixed(2) + ' ms');
+    dbgSetText('dbg-light-phase', `u=${SimLighting.phase().toFixed(3)} · 档 ${SimLighting.stamp()}`);
+  }
   dbgSetText('dbg-render-ms', dbgRenderMs.toFixed(2) + ' ms');
   dbgSetText('dbg-frame-ms', dbgFrameMs.toFixed(2) + ' ms');
   dbgSetText('dbg-cpu', Math.min(100, (dbgFrameMs / FRAME_INTERVAL) * 100).toFixed(1) + '%');
@@ -172,6 +177,14 @@ function updateTopBarStats(now) {
   document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
   document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
   document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
+
+  // ★ 动态季节光照：当前光位读数（方位 + 高度角）
+  const sunEl = document.getElementById('stat-sun');
+  if (sunEl && window.SimLighting) {
+    sunEl.textContent = SimLighting.enabled()
+      ? `${SimLighting.compass()} · ${Math.round(SimLighting.elevationDeg())}°`
+      : '固定光（已关闭）';
+  }
 
   // 气温预测浮窗如果在展开状态，每 30 帧刷新一次以跟随时间平滑演化
   if (_climatePopupVisible && sim && (sim.tickCount - _lastClimateChartRenderTick >= 30)) {

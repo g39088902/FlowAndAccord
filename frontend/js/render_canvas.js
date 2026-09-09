@@ -173,17 +173,28 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   w = window.innerWidth;
   h = window.innerHeight;
   ctx.clearRect(0, 0, w, h);
-  // 1. 3D 地形网格渲染
+
+  // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
+  //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/27-plan-seasonal-lighting.md §2.7）
+  if (window.SimLighting) window.SimLighting.update(now, sim);
+
+  // 1. 天空与地平氛围（地表之下的第一个氛围插入点）
+  drawSkyBackdrop();
+
+  // 2. 3D 地形网格渲染
   drawTerrain();
 
-  // 2. 动态踩踏道路网络渲染（贴地表面先画，避免遮挡建筑）
+  // 3. 动态踩踏道路网络渲染（贴地表面先画，避免遮挡建筑）
   drawLanes();
 
-  // 3. 贴地图元补充层：选中营地的辖区连线 + POI 底座/营地暖光（必须在立体实体之前落笔）
+  // 4. 贴地图元补充层：选中营地的辖区连线 + POI 底座/营地暖光（必须在立体实体之前落笔）
   drawSelectedCampHouseLinks();
   drawPoiGroundBases();
 
-  // 4. ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 + 私产宅舍 + 部落民，远 → 近依次落笔）
+  // 5. 大气色洗（第二个氛围插入点：在立体实体之前，保证建筑与文字不被洗灰）
+  drawAtmosphereWash();
+
+  // 6. ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 + 私产宅舍 + 部落民，远 → 近依次落笔）
   drawWorldEntities();
 
   // ★ M4: 登基礼花特效

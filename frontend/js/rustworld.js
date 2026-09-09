@@ -79,7 +79,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.47.11';
+        this._appVersion = '1.48.0';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -148,7 +148,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.47.11';
+            this._appVersion = msg.appVersion || '1.48.0';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -160,6 +160,8 @@
               window.SnapshotBin.resetCaches();
             }
             if (msg.snapshot) {
+              // ★ 动态季节光照：全新引擎 → 光相立即对齐（不做平滑）
+              if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
             }
             console.info(`[RustWorld Worker] sim_core wasm 引擎已在 Worker 中接管计算 (开局种子: ${this._engineSeed})`);
@@ -213,6 +215,8 @@
             if (msg.ok && msg.snapshot) {
               // ★ M4：读档后引擎重建 → 清空解码器字符串缓存与车道几何缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ 动态季节光照：读档时间可能倒退 → 光相立即对齐
+              if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
             }
             break;
@@ -226,6 +230,8 @@
             }
             if (msg.ok && msg.snapshot) {
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ 动态季节光照：时光倒流时间倒退 → 光相立即对齐
+              if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
             }
             // 回滚结果同样携带一帧完整快照；确认消费后解除 Worker 的背压，
@@ -243,6 +249,8 @@
             if (msg.snapshot) {
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ 动态季节光照：重置 → 光相立即对齐
+              if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
             }
             this._worker.postMessage({ type: 'ACK' });
@@ -397,7 +405,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.47.11';
+        return this._appVersion || '1.48.0';
       }
 
       /**
@@ -548,6 +556,9 @@
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
         this.seasonTimer = snap.season_timer != null ? snap.season_timer : 0.0;
+        // ★ 动态季节光照：季节内进度（FABS/JSON 均已下发，此前未映射）
+        this.seasonProgress = (typeof snap.season_progress === 'number' && isFinite(snap.season_progress))
+          ? snap.season_progress : null;
         this.elNinoPhase = snap.el_nino_phase != null ? snap.el_nino_phase : 0.0;
         this.climateEpochPhase = snap.climate_epoch_phase != null ? snap.climate_epoch_phase : 0.0;
 
@@ -594,6 +605,13 @@
             }
           }
           const step = worldSize / (w - 1);
+          // ★ 动态季节光照（docs/27-plan-seasonal-lighting.md §4）：
+          //   一次性预存单位法线 / 无光反照率 / 坡度 AO；光档变化时由 SimLighting.relightTerrain()
+          //   只重算光因子并原地写回 cell.color，避免每次整片重建颜色与字符串。
+          const cellCount = w * h;
+          const nxArr = new Float32Array(cellCount), nyArr = new Float32Array(cellCount), nzArr = new Float32Array(cellCount);
+          const aoArr = new Float32Array(cellCount);
+          const albR = new Float32Array(cellCount), albG = new Float32Array(cellCount), albB = new Float32Array(cellCount);
           for (let gy = 0; gy < h; gy++) {
             for (let gx = 0; gx < w; gx++) {
               const idx = gy * w + gx;
@@ -601,9 +619,17 @@
               const eL = gx > 0 ? cells[gy * w + gx - 1].elev : cells[idx].elev;
               const eD = gy < h - 1 ? cells[(gy + 1) * w + gx].elev : cells[idx].elev;
               const eU = gy > 0 ? cells[(gy - 1) * w + gx].elev : cells[idx].elev;
-              cells[idx].dzdx = (eR - eL) / (2 * step);
-              cells[idx].dzdy = (eD - eU) / (2 * step);
-              cells[idx].color = computeElevationColor(cells[idx], minZ, maxZ);
+              const cell = cells[idx];
+              cell.dzdx = (eR - eL) / (2 * step);
+              cell.dzdy = (eD - eU) / (2 * step);
+              const invLen = 1 / (Math.hypot(-cell.dzdx, -cell.dzdy, 1.0) || 1.0);
+              nxArr[idx] = -cell.dzdx * invLen;
+              nyArr[idx] = -cell.dzdy * invLen;
+              nzArr[idx] = invLen;
+              aoArr[idx] = terrainAmbientOcclusion(cell.dzdx, cell.dzdy);
+              const alb = computeTerrainAlbedo(cell, minZ, maxZ);
+              albR[idx] = alb.r; albG[idx] = alb.g; albB[idx] = alb.b;
+              cell.color = computeElevationColor(cell, minZ, maxZ);
             }
           }
           this.terrain = {
@@ -612,11 +638,15 @@
             minZ,
             maxZ,
             cells,
+            nx: nxArr, ny: nyArr, nz: nzArr, ao: aoArr,
+            albR, albG, albB,
             features: snap.terrain_features || [],
             generatorVersion: snap.terrain_generator_version || 0,
             profile: snap.terrain_profile || '',
           };
           this._terrainCached = true;
+          // 地形重建后强制下一帧整片重着色（光相未变也要重写新数组对应的 cell.color）
+          if (window.SimLighting) window.SimLighting.markDirty();
         }
 
         // --- POI ---

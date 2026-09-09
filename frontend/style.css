@@ -4096,6 +4096,10 @@ body.theme-light .control-panel .panel-title {
 body.theme-light .control-panel .toggle-row > span[style*="#facc15"] { color: #b45309 !important; }
 body.theme-light .control-panel .toggle-row > span[style*="#38bdf8"] { color: #0284c7 !important; }
 body.theme-light #stat-actual-speed { color: #475569 !important; }
+/* ☀️ 动态季节光照开关与光位读数浅色适配（v1.48.0） */
+body.theme-light .control-panel label[for="chk-dynamic-light"] { color: #b45309 !important; }
+body.theme-light .control-panel .toggle-row > span[style*="#fbbf24"] { color: #b45309 !important; }
+body.theme-light #stat-sun { color: #475569 !important; }
 body.theme-light #btn-open-rewind-ctrl {
   color: #b45309 !important;
   border-color: rgba(180, 83, 9, 0.45) !important;

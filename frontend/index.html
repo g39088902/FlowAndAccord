@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.47.11</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.48.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -814,6 +814,14 @@
       </select>
     </div>
     <div class="toggle-row">
+      <label for="chk-dynamic-light" style="font-weight:600; color:#fbbf24;">☀️ 动态季节光照（一年一圈）</label>
+      <input aria-label="动态季节光照" type="checkbox" id="chk-dynamic-light" checked style="accent-color: #fbbf24; cursor: pointer;">
+    </div>
+    <div class="toggle-row">
+      <span style="font-weight:600; color:#fbbf24;">🧭 当前光位</span>
+      <span id="stat-sun" class="mono-num" style="font-weight:600; color:#94a3b8;">东 · 65°</span>
+    </div>
+    <div class="toggle-row">
       <span style="font-weight:600; color:#38bdf8;">⏱️ 实际演化倍速</span>
       <span id="stat-actual-speed" class="mono-num" style="font-weight:600; color:#94a3b8;">0.0x (已暂停)</span>
     </div>
@@ -831,6 +839,8 @@
     <div class="debug-row"><span>🖼️ 渲染 FPS</span><span id="dbg-fps" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚙️ 内核步进</span><span id="dbg-tick-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>📦 快照解析</span><span id="dbg-snap-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>☀️ 光照重着色</span><span id="dbg-light-ms" class="mono-num">0.00 ms</span></div>
+    <div class="debug-row"><span>🧭 光相 / 光档</span><span id="dbg-light-phase" class="mono-num">—</span></div>
     <div class="debug-row"><span>🎨 渲染 + UI</span><span id="dbg-render-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>🧮 整帧耗时</span><span id="dbg-frame-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>🔥 CPU 占用</span><span id="dbg-cpu" class="mono-num">0%</span></div>
@@ -1350,6 +1360,9 @@
   <script src="js/config.decision-order.js"></script>
   <!-- M8 升级材料成本矩阵（20 字段）· 须早于 rustworld.js 首次 applyConfig -->
   <script src="js/config.house-upgrade-cost.js"></script>
+  <!-- ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）：前端独立配置 + 光相引擎，须早于 rustworld.js -->
+  <script src="js/config.lighting.js"></script>
+  <script src="js/lighting.js"></script>
   <script src="js/decision-viz-data.js"></script>
   <script src="js/decision-viz-view.js"></script>
   <script src="js/decision-viz.js"></script>
@@ -1367,6 +1380,7 @@
   <script src="js/save-ui.js"></script>
   <!-- render.js 拆分为5个文件 (v1.7.0): canvas主循环 → HUD → 世界 → 族人 → Inspector -->
   <script src="js/render_canvas.js"></script>
+  <script src="js/render_terrain.js"></script>
   <script src="js/render_hud.js"></script>
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>

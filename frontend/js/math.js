@@ -45,7 +45,10 @@
       }
     }
 
-    function computeElevationColor(cell, minZ, maxZ) {
+    // 地形反照率（不含光）：水体色 / 高程插值 / 坡度平滑过渡。
+    // ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）把它与光照拆开：
+    //   反照率只算一次并预存，光向变化时只重算光因子，避免每次整片重建颜色。
+    function computeTerrainAlbedo(cell, minZ, maxZ) {
       const { elev, dzdx = 0, dzdy = 0, surfaceKind, naturalFertility = 1.0 } = cell;
       const range = Math.max(1, maxZ - minZ);
       const normZ = Math.max(0, Math.min(1, (elev - minZ) / range));
@@ -53,17 +56,6 @@
       // 连续坡度计算 (度数)
       const gradMag = Math.hypot(dzdx, dzdy);
       const slopeDeg = Math.atan(gradMag) * (180 / Math.PI);
-
-      // 统一太阳主光源与物理法线漫反射 (Lambertian Diffuse + Ambient)
-      // 光源来自左上方俯视: L = normalize(-0.45, -0.60, 0.66)
-      // 单位法线: N = normalize(-dzdx, -dzdy, 1.0)
-      const normLen = Math.hypot(-dzdx, -dzdy, 1.0) || 1.0;
-      const dot = (0.45 * dzdx + 0.60 * dzdy + 0.66) / normLen;
-      const diffuse = Math.max(0, dot);
-
-      // 地形微环境光遮蔽 (Ambient Occlusion): 陡峭山谷/深沟采光受限，平原开阔通透
-      const ao = Math.max(0.70, 1.0 - (slopeDeg / 65.0) * 0.30);
-      const lightFactor = Math.max(0.52, Math.min(1.22, (0.54 + 0.46 * diffuse) * ao));
 
       let r, g, b;
 
@@ -118,9 +110,31 @@
         }
       }
 
-      const finalR = Math.min(255, Math.max(0, Math.floor(r * lightFactor)));
-      const finalG = Math.min(255, Math.max(0, Math.floor(g * lightFactor)));
-      const finalB = Math.min(255, Math.max(0, Math.floor(b * lightFactor)));
+      return { r, g, b };
+    }
+
+    // 地形坡度环境光遮蔽 (AO)：陡峭山谷/深沟采光受限，平原开阔通透
+    function terrainAmbientOcclusion(dzdx, dzdy) {
+      const slopeDeg = Math.atan(Math.hypot(dzdx || 0, dzdy || 0)) * (180 / Math.PI);
+      return Math.max(0.70, 1.0 - (slopeDeg / 65.0) * 0.30);
+    }
+
+    // 静态光照组合入口（v1.47.11 行为，作为动态光照关闭时的对照路径与兜底）
+    // 光源来自左上方俯视: L = normalize(-0.45, -0.60, 0.66)
+    function computeElevationColor(cell, minZ, maxZ) {
+      const { dzdx = 0, dzdy = 0 } = cell;
+      const alb = computeTerrainAlbedo(cell, minZ, maxZ);
+
+      // 单位法线: N = normalize(-dzdx, -dzdy, 1.0)
+      const normLen = Math.hypot(-dzdx, -dzdy, 1.0) || 1.0;
+      const dot = (0.45 * dzdx + 0.60 * dzdy + 0.66) / normLen;
+      const diffuse = Math.max(0, dot);
+      const ao = terrainAmbientOcclusion(dzdx, dzdy);
+      const lightFactor = Math.max(0.52, Math.min(1.22, (0.54 + 0.46 * diffuse) * ao));
+
+      const finalR = Math.min(255, Math.max(0, Math.floor(alb.r * lightFactor)));
+      const finalG = Math.min(255, Math.max(0, Math.floor(alb.g * lightFactor)));
+      const finalB = Math.min(255, Math.max(0, Math.floor(alb.b * lightFactor)));
 
       return `rgb(${finalR}, ${finalG}, ${finalB})`;
     }

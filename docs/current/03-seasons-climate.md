@@ -44,6 +44,7 @@
 - `housing_system/maintenance.rs`：读取气温判断是否扣供暖木材。
 - `agent.rs` / `birth.rs`：受孕门槛检查房屋木材储量。
 - 前端 `render_hud.js`：顶栏展示四季时钟与实时气温；鼠标悬停展示未来 49 年宏观气候预测折线图。
+- 前端 `lighting.js`（★ v1.48.0）：动态季节光照只消费本模块的 `season` / `season_progress` / `temperature` 事实推导年周期光弧（一年一圈、四季各占一个象限），不新增时间基准、不修改 `tick_season`；详见 [27-plan-seasonal-lighting.md](../27-plan-seasonal-lighting.md)。
 
 ## 调参入口
 年轮周期、气温基准与振幅、供暖温度阈值与木材消耗速率见 [06-config-reference.md](../06-config-reference.md) 第 6、7 分区。

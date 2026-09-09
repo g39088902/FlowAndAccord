@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：26 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + style.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：29 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + style.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -24,6 +24,8 @@
 | `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：16 条活动分支顺序 + 层级覆盖。用户调整保存到 `flowaccord.decision-order.v3`；启动时迁移 v2（b11→b8、移除 b15） | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
+| `js/config.lighting.js` | ~56 | ★ v1.48.0 `window.SIM_LIGHTING`：动态季节光照纯表现层配置（光位/强度/色温/阴影/量化档/限速）。**不并入 SIM_CONFIG**（并入会与 SimConfig 字段集比对冲突），不注入 WASM | 任何模拟行为参数（那些走 SimConfig） |
+| `js/lighting.js` | ~330 | ★ v1.48.0 `window.SimLighting`：年周期光弧引擎——年度相位推导、视觉限速器、地形整片重着色、面光照、世界空间阴影、天空氛围。**必须在 rustworld.js 与渲染六件套之前加载** | DOM 操作、模拟状态写入、RNG 消费 |
 
 ### 1.2 决策引擎视图层（三件套，必须在 rustworld.js 之前加载）
 
@@ -42,9 +44,10 @@
 | `js/snapshot-bin.js` | ~520 | **★ M4 (v1.45.3) FABS 二进制快照解码器**：`window.SnapshotBin.decode(Uint8Array) → 与 JSON 快照逐字段同构的 JS 对象`；维护持久化字符串驻留缓存与枚举名称表（`setEnumTables`/`resetCaches`）。**必须在 rustworld.js 之前加载** | 任何 DOM 操作、Canvas 绘制 |
 | `js/sim_worker.js` | ~300 | **仿真内核专用 Web Worker**（★ v1.38.0 Phase 1 解耦）：在独立 Worker 线程加载 WASM 引擎、自适应计时循环驱动 `world_tick_steps`、背压限频下发快照（**★ M4 优先二进制 FABS 帧 `.slice()` 后 `postMessage(transfer)` 转移**，wasm 无导出自动回退 JSON）、管理历史检查点与时光倒流 | 任何 DOM 操作、Canvas 绘制 |
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
-| `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.47.9 调用顺序：地形 → 路网 → 贴地图元 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
+| `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.48.0 调用顺序：`SimLighting.update` → 天空 → 地形 → 路网 → 贴地图元 → 大气色洗 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
-| `js/render_world.js` | ~767 | **世界元素绘制**（v1.7.1 拆分）：drawTerrain（3D 地形网格）/ drawLanes（踩踏路网与悬浮 Tooltip）/ drawSelectedCampHouseLinks（营地辖区虚线）/ drawPoiGroundBases + drawPoiGroundBase（POI 贴地底座与营地暖光）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型）/ **★ v1.47.9 `drawWorldEntities()`（POI 标记 + 房屋 + 族人统一按相机深度远 → 近绘制）** | 共享状态（在 render_canvas）、HUD（在 render_hud） |
+| `js/render_terrain.js` | ~340 | ★ v1.48.0 从 render_world.js 拆出：`drawTerrain`（3D 地形网格 + 随光向变化的沙盘侧壁）/ `drawTerrainFeatures`（水系特征）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAtmosphereWash`（大气色洗） | 立体实体、HUD、共享状态 |
+| `js/render_world.js` | ~528 | **世界元素绘制**（v1.7.1 拆分）：drawLanes（踩踏路网与悬浮 Tooltip）/ drawSelectedCampHouseLinks（营地辖区虚线）/ drawPoiGroundBases + drawPoiGroundBase（POI 贴地底座与营地暖光）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型，★ v1.48.0 面法线受光 + 世界空间阴影）/ **★ v1.47.9 `drawWorldEntities()`（POI 标记 + 房屋 + 族人统一按相机深度远 → 近绘制）** | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
 | `js/main.js` | ~574 | 全局初始化 / 相机控制（缩放/平移/跟随）/ 事件绑定（点击拾取/快捷键 Space/Esc/重置按钮/倍速切换）/ 控制台日志 / 无头模式切换 / **★ v1.27.0 启动即暂停**（`sim.isPaused=true`，由 save-ui.js 完成存档连接后解除） | Canvas 绘制（在 render.js）、wasm 交互（在 rustworld.js） |
@@ -72,7 +75,7 @@
 | 文件 | 行数 | 职责 |
 |---|---|---|
 | `server.js` | ~122 | 静态文件开发服务器（内置 `.wasm` MIME = application/wasm）/ `POST /save-decision-order` 端点（★ v1.27.0 起仅保留兼容迁移，决策顺序保存主路径已迁至浏览器 localStorage）/ 默认 3000 端口 |
-| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 24 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
+| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 27 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
 | `style.css` | — | 全局样式（顶栏/Inspector/大盘/决策视图/族谱/调试器） |
 | `rust/sim_wasm.wasm` | — | WASM 编译产物**主副本**（rustworld.js 实际 fetch 的路径） |
 | `sim_wasm.wasm` | — | WASM 编译产物**根目录备用副本** |
@@ -82,38 +85,42 @@
 ## 二、脚本加载顺序（index.html，勿打乱）
 
 ```
-1. math.js                    零依赖基础
+1. math.js                    零依赖基础（含 computeTerrainAlbedo 反照率/光照分解）
 2. config.js                  SIM_CONFIG (237 字段，含拆分配置合计)
 3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
 4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
 5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)
-6. decision-viz-data.js       分支元数据
-7. decision-viz-view.js       决策视图 DOM 渲染
-8. decision-viz.js            集成层: mergeIntoSimConfig() ← 此时 SIM_CONFIG 才完整
-9. snapshot-bin.js            ★ M4 FABS 二进制快照解码器（必须在 rustworld.js 之前）
-10. rustworld.js              构造时读取 SIM_CONFIG 并 applyConfig ← 必须在配置、决策三件套及 snapshot-bin 之后
-11. dag-layout.js             族谱布局数学
-12. dag-view.js               族谱渲染
-13. dag-standalone.js         族谱独立页模板
-14. dag.js                    族谱数据构建+编排
-15. main.js                   事件绑定+初始化
-16. entity-link.js            统一实体跳转（依赖 main.js）
-17. ledger-ui.js              制度大盘
-18. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
-19. render_canvas.js           Canvas 主循环调度（v1.7.1 拆分）
-20. render_hud.js              HUD/大盘辅助函数（v1.7.1 拆分）
-21. render_world.js            地形/路网/POI/房屋绘制（v1.7.1 拆分）
-22. render_agents.js           族人/特效绘制（v1.7.1 拆分）
-23. render_inspector.js        Inspector 面板/点击拾取（v1.7.1 拆分）
-24. auction-ui.js              拍卖大盘（最后加载，独立模态）
+6. config.lighting.js         ★ v1.48.0 SIM_LIGHTING 动态季节光照前端配置（纯表现层，不注入 WASM）
+7. lighting.js                ★ v1.48.0 年周期光弧引擎 SimLighting（须早于 rustworld.js 与渲染六件套）
+8. decision-viz-data.js       分支元数据
+9. decision-viz-view.js       决策视图 DOM 渲染
+10. decision-viz.js           集成层: mergeIntoSimConfig() ← 此时 SIM_CONFIG 才完整
+11. snapshot-bin.js           ★ M4 FABS 二进制快照解码器（必须在 rustworld.js 之前）
+12. rustworld.js              构造时读取 SIM_CONFIG 并 applyConfig ← 必须在配置、决策三件套及 snapshot-bin 之后
+13. dag-layout.js             族谱布局数学
+14. dag-view.js               族谱渲染
+15. dag-standalone.js         族谱独立页模板
+16. dag.js                    族谱数据构建+编排
+17. main.js                   事件绑定+初始化
+18. entity-link.js            统一实体跳转（依赖 main.js）
+19. ledger-ui.js              制度大盘
+20. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
+21. render_canvas.js          Canvas 主循环调度（v1.7.1 拆分）
+22. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
+23. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
+24. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
+25. render_agents.js          族人/特效绘制（v1.7.1 拆分）
+26. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
+27. auction-ui.js             拍卖大盘（最后加载，独立模态）
 ```
 
 **关键约束**：
-- 四个配置/视图准备文件（3-8：config.poi-rates.js、config.decision-order.js、config.house-upgrade-cost.js + 决策三件套）必须在 `rustworld.js`（10）之前——否则创世没有持久 POI 产速，或 WASM 注入的是不含决策顺序/升级成本矩阵的不完整配置
-- ★ M4 `snapshot-bin.js`（9）必须在 `rustworld.js`（10）之前——否则 READY 首个二进制快照无法解码
+- 配置/视图准备文件（3-10：config.poi-rates.js、config.decision-order.js、config.house-upgrade-cost.js、config.lighting.js、lighting.js + 决策三件套）必须在 `rustworld.js`（12）之前——否则创世没有持久 POI 产速，或 WASM 注入的是不含决策顺序/升级成本矩阵的不完整配置
+- ★ M4 `snapshot-bin.js`（11）必须在 `rustworld.js`（12）之前——否则 READY 首个二进制快照无法解码
+- ★ v1.48.0 `config.lighting.js`（6）与 `lighting.js`（7）必须早于 `rustworld.js`——`_applySnapshot` 建地形缓存时会调用 `SimLighting.markDirty()`，缺失则首帧不重着色
 - 改拆分配置 JS（新增全局对象）必须同步：`rustworld.js::applyConfig` 合并逻辑、`tools/config-check.js` 前端字段集、`tools/test-wasm.js` 注入
 - **`save-ui.js`（18）必须在 `main.js`（15）之后**——它读取 `window.rustWorldSim`（main.js 第 5 行挂载）调用 `saveWorld()/loadWorld()`
-- **render 五件套（19-23）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；五文件共享全局作用域，函数声明可提升，加载顺序为 canvas→hud→world→agents→inspector
+- **render 六件套（21-26）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；六文件共享全局作用域，函数声明可提升，加载顺序为 canvas→terrain→hud→world→agents→inspector
 
 ---
 
@@ -170,6 +177,9 @@ main.js::事件绑定
 | `debug-*` | render_hud.js / main.js | 调试监视器字段 |
 | `save-*` / `.save-slot-*` / `.save-tab-btn` | save-ui.js / index.html / style.css | 存档面板与槽位卡片（v1.8.0） |
 | `btn-pause` | main.js / save-ui.js | 暂停按钮（`togglePause()` 改文案，save-ui 读档后同步置为「▶️ 继续模拟」） |
+| `chk-dynamic-light` | main.js / index.html / style.css | ★ v1.48.0 动态季节光照开关（`L` 键同源触发，`change` 事件热切换） |
+| `stat-sun` | render_hud.js / index.html | ★ v1.48.0 当前光位读数（方位 + 高度角） |
+| `dbg-light-ms` / `dbg-light-phase` | render_hud.js / index.html | ★ v1.48.0 光照重着色耗时与光相/光档调试读数 |
 | `version-tag` | index.html | 版本徽章 · **版本号唯一真相源**（由 `node tools/bump-version.js --patch` 自动同步至 SAVE_APP_VERSION 等全部定义点，勿手工改） |
 
 **搜索方法**：改 ID 前用 `grep -r "旧ID" frontend/` 确认所有引用点。
@@ -178,7 +188,7 @@ main.js::事件绑定
 
 ## 五、局部易踩坑
 
-### 5.1 render.js 已拆分为 5 个文件（v1.7.1）
+### 5.1 render.js 已拆分为 5 个文件（v1.7.1）· v1.48.0 再拆出 render_terrain.js
 
 render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文件，单文件均 <800 行：
 - `render_canvas.js`（~226 行）：共享状态 + 主循环调度骨架
@@ -267,9 +277,20 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 ### 5.9 世界图层顺序与统一相机深度绘制（★ v1.47.9）
 
-- **固定图层顺序**（`render_canvas.js::render`）：`drawTerrain` → `drawLanes` → `drawSelectedCampHouseLinks` + `drawPoiGroundBases` → `drawWorldEntities` → `drawCoronationEffects`。道路是贴地踩踏纹理必须先于建筑（否则「路切屋顶」倒错）；POI 底座/营地暖光是贴地绘制物，必须留在立体实体之前，否则暖光会糊在近处建筑上。
+- **固定图层顺序**（`render_canvas.js::render`，★ v1.48.0 起含两个氛围插入点）：`SimLighting.update()` → `drawSkyBackdrop` → `drawTerrain` → `drawLanes` → `drawSelectedCampHouseLinks` + `drawPoiGroundBases` → `drawAtmosphereWash` → `drawWorldEntities` → `drawCoronationEffects`。天空背景必须在地表之下、大气色洗必须在立体实体之前（否则建筑与文字被洗灰）。道路是贴地踩踏纹理必须先于建筑（否则「路切屋顶」倒错）；POI 底座/营地暖光是贴地绘制物，必须留在立体实体之前，否则暖光会糊在近处建筑上。
 - **立体实体共用一个深度队列**：Canvas 2D 无深度缓冲，任何同层按数组原序绘制都会出现「远物压近物」。`render_world.js::drawWorldEntities()` 每帧把 **POI 标记（`drawPoiMarker`）+ 房屋（`drawHouse`）+ 族人（`render_agents.js::drawAgent`）** 收进同一个列表，按 `project3D().depth`（= `ry·sinX + z·cosX`，数值越大越靠近视点）**升序**绘制（远 → 近）；同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性。每帧重算，相机旋转后不残留旧序；排序只作用于绘制队列，`sim.pois`/`sim.houses`/`sim.agents` 顺序与点击拾取/Inspector 遍历逻辑均不变。
 - **新增世界实体（树木/农田/哨塔等）必须挂进同一队列**：在 `drawWorldEntities()` 的 collect 阶段登记种类 + 提供单实体绘制函数即可，**严禁**在 `render()` 里新增独立的整层绘制调用（那会立刻退回「远物压近物」）。历史教训：v1.47.8 只修了房屋层，POI 与族人仍按固定图层顺序绘制。
+
+### 5.10 动态季节光照契约（★ v1.48.0）
+
+- **光相唯一来源 = 快照**：`SimLighting.phaseFromSnapshot()` 只消费 `sim.currentSeason` + `sim.seasonProgress`（缺字段回退 `seasonTimer / seasonYearLength`）。**严禁**前端另建计时器或按 `Date.now()` 推季节——那会与内核的气温、供暖、浆果霜冻形成两套季节事实。
+- **一年一圈**：年度相位 `u = (seasonIdx - 0.5 + seasonProgress) / 4`；方位 `β = 360°u + 90°`（春=东 / 夏=南 / 秋=西 / 冬=北，季分箱中心恰为正方向），高度角 `e = 47° + 25°·sin(2πu)`（盛夏 72°、隆冬 22°）。
+- **地形重着色必须走光档量化**：`rustworld.js::_applySnapshot` 建地形缓存时预存 `nx/ny/nz`（单位法线）+ `albR/G/B`（无光反照率）+ `ao`，`SimLighting.relightTerrain()` 仅在光档（`lightStepsPerYear`，默认 144 档/年）变化时整片重算并**原地写回 `cell.color`**；`drawTerrain` 不感知光照，禁止在绘制循环里逐格生成颜色字符串。
+- **视觉限速器**：仿真角速度超过 `rateCapDegPerSec`（默认 90°/s，最快 4 秒一圈）时按限速跟随，相位误差超过半圈直接对齐——高倍速下不得出现频闪。
+- **时间跳变必须 `resync()`**：`rustworld.js` 在 `READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE` 四处已调用；新增任何重建世界的入口都要补上，否则光相会从上一世界缓慢爬回来。
+- **阴影用世界空间**：`lightShadowOffset()`（render_world.js）与 `SimLighting.shadowOffset()` 把世界光向投影到屏幕（随相机 `rotZ/rotX` 旋转）；**禁止**再写死屏幕偏移。
+- **纯表现层边界**：不消耗 `WorldRng`、不写模拟状态、不进存档、不参与逐字节确定性承诺；`enabled=false` 必须退回 v1.47.11 的固定光（西北 41°）以便 A/B 对照。
+- 详细设计与验收见 [docs/27-plan-seasonal-lighting.md](../docs/27-plan-seasonal-lighting.md)。
 
 ---
 
