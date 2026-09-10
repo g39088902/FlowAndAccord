@@ -8,7 +8,8 @@ use super::snapshot::{
     ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot,
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
-    TerrainFeatureSnapshot, TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
+    TerrainAccentSnapshot, TerrainFeatureSnapshot, TransferRecordSnapshot,
+    VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -688,10 +689,31 @@ impl World3DEngine {
             Vec::new()
         };
 
+        // ★ v1.48.0 D-A：JSON 快照装饰赋值
+        let terrain_accents = if need_terrain {
+            self.terrain
+                .accents
+                .iter()
+                .map(|accent| TerrainAccentSnapshot {
+                    id: accent.id,
+                    kind: accent.kind.as_str().to_string(),
+                    x: accent.pos.x,
+                    y: accent.pos.y,
+                    z: accent.pos.z,
+                    scale: accent.scale,
+                    rotation: accent.rotation_rad,
+                    tint: accent.tint,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         WorldSnapshot3D {
             tick: self.tick_counter,
             terrain_cells,
             terrain_features,
+            terrain_accents,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,

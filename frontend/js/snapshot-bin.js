@@ -39,6 +39,8 @@
     GLOBAL: 1, AGENT: 2, POI: 3, HOUSE: 4, LANE_GEO: 5, LANE_WEAR: 6, NODE: 7, TERRAIN: 8,
     HOUSEHOLD: 9, MARRIAGE: 10, CLAN: 11, REGION: 12, EMPIRE: 13, GRANARY: 14, DEATH: 15,
     AUCTION_HIST: 16, STR_TAB: 17, TERRAIN_FEATURES: 18,
+    // ★ v1.48.0 D-A：Terrain 相关 section 需与 layout.rs SectionKind 枚举同步
+    TERRAIN_ACCENTS: 21,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -461,6 +463,25 @@
         }
         fr.align4();
         snap.terrain_features.push(feature);
+      }
+    }
+    // ★ v1.48.0 D-A：解码地表装饰 Section 21
+    if (dir[K.TERRAIN_ACCENTS]) {
+      var ar = readerAt(uint8, dir[K.TERRAIN_ACCENTS].o, dir[K.TERRAIN_ACCENTS].bl);
+      snap.terrain_accents = [];
+      for (var ai = 0; ai < dir[K.TERRAIN_ACCENTS].c; ai++) {
+        var accent = {
+          id: ar.u32(),
+          kind: en('accentKind', ar.u8()),
+          x: ar.f32(),
+          y: ar.f32(),
+          z: ar.f32(),
+          scale: ar.f32(),
+          rotation: ar.f32(),
+          tint: ar.u8(),
+        };
+        ar.align4();
+        snap.terrain_accents.push(accent);
       }
     }
 

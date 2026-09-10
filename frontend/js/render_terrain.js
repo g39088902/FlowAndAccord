@@ -251,6 +251,9 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 
   drawTerrainFeatures();
 
+  // ★ v1.48.0 D-A：Accent 装饰 pass（在地形特征之后、网格线/道路之前绘制）
+  drawAccents();
+
   // 3. 批处理绘制地形网格线 (仅在 sim.showGrid 为 true 时绘制，默认隐藏以呈现自然地貌，按 'G' 键切换)
   if (sim.showGrid) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
@@ -283,35 +286,6 @@ function drawTerrainFeatures() {
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
-
-  // ── Pass 1: 河岸平滑湿砂漫滩带（RiverBank Sand Ribbon） ──
-  // 沿左右两岸平滑曲线先绘制加宽温润细砂带，遮蔽底层 13m 栅格方块阶梯
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  for (let fi = 0; fi < features.length; fi++) {
-    const feature = features[fi];
-    if (feature.kind !== 'RiverBank' || !feature.vertices || !feature.vertices.length) continue;
-    const vLen = feature.vertices.length;
-    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-
-    // 外层漫滩羽化过渡
-    ctx.strokeStyle = 'rgba(168, 148, 116, 0.40)';
-    ctx.lineWidth = Math.max(14, feature.width * scale * 2.1);
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.stroke();
-
-    // 内层温润湿润金砂
-    ctx.strokeStyle = 'rgba(186, 166, 132, 0.78)';
-    ctx.lineWidth = Math.max(10, feature.width * scale * 1.4);
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.stroke();
-  }
-  ctx.restore();
 
   // ── Pass 1.5: 水底生态层（RiverLife Submerged Layer） ──
   // 先铺一层均匀深沉河床基底（遮蔽水下逐格光照的明暗斑驳），再画卵石与游鱼；
@@ -477,4 +451,123 @@ function drawTerrainFeatures() {
     }
     ctx.restore();
   }
+}
+
+// ★ v1.48.0 D-A：Accent 装饰渲染（Tree/Boulder/Bush）
+// 在地形特征之后、道路之前绘制（低矮 → 高，让高树可遮挡远景道路）
+function drawAccents() {
+  const accents = (sim.terrain && sim.terrain.accents) || [];
+  if (!accents.length) return;
+
+  const cx = w / 2 + camera.panX;
+  const cy = h / 2 + camera.panY;
+  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+  const scale = camera.zoom;
+
+  // 按种类分组绘制顺序：Bush → Boulder → Tree（低 → 高）
+  const BUSH = 0, BOULDER = 1, TREE = 2;
+  const order = [BUSH, BOULDER, TREE];
+
+  for (let oi = 0; oi < 3; oi++) {
+    const targetKind = order[oi];
+    for (let ai = 0; ai < accents.length; ai++) {
+      const accent = accents[ai];
+      let kindIdx;
+      if (accent.kind === 'Bush') kindIdx = BUSH;
+      else if (accent.kind === 'Boulder') kindIdx = BOULDER;
+      else if (accent.kind === 'Tree') kindIdx = TREE;
+      else continue;
+
+      if (kindIdx !== targetKind) continue;
+
+      // 投影
+      const rx = accent.x * cosZ - accent.y * sinZ;
+      const ry = accent.x * sinZ + accent.y * cosZ;
+      const y2 = ry * cosX - (accent.z || 0) * sinX;
+      const sx = cx + rx * scale;
+      const sy = cy + y2 * scale;
+
+      // 视口剔除
+      if (sx < -20 || sx > w + 20 || sy < -20 || sy > h + 20) continue;
+
+      // ★ v1.48.0 D-A：Tree 季节色调
+      let seasonTint = accent.tint || 0;
+      if (window.SimTreeTint && sim.treeTintEnabled !== false) {
+        seasonTint = window.SimTreeTint.tint(accent, sim);
+      }
+
+      if (accent.kind === 'Tree') {
+        drawAccentTree(sx, sy, accent.scale * scale, seasonTint);
+      } else if (accent.kind === 'Boulder') {
+        drawAccentBoulder(sx, sy, accent.scale * scale, accent.rotation || 0, cosZ, sinZ);
+      } else if (accent.kind === 'Bush') {
+        drawAccentBush(sx, sy, accent.scale * scale);
+      }
+    }
+  }
+}
+
+// Tree：圆形树冠（渐变绿）+ 短树干，秋季 tint=1 变黄绿，tint=2 变红褐
+function drawAccentTree(sx, sy, scaled, tint) {
+  const trunkH = Math.max(2.5, 5 * scaled * 0.15);
+  const crownR = Math.max(3, 5 * scaled * 0.3);
+
+  // 树干
+  ctx.fillStyle = 'rgb(102, 78, 54)';
+  ctx.fillRect(sx - trunkH * 0.12, sy - trunkH, trunkH * 0.24, trunkH);
+
+  // 树冠
+  let baseR = 78, baseG = 112, baseB = 62;
+  let hiR = 128, hiG = 162, hiB = 108;
+  if (tint === 1) { baseR = 158; baseG = 142; baseB = 82; hiR = 190; hiG = 170; hiB = 110; }
+  else if (tint === 2) { baseR = 168; baseG = 108; baseB = 62; hiR = 200; hiG = 138; hiB = 82; }
+
+  const grad = ctx.createRadialGradient(sx - crownR * 0.2, sy - trunkH - crownR * 0.3, 0, sx, sy - trunkH, crownR);
+  grad.addColorStop(0, 'rgb(' + hiR + ',' + hiG + ',' + hiB + ')');
+  grad.addColorStop(1, 'rgb(' + baseR + ',' + baseG + ',' + baseB + ')');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(sx, sy - trunkH, crownR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Boulder：不规则多边形岩石（带方向光阴影）
+function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
+  const r = Math.max(1.5, 3 * scaled * 0.2);
+  ctx.fillStyle = 'rgb(128, 122, 114)';
+  ctx.beginPath();
+  const sides = 6;
+  for (let i = 0; i < sides; i++) {
+    const angle = rot + (i / sides) * Math.PI * 2;
+    const rVar = r * (0.8 + 0.4 * ((i * 37 + 13) % 7) / 7);
+    const px = sx + Math.cos(angle) * rVar;
+    const py = sy + Math.sin(angle) * rVar * 0.7;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // 顶面高光（屏幕系左上方向光）
+  ctx.fillStyle = 'rgba(168, 162, 154, 0.6)';
+  ctx.beginPath();
+  const hiR = r * 0.5;
+  ctx.arc(sx - r * 0.15, sy - r * 0.15, hiR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Bush：低矮灌木簇（2-4 个绿色椭圆组合）
+function drawAccentBush(sx, sy, scaled) {
+  const r = Math.max(1.5, 3.5 * scaled * 0.22);
+  ctx.fillStyle = 'rgb(78, 112, 62)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, r * 0.9, r * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgb(92, 128, 74)';
+  ctx.beginPath();
+  ctx.ellipse(sx - r * 0.4, sy + r * 0.1, r * 0.5, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(sx + r * 0.4, sy + r * 0.05, r * 0.45, r * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
 }

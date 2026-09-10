@@ -199,6 +199,9 @@
 | `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |
 | `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
 | `terrainGenerationMaxRetries` | usize | 8 | ecology/seed.rs (地形布局有界重试) | 地形/布局校验的有界重试次数 |
+| `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
+| `terrainAccentSubFeatures` | bool | true | geo/accents.rs (子特征注入开关) | 是否启用子特征注入（山脚湖/瀑布/峭壁等，D-B） |
+| `terrainTreeSeasonTint` | bool | true | geo/accents.rs (树木季节变色开关) | 装饰树木是否按季节变色 |
 
 ## 8. 四季更迭与宏观气候
 

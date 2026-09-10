@@ -184,6 +184,10 @@ window.SIM_CONFIG = {
   terrainFootprintHalfExtent: 7.0,    // 房屋基础完整占地半径 (m)
   terrainRoadCorridorWidth: 5.0,      // 道路合法走廊宽度 (m)
   terrainGenerationMaxRetries: 8,     // 地形/布局校验的有界重试次数
+  // ★ v1.48.0 D-A 装饰系统
+  terrainAccentDensity: 1.0,          // 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
+  terrainAccentSubFeatures: true,     // 是否启用子特征注入（山脚湖/瀑布/峭壁等，D-B）
+  terrainTreeSeasonTint: true,        // 装饰树木是否按季节变色
 
   // ==========================================================================
   // 8. 四季更迭与宏观气候 (Seasons & Macro Climate)

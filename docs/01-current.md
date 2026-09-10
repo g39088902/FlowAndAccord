@@ -3,7 +3,7 @@
 开发任务入口：[Agent 快速入口](./current/00-agent-start.md)，按改动类型选择指南、上下游同步链与验证命令。
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.49.0（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v1.49.1（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（237 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
@@ -48,6 +48,7 @@
 | # | 功能模块 | 文档路径 | 主要内容 |
 | :--- | :--- | :--- | :--- |
 | 1 | 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`) | [01-spatial-network.md](./current/01-spatial-network.md) | T0 地表查询、T1 山口/山脊连续起伏 profile、完整占地校验、连续 3D 地形、贝塞尔路网、A\* 寻路、踏路成道、5 阶恒宽色彩 |
+| 1.1 | 🏞️ D-A 装饰系统基础 v1.49.1 (`geo/accents.rs`) | [21-plan-terrain-art.md](../21-plan-terrain-art.md) | 确定性散布树木/灌木/巨石 5 类装饰，`salt=0x4143_4345_4E54_3031` 独立 RNG 流，FABS Section 21 编码/解码，3 配置密度/子特征/季节色；**已移除**河道两旁手绘沙滩金砂线（Pass 1 RiverBank sand ribbon） |
 | 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 23 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
 | 3 | ❄️ 四季更替与热力学供暖系统 (`seasons`) | [03-seasons-climate.md](./current/03-seasons-climate.md) | 240s 四季年轮模型、冬季供暖消耗、低温受孕安全红线 |
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |
@@ -77,7 +78,7 @@
 | 16+ | 🚀 仿真内核与全链路性能优化规划书 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | 仅保留未完成计划：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join（条件触发） |
 | 20 | 🛠️ 仿真内核与工程工具箱操作指南 | [20-tools-guide.md](./current/20-tools-guide.md) | `tools/` 全部 24 个工具（契约门禁/确定性测试/性能基准/无头诊断/族谱/版本治理）速查手册 |
 | 25 | 🧭 竞品与同类项目分析 | [25-competitor-analysis.md](./current/25-competitor-analysis.md) | GitHub 同类项目横向比较、完成度判断、竞争位置与可借鉴研发方向 |
-| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.46.0 各版本核心机制改动 |
+| — | 📜 版本演进记录 (Changelog) | [11-changelog.md](./current/11-changelog.md) | v0.9.24 ~ v1.49.1 各版本核心机制改动 |
 
 ---
 

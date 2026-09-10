@@ -15,7 +15,7 @@ use crate::spatial::house::HouseTier;
 use crate::spatial::ledger::{ResourceKind, TransferReason};
 use crate::spatial::poi::PoiType;
 use crate::spatial::snapshot::Season;
-use crate::geo::SurfaceKind;
+use crate::geo::{SurfaceKind, AccentKind};
 
 #[inline]
 pub fn surface_kind_code(kind: SurfaceKind) -> u8 {
@@ -50,6 +50,23 @@ pub fn terrain_feature_kind_table() -> Vec<&'static str> {
     .iter()
     .map(|k| k.as_str())
     .collect()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 装饰物种类 AccentKind（5 变体，v1.48.0 D-A）
+// ═══════════════════════════════════════════════════════════════
+
+#[inline]
+pub fn accent_kind_code(kind: AccentKind) -> u8 {
+    kind as u8
+}
+
+pub fn accent_kind_table() -> Vec<&'static str> {
+    use AccentKind::*;
+    [Tree, Bush, Boulder, RockCluster, GrassTuft]
+        .iter()
+        .map(|k| k.as_str())
+        .collect()
 }
 
 pub fn surface_kind_table() -> Vec<&'static str> {
@@ -420,6 +437,7 @@ pub fn enum_table_json() -> String {
     out.push('{');
     push_arr(&mut out, "surfaceKind", &surface_kind_table(), true);
     push_arr(&mut out, "terrainFeatureKind", &terrain_feature_kind_table(), false);
+    push_arr(&mut out, "accentKind", &accent_kind_table(), false);
     push_arr(&mut out, "gender", &gender_table(), false);
     push_arr(&mut out, "state", &state_table(), false);
     push_arr(&mut out, "poiType", &poi_type_table(), false);

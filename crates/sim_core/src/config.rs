@@ -209,9 +209,15 @@ pub struct SimConfig {
     pub terrain_max_build_slope: f32,
     pub terrain_footprint_half_extent: f32,
     pub terrain_road_corridor_width: f32,
-    pub terrain_generation_max_retries: usize,
+pub terrain_generation_max_retries: usize,
+/// ★ v1.48.0 D-A 装饰系统：装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
+pub terrain_accent_density: f32,
+/// ★ v1.48.0 D-B 子特征注入：是否启用子特征注入（山脚湖/瀑布/峭壁等）
+pub terrain_accent_sub_features: bool,
+/// ★ v1.48.0 D-A 装饰系统：装饰树木是否按季节变色
+pub terrain_tree_season_tint: bool,
 
-    // 8. 四季更迭与宏观气候
+// 8. 四季更迭与宏观气候
     pub season_year_length: f32,
     pub temp_base_mid: f32,
     pub temp_amplitude: f32,

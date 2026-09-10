@@ -55,6 +55,10 @@ const IMPACT_OVERRIDES = {
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',
   terrainRoadCorridorWidth: 'geo/terrain.rs / graph.rs (道路走廊宽度)',
   terrainGenerationMaxRetries: 'ecology/seed.rs (地形布局有界重试)',
+  // ★ v1.48.0 D-A 装饰系统
+  terrainAccentDensity: 'geo/accents.rs (装饰密度)',
+  terrainAccentSubFeatures: 'geo/accents.rs (子特征注入开关)',
+  terrainTreeSeasonTint: 'geo/accents.rs (树木季节变色开关)',
 };
 
 const IMPACT_PREFIX_RULES = [

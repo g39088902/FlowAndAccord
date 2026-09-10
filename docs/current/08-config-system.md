@@ -6,12 +6,12 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**237 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**240 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
 ### 全量超参数抽取
-- `SimConfig` 共 **237 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [06-config-reference.md](../06-config-reference.md) 自动速查表为准）：
+- `SimConfig` 共 **240 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [06-config-reference.md](../06-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（3 字段）
   2. 部落民生理、代谢与生命周期（46 字段）
   3. 先天禀赋与遗传演化（9 字段）

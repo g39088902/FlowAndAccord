@@ -1,4 +1,5 @@
 use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
+use super::accents::TerrainAccent;
 use crate::rng::WorldRng;
 use crate::spatial::curve::Curve3D;
 use crate::spatial::vec3::Vec3;
@@ -58,6 +59,8 @@ pub struct TerrainMap {
     pub profile: String,
     #[serde(default)]
     pub features: Vec<TerrainFeature>,
+    #[serde(default)]
+    pub accents: Vec<TerrainAccent>,
     pub hydrology: super::hydrology::Hydrology,
 }
 
@@ -84,6 +87,7 @@ impl TerrainMap {
             generator_version: TERRAIN_GENERATOR_VERSION,
             profile: TERRAIN_PROFILE_MOUNTAIN_PASS.to_string(),
             features: Vec::new(),
+            accents: Vec::new(),
             hydrology: Default::default(),
         }
     }

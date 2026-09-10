@@ -28,6 +28,8 @@ pub struct WorldSnapshot3D {
     #[serde(default)]
     pub terrain_features: Vec<TerrainFeatureSnapshot>,
     #[serde(default)]
+    pub terrain_accents: Vec<TerrainAccentSnapshot>,
+    #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
     pub terrain_profile: String,
@@ -161,6 +163,19 @@ pub struct TerrainFeatureSnapshot {
     pub elevation: f32,
     pub width: f32,
     pub flags: u16,
+}
+
+/// ★ v1.48.0 D-A：地表装饰快照（纯视觉要素，约 24B/个）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainAccentSnapshot {
+    pub id: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub scale: f32,
+    pub rotation: f32,
+    pub tint: u8,
 }
 
 /// ★ v1.10.0 空置房屋快照条目（营地空置房屋列表：房屋 ID + 受益人 ID 列表）

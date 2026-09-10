@@ -80,6 +80,9 @@ pub enum SectionKind {
     AuctionHist = 16,
     StrTab = 17,
     TerrainFeatures = 18,
+    /// ★ v1.48.0 D-A：地表装饰（id u32 + kind u8 + x f32 + y f32 + z f32
+    ///   + scale f32 + rotation f32 + tint u8 + align4，约 24B/个，脏帧输出）
+    TerrainAccents = 21,
 }
 
 impl SectionKind {

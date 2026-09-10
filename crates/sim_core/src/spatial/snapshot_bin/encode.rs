@@ -493,6 +493,26 @@ impl World3DEngine {
                 self.terrain.features.len() as u32,
                 f.into_inner(),
             ));
+
+            // ★ v1.48.0 D-A：地表装饰 Section 21（约 24B/个）
+            let mut a = BinWriter::with_capacity(self.terrain.accents.len() * 24 + 16);
+            for accent in &self.terrain.accents {
+                a.u32(accent.id);
+                a.u8(accent_kind_code(accent.kind));
+                a.f32(accent.pos.x);
+                a.f32(accent.pos.y);
+                a.f32(accent.pos.z);
+                a.f32(accent.scale);
+                a.f32(accent.rotation_rad);
+                a.u8(accent.tint);
+                a.align4();
+            }
+            a.align4();
+            secs.push(Sec::new(
+                SectionKind::TerrainAccents,
+                self.terrain.accents.len() as u32,
+                a.into_inner(),
+            ));
         }
 
         // ══════════════ HOUSEHOLD ══════════════

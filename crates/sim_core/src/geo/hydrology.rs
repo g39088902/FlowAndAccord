@@ -55,6 +55,8 @@ impl TerrainMap {
         self.generate_with_profile(seed, &config.terrain_profile);
         self.hydrology = Hydrology::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY { self.generate_river(seed, config); }
+        // ★ v1.48.0 D-A：散布地表装饰（在地貌与水系生成完成后，避免装饰落入深水区）
+        self.accents = super::accents::generate_accents(self, config.terrain_accent_density, seed);
     }
     fn generate_river(&mut self, seed: u64, cfg: &SimConfig) {
         let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
