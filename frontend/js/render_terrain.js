@@ -313,8 +313,29 @@ function drawTerrainFeatures() {
   }
   ctx.restore();
 
+  // ── Pass 1.5: 水底生态层（RiverLife Submerged Layer） ──
+  // 先铺一层均匀深沉河床基底（遮蔽水下逐格光照的明暗斑驳），再画卵石与游鱼；
+  // 盖上 Pass 2 半透明水面后自然产生水下半透明景深
+  for (let fi = 0; fi < features.length; fi++) {
+    const feature = features[fi];
+    if (feature.kind !== 'River' || !feature.vertices || feature.vertices.length < 3) continue;
+    const vLen = feature.vertices.length;
+    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+    ctx.fillStyle = 'rgba(30, 46, 56, 0.92)';
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (window.RiverLife) {
+    window.RiverLife.update(performance.now());
+    window.RiverLife.drawRiverbed(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+    window.RiverLife.drawFish(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+  }
+
   // ── Pass 2: 连续矢量水面闭合多边形（Vector Water Surface） ──
-  // 以 194 顶点闭合矢量填充整片水面，完全盖过水底网格方块
+  // 以闭合矢量填充整片半透明水面；水底网格方块由 Pass 1.5 的河床基底先行遮蔽
   for (let fi = 0; fi < features.length; fi++) {
     const feature = features[fi];
     if (feature.kind !== 'River' || !feature.vertices || !feature.vertices.length) continue;
@@ -328,13 +349,37 @@ function drawTerrainFeatures() {
     ctx.closePath();
 
     // 底层深水基底（深潭幽蓝，奠定水深纵深感）
-    ctx.fillStyle = 'rgba(28, 82, 116, 0.55)';
+    ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
     ctx.fill();
 
-    // 主流水体：清透碧蓝山泉流
-    ctx.fillStyle = 'rgba(54, 158, 202, 0.85)';
+    // 主流水体：清透碧蓝山泉流（半透明 0.62，综合不透明度 ~72%，水体清澈，水底卵石与游鱼清晰可辨）
+    ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
     ctx.fill();
     ctx.restore();
+
+    // B1 深浅水色纵深带：沿中心线逐段铺深色水带，笔宽跟随当地河宽——
+    // 宽河段自动显出「深潭」幽暗，收窄处显出「急流浅滩」的透亮（纯屏幕空间，不碰内核）
+    if (vLen >= 6) {
+      const halfCount = Math.floor(vLen / 2);
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(20, 58, 84, 0.28)';
+      for (let i = 0; i < halfCount - 1; i++) {
+        const j = vLen - 1 - i;
+        const j1 = j - 1;
+        const mx = (_featProjX[i] + _featProjX[j]) * 0.5;
+        const my = (_featProjY[i] + _featProjY[j]) * 0.5;
+        const mx1 = (_featProjX[i + 1] + _featProjX[j1]) * 0.5;
+        const my1 = (_featProjY[i + 1] + _featProjY[j1]) * 0.5;
+        const hw = Math.hypot(_featProjX[i] - _featProjX[j], _featProjY[i] - _featProjY[j]) * 0.5;
+        ctx.lineWidth = Math.max(2, hw * 0.9);
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx1, my1);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // 水面中心潺潺流动微波细线
     if (vLen >= 194) {
@@ -357,6 +402,11 @@ function drawTerrainFeatures() {
     }
   }
 
+  // ── Pass 2.8: 迎光面太阳波光粼粼 (Sun Caustics Glint) ──
+  if (window.RiverLife) {
+    window.RiverLife.drawSunGlint(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+  }
+
   // ── Pass 3: 水陆交界表面张力微沫高光（Shoreline Foam Highlight） ──
   ctx.save();
   ctx.lineJoin = 'round';
@@ -373,6 +423,15 @@ function drawTerrainFeatures() {
     ctx.moveTo(_featProjX[0], _featProjY[0]);
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
+
+    // B2 顺流漂移的碎沫段：短虚线沿岸线顶点序推进，岸线即刻有了水流方向感
+    // （两岸顶点序相反，漂移方向在世界系中天然一顺一逆，呈写意效果）
+    ctx.strokeStyle = 'rgba(244, 252, 255, 0.42)';
+    ctx.lineWidth = Math.max(1.0, 1.4 * scale);
+    ctx.setLineDash([9 * scale, 30 * scale]);
+    ctx.lineDashOffset = -((performance.now() * 0.014) % (39 * scale));
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
   ctx.restore();
 

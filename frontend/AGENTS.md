@@ -46,7 +46,8 @@
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
 | `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.48.0 调用顺序：`SimLighting.update` → 天空 → 地形 → 路网 → 贴地图元 → 大气色洗 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
-| `js/render_terrain.js` | ~345 | ★ v1.48.0 从 render_world.js 拆出：`drawTerrain`（3D 地形网格 + 随光向变化的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainFeatures`（水系特征）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAtmosphereWash`（大气色洗） | 立体实体、HUD、共享状态 |
+| `js/render_terrain.js` | ~345 | ★ v1.48.0 从 render_world.js 拆出：`drawTerrain`（3D 地形网格 + 随光向变化的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainFeatures`（水系特征：★ v1.49.0 Pass 1.5 河床基底 + RiverLife 水底卵石/游鱼、Pass 2 半透明水面 + 深浅水纵深带、Pass 2.8 迎光波光、Pass 3 岸沫 + 漂移碎沫段）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAtmosphereWash`（大气色洗） | 立体实体、HUD、共享状态 |
+| `js/river_life.js` | ~380 | **★ v1.49.0 水系微观生态纯表现层**：`window.RiverLife`——`init(features, seed)`（世界重置/读档时由 rustworld.js 以 `_engineSeed` 重建，水底卵石 85 颗 Float32Array 扁平存储 + 4 群 22 条游鱼沿河道中心线巡航）/ `update`（墙钟驱动，暂停时继续流动属设计决策）/ `drawRiverbed`（卵石高光斑跟随 SimLighting 光向）/ `drawFish` / `drawSunGlint`（迎光波光，强度按河道切线与光向夹角调制）；在 render_terrain.js 之前加载 | 仿真状态读写、WorldRng 消耗、快照契约 |
 | `js/render_world.js` | ~528 | **世界元素绘制**（v1.7.1 拆分）：drawLanes（踩踏路网与悬浮 Tooltip）/ drawSelectedCampHouseLinks（营地辖区虚线）/ drawPoiGroundBases + drawPoiGroundBase（POI 贴地底座与营地暖光）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型，★ v1.48.0 面法线受光 + 世界空间阴影）/ **★ v1.47.9 `drawWorldEntities()`（POI 标记 + 房屋 + 族人统一按相机深度远 → 近绘制）** | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
 | `js/render_inspector.js` | ~790 | **Inspector 面板与点击拾取**（v1.7.1 拆分）：updateInspector（族人/房屋/POI Inspector 面板 DOM 更新）/ 智能点击拾取事件监听器（排除拖拽平移，多元素重叠循环切换） | Canvas 绘制（在 render_*）、wasm 交互（在 rustworld.js） |
@@ -106,12 +107,13 @@
 19. ledger-ui.js              制度大盘
 20. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
 21. render_canvas.js          Canvas 主循环调度（v1.7.1 拆分）
-22. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
-23. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
-24. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
-25. render_agents.js          族人/特效绘制（v1.7.1 拆分）
-26. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
-27. auction-ui.js             拍卖大盘（最后加载，独立模态）
+22. river_life.js             水系微观生态纯表现层（★ v1.49.0，须早于 render_terrain.js）
+23. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
+24. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
+25. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
+26. render_agents.js          族人/特效绘制（v1.7.1 拆分）
+27. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
+28. auction-ui.js             拍卖大盘（最后加载，独立模态）
 ```
 
 **关键约束**：

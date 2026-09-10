@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.48.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.0**。
+
+| **v1.49.0** | 新增「水系微观生态层（RiverLife）」纯表现层并优化河道景观视觉效果：① **新模块** `frontend/js/river_life.js`——水底卵石（85 颗，5 色系扁圆石 + 受光高光斑，Mulberry32 种子取自 `_engineSeed`，世界重置/读档随种子确定性重建）、成群游鱼（4 群 22 条，沿河道中心线巡航插值 + 正弦摆尾 + 水底投影，走墙钟驱动，模拟暂停时与水面虚线一致继续流动）、迎光面太阳波光粼粼；② **渲染管线扩展** `render_terrain.js`——Pass 1.5 先铺均匀深沉河床基底（遮蔽水下逐格光照斑驳与 13m 网格方块），再画卵石与游鱼，盖上水面后自然产生水下半透明景深；Pass 2 水体不透明度 0.85→0.62、深水基底 0.55→0.25 使水底可辨，并新增深浅水色纵深带（沿中心线逐段铺深色水带、笔宽跟随当地河宽，宽河段显深潭、收窄处显急流）；Pass 2.8 太阳波光强度按河道切线与太阳屏幕方向夹角调制（取 \|dot\| 双向迎光）；Pass 3 岸线微沫新增顺流漂移碎沫段（短虚线 `lineDashOffset` 随时间推进，赋予水流方向感）；③ **联动季节光照（v1.48.0）**：卵石高光斑方向跟随 `SimLighting.sunScreenDir`（逐石微抖动防整齐划一，关闭动态光照时退回旧固定光西北 41° 等效方向），四季光弧转动时水底石光与水面波光同步响应；④ **健壮性**：河道顶点判据由硬编码 194 放宽为左右岸各 ≥2 顶点，卵石/游鱼加视口粗剔除，清理死变量；⑤ 纯前端表现层，不消耗 `WorldRng`、不写模拟状态、不进存档、不参与内核确定性承诺；升版 v1.49.0 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更，自动废弃旧存档）；门禁：`frontend-check` 30 文件语法 + DOM 引用全绿、`test-wasm` ALL_TESTS_DONE（含存读档确定性）、`bump-version --check` 零漂移。 | frontend(river_life/render_terrain/rustworld/index) / docs / version |
 
 | **v1.48.2** | 水系河岸平滑化与写意微缩沙盘水体改造（方案 `docs/28-plan-river-shoreline-refinement.md`）：① **根因消除**：彻底解决 60×60 栅格（13m/格）离散整格填色导致的 Minecraft 巨型直角阶梯锯齿与矢量细线脱节悬浮；② **Rust 内核打通**：`crates/sim_core/src/geo/hydrology.rs` 正式将 194 顶点水体闭合矢量轮廓封装为 `TerrainFeatureKind::River` 压入 `self.features` 随创世快照下发；③ **前端四层微缩沙盘管线**：`frontend/js/render_terrain.js` 重构 `drawTerrainFeatures`——Pass 1 沿左右岸平滑曲线先绘制加宽温润细砂带（`RiverBank`，双层羽化），遮蔽底层 13m 栅格方块；Pass 2 以 194 顶点闭合矢量填充整片清透碧蓝山泉流水面（`River`），彻底遮盖底层网格方块；Pass 3 沿水陆边界绘制 1.5px 表面张力微沫反光细线与中心潺潺微波流线；Pass 4 浅滩涉渡（`ShallowFord`）升级为鹅卵石踏石质感；④ **底模消隐**：`frontend/js/math.js` `computeTerrainAlbedo` 将水底河床与岸边底格调整为深沉湿卵石基底阴影，消除网格色差；⑤ **零 GC 与高性能**：预分配静态 `_featProjX`/`_featProjY` 投影缓冲，单帧耗时增量 $\le 0.08\text{ms}$，零堆内存分配，确定性 100% 保持；⑥ WASM 双副本同步，全套自动化门禁全绿（`test-wasm`、`test-snapshot-bin`、`test-determinism` 6/6、`config-check`、`frontend-check`）。 | sim_core(geo/hydrology) / frontend(render_terrain/math) / docs / version |
 
