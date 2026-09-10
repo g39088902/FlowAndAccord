@@ -9,7 +9,7 @@
 > - **代谢轴（总闸门）**：甲状腺素。
 >
 > 激素不新增需求种类、不直接决定行为，只**调制**既有决策分支的阈值、候选成本、需求层级权重与生理消耗速率，让同一个人在不同时期表现出可观察的动力、情绪、联结、竞争、生育与代谢差异，并为[关系 × 生产](./29-plan-social-relations-production.md)提供生理载体。
-> **关联文档**：[03 四季气候](./current/03-seasons-climate.md)（季节性情感 / 供暖）· [04 代谢与禀赋](./current/04-agent-life.md)（气质遗传 / 受孕流产分娩 / 性别二态）· [06 决策引擎](./current/06-motivation-ai.md)（接入点）· [18 狩猎防御](./18-plan-conflict-hunting-defense.md)（vitality / 战斗）· [20 日常生活](./20-plan-everyday-life.md)（照料 / 作息 / 成长）· [23 记忆](./23-plan-memory-system.md)（编码耦合）· [24 内部市场](./24-plan-internal-market.md)（信任折扣）· [25 融合设计](./25-plan-system-integration.md)（L2 选策 / 身体契约）· [29 关系 × 生产](./29-plan-social-relations-production.md)（催产素 = 关系的生理通道）。
+> **关联文档**：[03 四季气候](./current/03-seasons-climate.md)（季节性情感 / 供暖）· [04 代谢与禀赋](./current/04-agent-life.md)（气质遗传 / 受孕流产分娩 / 性别二态）· [06 决策引擎](./current/06-motivation-ai.md)（接入点）· [18 狩猎防御](./18-plan-conflict-hunting-defense.md)（vitality / 战斗）· [20 日常生活](./20-plan-everyday-life.md)（照料 / 作息 / 成长）· [23 记忆](./23-plan-memory-system.md)（编码耦合）· [24 售货员撮合市场](./24-plan-internal-market.md)（信任折扣）· [25 融合设计](./25-plan-system-integration.md)（L2 选策 / 身体契约）· [29 关系 × 生产](./29-plan-social-relations-production.md)（催产素 = 关系的生理通道）。
 
 ---
 
@@ -256,7 +256,7 @@ level' = clamp( level + Σ pulses(events_this_tick) − decay_rate × dt × (lev
 | 18 狩猎防御 | ADR 乘进对抗公式与侦测；EP 掩盖伤势移速惩罚；CORT 慢性折损 vitality / 健康；AND 调制 b20 狩猎意愿与战力 | 读 / 被读 |
 | 20 日常生活 | 照料 / 共处 / 作息作为 OT / 5-HT 来源；THY 调制儿童发育速率（成长校准后）；晨峰皮质醇等昼夜节律**等 20③ 落地后再接** | 读 |
 | 23 记忆 | DA × 强化增量（编码增强）；CORT 慢性 × 衰减加速；M01/M02 与 NE 分通道叠加 | 读 / 被读 |
-| 24 内部市场 | OT 信任折扣作用于对手方候选成本（钳制内） | 读 |
+| 24 售货员撮合市场 | OT 信任折扣作用于对手方候选成本（钳制内） | 读 |
 | 25 融合设计 | 激素调制进入统一 L2 选策「有限偏好」档；身体能力查询保持唯一定义；速率乘子单点合成 | 遵守 |
 | 29 关系 × 生产 | OT = 依赖方向的生理载体；CORT = 敌对环境（劫掠 / 苛税）的生理账单；AND = 竞争方向（b14/b17）的生理载体；五条传导管道的激素注脚 | 互相引用 |
 
