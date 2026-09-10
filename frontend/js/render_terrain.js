@@ -509,9 +509,10 @@ function drawAccents() {
 }
 
 // Tree：圆形树冠（渐变绿）+ 短树干，秋季 tint=1 变黄绿，tint=2 变红褐
+// scaled = accent.scale(0.7~1.4) × camera.zoom
 function drawAccentTree(sx, sy, scaled, tint) {
-  const trunkH = Math.max(2.5, 5 * scaled * 0.15);
-  const crownR = Math.max(3, 5 * scaled * 0.3);
+  const trunkH = 5 * scaled;
+  const crownR = 11 * scaled;
 
   // 树干
   ctx.fillStyle = 'rgb(102, 78, 54)';
@@ -534,7 +535,7 @@ function drawAccentTree(sx, sy, scaled, tint) {
 
 // Boulder：不规则多边形岩石（带方向光阴影）
 function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
-  const r = Math.max(1.5, 3 * scaled * 0.2);
+  const r = 5 * scaled;
   ctx.fillStyle = 'rgb(128, 122, 114)';
   ctx.beginPath();
   const sides = 6;
@@ -558,7 +559,7 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
 
 // Bush：低矮灌木簇（2-4 个绿色椭圆组合）
 function drawAccentBush(sx, sy, scaled) {
-  const r = Math.max(1.5, 3.5 * scaled * 0.22);
+  const r = 5.5 * scaled;
   ctx.fillStyle = 'rgb(78, 112, 62)';
   ctx.beginPath();
   ctx.ellipse(sx, sy, r * 0.9, r * 0.6, 0, 0, Math.PI * 2);
