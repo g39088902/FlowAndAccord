@@ -198,7 +198,7 @@ pub enum AccentKind {
 
 装饰散布规则：
 - **禁区**：道路占地、房屋占地、`WaterAccessPoint` 交互半径内、`DeepWater` 上
-- **偏好**：Tree 偏好中等坡度(8°~25°)与高肥力区；Boulder 偏好多坡度(>20°)与裸露 `RockFace`；Bush 偏好林缘过渡带
+- **偏好**：★ v1.49.3 放宽——Tree 接受平地（含 0 坡）至 32° 坡度：DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 高概率（河流两岸有树）；Boulder 偏好多坡度(>18°)与裸露 `RockFace`；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛
 - **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree ~40、Boulder ~20、Bush ~25、RockCluster ~12、GrassTuft 通过纹理而非离散对象实现
 - **确定性**：`accent_rng = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)`（盐值 "ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG
 

@@ -508,6 +508,14 @@ function drawAccents() {
   }
 }
 
+// ★ v1.49.3：Accent 个体确定性哈希（用于叶片纹理散点等纯视觉细节，不参与模拟）
+function _accentHash(id, i) {
+  let h = (((id | 0) * 374761393 + (i | 0) * 668265263) >>> 0);
+  h = (h ^ (h >>> 13)) >>> 0;
+  h = (h * 1274126177) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
 // Tree：写意微缩乔木 —— 锥形微弯树干 + 四瓣层叠树冠 + 贴地投影（与 POI/房屋同一光照源）
 // tint=0 鲜绿(春夏) / 1 黄绿(秋) / 2 红褐(深秋)；scaled = accent.scale(0.7~1.4) × camera.zoom
 function drawAccentTree(accent, sx, sy, scaled, tint) {
@@ -531,8 +539,9 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
   const bw = Math.max(1.2, crownR * 0.17);
   const tw = Math.max(0.6, bw * 0.45);
   ctx.fillStyle = 'rgb(86, 62, 42)';
-  ctx.strokeStyle = 'rgba(40, 28, 18, 0.85)';
-  ctx.lineWidth = Math.max(0.5, 0.7 * scaled);
+  // ★ v1.49.3 描边减重：暗边改为半透明细线，只用于收拢形体不再框死轮廓
+  ctx.strokeStyle = 'rgba(40, 28, 18, 0.38)';
+  ctx.lineWidth = Math.max(0.4, 0.45 * scaled);
   ctx.beginPath();
   ctx.moveTo(sx - bw, sy);
   ctx.quadraticCurveTo(sx - bw * 0.45, sy - trunkH * 0.55, topX - tw, topY);
@@ -540,6 +549,14 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
   ctx.quadraticCurveTo(sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+
+  // 树皮受光面：沿左侧一条浅色细干，替代厚重描边提供的立体感
+  ctx.strokeStyle = 'rgba(158, 124, 92, 0.5)';
+  ctx.lineWidth = Math.max(0.4, 0.32 * scaled);
+  ctx.beginPath();
+  ctx.moveTo(sx - bw * 0.45, sy - trunkH * 0.06);
+  ctx.quadraticCurveTo(sx - bw * 0.15, sy - trunkH * 0.55, topX - tw * 0.4, topY + trunkH * 0.04);
   ctx.stroke();
 
   // 树冠配色：暗轮廓 / 底色 / 亮部（个体色相 ±7 微调）
@@ -556,7 +573,17 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
 
   const ccX = topX, ccY = topY - crownR * 0.30;
   const squash = 0.88;
-  const lw = Math.max(0.8, 1.1 * scaled);
+  // ★ v1.49.3 描边减重：暗轮廓宽度减半，只留一圈细线分离背景
+  const lw = Math.max(0.4, 0.5 * scaled);
+  // ★ v1.49.3 叶面纹理配色：暗叶簇/亮叶簇按季节色调取色（半透明叠加不遮底色渐变）
+  let dapDark, dapLite;
+  if (tint === 1) {
+    dapDark = 'rgba(122, 104, 44, 0.28)'; dapLite = 'rgba(228, 208, 146, 0.32)';
+  } else if (tint === 2) {
+    dapDark = 'rgba(122, 62, 32, 0.28)'; dapLite = 'rgba(236, 170, 116, 0.32)';
+  } else {
+    dapDark = 'rgba(40, 72, 32, 0.28)'; dapLite = 'rgba(178, 212, 140, 0.32)';
+  }
   // 四瓣层叠：左右托底瓣 + 主瓣 + 顶瓣
   const lobes = [
     { dx: -0.52, dy: 0.20, r: 0.58 },
@@ -586,6 +613,25 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
     const L = lobes[i];
     ctx.beginPath();
     ctx.ellipse(ccX + L.dx * crownR, ccY + L.dy * crownR, L.r * crownR, L.r * crownR * squash, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ★ v1.49.3 Pass B2：叶片斑驳纹理 —— 由 id 确定性散布的暗/亮叶簇小点，
+  // 给树冠注入叶面质感（替代原先纯渐变的“塑料感”）
+  const DAPPLES = 10;
+  for (let i = 0; i < DAPPLES; i++) {
+    const t1 = _accentHash(accent.id || 0, i + 1);
+    const t2 = _accentHash(accent.id || 0, i + 31);
+    const t3 = _accentHash(accent.id || 0, i + 67);
+    // 分布域：主冠椭圆内（中上偏密），乘 squash 保持冠形透视
+    const ang = t1 * Math.PI * 2;
+    const rad = (0.16 + t2 * 0.60) * crownR;
+    const px = ccX + Math.cos(ang) * rad * 0.88 + (i - DAPPLES / 2) * 0.4;
+    const py = ccY + Math.sin(ang) * rad * squash - crownR * 0.04;
+    const dr = (0.09 + t3 * 0.12) * crownR;
+    ctx.fillStyle = (i & 1) === 0 ? dapDark : dapLite;
+    ctx.beginPath();
+    ctx.ellipse(px, py, dr, dr * 0.72, ang * 0.5, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -646,7 +692,8 @@ function drawAccentBush(accent, sx, sy, scaled) {
 
   // 三瓣簇：左右托瓣 + 顶主瓣（扁压 squash 让簇丛贴地）
   const squash = 0.70;
-  const lw = Math.max(0.7, 0.9 * scaled);
+  // ★ v1.49.3 描边减重：暗轮廓宽度减半
+  const lw = Math.max(0.4, 0.45 * scaled);
   const lobes = [
     { dx: -0.48 + vSeed * 0.10, dy: 0.10, r: 0.60 },
     { dx: 0.50 - vSeed * 0.08, dy: 0.12, r: 0.56 },
@@ -674,6 +721,23 @@ function drawAccentBush(accent, sx, sy, scaled) {
     const L = lobes[i];
     ctx.beginPath();
     ctx.ellipse(sx + L.dx * r, sy + L.dy * r, L.r * r, L.r * r * squash, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ★ v1.49.3 Pass B2：枝叶斑驳纹理 —— 确定性暗/亮小叶点（同 Tree 技法，簇径更小）
+  const B_DAP = 7;
+  for (let i = 0; i < B_DAP; i++) {
+    const t1 = _accentHash(accent.id || 0, i + 101);
+    const t2 = _accentHash(accent.id || 0, i + 131);
+    const t3 = _accentHash(accent.id || 0, i + 167);
+    const ang = t1 * Math.PI * 2;
+    const rad = (0.15 + t2 * 0.55) * r;
+    const px = sx + Math.cos(ang) * rad * 0.9;
+    const py = sy + Math.sin(ang) * rad * squash - r * 0.02;
+    const dr = (0.10 + t3 * 0.12) * r;
+    ctx.fillStyle = (i & 1) === 0 ? 'rgba(38, 66, 30, 0.26)' : 'rgba(150, 192, 118, 0.30)';
+    ctx.beginPath();
+    ctx.ellipse(px, py, dr, dr * 0.70, ang * 0.5, 0, Math.PI * 2);
     ctx.fill();
   }
 

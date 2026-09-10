@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.3**。
+
+| **v1.49.3** | D-A 装饰观感打磨 + 树木生成条件放宽：① **叶片纹理**：`render_terrain.js` 新增确定性哈希 `_accentHash(id,i)`，Tree 树冠新增 Pass B2「叶片斑驳纹理」（10 枚由 `accent.id` 派生的暗/亮叶簇小点，按季节 tint 取色，半透明叠加保留底色渐变），Bush 新增 7 枚小叶点，消除纯渐变的塑料感；② **描边减重**：Tree 树冠暗轮廓宽度 1.1→0.5（×scaled）、树干描边 alpha 0.85→0.38 并新增树皮受光面浅色细干、Bush 暗轮廓 0.9→0.45（×scaled），立体感改由受光面而非重描边提供；③ **生成条件放宽**（`geo/accents.rs`）：Tree 由「仅 DryGround/SoftGround 且坡度 5°~30°」放宽为「平地（含 0 坡）与河滩/河阶均可生树，坡度上限 32°」——RiverBank 以 0.85 概率接受（河流地图从此有树）、RiverTerrace 按 `fertility×0.5+0.5` 高概率接受；Bush 新增 RiverBank 0.6 / RiverTerrace 0.5 概率的喜湿灌丛；④ 装饰走独立 `accent_rng`，不消耗模拟 RNG、不影响确定性矩阵；升版 v1.49.3 重编译 WASM 双副本（旧存档按设计自动废弃）；门禁：`cargo test --lib`、`test-wasm` ALL_TESTS_DONE、`config-check` 240 全绿、`frontend-check` 全绿、`bump-version --check` 零漂移。 | sim_core(geo/accents) / frontend(render_terrain) / docs / version |
 
 | **v1.49.2** | D-A 地形装饰观感重绘（Tree/Bush 全面重塑）：① **Tree**：`render_terrain.js::drawAccentTree` 由「矩形树干 + 单圆饼树冠」重绘为写意微缩乔木——底粗顶细的锥形微弯树干（随 `accent.rotation` 微倾）、四瓣层叠树冠（左右托底瓣 + 主瓣 + 顶瓣）、「暗轮廓二遍填充」技法（整组放大一圈填暗轮廓再统一径向渐变填充，瓣间无缝且只有一圈外轮廓，消除旧版单圆描边的呆板圆饼感）、冠顶受光柔和高光点；② **Bush**：`drawAccentBush` 同技法重绘为三瓣扁压圆簇 + 微投影，替换旧版三个独立椭圆 + 单圈描边；③ **个体差异**：以 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调），成片树不再完全同构；④ **投影对齐**：Tree/Bush 贴地投影改走 `SimLighting.shadowOffset`（与 POI/房屋同一动态季节光照源，关闭动态光照时退回旧固定影方向）；⑤ 纯前端表现层，`accent.scale`/`tint` 语义与快照契约零改动，不消耗 `WorldRng`、不进存档；升版 v1.49.2 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更，自动废弃旧存档）；门禁：`frontend-check` 全绿、`test-wasm` ALL_TESTS_DONE、`bump-version --check` 零漂移。 | frontend(render_terrain) / docs / version |
 

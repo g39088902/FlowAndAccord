@@ -101,18 +101,30 @@ pub fn generate_accents(
         half_size,
         &mut accent_rng,
         |cell, rng| {
-            // Tree 偏好中等坡度(5°~30°)且可建地表
-            if cell.surface_kind != SurfaceKind::DryGround
-                && cell.surface_kind != SurfaceKind::SoftGround
-            {
-                return false;
+            // ★ v1.49.3 放宽：平地（含 0 坡）与河流两岸（河滩/河阶，喜湿）均可生树，
+            // 仅仍排除水面/岩壁等禁区（外层已过滤 NO_WALK/水体）
+            match cell.surface_kind {
+                SurfaceKind::DryGround | SurfaceKind::SoftGround => {
+                    if cell.slope_angle_deg > 32.0 {
+                        return false;
+                    }
+                    // 肥力加权：高肥力更高概率
+                    let fertility_weight = cell.natural_fertility;
+                    rng.gen_range(0.0, 1.0) < fertility_weight
+                }
+                SurfaceKind::RiverTerrace => {
+                    // 河阶：地势平缓湿润，按肥力高概率接受
+                    if cell.slope_angle_deg > 32.0 {
+                        return false;
+                    }
+                    rng.gen_range(0.0, 1.0) < (cell.natural_fertility * 0.5 + 0.5)
+                }
+                SurfaceKind::RiverBank => {
+                    // 河滩：水分充沛，树木高概率扎根（河流地图从此有树）
+                    rng.gen_range(0.0, 1.0) < 0.85
+                }
+                _ => false,
             }
-            if cell.slope_angle_deg < 5.0 || cell.slope_angle_deg > 30.0 {
-                return false;
-            }
-            // 肥力加权：高肥力更高概率
-            let fertility_weight = cell.natural_fertility;
-            rng.gen_range(0.0, 1.0) < fertility_weight
         },
     );
 
@@ -157,6 +169,13 @@ pub fn generate_accents(
             }
             if cell.surface_kind == SurfaceKind::DryGround && cell.natural_fertility > 0.55 {
                 return rng.gen_range(0.0, 1.0) < 0.4;
+            }
+            // ★ v1.49.3 河滩/河阶灌丛：喜湿低矮灌丛点缀河流两岸
+            if cell.surface_kind == SurfaceKind::RiverBank {
+                return rng.gen_range(0.0, 1.0) < 0.6;
+            }
+            if cell.surface_kind == SurfaceKind::RiverTerrace {
+                return rng.gen_range(0.0, 1.0) < 0.5;
             }
             false
         },
