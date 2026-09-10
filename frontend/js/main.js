@@ -540,16 +540,52 @@
       }
     });
 
-    document.getElementById('btn-reroll-eco').addEventListener('click', () => {
-      if (!window.confirm('重演生态会永久丢失当前世界且无法撤销。\n确定要重新播撒 20 名初始族人吗？')) return;
-      sim.initEcology(20);
+    const worldSeedInput = document.getElementById('world-seed-input');
+    const applyWorldSeedBtn = document.getElementById('btn-apply-world-seed');
+
+    function normalizeWorldSeed(value) {
+      const seed = Number.parseInt(String(value), 10);
+      return Number.isSafeInteger(seed) && seed >= 0 ? seed : null;
+    }
+
+    function syncWorldSeedInput() {
+      if (worldSeedInput) worldSeedInput.value = String(sim._engineSeed);
+    }
+
+    function resetWorldWithSeed(seed, confirmation) {
+      if (confirmation && !window.confirm(confirmation)) return false;
+      sim.initEcology(20, seed);
+      syncWorldSeedInput();
       isCameraFollow = false;
       updateFollowBtnState();
-      // ★ 重置生态开启新档：自动更新存档
+      // 种子进入 URL，刷新或分享链接时仍可复现同一开局；不写入地图图鉴或模拟存档。
+      const url = new URL(window.location.href);
+      url.searchParams.set('seed', String(sim._engineSeed));
+      window.history.replaceState({}, '', url);
       window.dispatchEvent(new CustomEvent('ecology-reset'));
-      if (window.saveUI && typeof window.saveUI.autoSave === 'function') {
-        window.saveUI.autoSave();
-      }
+      if (window.saveUI && typeof window.saveUI.autoSave === 'function') window.saveUI.autoSave();
+      return true;
+    }
+
+    syncWorldSeedInput();
+    if (applyWorldSeedBtn) {
+      applyWorldSeedBtn.addEventListener('click', () => {
+        const seed = normalizeWorldSeed(worldSeedInput && worldSeedInput.value);
+        if (seed === null) {
+          window.alert('请输入 0 到 9007199254740991 之间的整数种子。');
+          return;
+        }
+        resetWorldWithSeed(seed, `将使用种子 ${seed} 重置地图。当前世界会被替换，确定继续吗？`);
+      });
+    }
+    if (worldSeedInput) {
+      worldSeedInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') applyWorldSeedBtn?.click();
+      });
+    }
+
+    document.getElementById('btn-reroll-eco').addEventListener('click', () => {
+      resetWorldWithSeed(null, '随机重置地图会永久丢失当前世界且无法撤销。\n确定要重新播撒 20 名初始族人吗？');
     });
 
     // ==========================================

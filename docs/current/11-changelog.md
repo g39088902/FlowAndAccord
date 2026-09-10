@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.3**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.50.0**。
+
+| **v1.50.0** | 新增「地图图鉴」独立页与正式游戏世界种子控制：① **新独立页** `frontend/map.html` + `map.css` + `js/map-view.js`——不加载 WASM、不启动模拟、不读写任何存档的纯视觉地形模板图鉴（山口聚落 / 两岸河谷 / 湖畔盆地三模板预览），确定性哈希噪声绘制、指针拖拽平移缩放、种子输入（0 ~ `Number.MAX_SAFE_INTEGER`，与正式游戏一致）与「刷新地图」随机种子；「在正式游戏中使用此种子」以 `index.html?seed=<n>` 链接带回正式世界；② **主界面种子控制台**：`index.html` 生态控制台新增「🧬 世界种子」控件（输入框 + 应用种子并重置 + 说明文案），应用时经 `window.confirm` 确认后以指定种子重置世界，并把种子写入 URL（`history.replaceState`）便于刷新复现与分享；③ **种子链路打通**：`rustworld.js` 启动时解析 `?seed=` 参数（非法值回退 `Date.now()` 随机开局）、`initEcology(agentCount, seed)` 支持显式种子，「🏕️ 重演生态」更名「随机重置地图」并改用随机安全整数种子；④ **工具联动**：`tools/frontend-check.js` DOM ID 校验由硬编码 index/dag 两页扩展为自动扫描 `frontend/` 全部 `*.html`；⑤ **文档**：`frontend/AGENTS.md` 新增 §1.7 独立页面登记；`docs/11-plan.md` 与 `22-plan-terrain-features.md` 地图组合库扩充为 14 种未来地图模板（台地、河口三角洲、海湾、峡湾、河谷、半岛、海岛、沙漠绿洲、山前冲积扇、喀斯特等，均未排期）。纯前端表现层，不触碰内核 RNG 消费、快照契约与配置字段；升版 v1.50.0 重编译 WASM 双副本（`SAVE_APP_VERSION` 变更，旧存档按设计自动废弃）；门禁：`frontend-check` 31 文件语法 + DOM 引用全绿、`test-wasm` ALL_TESTS_DONE、`cross-doc-check` 冲突 0 漂移 0、`bump-version --check` 零漂移。 | frontend(map.html/map.css/map-view/main/rustworld/style/index) / tools(frontend-check) / docs / version |
 
 | **v1.49.3** | D-A 装饰观感打磨 + 树木生成条件放宽：① **叶片纹理**：`render_terrain.js` 新增确定性哈希 `_accentHash(id,i)`，Tree 树冠新增 Pass B2「叶片斑驳纹理」（10 枚由 `accent.id` 派生的暗/亮叶簇小点，按季节 tint 取色，半透明叠加保留底色渐变），Bush 新增 7 枚小叶点，消除纯渐变的塑料感；② **描边减重**：Tree 树冠暗轮廓宽度 1.1→0.5（×scaled）、树干描边 alpha 0.85→0.38 并新增树皮受光面浅色细干、Bush 暗轮廓 0.9→0.45（×scaled），立体感改由受光面而非重描边提供；③ **生成条件放宽**（`geo/accents.rs`）：Tree 由「仅 DryGround/SoftGround 且坡度 5°~30°」放宽为「平地（含 0 坡）与河滩/河阶均可生树，坡度上限 32°」——RiverBank 以 0.85 概率接受（河流地图从此有树）、RiverTerrace 按 `fertility×0.5+0.5` 高概率接受；Bush 新增 RiverBank 0.6 / RiverTerrace 0.5 概率的喜湿灌丛；④ 装饰走独立 `accent_rng`，不消耗模拟 RNG、不影响确定性矩阵；升版 v1.49.3 重编译 WASM 双副本（旧存档按设计自动废弃）；门禁：`cargo test --lib`、`test-wasm` ALL_TESTS_DONE、`config-check` 240 全绿、`frontend-check` 全绿、`bump-version --check` 零漂移。 | sim_core(geo/accents) / frontend(render_terrain) / docs / version |
 

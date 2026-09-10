@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flow & Accord · 地图图鉴</title>
+  <link rel="stylesheet" href="map.css">
+</head>
+<body>
+  <main class="map-page">
+    <canvas id="map-canvas" aria-label="静态地形地图"></canvas>
+
+    <header class="map-header">
+      <a class="map-brand" href="index.html" title="返回模拟世界">Flow & Accord <span>地图图鉴</span></a>
+      <div class="map-header-copy">静态地貌预览 · 无模拟、无节点、无边、无居民数据</div>
+    </header>
+
+    <aside class="map-panel" aria-label="地图控制">
+      <div class="map-panel-title">地图图鉴</div>
+      <p class="map-panel-desc">用纯地形构图预览未来的世界模板；此页面不加载 WASM，也不会创建模拟实体。</p>
+
+      <label class="map-control-label" for="terrain-template">地貌模板</label>
+      <select id="terrain-template" class="map-select">
+        <option value="river-valley">两岸河谷</option>
+        <option value="plateau">台地聚落</option>
+        <option value="delta">河口三角洲</option>
+        <option value="bay">海湾聚落</option>
+        <option value="basin">盆地绿洲</option>
+        <option value="fjord">峡湾聚落</option>
+        <option value="peninsula">半岛聚落</option>
+        <option value="island">海岛聚落</option>
+        <option value="desert-oasis">沙漠绿洲</option>
+        <option value="alluvial-fan">山前冲积扇</option>
+        <option value="karst">喀斯特地貌</option>
+      </select>
+
+      <label class="map-control-label" for="terrain-seed">视觉种子</label>
+      <div class="seed-row">
+        <input id="terrain-seed" class="map-input" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" value="20260910">
+        <button id="btn-reroll" class="map-button" type="button">刷新地图</button>
+      </div>
+      <a id="btn-use-in-game" class="map-use-button" href="index.html" title="将当前种子带入正式游戏并生成新世界">在正式游戏中使用此种子</a>
+      <div class="map-seed-note">会把当前种子带到正式游戏的重置入口。图鉴不加载模拟，也不保存任何世界数据。</div>
+
+      <div class="map-legend">
+        <div><span class="legend-dot legend-land"></span>陆地与坡面</div>
+        <div><span class="legend-dot legend-water"></span>水体</div>
+        <div><span class="legend-dot legend-vegetation"></span>植被</div>
+      </div>
+    </aside>
+
+    <section class="map-caption" aria-live="polite">
+      <div id="map-title" class="map-title"></div>
+      <p id="map-description" class="map-description"></p>
+      <div id="map-tags" class="map-tags"></div>
+    </section>
+
+    <div class="map-hint">滚轮缩放 · 拖拽平移 · R 换图</div>
+  </main>
+  <script src="js/map-view.js"></script>
+</body>
+</html>

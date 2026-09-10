@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.49.3</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.0</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -71,6 +71,7 @@
     <div class="save-bar-card">
       <button class="save-bar-btn" id="btn-open-save-panel" title="将当前世界保存到槽位">💾 存档</button>
       <button class="save-bar-btn" id="btn-open-load-panel" title="从槽位或文件读取世界">📂 读档</button>
+      <a class="save-bar-btn map-gallery-link" href="map.html" title="打开不启动模拟的纯地图图鉴，挑选种子后可带回正式游戏">🗺️ 地图图鉴</a>
       <button class="save-bar-btn" id="btn-decision-viz" title="打开马斯洛决策引擎：拖动 Branch 分支调整内核评估顺序，拖动分界线重划层级（实时热注入运行中模拟）">🧠 决策引擎</button>
       <button class="save-bar-btn auction-bar-btn" id="btn-open-auction-modal" title="查看全图房屋拍卖大盘与连续报价过程">🏛️ 报价 (<span id="top-auction-count">0</span>)</button>
       <button class="save-bar-btn" id="btn-toggle-theme" title="切换明亮/暗色主题">☀️ 主题</button>
@@ -778,9 +779,15 @@
       <span>生态时钟与倍速控制台</span>
       <span style="font-size: 11px; color: #facc15;">60 Tick/s (1秒=1小时)</span>
     </div>
+    <div class="world-seed-control" aria-label="世界种子控制">
+      <label for="world-seed-input">🧬 世界种子</label>
+      <input id="world-seed-input" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" aria-label="正式游戏世界种子">
+      <button id="btn-apply-world-seed" type="button" title="用输入的种子重置并生成新的正式游戏世界">应用种子并重置</button>
+      <div class="world-seed-note">可从地图图鉴带回；应用会替换当前世界。图鉴本身不保存或读取任何模拟数据。</div>
+    </div>
     <div class="btn-grid">
       <button class="primary" id="btn-pause">⏸️ 暂停模拟 (空格)</button>
-      <button class="ecology-btn" id="btn-reroll-eco" title="重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 重演生态</button>
+      <button class="ecology-btn" id="btn-reroll-eco" title="使用新的随机种子重新播撒 20 名初始族人（10 男 10 女，随机离散）">🏕️ 随机重置地图</button>
       <button class="ecology-btn" id="btn-open-rewind-ctrl" title="打开时光倒流控制器：输入指定 Tick 瞬间回滚世界历史" style="border-color:rgba(245,158,11,.45); color:#fbbf24; background:rgba(245,158,11,.14);">⏪ 时光倒流</button>
       <button class="headless-btn" id="btn-headless" title="无头模式">🧠 无头模式</button>
     </div>

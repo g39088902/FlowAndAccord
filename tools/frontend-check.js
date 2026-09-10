@@ -4,7 +4,7 @@
  * ============================================================================
  * 用途：
  *   1. 语法检查：对 frontend/ 目录下全部 JS 文件执行语法解析（防语法错误瘫痪前端）
- *   2. DOM ID 校验：检查 JS 中通过 getElementById 调用的 DOM ID 在 index.html / dag.html 是否存在
+ *   2. DOM ID 校验：检查 JS 中通过 getElementById 调用的 DOM ID 在各前端 HTML 页面是否存在
  *
  * 用法：
  *   node tools/frontend-check.js
@@ -22,10 +22,9 @@ const { execFileSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const FRONTEND_DIR = path.join(ROOT, 'frontend');
 const JS_DIR = path.join(FRONTEND_DIR, 'js');
-const HTML_FILES = [
-  path.join(FRONTEND_DIR, 'index.html'),
-  path.join(FRONTEND_DIR, 'dag.html')
-].filter(f => fs.existsSync(f));
+const HTML_FILES = fs.readdirSync(FRONTEND_DIR, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+  .map((entry) => path.join(FRONTEND_DIR, entry.name));
 
 let hasError = false;
 

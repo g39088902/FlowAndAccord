@@ -62,7 +62,9 @@
         // 引擎状态与 Web Worker 架构
         this._worker = null;
         this._ready = false;
-        this._engineSeed = Date.now();
+        // 地图图鉴可通过 ?seed=<整数> 把已挑选的种子带入正式世界；无参数时保留随机开局。
+        const requestedSeed = Number.parseInt(new URLSearchParams(window.location.search).get('seed') || '', 10);
+        this._engineSeed = Number.isSafeInteger(requestedSeed) && requestedSeed >= 0 ? requestedSeed : Date.now();
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
@@ -79,7 +81,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.49.3';
+        this._appVersion = '1.50.0';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -148,7 +150,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.49.3';
+            this._appVersion = msg.appVersion || '1.50.0';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -367,8 +369,12 @@
         };
       }
 
-      initEcology(agentCount) {
-        this._engineSeed = Date.now();
+      initEcology(agentCount, seed) {
+        // 允许地图图鉴或主界面显式传入种子；随机重置则生成新的安全整数种子。
+        const requestedSeed = Number(seed);
+        this._engineSeed = Number.isSafeInteger(requestedSeed) && requestedSeed >= 0
+          ? requestedSeed
+          : Date.now();
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails.clear();
@@ -405,7 +411,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.49.3';
+        return this._appVersion || '1.50.0';
       }
 
       /**
