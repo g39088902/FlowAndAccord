@@ -508,21 +508,27 @@ function drawAccents() {
   }
 }
 
-// Tree：圆形树冠（渐变绿）+ 短树干，秋季 tint=1 变黄绿，tint=2 变红褐
-// scaled = accent.scale(0.7~1.4) × camera.zoom
+// Tree：圆形树冠（渐变绿）+ 短树干；tint=0 鲜绿 / 1 黄绿(秋) / 2 红褐(深秋)
+// scaled = accent.scale(0.7~1.4) × camera.zoom —— 已是屏幕像素因子
 function drawAccentTree(sx, sy, scaled, tint) {
   const trunkH = 5 * scaled;
   const crownR = 11 * scaled;
 
-  // 树干
-  ctx.fillStyle = 'rgb(102, 78, 54)';
-  ctx.fillRect(sx - trunkH * 0.12, sy - trunkH, trunkH * 0.24, trunkH);
+  // 树干（深褐色，暗边增强对比）
+  ctx.fillStyle = 'rgb(82, 58, 38)';
+  ctx.strokeStyle = 'rgba(40, 28, 18, 0.85)';
+  ctx.lineWidth = Math.max(0.5, 0.8 * scaled);
+  ctx.beginPath();
+  const tw = trunkH * 0.12;
+  ctx.rect(sx - tw, sy - trunkH, tw * 2, trunkH);
+  ctx.fill();
+  ctx.stroke();
 
-  // 树冠
-  let baseR = 78, baseG = 112, baseB = 62;
-  let hiR = 128, hiG = 162, hiB = 108;
-  if (tint === 1) { baseR = 158; baseG = 142; baseB = 82; hiR = 190; hiG = 170; hiB = 110; }
-  else if (tint === 2) { baseR = 168; baseG = 108; baseB = 62; hiR = 200; hiG = 138; hiB = 82; }
+  // 树冠底色（径向渐变 + 深色描边让圆形从地形跃出）
+  let baseR = 78, baseG = 122, baseB = 58;
+  let hiR = 138, hiG = 178, hiB = 108;
+  if (tint === 1) { baseR = 168; baseG = 152; baseB = 82; hiR = 200; hiG = 180; hiB = 120; }
+  else if (tint === 2) { baseR = 168; baseG = 98; baseB = 52; hiR = 210; hiG = 138; hiB = 78; }
 
   const grad = ctx.createRadialGradient(sx - crownR * 0.2, sy - trunkH - crownR * 0.3, 0, sx, sy - trunkH, crownR);
   grad.addColorStop(0, 'rgb(' + hiR + ',' + hiG + ',' + hiB + ')');
@@ -531,44 +537,65 @@ function drawAccentTree(sx, sy, scaled, tint) {
   ctx.beginPath();
   ctx.arc(sx, sy - trunkH, crownR, 0, Math.PI * 2);
   ctx.fill();
+  // 描边关键：深色圆形轮廓让树冠从任何地形背景中分离
+  ctx.strokeStyle = 'rgba(35, 65, 25, 0.7)';
+  ctx.lineWidth = Math.max(0.7, 1.0 * scaled);
+  ctx.stroke();
 }
 
-// Boulder：不规则多边形岩石（带方向光阴影）
+// Boulder：不规则多边形岩石（灰白顶+深灰底+暗边）
 function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
-  const r = 5 * scaled;
-  ctx.fillStyle = 'rgb(128, 122, 114)';
+  const r = 6 * scaled;
+  const sides = 7;
+  // 阴影底层（深灰，略偏右下）
+  ctx.fillStyle = 'rgb(78, 74, 68)';
   ctx.beginPath();
-  const sides = 6;
   for (let i = 0; i < sides; i++) {
     const angle = rot + (i / sides) * Math.PI * 2;
-    const rVar = r * (0.8 + 0.4 * ((i * 37 + 13) % 7) / 7);
-    const px = sx + Math.cos(angle) * rVar;
-    const py = sy + Math.sin(angle) * rVar * 0.7;
+    const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
+    const px = sx + Math.cos(angle) * rVar + r * 0.18;
+    const py = sy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
   ctx.fill();
-
-  // 顶面高光（屏幕系左上方向光）
-  ctx.fillStyle = 'rgba(168, 162, 154, 0.6)';
+  // 顶面（浅灰白色）
+  ctx.fillStyle = 'rgb(152, 146, 138)';
   ctx.beginPath();
-  const hiR = r * 0.5;
-  ctx.arc(sx - r * 0.15, sy - r * 0.15, hiR, 0, Math.PI * 2);
+  for (let i = 0; i < sides; i++) {
+    const angle = rot + (i / sides) * Math.PI * 2;
+    const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
+    const px = sx + Math.cos(angle) * rVar;
+    const py = sy + Math.sin(angle) * rVar * 0.72;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
   ctx.fill();
+  // 暗边轮廓让岩石从地形中分离
+  ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
+  ctx.lineWidth = Math.max(0.6, 0.9 * scaled);
+  ctx.stroke();
 }
 
-// Bush：低矮灌木簇（2-4 个绿色椭圆组合）
+// Bush：低矮灌木簇（多层绿色椭圆 + 暗边让簇丛可辨）
 function drawAccentBush(sx, sy, scaled) {
-  const r = 5.5 * scaled;
-  ctx.fillStyle = 'rgb(78, 112, 62)';
+  const r = 6.5 * scaled;
+  ctx.fillStyle = 'rgb(58, 92, 46)';
   ctx.beginPath();
-  ctx.ellipse(sx, sy, r * 0.9, r * 0.6, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, sy, r * 0.95, r * 0.62, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgb(92, 128, 74)';
+  ctx.fillStyle = 'rgb(82, 120, 64)';
   ctx.beginPath();
-  ctx.ellipse(sx - r * 0.4, sy + r * 0.1, r * 0.5, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx - r * 0.4, sy + r * 0.12, r * 0.55, r * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = 'rgb(96, 138, 76)';
   ctx.beginPath();
-  ctx.ellipse(sx + r * 0.4, sy + r * 0.05, r * 0.45, r * 0.35, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + r * 0.4, sy + r * 0.06, r * 0.5, r * 0.38, 0, 0, Math.PI * 2);
   ctx.fill();
+  // 簇丛统一描边：暗绿色轮廓在亮地形上同样清晰
+  ctx.strokeStyle = 'rgba(28, 52, 22, 0.7)';
+  ctx.lineWidth = Math.max(0.6, 0.9 * scaled);
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, r * 0.95, r * 0.62, 0, 0, Math.PI * 2);
+  ctx.stroke();
 }
