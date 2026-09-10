@@ -141,7 +141,6 @@ function updateTopBarStats(now) {
 
   document.getElementById('stat-pop').textContent = aliveAgents.length;
   document.getElementById('stat-houses').textContent = sim.houses.length;
-  document.getElementById('stat-pois').textContent = sim.pois.length;
   // ★ 家户与婚姻统计 (v0.9.72 M1)
   const activeHouseholds = sim.households ? sim.households.filter(h => !h.isDissolved).length : 0;
   const activeMarriages = sim.marriages ? sim.marriages.filter(m => m.isActive).length : 0;

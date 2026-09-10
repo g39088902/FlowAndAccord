@@ -139,16 +139,25 @@ pub fn generate_accents(
         half_size,
         &mut accent_rng,
         |cell, rng| {
-            // Boulder 偏好陡坡与裸露 RockFace
-            if cell.surface_kind == SurfaceKind::RockFace {
+            // Boulder 偏好陡坡与裸露 RockFace。
+            // ★ v1.50.10 修复：原「slope>18 且 NO_BUILD」条件在两类地貌下几乎恒为假——
+            // ① NO_BUILD 在河谷图被 hydrology::generate_river 全图重写清零；且河谷重算后
+            //    坡度普遍 <8°（河阶抬升 ≈5.7°、远丘 ≈2°）、全图无 RockFace（surface_kind 被重写）；
+            // ② T1 山口图坡度构成（基础斜面 ≈4.5°/波形 ≈3~4°/主脊梯度 ≈10°）也极少超过 18°
+            //    （无头实证：T1 Seed=999 修复前仅 1 颗、T2 各 Seed 均为 0）。
+            // 装饰是纯视觉要素，不参与通行/建造判定，故只依赖坡度本身，门槛降至 10°。
+            if cell.slope_angle_deg > 18.0 {
                 return true;
             }
-            if cell.slope_angle_deg > 18.0
-                && cell.feature_flags & super::biome::TERRAIN_FLAG_NO_BUILD != 0
-            {
+            if cell.slope_angle_deg > 10.0 {
                 return rng.gen_range(0.0, 1.0) < 0.6;
             }
-            false
+            // 河谷图补充：巨石以「河滩卵石 / 河阶散石」形态点缀平缓河谷
+            match cell.surface_kind {
+                SurfaceKind::RiverBank => rng.gen_range(0.0, 1.0) < 0.5,
+                SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.25,
+                _ => false,
+            }
         },
     );
 
@@ -219,7 +228,11 @@ fn generate_accents_of_kind<F>(
         {
             continue;
         }
-        if cell.feature_flags & super::biome::TERRAIN_FLAG_NO_WALK != 0 {
+        // ★ v1.50.10：RockFace 必打 NO_WALK，但对 Boulder 是目标地表而非禁区——
+        // 岩壁巨石属纯视觉装饰，放行到偏好检查（RockFace → 直接接受）
+        if cell.feature_flags & super::biome::TERRAIN_FLAG_NO_WALK != 0
+            && !(kind == AccentKind::Boulder && cell.surface_kind == SurfaceKind::RockFace)
+        {
             continue;
         }
 

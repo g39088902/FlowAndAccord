@@ -327,7 +327,10 @@ async function run() {
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const snap1 = reader.getSnapshot();
-    const hash1 = crypto.createHash('sha256').update(new Uint8Array(ex.memory.buffer, ex.world_save_ptr(), ex.world_save_len())).digest('hex');
+    // ★ v1.50.10 修复求值顺序：先取 ptr/len（wasm 内序列化可能 memory.grow），
+    // 再取 memory.buffer 构造视图——否则先取到的 buffer 会被扩容 detach
+    const savePtr1 = ex.world_save_ptr(), saveLen1 = ex.world_save_len();
+    const hash1 = crypto.createHash('sha256').update(new Uint8Array(ex.memory.buffer, savePtr1, saveLen1)).digest('hex');
 
     // 检查零 NaN、零越界
     for (const a of snap1.agents) {
@@ -340,7 +343,8 @@ async function run() {
     ex.world_create(120, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
-    const hash2 = crypto.createHash('sha256').update(new Uint8Array(ex.memory.buffer, ex.world_save_ptr(), ex.world_save_len())).digest('hex');
+    const savePtr2 = ex.world_save_ptr(), saveLen2 = ex.world_save_len();
+    const hash2 = crypto.createHash('sha256').update(new Uint8Array(ex.memory.buffer, savePtr2, saveLen2)).digest('hex');
 
     assert(hash1 === hash2, `Seed ${s} 确定性重放失败: ${hash1} !== ${hash2}`);
     console.log(`  ✅ Seed ${s}: 600 tick 推进正常 (人口 ${snap1.agents.length}, 0 NaN, 0 越界, 重放哈希逐字节一致)`);

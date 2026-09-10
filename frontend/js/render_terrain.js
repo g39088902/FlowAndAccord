@@ -1,19 +1,27 @@
-// === 地形与天空氛围绘制（v1.48.0 从 render_world.js 拆出） ===
-// 地形网格 / 水系地貌特征 / 天空背景与大气色洗
+// === 地形与天空氛围绘制（v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造） ===
+// 地形壳层（投影 + 沙盘基底/侧壁）/ 单格填充 / 单水系特征 / 天空背景 / 地形网格线
 // 依赖全局: ctx, camera, sim, project3D, getElevationColor, w, h, terrainProjX, terrainProjY, SimLighting
 //
 // ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）：
-//   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color，本文件只负责绘制；
-//   天空背景与大气色洗是两个固定的氛围插入点，不得在此新增整层立体实体绘制。
+//   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color（大气色洗亦烘焙于此），本文件只负责绘制。
+//
+// ★ v1.50.11 图层契约变更：drawTerrainCell / drawFeatureItem 是**单实体绘制入口**，
+//   由 render_world.js::drawWorldEntities() 的统一相机深度队列调度（远 → 近），
+//   使近处山地格与河道能正确遮挡远处图标。**严禁**在 render() 里恢复「整层先画地形」的调用，
+//   那会退回「图标透过山体可见」的旧 bug（与 v1.47.8 房屋、v1.50.2 装饰两次历史教训同类）。
 
 // ★ v1.48.1 地形格间抗锯齿缝隙补偿量（屏幕像素）：相邻格共享边各只覆盖约半像素，
 //   不补偿会露出背景色 1px 网格线。0.75px 经像素采样验证可把缝隙残差压到 1/255 以内。
 const TERRAIN_SEAM_PX = 0.75;
 
-// ★ v1.48.2 边界墙（沙盘侧壁）深度排序：
-//   四面墙都是沿世界 z 轴垂直下垂的幕布，下垂只改变 z（屏幕 y 与相机深度），不改变旋转后的 ry。
-//   同一屏幕点上的两面墙，深度差 = (ry_a − ry_b) / sinX ⇒「谁在前面」只由 ry = wx·sinZ + wy·cosZ
-//   决定，与墙高无关。故按各墙边界中点的 ry 升序（远 → 近）落笔，取代旧的固定 N/W/S/E 顺序。
+// ★ v1.48.2 边界墙（沙盘侧壁）深度排序 → ★ v1.50.14 并入统一深度队列：
+//   v1.48.2 曾按整墙中点 ry 在壳层排序绘制；但 v1.50.11 地形格并入深度队列后，
+//   侧壁仍整墙先行栅格化 → 侧壁永远画在所有队列元素之前，盖不住任何贴边实体
+//   （用户可见症状：「贴边 POI/房屋的底座与图标盖在南侧壁之上，未被遮挡」）。
+//   v1.50.14 起侧壁按**边界格分段**入队（drawBoundaryWallSeg），每段深度 = 该段
+//   上沿两端顶点深度的较大值（较近端）——侧壁是地图边界上最靠近相机的几何，
+//   贴边实体的底座/圆环伸过边界线的部分会被正确盖住；远离边界的实体与侧壁
+//   屏幕区域不相交，不受影响。
 const BOUNDARY_WALL_BASE = '#5A5043'; // 基准色 = v1.47.11 北侧壁色（关闭动态光照时的观感基准）
 const BOUNDARY_WALLS = [
   { nx: 0, ny: -1, nz: 0, first: 0, step: 1, ry: 0 }, // 北（世界 -y，受光面）
@@ -21,7 +29,6 @@ const BOUNDARY_WALLS = [
   { nx: 0, ny: 1, nz: 0, first: 0, step: 1, ry: 0 },  // 南（世界 +y，背阴）
   { nx: 1, ny: 0, nz: 0, first: 0, step: 1, ry: 0 },  // 东（世界 +x）
 ];
-const _wallDrawOrder = [0, 1, 2, 3]; // 每帧按 ry 重排（持久数组，零分配）
 
 // 预分配水系与特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
 let _featProjX = new Float32Array(512);
@@ -44,22 +51,24 @@ function _projectFeatureVertices(vertices, count, cx, cy, cosZ, sinZ, cosX, sinX
   }
 }
 
-// 单面边界墙：沿边界顶点序列走上沿，再折返走下沿（按各格高程下垂）后闭合填充
-// first/step 定位该墙在 terrainProjX/Y 中的顶点序列；外法线参与季节光照
-function drawBoundaryWall(first, step, count, nx, ny, nz, skirtElev, elevDropFactor) {
+// ★ v1.50.14 单段边界墙（由 render_world.js 统一深度队列调度）：
+// 画出第 k 段——上沿顶点 k → k+1，折返下垂底沿后闭合填充。下垂参数由
+// drawTerrainShell 每帧暂存（模块级），外法线参与季节光照。
+let _wallSkirtElev = 0;
+let _wallElevDrop = 0;
+function drawBoundaryWallSeg(wd, k) {
   const cells = sim.terrain.cells;
+  const i0 = wd.first + k * wd.step;
+  const i1 = i0 + wd.step;
+  const drop0 = (cells[i0].elev - _wallSkirtElev) * _wallElevDrop;
+  const drop1 = (cells[i1].elev - _wallSkirtElev) * _wallElevDrop;
   const L = window.SimLighting;
-  ctx.fillStyle = (L && L.enabled()) ? L.shadeFace(BOUNDARY_WALL_BASE, nx, ny, nz) : BOUNDARY_WALL_BASE;
+  ctx.fillStyle = (L && L.enabled()) ? L.shadeFace(BOUNDARY_WALL_BASE, wd.nx, wd.ny, wd.nz) : BOUNDARY_WALL_BASE;
   ctx.beginPath();
-  ctx.moveTo(terrainProjX[first], terrainProjY[first]);
-  for (let k = 1; k < count; k++) {
-    const idx = first + k * step;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx]);
-  }
-  for (let k = count - 1; k >= 0; k--) {
-    const idx = first + k * step;
-    ctx.lineTo(terrainProjX[idx], terrainProjY[idx] + (cells[idx].elev - skirtElev) * elevDropFactor);
-  }
+  ctx.moveTo(terrainProjX[i0], terrainProjY[i0]);
+  ctx.lineTo(terrainProjX[i1], terrainProjY[i1]);
+  ctx.lineTo(terrainProjX[i1], terrainProjY[i1] + drop1);
+  ctx.lineTo(terrainProjX[i0], terrainProjY[i0] + drop0);
   ctx.closePath();
   ctx.fill();
 }
@@ -103,22 +112,15 @@ function drawSkyBackdrop() {
   ctx.fillRect(0, 0, w, h);
 }
 
-// 大气色洗：统一当季色调（落在贴地图元之后、立体实体之前，保证建筑与文字不被洗灰）
-function drawAtmosphereWash() {
-  const L = window.SimLighting;
-  if (!L || !L.enabled()) return;
-  const c = L.cfg();
-  const tint = L.tint();
-  const lightTheme = !!(c.respectLightTheme && document.body && document.body.classList.contains('theme-light'));
-  const alpha = c.skyWash * (lightTheme ? 0.55 : 1);
-  const r = Math.round(Math.min(255, 140 * tint[0]));
-  const g = Math.round(Math.min(255, 150 * tint[1]));
-  const b = Math.round(Math.min(255, 172 * tint[2]));
-  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
-  ctx.fillRect(0, 0, w, h);
-}
+// ★ v1.50.11 大气色洗已烘焙进 lighting.js::relightTerrain() 的地形色：
+//   色洗原本是「贴地图元之后、立体实体之前」的整屏 fillRect，但地形格并入统一深度队列后
+//   实体与地形格交错落笔，整屏矩形会把实体一起洗灰（渲染顺序见 render_world.js::drawWorldEntities）。
+//   烘焙进 cell.color 后观感不变，且省去每帧一次全屏合成。
 
-function drawTerrain() {
+function drawTerrainShell() {
+// ★ v1.50.11 拆分：本函数只保留「全网格顶点投影 + 沙盘基底/侧壁」壳层；
+//   地形格四边形填充迁入 render_world.js 统一深度队列（drawTerrainCell），
+//   使近处山地格能正确遮挡站在山后的远处图标/道路/水系。
 if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
   const gSize = sim.terrain.gridSize;
   const totalVertices = gSize * gSize;
@@ -168,118 +170,92 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
   ctx.closePath();
   ctx.fill();
 
-  // 1.2 四周边沿垂直剖面侧壁：外法线参与季节光照，明暗随光向旋转
-  //     基准色取 v1.47.11 北侧壁色，相对旧固定光归一化 ⇒ 关闭动态光照时观感与原版一致
-  //     ★ v1.48.2 按相机距离排序（远 → 近）绘制，取代旧的固定 N/W/S/E 顺序，
-  //       使较近的边界墙遮盖较远的边界墙（判据推导见文件头 BOUNDARY_WALLS 注释）。
-  const cells = sim.terrain.cells;
-  const lastIdx = gSize - 1;
-  const rowOffsetS = lastIdx * gSize;
+  // ★ v1.50.14 四周边沿垂直剖面侧壁已并入 render_world.js 统一深度队列
+  //    （按边界格分段 drawBoundaryWallSeg，见该文件 DEPTH_WALL 收集段）。
+  //    此处只暂存下垂参数供单段绘制消费。
+  _wallSkirtElev = skirtElev;
+  _wallElevDrop = elevDropFactor;
   BOUNDARY_WALLS[0].first = 0;          BOUNDARY_WALLS[0].step = 1;     // 北
   BOUNDARY_WALLS[1].first = 0;          BOUNDARY_WALLS[1].step = gSize; // 西
-  BOUNDARY_WALLS[2].first = rowOffsetS; BOUNDARY_WALLS[2].step = 1;     // 南
-  BOUNDARY_WALLS[3].first = lastIdx;    BOUNDARY_WALLS[3].step = gSize; // 东
-  for (let wi = 0; wi < 4; wi++) {
-    const wd = BOUNDARY_WALLS[wi];
-    const ca = cells[wd.first], cb = cells[wd.first + lastIdx * wd.step];
-    wd.ry = (ca.wx + cb.wx) * 0.5 * sinZ + (ca.wy + cb.wy) * 0.5 * cosZ;
-  }
-  // 稳定排序：ry 相同（墙在屏幕上退化为零面积）时保持 N/W/S/E 原序，渲染确定性不变
-  _wallDrawOrder.sort((a, b) => (BOUNDARY_WALLS[a].ry - BOUNDARY_WALLS[b].ry) || (a - b));
-  for (let oi = 0; oi < 4; oi++) {
-    const wd = BOUNDARY_WALLS[_wallDrawOrder[oi]];
-    drawBoundaryWall(wd.first, wd.step, gSize, wd.nx, wd.ny, wd.nz, skirtElev, elevDropFactor);
-  }
-
-  // 2. 视口裁剪绘制地形四边形
-  for (let gy = 0; gy < gSize - 1; gy++) {
-    const rowOffset0 = gy * gSize;
-    const rowOffset1 = (gy + 1) * gSize;
-    for (let gx = 0; gx < gSize - 1; gx++) {
-      const i00 = rowOffset0 + gx;
-      const i10 = rowOffset0 + (gx + 1);
-      const i11 = rowOffset1 + (gx + 1);
-      const i01 = rowOffset1 + gx;
-
-      const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
-      const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
-      const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
-      const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
-
-      // 视口边界快速剔除
-      const minX = Math.min(p00x, p10x, p11x, p01x);
-      const maxX = Math.max(p00x, p10x, p11x, p01x);
-      const minY = Math.min(p00y, p10y, p11y, p01y);
-      const maxY = Math.max(p00y, p10y, p11y, p01y);
-
-      if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) {
-        continue;
-      }
-
-      const c00 = sim.terrain.cells[i00];
-      ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
-
-      // ★ v1.48.1 无缝拼接：相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，
-      //   两者叠加后仍留约 25% 的透光率，深色天空背景便从缝隙里透出 1px 网格线
-      //   （表现为「地形漏出后面的边界线条」）。把四条边各自沿外法线平移 TERRAIN_SEAM_PX，
-      //   使相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度。
-      const mx = (p00x + p10x + p11x + p01x) * 0.25;
-      const my = (p00y + p10y + p11y + p01y) * 0.25;
-      const e0x = p10x - p00x, e0y = p10y - p00y;
-      const e1x = p11x - p10x, e1y = p11y - p10y;
-      const e2x = p01x - p11x, e2y = p01y - p11y;
-      const e3x = p00x - p01x, e3y = p00y - p01y;
-      const l0 = Math.sqrt(e0x * e0x + e0y * e0y) || 1;
-      const l1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
-      const l2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
-      const l3 = Math.sqrt(e3x * e3x + e3y * e3y) || 1;
-      // 固定旋向法线 (ey, -ex)/l，再用质心方向确定指向"外"侧
-      const sgn = (e0y * ((p00x + p10x) * 0.5 - mx) - e0x * ((p00y + p10y) * 0.5 - my)) > 0 ? 1 : -1;
-      const n0x = sgn * e0y / l0, n0y = -sgn * e0x / l0;
-      const n1x = sgn * e1y / l1, n1y = -sgn * e1x / l1;
-      const n2x = sgn * e2y / l2, n2y = -sgn * e2x / l2;
-      const n3x = sgn * e3y / l3, n3y = -sgn * e3x / l3;
-      ctx.beginPath();
-      ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
-      ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
-      ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
-      ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  drawTerrainFeatures();
-
-  // ★ v1.48.0 D-A：Accent 装饰 pass（在地形特征之后、网格线/道路之前绘制）
-  drawAccents();
-
-  // 3. 批处理绘制地形网格线 (仅在 sim.showGrid 为 true 时绘制，默认隐藏以呈现自然地貌，按 'G' 键切换)
-  if (sim.showGrid) {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 0.4;
-    ctx.beginPath();
-    for (let gy = 0; gy < gSize; gy++) {
-      const rowOffset = gy * gSize;
-      ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
-      for (let gx = 1; gx < gSize; gx++) {
-        ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
-      }
-    }
-    for (let gx = 0; gx < gSize; gx++) {
-      ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
-      for (let gy = 1; gy < gSize; gy++) {
-        ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
-      }
-    }
-    ctx.stroke();
-  }
+  BOUNDARY_WALLS[2].first = (gSize - 1) * gSize; BOUNDARY_WALLS[2].step = 1;     // 南
+  BOUNDARY_WALLS[3].first = gSize - 1;  BOUNDARY_WALLS[3].step = gSize; // 东
 }
 }
 
-function drawTerrainFeatures() {
-  const features = (sim.terrain && sim.terrain.features) || [];
-  if (!features.length) return;
+// ★ v1.50.11 单个地形格四边形填充（由 render_world.js 统一深度队列调度）。
+// 原 drawTerrain 的「视口裁剪 + 逐格填充」整层循环迁出为单格入口：
+// 地形格与 POI 标记/房屋/族人/装饰同队列按相机深度远 → 近落笔，
+// 近处山地格后落笔即可遮挡站在山后的远处图标（旧整层先画导致图标透山可见）。
+// 视口粗剔除在队列收集阶段完成（同一 20px 余量）。
+function drawTerrainCell(i00, i10, i11, i01) {
+  const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
+  const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
+  const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
+  const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
+
+  const c00 = sim.terrain.cells[i00];
+  ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
+
+  // ★ v1.48.1 无缝拼接：相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，
+  //   两者叠加后仍留约 25% 的透光率，深色天空背景便从缝隙里透出 1px 网格线
+  //   （表现为「地形漏出后面的边界线条」）。把四条边各自沿外法线平移 TERRAIN_SEAM_PX，
+  //   使相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度。
+  const mx = (p00x + p10x + p11x + p01x) * 0.25;
+  const my = (p00y + p10y + p11y + p01y) * 0.25;
+  const e0x = p10x - p00x, e0y = p10y - p00y;
+  const e1x = p11x - p10x, e1y = p11y - p10y;
+  const e2x = p01x - p11x, e2y = p01y - p11y;
+  const e3x = p00x - p01x, e3y = p00y - p01y;
+  const l0 = Math.sqrt(e0x * e0x + e0y * e0y) || 1;
+  const l1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
+  const l2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
+  const l3 = Math.sqrt(e3x * e3x + e3y * e3y) || 1;
+  // 固定旋向法线 (ey, -ex)/l，再用质心方向确定指向"外"侧
+  const sgn = (e0y * ((p00x + p10x) * 0.5 - mx) - e0x * ((p00y + p10y) * 0.5 - my)) > 0 ? 1 : -1;
+  const n0x = sgn * e0y / l0, n0y = -sgn * e0x / l0;
+  const n1x = sgn * e1y / l1, n1y = -sgn * e1x / l1;
+  const n2x = sgn * e2y / l2, n2y = -sgn * e2x / l2;
+  const n3x = sgn * e3y / l3, n3y = -sgn * e3x / l3;
+  ctx.beginPath();
+  ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
+  ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
+  ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
+  ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ★ v1.50.11 地形网格线（调试叠加，'G' 键切换）：从 drawTerrain 拆出独立整层。
+//   0.04 极低透明度的调试线条，置于统一深度队列之后绘制，叠加在实体上不可感知。
+function drawTerrainGrid() {
+  if (!sim.showTerrain || !sim.showGrid || !sim.terrain || !sim.terrain.cells) return;
+  const gSize = sim.terrain.gridSize;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.lineWidth = 0.4;
+  ctx.beginPath();
+  for (let gy = 0; gy < gSize; gy++) {
+    const rowOffset = gy * gSize;
+    ctx.moveTo(terrainProjX[rowOffset], terrainProjY[rowOffset]);
+    for (let gx = 1; gx < gSize; gx++) {
+      ctx.lineTo(terrainProjX[rowOffset + gx], terrainProjY[rowOffset + gx]);
+    }
+  }
+  for (let gx = 0; gx < gSize; gx++) {
+    ctx.moveTo(terrainProjX[gx], terrainProjY[gx]);
+    for (let gy = 1; gy < gSize; gy++) {
+      ctx.lineTo(terrainProjX[gy * gSize + gx], terrainProjY[gy * gSize + gx]);
+    }
+  }
+  ctx.stroke();
+}
+
+// ★ v1.50.11 单个水系地貌特征绘制（由 render_world.js 统一深度队列调度）。
+// 旧 drawTerrainFeatures() 是「Pass 1.5 游鱼 → Pass 2 水面 → Pass 2.8 波光 → Pass 4 浅滩」
+// 的整层先画，水面永远盖在地形之上——河道在近处山体前依然可见（与图标透山同一根因）。
+// 现改为：River 水面多边形 / ShallowFord 等特征各自作为深度项入队（深度 = 特征顶点的
+// 最大相机深度，保证盖住更远的地形格）；游鱼逐条、波光逐段独立入队（见 river_life.js）。
+function drawFeatureItem(feature) {
+  if (!feature.vertices || !feature.vertices.length) return;
 
   const cx = w / 2 + camera.panX;
   const cy = h / 2 + camera.panY;
@@ -287,35 +263,12 @@ function drawTerrainFeatures() {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  // ── Pass 1.5: 水底生态层（RiverLife Submerged Layer） ──
-  // 先铺一层均匀深沉河床基底（遮蔽水下逐格光照的明暗斑驳），再画卵石与游鱼；
-  // 盖上 Pass 2 半透明水面后自然产生水下半透明景深
-  for (let fi = 0; fi < features.length; fi++) {
-    const feature = features[fi];
-    if (feature.kind !== 'River' || !feature.vertices || feature.vertices.length < 3) continue;
-    const vLen = feature.vertices.length;
-    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-    ctx.fillStyle = 'rgba(30, 46, 56, 0.92)';
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.closePath();
-    ctx.fill();
-  }
-  if (window.RiverLife) {
-    window.RiverLife.update(performance.now());
-    window.RiverLife.drawRiverbed(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-    window.RiverLife.drawFish(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-  }
+  const vLen = feature.vertices.length;
+  _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
 
-  // ── Pass 2: 连续矢量水面闭合多边形（Vector Water Surface） ──
-  // 以闭合矢量填充整片半透明水面；水底网格方块由 Pass 1.5 的河床基底先行遮蔽
-  for (let fi = 0; fi < features.length; fi++) {
-    const feature = features[fi];
-    if (feature.kind !== 'River' || !feature.vertices || !feature.vertices.length) continue;
-    const vLen = feature.vertices.length;
-    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-
+  if (feature.kind === 'River') {
+    // ── Pass 2: 连续矢量水面闭合多边形（Vector Water Surface） ──
+    // 以闭合矢量填充整片半透明水面，直接叠在水下地表色之上成色
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(_featProjX[0], _featProjY[0]);
@@ -331,180 +284,83 @@ function drawTerrainFeatures() {
     ctx.fill();
     ctx.restore();
 
-    // B1 深浅水色纵深带：沿中心线逐段铺深色水带，笔宽跟随当地河宽——
-    // 宽河段自动显出「深潭」幽暗，收窄处显出「急流浅滩」的透亮（纯屏幕空间，不碰内核）
-    if (vLen >= 6) {
-      const halfCount = Math.floor(vLen / 2);
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(20, 58, 84, 0.28)';
-      for (let i = 0; i < halfCount - 1; i++) {
-        const j = vLen - 1 - i;
-        const j1 = j - 1;
-        const mx = (_featProjX[i] + _featProjX[j]) * 0.5;
-        const my = (_featProjY[i] + _featProjY[j]) * 0.5;
-        const mx1 = (_featProjX[i + 1] + _featProjX[j1]) * 0.5;
-        const my1 = (_featProjY[i + 1] + _featProjY[j1]) * 0.5;
-        const hw = Math.hypot(_featProjX[i] - _featProjX[j], _featProjY[i] - _featProjY[j]) * 0.5;
-        ctx.lineWidth = Math.max(2, hw * 0.9);
-        ctx.beginPath();
-        ctx.moveTo(mx, my);
-        ctx.lineTo(mx1, my1);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    // 水面中心潺潺流动微波细线
-    if (vLen >= 194) {
-      const halfCount = Math.floor(vLen / 2);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(240, 252, 255, 0.40)';
-      ctx.lineWidth = Math.max(1.0, 1.8 * scale);
-      ctx.setLineDash([16 * scale, 12 * scale]);
-      ctx.lineDashOffset = -((performance.now() * 0.02) % (28 * scale));
-      ctx.beginPath();
-      for (let i = 0; i < halfCount; i++) {
-        const j = vLen - 1 - i;
-        const mx = (_featProjX[i] + _featProjX[j]) * 0.5;
-        const my = (_featProjY[i] + _featProjY[j]) * 0.5;
-        if (i === 0) ctx.moveTo(mx, my);
-        else ctx.lineTo(mx, my);
-      }
-      ctx.stroke();
-      ctx.restore();
-    }
+    // ★ v1.50.6：移除「B1 深浅水色纵深带」——沿中心线铺的深色宽水带在窄河道上观感为一条压在河心的暗色粗线，见 11-changelog.md
+    // ★ v1.50.3：移除「水面中心潺潺流动微波细线」——虚线观感形似车道线，见 11-changelog.md
+    return;
   }
 
-  // ── Pass 2.8: 迎光面太阳波光粼粼 (Sun Caustics Glint) ──
-  if (window.RiverLife) {
-    window.RiverLife.drawSunGlint(ctx, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-  }
-
-  // ── Pass 3: 水陆交界表面张力微沫高光（Shoreline Foam Highlight） ──
+  // ── Pass 4: 浅滩涉渡（ShallowFord）与其余地貌特征 ──
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  for (let fi = 0; fi < features.length; fi++) {
-    const feature = features[fi];
-    if (feature.kind !== 'RiverBank' || !feature.vertices || !feature.vertices.length) continue;
-    const vLen = feature.vertices.length;
-    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
 
-    ctx.strokeStyle = 'rgba(238, 248, 255, 0.62)';
-    ctx.lineWidth = Math.max(1.2, 1.8 * scale);
+  if (feature.kind === 'ShallowFord') {
+    // 浅滩涉渡：卵石踏道基底
+    ctx.strokeStyle = 'rgba(196, 178, 136, 0.88)';
+    ctx.lineWidth = Math.max(6, feature.width * scale * 0.22);
     ctx.beginPath();
     ctx.moveTo(_featProjX[0], _featProjY[0]);
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
 
-    // B2 顺流漂移的碎沫段：短虚线沿岸线顶点序推进，岸线即刻有了水流方向感
-    // （两岸顶点序相反，漂移方向在世界系中天然一顺一逆，呈写意效果）
-    ctx.strokeStyle = 'rgba(244, 252, 255, 0.42)';
-    ctx.lineWidth = Math.max(1.0, 1.4 * scale);
-    ctx.setLineDash([9 * scale, 30 * scale]);
-    ctx.lineDashOffset = -((performance.now() * 0.014) % (39 * scale));
+    // 踏石微光
+    ctx.strokeStyle = 'rgba(255, 252, 240, 0.90)';
+    ctx.lineWidth = Math.max(2.5, feature.width * scale * 0.10);
+    ctx.setLineDash([4 * scale, 5 * scale]);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
     ctx.setLineDash([]);
+  } else {
+    // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
+    ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
+    ctx.lineWidth = Math.max(2, feature.width * scale * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.stroke();
   }
   ctx.restore();
-
-  // ── Pass 4: 浅滩涉渡（ShallowFord）与其余地貌特征 ──
-  for (let fi = 0; fi < features.length; fi++) {
-    const feature = features[fi];
-    if (!feature.vertices || !feature.vertices.length) continue;
-    if (feature.kind === 'River' || feature.kind === 'RiverBank') continue;
-
-    const vLen = feature.vertices.length;
-    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-
-    ctx.save();
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-
-    if (feature.kind === 'ShallowFord') {
-      // 浅滩涉渡：卵石踏道基底
-      ctx.strokeStyle = 'rgba(196, 178, 136, 0.88)';
-      ctx.lineWidth = Math.max(6, feature.width * scale * 0.22);
-      ctx.beginPath();
-      ctx.moveTo(_featProjX[0], _featProjY[0]);
-      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-      ctx.stroke();
-
-      // 踏石微光
-      ctx.strokeStyle = 'rgba(255, 252, 240, 0.90)';
-      ctx.lineWidth = Math.max(2.5, feature.width * scale * 0.10);
-      ctx.setLineDash([4 * scale, 5 * scale]);
-      ctx.beginPath();
-      ctx.moveTo(_featProjX[0], _featProjY[0]);
-      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else {
-      // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
-      ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
-      ctx.lineWidth = Math.max(2, feature.width * scale * 0.06);
-      ctx.beginPath();
-      ctx.moveTo(_featProjX[0], _featProjY[0]);
-      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 }
 
-// ★ v1.48.0 D-A：Accent 装饰渲染（Tree/Boulder/Bush）
-// 在地形特征之后、道路之前绘制（低矮 → 高，让高树可遮挡远景道路）
-function drawAccents() {
-  const accents = (sim.terrain && sim.terrain.accents) || [];
-  if (!accents.length) return;
+// ★ v1.50.2 D-A：Accent 装饰（Tree/Boulder/Bush）单实体绘制入口
+// 旧实现 drawAccents() 在 drawTerrain() 内按「种类分组（Bush→Boulder→Tree）→ 数组原序」整层落笔，
+// 本质是**按生成顺序而非距离**绘制：远树会压住近树，且乔木永远被后画的道路/族人覆盖。
+// 现统一并入 render_world.js::drawWorldEntities() 的相机深度队列（远 → 近），与 POI 标记 / 私产宅舍 /
+// 部落民同队列排序，近处乔木可正确遮挡远处道路与小人，远处乔木也被近处实体正确遮挡。
+function drawAccentEntity(accent) {
+  if (accent.kind !== 'Tree' && accent.kind !== 'Boulder' && accent.kind !== 'Bush') return;
 
-  const cx = w / 2 + camera.panX;
-  const cy = h / 2 + camera.panY;
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  // 按种类分组绘制顺序：Bush → Boulder → Tree（低 → 高）
-  const BUSH = 0, BOULDER = 1, TREE = 2;
-  const order = [BUSH, BOULDER, TREE];
+  // 投影（与地形/世界实体同一套 3D → 屏幕变换）
+  const rx = accent.x * cosZ - accent.y * sinZ;
+  const ry = accent.x * sinZ + accent.y * cosZ;
+  const az = (accent.z || 0) + MAP_Z_LIFT; // ★ v1.50.12 精灵锚点略抬于地表（render_world.js 定义）
+  const y2 = ry * cosX - az * sinX;
+  const sx = w / 2 + camera.panX + rx * scale;
+  const sy = h / 2 + camera.panY + y2 * scale;
 
-  for (let oi = 0; oi < 3; oi++) {
-    const targetKind = order[oi];
-    for (let ai = 0; ai < accents.length; ai++) {
-      const accent = accents[ai];
-      let kindIdx;
-      if (accent.kind === 'Bush') kindIdx = BUSH;
-      else if (accent.kind === 'Boulder') kindIdx = BOULDER;
-      else if (accent.kind === 'Tree') kindIdx = TREE;
-      else continue;
+  // 视口粗剔除：树冠/树干向上延伸（最大约 36×zoom），上方按缩放留足余量避免边缘弹跳
+  const upMargin = 20 + 40 * scale;
+  if (sx < -20 || sx > w + 20 || sy < -upMargin || sy > h + 20) return;
 
-      if (kindIdx !== targetKind) continue;
+  // ★ v1.48.0 D-A：Tree 季节色调
+  let seasonTint = accent.tint || 0;
+  if (window.SimTreeTint && sim.treeTintEnabled !== false) {
+    seasonTint = window.SimTreeTint.tint(accent, sim);
+  }
 
-      // 投影
-      const rx = accent.x * cosZ - accent.y * sinZ;
-      const ry = accent.x * sinZ + accent.y * cosZ;
-      const y2 = ry * cosX - (accent.z || 0) * sinX;
-      const sx = cx + rx * scale;
-      const sy = cy + y2 * scale;
-
-      // 视口剔除
-      if (sx < -20 || sx > w + 20 || sy < -20 || sy > h + 20) continue;
-
-      // ★ v1.48.0 D-A：Tree 季节色调
-      let seasonTint = accent.tint || 0;
-      if (window.SimTreeTint && sim.treeTintEnabled !== false) {
-        seasonTint = window.SimTreeTint.tint(accent, sim);
-      }
-
-      if (accent.kind === 'Tree') {
-        drawAccentTree(accent, sx, sy, accent.scale * scale, seasonTint);
-      } else if (accent.kind === 'Boulder') {
-        drawAccentBoulder(sx, sy, accent.scale * scale, accent.rotation || 0, cosZ, sinZ);
-      } else if (accent.kind === 'Bush') {
-        drawAccentBush(accent, sx, sy, accent.scale * scale);
-      }
-    }
+  const scaled = accent.scale * scale;
+  if (accent.kind === 'Tree') {
+    drawAccentTree(accent, sx, sy, scaled, seasonTint);
+  } else if (accent.kind === 'Boulder') {
+    drawAccentBoulder(sx, sy, scaled, accent.rotation || 0, cosZ, sinZ);
+  } else {
+    drawAccentBush(accent, sx, sy, scaled);
   }
 }
 
@@ -646,6 +502,9 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
 function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
   const r = 6 * scaled;
   const sides = 7;
+  // ★ v1.50.13 锚点修正：七边形原以 (sx,sy) 为中心，下半岩体沉入地表之下被近处格子盖掉
+  //   （「石头半截入土」）。改为底边贴锚点：整体上移 r（多边形最大下探 0.72rVar+0.18r ≈ 1.04r）。
+  const cy = sy - r;
   // 阴影底层（深灰，略偏右下）
   ctx.fillStyle = 'rgb(78, 74, 68)';
   ctx.beginPath();
@@ -653,7 +512,7 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
     const angle = rot + (i / sides) * Math.PI * 2;
     const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
     const px = sx + Math.cos(angle) * rVar + r * 0.18;
-    const py = sy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
+    const py = cy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
@@ -665,7 +524,7 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
     const angle = rot + (i / sides) * Math.PI * 2;
     const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
     const px = sx + Math.cos(angle) * rVar;
-    const py = sy + Math.sin(angle) * rVar * 0.72;
+    const py = cy + Math.sin(angle) * rVar * 0.72;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
   }
   ctx.closePath();
@@ -692,6 +551,9 @@ function drawAccentBush(accent, sx, sy, scaled) {
 
   // 三瓣簇：左右托瓣 + 顶主瓣（扁压 squash 让簇丛贴地）
   const squash = 0.70;
+  // ★ v1.50.13 锚点修正：瓣簇中心原在锚点附近，侧瓣底部下探 ~0.54r 沉入地表被近格盖住。
+  //   瓣簇整体上移 0.55r 使底边贴锚点；贴地微投影仍留在地表 sy。
+  const cy = sy - r * 0.55;
   // ★ v1.49.3 描边减重：暗轮廓宽度减半
   const lw = Math.max(0.4, 0.45 * scaled);
   const lobes = [
@@ -705,14 +567,14 @@ function drawAccentBush(accent, sx, sy, scaled) {
   for (let i = 0; i < lobes.length; i++) {
     const L = lobes[i];
     ctx.beginPath();
-    ctx.ellipse(sx + L.dx * r, sy + L.dy * r, L.r * r + lw, L.r * r * squash + lw, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + L.dx * r, cy + L.dy * r, L.r * r + lw, L.r * r * squash + lw, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
   // Pass B：主体（径向渐变，光心偏左上）
   const grad = ctx.createRadialGradient(
-    sx - r * 0.30, sy - r * 0.65, r * 0.10,
-    sx, sy - r * 0.1, r * 1.15
+    sx - r * 0.30, cy - r * 0.65, r * 0.10,
+    sx, cy - r * 0.1, r * 1.15
   );
   grad.addColorStop(0, 'rgb(112, 154, 88)');
   grad.addColorStop(1, 'rgb(60, 96, 46)');
@@ -720,7 +582,7 @@ function drawAccentBush(accent, sx, sy, scaled) {
   for (let i = 0; i < lobes.length; i++) {
     const L = lobes[i];
     ctx.beginPath();
-    ctx.ellipse(sx + L.dx * r, sy + L.dy * r, L.r * r, L.r * r * squash, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + L.dx * r, cy + L.dy * r, L.r * r, L.r * r * squash, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -733,7 +595,7 @@ function drawAccentBush(accent, sx, sy, scaled) {
     const ang = t1 * Math.PI * 2;
     const rad = (0.15 + t2 * 0.55) * r;
     const px = sx + Math.cos(ang) * rad * 0.9;
-    const py = sy + Math.sin(ang) * rad * squash - r * 0.02;
+    const py = cy + Math.sin(ang) * rad * squash - r * 0.02;
     const dr = (0.10 + t3 * 0.12) * r;
     ctx.fillStyle = (i & 1) === 0 ? 'rgba(38, 66, 30, 0.26)' : 'rgba(150, 192, 118, 0.30)';
     ctx.beginPath();
@@ -744,6 +606,6 @@ function drawAccentBush(accent, sx, sy, scaled) {
   // Pass C：顶瓣受光点
   ctx.fillStyle = 'rgba(255, 252, 218, 0.20)';
   ctx.beginPath();
-  ctx.ellipse(sx - r * 0.18, sy - r * 0.52, r * 0.26, r * 0.18, -0.4, 0, Math.PI * 2);
+  ctx.ellipse(sx - r * 0.18, cy - r * 0.52, r * 0.26, r * 0.18, -0.4, 0, Math.PI * 2);
   ctx.fill();
 }

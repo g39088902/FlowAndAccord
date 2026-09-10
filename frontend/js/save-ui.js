@@ -16,7 +16,7 @@
   /// v1.46.12：BranchId 收敛为 16 条，活动任务枚举不兼容旧档。
   const SAVE_FORMAT_VERSION = 7;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.50.0';
+  const DEFAULT_APP_VERSION = '1.50.15';
   const AUTO_SAVE_INTERVAL_MS = 30000;
 
   /**
@@ -142,6 +142,20 @@
     if (message) setStatus(message, 'ok');
   }
 
+  /**
+   * ★ v1.50.8 存档门禁旁路开关：URL 携带 `?nogate=1`（或任意值的 nogate 参数）时
+   * 跳过「先建立本地存档文件」弹窗直接进入模拟。供截图/演示/自动化预览等
+   * 无需持久化存档的场景使用；注意该模式下自动保存没有文件句柄可写，仅内存演算，
+   * 刷新页面世界即回到初始态。
+   */
+  function isSaveGateBypassed() {
+    try {
+      return new URLSearchParams(window.location.search).has('nogate');
+    } catch (e) {
+      return false;
+    }
+  }
+
   function setStartupGateMessage(message, error) {
     const el = document.getElementById('startup-save-message');
     if (el) { el.textContent = message; el.style.color = error ? '#f87171' : '#9fb3c8'; }
@@ -205,6 +219,11 @@
     const gate = document.getElementById('startup-save-gate');
     const btn = document.getElementById('startup-save-connect');
     if (!gate || !btn) return;
+    // ★ v1.50.8：?nogate=1 旁路——隐藏门禁弹窗并直接解除暂停，不连接任何存档文件
+    if (isSaveGateBypassed()) {
+      releaseStartupGate('已跳过存档门禁（?nogate=1）：无存档文件，仅内存演算');
+      return;
+    }
     if (!supportsFileAPI()) {
       btn.disabled = true;
       setStartupGateMessage('当前浏览器不兼容本地存档文件，请使用最新版 Chrome 或 Edge。', true);

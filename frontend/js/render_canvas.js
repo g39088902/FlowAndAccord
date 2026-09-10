@@ -181,21 +181,18 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   // 1. 天空与地平氛围（地表之下的第一个氛围插入点）
   drawSkyBackdrop();
 
-  // 2. 3D 地形网格渲染
-  drawTerrain();
+  // 2. 地形壳层：全网格顶点投影 + 沙盘基底/侧壁（地形格填充已迁入统一深度队列）
+  drawTerrainShell();
 
-  // 3. 动态踩踏道路网络渲染（贴地表面先画，避免遮挡建筑）
-  drawLanes();
-
-  // 4. 贴地图元补充层：选中营地的辖区连线 + POI 底座/营地暖光（必须在立体实体之前落笔）
-  drawSelectedCampHouseLinks();
-  drawPoiGroundBases();
-
-  // 5. 大气色洗（第二个氛围插入点：在立体实体之前，保证建筑与文字不被洗灰）
-  drawAtmosphereWash();
-
-  // 6. ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 + 私产宅舍 + 部落民，远 → 近依次落笔）
+  // 3. ★ v1.50.11 世界统一深度队列（修复「图标透过山体可见」）：
+  //    地形格 + 水系 + 游鱼/波光 + 道路分段 + 营地连线 + POI 底座 +
+  //    POI 标记/房屋/乔木/族人，全部按相机深度远 → 近落笔——
+  //    近处山地格、河道、乔木都能正确遮挡更远的图标（含道路悬浮检测与 Tooltip）。
+  //    大气色洗不再整屏绘制（会洗灰交错落笔的实体），已烘焙进 relightTerrain 的地形色。
   drawWorldEntities();
+
+  // 4. 地形网格线（调试叠加，'G' 键切换，0.04 极低透明度）
+  drawTerrainGrid();
 
   // ★ M4: 登基礼花特效
   drawCoronationEffects(now);

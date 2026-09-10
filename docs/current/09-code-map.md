@@ -117,7 +117,7 @@ FlowAndAccord/
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
-│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征/装饰 accents + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线)
+│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 + ★ v1.50.2 装饰单实体 drawAccentEntity (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；装饰整层绘制已并入 render_world.js 深度队列)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制与世界实体统一深度队列
 │   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效
 │   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染

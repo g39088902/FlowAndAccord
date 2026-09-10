@@ -188,6 +188,14 @@ window.SimLighting = (function () {
     const hasPre = !!(nx && ny && nz && aoA && ar && ag && ab);
     const palette = new Map(); // 每趟清空：趟内去重、趟间不累积
 
+    // ★ v1.50.11 大气色洗烘焙：色洗原先是 render 管线里「贴地图元之后、立体实体之前」的
+    //   整屏 fillRect，但地形格并入统一深度队列后与实体交错落笔，整屏矩形会把实体一起洗灰。
+    //   现按 drawAtmosphereWash 的同一公式（当季 tint 调色 × skyWash 透明度 × 浅色主题 0.55 系数）
+    //   直接混入 cell.color，观感不变且零每帧成本；仅动态光照模式生效（旧固定光对照路径无色洗）。
+    const lightTheme = !!(c.respectLightTheme && document.body && document.body.classList.contains('theme-light'));
+    const washA = c.enabled ? c.skyWash * (lightTheme ? 0.55 : 1) : 0;
+    const washR = Math.min(255, 140 * tr), washG = Math.min(255, 150 * tg), washB = Math.min(255, 172 * tb);
+
     for (let i = 0; i < cells.length; i++) {
       const cell = cells[i];
       if (!cell) continue;
@@ -216,6 +224,13 @@ window.SimLighting = (function () {
       r = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
       g = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
       b = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
+
+      // ★ v1.50.11 大气色洗烘焙（见上方注释）
+      if (washA > 0) {
+        r = Math.round(r + (washR - r) * washA);
+        g = Math.round(g + (washG - g) * washA);
+        b = Math.round(b + (washB - b) * washA);
+      }
 
       const key = (r << 16) | (g << 8) | b;
       let str = palette.get(key);

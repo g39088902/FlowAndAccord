@@ -6,7 +6,7 @@
 function drawAgent(agent) {
   // ★ M1.7 胎儿不设置地图实体：不在地图上渲染
   if (agent.isFetus) return;
-  const p2D = project3D(agent.pos);
+  const p2D = projectLifted(agent.pos); // ★ v1.50.12 精灵锚点略抬于地表（render_world.js 定义）
   const isSelectedAgent = sim.selectionType === 'agent' && sim.selectedAgentId === agent.id;
 
   if (!agent.isAlive) {

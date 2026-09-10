@@ -21,7 +21,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.15</span></div>
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
     <div class="stats-card">
@@ -32,10 +32,6 @@
       <div class="stat-item">
         <div class="stat-val" id="stat-houses" style="color:#f59e0b;">0</div>
         <div class="stat-lbl">🏡 私产宅舍</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-val" id="stat-pois" style="color:#10b981;">23</div>
-        <div class="stat-lbl">生态地标</div>
       </div>
       <div class="stat-item" title="存续家户数（家庭跟着男人走：以男性户主为锚）">
         <div class="stat-val" id="stat-households" style="color:#f59e0b;">0</div>
@@ -1369,6 +1365,8 @@
   <script src="js/config.house-upgrade-cost.js"></script>
   <!-- ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）：前端独立配置 + 光相引擎，须早于 rustworld.js -->
   <script src="js/config.lighting.js"></script>
+  <!-- ★ v1.50.15 渲染表现层参数（视觉抬升/足迹深度半径），须早于 render_world.js -->
+  <script src="js/config.render.js"></script>
   <script src="js/lighting.js"></script>
   <script src="js/decision-viz-data.js"></script>
   <script src="js/decision-viz-view.js"></script>

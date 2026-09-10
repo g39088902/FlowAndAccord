@@ -1,7 +1,13 @@
 // === 世界元素绘制 (从 render.js 拆分) ===
-// 路网 / POI 底座与标记 / 私产宅舍 / 世界立体实体统一深度绘制
-// 地形与水系地貌已拆出到 render_terrain.js（v1.48.0，含天空氛围）
-// 依赖全局: ctx, camera, sim, project3D, getElevationColor, mousePos, isDragging, hoveredLane, SimLighting
+// ★ v1.50.11 世界统一深度队列：地形格 + 水系 + 游鱼/波光 + 道路分段 + 营地连线 +
+//   POI 底座 + POI 标记 + 私产宅舍 + 地表装饰 + 族人，全部按相机深度远 → 近落笔
+// 地形壳层（投影/沙盘侧壁）与单格/单特征绘制入口在 render_terrain.js
+// 依赖全局: ctx, camera, sim, project3D, getElevationColor, mousePos, isDragging, hoveredLane, SimLighting, terrainProjX, terrainProjY
+
+// ★ v1.50.15 渲染表现层参数（视觉抬升 / 足迹深度半径），来源 config.render.js
+//   （前端独立配置，不进 SIM_CONFIG——config.js 与 Rust SimConfig 严格互检）。
+//   本文件在 index.html 中晚于 config.render.js 加载，顶层读取安全。
+const RC = window.RENDER_CONFIG || {};
 
 // ★ 动态季节光照：贴地阴影偏移 = 世界空间光向 → 屏幕投影（随相机旋转）
 //   关闭动态光照时回退 v1.47.11 的固定屏幕偏移，保证 A/B 对照
@@ -21,11 +27,8 @@ function shadeHex(baseHex, nx, ny, nz) {
 }
 
 // ★ v1.47.9 POI 拆为「贴地底座（地面层）」与「标记（立体实体层）」两段：
-// 底座/营地暖光是贴地绘制物，必须先于全部立体实体落笔，否则暖光会糊在近处房屋与族人身上。
-function drawPoiGroundBases() {
-  for (const poi of sim.pois || []) drawPoiGroundBase(poi);
-}
-
+// 底座/营地暖光是贴地绘制物，深度略远于自身标记（−0.01 epsilon），保证垫在自己图标之下。
+// ★ v1.50.11 起底座不再整层先画，而是逐 POI 入统一深度队列（drawWorldEntities 收集阶段）。
 function drawPoiGroundBase(poi) {
   const z = camera.zoom;
   const p2D = project3D(poi.pos);
@@ -77,7 +80,7 @@ function poiTintColor(poi) {
 function drawPoiMarker(poi) {
   const z = camera.zoom;
   const showDetailRings = z >= 0.70;
-  const p2D = project3D(poi.pos);
+  const p2D = projectLifted(poi.pos); // ★ v1.50.12 精灵锚点略抬于地表（贴地底座仍用 project3D）
   const isSelected = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
   const x = p2D.x, y = p2D.y;
 
@@ -137,45 +140,341 @@ function drawPoiMarker(poi) {
 }
 
 // ==========================================
-// ★ v1.47.9 世界立体实体统一深度绘制（POI 标记 / 私产宅舍 / 部落民）
+// ★ v1.50.11 世界统一深度绘制（地形格 + 水系 + 道路 + 底座 + 立体实体）
 // ==========================================
-// Canvas 2D 无深度缓冲：同一 pass 内必须按相机深度升序落笔（远 → 近），近处实体才能压住远处实体。
-// 相机深度 = project3D().depth = ry·sinX + z·cosX，数值越大越靠近视点；每帧重建，相机旋转后不残留旧序。
-// 同深度保持快照原序（Array.sort 稳定），渲染确定性不变。贴地图元（地形/道路/POI 底座）在更早的 pass 绘制。
-const WORLD_ENTITY_POI = 0;
-const WORLD_ENTITY_HOUSE = 1;
-const WORLD_ENTITY_AGENT = 2;
-let _worldDrawList = [];
+// Canvas 2D 无深度缓冲。v1.47.9 只把立体实体收进深度队列，地形格仍整层先画——
+// 结果实体之间的遮挡正确了，但**近处山地无法遮挡远处图标**（图标永远后画、透山可见）。
+// 现将地形格 / 水系特征 / 游鱼 / 波光 / 道路分段 / 营地连线 / POI 底座 /
+// POI 标记 / 房屋 / 地表装饰 / 族人全部收进**同一个相机深度队列**，
+// 按 project3D().depth = ry·sinX + z·cosX 升序（远 → 近）落笔：
+// 近处山地格、近处河道、近处乔木都会正确遮挡更远的图标。
+// 同深度保持收集原序（Array.sort 稳定），渲染确定性不变。
+// 大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），已烘焙进 relightTerrain 的地形色。
+const DEPTH_CELL = 0;      // 地形格（a/b/c/d = i00/i10/i11/i01 顶点索引）
+const DEPTH_FEATURE = 1;   // 水系特征（a = feature，River 水面 / ShallowFord / 泉谷）
+const DEPTH_FISH = 2;      // 游鱼（a = fish，水中层，深度低于水面填充）
+const DEPTH_GLINT = 3;     // 太阳波光（a = 中心线采样点，深度 = 河道最近岸 + ε，保持盖在水面之上）
+const DEPTH_LANE = 4;      // 道路分段（a = lane，b = 段序号，s1/s2 = 屏幕端点，dash = 弧长相位）
+const DEPTH_LINK = 5;      // 选中营地辖区连线（a = house）
+const DEPTH_POI_BASE = 6;  // POI 贴地底座（a = poi）
+const DEPTH_POI = 7;       // POI 标记（a = poi）
+const DEPTH_HOUSE = 8;     // 房屋（a = house）
+const DEPTH_ACCENT = 9;    // 地表装饰（a = accent）
+const DEPTH_AGENT = 10;    // 族人（a = agent）
+const DEPTH_WALL = 11;     // ★ v1.50.14 边界侧壁分段（a = 墙定义，b = 段序号；深度 = 段上沿较近端顶点）
+
+const _depthPool = [];     // 持久深度项对象池（零每帧 GC）
+const _depthList = [];     // 每帧重建的引用列表（仅含本帧使用的项）
+let _depthPoolUsed = 0;
+
+function _depthItem(kind, a, b, depth) {
+  let it = _depthPool[_depthPoolUsed];
+  if (it === undefined) {
+    it = { kind: 0, a: null, b: 0, c: 0, d: 0, depth: 0, s1x: 0, s1y: 0, s2x: 0, s2y: 0, dash: 0 };
+    _depthPool.push(it);
+  }
+  _depthPoolUsed++;
+  it.kind = kind; it.a = a; it.b = b; it.depth = depth;
+  _depthList.push(it);
+  return it;
+}
+
+// 道路分段持久投影缓冲（消除每帧分配）
+let _lanePX = null, _lanePY = null, _laneWX = null, _laneWY = null, _laneWZ = null, _laneCum = null;
+function _ensureLaneBuf(n) {
+  if (!_lanePX || _lanePX.length < n) {
+    _lanePX = new Float32Array(n + 16); _lanePY = new Float32Array(n + 16);
+    _laneWX = new Float64Array(n + 16); _laneWY = new Float64Array(n + 16);
+    _laneWZ = new Float64Array(n + 16); _laneCum = new Float32Array(n + 16);
+  }
+}
+
+// ★ v1.50.12 贴面防埋修正（「图标/道路半截被自己的地形格盖住」）：
+// 地形格深度取格心（四角均值），实体/道路锚点落在格子远半侧时格心深度 > 锚点深度，
+// 脚下的格子反而后画、盖掉下半截。修正：所有非地形元素的排序深度一律
+// 抬到「所在格格心深度 + SURFACE_EPS」之上——自己的格子永远先画；
+// 深度对更远的格子仍是真值，近山遮挡远图标的正确性不受影响。
+const SURFACE_EPS = 0.05;
+
+// ★ v1.50.12 立体精灵视觉抬升（世界单位，config.render.js::mapZLift）：
+// POI 图标 / 房屋 / 装饰 / 族人的绘制锚点略高于地表，站在坡面上不再「陷进」地面。
+// 仅作用于精灵锚点（道路/底座等贴地元素不抬）。
+const MAP_Z_LIFT = RC.mapZLift || 0;
+
+function projectLifted(v3) {
+  return project3D({ x: v3.x, y: v3.y, z: (v3.z || 0) + MAP_Z_LIFT });
+}
+
+// (px,py) 所在地形格的格心相机深度；地形不可用时返回 null
+function _ownCellCenterDepth(px, py, cosZ, sinZ, cosX, sinX) {
+  const terrain = sim.terrain;
+  if (!terrain || !terrain.cells || terrain.cells.length < terrain.gridSize * terrain.gridSize) return null;
+  const gSize = terrain.gridSize;
+  const half = terrain.cells[gSize * gSize - 1].wx; // 顶点阵末列 wx = +worldSize/2
+  if (!(half > 0)) return null;
+  const gx = Math.max(0, Math.min(gSize - 2, Math.floor(((px + half) / (2 * half)) * (gSize - 1))));
+  const gy = Math.max(0, Math.min(gSize - 2, Math.floor(((py + half) / (2 * half)) * (gSize - 1))));
+  const i00 = gy * gSize + gx;
+  const c00 = terrain.cells[i00], c10 = terrain.cells[i00 + 1];
+  const c01 = terrain.cells[i00 + gSize], c11 = terrain.cells[i00 + gSize + 1];
+  // 深度公式对坐标线性：格心深度 = 四角深度均值 = 均值坐标代入公式
+  return ((c00.wx + c10.wx + c11.wx + c01.wx) * 0.25 * sinZ +
+    (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25 * cosZ) * sinX +
+    (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25 * cosX;
+}
+
+// 贴地元素排序深度：真值深度与「所在格格心 + ε」取大（防自己的格子盖住自己）
+function _surfaceDepth(px, py, pz, cosZ, sinZ, cosX, sinX) {
+  const d = (px * sinZ + py * cosZ) * sinX + (pz || 0) * cosX;
+  const cd = _ownCellCenterDepth(px, py, cosZ, sinZ, cosX, sinX);
+  return cd == null ? d : (d > cd + SURFACE_EPS ? d : cd + SURFACE_EPS);
+}
+
+// ★ v1.50.13 贴地圆片/线段的足迹感知深度：
+// 底座圆、储量环、路面等贴地图元的下半部分会延伸进**相邻更近格**的 territory——
+// 只抬到「所在格心 + ε」仍会被邻格后画盖掉（POI 底座/道路「半截入土」的残余根因）。
+// 取「圆心 + 朝向相机方向的圆缘采样点」所在格心的最大值 + ε：
+// 圆片触及的格子全部先画；对足迹之外的更近格子（如真山体）仍是真值，不破坏远山遮挡。
+function _decalDepth(px, py, rWorld, cosZ, sinZ, cosX, sinX) {
+  let dMax = _ownCellCenterDepth(px, py, cosZ, sinZ, cosX, sinX);
+  const nx = sinZ, ny = cosZ; // 深度增速最大的世界方向（单位向量：depth = wx·sinZ + wy·cosZ）
+  for (let t = 0.5; t <= 1.001; t += 0.5) {
+    const cd = _ownCellCenterDepth(px + nx * rWorld * t, py + ny * rWorld * t, cosZ, sinZ, cosX, sinX);
+    if (cd != null && (dMax == null || cd > dMax)) dMax = cd;
+  }
+  return dMax == null ? null : dMax + SURFACE_EPS;
+}
+
+// 选中营地辖区连线暂存（收集阶段定位，绘制阶段消费）
+let _selLinkCamp = null;
 
 function drawWorldEntities() {
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-  const list = _worldDrawList;
+  const scale = camera.zoom;
+  const cx = w / 2 + camera.panX, cy = h / 2 + camera.panY;
+  const list = _depthList;
   list.length = 0;
+  _depthPoolUsed = 0;
 
-  const collect = (kind, entity) => {
-    const p = entity.pos;
-    entity._drawDepth = (p.x * sinZ + p.y * cosZ) * sinX + (p.z || 0) * cosX;
-    entity._drawKind = kind;
-    list.push(entity);
-  };
+  // 道路悬浮检测 + Tooltip（先于收集，isHovered 供分段高亮样式使用）
+  updateLaneHover();
 
-  for (const poi of sim.pois || []) collect(WORLD_ENTITY_POI, poi);
-  for (const house of sim.houses || []) collect(WORLD_ENTITY_HOUSE, house);
-  if (sim.showAgents) {
-    for (const agent of sim.agents || []) {
-      if (agent.isFetus) continue; // ★ M1.7 胎儿无地图实体，不参与渲染
-      collect(WORLD_ENTITY_AGENT, agent);
+  const depthOf = (px, py, pz) => (px * sinZ + py * cosZ) * sinX + (pz || 0) * cosX;
+
+  const terrain = sim.terrain;
+  const hasTerrain = !!(sim.showTerrain && terrain && terrain.cells &&
+    terrain.cells.length >= terrain.gridSize * terrain.gridSize);
+
+  // ── 1. 地形格入队（★ 本修复核心）──
+  //    深度取四角 world 坐标均值（深度公式对 wx/wy/elev 线性，均值即格心深度）；
+  //    与立体实体同队列排序后，近处山地格后落笔即遮挡山后图标。
+  if (hasTerrain) {
+    const cells = terrain.cells;
+    const gSize = terrain.gridSize;
+    for (let gy = 0; gy < gSize - 1; gy++) {
+      const rowOffset0 = gy * gSize;
+      const rowOffset1 = rowOffset0 + gSize;
+      for (let gx = 0; gx < gSize - 1; gx++) {
+        const i00 = rowOffset0 + gx;
+        const i10 = i00 + 1;
+        const i11 = rowOffset1 + gx + 1;
+        const i01 = rowOffset1 + gx;
+
+        // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
+        const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+        const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+        const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+        const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+        if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
+
+        const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
+        const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
+          (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
+          (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
+          (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
+        it.c = i11; it.d = i01;
+      }
+    }
+
+    // ── 1.5 边界侧壁分段入队（★ v1.50.14）──
+    //    侧壁是地图边界处最靠近相机的几何：贴边实体的底座/圆环伸过边界线的部分
+    //    必须被侧壁盖住。旧实现整墙在壳层先行栅格化，永远盖不住队列元素
+    //    （用户可见症状：「贴边 POI/房屋未被地形墙遮挡」）。分段深度取该段上沿
+    //    两端顶点深度的较大值（较近端），墙面垂直下垂不改变 ry、只减 z ⇒ 段内
+    //    越往下深度越小，用上沿较近端代表整段是「遮挡从严」的安全近似。
+    if (hasTerrain) {
+      const gSize = terrain.gridSize;
+      const walls = BOUNDARY_WALLS;
+      const cellsW = terrain.cells;
+      for (let wi = 0; wi < 4; wi++) {
+        const wd = walls[wi];
+        for (let k = 0; k < gSize - 1; k++) {
+          const c0 = cellsW[wd.first + k * wd.step];
+          const c1 = cellsW[wd.first + (k + 1) * wd.step];
+          const d0 = depthOf(c0.wx, c0.wy, c0.elev);
+          const d1 = depthOf(c1.wx, c1.wy, c1.elev);
+          _depthItem(DEPTH_WALL, wd, k, d0 > d1 ? d0 : d1);
+        }
+      }
+    }
+
+    // ── 2. 水系特征 / 游鱼 / 波光 ──
+    const features = terrain.features || [];
+    if (features.length && window.RiverLife) window.RiverLife.update(performance.now());
+
+    // 河道最近岸深度（顶点最大相机深度）：水面填充以此入队，保证盖住更远的地形格
+    let riverNearDepth = -Infinity;
+    for (let fi = 0; fi < features.length; fi++) {
+      const f = features[fi];
+      if (f.kind !== 'River' || !f.vertices || !f.vertices.length) continue;
+      const vs = f.vertices;
+      for (let vi = 0; vi < vs.length; vi++) {
+        const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
+        if (d > riverNearDepth) riverNearDepth = d;
+      }
+    }
+    for (let fi = 0; fi < features.length; fi++) {
+      const f = features[fi];
+      if (!f.vertices || !f.vertices.length) continue;
+      if (f.kind === 'River') {
+        _depthItem(DEPTH_FEATURE, f, 0, riverNearDepth);
+      } else {
+        const vs = f.vertices;
+        let dmax = -Infinity;
+        for (let vi = 0; vi < vs.length; vi++) {
+          const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
+          if (d > dmax) dmax = d;
+        }
+        _depthItem(DEPTH_FEATURE, f, 0, dmax);
+      }
+    }
+    // 游鱼逐条入队：深度 = 鱼体世界坐标（水中层，低于水面顶点 ⇒ 落在水面填充之前）
+    const fishList = window.RiverLife ? window.RiverLife.fishList() : null;
+    if (fishList) {
+      for (let i = 0; i < fishList.length; i++) {
+        const f = fishList[i];
+        _depthItem(DEPTH_FISH, f, 0, depthOf(f.x, f.y, f.z));
+      }
+    }
+    // 波光逐段入队：深度挂河道最近岸 + ε ⇒ 恒在水面填充之后、任何更近山地之前
+    const cps = window.RiverLife ? window.RiverLife.centerPoints() : null;
+    if (cps && riverNearDepth > -Infinity) {
+      for (let i = 4; i < cps.length - 6; i += 7) {
+        _depthItem(DEPTH_GLINT, cps[i], i, riverNearDepth + 0.05);
+      }
     }
   }
 
-  list.sort((a, b) => a._drawDepth - b._drawDepth);
+  // ── 3. 道路（每段一个深度项；投影 17 个采样点，虚线相位按累计弧长跨段连续）──
+  if (sim.showLanes && sim.network && sim.network.lanes) {
+    const segs = 16;
+    for (const lane of sim.network.lanes.values()) {
+      const wear = lane.wear || 0.0;
+      if (wear < 0.3) continue;
 
+      _ensureLaneBuf(segs + 1);
+      let cum = 0;
+      let prevX = 0, prevY = 0;
+      for (let i = 0; i <= segs; i++) {
+        const pt3D = lane.curve.evalPos(i / segs);
+        _laneWX[i] = pt3D.x; _laneWY[i] = pt3D.y; _laneWZ[i] = pt3D.z || 0;
+        const rx = pt3D.x * cosZ - pt3D.y * sinZ;
+        const ry = pt3D.x * sinZ + pt3D.y * cosZ;
+        const y2 = ry * cosX - (pt3D.z || 0) * sinX;
+        _lanePX[i] = cx + rx * scale;
+        _lanePY[i] = cy + y2 * scale;
+        if (i > 0) cum += Math.hypot(_lanePX[i] - prevX, _lanePY[i] - prevY);
+        prevX = _lanePX[i]; prevY = _lanePY[i];
+        _laneCum[i] = cum;
+      }
+
+      cacheLaneStyle(lane, wear);
+
+      for (let k = 0; k < segs; k++) {
+        // ★ v1.50.15 足迹感知深度强化：分段 5 采样（原 3）× _decalDepth(R)——
+        //   v1.50.13 的「两端+中点三采样 _surfaceDepth」有两个缺口：① _surfaceDepth
+        //   只抬到所在格心，路拱半宽（热力图外光晕 ~2.9px）朝相机侧伸入**下一格**
+        //   的 territory 未被覆盖；② 整条赛道仅 16 分段，长路段会跨越 3+ 格，
+        //   3 采样漏掉中段跨入的更近格——两处均表现为路面被后画格「半截入土」。
+        let segDepth = -Infinity;
+        for (let s = 0; s <= 4; s++) {
+          const f = s * 0.25;
+          const wx = _laneWX[k] + (_laneWX[k + 1] - _laneWX[k]) * f;
+          const wy = _laneWY[k] + (_laneWY[k + 1] - _laneWY[k]) * f;
+          const wz = _laneWZ[k] + (_laneWZ[k + 1] - _laneWZ[k]) * f;
+          const dd = _decalDepth(wx, wy, RC.laneFootprintR || 6, cosZ, sinZ, cosX, sinX);
+          const d = dd != null ? dd : _surfaceDepth(wx, wy, wz, cosZ, sinZ, cosX, sinX);
+          if (d > segDepth) segDepth = d;
+        }
+        const it = _depthItem(DEPTH_LANE, lane, k, segDepth);
+        it.s1x = _lanePX[k]; it.s1y = _lanePY[k];
+        it.s2x = _lanePX[k + 1]; it.s2y = _lanePY[k + 1];
+        it.dash = _laneCum[k];
+      }
+    }
+  }
+
+  // ── 4. 选中营地的辖区连线（中点近似深度；选择辅助线，允许穿越山地的小误差）──
+  collectCampHouseLinks(cosZ, sinZ, cosX, sinX);
+
+  // ── 5. POI 贴地底座（足迹感知深度取「底座触及格」最大值，再 −0.01 垫在自己标记之下）──
+  //   底座圆半径与 Camp 等级/类型相关（与 drawPoiGroundBase 的屏幕半径 ÷ zoom 同源）
+  for (const poi of sim.pois || []) {
+    const rWorld = poi.type === 'Camp'
+      ? (RC.poiBaseCampR || 16) + (poi.level || 0) * (RC.poiBaseCampRPerLevel != null ? RC.poiBaseCampRPerLevel : 3)
+      : (RC.poiBaseResourceR || 12);
+    const dd = _decalDepth(poi.pos.x, poi.pos.y, rWorld, cosZ, sinZ, cosX, sinX);
+    const d = (dd != null ? dd : _surfaceDepth(poi.pos.x, poi.pos.y, poi.pos.z, cosZ, sinZ, cosX, sinX)) - 0.01;
+    _depthItem(DEPTH_POI_BASE, poi, 0, d);
+  }
+
+  // ── 6. 立体实体（原 v1.47.9 队列，收集顺序 = 同深度 tie-break 次序）──
+  // POI 标记：图标/储量环/门牌以锚点为中心半径 ~14-22 世界单位，同样走足迹感知深度
+  for (const poi of sim.pois || []) {
+    const dd = _decalDepth(poi.pos.x, poi.pos.y, RC.poiMarkerFootprintR || 20, cosZ, sinZ, cosX, sinX);
+    _depthItem(DEPTH_POI, poi, 0, dd != null ? dd : _surfaceDepth(poi.pos.x, poi.pos.y, poi.pos.z, cosZ, sinZ, cosX, sinX));
+  }
+  for (const house of sim.houses || []) {
+    _depthItem(DEPTH_HOUSE, house, 0, _surfaceDepth(house.pos.x, house.pos.y, house.pos.z, cosZ, sinZ, cosX, sinX));
+  }
+  const terrainAccents = (terrain && terrain.accents) || [];
+  for (const accent of terrainAccents) {
+    // ★ v1.50.13 石头/灌木宽约 6 世界单位，走足迹感知深度消除底边残缝
+    const dd = _decalDepth(accent.x, accent.y, RC.accentFootprintR || 8, cosZ, sinZ, cosX, sinX);
+    _depthItem(DEPTH_ACCENT, accent, 0, dd != null ? dd : _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX));
+  }
+  if (sim.showAgents) {
+    for (const agent of sim.agents || []) {
+      if (agent.isFetus) continue; // ★ M1.7 胎儿无地图实体，不参与渲染
+      // ★ v1.50.15 族人改走足迹感知深度：人偶/受孕环/施工环/选中环全部**以锚点为中心**，
+      //   下方笔迹最大 ~9px（rotX 默认 1.05 时 ≈ 朝相机方向 18 世界单位）——
+      //   v1.50.12 的 _surfaceDepth 只保证所在格先画，站在格子远半侧时下半身
+      //   伸进的更近格后画，把小人的腿脚盖掉（「半截入土」）。
+      const dd = _decalDepth(agent.pos.x, agent.pos.y, RC.agentFootprintR || 18, cosZ, sinZ, cosX, sinX);
+      _depthItem(DEPTH_AGENT, agent, 0, dd != null ? dd : _surfaceDepth(agent.pos.x, agent.pos.y, agent.pos.z, cosZ, sinZ, cosX, sinX));
+    }
+  }
+
+  list.sort((a, b) => a.depth - b.depth);
+
+  const RL = window.RiverLife;
   for (let i = 0; i < list.length; i++) {
-    const e = list[i];
-    if (e._drawKind === WORLD_ENTITY_POI) drawPoiMarker(e);
-    else if (e._drawKind === WORLD_ENTITY_HOUSE) drawHouse(e);
-    else drawAgent(e);
+    const it = list[i];
+    switch (it.kind) {
+      case DEPTH_CELL: drawTerrainCell(it.a, it.b, it.c, it.d); break;
+      case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
+      case DEPTH_FEATURE: drawFeatureItem(it.a); break;
+      case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
+      case DEPTH_GLINT: RL.drawGlintAt(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
+      case DEPTH_LANE: drawLaneSegment(it); break;
+      case DEPTH_LINK: drawCampHouseLink(it); break;
+      case DEPTH_POI_BASE: drawPoiGroundBase(it.a); break;
+      case DEPTH_POI: drawPoiMarker(it.a); break;
+      case DEPTH_HOUSE: drawHouse(it.a); break;
+      case DEPTH_ACCENT: drawAccentEntity(it.a); break;
+      default: drawAgent(it.a);
+    }
   }
 }
 
@@ -183,7 +482,7 @@ function drawHouse(house) {
   const z = camera.zoom;
   const showLabels = z > 1.05;
 
-  const p2D = project3D(house.pos);
+  const p2D = projectLifted(house.pos); // ★ v1.50.12 精灵锚点略抬于地表
   const isSelected = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
   const isWarehouse = house.tier === 'Tier0Warehouse';
   const isVacant = house.ownerId == null;
@@ -307,45 +606,60 @@ function drawHouse(house) {
 }
 
 // 选中营地时，用特殊虚线把辖区内的全部房屋连回营地；线段置于房屋图标下方避免遮挡信息。
-function drawSelectedCampHouseLinks() {
+// ★ v1.50.11：不再整层先画，逐条入统一深度队列（中点近似深度——选择辅助线，允许穿越山地的小误差）。
+function collectCampHouseLinks(cosZ, sinZ, cosX, sinX) {
+  _selLinkCamp = null;
   if (sim.selectionType !== 'poi' || sim.selectedPoiId == null) return;
   const camp = sim.pois.find(p => p.id === sim.selectedPoiId && p.type === 'Camp');
   if (!camp) return;
   const houses = sim.houses.filter(h => h.campId === camp.id);
   if (houses.length === 0) return;
+  _selLinkCamp = camp;
+  for (const house of houses) {
+    _depthItem(DEPTH_LINK, house, 0, _surfaceDepth(
+      (camp.pos.x + house.pos.x) * 0.5,
+      (camp.pos.y + house.pos.y) * 0.5,
+      ((camp.pos.z || 0) + (house.pos.z || 0)) * 0.5, cosZ, sinZ, cosX, sinX));
+  }
+}
 
+function drawCampHouseLink(it) {
+  const house = it.a;
+  const camp = _selLinkCamp;
+  if (!camp) return;
   const camp2D = project3D(camp.pos);
+  const house2D = project3D(house.pos);
+  const vacant = house.ownerId == null;
+  const color = vacant ? '#f59e0b' : '#38bdf8';
   ctx.save();
   ctx.lineWidth = Math.max(1.2, 2.0 * camera.zoom);
   ctx.setLineDash([Math.max(4, 8 * camera.zoom), Math.max(3, 5 * camera.zoom)]);
   ctx.lineCap = 'round';
-  for (const house of houses) {
-    const house2D = project3D(house.pos);
-    const vacant = house.ownerId == null;
-    const color = vacant ? '#f59e0b' : '#38bdf8';
-    ctx.strokeStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 7 * camera.zoom;
-    ctx.globalAlpha = 0.72;
-    ctx.beginPath();
-    ctx.moveTo(camp2D.x, camp2D.y);
-    ctx.lineTo(house2D.x, house2D.y);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(house2D.x, house2D.y, Math.max(1.5, 2.5 * camera.zoom), 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 7 * camera.zoom;
+  ctx.globalAlpha = 0.72;
+  ctx.beginPath();
+  ctx.moveTo(camp2D.x, camp2D.y);
+  ctx.lineTo(house2D.x, house2D.y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(house2D.x, house2D.y, Math.max(1.5, 2.5 * camera.zoom), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
-function drawLanes() {
+// ★ v1.50.11：drawLanes 拆分——
+//   ① updateLaneHover：悬浮检测 + Tooltip DOM 更新（原 drawLanes 前半段，逐帧整层无关深度）；
+//   ② cacheLaneStyle + drawLaneSegment：道路样式计算与单段描边（由统一深度队列逐段调度）。
+function updateLaneHover() {
 hoveredLane = null;
 let minHoverDist = 14;
 
-if (sim.showLanes) {
+if (sim.showLanes && sim.network && sim.network.lanes) {
   // 先进行鼠标悬浮检测 (仅对可见道路 wear >= 0.3)
   if (!isDragging && mousePos.x >= 0 && mousePos.y >= 0) {
     for (const lane of sim.network.lanes.values()) {
@@ -367,95 +681,6 @@ if (sim.showLanes) {
         prev2D = p2D;
       }
     }
-  }
-
-  // 渲染车道 (仅从 0.3 级开始显现，1级~5级动态质感演化)
-  for (const lane of sim.network.lanes.values()) {
-    const wear = lane.wear || 0.0;
-    if (wear < 0.3) {
-      // 原始荒野无路或踩踏痕迹过浅 (< 0.3级)，不显现
-      continue;
-    }
-
-    const isHovered = hoveredLane && (lane.id === hoveredLane.id || (hoveredLane.reverseId && lane.id === hoveredLane.reverseId));
-
-    let lineWidth = 2.0 * camera.zoom;
-    let strokeColor, lineDash;
-    if (sim.showRoadHeatmap) {
-      // 道路等级分析热力图模式 (按 R 键切换开启): 高饱和色彩与外圈分析光晕
-      if (wear < 1.0) { strokeColor = `rgba(180, 83, 9, ${Math.min(0.75, 0.20 + (wear - 0.3) * 0.64)})`; lineDash = [3, 4]; }
-      else if (wear < 2.0) { strokeColor = `rgba(245, 158, 11, ${Math.min(0.85, 0.45 + (wear - 1.0) * 0.35)})`; lineDash = []; }
-      else if (wear < 3.0) { strokeColor = 'rgba(250, 204, 21, 0.95)'; lineDash = []; }
-      else if (wear < 4.0) { strokeColor = 'rgba(56, 189, 248, 0.95)'; lineDash = []; }
-      else { strokeColor = 'rgba(217, 70, 239, 1.0)'; lineDash = []; }
-    } else {
-      // 自然地表踩踏小径模式 (普通观察默认): 低饱和自然泥土、夯土与石板，消除高光割裂
-      if (wear < 1.0) {
-        lineWidth = 1.2 * camera.zoom;
-        strokeColor = `rgba(142, 115, 84, ${Math.min(0.55, 0.12 + (wear - 0.3) * 0.50)})`;
-        lineDash = [3, 4];
-      } else if (wear < 2.0) {
-        lineWidth = 1.6 * camera.zoom;
-        strokeColor = `rgba(122, 98, 72, ${Math.min(0.75, 0.35 + (wear - 1.0) * 0.30)})`;
-        lineDash = [];
-      } else if (wear < 3.0) {
-        lineWidth = 2.0 * camera.zoom;
-        strokeColor = 'rgba(108, 95, 80, 0.85)';
-        lineDash = [];
-      } else if (wear < 4.0) {
-        lineWidth = 2.4 * camera.zoom;
-        strokeColor = 'rgba(132, 128, 120, 0.90)';
-        lineDash = [];
-      } else {
-        lineWidth = 2.8 * camera.zoom;
-        strokeColor = 'rgba(158, 154, 144, 0.95)';
-        lineDash = [];
-      }
-    }
-
-    // 鼠标悬浮高亮光晕
-    if (isHovered) {
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-      ctx.lineWidth = lineWidth + 3.0 * camera.zoom;
-      ctx.beginPath();
-      const segs = 16;
-      for (let i = 0; i <= segs; i++) {
-        const pt3D = lane.curve.evalPos(i / segs);
-        const p2D = project3D(pt3D);
-        if (i === 0) ctx.moveTo(p2D.x, p2D.y);
-        else ctx.lineTo(p2D.x, p2D.y);
-      }
-      ctx.stroke();
-    }
-
-    // 高等级大道外圈微光 (仅在热力图模式下显示，自然模式保持地表克制)
-    if (sim.showRoadHeatmap && wear >= 4.0) {
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
-      ctx.lineWidth = lineWidth + 3.0 * camera.zoom;
-      ctx.beginPath();
-      const segs = 16;
-      for (let i = 0; i <= segs; i++) {
-        const pt3D = lane.curve.evalPos(i / segs);
-        const p2D = project3D(pt3D);
-        if (i === 0) ctx.moveTo(p2D.x, p2D.y);
-        else ctx.lineTo(p2D.x, p2D.y);
-      }
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash(lineDash);
-    ctx.beginPath();
-    const segs = 16;
-    for (let i = 0; i <= segs; i++) {
-      const pt3D = lane.curve.evalPos(i / segs);
-      const p2D = project3D(pt3D);
-      if (i === 0) ctx.moveTo(p2D.x, p2D.y);
-      else ctx.lineTo(p2D.x, p2D.y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 
   // 更新悬浮 Tooltip 提示
@@ -546,4 +771,91 @@ if (sim.showLanes) {
   const roadTooltip = document.getElementById('road-hover-tooltip');
   if (roadTooltip) roadTooltip.style.display = 'none';
 }
+}
+
+// 道路分段样式（每帧每路计算一次，字符串缓存到 lane 对象上，避免逐段分配 rgba 字符串）
+// 样式规则与旧 drawLanes 完全一致：热力图模式（R 键）高饱和五档 / 自然模式低饱和泥土-夯土-石板五档。
+function cacheLaneStyle(lane, wear) {
+  const isHovered = hoveredLane && (lane.id === hoveredLane.id || (hoveredLane.reverseId && lane.id === hoveredLane.reverseId));
+  let st = lane._rdStyle;
+  if (!st) {
+    st = { wear: -1, isHovered: false, heatmap: null, strokeColor: '', lineWidth: 0, lineDash: null };
+    lane._rdStyle = st;
+  }
+  if (st.wear === wear && st.isHovered === isHovered && st.heatmap === sim.showRoadHeatmap) return;
+  st.wear = wear; st.isHovered = isHovered; st.heatmap = sim.showRoadHeatmap;
+
+  let lineWidth = 2.0 * camera.zoom;
+  let strokeColor, lineDash;
+  if (sim.showRoadHeatmap) {
+    // 道路等级分析热力图模式 (按 R 键切换开启): 高饱和色彩与外圈分析光晕
+    if (wear < 1.0) { strokeColor = `rgba(180, 83, 9, ${Math.min(0.75, 0.20 + (wear - 0.3) * 0.64)})`; lineDash = [3, 4]; }
+    else if (wear < 2.0) { strokeColor = `rgba(245, 158, 11, ${Math.min(0.85, 0.45 + (wear - 1.0) * 0.35)})`; lineDash = []; }
+    else if (wear < 3.0) { strokeColor = 'rgba(250, 204, 21, 0.95)'; lineDash = []; }
+    else if (wear < 4.0) { strokeColor = 'rgba(56, 189, 248, 0.95)'; lineDash = []; }
+    else { strokeColor = 'rgba(217, 70, 239, 1.0)'; lineDash = []; }
+  } else {
+    // 自然地表踩踏小径模式 (普通观察默认): 低饱和自然泥土、夯土与石板，消除高光割裂
+    if (wear < 1.0) {
+      lineWidth = 1.2 * camera.zoom;
+      strokeColor = `rgba(142, 115, 84, ${Math.min(0.55, 0.12 + (wear - 0.3) * 0.50)})`;
+      lineDash = [3, 4];
+    } else if (wear < 2.0) {
+      lineWidth = 1.6 * camera.zoom;
+      strokeColor = `rgba(122, 98, 72, ${Math.min(0.75, 0.35 + (wear - 1.0) * 0.30)})`;
+      lineDash = [];
+    } else if (wear < 3.0) {
+      lineWidth = 2.0 * camera.zoom;
+      strokeColor = 'rgba(108, 95, 80, 0.85)';
+      lineDash = [];
+    } else if (wear < 4.0) {
+      lineWidth = 2.4 * camera.zoom;
+      strokeColor = 'rgba(132, 128, 120, 0.90)';
+      lineDash = [];
+    } else {
+      lineWidth = 2.8 * camera.zoom;
+      strokeColor = 'rgba(158, 154, 144, 0.95)';
+      lineDash = [];
+    }
+  }
+  st.strokeColor = strokeColor;
+  st.lineWidth = lineWidth;
+  st.lineDash = lineDash;
+}
+
+// 单段道路描边（统一深度队列调度）。悬浮高亮光晕与热力图外圈微光逐段先行落笔，
+// 效果与旧整路两遍描边等价；lineDashOffset 按段首累计弧长推进，虚线相位跨段连续。
+function drawLaneSegment(it) {
+  const st = it.a._rdStyle;
+  if (!st) return;
+
+  if (st.isHovered) {
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = st.lineWidth + 3.0 * camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(it.s1x, it.s1y);
+    ctx.lineTo(it.s2x, it.s2y);
+    ctx.stroke();
+  }
+
+  // 高等级大道外圈微光 (仅在热力图模式下显示，自然模式保持地表克制)
+  if (st.heatmap && st.wear >= 4.0) {
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.25)';
+    ctx.lineWidth = st.lineWidth + 3.0 * camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(it.s1x, it.s1y);
+    ctx.lineTo(it.s2x, it.s2y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = st.strokeColor;
+  ctx.lineWidth = st.lineWidth;
+  ctx.setLineDash(st.lineDash);
+  ctx.lineDashOffset = it.dash;
+  ctx.beginPath();
+  ctx.moveTo(it.s1x, it.s1y);
+  ctx.lineTo(it.s2x, it.s2y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
 }
