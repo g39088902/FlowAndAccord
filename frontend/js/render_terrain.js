@@ -23,6 +23,27 @@ const BOUNDARY_WALLS = [
 ];
 const _wallDrawOrder = [0, 1, 2, 3]; // 每帧按 ry 重排（持久数组，零分配）
 
+// 预分配水系与特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
+let _featProjX = new Float32Array(512);
+let _featProjY = new Float32Array(512);
+function _ensureFeatProjCapacity(needed) {
+  if (_featProjX.length < needed) {
+    _featProjX = new Float32Array(needed + 64);
+    _featProjY = new Float32Array(needed + 64);
+  }
+}
+function _projectFeatureVertices(vertices, count, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
+  _ensureFeatProjCapacity(count);
+  for (let i = 0; i < count; i++) {
+    const v = vertices[i];
+    const rx = v.x * cosZ - v.y * sinZ;
+    const ry = v.x * sinZ + v.y * cosZ;
+    const y2 = ry * cosX - (v.z || 0) * sinX;
+    _featProjX[i] = cx + rx * scale;
+    _featProjY[i] = cy + y2 * scale;
+  }
+}
+
 // 单面边界墙：沿边界顶点序列走上沿，再折返走下沿（按各格高程下垂）后闭合填充
 // first/step 定位该墙在 terrainProjX/Y 中的顶点序列；外法线参与季节光照
 function drawBoundaryWall(first, step, count, nx, ny, nz, skirtElev, elevDropFactor) {
@@ -256,75 +277,143 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 function drawTerrainFeatures() {
   const features = (sim.terrain && sim.terrain.features) || [];
   if (!features.length) return;
-  for (const feature of features) {
+
+  const cx = w / 2 + camera.panX;
+  const cy = h / 2 + camera.panY;
+  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+  const scale = camera.zoom;
+
+  // ── Pass 1: 河岸平滑湿砂漫滩带（RiverBank Sand Ribbon） ──
+  // 沿左右两岸平滑曲线先绘制加宽温润细砂带，遮蔽底层 13m 栅格方块阶梯
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (let fi = 0; fi < features.length; fi++) {
+    const feature = features[fi];
+    if (feature.kind !== 'RiverBank' || !feature.vertices || !feature.vertices.length) continue;
+    const vLen = feature.vertices.length;
+    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+    // 外层漫滩羽化过渡
+    ctx.strokeStyle = 'rgba(168, 148, 116, 0.40)';
+    ctx.lineWidth = Math.max(14, feature.width * scale * 2.1);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.stroke();
+
+    // 内层温润湿润金砂
+    ctx.strokeStyle = 'rgba(186, 166, 132, 0.78)';
+    ctx.lineWidth = Math.max(10, feature.width * scale * 1.4);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Pass 2: 连续矢量水面闭合多边形（Vector Water Surface） ──
+  // 以 194 顶点闭合矢量填充整片水面，完全盖过水底网格方块
+  for (let fi = 0; fi < features.length; fi++) {
+    const feature = features[fi];
+    if (feature.kind !== 'River' || !feature.vertices || !feature.vertices.length) continue;
+    const vLen = feature.vertices.length;
+    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.closePath();
+
+    // 底层深水基底（深潭幽蓝，奠定水深纵深感）
+    ctx.fillStyle = 'rgba(28, 82, 116, 0.55)';
+    ctx.fill();
+
+    // 主流水体：清透碧蓝山泉流
+    ctx.fillStyle = 'rgba(54, 158, 202, 0.85)';
+    ctx.fill();
+    ctx.restore();
+
+    // 水面中心潺潺流动微波细线
+    if (vLen >= 194) {
+      const halfCount = Math.floor(vLen / 2);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(240, 252, 255, 0.40)';
+      ctx.lineWidth = Math.max(1.0, 1.8 * scale);
+      ctx.setLineDash([16 * scale, 12 * scale]);
+      ctx.lineDashOffset = -((performance.now() * 0.02) % (28 * scale));
+      ctx.beginPath();
+      for (let i = 0; i < halfCount; i++) {
+        const j = vLen - 1 - i;
+        const mx = (_featProjX[i] + _featProjX[j]) * 0.5;
+        const my = (_featProjY[i] + _featProjY[j]) * 0.5;
+        if (i === 0) ctx.moveTo(mx, my);
+        else ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ── Pass 3: 水陆交界表面张力微沫高光（Shoreline Foam Highlight） ──
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (let fi = 0; fi < features.length; fi++) {
+    const feature = features[fi];
+    if (feature.kind !== 'RiverBank' || !feature.vertices || !feature.vertices.length) continue;
+    const vLen = feature.vertices.length;
+    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+    ctx.strokeStyle = 'rgba(238, 248, 255, 0.62)';
+    ctx.lineWidth = Math.max(1.2, 1.8 * scale);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[0], _featProjY[0]);
+    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Pass 4: 浅滩涉渡（ShallowFord）与其余地貌特征 ──
+  for (let fi = 0; fi < features.length; fi++) {
+    const feature = features[fi];
     if (!feature.vertices || !feature.vertices.length) continue;
-    const points = feature.vertices.map(project3D);
+    if (feature.kind === 'River' || feature.kind === 'RiverBank') continue;
+
+    const vLen = feature.vertices.length;
+    _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    if (feature.kind === 'River') {
-      // 1. 底层深潭幽蓝 (基底深度阴影)
-      ctx.strokeStyle = 'rgba(32, 86, 122, 0.45)';
-      ctx.lineWidth = Math.max(12, feature.width * camera.zoom * 0.36);
-      ctx.setLineDash([]);
+
+    if (feature.kind === 'ShallowFord') {
+      // 浅滩涉渡：卵石踏道基底
+      ctx.strokeStyle = 'rgba(196, 178, 136, 0.88)';
+      ctx.lineWidth = Math.max(6, feature.width * scale * 0.22);
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.moveTo(_featProjX[0], _featProjY[0]);
+      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
       ctx.stroke();
 
-      // 2. 主流水体：清透碧蓝山泉流
-      ctx.strokeStyle = 'rgba(56, 158, 202, 0.82)';
-      ctx.lineWidth = Math.max(8, feature.width * camera.zoom * 0.28);
+      // 踏石微光
+      ctx.strokeStyle = 'rgba(255, 252, 240, 0.90)';
+      ctx.lineWidth = Math.max(2.5, feature.width * scale * 0.10);
+      ctx.setLineDash([4 * scale, 5 * scale]);
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-
-      // 3. 水面阳光折射波光线 (中心浅蓝白反射细线)
-      ctx.strokeStyle = 'rgba(235, 248, 255, 0.65)';
-      ctx.lineWidth = Math.max(1.2, feature.width * camera.zoom * 0.06);
-      ctx.setLineDash([14 * camera.zoom, 10 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else if (feature.kind === 'RiverBank') {
-      // 湿润河岸：柔和浅金砂漫滩过渡
-      ctx.strokeStyle = 'rgba(188, 160, 120, 0.48)';
-      ctx.lineWidth = Math.max(3, feature.width * camera.zoom * 0.12);
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-    } else if (feature.kind === 'ShallowFord') {
-      // 浅滩涉渡：卵石踏道质感
-      ctx.strokeStyle = 'rgba(215, 196, 142, 0.90)';
-      ctx.lineWidth = Math.max(5, feature.width * camera.zoom * 0.20);
-      ctx.setLineDash([6 * camera.zoom, 4 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-      ctx.stroke();
-      // 浅水反光微斑
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-      ctx.lineWidth = Math.max(1.5, feature.width * camera.zoom * 0.08);
-      ctx.setLineDash([2 * camera.zoom, 8 * camera.zoom]);
-      ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.moveTo(_featProjX[0], _featProjY[0]);
+      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
       ctx.stroke();
       ctx.setLineDash([]);
     } else {
       // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
-      // v1.47.7：Ridge/Saddle/Terrace 台地轮廓绘制已随特征整体删除
       ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
-      ctx.lineWidth = Math.max(2, feature.width * camera.zoom * 0.06);
-      ctx.setLineDash([]);
+      ctx.lineWidth = Math.max(2, feature.width * scale * 0.06);
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+      ctx.moveTo(_featProjX[0], _featProjY[0]);
+      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
       ctx.stroke();
     }
     ctx.restore();

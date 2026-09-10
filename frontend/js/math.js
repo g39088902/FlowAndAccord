@@ -59,13 +59,13 @@
 
       let r, g, b;
 
-      // 特殊水体与河岸处理 (P1: 清澈碧蓝山泉与湿润细金沙滩，告别发黑枯水感)
+      // 特殊水体与河岸底模处理（作为水下深沉河床与湿泥基底阴影，避免高反差亮方块漏出）
       if (surfaceKind === 'ShallowWater') {
-        r = 62; g = 152; b = 176;
+        r = 44; g = 74; b = 86;
       } else if (surfaceKind === 'DeepWater') {
-        r = 36; g = 104; b = 138;
+        r = 28; g = 48; b = 58;
       } else if (surfaceKind === 'RiverBank') {
-        r = 168; g = 152; b = 126;
+        r = 148; g = 138; b = 114;
       } else {
         // 核心大地色系：连续平滑过渡，彻底消除因离散枚举阈值导致的生硬锯齿台阶
         const fert = Math.max(0, Math.min(1, naturalFertility));

@@ -112,7 +112,8 @@ impl TerrainMap {
             right.push(Vec3::new(center(y)+half_width(y),y,level));
         }
         let mut outline=left.clone(); outline.extend(right.iter().rev().copied());
-        self.hydrology.water_bodies.push(WaterBody{id:1,level,flow_direction:Vec3::new(0.0,-1.0,0.0),resource_pool_id:1,vertices:outline});
+        self.hydrology.water_bodies.push(WaterBody{id:1,level,flow_direction:Vec3::new(0.0,-1.0,0.0),resource_pool_id:1,vertices:outline.clone()});
+        self.features.push(TerrainFeature{id:1,kind:TerrainFeatureKind::River,vertices:outline,elevation:level,width,flags:0});
         for (i,vertices) in [left,right].into_iter().enumerate() {
             self.features.push(TerrainFeature{id:20+i as u32,kind:TerrainFeatureKind::RiverBank,vertices,elevation:level,width:bank,flags:0});
         }

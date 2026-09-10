@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.48.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.48.2**。
+
+| **v1.48.2** | 水系河岸平滑化与写意微缩沙盘水体改造（方案 `docs/28-plan-river-shoreline-refinement.md`）：① **根因消除**：彻底解决 60×60 栅格（13m/格）离散整格填色导致的 Minecraft 巨型直角阶梯锯齿与矢量细线脱节悬浮；② **Rust 内核打通**：`crates/sim_core/src/geo/hydrology.rs` 正式将 194 顶点水体闭合矢量轮廓封装为 `TerrainFeatureKind::River` 压入 `self.features` 随创世快照下发；③ **前端四层微缩沙盘管线**：`frontend/js/render_terrain.js` 重构 `drawTerrainFeatures`——Pass 1 沿左右岸平滑曲线先绘制加宽温润细砂带（`RiverBank`，双层羽化），遮蔽底层 13m 栅格方块；Pass 2 以 194 顶点闭合矢量填充整片清透碧蓝山泉流水面（`River`），彻底遮盖底层网格方块；Pass 3 沿水陆边界绘制 1.5px 表面张力微沫反光细线与中心潺潺微波流线；Pass 4 浅滩涉渡（`ShallowFord`）升级为鹅卵石踏石质感；④ **底模消隐**：`frontend/js/math.js` `computeTerrainAlbedo` 将水底河床与岸边底格调整为深沉湿卵石基底阴影，消除网格色差；⑤ **零 GC 与高性能**：预分配静态 `_featProjX`/`_featProjY` 投影缓冲，单帧耗时增量 $\le 0.08\text{ms}$，零堆内存分配，确定性 100% 保持；⑥ WASM 双副本同步，全套自动化门禁全绿（`test-wasm`、`test-snapshot-bin`、`test-determinism` 6/6、`config-check`、`frontend-check`）。 | sim_core(geo/hydrology) / frontend(render_terrain/math) / docs / version |
 
 | **v1.48.1** | 修复地形网格「漏出后面的边界线条」（格间抗锯齿缝隙）：① **根因**：`drawTerrain` 逐格填充四边形，相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，两者叠加后仍留约 25% 透光率，深色天空背景从缝隙透出，整片地形浮现 1px 深色网格（像素实验：缝隙处 `#46613a` vs 填充色 `#5a7c43`）；② **修复**：`render_terrain.js` 新增文件级常量 `TERRAIN_SEAM_PX`(0.75)，绘制时把每格四条边沿各自**外法线**平移该像素量——法线由边向量 `(ey,-ex)/l` 归一化、以质心方向定外向，逐格计算以适配起伏地形，相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度，故不影响格内着色；③ **验证**：像素采样残差由 1px 深线（Δ≈20/255）压到 1/255 以内，Playwright 实测 zoom 0.32 / 1.15 / 2.6 / 6 四档视角网格线全部消失，地形轮廓、沙盘侧壁与水面特征无回归；④ **代价**：每格新增 4 次 `sqrt` + 约 24 次浮点运算（14161 格实测 +1.7ms，约为 `drawTerrain` 耗时的 2%，无额外绘制调用）；⑤ 纯前端表现层，不消耗 `WorldRng`、不写模拟状态、不进存档、不参与确定性承诺。升版 v1.48.1 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更）。 | frontend(render_terrain) / docs / version |
 
