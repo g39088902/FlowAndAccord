@@ -2,7 +2,7 @@
 
 > 用于「打开页面 / 渲染校验 / 截图 / 自动化交互」。驱动工具为 playwright-cli，一套命令覆盖多浏览器引擎。
 >
-> 当前版本：v1.1.0 · 主环境：Windows（§1-5）· 补充：豆包工作云电脑 Ubuntu Linux（§6）
+> 当前版本：v1.2.0 · 主环境：Windows（§1-5）· 补充：豆包工作云电脑 Ubuntu Linux（§6）· 补充：CatPaw 内置浏览器 macOS（§7）
 
 ---
 
@@ -199,3 +199,59 @@ sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
 3. **截图即交付**：`take_screenshot` 返回的 URL 可直接通过交付工具呈现，无需先存本地再上传。
 4. **工作目录重置**：每次 Bash 调用后工作目录可能被重置为会话工作区，涉及项目路径时使用绝对路径或在同一条命令内 `cd`。
 5. **无头模式备选**：若 1024x 渲染导致浏览器卡顿，可点击页面「无头模式（只运行不渲染）」按钮，纯推进模拟不画 Canvas，进一步提升长程演化速度。
+
+---
+
+## 7. 🐱 CatPaw 内置浏览器环境（macOS）操作经验
+
+> 本节由 **CatPaw 内置浏览器**（`paw browser-action`，macOS darwin/arm64）实操沉淀，与 §1-5（Windows playwright-cli）、§6（云电脑）互为补充。内置浏览器渲染在 CatPaw 预览面板中，随会话自动管理生命周期，无需安装。
+>
+> 🔴 **适用边界（先读）**：内置预览浏览器**不支持 File System Access API**，无法通过本项目的启动存档门禁（模拟一直暂停）。因此它**只适合纯视觉截图 / 布局校验**；凡涉及存档读写、模拟推进、长程演化的验证，**能用 Chrome 测试必须优先用 Chrome 测试**（playwright-cli `--browser=chrome`，见 §3；或手动开系统 Chrome 访问 `localhost:3000`）。
+>
+> 记录人：CatPaw AI Agent · 2026-09-10 · 项目版本 v1.49.2
+
+### 7.1 工具与前置条件
+
+- **唯一驱动命令**：`paw browser-action '<json>'`——JSON 必须用**单引号**包裹（本环境 CLI 别名为 `paw`，技能文档中出现 `catdesk` 一律替换为 `paw`）。
+- **前端服务前置**：先确认 `:3000` 已有服务（`lsof -i :3000 -sTCP:LISTEN`），已在运行则**直接访问**，重复启动 `server.js` 会触发端口递增卡死问题（见根 AGENTS.md §2 步骤三）。
+- **可批量串联**：向 `browser-action` 传 JSON 数组可顺序执行多个动作，遇错即停；也可在 bash 层用 `&&` 串联多条单命令（推荐后者，便于观察中间输出）。
+
+### 7.2 标准截图 SOP（一次调用全做完）
+
+```bash
+# 前置：lsof 确认 :3000 已监听
+paw browser-action '{"action":"navigate","url":"http://localhost:3000","waitUntil":"networkidle"}' \
+  && paw browser-action '{"action":"wait","timeout":4000}' \
+  && paw browser-action '{"action":"screenshot"}'
+```
+
+截图产物落盘于 `/Users/empathy/.agent-browser/tmp/screenshots/screenshot-<ts>.png`（响应 JSON 的 `data.path`），用读图工具按绝对路径查看并验证内容，再以 Markdown 图片语法（`![alt](/绝对路径.png)`）在对话中展示。
+
+**推荐把「导航 → 处理弹窗 → 调整画面 → 截图」全部放进同一条 bash 命令**（`&&` 串联），原因见 §7.3 坑 1。
+
+### 7.3 易踩坑清单（本次实操全部踩过）
+
+1. **🔴 会话跨调用偶发重置**：每次 bash 调用之间，浏览器 tab 可能被重置为 `about:blank`（`tab_list` 可见 tabId 变化），此前导航的页面直接丢失。**判据**：任何 `evaluate` / `snapshot` 响应的 `origin` 变成 `data:text/html,...New Tab...` 即会话已重置。**对策**：多步流程必须在同一条 bash 命令内 `&&` 串联完成；跨调用续作前先 `tab_list` 检查，发现重置就重新 `navigate`。
+2. **🔴 截图 CDP 超时是常态**：`Page.captureScreenshot` 在 Canvas 渲染页面上偶发超时（本项目 60 FPS Canvas 高频重绘，实测约 1/3 概率）。**对策**：捕获失败后先 `wait` 2~3 秒再重试，一般第 2~3 次即成功；可在命令里预置 `(screenshot || (wait && screenshot))` 的重试结构。
+3. **🟠 JSON 里的 `!` 会被 shell 破坏**：`evaluate` 脚本中写 `!==` 时，bash 传递后 JSON 出现非法转义导致 `Invalid JSON command`。**对策**：evaluate 的 JS 脚本内**禁用 `!`**——改为正向判等（如 `s.position==="fixed"`）并调整过滤条件写法，或把复杂脚本拆成多个简单 evaluate。
+4. **🟠 首次进入的「先建立本地存档文件」弹窗**：本页面用 **File System Access API**（仅 Chrome / Edge 支持）建立本地 `.json` 存档，内置浏览器不支持该 API，点击「建立存档文件」按钮会失败并提示「游戏仍被暂停」，且**该门禁不会解除**——这是设计行为（★ v1.27.0 启动存档门禁），不是 Bug。**要验证存档 / 模拟推进，必须改用系统 Chrome**。**对策**（仅截图展示场景）：用 evaluate 隐藏该 fixed 遮罩：
+
+   ```bash
+   paw browser-action '{"action":"evaluate","script":"(()=>{const els=[...document.querySelectorAll(\"div\")].filter(d=>{const s=getComputedStyle(d);return (s.position==="fixed")&&d.textContent.includes("先建立本地存档文件")&&d.offsetWidth>200;});els.forEach(d=>d.style.display="none");return els.length;})()"}'
+   ```
+
+   返回 `1` 即隐藏成功；遮罩只是视觉隐藏，未改动页面其它状态。
+5. **🟡 Canvas 镜头缩放用 WheelEvent**：页面无缩放按钮，需在 canvas 上派发 `WheelEvent` 调整镜头。**实测方向**：`deltaY:120`（正值）缩小、`deltaY:-120`（负值）放大，每次调用后截图核对方向，不符就反向补发。连发示例：
+
+   ```bash
+   paw browser-action '{"action":"evaluate","script":"(()=>{const c=document.querySelector("canvas");if(c===null){return "no canvas";}const r=c.getBoundingClientRect();for(let i=0;i<8;i++){c.dispatchEvent(new WheelEvent("wheel",{deltaY:-120,clientX:r.left+r.width*0.8,clientY:r.top+r.height*0.75,bubbles:true,cancelable:true}));}return "ok";})()"}'
+   ```
+
+   返回 `"no canvas"` 同样说明会话已重置（见坑 1）。
+6. **🟡 点击 canvas 选坐标会误选实体**：本项目 canvas 支持点选族人/房屋/地标，用坐标点击调镜头时容易顺手打开 Inspector 弹窗挡住画面。**对策**：调镜头统一用 WheelEvent（不产生 click 语义）；误开的面板可通过 evaluate 找「关闭选中窗口」按钮 `.click()` 关闭。
+
+### 7.4 收尾与卫生
+
+- 任务结束后 `tab_list` 检查残留 tab，`tab_close`（不带 index 关当前）逐一关闭，避免占用 4 个 tab 的会话上限。
+- 截图产物位于 CatPaw 临时目录，不进工作区、不入 git；若用户要求落盘到工作区再显式复制。
+- 判图有效性用读图工具直接打开 PNG 验证内容（分辨率/画面元素），勿凭响应 success 判定（对应 §5 坑 4 同源经验）。

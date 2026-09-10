@@ -23,7 +23,7 @@
 | **docs/archive/08-decision-viz-design.md** | 历史马斯洛决策可视化设计方案 | 追溯既有图元/交互设计时参考；当前实现以 `docs/current/06-motivation-ai.md`、`23-ui-dev-guide.md` 为准 |
 | **docs/current/12-ledger-system.md** | 账本模块文档（M1~M4 已落地：账本内核、团体基类、婚姻登记簿、家户体系、宗族体系、地区王国政体、胎儿 Agent 身份） | 改动 ledger/ 代码时查阅 |
 | **docs/02-build-guide.md** | 编译与运行深度指南：工具链环境、WASM 编译、测试与故障排查 | 深入构建与环境排障时 |
-| **docs/03-browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略 | 需要打开页面/渲染校验/截图/自动化交互时 |
+| **docs/03-browser-guide.md** | 浏览器自动化指南：playwright-cli、可驱动引擎、标准流程、防卡死策略；§6 豆包云电脑经验、§7 CatPaw 内置浏览器（`paw browser-action`，macOS）截图 SOP 与易踩坑 | 需要打开页面/渲染校验/截图/自动化交互时 |
 | **docs/04-cicd-guide.md** | CI/CD 部署指南：GitHub Actions 流水线、4 个 Secrets、COS MIME 排障 | 调整部署流程或排查部署失败时 |
 | **docs/05-headless-diagnostics-guide.md** | 确定性无头诊断指南：`tools/diagnose.js` 命令行用法、八大嗅探规则、Agent 五步排障 SOP | 需要使用指定 Seed/Tick 诊断 Bug 与回归验证时 |
 | **docs/15-profiling-and-benchmarking-guide.md** | 性能 Profiling 基准与确定性矩阵操作指南：`tools/profile-benchmark.js` 与 `tools/test-determinism.js` | 进行性能优化、寻路改进、多线程改造前建立基准与回归时 |
@@ -66,7 +66,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.49.1)"]
+    F --> G["浏览器 UI (版本: v1.49.2)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -114,9 +114,11 @@ node frontend/server.js           # http://localhost:3000
 
 ### 步骤四：浏览器访问
 
+> ⚠️ **必须使用 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `docs/current/15-save-load.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。能用 Chrome 测试必须优先用 Chrome 测试。
+
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.49.1`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.49.2`**。
 
 ---
 
@@ -136,6 +138,8 @@ node frontend/server.js           # http://localhost:3000
 ## 4. ⚠️ 重要易踩坑清单
 
 > 以下坑均由实际开发沉淀，**改动代码前先对照本节**。按"最常踩 → 最隐蔽"排序。实现细节见对应模块文档与嵌套 AGENTS.md。
+
+> 🔴 **浏览器测试铁律**：本项目存档依赖 **Chrome 的 File System Access API**（直写磁盘 `.json`，启动存档门禁未建立存档前模拟一直暂停）。一切浏览器验证（手动或自动化）**能用 Chrome 测试必须优先用 Chrome 测试**；Firefox / Safari / CatPaw 内置预览浏览器只能做纯视觉截图，无法走通存档与模拟推进链路。
 
 ### 4.0 ✅ 改动前快速自检（10 秒扫完）
 

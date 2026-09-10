@@ -498,49 +498,102 @@ function drawAccents() {
       }
 
       if (accent.kind === 'Tree') {
-        drawAccentTree(sx, sy, accent.scale * scale, seasonTint);
+        drawAccentTree(accent, sx, sy, accent.scale * scale, seasonTint);
       } else if (accent.kind === 'Boulder') {
         drawAccentBoulder(sx, sy, accent.scale * scale, accent.rotation || 0, cosZ, sinZ);
       } else if (accent.kind === 'Bush') {
-        drawAccentBush(sx, sy, accent.scale * scale);
+        drawAccentBush(accent, sx, sy, accent.scale * scale);
       }
     }
   }
 }
 
-// Tree：圆形树冠（渐变绿）+ 短树干；tint=0 鲜绿 / 1 黄绿(秋) / 2 红褐(深秋)
-// scaled = accent.scale(0.7~1.4) × camera.zoom —— 已是屏幕像素因子
-function drawAccentTree(sx, sy, scaled, tint) {
-  const trunkH = 5 * scaled;
-  const crownR = 11 * scaled;
+// Tree：写意微缩乔木 —— 锥形微弯树干 + 四瓣层叠树冠 + 贴地投影（与 POI/房屋同一光照源）
+// tint=0 鲜绿(春夏) / 1 黄绿(秋) / 2 红褐(深秋)；scaled = accent.scale(0.7~1.4) × camera.zoom
+function drawAccentTree(accent, sx, sy, scaled, tint) {
+  // 由 id 派生的确定性个体差异：干高 / 冠形 / 色相微调，避免成片树完全同构
+  const vSeed = (((accent.id || 0) * 2654435761) >>> 0) % 997 / 997;
+  const crownR = 8.5 * scaled;
+  const trunkH = (6.5 + vSeed * 2.5) * scaled;
 
-  // 树干（深褐色，暗边增强对比）
-  ctx.fillStyle = 'rgb(82, 58, 38)';
+  // 贴地投影：跟随动态季节光照方向（关闭光照时退化为右下固定影）
+  const so = (typeof lightShadowOffset === 'function')
+    ? lightShadowOffset(1.2, 2.5, 2.0)
+    : { x: 1.2 * camera.zoom, y: 2.5 * camera.zoom, alphaScale: 1 };
+  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.17 * so.alphaScale).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(sx + so.x * 0.7, sy + so.y * 0.4, crownR * (0.85 + vSeed * 0.15), crownR * 0.40, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 树干：底粗顶细的锥形曲干，随个体 rotation 微倾
+  const leanDx = Math.cos(accent.rotation || 0) * trunkH * 0.22;
+  const topX = sx + leanDx, topY = sy - trunkH;
+  const bw = Math.max(1.2, crownR * 0.17);
+  const tw = Math.max(0.6, bw * 0.45);
+  ctx.fillStyle = 'rgb(86, 62, 42)';
   ctx.strokeStyle = 'rgba(40, 28, 18, 0.85)';
-  ctx.lineWidth = Math.max(0.5, 0.8 * scaled);
+  ctx.lineWidth = Math.max(0.5, 0.7 * scaled);
   ctx.beginPath();
-  const tw = trunkH * 0.12;
-  ctx.rect(sx - tw, sy - trunkH, tw * 2, trunkH);
+  ctx.moveTo(sx - bw, sy);
+  ctx.quadraticCurveTo(sx - bw * 0.45, sy - trunkH * 0.55, topX - tw, topY);
+  ctx.lineTo(topX + tw, topY);
+  ctx.quadraticCurveTo(sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
+  ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
-  // 树冠底色（径向渐变 + 深色描边让圆形从地形跃出）
-  let baseR = 78, baseG = 122, baseB = 58;
-  let hiR = 138, hiG = 178, hiB = 108;
-  if (tint === 1) { baseR = 168; baseG = 152; baseB = 82; hiR = 200; hiG = 180; hiB = 120; }
-  else if (tint === 2) { baseR = 168; baseG = 98; baseB = 52; hiR = 210; hiG = 138; hiB = 78; }
+  // 树冠配色：暗轮廓 / 底色 / 亮部（个体色相 ±7 微调）
+  let rim, base, hi;
+  if (tint === 1) {
+    rim = 'rgb(96, 82, 34)'; base = [160, 142, 72]; hi = [208, 188, 122];
+  } else if (tint === 2) {
+    rim = 'rgb(88, 44, 22)'; base = [162, 94, 52]; hi = [214, 142, 86];
+  } else {
+    rim = 'rgb(34, 62, 26)'; base = [66, 108, 50]; hi = [142, 184, 110];
+  }
+  const vary = Math.round((vSeed - 0.5) * 14);
+  base = [base[0] + vary, base[1] + vary, base[2] + vary];
 
-  const grad = ctx.createRadialGradient(sx - crownR * 0.2, sy - trunkH - crownR * 0.3, 0, sx, sy - trunkH, crownR);
-  grad.addColorStop(0, 'rgb(' + hiR + ',' + hiG + ',' + hiB + ')');
-  grad.addColorStop(1, 'rgb(' + baseR + ',' + baseG + ',' + baseB + ')');
+  const ccX = topX, ccY = topY - crownR * 0.30;
+  const squash = 0.88;
+  const lw = Math.max(0.8, 1.1 * scaled);
+  // 四瓣层叠：左右托底瓣 + 主瓣 + 顶瓣
+  const lobes = [
+    { dx: -0.52, dy: 0.20, r: 0.58 },
+    { dx: 0.54, dy: 0.18, r: 0.62 },
+    { dx: 0.02, dy: -0.02, r: 0.86 },
+    { dx: -0.10 + vSeed * 0.16, dy: -0.50, r: 0.52 },
+  ];
+
+  // Pass A：暗轮廓 —— 整组放大一圈填充，瓣间接缝处只留一圈外轮廓
+  ctx.fillStyle = rim;
+  for (let i = 0; i < lobes.length; i++) {
+    const L = lobes[i];
+    ctx.beginPath();
+    ctx.ellipse(ccX + L.dx * crownR, ccY + L.dy * crownR, L.r * crownR + lw, L.r * crownR * squash + lw, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Pass B：主体 —— 共用同一径向渐变（光心在冠顶偏左上），瓣间无缝且整体自上而下变暗
+  const grad = ctx.createRadialGradient(
+    ccX - crownR * 0.35, ccY - crownR * 0.75, crownR * 0.12,
+    ccX, ccY, crownR * 1.28
+  );
+  grad.addColorStop(0, 'rgb(' + hi[0] + ',' + hi[1] + ',' + hi[2] + ')');
+  grad.addColorStop(1, 'rgb(' + base[0] + ',' + base[1] + ',' + base[2] + ')');
   ctx.fillStyle = grad;
+  for (let i = 0; i < lobes.length; i++) {
+    const L = lobes[i];
+    ctx.beginPath();
+    ctx.ellipse(ccX + L.dx * crownR, ccY + L.dy * crownR, L.r * crownR, L.r * crownR * squash, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Pass C：顶瓣受光点（柔和高光，让冠顶从渐变里再亮一档）
+  ctx.fillStyle = 'rgba(255, 252, 218, 0.24)';
   ctx.beginPath();
-  ctx.arc(sx, sy - trunkH, crownR, 0, Math.PI * 2);
+  ctx.ellipse(ccX - crownR * 0.26, ccY - crownR * 0.62, crownR * 0.30, crownR * 0.22, -0.4, 0, Math.PI * 2);
   ctx.fill();
-  // 描边关键：深色圆形轮廓让树冠从任何地形背景中分离
-  ctx.strokeStyle = 'rgba(35, 65, 25, 0.7)';
-  ctx.lineWidth = Math.max(0.7, 1.0 * scaled);
-  ctx.stroke();
 }
 
 // Boulder：不规则多边形岩石（灰白顶+深灰底+暗边）
@@ -577,25 +630,56 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
   ctx.stroke();
 }
 
-// Bush：低矮灌木簇（多层绿色椭圆 + 暗边让簇丛可辨）
-function drawAccentBush(sx, sy, scaled) {
-  const r = 6.5 * scaled;
-  ctx.fillStyle = 'rgb(58, 92, 46)';
+// Bush：低矮灌木簇 —— 三瓣层叠圆簇 + 微投影（同 Tree 的暗轮廓二遍填充技法，体量更扁更碎）
+function drawAccentBush(accent, sx, sy, scaled) {
+  const vSeed = (((accent.id || 0) * 2654435761) >>> 0) % 997 / 997;
+  const r = (5.5 + vSeed * 1.2) * scaled;
+
+  // 贴地微投影
+  const so = (typeof lightShadowOffset === 'function')
+    ? lightShadowOffset(1.2, 2.5, 0.7)
+    : { x: 1.2 * camera.zoom, y: 2.5 * camera.zoom, alphaScale: 1 };
+  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.15 * so.alphaScale).toFixed(3) + ')';
   ctx.beginPath();
-  ctx.ellipse(sx, sy, r * 0.95, r * 0.62, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, r * 0.95, r * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgb(82, 120, 64)';
+
+  // 三瓣簇：左右托瓣 + 顶主瓣（扁压 squash 让簇丛贴地）
+  const squash = 0.70;
+  const lw = Math.max(0.7, 0.9 * scaled);
+  const lobes = [
+    { dx: -0.48 + vSeed * 0.10, dy: 0.10, r: 0.60 },
+    { dx: 0.50 - vSeed * 0.08, dy: 0.12, r: 0.56 },
+    { dx: 0.02, dy: -0.20, r: 0.72 },
+  ];
+
+  // Pass A：暗轮廓
+  ctx.fillStyle = 'rgb(26, 50, 22)';
+  for (let i = 0; i < lobes.length; i++) {
+    const L = lobes[i];
+    ctx.beginPath();
+    ctx.ellipse(sx + L.dx * r, sy + L.dy * r, L.r * r + lw, L.r * r * squash + lw, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Pass B：主体（径向渐变，光心偏左上）
+  const grad = ctx.createRadialGradient(
+    sx - r * 0.30, sy - r * 0.65, r * 0.10,
+    sx, sy - r * 0.1, r * 1.15
+  );
+  grad.addColorStop(0, 'rgb(112, 154, 88)');
+  grad.addColorStop(1, 'rgb(60, 96, 46)');
+  ctx.fillStyle = grad;
+  for (let i = 0; i < lobes.length; i++) {
+    const L = lobes[i];
+    ctx.beginPath();
+    ctx.ellipse(sx + L.dx * r, sy + L.dy * r, L.r * r, L.r * r * squash, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Pass C：顶瓣受光点
+  ctx.fillStyle = 'rgba(255, 252, 218, 0.20)';
   ctx.beginPath();
-  ctx.ellipse(sx - r * 0.4, sy + r * 0.12, r * 0.55, r * 0.42, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx - r * 0.18, sy - r * 0.52, r * 0.26, r * 0.18, -0.4, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgb(96, 138, 76)';
-  ctx.beginPath();
-  ctx.ellipse(sx + r * 0.4, sy + r * 0.06, r * 0.5, r * 0.38, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // 簇丛统一描边：暗绿色轮廓在亮地形上同样清晰
-  ctx.strokeStyle = 'rgba(28, 52, 22, 0.7)';
-  ctx.lineWidth = Math.max(0.6, 0.9 * scaled);
-  ctx.beginPath();
-  ctx.ellipse(sx, sy, r * 0.95, r * 0.62, 0, 0, Math.PI * 2);
-  ctx.stroke();
 }

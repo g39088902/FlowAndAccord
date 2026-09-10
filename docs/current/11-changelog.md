@@ -1,7 +1,9 @@
 # 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 01-current.md 全景索引](../current.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.49.2**。
+
+| **v1.49.2** | D-A 地形装饰观感重绘（Tree/Bush 全面重塑）：① **Tree**：`render_terrain.js::drawAccentTree` 由「矩形树干 + 单圆饼树冠」重绘为写意微缩乔木——底粗顶细的锥形微弯树干（随 `accent.rotation` 微倾）、四瓣层叠树冠（左右托底瓣 + 主瓣 + 顶瓣）、「暗轮廓二遍填充」技法（整组放大一圈填暗轮廓再统一径向渐变填充，瓣间无缝且只有一圈外轮廓，消除旧版单圆描边的呆板圆饼感）、冠顶受光柔和高光点；② **Bush**：`drawAccentBush` 同技法重绘为三瓣扁压圆簇 + 微投影，替换旧版三个独立椭圆 + 单圈描边；③ **个体差异**：以 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调），成片树不再完全同构；④ **投影对齐**：Tree/Bush 贴地投影改走 `SimLighting.shadowOffset`（与 POI/房屋同一动态季节光照源，关闭动态光照时退回旧固定影方向）；⑤ 纯前端表现层，`accent.scale`/`tint` 语义与快照契约零改动，不消耗 `WorldRng`、不进存档；升版 v1.49.2 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更，自动废弃旧存档）；门禁：`frontend-check` 全绿、`test-wasm` ALL_TESTS_DONE、`bump-version --check` 零漂移。 | frontend(render_terrain) / docs / version |
 
 | **v1.49.0** | 新增「水系微观生态层（RiverLife）」纯表现层并优化河道景观视觉效果：① **新模块** `frontend/js/river_life.js`——水底卵石（85 颗，5 色系扁圆石 + 受光高光斑，Mulberry32 种子取自 `_engineSeed`，世界重置/读档随种子确定性重建）、成群游鱼（4 群 22 条，沿河道中心线巡航插值 + 正弦摆尾 + 水底投影，走墙钟驱动，模拟暂停时与水面虚线一致继续流动）、迎光面太阳波光粼粼；② **渲染管线扩展** `render_terrain.js`——Pass 1.5 先铺均匀深沉河床基底（遮蔽水下逐格光照斑驳与 13m 网格方块），再画卵石与游鱼，盖上水面后自然产生水下半透明景深；Pass 2 水体不透明度 0.85→0.62、深水基底 0.55→0.25 使水底可辨，并新增深浅水色纵深带（沿中心线逐段铺深色水带、笔宽跟随当地河宽，宽河段显深潭、收窄处显急流）；Pass 2.8 太阳波光强度按河道切线与太阳屏幕方向夹角调制（取 \|dot\| 双向迎光）；Pass 3 岸线微沫新增顺流漂移碎沫段（短虚线 `lineDashOffset` 随时间推进，赋予水流方向感）；③ **联动季节光照（v1.48.0）**：卵石高光斑方向跟随 `SimLighting.sunScreenDir`（逐石微抖动防整齐划一，关闭动态光照时退回旧固定光西北 41° 等效方向），四季光弧转动时水底石光与水面波光同步响应；④ **健壮性**：河道顶点判据由硬编码 194 放宽为左右岸各 ≥2 顶点，卵石/游鱼加视口粗剔除，清理死变量；⑤ 纯前端表现层，不消耗 `WorldRng`、不写模拟状态、不进存档、不参与内核确定性承诺；升版 v1.49.0 重编译 WASM 双副本（`SAVE_APP_VERSION` 随升版变更，自动废弃旧存档）；门禁：`frontend-check` 30 文件语法 + DOM 引用全绿、`test-wasm` ALL_TESTS_DONE（含存读档确定性）、`bump-version --check` 零漂移。 | frontend(river_life/render_terrain/rustworld/index) / docs / version |
 

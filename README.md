@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.49.1` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.49.2` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 </div>
 
@@ -161,7 +161,9 @@
 node frontend/server.js
 ```
 
-然后打开浏览器（推荐 Chrome 或 Edge）访问 `http://localhost:3000`。无需复杂打包、无需安装外部依赖。
+> ⚠️ **必须使用 Chrome 或 Edge 打开**：游戏存档依赖 Chrome 的 File System Access API 直写磁盘 `.json` 文件，Firefox / Safari 等浏览器无法建立存档、会被启动门禁阻断。
+
+然后打开 Chrome 或 Edge 访问 `http://localhost:3000`。无需复杂打包、无需安装外部依赖。
 
 > 🎮 **不想本地搭建？在线直接游玩**：<https://xn--fiqs8s171bcnq.com>
 

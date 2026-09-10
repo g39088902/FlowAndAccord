@@ -18,7 +18,7 @@
   1. `drawSkyBackdrop()`：天空/地平渐变与逆光光晕（第一个氛围插入点，地表之下）；
   2. `drawTerrain()`：3D 连续坡度与法线环境光遮蔽（AO）高程沙盘网格（含随光向变化明的沙盘侧壁）；★ v1.48.1 起每格四边沿外法线外扩 `TERRAIN_SEAM_PX`(0.75px)，消除相邻格抗锯齿缝隙导致的「深色网格线透出」（详见 `frontend/AGENTS.md` §5.9）；drawTerrain 内部依次调用：
      - `drawTerrainFeatures()`：水系地貌矢量特征——Pass 1.5 河床基底 → Pass 2 半透明碧蓝水面 + 深浅水纵深带 + 微波流线 → Pass 2.8 迎光面太阳波光 → Pass 3 岸线微沫高光 + 顺流碎沫 → Pass 4 浅滩卵石踏石；
-     - `drawAccents()`（★ v1.49.1 D-A 装饰系统）：地形表面散布的树木/灌木/巨石 5 类装饰（按种类排序 Bush→Boulder→Tree，Y 轴视锥裁剪），Tree 径向渐变树冠 + 季节色调（`SimTreeTint` 消费 `lighting.js` 的光相）、Boulder 不规则六角石 + 高光、Bush 椭圆簇丛；
+     - `drawAccents()`（★ v1.49.1 D-A 装饰系统 / ★ v1.49.2 观感重绘）：地形表面散布的树木/灌木/巨石 5 类装饰（按种类排序 Bush→Boulder→Tree，Y 轴视锥裁剪），Tree 为写意微缩乔木（锥形微弯树干 + 四瓣层叠树冠 + 暗轮廓二遍填充 + 冠顶受光高光 + 贴地投影走 `SimLighting.shadowOffset`）、Bush 三瓣扁压圆簇同技法、Boulder 不规则六角石 + 高光；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相微调）；季节色调 tint=0 鲜绿 / 1 黄绿(秋) / 2 红褐(深秋)；
   3. `drawLanes()`：动态踩踏路网（贴地纹理，先于建筑绘制）；
   4. `drawSelectedCampHouseLinks()` + `drawPoiGroundBases()`：贴地图元补充层（选中营地辖区虚线、POI 底座与营地暖光，必须先于立体实体落笔）；
   5. `drawAtmosphereWash()`：大气色洗（第二个氛围插入点，在立体实体之前，建筑与文字不被洗灰）；

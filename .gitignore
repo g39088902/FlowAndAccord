@@ -11,3 +11,4 @@ target/
 .workbuddy-ai
 .playwright-cli/
 .workbuddy
+node_modules
