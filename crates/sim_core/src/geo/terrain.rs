@@ -1,5 +1,6 @@
 use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::accents::TerrainAccent;
+use crate::config::SimConfig;
 use crate::rng::WorldRng;
 use crate::spatial::curve::Curve3D;
 use crate::spatial::vec3::Vec3;
@@ -38,7 +39,9 @@ pub struct TerrainFeature {
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 3;
+/// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
+///           同时移除 `generate_with_profile` 无配置的兼容入口，旧存档按版本门禁拒绝）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 4;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -92,13 +95,13 @@ impl TerrainMap {
         }
     }
 
-    /// 兼容旧调用点；默认启用 T1 山口聚落 profile。
-    pub fn generate_natural_landscape(&mut self, seed: u64) {
-        self.generate_with_profile(seed, TERRAIN_PROFILE_MOUNTAIN_PASS);
-    }
-
     /// 生成 T0 基础高程与 T1 山脊/山口连续起伏地貌（v1.47.7 起不再生成台地/高台）。
-    pub fn generate_with_profile(&mut self, seed: u64, profile: &str) {
+    ///
+    /// ★ T1-R 主脊通行力修复：主脊宽度/幅度改为消费 `SimConfig`（原先硬编码
+    /// `0.16~0.23 × world_size` 与 `24~34m`，最大梯度仅 6.7~13.4°，全图无格越过
+    /// `terrain_max_walk_slope`，山口不产生任何通行约束）。详见
+    /// `docs/22-plan-terrain-features.md` §7.3.1。
+    pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
         self.profile = if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
@@ -125,10 +128,15 @@ impl TerrainMap {
         let p2_y: f32 = rng.gen_range(0.0, 100.0);
         let theta = relief_rng.gen_range(-0.18, 0.18);
         let ridge_offset = relief_rng.gen_range(-0.08, 0.08) * self.world_size;
-        let ridge_width = relief_rng.gen_range(0.16, 0.23) * self.world_size;
-        let ridge_amplitude = relief_rng.gen_range(24.0, 34.0);
+        // ★ T1-R：主脊宽度/幅度走配置（禁止散落字面量）。通行力约束：
+        //   高斯主脊最大梯度 ≈ 0.858 × amplitude / width，必须显著大于
+        //   tan(terrain_max_walk_slope)，否则主脊上任何路线都合法、山口形同虚设。
+        let ridge_width = config.terrain_pass_ridge_width.max(8.0);
+        let ridge_amplitude = config.terrain_pass_ridge_amplitude.max(4.0);
         let saddle_along = relief_rng.gen_range(-0.12, 0.12) * self.world_size;
-        let saddle_width = relief_rng.gen_range(0.10, 0.15) * self.world_size;
+        // 鞍部过渡带的沿脊梯度 ≈ 0.9 × amplitude × 0.858 / saddle_width；主脊变陡后
+        // 鞍部若过窄会把山口本身夹成不可通行，故下限从 0.10 放宽到 0.14。
+        let saddle_width = relief_rng.gen_range(0.14, 0.19) * self.world_size;
 
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;

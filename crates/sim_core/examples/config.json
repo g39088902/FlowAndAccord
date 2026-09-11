@@ -162,6 +162,8 @@
   "terrainProfile": "random",
   "terrainRidgeAmplitude": 28,
   "terrainRidgeWidth": 125,
+  "terrainPassRidgeWidth": 62,
+  "terrainPassRidgeAmplitude": 53,
   "terrainRiverWidthMin": 28,
   "terrainRiverWidthMax": 42,
   "terrainRiverWaterLevel": 0,

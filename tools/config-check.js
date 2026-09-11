@@ -50,6 +50,8 @@ const IMPACT_OVERRIDES = {
   campLevelTownMinHouses: 'poi.rs (营地行政级别升级)',
   campLevelCountyMinHouses: 'poi.rs (营地行政级别升级)',
   terrainProfile: 'geo/terrain.rs / world_save.rs (地形生成器版本门禁)',
+  terrainPassRidgeWidth: 'geo/terrain.rs (T1 主脊高斯半宽，通行力约束)',
+  terrainPassRidgeAmplitude: 'geo/terrain.rs (T1 主脊幅度，通行力约束)',
   terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',
   terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',

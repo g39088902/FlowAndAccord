@@ -47,16 +47,32 @@ impl World3DEngine {
     pub(crate) fn connect_land_nodes(&mut self,a:u32,b:u32)->bool {
         let pa=self.network.graph[self.network.node_map[&a]].pos;let pb=self.network.graph[self.network.node_map[&b]].pos;
         let Some(path)=corridor::route(&self.terrain,pa,pb,&self.config) else{return false;};
-        self.commit_terrain_path(a,b,&path,None);true
+        self.commit_terrain_path(a,b,&path,None)
     }
-    pub(crate) fn commit_terrain_path(&mut self,a:u32,b:u32,path:&[Vec3],crossing:Option<u32>) {
-        let mut from=a;
-        for (i,pair) in path.windows(2).enumerate(){
-            let to=if i+2==path.len(){b}else{self.network.add_node(pair[1],NodeType::GroundIntersection)};
+    /// 提交一条走廊折线为车道。**先按读档同一判据（`corridor::validate_curve`）验证全部
+    /// 曲线，全部通过才落盘**——否则创世会产出读档时被 `validate_terrain_world` 拒绝的
+    /// 车道，世界一旦存档就再也读不回来。
+    ///
+    /// ★ v1.50.17：`route` 内部的 `segment_valid` 用原始走廊宽度，而 `validate_curve` 会按
+    /// 控制点偏离弦长放大有效走廊宽度，判据更严；地形变陡后两者的差集不再为空，故必须在
+    /// 提交前用同一判据复核。返回 `false` 表示整条折线一条车道都没提交。
+    pub(crate) fn commit_terrain_path(&mut self,a:u32,b:u32,path:&[Vec3],crossing:Option<u32>)->bool {
+        let segs=path.len().saturating_sub(1);
+        if segs==0 {return false;}
+        let w=self.config.terrain_road_corridor_width;let slope=self.config.terrain_max_walk_slope;
+        let mut curves=Vec::with_capacity(segs);
+        for pair in path.windows(2) {
             let mut forward=Curve3D::new_straight(pair[0],pair[1]);
             forward.p1.z=self.terrain.sample_elevation(forward.p1.x,forward.p1.y);
             forward.p2.z=self.terrain.sample_elevation(forward.p2.x,forward.p2.y);
             forward.length=forward.calculate_arc_length(32);
+            // 反向车道是同一 x/y 轨迹的逆参数化，几何等价，验证正向即可覆盖两者。
+            if !corridor::validate_curve(&self.terrain,&forward,w,slope,crossing){return false;}
+            curves.push(forward);
+        }
+        let mut from=a;
+        for (i,forward) in curves.into_iter().enumerate(){
+            let to=if i+1==segs{b}else{self.network.add_node(path[i+1],NodeType::GroundIntersection)};
             let reverse=Curve3D::new_bezier(forward.p3,forward.p2,forward.p1,forward.p0);
             let mut profile=LaneTerrainProfile {max_slope_deg:0.0,terrain_time_cost:1.0,surface_mask:0,crossing_id:crossing};
             for k in 0..=32{let p=forward.evaluate_pos(k as f32/32.0);let c=self.terrain.sample_cell(p.x,p.y);
@@ -68,6 +84,7 @@ impl World3DEngine {
             }
             from=to;
         }
+        true
     }
     pub(crate) fn connect_terrain_world(&mut self, ids:&[u32]) {
         let mut all=ids.to_vec();

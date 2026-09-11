@@ -52,7 +52,7 @@ impl WaterPool {
 }
 impl TerrainMap {
     pub fn generate_with_config(&mut self, seed: u64, config: &SimConfig) {
-        self.generate_with_profile(seed, &config.terrain_profile);
+        self.generate_with_profile(seed, &config.terrain_profile, config);
         self.hydrology = Hydrology::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY { self.generate_river(seed, config); }
         // ★ v1.48.0 D-A：散布地表装饰（在地貌与水系生成完成后，避免装饰落入深水区）
