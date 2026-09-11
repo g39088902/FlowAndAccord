@@ -320,27 +320,68 @@ function drawWorldEntities() {
     }
 
     // ── 2. 水系特征 / 游鱼 / 波光 ──
+    // ★ v1.50.20 河流分段入队：整条河多边形若以「全顶点最大深度」入队（v1.50.11 做法），
+    //   只要任一岸段靠近相机，整条河就后画、盖住所有更远的树/房/POI/族人（用户可见症状：
+    //   「河流叠加在树和房子、POI、NPC 上」）。现在：
+    //   River 水面按剖分区间逐段入队（b = 段号，深度 = 段四角最大相机深度）；
+    //   RiverBank 逐段描边；ShallowFord / 波光挂所在段深度 + ε（恒在所在段水面之后）。
     const features = terrain.features || [];
     if (features.length && window.RiverLife) window.RiverLife.update(performance.now());
-
-    // 河道最近岸深度（顶点最大相机深度）：水面填充以此入队，保证盖住更远的地形格
-    let riverNearDepth = -Infinity;
+    const rivers = [];
     for (let fi = 0; fi < features.length; fi++) {
       const f = features[fi];
-      if (f.kind !== 'River' || !f.vertices || !f.vertices.length) continue;
-      const vs = f.vertices;
-      for (let vi = 0; vi < vs.length; vi++) {
-        const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
-        if (d > riverNearDepth) riverNearDepth = d;
-      }
+      if (f.kind === 'River' && f.vertices && f.vertices.length >= 4) rivers.push(f);
     }
+    // 河轴剖分 y → 所在段的最大深度（左右岸顶点 y 单调；段深度 = 4 角相机深度最大值）
+    const riverBandDepth = (river, y) => {
+      const v = river.vertices, half = v.length >> 1;
+      const asc = v[0].y <= v[half - 1].y;
+      if (asc ? (y < v[0].y || y > v[half - 1].y) : (y > v[0].y || y < v[half - 1].y)) return null;
+      let lo = 0, hi = half - 2;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (asc ? v[mid].y <= y : v[mid].y >= y) lo = mid; else hi = mid - 1;
+      }
+      const j = v.length - 1 - lo;
+      return Math.max(
+        depthOf(v[lo].x, v[lo].y, v[lo].z),
+        depthOf(v[lo + 1].x, v[lo + 1].y, v[lo + 1].z),
+        depthOf(v[j].x, v[j].y, v[j].z),
+        depthOf(v[j - 1].x, v[j - 1].y, v[j - 1].z));
+    };
     for (let fi = 0; fi < features.length; fi++) {
       const f = features[fi];
-      if (!f.vertices || !f.vertices.length) continue;
+      if (!f.vertices || f.vertices.length < 2) continue;
+      const vs = f.vertices;
       if (f.kind === 'River') {
-        _depthItem(DEPTH_FEATURE, f, 0, riverNearDepth);
+        const half = vs.length >> 1;
+        for (let b = 0; b < half - 1; b++) {
+          const j = vs.length - 1 - b;
+          _depthItem(DEPTH_FEATURE, f, b, Math.max(
+            depthOf(vs[b].x, vs[b].y, vs[b].z),
+            depthOf(vs[b + 1].x, vs[b + 1].y, vs[b + 1].z),
+            depthOf(vs[j].x, vs[j].y, vs[j].z),
+            depthOf(vs[j - 1].x, vs[j - 1].y, vs[j - 1].z)));
+        }
+      } else if (f.kind === 'RiverBank') {
+        // 岸线带逐段入队（整条以最大顶点深度入队会同样盖住更远实体）
+        for (let s = 0; s < vs.length - 1; s++) {
+          const d0 = depthOf(vs[s].x, vs[s].y, vs[s].z);
+          const d1 = depthOf(vs[s + 1].x, vs[s + 1].y, vs[s + 1].z);
+          _depthItem(DEPTH_FEATURE, f, s, d0 > d1 ? d0 : d1);
+        }
+      } else if (f.kind === 'ShallowFord') {
+        // 涉渡横跨河道（两端 y 相同）：挂所在段深度 + ε ⇒ 恒在该段水面之后
+        let d = null;
+        const yMid = (vs[0].y + vs[1].y) * 0.5;
+        for (let ri = 0; ri < rivers.length && d == null; ri++) d = riverBandDepth(rivers[ri], yMid);
+        if (d == null) {
+          const d0 = depthOf(vs[0].x, vs[0].y, vs[0].z);
+          const d1 = depthOf(vs[1].x, vs[1].y, vs[1].z);
+          d = d0 > d1 ? d0 : d1;
+        }
+        _depthItem(DEPTH_FEATURE, f, 0, d + 0.05);
       } else {
-        const vs = f.vertices;
         let dmax = -Infinity;
         for (let vi = 0; vi < vs.length; vi++) {
           const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
@@ -349,7 +390,7 @@ function drawWorldEntities() {
         _depthItem(DEPTH_FEATURE, f, 0, dmax);
       }
     }
-    // 游鱼逐条入队：深度 = 鱼体世界坐标（水中层，低于水面顶点 ⇒ 落在水面填充之前）
+    // 游鱼逐条入队：深度 = 鱼体世界坐标（所在段水面的段内位置深度 < 段 4 角最大 ⇒ 落在水面填充之前）
     const fishList = window.RiverLife ? window.RiverLife.fishList() : null;
     if (fishList) {
       for (let i = 0; i < fishList.length; i++) {
@@ -357,11 +398,13 @@ function drawWorldEntities() {
         _depthItem(DEPTH_FISH, f, 0, depthOf(f.x, f.y, f.z));
       }
     }
-    // 波光逐段入队：深度挂河道最近岸 + ε ⇒ 恒在水面填充之后、任何更近山地之前
+    // 波光逐段入队：深度挂所在河段最大深度 + ε ⇒ 恒在所在段水面之后、任何更近实体之前
     const cps = window.RiverLife ? window.RiverLife.centerPoints() : null;
-    if (cps && riverNearDepth > -Infinity) {
+    if (cps && rivers.length) {
       for (let i = 4; i < cps.length - 6; i += 7) {
-        _depthItem(DEPTH_GLINT, cps[i], i, riverNearDepth + 0.05);
+        const cp = cps[i];
+        const bd = riverBandDepth(rivers[0], cp.y);
+        if (bd != null) _depthItem(DEPTH_GLINT, cp, i, bd + 0.06);
       }
     }
   }
@@ -464,7 +507,7 @@ function drawWorldEntities() {
     switch (it.kind) {
       case DEPTH_CELL: drawTerrainCell(it.a, it.b, it.c, it.d); break;
       case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
-      case DEPTH_FEATURE: drawFeatureItem(it.a); break;
+      case DEPTH_FEATURE: drawFeatureItem(it.a, it.b); break;
       case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
       case DEPTH_GLINT: RL.drawGlintAt(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
       case DEPTH_LANE: drawLaneSegment(it); break;

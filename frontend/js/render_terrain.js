@@ -250,12 +250,10 @@ function drawTerrainGrid() {
 }
 
 // ★ v1.50.11 单个水系地貌特征绘制（由 render_world.js 统一深度队列调度）。
-// 旧 drawTerrainFeatures() 是「Pass 1.5 游鱼 → Pass 2 水面 → Pass 2.8 波光 → Pass 4 浅滩」
-// 的整层先画，水面永远盖在地形之上——河道在近处山体前依然可见（与图标透山同一根因）。
-// 现改为：River 水面多边形 / ShallowFord 等特征各自作为深度项入队（深度 = 特征顶点的
-// 最大相机深度，保证盖住更远的地形格）；游鱼逐条、波光逐段独立入队（见 river_life.js）。
-function drawFeatureItem(feature) {
-  if (!feature.vertices || !feature.vertices.length) return;
+// ★ v1.50.20 河流分段绘制：River / RiverBank 的 idx 为段号（整条以「全顶点最大深度」入队
+// 会盖住所有更远的实体，见 render_world.js 收集段注释）；ShallowFord / 其余短特征仍整条绘制。
+function drawFeatureItem(feature, idx) {
+  if (!feature.vertices || feature.vertices.length < 2) return;
 
   const cx = w / 2 + camera.panX;
   const cy = h / 2 + camera.panY;
@@ -263,39 +261,37 @@ function drawFeatureItem(feature) {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  const vLen = feature.vertices.length;
-  _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-
   if (feature.kind === 'River') {
-    // ── Pass 2: 连续矢量水面闭合多边形（Vector Water Surface） ──
-    // 以闭合矢量填充整片半透明水面，直接叠在水下地表色之上成色
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.closePath();
-
-    // 底层深水基底（深潭幽蓝，奠定水深纵深感）
-    ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
-    ctx.fill();
-
-    // 主流水体：清透碧蓝山泉流（半透明 0.62，综合不透明度 ~72%，水体清澈，水底卵石与游鱼清晰可辨）
-    ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
-    ctx.fill();
-    ctx.restore();
-
-    // ★ v1.50.6：移除「B1 深浅水色纵深带」——沿中心线铺的深色宽水带在窄河道上观感为一条压在河心的暗色粗线，见 11-changelog.md
-    // ★ v1.50.3：移除「水面中心潺潺流动微波细线」——虚线观感形似车道线，见 11-changelog.md
+    drawRiverBand(feature, idx | 0, cx, cy, cosZ, sinZ, cosX, sinX, scale);
     return;
   }
 
-  // ── Pass 4: 浅滩涉渡（ShallowFord）与其余地貌特征 ──
+  const vLen = feature.vertices.length;
+  _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+  if (feature.kind === 'RiverBank') {
+    // 岸线带单段描边（idx = 段号）
+    const s = idx | 0;
+    if (s < 0 || s >= vLen - 1) return;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
+    ctx.lineWidth = Math.max(2, feature.width * scale * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(_featProjX[s], _featProjY[s]);
+    ctx.lineTo(_featProjX[s + 1], _featProjY[s + 1]);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // ── 浅滩涉渡（ShallowFord）与其余地貌特征 ──
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
   if (feature.kind === 'ShallowFord') {
-    // 浅滩涉渡：卵石踏道基底
     ctx.strokeStyle = 'rgba(196, 178, 136, 0.88)';
     ctx.lineWidth = Math.max(6, feature.width * scale * 0.22);
     ctx.beginPath();
@@ -321,6 +317,40 @@ function drawFeatureItem(feature) {
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+// ★ v1.50.20 河面单段绘制（idx = 剖分区间号）：
+//   河道 outline 是「左岸 N 点顺去 + 右岸 N 点逆回」的闭合带（hydrology.rs），
+//   顶点 i 与顶点 vLen-1-i 同为第 i 剖分断面的左右岸点。段 b 的四边形 =
+//   (v[b], v[b+1], v[vLen-2-b], v[vLen-1-b])。
+//   绘制时 **clip 到该段四边形内、再整多边形两遍填充**（深水基底 + 主水体）：
+//   硬 clip 逐像素归属唯一一段 ⇒ 相邻段无接缝、无半透明叠 blend，
+//   观感与整河单次填充完全一致；段外的更近地形/实体照常遮挡该段。
+function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
+  const v = feature.vertices, vLen = v.length, half = vLen >> 1;
+  if (band < 0 || band >= half - 1) return;
+  const j = vLen - 1 - band;
+  _projectFeatureVertices(v, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(_featProjX[band], _featProjY[band]);
+  ctx.lineTo(_featProjX[band + 1], _featProjY[band + 1]);
+  ctx.lineTo(_featProjX[j - 1], _featProjY[j - 1]);
+  ctx.lineTo(_featProjX[j], _featProjY[j]);
+  ctx.closePath();
+  ctx.clip();
+
+  // 整多边形填充（clip 限定只落本段）：底层深水基底 + 主流水体，与旧整河填充同色同透明度
+  ctx.beginPath();
+  ctx.moveTo(_featProjX[0], _featProjY[0]);
+  for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
+  ctx.fill();
+  ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
+  ctx.fill();
   ctx.restore();
 }
 

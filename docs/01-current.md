@@ -3,7 +3,7 @@
 开发任务入口：[Agent 快速入口](./current/00-agent-start.md)，按改动类型选择指南、上下游同步链与验证命令。
 
 > **文档定位**：本文件为「已实现功能」的索引入口。详细内容按功能模块拆分至 [`docs/current/`](./current/) 目录，本文仅保留全局架构速览与模块导航。
-> **版本**：v1.50.19（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
+> **版本**：v1.50.20（版本演进记录见 [docs/current/11-changelog.md](./current/11-changelog.md)）
 > **超参配置**：全部可调超参（237 个）统一由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` 升级成本矩阵 20 字段 / `config.decision-order.js` 决策顺序）驱动，**前端 JS 为唯一数值真相源**（v1.44.9 起内核常量已清零）；字段/类型/默认值/中文说明见 [docs/06-config-reference.md](./06-config-reference.md)，Rust↔JS 字段契约由 `node tools/config-check.js` 校验。
 
 ---
