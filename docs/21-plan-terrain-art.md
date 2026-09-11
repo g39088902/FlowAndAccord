@@ -3,8 +3,8 @@
 > **状态**：短期 S1（地表光照沙盘基底）、S2/P0（渲染层级反转 + 自然道路色阶）、S2.1/P1（水系通透化与三层水光）、P2（世界实体统一相机深度绘制，v1.47.8/v1.47.9）均已落地；内核 T0 地表查询、T1 山口聚落、T2 两岸河谷（v1.47.5，生成器版本 3）已提供真实高程、地表类别与水系事实。S3（资源点景观群与房屋院地样板）、标注避让、季节地表调色、M2/M3 素材与缓存仍未实施。
 > **v1.48.0 方案优化**：取消独立 T3（湖泊/湿地/峡谷/瀑布 profile），改为「T1/T2 子特征注入 + 地表装饰系统」。新增 Accent 装饰层（Tree/Boulder/Bush/RockCluster/GrassTuft），独立 RNG 加盐生成；子特征注入器按 seed 概率注入山脚湖/瀑布/峭壁等特色地貌。
 > **整理日期**：2026-09-10（按 v1.48.0 方案优化同步）。
-> **评估依据**：用户实机运行反馈截图（诊断基线）＋ 当前 `frontend/js` 渲染实现逐函数核对 ＋ [地形实施技术方案](./26-plan-terrain-implementation.md) 落地状态。
-> **入口**：[文档导航](./README.md) · [长期路线图](./11-plan.md) · [空间与路网现状](./current/01-spatial-network.md) · [前端现状](./current/07-frontend-ui.md) · [地形实施技术方案](./26-plan-terrain-implementation.md)。
+> **评估依据**：用户实机运行反馈截图（诊断基线）＋ 当前 `frontend/js` 渲染实现逐函数核对 ＋ [地形专项方案](./22-plan-terrain-features.md) 落地状态。
+> **入口**：[文档导航](./README.md) · [长期路线图](./11-plan.md) · [空间与路网现状](./current/01-spatial-network.md) · [前端现状](./current/07-frontend-ui.md) · [地形专项方案](./22-plan-terrain-features.md)。
 
 ## 1. 建议方向
 
@@ -41,7 +41,7 @@
 - [世界元素绘制](../frontend/js/render_world.js)（`drawTerrain` / `drawTerrainFeatures` / `drawLanes` / `drawPoiGroundBase` / `drawPoiMarker` / `drawHouse` / `drawWorldEntities`） / [族人绘制](../frontend/js/render_agents.js)（`drawAgent`） / [帧循环](../frontend/js/render_canvas.js)。
 - [存读档](../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 3 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
-农田、哨塔和路卡的占地与通行消费[融合设计 §6](./25-plan-system-integration.md#6-土地设施与通行)与[地形实施方案 §6](./26-plan-terrain-implementation.md#6-房屋农业设施与-poi-接入)的内核事实；T0 的 `validate_footprint` 原语已就绪但农业/防务尚未接入，视觉样板不得提前画出不存在的生产、阻路或防御效果。S3 与 M2/M3 仍可独立推进，不以农业、市场或记忆上线为前提。
+农田、哨塔和路卡的占地与通行消费[融合设计 §6](./25-plan-system-integration.md#6-土地设施与通行)与[地形专项方案 §11](./22-plan-terrain-features.md#11-房屋农业设施与-poi-接入)的内核事实；T0 的 `validate_footprint` 原语已就绪但农业/防务尚未接入，视觉样板不得提前画出不存在的生产、阻路或防御效果。S3 与 M2/M3 仍可独立推进，不以农业、市场或记忆上线为前提。
 
 ## 3. 统一美术规则
 
@@ -154,7 +154,7 @@ S1～S3 可独立先行，但保留地表类别、岸线和连接设施的绘制
 
 ### M4 · 两岸河谷完整切片 ◐ 内核与基础渲染已落地，子特征待注入
 
-对接[地形专项方案 T2](./22-plan-terrain-features.md#6-分阶段落地与景观计划对接)，静态主河、浅滩、河滩与河阶已落地（v1.47.5）。
+对接[地形专项方案 T2](./22-plan-terrain-features.md#17-分阶段落地与景观计划对接)，静态主河、浅滩、河滩与河阶已落地（v1.47.5）。
 
 - ✅ 水域、岸线、浅滩位置来自内核；前端只增加高光、岸石和植被（岸石/植被待 D-A/M2 素材）。
 - ✅ 河床先绘制，水面与岸边物体按遮挡关系组织；人物在浅滩沿内核实际路线过水并按 `terrain_shallow_water_cost` 减速。

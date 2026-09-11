@@ -181,9 +181,15 @@ FlowAndAccord/
     ├── 19-plan-agent-intent-strategy-decoupling.md # 决策意图-策略解耦规划书 (M19)
     ├── 20-plan-everyday-life.md               # 日常生活演化规划书
     ├── 21-plan-terrain-art.md                 # 地形美术规划书
-    ├── 22-plan-terrain-features.md            # 地形特征规划书
+    ├── 22-plan-terrain-features.md            # 地形特征、地理玩法与实施技术方案 (原 26 号已并入)
     ├── 23-plan-memory-system.md               # 记忆系统规划书
     ├── 24-plan-internal-market.md             # 内部市场规划书
+    ├── 25-plan-system-integration.md          # 在办方案融合设计 (跨专项契约)
+    ├── 27-plan-seasonal-lighting.md           # 动态季节光照规划书
+    ├── 28-plan-river-shoreline-refinement.md  # 水系河岸平滑化与写实沙盘水体改造方案
+    ├── 29-plan-social-relations-production.md # 人际依赖与敌对关系×生产机制分析
+    ├── 30-plan-agent-hormone-system.md        # Agent 四轴十一激素内分泌调制层方案
+    ├── 31-plan-affinity-system.md             # 人际好感度系统方案
     ├── decision-viz-prototype.html          # 决策可视化交互原型
     ├── decision-viz-live-tab.png            # 决策可视化实时监控页截图
     ├── decision-viz-logic-tab.png           # 决策可视化逻辑引擎页截图

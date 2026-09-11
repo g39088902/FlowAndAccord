@@ -48,7 +48,7 @@
 | # | 功能模块 | 文档路径 | 主要内容 |
 | :--- | :--- | :--- | :--- |
 | 1 | 🗺️ 3D 空间拓扑与路网涌现系统 (`spatial`) | [01-spatial-network.md](./current/01-spatial-network.md) | T0 地表查询、T1 山口/山脊连续起伏 profile、完整占地校验、连续 3D 地形、贝塞尔路网、A\* 寻路、踏路成道、5 阶恒宽色彩 |
-| 1.1 | 🏞️ D-A 装饰系统基础 v1.49.1 (`geo/accents.rs`) | [21-plan-terrain-art.md](../21-plan-terrain-art.md) | 确定性散布树木/灌木/巨石 5 类装饰，`salt=0x4143_4345_4E54_3031` 独立 RNG 流，FABS Section 21 编码/解码，3 配置密度/子特征/季节色；**已移除**河道两旁手绘沙滩金砂线（Pass 1 RiverBank sand ribbon） |
+| 1.1 | 🏞️ D-A 装饰系统基础 v1.49.1 (`geo/accents.rs`) | [21-plan-terrain-art.md](./21-plan-terrain-art.md) | 确定性散布树木/灌木/巨石 5 类装饰，`salt=0x4143_4345_4E54_3031` 独立 RNG 流，FABS Section 21 编码/解码，3 配置密度/子特征/季节色；**已移除**河道两旁手绘沙滩金砂线（Pass 1 RiverBank sand ribbon） |
 | 2 | 🌲 全局有限生态与 POI 资源体系 (`poi`) | [02-ecology-poi.md](./current/02-ecology-poi.md) | 23 处有限生态地标、储量/再生、Agent 私有施密特触发器、营地下行政升级 |
 | 3 | ❄️ 四季更替与热力学供暖系统 (`seasons`) | [03-seasons-climate.md](./current/03-seasons-climate.md) | 240s 四季年轮模型、冬季供暖消耗、低温受孕安全红线 |
 | 4 | 🧬 部落民生理代谢、繁衍与寿命 (`agent`) | [04-agent-life.md](./current/04-agent-life.md) | 生理指标、年龄两性分化、婚姻改嫁繁衍、先天禀赋、尸体风化 |

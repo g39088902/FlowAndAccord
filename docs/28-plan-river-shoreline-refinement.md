@@ -3,15 +3,13 @@
 > **状态**：★ **已实现（v1.49.0）**——Rust 内核水体矢量多边形打通、前端四层微缩沙盘水体管线落地、底模消隐与边界墙深度排序调优完成、水系微观生态层（RiverLife）叠水底卵石/游鱼/波光进场；零网格细分与零 GC，门禁全通。
 > **整理日期**：2026-09-10（v1.49.0 更新）
 > **范围**：消除河流与河岸的 13 米级网格阶梯锯齿、打通连续矢量水面多边形渲染、构建平滑湿润漫滩过渡带（Sandbank Ribbon）、增加水陆交界表面张力微沫高光与涉渡点质感、铺设写意水底卵石/鱼群/太阳波光生态层、地形格间抗锯齿缝隙补偿与沙盘边界墙深度排序调优；**不改动**宏观水库逻辑、不改动寻路阻挡判定、不增加全局网格细分，保持零 GC 与确定性。
-> **入口**：[文档导航](./README.md) · [地形美术规划](./21-plan-terrain-art.md) · [新增地形技术方案](./26-plan-terrain-implementation.md) · [前端渲染现状](./current/07-frontend-ui.md)。
+> **入口**：[文档导航](./README.md) · [地形美术规划](./21-plan-terrain-art.md) · [地形专项方案](./22-plan-terrain-features.md) · [前端渲染现状](./current/07-frontend-ui.md)。
 
 ---
 
 ## 0. 背景与现状视觉实证
 
-在 v1.48.0 之前的项目版本中运行并随机生成河流地图（模板 `river_valley_v1`），通过高分辨率无头诊断采样捕获的历史渲染特写：
-
-![当前河流地图河岸特写](../../.gemini/antigravity/brain/99b815ba-954c-4f8b-873a-4bf54e02d1eb/river_closeup.png)
+在 v1.48.0 之前的项目版本中运行并随机生成河流地图（模板 `river_valley_v1`），通过高分辨率无头诊断采样捕获历史渲染特写；截图素材未随仓库分发，缺陷表现以 §0.1 文字描述为准。
 
 *(全局全景截图见开发日志归档：`river_current.png`)*
 
@@ -23,8 +21,8 @@
    - 连续弯曲斜向流动的河流因此被切成一阶一阶由西向东、由北向南的**巨大直角折线台阶**，呈现严重的"低清 Minecraft 像素阶梯感"，彻底破坏了微缩沙盘连绵自然的温润观感。
 
 2. **已有高精度矢量特征被弃用，细线与方块割裂悬浮**
-   - 内核 [`hydrology.rs`](crates/sim_core/src/geo/hydrology.rs) 内部其实已经通过正弦波函数生成了 **97 个平滑采样点的左右岸线序列**（`left` 与 `right`），甚至构建了由 194 点组成的闭合水面轮廓 `WaterBody.vertices`。
-   - 但前端 [`render_terrain.js`](frontend/js/render_terrain.js) 仅将左右岸线作为单条半透明细线条（`RiverBank`）绘制在阶梯方块上方。
+   - 内核 [`hydrology.rs`](../crates/sim_core/src/geo/hydrology.rs) 内部其实已经通过正弦波函数生成了 **97 个平滑采样点的左右岸线序列**（`left` 与 `right`），甚至构建了由 194 点组成的闭合水面轮廓 `WaterBody.vertices`。
+   - 但前端 [`render_terrain.js`](../frontend/js/render_terrain.js) 仅将左右岸线作为单条半透明细线条（`RiverBank`）绘制在阶梯方块上方。
    - 这条平滑线漂浮在粗糙的阶梯方块上，不仅掩盖不了锯齿，反而形成"平滑细线切过直角方块"的穿模与脱节感；而水体闭合矢量轮廓更未被下发到前端快照。
 
 3. **水岸材质过渡单薄，缺乏沙盘写意质感**
@@ -49,7 +47,7 @@
 
 3. **确定性与存档绝对一致（Deterministic & Save-Safe）**
    - 水体与岸线矢量几何属于静态地貌特征，由创世种子纯函数生成，且仅在第 0 帧随地形下发一次，后续 Tick 零通信消耗。
-   - 视觉平滑化改造仅属于渲染呈现层，不改变 [`biome.rs`](crates/sim_core/src/geo/biome.rs) 中 `SurfaceKind::DeepWater` 对部落民移动的物理阻挡判定。
+   - 视觉平滑化改造仅属于渲染呈现层，不改变 [`biome.rs`](../crates/sim_core/src/geo/biome.rs) 中 `SurfaceKind::DeepWater` 对部落民移动的物理阻挡判定。
 
 ---
 
@@ -72,7 +70,7 @@ graph TD
 ### 2.1 Layer 0：底模河床平缓消隐 (Submerged Riverbed Mesh)
 - **原理**：原本网格 Quad 露出 13 米锯齿的一大原因，是网格底色直接使用了鲜艳高反差的"亮蓝"与"干砂黄"。
 - **改造**：
-  - 调整 [`frontend/js/math.js`](frontend/js/math.js) 中的 `computeTerrainAlbedo`：将判定为 `DeepWater` / `ShallowWater` 的网格底色改为**暗灰深褐/湿卵石色**（`rgb(32, 48, 56)`）。
+  - 调整 [`frontend/js/math.js`](../frontend/js/math.js) 中的 `computeTerrainAlbedo`：将判定为 `DeepWater` / `ShallowWater` 的网格底色改为**暗灰深褐/湿卵石色**（`rgb(32, 48, 56)`）。
   - 底模仅作为水下深不见底的暗部衬底，不再承担水体表面的视觉主角，即使局部露出也只呈现为自然的河床阴影，彻底消除亮色直角阶梯。
   - **★ v1.50.7 更新**：水格底色再次调整为**深褐色河床土色**——`ShallowWater` → `rgb(92, 68, 46)`（湿润浅滩土），`DeepWater` → `rgb(58, 42, 28)`（幽深河床暗土）。v1.50.5 河床基底移除后，水格底色透过半透明水面直接成色，深蓝底与碧蓝水面混成一片蓝黑缺乏层次；改用暖棕河床土色后，水面呈清透碧蓝、水下透出湿润泥土的暖调，蓝水褐床对比自然。
   - **★ v1.50.8 调浅**：实测 v1.50.7 的深褐仍偏暗，水格与相邻陆格的色阶反差使 13m 网格锯齿在半透明水面下显形；整体上调两档贴近岸边湿砂色——`ShallowWater` → `rgb(126, 100, 72)`，`DeepWater` → `rgb(100, 78, 54)`。
@@ -155,18 +153,18 @@ graph TD
 
 | 文件 | 改造点 | 职责说明 |
 | :--- | :--- | :--- |
-| [`geo/hydrology.rs`](crates/sim_core/src/geo/hydrology.rs) | `generate_river` | 将 `outline` 封装为 `TerrainFeatureKind::River` 压入 `self.features`；构建左/右平滑漫滩带 `TerrainFeatureKind::RiverBank` 并赋有效高程。 |
-| [`geo/terrain.rs`](crates/sim_core/src/geo/terrain.rs) | `TerrainFeatureKind` | 确保 `River` 枚举变体与几何闭合多边形语义对应。 |
-| [`spatial/snapshot_bin/dict.rs`](crates/sim_core/src/spatial/snapshot_bin/dict.rs) | `feature_kind_code` | `TerrainFeatureKind::River` 枚举码位与表格一一对应（防 FABS 漂移）。 |
+| [`geo/hydrology.rs`](../crates/sim_core/src/geo/hydrology.rs) | `generate_river` | 将 `outline` 封装为 `TerrainFeatureKind::River` 压入 `self.features`；构建左/右平滑漫滩带 `TerrainFeatureKind::RiverBank` 并赋有效高程。 |
+| [`geo/terrain.rs`](../crates/sim_core/src/geo/terrain.rs) | `TerrainFeatureKind` | 确保 `River` 枚举变体与几何闭合多边形语义对应。 |
+| [`spatial/snapshot_bin/dict.rs`](../crates/sim_core/src/spatial/snapshot_bin/dict.rs) | `feature_kind_code` | `TerrainFeatureKind::River` 枚举码位与表格一一对应（防 FABS 漂移）。 |
 
 ### 3.2 前端渲染层 (`frontend/js`)
 
 | 文件 | 改造点 | 职责说明 |
 | :--- | :--- | :--- |
-| [`js/render_terrain.js`](frontend/js/render_terrain.js) | `drawTerrain` / `drawTerrainFeatures` | 1. 地形 Quad 格间抗锯齿缝隙补偿（★ v1.48.1 `TERRAIN_SEAM_PX`）；<br>2. 边界墙深度排序绘制（★ v1.48.2 `BOUNDARY_WALLS` / `drawBoundaryWall`）；<br>3. 拆解绘制流水线：Pass 1 漫滩带 → Pass 1.5 河床基底+卵石+游鱼（★ v1.49.0） → Pass 2 矢量水面+深浅纵深 → Pass 2.8 太阳波光（★ v1.49.0） → Pass 3 岸线微沫+碎沫漂移 → Pass 4 涉渡点。 |
-| [`js/math.js`](frontend/js/math.js) | `computeTerrainAlbedo` | 弱化 `DeepWater` 底模颜色反差，改为深暗卵石底色，避免缝隙渗色。 |
-| [`js/river_life.js`](frontend/js/river_life.js) | `RiverLife` 模块（★ v1.49.0 新增） | 纯表现层（不消耗 WorldRng、不写模拟状态、不进存档）：<br>① 水底 85 颗卵石（5 色系色盘 + 迎光跟随的高光斑）；<br>② 4 群 22 条游鱼（中心线巡航 + 正弦摆尾 + 水底投影，走墙钟）；<br>③ `drawSunGlint` 太阳波光（迎光相位调制 + 细碎闪烁节奏）。<br>世界重置/读档随种子确定性重建（`rustworld.js` 地形重建时以 `_engineSeed` 初始化）。 |
-| [`js/rustworld.js`](frontend/js/rustworld.js) | `_applySnapshot` 或 terrain 重建钩子 | 地形重建时以 `_engineSeed` 初始化 `RiverLife`（保证世界重置/读档后卵石鱼群分布确定性一致）。 |
+| [`js/render_terrain.js`](../frontend/js/render_terrain.js) | `drawTerrain` / `drawTerrainFeatures` | 1. 地形 Quad 格间抗锯齿缝隙补偿（★ v1.48.1 `TERRAIN_SEAM_PX`）；<br>2. 边界墙深度排序绘制（★ v1.48.2 `BOUNDARY_WALLS` / `drawBoundaryWall`）；<br>3. 拆解绘制流水线：Pass 1 漫滩带 → Pass 1.5 河床基底+卵石+游鱼（★ v1.49.0） → Pass 2 矢量水面+深浅纵深 → Pass 2.8 太阳波光（★ v1.49.0） → Pass 3 岸线微沫+碎沫漂移 → Pass 4 涉渡点。 |
+| [`js/math.js`](../frontend/js/math.js) | `computeTerrainAlbedo` | 弱化 `DeepWater` 底模颜色反差，改为深暗卵石底色，避免缝隙渗色。 |
+| [`js/river_life.js`](../frontend/js/river_life.js) | `RiverLife` 模块（★ v1.49.0 新增） | 纯表现层（不消耗 WorldRng、不写模拟状态、不进存档）：<br>① 水底 85 颗卵石（5 色系色盘 + 迎光跟随的高光斑）；<br>② 4 群 22 条游鱼（中心线巡航 + 正弦摆尾 + 水底投影，走墙钟）；<br>③ `drawSunGlint` 太阳波光（迎光相位调制 + 细碎闪烁节奏）。<br>世界重置/读档随种子确定性重建（`rustworld.js` 地形重建时以 `_engineSeed` 初始化）。 |
+| [`js/rustworld.js`](../frontend/js/rustworld.js) | `_applySnapshot` 或 terrain 重建钩子 | 地形重建时以 `_engineSeed` 初始化 `RiverLife`（保证世界重置/读档后卵石鱼群分布确定性一致）。 |
 
 ---
 

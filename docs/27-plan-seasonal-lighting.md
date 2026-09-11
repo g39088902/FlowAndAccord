@@ -404,7 +404,7 @@ node tools/test-snapshot-bin.js     # 快照未改，作为回归网
 |---|---|
 | [21-plan-terrain-art.md](./21-plan-terrain-art.md) S1-4 / M3 | 该方案负责**地表反照率**（草绿→枯黄→积雪、纹理、素材）；本方案负责**光**（方向/强度/色温/阴影/氛围）。两侧**共用** `SimLighting.phase()` 与同一套 `cell.color` 失效机制，**严禁各自维护一套季节相位**。本方案先落地可让 S1-4 直接消费光相。 |
 | [03-seasons-climate.md](./current/03-seasons-climate.md) | 只提供季节/气温事实；本方案不新增时间基准、不修改 `tick_season`。 |
-| [26-plan-terrain-implementation.md](./26-plan-terrain-implementation.md) | 地表类别与法线来源不变；本方案只消费既有 `dzdx/dzdy`。 |
+| [22-plan-terrain-features.md](./22-plan-terrain-features.md) | 地表类别与法线来源不变；本方案只消费既有 `dzdx/dzdy`。 |
 | [16-plan-performance-optimization.md](./16-plan-performance-optimization.md) | 本方案的重着色成本需纳入其渲染侧基准；若未来网格分辨率提升，须重估 §4.1。 |
 | [07-frontend-ui.md](./current/07-frontend-ui.md) | 渲染管线新增两个氛围插入点，需同步文档（不动实体深度队列）。 |
 
