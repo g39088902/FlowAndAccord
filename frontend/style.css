@@ -34,6 +34,10 @@
     #canvas-container:active { cursor: grabbing; }
     canvas { display: block; width: 100%; height: 100%; }
 
+    /* 地图图鉴嵌入的只读地图模式：保留正式游戏的同一 Canvas 渲染管线，隐藏全部游戏 UI。 */
+    html.map-only body > :not(#canvas-container):not(#engine-status) { display: none !important; }
+    html.map-only #canvas-container { cursor: grab; }
+
     /* 顶部玻璃拟态信息栏 */
     .top-bar {
       position: absolute;

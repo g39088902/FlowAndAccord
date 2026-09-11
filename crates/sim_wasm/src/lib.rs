@@ -60,6 +60,22 @@ pub extern "C" fn world_create(
     0
 }
 
+/// 创建仅含地貌的只读世界：复用正式游戏相同的确定性地形生成链路，但不播撒
+/// POI、Agent、房屋或路网。供地图图鉴调用，不能用于推进或存档。
+#[no_mangle]
+pub extern "C" fn world_create_map(grid_res: u32, world_size: f32, seed: f64) -> i32 {
+    unsafe {
+        let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
+        WORLD = Some(World3DEngine::new_seeded_with_config(
+            grid_res as usize,
+            world_size,
+            seed as u64,
+            config,
+        ));
+    }
+    0
+}
+
 /// 准备写入 Config JSON 的内部缓冲区，返回起始指针
 #[no_mangle]
 pub extern "C" fn world_config_buf_ptr(len: u32) -> u32 {

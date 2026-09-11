@@ -63,8 +63,11 @@
         this._worker = null;
         this._ready = false;
         // 地图图鉴可通过 ?seed=<整数> 把已挑选的种子带入正式世界；无参数时保留随机开局。
-        const requestedSeed = Number.parseInt(new URLSearchParams(window.location.search).get('seed') || '', 10);
+        const query = new URLSearchParams(window.location.search);
+        const requestedSeed = Number.parseInt(query.get('seed') || '', 10);
         this._engineSeed = Number.isSafeInteger(requestedSeed) && requestedSeed >= 0 ? requestedSeed : Date.now();
+        // 地图图鉴以相同 seed 创建仅含 TerrainMap 的 WASM 世界；不播撒任何游戏实体或路网。
+        this._mapOnly = query.has('mapOnly');
         this._terrainCached = false;
         this._lastEvent = null;
         this._trails = new Map();
@@ -81,7 +84,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.15';
+        this._appVersion = '1.50.16';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -135,6 +138,7 @@
             seed: this._engineSeed,
             agentCount: 20,
             campCount: this._campCountFromConfig(),
+            mapOnly: this._mapOnly,
             config: configObj,
             regenMultipliers: this._poiRegenMultipliersFromStorage(),
           });
@@ -150,7 +154,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.15';
+            this._appVersion = msg.appVersion || '1.50.16';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -411,7 +415,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.15';
+        return this._appVersion || '1.50.16';
       }
 
       /**

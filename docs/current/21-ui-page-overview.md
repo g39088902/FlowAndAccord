@@ -27,7 +27,8 @@ graph TD
 
 ## 1.1 画布视口与 3D 渲染层 (Canvas Viewport)
 
-- **容器与元素**：`<div id="canvas-container"><canvas id="sim-canvas"></canvas></div>`
+- **容器与元素**：`<div id="canvas-container"><canvas id="sim-canvas"></canvas></div>`。
+- **只读地图图鉴**：`map.html` 将相同 Canvas 页面作为 `index.html?seed=<n>&mapOnly=1&nogate=1` 内嵌视图加载；`mapOnly` 通过 WASM 的 `world_create_map` 复用正式 `TerrainMap` 生成器，且不播撒 POI、路网、房屋与族人。因此同种子地貌、河道、自然装饰、相机和光照与正式游戏一致，只有游戏数据被刻意移除。
 - **坐标映射与投影管线**（`frontend/js/math.js` & `render_world.js`）：
   - 维持 3D 等轴斜视投影：RotX = 58°，RotZ = 45°；
   - 鼠标滚轮缩放（Zoom 0.25x ~ 3.5x）、右键拖拽或左键平移（PanX, PanY）；

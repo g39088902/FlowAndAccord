@@ -59,7 +59,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.50.15';
+  return '1.50.16';
 }
 
 function applyConfigInternal(configObj) {
@@ -393,8 +393,16 @@ self.onmessage = async function(e) {
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
-        _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
-        applyInitialRegenMultipliers(msg.regenMultipliers);
+        // 地图图鉴复用正式世界的同一地形生成器，但不播撒 POI、Agent、房屋或路网。
+        if (msg.mapOnly) {
+          if (typeof _wasm.world_create_map !== 'function') {
+            throw new Error('当前 WASM 不支持地图图鉴模式，请重新编译后刷新页面');
+          }
+          _wasm.world_create_map(120, 764.0, _engineSeed);
+        } else {
+          _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+          applyInitialRegenMultipliers(msg.regenMultipliers);
+        }
         _ready = true;
         historyCheckpoints = [];
         historyCommands = [];
@@ -402,10 +410,11 @@ self.onmessage = async function(e) {
         lastCheckpointRealTime = 0;
         const initialRes = pullSnapshot(true);
         const initialSnap = initialRes ? (initialRes.bin || initialRes.snap) : null;
-        if (initialSnap) {
+        if (initialSnap && !msg.mapOnly) {
           recordHistoryCheckpoint(currentTick);
         }
-        startLoop();
+        // 图鉴世界只读取首帧地形快照，不创建检查点也不启动模拟节拍，确保它始终是无游戏数据的静态地图。
+        if (!msg.mapOnly) startLoop();
         const initMsg = {
           type: 'READY',
           seed: _engineSeed,
