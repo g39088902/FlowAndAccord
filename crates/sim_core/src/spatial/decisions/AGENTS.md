@@ -32,7 +32,7 @@
 
 - **`Decisioner<'a>`**：单 Agent 决策器，持有全部只读上下文（`ctx`/`network`/`houses`/`rng`/`config`）；多个 `impl` 块分布在 routing / evaluate / harvest / seeking 四个文件中，方法全 `pub`，跨文件互调零障碍。
 - **`DecisionContext`**：每 tick 由 `build_decision_context` 重建的全图资源节点集合；**是否可用由每个 Agent 的私有触发器过滤**，`needs.rs` 不判断可用性。
-- **`Need { level, kind, target_state }`**：一条需求判定结论，`evaluate_needs` 返回、`fulfill_resting_need` 落地。
+- **`Need { level, kind, target_state }`**：一条需求判定结论，`arbitrate_sustained_task` 返回、`dispatch_task` 落地。
 
 ## 4. ⚠️ 本目录局部易踩坑
 
@@ -44,7 +44,7 @@
 
 ### 4.2 RNG 消费点
 
-`Decisioner.rng` 指向全局 `WorldRng`，按 agents 顺序消费。当前本目录实际 RNG 调用只有 `evaluate.rs::fulfill_resting_need` 的立宅候选 angle/dist；竞拍候选按 ID 升序全集枚举，资源/市场选最近点均不耗 RNG。资源/市场并列沿用输入遍历顺序；夺位只在距离严格更小时替换候选，保留先遇到的营地。只读观察模块不得重新调用评估、选址或派发。
+`Decisioner.rng` 指向全局 `WorldRng`，按 agents 顺序消费。当前本目录实际 RNG 调用只有 `evaluate.rs::dispatch_task` 的立宅候选 angle/dist；竞拍候选按 ID 升序全集枚举，资源/市场选最近点均不耗 RNG。资源/市场并列沿用输入遍历顺序；夺位只在距离严格更小时替换候选，保留先遇到的营地。只读观察模块不得重新调用评估、选址或派发。
 
 ### 4.3  dispatch 成功才改写状态
 
@@ -52,7 +52,7 @@
 
 ### 4.4 立宅选址掷点
 
-`FoundHome` 在 `fulfill_resting_need` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing` 自检，存 `pending_house_pos`（★ v1.29.1 起存**候选点本身**，而非离候选点最近的路网节点——后者可能是别人家门节点，会导致实体化校验失败）；系统仅由 `housing_system/settlement.rs::materialize_founded_houses` 实体化，到达判定 = 走完派发路线（`current_lane_id` 清空）即视为抵达。`B12FoundHome` 分支含 `pending_house_pos.is_none()` 守卫，已选定宅址则不重掷。选址掷点消耗共享 RNG，改动候选数/距离/间距必须走 `SimConfig`（`decision_found_home_*`）。
+`FoundHome` 在 `dispatch_task` 内由 agent 自己掷 `decision_found_home_candidates`(12) 个候选点、按 `house_min_spacing` 自检，存 `pending_house_pos`（★ v1.29.1 起存**候选点本身**，而非离候选点最近的路网节点——后者可能是别人家门节点，会导致实体化校验失败）；系统仅由 `housing_system/settlement.rs::materialize_founded_houses` 实体化，到达判定 = 走完派发路线（`current_lane_id` 清空）即视为抵达。`B12FoundHome` 分支含 `pending_house_pos.is_none()` 守卫，已选定宅址则不重掷。选址掷点消耗共享 RNG，改动候选数/距离/间距必须走 `SimConfig`（`decision_found_home_*`）。
 
 ### 4.5 淘金冷却三处联动
 
@@ -64,7 +64,7 @@
 
 ### 4.7 🔴 评估顺序的真相源在前端配置文件（Rust 无顺序）
 
-- `evaluate_needs` **不写死优先级**：按 `Decisioner.branch_order`（由 `scheduler.rs` 每拍调 `resolve_order(&config.decision_eval_order)` 解析、热路径零分配）迭代 `branches.rs` 注册表。
+- `arbitrate_sustained_task` **不写死优先级**：按 `Decisioner.branch_order`（由 `scheduler.rs` 每拍调 `resolve_order(&config.decision_eval_order)` 解析、热路径零分配）迭代 `branches.rs` 注册表。
 - **严禁**在本目录写死任何策展优先级常量（如 `[b1,b2,b3,b12,…]`）：`BranchId::ALL` 只是配置空/非法时的中性兜底序。
   策展顺序的唯一真相源是 `frontend/js/config.decision-order.js`，经 `SIM_CONFIG` 注入。
 - 新增/修改分支时必须保持条件函数**自包含**：无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认
@@ -76,7 +76,7 @@
 
 v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决策引擎的第 14 条分支 `B14SeekThrone`**（`NeedKind::SeekThrone`，`MaslowLevel::Physiological`，策展序/兜底序均置首 b14）：
 - **触发（守卫全内联在分支内）**：在世成年男性、非现任国王、且 `Decisioner.eligible_leaderless_camp` 找到空缺王位营地——有房（含 0 级）者只能夺**自家房屋所在营地**的空缺王位，无房可夺**任意**空缺王位营地（Task6 语义）；
-- **选点写字段**：`fulfill_resting_need` 将选定营地写入 `agent.expedition_target_camp` 并 `dispatch` 为 `PrimitiveActionState::SeekingThrone`，`current_need = "Physiological·SeekThrone"`；
+- **选点写字段**：`dispatch_task` 将选定营地写入 `agent.expedition_target_camp` 并 `dispatch` 为 `PrimitiveActionState::SeekingThrone`，`current_need = "Physiological·SeekThrone"`；
 - **途中状态机 `decide_seeking_throne`**（seeking.rs，寻路+运动系统，坐标连续不闪现）：体力告警 → 折返；抵达目标营地交互半径且王位仍空缺 → 写 `coronation_pending` 待世界登基；途中目标已易主 → 原地掉头重定向到新的空缺王位营地；无可夺位营地 → 放弃远征恢复常规决策；
 - **登基物理执行**：世界 `scheduler.rs::execute_pending_coronations` 每拍决策后扫描 `coronation_pending`，校验王位仍空缺才 `coronate_king`（迁籍入地区、`set_king` 入历史、`set_leader`、回 `RestingAtCamp`）——系统只当物理规则执行者，与 `materialize_founded_houses` 同模式；★ v1.45.2 登基时若族人已有私宅，严禁覆盖 `home_camp_node` 为营地中心 POI 节点，保留私宅大门连接以杜绝与配偶分居、无法育儿；
 - 状态以 `agent.state == SeekingThrone` 与 `agent.expedition_target_camp` 记录（`activeExpeditionAgents` 由快照按状态+目标营地过滤派生）；
@@ -85,7 +85,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 
 ### 4.9 🔴 决策层非移动态切换必须走 `enter_stationary_state()` · 移动态由 dispatch 自动驱动（v1.25.0 起）
 
-**移动态**：分支命中返回的 `Need.target_state` 若是需要物理移动的状态（`Seeking*` 等），`fulfill_resting_need` → `dispatch()` 会自动写入 `state / route / current_lane_id`，运动系统读到 `current_lane_id.is_some()` 即开始移动。**无需维护任何白名单**，新增移动态分支零额外成本。
+**移动态**：分支命中返回的 `Need.target_state` 若是需要物理移动的状态（`Seeking*` 等），`dispatch_task` → `dispatch()` 会自动写入 `state / route / current_lane_id`，运动系统读到 `current_lane_id.is_some()` 即开始移动。**无需维护任何白名单**，新增移动态分支零额外成本。
 
 **非移动态**：若 `Need.target_state` 是静止态（`RepairingHouse` / `ConstructingHouse` / `RestingAtCamp` 等），或决策途中从移动态切回静止态（放弃远征/求偶资格失败/成婚结算/登基/封王等），**必须调用 `agent.enter_stationary_state(state)`**，禁止直接 `agent.state = X`——该方法统一清空 `current_lane_id` / `current_velocity` / `route_index`，确保运动系统读到无车道即静止。直接赋值不清车道会导致"人在家但坐标在跑"。
 

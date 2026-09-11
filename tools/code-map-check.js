@@ -74,34 +74,6 @@ function scanActualFiles() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. 解析 09-code-map.md 中的文件清单
-//    从代码块中提取所有文件路径（含 .rs/.js/.yml/.md 等）
-// ---------------------------------------------------------------------------
-function parseCodeMapFiles(text) {
-  const files = new Set();
-  // 提取 ```text ... ``` 代码块
-  const blockRe = /```text\n([\s\S]*?)```/g;
-  let blockMatch;
-  while ((blockMatch = blockRe.exec(text)) !== null) {
-    const block = blockMatch[1];
-    // 逐行提取文件名：匹配路径片段中的 xxx.ext
-    // 树形符号行如：│   │       ├── config.rs                   # 说明
-    const lineRe = /(?:^|\s)([a-zA-Z0-9_./-]+\.(?:rs|js|ts|html|css|toml|yml|yaml|json|md|wasm))/g;
-    let m;
-    while ((m = lineRe.exec(block)) !== null) {
-      let filePath = m[1];
-      // 去掉可能的行内注释残留
-      filePath = filePath.replace(/#.*$/, '').trim();
-      // 代码地图中写的是相对路径片段，需要补全为相对于 ROOT 的路径
-      // 例如 "config.rs" 在 crates/sim_core/src/ 下，但代码地图用树形表示
-      // 我们收集所有出现的文件名，后续用"文件名匹配"做粗粒度对比
-      files.add(filePath);
-    }
-  }
-  return files;
-}
-
-// ---------------------------------------------------------------------------
 // 3. 构建代码地图中的"目录→文件"映射（基于树形缩进）
 // ---------------------------------------------------------------------------
 function parseCodeMapTree(text) {

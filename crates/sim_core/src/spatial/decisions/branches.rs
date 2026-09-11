@@ -1,6 +1,6 @@
 //! 需求判定分支注册表 (branches.rs)
 //!
-//! `evaluate_needs` 的 16 条分支抽为稳定字符串 ID 索引的自包含条件函数。
+//! `arbitrate_sustained_task` 的 16 条分支抽为稳定字符串 ID 索引的自包含条件函数。
 //! 本文件只描述「每条分支的语义」，**不持有任何策展优先级**：
 //! 评估顺序的唯一真相源是前端持久化配置文件 `frontend/js/config.decision-order.js`，
 //! 经 `SimConfig.decision_eval_order` 热注入；为空或非法时回退 `BranchId::ALL`
@@ -517,7 +517,7 @@ fn at_home_door(d: &Decisioner, a: &Agent3D, house: &House) -> bool {
 }
 
 /// ★ v1.31.0 竞拍候选全集：把所有符合条件的在售空置房一次性返回（升序、确定性、不耗 RNG）。
-/// 分支守卫与 `fulfill_resting_need::write_bid_pending` 共用同一判据，杜绝两处口径漂移。
+/// 分支守卫与 `dispatch_task::write_bid_pending` 共用同一判据，杜绝两处口径漂移。
 /// - 无房者（`home_house_id` 为 None，视为 0 级）：对**全部**在售空置房（含 0 级仓库）出价；
 /// - 有房者：仅改善型换房，只对 `tier > 自家等级` 的更高等级在售房出价。
 /// 出价金额由执行器统一倾囊（家户全部黄金），故此处只返回房屋 ID 升序集合。

@@ -33,7 +33,7 @@ fn clear_error() {
 }
 
 /// 创建世界并注入初始生态 (grid_res=120, world_size=764, seed 可复现，agent_count=20)
-/// 优先使用前端通过 world_apply_config_buf / world_set_config 注入的持久配置 ACTIVE_CONFIG。
+/// 优先使用前端通过 world_apply_config_buf 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 #[no_mangle]
 pub extern "C" fn world_create(
@@ -95,29 +95,6 @@ pub extern "C" fn world_apply_config_buf(len: u32) -> i32 {
             return -1;
         }
         let json_str = match std::str::from_utf8(&CONFIG_BUF[..len]) {
-            Ok(s) => s,
-            Err(_) => return -3,
-        };
-
-        match serde_json::from_str::<SimConfig>(json_str) {
-            Ok(cfg) => {
-                if let Some(w) = WORLD.as_mut() {
-                    let _ = w.apply_config(cfg.clone());
-                }
-                ACTIVE_CONFIG = Some(cfg);
-                0
-            }
-            Err(_) => -2,
-        }
-    }
-}
-
-/// 直接从线性内存指针和长度应用 Config JSON
-#[no_mangle]
-pub extern "C" fn world_set_config(ptr: u32, len: u32) -> i32 {
-    unsafe {
-        let slice = std::slice::from_raw_parts(ptr as *const u8, len as usize);
-        let json_str = match std::str::from_utf8(slice) {
             Ok(s) => s,
             Err(_) => return -3,
         };

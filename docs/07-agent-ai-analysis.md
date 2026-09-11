@@ -107,7 +107,7 @@ Dijkstra 不使用启发式，会探索大量无关节点；A* 的欧氏距离�
 
 ## 6. 为什么是 Agent 自主决策，而非系统扫描指挥
 
-根 AGENTS.md §4.11 明确：系统只当"物理规则执行者"，一切"盖不盖、何时盖、在哪盖"来自 agent 自己的 `evaluate_needs` 输出。三条自主触发链路（立宅/升级/修缮）均为确定性触发，详细门槛见 [06-motivation-ai.md](./current/06-motivation-ai.md)。
+根 AGENTS.md §4.11 明确：系统只当"物理规则执行者"，一切"盖不盖、何时盖、在哪盖"来自 agent 自己的 `arbitrate_sustained_task` 输出。三条自主触发链路（立宅/升级/修缮）均为确定性触发，详细门槛见 [06-motivation-ai.md](./current/06-motivation-ai.md)。
 
 **禁止系统扫描指挥的三个理由**：
 1. **涌现性**：系统扫描会强制所有 agent 同步行为（如"所有仓满的房子同时升级"），破坏个体差异和时间分散；

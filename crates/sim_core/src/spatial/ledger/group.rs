@@ -95,9 +95,4 @@ impl Group {
         }
         true
     }
-
-    /// 是否包含某成员（含领导）
-    pub fn has_member(&self, agent: AgentId) -> bool {
-        self.members.contains(&agent)
-    }
 }

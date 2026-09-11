@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 pub struct SimConfig {
     // 1. 引擎节拍与时间基准
     pub simulation_dt: f32,
-    pub ticks_per_second: u64,
     pub agent_decision_interval_ticks: u64,
 
     // 2. 部落民生理、代谢与生命周期
@@ -114,9 +113,6 @@ pub struct SimConfig {
     pub poi_spawn_fallback_ratio: f32,
     pub count_terrain_transition_nodes: usize,
     pub poi_spawn_spread_ratio: f32,
-    pub road_connect_near_dist: f32,
-    pub road_connect_far_dist: f32,
-    pub road_grade_pave_threshold: f32,
     pub poi_interaction_radius: f32,
     pub camp_home_consume_rate: f32,
 
@@ -158,7 +154,6 @@ pub struct SimConfig {
     // 6. 私宅营造、代际传承与升级
     pub house_durability_max: f32,
     pub house_depreciation_rate: f32,
-    pub house_repair_trigger_threshold: f32,
     pub house_repair_speed: f32,
     // ★ M8 房屋升级材料成本矩阵（4 级 × 5 资源；升到 N 级时该品类一次性扣除量，不消耗填 0）
     pub house_upgrade_cost_tier1_water: f32,
@@ -195,7 +190,6 @@ pub struct SimConfig {
     // 7. 地形生成、地表查询与山口 profile
     pub terrain_profile: String,
     pub terrain_ridge_amplitude: f32,
-    pub terrain_ridge_width: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊高斯半宽 (m)。
     /// 通行力约束：主脊最大梯度 ≈ 0.858 × `terrain_pass_ridge_amplitude` / 本值，
     /// 必须显著大于 tan(`terrain_max_walk_slope`)，否则主脊不产生绕行代价（docs/22 §9.3.1）。
@@ -215,13 +209,8 @@ pub struct SimConfig {
     pub terrain_max_build_slope: f32,
     pub terrain_footprint_half_extent: f32,
     pub terrain_road_corridor_width: f32,
-pub terrain_generation_max_retries: usize,
-/// ★ v1.48.0 D-A 装饰系统：装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
-pub terrain_accent_density: f32,
-/// ★ v1.48.0 D-B 子特征注入：是否启用子特征注入（山脚湖/瀑布/峭壁等）
-pub terrain_accent_sub_features: bool,
-/// ★ v1.48.0 D-A 装饰系统：装饰树木是否按季节变色
-pub terrain_tree_season_tint: bool,
+    /// ★ v1.48.0 D-A 装饰系统：装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
+    pub terrain_accent_density: f32,
 
 // 8. 四季更迭与宏观气候
     pub season_year_length: f32,
@@ -259,7 +248,6 @@ pub terrain_tree_season_tint: bool,
     pub agent_move_stamina_grade_coef: f32,
     pub agent_move_accel_coef: f32,
     pub road_astar_grade_penalty_coef: f32,
-    pub road_astar_heuristic_divisor: f32,
     pub road_hidden_prefer_modifier: f32,
     pub road_visible_prefer_modifier: f32,
     pub road_hidden_avoid_modifier: f32,
@@ -315,7 +303,6 @@ pub terrain_tree_season_tint: bool,
     pub house_auction_crown_share_weight: f32,
     pub house_auction_benchmark_decay_rate: f32,
     pub market_price_base_wood: f32,
-    pub market_price_base_stone: f32,
 }
 
 impl SimConfig {

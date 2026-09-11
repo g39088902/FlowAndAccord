@@ -136,27 +136,6 @@ impl Region {
         }
         ok
     }
-
-    /// 插入 agent 到 arrival_order 的正确位置（按 (arrival_tick, agent_id) 升序）
-    /// 调用方需先从 world 读取 agent.arrival_tick
-    pub fn insert_arrival(&mut self, agent: AgentId, _arrival_tick: u64) {
-        if self.arrival_order.contains(&agent) {
-            return;
-        }
-        // 找到第一个 (tick, id) > (arrival_tick, agent) 的位置插入
-        let _pos = self
-            .arrival_order
-            .iter()
-            .position(|&_a| {
-                // 比较逻辑：需要 world 中的 arrival_tick，但这里只按 id 辅助
-                // 实际排序由调用方在 add_member 时完成
-                false
-            })
-            .unwrap_or(self.arrival_order.len());
-        // 简化：直接 push，由 RegionRegistry::add_member 统一排序
-        let _ = _pos;
-        self.arrival_order.push(agent);
-    }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -209,17 +188,6 @@ impl RegionRegistry {
     /// 某人当前所属 camp_id
     pub fn region_of(&self, agent: AgentId) -> Option<u32> {
         self.by_agent.get(&agent).copied()
-    }
-
-    /// 获取某人所在地区的引用
-    pub fn get_region_of_agent(&self, agent: AgentId) -> Option<&Region> {
-        let camp_id = *self.by_agent.get(&agent)?;
-        self.regions.get(&camp_id)
-    }
-
-    /// 全部地区迭代（按 camp_id 升序）
-    pub fn all_regions(&self) -> impl Iterator<Item = (&u32, &Region)> {
-        self.regions.iter()
     }
 
     /// 加入地区成员（幂等：已是成员返回 false）。自动确保地区存在。

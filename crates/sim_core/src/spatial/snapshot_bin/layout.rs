@@ -98,10 +98,6 @@ pub const NONE_U64: u64 = u64::MAX;
 /// `Option<f32>` 的空值哨兵（IEEE-754 NaN；内核不会产出 NaN，见 `test-wasm.js` 防 NaN 门禁）
 pub const NONE_F32: f32 = f32::NAN;
 
-/// 账本资源品类的**固定书写顺序**（与 `ResourceKind` 枚举序一致）：
-/// Water, Food, Wood, Stone, Gold
-pub const RESOURCE_ORDER_LEN: usize = 5;
-
 /// 顺序流二进制写入器（小端，零依赖手写，不引入 bincode 等新 crate）
 pub struct BinWriter {
     buf: Vec<u8>,

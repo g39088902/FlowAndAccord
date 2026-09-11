@@ -454,24 +454,6 @@ impl<'a> Decisioner<'a> {
         None
     }
 
-    /// 向后兼容别名：调用 arbitrate_sustained_task
-    #[inline]
-    pub fn evaluate_needs_with_branch(&mut self, agent: &Agent3D) -> Option<(BranchId, Need)> {
-        self.arbitrate_sustained_task(agent)
-    }
-
-    /// 向后兼容别名：仅返回 Need
-    #[inline]
-    pub fn evaluate_needs(&mut self, agent: &Agent3D) -> Option<Need> {
-        self.arbitrate_sustained_task(agent).map(|(_, need)| need)
-    }
-
-    /// 向后兼容别名：调用 dispatch_task
-    #[inline]
-    pub fn fulfill_resting_need(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need) {
-        self.dispatch_task(agent, branch, need);
-    }
-
     /// ★ L2 策略规划与 L3 原语派发：
     /// 将 L1 仲裁出的 Need/Branch 转化为具体可执行策略，安装 ActiveTask，并驱动路网导航或原语驻留。
     pub fn dispatch_task(&mut self, agent: &mut Agent3D, branch: BranchId, need: Need) {

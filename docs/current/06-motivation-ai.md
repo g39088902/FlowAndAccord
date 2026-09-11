@@ -157,7 +157,7 @@ stateDiagram-v2
 - 16 条活动分支抽为 `branches.rs` 注册表；b11 合并入 b8「改善住宅」，b15 下沉为水粮木资源意图的采购策略。
   每条分支是**自包含条件函数**，
   因此任意排列都语义安全。
-- `evaluate_needs` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
+- `arbitrate_sustained_task` 不再硬编码优先级，而是**按配置顺序迭代注册表，首个命中即返回**。
 - **Rust 层无顺序**：`decision_eval_order` / `decision_eval_levels` 默认空（未注入）时按 `BranchId::ALL`
   声明序中性兜底；策展优先级权威默认值在 `frontend/js/config.decision-order.js`，
   启动时合并进 `SIM_CONFIG` 经 `applyConfig` 注入；用户调整保存到 `flowaccord.decision-order.v3`，旧 v2 顺序按 ID 自动迁移。
@@ -169,7 +169,7 @@ stateDiagram-v2
 | `mod.rs` | 决策子模块入口与重新导出 |
 | `branches.rs` | 16 条活动分支注册表：`BranchId`、自包含条件、顺序解析与层级覆盖 |
 | `needs.rs` | 需求定义（MaslowLevel/NeedKind）、节点池、家宅缺口计算、`state_need_label_with_agent` 层级覆盖 |
-| `evaluate.rs` | Decisioner 结构体、decide/evaluate_needs（数据驱动）/fulfill_resting_need + ★ v1.29.0 ⓪瞬间层 evaluate_instant_needs/apply_instant_need |
+| `evaluate.rs` | Decisioner 结构体、decide/arbitrate_sustained_task（数据驱动）/dispatch_task + ★ v1.29.0 ⓪瞬间层 evaluate_instant_needs/apply_instant_need |
 | `routing.rs` | 导航/寻路/原地掉头/返家/POI 触发器可用性 |
 | `seeking.rs` | 途中熔断与平滑重路由（含 `decide_seeking_throne` 夺位远征与 `decide_seeking_courtship` 奔赴求偶途中状态机）；★ v1.27.0 `try_route_to_market`（水/粮断流时户主直接改道榷场） |
 | `market.rs` | 采购策略：判断水粮木能否采购、在采集与采购间选策，并处理市场途中与现场阶段 |

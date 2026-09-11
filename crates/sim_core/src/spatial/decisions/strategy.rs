@@ -73,7 +73,6 @@ pub enum ReturnStage {
 pub enum CommitStage {
     Travelling,
     Ready,
-    AwaitingSettlement,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HomeStage {
@@ -84,23 +83,4 @@ pub enum HomeStage {
 pub enum ResidenceTarget {
     House(u32),
     Camp(NodeId),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum StrategyFailureReason {
-    TargetPoiClosed,
-    NoAvailablePoi,
-    NoEligibleSocialTarget,
-    Unreachable,
-    InsufficientFunds,
-    StaminaRestricted,
-    ResidenceInvalid,
-    HouseholdInvalid,
-    SubmissionRejected,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum StrategyFeasibility {
-    Applicable,
-    NotApplicable,
-    Blocked(StrategyFailureReason),
 }

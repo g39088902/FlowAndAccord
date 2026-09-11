@@ -8,7 +8,6 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `simulationDt` | f32 | 0.016666666666666666 | world_tick.rs / sim_wasm (§4.3 严禁改) | 单个 tick 对应的模拟小时数 (1/60) |
-| `ticksPerSecond` | u64 | 60 | world_tick.rs / rustworld.js | 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准） |
 | `agentDecisionIntervalTicks` | u64 | 120 | decisions/scheduler.rs (§4.3 错峰相位) | 每个族人错峰决策间隔 (tick)，平均 2 游戏小时决策一次 |
 
 ## 2. 部落民生理、代谢与生命周期
@@ -108,9 +107,6 @@
 | `poiSpawnFallbackRatio` | f32 | 0.6 | ecology/ (POI 初始化播撒布局) | 紧密撒点回退最小间距比例 (min_distance × N) |
 | `countTerrainTransitionNodes` | usize | 17 | ecology/ (路网过渡节点) | 地形过渡节点数量 (路网骨架) |
 | `poiSpawnSpreadRatio` | f32 | 0.85 | ecology/ (POI 初始化播撒布局) | 地形过渡节点散布范围占半图比例 |
-| `roadConnectNearDist` | f32 | 175 | ecology/ (路网连接距离) | 路网直连近距阈值 (≤ 双向铺装) |
-| `roadConnectFarDist` | f32 | 320 | ecology/ (路网连接距离) | 路网直连远距阈值 (≤ 单向泥径) |
-| `roadGradePaveThreshold` | f32 | 8 | graph.rs (道路等级铺装阈值) | 坡度铺装阈值 (高差超过则盘山道，否则泥径) |
 | `poiInteractionRadius` | f32 | 22 | ecology/ (POI 交互采收/卸货) | 采收现场「已抵达 POI」判定半径 (m) |
 | `campHomeConsumeRate` | f32 | 3 | ecology/ (营地在家吃喝) | 营地/家宅休息自饮自食消耗速率 (单位/小时) |
 
@@ -146,7 +142,6 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `houseDurabilityMax` | f32 | 100 | housing_system/ (耐久度上限) | 房屋耐久上限 |
 | `houseDepreciationRate` | f32 | 0.02 | housing_system/maintenance.rs (折旧) | 房屋耐久自然折旧速率 (每秒) |
-| `houseRepairTriggerThreshold` | f32 | 80 | housing_system/maintenance.rs (修缮) | 耐久低于此值允许修缮 |
 | `houseRepairSpeed` | f32 | 5 | housing_system/maintenance.rs (修缮) | 修缮进度速率 (每秒) |
 | `houseUpgradeCostTier1Water` | f32 | 50 | housing_system/upgrade.rs (升级成本矩阵 §4.8) | 升到 1 级：水 |
 | `houseUpgradeCostTier1Food` | f32 | 50 | housing_system/upgrade.rs (升级成本矩阵 §4.8) | 升到 1 级：粮 |
@@ -185,7 +180,6 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
-| `terrainRidgeWidth` | f32 | 125 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
@@ -200,10 +194,7 @@
 | `terrainMaxBuildSlope` | f32 | 16 | geo/query.rs / housing_system/settlement.rs (房屋完整占地) | 房屋/设施完整占地允许的最大坡度 (度) |
 | `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |
 | `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
-| `terrainGenerationMaxRetries` | usize | 8 | ecology/seed.rs (地形布局有界重试) | 地形/布局校验的有界重试次数 |
 | `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
-| `terrainAccentSubFeatures` | bool | true | geo/accents.rs (子特征注入开关) | 是否启用子特征注入（山脚湖/瀑布/峭壁等，D-B） |
-| `terrainTreeSeasonTint` | bool | true | geo/accents.rs (树木季节变色开关) | 装饰树木是否按季节变色 |
 
 ## 8. 四季更迭与宏观气候
 
@@ -247,7 +238,6 @@
 | `agentMoveStaminaGradeCoef` | f32 | 3.5 | agent.rs (运动学) / graph.rs (寻路) | 坡度对移动体力消耗加成系数 |
 | `agentMoveAccelCoef` | f32 | 4 | agent.rs (运动学) / graph.rs (寻路) | 移动加速度收敛系数 |
 | `roadAstarGradePenaltyCoef` | f32 | 1.5 | graph.rs (A* 寻路权重) | A* 坡度通行代价惩罚系数 |
-| `roadAstarHeuristicDivisor` | f32 | 80 | graph.rs (A* 寻路权重) | A* 启发式距离除数 |
 | `roadHiddenPreferModifier` | f32 | 0.4 | graph.rs / decisions/ (隐秘道路偏好) | A* 偏好隐秘时隐秘道路代价乘子 |
 | `roadVisiblePreferModifier` | f32 | 1.2 | graph.rs / decisions/ (可见道路偏好) | A* 偏好隐秘时公开道路代价乘子 |
 | `roadHiddenAvoidModifier` | f32 | 2.5 | graph.rs / decisions/ (隐秘道路偏好) | A* 非偏好隐秘时隐秘道路代价乘子 |
@@ -318,4 +308,3 @@
 | `houseAuctionCrownShareWeight` | f32 | 1 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额) |
 | `houseAuctionBenchmarkDecayRate` | f32 | 0.02 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭 |
 | `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
-| `marketPriceBaseStone` | f32 | 0.2 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 石料基准金价 (保留：待榷市扩展承载石料后作单价基准) |

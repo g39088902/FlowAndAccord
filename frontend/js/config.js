@@ -17,7 +17,6 @@ window.SIM_CONFIG = {
   // 1. 引擎节拍与时间基准 (Simulation Time & Ticks)
   // ==========================================================================
   simulationDt: 1.0 / 60.0,        // 单个 tick 对应的模拟小时数 (1/60)
-  ticksPerSecond: 60,              // 每小时 tick 数（1x 倍速下现实 1 秒 = 游戏 1 小时，决定模拟实时倍速基准）
   agentDecisionIntervalTicks: 120, // 每个族人错峰决策间隔 (tick)，平均 2 游戏小时决策一次
 
   // ==========================================================================
@@ -115,9 +114,6 @@ window.SIM_CONFIG = {
   poiSpawnFallbackRatio: 0.6,     // 紧密撒点回退最小间距比例 (min_distance × N)
   countTerrainTransitionNodes: 17,// 地形过渡节点数量 (路网骨架)
   poiSpawnSpreadRatio: 0.85,      // 地形过渡节点散布范围占半图比例
-  roadConnectNearDist: 175.0,     // 路网直连近距阈值 (≤ 双向铺装)
-  roadConnectFarDist: 320.0,      // 路网直连远距阈值 (≤ 单向泥径)
-  roadGradePaveThreshold: 8.0,    // 坡度铺装阈值 (高差超过则盘山道，否则泥径)
   poiInteractionRadius: 22.0,     // 采收现场「已抵达 POI」判定半径 (m)
   campHomeConsumeRate: 3.0,       // 营地/家宅休息自饮自食消耗速率 (单位/小时)
 
@@ -151,7 +147,6 @@ window.SIM_CONFIG = {
   // ==========================================================================
   houseDurabilityMax: 100.0,      // 房屋耐久上限
   houseDepreciationRate: 0.02,    // 房屋耐久自然折旧速率 (每秒)
-  houseRepairTriggerThreshold: 80.0, // 耐久低于此值允许修缮
   houseRepairSpeed: 5.0,          // 修缮进度速率 (每秒)
   // M6 升级瞬时化：houseBuildTimeTier*To* 已删除（房屋升级一次性扣账、无施工时长）
   // M8：houseCapacityTier0..4、houseUpgradeTier{0..3}*Ratio、houseFertilityStockRatio 共 14 个字段已删除，
@@ -170,7 +165,6 @@ window.SIM_CONFIG = {
   // 地形生成、地表查询与山口 profile
   terrainProfile: 'random', // 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
-  terrainRidgeWidth: 125.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
   //   通行力约束：0.858 × terrainPassRidgeAmplitude / terrainPassRidgeWidth 须显著大于
@@ -189,11 +183,8 @@ window.SIM_CONFIG = {
   terrainMaxBuildSlope: 16.0,         // 房屋/设施完整占地允许的最大坡度 (度)
   terrainFootprintHalfExtent: 7.0,    // 房屋基础完整占地半径 (m)
   terrainRoadCorridorWidth: 5.0,      // 道路合法走廊宽度 (m)
-  terrainGenerationMaxRetries: 8,     // 地形/布局校验的有界重试次数
   // ★ v1.48.0 D-A 装饰系统
   terrainAccentDensity: 1.0,          // 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
-  terrainAccentSubFeatures: true,     // 是否启用子特征注入（山脚湖/瀑布/峭壁等，D-B）
-  terrainTreeSeasonTint: true,        // 装饰树木是否按季节变色
 
   // ==========================================================================
   // 8. 四季更迭与宏观气候 (Seasons & Macro Climate)
@@ -234,7 +225,6 @@ window.SIM_CONFIG = {
   agentMoveStaminaGradeCoef: 3.5, // 坡度对移动体力消耗加成系数
   agentMoveAccelCoef: 4.0,        // 移动加速度收敛系数
   roadAstarGradePenaltyCoef: 1.5, // A* 坡度通行代价惩罚系数
-  roadAstarHeuristicDivisor: 80.0,// A* 启发式距离除数
   roadHiddenPreferModifier: 0.4,  // A* 偏好隐秘时隐秘道路代价乘子
   roadVisiblePreferModifier: 1.2, // A* 偏好隐秘时公开道路代价乘子
   roadHiddenAvoidModifier: 2.5,   // A* 非偏好隐秘时隐秘道路代价乘子
@@ -300,5 +290,4 @@ window.SIM_CONFIG = {
   houseAuctionCrownShareWeight: 1.0,  // 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额)
   houseAuctionBenchmarkDecayRate: 0.02, // ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭
   marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市扩展承载木材后作单价基准)
-  marketPriceBaseStone: 0.20,         // 石料基准金价 (保留：待榷市扩展承载石料后作单价基准)
 };

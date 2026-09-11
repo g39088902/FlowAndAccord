@@ -5,6 +5,7 @@
  * 用途：
  *   1. 交叉校验 frontend/js/config.js 与 Rust SimConfig (crates/sim_core/src/config.rs)
  *      的字段集、类型与默认值是否完全一致，捕获「孤儿字段 / 缺失字段 / 类型错配 / 数值漂移」。
+ *      ★ v1.50.18 新增第 5 条：内核零读取的空转参数检测（调它不产生任何效果）。
  *   2. 生成 docs/06-config-reference.md —— 一份带中文说明的参数速查表，降低用户检索与调参成本。
  *
  * 用法：
@@ -32,7 +33,6 @@ const OUT_MD = path.join(ROOT, 'docs', '06-config-reference.md');
 // ---------------------------------------------------------------------------
 const IMPACT_OVERRIDES = {
   simulationDt: 'world_tick.rs / sim_wasm (§4.3 严禁改)',
-  ticksPerSecond: 'world_tick.rs / rustworld.js',
   agentDecisionIntervalTicks: 'decisions/scheduler.rs (§4.3 错峰相位)',
   carryCapacityResource: 'agent.rs / ecology/ / decisions/',
   campHomeConsumeRate: 'ecology/ (营地在家吃喝)',
@@ -56,11 +56,8 @@ const IMPACT_OVERRIDES = {
   terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',
   terrainRoadCorridorWidth: 'geo/terrain.rs / graph.rs (道路走廊宽度)',
-  terrainGenerationMaxRetries: 'ecology/seed.rs (地形布局有界重试)',
   // ★ v1.48.0 D-A 装饰系统
   terrainAccentDensity: 'geo/accents.rs (装饰密度)',
-  terrainAccentSubFeatures: 'geo/accents.rs (子特征注入开关)',
-  terrainTreeSeasonTint: 'geo/accents.rs (树木季节变色开关)',
 };
 
 const IMPACT_PREFIX_RULES = [
@@ -212,6 +209,46 @@ function parseConfigRs(text) {
 }
 
 // ---------------------------------------------------------------------------
+// 5) 内核零读取检测 (v1.50.18 新增 · 死代码审计 §2 门禁补漏)
+//    原四条规则只校验「JS↔Rust 契约」，检测不出「两端口径一致、但 Rust 内核从不读取」
+//    的空转参数——这类字段调它不产生任何效果，却会持续误导调参。
+//    判据：SimConfig 字段在 crates/ 内（除 config.rs 自身外）零次 `.field` 读取。
+// ---------------------------------------------------------------------------
+
+/** 收集 crates/ 下全部 .rs 源码（排除 config.rs 自身与 target/） */
+function collectKernelSources() {
+  const out = [];
+  const stack = [path.join(ROOT, 'crates')];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      continue;
+    }
+    for (const ent of entries) {
+      const p = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (ent.name === 'target') continue;
+        stack.push(p);
+      } else if (ent.name.endsWith('.rs') && ent.name !== 'config.rs') {
+        out.push(p);
+      }
+    }
+  }
+  return out;
+}
+
+/** 返回内核从未读取的 SimConfig 字段列表 */
+function findUnreadConfigFields(rsFields) {
+  const corpus = collectKernelSources()
+    .map(f => fs.readFileSync(f, 'utf8'))
+    .join('\n');
+  return rsFields.filter(f => !corpus.includes('.' + f.rustName));
+}
+
+// ---------------------------------------------------------------------------
 // 主流程
 // ---------------------------------------------------------------------------
 function main() {
@@ -303,6 +340,14 @@ function main() {
     }
   } else {
     warnings.push('未找到 config.decision-order.js（拖动决策卡后由 server.js 生成落盘）');
+  }
+
+  // 5) 空转参数：Rust 内核零读取（★ v1.50.18 死代码审计 §2 门禁）
+  const unread = findUnreadConfigFields(rs.fields);
+  for (const f of unread) {
+    errors.push(
+      `空转参数 (内核零读取): ${f.rustName} —— 两端口径一致，但 crates/ 内除 config.rs 外无任何读取点；调它不产生效果，请删除或接线`
+    );
   }
 
   // 输出报告

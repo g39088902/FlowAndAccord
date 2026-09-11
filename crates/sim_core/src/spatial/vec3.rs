@@ -24,28 +24,11 @@ impl Vec3 {
             .sqrt()
     }
 
-    pub fn distance_squared_to(&self, other: &Vec3) -> f32 {
-        (self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2)
-    }
-
-    pub fn horizontal_distance_to(&self, other: &Vec3) -> f32 {
-        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2)).sqrt()
-    }
-
     pub fn lerp(a: Vec3, b: Vec3, t: f32) -> Vec3 {
         Vec3 {
             x: a.x + (b.x - a.x) * t,
             y: a.y + (b.y - a.y) * t,
             z: a.z + (b.z - a.z) * t,
-        }
-    }
-
-    pub fn normalize(&self) -> Vec3 {
-        let mag = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
-        if mag > 1e-6 {
-            Vec3::new(self.x / mag, self.y / mag, self.z / mag)
-        } else {
-            Vec3::ZERO
         }
     }
 }

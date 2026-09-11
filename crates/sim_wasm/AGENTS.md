@@ -32,7 +32,6 @@
 | `world_create_map` | `(grid_res: u32, world_size: f32, seed: f64) -> i32` | 仅建正式同源 TerrainMap，不播撒生态、Agent、房屋或路网；仅供地图图鉴的只读预览。 |
 | `world_config_buf_ptr` | `(len: u32) -> u32` | 准备 Config JSON 内部缓冲区，返回起始指针 |
 | `world_apply_config_buf` | `(len: u32) -> i32` | 解析并应用缓冲区 JSON；0 成功，-1 长度越界，-2 JSON 解析失败，-3 UTF-8 非法，-4 世界未创建 |
-| `world_set_config` | `(ptr: u32, len: u32) -> i32` | 直接从线性内存指针应用 Config JSON；返回码同上 |
 | `world_tick` | `(dt: f32)` | 推进一个确定性仿真步 |
 | `world_tick_steps` | `(steps: u32, dt: f32)` | 推进 N 步（对应前端 speedMult）；内部循环调 `world_tick` |
 | `world_set_regen_multiplier` | `(which: i32, mult: f32)` | 设置某类 POI 再生倍率（0=水 1=果 2=木 3=石 4=金） |
@@ -51,7 +50,8 @@
 - **★ `terrain_dirty` 双通道互斥**：`world_snapshot_json_debug_ptr`（JSON，test-only）与 `world_snapshot_bin_ptr`（二进制）**共享同一个 `terrain_dirty` 脏位**（`Cell<bool>`，被消费后清零）。生产与工具链路已统一走二进制；**严禁在同一会话混调两条通道**，否则后调用方将拿不到地形。`world_require_terrain()` 现调用 `World3DEngine::require_full_geometry()`，同时复位地形脏位与路网几何签名（`last_geom_sig`），保证二进制下帧重发 `LANE_GEO`/`NODE`。
 - **指针约定**：所有跨边界数据都是"先调 `*_ptr`/`*_buf_ptr` 拿指针 + 对应 len"，前端用 `Uint8Array` 拷贝。**不要在 wasm 内存外返回指针**。`world_snapshot_json_debug_ptr` 每次调用重新序列化；序列化失败时缓冲区保持旧内容、指针仍指向旧数据，须先读 `world_snapshot_json_debug_len` 再按长度取指针。
 - **★ T1（v1.46.0）JSON 通道已退化为 test-only**：原 `world_snapshot_ptr/len` 与 `SNAPSHOT_BUF` 已删除。6 个工具统一走 `tools/snapshot-reader.js`（FABS 优先、JSON 仅回退），前端 `sim_worker.js` 已删除 JSON 回退分支。保留 `world_snapshot_json_debug_ptr/len` 的**唯一**理由是 `tools/test-snapshot-bin.js` 需要 JSON 作为二进制编码的比对真值；**给它改名或删除前，必须先为该门禁找到等价真值源**。
-- **错误码语义**：`world_apply_config_buf` 与 `world_set_config` 的返回码（0/-1/-2/-3/-4）已被前端依赖，**新增失败分支只能向后追加新负数**，不得改动既有语义。
+- **错误码语义**：`world_apply_config_buf` 的返回码（0/-1/-2/-3/-4）已被前端依赖，**新增失败分支只能向后追加新负数**，不得改动既有语义。
+  （原 `world_set_config(ptr,len)` 与 `world_apply_config_buf` 功能完全重复且全项目零调用，已于 v1.50.18 删除；配置注入现只有 `world_config_buf_ptr` + `world_apply_config_buf` 一条路径。）
 - **`dt` 语义**：`world_tick` 接收 dt；前端固定 1/60，倍速用 `world_tick_steps`，**严禁改动内核 dt=1/60**（根 AGENTS.md §4.3）。
 - **确定性**：`world_create` 的 seed 是复现入口；`tools/test-wasm.js` 的同种子逐字节校验覆盖本层，改动导出或序列化格式前先跑回归。
 - **改本目录代码后必须重编并同步双副本**（根 AGENTS.md §4.1），不要用字节数判断是否更新，以 `test-wasm.js` 输出为准。

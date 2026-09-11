@@ -79,20 +79,12 @@ impl EmpireRegistry {
         self.camp_to_empire.clear();
     }
 
-    pub fn empire_of_camp(&self, camp_id: u32) -> Option<u32> {
-        self.camp_to_empire.get(&camp_id).copied()
-    }
-
     pub fn get(&self, empire_id: u32) -> Option<&Empire> {
         self.empires.get(&empire_id)
     }
 
     pub fn get_mut(&mut self, empire_id: u32) -> Option<&mut Empire> {
         self.empires.get_mut(&empire_id)
-    }
-
-    pub fn all_empires(&self) -> impl Iterator<Item = (&u32, &Empire)> {
-        self.empires.iter()
     }
 
     /// 以升序营地做连续切片，保证每个帝国至少 1 个营地（当 camps 非空）。

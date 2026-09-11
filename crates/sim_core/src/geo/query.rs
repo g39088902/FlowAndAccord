@@ -2,14 +2,10 @@ use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_
 use super::terrain::TerrainMap;
 use crate::spatial::vec3::Vec3;
 
-pub const TERRAIN_SURFACE_MASK_DRY: u16 = 1 << SurfaceKind::DryGround as u8;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LandUseKind {
     Road,
     House,
-    Farm,
-    Defense,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

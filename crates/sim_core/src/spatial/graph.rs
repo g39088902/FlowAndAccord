@@ -168,18 +168,6 @@ impl LaneGraph3D {
         });
     }
 
-    /// 局部失效：仅使经过指定车道的端点对缓存失效 (M3 优化)
-    pub fn invalidate_paths_containing_lane(&self, lane_id: LaneId) {
-        let mut cache = self.path_cache.borrow_mut();
-        cache.retain(|_, opt_path| {
-            if let Some(path) = opt_path {
-                !path.contains(&lane_id)
-            } else {
-                false
-            }
-        });
-    }
-
     /// 当车道因踩踏提速跨阶时局部失效：仅失效可能受该车道提速影响的端点对路径 (M3 优化)
     pub fn invalidate_paths_for_trampled_lanes(&self, lanes: &BTreeSet<LaneId>) {
         if lanes.is_empty() {
@@ -365,16 +353,6 @@ impl LaneGraph3D {
         if !changed_lanes.is_empty() {
             self.invalidate_paths_containing_lanes(&changed_lanes);
         }
-    }
-
-    /// 3D 拓扑加权 A* 寻路
-    pub fn find_path_3d(
-        &self,
-        start: NodeId,
-        goal: NodeId,
-        config: &SimConfig,
-    ) -> Option<Vec<LaneId>> {
-        self.find_path_3d_with_preference(start, goal, false, config)
     }
 
     /// 支持潜行特工偏好的 3D 拓扑加权 A* 寻路（带局部失效端点对缓存与 APSP 静态查表）

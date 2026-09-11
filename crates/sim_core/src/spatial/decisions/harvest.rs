@@ -112,7 +112,6 @@ impl<'a> Decisioner<'a> {
         #[derive(Clone, Copy)]
         struct CandidateStop {
             branch: BranchId,
-            pool: NodePool,
             pos: crate::spatial::vec3::Vec3,
         }
 
@@ -133,7 +132,6 @@ impl<'a> Decisioner<'a> {
                     let pos = self.node_pos(target);
                     candidates[count] = Some(CandidateStop {
                         branch: b,
-                        pool,
                         pos,
                     });
                     count += 1;
