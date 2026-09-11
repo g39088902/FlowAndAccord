@@ -188,7 +188,7 @@ async function main() {
   console.log(`wasm:   ${wasmPath}\n`);
 
   // 场景 1：创世帧（世界刚创建，地形 + 全量路网 + 字符串驻留表初建）
-  ex.world_create(120, 764.0, 42, 20, 4);
+  ex.world_create(0, 764.0, 42, 20, 4);
   SnapshotBin.resetCaches(); // 新引擎 → 清空字符串缓存（与浏览器读档/重置行为一致）
   console.log('[1/4] 创世帧（地形+路网全量）...');
   compareBoth('genesis');
@@ -226,7 +226,7 @@ async function main() {
   // 本场景是该类缺陷的唯一自动防线。
   console.log('[4/4] 换世界后（跨世界字符串驻留表缓存失效）...');
   const prevNames = jsonSnap().pois.map((p) => p.name).join('|');
-  ex.world_create(120, 764.0, 2026, 20, 4);
+  ex.world_create(0, 764.0, 2026, 20, 4);
   const newNames = jsonSnap().pois.map((p) => p.name).join('|');
   if (!prevNames || !newNames) {
     fail('换世界场景取样失败：地名列表为空，无法验证缓存失效');

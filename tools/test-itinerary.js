@@ -140,7 +140,7 @@ async function run() {
   // ==========================================================================
   console.log('[1/5] 验证多品类短缺下的预排行程链路生成 (Itinerary Chain Planning)...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -177,7 +177,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[2/5] 验证 TSP 最近邻贪心链路排序 (Nearest Neighbor Ordering)...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -212,7 +212,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[3/5] 验证连续采收多站顺路推进 (Multi-stop Continuous Harvest)...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -250,7 +250,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[4/5] 验证异常中断与体力告警清空队列 (Queue Invalidation & Safety Return)...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -294,7 +294,7 @@ async function run() {
   console.log('\n[5/5] 验证多随机种子长程确定性矩阵与数值稳定性...');
   const seeds = [101, 202, 303];
   for (const s of seeds) {
-    ex.world_create(120, 764.0, s, 20, 4);
+    ex.world_create(0, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const snap1 = reader.getSnapshot();
@@ -310,7 +310,7 @@ async function run() {
       assert(a.x >= -500 && a.x <= 500 && a.y >= -500 && a.y <= 500, `Seed ${s} Agent ${a.id} 坐标严重越界: (${a.x}, ${a.y})`);
     }
 
-    ex.world_create(120, 764.0, s, 20, 4);
+    ex.world_create(0, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const savePtr2 = ex.world_save_ptr();

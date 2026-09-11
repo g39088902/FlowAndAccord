@@ -228,7 +228,7 @@ async function main() {
   wasm.world_apply_config_buf(encoded.length);
 
   // 创建世界（与前端一致：grid=60, size=764, seed=42, 20人）
-  wasm.world_create(120, 764.0, 42, 20, cfg.countCamps || 4);
+  wasm.world_create(0, 764.0, 42, 20, cfg.countCamps || 4);
 
   // ★ T1：统一走通用读取器（FABS 二进制优先，JSON 仅调试回退）
   const reader = createSnapshotReader(wasm);

@@ -28,8 +28,8 @@
 
 | 导出 | 签名 | 作用 |
 | :--- | :--- | :--- |
-| `world_create` | `(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32` | 建世界 + 播撒生态；seed 保证可复现；camp_count 在播种前注入（否则前端 countCamps 不生效，见根 AGENTS.md §4.7） |
-| `world_create_map` | `(grid_res: u32, world_size: f32, seed: f64) -> i32` | 仅建正式同源 TerrainMap，不播撒生态、Agent、房屋或路网；仅供地图图鉴的只读预览。 |
+| `world_create` | `(grid_res: u32, world_size: f32, seed: f64, agent_count: u32, camp_count: u32) -> i32` | 建世界 + 播撒生态；seed 保证可复现；camp_count 在播种前注入（否则前端 countCamps 不生效，见根 AGENTS.md §4.7）。**★ v1.50.19：`grid_res` 传 0 = 按 `SimConfig::terrain_grid_res`（分辨率单一真相源），非 0 值仅测试参数化使用** |
+| `world_create_map` | `(grid_res: u32, world_size: f32, seed: f64) -> i32` | 仅建正式同源 TerrainMap，不播撒生态、Agent、房屋或路网；仅供地图图鉴的只读预览。`grid_res` 语义同 `world_create` |
 | `world_config_buf_ptr` | `(len: u32) -> u32` | 准备 Config JSON 内部缓冲区，返回起始指针 |
 | `world_apply_config_buf` | `(len: u32) -> i32` | 解析并应用缓冲区 JSON；0 成功，-1 长度越界，-2 JSON 解析失败，-3 UTF-8 非法，-4 世界未创建 |
 | `world_tick` | `(dt: f32)` | 推进一个确定性仿真步 |

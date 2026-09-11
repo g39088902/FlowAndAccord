@@ -74,7 +74,7 @@
   },
   "simulationBaseline": {
     "seed": 42,
-    "gridRes": 60,
+    "gridRes": 120,
     "worldSize": 764,
     "initialAgents": 20,
     "saveHash1800": "8598ec4a332ed4bc3a30ed35457036d7ddaeab0ce24e9dfb40395b9cddf8d1f7",

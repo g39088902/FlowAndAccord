@@ -4,6 +4,10 @@
 
 'use strict';
 
+// 世界物理跨度（米）。与 world_create 的 world_size 形参对应；地形栅格分辨率不在此处，
+// 走 SIM_CONFIG.terrainGridRes（world_create 的 grid_res 传 0 即回落配置）。
+const WORLD_SIZE = 764.0;
+
 let _wasm = null;
 let _memory = null;
 let _ready = false;
@@ -59,7 +63,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.50.18';
+  return '1.50.19';
 }
 
 function applyConfigInternal(configObj) {
@@ -391,9 +395,10 @@ self.onmessage = async function(e) {
           if (typeof _wasm.world_create_map !== 'function') {
             throw new Error('当前 WASM 不支持地图图鉴模式，请重新编译后刷新页面');
           }
-          _wasm.world_create_map(120, 764.0, _engineSeed);
+          // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
+          _wasm.world_create_map(0, WORLD_SIZE, _engineSeed);
         } else {
-          _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+          _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
           applyInitialRegenMultipliers(msg.regenMultipliers);
         }
         _ready = true;
@@ -491,7 +496,8 @@ self.onmessage = async function(e) {
         if (msg.config) {
           applyConfigInternal(msg.config);
         }
-        _wasm.world_create(120, 764.0, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
+        _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         applyInitialRegenMultipliers(msg.regenMultipliers);
         historyCheckpoints = [];
         historyCommands = [];

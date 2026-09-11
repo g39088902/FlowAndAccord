@@ -50,6 +50,8 @@ const IMPACT_OVERRIDES = {
   campLevelTownMinHouses: 'poi.rs (营地行政级别升级)',
   campLevelCountyMinHouses: 'poi.rs (营地行政级别升级)',
   terrainProfile: 'geo/terrain.rs / world_save.rs (地形生成器版本门禁)',
+  // ★ v1.50.19：地形栅格分辨率单一真相源。world_create(grid_res=0) 回落本值。
+  terrainGridRes: 'sim_wasm/lib.rs (resolve_grid_res 建世界栅格)',
   terrainPassRidgeWidth: 'geo/terrain.rs (T1 主脊高斯半宽，通行力约束)',
   terrainPassRidgeAmplitude: 'geo/terrain.rs (T1 主脊幅度，通行力约束)',
   terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',

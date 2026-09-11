@@ -32,7 +32,23 @@ fn clear_error() {
     }
 }
 
-/// 创建世界并注入初始生态 (grid_res=120, world_size=764, seed 可复现，agent_count=20)
+/// 地形栅格分辨率兜底值（每边格数）。仅当配置既未注入、调用方又传 0 时生效，
+/// 保证 `SimConfig::default()`（`terrain_grid_res = 0`）场景下也能建出合法世界。
+const TERRAIN_GRID_RES_FALLBACK: usize = 120;
+
+/// 解析实际生效的地形栅格分辨率：调用方传非 0 值则显式覆盖（仅供测试参数化），
+/// 否则回落到 `SimConfig::terrain_grid_res`，使配置成为全项目分辨率的单一真相源。
+fn resolve_grid_res(grid_res: u32, config: &SimConfig) -> usize {
+    if grid_res > 0 {
+        grid_res as usize
+    } else if config.terrain_grid_res > 0 {
+        config.terrain_grid_res
+    } else {
+        TERRAIN_GRID_RES_FALLBACK
+    }
+}
+
+/// 创建世界并注入初始生态 (grid_res=0 表示按配置 terrain_grid_res，world_size=764, seed 可复现，agent_count=20)
 /// 优先使用前端通过 world_apply_config_buf 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 #[no_mangle]
@@ -46,7 +62,7 @@ pub extern "C" fn world_create(
     unsafe {
         let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
         let mut w = World3DEngine::new_seeded_with_config(
-            grid_res as usize,
+            resolve_grid_res(grid_res, &config),
             world_size,
             seed as u64,
             config,
@@ -67,7 +83,7 @@ pub extern "C" fn world_create_map(grid_res: u32, world_size: f32, seed: f64) ->
     unsafe {
         let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
         WORLD = Some(World3DEngine::new_seeded_with_config(
-            grid_res as usize,
+            resolve_grid_res(grid_res, &config),
             world_size,
             seed as u64,
             config,

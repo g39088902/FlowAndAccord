@@ -137,7 +137,7 @@ async function createEngine(seed, agentCount, campCount, config) {
   const res = ex.world_apply_config_buf(encoded.length);
   if (res !== 0) throw new Error('配置注入失败: ' + res);
 
-  ex.world_create(120, 764.0, seed, agentCount, campCount);
+  ex.world_create(0, 764.0, seed, agentCount, campCount);
 
   return { ex, textDecoder, textEncoder };
 }

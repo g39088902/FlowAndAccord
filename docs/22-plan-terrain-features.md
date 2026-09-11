@@ -3,7 +3,7 @@
 > **本文以「地图模板」为核心**：回答「我们想要哪些地图、每张地图像什么、玩家在上面做什么」，并把数据结构、生成流水线、路网、水资源、快照、存档、前端渲染与配置统一降格为**服务于实现这些模板的共用基座**——任何新技术只有当它让某个地图模板能落地、能被保存、能被读回时，才有资格进入本文。
 >
 > **状态**：T0 统一地表查询、T1 山口聚落、T2 两岸河谷水系与 D-A 地表装饰系统**均已落地**（T1/T2 于 v1.47.5；D-A 于 v1.49.1，v1.49.2/v1.49.3/v1.50.10 持续打磨）；生成器版本 **4**（v1.50.17 经 T1-R 主脊通行力修复后由 3 递增）；T1/T2 **子特征注入**、D-B/D-C 高级装饰为**新增规划（v1.48.0）**；T4 动态水文、桥梁与土地演化**未实现、未排期**。**T1-R 主脊通行力缺口已修复**（2026-09-11 审查发现、同日修复：主脊最大坡度由约 24° 提升至 36°~41°，产生真实硬禁行与绕行代价；实测记录、参数契约与门禁见 §9.3.1）。
-> **本文定位**：地形领域**唯一权威文档**——以地图模板为主轴，同时承载「模板清单与地理玩法」与「支撑其实现的技术方案」两部分。2026-09-11 由原 `22-plan-terrain-features.md`（方向设计）与 `26-plan-terrain-implementation.md`（实施技术方案）合并而成，26 号已删除；合并时按当前代码事实校正了原 26 号中已过时的落地状态（D-A 装饰已落地、`render_terrain.js` 已拆分、配置已达 231 字段）。同日二次整理：改为以地图模板为核心，技术章节按「服务对象」重新归位并整体重排章节号（对照表见 §0.3）。
+> **本文定位**：地形领域**唯一权威文档**——以地图模板为主轴，同时承载「模板清单与地理玩法」与「支撑其实现的技术方案」两部分。2026-09-11 由原 `22-plan-terrain-features.md`（方向设计）与 `26-plan-terrain-implementation.md`（实施技术方案）合并而成，26 号已删除；合并时按当前代码事实校正了原 26 号中已过时的落地状态（D-A 装饰已落地、`render_terrain.js` 已拆分、配置已达 232 字段）。同日二次整理：改为以地图模板为核心，技术章节按「服务对象」重新归位并整体重排章节号（对照表见 §0.3）。
 > **整理日期**：2026-09-11（合并日 + 模板化重组日）；方案优化基线 v1.48.0，现状基线 v1.50.16。
 > **入口**：[文档导航](./README.md) · [长期路线图](./11-plan.md) · [地形美术与世界景观提升](./21-plan-terrain-art.md)。
 > **依据**：[25-plan-system-integration.md](./25-plan-system-integration.md)、[21-plan-terrain-art.md](./21-plan-terrain-art.md)、[27-plan-seasonal-lighting.md](./27-plan-seasonal-lighting.md)、[28-plan-river-shoreline-refinement.md](./28-plan-river-shoreline-refinement.md)。
@@ -1452,7 +1452,7 @@ render_agents.js        族人绘制                                        ✅
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 21 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 231）：
+✅ 已落地 22 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 232）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
@@ -1480,7 +1480,7 @@ render_agents.js        族人绘制                                        ✅
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 231）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 232）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ◐ `terrainAccentSubFeatures` 已声明并前后端对齐，但子特征注入器尚未实现（D-B）；`terrainGenerationMaxRetries` 已声明未被消费。

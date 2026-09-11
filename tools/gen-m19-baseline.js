@@ -93,7 +93,7 @@ async function main() {
   ex.world_apply_config_buf(cfgBytes.length);
 
   // 初始化世界
-  ex.world_create(120, 764.0, 42.0, 20, 4);
+  ex.world_create(0, 764.0, 42.0, 20, 4);
 
   // 推进 1800 tick
   for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
@@ -162,7 +162,7 @@ async function main() {
     },
     simulationBaseline: {
       seed: 42,
-      gridRes: 60,
+      gridRes: 120,
       worldSize: 764,
       initialAgents: 20,
       saveHash1800,

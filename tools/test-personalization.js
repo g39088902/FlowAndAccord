@@ -96,7 +96,7 @@ async function run() {
   // ==========================================================================
   console.log('[1/5] 验证先天力量对重体力伐木采石装载速率的加成与惩罚...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 60; i++) ex.world_tick(1.0 / 60.0);
 
@@ -140,7 +140,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[2/5] 验证力量禀赋偏好特化 (低力量家政修缮与采石体力门槛)...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -197,7 +197,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[3/5] 验证智力驱动理性商贸与通衢选点...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -264,7 +264,7 @@ async function run() {
   // ==========================================================================
   console.log('\n[4/5] 验证豪绅家户阶层分化与劳作免除...');
   {
-    ex.world_create(120, 764.0, 42.0, 20, 4);
+    ex.world_create(0, 764.0, 42.0, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 1800; i++) ex.world_tick(1.0 / 60.0);
 
@@ -323,7 +323,7 @@ async function run() {
   const seeds = [101, 202, 303];
   for (const s of seeds) {
     // 运行第 1 遍
-    ex.world_create(120, 764.0, s, 20, 4);
+    ex.world_create(0, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const snap1 = reader.getSnapshot();
@@ -340,7 +340,7 @@ async function run() {
     }
 
     // 运行第 2 遍验证重放一致性
-    ex.world_create(120, 764.0, s, 20, 4);
+    ex.world_create(0, 764.0, s, 20, 4);
     reader.resetCaches();
     for (let i = 0; i < 600; i++) ex.world_tick(1.0 / 60.0);
     const savePtr2 = ex.world_save_ptr(), saveLen2 = ex.world_save_len();

@@ -16,7 +16,11 @@
 ### 0.1 历史核心缺陷剖析
 
 1. **13 米级巨大网格阶梯锯齿（Rasterization Stair-Stepping）**
-   - 当前地形网格分辨率为 $60 \times 60$，世界尺寸为 $764\text{m}$，网格步长 $\Delta = \frac{764}{59} \approx \mathbf{12.95\text{m}}$。
+   - 缺陷发生时（v1.48.0 之前）地形网格分辨率为 $60 \times 60$，世界尺寸为 $764\text{m}$，网格步长 $\Delta = \frac{764}{59} \approx \mathbf{12.95\text{m}}$。
+   - > 📌 **v1.50.19 更正**：本节的 $60 \times 60$ 是历史快照，并非现状。现网实际为
+     > **$120 \times 120$**（步长 $\frac{764}{119} \approx 6.42\text{m}$），且已抽离为配置项
+     > `SIM_CONFIG.terrainGridRes`（`world_create` 的 `grid_res` 传 0 即回落该值）。
+     > 早期文档与 `tools/baseline-m19-observation.json` 中的 `gridRes: 60` 属过期元数据，已一并更正。
    - 水体与河岸完全依附于**离散 Quad 网格逐格填色**：只要一个网格的中心或角点满足距离判定 $d < w$，整个 $13\text{m} \times 13\text{m}$ 的四边形就会被整格染为深蓝（`DeepWater`）；稍出范围则整格染为黄沙（`RiverBank`）或草绿（`DryGround`）。
    - 连续弯曲斜向流动的河流因此被切成一阶一阶由西向东、由北向南的**巨大直角折线台阶**，呈现严重的"低清 Minecraft 像素阶梯感"，彻底破坏了微缩沙盘连绵自然的温润观感。
 

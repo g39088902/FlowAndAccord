@@ -188,6 +188,11 @@ pub struct SimConfig {
     pub house_node_poi_occupy_radius: f32,
 
     // 7. 地形生成、地表查询与山口 profile
+    /// ★ v1.50.19：地形栅格分辨率（每边格数），全项目分辨率的单一真相源。
+    /// `world_create(grid_res = 0, …)` 时内核回落到本值；调用方传非 0 值可显式覆盖（仅供测试）。
+    /// ⚠️ 改动本值会改变网格步长（world_size / (res-1)）、地形形态、POI 落位与全部确定性基线，
+    /// 并使旧存档因 `SAVE_APP_VERSION` 变更而废弃——调整后必须重跑全量门禁与性能基准。
+    pub terrain_grid_res: usize,
     pub terrain_profile: String,
     pub terrain_ridge_amplitude: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊高斯半宽 (m)。

@@ -6,12 +6,12 @@
 
 ## 模块定位
 
-全部仿真超参数的统一配置入口。**231 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**232 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 核心机制
 
 ### 全量超参数抽取
-- `SimConfig` 共 **231 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [06-config-reference.md](../06-config-reference.md) 自动速查表为准）：
+- `SimConfig` 共 **232 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [06-config-reference.md](../06-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（3 字段）
   2. 部落民生理、代谢与生命周期（46 字段）
   3. 先天禀赋与遗传演化（9 字段）
@@ -44,10 +44,11 @@
 - WASM 初始化与世界创建前通过持久全局缓冲注入前端 `SimConfig`，仿真行为 100% 由前端 JS 传入的数值驱动。
 
 ### 地形配置分区
-T0/T1 已接入 5 个配置字段：
+T0/T1 已接入 6 个配置字段：
 
 | 字段 | 当前默认值 | 作用 |
 | :--- | :--- | :--- |
+| `terrainGridRes` | `120` | ★ v1.50.19 地形栅格每边格数（分辨率单一真相源，见下） |
 | `terrainProfile` | `mountain_pass_v1` | 地形生成 profile 与存档重建口径 |
 | `terrainMaxWalkSlope` | `30.0` | 道路/走廊的最大允许坡度 |
 | `terrainMaxBuildSlope` | `16.0` | 房屋完整占地的最大允许坡度 |
@@ -55,6 +56,16 @@ T0/T1 已接入 5 个配置字段：
 | `terrainRoadCorridorWidth` | `5.0` | T0 曲线走廊校验宽度 |
 
 > `terrainGenerationMaxRetries`（原列此表）已随 v1.50.18 死代码审计删除——内核从未读取该字段。
+
+### 地形栅格分辨率（v1.50.19）
+- 历史上分辨率是**散落在 `sim_worker.js` 与 `tools/*.js` 里的硬编码字面量 `120`**，早期文档与
+  `tools/baseline-m19-observation.json` 更误记为 `60 × 60`，与实际严重不符。
+- 现已抽离为 `terrainGridRes`，内核 `sim_wasm::resolve_grid_res()` 成为唯一消费点：
+  `world_create` / `world_create_map` 的 `grid_res` 形参**传 0 即回落本配置**；传非 0 值可显式覆盖（仅供测试参数化）。
+  配置缺失时（`SimConfig::default()` 下 `terrain_grid_res = 0`）再有常量兜底 120。
+- 当前 120 × 120，世界尺寸 764m → 网格步长 764/119 ≈ **6.42m**。
+- ⚠️ 改动本值会改变地形形态、POI 落位与全部确定性基线，并使旧存档因 `SAVE_APP_VERSION` 变更而废弃；
+  调整后必须重跑全量门禁，并参考 `docs/15-profiling-and-benchmarking-guide.md` 建立性能基准（格子数按 res² 增长）。
 
 `terrainProfile` 影响 seed 重建与存档门禁；其余字段经 `config.js` 热注入。改变影响行为的字段后必须重新运行 `config-check.js` 和确定性门禁。
 
@@ -90,7 +101,7 @@ T0/T1 已接入 5 个配置字段：
 - 改字段后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 关键不变量
-- `SimConfig` 当前有效字段数为 **231 个**（由 `config-check.js` 运行时统计，勿手改此数）。
+- `SimConfig` 当前有效字段数为 **232 个**（由 `config-check.js` 运行时统计，勿手改此数）。
 - 前端 JS 为仿真超参数的唯一数值真相源，Rust 内核不保留数值字面量常量。
 - `config.js` 字段集与类型必须与 `config.rs` 契约严格 100% 吻合。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

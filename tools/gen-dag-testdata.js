@@ -83,7 +83,7 @@ function summarize(arr) {
   new Uint8Array(ex.memory.buffer, cfgPtr, encoded.length).set(encoded);
   ex.world_apply_config_buf(encoded.length);
 
-  ex.world_create(120, 764.0, SEED, 20, cfg.countCamps || 4);
+  ex.world_create(0, 764.0, SEED, 20, cfg.countCamps || 4);
 
   // archive: id -> 族人档案 (末次出现状态覆盖式写入)
   const archive = new Map();
