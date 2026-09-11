@@ -1,7 +1,7 @@
 //! 地形通行力探针（临时诊断示例，不进入测试套件）。
 //!
 //! 用途：对 T1 `mountain_pass_v1` / T2 `river_valley_v1` 直接调用内核生成器，实测
-//! 「主脊是否真的挡路」。对应 `docs/22-plan-terrain-features.md` §7.3.1。
+//! 「主脊是否真的挡路」。对应 `docs/22-plan-terrain-features.md` §9.3.1。
 //!
 //! 运行：`cargo run --release -p sim_core --example terrain_probe`
 //!

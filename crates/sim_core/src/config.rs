@@ -198,7 +198,7 @@ pub struct SimConfig {
     pub terrain_ridge_width: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊高斯半宽 (m)。
     /// 通行力约束：主脊最大梯度 ≈ 0.858 × `terrain_pass_ridge_amplitude` / 本值，
-    /// 必须显著大于 tan(`terrain_max_walk_slope`)，否则主脊不产生绕行代价（docs/22 §7.3.1）。
+    /// 必须显著大于 tan(`terrain_max_walk_slope`)，否则主脊不产生绕行代价（docs/22 §9.3.1）。
     pub terrain_pass_ridge_width: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊幅度 (m)。
     pub terrain_pass_ridge_amplitude: f32,

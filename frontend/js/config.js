@@ -174,7 +174,7 @@ window.SIM_CONFIG = {
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
   //   通行力约束：0.858 × terrainPassRidgeAmplitude / terrainPassRidgeWidth 须显著大于
-  //   tan(terrainMaxWalkSlope)=0.577，否则主脊不挡路。详见 docs/22-plan-terrain-features.md §7.3.1。
+  //   tan(terrainMaxWalkSlope)=0.577，否则主脊不挡路。详见 docs/22-plan-terrain-features.md §9.3.1。
   terrainPassRidgeWidth: 62.0, // T1 山口主脊高斯半宽 (m)
   terrainPassRidgeAmplitude: 53.0, // T1 山口主脊幅度 (m)
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数

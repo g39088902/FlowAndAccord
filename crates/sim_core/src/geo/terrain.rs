@@ -100,7 +100,7 @@ impl TerrainMap {
     /// ★ T1-R 主脊通行力修复：主脊宽度/幅度改为消费 `SimConfig`（原先硬编码
     /// `0.16~0.23 × world_size` 与 `24~34m`，最大梯度仅 6.7~13.4°，全图无格越过
     /// `terrain_max_walk_slope`，山口不产生任何通行约束）。详见
-    /// `docs/22-plan-terrain-features.md` §7.3.1。
+    /// `docs/22-plan-terrain-features.md` §9.3.1。
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;

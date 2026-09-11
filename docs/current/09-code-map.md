@@ -12,7 +12,7 @@ FlowAndAccord/
 │   │   ├── examples/                       # 示例程序与探针
 │   │   │   ├── config.json                 # 示例配置（M19 / 地形探针共用）
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
-│   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，docs/22 §7.3.1）
+│   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，docs/22 §9.3.1）
 │   │   └── src/
 │   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (242 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
@@ -188,7 +188,7 @@ FlowAndAccord/
     ├── 19-plan-agent-intent-strategy-decoupling.md # 决策意图-策略解耦规划书 (M19)
     ├── 20-plan-everyday-life.md               # 日常生活演化规划书
     ├── 21-plan-terrain-art.md                 # 地形美术规划书
-    ├── 22-plan-terrain-features.md            # 地形特征、地理玩法与实施技术方案 (原 26 号已并入)
+    ├── 22-plan-terrain-features.md            # 地图模板总纲：地图模板、地形要素与实现技术方案 (原 26 号已并入)
     ├── 23-plan-memory-system.md               # 记忆系统规划书
     ├── 24-plan-internal-market.md             # 内部市场规划书
     ├── 25-plan-system-integration.md          # 在办方案融合设计 (跨专项契约)
