@@ -29,6 +29,7 @@ FlowAndAccord/
 │   │           ├── vec3.rs                 # 3D 向量数学库
 │   │           ├── curve.rs                # 三次贝塞尔曲线定义与采样
 │   │           ├── graph.rs                # LaneGraph3D 拓扑路网 + A* 寻路 + 踩踏衰减
+│   │           ├── terrain_network.rs      # ★ v1.47.4 地形感知路网：合法陆位搜索/走廊 A* 提交/浅滩跨水接入/创世与读档全图校验/水池同步
 │   │           ├── poi.rs                  # 23 处 POI 实体定义 (营地4/泉6/果6/木3/石2/金1/榷场互市1)
 │   │           ├── house.rs                # 5 阶房屋模型、耐久度与户主绑定 (M6 起无仓储，家户账本为唯一真相源)
 │   │           ├── agent.rs                # 部落民实体、生理代谢、随身行囊、运动与状态机
@@ -99,6 +100,7 @@ FlowAndAccord/
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── config.poi-rates.js             # POI 产速本地偏好 (localStorage 倍率，world_create 前读取，可复现演化)
+│   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
 │   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
@@ -114,9 +116,11 @@ FlowAndAccord/
 │   │   ├── dag-standalone.js               # 族谱独立新标签页 HTML 模板
 │   │   ├── dag.js                          # 族谱数据构建 + 模态编排 + Inspector
 │   │   ├── main.js                         # 页面交互、控制台、事件绑定、相机控制
+│   │   ├── map-view.js                     # ★ v1.50.0 地图图鉴独立页控制器 (只读嵌入正式渲染管线，无模拟/无存档)
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
+│   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (水底卵石/成群游鱼/太阳波光，纯表现层，随种子确定性重建)
 │   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 + ★ v1.50.2 装饰单实体 drawAccentEntity (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；装饰整层绘制已并入 render_world.js 深度队列)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制与世界实体统一深度队列
 │   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效
@@ -127,6 +131,8 @@ FlowAndAccord/
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本
 │   ├── server.js                           # 静态文件开发服务器 (内置 .wasm MIME + POST /save-decision-order, 默认 3000 端口)
 │   ├── index.html                          # 完整单页可视化仿真系统 (14 script 按序加载)
+│   ├── map.html                            # ★ v1.50.0 地图图鉴独立页 (加载 index.html?mapOnly=1&nogate=1 只读画布，无存档门禁)
+│   ├── map.css                             # ★ v1.50.0 地图图鉴页样式 (map-only 模式，仅保留画布)
 │   └── style.css                           # 全局样式
 # frontend/public/ = 对象存储借用测试页目录（elder.html 等），非本项目产物，code-map 扫描已屏蔽
 ├── tools/

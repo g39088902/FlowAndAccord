@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：29 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + style.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：31 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
