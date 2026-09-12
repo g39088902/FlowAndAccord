@@ -46,7 +46,7 @@
     }
 
     // 地形反照率（不含光）：水体色 / 高程插值 / 坡度平滑过渡。
-    // ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）把它与光照拆开：
+    // ★ 动态季节光照（docs/current/tech/51-seasonal-lighting.md）把它与光照拆开：
     //   反照率只算一次并预存，光向变化时只重算光因子，避免每次整片重建颜色。
     function computeTerrainAlbedo(cell, minZ, maxZ) {
       const { elev, dzdx = 0, dzdy = 0, surfaceKind, naturalFertility = 1.0 } = cell;

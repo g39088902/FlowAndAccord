@@ -1,0 +1,147 @@
+# CI/CD 自动部署指南（GitHub Actions → 腾讯云 COS）
+
+> push 到 `master` 后自动完成：WASM 编译 → 回归测试 → 上传 `frontend/` 到腾讯云 COS。
+> 工作流文件：[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+> 当前版本：v1.0.2
+
+---
+
+## 状态机
+
+本状态机描述「一次部署运行」的状态迁移：从 push `master` 后排队，经 WASM 构建、双副本同步、确定性/跨文档门禁，再到预检 Secrets 与 COS 上传，最终成功或终止。边界是门禁不过绝不部署（P3）。
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> A
+    A --> B : push master / workflow_dispatch (cancel-in-progress 取消旧部署)
+    B --> C : cargo build --locked -p sim_wasm --target wasm32-unknown-unknown --release
+    C --> D : 双副本同步 frontend/rust/ + frontend/
+    D --> E : test-wasm.js + cross-doc-check.js 全绿
+    E --> [*] : 预检 Secrets 通过 + coscmd upload -rsy --delete + MIME 覆写 + 摘要
+    D --> F : DETERMINISM FAILED / NAN FOUND / CONFLICT / DRIFT
+    E --> F : Secret 格式错误 / DNS 解析失败 / exit 253
+```
+
+| 状态 | 含义 | 进入条件 | 退出条件 |
+| :--- | :--- | :--- | :--- |
+| A | 排队 | push 到 `master` 或手动触发 | runners 分配，开始构建 |
+| B | 构建 | 已分配运行环境 | wasm32 release 产物生成 |
+| C | 双副本同步 | 构建完成 | `frontend/rust/` 与 `frontend/` 两副本一致 |
+| D | 门禁 | 双副本就绪 | `test-wasm.js` 与 `cross-doc-check.js` 跑完 |
+| E | 部署上传 | 门禁全绿，Secrets 预检通过 | COS 上传与 MIME 覆写完成，输出摘要 |
+| F | 终止（不部署） | 门禁失败或 Secrets 预检失败 | 进入终态，不执行 coscmd 上传 |
+
+**不变量**（违反即出 bug）：
+- 门禁不过不部署（P3）：`test-wasm.js` 失败时 `coscmd` 上传步骤不执行，破损版本不上线。
+- CI 严禁设置 `CARGO_HOME` 指向 `.cargo-home` 或把 `.toolchain/` 加入 PATH（P1），否则 ubuntu-latest 全新 checkout 编译失败。
+- 上传后强制覆写双副本 `Content-Type=application/wasm`（P2），否则浏览器以 `application/octet-stream` 加载导致 wasm 实例化失败。
+
+## 1. 流水线架构
+
+```mermaid
+graph TD
+    A["push master / 手动 workflow_dispatch"] --> B["checkout + Node 24 + rustup stable(wasm32) + rust-cache"]
+    B --> C["cargo build --locked -p sim_wasm --target wasm32-unknown-unknown --release"]
+    C --> D["双副本同步: frontend/rust/ + frontend/"]
+    D --> E["node tools/test-wasm.js 门禁"]
+    E --> E1["node tools/cross-doc-check.js 跨文档一致性门禁"]
+    E1 -->|全绿| F["upload-artifact frontend/"]
+    F --> G["deploy job: download-artifact + pip install coscmd"]
+    G --> H["预检 Secrets: 格式正则 + DNS 预解析"]
+    H --> I["coscmd upload -rsy --delete frontend/ /"]
+    I --> J["强制覆写两个 .wasm 的 Content-Type=application/wasm"]
+    J --> K["输出部署摘要"]
+    E -->|失败| L["终止, 不部署"]
+    E1 -->|失败| L
+```
+
+| 环节 | 说明 |
+| :--- | :--- |
+| 触发 | `push` 到 `master`；支持 Actions 页手动 `Run workflow` |
+| 构建 | 标准 rustup（**非**便携 `.toolchain/`），锁定 `Cargo.lock` 后从 crates.io 解析依赖，`Swatinem/rust-cache` 加速增量编译 |
+| 门禁 | `node tools/test-wasm.js`（确定性/越界/NaN/长程）+ `node tools/cross-doc-check.js`（跨文档事实指纹），任一不通过则不上线 |
+| 上传 | `coscmd upload -rsy --delete` 增量同步整目录 |
+| 并发 | 同分支连续 push 自动取消旧的进行中部署（`cancel-in-progress: true`） |
+
+> CI 运行在 `ubuntu-latest`，**严禁**在 workflow 中设置 `CARGO_HOME` 指向仓库 `.cargo-home`、把 `.toolchain/` 加入 PATH，或把 crates.io 替换至未提交的 `.vendor/`——它们是本机缓存，GitHub 的全新 checkout 中不可用。
+
+---
+
+## 2. GitHub Secrets（4 个，必填）
+
+配置入口：仓库 → Settings → Secrets and variables → Actions → New repository secret
+
+| Secret | 说明 | 示例 |
+| :--- | :--- | :--- |
+| `COS_SECRET_ID` | 腾讯云 API 密钥 SecretId | `AKIDxxxxxxxxxxxxxxxx` |
+| `COS_SECRET_KEY` | 腾讯云 API 密钥 SecretKey | `xxxxxxxxxxxxxxxx` |
+| `COS_BUCKET` | 桶名，格式 `名称-APPID`，全小写 | `flow-and-accord-1250000000` |
+| `COS_REGION` | 桶所在地域简称 | `ap-guangzhou` / `ap-shanghai` |
+
+### 子账号最小权限
+
+不要用主账号密钥。在 [CAM 子账号](https://console.cloud.tencent.com/cam) 创建专用子用户，仅授予目标桶的 `cos:PutObject` / `cos:DeleteObject` / `cos:ListBucket`（或简化为该桶 `cos:*`）。
+
+### 格式踩坑
+
+- `COS_BUCKET` 必须**全小写** `名称-APPID`——含大写会导致 DNS 解析失败（`Failed to resolve *.myqcloud.com`）
+- 勿填完整域名或 `https://` 前缀，勿用下划线 / 中文
+- `COS_REGION` 填地域**简称**（`ap-guangzhou`），不是中文名
+- 值首尾不要带空格或引号——流水线预检步骤会自动去空白并做格式 + DNS 预解析校验，错误时秒级报出中文指引
+
+---
+
+## 3. COS 侧一次性准备
+
+1. **桶权限**：静态网站访问需设为「公有读私有写」（或在静态网站设置中开启公开访问）
+2. **开启静态网站**：桶 → 基础配置 → 静态网站 → 开启
+   - 索引文档：`index.html`
+   - 错误文档：`index.html`（单页兜底）
+3. 记下静态网站域名（形如 `https://<bucket>.cos-website.<region>.myqcloud.com`），即访问地址
+
+---
+
+## 4. .wasm MIME 配置
+
+浏览器流式编译 WebAssembly 要求 `Content-Type: application/wasm`，否则失败。
+
+工作流在上传后**强制覆写**两个 wasm 副本的 Content-Type：
+
+```bash
+coscmd upload -f -H "Content-Type: application/wasm" frontend/rust/sim_wasm.wasm /rust/sim_wasm.wasm
+coscmd upload -f -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim_wasm.wasm
+```
+
+若仍遇 `CompileError: Invalid WebAssembly`，在 COS 控制台对应对象 → 自定义 Header 检查。
+
+---
+
+## 5. 使用方式
+
+| 操作 | 方法 |
+| :--- | :--- |
+| 自动部署 | 推送代码到 `master` |
+| 手动部署 | Actions 页 → Deploy to COS → Run workflow |
+| 查看进度 | Actions 页查看 Job 日志；成功后 Job Summary 显示提交、分支、桶信息 |
+| 版本确认 | 打开静态网站域名，页面右上角版本徽章与 `frontend/index.html` 一致 |
+
+> COS 与浏览器均有缓存，更新后如页面未变化按 `Ctrl+F5` 强刷；可在 COS 控制台为 `index.html` 设 `Cache-Control: no-cache`。
+
+---
+
+## 6. 故障排查
+
+| 现象 | 原因与处理 |
+| :--- | :--- |
+| `test-wasm.js` 门禁失败 | 代码问题（确定性 / 越界 / NaN），修复后再推送；日志关键词 `DETERMINISM FAILED` / `NAN FOUND` |
+| `cross-doc-check.js` 门禁失败 | 文档间冲突（CONFLICT）或文档值与权威配置漂移（DRIFT），先跑 `node tools/cross-doc-check.js` 本地定位并修复文档后重推；日志关键词 `CONFLICT` / `DRIFT` |
+| `coscmd` 403 / 签名错误 | 检查 4 个 Secrets 是否齐全、密钥有效、子账号有该桶写权限、`COS_BUCKET` 为 `名称-APPID` 完整格式 |
+| **exit 253 + `please make sure [y/N]`** | `coscmd upload --delete` 删除远端多余文件前会交互确认，runner 无 stdin 导致失败；workflow 已加 `-y`（Skip confirmation），勿移除 |
+| **`Failed to resolve *.cos.*.myqcloud.com`（DNS 失败）** | 几乎必为 Secret 格式错误：① 桶名含大写 / 下划线；② 缺 `-APPID` 或误填完整域名；③ 地域填了中文；④ 值首尾带空格。流水线预检会秒级报出中文指引 |
+| **`coscmd: error: unrecognized arguments: -f`** | `-f`（强制覆盖）是 `upload` **子命令**的选项，必须写在 `upload` 之后（`coscmd upload -f -H ...`）；`-r/-b` 等全局参数才放在子命令之前 |
+| 页面 404 | 静态网站未开启，或索引文档未设为 `index.html` |
+| 页面能开但模拟器不运行 | MIME 问题（§4），或 `rust/sim_wasm.wasm` 未上传 |
+| 页面是旧版本 | 确认最新一次 Actions 运行成功；浏览器强刷 |
+| 编译缓慢 | 首次无缓存正常，后续 `rust-cache` 命中 |
+| `failed to read root of directory source: .vendor` | 仓库级 Cargo 配置误将 crates.io 替换为未提交的 `.vendor/`；移除该 replacement，让 CI 按 `Cargo.lock` 从 crates.io 下载依赖 |

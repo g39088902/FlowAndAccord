@@ -77,8 +77,8 @@ const SITES = [
     re: /(版本徽章 \*\*`v)\d+\.\d+\.\d+(`\*\*)/g,
   },
   {
-    id: 'docs/01-current.md 版本行',
-    file: 'docs/01-current.md',
+    id: 'docs/current/README.md 版本行',
+    file: 'docs/current/README.md',
     re: /(\*\*版本\*\*：v)\d+\.\d+\.\d+/g,
   },
   {
@@ -87,8 +87,8 @@ const SITES = [
     re: /(最新版本：\*\*v)\d+\.\d+\.\d+(\*\*)/g,
   },
   {
-    id: 'docs/current/15-save-load.md 存档版本说明',
-    file: 'docs/current/15-save-load.md',
+    id: 'docs/current/tech/15-snapshot-and-save.md 存档版本说明',
+    file: 'docs/current/tech/15-snapshot-and-save.md',
     re: /(当前 \*\*)\d+\.\d+\.\d+(\*\*)/g,
   },
   {
@@ -238,7 +238,7 @@ function runBump(from, to, dryRun) {
   console.log('└──────────────────────────────────────────────┘');
 
   if (rustTouched) {
-    console.log('\n⚠️  SAVE_APP_VERSION 变更将自动废弃全部旧存档（设计行为，见 docs/current/15-save-load.md）。');
+    console.log('\n⚠️  SAVE_APP_VERSION 变更将自动废弃全部旧存档（设计行为，见 docs/current/tech/15-snapshot-and-save.md）。');
   }
 }
 

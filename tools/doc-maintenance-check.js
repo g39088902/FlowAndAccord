@@ -28,7 +28,7 @@ function canonicalVersion() {
 }
 function factDrifts() {
   const drifts = [], version = canonicalVersion();
-  const impact = readText('docs/current/13-impact-matrix.md');
+  const impact = readText('docs/current/tech/67-impact-matrix.md');
   const spatial = readText('crates/sim_core/src/spatial/AGENTS.md');
   const core = readText('crates/sim_core/AGENTS.md');
   const frontend = readText('frontend/AGENTS.md');
@@ -36,16 +36,16 @@ function factDrifts() {
   const fields = [...readText('crates/sim_core/src/config.rs').matchAll(/^\s*pub\s+\w+\s*:/gm)].length;
   const interval = readText('frontend/js/config.js').match(/agentDecisionIntervalTicks:\s*(\d+)/)?.[1];
   if (!fields || !interval) drifts.push('无法读取配置字段数或决策间隔');
-  for (const [name, text] of [['13-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
+  for (const [name, text] of [['67-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
     if (!text.includes(`(tick + id) % ${interval} == 0`)) drifts.push(`${name} 决策错峰与 config.js 不一致`);
   }
-  for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['13-impact-matrix.md', impact]]) {
+  for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['67-impact-matrix.md', impact]]) {
     const declarations = [...text.matchAll(/(\d+)\s*个?字段/gm)];
     if (!declarations.some(m => Number(m[1]) === fields)) drifts.push(`${name} 未声明配置字段总数 ${fields}`);
   }
   const stale = [/163 个字段/, /175 字段/, /148 字段/, /165\/165/, /% 30 == 0/];
   for (const re of stale) {
-    for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['13-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
+    for (const [name, text] of [['sim_core/AGENTS.md', core], ['frontend/AGENTS.md', frontend], ['67-impact-matrix.md', impact], ['spatial/AGENTS.md', spatial]]) {
       if (re.test(text)) drifts.push(`${name} 含已废弃事实 ${re}`);
     }
   }

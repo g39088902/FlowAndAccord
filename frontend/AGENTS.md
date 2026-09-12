@@ -308,7 +308,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 - **时间跳变必须 `resync()`**：`rustworld.js` 在 `READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE` 四处已调用；新增任何重建世界的入口都要补上，否则光相会从上一世界缓慢爬回来。
 - **阴影用世界空间**：`lightShadowOffset()`（render_world.js）与 `SimLighting.shadowOffset()` 把世界光向投影到屏幕（随相机 `rotZ/rotX` 旋转）；**禁止**再写死屏幕偏移。
 - **纯表现层边界**：不消耗 `WorldRng`、不写模拟状态、不进存档、不参与逐字节确定性承诺；`enabled=false` 必须退回 v1.47.11 的固定光（西北 41°）以便 A/B 对照。
-- 详细设计与验收见 [docs/27-plan-seasonal-lighting.md](../docs/27-plan-seasonal-lighting.md)。
+- 详细设计与验收见 [../docs/current/tech/51-seasonal-lighting.md](../docs/current/tech/51-seasonal-lighting.md)。
 
 ---
 

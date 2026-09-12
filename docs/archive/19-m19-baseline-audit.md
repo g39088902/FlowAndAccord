@@ -2,7 +2,7 @@
 
 > 冻结对象：应用 v1.46.7，源码基于 `779e941945cd60197e5485cc308b5be253db6ab0`，相对该提交的运行时变更仅为此前统一升版。M19.1 不接管任何行为链。
 >
-> 当前 API 说明见 [26-intent-observation.md](../current/26-intent-observation.md)；未来控制契约见 [M19 技术规格](../19-1-spec-intent-strategy-split-result.md)。本页保存审计时的事实，未来新增写入点应重新审计。
+> 当前 API 说明见 [../current/tech/32-m19-architecture.md](../current/tech/32-m19-architecture.md)；未来控制契约见 [M19 技术规格](../current/tech/32-m19-architecture.md)。本页保存审计时的事实，未来新增写入点应重新审计。
 
 ## 1. 可复现基线
 

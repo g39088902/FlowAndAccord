@@ -1,5 +1,5 @@
 // === 动态季节光照配置（前端独立配置） ===
-// 方案：docs/27-plan-seasonal-lighting.md（年周期光弧：一年转一圈，四季各占一个象限）
+// 方案：docs/current/tech/51-seasonal-lighting.md（年周期光弧：一年转一圈，四季各占一个象限）
 // 定位：纯表现层数值，不注入 WASM、不并入 SIM_CONFIG（并入会与 SimConfig 字段集比对冲突）。
 // 加载顺序：config.js 之后、lighting.js 与渲染五件套之前。
 // 口径（已确认）：光向一年扫过 360°；春=东 / 夏=南 / 秋=西 / 冬=北；盛夏光强、隆冬光弱。

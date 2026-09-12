@@ -245,11 +245,12 @@ node frontend/server.js
 | 文档 | 内容 |
 | :--- | :--- |
 | [AGENTS.md](./AGENTS.md) | 开发操作指南与易踩坑清单（改代码前必读） |
-| [docs/01-current.md](./docs/01-current.md) | 已实现功能全景索引与模块导航 |
-| [docs/current/](./docs/current/) | 分模块机制文档（空间路网 / 生态 POI / 四季 / 代谢繁衍 / 房屋 / 决策 AI / 前端 / 配置 / 账本 / 市场 / 存档 / 影响矩阵） |
-| [docs/current/21-ui-page-overview.md](./docs/current/21-ui-page-overview.md) · [22-society-ledger-ui.md](./docs/current/22-society-ledger-ui.md) · [23-ui-dev-guide.md](./docs/current/23-ui-dev-guide.md) | UI 页面全景剖析 · 制度大盘界面实现 · 前端开发指南 |
-| [docs/11-plan.md](./docs/11-plan.md) | 项目长期规划书 |
-| [docs/06-config-reference.md](./docs/06-config-reference.md) | 240 个可调超参速查表（自动生成） |
+| [docs/README.md](./docs/README.md) | 文档总导航：按「当前 / 计划 × 产品设计 / 技术方案」分层 |
+| [docs/current/README.md](./docs/current/README.md) | 现状总索引：已实现功能的完整模块导航表 |
+| [docs/current/design/](./docs/current/design/) | 产品设计（玩家视角）：产品总览 / 世界规则 / 社会规则 / 经济规则 / 观察设计 |
+| [docs/current/tech/](./docs/current/tech/) | 技术方案（实现视角）：架构 → 上层社会 → 中层个体 → 下层世界 → 表现层 → 工程层 |
+| [docs/plan/README.md](./docs/plan/README.md) | 计划总索引：在办设计与未落地方案 |
+| [docs/current/tech/14-config-reference.md](./docs/current/tech/14-config-reference.md) | 可调超参速查表（自动生成） |
 
 ---
 

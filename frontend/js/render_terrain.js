@@ -2,7 +2,7 @@
 // 地形壳层（投影 + 沙盘基底/侧壁）/ 单格填充 / 单水系特征 / 天空背景 / 地形网格线
 // 依赖全局: ctx, camera, sim, project3D, getElevationColor, w, h, terrainProjX, terrainProjY, SimLighting
 //
-// ★ 动态季节光照（docs/27-plan-seasonal-lighting.md）：
+// ★ 动态季节光照（docs/current/tech/51-seasonal-lighting.md）：
 //   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color（大气色洗亦烘焙于此），本文件只负责绘制。
 //
 // ★ v1.50.11 图层契约变更：drawTerrainCell / drawFeatureItem 是**单实体绘制入口**，

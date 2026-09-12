@@ -23,11 +23,11 @@
 >
 > （施密特触发器 / PrimitiveActionState）・深度拆解见 
 >
-> [docs/07-agent-ai-analysis.md](../07-agent-ai-analysis.md)
+> [../current/tech/31-decision-engine.md](../current/tech/31-decision-engine.md)
 >
 >  与 
 >
-> [docs/current/06-motivation-ai.md](../current/06-motivation-ai.md)
+> [../current/tech/31-decision-engine.md](../current/tech/31-decision-engine.md)
 > **可复用前端基建**
 >
 > ：
@@ -136,7 +136,7 @@ pub home\_house\_id / spouse\_id / children\_ids,
 | 确定性布局引擎 | `dag-layout.js`                                   | Y 语义映射、X 冲突消解、布局可复用为 "逻辑图" 基础                              |
 | 视口渲染层   | `dag-view.js`                                     | 拖拽平移、滚轮缩放、LOD 分级、hover 高亮、`transform: translate+scale` 虚拟化 |
 | 独立标签页   | `dag-standalone.js`                               | 决策图独立新开 Tab，与主地图双屏联动                                       |
-| 设计系统    | `style.css` + `docs/current/23-ui-dev-guide.md` §3.3 | 暗黑玻璃拟态、`.lineage-chip`、语义色板                                |
+| 设计系统    | `style.css` + `../current/tech/55-frontend-dev-guide.md` §3.3 | 暗黑玻璃拟态、`.lineage-chip`、语义色板                                |
 | 检查器模式   | `render.js` Inspector                             | 右侧浮动检查器、Esc 关闭、事件驱动刷新                                      |
 
 ### 2.4 关键阈值（真实 config，直接标注在图元上）
@@ -430,7 +430,7 @@ sim.agents\[i].hunger/thirst/stamina
 | ---------------------------------------------------- | ---------------------------------------------------- |
 | `frontend/index.html`                                | 增加决策图入口按钮 + 新标签页 / Modal 容器 + script 标签 + **版本徽章自增** |
 | `frontend/style.css`                                 | 决策图专属样式（层级色板、图元形状、参考线、检查器）                           |
-| `docs/current/07-frontend-ui.md` / `11-changelog.md` | 功能描述 + 版本条目                                          |
+| `../current/tech/50-frontend-overview.md` / `../current/11-changelog.md` | 功能描述 + 版本条目                                          |
 | `AGENTS.md` §0                                       | 文档地图登记本设计文档                                          |
 
 ### 8.3 实现顺序
@@ -463,7 +463,7 @@ graph LR
 1. `node tools/config-check.js` 165/165 全绿（若引入新阈值必须三处同步）；
 2. `node tools/test-wasm.js` 输出 `ALL_TESTS_DONE`（内核未动也必须跑，防回归）；
 3. WASM 双副本同步（本方案不改内核，无需重编译，但改动任何 Rust 后必须同步）；
-4. 版本号自增（`index.html` / `AGENTS.md` / `11-changelog.md` 三处）。
+4. 版本号自增（`index.html` / `AGENTS.md` / `../current/11-changelog.md` 三处）。
 
 
 

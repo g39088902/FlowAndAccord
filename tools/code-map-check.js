@@ -3,7 +3,7 @@
  * Flow & Accord · 代码地图一致性校验工具 (code-map-check.js)
  * ============================================================================
  * 用途：
- *   扫描实际文件树（crates/ + frontend/）与 docs/current/09-code-map.md
+ *   扫描实际文件树（crates/ + frontend/）与 docs/current/tech/90-code-map.md
  *   中登记的文件清单做交叉对比，捕获：
  *     1. 文档缺失（实际有文件但代码地图未登记）
  *     2. 文档过时（代码地图登记了但实际已删除/重命名）
@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const CODE_MAP_MD = path.join(ROOT, 'docs', 'current', '09-code-map.md');
+const CODE_MAP_MD = path.join(ROOT, 'docs', 'current', 'tech', '90-code-map.md');
 
 // ---------------------------------------------------------------------------
 // 1. 扫描实际文件树
