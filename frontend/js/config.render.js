@@ -44,4 +44,12 @@ window.RENDER_CONFIG = {
   treeTintRedBand: 0.72,      // b ≥ 此值 → 红褐档
   treeTintJitterTurns: 0.05,  // 逐树相位抖动幅度（年相位比例，按 accent.id 确定性派生）
                               // 目的：避免成片树在同一帧整体换色「整片闪一下」，林相错落更自然
+
+  // —— 局部三维植被样板（纯表现层；见 docs/plan/tech/07-terrain-art.md §10.1/10.2）——
+  accentModelStyleVersion: 1,
+  accentDetailNearPx: 15,     // 近景：细枝、完整叶簇
+  accentDetailMidPx: 7,       // 中景：主枝与主要叶簇
+  accentLeafClustersTree: 16, // 每棵树稳定叶簇数（由 id 派生，不进快照）
+  accentLeafClustersBush: 8,
+  accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希变体比例
 };

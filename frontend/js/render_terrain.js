@@ -367,7 +367,7 @@ function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
 //   唯一真相源是快照的年相位（与 lighting.js 同一套 season/season_progress 公式），
 //   调参走 window.RENDER_CONFIG.treeTint*（见 config.render.js），改完刷新浏览器即生效。
 // 依赖：_accentHash（定义见本文件下方；函数声明提升，实际调用发生在渲染期）。
-window.SimTreeTint = (function () {
+window.SimTreeTint = window.SimTreeTint || (function () {
   const SEASON_INDEX = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
   const DEFAULT_CYCLE = [
     { u: 0.000, b: 0.00 },   // 春：返青完成
@@ -436,6 +436,10 @@ window.SimTreeTint = (function () {
 // 现统一并入 render_world.js::drawWorldEntities() 的相机深度队列（远 → 近），与 POI 标记 / 私产宅舍 /
 // 部落民同队列排序，近处乔木可正确遮挡远处道路与小人，远处乔木也被近处实体正确遮挡。
 function drawAccentEntity(accent) {
+  if (window.AccentRenderer) {
+    window.AccentRenderer.draw(accent, sim);
+    return;
+  }
   if (accent.kind !== 'Tree' && accent.kind !== 'Boulder' && accent.kind !== 'Bush') return;
 
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);

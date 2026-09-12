@@ -37,7 +37,7 @@
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；生命力解耦、民兵动员与公仓契约 |
 | 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A 已落地；本文保留模板库与 D-B 子特征注入蓝图 |
-| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地（S1/S2/P2）；剩余素材、季节调色与标注避让 |
+| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§10 新增 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
 
 ---

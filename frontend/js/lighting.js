@@ -277,6 +277,22 @@ window.SimLighting = (function () {
     return v;
   }
 
+  // Accent 等纯表现层的材质受光入口。它直接消费当前世界光向、环境光、强度和色温，
+  // 不复用 shadeFace 的旧光归一化逻辑，避免把房屋的历史兼容策略带进植被材质。
+  function shadeRgb(rgb, nx, ny, nz) {
+    const c = cfg();
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    const dot = clamp(nx * S.lx + ny * S.ly + nz * S.lz, -1, 1);
+    const diffuse = clamp((dot + c.wrap) / (1 + c.wrap), 0, 1);
+    const k = clamp((S.ambient + (1 - S.ambient) * diffuse) * S.intensity, c.lightMin, c.lightMax);
+    return [
+      clamp(Math.round(rgb[0] * k * S.tint[0]), 0, 255),
+      clamp(Math.round(rgb[1] * k * S.tint[1]), 0, 255),
+      clamp(Math.round(rgb[2] * k * S.tint[2]), 0, 255),
+    ];
+  }
+
   // 相机参数来自 main.js 的全局词法绑定 `camera`（非 window 属性），仅在渲染期调用
   function camRef() {
     return (typeof camera !== 'undefined' && camera) ? camera : { rotZ: 0, rotX: 0.6, zoom: 1 };
@@ -332,6 +348,7 @@ window.SimLighting = (function () {
     shadowOffset,
     sunScreenDir,
     shadeFace,
+    shadeRgb,
     lastMs: () => S.lastMs,
     relightCount: () => S.relightCount,
     // 时间跳变（读档 / 重置 / 时光倒流 / 无头恢复）后立即对齐，不做平滑
