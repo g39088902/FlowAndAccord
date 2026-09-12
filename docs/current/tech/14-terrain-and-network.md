@@ -232,7 +232,7 @@ pub struct TerrainAccent {
     pub     tint: u8,              // 0=默认, 1=偏黄(秋季), 2=偏红(深秋)
     // ★ 现状：该字段是**无生产者的预留钩子**——Rust 侧恒写 0（`accents.rs`「tint 默认 0」），
     //   渲染层也不再读它：季节叶色自 2026-09-12 起由前端 `SimTreeTint.tint(accent, sim)`
-    //   按当前季节实时派生（`render_terrain.js`，真相源＝快照 `season`/`season_progress`）。
+    //   按当前季节实时派生（`accent-season.js`，★ v1.50.23 自 render_terrain.js 迁出；真相源＝快照 `season`/`season_progress`）。
     //   D-B1 若仍需该字段，必须指定唯一生产者；否则应借 FABS `FORMAT_VERSION` 2→3 之机移除（§5.7）。
 }
 
@@ -800,16 +800,19 @@ pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1
 
 ### 15.1 渲染职责拆分
 
-✅ 已拆分（v1.48.0 起）。`render_terrain.js` 从 `render_world.js` 独立：
+✅ 已拆分（v1.48.0 起）。`render_terrain.js` 从 `render_world.js` 独立；★ v1.50.23 TA-01 装饰再拆为 accent 三件套：
 
 ```text
-render_terrain.js       天空背景、地形壳层/单格填充/网格线、地貌特征、装饰实体   ✅ 已拆
-render_features.js      河流、岸线、浅滩、泉谷等水系特征                      ❌ 未建（并入 render_terrain.js::drawFeatureItem）
-render_world.js         统一深度队列调度、POI、房屋、道路、贴地图元            ✅
-render_agents.js        族人绘制                                        ✅
+render_terrain.js       天空背景、地形壳层/单格填充/网格线、地貌特征             ✅ 已拆（★ v1.50.23 装饰已迁出）
+accent-season.js        装饰季相层（window.SimTreeTint 叶色唯一生产者）          ✅ 已建（v1.50.23）
+accent-model.js         装饰模型层（window.AccentModel 个体形态缓存）            ✅ 已建（v1.50.23）
+render_accents.js       装饰绘制层（drawAccentEntity / Tree / Boulder / Bush）   ✅ 已建（v1.50.23）
+render_features.js      河流、岸线、浅滩、泉谷等水系特征                         ❌ 未建（并入 render_terrain.js::drawFeatureItem）
+render_world.js         统一深度队列调度、POI、房屋、道路、贴地图元              ✅
+render_agents.js        族人绘制                                                 ✅
 ```
 
-> 现状：`drawTerrainFeatures()` 已按单实体入口 `drawFeatureItem()` 重构并落在 `render_terrain.js`；`render_features.js` 未单独创建，特征绘制与地形壳层同文件。`render_world.js` 现约 770 行，逼近 800 行上限，新增景观素材前应先评估进一步拆分。
+> 现状：`drawTerrainFeatures()` 已按单实体入口 `drawFeatureItem()` 重构并落在 `render_terrain.js`；`render_features.js` 未单独创建，特征绘制与地形壳层同文件。装饰绘制已迁至 `render_accents.js`（★ v1.50.23 TA-01）。`render_world.js` 现约 904 行，已超 800 行上限，新增景观素材前应先评估进一步拆分。
 
 ### 15.2 绘制顺序
 
@@ -838,7 +841,7 @@ render_agents.js        族人绘制                                        ✅
 - **ShallowFord**：浅滩跨水步道虚线（`rgba(218, 197, 133, 0.95)`，双向虚线）；
 - **SpringValley**：浅沟细带；
 - ~~**Ridge/Saddle/Terrace**~~（v1.47.7 已删除，不再绘制山脊线/山口圆/台地轮廓）。
-- **Tree**（✅ D-A）：四瓣层叠树冠（径向渐变绿 + 冠顶受光高光）+ 锥形微弯树干，含叶片斑驳纹理（10 枚由 `accent.id` 派生的暗/亮叶簇小点）；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调）；季节叶色由前端 `window.SimTreeTint`（`render_terrain.js`，2026-09-12 落地）按**当前季节**实时派生：以快照 `season` + `season_progress` 推年相位，分段年历映射到三档叶色（鲜绿 → 黄绿 → 红褐，深秋与冬季共用红褐档），并逐树按 `accent.id` 做相位抖动以避免成片树同帧换色；调参入口 `RENDER_CONFIG.treeTint*`（`config.render.js`）——**不读存档里的 `tint`**（后者恒为 0，见 §7.4）；
+- **Tree**（✅ D-A）：四瓣层叠树冠（径向渐变绿 + 冠顶受光高光）+ 锥形微弯树干，含叶片斑驳纹理（10 枚由 `accent.id` 派生的暗/亮叶簇小点，散点几何缓存于 `accent-model.js`）；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调）；季节叶色由前端 `window.SimTreeTint`（`accent-season.js`，★ v1.50.23 自 render_terrain.js 迁出；2026-09-12 落地）按**当前季节**实时派生：以快照 `season` + `season_progress` 推年相位，分段年历映射到三档叶色（鲜绿 → 黄绿 → 红褐，深秋与冬季共用红褐档），并逐树按 `accent.id` 做相位抖动以避免成片树同帧换色；调参入口 `RENDER_CONFIG.treeTint*`（`config.render.js`）——**不读存档里的 `tint`**（后者恒为 0，见 §7.4）；
 - **Boulder**（✅ D-A）：不规则多边形岩石（灰岩基色 + 受光面高光），尺寸 2-5m；
 - **Bush**（✅ D-A）：三瓣扁压圆簇灌木 + 微投影，高度 < 1m。
 

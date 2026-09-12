@@ -122,7 +122,10 @@ FlowAndAccord/
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
 │   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (水底卵石/成群游鱼/太阳波光，纯表现层，随种子确定性重建)
-│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 + ★ v1.50.2 装饰单实体 drawAccentEntity (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；装饰整层绘制已并入 render_world.js 深度队列)
+│   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出)
+│   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache)
+│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；★ v1.50.23 装饰绘制已迁出 render_accents.js)
+│   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity / Tree / Boulder / Bush，由 render_world.js 深度队列调度)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制与世界实体统一深度队列
 │   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效
 │   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染

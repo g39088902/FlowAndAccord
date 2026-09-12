@@ -16,7 +16,7 @@
 > 属"空转配置"。因此下文凡出现「已声明未消费」「保留该开关」「应一并清理」的表述**均以本段为准**：
 > 三项已清理完毕，**D-B 落地时必须把字段连同唯一消费点一起加回**（`tools/config-check.js` 第 5 条
 > 「空转参数」规则会拒绝任何无消费点的字段）。树木季节变色已不依赖任何配置开关：
-> 自 2026-09-12 起由前端 `SimTreeTint`（`render_terrain.js`）按快照季节实时派生，
+> 自 2026-09-12 起由前端 `SimTreeTint`（★ v1.50.23 起位于 `accent-season.js`，自 `render_terrain.js` 迁出）按快照季节实时派生，
 > 调参入口是 `window.RENDER_CONFIG.treeTint*`（`frontend/js/config.render.js`）。
 > **入口**：[文档导航](../../README.md) · [长期路线图](../design/01-roadmap.md) · [地形美术与世界景观提升](./07-terrain-art.md)。
 > **依据**：[./01-integration-contracts.md](./01-integration-contracts.md)、[./07-terrain-art.md](./07-terrain-art.md)、[../../current/tech/17-seasonal-lighting.md](../../current/tech/17-seasonal-lighting.md)、[../../current/tech/18-water-rendering.md](../../current/tech/18-water-rendering.md)。
@@ -206,7 +206,7 @@ T0 地表查询与完整曲线校验                      ✅
 | T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现本步时一并加回 |
 | T1 山口聚落（丘陵/山脊/山口连续起伏） | ✅ 已落地（v1.47.1/v1.47.2；v1.47.7 移除台地） | `mountain_pass_v1` profile；局部 `relief_rng` 派生主脊/山口连续起伏；存档版本门禁；前端按地表类别渲染。v1.47.7：删除台地压平与 `Ridge`/`Saddle`/`Terrace` 特征及前端轮廓绘制 | 山口地貌参数已配置化（`terrainPassRidgeWidth` / `terrainPassRidgeAmplitude`）；支脊未实现；子特征注入待规划。v1.50.17 完成主脊通行力修复（§9.3.1） |
 | T2 静态主河/浅滩/河阶/泉谷 | ✅ 已落地 | `river_valley_v1` profile + 生成器版本 3（v1.47.7 起，与 T1 共用全局版本）；主河生成（`geo/hydrology.rs`），单调河床下凹与水面静态；低滩（`NO_BUILD`）与河阶（`RiverTerrace`）；两处静态浅滩走廊（`ShallowFord`，跨水授权）；共享水池 `WaterPool` 聚合取水与稳定扣减；地形感知路网（`spatial/terrain_network.rs`）与 `LaneTerrainProfile` 边权通行代价折算；占地校验拒绝浅水（`WaterCovered`）；存档格式升级为 7；10 个 T2 配置参数；前端河道/岸线/浅滩特征渲染与 HUD 水量去重；支持 T1/T2 模板按种子哈希随机轮换（`terrainProfile: 'random'`） | 子特征注入待规划 |
-| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_terrain.js::drawAccentEntity()`（Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`）；配置字段现存 1 个（`terrainAccentDensity`），`terrainAccentSubFeatures`/`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 仅枚举定义未生成；装饰缓存标志仍与地形共用 |
+| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_accents.js::drawAccentEntity()`（★ v1.50.23 自 `render_terrain.js` 迁出；Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`，个体形态缓存 `accent-model.js`）；配置字段现存 1 个（`terrainAccentDensity`），`terrainAccentSubFeatures`/`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 仅枚举定义未生成；装饰缓存标志仍与地形共用 |
 | D-B 装饰系统扩展 | ⏳ 未实施 | — | RockCluster/GrassTuft 生成（季节叶色已由前端 `SimTreeTint` 落地，见文首更正段） |
 | T1 子特征注入 | ⏳ 未实施 | — | 山脚湖（T1 鞍部静水）；山涧飞瀑（主脊跌水）；密林山坡（装饰树群）；裸岩露头（陡坡岩石） |
 | T2 子特征注入 | ⏳ 未实施 | — | 牛轭湖（回水湾）；河谷峭壁（河段两侧 Cliff）；河岸林带（沿河装饰树列）；碎石浅滩（河滩石砾） |
@@ -638,7 +638,7 @@ D-B2/P1 改变 `TerrainFeatureKind`、`TerrainMap` 或 profile 时，必须在�
 | 快照 JSON | `spatial/snapshot.rs`、`spatial/world_snapshot.rs` | `TerrainSubFeatureSnapshot` 及 `terrain_sub_features`；静态地形脏帧才发送 |
 | FABS | `snapshot_bin/layout.rs`、`encode.rs`、`dict.rs`、`frontend/js/snapshot-bin.js` | `FORMAT_VERSION` 由当前 **2** 递增为 **3**（旧 JS 枚举表无法可靠展示新 code，故必须递增）；新增 `TerrainSubFeatures=22`。记录固定为 `id:u32,kind:u8,anchor:Vec3,bounds_min:Vec3,bounds_max:Vec3,feature_count:u8,feature_ids...,accent_start:opt_u32,accent_end:opt_u32,align4`；同步 feature/accent 枚举表 |
 | 前端状态 | `frontend/js/rustworld.js` | 映射 `terrain.subFeatures`；在 READY/LOAD/REWIND/RESET 及 `STR_TAB.start_index==0` 时和 features/accents 一起清除 |
-| Canvas | `frontend/js/render_terrain.js`、必要时 `render_world.js` | `WaterBody` 按静水多边形绘制；`Waterfall` 绘制折线/白沫；`Cliff` 绘制岩层阴影；`RockCluster`/`GrassTuft` 通过统一深度队列绘制，不能恢复整层落笔 |
+| Canvas | `frontend/js/render_terrain.js`、`render_accents.js`（★ v1.50.23 装饰已迁入，装饰统一深度队列在后者），必要时 `render_world.js` | `WaterBody` 按静水多边形绘制；`Waterfall` 绘制折线/白沫；`Cliff` 绘制岩层阴影；`RockCluster`/`GrassTuft` 通过统一深度队列绘制，不能恢复整层落笔 |
 | 存档 | `spatial/world_save.rs` 与存读档测试路径 | `TerrainMap` 自动序列化 sub_features（容器字段可加 `#[serde(default)]`）；保存/加载严格校验 `terrain_generator_version` 与 `terrain_profile`，跨版本旧档明确报错、不静默重生成；**本阶段必须把 `TERRAIN_GENERATOR_VERSION` 从当前 4 递增到 5**（P1 新增 3 个 profile 时再递增一次），`SAVE_FORMAT_VERSION` 仅在 `WorldSave` 结构本身变化时才递增（当前 7） |
 
 `TerrainSubFeatures` 不是渲染必需字段，但必须快照化：它是调试面板、诊断输出、跨世界缓存清理和“此种子究竟启用了什么”的稳定事实。FABS Section 18 的 feature 记录布局只新增 enum code 不改变字段布局；仍必须升级 `FORMAT_VERSION`，因为旧 JS 枚举表不能可靠展示新 code。
@@ -792,7 +792,7 @@ pub struct RiverCenterline {
 | `crates/sim_core/src/geo/terrain.rs` | T1 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**，见 §5.3） | ⏳ 未改 |
 | `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ⏳ 未改 |
 | `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 注册 Cliff/Waterfall/WaterBody 特征表 | ⏳ 未改 |
-| `frontend/js/render_terrain.js` | Cliff/Waterfall/WaterBody 特征绘制（Tree 季节叶色已由 `SimTreeTint` 落地，见文首更正段） | ⏳ 未改 |
+| `frontend/js/render_terrain.js` | Cliff/Waterfall/WaterBody 特征绘制（★ v1.50.23 装饰已迁至 `render_accents.js` / `accent-model.js` / `accent-season.js`） | ⏳ 未改 |
 | `tools/config-check.js` | 子特征相关配置映射 | ⏳ 未改 |
 | `crates/sim_core/src/spatial/terrain_network.rs` | 无（子特征在路网生成前完成，路网只消费最终地表） | ✅ 无需改动 |
 

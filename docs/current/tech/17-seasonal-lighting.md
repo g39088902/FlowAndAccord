@@ -361,7 +361,7 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 | `frontend/js/main.js` | 开关绑定 + 可选 `L` 键 | ±15 行 |
 | 文档 | `frontend/AGENTS.md`（文件清单/加载顺序/DOM 契约）、`./16-frontend-overview.md`、`./31-code-map.md`、`./19-ui-implementation.md`、`../01-changelog.md`、`../../plan/tech/07-terrain-art.md`（S1-4 对接） | — |
 
-`drawTerrain`/水系/装饰绘制已拆到 `render_terrain.js`（约 724 行），但 `render_world.js` 现约 904 行、已超 800 行上限：本方案落地时**不得新增整层绘制**，新增光照相关笔迹优先放入既有对应文件并视情况继续拆分（`../../plan/tech/07-terrain-art.md` §6.7 列有渲染文件拆分计划）。
+水系绘制在 `render_terrain.js`（★ v1.50.23 装饰已迁出，约 365 行），装饰绘制在 `render_accents.js`（v1.50.23 TA-01 拆分）；但 `render_world.js` 现约 904 行、已超 800 行上限：本方案落地时**不得新增整层绘制**，新增光照相关笔迹优先放入既有对应文件并视情况继续拆分（`../../plan/tech/07-terrain-art.md` §6.7 列有渲染文件拆分计划）。
 
 ### 8.1 实施门禁
 

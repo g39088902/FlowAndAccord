@@ -28,7 +28,7 @@ window.RENDER_CONFIG = {
   poiMarkerFootprintR: 20,    // POI 标记足迹（覆盖图标/储量环/门牌）
   accentFootprintR: 8,        // 地表装饰（Tree/Boulder/Bush）足迹
 
-  // —— 装饰树木季节叶色（★ 2026-09-12 落地，render_terrain.js::SimTreeTint 消费）——
+  // —— 装饰树木季节叶色（★ 2026-09-12 落地，accent-season.js::SimTreeTint 消费；v1.50.23 自 render_terrain.js 迁出）——
   // 年相位 u 的定义与 lighting.js::phaseFromSnapshot 完全一致（同一真相源：快照 season +
   // season_progress，缺字段回退 seasonTimer / seasonYearLength）：春 0.00 / 夏 0.25 / 秋 0.50 / 冬 0.75。
   // 叶色档只有 3 档可用（drawAccentTree 的既定调色板）：0=鲜绿(春夏) / 1=黄绿(秋) / 2=红褐(深秋·冬)。

@@ -1,7 +1,8 @@
 // === 世界元素绘制 (从 render.js 拆分) ===
 // ★ v1.50.11 世界统一深度队列：地形格 + 水系 + 游鱼/波光 + 道路分段 + 营地连线 +
 //   POI 底座 + POI 标记 + 私产宅舍 + 地表装饰 + 族人，全部按相机深度远 → 近落笔
-// 地形壳层（投影/沙盘侧壁）与单格/单特征绘制入口在 render_terrain.js
+// 地形壳层（投影/沙盘侧壁）与单格/单特征绘制入口在 render_terrain.js；
+// 装饰单实体绘制入口 drawAccentEntity 在 render_accents.js（★ v1.50.23 TA-01 迁出）
 // 依赖全局: ctx, camera, sim, project3D, getElevationColor, mousePos, isDragging, hoveredLane, SimLighting, terrainProjX, terrainProjY
 
 // ★ v1.50.15 渲染表现层参数（视觉抬升 / 足迹深度半径），来源 config.render.js

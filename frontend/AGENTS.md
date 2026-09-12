@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：31 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：34 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器与 ★ v1.50.23 TA-01 装饰三件套 `accent-season.js` / `accent-model.js` / `render_accents.js`）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -47,7 +47,10 @@
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
 | `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.48.0 调用顺序：`SimLighting.update` → 天空 → 地形 → 路网 → 贴地图元 → 大气色洗 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
-| `js/render_terrain.js` | ~430 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石；★ v1.50.3/04/05/06 已裁剪波光以外的整层装饰 pass）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAccentEntity` + Tree/Boulder/Bush 单体绘制（★ 2026-09-12 季节叶色由本文件**定义**的 `window.SimTreeTint` 派生 + 确定性哈希叶纹理）；**★ 本文件定义 `window.SimTreeTint`**（`yearPhase`/`brownness`/`tint`，消费 `RENDER_CONFIG.treeTint*`） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
+| `js/render_terrain.js` | ~365 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ ★ v1.50.23 TA-01 装饰代码已迁出为 accent 三件套（下方三行） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
+| `js/accent-season.js` | ~75 | ★ v1.50.23 TA-01（docs/plan/tech/07-terrain-art.md §6.7）：**`window.SimTreeTint` 季相层**——装饰树木季节叶色的唯一生产者（`yearPhase`/`brownness`/`tint`，消费 `RENDER_CONFIG.treeTint*`，自 render_terrain.js 原位迁出）；TA-02 连续季相生产器将在此扩展。**新增消费方只能读它，不得另建季节色逻辑** | 模型几何（accent-model）、绘制（render_accents） |
+| `js/accent-model.js` | ~100 | ★ v1.50.23 TA-01：**`window.AccentModel` 模型层**——稳定形态派生 + 个体模型缓存（全局 `_accentHash` 哈希 / 个体种子 `vSeed` / Tree 10 + Bush 7 叶簇散点 / `extent` 包围体预留），键 `kind#id`、上限 2048 条超限清空；`resetCache()` 由 rustworld.js 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处调用（换世界不残留旧模型）。TA-03 枝干骨架将在此扩展 | 季相曲线（accent-season）、绘制（render_accents） |
+| `js/render_accents.js` | ~300 | ★ v1.50.23 TA-01：**装饰绘制层**——`drawAccentEntity` / `drawAccentTree` / `drawAccentBoulder` / `drawAccentBush`（自 render_terrain.js 原位迁出，叶簇散点改读 AccentModel 缓存、数值逐位一致），仍由 render_world.js 深度队列以 DEPTH_ACCENT 调度；迁出时移除全仓无定义点的 `window.AccentRenderer` 死分支。TA-04 世界光向受光将在此接入 | 深度队列调度（render_world）、季相（accent-season） |
 | `js/river_life.js` | ~300 | **★ v1.49.0 水系微观生态纯表现层**：`window.RiverLife`——`init(features, seed)`（世界重置/读档时由 rustworld.js 以 `_engineSeed` 重建，4 群 22 条游鱼沿河道中心线巡航）/ `update`（墙钟驱动，暂停时继续流动属设计决策）/ `drawFish` / `drawSunGlint`（迎光波光，强度按河道切线与光向夹角调制）；★ v1.50.3 移除水面微波虚线、★ v1.50.4 移除水底卵石层（`drawRiverbed` 及卵石数据已删除——深色扁圆石透水面观感呈"一堆深蓝色圆圈"）；在 render_terrain.js 之前加载 | 仿真状态读写、WorldRng 消耗、快照契约 |
 | `js/render_world.js` | ~700 | **世界元素绘制**（v1.7.1 拆分）：**★ v1.50.11 `drawWorldEntities()` 世界统一深度队列**（地形格 + 水系特征 + 游鱼/波光 + 道路 16 分段（`lineDashOffset` 虚线相位跨段连续）+ 营地辖区连线 + POI 底座 + POI 标记 + 房屋 + 族人 + 地表装饰，全部按 `depth = ry·sinX + z·cosX` 升序远 → 近落笔，深度项走持久对象池 `_depthPool` 零每帧 GC）/ `updateLaneHover`（道路悬浮检测 + Tooltip）/ `cacheLaneStyle` + `drawLaneSegment`（道路样式缓存与单段描边）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型，★ v1.48.0 面法线受光 + 世界空间阴影） | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
@@ -77,7 +80,7 @@
 | 文件 | 行数 | 职责 |
 |---|---|---|
 | `server.js` | ~122 | 静态文件开发服务器（内置 `.wasm` MIME = application/wasm）/ `POST /save-decision-order` 端点（★ v1.27.0 起仅保留兼容迁移，决策顺序保存主路径已迁至浏览器 localStorage）/ 默认 3000 端口 |
-| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 27 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
+| `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 30 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
 | `style.css` | — | 全局样式（顶栏/Inspector/大盘/决策视图/族谱/调试器） |
 | `rust/sim_wasm.wasm` | — | WASM 编译产物**主副本**（rustworld.js 实际 fetch 的路径） |
 | `sim_wasm.wasm` | — | WASM 编译产物**根目录备用副本** |
@@ -119,12 +122,15 @@
 20. save-ui.js                读档/存档系统（v1.8.0）← 依赖 main.js 暴露的 window.rustWorldSim
 21. render_canvas.js          Canvas 主循环调度（v1.7.1 拆分）
 22. river_life.js             水系微观生态纯表现层（★ v1.49.0，须早于 render_terrain.js）
-23. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
-24. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
-25. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
-26. render_agents.js          族人/特效绘制（v1.7.1 拆分）
-27. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
-28. auction-ui.js             拍卖大盘（最后加载，独立模态）
+23. accent-season.js          ★ v1.50.23 TA-01 装饰季相层（window.SimTreeTint 唯一生产者）
+24. accent-model.js           ★ v1.50.23 TA-01 装饰模型层（window.AccentModel 缓存，须早于 render_accents.js）
+25. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
+26. render_accents.js         ★ v1.50.23 TA-01 装饰绘制层（drawAccentEntity 等，早于 render_world.js）
+27. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
+28. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
+29. render_agents.js          族人/特效绘制（v1.7.1 拆分）
+30. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
+31. auction-ui.js             拍卖大盘（最后加载，独立模态）
 ```
 
 **关键约束**：
@@ -133,7 +139,7 @@
 - ★ v1.48.0 `config.lighting.js`（6）与 `lighting.js`（7）必须早于 `rustworld.js`——`_applySnapshot` 建地形缓存时会调用 `SimLighting.markDirty()`，缺失则首帧不重着色
 - 改拆分配置 JS（新增全局对象）必须同步：`rustworld.js::applyConfig` 合并逻辑、`tools/config-check.js` 前端字段集、`tools/test-wasm.js` 注入
 - **`save-ui.js`（18）必须在 `main.js`（15）之后**——它读取 `window.rustWorldSim`（main.js 第 5 行挂载）调用 `saveWorld()/loadWorld()`
-- **render 六件套（21-26）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；六文件共享全局作用域，函数声明可提升，加载顺序为 canvas→terrain→hud→world→agents→inspector
+- **渲染系列（21-30）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；共享全局作用域，函数声明可提升，加载顺序为 canvas→river_life→accent-season→accent-model→terrain→accents→hud→world→agents→inspector
 
 ---
 
@@ -290,7 +296,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 ### 5.9 世界图层顺序与统一相机深度绘制（★ v1.47.9 建立 / ★ v1.50.11 地形格并入）
 
 - **固定图层顺序**（`render_canvas.js::render`，★ v1.50.11 起收敛为四步）：`SimLighting.update()` → `drawSkyBackdrop` → `drawTerrainShell`（全网格顶点投影 + 沙盘基底/侧壁）→ **`drawWorldEntities`（世界统一深度队列，内含道路悬浮检测与 Tooltip）** → `drawTerrainGrid`（'G' 键调试网格线，0.04 透明度叠加层）→ `drawCoronationEffects`。旧管线中独立的「地形格整层 / 路网 / POI 底座 / 大气色洗」四个 pass 全部并入统一深度队列或烘焙进地形色——**严禁恢复任何「整层先画」调用**（已有三次历史教训：v1.47.8 房屋、v1.50.2 装饰、v1.50.11 之前图标透山）。
-- **★ v1.50.11 世界统一深度队列（核心契约）**：Canvas 2D 无深度缓冲，`render_world.js::drawWorldEntities()` 每帧把**地形格（`drawTerrainCell`，深度 = 四角 world 坐标均值）、水系特征（★ v1.50.20 河面按剖分区间逐段入队，段深度 = 段四角最大相机深度；RiverBank 逐段描边；ShallowFord/波光挂所在段深度 + ε）、游鱼（逐条）、道路（16 分段，`lineDashOffset` 按累计弧长保持虚线相位跨段连续）、营地辖区连线（中点近似深度）、POI 底座（−0.01 ε 垫在自己标记下）、POI 标记 / 房屋 / 族人（`render_agents.js::drawAgent`）/ 地表装饰（`render_terrain.js::drawAccentEntity`）** 全部收进同一个列表，按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制（远 → 近）；同深度保持收集原序（`Array.sort` 稳定）维持渲染确定性。深度项走持久对象池 `_depthPool`（零每帧 GC）。地形格与实体同队列后，**近处山地格与河道才能正确遮挡更远的图标**（v1.50.11 修复「图标透过山体可见」），同时修正了相机旋转下地形格行主序绘制导致的自遮挡隐患。
+- **★ v1.50.11 世界统一深度队列（核心契约）**：Canvas 2D 无深度缓冲，`render_world.js::drawWorldEntities()` 每帧把**地形格（`drawTerrainCell`，深度 = 四角 world 坐标均值）、水系特征（★ v1.50.20 河面按剖分区间逐段入队，段深度 = 段四角最大相机深度；RiverBank 逐段描边；ShallowFord/波光挂所在段深度 + ε）、游鱼（逐条）、道路（16 分段，`lineDashOffset` 按累计弧长保持虚线相位跨段连续）、营地辖区连线（中点近似深度）、POI 底座（−0.01 ε 垫在自己标记下）、POI 标记 / 房屋 / 族人（`render_agents.js::drawAgent`）/ 地表装饰（`render_accents.js::drawAccentEntity`）** 全部收进同一个列表，按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制（远 → 近）；同深度保持收集原序（`Array.sort` 稳定）维持渲染确定性。深度项走持久对象池 `_depthPool`（零每帧 GC）。地形格与实体同队列后，**近处山地格与河道才能正确遮挡更远的图标**（v1.50.11 修复「图标透过山体可见」），同时修正了相机旋转下地形格行主序绘制导致的自遮挡隐患。
 - **★ v1.50.20 河面必须分段入队（勿回退）**：River 水面整条多边形若以「全顶点最大相机深度」单坑入队（v1.50.11 做法），河道任一岸段靠近相机时整条河就排到队尾、盖住所有更远的树/房/POI/族人（用户可见症状：「河流叠加在树和房子上」）。现在水面按剖分区间逐段入队（河道 outline 是「左岸 N 点顺去 + 右岸 N 点逆回」闭合带，顶点 `i` 与 `vLen−1−i` 同为第 `i` 断面；段四角 = `v[b]/v[b+1]/v[vLen−2−b]/v[vLen−1−b]`），绘制走 `render_terrain.js::drawRiverBand`：**clip 到段四边形内、再整多边形两遍填充**——硬 clip 逐像素归属唯一一段 ⇒ 无接缝、无半透明叠 blend，观感与整河填充一致；RiverBank 同理逐段描边；涉渡/波光挂所在段深度 + ε（二分左岸单调 y 定位段）。新增「沿河长条状贴地特征」时一律沿用此分段模式。
 - **新增世界实体/贴地图元必须挂进同一队列**：在 `drawWorldEntities()` 收集阶段登记种类 + 提供单实体绘制函数即可，**严禁**在 `render()` 里新增独立的整层绘制调用。注意深度键约定：立体实体用锚点（`pos`/裸 `x/y/z`）深度；跨大深度区间的面状元素（河道等）用「顶点最大深度」近似；贴地装饰性线条（辖区连线）允许中点近似。
 - **★ v1.50.11 大气色洗已烘焙进地形色**：色洗原先是「贴地图元之后、立体实体之前」的整屏 `fillRect`，实体与地形格交错落笔后会把实体一起洗灰——现按同一公式（当季 tint × `skyWash` × 浅色主题 0.55 系数）在 `lighting.js::relightTerrain()` 写回 `cell.color` 时混入，观感不变且零每帧成本；旧固定光对照路径（`enabled=false`）无色洗。`drawAtmosphereWash()` 函数已删除，勿在文档外恢复。
@@ -317,7 +323,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
   判断用的 `sim.treeTintEnabled` 来源字段 `terrainTreeSeasonTint` 又在 v1.50.18 被清理
   → 条件恒假、分支永不进入，树木叶色恒等于 `accent.tint`，而 Rust `geo/accents.rs` 恒写 `tint: 0`
   → **四季渲染完全相同**（文档却一直声称"按当前季节实时派生"）。
-- **唯一生产者 = `window.SimTreeTint`**（定义在 `render_terrain.js`，不是独立文件）：
+- **唯一生产者 = `window.SimTreeTint`**（★ v1.50.23 起定义在 `accent-season.js`，TA-01 自 render_terrain.js 迁出；此前为「不是独立文件」）：
   `yearPhase(sim)` / `brownness(u)` / `tint(accent, sim)`。**新增消费方只能读它，不得另建季节色逻辑。**
 - **真相源与 `SimLighting` 完全同构**：只消费快照 `sim.currentSeason` + `sim.seasonProgress`
   （缺字段回退 `seasonTimer / seasonYearLength`），**严禁**另建计时器（同 §5.10）。

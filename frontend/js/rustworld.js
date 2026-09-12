@@ -84,7 +84,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.22';
+        this._appVersion = '1.50.23';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -154,7 +154,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.22';
+            this._appVersion = msg.appVersion || '1.50.23';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -165,6 +165,8 @@
               if (msg.enumTableJson) window.SnapshotBin.setEnumTables(msg.enumTableJson);
               window.SnapshotBin.resetCaches();
             }
+            // ★ TA-01：引擎全新 → 装饰个体模型缓存失效（换世界不残留旧形态，07-terrain-art.md §10.2）
+            if (window.AccentModel) window.AccentModel.resetCache();
             if (msg.snapshot) {
               // ★ 动态季节光照：全新引擎 → 光相立即对齐（不做平滑）
               if (window.SimLighting) window.SimLighting.resync();
@@ -221,6 +223,8 @@
             if (msg.ok && msg.snapshot) {
               // ★ M4：读档后引擎重建 → 清空解码器字符串缓存与车道几何缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ TA-01：读档重建 → 装饰个体模型缓存失效
+              if (window.AccentModel) window.AccentModel.resetCache();
               // ★ 动态季节光照：读档时间可能倒退 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -236,6 +240,8 @@
             }
             if (msg.ok && msg.snapshot) {
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ TA-01：回溯重建 → 装饰个体模型缓存失效
+              if (window.AccentModel) window.AccentModel.resetCache();
               // ★ 动态季节光照：时光倒流时间倒退 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -255,6 +261,8 @@
             if (msg.snapshot) {
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
+              // ★ TA-01：重置后引擎全新 → 装饰个体模型缓存失效
+              if (window.AccentModel) window.AccentModel.resetCache();
               // ★ 动态季节光照：重置 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -415,7 +423,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.22';
+        return this._appVersion || '1.50.23';
       }
 
       /**

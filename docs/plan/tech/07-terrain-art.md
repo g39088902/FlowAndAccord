@@ -1,6 +1,6 @@
 # 07. 地形美术与世界景观提升规划
 
-> **状态**：短期 S1（地表光照沙盘基底）、S2/P0（渲染层级反转 + 自然道路色阶）、S2.1/P1（水系三层水光）、S2.2/P2（统一相机深度绘制）均已落地，并在 v1.50.11 / v1.50.14 / v1.50.20 演进为「地形格 / 水系 / 道路 / 沙盘侧壁 / 地表装饰全部并入 `drawWorldEntities()` 统一深度队列」；内核 T0 地表查询、T1 山口聚落、T2 两岸河谷已提供真实高程、地表类别与水系事实（`terrain_generator_version = 4`）；D-A 装饰基础（Tree/Bush/Boulder 生成 + FABS Section 21 + 绘制，v1.49.1）与三档树冠季相（v1.50.21）已落地。未实施：连续季相与局部三维植被（§6）、D-B 子特征注入、RockCluster/GrassTuft 生成与绘制、资源点景观群与房屋院地、标注避让、季节地表调色、分块缓存与 LOD。
+> **状态**：短期 S1（地表光照沙盘基底）、S2/P0（渲染层级反转 + 自然道路色阶）、S2.1/P1（水系三层水光）、S2.2/P2（统一相机深度绘制）均已落地，并在 v1.50.11 / v1.50.14 / v1.50.20 演进为「地形格 / 水系 / 道路 / 沙盘侧壁 / 地表装饰全部并入 `drawWorldEntities()` 统一深度队列」；内核 T0 地表查询、T1 山口聚落、T2 两岸河谷已提供真实高程、地表类别与水系事实（`terrain_generator_version = 4`）；D-A 装饰基础（Tree/Bush/Boulder 生成 + FABS Section 21 + 绘制，v1.49.1）与三档树冠季相（v1.50.21）已落地；v1.50.23 TA-01 将装饰代码拆为 `accent-season.js` / `accent-model.js` / `render_accents.js` 三件套。未实施：连续季相与局部三维植被（§6）、D-B 子特征注入、RockCluster/GrassTuft 生成与绘制、资源点景观群与房屋院地、标注避让、季节地表调色、分块缓存与 LOD。
 > **v1.48.0 方案决策**：取消独立 T3（湖泊/湿地/峡谷/瀑布 profile），改为「T1/T2 子特征注入 + 地表装饰系统」——Accent 装饰层（Tree/Boulder/Bush/RockCluster/GrassTuft）以独立加盐 RNG 生成；子特征注入器按 seed 概率注入山脚湖/瀑布/峭壁等特色地貌；湿地因视觉辨识度低明确删除。
 > **整理记录**：2026-09-12 结构重整——原先同层内容散落在旧 §3/§4/§5/§9/§10（季相写了四遍、缓存规则写了四遍、验收写了五遍、优先级写了三遍），现按「计划 → 目标边界 → 现状 → 规则 → 任务设计 → 工程约束 → 验收」归并；全部待办统一编号为 TA/TB/TC 任务并前置到 §1，旧 S/M/D-B/P 编号作为别名保留以便检索；同时按当前源码刷新管线、函数名与数字事实。
 > **评估依据**：用户实机运行反馈截图（诊断基线）＋ 当前 `frontend/js` 渲染实现逐函数核对 ＋ [地形专项方案](./06-terrain-templates.md) 落地状态。
@@ -56,7 +56,7 @@ stateDiagram-v2
 - **水系**：T2 内核河道/岸线/浅滩/泉谷 + 清透碧蓝水体三层落笔（深底/主流/波光）；v1.49.1 移除手绘沙滩金砂线，v1.50.20 河面按剖分区间逐段并入深度队列。
 - **深度排序**：`drawWorldEntities()` 统一深度队列——地形格、水系、道路 16 分段、营地辖区连线、POI 底座/标记、房屋、族人、地表装饰、沙盘侧壁全部按相机深度远 → 近落笔，稳定排序保确定性，拾取遍历与绘制队列解耦。
 - **内核地貌**：T0 地表查询（`sample_elevation` / `validate_footprint`）、T1 山口聚落 `mountain_pass_v1`、T2 两岸河谷 `river_valley_v1`，`terrainProfile: 'random'` 按种子哈希 ~50% 轮换并回写入档，生成器版本 4。
-- **D-A 装饰基础**：`geo/accents.rs` 五类枚举（Tree/Bush/Boulder/RockCluster/GrassTuft，后两类无生成调用）、独立盐值 RNG、基数树 40 / 石 20 / 灌木 25 × 密度、FABS Section 21 持久化、前端 `drawAccentEntity` 绘制 Tree/Bush/Boulder；v1.50.21 落地三档树冠季相（鲜绿 → 黄绿 → 红褐，快照季节驱动）。
+- **D-A 装饰基础**：`geo/accents.rs` 五类枚举（Tree/Bush/Boulder/RockCluster/GrassTuft，后两类无生成调用）、独立盐值 RNG、基数树 40 / 石 20 / 灌木 25 × 密度、FABS Section 21 持久化、前端 `drawAccentEntity` 绘制 Tree/Bush/Boulder；v1.50.21 落地三档树冠季相（鲜绿 → 黄绿 → 红褐，快照季节驱动）。★ v1.50.23 TA-01：装饰代码自 `render_terrain.js` 迁出为 `accent-season.js`（SimTreeTint）/ `accent-model.js`（个体模型缓存）/ `render_accents.js`（绘制入口）三文件。
 
 ### 1.2 任务总表
 
@@ -64,7 +64,7 @@ stateDiagram-v2
 
 | 编号 | 任务 | 原代号 / 详见 | 难度 | 依赖 |
 | :--- | :--- | :--- | :--- | :--- |
-| TA-01 | 从 `render_terrain.js` 迁出装饰代码，建立 `accent-season.js` / `accent-model.js` / `render_accents.js` 三文件 | P0，详见 §6.7 | 低 | — |
+| TA-01 | ✅ 从 `render_terrain.js` 迁出装饰代码，建立 `accent-season.js` / `accent-model.js` / `render_accents.js` 三文件（v1.50.23 落地） | P0，详见 §6.7 | 低 | — |
 | TA-02 | 统一植被季相生产器：`SimTreeTint` 扩展 `sample()`，输出连续叶色/叶量/芽/花/地被落叶，替代 v1.50.21 的三档映射 | P0，详见 §6.3 | 中 | TA-01 |
 | TA-03 | 局部三维枝干骨架 + 椭球叶簇 + 稳定脱落次序，真正落叶露枝、冬季 0~5% 叶量 | P0，详见 §6.4 | 高 | TA-02 |
 | TA-04 | 世界光向动态受光：枝干/叶簇/Boulder 法线点积，移除固定屏幕亮斑，阴影随树高与叶量变化 | P0，详见 §6.5 | 中 | TA-03 |
@@ -175,7 +175,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 
 **统一深度队列（S2.2/P2，v1.47.8 建立、v1.50.11/14/20 扩展）**：`render_canvas.js::render()` 现行顺序为 `SimLighting.update()` → `drawSkyBackdrop()` → `drawTerrainShell()`（全网格顶点投影 + 沙盘基底/侧壁壳）→ **`drawWorldEntities()`（世界统一深度队列）** → `drawTerrainGrid()`（`G` 键调试网格）→ 登基礼花。队列内一切图元按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制，同深度保持收集原序（`Array.sort` 稳定）以维持渲染确定性，深度项走持久对象池 `_depthPool` 零每帧 GC；排序只作用于绘制，`sim.pois` / `sim.houses` / `sim.agents` 顺序与点击拾取、Inspector 遍历不变。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制**（已有三次历史教训，见 `frontend/AGENTS.md` §5.9）。
 
-**D-A 装饰基础（v1.49.1）**：`geo/accents.rs` 定义 `AccentKind`（Tree/Bush/Boulder/RockCluster/GrassTuft 五变体）与 `TerrainAccent`（id/kind/pos/scale/rotation/tint）；`generate_accents()` 使用独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40 / 巨石 20 / 灌木 25 × `terrainAccentDensity`，按地表类别/坡度/肥力过滤水体与禁区、有界重试 3×；经 FABS Section 21（约 24B/个）随 `terrain_state` 入档；前端 `render_terrain.js::drawAccentEntity` 分种类绘制。RockCluster/GrassTuft 仅有枚举，生成器无调用、绘制入口跳过，**不能算作已实现能力**。
+**D-A 装饰基础（v1.49.1）**：`geo/accents.rs` 定义 `AccentKind`（Tree/Bush/Boulder/RockCluster/GrassTuft 五变体）与 `TerrainAccent`（id/kind/pos/scale/rotation/tint）；`generate_accents()` 使用独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40 / 巨石 20 / 灌木 25 × `terrainAccentDensity`，按地表类别/坡度/肥力过滤水体与禁区、有界重试 3×；经 FABS Section 21（约 24B/个）随 `terrain_state` 入档；前端 `render_accents.js::drawAccentEntity` 分种类绘制（★ v1.50.23 自 `render_terrain.js` 迁出）。RockCluster/GrassTuft 仅有枚举，生成器无调用、绘制入口跳过，**不能算作已实现能力**。
 
 ### 3.3 关键实现入口（按职责）
 
@@ -183,7 +183,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 - [地形感知路网](../../../crates/sim_core/src/spatial/terrain_network.rs)：走廊合法性、浅滩跨河授权与 `LaneTerrainProfile` 通行代价。
 - [颜色计算](../../../frontend/js/math.js)（`computeElevationColor`，唯一着色入口）/ [颜色兜底与投影](../../../frontend/js/main.js)（`getElevationColor` 只做委托 + 纯色兜底）/ [季节光照](../../../frontend/js/lighting.js)（`SimLighting`，光源真相）。
 - [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`，`_terrainCached` 单标志控制整块地形与特征缓存）。
-- [地形/水系/装饰绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand` / `drawAccentEntity`，约 724 行）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
+- [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
 - [渲染表现层参数](../../../frontend/js/config.render.js)（`window.RENDER_CONFIG`，不注入 WASM、不并入 SIM_CONFIG）。
 - [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 4 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
@@ -328,13 +328,13 @@ S1 已落地部分见 §3.2；本节只保留 S1 未完成项与信息减噪任�
 
 成组分布优先于全图提高密度：主树周围有低灌木与草，岸边有草石，聚落和主路保留可读空间。当前 accent 早于路网/房屋/POI 生成，不能声称生成时已经避让这些对象；扩展阶段（TA-14）增加基于最终世界几何的**表现层遮罩/裁剪**，只影响装饰可见部分，不改通行或建造规则。选中目标轮廓与标签保持清晰。
 
-### 6.7 模块拆分、模型缓存与遮挡边界（TA-01、TA-07、TA-08）
+### 6.7 模块拆分、模型缓存与遮挡边界（TA-01 ✅ v1.50.23、TA-07、TA-08）
 
-`render_terrain.js` 现约 724 行，逼近 800 行上限；`render_world.js` 已约 904 行、**已经超限**。增加植被功能前先把装饰相关代码从 `render_terrain.js` 迁出：
+TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 → 约 365 行）迁出为三文件，`render_world.js` 已约 904 行、**仍然超限**，后续植被功能（TA-02/03/04）应优先在 accent 三件套内扩展：
 
-- `accent-season.js`：承接扩展后的 `SimTreeTint`，只负责季相和物种曲线。
-- `accent-model.js`：稳定形态、叶簇次序、局部几何和包围体缓存。
-- `render_accents.js`：模型投影、受光、细节分级、绘制入口。
+- ✅ `accent-season.js`：承接扩展后的 `SimTreeTint`，只负责季相和物种曲线（v1.50.23，当前仍为 v1.50.21 三档映射，TA-02 扩展 `sample()`）。
+- ✅ `accent-model.js`：稳定形态、叶簇次序、局部几何和包围体缓存（v1.50.23，当前提供 `get(accent)` 派生缓存 + `resetCache()` 世界事件失效 + `_accentHash`）。
+- ✅ `render_accents.js`：模型投影、受光、细节分级、绘制入口（v1.50.23，`drawAccentEntity` / Tree / Boulder / Bush）。
 - `render_world.js`：继续负责跨实体队列；需要时把地被、影子、枝干和冠层拆成有限子项。
 - `config.render.js`：集中维护视觉种类、曲线与质量预算；`lighting.js` 继续独占光源真相。
 
@@ -449,7 +449,7 @@ S1 已落地部分见 §3.2；本节只保留 S1 未完成项与信息减噪任�
 
 - **快照同步**：快照真值赋值文件为 `crates/sim_core/src/spatial/world_snapshot.rs`，连同 `snapshot.rs`、`snapshot_bin/encode.rs`、`snapshot-bin.js`、`rustworld.js` 一起核对；新增 accent 字段/枚举时还要同步 `snapshot_bin/dict.rs` 枚举表。
 - **配置集中**：影响模拟的参数走 `SimConfig` 全链路（当前 **232** 字段，`config.rs` 命名 const + 字段 + Default 三处，前端 `config.js` 同步并过 `config-check.js`）；纯视觉参数集中在 `frontend/js/config.render.js`（`window.RENDER_CONFIG`，不注入 WASM）。
-- **文件行数**：单文件严控 800 行以内；`render_world.js` 已约 904 行超限，`render_terrain.js` 约 724 行逼近上限，新增绘制功能前先按 §6.7 拆分。
+- **文件行数**：单文件严控 800 行以内；`render_world.js` 已约 904 行超限；★ v1.50.23 TA-01 已将装饰从 `render_terrain.js`（约 724 → 约 365 行）拆出至 accent 三件套，后续植被功能在 `render_accents.js` / `accent-model.js` / `accent-season.js` 内扩展，不再回填 `render_terrain.js`。
 - **持久化测试禁令**：不提交临时单元测试；临时验证跑通后删除，长期验证以 `test-wasm.js` 等既有门禁为准。
 
 ## 11. 验收与性能预算
