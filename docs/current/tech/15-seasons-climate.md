@@ -49,11 +49,14 @@ stateDiagram-v2
 
 ### 2.3 霜冻降产与冰封绝收（浆果生态）
 - 霜降寒潮临界点（8℃）：气温低于 8℃（`berryFrostDeclineTemp`）时，自然浆果开始按平滑三次方曲线（Smoothstep）衰减产速。
-- 冰封绝收点（0℃）：气温低于 0℃（`berryFrostZeroTemp`）时，野外浆果彻底绝收（产速归零），倒逼族人深秋囤粮或入冬赴榷场买粮。
+- 冰封绝收点（0℃）：气温低于 0℃（`berryFrostZeroTemp`）时，野外浆果产速归零。
+- 这两条温度线对玩家的意义（深秋囤粮窗口 / 断粮赴榷场）见
+  [`../design/02-world-rules.md`](../design/02-world-rules.md) §6。
 
 ### 2.4 低温受孕安全红线
 - 房屋木材储量 < 10.0 时无法保障严寒取暖，自动禁用受孕功能。
-- 倒逼族人在春夏秋三季主动伐木储备过冬木料。
+- 玩家侧的对应预期（春夏秋主动囤柴）同见
+  [`../design/02-world-rules.md`](../design/02-world-rules.md) §6。
 
 ### 2.5 未来 49 年宏观气候预测（★ v1.46.15）
 - 鼠标悬停在顶部气温窗口时，弹出 `#climate-forecast-popup` 折线图浮窗；

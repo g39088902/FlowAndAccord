@@ -1,8 +1,8 @@
 # 05. 观察与交互设计（玩家视角）
 
 > **本层定位**：玩家用什么工具看懂这个世界。
-> 实现见 [`50 前端总览`](../tech/16-frontend-overview.md)、[`53 UI 实现`](../tech/19-ui-implementation.md)、
-> [`54 制度大盘 UI`](../tech/20-society-ledger-ui.md)、[`55 前端开发指南`](../tech/21-frontend-dev-guide.md)。
+> 实现见 [`16 前端总览`](../tech/16-frontend-overview.md)、[`19 UI 实现`](../tech/19-ui-implementation.md)、
+> [`20 制度大盘 UI`](../tech/20-society-ledger-ui.md)、[`21 前端开发指南`](../tech/21-frontend-dev-guide.md)。
 
 ---
 
@@ -33,7 +33,7 @@
     └── 独立页     地图图鉴 map.html（只读渲染，不启动模拟）
 ```
 
-- 入口与返回关系、跨窗口跳转契约见 [`53 UI 实现`](../tech/19-ui-implementation.md)。
+- 入口与返回关系、跨窗口跳转契约见 [`19 UI 实现`](../tech/19-ui-implementation.md)。
 - 地图图鉴以相同 seed 加载 `index.html?mapOnly=1&nogate=1`，与正式游戏同源且不受存档门禁影响。
 
 ---
@@ -89,7 +89,7 @@
 - 固定世界光向统一受光面与投影；地形受光、水底石光与水面波光联动。
 - **遮挡排序是硬约束**：Canvas 2D 无深度缓冲，所有世界实体必须进入统一深度队列，
   远处的山要能挡住山后的图标；长条状特征（河道、岸线、边界侧壁）必须**分段入队**，
-  否则任一岸段靠近相机就会盖住更远的一切。实现铁律见 [`50 前端总览`](../tech/16-frontend-overview.md)。
+  否则任一岸段靠近相机就会盖住更远的一切。实现铁律见 [`16 前端总览`](../tech/16-frontend-overview.md)。
 
 ---
 

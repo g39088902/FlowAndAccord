@@ -1,8 +1,9 @@
 # 03. 族人、家庭与社会规则（玩家视角）
 
 > **本层定位**：一个族人从出生到死亡会经历什么，家庭/宗族/王国如何形成。
-> 实现见 [`30 生命周期`](../tech/10-agent-life-cycle.md)、[`31 决策引擎`](../tech/11-decision-engine.md)、
-> [`33 房屋系统`](../tech/13-housing-system.md)、[`20 账本与政体`](../tech/07-ledger-and-polity.md)。
+> 实现见 [`10 生命周期`](../tech/10-agent-life-cycle.md)、[`11 决策引擎`](../tech/11-decision-engine.md)、
+> [`13 房屋系统`](../tech/13-housing-system.md)、[`07 账本与政体`](../tech/07-ledger-and-polity.md)；
+> 「为什么这样设计」见 [`06 AI 行为设计`](./06-agent-behavior-design.md)。
 
 ---
 
@@ -25,6 +26,8 @@
 
 **玩家可以策展他们的价值观**：控制台「🧠 决策引擎」把全部 18 条分支按 6 大层级排成可拖动卡片，
 拖动分界线或重排卡片即刻热注入运行中的模拟，并可一键落盘持久化。
+「为什么是这套 AI 而不是效用打分」「为什么系统不能替他们派活」，见
+[`06 AI 行为设计`](./06-agent-behavior-design.md)。
 
 ---
 

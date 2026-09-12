@@ -73,24 +73,18 @@ stateDiagram-v2
 
 ### 2.4 Agent 私有施密特触发器
 每名 Agent 在自身决策相位观察 POI 库存，维护 `poi_seekability` 私有锁存：
-- 库存升至 ≥ 30% 才开放；
+- 库存升至 ≥ 50% 才开放；
 - 已开放点仅在跌破 < 10% 时关闭；
-- 10%~30% 中间带保持该 Agent 的前态。
+- 10%~50% 中间带保持该 Agent 的前态。
 
 相同 POI 可被不同 Agent 判为不同可用性，路由与重路由只读取 Agent 的触发器结论，不直接依赖瞬时库存。详见根 AGENTS.md §4.2。
 
 ### 2.5 营地 5 级行政升级
 以辖内绑定有效房屋数量为界，四个升级门槛由 `SimConfig` 的
 `campLevelVillageMinHouses`、`campLevelTownshipMinHouses`、
-`campLevelTownMinHouses`、`campLevelCountyMinHouses` 配置：
-
-| 阶位 | 房屋数 | 名称 | 图标 |
-| :--- | :--- | :--- | :--- |
-| 1 | 0~4（默认） | 营地 | 🏕️ |
-| 2 | 5~9（默认） | 村 | 🏕️ |
-| 3 | 10~14（默认） | 乡 | 🏘️ |
-| 4 | 15~19（默认） | 镇 | 🏘️ |
-| 5 | 20+（默认） | 县 | 🏛️ |
+`campLevelTownMinHouses`、`campLevelCountyMinHouses` 配置。
+等级 → 名称/图标映射（营地 → 村 → 乡 → 镇 → 县）与各阶位门槛数值的权威表述已移至
+[`../design/02-world-rules.md`](../design/02-world-rules.md) §4，本文只保留机制与配置字段。
 
 每座私宅选址时自动绑定最近营地（`house.camp_id`），达成门槛时全图广播晋升。
 

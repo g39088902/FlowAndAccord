@@ -406,6 +406,16 @@
         "frontend/js/**/*.js",
         "docs/current/design/05-observation-ux.md"
       ]
+    },
+    {
+      "id": "design-agent-behavior-design",
+      "path": "docs/current/design/06-agent-behavior-design.md",
+      "owner": "product/sim-core(decisions)",
+      "lastReviewed": "2026-09-12",
+      "sources": [
+        "crates/sim_core/src/spatial/decisions/**/*.rs",
+        "docs/current/design/06-agent-behavior-design.md"
+      ]
     }
   ]
 }

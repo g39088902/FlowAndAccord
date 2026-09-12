@@ -57,7 +57,7 @@ graph TD
 
 | # | 看点 | 玩家能观察到的 | 规则与实现 |
 | :--- | :--- | :--- | :--- |
-| 1 | 真·自主 AI | Inspector 里「他此刻最想要什么、为什么想要」；决策顺序可拖拽热重排 | [03 生命与社会规则](./03-life-and-society.md) · [11 决策引擎](../tech/11-decision-engine.md) |
+| 1 | 真·自主 AI | Inspector 里「他此刻最想要什么、为什么想要」；决策顺序可拖拽热重排 | [06 AI 行为设计](./06-agent-behavior-design.md) · [03 生命与社会规则](./03-life-and-society.md) · [11 决策引擎](../tech/11-decision-engine.md) |
 | 2 | 路是自己踩出来的 | 荒野小径 → 紫金帝国大道，没人走的路衰减回荒野 | [02 世界与地图规则](./02-world-rules.md) · [14 地形与路网](../tech/14-terrain-and-network.md) |
 | 3 | 一间仓库到一座大庄园 | 五级形态、瞬时升级、自然折旧、无主房麦穗 37% 拍卖 | [03 生命与社会规则](./03-life-and-society.md) · [13 房屋系统](../tech/13-housing-system.md) |
 | 4 | 四季会咬掉柴火 | 240s 一年、-3~31℃、冬季账本烧柴、低温受孕红线 | [02 世界与地图规则](./02-world-rules.md) · [15 四季与气候](../tech/15-seasons-climate.md) |
@@ -68,8 +68,8 @@ graph TD
 
 补充看点：**动态季节光照**（光位一年扫 360°，春东/夏南/秋西/冬北，快捷键 `L` 开关）、
 **写意微缩沙盘地形**（T2 两岸河谷静态水系 + D-A 装饰系统）、**水系微观生态层**（游鱼与波光）、
-**地图图鉴独立页 + 世界种子分享**（`?seed=<n>`）。实现见 [`51 季节光照`](../tech/17-seasonal-lighting.md)
-与 [`52 水体渲染`](../tech/18-water-rendering.md)。
+**地图图鉴独立页 + 世界种子分享**（`?seed=<n>`）。实现见 [`17 季节光照`](../tech/17-seasonal-lighting.md)
+与 [`18 水体渲染`](../tech/18-water-rendering.md)。
 
 ---
 
@@ -102,4 +102,4 @@ graph TD
 | 调整全部数值超参（免重编译，刷新即生效） | 关闭确定性或绕过放置/通行校验 |
 | 选择观察焦点（族人 / 房屋 / 家户 / 宗族 / 王国） | 替居民决定婚姻、继承与夺位 |
 
-超参与配置入口见 [`13 配置系统`](../tech/04-config-system.md) 与 [`14 配置速查`](../tech/05-config-reference.md)。
+超参与配置入口见 [`04 配置系统`](../tech/04-config-system.md) 与 [`05 配置速查`](../tech/05-config-reference.md)。

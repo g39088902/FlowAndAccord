@@ -19,7 +19,7 @@
 | **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
 | **`docs/README.md`** | 文档总导航（唯一入口） | 找文档时 |
 | **./docs/current/README.md** | **现状总索引**：完整模块导航表 | 快速了解现状 |
-| **`docs/current/design/`** | 现状 · 产品设计（玩家视角）：[01 产品总览](./docs/current/design/01-product-overview.md) · [02 世界与地图规则](./docs/current/design/02-world-rules.md) · [03 族人家庭与社会规则](./docs/current/design/03-life-and-society.md) · [04 经济与资源规则](./docs/current/design/04-economy.md) · [05 观察与交互设计](./docs/current/design/05-observation-ux.md) | 讨论玩法、规则与体验时 |
+| **`docs/current/design/`** | 现状 · 产品设计（玩家视角）：[01 产品总览](./docs/current/design/01-product-overview.md) · [02 世界与地图规则](./docs/current/design/02-world-rules.md) · [03 族人家庭与社会规则](./docs/current/design/03-life-and-society.md) · [04 经济与资源规则](./docs/current/design/04-economy.md) · [05 观察与交互设计](./docs/current/design/05-observation-ux.md) · [06 AI 行为设计](./docs/current/design/06-agent-behavior-design.md) | 讨论玩法、规则与体验时 |
 | **./docs/current/tech/01-engine-architecture.md** | 现状 · 技术总体：三层解耦、文档地图、tick 内部顺序、数据流、配置注入 | 入门架构 / 定位模块归属 |
 | **./docs/current/tech/02-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化 | 查阅核心 FSM 与状态转移契约时 |
 | **./docs/current/tech/11-decision-engine.md** | 决策引擎：马斯洛六层、18 条分支、私有触发器、错峰节拍（附「为什么这么设计」篇） | 理解决策状态机与寻路逻辑时 |

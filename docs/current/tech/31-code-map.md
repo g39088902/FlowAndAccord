@@ -180,10 +180,11 @@ FlowAndAccord/
     │   ├── 01-changelog.md                    # 版本演进记录
     │   ├── design/                            # 产品设计（玩家视角：看到什么、规则是什么）
     │   │   ├── 01-product-overview.md           # 定位、核心循环、八大看点、首局瞬间
-    │   │   ├── 02-world-rules.md                # 地图模板、地形、道路涌现、四季
+    │   │   ├── 02-world-rules.md                # 地图模板、地形、聚落行政升级、道路涌现、四季
     │   │   ├── 03-life-and-society.md           # 马斯洛六层、生命周期、房屋五级、社会结构
     │   │   ├── 04-economy.md                    # 有限生态、真实搬运、家户账本、榷场定价
-    │   │   └── 05-observation-ux.md             # 窗口模型、观察工具、操作与信息层级
+    │   │   ├── 05-observation-ux.md             # 窗口模型、观察工具、操作与信息层级
+    │   │   └── 06-agent-behavior-design.md      # AI 行为设计：自治边界、严优先级马斯洛、闭环
     │   └── tech/                              # 技术方案（实现视角，目录内从 01 起顺序编号）
     │       ├── 01-engine-architecture.md        # 总体：三层解耦、tick 顺序、数据流
     │       ├── 02-core-systems-fsm.md           # 三大核心系统状态机全景
@@ -195,7 +196,7 @@ FlowAndAccord/
     │       ├── 08-ecology-and-poi.md            # 上层：23 处有限生态、采收与卸货
     │       ├── 09-market-pricing.md             # 上层：榷场互市与幂律定价
     │       ├── 10-agent-life-cycle.md           # 中层：生理代谢、繁衍、禀赋、死亡
-    │       ├── 11-decision-engine.md            # 中层：马斯洛六层与 18 条分支（附设计思路）
+    │       ├── 11-decision-engine.md            # 中层：马斯洛六层与 18 条分支（附技术选型理由）
     │       ├── 12-m19-architecture.md           # 中层：意图-策略-原语三层解耦规格
     │       ├── 13-housing-system.md             # 中层：五级房屋、折旧、空置房拍卖
     │       ├── 14-terrain-and-network.md        # 下层：地表单元、水系、路网与通行
