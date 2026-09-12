@@ -29,14 +29,14 @@
 
 > **本节是全文唯一的排期权威**（2026-09-12 重组新增）：整合原 §2.2 实现路线、§5.9 推荐提交顺序、§5.1 提交组框架与 §19 景观对接的排期信息，原位置只保留细节契约或指针，避免多处维护漂移。排期原则：**从易到难、按依赖解锁**；§5.1 的四类提交组（D-B1 / R0 / D-B2 / P1）仍是不可合并的提交边界——阶段编号只是推荐顺序而非强制串行，禁止把多个提交组合并为一次大改。
 
-### R.1 现状快照（现状基线 v1.50.21 · 生成器版本 4）
+### R.1 现状快照（含阶段一装饰扩展 · 生成器版本 4）
 
 | 基座 | 状态 | 已达成 | 遗留缺口（后续阶段的输入） |
 | :--- | :--- | :--- | :--- |
 | T0 地表查询与完整曲线校验 | ✅ 主体落地 | `sample_cell` / `validate_footprint` / `validate_curve` 原语、房屋完整占地消费、浅滩与陆路走廊（§2.3） | 生存连通分量与往返成本诊断、`flat_baseline` 行为等价（§18.1 ⏳） |
 | T1 山口聚落 | ✅ 已落地 | `mountain_pass_v1`；v1.50.17 修复主脊通行力：坡度 36.2°~40.8°、绕行比 2.17~4.80、可行走连通分量恒 1（§9.3.1，指 14 号） | 有界重试与简化 profile 回退（§18.2 ⏳）；支脊未实现；子特征注入未实施 |
 | T2 两岸河谷 | ✅ 已落地 | 主河/浅滩/河阶/泉谷、共享水池聚合取水、地形感知路网、T1/T2 随机轮换（§2.3） | 子特征注入未实施 |
-| D-A 装饰基础 | ✅ 已落地 | Tree/Boulder/Bush 生成与绘制、季节叶色 `SimTreeTint`、FABS Section 21（§2.3） | RockCluster/GrassTuft 仅枚举未生成；装饰缓存与地形共用待拆分验证（§18.4 ⏳） |
+| D-A 装饰基础 | ✅ 已落地 | Tree/Boulder/Bush/RockCluster/GrassTuft 生成与绘制、季节叶色 `SimTreeTint`、FABS Section 21（§2.3） | 装饰缓存与地形共用待拆分验证（§18.4 ⏳） |
 
 > 按 §20 的口径：T0/T1/T2 主体达标，**遗留 3 项门禁待办**（§18.1 ×2、§18.2 ×1）——「失败有界且可解释」这最后一块由阶段二补齐；装饰缓存拆分验证随阶段一收口。
 
@@ -71,7 +71,7 @@ flowchart TD
 | 阶段 | 提交组 | 内容与关键要求 | 难度 | 依赖 | 改变物理事实 | 详情 |
 | :--- | :--- | :--- | :---: | :--- | :---: | :--- |
 | ⓪ 基座 | — | **已落地**：T0 / T1 / T2 / D-A（含 v1.50.17 主脊通行力修复） | — | — | — | §2.3 |
-| 一 | D-B1 | 场景样板（支脊山口、岩壁河谷构图与美术；纯视觉样板不冒充物理验收）＋ RockCluster/GrassTuft 生成与绘制 ＋ 特征/快照骨架（FABS Section 22、`FORMAT_VERSION` 2→3）＋ 子特征选择器与总开关接线（字段加回见 R.5）；**旧 T1/T2 高程/地表/路网/POI 逐字节不变**；顺带收口 §18.4 装饰缓存拆分验证 | 低 | D-A ✅ | 否 | §5.5、§5.2、§17.1 |
+| 一 | D-B1 | 代码交付：RockCluster/GrassTuft 生成与绘制 ＋ 特征/快照骨架（FABS Section 22、`FORMAT_VERSION` 2→3）＋ 子特征选择器与总开关接线（字段加回见 R.5）；**旧 T1/T2 高程/地表/路网/POI 逐字节不变**；顺带收口 §18.4 装饰缓存拆分验证；场景样板作为关联美术交付按 07 号 TA-09 波次后置，不阻塞代码交付及阶段二 | 低 | D-A ✅ | 否 | §5.5、§5.2、§17.1 |
 | 二 | —（D-B2 公共前置） | 生成组合基座：§5.3 阶段化流水线（含把 `hydrology::generate_river` 整图重写收敛到河道带的改造）、稳定 ID 与断言（§5.2）、§5.8 有界回退；**顺带补齐 3 项遗留门禁**：生存连通诊断、`flat_baseline` 等价、有界重试（字段加回见 R.5） | 中 | 一（数据骨架） | 否（基座自身不改世界） | §5.2、§5.3、§5.8 |
 | 三 | D-B2 | 首批子特征：T1 不对称支脊（**先补独立施工规格与种子矩阵**，不直接向共享 RNG 插入抽样）、T2 河谷峭壁 `RiverCliff`；配套视觉型裸岩露头、河岸林带；**物理改动与装饰改动分别提交** | 中 | 二 | 是 | §5.4.D、§5.3 |
 | 四 | D-C | 高级装饰：泉水景观群、资源区景观群、标注避让；可与三～八并行施工，验收窗口在 D-B 全组通过后（§19） | 低 | 一（验收需 D-B 全组） | 否 | §19 |
@@ -87,7 +87,7 @@ flowchart TD
 ### R.4 依赖与并行要点
 
 - **R0 只阻塞牛轭湖**：不阻塞河谷峭壁、台地和其他静态骨架；R0-1～R0-4 各自独立可回滚，不得复用版本号（§6.5）。
-- **D-B1 可单独上线**：旧 T1/T2 逐字节不变是其退出条件（§5.1）；视觉样板先行不等于物理落地。
+- **D-B1 可单独上线**：旧 T1/T2 物理输出逐字节不变是其退出条件（§5.1）。D-B1-1～7 与收口验收通过后只标记“阶段一代码交付完成”，可进入阶段二；D-B1-8 / TA-09 场景样板依赖 07 号 TB-01、TA-08，保持独立待交付，未通过前不得将阶段一全部交付标为完成。视觉样板不替代物理验收。
 - **失败隔离**：D-B2/P1 任何一项失败只禁用该特征或 profile，不得在运行中修改道路、移动居民或回抽世界种子（§5.1、§5.8）。
 - **每组一改**：四类提交组禁止合并为一次大改；一次只改一件事，门禁失败才可定位（§6.5「不要顺手做的事」）。
 - **两个模板级前置**：GrassTuft 先于平地草原（§4.1），密林山坡先于半坡林地（§4.2）。
@@ -310,8 +310,8 @@ stateDiagram-v2
 | T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现本步时一并加回 |
 | T1 山口聚落（丘陵/山脊/山口连续起伏） | ✅ 已落地（v1.47.1/v1.47.2；v1.47.7 移除台地） | `mountain_pass_v1` profile；局部 `relief_rng` 派生主脊/山口连续起伏；存档版本门禁；前端按地表类别渲染。v1.47.7：删除台地压平与 `Ridge`/`Saddle`/`Terrace` 特征及前端轮廓绘制 | 山口地貌参数已配置化（`terrainPassRidgeWidth` / `terrainPassRidgeAmplitude`）；支脊未实现；子特征注入待规划。v1.50.17 完成主脊通行力修复（§9.3.1） |
 | T2 静态主河/浅滩/河阶/泉谷 | ✅ 已落地 | `river_valley_v1` profile + 生成器版本 3（v1.47.7 起，与 T1 共用全局版本）；主河生成（`geo/hydrology.rs`），单调河床下凹与水面静态；低滩（`NO_BUILD`）与河阶（`RiverTerrace`）；两处静态浅滩走廊（`ShallowFord`，跨水授权）；共享水池 `WaterPool` 聚合取水与稳定扣减；地形感知路网（`spatial/terrain_network.rs`）与 `LaneTerrainProfile` 边权通行代价折算；占地校验拒绝浅水（`WaterCovered`）；存档格式升级为 7；10 个 T2 配置参数；前端河道/岸线/浅滩特征渲染与 HUD 水量去重；支持 T1/T2 模板按种子哈希随机轮换（`terrainProfile: 'random'`） | 子特征注入待规划 |
-| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_accents.js::drawAccentEntity()`（★ v1.50.23 自 `render_terrain.js` 迁出；Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`，个体形态缓存 `accent-model.js`）；配置字段现存 2 个（`terrainAccentDensity` + `terrainAccentSubFeatures`，后者已于 v1.50.29 由 D-B1-1 连同消费点加回，见文首更正段），`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 仅枚举定义未生成；装饰缓存标志仍与地形共用 |
-| D-B 装饰系统扩展 | ⏳ 未实施 | — | RockCluster/GrassTuft 生成（季节叶色已由前端 `SimTreeTint` 落地，见文首更正段） |
+| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_accents.js::drawAccentEntity()`（★ v1.50.23 自 `render_terrain.js` 迁出；Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`，个体形态缓存 `accent-model.js`）；配置字段现存 2 个（`terrainAccentDensity` + `terrainAccentSubFeatures`，后者已于 v1.50.29 由 D-B1-1 连同消费点加回，见文首更正段），`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 已生成并接入前端绘制；装饰缓存标志仍与地形共用 |
+| D-B 装饰系统扩展 | ◐ 部分落地 | RockCluster/GrassTuft 已生成并绘制；子特征模型、快照骨架与选择器已落地 | 装饰缓存拆分与阶段一代码收口验收待完成；子特征注入仍待后续阶段 |
 | T1 子特征注入 | ⏳ 未实施 | — | 山脚湖（T1 鞍部静水）；山涧飞瀑（主脊跌水）；密林山坡（装饰树群）；裸岩露头（陡坡岩石） |
 | T2 子特征注入 | ⏳ 未实施 | — | 牛轭湖（回水湾）；河谷峭壁（河段两侧 Cliff）；河岸林带（沿河装饰树列）；碎石浅滩（河滩石砾） |
 | T4 动态水文、桥梁、土地演化 | ⏳ 未实施 | — | — |
@@ -480,6 +480,12 @@ stateDiagram-v2
 | **P1** | 台地聚落、盆地绿洲、山前冲积扇三个静态模板 | 是（3 个） | 是 | 每个模板单独通过有效世界矩阵后才加入 `random` 候选 |
 
 D-B1 的视觉子特征可以单独上线；D-B2/P1 任何一项失败均只禁用该特征或 profile，**不能**在运行中修改道路、移动居民或回抽世界种子。三角洲、海岛、峡湾暂不进入本轮；动态河流、洪水、桥梁及地下系统另立项。海湾、半岛、地表喀斯特可作为后续静态扩展，不强制等待 T4（远期排期见文首 R.3 阶段九a～九d），但须先补齐各自水陆、淡水与可达性契约，不能提前做成“看起来能走”的假设施。
+
+**D-B1 跨构建比较契约**：阶段一之前的基准提交与最终候选提交、两个 WASM 的 SHA256 必须写入验收记录（本轮基准见根 TODO 的 D-B1-9）。两端注入同一份冻结的完整模拟配置，记录配置内容及 SHA256；配置由基准提交的前端配置及拆分配置合并，候选端仅额外覆盖 `terrainAccentSubFeatures=false/true`，旧端不注入该新增字段。分别显式设置 `mountain_pass_v1` / `river_valley_v1`，种子固定为 `1, 2, 3, 7, 42, 100, 123, 456, 789, 1024, 2026, 65535`，在创世完成且未推进 tick 时取完整快照。以上为待执行验收矩阵，不代表已通过。
+
+- 比较高程与完整地表格、完整路网节点/车道及其几何与拓扑、完整 POI 记录；导出时固定字段顺序、保留数组顺序及数值精度，不四舍五入、不删物理字段，逐字节比较导出结果并记录逐类摘要。任一物理差异即失败，不得通过更新基线消除差异。
+- 允许变化的 `terrain_accents`、新增 `terrain_sub_features` 元数据、FABS/应用版本及编码封装不纳入物理比较；不直接比较整个存档或不同格式版本的 FABS 原始字节。装饰自身确定性另由同构建回归验证。
+- `test-wasm.js` 与 `test-determinism.js` 验证各自构建内部的确定性和回归，不能替代上述跨构建差分；使用临时比较脚本，提交前删除，验收记录保留基准、配置、矩阵与结果证据。
 
 ### 5.2 单一真相源、稳定 ID 与新数据模型
 
@@ -892,7 +898,7 @@ pub struct RiverCenterline {
 
 | 文件 | 修改内容 | 落地 |
 |---|---|---|
-| `crates/sim_core/src/geo/accents.rs` | 扩展 RockCluster/GrassTuft 类型生成 | ⏳ 未改（枚举已定义，生成未实现） |
+| `crates/sim_core/src/geo/accents.rs` | RockCluster/GrassTuft 类型生成 | ✅ 已实现；装饰扩展见 §5.5 |
 | `crates/sim_core/src/geo/terrain.rs` | 子特征选择器 `plan_subfeatures()`（§5.3 第 4 步：无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**）+ T1 注入器 | ◐ 选择器已落地（D-B1-3），注入器 ⏳ |
 | `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ◐ §5.3 第 4–5、9 步钩子已接线（D-B1-3，本阶段空操作），注入器 ⏳ |
 | `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 注册 Cliff/Waterfall/WaterBody 特征表 | ⏳ 未改 |
@@ -939,6 +945,13 @@ pub struct RiverCenterline {
 - ✅ 装饰并入统一深度队列后按相机深度正确遮挡（v1.50.2），不再「远树压近树」或「近树被远人穿透」。
 - ✅ FABS Section 21 编码/解码与 JSON 深比较通过（`test-snapshot-bin.js`）。
 - ⏳ 换世界/读档/重置后装饰缓存无旧数据残留——当前依赖单一 `_terrainCached`，拆分后需独立验证。
+
+**装饰缓存拆分的静态数据更新契约（待 D-B1-7 实施）**：
+
+- 普通增量帧没有发送静态 section 时，保留已有 accents/subFeatures；不能仅凭解码器默认空数组清空缓存。
+- 明确携带静态全量数据的帧，即使装饰集合为空，也必须替换旧值。实现须保留 section 是否存在或等价的静态帧标识；JSON 通道采用对应的明确静态帧语义，不能用装饰数组长度猜测是否发送。
+- READY/LOAD/REWIND/RESET 按实际消息生命周期使静态数据及 `AccentModel` 模型缓存失效，并在新世界完整静态数据到达后重建；世界切换不能只靠 profile、生成器版本或复用的 accent ID 判断。字符串驻留表继续按 `STR_TAB.start_index==0` 清理，该判据不替代世界生命周期处理。
+- 临时用例覆盖普通增量帧保留、同 profile/生成器版本换世界、非空→空、LOAD/REWIND/RESET 和模型缓存清理；subFeatures 暂无非空生产者时使用临时非空夹具，不新增模拟注入行为来完成缓存验收。通过后才把上方缓存项标为完成，临时脚本不进入提交。
 
 ### 18.5 D-B 子特征注入门禁
 
@@ -994,7 +1007,7 @@ pub struct RiverCenterline {
 
 | 阶段 | 实施内容 | 前置条件 | 对接景观计划 | 现状 |
 |---|---|---|---|---|
-| D-B：装饰扩展 + 子特征注入 | RockCluster/GrassTuft、T1/T2 子特征注入（山脚湖/瀑布/峭壁/牛轭湖等） | D-A 通过 | 中期 M2/M3 | ⏳ 未实施 |
+| D-B：装饰扩展 + 子特征注入 | RockCluster/GrassTuft、T1/T2 子特征注入（山脚湖/瀑布/峭壁/牛轭湖等） | D-A 通过 | 中期 M2/M3 | ◐ 装饰扩展与选择器/快照骨架已落地；子特征注入未实施 |
 | D-C：高级装饰 | 泉水景观群、资源区景观群、标注避让 | D-B 通过 | 中期 M3 | ⏳ 未实施 |
 | T4：动态地理 | 枯丰水期、洪水、桥梁工程、土地演化；航运单独立项 | 动态状态存档、道路失效及决策恢复先完成 | 长期 L1/L2 | ⏳ 未实施 |
 
