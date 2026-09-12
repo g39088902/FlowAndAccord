@@ -78,7 +78,7 @@ stateDiagram-v2
 - [世界元素绘制](../../../frontend/js/render_world.js)（`drawTerrain` / `drawTerrainFeatures` / `drawLanes` / `drawPoiGroundBase` / `drawPoiMarker` / `drawHouse` / `drawWorldEntities`） / [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`） / [帧循环](../../../frontend/js/render_canvas.js)。
 - [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 3 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
-农田、哨塔和路卡的占地与通行消费[融合设计 §6](./01-integration-contracts.md#6-土地设施与通行)与[地形专项方案 §13](./06-terrain-templates.md#13-房屋农业设施与-poi-接入)的内核事实；T0 的 `validate_footprint` 原语已就绪但农业/防务尚未接入，视觉样板不得提前画出不存在的生产、阻路或防御效果。S3 与 M2/M3 仍可独立推进，不以农业、市场或记忆上线为前提。
+农田、哨塔和路卡的占地与通行消费[融合设计 §6](./01-integration-contracts.md#6-土地设施与通行)与[现状 · 地形与路网 §13](../../current/tech/14-terrain-and-network.md#13-房屋农业设施与-poi-接入)的内核事实；T0 的 `validate_footprint` 原语已就绪但农业/防务尚未接入，视觉样板不得提前画出不存在的生产、阻路或防御效果。S3 与 M2/M3 仍可独立推进，不以农业、市场或记忆上线为前提。
 
 ## 3. 统一美术规则
 
@@ -159,7 +159,7 @@ S1～S3 可独立先行，但保留地表类别、岸线和连接设施的绘制
 
 ### 5.1 M1 · 宏观地貌先于细碎噪声 ◐ 内核主体已落地
 
-生成顺序以[地形专项方案 §8](./06-terrain-templates.md#8-生成顺序与有效世界保障)为准：内核先完成高程、水系、通行与选址约束，再生成合法路网并通过校验，最后添加材质与装饰。
+生成顺序以[现状 · 地形与路网 §8](../../current/tech/14-terrain-and-network.md#8-生成顺序与有效世界保障)为准：内核先完成高程、水系、通行与选址约束，再生成合法路网并通过校验，最后添加材质与装饰。
 
 - ✅ T1 山口聚落（`mountain_pass_v1`：主脊 + 山口鞍部连续起伏，v1.47.7 起不含台地）与 T2 两岸河谷（`river_valley_v1`：蜿蜒主河 + 河阶 + 两岸浅滩）均已落地；`terrainProfile: 'random'` 按种子哈希在两者间 ~50% 轮换，创世后把实际模板名回写入档。
 - ✅ 用少量可控的山脊、洼地塑造轮廓，保留平缓建房区与可达资源；地形感知路网（`terrain_network.rs`）保证路线绕山、经浅滩跨河，而非直线穿水。

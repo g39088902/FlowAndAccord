@@ -13,8 +13,8 @@
 > - [`current/tech/14-terrain-and-network.md`](./current/tech/14-terrain-and-network.md)：`## 模块定位` /
 >   `## 核心机制` 及其下 `###` 不编号，且 `# 第二部分` 自 `## 7.` 起跳（1–6 空档）——因为它承接
 >   [`plan/tech/06-terrain-templates.md`](./plan/tech/06-terrain-templates.md) 移出的 7–16 节。
-> - [`plan/tech/06-terrain-templates.md`](./plan/tech/06-terrain-templates.md)：含 `## 0.` 编号，
->   并有「§0.3 旧章节号对照」表（2026-09-11 主动重排过，§ 引用按该表映射）。
+> - [`plan/tech/06-terrain-templates.md`](./plan/tech/06-terrain-templates.md)：含 `## 0.` 编号；
+>   §17–21 与 14 号的 §7–16 成对保留历史编号，06 中引用 §7–§16 时指 14 号对应章节（约定见其文首）。
 
 | 我想… | 去这里 |
 | :--- | :--- |
