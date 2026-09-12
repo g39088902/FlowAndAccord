@@ -324,6 +324,30 @@ window.SimLighting = (function () {
     return { x: rx / len, y: ry / len };
   }
 
+  // ── 世界光向完整屏幕投影（TA-04-1，07-terrain-art.md §6.5 末段） ──
+  // 立体树冠亮部 / 渐变光心的「屏幕光心」方向：与实体同一套相机变换把世界光向
+  // （含 z 分量）完整投影到屏幕——screenX = Lx·cosZ − Ly·sinZ，
+  // screenY = (Lx·sinZ + Ly·cosZ)·cosX − Lz·sinX。
+  // sunScreenDir() 只投影水平分量（Lz 不参与、无回退），不能原样作为立体树冠
+  // 亮部位置。光源接近视线方向时投影长度趋零，直接归一化会产生抖动/跳变——
+  // 本函数在 len < SUN_SCREEN_EPS 时把方向按 len/EPS 平滑衰减回零（亮部回到冠心、偏移为 0），
+  // 调用方无需分支：渐变光心 = (cx + x·r, cy + y·r)，r 为光心距冠心半径。
+  const SUN_SCREEN_EPS = 0.02; // 退化视角半径（∠光与视线 < ~1.1° 内回冠心；TA-04-7 统一入 config.render.js）
+  function sunScreenDirFull() {
+    const cam = camRef();
+    const cosZ = Math.cos(cam.rotZ || 0), sinZ = Math.sin(cam.rotZ || 0);
+    const cosX = Math.cos(cam.rotX || 0), sinX = Math.sin(cam.rotX || 0);
+    const sx = S.lx * cosZ - S.ly * sinZ;
+    const sy = (S.lx * sinZ + S.ly * cosZ) * cosX - S.lz * sinX;
+    const len = Math.hypot(sx, sy);
+    if (len < SUN_SCREEN_EPS) {
+      if (len < 1e-9) return { x: 0, y: 0, len: len, valid: false };
+      const f = len / SUN_SCREEN_EPS;
+      return { x: (sx / len) * f, y: (sy / len) * f, len: len, valid: false };
+    }
+    return { x: sx / len, y: sy / len, len: len, valid: true };
+  }
+
   function compassName() {
     const idx = Math.round(S.azDeg / 45) % 8;
     return COMPASS[idx];
@@ -347,6 +371,7 @@ window.SimLighting = (function () {
     shadowAlpha: () => S.shadowAlpha,
     shadowOffset,
     sunScreenDir,
+    sunScreenDirFull,
     shadeFace,
     shadeRgb,
     lastMs: () => S.lastMs,

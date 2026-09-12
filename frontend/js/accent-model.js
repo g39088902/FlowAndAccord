@@ -9,6 +9,11 @@
 //   春季按萌芽曲线恢复**同一批稳定位置**；暂停、读档、回溯后不重新随机抽样。
 //   后续 TA-07（包围体剔除 / 局部几何缓存分级）在本文件扩展。
 //
+// ★ D-B1-6（06 号文 §5.5）：RockCluster = 内核只下发一个 anchor，2–5 颗子石的偏移/尺度/
+//   形状全部由 accent.id 哈希派生（纯函数，读档/回溯逐位一致），**不为子石建实体、
+//   不改碰撞/路面**；GrassTuft = 3–6 根短草线骨架，颜色由绘制层按当前季节派生
+//   （同 Tree：SimTreeTint，不读存档 tint，见 14 号 §7.4）。
+//
 // 契约（frontend/AGENTS.md §5.11 / 07-terrain-art.md §10.2）：
 // - 纯表现层：不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
 // - 模型值是 accent.id 的**纯函数**——缓存与否、何时失效都不改变像素结果，
@@ -193,12 +198,74 @@ window.AccentModel = window.AccentModel || (function () {
     return { trunkH: 4.2, crownR: 6.5, segments: segments, branchTips: [], clusters: clusters };
   }
 
+  // ── RockCluster（D-B1-6，06 号 §5.5）：anchor 前端派生 2–5 颗子石 ──
+  // stones：{ x, y } 世界单位水平偏移（未乘 accent.scale/zoom，rotation 由绘制层施加）、
+  // { r } 子石半径、{ shape[6] } 逐顶点半径变化系数（沿用 Boulder 七边形变径画法）、
+  // { rot } 自转角、{ lite } 岩面明暗色差通道。首颗为主石（居中、最大），其余碎石散布。
+  function rockClusterSkeleton(id, vSeed) {
+    const n = 2 + Math.floor(_accentHash(id, 600) * 4); // 2~5 颗（§5.5）
+    const spread = 3.2 + vSeed * 1.2;                    // 簇散布半径（世界单位）
+    const stones = [];
+    for (let i = 0; i < n; i++) {
+      const h1 = _accentHash(id, 610 + i * 5);
+      const h2 = _accentHash(id, 611 + i * 5);
+      const h3 = _accentHash(id, 612 + i * 5);
+      const h4 = _accentHash(id, 613 + i * 5);
+      const ang = h1 * Math.PI * 2;
+      const dist = i === 0 ? (h2 - 0.5) * 1.2 : spread * (0.35 + h2 * 0.60); // 主石近中
+      const shape = [];
+      for (let k = 0; k < 6; k++) {
+        shape.push(0.82 + _accentHash(id, 630 + i * 6 + k) * 0.38); // 逐顶点变径（不重复 Boulder 固定纹理）
+      }
+      stones.push({
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        r: i === 0 ? 2.4 + h3 * 1.0 : 1.1 + h3 * 1.3, // 主石最大，其余碎石
+        rot: h4 * Math.PI * 2,
+        lite: _accentHash(id, 614 + i * 5),
+        shape: shape,
+      });
+    }
+    return { spread: spread, stones: stones };
+  }
+
+  // ── GrassTuft（D-B1-6，06 号 §5.5）：3–6 根短草线 ──
+  // 每根草叶：根部偏移 (bx,by) + 叶尖水平外倾 (tx,ty) + 叶高 h（世界单位，低于灌木）。
+  // 颜色由绘制层按当前季节派生（同 Tree：SimTreeTint，不读存档 tint）；
+  // lite 为个体色差通道。草叶形态是 id 纯函数，暂停/读档/回溯逐位重建。
+  function grassTuftSkeleton(id, vSeed) {
+    const n = 3 + Math.floor(_accentHash(id, 700) * 4); // 3~6 根（§5.5）
+    const blades = [];
+    for (let i = 0; i < n; i++) {
+      const h1 = _accentHash(id, 710 + i * 5);
+      const h2 = _accentHash(id, 711 + i * 5);
+      const h3 = _accentHash(id, 712 + i * 5);
+      const h4 = _accentHash(id, 713 + i * 5);
+      const ang = (i / n) * Math.PI * 2 + (h1 - 0.5) * 1.6; // 方位均匀 + 抖动
+      const base = 0.8 + h4 * 0.9;       // 根部离锚点距离（簇底不完全重叠）
+      const bx = Math.cos(ang) * base;
+      const by = Math.sin(ang) * base;
+      const h = 2.4 + h2 * 1.6;          // 叶高 2.4~4.0（短草线）
+      const leanK = 0.30 + h3 * 0.45;    // 叶尖外倾比例
+      blades.push({
+        bx: bx, by: by,
+        tx: bx + Math.cos(ang) * h * leanK,
+        ty: by + Math.sin(ang) * h * leanK,
+        h: h,
+        lite: _accentHash(id, 714 + i * 5),
+      });
+    }
+    return { blades: blades };
+  }
+
   // 锚点上方最大延伸（世界单位，未乘 zoom）——TA-07 包围体剔除的预留字段。
   // 仅作信息登记，当前视口剔除仍走 render_accents.js 的既有余量公式。
   function extentOf(kind, vSeed) {
     if (kind === 'Tree') return (6.5 + vSeed * 2.5) + 8.5 * 1.3; // trunkH + 冠顶余量
     if (kind === 'Bush') return 8;
     if (kind === 'Boulder') return 7;
+    if (kind === 'RockCluster') return 10; // 主石半径×1.2 变径上限 + 散布
+    if (kind === 'GrassTuft') return 5;    // 短草叶高上限
     return 8;
   }
 
@@ -217,6 +284,8 @@ window.AccentModel = window.AccentModel || (function () {
       evergreen: kind === 'Tree' || kind === 'Bush' ? evergreenOf(id) : false,
       skeleton: kind === 'Tree' ? treeSkeleton(id, vSeed)
         : kind === 'Bush' ? bushSkeleton(id, vSeed)
+        : kind === 'RockCluster' ? rockClusterSkeleton(id, vSeed)
+        : kind === 'GrassTuft' ? grassTuftSkeleton(id, vSeed)
         : null,
       extent: extentOf(kind, vSeed),
     };

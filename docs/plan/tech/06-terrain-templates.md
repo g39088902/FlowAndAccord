@@ -585,7 +585,7 @@ pub const NO_RESOURCE_POOL_ID: u32 = 0;
 1. reset_static_terrain_state()                                      // 清 features/accents/sub_features/hydrology
 2. generate_base_relief(seed, profile)                               // 保持现有主 RNG + relief_rng 消费顺序
 3. apply_profile_static_hydrology(seed, profile, config)             // T2 主河；P1 对应水面
-4. plan_subfeatures(seed, profile, enabled) -> Vec<PlannedSubFeature>// 纯 hash 决定"注入哪些"；不读/写 terrain
+4. plan_subfeatures(seed, profile, enabled) -> Vec<PlannedSubFeature>// ✅ D-B1-3 已落地：纯 hash 决定"注入哪些"；不读/写 terrain
 5. 按 kind 升序逐个处理已计划的子特征：
      5a. snapshot_bbox(f)             // 复制该 feature AABB 内的原高程到局部数组
      5b. apply_subfeature_geometry(f) // 只改高程、水面几何与 features；不写 slope_angle_deg / flags
@@ -641,6 +641,9 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 > `FootLake` 会改变可通行/可建地表（进而改变路网拓扑），**不是纯视觉**；`RidgeWaterfall` / `OxbowLake` 的几何硬前置见 §5.4.B / §5.4.C，未满足时判为未注入、**不重抽其他特征**。
 
 **互斥裁决规则（必须按此实现，否则同种子会因代码书写顺序而换图）**：在每一类内部，按 `TerrainSubFeatureKind` **升序**逐个判定；**首个命中者即选定，并立即停止该类别的后续判定**。因此「选到哪一个」只取决于哈希值与 kind 编号顺序，与函数书写顺序、插入位置无关。`terrainAccentSubFeatures=false` 时第 4–5、9 步为空（✅ 该开关已于 v1.50.29 由 D-B1-1 按文首更正段加回并接线为空钩子门控）；D-B1 上线前相关步骤必须是空实现、不改变既有世界。
+
+> **✅ D-B1-3 已落地（v1.50.30）**：第 4 步 `plan_subfeatures()` 已在 `geo/terrain.rs` 实现（`mix64` / `roll_10000` / 8 个固定盐值 / kind 升序互斥裁决 / `PlannedSubFeature` 中间结构），并由 `geo/hydrology.rs::generate_with_config` 的开关门控调用。第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**仍为空实现**——`plan` 目前只被第 9 步空钩子读取长度，不写任何格子、不追加任何装饰，故开关两态与改动前世界输出**逐字节等价**（实测 12 种子 × 2 profile × 3 开关态，高程/地表格/水系/特征/装饰/POI/节点/车道 8 类指纹全等）。
+> 实现注意（踩坑沉淀）：候选池是 **profile 作用域** 的，按 kind 编号扫描时「该 kind 不在本 profile 池内」必须 `continue` 跳过，**不能**用 `?` 提前返回 `None`——T2 的 `OxbowLake`/`RiverCliff`（编号 4/5）排在 T1 的 `FootLake`/`RidgeWaterfall`（0/1）之后，提前返回会让 T2 恒为空。
 
 ### 5.4 D-B2 四种改变物理事实的子特征
 
@@ -890,8 +893,8 @@ pub struct RiverCenterline {
 | 文件 | 修改内容 | 落地 |
 |---|---|---|
 | `crates/sim_core/src/geo/accents.rs` | 扩展 RockCluster/GrassTuft 类型生成 | ⏳ 未改（枚举已定义，生成未实现） |
-| `crates/sim_core/src/geo/terrain.rs` | T1 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**，见 §5.3） | ⏳ 未改 |
-| `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ⏳ 未改 |
+| `crates/sim_core/src/geo/terrain.rs` | 子特征选择器 `plan_subfeatures()`（§5.3 第 4 步：无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**）+ T1 注入器 | ◐ 选择器已落地（D-B1-3），注入器 ⏳ |
+| `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ◐ §5.3 第 4–5、9 步钩子已接线（D-B1-3，本阶段空操作），注入器 ⏳ |
 | `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 注册 Cliff/Waterfall/WaterBody 特征表 | ⏳ 未改 |
 | `frontend/js/render_terrain.js` | Cliff/Waterfall/WaterBody 特征绘制（★ v1.50.23 装饰已迁至 `render_accents.js` / `accent-model.js` / `accent-season.js`） | ⏳ 未改 |
 | `tools/config-check.js` | 子特征相关配置映射 | ⏳ 未改 |
@@ -939,8 +942,9 @@ pub struct RiverCenterline {
 
 ### 18.5 D-B 子特征注入门禁
 
-- ⏳ T1 子特征注入：当总开关 `terrainAccentSubFeatures` 为真时（✅ 该字段已于 v1.50.29 由 D-B1-1 加回），foot_lake/ridge_waterfall/forested_slope/rocky_outcrop 各自用固定盐值做无状态哈希判定；**结构型（foot_lake/ridge_waterfall）至多取一个、视觉型（forested_slope/rocky_outcrop）至多取一个**，互斥裁决按 kind 升序取首个命中者（§5.3）。同种子 100% 复现。
-- ⏳ T2 子特征注入：oxbow_lake/river_cliff/riverside_forest/gravel_beach 同上（结构型至多一个、视觉型至多一个）。
+- ◐ T1 子特征**选择器**：当总开关 `terrainAccentSubFeatures` 为真时（✅ 该字段已于 v1.50.29 由 D-B1-1 加回），foot_lake/ridge_waterfall/forested_slope/rocky_outcrop 各自用固定盐值做无状态哈希判定；**结构型（foot_lake/ridge_waterfall）至多取一个、视觉型（forested_slope/rocky_outcrop）至多取一个**，互斥裁决按 kind 升序取首个命中者（§5.3）。同种子 100% 复现。✅ **选择器已于 v1.50.30 由 D-B1-3 落地**（`plan_subfeatures()`，实测 10000 种子：FootLake 29.63%/ForestedSlope 40.12% 命中，两类各 >1 的违规 0；同种子 1000 次重复调用逐项一致）；⏳ **注入器（几何施加）仍属阶段三/八**，本阶段不写任何格子。
+- ◐ T2 子特征**选择器**：oxbow_lake/river_cliff/riverside_forest/gravel_beach 同上（结构型至多一个、视觉型至多一个）。✅ **选择器已于 v1.50.30 由 D-B1-3 落地**（实测 10000 种子：OxbowLake 20.20%/RiversideForest 49.80% 命中，违规 0）；⏳ 注入器未实施。
+- ⏳ **「选中 ≠ 注入」**：阶段一选择器已产出 `PlannedSubFeature`，但第 5 步几何施加与第 9 步专属装饰为空实现，故**开关两态、改动前后旧 T1/T2 世界逐字节等价**（D-B1-3 实测 12 种子 × 2 profile × 3 开关态 × 8 类指纹全等）。注入器落地后本条须改为「开关两态是两张不同的静态世界」。
 - ⏳ 子特征注入在 POI/营地/路网生成前完成；生成后的 POI/路网必须通过完整地表、连通性与生存成本校验。关闭注入与开启注入是两张不同的静态世界，不比较 POI 坐标。
 - ⏳ Cliff 子特征对应地表写入 `NO_BUILD` 并硬禁行（`slope >= 34°` → `RockFace`/`NO_WALK`）；占地校验返回 `CliffTooSteep`。
 - ⏳ foot_lake / oxbow_lake 生成 `WaterBody` 特征（静态水面），HUD 不重复统计其储量（非可采水点）。

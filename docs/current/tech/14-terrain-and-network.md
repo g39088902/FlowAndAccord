@@ -452,6 +452,10 @@ T1 骨架生成完成后，用无状态哈希判定是否注入子特征：
 - **结构型**（`foot_lake` / `ridge_waterfall`）至多取一个，**视觉型**（`forested_slope` / `rocky_outcrop`）至多取一个；两者可同时存在，故每张图最多两个子特征。互斥裁决规则见 §5.3
 - 注入必须在生态播撒、营地/POI 落位与路网拓扑生成前完成；它不在运行中移动已存在的实体。最终落点以注入后的完整地表查询结果为准，不能承诺与关闭注入时坐标相同。
 
+> ✅ **D-B1-3（v1.50.30）**：**选择器**已在 `geo/terrain.rs::plan_subfeatures()` 落地——`mix64` / `roll_10000` / 每种 kind 一个固定盐值 / 按 `TerrainSubFeatureKind` 编号升序的「首个命中即停」互斥裁决，产出 `Vec<PlannedSubFeature>`（≤2，结构型在前）。它**不消费任何 `WorldRng`**、不读不写 `terrain`，由 `geo/hydrology.rs::generate_with_config` 的 `terrainAccentSubFeatures` 开关门控调用。
+> ⚠️ **选中 ≠ 注入**：第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**仍是空实现**，`plan` 目前只被第 9 步空钩子读取长度，故开关两态与改动前世界输出**逐字节等价**——这是 D-B1 阶段一「旧 T1/T2 逐字节不变」退出条件成立的原因。注入器属阶段三/八。
+> 实现踩坑：候选池是 profile 作用域的，按 kind 编号扫描时「不在本 profile 池内」必须 `continue`，不能用 `?` 提前返回——否则排在 T1 候选（编号 0/1）之后的 T2 候选（4/5）永远判不到，T2 恒为空。
+
 ### 9.5 T2 主河与浅滩模板
 
 ✅ 已落地（v1.47.5）。实现于 `geo/hydrology.rs::generate_river`：

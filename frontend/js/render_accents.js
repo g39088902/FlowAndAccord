@@ -23,6 +23,11 @@
 // - accent-model.js：稳定形态派生 + 个体模型缓存（骨架 / 叶簇次序 / extent）
 // - 本文件：模型投影、色板与色差、细节分级、视口剔除、绘制入口
 //
+// ★ D-B1-6（06 号文 §5.5 / §5.7 Canvas 行）：新增 RockCluster / GrassTuft 两分支——
+// RockCluster 由 anchor 按 accent.id 前端派生 2–5 颗子石（不建实体、不改碰撞/路面）；
+// GrassTuft 3–6 根短草线，颜色由前端按当前季节派生（同 Tree，不读存档 tint，14 号 §7.4）。
+// 未知 kind 直接跳过并计数，开发模式（🐞 调试开关）下限频报警，**严禁错画成 Bush**。
+//
 // 依赖全局: ctx, camera, sim, w, h, MAP_Z_LIFT（render_world.js 定义，渲染期可用）、
 //   lightShadowOffset（render_world.js）、window.SimTreeTint（accent-season.js）、
 //   window.AccentModel（accent-model.js，须先于本文件加载）、window.RENDER_CONFIG。
@@ -30,8 +35,32 @@
 // ★ v1.50.2 D-A：Accent 装饰（Tree/Boulder/Bush）单实体绘制入口
 // 现统一并入 render_world.js::drawWorldEntities() 的相机深度队列（远 → 近），
 // 与 POI 标记 / 私产宅舍 / 部落民同队列排序，近处乔木可正确遮挡远处道路与小人。
+
+// ★ D-B1-6：未知 kind 计数报警（06 号 §5.5 末段：未知 kind 直接跳过并在开发模式
+// 计数报警，不能默默按 Bush 绘制）。计数全量累计；日志在开发模式（sim.debugMode，
+// 与主界面 🐞 调试开关同源）下按 3s 限频汇总输出，避免每帧刷屏。
+var _unknownAccentKinds = Object.create(null);
+var _unknownAccentWarnAt = 0;
+function _reportUnknownAccent(kind) {
+  _unknownAccentKinds[kind] = (_unknownAccentKinds[kind] || 0) + 1;
+  if (sim && sim.debugMode) {
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (now - _unknownAccentWarnAt > 3000) {
+      _unknownAccentWarnAt = now;
+      var parts = Object.keys(_unknownAccentKinds).map(function (k) { return k + '×' + _unknownAccentKinds[k]; });
+      console.warn('[render_accents] 未注册装饰种类（已跳过，不按既有类型错画）:', parts.join(', '));
+    }
+  }
+}
+
 function drawAccentEntity(accent) {
-  if (accent.kind !== 'Tree' && accent.kind !== 'Boulder' && accent.kind !== 'Bush') return;
+  const kind = accent.kind;
+  // ★ D-B1-6：只放行已实现分支；未知 kind（含未来新增未绘制类型）跳过 + 计数报警
+  if (kind !== 'Tree' && kind !== 'Boulder' && kind !== 'Bush' &&
+      kind !== 'RockCluster' && kind !== 'GrassTuft') {
+    _reportUnknownAccent(String(kind));
+    return;
+  }
 
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
@@ -51,18 +80,23 @@ function drawAccentEntity(accent) {
   const xMargin = 24 + 14 * scale;
   if (sx < -xMargin || sx > w + xMargin || sy < -upMargin || sy > h + 20) return;
 
-  // Tree/Bush 共用连续季相（TA-02）；常绿变体走 evergreen profile（叶量全年 ≥94%）
+  // Tree/Bush/GrassTuft 共用连续季相（TA-02/D-B1-6；GrassTuft 同 Tree 逻辑，颜色按当前
+  // 季节派生，不读存档 tint）；常绿变体走 evergreen profile（叶量全年 ≥94%）
   const model = window.AccentModel.get(accent);
-  const season = accent.kind === 'Boulder' ? null
+  const season = (kind === 'Boulder' || kind === 'RockCluster') ? null
     : window.SimTreeTint.sample(accent, sim, model.evergreen ? 'evergreen' : undefined);
 
   const scaled = accent.scale * scale;
-  if (accent.kind === 'Tree') {
+  if (kind === 'Tree') {
     drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
-  } else if (accent.kind === 'Boulder') {
+  } else if (kind === 'Boulder') {
     drawAccentBoulder(sx, sy, scaled, accent.rotation || 0, cosZ, sinZ);
-  } else {
+  } else if (kind === 'Bush') {
     drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
+  } else if (kind === 'RockCluster') {
+    drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX);
+  } else {
+    drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   }
 }
 
@@ -419,4 +453,158 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       ctx.fill();
     }
   }
+}
+
+// RockCluster：anchor 派生 2–5 颗子石（D-B1-6，06 号 §5.5：不为子石建实体、不改碰撞/路面）。
+// 画法沿用 Boulder「深灰底 + 浅灰顶 + 暗边」三笔低饱和灰岩色板，子石形状由模型层
+// accent.id 派生（逐顶点变径，不共享 Boulder 固定纹理），按投影深度画家排序（远 → 近）；
+// 每颗子石底边贴自身落地点（v1.50.13 锚点契约），accent.rotation 只旋转水平偏移。
+function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX) {
+  const sk = model.skeleton;
+  const rot = accent.rotation || 0;
+  const cR = Math.cos(rot), sR = Math.sin(rot);
+
+  function proj(dx, dy, dz) {
+    const rx = dx * cosZ - dy * sinZ;
+    const ry = dx * sinZ + dy * cosZ;
+    return {
+      x: sx + rx * scaled,
+      y: sy + (ry * cosX - dz * sinX) * scaled,
+      d: ry * sinX + dz * cosX,
+    };
+  }
+
+  // 岩面个体色差：lite 通道小幅整体明暗（±10），保持 Boulder 低饱和灰岩色板（§4.1）
+  function stoneTone(lite, base) {
+    const k = (lite - 0.5) * 20;
+    return 'rgb(' +
+      Math.max(0, Math.min(255, Math.round(base[0] + k))) + ',' +
+      Math.max(0, Math.min(255, Math.round(base[1] + k))) + ',' +
+      Math.max(0, Math.min(255, Math.round(base[2] + k))) + ')';
+  }
+
+  // 贴地接触投影：簇底一整片弱椭圆（先画，被子石压住）
+  const so = (typeof lightShadowOffset === 'function')
+    ? lightShadowOffset(1.0, 2.0, 0.6)
+    : { x: 1.0 * camera.zoom, y: 2.0 * camera.zoom, alphaScale: 1 };
+  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.13 * so.alphaScale).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 子石收集 + 深度画家排序（远 → 近）
+  const items = [];
+  for (let i = 0; i < sk.stones.length; i++) {
+    const st = sk.stones[i];
+    const gx = st.x * cR - st.y * sR;
+    const gy = st.x * sR + st.y * cR;
+    items.push({ st: st, g: proj(gx, gy, 0) });
+  }
+  items.sort(function (a, b) { return a.g.d - b.g.d; });
+
+  const sides = 6;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const st = it.st;
+    const r = st.r * scaled;
+    if (r < 0.6) continue; // 微碎石在远景不可辨，直接省略
+    // 底边贴落地点：中心上抬 0.72r（同 Boulder 屏幕纵压比），再压暗底色
+    const cy = it.g.y - r * 0.72;
+    // 底层（深灰，略偏背光侧）
+    ctx.fillStyle = stoneTone(st.lite, [78, 74, 68]);
+    ctx.beginPath();
+    for (let k = 0; k < sides; k++) {
+      const angle = st.rot + (k / sides) * Math.PI * 2;
+      const rVar = r * st.shape[k];
+      const px = it.g.x + Math.cos(angle) * rVar + r * 0.18;
+      const py = cy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // 顶面（浅灰白）
+    ctx.fillStyle = stoneTone(st.lite, [152, 146, 138]);
+    ctx.beginPath();
+    for (let k = 0; k < sides; k++) {
+      const angle = st.rot + (k / sides) * Math.PI * 2;
+      const rVar = r * st.shape[k];
+      const px = it.g.x + Math.cos(angle) * rVar;
+      const py = cy + Math.sin(angle) * rVar * 0.72;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    // 暗边轮廓让碎石从地形中分离
+    ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
+    ctx.lineWidth = Math.max(0.5, 0.8 * scaled);
+    ctx.stroke();
+  }
+}
+
+// GrassTuft：3–6 根短草线（D-B1-6，06 号 §5.5）。
+// 颜色由前端按当前季节派生（同 Tree：SimTreeTint 连续季相，不读存档 tint，14 号 §7.4）；
+// 草叶不脱落——冬季以「低矮 + 枯色」表达（07 号 §6.6 目标：嫩绿→深绿→枯黄→冬季低矮枯草），
+// 叶高随 leafDensity 在 0.62~1.0 倍收缩，隆冬枯草仍在场。
+function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
+  const sk = model.skeleton;
+  const rot = accent.rotation || 0;
+  const cR = Math.cos(rot), sR = Math.sin(rot);
+  const hK = 0.62 + 0.38 * season.leafDensity;
+
+  function proj(dx, dy, dz) {
+    const rx = dx * cosZ - dy * sinZ;
+    const ry = dx * sinZ + dy * cosZ;
+    return {
+      x: sx + rx * scaled,
+      y: sy + (ry * cosX - dz * sinX) * scaled,
+      d: ry * sinX + dz * cosX,
+    };
+  }
+
+  // 草色：季相连续叶色向草绿微偏（草比树叶更黄绿），浮点直出不做色档量化
+  const lc = season.leafColor;
+  const gr = Math.max(0, Math.min(255, lc[0] * 0.96 + 10));
+  const gg = Math.max(0, Math.min(255, lc[1] * 1.02 + 4));
+  const gb = Math.max(0, Math.min(255, lc[2] * 0.88));
+
+  // 贴地接触投影（弱于灌木）
+  const so = (typeof lightShadowOffset === 'function')
+    ? lightShadowOffset(0.8, 1.6, 0.5)
+    : { x: 0.8 * camera.zoom, y: 1.6 * camera.zoom, alphaScale: 1 };
+  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.10 * so.alphaScale).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, 2.6 * scaled, 1.1 * scaled, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 草叶收集 + 深度画家排序（叶尖投影深度，远 → 近）
+  const items = [];
+  for (let i = 0; i < sk.blades.length; i++) {
+    const b = sk.blades[i];
+    const bx = b.bx * cR - b.by * sR;
+    const by = b.bx * sR + b.by * cR;
+    const tx = b.tx * cR - b.ty * sR;
+    const ty = b.tx * sR + b.ty * cR;
+    items.push({ b: b, bx: bx, by: by, tx: tx, ty: ty, h: b.h * hK, d: proj(tx, ty, b.h * hK).d });
+  }
+  items.sort(function (a, b2) { return a.d - b2.d; });
+
+  ctx.lineCap = 'round';
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const p0 = proj(it.bx, it.by, 0);
+    const p1 = proj(it.tx, it.ty, it.h);
+    // 控制点：半高、外倾 25% —— 叶先立后弯不僵硬
+    const c = proj(it.bx + (it.tx - it.bx) * 0.25, it.by + (it.ty - it.by) * 0.25, it.h * 0.5);
+    const k = 0.86 + 0.28 * it.b.lite; // 个体色差（同 Tree/Bush lite 通道语义）
+    ctx.strokeStyle = 'rgb(' +
+      Math.round(Math.max(0, Math.min(255, gr * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, gg * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, gb * k))) + ')';
+    ctx.lineWidth = Math.max(0.5, 0.62 * scaled);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.quadraticCurveTo(c.x, c.y, p1.x, p1.y);
+    ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
 }

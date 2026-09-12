@@ -56,6 +56,173 @@ impl TerrainSubFeatureKind {
             Self::GravelBeach => "GravelBeach",
         }
     }
+
+    /// 反查枚举值。§5.3 的互斥裁决要求「按 `TerrainSubFeatureKind` 升序」逐个判定，
+    /// 故选择器按 `as u32` 从 0 递增扫描，而不是依赖任何表/数组的书写顺序。
+    pub const fn from_code(code: u32) -> Option<Self> {
+        match code {
+            0 => Some(Self::FootLake),
+            1 => Some(Self::RidgeWaterfall),
+            2 => Some(Self::ForestedSlope),
+            3 => Some(Self::RockyOutcrop),
+            4 => Some(Self::OxbowLake),
+            5 => Some(Self::RiverCliff),
+            6 => Some(Self::RiversideForest),
+            7 => Some(Self::GravelBeach),
+            _ => None,
+        }
+    }
+
+    /// 结构型（改变高程/水体/通行）vs 视觉型（只追加装饰）。
+    /// 互斥裁决在同一类内部进行：每类至多取一个，两类可各取一个 ⇒ 每张图最多两个子特征。
+    pub const fn is_structural(self) -> bool {
+        matches!(
+            self,
+            Self::FootLake | Self::RidgeWaterfall | Self::OxbowLake | Self::RiverCliff
+        )
+    }
+}
+
+/// 子特征候选：固定盐值 + 首版命中概率（§5.3 表）。
+///
+/// 概率单位是**基点**（1/10000），不是百分比——避免浮点参与判定。
+/// ⚠️ 概率是「该候选自身是否命中」的独立概率，**不是**「该类最终选中它」的概率：
+/// 命中后还要按 kind 升序做「首个命中即停」的互斥裁决。
+struct SubFeatureCandidate {
+    salt: u64,
+    prob_bp: u16,
+}
+
+/// `TerrainSubFeatureKind` 的变体总数。选择器按 `0..COUNT` 扫描枚举编号，
+/// 新增变体时必须同步递增（否则新 kind 永不参与判定）。
+const SUB_FEATURE_KIND_COUNT: u32 = 8;
+
+/// 每种 kind 的固定盐值（8 个 ASCII 字符打包为 u64，与 `ACCENT_RNG_SALT` 同一风格）。
+/// 一经落地**永不更改**——改盐值等于换图（同种子不再复现旧世界）。
+const SALT_FOOT_LAKE: u64 = 0x5342_4646_4F4F_544C; // "SBFFOOTL"
+const SALT_RIDGE_WATERFALL: u64 = 0x5342_4652_4447_5746; // "SBFRDGWF"
+const SALT_FORESTED_SLOPE: u64 = 0x5342_4646_4F52_534C; // "SBFFORSL"
+const SALT_ROCKY_OUTCROP: u64 = 0x5342_4652_4F43_4B4F; // "SBFROCKO"
+const SALT_OXBOW_LAKE: u64 = 0x5342_464F_5842_4C4B; // "SBFOXBLK"
+const SALT_RIVER_CLIFF: u64 = 0x5342_4652_5643_4C46; // "SBFRVCLF"
+const SALT_RIVERSIDE_FOREST: u64 = 0x5342_4652_5646_4F52; // "SBFRVFOR"
+const SALT_GRAVEL_BEACH: u64 = 0x5342_4647_5256_4243; // "SBFGRVBC"
+
+/// 取某个 profile 下某个 kind 的候选参数；该组合不在候选池内则返回 `None`。
+/// 用穷举 match 而非查表数组，使「是否存在该候选」与代码书写顺序无关。
+fn sub_feature_candidate(
+    profile: &str,
+    kind: TerrainSubFeatureKind,
+) -> Option<SubFeatureCandidate> {
+    match (profile, kind) {
+        // —— T1 山口聚落 ——
+        (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::FootLake) => {
+            Some(SubFeatureCandidate { salt: SALT_FOOT_LAKE, prob_bp: 3000 }) // 30%
+        }
+        (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::RidgeWaterfall) => {
+            Some(SubFeatureCandidate { salt: SALT_RIDGE_WATERFALL, prob_bp: 2500 }) // 25%
+        }
+        (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::ForestedSlope) => {
+            Some(SubFeatureCandidate { salt: SALT_FORESTED_SLOPE, prob_bp: 4000 }) // 40%
+        }
+        (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::RockyOutcrop) => {
+            Some(SubFeatureCandidate { salt: SALT_ROCKY_OUTCROP, prob_bp: 3500 }) // 35%
+        }
+        // —— T2 两岸河谷 ——
+        (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::OxbowLake) => {
+            Some(SubFeatureCandidate { salt: SALT_OXBOW_LAKE, prob_bp: 2000 }) // 20%
+        }
+        (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::RiverCliff) => {
+            Some(SubFeatureCandidate { salt: SALT_RIVER_CLIFF, prob_bp: 2500 }) // 25%
+        }
+        (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::RiversideForest) => {
+            Some(SubFeatureCandidate { salt: SALT_RIVERSIDE_FOREST, prob_bp: 5000 }) // 50%
+        }
+        (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::GravelBeach) => {
+            Some(SubFeatureCandidate { salt: SALT_GRAVEL_BEACH, prob_bp: 4000 }) // 40%
+        }
+        _ => None,
+    }
+}
+
+/// 无状态 64 位整数混合（SplitMix64 finalizer）。
+///
+/// ★ 子特征判定**禁止**使用 `DefaultHasher`、浮点哈希或系统时间——它们在不同
+/// 编译目标/标准库版本下不保证结果一致，会直接击穿确定性。本函数只依赖
+/// 整数运算与 `wrapping_mul`，跨平台逐位稳定。
+fn mix64(mut x: u64) -> u64 {
+    x ^= x >> 30;
+    x = x.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    x ^= x >> 27;
+    x = x.wrapping_mul(0x94d0_49bb_1331_11eb);
+    x ^ (x >> 31)
+}
+
+/// 掷 [0, 10000) 的确定性骰子。`salt` 为该 kind 的固定盐值。
+fn roll_10000(seed: u64, salt: u64) -> u16 {
+    (mix64(seed ^ salt) % 10_000) as u16
+}
+
+/// 在某一类（结构型 / 视觉型）内按 `TerrainSubFeatureKind` **升序**逐个判定，
+/// **首个命中者即选定并立即停止**该类的后续判定（§5.3 互斥裁决）。
+///
+/// ★ 必须按 kind 编号扫描而非按表顺序：否则「选到哪一个」会随函数书写顺序、
+/// 插入位置而变，同种子换图。
+fn pick_sub_feature_in_class(
+    seed: u64,
+    profile: &str,
+    structural: bool,
+) -> Option<PlannedSubFeature> {
+    for code in 0..SUB_FEATURE_KIND_COUNT {
+        let kind = TerrainSubFeatureKind::from_code(code)?;
+        if kind.is_structural() != structural {
+            continue; // 另一类，不在本轮裁决范围内
+        }
+        // ⚠️ 候选池是 **profile 作用域** 的：某个 kind 不在本 profile 池内时必须
+        // `continue` 跳过，不能用 `?` 提前返回 None——否则排在它后面的同类候选
+        // 永远没机会判定（T2 的 OxbowLake/RiverCliff 编号 4/5 排在 T1 的
+        // FootLake/RidgeWaterfall 0/1 之后，会被直接吞掉导致 T2 恒为空）。
+        let cand = match sub_feature_candidate(profile, kind) {
+            Some(c) => c,
+            None => continue,
+        };
+        if roll_10000(seed, cand.salt) < cand.prob_bp {
+            return Some(PlannedSubFeature {
+                kind,
+                salt: cand.salt,
+                anchor_hint: Vec3::ZERO,
+                accepted: false,
+            });
+        }
+        // 未命中：继续判定同类下一个 kind（不重抽、不降级）
+    }
+    None
+}
+
+/// §5.3 第 4 步：规划本张图要注入哪些子特征。
+///
+/// **纯函数**：只消费 `seed` / `profile` / `enabled`，不读不写 `terrain`，
+/// 不消费任何 `WorldRng`（因此不改变既有 `relief_rng` / `hydro_rng` / `accent_rng`
+/// 的消费顺序，这是「旧 T1/T2 逐字节不变」的前提）。
+///
+/// 产出顺序恒为「结构型 → 视觉型」，每类至多一个，故长度 ≤ 2。
+/// `enabled=false`（`terrainAccentSubFeatures`）或 profile 不在候选池内时返回空。
+pub(crate) fn plan_subfeatures(
+    seed: u64,
+    profile: &str,
+    enabled: bool,
+) -> Vec<PlannedSubFeature> {
+    if !enabled {
+        return Vec::new();
+    }
+    let mut plan = Vec::with_capacity(2);
+    if let Some(s) = pick_sub_feature_in_class(seed, profile, true) {
+        plan.push(s);
+    }
+    if let Some(v) = pick_sub_feature_in_class(seed, profile, false) {
+        plan.push(v);
+    }
+    plan
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +233,21 @@ pub struct TerrainFeature {
     pub elevation: f32,
     pub width: f32,
     pub flags: u16,
+}
+
+/// 规划期中间结构：只描述「要注入什么」，不含生成后的 ID 绑定，**不进快照**（§5.2）。
+/// 由第 4 步 `plan_subfeatures()` 产出，第 5 步消费。
+#[derive(Debug, Clone)]
+pub struct PlannedSubFeature {
+    pub kind: TerrainSubFeatureKind,
+    /// 该 kind 的固定盐值（`sub_feature_salt`），阶段二复用它做放点哈希
+    pub salt: u64,
+    /// 由 profile 几何推导的候选锚点（山口鞍部 / 主河弯道）。
+    /// ★ 第 4 步**禁止读 terrain**（§5.3），故本阶段恒为 `Vec3::ZERO`，
+    /// 真实锚点由第 5 步接管后按 profile 几何填充。
+    pub anchor_hint: Vec3,
+    /// 第 5d 步局部（几何类）判定的结果。阶段一不施加几何，恒为 `false`。
+    pub accepted: bool,
 }
 
 /// 已注入的子特征（06 号 §5.2 数据模型，D-B1-2 新增）。

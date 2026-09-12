@@ -55,18 +55,19 @@ impl TerrainMap {
         self.generate_with_profile(seed, &config.terrain_profile, config);
         self.hydrology = Hydrology::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY { self.generate_river(seed, config); }
-        // ★ D-B1（06号 §5.3 第 4–5 步钩子）：子特征注入规划与几何施加。
-        // 阶段一为空实现：不消费 RNG、不写任何格子，开关两态下世界输出逐字节等价；
-        // 选择器（mix64/roll_10000/固定盐值/互斥裁决）属 D-B1-3，完整阶段化流水线属阶段二。
-        if config.terrain_accent_sub_features {
-            // 空钩子占位（D-B1-3 接管）。
-        }
+        // ★ D-B1-3（06号 §5.3 第 4–5 步钩子）：子特征注入规划与几何施加。
+        // 第 4 步 `plan_subfeatures()` 已由 D-B1-3 落地——纯无状态哈希（mix64/roll_10000
+        // + 固定盐值 + kind 升序互斥裁决），**不消费任何 WorldRng**、不读不写 terrain。
+        // 第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）仍是空操作，属阶段二/三：
+        // 本阶段 `plan` 只被第 9 步空钩子形式化消费，不写任何格子、不改任何地表。
+        let sub_plan = plan_subfeatures(seed, &self.profile, config.terrain_accent_sub_features);
         // ★ v1.48.0 D-A：散布地表装饰（在地貌与水系生成完成后，避免装饰落入深水区）
         self.accents = super::accents::generate_accents(self, config.terrain_accent_density, seed);
-        // ★ D-B1（06号 §5.3 第 9 步钩子）：子特征专属装饰追加（hash 放点、不消费 accent_rng）。
-        // 阶段一为空实现，语义同第 4–5 步钩子。
-        if config.terrain_accent_sub_features {
-            // 空钩子占位（D-B1-3 接管）。
+        // ★ D-B1-3（06号 §5.3 第 9 步钩子）：子特征专属装饰追加（hash 放点、不消费 accent_rng）。
+        // 阶段一为空实现——`sub_plan` 仅在此被读取长度以绑定钩子，不产生任何装饰；
+        // 阶段二接管后此处按 §5.5 追加 Accent 并回填 `accent_id_start/end`。
+        if !sub_plan.is_empty() {
+            // 空钩子占位（阶段二接管：append_subfeature_accents）。
         }
     }
     fn generate_river(&mut self, seed: u64, cfg: &SimConfig) {
