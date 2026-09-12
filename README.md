@@ -250,7 +250,7 @@ node frontend/server.js
 | [docs/current/design/](./docs/current/design/) | 产品设计（玩家视角）：产品总览 / 世界规则 / 社会规则 / 经济规则 / 观察设计 |
 | [docs/current/tech/](./docs/current/tech/) | 技术方案（实现视角）：架构 → 上层社会 → 中层个体 → 下层世界 → 表现层 → 工程层 |
 | [docs/plan/README.md](./docs/plan/README.md) | 计划总索引：在办设计与未落地方案 |
-| [docs/current/tech/14-config-reference.md](./docs/current/tech/14-config-reference.md) | 可调超参速查表（自动生成） |
+| [docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | 可调超参速查表（自动生成） |
 
 ---
 

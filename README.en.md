@@ -222,9 +222,9 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | [AGENTS.md](./AGENTS.md) | Development operation guide & pitfall checklist (read before changing code) |
 | [./docs/current/README.md](./docs/current/README.md) | Full index of implemented features & module navigation |
 | [docs/current/](./docs/current/) | Per-module mechanism docs (road network / ecology POIs / seasons / metabolism & reproduction / housing / decision AI / frontend / config / ledger / market / save / impact matrix) |
-| [./docs/current/tech/53-ui-implementation.md](./docs/current/tech/53-ui-implementation.md) · [./docs/current/tech/54-society-ledger-ui.md](./docs/current/tech/54-society-ledger-ui.md) · [./docs/current/tech/55-frontend-dev-guide.md](./docs/current/tech/55-frontend-dev-guide.md) | UI page panorama · society-ledger UI implementation · frontend development guide |
-| [./docs/plan/design/10-roadmap.md](./docs/plan/design/10-roadmap.md) | Long-term project roadmap |
-| [./docs/current/tech/14-config-reference.md](./docs/current/tech/14-config-reference.md) | Quick reference for the 200 tunable hyper-parameters (auto-generated) |
+| [./docs/current/tech/19-ui-implementation.md](./docs/current/tech/19-ui-implementation.md) · [./docs/current/tech/20-society-ledger-ui.md](./docs/current/tech/20-society-ledger-ui.md) · [./docs/current/tech/21-frontend-dev-guide.md](./docs/current/tech/21-frontend-dev-guide.md) | UI page panorama · society-ledger UI implementation · frontend development guide |
+| [./docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md) | Long-term project roadmap |
+| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 200 tunable hyper-parameters (auto-generated) |
 
 ---
 

@@ -605,7 +605,7 @@
     }
 
     // ==========================================
-    // ★ 动态季节光照开关（docs/current/tech/51-seasonal-lighting.md）
+    // ★ 动态季节光照开关（docs/current/tech/17-seasonal-lighting.md）
     //   关闭即退回 v1.47.11 的固定光并立即整片重着色；开启后光相立即对齐当前季节
     // ==========================================
     const chkDynamicLight = document.getElementById('chk-dynamic-light');

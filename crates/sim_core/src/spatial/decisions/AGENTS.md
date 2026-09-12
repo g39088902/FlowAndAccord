@@ -107,7 +107,7 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 
 ### 4.11 M19.1 观察边界
 
-意图/策略/原语为非持久化词汇；旧 Agent 状态和 pending 继续权威。`Need::observe_intent` 要求实际来源分支及评估时家宅等级，`Agent3D::observe_execution` 不根据标签反推来源，不构造 ActiveTask。观察借用路线/候选/标签，不写 state、不耗 RNG、不分配。完整 API 契约见 [../../../../../docs/current/tech/32-m19-architecture.md](../../../../../docs/current/tech/32-m19-architecture.md)。
+意图/策略/原语为非持久化词汇；旧 Agent 状态和 pending 继续权威。`Need::observe_intent` 要求实际来源分支及评估时家宅等级，`Agent3D::observe_execution` 不根据标签反推来源，不构造 ActiveTask。观察借用路线/候选/标签，不写 state、不耗 RNG、不分配。完整 API 契约见 [../../../../../docs/current/tech/12-m19-architecture.md](../../../../../docs/current/tech/12-m19-architecture.md)。
 
 ### 4.12 M19.2/M19.3 意图-策略-原语三层架构与生命周期收口
 

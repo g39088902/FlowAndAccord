@@ -175,7 +175,7 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   ctx.clearRect(0, 0, w, h);
 
   // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
-  //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/51-seasonal-lighting.md §2.7）
+  //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/17-seasonal-lighting.md §3.7）
   if (window.SimLighting) window.SimLighting.update(now, sim);
 
   // 1. 天空与地平氛围（地表之下的第一个氛围插入点）

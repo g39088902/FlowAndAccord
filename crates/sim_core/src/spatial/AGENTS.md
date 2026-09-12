@@ -61,7 +61,7 @@
 
 ## 二、world.rs::tick() 内部调用顺序（勿打乱）
 
-> 这是本层最重要的不变量。调整顺序会破坏确定性或行为语义。详见 `../../../../docs/current/tech/67-impact-matrix.md` §二。
+> 这是本层最重要的不变量。调整顺序会破坏确定性或行为语义。详见 `../../../../docs/current/tech/29-impact-matrix.md` §二。
 
 ```
 0. tick_season(dt)                          四季更迭与温度演化

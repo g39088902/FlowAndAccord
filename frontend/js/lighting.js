@@ -1,5 +1,5 @@
 // === 动态季节光照引擎（年周期光弧） ===
-// 方案：docs/current/tech/51-seasonal-lighting.md
+// 方案：docs/current/tech/17-seasonal-lighting.md
 // 定位：纯表现层。不消耗 WorldRng、不写模拟状态、不进存档、不参与内核确定性承诺。
 // 光相唯一来源：快照的 season / season_progress / season_timer / temperature（严禁自建计时器）。
 // 加载顺序：config.lighting.js → math.js → 本文件 → rustworld.js → 渲染五件套。

@@ -82,13 +82,13 @@ const SITES = [
     re: /(\*\*版本\*\*：v)\d+\.\d+\.\d+/g,
   },
   {
-    id: 'docs/current/11-changelog.md 最新版本',
-    file: 'docs/current/11-changelog.md',
+    id: 'docs/current/01-changelog.md 最新版本',
+    file: 'docs/current/01-changelog.md',
     re: /(最新版本：\*\*v)\d+\.\d+\.\d+(\*\*)/g,
   },
   {
-    id: 'docs/current/tech/15-snapshot-and-save.md 存档版本说明',
-    file: 'docs/current/tech/15-snapshot-and-save.md',
+    id: 'docs/current/tech/06-snapshot-and-save.md 存档版本说明',
+    file: 'docs/current/tech/06-snapshot-and-save.md',
     re: /(当前 \*\*)\d+\.\d+\.\d+(\*\*)/g,
   },
   {
@@ -232,13 +232,13 @@ function runBump(from, to, dryRun) {
   } else {
     console.log('│ 1. 本次未改动 Rust 常量，无需重编译 WASM（纯前端/文档升版）。');
   }
-  console.log(`│ 2. 在 docs/current/11-changelog.md 追加 **v${to}** 条目（表头已自动更新）。`);
+  console.log(`│ 2. 在 docs/current/01-changelog.md 追加 **v${to}** 条目（表头已自动更新）。`);
   console.log('│ 3. 跑门禁: node tools/bump-version.js --check');
   console.log('│            node tools/frontend-check.js && node tools/test-wasm.js');
   console.log('└──────────────────────────────────────────────┘');
 
   if (rustTouched) {
-    console.log('\n⚠️  SAVE_APP_VERSION 变更将自动废弃全部旧存档（设计行为，见 docs/current/tech/15-snapshot-and-save.md）。');
+    console.log('\n⚠️  SAVE_APP_VERSION 变更将自动废弃全部旧存档（设计行为，见 docs/current/tech/06-snapshot-and-save.md）。');
   }
 }
 

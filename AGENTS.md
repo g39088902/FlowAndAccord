@@ -6,11 +6,12 @@
 
 ## 0. 📚 项目文档地图
 
-开发任务从 [Agent 快速入口](./docs/current/tech/68-workflow.md) 按改动类型选择局部指南和门禁；本文件仍为全局规则入口。
+开发任务从 [Agent 快速入口](./docs/current/tech/30-workflow.md) 按改动类型选择局部指南和门禁；本文件仍为全局规则入口。
 
 除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下，按
-**当前 / 计划** 划分，每层再按 **产品设计 / 技术方案** 划分；技术方案编号的十位数字表示层
-（1x 总体与基座 → 2x 上层社会与经济 → 3x 中层个体与行为 → 4x 下层世界与物理 → 5x 表现层 → 6x 工程层）。
+**当前 / 计划** 划分，每层再按 **产品设计 / 技术方案** 划分；**每个目录内文档按顺序从 `01` 起连续编号**
+（各目录各自成序，编号本身不含层级语义）。`tech/` 内按
+总体与基座 → 上层社会与经济 → 中层个体与行为 → 下层世界与物理 → 表现层 → 工程层 → 附录 分层排列。
 
 | 文件 | 定位 | 何时阅读 |
 | :--- | :--- | :--- |
@@ -18,19 +19,19 @@
 | **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
 | **`docs/README.md`** | 文档总导航（唯一入口） | 找文档时 |
 | **./docs/current/README.md** | **现状总索引**：完整模块导航表 | 快速了解现状 |
-| **`docs/current/design/`** | 现状 · 产品设计（玩家视角）：[10 产品总览](./docs/current/design/10-product-overview.md) · [11 世界与地图规则](./docs/current/design/11-world-rules.md) · [12 族人家庭与社会规则](./docs/current/design/12-life-and-society.md) · [13 经济与资源规则](./docs/current/design/13-economy.md) · [14 观察与交互设计](./docs/current/design/14-observation-ux.md) | 讨论玩法、规则与体验时 |
-| **./docs/current/tech/10-engine-architecture.md** | 现状 · 技术总体：三层解耦、文档地图、tick 内部顺序、数据流、配置注入 | 入门架构 / 定位模块归属 |
-| **./docs/current/tech/11-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化 | 查阅核心 FSM 与状态转移契约时 |
-| **./docs/current/tech/31-decision-engine.md** | 决策引擎：马斯洛六层、18 条分支、私有触发器、错峰节拍（附「为什么这么设计」篇） | 理解决策状态机与寻路逻辑时 |
-| **./docs/current/tech/32-m19-architecture.md** | M19 决策架构规格：意图/策略/原语三层解耦、ActiveTask 单一真相源 | 使用意图/策略/原语类型及观察 API 时 |
-| **./docs/current/tech/20-ledger-and-polity.md** | 账本与政体（M1~M5 已落地） | 改动 ledger/ 代码时查阅 |
-| **./docs/current/tech/66-invariants.md** · [67 影响矩阵](./docs/current/tech/67-impact-matrix.md) | 六类硬约束集中清单 · 改 X 牵动哪些文件 | 改动前对照 |
-| **./docs/current/tech/68-workflow.md** | Agent 快速入口 + Commit 检查单 + 文档维护机制 | **提交前必读** |
-| **./docs/current/tech/60-build-and-run.md** · [62 无头诊断](./docs/current/tech/62-diagnostics.md) · [63 性能基准](./docs/current/tech/63-benchmarking.md) · [64 CI/CD](./docs/current/tech/64-cicd.md) · [65 浏览器自动化](./docs/current/tech/65-browser-automation.md) · [61 工具箱](./docs/current/tech/61-tools-guide.md) | 工程层：构建 / 诊断 / 基准 / 部署 / 自动化 / 工具速查 | 排障、优化、部署、自动化时 |
-| **./docs/current/tech/53-ui-implementation.md** · [54 制度大盘 UI](./docs/current/tech/54-society-ledger-ui.md) · [55 前端开发指南](./docs/current/tech/55-frontend-dev-guide.md) | 表现层：页面全景 + 窗口跳转 · 制度大盘 4 标签页 · 前端实施指南 | 开发新 UI 模块时 |
+| **`docs/current/design/`** | 现状 · 产品设计（玩家视角）：[01 产品总览](./docs/current/design/01-product-overview.md) · [02 世界与地图规则](./docs/current/design/02-world-rules.md) · [03 族人家庭与社会规则](./docs/current/design/03-life-and-society.md) · [04 经济与资源规则](./docs/current/design/04-economy.md) · [05 观察与交互设计](./docs/current/design/05-observation-ux.md) | 讨论玩法、规则与体验时 |
+| **./docs/current/tech/01-engine-architecture.md** | 现状 · 技术总体：三层解耦、文档地图、tick 内部顺序、数据流、配置注入 | 入门架构 / 定位模块归属 |
+| **./docs/current/tech/02-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化 | 查阅核心 FSM 与状态转移契约时 |
+| **./docs/current/tech/11-decision-engine.md** | 决策引擎：马斯洛六层、18 条分支、私有触发器、错峰节拍（附「为什么这么设计」篇） | 理解决策状态机与寻路逻辑时 |
+| **./docs/current/tech/12-m19-architecture.md** | M19 决策架构规格：意图/策略/原语三层解耦、ActiveTask 单一真相源 | 使用意图/策略/原语类型及观察 API 时 |
+| **./docs/current/tech/07-ledger-and-polity.md** | 账本与政体（M1~M5 已落地） | 改动 ledger/ 代码时查阅 |
+| **./docs/current/tech/28-invariants.md** · [29 影响矩阵](./docs/current/tech/29-impact-matrix.md) | 六类硬约束集中清单 · 改 X 牵动哪些文件 | 改动前对照 |
+| **./docs/current/tech/30-workflow.md** | Agent 快速入口 + Commit 检查单 + 文档维护机制 | **提交前必读** |
+| **./docs/current/tech/22-build-and-run.md** · [24 无头诊断](./docs/current/tech/24-diagnostics.md) · [25 性能基准](./docs/current/tech/25-benchmarking.md) · [26 CI/CD](./docs/current/tech/26-cicd.md) · [27 浏览器自动化](./docs/current/tech/27-browser-automation.md) · [23 工具箱](./docs/current/tech/23-tools-guide.md) | 工程层：构建 / 诊断 / 基准 / 部署 / 自动化 / 工具速查 | 排障、优化、部署、自动化时 |
+| **./docs/current/tech/19-ui-implementation.md** · [20 制度大盘 UI](./docs/current/tech/20-society-ledger-ui.md) · [21 前端开发指南](./docs/current/tech/21-frontend-dev-guide.md) | 表现层：页面全景 + 窗口跳转 · 制度大盘 4 标签页 · 前端实施指南 | 开发新 UI 模块时 |
 | **./docs/plan/README.md** | **计划总索引**：在办设计与未落地方案 + 依赖顺序图 | 了解未来方向时 |
-| **./docs/plan/design/10-roadmap.md** | 长期规划书（M10~M18：空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解宏观方向（多为规划态） |
-| **`docs/plan/tech/`** | 计划 · 技术方案：[20 融合契约](./docs/plan/tech/20-integration-contracts.md) · [21 记忆](./docs/plan/tech/21-memory-system.md) · [22 内部市场](./docs/plan/tech/22-internal-market.md) · [23 农田](./docs/plan/tech/23-farmland-agriculture.md) · [24 狩猎防御](./docs/plan/tech/24-hunting-defense.md) · [25 地图模板](./docs/plan/tech/25-terrain-templates.md) · [26 地形美术](./docs/plan/tech/26-terrain-art.md) · [27 性能优化](./docs/plan/tech/27-performance.md) | 设计未落地方案时 |
+| **./docs/plan/design/01-roadmap.md** | 长期规划书（M10~M18：空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解宏观方向（多为规划态） |
+| **`docs/plan/tech/`** | 计划 · 技术方案：[01 融合契约](./docs/plan/tech/01-integration-contracts.md) · [02 记忆](./docs/plan/tech/02-memory-system.md) · [03 内部市场](./docs/plan/tech/03-internal-market.md) · [04 农田](./docs/plan/tech/04-farmland-agriculture.md) · [05 狩猎防御](./docs/plan/tech/05-hunting-defense.md) · [06 地图模板](./docs/plan/tech/06-terrain-templates.md) · [07 地形美术](./docs/plan/tech/07-terrain-art.md) · [08 性能优化](./docs/plan/tech/08-performance.md) | 设计未落地方案时 |
 | **`docs/archive/`** | 已完成或被替代的历史设计稿（[08 决策可视化](docs/archive/08-decision-viz-design.md) / [10 架构愿景](docs/archive/10-architecture.md) / [12 账本重构](docs/archive/12-plan-ledger-refactor.md) / [13 房屋拍卖](docs/archive/13-plan-house-upgrade-auction.md) / [14 v1.27 待办](docs/archive/14-plan-todo-followup-v1.27.md) / [19 M19 基线审计](docs/archive/19-m19-baseline-audit.md)） | 仅追溯，不作开发入口 |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
 
@@ -76,7 +77,7 @@ graph TD
 
 ## 2. 编译与运行步骤
 
-> 详细环境配置与故障排查见 `./docs/current/tech/60-build-and-run.md`。
+> 详细环境配置与故障排查见 `./docs/current/tech/22-build-and-run.md`。
 
 ### 步骤一：编译 WASM 并双副本同步
 
@@ -113,7 +114,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 步骤四：浏览器访问
 
-> ⚠️ **必须使用 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/15-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。能用 Chrome 测试必须优先用 Chrome 测试。
+> ⚠️ **必须使用 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/06-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。能用 Chrome 测试必须优先用 Chrome 测试。
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
@@ -142,7 +143,7 @@ node frontend/server.js           # http://localhost:3000
 
 ### 4.0 ✅ 改动前快速自检（10 秒扫完）
 
-> 详细版（含影响面说明）见 [`./docs/current/tech/67-impact-matrix.md` §五](./docs/current/tech/67-impact-matrix.md)。
+> 详细版（含影响面说明）见 [`./docs/current/tech/29-impact-matrix.md` §五](./docs/current/tech/29-impact-matrix.md)。
 
 ```
 □ 版本号：node tools/bump-version.js --patch（自动同步 index.html / SAVE_APP_VERSION / 文档全部定义点，见 §4.9；仅文档变更可跳过，见 §4.0.1）
@@ -151,18 +152,18 @@ node frontend/server.js           # http://localhost:3000
 □ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
 □ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
-□ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/11-changelog.md + 受影响的局部 AGENTS.md
+□ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/01-changelog.md + 受影响的局部 AGENTS.md
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
 □ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
 ```
 
 ### 4.0.1 ✅ Commit 前检查单（提交前必做）
 
-详细清单已拆分至 [`./docs/current/tech/68-workflow.md`](./docs/current/tech/68-workflow.md)。准备 `git commit` 时必须执行该清单：所有提交先做工作区、diff 和文档维护体检；命中 Rust/WASM、前端、配置或行为机制改动时，再执行对应专项门禁。
+详细清单已拆分至 [`./docs/current/tech/30-workflow.md`](./docs/current/tech/30-workflow.md)。准备 `git commit` 时必须执行该清单：所有提交先做工作区、diff 和文档维护体检；命中 Rust/WASM、前端、配置或行为机制改动时，再执行对应专项门禁。
 
 **最低标准**：基础项全部通过，专项项按改动类型通过；发布或 CI 追加 `node tools/doc-maintenance-check.js --strict`。未执行的门禁必须在提交说明或 PR 中注明原因。
 
-**⚡ 仅文档变更例外（纯文档提交）**：若 diff 只涉及 `docs/`、根/局部 `AGENTS.md` 等纯文档内容（**不含** Rust / 前端 / 配置 / 版本号定义点等任何代码或行为/契约改动），则 commit 时**不需要升版**（跳过 `bump-version.js --patch/--minor`）也**不需要重跑任何测试门禁**（`cargo build/test`、`test-wasm.js`、`config-check.js`、`frontend-check.js`、`test-snapshot-bin.js`、`diagnose.js --check all` 等）。此时只需：① 工作区/diff 检查；② `node tools/doc-maintenance-check.js` 通过；③ `node tools/cross-doc-check.js` 无文档间冲突/权威漂移；④ `node tools/bump-version.js --check` 零漂移（纯一致性校验，非升版）。详细清单见 [`./docs/current/tech/68-workflow.md`](./docs/current/tech/68-workflow.md) §G。
+**⚡ 仅文档变更例外（纯文档提交）**：若 diff 只涉及 `docs/`、根/局部 `AGENTS.md` 等纯文档内容（**不含** Rust / 前端 / 配置 / 版本号定义点等任何代码或行为/契约改动），则 commit 时**不需要升版**（跳过 `bump-version.js --patch/--minor`）也**不需要重跑任何测试门禁**（`cargo build/test`、`test-wasm.js`、`config-check.js`、`frontend-check.js`、`test-snapshot-bin.js`、`diagnose.js --check all` 等）。此时只需：① 工作区/diff 检查；② `node tools/doc-maintenance-check.js` 通过；③ `node tools/cross-doc-check.js` 无文档间冲突/权威漂移；④ `node tools/bump-version.js --check` 零漂移（纯一致性校验，非升版）。详细清单见 [`./docs/current/tech/30-workflow.md`](./docs/current/tech/30-workflow.md) §G。
 
 ### 4.1 🔴 WASM 编译与双副本同步（最常踩）
 
@@ -180,7 +181,7 @@ node frontend/server.js           # http://localhost:3000
 - **中途断流熔断与平滑重路由**：途中检测自身对目标的触发器关闭时，若有其他已开放同类 POI，立即原地掉头并重新规划路径；仅在无可用点或体力告警时折返。**严禁闪现瞬移**——掉头必须在当前车道反向平滑回走，保持坐标连续性。
 - **★ v1.27.0 / v1.36.0 断流直达榷场**：**水/粮/木**采集链路断流（无任何同类可用 POI）时，家户户主若家户账本金币 ≥ `config.market_min_family_gold` 且体力 ≥ `config.decision_work_stamina_threshold`，可直接原地掉头赴最近榷场交易——市场支付用家户账本**远程结算**（`try_route_to_market`，不要求随身携带金币）；石/金采集不享受该兜底。
 - **★ v1.40.3 / v1.43.0 A\* 局部失效与 APSP 静态查表 (M3 优化)**：A\* 寻路通过 `LaneEdge3D::wear_tier_bucket` 量化道路踩踏加成（0.50x~2.20x）。在 v1.43.0 (M3) 中：① **衰减局部失效**：自然衰减只会增加成本，因此 `tick_wear_decay` 仅对包含跌落车道的路径定向失效，未涉车道路径严格保持最优；② **踩踏几何剪枝**：车道踩踏跃迁仅基于三角不等式失效受影响范围内的路径，消除全图击穿；③ **全源静态查表 (APSP Table)**：未发生踩踏或远端拓扑直接查表获取，全内核吞吐达 97,792 TPS。
-- 实现细节见 `decisions/AGENTS.md` 与 `./docs/current/tech/31-decision-engine.md`。
+- 实现细节见 `decisions/AGENTS.md` 与 `./docs/current/tech/11-decision-engine.md`。
 
 ### 4.3 🟠 决策节拍语义（行为核心，勿随意改）
 
@@ -206,7 +207,7 @@ node frontend/server.js           # http://localhost:3000
 3. `crates/sim_core/src/spatial/snapshot_bin/encode.rs`（**M4 FABS 二进制编码**，字段顺序/枚举码位与 1、2 等价）
 4. `frontend/js/snapshot-bin.js`（二进制解码，产物与 JSON 同构）+ `frontend/js/rustworld.js`（`_applySnapshot()` 映射）
 
-**M4 二进制快照要点**：快照主链路已从「JSON 字符串 + `JSON.parse`」改为「FABS 定长二进制帧 + TypedArray 直读」（见 `./docs/plan/tech/27-performance.md` M4 与 `crates/sim_core/src/spatial/snapshot_bin/`）；路网几何/地形按版本号增量下发；枚举名称表由 `world_enum_table_ptr/len` 从 Rust `as_str()` 生成（新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`）；防漂移自动网 = `node tools/test-snapshot-bin.js`。★ T1（v1.46.0）：JSON 快照通道已从生产与工具链路移除 —— `tools/` 全部工具统一走 `tools/snapshot-reader.js`（FABS 优先），前端 `sim_worker.js` 删除 JSON 回退；`crates/sim_wasm` 仅保留 **test-only** 的 `world_snapshot_json_debug_ptr/len`（仅供 `test-snapshot-bin.js` 做真值比对，**禁止**其它任何代码调用）。前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
+**M4 二进制快照要点**：快照主链路已从「JSON 字符串 + `JSON.parse`」改为「FABS 定长二进制帧 + TypedArray 直读」（见 `./docs/plan/tech/08-performance.md` M4 与 `crates/sim_core/src/spatial/snapshot_bin/`）；路网几何/地形按版本号增量下发；枚举名称表由 `world_enum_table_ptr/len` 从 Rust `as_str()` 生成（新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`）；防漂移自动网 = `node tools/test-snapshot-bin.js`。★ T1（v1.46.0）：JSON 快照通道已从生产与工具链路移除 —— `tools/` 全部工具统一走 `tools/snapshot-reader.js`（FABS 优先），前端 `sim_worker.js` 删除 JSON 回退；`crates/sim_wasm` 仅保留 **test-only** 的 `world_snapshot_json_debug_ptr/len`（仅供 `test-snapshot-bin.js` 做真值比对，**禁止**其它任何代码调用）。前端 DOM ID 必须与 `render.js` / `main.js` 中的 `getElementById` 完全匹配。
 
 ### 4.5.1 🔴 跨世界必须让驻留表缓存失效（★ T1 缺陷修复，v1.46.0）
 
@@ -226,7 +227,7 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 
 - **共 23 处 POI**：营地 4 / 清泉 6 / 浆果 6 / 林木 3 / 石矿 2 / 金矿 1 / 榷场互市 1，由 `config.countCamps` 等字段控制。ID 段位：营地 1-4 / 清泉 10-15 / 浆果 20-25 / 林木 30-32 / 石矿 40-41 / 金矿 50 / 榷场互市 60。空间排斥间距 `config.poiMinDistance`(70m)。
 - **营地行政区升级**：随辖内有效房屋数量自动升级——0~4 营地 / 5~9 村 / 10~14 乡 / 15~19 镇 / 20+ 县；门槛由 `campLevel*MinHouses` 配置。
-- 改 POI 数量须同步：`ecology/` → `index.html` 面板文案 → `./docs/current/tech/21-ecology-and-poi.md`。
+- 改 POI 数量须同步：`ecology/` → `index.html` 面板文案 → `./docs/current/tech/08-ecology-and-poi.md`。
 
 ### 4.8 🟡 行为与生理硬约束
 
@@ -242,7 +243,7 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 
 每次 AI 修改代码（Rust 内核、前端 JS/CSS/HTML、文档配置）都必须自增版本号。**严禁手工改版本号**——一律使用统一升版器，一次命令同步全部定义点：
 
-> ⚡ **仅文档变更例外**：diff 只涉及纯文档（`docs/`、根/局部 `AGENTS.md` 内容，不含代码/配置/版本号定义点）时**不升版、不重跑测试**，只需 `doc-maintenance-check` 通过 + `bump-version.js --check` 零漂移（见 §4.0.1 与 `./docs/current/tech/68-workflow.md` §G）。升版只针对会改变行为、契约或版本定义点本身的改动。
+> ⚡ **仅文档变更例外**：diff 只涉及纯文档（`docs/`、根/局部 `AGENTS.md` 内容，不含代码/配置/版本号定义点）时**不升版、不重跑测试**，只需 `doc-maintenance-check` 通过 + `bump-version.js --check` 零漂移（见 §4.0.1 与 `./docs/current/tech/30-workflow.md` §G）。升版只针对会改变行为、契约或版本定义点本身的改动。
 
 ```powershell
 node tools/bump-version.js --patch          # 默认：1.44.1 → 1.44.2
@@ -261,14 +262,14 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 | `frontend/js/rustworld.js` 版本兜底串 | Worker READY 前的 `getAppVersion()` 返回值 |
 | `frontend/js/sim_worker.js` 版本兜底串 | Worker 侧 `world_app_version_*` 不可用时的返回值 |
 | `AGENTS.md` §1 Mermaid + §2 步骤四 | 本文档 |
-| `./docs/current/README.md` 版本行 / `docs/current/11-changelog.md` 表头 | 现状文档 |
-| `./docs/current/tech/15-snapshot-and-save.md` 存档版本说明 | 存档模块文档 |
+| `./docs/current/README.md` 版本行 / `docs/current/01-changelog.md` 表头 | 现状文档 |
+| `./docs/current/tech/06-snapshot-and-save.md` 存档版本说明 | 存档模块文档 |
 | `README.md` 版本徽章 | 对外宣传文档 |
 
 **升版后必做**：
 1. 若 `world_save.rs` 变更（几乎每次都会），必须重编译 WASM 并同步双副本（§4.1）——否则浏览器里仍是旧版本常量，存档门禁失效；
-2. `SAVE_APP_VERSION` 变更会**自动废弃全部旧存档**（v1.37.1 起的设计行为，见 `./docs/current/tech/15-snapshot-and-save.md`）；
-3. 在 `docs/current/11-changelog.md` 追加该版本条目（表头已由升版器自动更新，正文条目需手写）；
+2. `SAVE_APP_VERSION` 变更会**自动废弃全部旧存档**（v1.37.1 起的设计行为，见 `./docs/current/tech/06-snapshot-and-save.md`）；
+3. 在 `docs/current/01-changelog.md` 追加该版本条目（表头已由升版器自动更新，正文条目需手写）；
 4. 跑 `node tools/bump-version.js --check` 确认零漂移。
 
 > ⚠️ `SAVE_FORMAT_VERSION`（存档**结构**版本，当前 4）**不随应用版本自增**，仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，且必须同改 `world_save.rs` 与 `save-ui.js`。
@@ -306,12 +307,12 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 - **文档化例外（v1.3.6 起）**：`decisionEvalOrder: Vec<String>` 与 `decisionEvalLevels: Vec<u8>` 是**「Rust 无顺序」字段**——Rust 默认为空 Vec，权威值只存在于前端 `frontend/js/config.decision-order.js`（启动时合并进 `SIM_CONFIG`）。**严禁**在 Rust 侧写死任何策展优先级序列（`branches.rs::BranchId::ALL` 仅为配置缺失/非法时的中性兜底序）。
 - **调参流程**：直接编辑 `config.js`，浏览器 `Ctrl+F5` 强刷即生效；改后运行 `node tools/config-check.js` 校验前后端一致性。
 - **一致性校验**：`tools/config-check.js` 交叉解析 `config.js` 与 `config.rs`，捕获孤儿字段、缺失字段、类型错配、数值漂移四类问题。
-- **参数速查表**：`./docs/current/tech/14-config-reference.md` 由 `config-check.js` 自动生成，**不要手工维护**。
+- **参数速查表**：`./docs/current/tech/05-config-reference.md` 由 `config-check.js` 自动生成，**不要手工维护**。
 - **防回归**：`config-check.js` 与 `test-wasm.js` 双绿方为可发布状态。
 
 ### 4.13 🚀 CI/CD 流水线（GitHub Actions → 腾讯云 COS）
 
-- **触发与门禁**：`.github/workflows/deploy.yml` 仅在 push `master`（或手动 `workflow_dispatch`）时运行；流程为编译 WASM → 双副本同步 → `test-wasm.js` 门禁 → `cross-doc-check.js` 跨文档一致性门禁 → `coscmd` 增量上传 `frontend/`。门禁不过不部署。详见 `./docs/current/tech/64-cicd.md`。
+- **触发与门禁**：`.github/workflows/deploy.yml` 仅在 push `master`（或手动 `workflow_dispatch`）时运行；流程为编译 WASM → 双副本同步 → `test-wasm.js` 门禁 → `cross-doc-check.js` 跨文档一致性门禁 → `coscmd` 增量上传 `frontend/`。门禁不过不部署。详见 `./docs/current/tech/26-cicd.md`。
 - **CI 工具链**：使用标准 rustup，**严禁**在 workflow 中设置 `CARGO_HOME` 指向 `.cargo-home` 或把 `.toolchain/` 加入 PATH——它们是 Windows 便携缓存，与 ubuntu-latest 不兼容。
 - **wasm MIME**：`.wasm` 必须 `Content-Type: application/wasm`，workflow 上传后对双副本强制覆写 Header。
 - **密钥安全**：桶地址/密钥一律走 GitHub Secrets（`COS_SECRET_ID` / `COS_SECRET_KEY` / `COS_BUCKET` / `COS_REGION`），严禁明文写入。
@@ -361,5 +362,5 @@ node tools/bump-version.js --check          # 只校验一致性（漂移即 exi
 1. **同一事实只在一个权威位置出现**，其余用交叉引用（如"详见 decisions/AGENTS.md"），禁止多处复制粘贴导致漂移。
 2. **禁止往高层文档塞**：会话级临时决策、单次调试过程、已完成的中间步骤、具体函数名清单（除非是跨模块硬约束的一部分）。
 3. **历史性 churn 只进 changelog** 的里程碑条目，不进机制文档。机制文档只描述"当前是什么"，不描述"从什么改过来"。
-4. **新增模块时**：先在 `docs/current/tech/`（实现视角）与 `docs/current/design/`（玩家视角，若影响可观察规则）建模块文档 + 在对应目录建嵌套 AGENTS.md，再在 `docs/current/README.md` 模块导航表登记，最后在 `./docs/current/11-changelog.md` 追加版本条目。文档编号的十位数字对应所属层（见 [`10-engine-architecture.md`](./docs/current/tech/10-engine-architecture.md) §2）。
+4. **新增模块时**：先在 `docs/current/tech/`（实现视角）与 `docs/current/design/`（玩家视角，若影响可观察规则）建模块文档 + 在对应目录建嵌套 AGENTS.md，再在 `docs/current/README.md` 模块导航表登记，最后在 `./docs/current/01-changelog.md` 追加版本条目。文档编号为**目录内顺序号**（从 `01` 起连续，各目录各自成序），新增文档取该目录下一个可用编号；文档内标题编号约定见 [`docs/README.md`](./docs/README.md)（H1 写文件名前缀、分部内 `##` 从 1 起连续、`## 状态机` 不编号）。
 5. **改机制时**：同步更新对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新。

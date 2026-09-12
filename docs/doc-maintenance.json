@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "reviewIntervalDays": 90,
   "ignoreDocs": [
-    "docs/current/11-changelog.md",
-    "docs/current/tech/14-config-reference.md"
+    "docs/current/01-changelog.md",
+    "docs/current/tech/05-config-reference.md"
   ],
   "docs": [
     {
@@ -17,54 +17,54 @@
     },
     {
       "id": "engine-architecture",
-      "path": "docs/current/tech/10-engine-architecture.md",
+      "path": "docs/current/tech/01-engine-architecture.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "AGENTS.md",
         "crates/sim_core/src/spatial/world.rs",
         "frontend/js/rustworld.js",
-        "docs/current/tech/10-engine-architecture.md"
+        "docs/current/tech/01-engine-architecture.md"
       ]
     },
     {
       "id": "core-systems-fsm",
-      "path": "docs/current/tech/11-core-systems-fsm.md",
+      "path": "docs/current/tech/02-core-systems-fsm.md",
       "owner": "sim-core/decisions",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/decisions/**/*.rs",
         "crates/sim_core/src/spatial/housing_system/**/*.rs",
         "crates/sim_core/src/spatial/ledger/**/*.rs",
-        "docs/current/tech/11-core-systems-fsm.md"
+        "docs/current/tech/02-core-systems-fsm.md"
       ]
     },
     {
       "id": "determinism",
-      "path": "docs/current/tech/12-determinism.md",
+      "path": "docs/current/tech/03-determinism.md",
       "owner": "sim-core",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/config.rs",
         "tools/test-determinism.js",
-        "docs/current/tech/12-determinism.md"
+        "docs/current/tech/03-determinism.md"
       ]
     },
     {
       "id": "config-system",
-      "path": "docs/current/tech/13-config-system.md",
+      "path": "docs/current/tech/04-config-system.md",
       "owner": "frontend/sim-core",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/config.rs",
         "frontend/js/config*.js",
         "tools/config-check.js",
-        "docs/current/tech/13-config-system.md"
+        "docs/current/tech/04-config-system.md"
       ]
     },
     {
       "id": "snapshot-and-save",
-      "path": "docs/current/tech/15-snapshot-and-save.md",
+      "path": "docs/current/tech/06-snapshot-and-save.md",
       "owner": "frontend/sim-core",
       "lastReviewed": "2026-09-12",
       "sources": [
@@ -72,236 +72,236 @@
         "crates/sim_wasm/src/**/*.rs",
         "frontend/js/save-ui.js",
         "frontend/js/rustworld.js",
-        "docs/current/tech/15-snapshot-and-save.md"
+        "docs/current/tech/06-snapshot-and-save.md"
       ]
     },
     {
       "id": "ledger-and-polity",
-      "path": "docs/current/tech/20-ledger-and-polity.md",
+      "path": "docs/current/tech/07-ledger-and-polity.md",
       "owner": "sim-core/ledger",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/ledger/**/*.rs",
-        "docs/current/tech/20-ledger-and-polity.md"
+        "docs/current/tech/07-ledger-and-polity.md"
       ]
     },
     {
       "id": "ecology-and-poi",
-      "path": "docs/current/tech/21-ecology-and-poi.md",
+      "path": "docs/current/tech/08-ecology-and-poi.md",
       "owner": "sim-core/ecology",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/ecology/**/*.rs",
         "crates/sim_core/src/spatial/poi.rs",
-        "docs/current/tech/21-ecology-and-poi.md"
+        "docs/current/tech/08-ecology-and-poi.md"
       ]
     },
     {
       "id": "market-pricing",
-      "path": "docs/current/tech/22-market-pricing.md",
+      "path": "docs/current/tech/09-market-pricing.md",
       "owner": "sim-core/market",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/decisions/market.rs",
         "frontend/js/auction-ui.js",
-        "docs/current/tech/22-market-pricing.md"
+        "docs/current/tech/09-market-pricing.md"
       ]
     },
     {
       "id": "agent-life-cycle",
-      "path": "docs/current/tech/30-agent-life-cycle.md",
+      "path": "docs/current/tech/10-agent-life-cycle.md",
       "owner": "sim-core/agent",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/agent.rs",
         "crates/sim_core/src/spatial/birth.rs",
-        "docs/current/tech/30-agent-life-cycle.md"
+        "docs/current/tech/10-agent-life-cycle.md"
       ]
     },
     {
       "id": "decision-engine",
-      "path": "docs/current/tech/31-decision-engine.md",
+      "path": "docs/current/tech/11-decision-engine.md",
       "owner": "sim-core/decisions",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/decisions/**/*.rs",
-        "docs/current/tech/31-decision-engine.md"
+        "docs/current/tech/11-decision-engine.md"
       ]
     },
     {
       "id": "m19-architecture",
-      "path": "docs/current/tech/32-m19-architecture.md",
+      "path": "docs/current/tech/12-m19-architecture.md",
       "owner": "sim-core/decisions",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/decisions/**/*.rs",
-        "docs/current/tech/32-m19-architecture.md"
+        "docs/current/tech/12-m19-architecture.md"
       ]
     },
     {
       "id": "housing-system",
-      "path": "docs/current/tech/33-housing-system.md",
+      "path": "docs/current/tech/13-housing-system.md",
       "owner": "sim-core/housing",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/house.rs",
         "crates/sim_core/src/spatial/housing_system/**/*.rs",
-        "docs/current/tech/33-housing-system.md"
+        "docs/current/tech/13-housing-system.md"
       ]
     },
     {
       "id": "terrain-and-network",
-      "path": "docs/current/tech/40-terrain-and-network.md",
+      "path": "docs/current/tech/14-terrain-and-network.md",
       "owner": "sim-core/geo",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/spatial/graph.rs",
-        "docs/current/tech/40-terrain-and-network.md"
+        "docs/current/tech/14-terrain-and-network.md"
       ]
     },
     {
       "id": "seasons-climate",
-      "path": "docs/current/tech/41-seasons-climate.md",
+      "path": "docs/current/tech/15-seasons-climate.md",
       "owner": "sim-core/world",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/world_season.rs",
         "crates/sim_core/src/config.rs",
-        "docs/current/tech/41-seasons-climate.md"
+        "docs/current/tech/15-seasons-climate.md"
       ]
     },
     {
       "id": "frontend-overview",
-      "path": "docs/current/tech/50-frontend-overview.md",
+      "path": "docs/current/tech/16-frontend-overview.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/index.html",
         "frontend/style.css",
         "frontend/js/**/*.js",
-        "docs/current/tech/50-frontend-overview.md"
+        "docs/current/tech/16-frontend-overview.md"
       ]
     },
     {
       "id": "seasonal-lighting",
-      "path": "docs/current/tech/51-seasonal-lighting.md",
+      "path": "docs/current/tech/17-seasonal-lighting.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/js/config.lighting.js",
         "frontend/js/render_world.js",
-        "docs/current/tech/51-seasonal-lighting.md"
+        "docs/current/tech/17-seasonal-lighting.md"
       ]
     },
     {
       "id": "water-rendering",
-      "path": "docs/current/tech/52-water-rendering.md",
+      "path": "docs/current/tech/18-water-rendering.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/js/render_world.js",
         "frontend/js/render_terrain.js",
-        "docs/current/tech/52-water-rendering.md"
+        "docs/current/tech/18-water-rendering.md"
       ]
     },
     {
       "id": "ui-implementation",
-      "path": "docs/current/tech/53-ui-implementation.md",
+      "path": "docs/current/tech/19-ui-implementation.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/index.html",
         "frontend/js/**/*.js",
-        "docs/current/tech/53-ui-implementation.md"
+        "docs/current/tech/19-ui-implementation.md"
       ]
     },
     {
       "id": "society-ledger-ui",
-      "path": "docs/current/tech/54-society-ledger-ui.md",
+      "path": "docs/current/tech/20-society-ledger-ui.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/js/ledger-ui.js",
         "frontend/js/auction-ui.js",
-        "docs/current/tech/54-society-ledger-ui.md"
+        "docs/current/tech/20-society-ledger-ui.md"
       ]
     },
     {
       "id": "frontend-dev-guide",
-      "path": "docs/current/tech/55-frontend-dev-guide.md",
+      "path": "docs/current/tech/21-frontend-dev-guide.md",
       "owner": "frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/js/**/*.js",
         "frontend/style.css",
         "frontend/index.html",
-        "docs/current/tech/55-frontend-dev-guide.md"
+        "docs/current/tech/21-frontend-dev-guide.md"
       ]
     },
     {
       "id": "build-and-run",
-      "path": "docs/current/tech/60-build-and-run.md",
+      "path": "docs/current/tech/22-build-and-run.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "AGENTS.md",
-        "docs/current/tech/60-build-and-run.md"
+        "docs/current/tech/22-build-and-run.md"
       ]
     },
     {
       "id": "tools-guide",
-      "path": "docs/current/tech/61-tools-guide.md",
+      "path": "docs/current/tech/23-tools-guide.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "tools/**/*.js",
-        "docs/current/tech/61-tools-guide.md"
+        "docs/current/tech/23-tools-guide.md"
       ]
     },
     {
       "id": "diagnostics",
-      "path": "docs/current/tech/62-diagnostics.md",
+      "path": "docs/current/tech/24-diagnostics.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "tools/diagnose.js",
-        "docs/current/tech/62-diagnostics.md"
+        "docs/current/tech/24-diagnostics.md"
       ]
     },
     {
       "id": "benchmarking",
-      "path": "docs/current/tech/63-benchmarking.md",
+      "path": "docs/current/tech/25-benchmarking.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "tools/profile-benchmark.js",
         "tools/test-determinism.js",
-        "docs/current/tech/63-benchmarking.md"
+        "docs/current/tech/25-benchmarking.md"
       ]
     },
     {
       "id": "cicd",
-      "path": "docs/current/tech/64-cicd.md",
+      "path": "docs/current/tech/26-cicd.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         ".github/workflows/deploy.yml",
-        "docs/current/tech/64-cicd.md"
+        "docs/current/tech/26-cicd.md"
       ]
     },
     {
       "id": "browser-automation",
-      "path": "docs/current/tech/65-browser-automation.md",
+      "path": "docs/current/tech/27-browser-automation.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
-        "docs/current/tech/65-browser-automation.md"
+        "docs/current/tech/27-browser-automation.md"
       ]
     },
     {
       "id": "invariants",
-      "path": "docs/current/tech/66-invariants.md",
+      "path": "docs/current/tech/28-invariants.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
@@ -309,24 +309,24 @@
         "frontend/AGENTS.md",
         "crates/sim_core/src/**/*.rs",
         "frontend/**/*.js",
-        "docs/current/tech/66-invariants.md"
+        "docs/current/tech/28-invariants.md"
       ]
     },
     {
       "id": "impact-matrix",
-      "path": "docs/current/tech/67-impact-matrix.md",
+      "path": "docs/current/tech/29-impact-matrix.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "AGENTS.md",
         "frontend/AGENTS.md",
         "crates/sim_core/src/spatial/**/*.rs",
-        "docs/current/tech/67-impact-matrix.md"
+        "docs/current/tech/29-impact-matrix.md"
       ]
     },
     {
       "id": "workflow",
-      "path": "docs/current/tech/68-workflow.md",
+      "path": "docs/current/tech/30-workflow.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
@@ -336,75 +336,75 @@
         "crates/sim_wasm/AGENTS.md",
         "frontend/AGENTS.md",
         "tools/doc-maintenance-check.js",
-        "docs/current/tech/68-workflow.md"
+        "docs/current/tech/30-workflow.md"
       ]
     },
     {
       "id": "code-map",
-      "path": "docs/current/tech/90-code-map.md",
+      "path": "docs/current/tech/31-code-map.md",
       "owner": "engineering",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/**/*.rs",
         "crates/sim_wasm/src/**/*.rs",
         "frontend/**/*.js",
-        "docs/current/tech/90-code-map.md"
+        "docs/current/tech/31-code-map.md"
       ]
     },
     {
       "id": "design-product-overview",
-      "path": "docs/current/design/10-product-overview.md",
+      "path": "docs/current/design/01-product-overview.md",
       "owner": "product",
       "lastReviewed": "2026-09-12",
       "sources": [
         "README.md",
-        "docs/current/design/10-product-overview.md"
+        "docs/current/design/01-product-overview.md"
       ]
     },
     {
       "id": "design-world-rules",
-      "path": "docs/current/design/11-world-rules.md",
+      "path": "docs/current/design/02-world-rules.md",
       "owner": "product",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/config.rs",
-        "docs/current/design/11-world-rules.md"
+        "docs/current/design/02-world-rules.md"
       ]
     },
     {
       "id": "design-life-and-society",
-      "path": "docs/current/design/12-life-and-society.md",
+      "path": "docs/current/design/03-life-and-society.md",
       "owner": "product",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/agent.rs",
         "crates/sim_core/src/spatial/housing_system/**/*.rs",
         "crates/sim_core/src/spatial/ledger/**/*.rs",
-        "docs/current/design/12-life-and-society.md"
+        "docs/current/design/03-life-and-society.md"
       ]
     },
     {
       "id": "design-economy",
-      "path": "docs/current/design/13-economy.md",
+      "path": "docs/current/design/04-economy.md",
       "owner": "product",
       "lastReviewed": "2026-09-12",
       "sources": [
         "crates/sim_core/src/spatial/ecology/**/*.rs",
         "crates/sim_core/src/spatial/decisions/market.rs",
         "crates/sim_core/src/spatial/ledger/**/*.rs",
-        "docs/current/design/13-economy.md"
+        "docs/current/design/04-economy.md"
       ]
     },
     {
       "id": "design-observation-ux",
-      "path": "docs/current/design/14-observation-ux.md",
+      "path": "docs/current/design/05-observation-ux.md",
       "owner": "product/frontend",
       "lastReviewed": "2026-09-12",
       "sources": [
         "frontend/index.html",
         "frontend/js/**/*.js",
-        "docs/current/design/14-observation-ux.md"
+        "docs/current/design/05-observation-ux.md"
       ]
     }
   ]

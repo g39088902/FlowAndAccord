@@ -615,7 +615,7 @@
             }
           }
           const step = worldSize / (w - 1);
-          // ★ 动态季节光照（docs/current/tech/51-seasonal-lighting.md §4）：
+          // ★ 动态季节光照（docs/current/tech/17-seasonal-lighting.md §5）：
           //   一次性预存单位法线 / 无光反照率 / 坡度 AO；光档变化时由 SimLighting.relightTerrain()
           //   只重算光因子并原地写回 cell.color，避免每次整片重建颜色与字符串。
           const cellCount = w * h;

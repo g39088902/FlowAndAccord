@@ -20,7 +20,7 @@
  *
  * 扫描范围：根 AGENTS.md + 各局部 AGENTS.md + docs 目录下全部 markdown。
  * 已知边界（有意排除）：
- *   - docs/archive 目录与 docs/current/11-changelog.md：历史记录保留旧值属归档语义；
+ *   - docs/archive 目录与 docs/current/01-changelog.md：历史记录保留旧值属归档语义；
  *   - docs/plan/ 目录：规划态文档描述愿景数值，不参与现状比对；
  *   - 版本号字符串：由 tools/bump-version.js --check 统一门禁，此处不重复；
  *   - 语义型冲突（机制描述 / 因果 / 归属自相矛盾）：无法机检，靠维护清单
@@ -38,7 +38,7 @@ const ROOT = path.resolve(__dirname, '..');
 const CONFIG_FILE = 'frontend/js/config.js';
 const EXCLUDED = [
   new RegExp('^docs/archive/'),           // 历史设计稿归档，保留当时事实
-  new RegExp('^docs/current/11-changelog\\.md$'), // 历史版本记录，全是过去值
+  new RegExp('^docs/current/01-changelog\\.md$'), // 历史版本记录，全是过去值
   new RegExp('^docs/plan/'),               // 规划文档（愿景态数值），不与现状比对
   new RegExp('^README\\.md$'),             // 对外营销文档，存在刻意简化表述
   new RegExp('^TODO\\.md$'),
