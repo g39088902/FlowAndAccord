@@ -513,6 +513,37 @@ impl World3DEngine {
                 self.terrain.accents.len() as u32,
                 a.into_inner(),
             ));
+
+            // ★ v1.50.30 D-B1-4：地图模板子特征 Section 22（静态地形脏帧输出；
+            //   记录布局 = id u32 + kind u8 + anchor/bounds_min/bounds_max 各 3×f32
+            //   + feature_count u8 + feature_ids… + accent_start/end opt_u32 + align4）
+            let mut sf = BinWriter::with_capacity(self.terrain.sub_features.len() * 64 + 16);
+            for sub in &self.terrain.sub_features {
+                sf.u32(sub.id);
+                sf.u8(sub_feature_kind_code(sub.kind));
+                sf.f32(sub.anchor.x);
+                sf.f32(sub.anchor.y);
+                sf.f32(sub.anchor.z);
+                sf.f32(sub.bounds_min.x);
+                sf.f32(sub.bounds_min.y);
+                sf.f32(sub.bounds_min.z);
+                sf.f32(sub.bounds_max.x);
+                sf.f32(sub.bounds_max.y);
+                sf.f32(sub.bounds_max.z);
+                sf.u8(sub.feature_ids.len() as u8);
+                for &fid in &sub.feature_ids {
+                    sf.u32(fid);
+                }
+                sf.opt_u32(sub.accent_id_start);
+                sf.opt_u32(sub.accent_id_end);
+                sf.align4();
+            }
+            sf.align4();
+            secs.push(Sec::new(
+                SectionKind::TerrainSubFeatures,
+                self.terrain.sub_features.len() as u32,
+                sf.into_inner(),
+            ));
         }
 
         // ══════════════ HOUSEHOLD ══════════════

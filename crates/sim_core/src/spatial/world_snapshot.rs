@@ -8,8 +8,8 @@ use super::snapshot::{
     ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot,
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
-    TerrainAccentSnapshot, TerrainFeatureSnapshot, TransferRecordSnapshot,
-    VacantHouseSnapshot, WorldSnapshot3D,
+    TerrainAccentSnapshot, TerrainFeatureSnapshot, TerrainSubFeatureSnapshot,
+    TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -709,11 +709,32 @@ impl World3DEngine {
             Vec::new()
         };
 
+        // ★ D-B1-4：JSON 快照子特征赋值（本阶段容器恒空，注入自阶段二起）
+        let terrain_sub_features = if need_terrain {
+            self.terrain
+                .sub_features
+                .iter()
+                .map(|sf| TerrainSubFeatureSnapshot {
+                    id: sf.id,
+                    kind: sf.kind.as_str().to_string(),
+                    anchor: sf.anchor,
+                    bounds_min: sf.bounds_min,
+                    bounds_max: sf.bounds_max,
+                    feature_ids: sf.feature_ids.clone(),
+                    accent_id_start: sf.accent_id_start,
+                    accent_id_end: sf.accent_id_end,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         WorldSnapshot3D {
             tick: self.tick_counter,
             terrain_cells,
             terrain_features,
             terrain_accents,
+            terrain_sub_features,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,

@@ -53,6 +53,35 @@ pub fn terrain_feature_kind_table() -> Vec<&'static str> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// 地图模板子特征 TerrainSubFeatureKind（8 变体，v1.50.30 D-B1-4）
+//
+// ⚠ 与 `TerrainFeatureKind`（0–3）是两套编号空间：本表按
+// `TerrainSubFeatureKind` 自身的枚举序（FootLake=0 … GravelBeach=7）编码。
+// ═══════════════════════════════════════════════════════════════
+
+#[inline]
+pub fn sub_feature_kind_code(kind: crate::geo::TerrainSubFeatureKind) -> u8 {
+    kind as u8
+}
+
+pub fn sub_feature_kind_table() -> Vec<&'static str> {
+    use crate::geo::TerrainSubFeatureKind as K;
+    [
+        K::FootLake,
+        K::RidgeWaterfall,
+        K::ForestedSlope,
+        K::RockyOutcrop,
+        K::OxbowLake,
+        K::RiverCliff,
+        K::RiversideForest,
+        K::GravelBeach,
+    ]
+    .iter()
+    .map(|k| k.as_str())
+    .collect()
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 装饰物种类 AccentKind（5 变体，v1.48.0 D-A）
 // ═══════════════════════════════════════════════════════════════
 
@@ -437,6 +466,7 @@ pub fn enum_table_json() -> String {
     out.push('{');
     push_arr(&mut out, "surfaceKind", &surface_kind_table(), true);
     push_arr(&mut out, "terrainFeatureKind", &terrain_feature_kind_table(), false);
+    push_arr(&mut out, "terrainSubFeatureKind", &sub_feature_kind_table(), false);
     push_arr(&mut out, "accentKind", &accent_kind_table(), false);
     push_arr(&mut out, "gender", &gender_table(), false);
     push_arr(&mut out, "state", &state_table(), false);

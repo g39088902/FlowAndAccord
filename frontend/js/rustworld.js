@@ -84,7 +84,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.29';
+        this._appVersion = '1.50.30';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -154,7 +154,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.29';
+            this._appVersion = msg.appVersion || '1.50.30';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -423,7 +423,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.29';
+        return this._appVersion || '1.50.30';
       }
 
       /**
@@ -660,6 +660,10 @@
             albR, albG, albB,
             features: snap.terrain_features || [],
             accents: snap.terrain_accents || [],
+            // ★ v1.50.30 D-B1-4：地图模板子特征（调试/诊断稳定事实源，本阶段恒空）。
+            //   与 features/accents 同生命周期：READY/LOAD/REWIND/RESET 的强制地形重建
+            //   会整组替换，不残留上一世界数据。
+            subFeatures: snap.terrain_sub_features || [],
             generatorVersion: snap.terrain_generator_version || 0,
             profile: snap.terrain_profile || '',
           };

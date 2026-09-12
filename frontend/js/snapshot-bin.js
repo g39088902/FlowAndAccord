@@ -20,7 +20,7 @@
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 2;
+  var FORMAT_VERSION = 3; // v1.50.30 D-B1-4：新增 TERRAIN_SUB_FEATURES section
   var NONE_U32 = 0xffffffff;
   var NONE_F32_NAN = NaN;
 
@@ -41,6 +41,8 @@
     AUCTION_HIST: 16, STR_TAB: 17, TERRAIN_FEATURES: 18,
     // ★ v1.48.0 D-A：Terrain 相关 section 需与 layout.rs SectionKind 枚举同步
     TERRAIN_ACCENTS: 21,
+    // ★ v1.50.30 D-B1-4：地图模板子特征（静态地形脏帧输出；本阶段恒空）
+    TERRAIN_SUB_FEATURES: 22,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -151,7 +153,7 @@
     // 故这里每帧都构造全新容器，`setReuse()` 仅为兼容旧调用点而保留的空操作。
     var snap = {
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
-      terrain_cells: [], terrain_features: [], terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
+      terrain_cells: [], terrain_features: [], terrain_sub_features: [], terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
       total_births: 0, total_deaths: 0, total_deaths_natural: 0, total_deaths_unnatural: 0,
@@ -482,6 +484,33 @@
         };
         ar.align4();
         snap.terrain_accents.push(accent);
+      }
+    }
+    // ★ v1.50.30 D-B1-4：解码地图模板子特征 Section 22（静态地形脏帧才携带；
+    //   记录布局 = id u32 + kind u8 + anchor/bounds_min/bounds_max 各 3×f32
+    //   + feature_count u8 + feature_ids… + accent_start/end opt_u32 + align4）
+    if (dir[K.TERRAIN_SUB_FEATURES]) {
+      var sfr = readerAt(uint8, dir[K.TERRAIN_SUB_FEATURES].o, dir[K.TERRAIN_SUB_FEATURES].bl);
+      snap.terrain_sub_features = [];
+      for (var sfi = 0; sfi < dir[K.TERRAIN_SUB_FEATURES].c; sfi++) {
+        var sub = {
+          id: sfr.u32(),
+          kind: en('terrainSubFeatureKind', sfr.u8()),
+          anchor: { x: sfr.f32(), y: sfr.f32(), z: sfr.f32() },
+          bounds_min: { x: sfr.f32(), y: sfr.f32(), z: sfr.f32() },
+          bounds_max: { x: sfr.f32(), y: sfr.f32(), z: sfr.f32() },
+          feature_ids: [],
+          accent_id_start: null,
+          accent_id_end: null,
+        };
+        var fidCount = sfr.u8();
+        for (var fii = 0; fii < fidCount; fii++) {
+          sub.feature_ids.push(sfr.u32());
+        }
+        sub.accent_id_start = sfr.optU32();
+        sub.accent_id_end = sfr.optU32();
+        sfr.align4();
+        snap.terrain_sub_features.push(sub);
       }
     }
 

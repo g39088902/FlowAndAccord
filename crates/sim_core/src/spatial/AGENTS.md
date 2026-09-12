@@ -45,8 +45,8 @@
 | `ecology/` | 7 文件 | 生态初始化（世界重置 + POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝、榷场互市）、分娩结算。子模块：`seed.rs` 步骤编排 / `spawn.rs` POI 落位与路网 / `founder.rs` 始祖与制度登记 / `tick.rs` 交互调度壳 / `harvest.rs` 采收与采购 / `home.rs` 卸货与吃喝 | 决策（decisions/）、账本结构（ledger/） |
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
 | `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology/ 与 maintenance.rs 真实收付） |
-| `snapshot.rs` | ~290 | 全部快照结构体定义（WorldSnapshot3D / AgentSnapshot / HouseSnapshot / PoiSnapshot / NodeSnapshot / LaneSnapshot / HouseholdSnapshot / MarriageSnapshot / ClanSnapshot / RegionSnapshot / LedgerBalanceSnapshot / TransferRecordSnapshot / GeoCellSnapshot / TerrainFeatureSnapshot / ★ v1.49.1 TerrainAccentSnapshot） | 快照赋值（在 world.rs）、前端映射（在 rustworld.js） |
-| `snapshot_bin/` | 4 | ★ M4 (v1.45.3) 二进制快照（FABS 帧）：`layout.rs` 格式常量（SectionKind 全集含 ★ v1.49.1 TerrainAccents=21）、`dict.rs` 枚举码表（TerrainFeatureKind + ★ v1.49.1 AccentKind）、`strtab.rs` 持久化字符串驻留、`encode.rs` `write_snapshot_binary()`（含 ★ v1.49.1 TerrainAccents 段定长编码） | JSON 快照通道（在 world_snapshot.rs） |
+| `snapshot.rs` | ~310 | 全部快照结构体定义（WorldSnapshot3D / AgentSnapshot / HouseSnapshot / PoiSnapshot / NodeSnapshot / LaneSnapshot / HouseholdSnapshot / MarriageSnapshot / ClanSnapshot / RegionSnapshot / LedgerBalanceSnapshot / TransferRecordSnapshot / GeoCellSnapshot / TerrainFeatureSnapshot / TerrainAccentSnapshot / ★ v1.50.30 TerrainSubFeatureSnapshot） | 快照赋值（在 world.rs）、前端映射（在 rustworld.js） |
+| `snapshot_bin/` | 4 | ★ M4 (v1.45.3) 二进制快照（FABS 帧，★ v1.50.30 起 `FORMAT_VERSION = 3`）：`layout.rs` 格式常量（SectionKind 全集含 ★ v1.49.1 TerrainAccents=21、★ v1.50.30 TerrainSubFeatures=22）、`dict.rs` 枚举码表（TerrainFeatureKind + ★ v1.50.30 TerrainSubFeatureKind + ★ v1.49.1 AccentKind）、`strtab.rs` 持久化字符串驻留、`encode.rs` `write_snapshot_binary()`（含 ★ v1.49.1 TerrainAccents / ★ v1.50.30 TerrainSubFeatures 段定长编码，后者静态地形脏帧输出、本阶段恒空） | JSON 快照通道（在 world_snapshot.rs） |
 
 ### 1.4 子目录（各有独立局部 AGENTS.md）
 

@@ -24,7 +24,7 @@
     - 验收：同种子 100% 复现；开关开/关均不改变既有 T1/T2 世界输出。
     - 依赖：D-B1-1（开关）、D-B1-2（kind 枚举）。
 
-- [ ] **D-B1-4 子特征快照四处同步 + `FORMAT_VERSION` 2→3**（须一个提交内完成）
+- [x] **D-B1-4 子特征快照四处同步 + `FORMAT_VERSION` 2→3**（须一个提交内完成）
     - 内容：① `spatial/snapshot.rs` 定义 `TerrainSubFeatureSnapshot`；② `spatial/world_snapshot.rs::generate_snapshot()` 赋值（本阶段恒空数组；静态地形脏帧才发送）；③ FABS：`snapshot_bin/layout.rs` 新增 `SectionKind::TerrainSubFeatures = 22`、`encode.rs` 落记录布局（`id:u32,kind:u8,anchor,bounds_min,bounds_max,feature_count,feature_ids...,accent_start/end:opt_u32,align4`）、`dict.rs` 同步枚举表（§17.1 的 Cliff/Waterfall/WaterBody 特征表注册项可一并或随阶段三注入落地）、`FORMAT_VERSION` 2→3；④ 前端：`snapshot-bin.js` 解码 + `rustworld.js` 映射 `terrain.subFeatures`，在 READY/LOAD/REWIND/RESET 及 `STR_TAB.start_index==0` 时与 features/accents 一起清除。
     - 出处：§5.7 快照 JSON / FABS / 前端状态三行 + 末段（快照化理由：调试面板、诊断、跨世界缓存清理、种子事实源）；根 AGENTS.md §4.5 四处同步与 §4.5.1 缓存判据。
     - 验收：`node tools/test-snapshot-bin.js` 全场景通过。

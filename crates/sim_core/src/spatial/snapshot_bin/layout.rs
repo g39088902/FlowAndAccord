@@ -27,7 +27,8 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 
 /// 帧格式版本。**结构性**变更（增删 section 或改字段编码）时必须 +1；
 /// 前端 `snapshot-bin.js` 校验不匹配即回退 JSON 通道。
-pub const FORMAT_VERSION: u16 = 2;
+/// v1.50.30：2 -> 3（D-B1-4 新增 `TerrainSubFeatures=22` section，见下方枚举）。
+pub const FORMAT_VERSION: u16 = 3;
 
 /// Header 定长（字节）
 ///
@@ -83,6 +84,10 @@ pub enum SectionKind {
     /// ★ v1.48.0 D-A：地表装饰（id u32 + kind u8 + x f32 + y f32 + z f32
     ///   + scale f32 + rotation f32 + tint u8 + align4，约 24B/个，脏帧输出）
     TerrainAccents = 21,
+    /// ★ v1.50.30 D-B1-4：地图模板子特征（id u32 + kind u8 + anchor/bounds_min/bounds_max
+    ///   各 3×f32 + feature_count u8 + feature_ids… + accent_start/end opt_u32 + align4，
+    ///   静态地形脏帧输出；本阶段恒空）
+    TerrainSubFeatures = 22,
 }
 
 impl SectionKind {

@@ -29,6 +29,10 @@ pub struct WorldSnapshot3D {
     pub terrain_features: Vec<TerrainFeatureSnapshot>,
     #[serde(default)]
     pub terrain_accents: Vec<TerrainAccentSnapshot>,
+    /// ★ D-B1-4：地图模板子特征快照（06 号 §5.2/§5.7）。本阶段恒为空数组
+    /// （注入自阶段二起）；随静态地形脏帧输出，是调试/诊断/跨世界缓存清理的稳定事实源
+    #[serde(default)]
+    pub terrain_sub_features: Vec<TerrainSubFeatureSnapshot>,
     #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
@@ -176,6 +180,23 @@ pub struct TerrainAccentSnapshot {
     pub scale: f32,
     pub rotation: f32,
     pub tint: u8,
+}
+
+/// ★ D-B1-4：地图模板子特征快照（06 号 §5.2 数据模型的快照投影）。
+/// 字段口径与 `geo/terrain.rs::TerrainSubFeature` 逐一对齐；`kind` 序列化为
+/// `TerrainSubFeatureKind::as_str()` 字符串（与 dict.rs 名称表一致）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainSubFeatureSnapshot {
+    pub id: u32,
+    pub kind: String,
+    pub anchor: Vec3,
+    pub bounds_min: Vec3,
+    pub bounds_max: Vec3,
+    /// 关联 `TerrainFeature` 的稳定 ID，升序
+    pub feature_ids: Vec<u32>,
+    /// 关联装饰 ID 闭区间 [start, end]；无装饰则为 None
+    pub accent_id_start: Option<u32>,
+    pub accent_id_end: Option<u32>,
 }
 
 /// ★ v1.10.0 空置房屋快照条目（营地空置房屋列表：房屋 ID + 受益人 ID 列表）
