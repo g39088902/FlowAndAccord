@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.50.28` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.50.29` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 </div>
 
@@ -190,7 +190,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | Bridge layer | Zero-dependency WebAssembly export layer: linear-memory JSON snapshots & static high-throughput buffers |
 | Presentation layer | Native static frontend (ES6+) + dual-theme Canvas rendering pipeline, zero front-end build chain |
 | Storage engine | File System Access API native disk writes + IndexedDB handle persistence + localStorage fallback with three slots |
-| Tunable hyper-parameters | **232** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
+| Tunable hyper-parameters | **233** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
 | Quality gates | `node tools/test-wasm.js` (determinism / bounds-safety / no-NaN / long-run stability) + `config-check.js` (frontend-backend parameter alignment) + `diagnose.js` (headless diagnostic engine) |
 
 ---
@@ -242,7 +242,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | [docs/current/](./docs/current/) | Per-module mechanism docs (road network / ecology POIs / seasons / metabolism & reproduction / housing / decision AI / frontend / config / ledger / market / save / impact matrix) |
 | [./docs/current/tech/19-ui-implementation.md](./docs/current/tech/19-ui-implementation.md) · [./docs/current/tech/20-society-ledger-ui.md](./docs/current/tech/20-society-ledger-ui.md) · [./docs/current/tech/21-frontend-dev-guide.md](./docs/current/tech/21-frontend-dev-guide.md) | UI page panorama · society-ledger UI implementation · frontend development guide |
 | [./docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md) | Long-term project roadmap |
-| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 232 tunable hyper-parameters (auto-generated) |
+| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 233 tunable hyper-parameters (auto-generated) |
 
 ---
 

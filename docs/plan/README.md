@@ -36,7 +36,7 @@
 | 03 | [内部市场](tech/03-internal-market.md) | 售货员撮合 + 有限订单簿（替代已废弃的 AMM 方案） |
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；生命力解耦、民兵动员与公仓契约 |
-| 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A 已落地；本文保留模板库与 D-B 子特征注入蓝图 |
+| 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A 已落地；本文保留模板库、D-B 子特征注入蓝图与全量排期（R.3：2026-09-13 起 16 张模板全部排期） |
 | 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
 

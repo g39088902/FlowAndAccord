@@ -216,6 +216,10 @@ pub struct SimConfig {
     pub terrain_road_corridor_width: f32,
     /// ★ v1.48.0 D-A 装饰系统：装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
     pub terrain_accent_density: f32,
+    /// ★ D-B1（06号 §5.3）：子特征注入总开关（山脚湖/山涧飞瀑/河谷峭壁等）。
+    /// 唯一消费点 = `geo/hydrology.rs::generate_with_config` 的 §5.3 第 4–5、9 步空钩子门控；
+    /// 阶段一钩子为空操作（开关两态下世界输出逐字节等价），选择器实现属 D-B1-3、完整阶段化流水线属阶段二。
+    pub terrain_accent_sub_features: bool,
 
 // 8. 四季更迭与宏观气候
     pub season_year_length: f32,

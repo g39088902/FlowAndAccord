@@ -6,13 +6,13 @@
 
 ## 阶段一 · D-B1 装饰扩展与骨架
 
-- [ ] **D-B1-1 配置字段加回：子特征注入总开关 `terrainAccentSubFeatures`**
+- [x] **D-B1-1 配置字段加回：子特征注入总开关 `terrainAccentSubFeatures`**
     - 内容：`config.rs` 三处同步（命名 const 默认值 / `SimConfig` 字段 / `Default` 映射）+ `frontend/js/config.js` + `examples/config.json` + `tools/config-check.js` 映射；唯一消费点 = D-B1-3 预留的流水线空钩子（§5.3 第 4–5、9 步门控）。禁止无消费点字段（`config-check.js` 第 5 条「空转参数」直接报错）；默认值实施时定，本阶段无注入实现、两种取值下世界输出等价。
     - 出处：06 号文首更正段（字段已于 v1.50.18 全量删除）、R.5 待加回清单、§5.3、§5.7 配置行；根 AGENTS.md §4.12。
     - 验收：`node tools/config-check.js` 通过。
     - 依赖：无（首个任务）。
 
-- [ ] **D-B1-2 内核子特征数据模型与稳定 ID**
+- [x] **D-B1-2 内核子特征数据模型与稳定 ID**
     - 内容：新增 `TerrainSubFeatureKind` 八变体枚举（FootLake / RidgeWaterfall / ForestedSlope / RockyOutcrop / OxbowLake / RiverCliff / RiversideForest / GravelBeach）+ `TerrainSubFeature` 结构（`id:u32`、`kind`、`anchor:Vec3`、`bounds_min/max`、`feature_ids`、accent 区间）；`TerrainMap.sub_features` 容器字段加 `#[serde(default)]`（旧档加载默认空数组，`SAVE_FORMAT_VERSION` 不递增）；ID 唯一性断言、按 ID 升序存储（§5.2 ID 表与稳定 ID 规则）。
     - 出处：§5.2、§5.7 快照 JSON 行与存档行、§17.1。
     - 验收：`cargo test --lib`；存读档回归（旧档可载、新档含空字段）。
@@ -30,7 +30,7 @@
     - 验收：`node tools/test-snapshot-bin.js` 全场景通过。
     - 依赖：D-B1-2（模型）。
 
-- [ ] **D-B1-5 RockCluster / GrassTuft 内核生成**
+- [x] **D-B1-5 RockCluster / GrassTuft 内核生成**
     - 内容：`geo/accents.rs` 的 `generate_accents()` 按固定顺序追加两段：Tree → Boulder → Bush → RockCluster → GrassTuft；新增随机数只允许 `accent_rng` 消费（保持消费顺序确定性）；候选地表按 §5.5 表执行——RockCluster：`RiverBank`/`RiverTerrace` 或坡度 ≥ 8° 干地；GrassTuft：`DryGround`/`SoftGround`/`RiverTerrace` 且坡度 < 24°，避开深水/浅水/`NO_WALK`。
     - 出处：§5.5、§17.1 `geo/accents.rs` 待办行、§2.3 D-A 行遗留（仅枚举未生成）。
     - 验收：装饰不进禁区门禁（§18.4）保持通过；同步更新所有「同种子 accent 数组逐字节一致」基线（§5.5 明确要求）。
@@ -62,4 +62,4 @@
 
 ## 未拆分阶段
 
-阶段二～九（生成组合基座、首批子特征、D-C、P1 三 profile、候选模板、复杂水系/R0、远期扩展）暂未拆分，排期与依赖见 06 号 R.3 阶段计划表；完成阶段一后按同一粒度逐批拆入本文件。
+阶段二～八与阶段九a~九d（生成组合基座、首批子特征、D-C、P1 四模板〔含湖畔盆地〕、阶段七插队模板〔河谷聚落/平地草原/半坡林地〕、复杂水系/R0、远期批次〔静态扩展/沙漠绿洲/T4 动态水文/海岛〕）暂未拆分，排期与依赖见 06 号 R.3 阶段计划表（2026-09-13 起 16 张模板全部排期）；完成阶段一后按同一粒度逐批拆入本文件。

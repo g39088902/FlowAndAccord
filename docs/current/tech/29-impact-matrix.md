@@ -181,7 +181,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 ## 3. 数据流向图（Rust → 前端）
 
 ```
-SimConfig (config.rs + config.house-upgrade-cost.js，共 232 字段)
+SimConfig (config.rs + config.house-upgrade-cost.js，共 233 字段)
     │  序列化
     ▼
 sim_wasm.wasm (world_create / world_tick / world_apply_config)

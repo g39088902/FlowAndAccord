@@ -27,6 +27,37 @@ impl TerrainFeatureKind {
     }
 }
 
+/// 地图模板子特征种类（06 号 §5.2 数据模型，D-B1-2 新增）。
+/// 编号即 `TerrainSubFeatureKind as u32`，是稳定 ID 分区
+/// `1000 + kind` 的组成部分；与 `TerrainFeatureKind`（0–6）是**两套编号空间**，
+/// 混用会直接算错 ID。本阶段仅落地模型，容器恒为空数组，注入自阶段二起。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TerrainSubFeatureKind {
+    FootLake = 0,
+    RidgeWaterfall = 1,
+    ForestedSlope = 2,
+    RockyOutcrop = 3,
+    OxbowLake = 4,
+    RiverCliff = 5,
+    RiversideForest = 6,
+    GravelBeach = 7,
+}
+
+impl TerrainSubFeatureKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::FootLake => "FootLake",
+            Self::RidgeWaterfall => "RidgeWaterfall",
+            Self::ForestedSlope => "ForestedSlope",
+            Self::RockyOutcrop => "RockyOutcrop",
+            Self::OxbowLake => "OxbowLake",
+            Self::RiverCliff => "RiverCliff",
+            Self::RiversideForest => "RiversideForest",
+            Self::GravelBeach => "GravelBeach",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerrainFeature {
     pub id: u32,
@@ -35,6 +66,28 @@ pub struct TerrainFeature {
     pub elevation: f32,
     pub width: f32,
     pub flags: u16,
+}
+
+/// 已注入的子特征（06 号 §5.2 数据模型，D-B1-2 新增）。
+/// 只描述「这张图注入了什么」，是快照/调试/存档的稳定事实源，不携带生成过程。
+/// 稳定 ID = `1000 + TerrainSubFeatureKind as u32`，一种最多一个实例。
+/// 本阶段容器恒为空数组（`#[serde(default)]` 保证旧档加载默认空，`SAVE_FORMAT_VERSION`
+/// 不递增）；阶段二注入器填充后必须保持按 `id` 升序且唯一（见
+/// `TerrainMap::validate_sub_features_sorted_unique`）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainSubFeature {
+    pub id: u32,
+    pub kind: TerrainSubFeatureKind,
+    /// 生成锚点，z 为最终地表高程
+    pub anchor: Vec3,
+    /// 世界坐标 AABB，仅用于调试/检查
+    pub bounds_min: Vec3,
+    pub bounds_max: Vec3,
+    /// 关联 `TerrainFeature` 的稳定 ID，升序
+    pub feature_ids: Vec<u32>,
+    /// 关联装饰 ID 闭区间 [start, end]；无装饰则为 None
+    pub accent_id_start: Option<u32>,
+    pub accent_id_end: Option<u32>,
 }
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
@@ -64,6 +117,10 @@ pub struct TerrainMap {
     pub features: Vec<TerrainFeature>,
     #[serde(default)]
     pub accents: Vec<TerrainAccent>,
+    /// 已注入的子特征（§5.2）。D-B1-2 起为数据模型空容器，阶段二起由注入器填充。
+    /// `#[serde(default)]`：旧档缺字段时默认空数组，`SAVE_FORMAT_VERSION` 不递增。
+    #[serde(default)]
+    pub sub_features: Vec<TerrainSubFeature>,
     pub hydrology: super::hydrology::Hydrology,
 }
 
@@ -91,6 +148,7 @@ impl TerrainMap {
             profile: TERRAIN_PROFILE_MOUNTAIN_PASS.to_string(),
             features: Vec::new(),
             accents: Vec::new(),
+            sub_features: Vec::new(),
             hydrology: Default::default(),
         }
     }
@@ -114,6 +172,7 @@ impl TerrainMap {
             profile.to_string()
         };
         self.features.clear();
+        self.sub_features.clear();
 
         let mut rng = WorldRng::new(seed);
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
@@ -238,4 +297,23 @@ impl TerrainMap {
         super::corridor::validate_curve(self, curve, corridor_width, max_walk_slope, None)
     }
 
+    /// §5.2 稳定 ID 契约：`sub_features` 必须按 `id` **严格升序**且 **ID 唯一**
+    /// （稳定 ID 禁止用 `Vec::len()` / HashMap 遍历顺序 / 候选失败次数推导）。
+    /// 本阶段容器恒为空数组，校验平凡通过；阶段二注入器每次写入后、
+    /// 以及存档加载路径都必须调用，防止同种子因集合顺序漂移而换图。
+    pub fn validate_sub_features_sorted_unique(&self) -> Result<(), String> {
+        let mut prev: Option<u32> = None;
+        for sf in &self.sub_features {
+            if let Some(p) = prev {
+                if sf.id <= p {
+                    return Err(format!(
+                        "sub_features 未按 id 严格升序存储或 ID 重复：id={}，前一个 id={}",
+                        sf.id, p
+                    ));
+                }
+            }
+            prev = Some(sf.id);
+        }
+        Ok(())
+    }
 }

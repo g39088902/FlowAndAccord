@@ -1,4 +1,4 @@
-//! accents.rs · 地表装饰系统（D-A 装饰系统基础，v1.48.0）
+//! accents.rs · 地表装饰系统（D-A 装饰系统基础，v1.48.0；★ D-B1-5 补齐 RockCluster/GrassTuft）
 //!
 //! 装饰层是独立于地貌特征（`TerrainFeature`）之外的纯视觉要素集合。
 //! 使用独立 `accent_rng` 加盐生成，不消费模拟 RNG、不参与通行/资源/碰撞计算。
@@ -18,7 +18,10 @@ use serde::{Deserialize, Serialize};
 /// 装饰 RNG 盐值："ACCNT01"
 pub const ACCENT_RNG_SALT: u64 = 0x4143_4345_4E54_3031;
 
-/// 装饰物种类。D-A 阶段实现 Tree/Boulder/Bush 三种。
+/// 装饰物种类。D-A 阶段实现 Tree/Boulder/Bush；★ D-B1-5 补齐 RockCluster/GrassTuft 生成。
+///
+/// 生成固定顺序（06 号文 §5.5）：Tree → Boulder → Bush → RockCluster → GrassTuft。
+/// 新增种类只允许追加在尾部，不得插入既有段之间（会改变 accent_rng 消费顺序）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccentKind {
     Tree = 0,
@@ -58,6 +61,11 @@ pub struct TerrainAccent {
 const BASE_TREE_COUNT: usize = 40;
 const BASE_BOULDER_COUNT: usize = 20;
 const BASE_BUSH_COUNT: usize = 25;
+/// ★ D-B1-5（06 号文 §5.5）：RockCluster / GrassTuft 基础目标数量。
+/// RockCluster 由前端按 anchor 派生 2–5 颗子石，内核只下发 anchor，数量宜少于 Boulder；
+/// GrassTuft 承担草甸辨识度，允许高密度。
+const BASE_ROCK_CLUSTER_COUNT: usize = 12;
+const BASE_GRASS_TUFT_COUNT: usize = 60;
 
 /// 候选点最大重试次数 = 3x 目标总数（防死循环）
 const MAX_RETRY_FACTOR: usize = 3;
@@ -82,7 +90,9 @@ pub fn generate_accents(
     let tree_count = ((BASE_TREE_COUNT as f32) * density).round() as usize;
     let boulder_count = ((BASE_BOULDER_COUNT as f32) * density).round() as usize;
     let bush_count = ((BASE_BUSH_COUNT as f32) * density).round() as usize;
-    let total_target = tree_count + boulder_count + bush_count;
+    let rock_cluster_count = ((BASE_ROCK_CLUSTER_COUNT as f32) * density).round() as usize;
+    let grass_tuft_count = ((BASE_GRASS_TUFT_COUNT as f32) * density).round() as usize;
+    let total_target = tree_count + boulder_count + bush_count + rock_cluster_count + grass_tuft_count;
     let max_retries = total_target * MAX_RETRY_FACTOR;
 
     let world_size = terrain.world_size;
@@ -187,6 +197,55 @@ pub fn generate_accents(
                 return rng.gen_range(0.0, 1.0) < 0.5;
             }
             false
+        },
+    );
+
+    // ★ D-B1-5（06 号文 §5.5）：RockCluster 生成（固定顺序第 4 段）
+    generate_accents_of_kind(
+        &mut accents,
+        &mut id_counter,
+        AccentKind::RockCluster,
+        rock_cluster_count,
+        max_retries,
+        terrain,
+        half_size,
+        &mut accent_rng,
+        |cell, rng| {
+            // 候选地表（§5.5 表）：RiverBank/RiverTerrace 卵石群，或坡度 ≥ 8° 的干地裸岩群。
+            // 内核只下发 anchor，2–5 颗子石由前端按 accent.id 派生（§5.5），
+            // 不为子石建实体、不改变碰撞/路面——本函数天然满足（纯视觉装饰）。
+            match cell.surface_kind {
+                SurfaceKind::RiverBank => rng.gen_range(0.0, 1.0) < 0.4,
+                SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.25,
+                SurfaceKind::DryGround => cell.slope_angle_deg >= 8.0,
+                _ => false,
+            }
+        },
+    );
+
+    // ★ D-B1-5（06 号文 §5.5）：GrassTuft 生成（固定顺序第 5 段）
+    generate_accents_of_kind(
+        &mut accents,
+        &mut id_counter,
+        AccentKind::GrassTuft,
+        grass_tuft_count,
+        max_retries,
+        terrain,
+        half_size,
+        &mut accent_rng,
+        |cell, rng| {
+            // 候选地表（§5.5 表）：DryGround/SoftGround/RiverTerrace 且坡度 < 24°；
+            // 深水/浅水/NO_WALK 已由 generate_accents_of_kind 外层禁区过滤排除。
+            // 草丛是纯视觉要素，不得被当作湿地/水源/可采资源（本层不写任何格子）。
+            if cell.slope_angle_deg >= 24.0 {
+                return false;
+            }
+            match cell.surface_kind {
+                SurfaceKind::DryGround => rng.gen_range(0.0, 1.0) < 0.8,
+                SurfaceKind::SoftGround => rng.gen_range(0.0, 1.0) < 0.9,
+                SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.7,
+                _ => false,
+            }
         },
     );
 

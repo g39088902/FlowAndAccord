@@ -55,8 +55,19 @@ impl TerrainMap {
         self.generate_with_profile(seed, &config.terrain_profile, config);
         self.hydrology = Hydrology::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY { self.generate_river(seed, config); }
+        // ★ D-B1（06号 §5.3 第 4–5 步钩子）：子特征注入规划与几何施加。
+        // 阶段一为空实现：不消费 RNG、不写任何格子，开关两态下世界输出逐字节等价；
+        // 选择器（mix64/roll_10000/固定盐值/互斥裁决）属 D-B1-3，完整阶段化流水线属阶段二。
+        if config.terrain_accent_sub_features {
+            // 空钩子占位（D-B1-3 接管）。
+        }
         // ★ v1.48.0 D-A：散布地表装饰（在地貌与水系生成完成后，避免装饰落入深水区）
         self.accents = super::accents::generate_accents(self, config.terrain_accent_density, seed);
+        // ★ D-B1（06号 §5.3 第 9 步钩子）：子特征专属装饰追加（hash 放点、不消费 accent_rng）。
+        // 阶段一为空实现，语义同第 4–5 步钩子。
+        if config.terrain_accent_sub_features {
+            // 空钩子占位（D-B1-3 接管）。
+        }
     }
     fn generate_river(&mut self, seed: u64, cfg: &SimConfig) {
         let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);

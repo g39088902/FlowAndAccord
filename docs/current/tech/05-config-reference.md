@@ -196,6 +196,7 @@
 | `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |
 | `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
 | `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
+| `terrainAccentSubFeatures` | bool | true | geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控) | ========================================================================== |
 
 ## 8. 四季更迭与宏观气候
 

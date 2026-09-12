@@ -33,7 +33,7 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.50.28";
+pub const SAVE_APP_VERSION: &str = "1.50.29";
 
 fn default_terrain_generator_version() -> u32 {
     TERRAIN_GENERATOR_VERSION
@@ -243,6 +243,8 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     // 地形按种子确定性重建（不消耗世界 RNG）
     let terrain = save.terrain_state;
     if terrain.profile != save.terrain_profile || terrain.generator_version != save.terrain_generator_version || terrain.cells.len()!=terrain.grid_width*terrain.grid_height { return Err("存档地形不一致".into()); }
+    // §5.2 稳定 ID 契约：加载时校验 sub_features 升序且唯一（D-B1-2）
+    terrain.validate_sub_features_sorted_unique()?;
 
     let mut world = World3DEngine {
         terrain,

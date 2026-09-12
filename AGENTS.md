@@ -65,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.28)"]
+    F --> G["浏览器 UI (版本: v1.50.29)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -120,7 +120,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.28`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.29`**。
 
 ---
 
@@ -154,7 +154,7 @@ node frontend/server.js           # http://localhost:3000
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
 □ 四处同步（M4）：快照字段变更时 snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 一致（门禁：node tools/test-snapshot-bin.js）
 □ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
-□ 配置联动：新增超参时 config.rs(const/字段/Default) + config.js + config-check.js 通过
+□ 配置联动：新增超参时 config.rs(字段+doc 注释) + config.js + examples/config.json + config-check.js 通过（含第 5 条「空转参数」消费点门禁）
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/01-changelog.md + 受影响的局部 AGENTS.md
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
@@ -262,7 +262,7 @@ FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「
 ### 4.12 🔧 超参集中化、配置校验与速查表（跨模块契约）
 
 - 全部 `SimConfig` 字段由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。
-- 新增超参须在 `config.rs` **三处**同步：命名 `const`（默认值唯一真相源）+ `SimConfig` 字段 + `Default` 映射。
+- 新增超参须**四处**同步：`config.rs` 增加 `SimConfig` 字段（含 doc 注释；v1.44.9 起 Rust 无 const/手写 Default，`#[derive(Default)]` 零值兑底，**默认值唯一真相源 = 前端 config.js**）+ `frontend/js/config.js` + `crates/sim_core/examples/config.json`（探针用）+ `tools/config-check.js` IMPACT_OVERRIDES 映射；内核必须有真实读取点——`config-check.js` 第 5 条「空转参数」规则拒绝零读取字段。
 - **文档化例外**：`decisionEvalOrder` / `decisionEvalLevels` 是「Rust 无顺序」字段——Rust 默认为空 Vec，权威值只存在于前端 `config.decision-order.js`；**严禁**在 Rust 侧写死策展优先级序列。
 - 防回归：`config-check.js` 与 `test-wasm.js` 双绿方为可发布状态；`./docs/current/tech/05-config-reference.md` **自动生成，勿手工维护**。
 

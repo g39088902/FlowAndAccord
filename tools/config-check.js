@@ -62,6 +62,8 @@ const IMPACT_OVERRIDES = {
   terrainRoadCorridorWidth: 'geo/terrain.rs / graph.rs (道路走廊宽度)',
   // ★ v1.48.0 D-A 装饰系统
   terrainAccentDensity: 'geo/accents.rs (装饰密度)',
+  // ★ D-B1 子特征注入总开关（06号 §5.3 第 4–5、9 步空钩子门控；选择器属 D-B1-3）
+  terrainAccentSubFeatures: 'geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控)',
 };
 
 const IMPACT_PREFIX_RULES = [

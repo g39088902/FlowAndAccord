@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "frozenAt": "2026-09-09T14:34:13.311Z",
+  "frozenAt": "2026-09-12T17:02:53.731Z",
   "frozenCommit": "af2d30e53810f4d625ce038cc846833549ab3b4a",
-  "targetWasmSha256": "0deae32e65b4d350630af7005b28269bfe5006b2f74bdeedbc135035d90e8b6c",
+  "targetWasmSha256": "74e0c4476e7d752e2269e3b9b88723567c1afc151fca3e982118f2a698093448",
   "sourceDigests": {
     "crates/sim_core/src/spatial/decisions/intent.rs": "37586b5ab7910184cecc65259aa6be0d366ad6ed8e2e511be91c7cb6ef6fb991",
-    "crates/sim_core/src/spatial/decisions/strategy.rs": "e7885790d573141996058eaa39d860228b5776bb290590eb37f72a614bf206bf",
+    "crates/sim_core/src/spatial/decisions/strategy.rs": "c58ffa769ff021fd358e4f740cf36cfef3e37819a11d0753f1fd1fcb1eb31b0f",
     "crates/sim_core/src/spatial/decisions/primitive.rs": "972932df8f6205c577737ca543b011cd867b25e39c6720f21d0b6d8e2eec70f5",
     "crates/sim_core/src/spatial/decisions/observation.rs": "35746f65e0a64e4fb9d144d905d49873d4c670e30aa23b706c2a6a61996e6e8e",
-    "crates/sim_core/src/spatial/decisions/branches.rs": "cd33444f397cb7da5fd23908fc1b780f7fc24def6aecb72b618405e52911bed2",
-    "crates/sim_core/src/spatial/decisions/evaluate.rs": "c0f36b7d0c15f4634fc3a6750797fa001277dd77173cabe5573e7ef1f968669b",
+    "crates/sim_core/src/spatial/decisions/branches.rs": "55de48fe0da6b9d1457fa8571822943f8e02ff2affa0b4cbbfa8f6ec7ec43d41",
+    "crates/sim_core/src/spatial/decisions/evaluate.rs": "51d1cc6af15f84677252adbb1b86a232a58c6d33e6797268c0e7a862c527fc0f",
     "crates/sim_core/src/spatial/agent.rs": "ac996754479ba4ace2eb86f4ede0ef31cfe598b938b3d17ae75aa8841ca2bcd3",
     "crates/sim_core/src/spatial/world_tick.rs": "a773bdde04616fd29c36276c9f4536af22e0dae09c227cbd59b15b484d738cdd",
-    "crates/sim_wasm/src/lib.rs": "8d7a0b566440ee58b979ec54ab0dbad77e8b9e48f603b06e79aabaee4afdfc78",
-    "frontend/rust/sim_wasm.wasm": "0deae32e65b4d350630af7005b28269bfe5006b2f74bdeedbc135035d90e8b6c"
+    "crates/sim_wasm/src/lib.rs": "cff4d32310212c1b176ccda50e69e88fdba4eb3e95d83891c1fbe40fcea13171",
+    "frontend/rust/sim_wasm.wasm": "74e0c4476e7d752e2269e3b9b88723567c1afc151fca3e982118f2a698093448"
   },
   "toolchain": {
-    "node": "v24.20.0",
+    "node": "v22.22.2",
     "platform": "win32",
     "arch": "x64"
   },
@@ -77,12 +77,12 @@
     "gridRes": 120,
     "worldSize": 764,
     "initialAgents": 20,
-    "saveHash1800": "8598ec4a332ed4bc3a30ed35457036d7ddaeab0ce24e9dfb40395b9cddf8d1f7",
-    "saveSize1800": 2355345,
-    "saveHash3600": "299dc3c2b0cc5ca2e82a4b7c6ae3a314c8c0b367d6fe1c333b6d918ece4cd01b",
-    "saveSize3600": 2358787,
-    "snapshotHash3600": "e366dad3e306e05dc8c37ad2f2eee068c2d2cbc881b178b4a2b71a442f5c3b89",
-    "snapshotSize3600": 325684
+    "saveHash1800": "b4401e153048edaef78b280d2e5718d3760e928bd0234fa872ea571574ba7b90",
+    "saveSize1800": 2382857,
+    "saveHash3600": "6087e36986e197a779d18676d2b4e0f8c4178e19d5102c58781a4eb8be161b3c",
+    "saveSize3600": 2386299,
+    "snapshotHash3600": "a4dd3aaab7cc294b195d19ca0ab52cacd59344d3ec64b99c0ec8246a54149a45",
+    "snapshotSize3600": 332444
   },
-  "configFieldsCount": 237
+  "configFieldsCount": 233
 }

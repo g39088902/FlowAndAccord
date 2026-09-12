@@ -7,5 +7,5 @@ pub mod accents;
 
 pub use biome::{GeoCell, SurfaceKind};
 pub use query::{explain_failure, sample_cell, validate_footprint, FootprintQuery, LandUseKind, TerrainFailure, TerrainQueryResult};
-pub use terrain::{TerrainFeature, TerrainFeatureKind, TerrainMap, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY};
+pub use terrain::{TerrainFeature, TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY};
 pub use accents::{AccentKind, TerrainAccent, ACCENT_RNG_SALT};

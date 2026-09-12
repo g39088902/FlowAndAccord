@@ -878,7 +878,7 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 18 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 232）：
+✅ 已落地 19 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 233）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
@@ -899,20 +899,22 @@ render_agents.js        族人绘制                                            
 ✅ terrainFootprintHalfExtent 7.0                 房屋基础占地半尺寸 (m)
 ✅ terrainRoadCorridorWidth   5.0                 道路合法走廊宽度 (m)
 ✅ terrainAccentDensity       1.0                 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
+✅ terrainAccentSubFeatures   true                子特征注入总开关（D-B1 空钩子门控；置 false 时 06号 §5.3 第 4–5、9 步为空）
 ```
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 232）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 233）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
-- ⚠️ **已删除的地形字段**（v1.50.18 死代码审计，勿再引用）：`terrainRidgeWidth`（山脊/河谷影响宽度，
-  T1 主脊已改走 `terrainPassRidgeWidth`）、`terrainGenerationMaxRetries`（有界重试）、
-  `terrainAccentSubFeatures`（D-B 子特征注入总开关）、`terrainTreeSeasonTint`（树木季节变色开关）——
-  四者在内核**零读取点**，已从 `config.rs` / `config.js` / `examples/config.json` 三处同步删除，字段总数 242 → 231 → 232（v1.50.19 新增 `terrainGridRes`）。
-  后三项同时是 `docs/plan/tech/06-terrain-templates.md` 中 D-B 蓝图的**预留占位**：若 D-B 继续执行，
-  须在实现时把字段**连同唯一消费点一起加回**（`tools/config-check.js` 第 5 条「空转参数」规则会拒绝无消费点的字段）。
-  树木季节变色**不依赖**该开关——自 2026-09-12 起由前端 `SimTreeTint` 按季节派生（见 §7.4 与本节 Tree 条目）。
+- ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
+  T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；
+  `terrainGenerationMaxRetries`（有界重试）待阶段二**连同消费点加回**（06号 R.5）。
+  `terrainAccentSubFeatures`（子特征注入总开关）已于 v1.50.29 由 D-B1-1 **连同唯一消费点加回**（见上表；
+  消费点 = `geo/hydrology.rs::generate_with_config` 的 06号 §5.3 第 4–5、9 步空钩子门控）。
+  历史：v1.50.18 曾以「内核零读取点（空转配置）」为由删除 4 个地形字段（`config.rs` / `config.js` / `examples/config.json` 三处同步，字段总数 242 → 231 → 232，v1.50.19 新增 `terrainGridRes`）；
+  `tools/config-check.js` 第 5 条「空转参数」规则会拒绝任何无消费点的字段——加回字段必须连同真实读取点。
+  树木季节变色**不依赖**任何配置开关——自 2026-09-12 起由前端 `SimTreeTint` 按季节派生（见 §7.4 与本节 Tree 条目）。
 - ⚠️ **本表的字段清单由门禁守护**：`tools/config-check.js` 第 6 条规则（2026-09-12 新增）会把本节
   ```text 代码块中的字段名与 `frontend/js/config.js` 的 `terrain*` 键做**双向比对**，
   出现幽灵字段（文档写了但已删）或漏列字段即报错——修完本表当次即已接入。
