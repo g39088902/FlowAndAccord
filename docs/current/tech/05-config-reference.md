@@ -309,3 +309,7 @@
 | `houseAuctionCrownShareWeight` | f32 | 1 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额) |
 | `houseAuctionBenchmarkDecayRate` | f32 | 0.02 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭 |
 | `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
+
+## ⚠ 校验错误
+
+- 14-terrain-and-network.md: 未定位到 §16「已落地 N 个仿真字段」+ text 代码块——若文档结构调整，请同步本门禁的匹配式

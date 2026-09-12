@@ -14,6 +14,9 @@
 // - 细节分级：按冠部投影像素尺寸分近/中/远三档（accentDetailNearPx/MidPx），
 //   远景只保留树形与叶量，中景画主枝，近景加二级枝、簇高光与春芽（TA-07 再做滞回）。
 // - 受光：本任务沿用既有左上柔光亮部；世界光向动态受光（法线点积）属 TA-04。
+// - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
+//   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
+//   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
 //
 // 职责分工（§6.7）：
 // - accent-season.js：季相与物种曲线（window.SimTreeTint 唯一生产者）
@@ -173,6 +176,13 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 
   // 叶簇：按 leafDensity × shed 次序收缩隐藏（§6.4）；色差随 brownness 加深（秋色簇间先后）
+  // ★ v1.50.27 漫画风两遍式树冠（用户反馈「内部簇间深描边太重」）：
+  //   旧画法逐簇「深色 rim 椭圆 + 本体椭圆」，相邻簇叠压处 rim 压在邻簇本体上，
+  //   冠内全是深色分界线，整冠读作一堆描边气泡。新画法：
+  //   Pass A 树冠剪影——全部可见簇先用同一「冠影色」（叶色压暗偏冷）扩边铺底，
+  //   重叠合并成一整块剪影，深色只留在整冠外缘一圈与簇间空隙（读作冠内阴影）；
+  //   Pass B 逐簇本体——基色 + lite 色差，再乘冠内体积明暗（下暗上亮、远暗近亮），
+  //   用体积分档替代描边提供立体感；近景高光只给冠层上半部。
   const lw = Math.max(0.4, 0.5 * scaled);
   const fade = 0.09;
   const jitterAmp = 6 + 26 * brown;
@@ -185,28 +195,57 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     if (p.y < -40 || p.y > h + 40) continue; // 簇级视口剔除
     const rr = c.r * scaled * v;
     if (rr < 0.5) continue;
-    items.push({ p: p, c: c, rr: rr });
+    items.push({ p: p, c: c, rr: rr, v: v });
   }
   items.sort(function (a, b) { return a.p.d - b.p.d; }); // 簇间画家排序：远 → 近
+
+  // 冠内体积明暗基准：对整副骨架（非当帧可见簇）求 z / 投影深度范围——
+  // 秋季掉叶时幸存簇的明暗不随可见集跳变；纯 id 派生，读档/回溯逐位一致
+  let zLo = Infinity, zHi = -Infinity, dLo = Infinity, dHi = -Infinity;
+  for (let i = 0; i < sk.clusters.length; i++) {
+    const c = sk.clusters[i];
+    if (c.z < zLo) zLo = c.z;
+    if (c.z > zHi) zHi = c.z;
+    const pd = proj(c.x, c.y, c.z).d;
+    if (pd < dLo) dLo = pd;
+    if (pd > dHi) dHi = pd;
+  }
+  const zSpan = Math.max(0.001, zHi - zLo);
+  const dSpan = Math.max(0.001, dHi - dLo);
+
+  // Pass A：树冠剪影——单 path 全簇一次填充（重叠即并集，零簇间分界线）；
+  // 扩边随簇半径（外缘云边厚度均匀，小簇空隙也被填满）；冠影色 = 叶色压暗偏冷
+  ctx.fillStyle = 'rgb(' +
+    Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4)) + ',' +
+    Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
+    Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
+  ctx.beginPath();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const sw = lw + it.rr * 0.16;
+    ctx.moveTo(it.p.x + it.rr + sw, it.p.y);
+    ctx.ellipse(it.p.x, it.p.y, it.rr + sw, it.rr * 0.78 + sw, 0, 0, Math.PI * 2);
+  }
+  ctx.fill();
+
+  // Pass B：簇本体（基色 + lite 色差，再乘冠内体积明暗）
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const j = (it.c.lite - 0.5) * 2 * jitterAmp;
-    const col = season.leafColor.map(function (c) { return Math.max(0, Math.min(255, c + j)); });
-    const rim = 'rgb(' + Math.round(col[0] * 0.55) + ',' + Math.round(col[1] * 0.55) + ',' + Math.round(col[2] * 0.55) + ')';
-    const base = 'rgb(' + Math.round(col[0]) + ',' + Math.round(col[1]) + ',' + Math.round(col[2]) + ')';
-    // Pass A：暗轮廓 —— 只留一圈细线分离背景与簇间空隙
-    ctx.fillStyle = rim;
-    ctx.beginPath();
-    ctx.ellipse(it.p.x, it.p.y, it.rr + lw, it.rr * 0.78 + lw, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Pass B：主体
-    ctx.fillStyle = base;
+    const tZ = (it.c.z - zLo) / zSpan;   // 冠内高度 0 底 → 1 顶
+    const tD = (it.p.d - dLo) / dSpan;   // 投影深度 0 远 → 1 近
+    const k = (0.80 + 0.20 * tZ) * (0.90 + 0.10 * tD);
+    ctx.fillStyle = 'rgb(' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[0] + j) * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[1] + j) * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[2] + j) * k))) + ')';
     ctx.beginPath();
     ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Pass C（近景）：柔和高光让簇顶从形体里再亮一档（固定亮部待 TA-04 换世界光向）
-    if (detailNear && it.rr > 2.2) {
-      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.20 * it.v).toFixed(3) + ')';
+    // 近景高光：只给冠层上半部（阳光自上而来）。旧版 `0.20 * it.v` 的 it.v
+    // 未入 items 恒为 NaN → fillStyle 赋值被忽略、高光实际从未生效，本版顺带修复
+    if (detailNear && it.rr > 2.2 && tZ > 0.30) {
+      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.20 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
       ctx.ellipse(it.p.x - it.rr * 0.28, it.p.y - it.rr * 0.42, it.rr * 0.42, it.rr * 0.30, -0.4, 0, Math.PI * 2);
       ctx.fill();
@@ -315,6 +354,8 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 
   // 叶簇：同 Tree 的脱落/色差/排序规则，扁压 squash 让簇丛贴地
+  // ★ v1.50.27 与 Tree 同步改两遍式剪影 + 体积明暗（去逐簇深描边），并修复
+  //   旧版高光 `0.18 * it.v` 的 it.v 未入 items 恒 NaN、高光从未生效的问题
   const lw = Math.max(0.4, 0.45 * scaled);
   const fade = 0.09;
   const jitterAmp = 6 + 26 * brown;
@@ -326,25 +367,53 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const p = proj(c.x, c.y, c.z);
     const rr = c.r * scaled * v;
     if (rr < 0.5) continue;
-    items.push({ p: p, c: c, rr: rr });
+    items.push({ p: p, c: c, rr: rr, v: v });
   }
   items.sort(function (a, b) { return a.p.d - b.p.d; });
+
+  // 冠内体积明暗基准（同 Tree：整副骨架求范围，秋季幸存簇明暗不随可见集跳变）
+  let zLo = Infinity, zHi = -Infinity, dLo = Infinity, dHi = -Infinity;
+  for (let i = 0; i < sk.clusters.length; i++) {
+    const c = sk.clusters[i];
+    if (c.z < zLo) zLo = c.z;
+    if (c.z > zHi) zHi = c.z;
+    const pd = proj(c.x, c.y, c.z).d;
+    if (pd < dLo) dLo = pd;
+    if (pd > dHi) dHi = pd;
+  }
+  const zSpan = Math.max(0.001, zHi - zLo);
+  const dSpan = Math.max(0.001, dHi - dLo);
+
+  // Pass A：统一冠影色剪影（重叠即并集）
+  ctx.fillStyle = 'rgb(' +
+    Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4)) + ',' +
+    Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
+    Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
+  ctx.beginPath();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const sw = lw + it.rr * 0.16;
+    ctx.moveTo(it.p.x + it.rr + sw, it.p.y);
+    ctx.ellipse(it.p.x, it.p.y, it.rr + sw, it.rr * 0.72 + sw, 0, 0, Math.PI * 2);
+  }
+  ctx.fill();
+
+  // Pass B：簇本体 + 冠内体积明暗
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const j = (it.c.lite - 0.5) * 2 * jitterAmp;
-    const col = season.leafColor.map(function (c) { return Math.max(0, Math.min(255, c + j)); });
-    const rim = 'rgb(' + Math.round(col[0] * 0.55) + ',' + Math.round(col[1] * 0.55) + ',' + Math.round(col[2] * 0.55) + ')';
-    const base = 'rgb(' + Math.round(col[0]) + ',' + Math.round(col[1]) + ',' + Math.round(col[2]) + ')';
-    ctx.fillStyle = rim;
-    ctx.beginPath();
-    ctx.ellipse(it.p.x, it.p.y, it.rr + lw, it.rr * 0.72 + lw, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = base;
+    const tZ = (it.c.z - zLo) / zSpan;
+    const tD = (it.p.d - dLo) / dSpan;
+    const k = (0.80 + 0.20 * tZ) * (0.90 + 0.10 * tD);
+    ctx.fillStyle = 'rgb(' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[0] + j) * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[1] + j) * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, (season.leafColor[2] + j) * k))) + ')';
     ctx.beginPath();
     ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
     ctx.fill();
-    if (detailNear && it.rr > 2.0) {
-      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.18 * it.v).toFixed(3) + ')';
+    if (detailNear && it.rr > 2.0 && tZ > 0.30) {
+      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.18 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
       ctx.ellipse(it.p.x - it.rr * 0.28, it.p.y - it.rr * 0.40, it.rr * 0.40, it.rr * 0.28, -0.4, 0, Math.PI * 2);
       ctx.fill();
