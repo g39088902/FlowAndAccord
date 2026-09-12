@@ -82,4 +82,7 @@ window.RENDER_CONFIG = {
   accentLeafClustersTree: 16, // 每棵树稳定叶簇数（§6.4 建议 12~24；由 id 派生，不进快照）
   accentLeafClustersBush: 8,  // 每丛灌木稳定叶簇数（基生细茎端 + 茎中段）
   accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希常绿变体比例（TA-06 前过渡）
+
+  // —— 世界光向动态受光（TA-04，lighting.js 消费）——
+  sunScreenEps: 0.02,         // 屏幕光心退化半径：光向接近视线（投影 len < eps）时亮部按 len/eps 平滑回冠心（lighting.js::sunScreenDirFull，TA-04-1 迁入）
 };

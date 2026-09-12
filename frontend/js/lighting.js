@@ -279,18 +279,23 @@ window.SimLighting = (function () {
 
   // Accent 等纯表现层的材质受光入口。它直接消费当前世界光向、环境光、强度和色温，
   // 不复用 shadeFace 的旧光归一化逻辑，避免把房屋的历史兼容策略带进植被材质。
-  function shadeRgb(rgb, nx, ny, nz) {
+  // ★ TA-04-2 零分配变体 shadeRgbInto：结果写入调用方复用的 out（逐簇/逐面高频受光
+  //   路径），公式与 shadeRgb 完全同源——法线归一化 → wrap 柔和漫反射 → ambient/intensity
+  //   → tint 色温；法线须经模型变换（含剪切逆转置）转到世界空间后传入。
+  function shadeRgbInto(rgb, nx, ny, nz, out) {
     const c = cfg();
     const len = Math.hypot(nx, ny, nz) || 1;
-    nx /= len; ny /= len; nz /= len;
-    const dot = clamp(nx * S.lx + ny * S.ly + nz * S.lz, -1, 1);
+    const dot = clamp((nx / len) * S.lx + (ny / len) * S.ly + (nz / len) * S.lz, -1, 1);
     const diffuse = clamp((dot + c.wrap) / (1 + c.wrap), 0, 1);
     const k = clamp((S.ambient + (1 - S.ambient) * diffuse) * S.intensity, c.lightMin, c.lightMax);
-    return [
-      clamp(Math.round(rgb[0] * k * S.tint[0]), 0, 255),
-      clamp(Math.round(rgb[1] * k * S.tint[1]), 0, 255),
-      clamp(Math.round(rgb[2] * k * S.tint[2]), 0, 255),
-    ];
+    out[0] = clamp(Math.round(rgb[0] * k * S.tint[0]), 0, 255);
+    out[1] = clamp(Math.round(rgb[1] * k * S.tint[1]), 0, 255);
+    out[2] = clamp(Math.round(rgb[2] * k * S.tint[2]), 0, 255);
+    return out;
+  }
+
+  function shadeRgb(rgb, nx, ny, nz) {
+    return shadeRgbInto(rgb, nx, ny, nz, [0, 0, 0]);
   }
 
   // 相机参数来自 main.js 的全局词法绑定 `camera`（非 window 属性），仅在渲染期调用
@@ -330,19 +335,24 @@ window.SimLighting = (function () {
   // screenY = (Lx·sinZ + Ly·cosZ)·cosX − Lz·sinX。
   // sunScreenDir() 只投影水平分量（Lz 不参与、无回退），不能原样作为立体树冠
   // 亮部位置。光源接近视线方向时投影长度趋零，直接归一化会产生抖动/跳变——
-  // 本函数在 len < SUN_SCREEN_EPS 时把方向按 len/EPS 平滑衰减回零（亮部回到冠心、偏移为 0），
+  // 本函数在 len < eps 时把方向按 len/eps 平滑衰减回零（亮部回到冠心、偏移为 0），
   // 调用方无需分支：渐变光心 = (cx + x·r, cy + y·r)，r 为光心距冠心半径。
-  const SUN_SCREEN_EPS = 0.02; // 退化视角半径（∠光与视线 < ~1.1° 内回冠心；TA-04-7 统一入 config.render.js）
+  // eps 迁入 RENDER_CONFIG.sunScreenEps（TA-04-2），缺省回退与原局部常量一致。
+  function sunScreenEps() {
+    const v = window.RENDER_CONFIG && window.RENDER_CONFIG.sunScreenEps;
+    return (Number.isFinite(v) && v > 0) ? v : 0.02;
+  }
   function sunScreenDirFull() {
     const cam = camRef();
+    const eps = sunScreenEps();
     const cosZ = Math.cos(cam.rotZ || 0), sinZ = Math.sin(cam.rotZ || 0);
     const cosX = Math.cos(cam.rotX || 0), sinX = Math.sin(cam.rotX || 0);
     const sx = S.lx * cosZ - S.ly * sinZ;
     const sy = (S.lx * sinZ + S.ly * cosZ) * cosX - S.lz * sinX;
     const len = Math.hypot(sx, sy);
-    if (len < SUN_SCREEN_EPS) {
+    if (len < eps) {
       if (len < 1e-9) return { x: 0, y: 0, len: len, valid: false };
-      const f = len / SUN_SCREEN_EPS;
+      const f = len / eps;
       return { x: (sx / len) * f, y: (sy / len) * f, len: len, valid: false };
     }
     return { x: sx / len, y: sy / len, len: len, valid: true };
@@ -374,6 +384,7 @@ window.SimLighting = (function () {
     sunScreenDirFull,
     shadeFace,
     shadeRgb,
+    shadeRgbInto,
     lastMs: () => S.lastMs,
     relightCount: () => S.relightCount,
     // 时间跳变（读档 / 重置 / 时光倒流 / 无头恢复）后立即对齐，不做平滑

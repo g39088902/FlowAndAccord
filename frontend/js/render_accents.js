@@ -13,7 +13,12 @@
 //   **严禁整冠透明度**（§6.4 红线）；枝条全年保留——冬季裸枝清晰（落叶树余 0~5% 叶量）。
 // - 细节分级：按冠部投影像素尺寸分近/中/远三档（accentDetailNearPx/MidPx），
 //   远景只保留树形与叶量，中景画主枝，近景加二级枝、簇高光与春芽（TA-07 再做滞回）。
-// - 受光：本任务沿用既有左上柔光亮部；世界光向动态受光（法线点积）属 TA-04。
+// - 受光：★ TA-04-2（v1.50.33）法线点积管线接入——叶簇/岩面颜色固定走
+//   「季节基础色 → SimLighting 漫反射+环境光（法线点积，公式单一来源 shadeRgbInto）→
+//   intensity/tint 色温」；冠内体积/AO 分档只保留与视角无关的 tZ 档，投影深度 tD
+//   不再参与明暗（同一世界表面转相机不变色）。枝干侧面明暗（TA-04-3）、叶簇渐变亮部
+//   与固定白斑移除（TA-04-4）、岩石 billboard 几何随相机细化（TA-04-5）后续接入；
+//   GrassTuft 不在本任务受光范围（§6.5：保留季相短草线，不新增立体法线）。
 // - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
 //   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
@@ -51,6 +56,26 @@ function _reportUnknownAccent(kind) {
       console.warn('[render_accents] 未注册装饰种类（已跳过，不按既有类型错画）:', parts.join(', '));
     }
   }
+}
+
+// ★ TA-04-2 世界光向受光唯一入口（公式单一来源 = lighting.js::shadeRgbInto，本层不复制光照公式）：
+// 基础色 → 漫反射+环境光（法线点积）→ intensity/tint 色温，再乘与视角无关的体积/AO 系数 kAo
+// 出 fill 色。基色/out 数组模块级复用（逐簇高频路径零分配）；SimLighting 缺席时退回基色
+// （加载顺序已保证，仅防御）。法线须经模型变换（含剪切逆转置）转到世界空间后传入，内部再归一化。
+var _litBase = [0, 0, 0];
+var _litOut = [0, 0, 0];
+function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo) {
+  const SL = window.SimLighting;
+  if (SL && SL.shadeRgbInto) {
+    _litBase[0] = baseR; _litBase[1] = baseG; _litBase[2] = baseB;
+    SL.shadeRgbInto(_litBase, nx, ny, nz, _litOut);
+  } else {
+    _litOut[0] = baseR; _litOut[1] = baseG; _litOut[2] = baseB;
+  }
+  const r = Math.max(0, Math.min(255, Math.round(_litOut[0] * kAo)));
+  const g = Math.max(0, Math.min(255, Math.round(_litOut[1] * kAo)));
+  const b = Math.max(0, Math.min(255, Math.round(_litOut[2] * kAo)));
+  return 'rgb(' + r + ', ' + g + ', ' + b + ')';
 }
 
 function drawAccentEntity(accent) {
@@ -233,19 +258,16 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
   items.sort(function (a, b) { return a.p.d - b.p.d; }); // 簇间画家排序：远 → 近
 
-  // 冠内体积明暗基准：对整副骨架（非当帧可见簇）求 z / 投影深度范围——
-  // 秋季掉叶时幸存簇的明暗不随可见集跳变；纯 id 派生，读档/回溯逐位一致
-  let zLo = Infinity, zHi = -Infinity, dLo = Infinity, dHi = -Infinity;
+  // 冠内体积/AO 分档基准：对整副骨架（非当帧可见簇）求 z 范围——
+  // 秋季掉叶时幸存簇的明暗不随可见集跳变；纯 id 派生，读档/回溯逐位一致。
+  // ★ TA-04-2：投影深度 tD 不再参与明暗（同一世界表面转相机不变色），只留与视角无关的 tZ 档
+  let zLo = Infinity, zHi = -Infinity;
   for (let i = 0; i < sk.clusters.length; i++) {
     const c = sk.clusters[i];
     if (c.z < zLo) zLo = c.z;
     if (c.z > zHi) zHi = c.z;
-    const pd = proj(c.x, c.y, c.z).d;
-    if (pd < dLo) dLo = pd;
-    if (pd > dHi) dHi = pd;
   }
   const zSpan = Math.max(0.001, zHi - zLo);
-  const dSpan = Math.max(0.001, dHi - dLo);
 
   // Pass A：树冠剪影——单 path 全簇一次填充（重叠即并集，零簇间分界线）；
   // 扩边随簇半径（外缘云边厚度均匀，小簇空隙也被填满）；冠影色 = 叶色压暗偏冷
@@ -262,22 +284,21 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
   ctx.fill();
 
-  // Pass B：簇本体（基色 + lite 色差，再乘冠内体积明暗）
+  // Pass B：簇本体（基色 + lite 色差，再乘冠内体积/AO 分档 × 世界光向受光）
+  // ★ TA-04-2 颜色管线：季节基础色 → 漫反射+环境光（簇法线点积，accentLitFill 单一入口）
+  //   → intensity/tint 色温；体积分档只留与视角无关的 tZ（tD 已移除，转相机不变色）
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const j = (it.c.lite - 0.5) * 2 * jitterAmp;
-    const tZ = (it.c.z - zLo) / zSpan;   // 冠内高度 0 底 → 1 顶
-    const tD = (it.p.d - dLo) / dSpan;   // 投影深度 0 远 → 1 近
-    const k = (0.80 + 0.20 * tZ) * (0.90 + 0.10 * tD);
-    ctx.fillStyle = 'rgb(' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[0] + j) * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[1] + j) * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[2] + j) * k))) + ')';
+    const tZ = (it.c.z - zLo) / zSpan;   // 冠内高度 0 底 → 1 顶（体积/AO 档）
+    const kZ = 0.80 + 0.20 * tZ;
+    // 簇法线（模型层冠包络外向法线）经倾干剪切逆转置补偿转到世界空间
+    const wn = window.AccentModel.shearNormal(it.c.nx, it.c.ny, it.c.nz, leanShear);
+    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, wn.x, wn.y, wn.z, kZ);
     ctx.beginPath();
     ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 近景高光：只给冠层上半部（阳光自上而来）。旧版 `0.20 * it.v` 的 it.v
-    // 未入 items 恒为 NaN → fillStyle 赋值被忽略、高光实际从未生效，本版顺带修复
+    // 近景高光：只给冠层上半部（阳光自上而来）。★ 属屏幕固定位置，TA-04-4 改由世界光向投影驱动
     if (detailNear && it.rr > 2.2 && tZ > 0.30) {
       ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.20 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
@@ -307,8 +328,12 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
   // ★ v1.50.13 锚点修正：七边形原以 (sx,sy) 为中心，下半岩体沉入地表之下被近处格子盖掉
   //   （「石头半截入土」）。改为底边贴锚点：整体上移 r（多边形最大下探 0.72rVar+0.18r ≈ 1.04r）。
   const cy = sy - r;
+  // ★ TA-04-2：两笔石面改走世界光向受光管线——顶面法线朝上，侧面取个体稳定世界方向
+  //   （accent.rotation 水平角 + 下倾 0.45），亮暗随光向/色温变化，不再固定顶亮侧暗；
+  //   屏幕 billboard 几何与随相机的法线细化归 TA-04-5（§6.5：亮暗由面朝向与光向决定）。
+  const snx = Math.cos(rot), sny = Math.sin(rot);
   // 阴影底层（深灰，略偏右下）
-  ctx.fillStyle = 'rgb(78, 74, 68)';
+  ctx.fillStyle = accentLitFill(78, 74, 68, snx, sny, -0.45, 1);
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     const angle = rot + (i / sides) * Math.PI * 2;
@@ -320,7 +345,7 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
   ctx.closePath();
   ctx.fill();
   // 顶面（浅灰白色）
-  ctx.fillStyle = 'rgb(152, 146, 138)';
+  ctx.fillStyle = accentLitFill(152, 146, 138, 0, 0, 1, 1);
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     const angle = rot + (i / sides) * Math.PI * 2;
@@ -405,18 +430,15 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
   items.sort(function (a, b) { return a.p.d - b.p.d; });
 
-  // 冠内体积明暗基准（同 Tree：整副骨架求范围，秋季幸存簇明暗不随可见集跳变）
-  let zLo = Infinity, zHi = -Infinity, dLo = Infinity, dHi = -Infinity;
+  // 冠内体积/AO 分档基准（同 Tree：整副骨架求范围，秋季幸存簇明暗不随可见集跳变；
+  // ★ TA-04-2 起投影深度 tD 不参与明暗，只留与视角无关的 tZ 档）
+  let zLo = Infinity, zHi = -Infinity;
   for (let i = 0; i < sk.clusters.length; i++) {
     const c = sk.clusters[i];
     if (c.z < zLo) zLo = c.z;
     if (c.z > zHi) zHi = c.z;
-    const pd = proj(c.x, c.y, c.z).d;
-    if (pd < dLo) dLo = pd;
-    if (pd > dHi) dHi = pd;
   }
   const zSpan = Math.max(0.001, zHi - zLo);
-  const dSpan = Math.max(0.001, dHi - dLo);
 
   // Pass A：统一冠影色剪影（重叠即并集）
   ctx.fillStyle = 'rgb(' +
@@ -432,20 +454,17 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
   ctx.fill();
 
-  // Pass B：簇本体 + 冠内体积明暗
+  // Pass B：簇本体 + 冠内体积/AO 分档 × 世界光向受光（★ TA-04-2，同 Tree 管线；灌木无倾干）
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const j = (it.c.lite - 0.5) * 2 * jitterAmp;
     const tZ = (it.c.z - zLo) / zSpan;
-    const tD = (it.p.d - dLo) / dSpan;
-    const k = (0.80 + 0.20 * tZ) * (0.90 + 0.10 * tD);
-    ctx.fillStyle = 'rgb(' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[0] + j) * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[1] + j) * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, (season.leafColor[2] + j) * k))) + ')';
+    const kZ = 0.80 + 0.20 * tZ;
+    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, it.c.nx, it.c.ny, it.c.nz, kZ);
     ctx.beginPath();
     ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
     ctx.fill();
+    // 近景高光属屏幕固定位置，TA-04-4 改由世界光向投影驱动
     if (detailNear && it.rr > 2.0 && tZ > 0.30) {
       ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.18 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
@@ -474,13 +493,15 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     };
   }
 
-  // 岩面个体色差：lite 通道小幅整体明暗（±10），保持 Boulder 低饱和灰岩色板（§4.1）
-  function stoneTone(lite, base) {
+  // 岩面个体色差：lite 通道小幅整体明暗（±10），保持 Boulder 低饱和灰岩色板（§4.1）。
+  // ★ TA-04-2 起底色只承载个体色差（基础色），受光统一经 accentLitFill 走世界光向管线
+  function stoneBase(lite, base) {
     const k = (lite - 0.5) * 20;
-    return 'rgb(' +
-      Math.max(0, Math.min(255, Math.round(base[0] + k))) + ',' +
-      Math.max(0, Math.min(255, Math.round(base[1] + k))) + ',' +
-      Math.max(0, Math.min(255, Math.round(base[2] + k))) + ')';
+    return [
+      Math.max(0, Math.min(255, base[0] + k)),
+      Math.max(0, Math.min(255, base[1] + k)),
+      Math.max(0, Math.min(255, base[2] + k)),
+    ];
   }
 
   // 贴地接触投影：簇底一整片弱椭圆（先画，被子石压住）
@@ -510,8 +531,12 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     if (r < 0.6) continue; // 微碎石在远景不可辨，直接省略
     // 底边贴落地点：中心上抬 0.72r（同 Boulder 屏幕纵压比），再压暗底色
     const cy = it.g.y - r * 0.72;
-    // 底层（深灰，略偏背光侧）
-    ctx.fillStyle = stoneTone(st.lite, [78, 74, 68]);
+    // 底层（深灰，略偏背光侧）。★ TA-04-2：侧面法线取子石稳定世界方向（st.rot 水平角 + 下倾）；
+    //   billboard 屏幕几何与随相机的法线细化归 TA-04-5
+    const sb = stoneBase(st.lite, [78, 74, 68]);
+    const sTop = stoneBase(st.lite, [152, 146, 138]);
+    const snx = Math.cos(st.rot), sny = Math.sin(st.rot);
+    ctx.fillStyle = accentLitFill(sb[0], sb[1], sb[2], snx, sny, -0.45, 1);
     ctx.beginPath();
     for (let k = 0; k < sides; k++) {
       const angle = st.rot + (k / sides) * Math.PI * 2;
@@ -522,8 +547,8 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     }
     ctx.closePath();
     ctx.fill();
-    // 顶面（浅灰白）
-    ctx.fillStyle = stoneTone(st.lite, [152, 146, 138]);
+    // 顶面（浅灰白，法线朝上；亮暗随光向变化）
+    ctx.fillStyle = accentLitFill(sTop[0], sTop[1], sTop[2], 0, 0, 1, 1);
     ctx.beginPath();
     for (let k = 0; k < sides; k++) {
       const angle = st.rot + (k / sides) * Math.PI * 2;

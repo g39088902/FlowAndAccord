@@ -14,6 +14,10 @@
 //   不改碰撞/路面**；GrassTuft = 3–6 根短草线骨架，颜色由绘制层按当前季节派生
 //   （同 Tree：SimTreeTint，不读存档 tint，见 14 号 §7.4）。
 //
+// ★ TA-04-2（v1.50.33）世界光向受光的法线几何：叶簇冠包络外向法线（attachCrownNormals，
+//   椭球梯度归一化，id 纯函数入骨架缓存）+ 倾干剪切逆转置变换 shearNormal（依赖
+//   accent.rotation，由绘制层每帧施加）；受光公式单一来源仍归 lighting.js。
+//
 // 契约（frontend/AGENTS.md §5.11 / 07-terrain-art.md §10.2）：
 // - 纯表现层：不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
 // - 模型值是 accent.id 的**纯函数**——缓存与否、何时失效都不改变像素结果，
@@ -64,6 +68,42 @@ window.AccentModel = window.AccentModel || (function () {
   function styleVersion() {
     const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentModelStyleVersion;
     return Number.isFinite(v) ? v : 1;
+  }
+
+  // ── TA-04-2 冠包络外向法线（世界光向受光的法线几何缓存，归模型层；07 号 §6.5/§6.7）──
+  // 叶簇受光法线 = 「冠包络椭球」在簇位置的外向梯度 (x/rx², y/ry², (z−zc)/rz²) 归一化
+  // （rx/ry/rz/zc 取整副骨架簇分布的包络半轴与质心；梯度垂直于过该簇的等值面切平面，
+  // 满足「变换后法线 ⊥ 切向量且长度为 1」）。id 纯函数，入骨架缓存。
+  // 倾干剪切（x += s·z）的法线补偿依赖 accent.rotation，由绘制层每帧经 shearNormal 施加。
+  function attachCrownNormals(clusters) {
+    const n = clusters.length;
+    if (!n) return;
+    let zc = 0;
+    for (let i = 0; i < n; i++) zc += clusters[i].z;
+    zc /= n;
+    let rx = 1e-3, ry = 1e-3, rz = 1e-3;
+    for (let i = 0; i < n; i++) {
+      const c = clusters[i];
+      const ax = Math.abs(c.x), ay = Math.abs(c.y), az = Math.abs(c.z - zc);
+      if (ax > rx) rx = ax;
+      if (ay > ry) ry = ay;
+      if (az > rz) rz = az;
+    }
+    for (let i = 0; i < n; i++) {
+      const c = clusters[i];
+      const gx = c.x / (rx * rx), gy = c.y / (ry * ry), gz = (c.z - zc) / (rz * rz);
+      const len = Math.hypot(gx, gy, gz) || 1;
+      c.nx = gx / len; c.ny = gy / len; c.nz = gz / len;
+    }
+  }
+
+  // 倾干剪切（局部点变换 x += s·z）下的法线变换 = 变换矩阵的逆转置：n' = (nx, ny, nz − s·nx)。
+  // 依赖 accent.rotation（不入模型缓存），绘制层每帧调用；shadeRgbInto 内部会再归一化，
+  // 此处归一化只为独立调用方给出单位法线。
+  function shearNormal(nx, ny, nz, s) {
+    const wz = nz - s * nx;
+    const len = Math.hypot(nx, ny, wz) || 1;
+    return { x: nx / len, y: ny / len, z: wz / len };
   }
 
   // ── Tree：锥形主干 + 主枝/二级枝 + 叶簇（§6.4：每树 12~24 簇，枝条全年保留）──
@@ -151,6 +191,7 @@ window.AccentModel = window.AccentModel || (function () {
     for (let i = 0; i < segments.length; i += 2) {
       branchTips.push({ x: segments[i].x2, y: segments[i].y2, z: segments[i].z2 });
     }
+    attachCrownNormals(clusters);
     return { trunkH: trunkH, crownR: crownR, segments: segments, branchTips: branchTips, clusters: clusters };
   }
 
@@ -195,6 +236,7 @@ window.AccentModel = window.AccentModel || (function () {
         lite: _accentHash(id, 500 + i),
       });
     }
+    attachCrownNormals(clusters);
     return { trunkH: 4.2, crownR: 6.5, segments: segments, branchTips: [], clusters: clusters };
   }
 
@@ -302,6 +344,7 @@ window.AccentModel = window.AccentModel || (function () {
   return {
     get: get,
     resetCache: resetCache,
+    shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置），绘制层每帧消费
     hash: _accentHash, // 对外别名（避免消费方绕过本文件直接依赖全局函数名）
   };
 })();
