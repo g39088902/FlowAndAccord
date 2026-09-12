@@ -93,7 +93,7 @@ stateDiagram-v2
 | **地图模板** | 一张地图的完整玩法设定：由若干地形要素 + 子特征构成，决定玩家看到什么、在哪里做取舍 | §2、§4 |
 | **profile** | 模板在内核中的实现形式：`mountain_pass_v1` / `river_valley_v1`，以及规划中的 `plateau_settlement_v1` / `basin_oasis_v1` / `alluvial_fan_v1`。一个模板对应一个 profile | §2、§9.1 |
 | **子特征**（sub-feature） | 在已有 profile 骨架上按种子哈希概率注入的额外地貌（山脚湖 / 山涧飞瀑 / 河谷峭壁 / 牛轭湖……），**不新增 profile** | §5 |
-| **地表装饰**（Accent） | 纯视觉点缀（树 / 岩石 / 灌木 / 草簇），不参与通行、资源、碰撞与建造判定 | §7.4、§9.7 |
+| **地表装饰**（Accent） | 纯视觉点缀（树 / 岩石 / 灌木 / 草簇），不参与通行、资源、碰撞与建造判定 | §7.4、§9.5 |
 
 ### 0.3 旧章节号对照
 
@@ -495,6 +495,18 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 ```
 
 每种 feature 使用单独固定盐值和 `roll_10000 < probability_bp` 判定。首先选出**至多一个结构型**（T1：FootLake / RidgeWaterfall；T2：OxbowLake / RiverCliff），再选出**至多一个视觉型**（T1：ForestedSlope / RockyOutcrop；T2：RiversideForest / GravelBeach）。所以每张图最多两个子特征。
+
+**首版候选池与命中概率**（各类内部按 `TerrainSubFeatureKind` 升序逐个判定、首个命中即停止）：
+
+| 模板 | 结构型候选 | 概率 | 视觉型候选 | 概率 |
+| :--- | :--- | :---: | :--- | :---: |
+| T1 山口聚落 | `FootLake` 山脚湖 | 30% | `ForestedSlope` 密林山坡 | 40% |
+| T1 山口聚落 | `RidgeWaterfall` 山涧飞瀑 | 25% | `RockyOutcrop` 裸岩露头 | 35% |
+| T2 两岸河谷 | `OxbowLake` 牛轭湖 | 20% | `RiversideForest` 河岸林带 | 50% |
+| T2 两岸河谷 | `RiverCliff` 河谷峭壁 | 25% | `GravelBeach` 碎石浅滩 | 40% |
+
+> 百分比是「该候选**自身是否命中**」的独立概率，不是「该类最终选中它」的概率——命中后再按上面的互斥规则裁决。
+> `FootLake` 会改变可通行/可建地表（进而改变路网拓扑），**不是纯视觉**；`RidgeWaterfall` / `OxbowLake` 的几何硬前置见 §5.4.B / §5.4.C，未满足时判为未注入、**不重抽其他特征**。
 
 **互斥裁决规则（必须按此实现，否则同种子会因代码书写顺序而换图）**：在每一类内部，按 `TerrainSubFeatureKind` **升序**逐个判定；**首个命中者即选定，并立即停止该类别的后续判定**。因此「选到哪一个」只取决于哈希值与 kind 编号顺序，与函数书写顺序、插入位置无关。`terrainAccentSubFeatures=false` 时第 4–5、9 步为空（⚠️ 该开关已于 v1.50.18 删除，落地 D-B1 时须先按文首更正段把它加回并接线）；D-B1 上线前相关步骤必须是空实现、不改变既有世界。
 
