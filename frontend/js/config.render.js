@@ -74,11 +74,12 @@ window.RENDER_CONFIG = {
   treeTintYellowBand: 0.32,   // tint() 兼容输出，正式绘制不再量化为三档
   treeTintRedBand: 0.72,
 
-  // —— 局部三维植被样板（纯表现层；见 docs/plan/tech/07-terrain-art.md §6.1/6.2）——
-  accentModelStyleVersion: 1,
-  accentDetailNearPx: 15,     // 近景：细枝、完整叶簇
-  accentDetailMidPx: 7,       // 中景：主枝与主要叶簇
-  accentLeafClustersTree: 16, // 每棵树稳定叶簇数（由 id 派生，不进快照）
-  accentLeafClustersBush: 8,
-  accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希变体比例
+  // —— 局部三维植被骨架（TA-03，v1.50.25；补位簇夹紧枝端修复 v1.50.26；见 §6.2/6.4）——
+  // 模型/叶簇/枝干为 accent.id 稳定哈希派生，不进快照；accent-model.js 消费。
+  accentModelStyleVersion: 3,   // 骨架模型风格版本：调值即整体重建模型缓存（§10.2 缓存键契约）
+  accentDetailNearPx: 15,     // 近景：二级枝、簇高光、春芽
+  accentDetailMidPx: 7,       // 中景：主枝与全部叶簇；远景只保留树形与叶量
+  accentLeafClustersTree: 16, // 每棵树稳定叶簇数（§6.4 建议 12~24；由 id 派生，不进快照）
+  accentLeafClustersBush: 8,  // 每丛灌木稳定叶簇数（基生细茎端 + 茎中段）
+  accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希常绿变体比例（TA-06 前过渡）
 };

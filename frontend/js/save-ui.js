@@ -16,7 +16,7 @@
   /// v1.46.12：BranchId 收敛为 16 条，活动任务枚举不兼容旧档。
   const SAVE_FORMAT_VERSION = 7;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.50.24';
+  const DEFAULT_APP_VERSION = '1.50.26';
   const AUTO_SAVE_INTERVAL_MS = 30000;
 
   /**
