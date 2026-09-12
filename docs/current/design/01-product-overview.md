@@ -9,7 +9,7 @@
 
 > **玩家规划一个社会，居民自主活出一段可以回放、比较和分享的家族史。**
 
-Flow & Accord 不是「你操作角色」的模拟经营。20 名始祖、一片起伏的荒野、23 处储量有限的资源点与一座榷场互市，
+Flow & Accord 不是「你操作角色」的模拟经营。`agentSpawnCount` 默认 20 名始祖、一片起伏的荒野、由 `countCamps`/`countWaterSources` 等配置合计 23 处储量有限的资源点与一座榷场互市，
 没有任务清单、没有鼠标指挥、没有「下一步该干什么」的提示——只有一部由他们自己走出来、盖出来、生出来、争出来的千年族谱。
 
 系统只扮演**物理规则执行者**：放置校验、路网接入、施工结算、交易交割。
@@ -59,8 +59,8 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | 1 | 真·自主 AI | Inspector 里「他此刻最想要什么、为什么想要」；决策顺序可拖拽热重排 | [06 AI 行为设计](./06-agent-behavior-design.md) · [03 生命与社会规则](./03-life-and-society.md) · [11 决策引擎](../tech/11-decision-engine.md) |
 | 2 | 路是自己踩出来的 | 荒野小径 → 紫金帝国大道，没人走的路衰减回荒野 | [02 世界与地图规则](./02-world-rules.md) · [14 地形与路网](../tech/14-terrain-and-network.md) |
-| 3 | 一间仓库到一座大庄园 | 五级形态、瞬时升级、自然折旧、无主房麦穗 37% 拍卖 | [03 生命与社会规则](./03-life-and-society.md) · [13 房屋系统](../tech/13-housing-system.md) |
-| 4 | 四季会咬掉柴火 | 240s 一年、-3~31℃、冬季账本烧柴、低温受孕红线 | [02 世界与地图规则](./02-world-rules.md) · [15 四季与气候](../tech/15-seasons-climate.md) |
+| 3 | 一间仓库到一座大庄园 | 五级形态、瞬时升级、自然折旧、无主房麦穗 `houseAuctionObservationRatio`=37% 拍卖 | [03 生命与社会规则](./03-life-and-society.md) · [13 房屋系统](../tech/13-housing-system.md) |
+| 4 | 四季会咬掉柴火 | `seasonYearLength`=240s 一年、`tempBaseMid`±`tempAmplitude` 得 -3~31℃、冬季账本烧柴、低温受孕红线 | [02 世界与地图规则](./02-world-rules.md) · [15 四季与气候](../tech/15-seasons-climate.md) |
 | 5 | 生死、遗传与六维禀赋 | 四项生理指标；智/力/魅/消化/睡眠/寿限六项禀赋代际漂移 | [10 生命周期](../tech/10-agent-life-cycle.md) |
 | 6 | 家户 → 宗族 → 王国 | 成婚合并账本、分家继承、族税互助、长子继承王位、夺位远征 | [04 经济与资源规则](./04-economy.md) · [07 账本与政体](../tech/07-ledger-and-polity.md) |
 | 7 | 千年族谱时间轴 | Y 轴严格映射出生时刻，主干优先落位，已故胎儿亦入谱 | [05 观察与交互设计](./05-observation-ux.md) |

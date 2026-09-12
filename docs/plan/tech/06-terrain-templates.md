@@ -147,7 +147,7 @@ stateDiagram-v2
 - 水系整形必须限于明确的河道、岸带与谷地影响范围，边缘平滑接回骨架。当前 `hydrology::generate_river` 重写全图，扩展前按 §5.3 改造；最终统一派生坡度与地表规则，再放置 POI 和路网。
 - 新骨架须校验主要可居住区域连通、关键资源可达、营地往返成本、连续可建面积及失败原因。无关荒地不必全部可达；已有 T1/T2 子特征的“不增加连通分量”保护门禁仍按 §5.3 执行，不能借此放宽既有保护。各模板分别设诊断区间，不把开放草原的低绕行比判为失败，也不为了全种子通过而抹平地理差异。
 
-技术参考：[Terrain Modelling from Feature Primitives](https://www.cs.purdue.edu/homes/bbenes/papers/Genevaux15CGF.pdf) 支持按特征原语组合地形的方向；本项目采用轻量实现，不引入论文系统作为依赖。景观组织、样板与性能门禁见 [07 地形美术 §9.1](./07-terrain-art.md#91-组合地貌的场景样板与美术规则)。
+技术参考：[Terrain Modelling from Feature Primitives](https://www.cs.purdue.edu/homes/bbenes/papers/Genevaux15CGF.pdf) 支持按特征原语组合地形的方向；本项目采用轻量实现，不引入论文系统作为依赖。景观组织、样板与性能门禁见 [07 地形美术 §4.4](./07-terrain-art.md#44-组合地貌美术规则)。
 
 ## 2. 地图模板路线与落地状态总览
 

@@ -170,7 +170,7 @@ dT = clamp((temperature - tempBaseMid) / tempAmplitude, -1, 1)   // 已有快照
 tint *= (1 + tempTintPerDeg · dT) 逐通道（默认 0.03/℃ 归一化）
 ```
 
-**边界**：这里只调“光”，不调地表反照率（草绿/枯黄/积雪属 `../../plan/tech/07-terrain-art.md` S1-4，见 §10）。
+**边界**：这里只调“光”，不调地表反照率（草绿/枯黄/积雪属 `../../plan/tech/07-terrain-art.md` S1-4，任务编号 TA-13，见其 §5.2 与 §6.3）。
 
 ### 3.6 阴影向量（世界空间，不是屏幕空间）
 
@@ -289,7 +289,7 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 | 天空/大气层 | 每帧 | 2 次全屏渐变 + 1 次全屏填充 | 固定 2 个插入点 |
 | 限速器 | 每帧 | O(1) | — |
 
-**预算**：新增渲染耗时 p95 增量 ≤ 3 ms；同设备仿真吞吐下降 ≤ 5%（对齐 `../../plan/tech/07-terrain-art.md` §8.2）。
+**预算**：新增渲染耗时 p95 增量 ≤ 3 ms；同设备仿真吞吐下降 ≤ 5%（对齐 `../../plan/tech/07-terrain-art.md` §11.3）。
 
 ### 5.2 缓存失效矩阵
 
@@ -361,7 +361,7 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 | `frontend/js/main.js` | 开关绑定 + 可选 `L` 键 | ±15 行 |
 | 文档 | `frontend/AGENTS.md`（文件清单/加载顺序/DOM 契约）、`./16-frontend-overview.md`、`./31-code-map.md`、`./19-ui-implementation.md`、`../01-changelog.md`、`../../plan/tech/07-terrain-art.md`（S1-4 对接） | — |
 
-`render_world.js` 现约 770 行，逼近 800 行上限：本方案落地时**先把 `drawTerrain`/`drawTerrainFeatures` 拆到 `render_terrain.js`**（`../../plan/tech/07-terrain-art.md` §9 已列为建议前置），再改光照。
+`drawTerrain`/水系/装饰绘制已拆到 `render_terrain.js`（约 724 行），但 `render_world.js` 现约 904 行、已超 800 行上限：本方案落地时**不得新增整层绘制**，新增光照相关笔迹优先放入既有对应文件并视情况继续拆分（`../../plan/tech/07-terrain-art.md` §6.7 列有渲染文件拆分计划）。
 
 ### 8.1 实施门禁
 
