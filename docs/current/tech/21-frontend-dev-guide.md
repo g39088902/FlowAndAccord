@@ -52,7 +52,10 @@ stateDiagram-v2
 ### 1.2 第三轮：地形渲染独立 + D-A 装饰系统（★ v1.48.0 / ★ v1.49.1）
 - `render_terrain.js` 从 `render_world.js` 拆出：独立承载地形网格 / 水系地貌特征 (`drawTerrainFeatures`) / 装饰单实体绘制 (`drawAccentEntity`，★ v1.50.2 起由整层 `drawAccents()` 改写并迁出 `drawTerrain()`，改挂 `drawWorldEntities()` 深度队列) / 天空大气环境光`SimLighting` 三角；
 - D-A 装饰系统（v1.49.1）扩展了四处同步清单：新增 `TerrainAccent`（`snapshot.rs`）、FABS Section `TerrainAccents=21`（`layout.rs` + `encode.rs`）、前端解码（`snapshot-bin.js`）、`rustworld.js` `_applySnapshot` 映射 `sim.terrain.accents`；
-- ★ 2026-09-12：装饰树**季节叶色**由 `render_terrain.js` **定义**的 `window.SimTreeTint` 派生（`yearPhase`/`brownness`/`tint`，真相源＝快照 `season`+`season_progress`，逐树按 `accent.id` 抖动），调参在 `config.render.js` 的 `treeTint*`；此前该命名空间全仓无定义点（死分支），树木四季同色（契约见 `frontend/AGENTS.md` §5.11）；
+- **TA-02 连续季相**：`accent-season.js` 定义唯一生产者 `SimTreeTint.sample(accent, sim, profile?)`，默认按 Tree/Bush 选落叶乔木/灌木，显式支持 `evergreen` / `floweringBush`。输出 `leafDensity`、浮点 RGB `leafColor`、`budAmount`、`flowerAmount`、`litterAmount` 及兼容枯荣系数。`tint()` 和 `brownness()` 复用新曲线，不再维护旧年历。
+- **时钟与连续性**：只读快照季节及进度（缺字段回退 seasonTimer），春中心 0、初春 0.875；周期 smoothstep 跨年连续。kind/id 哈希偏移默认 ±0.025 年、硬限幅 ±0.04，盛夏满叶、隆冬落叶乔木 3% / 灌木 4%，常绿全年至少 94%；先秋色后减叶。叶色与叶量不读取平滑光相，光源仍归 `SimLighting`。
+- **配置与消费**：`config.render.js::accentSeasonProfiles` 行格式 `[u, 叶量, RGB, 芽量, 花量, 地被量, 枯荣]`，`accentFlowerCycle` 仅为显式花灌木覆写花量。当前 Tree/Bush 精灵只消费连续叶色（绘制侧派生明暗），其余输出预留 TA-03/15；裸枝、逐簇落叶与花/地被绘制尚未实现，物种分配属于 TA-06。
+- **恢复与缓存**：季相纯函数无逐帧累积和颜色缓存；几何缓存不含季相，暂停、读档、回溯与重置直接根据新快照求值，不消耗模拟 RNG、不改存档或 FABS。
 - v1.49.1 同时移除了 Pass 1 的 `RiverBank` 手绘金砂漫滩线；v1.50.3~v1.50.5 连续降噪后水系只剩「水面（Pass 2 + 2.8 波光）+ 水下游鱼（Pass 1.5）+ 浅滩涉渡（Pass 4）」，河床基底、卵石、岸线白沫与微波虚线全部移除。
 
 ### 1.3 第四轮：制度大盘抽离 ledger-ui.js（v1.3.0）

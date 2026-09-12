@@ -48,7 +48,7 @@
 | `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.48.0 调用顺序：`SimLighting.update` → 天空 → 地形 → 路网 → 贴地图元 → 大气色洗 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
 | `js/render_terrain.js` | ~365 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ ★ v1.50.23 TA-01 装饰代码已迁出为 accent 三件套（下方三行） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
-| `js/accent-season.js` | ~75 | ★ v1.50.23 TA-01（docs/plan/tech/07-terrain-art.md §6.7）：**`window.SimTreeTint` 季相层**——装饰树木季节叶色的唯一生产者（`yearPhase`/`brownness`/`tint`，消费 `RENDER_CONFIG.treeTint*`，自 render_terrain.js 原位迁出）；TA-02 连续季相生产器将在此扩展。**新增消费方只能读它，不得另建季节色逻辑** | 模型几何（accent-model）、绘制（render_accents） |
+| `js/accent-season.js` | ~75 | ★ v1.50.23 TA-01（docs/plan/tech/07-terrain-art.md §6.7）：**`window.SimTreeTint` 季相层**——装饰树木季节叶色的唯一生产者（`yearPhase`/`sample`/兼容 `brownness`/`tint`，消费 `RENDER_CONFIG.accentSeason*`）；TA-02 已提供连续叶色/叶量/芽/花/地被曲线。**新增消费方只能读它，不得另建季节色逻辑** | 模型几何（accent-model）、绘制（render_accents） |
 | `js/accent-model.js` | ~100 | ★ v1.50.23 TA-01：**`window.AccentModel` 模型层**——稳定形态派生 + 个体模型缓存（全局 `_accentHash` 哈希 / 个体种子 `vSeed` / Tree 10 + Bush 7 叶簇散点 / `extent` 包围体预留），键 `kind#id`、上限 2048 条超限清空；`resetCache()` 由 rustworld.js 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处调用（换世界不残留旧模型）。TA-03 枝干骨架将在此扩展 | 季相曲线（accent-season）、绘制（render_accents） |
 | `js/render_accents.js` | ~300 | ★ v1.50.23 TA-01：**装饰绘制层**——`drawAccentEntity` / `drawAccentTree` / `drawAccentBoulder` / `drawAccentBush`（自 render_terrain.js 原位迁出，叶簇散点改读 AccentModel 缓存、数值逐位一致），仍由 render_world.js 深度队列以 DEPTH_ACCENT 调度；迁出时移除全仓无定义点的 `window.AccentRenderer` 死分支。TA-04 世界光向受光将在此接入 | 深度队列调度（render_world）、季相（accent-season） |
 | `js/river_life.js` | ~300 | **★ v1.49.0 水系微观生态纯表现层**：`window.RiverLife`——`init(features, seed)`（世界重置/读档时由 rustworld.js 以 `_engineSeed` 重建，4 群 22 条游鱼沿河道中心线巡航）/ `update`（墙钟驱动，暂停时继续流动属设计决策）/ `drawFish` / `drawSunGlint`（迎光波光，强度按河道切线与光向夹角调制）；★ v1.50.3 移除水面微波虚线、★ v1.50.4 移除水底卵石层（`drawRiverbed` 及卵石数据已删除——深色扁圆石透水面观感呈"一堆深蓝色圆圈"）；在 render_terrain.js 之前加载 | 仿真状态读写、WorldRng 消耗、快照契约 |
@@ -323,18 +323,13 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
   判断用的 `sim.treeTintEnabled` 来源字段 `terrainTreeSeasonTint` 又在 v1.50.18 被清理
   → 条件恒假、分支永不进入，树木叶色恒等于 `accent.tint`，而 Rust `geo/accents.rs` 恒写 `tint: 0`
   → **四季渲染完全相同**（文档却一直声称"按当前季节实时派生"）。
-- **唯一生产者 = `window.SimTreeTint`**（★ v1.50.23 起定义在 `accent-season.js`，TA-01 自 render_terrain.js 迁出；此前为「不是独立文件」）：
-  `yearPhase(sim)` / `brownness(u)` / `tint(accent, sim)`。**新增消费方只能读它，不得另建季节色逻辑。**
-- **真相源与 `SimLighting` 完全同构**：只消费快照 `sim.currentSeason` + `sim.seasonProgress`
-  （缺字段回退 `seasonTimer / seasonYearLength`），**严禁**另建计时器（同 §5.10）。
-- **年历与三档映射**：`RENDER_CONFIG.treeTintCycle` 定义枯荣系数 `b(u)` 的分段线性年历
-  （0=鲜绿 → 深秋 1=枯褐 → 初春返青），再按 `treeTintYellowBand` / `treeTintRedBand` 映射到渲染器既有的
-  三档 tint（0 鲜绿 / 1 黄绿 / 2 红褐）。**冬季沿用红褐档**（渲染器无落叶/光秃形态）。调参只改 `config.render.js`。
-- **逐树抖动**：相位按 `accent.id`（哈希通道 997）偏移 `±RENDER_CONFIG.treeTintJitterTurns`，
-  避免成片树同帧整体换色。抖动幅度必须小于「夏末全绿区间」，否则盛夏会被误染。
-- **纯表现层边界**：不消耗 `WorldRng`、不写模拟状态、不入快照；Boulder / Bush 不参与（`drawAccentBush` 不接受 tint）。
-- **Rust 侧 `TerrainAccent.tint` 字段仍是无生产者的预留钩子**（恒 0），渲染层已不读它；
-  D-B1 若仍需该字段必须指定唯一生产者，否则应借 FABS `FORMAT_VERSION` 2→3 之机移除。
+- **唯一生产者 = `window.SimTreeTint`**（`accent-season.js`）：`sample(accent, sim, profile?)` 输出连续季相，绘制树木与灌木都只读它；`tint()`/`brownness()` 为同一套曲线的兼容接口，不另建年历。
+- **真相源 = 原始快照**：`currentSeason` + `seasonProgress`，缺字段回退 `seasonTimer / seasonYearLength`；春中心为 0，初春为 0.875。不能用经限速的 `SimLighting.phase()` 决定叶量，更不能用墙钟。
+- **周期曲线**：参数集中在 `config.render.js` 的 `accentSeasonProfiles` / `accentFlowerCycle`；跨年 smoothstep 插值，输出浮点 RGB 反照率及 0–1 叶量/芽量/花量/地被量。默认 Tree/Bush 分别使用落叶乔木/灌木曲线；`evergreen` 与 `floweringBush` 为显式 profile 接口，物种自动分配留给 TA-06。
+- **有界个体偏移**：kind/id 独立哈希通道 997/998，`accentSeasonJitterTurns` 默认 ±0.025 年、硬限幅 ±0.04；共同盛夏满叶、隆冬落叶 3–4% 平台避免错季。常绿曲线全年保留至少 94% 叶量。
+- **消费边界**：现有二维树冠与灌木已消费连续叶色；叶量/芽/花/地被是 TA-03/15 后续几何接口，当前没有裸枝、开花、落叶地被或飘叶绘制。禁止把整冠透明度当作落叶。
+- **缓存与恢复**：季相按输入直接求值，不保存历史结果；几何缓存不含季相，恢复/读档/回溯自动按新快照重建颜色。暂停时输入不变，输出不漂移。
+- **纯表现层**：不消耗 WorldRng，不写模拟/快照/存档；Boulder 保持原配色，Rust `TerrainAccent.tint` 仍是恒 0 的预留字段，植被不读它。
 
 ---
 

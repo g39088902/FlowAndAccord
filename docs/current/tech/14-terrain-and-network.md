@@ -231,7 +231,7 @@ pub struct TerrainAccent {
     pub rotation_rad: f32,     // 0 ~ 2π
     pub     tint: u8,              // 0=默认, 1=偏黄(秋季), 2=偏红(深秋)
     // ★ 现状：该字段是**无生产者的预留钩子**——Rust 侧恒写 0（`accents.rs`「tint 默认 0」），
-    //   渲染层也不再读它：季节叶色自 2026-09-12 起由前端 `SimTreeTint.tint(accent, sim)`
+    //   渲染层也不再读它：季节叶色自 2026-09-12 起由前端 `SimTreeTint.sample(accent, sim)`
     //   按当前季节实时派生（`accent-season.js`，★ v1.50.23 自 render_terrain.js 迁出；真相源＝快照 `season`/`season_progress`）。
     //   D-B1 若仍需该字段，必须指定唯一生产者；否则应借 FABS `FORMAT_VERSION` 2→3 之机移除（§5.7）。
 }
@@ -841,7 +841,7 @@ render_agents.js        族人绘制                                            
 - **ShallowFord**：浅滩跨水步道虚线（`rgba(218, 197, 133, 0.95)`，双向虚线）；
 - **SpringValley**：浅沟细带；
 - ~~**Ridge/Saddle/Terrace**~~（v1.47.7 已删除，不再绘制山脊线/山口圆/台地轮廓）。
-- **Tree**（✅ D-A）：四瓣层叠树冠（径向渐变绿 + 冠顶受光高光）+ 锥形微弯树干，含叶片斑驳纹理（10 枚由 `accent.id` 派生的暗/亮叶簇小点，散点几何缓存于 `accent-model.js`）；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调）；季节叶色由前端 `window.SimTreeTint`（`accent-season.js`，★ v1.50.23 自 render_terrain.js 迁出；2026-09-12 落地）按**当前季节**实时派生：以快照 `season` + `season_progress` 推年相位，分段年历映射到三档叶色（鲜绿 → 黄绿 → 红褐，深秋与冬季共用红褐档），并逐树按 `accent.id` 做相位抖动以避免成片树同帧换色；调参入口 `RENDER_CONFIG.treeTint*`（`config.render.js`）——**不读存档里的 `tint`**（后者恒为 0，见 §7.4）；
+- **Tree**（✅ D-A + TA-02）：四瓣层叠树冠、锥形曲干与 10 枚稳定叶纹；个体模型来自 `AccentModel`。树木与灌木均读取 `SimTreeTint.sample(accent, sim, profile?)` 的浮点 RGB 叶色，不再按三档切换；纯季相曲线、恢复契约与后续几何边界见 [前端指南 §1.2](./21-frontend-dev-guide.md#12-第三轮地形渲染独立--d-a-装饰系统-v1480--v1491)。不读存档中的预留 `tint`。
 - **Boulder**（✅ D-A）：不规则多边形岩石（灰岩基色 + 受光面高光），尺寸 2-5m；
 - **Bush**（✅ D-A）：三瓣扁压圆簇灌木 + 微投影，高度 < 1m。
 
@@ -851,7 +851,7 @@ render_agents.js        族人绘制                                            
 - 水面颜色、岸石为静态视觉派生，不改变内核通行或库存。
 - HUD 大盘水源储量按 `waterPoolId` 去重汇总，避免多个河岸取水点重复累加导致总量虚高。
 - 浅滩人物沿内核实际路线移动，过水时根据 `terrain_shallow_water_cost` 自然减速。
-- 装饰物为静态视觉元素，不与库存绑定；**仅 Tree 叶色随季节变化**（`SimTreeTint` 三档：鲜绿 / 黄绿 / 红褐），Boulder 与 Bush 恒用固定配色（`drawAccentBush` 不接受 tint 参数）。
+- 装饰物不与库存绑定；Tree/Bush 使用连续季节叶色，Boulder 保持固定配色。叶量输出已就绪，真正的几何落叶与裸枝待 TA-03。
 - 贴地图元（道路/底座/水面/足迹线）保持贴合地表；立体实体与装饰锚点经 `MAP_Z_LIFT` 略抬于地表（v1.50.12），避免坡面「陷进」地面。
 - 渲染参数（`mapZLift`/`agentFootprintR`/`accentFootprintR` 等）外置在 `frontend/js/config.render.js`（`window.RENDER_CONFIG`），与 `SIM_CONFIG` 分离（v1.50.15）。
 

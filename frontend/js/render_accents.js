@@ -37,31 +37,36 @@ function drawAccentEntity(accent) {
   const upMargin = 20 + 40 * scale;
   if (sx < -20 || sx > w + 20 || sy < -upMargin || sy > h + 20) return;
 
-  // ★ 2026-09-12 Tree 季节叶色：唯一生产者 SimTreeTint（accent-season.js）。
-  //   历史教训：v1.48.0~2026-09-12 期间此处写作 `if (window.SimTreeTint && sim.treeTintEnabled !== false)`，
-  //   但 SimTreeTint 全仓无定义点（死分支），且判据用的 sim.treeTintEnabled 来源字段
-  //   terrainTreeSeasonTint 已于 v1.50.18 随空转配置清理删除 → 恒 undefined，条件恒假。
-  //   净效果是树木叶色恒为 accent.tint（Rust 恒写 0），四季同色。**勿再引入无生产者的全局判据。**
-  //   （v1.50.23 迁出时顺带移除了同类的 `window.AccentRenderer` 死分支——全仓无定义点。）
-  const seasonTint = (accent.kind === 'Tree' && window.SimTreeTint)
-    ? window.SimTreeTint.tint(accent, sim)
-    : (accent.tint || 0);
+  // Tree/Bush 共用连续季相；叶量/芽/花/地被的几何消费留给 TA-03/15。
+  const season = accent.kind === 'Boulder' ? null : window.SimTreeTint.sample(accent, sim);
 
   const scaled = accent.scale * scale;
   if (accent.kind === 'Tree') {
-    drawAccentTree(accent, sx, sy, scaled, seasonTint);
+    drawAccentTree(accent, sx, sy, scaled, season);
   } else if (accent.kind === 'Boulder') {
     drawAccentBoulder(sx, sy, scaled, accent.rotation || 0, cosZ, sinZ);
   } else {
-    drawAccentBush(accent, sx, sy, scaled);
+    drawAccentBush(accent, sx, sy, scaled, season);
   }
 }
 
+// 浮点 RGB 直接交给 Canvas，避免季相按整数/色档量化。个体色差不污染季相输出。
+function accentLeafPalette(color, vSeed) {
+  const vary = (vSeed - 0.5) * 14;
+  const rgb = (factor, lift) => color.map(c => Math.max(0, Math.min(255, c * factor + lift)));
+  return {
+    base: rgb(1, vary), hi: rgb(0.85, 62),
+    rim: 'rgb(' + rgb(0.53, 0).join(',') + ')',
+    dapDark: 'rgba(' + rgb(0.66, 0).join(',') + ',0.28)',
+    dapLite: 'rgba(' + rgb(0.85, 90).join(',') + ',0.32)',
+  };
+}
+
 // Tree：写意微缩乔木 —— 锥形微弯树干 + 四瓣层叠树冠 + 贴地投影（与 POI/房屋同一光照源）
-// tint=0 鲜绿(春夏) / 1 黄绿(秋) / 2 红褐(深秋)；scaled = accent.scale(0.7~1.4) × camera.zoom
+// season 为连续季相；scaled = accent.scale(0.7~1.4) × camera.zoom
 // ★ TA-01：个体差异（vSeed）与叶簇散点改读 accent-model.js 的稳定模型缓存，
 //   数值与原「逐帧哈希现算」逐位一致；迁移零行为变更。
-function drawAccentTree(accent, sx, sy, scaled, tint) {
+function drawAccentTree(accent, sx, sy, scaled, season) {
   const model = window.AccentModel.get(accent);
   const vSeed = model.vSeed;
   const crownR = 8.5 * scaled;
@@ -102,31 +107,14 @@ function drawAccentTree(accent, sx, sy, scaled, tint) {
   ctx.quadraticCurveTo(sx - bw * 0.15, sy - trunkH * 0.55, topX - tw * 0.4, topY + trunkH * 0.04);
   ctx.stroke();
 
-  // 树冠配色：暗轮廓 / 底色 / 亮部（个体色相 ±7 微调）
-  let rim, base, hi;
-  if (tint === 1) {
-    rim = 'rgb(96, 82, 34)'; base = [160, 142, 72]; hi = [208, 188, 122];
-  } else if (tint === 2) {
-    rim = 'rgb(88, 44, 22)'; base = [162, 94, 52]; hi = [214, 142, 86];
-  } else {
-    rim = 'rgb(34, 62, 26)'; base = [66, 108, 50]; hi = [142, 184, 110];
-  }
-  const vary = Math.round((vSeed - 0.5) * 14);
-  base = [base[0] + vary, base[1] + vary, base[2] + vary];
+  // 季节反照率来自唯一生产者；这里只派生当前精灵的明暗，世界光向留给 TA-04。
+  const palette = accentLeafPalette(season.leafColor, vSeed);
+  const { rim, base, hi, dapDark, dapLite } = palette;
 
   const ccX = topX, ccY = topY - crownR * 0.30;
   const squash = 0.88;
   // ★ v1.49.3 描边减重：暗轮廓宽度减半，只留一圈细线分离背景
   const lw = Math.max(0.4, 0.5 * scaled);
-  // ★ v1.49.3 叶面纹理配色：暗叶簇/亮叶簇按季节色调取色（半透明叠加不遮底色渐变）
-  let dapDark, dapLite;
-  if (tint === 1) {
-    dapDark = 'rgba(122, 104, 44, 0.28)'; dapLite = 'rgba(228, 208, 146, 0.32)';
-  } else if (tint === 2) {
-    dapDark = 'rgba(122, 62, 32, 0.28)'; dapLite = 'rgba(236, 170, 116, 0.32)';
-  } else {
-    dapDark = 'rgba(40, 72, 32, 0.28)'; dapLite = 'rgba(178, 212, 140, 0.32)';
-  }
   // 四瓣层叠：左右托底瓣 + 主瓣 + 顶瓣
   const lobes = [
     { dx: -0.52, dy: 0.20, r: 0.58 },
@@ -219,7 +207,7 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
 
 // Bush：低矮灌木簇 —— 三瓣层叠圆簇 + 微投影（同 Tree 的暗轮廓二遍填充技法，体量更扁更碎）
 // ★ TA-01：枝叶散点改读 accent-model.js 的稳定模型缓存（数值与原逐帧哈希现算逐位一致）。
-function drawAccentBush(accent, sx, sy, scaled) {
+function drawAccentBush(accent, sx, sy, scaled, season) {
   const model = window.AccentModel.get(accent);
   const vSeed = model.vSeed;
   const r = (5.5 + vSeed * 1.2) * scaled;
@@ -247,7 +235,8 @@ function drawAccentBush(accent, sx, sy, scaled) {
   ];
 
   // Pass A：暗轮廓
-  ctx.fillStyle = 'rgb(26, 50, 22)';
+  const palette = accentLeafPalette(season.leafColor, vSeed);
+  ctx.fillStyle = palette.rim;
   for (let i = 0; i < lobes.length; i++) {
     const L = lobes[i];
     ctx.beginPath();
@@ -260,8 +249,8 @@ function drawAccentBush(accent, sx, sy, scaled) {
     sx - r * 0.30, cy - r * 0.65, r * 0.10,
     sx, cy - r * 0.1, r * 1.15
   );
-  grad.addColorStop(0, 'rgb(112, 154, 88)');
-  grad.addColorStop(1, 'rgb(60, 96, 46)');
+  grad.addColorStop(0, 'rgb(' + palette.hi.join(',') + ')');
+  grad.addColorStop(1, 'rgb(' + palette.base.join(',') + ')');
   ctx.fillStyle = grad;
   for (let i = 0; i < lobes.length; i++) {
     const L = lobes[i];
@@ -277,7 +266,7 @@ function drawAccentBush(accent, sx, sy, scaled) {
     const px = sx + Math.cos(d.ang) * d.radK * r * 0.9;
     const py = cy + Math.sin(d.ang) * d.radK * squash - r * 0.02;
     const dr = d.drK * r;
-    ctx.fillStyle = d.lite ? 'rgba(150, 192, 118, 0.30)' : 'rgba(38, 66, 30, 0.26)';
+    ctx.fillStyle = d.lite ? palette.dapLite : palette.dapDark;
     ctx.beginPath();
     ctx.ellipse(px, py, dr, dr * 0.70, d.ang * 0.5, 0, Math.PI * 2);
     ctx.fill();

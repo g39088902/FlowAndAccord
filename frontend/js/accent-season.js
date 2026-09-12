@@ -1,76 +1,80 @@
-// === Accent 季相层（TA-01，docs/plan/tech/07-terrain-art.md §6.7）===
-// 装饰树木季节叶色的**唯一生产者** window.SimTreeTint（v1.50.23 从 render_terrain.js 原位迁出，
-// 迁移零行为变更）。只负责季相年历与物种曲线；后续 TA-02 将在本文件扩展 sample()
-// 连续叶色/叶量生产器（替代三档映射），TA-06 在此加物种曲线。
-//
-// ★ 背景（勿重犯）：v1.48.0~2026-09-12 期间 SimTreeTint 全仓无赋值点，drawAccentEntity
-//   的判据恒假 → 树木四季同色（死分支事故，见 frontend/AGENTS.md §5.11）。
-//   **新增消费方只能读 window.SimTreeTint，不得另建季节色逻辑。**
-//
-// 契约：
-// - 纯表现层：不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
-// - 真相源 = 快照年相位（与 lighting.js 同一套 season/season_progress 公式），严禁另建计时器。
-// - 调参走 window.RENDER_CONFIG.treeTint*（config.render.js），改完刷新浏览器即生效。
-// - 依赖 _accentHash（定义在 accent-model.js；全局函数声明，渲染期调用时两文件均已加载）。
+// === Accent 连续季相（TA-02）===
+// SimTreeTint 是 Tree/Bush 季相唯一生产者。只读快照，不累计帧状态、不用墙钟/RNG。
+// sample(accent, sim, profile?) 返回 0..1 叶/芽/花/落叶量与浮点 RGB 反照率。
+// profile: deciduousTree / deciduousBush / evergreen / floweringBush；省略时按 kind。
+// 常绿/花灌木先提供曲线接口，实际物种分配属于 TA-06。几何落叶属于 TA-03。
+// 依赖 config.render.js 与 accent-model.js（渲染期均已加载）。
 window.SimTreeTint = window.SimTreeTint || (function () {
   const SEASON_INDEX = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
-  const DEFAULT_CYCLE = [
-    { u: 0.000, b: 0.00 },   // 春：返青完成
-    { u: 0.375, b: 0.00 },   // 夏末：全绿保持
-    { u: 0.500, b: 0.55 },   // 中秋：初黄
-    { u: 0.625, b: 1.00 },   // 深秋：红褐
-    { u: 0.875, b: 1.00 },   // 冬末：枯褐保持
-    { u: 0.970, b: 0.00 },   // 初春：返青
-  ];
+  const cfg = () => window.RENDER_CONFIG;
+  const wrap01 = v => v - Math.floor(v);
+  const clamp01 = v => Math.max(0, Math.min(1, v));
 
-  function cfg() { return window.RENDER_CONFIG || {}; }
-  function wrap01(v) { return v - Math.floor(v); }
-
-  // 年相位（唯一真相源 = 快照；缺字段时回退 seasonTimer / seasonYearLength）
-  // 内核分箱：season_idx = ((season_time + q/2) / q) % 4 ⇒ u = (idx − 0.5 + progress) / 4
+  // 与 lighting.js 的原始快照公式同构；不能读经限速平滑的 SimLighting.phase()。
   function yearPhase(sim) {
     if (!sim) return 0;
     const idx = SEASON_INDEX[sim.currentSeason];
-    const prog = (typeof sim.seasonProgress === 'number' && isFinite(sim.seasonProgress))
-      ? sim.seasonProgress : null;
-    if (idx != null && prog != null) return wrap01((idx - 0.5 + prog) / 4);
+    if (idx != null && Number.isFinite(sim.seasonProgress)) {
+      return wrap01((idx - 0.5 + clamp01(sim.seasonProgress)) / 4);
+    }
     const year = (window.SIM_CONFIG && window.SIM_CONFIG.seasonYearLength) || 240;
-    const t = (typeof sim.seasonTimer === 'number' && isFinite(sim.seasonTimer)) ? sim.seasonTimer : 0;
+    const t = Number.isFinite(sim.seasonTimer) ? sim.seasonTimer : 0;
     return wrap01(t / Math.max(1e-6, year));
   }
 
-  // 枯荣系数：0 = 鲜绿，1 = 枯褐（分段线性，年历由 RENDER_CONFIG.treeTintCycle 提供）
-  function brownness(u) {
-    const cycle = cfg().treeTintCycle || DEFAULT_CYCLE;
-    if (!cycle || cycle.length === 0) return 0;
-    for (let i = 1; i < cycle.length; i++) {
-      const a = cycle[i - 1], b = cycle[i];
-      if (u <= b.u) {
-        const span = b.u - a.u;
-        const t = span > 1e-9 ? (u - a.u) / span : 0;
-        return a.b + (b.b - a.b) * (t < 0 ? 0 : (t > 1 ? 1 : t));
+  // 环形区间查找，跨 1→0 使用真实间距插值，结点两侧一阶连续。
+  function segment(cycle, u) {
+    u = wrap01(Number.isFinite(u) ? u : 0);
+    for (let i = 0; i < cycle.length; i++) {
+      const a = cycle[i], b = cycle[(i + 1) % cycle.length];
+      const end = i + 1 === cycle.length ? b[0] + 1 : b[0];
+      const x = u < cycle[0][0] ? u + 1 : u;
+      if (x >= a[0] && x <= end) {
+        const t = clamp01((x - a[0]) / (end - a[0]));
+        return { a, b, t: t * t * (3 - 2 * t) };
       }
     }
-    return cycle[cycle.length - 1].b;
+    return { a: cycle[0], b: cycle[0], t: 0 };
+  }
+  const mix = (a, b, t) => a + (b - a) * t;
+
+  function phaseOffset(accent) {
+    const configured = cfg().accentSeasonJitterTurns;
+    const amp = Number.isFinite(configured) ? Math.max(0, Math.min(0.04, configured)) : 0;
+    // 独立通道，kind/id 稳定；不把相位写进几何缓存，调参/恢复无需失效季相缓存。
+    const channel = accent && accent.kind === 'Bush' ? 998 : 997;
+    return (_accentHash((accent && accent.id) || 0, channel) - 0.5) * 2 * amp;
   }
 
-  // 逐树确定性相位抖动（纯视觉，通道 997 与叶纹理通道 i+1…i+167 互不重叠）
-  function jitter(id) {
-    const amp = cfg().treeTintJitterTurns != null ? cfg().treeTintJitterTurns : 0.05;
-    return (_accentHash(id | 0, 997) - 0.5) * 2 * amp;
+  function sample(accent, sim, profile) {
+    const profiles = cfg().accentSeasonProfiles;
+    const fallback = accent && accent.kind === 'Bush' ? 'deciduousBush' : 'deciduousTree';
+    const name = profile === 'floweringBush' ? 'deciduousBush' : profile;
+    const cycle = profiles[name] || profiles[fallback];
+    const u = wrap01(yearPhase(sim) + phaseOffset(accent));
+    const { a, b, t } = segment(cycle, u);
+    const value = index => clamp01(mix(a[index], b[index], t));
+    let flowerAmount = value(4);
+    if (profile === 'floweringBush') {
+      const f = segment(cfg().accentFlowerCycle, u);
+      flowerAmount = clamp01(mix(f.a[1], f.b[1], f.t));
+    }
+    return {
+      leafDensity: value(1),
+      leafColor: a[2].map((c, i) => mix(c, b[2][i], t)),
+      budAmount: value(3), flowerAmount,
+      litterAmount: value(5), brownness: value(6),
+    };
   }
 
-  return {
-    yearPhase: yearPhase,
-    brownness: brownness,
-    // 叶色档：0 鲜绿(春夏) / 1 黄绿(秋) / 2 红褐(深秋·冬)
-    tint: function (accent, sim) {
-      const u = wrap01(yearPhase(sim) + jitter((accent && accent.id) || 0));
-      const b = brownness(u);
-      const c = cfg();
-      const yb = c.treeTintYellowBand != null ? c.treeTintYellowBand : 0.32;
-      const rb = c.treeTintRedBand != null ? c.treeTintRedBand : 0.72;
-      return b >= rb ? 2 : (b >= yb ? 1 : 0);
-    },
-  };
+  // 迁移期兼容：复用同一条年历，不能再维护旧 treeTintCycle。
+  function brownness(u) {
+    const { a, b, t } = segment(cfg().accentSeasonProfiles.deciduousTree, u);
+    return clamp01(mix(a[6], b[6], t));
+  }
+  function tint(accent, sim, profile) {
+    const b = sample(accent, sim, profile).brownness;
+    return b >= cfg().treeTintRedBand ? 2 : (b >= cfg().treeTintYellowBand ? 1 : 0);
+  }
+  return { yearPhase, sample, brownness, tint };
 })();
