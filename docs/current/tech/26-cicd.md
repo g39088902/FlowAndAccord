@@ -138,7 +138,7 @@ coscmd upload -f -H "Content-Type: application/wasm" frontend/sim_wasm.wasm /sim
 | :--- | :--- |
 | `test-wasm.js` 门禁失败 | 代码问题（确定性 / 越界 / NaN），修复后再推送；日志关键词 `DETERMINISM FAILED` / `NAN FOUND` |
 | `cross-doc-check.js` 门禁失败 | 文档间冲突（CONFLICT）或文档值与权威配置漂移（DRIFT），先跑 `node tools/cross-doc-check.js` 本地定位并修复文档后重推；日志关键词 `CONFLICT` / `DRIFT` |
-| `doc-link-check.js` 门禁失败 | 文档相对链接失效（`DOC_LINK_CHECK_FAILED`，逐条列出 `文件:行 -> 目标`）。典型根因是文档迁入更深目录后路径深度未同步（`../crates/` 应为 `../../../crates/`）；本地跑同一条命令按提示补层级即可，`docs/archive/` 已自动排除 |
+| `doc-link-check.js` 门禁失败 | 文档相对链接失效（`DOC_LINK_CHECK_FAILED`，逐条列出 `文件:行 -> 目标`）。典型根因是文档迁入更深目录后路径深度未同步（`../crates/` 应为 `../../../crates/`）；本地跑同一条命令按提示补层级即可 |
 | `coscmd` 403 / 签名错误 | 检查 4 个 Secrets 是否齐全、密钥有效、子账号有该桶写权限、`COS_BUCKET` 为 `名称-APPID` 完整格式 |
 | **exit 253 + `please make sure [y/N]`** | `coscmd upload --delete` 删除远端多余文件前会交互确认，runner 无 stdin 导致失败；workflow 已加 `-y`（Skip confirmation），勿移除 |
 | **`Failed to resolve *.cos.*.myqcloud.com`（DNS 失败）** | 几乎必为 Secret 格式错误：① 桶名含大写 / 下划线；② 缺 `-APPID` 或误填完整域名；③ 地域填了中文；④ 值首尾带空格。流水线预检会秒级报出中文指引 |

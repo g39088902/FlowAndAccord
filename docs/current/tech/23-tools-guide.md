@@ -62,7 +62,7 @@ stateDiagram-v2
 | 22 | **`test-snapshot-bin.js`** | 契约门禁 | ★ M4 四处同步防漂移门禁：FABS 二进制帧 vs JSON 真值逐字段深比较（4 场景，含跨世界驻留表） | `node tools/test-snapshot-bin.js` | 0=全绿, 1=不一致 |
 | 23 | **`cross-doc-check.js`** | 契约门禁 | 跨文档事实指纹一致性：同一事实在多篇文档值不同即冲突，配置字段另与 config.js / config.rs 权威比对 | `node tools/cross-doc-check.js` | 0=全部一致, 1=冲突/漂移 |
 | 24 | **`test-dag.js`** | 族谱测试 | 直系血脉上下 5 代范围截断、闭合边拓扑、布局确定性与独立页导出自动化套件 | `node tools/test-dag.js` | 0=测试全通, 1=断言失败 |
-| 25 | **`doc-link-check.js`** | 契约门禁 | ★ Markdown 相对链接可达性门禁：文档迁移/重命名后路径深度未同步即报错（排除 `docs/archive/` 冻结区） | `node tools/doc-link-check.js` | 0=全部可达, 1=存在失效链接 |
+| 25 | **`doc-link-check.js`** | 契约门禁 | ★ Markdown 相对链接可达性门禁：文档迁移/重命名后路径深度未同步即报错） | `node tools/doc-link-check.js` | 0=全部可达, 1=存在失效链接 |
 
 ---
 
@@ -125,7 +125,7 @@ stateDiagram-v2
 - **目标**：机检「N 份文档两两之间没有冲突」——不做 O(N²) 全文比对，而是把可枚举事实（配置字段值 / 关键常量 / 结构数字）提取为指纹：
   1. **CONFLICT（文档 vs 文档）**：同一指纹键（如 `carryCapacityResource`、决策错峰相位 `% N == 0`、SimConfig 字段总数）在 ≥2 篇文档中值不同；
   2. **DRIFT（文档 vs 权威）**：配置字段值与 `frontend/js/config.js`、字段总数与 `config.rs`、工具数与 `tools/` 实际脚本数不一致（权威值运行时读取，不硬编码）。
-- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `docs/archive/`、`../01-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态）。
+- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `../01-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态）。
 - **常用命令**：
   ```bash
   node tools/cross-doc-check.js            # 常规检查（冲突/漂移即退出码 1）
@@ -136,7 +136,7 @@ stateDiagram-v2
 ### 2.7 `doc-link-check.js` · Markdown 相对链接可达性门禁
 - **目标**：校验 `docs/` 下全部 Markdown 的**相对链接**是否指向真实存在的文件/目录。
 - **为什么需要它（2026-09-12 技术债审计 §3）**：`cross-doc-check.js` 只管跨文档的**事实指纹**，`code-map-check.js` 只管**源码文件**是否登记，**此前没有任何门禁校验 Markdown 链接可达性**——2026-09-12 文档体系重构（`docs/*.md` → `docs/current/tech/*.md`，路径深两级）后，指向源码/工具/配置的 `../crates/…`、`../frontend/…`、`../.github/…` 整批失效（27 处散落 7 篇）却仍然全绿，直到人工审计才发现。
-- **扫描范围**：全仓 `*.md`（跳过构建产物与缓存目录），**自动排除 `docs/archive/`**——归档正文按「冻结历史」策略不改写；同时跳过 `http(s)://` / `mailto:` / 纯 `#锚点` / `/` 开头的示例占位符。
+- **扫描范围**：全仓 `*.md`（跳过构建产物与缓存目录）；同时跳过 `http(s)://` / `mailto:` / 纯 `#锚点` / `/` 开头的示例占位符。
 - **额外检测**：形如 `a.md.md`、`file.js.js` 的**重复扩展名**（批量改写脚本误伤的典型症状）。
 - **常用命令**：
   ```bash

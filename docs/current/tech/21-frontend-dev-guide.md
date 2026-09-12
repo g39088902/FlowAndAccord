@@ -208,8 +208,10 @@ pub struct HistoryKingSnapshot {
    - 超过 20 条的列表必须进行截断显示（如 `... 另有 X 户未展示`），或采用轻量级虚拟列表，避免几百代演化后 DOM 节点数突破数千导致浏览器掉帧卡死。
 4. **确定性与零额外 RNG**：
    - 前端所有排序展示（如族长顺位、继承人顺位）必须与 Rust 内核确定性算法保持一致（如并列时按 ID 从小到大排序），禁止在 JS 端使用非稳定排序。
-5. **高频 DOM 重建禁止破坏交互（★ v1.21.1 起内容快照缓存）**：
-   - 任何被高频（每帧 / 10FPS）`innerHTML = ...` 全量重建的容器，其内部可交互元素（`.lineage-chip`、按钮、卡片）必须套**内容快照缓存**（生成 HTML 与上次一致即跳过重建），否则 mousedown 与 mouseup 之间的节点替换会吞掉 `click` 事件且控制台零报错。先例：`ledger-ui.js::renderHtml`（v1.21.1）、`auction-ui.js::renderHtml`（v1.22.3）。
+5. **高频 DOM 重建禁止破坏交互（★ v1.21.1 起内容快照缓存 · 根 AGENTS.md §4.15）**：
+   - **症状与根因**：任何被高频（每帧 / 10FPS）`innerHTML = ...` 全量重建的容器，其内部可交互元素（`.lineage-chip`、按钮、卡片）会在 mousedown 与 mouseup 之间被替换成新节点，`click` 事件因此落到新旧节点的共同祖先上、`e.target.closest(...)` 落空——表现为「点击无反应 / 无法切换选中项 / 历史跳转失效」，且**控制台零报错**（handler 只是没被命中，并非抛异常）。
+   - **唯一正确姿势**：高频刷新容器一律套**内容快照缓存**——生成 HTML 与上次一致即跳过 `innerHTML` 重建。先例：`ledger-ui.js::renderHtml`（v1.21.1）、`auction-ui.js::renderHtml`（v1.22.3）、`render_inspector.js` 的 `innerHTML !== html` 守卫。仅内容真正变化时才重建 DOM，`:hover`/`click` 才稳定。
+   - **新增交互前的审计清单**：凡计划在「每帧 / 高频重建的容器」内放可点击元素（chip / 按钮 / 卡片），必须先确认该容器走快照缓存。**当前在红线内的容器**（每帧 innerHTML 重建且含 chip）：`render_hud.js` 的 `eventsList`、`insp-mg-history-list`、家户列表、婚姻列表——动它们前先套缓存。
 
 ---
 

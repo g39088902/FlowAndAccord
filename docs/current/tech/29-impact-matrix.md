@@ -58,7 +58,7 @@ stateDiagram-v2
 
 | 改动对象 | 必须同步改动 | 原因 |
 |---|---|---|
-| `snapshot.rs` 新增 AgentSnapshot 字段 | `world.rs` `generate_snapshot()` 赋值 / `rustworld.js` `_applySnapshot()` 映射 / `render.js` 或 `main.js` 消费端 | §4.5 三处同步：缺一处就是运行时 undefined |
+| `snapshot.rs` 新增 AgentSnapshot 字段 | `world_snapshot.rs` `generate_snapshot()` 赋值 / `snapshot_bin/encode.rs` FABS 编码 / `snapshot-bin.js` 解码 / `rustworld.js` `_applySnapshot()` 映射 / `render.js` 或 `main.js` 消费端 | §4.5 四处同步（★ M4）：缺一处就是运行时 undefined 或二进制≠JSON |
 | `snapshot.rs` 新增 HouseSnapshot 字段 | `world.rs` `generate_snapshot()` / `rustworld.js` / `render.js` 房屋 Inspector / `ledger-ui.js` 如涉及家户关联 | 房屋快照同时被渲染层和制度大盘消费 |
 | `snapshot.rs` 新增 PoiSnapshot 字段 | `world.rs` / `rustworld.js` / `render.js` POI 弹窗 / `main.js` 点击拾取 | POI 快照被顶栏统计和弹窗双重消费 |
 | 前端 DOM ID 变更 | `render.js` `getElementById` / `main.js` 事件绑定 / `ledger-ui.js` / `decision-viz-view.js` / `style.css` 选择器 | §4.5 末尾：DOM ID 是多文件共享契约 |

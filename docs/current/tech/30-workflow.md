@@ -93,7 +93,7 @@ node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS
 
 - [ ] 工作区只有本次任务相关文件；没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本。
 - [ ] `git diff --check` 无空白错误，新增/删除/重命名文件和引用路径已核对。
-- [ ] `doc-link-check.js` 全绿（改过文档路径 / 迁移过文档目录时尤其必跑）；`docs/archive/` 归档正文按冻结策略已自动排除。
+- [ ] `doc-link-check.js` 全绿（改过文档路径 / 迁移过文档目录时尤其必跑）。
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
 - [ ] 改过代码已用 `node tools/bump-version.js --patch`（或 `--minor` / 指定版本）升版，`--check` 零漂移；**未手工编辑任何版本号定义点**。
 - [ ] `docs/current/01-changelog.md` 已追加该版本条目；对应 `docs/current/` 模块文档已同步。
@@ -233,7 +233,7 @@ node tools/doc-maintenance-check.js --strict
 
 - **原理**：不做 O(N²) 全文比对，把可枚举事实（配置字段值 / 关键常量 / 结构数字）提取为「指纹」，同一指纹键在 ≥2 篇文档中值不同即 CONFLICT；
 - **权威比对**：配置字段值 vs `frontend/js/config.js`、SimConfig 字段总数 vs `config.rs`、工具数 vs `tools/` 实际脚本数，不一致即 DRIFT（权威值运行时读取，不硬编码）；
-- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `docs/archive/`、`docs/current/01-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态数值）；
+- **扫描范围**：根 AGENTS.md + 各局部 AGENTS.md + `docs/` 全部 markdown；有意排除 `docs/current/01-changelog.md`（历史记录）与 `*-plan-*` / `*-spec-*`（规划态数值）；
 - **用法**：`node tools/cross-doc-check.js`（存在冲突/漂移即 exit 1），`--json` 供 CI 与仪表盘；
 - **边界**：语义型冲突（机制描述 / 因果 / 归属自相矛盾）无法机检，仍靠维护清单 + 人工复核兜底。
 

@@ -150,7 +150,7 @@ FlowAndAccord/
 │   ├── cross-doc-check.js                  # ★ 跨文档事实指纹一致性检查 (同指纹多文档值不同即冲突，配置值另与权威比对)
 │   ├── dag-shot.js                         # 族谱多档位无头截图验证 (Node 加载 FlowDag + Chrome headless)
 │   ├── diagnose.js                         # 确定性无头内核诊断与 Bug 嗅探工具 (指定 seed/tick 极速排障)
-│   ├── doc-link-check.js                   # ★ Markdown 相对链接可达性门禁 (2026-09-12 新增；排除 docs/archive 冻结区)
+│   ├── doc-link-check.js                   # ★ Markdown 相对链接可达性门禁 (2026-09-12 新增)
 │   ├── doc-maintenance-check.js            # 文档维护体检器 (新鲜度、复核周期与维护清单扫描)
 │   ├── frontend-check.js                   # 前端静态一致性与 JS 语法校验门禁 (含 getElementById DOM ID 存在性检查)
 │   ├── gen-dag-testdata.js                 # 族谱布局参数拟合测试数据生成 (驱动 sim_wasm 跑满 50 万 tick)
@@ -177,7 +177,6 @@ FlowAndAccord/
 └── docs/                                    # 📚 全部项目文档（当前/计划 → 产品设计/技术方案 → 目录内顺序编号）
     ├── README.md                              # 文档总导航
     ├── doc-maintenance.json                   # 文档维护清单契约配置
-    ├── decision-viz-prototype.html            # 决策可视化交互原型
     ├── current/                               # 现状：代码中真实存在的行为
     │   ├── README.md                          # 现状总索引（含完整模块导航表）
     │   ├── 01-changelog.md                    # 版本演进记录
@@ -199,7 +198,7 @@ FlowAndAccord/
     │       ├── 08-ecology-and-poi.md            # 上层：23 处有限生态、采收与卸货
     │       ├── 09-market-pricing.md             # 上层：榷场互市与幂律定价
     │       ├── 10-agent-life-cycle.md           # 中层：生理代谢、繁衍、禀赋、死亡
-    │       ├── 11-decision-engine.md            # 中层：马斯洛六层与 18 条分支（附技术选型理由）
+    │       ├── 11-decision-engine.md            # 中层：马斯洛六层与 16 条分支（附技术选型理由）
     │       ├── 12-m19-architecture.md           # 中层：意图-策略-原语三层解耦规格
     │       ├── 13-housing-system.md             # 中层：五级房屋、折旧、空置房拍卖
     │       ├── 14-terrain-and-network.md        # 下层：地表单元、水系、路网与通行
@@ -220,7 +219,7 @@ FlowAndAccord/
     │       ├── 29-impact-matrix.md              # 工程：改 X 牵动哪些文件 + tick 顺序
     │       ├── 30-workflow.md                   # 工程：Agent 入口 + 提交检查单 + 文档维护
     │       └── 31-code-map.md                   # 附录：本文件
-    ├── plan/                                 # 计划：在办设计与未落地方案
+    └── plan/                                 # 计划：在办设计与未落地方案
     │   ├── README.md                          # 计划总索引（含依赖顺序图）
     │   ├── design/                            # 产品设计（玩法方向）
     │   │   ├── 01-roadmap.md                    # 长期路线图 M10~M18
@@ -238,14 +237,6 @@ FlowAndAccord/
     │       ├── 06-terrain-templates.md          # 地图模板库与 D-B 子特征蓝图
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       └── 08-performance.md                # 仅保留未完成的性能优化
-    └── archive/                               # 已完成或被替代的历史设计稿
-        ├── README.md                            # 归档索引（归档原因与替代入口）
-        ├── 08-decision-viz-design.md
-        ├── 10-architecture.md
-        ├── 12-plan-ledger-refactor.md
-        ├── 13-plan-house-upgrade-auction.md
-        ├── 14-plan-todo-followup-v1.27.md
-        └── 19-m19-baseline-audit.md
 ```
 
 ## 1. 目录级 AGENTS.md
@@ -264,3 +255,4 @@ FlowAndAccord/
 ## 3. M19.1 类型与只读观察入口
 
 `decisions/intent.rs` 定义意图并转换已知来源的 Need；`strategy.rs` / `primitive.rs` 定义计划词汇；`observation.rs` 为 Agent 提供借用式执行事实与旧状态无损视图。旧 evaluate/routing/scheduler 继续执行，不存在第二个调度器。API 与存储边界见 [./12-m19-architecture.md](./12-m19-architecture.md)。
+

@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.45.5` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.50.28` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 </div>
 
@@ -52,7 +52,7 @@ Every tribesfolk carries a pyramid inside, from the top-level "instant behaviors
 
 Decisions **never roll dice** — the same situation always yields the same choice. Whether a resource site is worth a trip is decided by each tribesfolk's **private ruler** (a Schmitt trigger): only worth setting out when stock is above half, no longer worth visiting once it drops below a tenth; if a site runs dry mid-route, they smoothly turn around and reroute on the spot — never teleporting. When the wilderness runs dry, the household head can even go straight to the Marketplace for remote ledger settlement!
 
-Even better, **you can curate their values**: the "🧠 Decision Engine" view on the page lays out all 18 decision branches as draggable cards across 6 layers. Drag a boundary or reorder the cards and the running simulation hot-injects the change immediately — make this tribe put "courting" ahead of "stockpiling", or the reverse, with one-click persistence to disk.
+Even better, **you can curate their values**: the "🧠 Decision Engine" view on the page lays out all 16 decision branches as draggable cards across 6 layers. Drag a boundary or reorder the cards and the running simulation hot-injects the change immediately — make this tribe put "courting" ahead of "stockpiling", or the reverse, with one-click persistence to disk.
 
 ### 2. 🛤️ The roads are worn out by their own feet
 
@@ -172,7 +172,7 @@ Then open your browser (Chrome or Edge recommended) at `http://localhost:3000`. 
 | **Top bar "⏪ Rewind" / console "⏪ Time Rewind"** | Open the rewind controller; enter any historical tick or drag the slider to instantly roll the world back |
 | **Top bar "🏛️ Bids" / double-click a listed house** | Open the dedicated 1240px auction dashboard and watch the wheat-ear timeline, buyer pool, and bidding flow |
 | **Top bar "☀️ Theme"** | One-click switch between dark immersive / bright airy visual themes |
-| **Console "🧠 Decision Engine"** | Drag the 18 branch cards and boundaries to hot-reorder the tribesfolk's need priorities in real time, with persistence |
+| **Console "🧠 Decision Engine"** | Drag the 16 branch cards and boundaries to hot-reorder the tribesfolk's need priorities in real time, with persistence |
 | **`Space` / console pause** | Globally pause / resume the simulation |
 | **Mouse wheel / right-drag** | Zoom and pan the map viewport (camera auto-follows a selected figure) |
 | **Console "🏕️ Reseed"** | Re-seed 20 founders (10 male, 10 female) and begin a brand-new civilization epic |
@@ -190,28 +190,46 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | Bridge layer | Zero-dependency WebAssembly export layer: linear-memory JSON snapshots & static high-throughput buffers |
 | Presentation layer | Native static frontend (ES6+) + dual-theme Canvas rendering pipeline, zero front-end build chain |
 | Storage engine | File System Access API native disk writes + IndexedDB handle persistence + localStorage fallback with three slots |
-| Tunable hyper-parameters | **200** parameters centralized in `frontend/js/config.js` and split config files; refresh to apply, no recompilation needed |
+| Tunable hyper-parameters | **232** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
 | Quality gates | `node tools/test-wasm.js` (determinism / bounds-safety / no-NaN / long-run stability) + `config-check.js` (frontend-backend parameter alignment) + `diagnose.js` (headless diagnostic engine) |
 
 ---
 
 ## 🗺️ Roadmap
 
-- ✅ **M1~M4** Ledger & social institutions: household / marriage / clan / kingdom (v1.0.0 ~ v1.3.0)
-- ✅ **M5** Ledger & warehouse refactor wrap-up
+**✅ Shipped**
+
+- ✅ **M1~M5** Ledger & social institutions: household / marriage / clan / kingdom / empire (v1.0.0 ~ v1.44.7)
 - ✅ **M6** Housing de-warehousing: household ledger = single source of truth for family reserves; instant house upgrades (v1.4.0)
 - ✅ **M7** Household inventory Schmitt trigger: restocking fully decoupled from house tier (v1.5.0)
 - ✅ **M8** House upgrade cost matrix: 20 hyper-parameters, fixed water/food/wood/stone/gold matrix (v1.6.0)
 - ✅ **M9** Save / load system: local-file direct writes, startup gate, and auto-resume (v1.8.0 ~ v1.28.1)
 - ✅ External market & dynamic pricing: the Marketplace, power-law pricing, direct access on supply failure, and 2.0 discrete settlement (v1.13.0 / v1.27.0 / v1.33.0)
 - ✅ Used-house exchange: 37% wheat-ear auction, all-in multi-house bidding, and linear benchmark decay (v1.14.0 / v1.26.0 / v1.31.0)
-- ✅ ⓪ Instant intention layer: 6-layer Maslow decision engine with 18 branches, dynamically orchestrated (v1.29.0)
-- ✅ Time-rewind controller: strongly deterministic tick checkpoints and arbitrary history rollback (v1.33.0)
-- ✅ Dual-theme UI: bright light theme with preference persistence (v1.33.0)
-- 🔜 **M10** Patent economy & pain-point dynamic invention: grassroots wild black tech, angel funding, monopoly dividends
-- 🔜 **M11** Six-dimensional political capital & mixed polity: composite ruler forms and privilege-bill matrices
-- 🔜 **M12** LLM cognition bus: street tabloids, parliamentary debates, NPC inner-thought diaries
-- 🔜 **M13** ECS core refactor & zero-copy snapshots
+- ✅ ⓪ Instant intention layer: 6-layer Maslow decision engine with 16 dynamically orchestrated branches (v1.29.0; consolidated v1.46.12)
+- ✅ Time-rewind controller + dual-theme UI (v1.33.0)
+- ✅ **M19** Decision-architecture decoupling: intent / strategy / primitive three-layer split, multi-resource TSP itinerary, graded preemption (v1.46.8 ~ v1.46.10)
+- ✅ **M4 FABS** binary snapshot channel: 23× steady-frame compression, 3.5× faster decoding (v1.45.3 / v1.46.0)
+- ✅ **Terrain system**: T1 mountain-pass settlement / T2 river-valley static water / shared water pools / terrain-aware road network / dynamic terrain-normal shading (v1.47.1 ~ v1.48.2)
+- ✅ **Dynamic seasonal lighting**: 360° annual sun arc, coupled terrain / riverbed / glint (v1.48.0)
+- ✅ **Micro aquatic habitat**: fish schools / sun glints (v1.49.0; v1.50.3 ~ v1.50.6 visual noise reduction)
+- ✅ **D-A decoration system**: stylized trees / bushes / boulders scattered on an independent RNG, seasonal tints (v1.49.1 ~ v1.49.3)
+- ✅ **Decorative seasonality & 3D foliage (TA-01 ~ TA-03)**: continuous leaf-color seasonality, 3D branch skeletons, two-pass canopy (v1.50.21 ~ v1.50.27)
+- ✅ **Map gallery page + world seed control**: terrain-template previews / `?seed=` share & reproduce (v1.50.0)
+
+**🔜 Planned** (ordered by player value & validation cost; see [docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md))
+
+- 🔜 **M10** First session & family-story onboarding: play without save files, understand one family in 5 minutes — curated seeds, an observation target, and event replay
+- 🔜 **M11** Camp planning & limited intervention: propose development directions and low-frequency public decisions; the tribesfolk decide whether to adopt them
+- 🔜 **M12** Family memory & historical timeline: naming & monuments, family chronicles, causality chains for key events, export & sharing
+- 🔜 **M13** Time-slot visitors: deterministic NPC time-travel — the last heir of a doomed house / the hunger-stricken girl from 200 years ago, spawning comparable new timelines
+- 🔜 **M14** Exchange, division of labor & resource politics: resident-to-resident matching, gold-standard settlement, specialization
+- 🔜 **M15** Political capital & mixed polity: six-dimension political capital (public opinion / technology / capital / coercion / clan law / ideology) and privilege-bill matrices
+- 🔜 **M16** Generative social & chronicles (optional): template-generated facts + async LLM tabloids / diaries, never altering simulation facts
+- 🔜 **M17** Scaling the core (on demand): ECS & zero-copy snapshots only when performance and population data prove the need
+- 🔜 **M18** Hunting, raiders & the force convention: deer hunts / bandit raids / militia mobilization & public-granary bounties
+- 🔜 **Map template expansion**: tablelands, river deltas, bays, fjords, valleys, peninsulas, islands, desert oases, alluvial fans, karst and more — 14 planned (un-scheduled)
+- 🔜 **M5-2** Condition-triggered multithreaded fork-join (engineering backlog)
 
 ---
 
@@ -224,7 +242,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | [docs/current/](./docs/current/) | Per-module mechanism docs (road network / ecology POIs / seasons / metabolism & reproduction / housing / decision AI / frontend / config / ledger / market / save / impact matrix) |
 | [./docs/current/tech/19-ui-implementation.md](./docs/current/tech/19-ui-implementation.md) · [./docs/current/tech/20-society-ledger-ui.md](./docs/current/tech/20-society-ledger-ui.md) · [./docs/current/tech/21-frontend-dev-guide.md](./docs/current/tech/21-frontend-dev-guide.md) | UI page panorama · society-ledger UI implementation · frontend development guide |
 | [./docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md) | Long-term project roadmap |
-| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 200 tunable hyper-parameters (auto-generated) |
+| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 232 tunable hyper-parameters (auto-generated) |
 
 ---
 

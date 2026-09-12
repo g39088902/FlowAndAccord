@@ -96,6 +96,11 @@ const SITES = [
     file: 'README.md',
     re: /(`v)\d+\.\d+\.\d+(` · `Rust 内核)/g,
   },
+  {
+    id: 'README.en.md 版本徽章',
+    file: 'README.en.md',
+    re: /(`v)\d+\.\d+\.\d+(` · `Rust core)/g,
+  },
 ];
 
 const SAVE_FORMAT_FILE = 'crates/sim_core/src/spatial/world_save.rs';
@@ -274,3 +279,4 @@ function runBump(from, to, dryRun) {
   }
   runBump(current, target, dryRun);
 })();
+

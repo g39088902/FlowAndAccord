@@ -177,7 +177,7 @@ Inspector 三栏属于后续展示增强；基础阶段保留 `current_need` 的
 
 | 阶段 | 交付 | 退出条件 | 状态 |
 |---|---|---|---|
-| **M19.0 基线与契约冻结** | 所有状态/pending 读写者、现有时序、分支资格/失败路径清单；修正现状文档漂移 | 固定 seed/config/tick 的差分样本、RNG 与性能基线可复现（见 `tools/baseline-m19-observation.json` 与 `archive/19-m19-baseline-audit.md`） | ✅ **已完成** (v1.46.8，87,631 TPS 基线与 239 项断言已冻结) |
+| **M19.0 基线与契约冻结** | 所有状态/pending 读写者、现有时序、分支资格/失败路径清单；修正现状文档漂移 | 固定 seed/config/tick 的差分样本、RNG 与性能基线可复现（见 `tools/baseline-m19-observation.json`） | ✅ **已完成** (v1.46.8，87,631 TPS 基线与 239 项断言已冻结) |
 | **M19.1 类型与观察适配** | 引入规格中的领域类型及只读执行视图，保留旧驱动 | 不新增任务选择或 RNG 消费；观察结果与现状逐项一致；零内存分配；门禁 `test-m19-differential.js` 全通 | ✅ **已完成** (v1.46.8，`crates/sim_core/src/spatial/decisions/{intent,strategy,primitive,observation}.rs`) |
 | **M19.2 策略与执行收口** | 先资源链，再社会/房屋链；逐条移交写入权 | 每条链路的状态、物理结算、到达、失败与读档门禁通过；无双驱动 | ✅ **已完成** (v1.46.8，`ActiveTask` 控制器、`transition.rs`、`projection.rs`、SAVE_FORMAT_VERSION 5) |
 | **M19.3 仲裁独立** | L1 统一持续任务入口、瞬发旁路与连续采收接口，清理迁移代码 | 全部 18 分支及重排/覆盖语义保持；全套验收通过；更新模块地图与局部 AGENTS | ✅ **已完成** (v1.46.8，L1 仲裁/瞬发/连续采收解耦，L2 策略与 L3 原语派发，全门禁通过) |
@@ -639,4 +639,4 @@ M19.1 阶段按需读取，不在 tick 中反复影子规划。M19.2/M19.3 已�
 
 新增旧枚举时同步 ActivityObservation 的两个穷尽匹配；新增 NeedKind/BranchId 时同步分支结果适配。调整真实执行行为时仍必须检查原状态写入者，而不是只更新观察映射。
 
-冻结基线、18 分支守卫、写入者清单和本阶段验证证据见 [M19.0/M19.1 审计记录](../../archive/19-m19-baseline-audit.md)，机器可读结果见 [基线报告](../../../tools/baseline-m19-observation.json)。临时验证脚本按项目规定删除；既有 WASM、确定性、快照、配置及前端门禁继续使用。
+机器可读结果见 [基线报告](../../../tools/baseline-m19-observation.json)。临时验证脚本按项目规定删除；既有 WASM、确定性、快照、配置及前端门禁继续使用。

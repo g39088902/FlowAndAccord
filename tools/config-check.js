@@ -259,6 +259,8 @@ function findUnreadConfigFields(rsFields) {
 //    v1.50.18 删掉 4 个地形字段后，文档表格照旧以 ✅ 列着其中 4 个，直到 2026-09-12 才被发现。
 //    判据：文档 §16「已落地 N 个仿真字段」后的 ```text 块中的标识符
 //          ↔ config.js 的 terrain* 键，双向比对，并校验声称的数量与表格行数一致。
+//    ★ text 块起始行尾写 \r?\n：工作区文档行尾受 core.autocrlf / 编辑器影响可能为 CRLF
+//      （v1.50.28 曾因 14 号文档被转成 CRLF 导致写死 \n 的匹配式失配误报「未定位到」）。
 // ---------------------------------------------------------------------------
 const TERRAIN_TABLE_DOC = path.join(ROOT, 'docs', 'current', 'tech', '14-terrain-and-network.md');
 
@@ -271,7 +273,7 @@ function findDocConfigDrift(jsValues) {
   }
   const docName = path.basename(TERRAIN_TABLE_DOC);
   const docText = fs.readFileSync(TERRAIN_TABLE_DOC, 'utf8');
-  const m = docText.match(/已落地\s*(\d+)\s*个仿真字段[\s\S]{0,240}?```text\n([\s\S]*?)```/);
+  const m = docText.match(/已落地\s*(\d+)\s*个仿真字段[\s\S]{0,240}?```text\r?\n([\s\S]*?)```/);
   if (!m) {
     issues.push({
       msg: `${docName}: 未定位到 §16「已落地 N 个仿真字段」+ text 代码块——若文档结构调整，请同步本门禁的匹配式`,

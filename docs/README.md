@@ -22,7 +22,6 @@
 | 改代码、查状态机与契约 | [`current/tech/`](./current/tech/) |
 | 讨论未来玩法方向 | [`plan/design/`](./plan/design/) |
 | 讨论未来技术实现 | [`plan/tech/`](./plan/tech/) |
-| 追溯历史设计决策 | [`archive/`](./archive/) |
 
 - **[现状总索引](./current/README.md)** —— 当前代码中真实存在的行为，含完整模块导航表。
 - **[计划总索引](./plan/README.md)** —— 在办设计与未落地方案，含依赖关系图。
@@ -35,11 +34,3 @@
 > **关于状态机图**：`current/tech/` 与 `plan/tech/` 下每篇技术方案都含
 > `stateDiagram-v2` 状态机图。仅两篇例外——`05-config-reference.md` 由
 > `tools/config-check.js` 自动生成（勿手改），`31-code-map.md` 是源码树附录。
-
----
-
-## 归档准则
-
-完成的里程碑计划、已被现状文档取代的设计方案，以及不再是实施依据的旧版本方案，
-移入 [`archive/`](./archive/) 保留追溯，不应作为开发入口。
-当前行为一律以 `current/`、源码及 `AGENTS.md` 为准。

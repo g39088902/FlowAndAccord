@@ -1,6 +1,5 @@
 //! journal.rs · 账本内核：统一资源类型、账本存量与可审计流水
 //!
-//! 隶属「账本与仓库重构」计划（`docs/archive/12-plan-ledger-refactor.md`）M1.1。
 //! 设计原则：本模块为**制度账本层**，只记录"归谁、谁付的、谁收的"权责流水，
 //! 与物理仓储层（house.rs pantry_* / agent.rs carried_* / ecology/ POI 储量）完全分离，
 //! 不读取、不修改任何物理库存字段。

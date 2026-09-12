@@ -232,7 +232,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 给 agent/house/poi 新增快照字段时，必须 **★ M4 起四处同步**：
 1. `crates/sim_core/src/spatial/snapshot.rs` — 结构体定义
-2. `crates/sim_core/src/spatial/world.rs` — `generate_snapshot()` 赋值（JSON 通道）
+2. `crates/sim_core/src/spatial/world_snapshot.rs` — `generate_snapshot()` 赋值（★ T1 起为 test-only 真值通道）
 3. `crates/sim_core/src/spatial/snapshot_bin/encode.rs` — `write_snapshot_binary()`（M4 FABS 二进制编码，字段顺序/码位须与 1、2 等价）
 4. `frontend/js/snapshot-bin.js`（解码）+ `frontend/js/rustworld.js`（`_applySnapshot()` 映射）
 

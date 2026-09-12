@@ -93,7 +93,7 @@
 ### 3.1 agent.rs ↔ ecology/ 装载/卸货契约
 
 ```
-agent.carry_water / carry_food / carry_wood / carry_stone  (每类独立容量 50.0)
+agent.carry_water / carry_food / carry_wood / carry_stone  (每类独立容量 carryCapacityResource=100.0，互不共享)
 agent.carry_gold                                              (容量无限)
 
 ecology/tick.rs::tick_poi_interactions(dt)
@@ -125,7 +125,7 @@ ecology/tick.rs::tick_poi_interactions(dt)
 snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.45.3) 二进制快照落地后，字段同步由「三处」扩为「四处」**：
 
 1. **定义**：`snapshot.rs` 中各 Snapshot 结构体的字段
-2. **赋值**：`world.rs::generate_snapshot()` 中从 World3DEngine 状态填充（JSON 通道）
+2. **赋值**：`world_snapshot.rs::generate_snapshot()` 中从 World3DEngine 状态填充（★ T1 起为 test-only 真值通道）
 3. **二进制编码**：`snapshot_bin/encode.rs::write_snapshot_binary()`（FABS 帧，字段顺序/枚举码位必须与 1、2 等价）
 4. **映射**：`frontend/js/rustworld.js::_applySnapshot()` + `frontend/js/snapshot-bin.js` 解码器（产物与 JSON 逐字段同构）
 

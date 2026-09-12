@@ -58,6 +58,9 @@ stateDiagram-v2
 | 璀璨金矿 (`Gold`) | 1 | 200.0 | 1.8/s | 产出黄金，终极建筑材料 |
 | 榷场互市 (`Market`) | 1 | 400.0(水) / 400.0(粮) / 400.0(木) | 2.0/s(水) / 2.0/s(粮) / 2.0/s(木) | 外部商贸枢纽，承载水、粮、木三套独立库存与再生，黄金动态计价兑换 |
 
+**ID 段位**（由播撒顺序固定，跨模块硬编码约定）：营地 `1-4` / 清泉 `10-15` / 浆果 `20-25` / 林木 `30-32` / 石矿 `40-41` / 金矿 `50` / 榷场互市 `60`。
+改 POI 数量须同步：`ecology/spawn.rs` 播撒循环 → `poi.rs` 段位常量 → `index.html` 面板文案 → 本文档 §2.1 表格。
+
 ### 2.2 有限储量与再生
 - 所有自然资源点具备 `extract`（抽取）与 `tick_regenerate`（周期再生）机制。
 - 外部市场具备主库存（水）、次级库存（粮）与第三库存（木）的三库存独立再生机制，不纳入 `NodePool`，不设施密特触发器（由 B15 专用派发，或野外断流直达）。
@@ -77,7 +80,7 @@ stateDiagram-v2
 - 已开放点仅在跌破 < 10% 时关闭；
 - 10%~50% 中间带保持该 Agent 的前态。
 
-相同 POI 可被不同 Agent 判为不同可用性，路由与重路由只读取 Agent 的触发器结论，不直接依赖瞬时库存。详见根 AGENTS.md §4.2。
+相同 POI 可被不同 Agent 判为不同可用性，路由与重路由只读取 Agent 的触发器结论，不直接依赖瞬时库存。详见 [`./11-decision-engine.md`](./11-decision-engine.md) §3.2 原则 3 与根 AGENTS.md §4.2。
 
 ### 2.5 营地 5 级行政升级
 以辖内绑定有效房屋数量为界，四个升级门槛由 `SimConfig` 的
@@ -87,6 +90,16 @@ stateDiagram-v2
 [`../design/02-world-rules.md`](../design/02-world-rules.md) §4，本文只保留机制与配置字段。
 
 每座私宅选址时自动绑定最近营地（`house.camp_id`），达成门槛时全图广播晋升。
+
+### 2.6 随身搬运机制（真实背包，非瞬移）
+
+> ★ M6 起家庭储备唯一真相源是**家户账本**，房屋仓库（`House.pantry_*`）已删除——本节的「入库」即「入家户账本」。
+
+- **水 / 粮 / 木 / 石**：在资源点**只装入随身行囊**，每类**独立容量**（`carryCapacityResource`，互不共享）；回家休整时按 `poiUnloadRateResource`/s 卸货**入家户账本**（Deposit 流水）；行囊满即触发返家。
+- **黄金**：行囊容量无限，单趟运满 20 后回宅存入金库（5/s）。
+- **无家宅**（`home_house_id.is_none()`）的 agent **不装载行囊**，只在现场就地自饮自食——**不得隔空入账**。
+
+**改容量 / 装卸速率必须全链条联动**：`agent.rs`（容量与行囊状态机）→ `ecology/`（装载/卸货）→ `decisions/`（满额判定与返家条件）→ `snapshot.rs`（AgentSnapshot 行囊字段）→ `rustworld.js::_applySnapshot` → `render_inspector.js`（Inspector 行囊展示）。完整影响面见 [`./29-impact-matrix.md`](./29-impact-matrix.md) §1.1。
 
 ## 3. 关键不变量
 - POI 数量由 `config.rs` COUNT_* 常量控制，改数量须同步 `ecology/` 与前端面板文案。

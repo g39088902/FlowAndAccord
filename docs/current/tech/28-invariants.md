@@ -2,8 +2,8 @@
 
 > **模块索引**：[← 返回 ../README.md 全景索引](../README.md)
 >
-> 本清单将散落在根 `AGENTS.md` §4 各小节中的硬约束集中提炼，按类别组织。
-> **agent 启动时读这一页即可掌握"哪些东西绝对不能动"**，比在 21KB 的 AGENTS.md 里逐节找高效。
+> 本清单集中提炼散落在根 `AGENTS.md` §4（速查索引）与**各模块文档 / 局部 AGENTS.md** 中的硬约束，按类别组织。
+> **agent 启动时读这一页即可掌握"哪些东西绝对不能动"**——根 `AGENTS.md` §4 只保留一句话要点与指向，本节给出完整约束与违反后果。
 > 每条不变量标注来源章节，便于追溯完整上下文。
 
 ---
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 | # | 不变量 | 来源 | 违反后果 |
 |---|---|---|---|
-| C1 | **家户账本是家庭储备唯一真相源**（M6 起已删除房屋仓库 `House.pantry_*`） | §4.8 | 吃喝/烧柴从错误来源扣减，库存与账本不一致 |
+| C1 | **家户账本是家庭储备唯一真相源**（M6 起已删除房屋仓库 `House.pantry_*`） | §4.8 / ./13-housing-system.md §2 | 吃喝/烧柴从错误来源扣减，库存与账本不一致 |
 | C2 | **快照四处同步（★ M4 起）**：新增 agent/house/poi 字段时必须同步修改 ① `snapshot.rs`（定义）② `world_snapshot.rs::generate_snapshot()`（赋值）③ `snapshot_bin/encode.rs`（**FABS 二进制编码**，字段顺序/码位须与 ①②等价）④ `snapshot-bin.js`（解码）+ `rustworld.js::_applySnapshot()`（前端映射） | §4.5 / spatial/AGENTS.md §3.3 | 前端读到 `undefined`、展示旧值，或二进制与 JSON 不一致 |
 | C3 | **WASM 双副本同步**：改 Rust 后 `sim_wasm.wasm` 必须复制到 `frontend/rust/`（主路径）+ `frontend/`（备用） | §4.1 | 浏览器仍加载旧逻辑，行为与代码不符 |
 | C4 | **不要用 wasm 字节数判断是否更新**，以 `node tools/test-wasm.js` 实际输出为准 | §4.1 | 字节数相同但内容已变的假阴性 |
@@ -107,20 +107,20 @@ stateDiagram-v2
 | # | 不变量 | 来源 | 违反后果 |
 |---|---|---|---|
 | B1 | **决策错峰相位**：每个 agent 仅在 `(tick_counter + agent.id) % 120 == 0` 的相位上决策，全员相位均摊错开 | §4.3 | 全员同拍决策导致性能尖峰和行为同步化 |
-| B2 | **建房/升级/修缮均为 Agent 自主决策**，严禁系统扫描指挥（`tick_warehouse_founding` / `check_start_house_upgrades` 等旧扫描器已删除，勿复活） | §4.11 | 破坏"系统只当物理规则执行者"的设计原则 |
+| B2 | **建房/升级/修缮均为 Agent 自主决策**，严禁系统扫描指挥（`tick_warehouse_founding` / `check_start_house_upgrades` 等旧扫描器已删除，勿复活） | §4.11 / housing_system/AGENTS.md §4.1 | 破坏"系统只当物理规则执行者"的设计原则 |
 | B3 | **掉头必须平滑回走**（中途重路由时在当前车道反向平滑回走），严禁闪现瞬移 | §4.2 | 坐标不连续，渲染跳变 |
-| B4 | **Agent 私有 POI 施密特触发器**：开启 ≥ 0.30 / 关闭 < 0.10 / 中间带保持前态，每名 Agent 维护私有锁存 | §4.2 | 相同 POI 被不同 Agent 判为不同可用性是预期行为 |
-| B5 | **连续采收**：现场采收时若目标触发器已关闭但行囊未满且家宅仍需，自动前往下一处自身触发器已开放的同类 POI | §4.2 | 提前返家导致效率低下 |
-| B6 | **无家宅者不装载行囊**，只在现场就地自饮自食 | §4.4 | 无家者装货后无处卸货 |
+| B4 | **Agent 私有 POI 施密特触发器**：开启 ≥ `decisionPoiSeekMinStockRatio`(0.50) / 关闭 < `decisionPoiAbandonStockRatio`(0.10) / 中间带保持前态，每名 Agent 维护私有锁存 | §4.2 / ./08-ecology-and-poi.md §2.4 | 相同 POI 被不同 Agent 判为不同可用性是预期行为 |
+| B5 | **连续采收**：现场采收时若目标触发器已关闭但行囊未满且家宅仍需，自动前往下一处自身触发器已开放的同类 POI | §4.2 / ./11-decision-engine.md §3.2 | 提前返家导致效率低下 |
+| B6 | **无家宅者不装载行囊**，只在现场就地自饮自食 | §4.4 / ./08-ecology-and-poi.md §2.6 | 无家者装货后无处卸货 |
 | B7 | **胎儿跳过**：代谢（步骤 2）、运动（步骤 6）、决策均跳过 `is_fetus` 的 agent；胎儿参与家户成员计数、继承清算、宗族成员 | spatial/AGENTS.md §4.2 | 胎儿有地图实体会导致渲染和交互异常 |
 | B8 | **分娩时原位复用胎儿 ID** 替换为新生儿，不新建 ID | spatial/AGENTS.md §4.2 | ID 段位混乱，族谱断代 |
-| B9 | **去采货 = 施密特触发器（M7 起）**：有房即可采，与房屋等级彻底脱钩；家户账本余额 < 100 触发，补到 ≥ 200 才停 | §4.8 | 旧逻辑按房屋等级决定采收权限已废弃 |
-| B10 | **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50 | §4.8 | 升级就绪判定与扣账不一致 |
-| B11 | **生育住宅门槛（★ v1.28.0）**：生育后代由男性户主在 `B18RaiseChild` 自主发起，除妻子身体指标达标且**流产冷却（200s）与产后休养冷却（200s）均结束**外，**男方（户主）名下须有 ≥1 级私宅**（0 级仓库/无房不生育） | §4.8 | 旧「生育去房屋化」口径已废弃；条件只写在 B18 分支内，避免与 `execute_pending_childcare` 双写漂移 |
-| B12 | **资金采集纪律**：4 级大庄园竣工前不触发 `B13AccumWealth`（积累财富，`GoldWealth` 冷却 180s）；家户资金补给由 `B10StockGold`（储备资金，`StockGold` 冷却 45s）负责 | §4.8 | 行为优先级混乱 |
-| B13 | **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随 | §4.8 | 镜头持续跟随已取消选中的族人 |
+| B9 | **去采货 = 施密特触发器（M7 起）**：有房即可采，与房屋等级彻底脱钩；家户账本余额 < 100 触发，补到 ≥ 200 才停 | §4.8 / ./08-ecology-and-poi.md §2.4 | 旧逻辑按房屋等级决定采收权限已废弃 |
+| B10 | **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50 | §4.8 / ./13-housing-system.md §2.1 | 升级就绪判定与扣账不一致 |
+| B11 | **生育住宅门槛（★ v1.28.0）**：生育后代由男性户主在 `B18RaiseChild` 自主发起，除妻子身体指标达标且**流产冷却（200s）与产后休养冷却（200s）均结束**外，**男方（户主）名下须有 ≥1 级私宅**（0 级仓库/无房不生育） | §4.8 / ./10-agent-life-cycle.md | 旧「生育去房屋化」口径已废弃；条件只写在 B18 分支内，避免与 `execute_pending_childcare` 双写漂移 |
+| B12 | **资金采集纪律**：4 级大庄园竣工前不触发 `B13AccumWealth`（积累财富，`GoldWealth` 冷却 180s）；家户资金补给由 `B10StockGold`（储备资金，`StockGold` 冷却 45s）负责 | §4.8 / ./11-decision-engine.md §3.2 | 行为优先级混乱 |
+| B13 | **镜头跟随**：选中小人后 `isCameraFollow` 开启，关闭 Inspector（✕ 或 Esc）时必须同时关闭跟随 | §4.8 / frontend/AGENTS.md §5.5 | 镜头持续跟随已取消选中的族人 |
 | B14 | **外部市场隔离与单向流失（v1.13.0，v1.27.0 扩展）**：榷场互市不进入 `NodePool`，不设公地施密特触发器，由 B15 专用派发；★ v1.27.0 起水/粮采集断流时家户户主（账本黄金 ≥ `market_min_family_gold` 且体力达标）可由 `try_route_to_market` 直接改道榷场——仍是**家户账本远程结算付费**，不改变市场支付与黄金单向扣入 `LedgerRef::Void` 的通缩闭环；到达后先濒危自救再装袋购入 | ./09-market-pricing.md | 族人蹭吃蹭喝破坏公地平衡或黄金通缩机制失效 |
-| B15 | **决策分支数组定长联动（18分支）**：内核 `BranchId::ALL`、`resolve_order`、`seen` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / ./09-market-pricing.md | 决策分支越界、反序列化 panic 或写盘校验失败 |
+| B15 | **决策分支数组定长联动（18分支）**：内核 `BranchId::ALL`、`resolve_order`、`seen` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / ./11-decision-engine.md §3.5 | 决策分支越界、反序列化 panic 或写盘校验失败 |
 | B16 | **衰弱守卫（★ v1.47.0 / v1.47.1）**：健康值 < `agentFrailHealthThreshold`（默认 2.0）即衰弱——`branches.rs::evaluate` 在**任何 RNG/散列消费之前**对 `b5/b6/b7/b9/b10/b13` 六条储备分支直接 `return None`（★ v1.47.1 起含 b13 淘金）；B1/B2 分支条件对衰弱者追加 `is_frail && can_home_meal` 或条件（家户账本余额 ≥ `decisionHomeMealMinStock` 即算可满足，野外断流也能派发返家） | decisions/AGENTS.md §4.14 | 衰弱者继续囤货/淘金违背「安度晚年」意图，或断流时家户有余粮却无人返家吃喝 |
 
 ---

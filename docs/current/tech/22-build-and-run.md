@@ -248,10 +248,35 @@ cargo build -p sim_core
 
 ## 5. 版本号统一升版与一致性校验
 ```bash
-node tools/bump-version.js --patch      # 升版并同步全部 10 个版本号定义点
+node tools/bump-version.js --patch      # 升版并同步全部 11 个版本号定义点
 node tools/bump-version.js --check      # 只校验一致性（漂移即 exit 1）
 ```
 改过代码就必须升版（根 AGENTS.md §4.9）。升版器以 `index.html` 版本徽章为唯一真相源，自动同步 `SAVE_APP_VERSION` 等定义点；若 Rust 常量变更，按方式 1 重编译 WASM 并同步双副本。
+
+**升版器自动同步的定义点**（清单维护在 `tools/bump-version.js` 的 `SITES`，新增定义点时先登记到那里）：
+
+| 定义点 | 说明 |
+| :--- | :--- |
+| `frontend/index.html` 徽章（`.version-tag`） | **唯一真相源**（玩家可见） |
+| `crates/sim_core/src/spatial/world_save.rs` `SAVE_APP_VERSION` | **存档应用版本门禁**，编译进 WASM；经 `world_app_version_ptr` 回传前端 |
+| `frontend/js/save-ui.js` `DEFAULT_APP_VERSION` | 引擎未就绪时的版本兜底 |
+| `frontend/js/rustworld.js` 版本兜底串 | Worker READY 前的 `getAppVersion()` 返回值 |
+| `frontend/js/sim_worker.js` 版本兜底串 | Worker 侧 `world_app_version_*` 不可用时的返回值 |
+| 根 `AGENTS.md` §1 Mermaid + §2 步骤四 | 全局操作指南 |
+| `docs/current/README.md` 版本行 / `docs/current/01-changelog.md` 表头 | 现状文档 |
+| `docs/current/tech/06-snapshot-and-save.md` 存档版本说明 | 存档模块文档 |
+| `README.md` 版本徽章 | 对外宣传文档（简体中文） |
+| `README.en.md` 版本徽章 | 对外宣传文档（英文） |
+
+**升版后必做**：
+1. 若 `world_save.rs` 变更（几乎每次都会），必须重编译 WASM 并同步双副本（§2）——否则浏览器里仍是旧版本常量，存档门禁失效；
+2. `SAVE_APP_VERSION` 变更会**自动废弃全部旧存档**（v1.37.1 起的设计行为，见 [`./06-snapshot-and-save.md`](./06-snapshot-and-save.md) §4.2.2）；
+3. 在 `docs/current/01-changelog.md` 追加该版本条目（表头已由升版器自动更新，正文条目需手写）；
+4. 跑 `node tools/bump-version.js --check` 确认零漂移。
+
+> ⚠️ `SAVE_FORMAT_VERSION`（存档**结构**版本）**不随应用版本自增**，仅在 `WorldSave` 字段增删/不兼容变更时手工 +1，且必须同改 `world_save.rs` 与 `save-ui.js`（当前值见 `./06-snapshot-and-save.md` §6 第 5 条）。
+
+> 🔤 **版本字符串格式铁律**：内核 `SAVE_APP_VERSION` 与存档 `app_version` **无 `v` 前缀**（`1.50.27`），`v` 只在 UI 文案里拼接显示。前端任何兜底串（`rustworld.js` / `sim_worker.js`）必须与内核同格式；新增版本比较点必须先过 `save-ui.js::normalizeVer()`，且废弃决策前 `await waitEngineReady()`——否则会重演 v1.44.2 事故（同版本被误判旧档、点「废弃」反而读回旧档）。
 
 > ⚡ **仅文档变更例外**：diff 只含 `docs/` 或根/局部 `AGENTS.md` 内容时，commit **不需要升版、不需要重跑测试**，只需 `doc-maintenance-check` 通过 + `--check` 零漂移（详见根 AGENTS.md §4.0.1 与 `./30-workflow.md` §G）。
 

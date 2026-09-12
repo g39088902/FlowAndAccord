@@ -14,7 +14,6 @@
  *     共 27 处散落 7 篇，直到人工审计才发现。
  *
  * 排除项（不是缺陷，勿报）：
- *   · `docs/archive/`   —— 归档正文按「冻结历史」策略不改写（`archive/README.md` 索引已单独修好）
  *   · `http(s)://` / `mailto:` / 纯 `#anchor` —— 非本地相对链接
  *   · `/` 开头的绝对路径 —— 多为示例占位符（如截图路径示例），不参与校验
  *
@@ -39,11 +38,6 @@ const SKIP_DIRS = new Set([
   '.git', 'node_modules', 'target', '.toolchain', '.vendor', '.cargo-home',
   '.workbuddy', '.codebuddy', '.idea', '.playwright-cli', '.rust-dist',
 ]);
-
-/** 不参与校验的文档（相对于仓库根，正斜杠）——归档正文冻结历史 */
-const SKIP_FILES = [
-  /^docs\/archive\//,
-];
 
 /** 收集全部 .md 文件 */
 function collectMarkdown(dir, out = []) {
@@ -74,8 +68,6 @@ function main() {
 
   for (const file of files) {
     const rel = path.relative(ROOT, file).split(path.sep).join('/');
-    if (SKIP_FILES.some(re => re.test(rel))) continue;
-
     const text = fs.readFileSync(file, 'utf8');
     const baseDir = path.dirname(file);
     const re = /\[([^\]]*)\]\(\s*(?!https?:|mailto:|#)([^)\s]+?)\s*\)/g;
@@ -118,7 +110,6 @@ function main() {
   }
   console.log(`\n❌ DOC_LINK_CHECK_FAILED —— ${broken.length} 条失效链接`);
   console.log('   修法：文档迁入更深目录后，指向仓库根的相对路径需整体补一级（如 ../crates/ → ../../../crates/）。');
-  console.log('   例外：docs/archive/ 归档正文按冻结策略不改写，已自动排除。');
   process.exit(1);
 }
 
