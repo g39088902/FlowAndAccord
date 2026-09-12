@@ -229,11 +229,11 @@ pub struct TerrainAccent {
     pub pos: Vec3,
     pub scale: f32,            // 0.7 ~ 1.4 视觉变体
     pub rotation_rad: f32,     // 0 ~ 2π
-    pub tint: u8,              // 0=默认, 1=偏黄(秋季), 2=偏红(深秋)
-    // ★ 现状：Rust 恒写 0（`accents.rs`「tint 默认 0，季节调色由前端应用」）。
-    //   季节色调由前端 `SimTreeTint.tint(accent, sim)` 按**当前季节实时**派生；
-    //   该字段是预留钩子，目前没有生产者。D-B1 若仍需它，必须指定唯一生产者；
-    //   否则应借 FABS `FORMAT_VERSION` 2→3 之机移除（§5.7）。
+    pub     tint: u8,              // 0=默认, 1=偏黄(秋季), 2=偏红(深秋)
+    // ★ 现状：该字段是**无生产者的预留钩子**——Rust 侧恒写 0（`accents.rs`「tint 默认 0」），
+    //   渲染层也不再读它：季节叶色自 2026-09-12 起由前端 `SimTreeTint.tint(accent, sim)`
+    //   按当前季节实时派生（`render_terrain.js`，真相源＝快照 `season`/`season_progress`）。
+    //   D-B1 若仍需该字段，必须指定唯一生产者；否则应借 FABS `FORMAT_VERSION` 2→3 之机移除（§5.7）。
 }
 
 pub enum AccentKind {
@@ -369,7 +369,7 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 3. ✅ 生成初始 `SurfaceKind::DryGround`。
 4. ✅ 按坡度阈值写入 `SurfaceKind` 候选：≥34° `RockFace`、≥20° `SoftGround`、其余 `DryGround`；同时写入 `NO_BUILD`（≥18°）与 `NO_WALK`（硬禁行地表）标志。最终禁行由配置和查询服务确定，不直接把所有高坡标成不可通行。
 5. ✅ 生成 `natural_fertility` 的静态遮罩（`(0.92 - slope/70 - 归一化高程*0.18).clamp(0.1, 1.0)`）。T0 只透传和可视化，不接入农业产量。
-6. ⏳ 对每个初始营地、关键资源和市场执行合法地表与生存距离校验——未实施（`ecology/spawn.rs` 未消费查询服务，`terrainGenerationMaxRetries` 因此尚未被使用）。
+6. ⏳ 对每个初始营地、关键资源和市场执行合法地表与生存距离校验——未实施（`ecology/spawn.rs` 未消费查询服务；与之配套的有界重试参数 `terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现该步时需一并加回并接线）。
 
 `sample_elevation` 当前使用双线性插值；离散地表事实由 `sample_cell`/`grid_index` 以最近栅格读取。若后续改变任一采样语义，必须同时复核 POI、房屋、路网和 Agent 的接地位置。
 
@@ -838,7 +838,7 @@ render_agents.js        族人绘制                                        ✅
 - **ShallowFord**：浅滩跨水步道虚线（`rgba(218, 197, 133, 0.95)`，双向虚线）；
 - **SpringValley**：浅沟细带；
 - ~~**Ridge/Saddle/Terrace**~~（v1.47.7 已删除，不再绘制山脊线/山口圆/台地轮廓）。
-- **Tree**（✅ D-A）：四瓣层叠树冠（径向渐变绿 + 冠顶受光高光）+ 锥形微弯树干，含叶片斑驳纹理（10 枚由 `accent.id` 派生的暗/亮叶簇小点）；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调）；季节色由前端按**当前季节**实时派生（受 `terrainTreeSeasonTint` 开关控制）——不是读存档里的 `tint`（后者恒为 0，见 §7.4）；
+- **Tree**（✅ D-A）：四瓣层叠树冠（径向渐变绿 + 冠顶受光高光）+ 锥形微弯树干，含叶片斑驳纹理（10 枚由 `accent.id` 派生的暗/亮叶簇小点）；个体差异由 `accent.id` 派生确定性 `vSeed`（干高/冠形/色相 ±7 微调）；季节叶色由前端 `window.SimTreeTint`（`render_terrain.js`，2026-09-12 落地）按**当前季节**实时派生：以快照 `season` + `season_progress` 推年相位，分段年历映射到三档叶色（鲜绿 → 黄绿 → 红褐，深秋与冬季共用红褐档），并逐树按 `accent.id` 做相位抖动以避免成片树同帧换色；调参入口 `RENDER_CONFIG.treeTint*`（`config.render.js`）——**不读存档里的 `tint`**（后者恒为 0，见 §7.4）；
 - **Boulder**（✅ D-A）：不规则多边形岩石（灰岩基色 + 受光面高光），尺寸 2-5m；
 - **Bush**（✅ D-A）：三瓣扁压圆簇灌木 + 微投影，高度 < 1m。
 
@@ -848,7 +848,7 @@ render_agents.js        族人绘制                                        ✅
 - 水面颜色、岸石为静态视觉派生，不改变内核通行或库存。
 - HUD 大盘水源储量按 `waterPoolId` 去重汇总，避免多个河岸取水点重复累加导致总量虚高。
 - 浅滩人物沿内核实际路线移动，过水时根据 `terrain_shallow_water_cost` 自然减速。
-- 装饰物为静态视觉元素，不与库存/季节直接绑定（仅按 `terrainTreeSeasonTint` 做全局季节色调变化）。
+- 装饰物为静态视觉元素，不与库存绑定；**仅 Tree 叶色随季节变化**（`SimTreeTint` 三档：鲜绿 / 黄绿 / 红褐），Boulder 与 Bush 恒用固定配色（`drawAccentBush` 不接受 tint 参数）。
 - 贴地图元（道路/底座/水面/足迹线）保持贴合地表；立体实体与装饰锚点经 `MAP_Z_LIFT` 略抬于地表（v1.50.12），避免坡面「陷进」地面。
 - 渲染参数（`mapZLift`/`agentFootprintR`/`accentFootprintR` 等）外置在 `frontend/js/config.render.js`（`window.RENDER_CONFIG`），与 `SIM_CONFIG` 分离（v1.50.15）。
 
@@ -865,12 +865,12 @@ render_agents.js        族人绘制                                        ✅
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 22 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 232）：
+✅ 已落地 18 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 232）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
+✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
-✅ terrainRidgeWidth          125.0               山脊/河谷影响宽度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
 ✅ terrainPassRidgeAmplitude  53.0                ★ T1 山口主脊幅度 (m)；通行力约束见 §9.3.1
 ✅ terrainRiverWidthMin       28.0                主河最小宽度 (m)
@@ -885,10 +885,7 @@ render_agents.js        族人绘制                                        ✅
 ✅ terrainMaxBuildSlope       16.0                房屋完整占地最大坡度 (度)
 ✅ terrainFootprintHalfExtent 7.0                 房屋基础占地半尺寸 (m)
 ✅ terrainRoadCorridorWidth   5.0                 道路合法走廊宽度 (m)
-✅ terrainGenerationMaxRetries 8                  地形布局有界重试上限
 ✅ terrainAccentDensity       1.0                 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
-✅ terrainAccentSubFeatures   true                是否启用子特征注入（山脚湖/瀑布/峭壁等；D-B 预留，当前仅声明）
-✅ terrainTreeSeasonTint      true                装饰树木是否按季节变色
 ```
 
 实现约束：
@@ -896,6 +893,15 @@ render_agents.js        族人绘制                                        ✅
 - ✅ 每个字段同时出现在 Rust `SimConfig`、默认映射、前端 `config.js`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 232）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
-- ◐ `terrainAccentSubFeatures` 已声明并前后端对齐，但子特征注入器尚未实现（D-B）；`terrainGenerationMaxRetries` 已声明未被消费。
+- ⚠️ **已删除的地形字段**（v1.50.18 死代码审计，勿再引用）：`terrainRidgeWidth`（山脊/河谷影响宽度，
+  T1 主脊已改走 `terrainPassRidgeWidth`）、`terrainGenerationMaxRetries`（有界重试）、
+  `terrainAccentSubFeatures`（D-B 子特征注入总开关）、`terrainTreeSeasonTint`（树木季节变色开关）——
+  四者在内核**零读取点**，已从 `config.rs` / `config.js` / `examples/config.json` 三处同步删除，字段总数 242 → 231 → 232（v1.50.19 新增 `terrainGridRes`）。
+  后三项同时是 `docs/plan/tech/06-terrain-templates.md` 中 D-B 蓝图的**预留占位**：若 D-B 继续执行，
+  须在实现时把字段**连同唯一消费点一起加回**（`tools/config-check.js` 第 5 条「空转参数」规则会拒绝无消费点的字段）。
+  树木季节变色**不依赖**该开关——自 2026-09-12 起由前端 `SimTreeTint` 按季节派生（见 §7.4 与本节 Tree 条目）。
+- ⚠️ **本表的字段清单由门禁守护**：`tools/config-check.js` 第 6 条规则（2026-09-12 新增）会把本节
+  ```text 代码块中的字段名与 `frontend/js/config.js` 的 `terrain*` 键做**双向比对**，
+  出现幽灵字段（文档写了但已删）或漏列字段即报错——修完本表当次即已接入。
 
 ---

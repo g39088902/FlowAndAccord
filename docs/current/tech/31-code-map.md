@@ -147,6 +147,7 @@ FlowAndAccord/
 │   ├── cross-doc-check.js                  # ★ 跨文档事实指纹一致性检查 (同指纹多文档值不同即冲突，配置值另与权威比对)
 │   ├── dag-shot.js                         # 族谱多档位无头截图验证 (Node 加载 FlowDag + Chrome headless)
 │   ├── diagnose.js                         # 确定性无头内核诊断与 Bug 嗅探工具 (指定 seed/tick 极速排障)
+│   ├── doc-link-check.js                   # ★ Markdown 相对链接可达性门禁 (2026-09-12 新增；排除 docs/archive 冻结区)
 │   ├── doc-maintenance-check.js            # 文档维护体检器 (新鲜度、复核周期与维护清单扫描)
 │   ├── frontend-check.js                   # 前端静态一致性与 JS 语法校验门禁 (含 getElementById DOM ID 存在性检查)
 │   ├── gen-dag-testdata.js                 # 族谱布局参数拟合测试数据生成 (驱动 sim_wasm 跑满 50 万 tick)

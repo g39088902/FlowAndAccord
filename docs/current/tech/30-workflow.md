@@ -86,12 +86,14 @@ stateDiagram-v2
 git status --short
 git diff --check
 node tools/doc-maintenance-check.js
+node tools/doc-link-check.js           # 相对链接可达性：文档迁移/重命名后路径深度未同步即退出码 1
 node tools/cross-doc-check.js          # 跨文档事实指纹：文档间冲突 / 配置权威漂移
 node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS.md §4.9）
 ```
 
 - [ ] 工作区只有本次任务相关文件；没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本。
 - [ ] `git diff --check` 无空白错误，新增/删除/重命名文件和引用路径已核对。
+- [ ] `doc-link-check.js` 全绿（改过文档路径 / 迁移过文档目录时尤其必跑）；`docs/archive/` 归档正文按冻结策略已自动排除。
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
 - [ ] 改过代码已用 `node tools/bump-version.js --patch`（或 `--minor` / 指定版本）升版，`--check` 零漂移；**未手工编辑任何版本号定义点**。
 - [ ] `docs/current/01-changelog.md` 已追加该版本条目；对应 `docs/current/` 模块文档已同步。
@@ -160,6 +162,7 @@ diff 只涉及 `docs/` 或根/局部 `AGENTS.md` 内容（不含 Rust / 前端 /
 git status --short
 git diff --check
 node tools/doc-maintenance-check.js
+node tools/doc-link-check.js           # 相对链接可达性（纯文档提交正是其主战场）
 node tools/cross-doc-check.js          # 跨文档事实指纹（纯文档提交正是其主战场）
 node tools/bump-version.js --check        # 一致性校验，非升版
 ```
@@ -187,7 +190,7 @@ A 必须全部通过（纯文档提交按 §G 走：跳过升版与测试，工�
 
 ## 2. 维护清单
 
-清单文件为 [`docs/doc-maintenance.json`](../doc-maintenance.json)。每条记录包含：
+清单文件为 [`docs/doc-maintenance.json`](../../doc-maintenance.json)。每条记录包含：
 
 | 字段 | 含义 |
 |---|---|

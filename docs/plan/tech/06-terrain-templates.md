@@ -9,6 +9,14 @@
 > **状态**：T0 统一地表查询、T1 山口聚落、T2 两岸河谷水系与 D-A 地表装饰系统**均已落地**（T1/T2 于 v1.47.5；D-A 于 v1.49.1，v1.49.2/v1.49.3/v1.50.10 持续打磨）；生成器版本 **4**（v1.50.17 经 T1-R 主脊通行力修复后由 3 递增）；T1/T2 **子特征注入**、D-B/D-C 高级装饰为**新增规划（v1.48.0）**；T4 动态水文、桥梁与土地演化**未实现、未排期**。**T1-R 主脊通行力缺口已修复**（2026-09-11 审查发现、同日修复：主脊最大坡度由约 24° 提升至 36°~41°，产生真实硬禁行与绕行代价；实测记录、参数契约与门禁见 §9.3.1）。
 > **本文定位**：地形领域**唯一权威文档**——以地图模板为主轴，同时承载「模板清单与地理玩法」与「支撑其实现的技术方案」两部分。2026-09-11 由原 `./06-terrain-templates.md`（方向设计）与 `26-plan-terrain-implementation.md`（实施技术方案）合并而成，26 号已删除；合并时按当前代码事实校正了原 26 号中已过时的落地状态（D-A 装饰已落地、`render_terrain.js` 已拆分、配置已达 232 字段）。同日二次整理：改为以地图模板为核心，技术章节按「服务对象」重新归位并整体重排章节号（对照表见 §0.3）。
 > **整理日期**：2026-09-11（合并日 + 模板化重组日）；方案优化基线 v1.48.0，现状基线 v1.50.16。
+> ⚠️ **配置字段状态更正（2026-09-12）**：本文 D-B 蓝图引用的三个字段
+> `terrainGenerationMaxRetries`（有界重试）、`terrainAccentSubFeatures`（子特征注入总开关）、
+> `terrainTreeSeasonTint`（树木季节变色开关）**已于 v1.50.18 全量删除**——它们在 `crates/` 中零读取点，
+> 属"空转配置"。因此下文凡出现「已声明未消费」「保留该开关」「应一并清理」的表述**均以本段为准**：
+> 三项已清理完毕，**D-B 落地时必须把字段连同唯一消费点一起加回**（`tools/config-check.js` 第 5 条
+> 「空转参数」规则会拒绝任何无消费点的字段）。树木季节变色已不依赖任何配置开关：
+> 自 2026-09-12 起由前端 `SimTreeTint`（`render_terrain.js`）按快照季节实时派生，
+> 调参入口是 `window.RENDER_CONFIG.treeTint*`（`frontend/js/config.render.js`）。
 > **入口**：[文档导航](../../README.md) · [长期路线图](../design/01-roadmap.md) · [地形美术与世界景观提升](./07-terrain-art.md)。
 > **依据**：[./01-integration-contracts.md](./01-integration-contracts.md)、[./07-terrain-art.md](./07-terrain-art.md)、[../../current/tech/17-seasonal-lighting.md](../../current/tech/17-seasonal-lighting.md)、[../../current/tech/18-water-rendering.md](../../current/tech/18-water-rendering.md)。
 > **现状以** `../../current/tech/14-terrain-and-network.md`、`../../current/tech/04-config-system.md`、`../../current/tech/06-snapshot-and-save.md`、`../../current/tech/16-frontend-overview.md` 与 `../../current/01-changelog.md` 为准。
@@ -120,7 +128,7 @@ stateDiagram-v2
 
 让地图拥有可以被记住的地方：一条把聚落分隔两岸的河、一处绕山必经的山口。地形同时改变画面轮廓、路线选择和聚落条件，帮助玩家理解“为什么人们住在这里、走这条路”。
 
-内核地形以高程与坡度为基础，见 [biome.rs](../crates/sim_core/src/geo/biome.rs)；[terrain.rs](../crates/sim_core/src/geo/terrain.rs) 使用倾斜大势与平滑起伏。本文是在此基础上的扩展，不将已有坡地改名当作新功能。
+内核地形以高程与坡度为基础，见 [biome.rs](../../../crates/sim_core/src/geo/biome.rs)；[terrain.rs](../../../crates/sim_core/src/geo/terrain.rs) 使用倾斜大势与平滑起伏。本文是在此基础上的扩展，不将已有坡地改名当作新功能。
 
 本文是**地形种类、生成关系、通行、选址和水资源语义**的规划权威；[景观提升计划](./07-terrain-art.md)负责材质、光照、素材、遮挡、缓存与视觉性能。土地适宜性由地形提供，农田产权、投资与产出仍由[农业规划](./04-farmland-agriculture.md)负责。
 
@@ -187,10 +195,10 @@ T0 地表查询与完整曲线校验                      ✅
 
 | 阶段 | 状态 | 落地要点 | 剩余工作 |
 | :--- | :--- | :--- | :--- |
-| T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries` 已声明未消费 |
+| T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries`（已声明未消费）已于 v1.50.18 删除，实现本步时一并加回 |
 | T1 山口聚落（丘陵/山脊/山口连续起伏） | ✅ 已落地（v1.47.1/v1.47.2；v1.47.7 移除台地） | `mountain_pass_v1` profile；局部 `relief_rng` 派生主脊/山口连续起伏；存档版本门禁；前端按地表类别渲染。v1.47.7：删除台地压平与 `Ridge`/`Saddle`/`Terrace` 特征及前端轮廓绘制 | 山口地貌参数已配置化（`terrainPassRidgeWidth` / `terrainPassRidgeAmplitude`）；支脊未实现；子特征注入待规划。v1.50.17 完成主脊通行力修复（§9.3.1） |
 | T2 静态主河/浅滩/河阶/泉谷 | ✅ 已落地 | `river_valley_v1` profile + 生成器版本 3（v1.47.7 起，与 T1 共用全局版本）；主河生成（`geo/hydrology.rs`），单调河床下凹与水面静态；低滩（`NO_BUILD`）与河阶（`RiverTerrace`）；两处静态浅滩走廊（`ShallowFord`，跨水授权）；共享水池 `WaterPool` 聚合取水与稳定扣减；地形感知路网（`spatial/terrain_network.rs`）与 `LaneTerrainProfile` 边权通行代价折算；占地校验拒绝浅水（`WaterCovered`）；存档格式升级为 7；10 个 T2 配置参数；前端河道/岸线/浅滩特征渲染与 HUD 水量去重；支持 T1/T2 模板按种子哈希随机轮换（`terrainProfile: 'random'`） | 子特征注入待规划 |
-| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_terrain.js::drawAccentEntity()`（Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节 tint）；3 个配置字段（`terrainAccentDensity`/`terrainAccentSubFeatures`/`terrainTreeSeasonTint`） | RockCluster/GrassTuft 仅枚举定义未生成；装饰缓存标志仍与地形共用 |
+| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_terrain.js::drawAccentEntity()`（Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`）；配置字段现存 1 个（`terrainAccentDensity`），`terrainAccentSubFeatures`/`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 仅枚举定义未生成；装饰缓存标志仍与地形共用 |
 | D-B 装饰系统扩展 | ⏳ 未实施 | — | RockCluster/GrassTuft 生成；季节色调细化 |
 | T1 子特征注入 | ⏳ 未实施 | — | 山脚湖（T1 鞍部静水）；山涧飞瀑（主脊跌水）；密林山坡（装饰树群）；裸岩露头（陡坡岩石） |
 | T2 子特征注入 | ⏳ 未实施 | — | 牛轭湖（回水湾）；河谷峭壁（河段两侧 Cliff）；河岸林带（沿河装饰树列）；碎石浅滩（河滩石砾） |
@@ -488,7 +496,7 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 
 每种 feature 使用单独固定盐值和 `roll_10000 < probability_bp` 判定。首先选出**至多一个结构型**（T1：FootLake / RidgeWaterfall；T2：OxbowLake / RiverCliff），再选出**至多一个视觉型**（T1：ForestedSlope / RockyOutcrop；T2：RiversideForest / GravelBeach）。所以每张图最多两个子特征。
 
-**互斥裁决规则（必须按此实现，否则同种子会因代码书写顺序而换图）**：在每一类内部，按 `TerrainSubFeatureKind` **升序**逐个判定；**首个命中者即选定，并立即停止该类别的后续判定**。因此「选到哪一个」只取决于哈希值与 kind 编号顺序，与函数书写顺序、插入位置无关。`terrainAccentSubFeatures=false` 时第 4–5、9 步为空；D-B1 上线前该开关继续只声明、不改变既有世界。
+**互斥裁决规则（必须按此实现，否则同种子会因代码书写顺序而换图）**：在每一类内部，按 `TerrainSubFeatureKind` **升序**逐个判定；**首个命中者即选定，并立即停止该类别的后续判定**。因此「选到哪一个」只取决于哈希值与 kind 编号顺序，与函数书写顺序、插入位置无关。`terrainAccentSubFeatures=false` 时第 4–5、9 步为空（⚠️ 该开关已于 v1.50.18 删除，落地 D-B1 时须先按文首更正段把它加回并接线）；D-B1 上线前相关步骤必须是空实现、不改变既有世界。
 
 ### 5.4 D-B2 四种改变物理事实的子特征
 
@@ -588,7 +596,7 @@ D-B2/P1 改变 `TerrainFeatureKind`、`TerrainMap` 或 profile 时，必须在�
 | 层 | 必改文件 | 精确改动 |
 | :--- | :--- | :--- |
 | 内核模型 | `geo/terrain.rs`、`geo/hydrology.rs`、`geo/accents.rs`、`geo/mod.rs` | 新枚举/子特征、阶段化生成器、ID 断言、水面 pool=0 语义与公开重导出 |
-| 配置 | `config.rs`、`frontend/js/config.js`、`tools/config-check.js` | 新 profile 白名单；保留 `terrainAccentSubFeatures` 作为总开关；新增字段必须同时落到这 3 处 + `examples/config.json`（探针用），并由 `config-check.js` 校验；**不得再引入无消费点的字段**——现存两个遗留项 `terrainGenerationMaxRetries`（全仓无读取）与 `terrainRidgeWidth`（全仓无读取，T1 主脊已改走 `terrainPassRidgeWidth`）应在 D-B1 一并清理或接线 |
+| 配置 | `config.rs`、`frontend/js/config.js`、`tools/config-check.js` | 新 profile 白名单；新增字段必须同时落到这 3 处 + `examples/config.json`（探针用），并由 `config-check.js` 校验；**不得再引入无消费点的字段**——`config-check.js` 第 5 条「空转参数」规则会直接报错。⚠️ 本行原列的三个遗留项 `terrainGenerationMaxRetries`、`terrainRidgeWidth`（T1 主脊已改走 `terrainPassRidgeWidth`）与总开关 `terrainAccentSubFeatures` **已于 v1.50.18 全部清理完毕**；D-B1 落地时须把 `terrainAccentSubFeatures` 连同唯一消费点一起加回（见文首更正段） |
 | 快照 JSON | `spatial/snapshot.rs`、`spatial/world_snapshot.rs` | `TerrainSubFeatureSnapshot` 及 `terrain_sub_features`；静态地形脏帧才发送 |
 | FABS | `snapshot_bin/layout.rs`、`encode.rs`、`dict.rs`、`frontend/js/snapshot-bin.js` | `FORMAT_VERSION` 由当前 **2** 递增为 **3**（旧 JS 枚举表无法可靠展示新 code，故必须递增）；新增 `TerrainSubFeatures=22`。记录固定为 `id:u32,kind:u8,anchor:Vec3,bounds_min:Vec3,bounds_max:Vec3,feature_count:u8,feature_ids...,accent_start:opt_u32,accent_end:opt_u32,align4`；同步 feature/accent 枚举表 |
 | 前端状态 | `frontend/js/rustworld.js` | 映射 `terrain.subFeatures`；在 READY/LOAD/REWIND/RESET 及 `STR_TAB.start_index==0` 时和 features/accents 一起清除 |
@@ -645,7 +653,7 @@ node tools/cross-doc-check.js
 
 1. **D-B1-Model**：仅增加枚举、`TerrainSubFeature`、快照/FABS Section 22、前端缓存清理；不启用生成。先让空数组全链路通过。
 2. **D-B1-Accents**：实现 `RockCluster`/`GrassTuft` 和 Canvas 单实体分支；固定种子验证只改变装饰 section。
-3. **D-B2-Planner**：实现 `mix64`、`PlannedSubFeature`、固定 salt、互斥/上限选择及 debug 输出。`terrainAccentSubFeatures` **沿用既有默认值 `true`**（§16 与 `frontend/js/config.js`），不改为 `false`；D-B2 生成器落地前，第 4–5、9 步必须是空实现，以保证 D-B1 阶段既有世界逐字节不变；首次真正改变世界时同步递增生成器版本与存档格式版本。
+3. **D-B2-Planner**：实现 `mix64`、`PlannedSubFeature`、固定 salt、互斥/上限选择及 debug 输出。⚠️ 总开关 `terrainAccentSubFeatures` 已于 v1.50.18 删除——实施本项时须**先把它按原默认值 `true` 加回**（§16 与 `frontend/js/config.js`）并接线，不得只声明不消费；D-B2 生成器落地前，第 4–5、9 步必须是空实现，以保证 D-B1 阶段既有世界逐字节不变；首次真正改变世界时同步递增生成器版本与存档格式版本。
 4. **D-B2-T1**：先山脚湖，再瀑布；每个子功能单独提交并完成静态几何与路网门禁。山脚湖必须补「整圈岸沿高于水面、湖面水平、未骑上脊线」三条断言（§5.4.A）。
 5. **D-B2-T2**：**先做 §6 的河道表示迁移（R0-1 ～ R0-4，单独递增生成器版本）**，再实现牛轭湖（裁弯取直，含「主河端点 C0 连续 + 弃弯弧月牙闭合 + 上游段回填避免核心成孤岛」断言）；河谷峭壁含「取水口不可达 / 连通分量增加」两条保护检查；接入水体 pool=0 语义与 HUD 去重断言。若不做迁移，则把 `oxbow_lake` 从 D-B2 移除或改名 `BendSlough`。
 6. **D-B2-VisualGroups**：实现林带、裸岩露头、碎石滩；它们只能追加 accent，不得混入 D-B2 物理地形提交。
@@ -847,7 +855,7 @@ pub struct RiverCenterline {
 - ✅ 固定山口种子：主脊可从远景辨认，陡坡会挡路，山口存在合法连续路线——连续起伏地貌与路网感知生成已打通（v1.47.7 起不再有台地/特征轮廓绘制）；v1.50.17 修复后实测主脊最大坡度 36.2°~40.8°、可行走连通分量恒为 1（§9.3.1）。
 - ❌ 台地房屋候选与平顶压平——v1.47.7 已整体删除，T1 不再生成台地。
 - ✅ 两端欧氏距离相近但越过主脊的路线成本高于经过山口的路线——v1.50.17 后主脊存在 34°+ 硬禁行带，越过主脊必须走山口；实测绕行比 2.17~4.80（§9.3.1）。
-- ⏳ 生成失败时在有界重试后使用通过校验的简化 profile，并记录失败原因——`terrainGenerationMaxRetries` 未消费。
+- ⏳ 生成失败时在有界重试后使用通过校验的简化 profile，并记录失败原因——参数 `terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现时连同消费点一并加回。
 - ✅ T1 FABS 二进制与 JSON 深比较通过，读档/重置/回溯无旧特征或字符串串味——`test-snapshot-bin.js` 通过。
 
 ### 18.3 T2 门禁
@@ -872,7 +880,7 @@ pub struct RiverCenterline {
 
 ### 18.5 D-B 子特征注入门禁
 
-- ⏳ T1 子特征注入：当 `terrainAccentSubFeatures=true` 时，foot_lake/ridge_waterfall/forested_slope/rocky_outcrop 各自用固定盐值做无状态哈希判定；**结构型（foot_lake/ridge_waterfall）至多取一个、视觉型（forested_slope/rocky_outcrop）至多取一个**，互斥裁决按 kind 升序取首个命中者（§5.3）。同种子 100% 复现。
+- ⏳ T1 子特征注入：当总开关 `terrainAccentSubFeatures` 为真时（⚠️ 该字段已于 v1.50.18 删除，实施时先加回），foot_lake/ridge_waterfall/forested_slope/rocky_outcrop 各自用固定盐值做无状态哈希判定；**结构型（foot_lake/ridge_waterfall）至多取一个、视觉型（forested_slope/rocky_outcrop）至多取一个**，互斥裁决按 kind 升序取首个命中者（§5.3）。同种子 100% 复现。
 - ⏳ T2 子特征注入：oxbow_lake/river_cliff/riverside_forest/gravel_beach 同上（结构型至多一个、视觉型至多一个）。
 - ⏳ 子特征注入在 POI/营地/路网生成前完成；生成后的 POI/路网必须通过完整地表、连通性与生存成本校验。关闭注入与开启注入是两张不同的静态世界，不比较 POI 坐标。
 - ⏳ Cliff 子特征对应地表写入 `NO_BUILD` 并硬禁行（`slope >= 34°` → `RockFace`/`NO_WALK`）；占地校验返回 `CliffTooSteep`。

@@ -1,6 +1,8 @@
 // === 地形与天空氛围绘制（v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造） ===
 // 地形壳层（投影 + 沙盘基底/侧壁）/ 单格填充 / 单水系特征 / 天空背景 / 地形网格线
 // 依赖全局: ctx, camera, sim, project3D, getElevationColor, w, h, terrainProjX, terrainProjY, SimLighting
+// 另消费 window.RENDER_CONFIG（config.render.js，须先加载）；本文件**定义** window.SimTreeTint
+// （装饰树木季节叶色，见下方 §SimTreeTint —— 它曾是全仓无定义点的死分支，2026-09-12 落地）。
 //
 // ★ 动态季节光照（docs/current/tech/17-seasonal-lighting.md）：
 //   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color（大气色洗亦烘焙于此），本文件只负责绘制。
@@ -354,6 +356,80 @@ function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
   ctx.restore();
 }
 
+// ★ 2026-09-12 SimTreeTint —— 装饰树木季节叶色的**唯一生产者**（修复长期死分支）
+// ---------------------------------------------------------------------------
+// 背景：v1.48.0 起 drawAccentEntity 一直调用 `window.SimTreeTint.tint(accent, sim)`，
+//   但该命名空间**全仓没有任何赋值点** → `window.SimTreeTint &&` 恒为假，
+//   分支永不进入；叶色恒等于 `accent.tint`，而 Rust `geo/accents.rs` 恒写 `tint: 0`
+//   → **装饰树木四季同色（恒鲜绿）**，与 `docs/current/tech/14-terrain-and-network.md`
+//   所述「季节色由前端按当前季节实时派生」长期不符（同篇 §7.4 已承认「没有生产者」）。
+// 契约：纯表现层——不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
+//   唯一真相源是快照的年相位（与 lighting.js 同一套 season/season_progress 公式），
+//   调参走 window.RENDER_CONFIG.treeTint*（见 config.render.js），改完刷新浏览器即生效。
+// 依赖：_accentHash（定义见本文件下方；函数声明提升，实际调用发生在渲染期）。
+window.SimTreeTint = (function () {
+  const SEASON_INDEX = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
+  const DEFAULT_CYCLE = [
+    { u: 0.000, b: 0.00 },   // 春：返青完成
+    { u: 0.375, b: 0.00 },   // 夏末：全绿保持
+    { u: 0.500, b: 0.55 },   // 中秋：初黄
+    { u: 0.625, b: 1.00 },   // 深秋：红褐
+    { u: 0.875, b: 1.00 },   // 冬末：枯褐保持
+    { u: 0.970, b: 0.00 },   // 初春：返青
+  ];
+
+  function cfg() { return window.RENDER_CONFIG || {}; }
+  function wrap01(v) { return v - Math.floor(v); }
+
+  // 年相位（唯一真相源 = 快照；缺字段时回退 seasonTimer / seasonYearLength）
+  // 内核分箱：season_idx = ((season_time + q/2) / q) % 4 ⇒ u = (idx − 0.5 + progress) / 4
+  function yearPhase(sim) {
+    if (!sim) return 0;
+    const idx = SEASON_INDEX[sim.currentSeason];
+    const prog = (typeof sim.seasonProgress === 'number' && isFinite(sim.seasonProgress))
+      ? sim.seasonProgress : null;
+    if (idx != null && prog != null) return wrap01((idx - 0.5 + prog) / 4);
+    const year = (window.SIM_CONFIG && window.SIM_CONFIG.seasonYearLength) || 240;
+    const t = (typeof sim.seasonTimer === 'number' && isFinite(sim.seasonTimer)) ? sim.seasonTimer : 0;
+    return wrap01(t / Math.max(1e-6, year));
+  }
+
+  // 枯荣系数：0 = 鲜绿，1 = 枯褐（分段线性，年历由 RENDER_CONFIG.treeTintCycle 提供）
+  function brownness(u) {
+    const cycle = cfg().treeTintCycle || DEFAULT_CYCLE;
+    if (!cycle || cycle.length === 0) return 0;
+    for (let i = 1; i < cycle.length; i++) {
+      const a = cycle[i - 1], b = cycle[i];
+      if (u <= b.u) {
+        const span = b.u - a.u;
+        const t = span > 1e-9 ? (u - a.u) / span : 0;
+        return a.b + (b.b - a.b) * (t < 0 ? 0 : (t > 1 ? 1 : t));
+      }
+    }
+    return cycle[cycle.length - 1].b;
+  }
+
+  // 逐树确定性相位抖动（纯视觉，通道 997 与叶纹理通道 i+1…i+167 互不重叠）
+  function jitter(id) {
+    const amp = cfg().treeTintJitterTurns != null ? cfg().treeTintJitterTurns : 0.05;
+    return (_accentHash(id | 0, 997) - 0.5) * 2 * amp;
+  }
+
+  return {
+    yearPhase: yearPhase,
+    brownness: brownness,
+    // 叶色档：0 鲜绿(春夏) / 1 黄绿(秋) / 2 红褐(深秋·冬)
+    tint: function (accent, sim) {
+      const u = wrap01(yearPhase(sim) + jitter((accent && accent.id) || 0));
+      const b = brownness(u);
+      const c = cfg();
+      const yb = c.treeTintYellowBand != null ? c.treeTintYellowBand : 0.32;
+      const rb = c.treeTintRedBand != null ? c.treeTintRedBand : 0.72;
+      return b >= rb ? 2 : (b >= yb ? 1 : 0);
+    },
+  };
+})();
+
 // ★ v1.50.2 D-A：Accent 装饰（Tree/Boulder/Bush）单实体绘制入口
 // 旧实现 drawAccents() 在 drawTerrain() 内按「种类分组（Bush→Boulder→Tree）→ 数组原序」整层落笔，
 // 本质是**按生成顺序而非距离**绘制：远树会压住近树，且乔木永远被后画的道路/族人覆盖。
@@ -378,11 +454,14 @@ function drawAccentEntity(accent) {
   const upMargin = 20 + 40 * scale;
   if (sx < -20 || sx > w + 20 || sy < -upMargin || sy > h + 20) return;
 
-  // ★ v1.48.0 D-A：Tree 季节色调
-  let seasonTint = accent.tint || 0;
-  if (window.SimTreeTint && sim.treeTintEnabled !== false) {
-    seasonTint = window.SimTreeTint.tint(accent, sim);
-  }
+  // ★ 2026-09-12 Tree 季节叶色：唯一生产者 SimTreeTint（定义见本文件上方）。
+  //   历史教训：v1.48.0~2026-09-12 期间此处写作 `if (window.SimTreeTint && sim.treeTintEnabled !== false)`，
+  //   但 SimTreeTint 全仓无定义点（死分支），且判据用的 sim.treeTintEnabled 来源字段
+  //   terrainTreeSeasonTint 已于 v1.50.18 随空转配置清理删除 → 恒 undefined，条件恒假。
+  //   净效果是树木叶色恒为 accent.tint（Rust 恒写 0），四季同色。**勿再引入无生产者的全局判据。**
+  const seasonTint = (accent.kind === 'Tree' && window.SimTreeTint)
+    ? window.SimTreeTint.tint(accent, sim)
+    : (accent.tint || 0);
 
   const scaled = accent.scale * scale;
   if (accent.kind === 'Tree') {

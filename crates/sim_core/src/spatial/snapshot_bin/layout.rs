@@ -1,6 +1,6 @@
 //! layout.rs · FABS 二进制快照帧的格式常量与写入器
 //!
-//! 隶属「性能优化规划书」里程碑 M4（`docs/16-plan-performance-optimization.md`）。
+//! 隶属「性能优化规划书」里程碑 M4（`docs/plan/tech/08-performance.md`）。
 //! 本文件**只定义格式，不含任何业务字段编码**（业务编码见 `encode.rs`）。
 //!
 //! # 帧总体结构（小端）

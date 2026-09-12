@@ -47,7 +47,7 @@
 | `js/rustworld.js` | ~600 | **主线程仿真代理层**（★ v1.38.0 改造）：管理 Worker 生命周期、将快照映射为 JS 视图对象（`_applySnapshot`，**★ M4 支持 ArrayBuffer/Uint8Array 入参经 SnapshotBin 解码**）、向 Worker 发送控制指令（暂停/倍速/调参/存读档）、提供同构实体查询接口与档案库 | WASM 底层直接执行（委托给 sim_worker.js） |
 | `js/render_canvas.js` | ~232 | **Canvas 主循环调度**（v1.7.1 从 render.js 拆分）：共享变量声明（frameCount/camera 引用/dbg 变量/coronationEffects）/ 马斯洛需求元数据 MASLOW_STYLE / parseMaslowNeed / `render(now)` 主循环骨架（★ v1.48.0 调用顺序：`SimLighting.update` → 天空 → 地形 → 路网 → 贴地图元 → 大气色洗 → `drawWorldEntities()` 统一深度实体 → 礼花）/ requestAnimationFrame 启动 | 具体绘制（委托给 render_world/render_agents/render_inspector/render_hud） |
 | `js/render_hud.js` | ~600 | **HUD 与大盘辅助函数**（v1.7.1 拆分）：dbgEl/fmtMB/dbgSetText 调试工具 / updateDebugHud 调试监视器 / updateTopBarStats 顶栏统计 / drawResourceDashboard 全地图资源大盘 / updateGlobalAverages 全局均值大盘 / updateLedgerPanel 家户账本面板 / tickToSec/formatDuration 格式化工具 / updateAgentLedgerInfo 族人家户账本信息 / **★ v1.46.15 未来 49 年气候预测折线图浮窗（Canvas 渲染 + 悬停交互）** | Canvas 绘制（在 render_canvas/render_world/render_agents） |
-| `js/render_terrain.js` | ~430 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石；★ v1.50.3/04/05/06 已裁剪波光以外的整层装饰 pass）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAccentEntity` + Tree/Boulder/Bush 单体绘制（季节 tint + 确定性哈希叶纹理） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
+| `js/render_terrain.js` | ~430 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石；★ v1.50.3/04/05/06 已裁剪波光以外的整层装饰 pass）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ `drawAccentEntity` + Tree/Boulder/Bush 单体绘制（★ 2026-09-12 季节叶色由本文件**定义**的 `window.SimTreeTint` 派生 + 确定性哈希叶纹理）；**★ 本文件定义 `window.SimTreeTint`**（`yearPhase`/`brownness`/`tint`，消费 `RENDER_CONFIG.treeTint*`） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
 | `js/river_life.js` | ~300 | **★ v1.49.0 水系微观生态纯表现层**：`window.RiverLife`——`init(features, seed)`（世界重置/读档时由 rustworld.js 以 `_engineSeed` 重建，4 群 22 条游鱼沿河道中心线巡航）/ `update`（墙钟驱动，暂停时继续流动属设计决策）/ `drawFish` / `drawSunGlint`（迎光波光，强度按河道切线与光向夹角调制）；★ v1.50.3 移除水面微波虚线、★ v1.50.4 移除水底卵石层（`drawRiverbed` 及卵石数据已删除——深色扁圆石透水面观感呈"一堆深蓝色圆圈"）；在 render_terrain.js 之前加载 | 仿真状态读写、WorldRng 消耗、快照契约 |
 | `js/render_world.js` | ~700 | **世界元素绘制**（v1.7.1 拆分）：**★ v1.50.11 `drawWorldEntities()` 世界统一深度队列**（地形格 + 水系特征 + 游鱼/波光 + 道路 16 分段（`lineDashOffset` 虚线相位跨段连续）+ 营地辖区连线 + POI 底座 + POI 标记 + 房屋 + 族人 + 地表装饰，全部按 `depth = ry·sinX + z·cosX` 升序远 → 近落笔，深度项走持久对象池 `_depthPool` 零每帧 GC）/ `updateLaneHover`（道路悬浮检测 + Tooltip）/ `cacheLaneStyle` + `drawLaneSegment`（道路样式缓存与单段描边）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型，★ v1.48.0 面法线受光 + 世界空间阴影） | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
@@ -309,6 +309,26 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 - **阴影用世界空间**：`lightShadowOffset()`（render_world.js）与 `SimLighting.shadowOffset()` 把世界光向投影到屏幕（随相机 `rotZ/rotX` 旋转）；**禁止**再写死屏幕偏移。
 - **纯表现层边界**：不消耗 `WorldRng`、不写模拟状态、不进存档、不参与逐字节确定性承诺；`enabled=false` 必须退回 v1.47.11 的固定光（西北 41°）以便 A/B 对照。
 - 详细设计与验收见 [../docs/current/tech/17-seasonal-lighting.md](../docs/current/tech/17-seasonal-lighting.md)。
+
+### 5.11 装饰树季节叶色契约（★ 2026-09-12 落地，修复长期死分支）
+
+- **背景（勿重犯）**：v1.48.0~2026-09-12 期间 `drawAccentEntity` 一直写作
+  `if (window.SimTreeTint && sim.treeTintEnabled !== false) { … }`，但 **`window.SimTreeTint` 全仓没有任何赋值点**，
+  判断用的 `sim.treeTintEnabled` 来源字段 `terrainTreeSeasonTint` 又在 v1.50.18 被清理
+  → 条件恒假、分支永不进入，树木叶色恒等于 `accent.tint`，而 Rust `geo/accents.rs` 恒写 `tint: 0`
+  → **四季渲染完全相同**（文档却一直声称"按当前季节实时派生"）。
+- **唯一生产者 = `window.SimTreeTint`**（定义在 `render_terrain.js`，不是独立文件）：
+  `yearPhase(sim)` / `brownness(u)` / `tint(accent, sim)`。**新增消费方只能读它，不得另建季节色逻辑。**
+- **真相源与 `SimLighting` 完全同构**：只消费快照 `sim.currentSeason` + `sim.seasonProgress`
+  （缺字段回退 `seasonTimer / seasonYearLength`），**严禁**另建计时器（同 §5.10）。
+- **年历与三档映射**：`RENDER_CONFIG.treeTintCycle` 定义枯荣系数 `b(u)` 的分段线性年历
+  （0=鲜绿 → 深秋 1=枯褐 → 初春返青），再按 `treeTintYellowBand` / `treeTintRedBand` 映射到渲染器既有的
+  三档 tint（0 鲜绿 / 1 黄绿 / 2 红褐）。**冬季沿用红褐档**（渲染器无落叶/光秃形态）。调参只改 `config.render.js`。
+- **逐树抖动**：相位按 `accent.id`（哈希通道 997）偏移 `±RENDER_CONFIG.treeTintJitterTurns`，
+  避免成片树同帧整体换色。抖动幅度必须小于「夏末全绿区间」，否则盛夏会被误染。
+- **纯表现层边界**：不消耗 `WorldRng`、不写模拟状态、不入快照；Boulder / Bush 不参与（`drawAccentBush` 不接受 tint）。
+- **Rust 侧 `TerrainAccent.tint` 字段仍是无生产者的预留钩子**（恒 0），渲染层已不读它；
+  D-B1 若仍需该字段必须指定唯一生产者，否则应借 FABS `FORMAT_VERSION` 2→3 之机移除。
 
 ---
 

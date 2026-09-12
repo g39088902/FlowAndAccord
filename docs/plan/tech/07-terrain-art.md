@@ -70,12 +70,12 @@ stateDiagram-v2
 
 关键实现入口（按职责，不再指向已删除的旧函数）：
 
-- [地形生成与高程采样](../crates/sim_core/src/geo/terrain.rs) / [水系与共享水池](../crates/sim_core/src/geo/hydrology.rs) / [地表查询与占地校验](../crates/sim_core/src/geo/query.rs)：内核地理事实唯一真相源，`sample_elevation` 仍为最近邻采样，不能把渲染平滑误认为物理采样已平滑。
-- [地形感知路网](../crates/sim_core/src/spatial/terrain_network.rs)：走廊合法性、浅滩跨河授权与 `LaneTerrainProfile` 通行代价。
-- [颜色计算](../frontend/js/math.js)（`computeElevationColor`，唯一着色入口） / [颜色兜底与投影](../frontend/js/main.js)（`getElevationColor` 只做委托 + 纯色兜底）。
-- [地形接收与颜色缓存](../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`，`_terrainCached` 单标志控制整块地形与特征缓存）。
-- [世界元素绘制](../frontend/js/render_world.js)（`drawTerrain` / `drawTerrainFeatures` / `drawLanes` / `drawPoiGroundBase` / `drawPoiMarker` / `drawHouse` / `drawWorldEntities`） / [族人绘制](../frontend/js/render_agents.js)（`drawAgent`） / [帧循环](../frontend/js/render_canvas.js)。
-- [存读档](../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 3 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
+- [地形生成与高程采样](../../../crates/sim_core/src/geo/terrain.rs) / [水系与共享水池](../../../crates/sim_core/src/geo/hydrology.rs) / [地表查询与占地校验](../../../crates/sim_core/src/geo/query.rs)：内核地理事实唯一真相源，`sample_elevation` 仍为最近邻采样，不能把渲染平滑误认为物理采样已平滑。
+- [地形感知路网](../../../crates/sim_core/src/spatial/terrain_network.rs)：走廊合法性、浅滩跨河授权与 `LaneTerrainProfile` 通行代价。
+- [颜色计算](../../../frontend/js/math.js)（`computeElevationColor`，唯一着色入口） / [颜色兜底与投影](../../../frontend/js/main.js)（`getElevationColor` 只做委托 + 纯色兜底）。
+- [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`，`_terrainCached` 单标志控制整块地形与特征缓存）。
+- [世界元素绘制](../../../frontend/js/render_world.js)（`drawTerrain` / `drawTerrainFeatures` / `drawLanes` / `drawPoiGroundBase` / `drawPoiMarker` / `drawHouse` / `drawWorldEntities`） / [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`） / [帧循环](../../../frontend/js/render_canvas.js)。
+- [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 3 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
 农田、哨塔和路卡的占地与通行消费[融合设计 §6](./01-integration-contracts.md#6-土地设施与通行)与[地形专项方案 §13](./06-terrain-templates.md#13-房屋农业设施与-poi-接入)的内核事实；T0 的 `validate_footprint` 原语已就绪但农业/防务尚未接入，视觉样板不得提前画出不存在的生产、阻路或防御效果。S3 与 M2/M3 仍可独立推进，不以农业、市场或记忆上线为前提。
 

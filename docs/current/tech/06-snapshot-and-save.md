@@ -161,7 +161,7 @@ World3DEngine
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.20**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.21**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
 
@@ -186,8 +186,123 @@ World3DEngine
 2. **非有限浮点必须走 `finite_f32`**：任何可能为 `INFINITY`/`NaN` 的入库 f32 字段都要加 `#[serde(with = "finite_f32")]`，否则存得进、读不回。
 3. **读档必须重建 `agent_index`**：遗漏会导致 `agent_by_id()` 返回错误下标或 panic。
 4. **读档必须强制重建地形快照**：不同种子的档地形不同，`_terrainCached` 不清会沿用旧地形。
-5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（当前 6；M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**。
+5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（**当前 7**；v1.46.8 M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6，v1.47.5 T2 共享水池聚合升至 7），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**（`tools/bump-version.js --check` 会打印其当前值供核对）。
 6. **本地文件句柄不跨页面刷新持久化**（v1.11.0）：`FileSystemFileHandle` 仅在当前页面生命周期内有效，刷新后必须重新连接；不可假设句柄持久化，也不要尝试把句柄存入 localStorage（它不可序列化）。
 7. **`showSaveFilePicker`/`showOpenFilePicker` 必须在用户手势中调用**：不能在 `setInterval` 或异步回调中间接触发，否则浏览器会报 `SecurityError`。`connectLocalFile()` 和 `loadFromLocalFilePicker()` 均由按钮点击直接触发。
 8. **自动保存切换本地文件后不再写 localStorage**：已连接本地文件时 `tickAutoSave()` 直写磁盘，localStorage 自动槽不再更新——这是有意行为（避免双倍写入且大存档会撑爆 localStorage），断开连接后自动恢复 localStorage 模式。
 9. **版本比较前必须 `normalizeVer()` 归一化（★ v1.44.2 事故）**：内核 `SAVE_APP_VERSION` 与存档 `app_version` **没有 `v` 前缀**，而前端兜底串历史写法带 `v`（`'v1.38.0'`）。`save-ui.js` 若直接 `meta.appVersion === curVer`，在 Worker READY 前必然不等 → 启动门禁 100% 误报「旧档已废弃」；等引擎就绪后同一判定又变 true → 点「废弃旧档并新建」反而把旧档读进来。**新增任何版本比较点都必须用 `normalizeVer()`（去空白 + 去 `v` 前缀），且决策前先 `await waitEngineReady()`**；`v` 只在 UI 文案里拼接显示。
+
+---
+
+# 附篇 · 时光倒流（Checkpoint + Replay）
+
+> **主要源码**：`frontend/js/sim_worker.js`（`recordHistoryCheckpoint` / `rewindToTickInternal` / `case 'REWIND'`）· `frontend/js/rustworld.js`（`rewindToTick` / `getRewindInfo` / `_applyRewindMeta`）· `frontend/js/main.js`（倒流控制器 UI）· `index.html`（`#rewind-modal` 一族 DOM）
+> **落地版本**：v1.33.0 引入控制器；v1.42.0 补现实时间守卫与分块重演；**v1.46.1 修复为可审计的分支语义**（本节即其唯一权威描述，此前只散落在 changelog 中）。
+> **本质**：不是「状态快照回放」，而是**检查点 + 确定性重演 + 命令日志重注入**——因为内核在「同种子 + 同配置 + 同 Tick」下逐字节确定（见 [./03-determinism.md](./03-determinism.md)），所以只需要存「某一刻的世界」再重跑若干 tick，就能精确回到任意历史 Tick。
+
+## 状态机
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> A
+    A --> B : 模拟推进，距上次检查点 ≥30 tick 且现实流逝 ≥150ms
+    B --> A : saveWorldInternal() 写入 {tick, json, commandCursor}
+    A --> C : 玩家点「⏪ 时光倒流」输入目标 Tick
+    C --> D : Worker 置 isPaused=true, rewindInProgress=true（冻结常规计时）
+    D --> E : loadWorldInternal(最近且 ≤ 目标的检查点)
+    E --> F : 分块 world_tick_steps（每块 ≤5000 tick，遇到命令边界提前切块）
+    F --> F : 每块后 applyHistoricalCommands() + REWIND_PROGRESS + 让出事件循环
+    F --> G : 重演到目标 tick，pullSnapshot(true)
+    G --> H : 截断目标之后的检查点与命令（分支收敛）
+    H --> I : 在目标 tick 补写检查点，恢复 isPaused=false
+    I --> [*]
+    C --> J : 请求非法（负数/超当前 tick/无可用检查点/已有倒流在跑）
+    J --> [*]
+```
+
+| 状态 | 含义 | 进入条件 | 退出条件 |
+| :--- | :--- | :--- | :--- |
+| A 记录中 | 常规模拟，后台按节奏落检查点 | 引擎就绪 | 触发落点或玩家发起倒流 |
+| B 落检查点 | `saveWorldInternal()` 导出世界并记下命令游标 | 距上次 ≥30 tick 且现实 ≥150ms（**首档/genesis 不受限**） | 压入 `historyCheckpoints` |
+| C 待命 | 倒流弹窗打开，滑块范围取自 `getRewindInfo()` | 点击 `#btn-open-rewind-ctrl` | 点击执行 / 关闭 |
+| D 冻结 | Worker 同步置暂停标志，常规计时循环不再插入 tick | 收到 `REWIND` 消息 | 进入加载 |
+| E 加载 | 载入 ≤ 目标 tick 的最近检查点 | 命中检查点 | 进入重演 |
+| F 重演 | 分块推进并重放命令，回传进度 | 加载成功 | 距目标剩 0 tick |
+| G 取快照 | 强制重取快照（`forceTerrain`） | 重演完成 | 进入截断 |
+| H 截断分支 | 丢弃目标 tick 之后的检查点与命令 | 快照就绪 | 补写目标检查点 |
+| I 完成 | 世界回滚且停在目标 tick，弹出成功日志 | 补写完成 | 终态（玩家需手动继续） |
+| J 拒绝 | 参数非法 / 无检查点 / 并发倒流 | 校验失败 | 终态，世界不变 |
+
+## 1. 为什么能倒流：确定性重演而非状态快照回放
+
+倒流**不是**把每一帧世界都存下来倒着放，那样内存撑不住。实际做法只有三步：
+
+1. **找一个不晚于目标的检查点**（一份完整 `WorldSave` 序列化文本）；
+2. **把世界载入回那一刻**（走与普通读档完全相同的 `world_load` 通路）；
+3. **原样重跑剩余 tick**——`world_tick_steps(n, 1/60)`。
+
+第 3 步之所以可信，是因为内核满足确定性硬约束：同种子 + 同配置 + 同 Tick 数 ⇒ 逐字节相同状态（[./03-determinism.md](./03-determinism.md)、[./28-invariants.md](./28-invariants.md)）。`test-determinism.js` 的「多点倒流存读档严格一致」套件就是这条前提的守卫。
+
+## 2. 检查点记录策略（`recordHistoryCheckpoint`）
+
+| 规则 | 值 | 理由 |
+| :--- | :--- | :--- |
+| Tick 间距下限 | 30 tick | 1 游戏小时（60 tick）落 1~2 档，回滚最多重跑 30 tick |
+| 现实时间下限 | 150 ms | 1024x 倍速下一游戏秒可推进数百 tick，无此守卫会每秒导出几十份数百 KB 文本触发 GC 停顿 |
+| 首档豁免 | genesis 不受上述两条限制 | 保证「回到最早」永远可用（`lastCheckpointTick < 0` 即 genesis） |
+| 同 tick 去重 | 是 | 同一 tick 只留一份 |
+| 容量上限 | 160 份（≈6 MB） | 超限后**保留首档 + 近程 60 份 + 中间每 6 份取 1 份**，形成「近密远疏」的历史分布 |
+
+每份检查点记录 `{ tick, json, commandCursor }`——**命令游标**是关键：它记住该时刻已经应用过多少条外部干预命令，重演时才知道从哪条开始补。
+
+> 副作用（预期行为，非缺陷）：随历史增长，最早已可回滚 Tick（`minTick`）会**向前移动**——因为中间的历史被稀疏化裁掉了。
+
+## 3. 命令日志（外部干预的按序重注入）
+
+检查点只存「世界本身」，**不存玩家/Kernel 之外注入的干预**——这些单独记为命令日志 `historyCommands`，每条带发生时的 `tick`：
+
+| 命令 | 触发场景 | 重演时如何重放 |
+| :--- | :--- | :--- |
+| `{type:'CONFIG'}` | 控制台热改超参（`applyConfigInternal`） | 在**同一 tick** 重新注入同一份配置 |
+| `{type:'SET_REGEN'}` | 调整生态再生倍率（`world_set_regen_multiplier`） | 同上，按 `which`/`mult` 重放 |
+
+**顺序即语义**：重演严格按日志原序重放（与检查点的 `commandCursor` 配合），这样「先改配置 A 再改配置 B」和「反过来」才会得到各自正确的结果。命令日志在重置 / 初始化 / 整档读入（`INIT` / `RESET` / `LOAD`）时**整体清空**——时间线换了，旧干预不再适用。
+
+## 4. 回滚算法（`rewindToTickInternal(targetTick, reqId)`）
+
+1. **校验**：目标须为非负整数，且 `≤ currentTick`（不允许倒流到未来）；
+2. **选点**：从最新往回扫，取第一个 `tick ≤ target` 的检查点；一个都没有 → 报「未找到合适的历史检查点」；
+3. **加载**：`loadWorldInternal(bestCp.json)`，失败则原样返回错误**且世界不变**；
+4. **对齐游标**：`currentTick = bestCp.tick`，`commandCursor = bestCp.commandCursor`；
+5. **补齐命令**：先把游标之后、`tick ≤ currentTick` 的命令全部重放（存在游标处的命令可能早于检查点时刻）；
+6. **分块重演**：`chunkSize = 5000`，但同时受「下一条命令的 tick」约束——**命令永远正好落在它自己的 tick 上，不会被跨块的批量推进跳过**；每块之后回传 `REWIND_PROGRESS` 并 `await setTimeout(0)` 让出事件循环（否则长距离回放会冻住 Worker）；
+7. **取快照**：`pullSnapshot(true)` 强制重取（含地形），作为回滚后的首帧；
+8. **分支截断**：`historyCheckpoints` 与 `historyCommands` 滤掉所有 `tick > targetTick` 的条目——**回滚后当前时间线成为唯一有效分支**，避免从历史分叉后又误用旧未来；
+9. **补写检查点**：若目标 tick 上还没有检查点，就地补一份，并把 `lastCheckpointTick` / `lastCheckpointRealTime` 重置到此刻；
+10. **回传**：`{ok, snapshot, minTick, checkpointCount}`。
+
+## 5. 前端协议与 UI
+
+- 入口：控制台按钮 `#btn-open-rewind-ctrl`（`⏪ 时光倒流`）→ 打开 `#rewind-modal`；
+- 滑块范围来自 `sim.getRewindInfo()` → `{currentTick, minTick, maxTick, checkpointCount}`；**`minTick` 取 Worker 回传的真实最早检查点**（v1.46.1 起不再虚报 Tick 0，读入中途存档后同样正确）；
+- 执行：`sim.rewindToTick(target)` 返回 Promise，内部发 `{type:'REWIND', reqId, targetTick}` 并按 `reqId` 配对响应；
+- 进度：Worker 发 `REWIND_PROGRESS` → `rustworld.onRewindProgress` → 弹窗进度条；
+- 完成：`REWIND_RESULT` 携带 `snapshot`（**FABS 二进制帧，经 transferable 转移 `ArrayBuffer`**，零拷贝）、`tick`（二进制帧主线程读不到 tick，由 Worker 附带）、`rewind` 元信息；成功后主线程强制置暂停并输出 `⏪ 时光倒流：世界已成功回滚至 Tick N（第 X.X 游戏小时）`。
+
+## 6. 不变量与易踩坑
+
+1. **Worker 必须在 `REWIND` 消息入口同步暂停**（`isPaused = true`），否则正常计时循环会在加载与重演之间插 tick，重演结果与目标 tick 错位——这是 v1.46.1 修掉的核心缺陷之一。
+2. **重演期间不得混入常规推进**：`rewindInProgress` 期间再次收到 `REWIND` 直接拒绝（`已有时光倒流正在重演，请等待完成`），不做排队。
+3. **命令必须按 tick 落点重放**，不得为了分块对齐而提前或延后应用；`untilNextCommand` 是硬边界。
+4. **回滚后必须截断未来**：不截断会让 UI 显示不存在的可回滚范围，并在下一次回滚时拿到「旧未来」的检查点。
+5. **`rewindToTickInternal` 必须是 `async`**：函数体内有 `await`，去掉 `async` 会导致整个 Worker 脚本语法错误、仿真完全起不来（`frontend-check.js` 的 `node --check` 会拦截）。
+6. **`ArrayBuffer` 转移后主线程才可读**：`REWIND_RESULT` 用 transferable 移交 `snapshotBuf.buffer`，转移后 Worker 侧引用即失效，不得再读。
+7. **倒流不消耗 `WorldRng`、不改变确定性承诺**：它只是「回到过去某个确定状态」，不是新的随机源。
+
+## 7. 当前限制（已知，未排期）
+
+1. **检查点参数是源码常量**：30 tick / 150 ms / 160 份 / 5000 tick 块均硬编码在 `sim_worker.js`，尚未抽到独立配置文件（现有先例为 `config.lighting.js` / `config.render.js` / `config.poi-rates.js`）。调参需改源码并刷新页面。
+2. **可回滚范围随历史推进而收缩**：受「近密远疏」裁剪策略影响，`minTick` 会逐渐前移；长时间运行后无法回到非常早期的时刻。
+3. **检查点仅在内存中**：页面刷新即清空历史（存档文件只保存「当前世界」，不含检查点序列），刷新后只能从当前存档点继续。
+4. **跨存档不连续**：读入中途存档即开启新的历史段（命令日志清空、新检查点从读档时刻开始）。

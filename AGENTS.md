@@ -66,7 +66,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.20)"]
+    F --> G["浏览器 UI (版本: v1.50.21)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -100,6 +100,9 @@ node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳�
 node tools/test-determinism.js    # 增强型确定性矩阵测试 (6套件：多种子/分批独立性/快照无副作用/存读档)
 node tools/config-check.js        # 前后端数值配置一致性校验
 node tools/frontend-check.js      # 前端脚本语法与 DOM ID 完整性校验
+node tools/doc-link-check.js      # Markdown 相对链接可达性（文档迁移后路径深度未同步即报错）
+node tools/cross-doc-check.js     # 跨文档事实指纹一致性校验
+node tools/code-map-check.js      # 代码地图与文件树登记一致性校验
 ```
 
 输出 `ALL_TESTS_DONE` 与 `确定性矩阵测试全通` 即全部通过。性能分析可运行 `node tools/profile-benchmark.js`。
@@ -118,7 +121,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.20`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.21`**。
 
 ---
 
@@ -155,6 +158,7 @@ node frontend/server.js           # http://localhost:3000
 □ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/01-changelog.md + 受影响的局部 AGENTS.md
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
 □ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
+□ 文档链接可达：node tools/doc-link-check.js（相对链接失效即退出码 1；docs/archive/ 已按冻结策略排除）
 ```
 
 ### 4.0.1 ✅ Commit 前检查单（提交前必做）

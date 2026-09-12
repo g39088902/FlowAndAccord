@@ -6,12 +6,14 @@
  *   1. 交叉校验 frontend/js/config.js 与 Rust SimConfig (crates/sim_core/src/config.rs)
  *      的字段集、类型与默认值是否完全一致，捕获「孤儿字段 / 缺失字段 / 类型错配 / 数值漂移」。
  *      ★ v1.50.18 新增第 5 条：内核零读取的空转参数检测（调它不产生任何效果）。
+ *      ★ 2026-09-12 新增第 6 条：现状文档配置清单漂移检测（14 号 §16 表格 ↔ config.js 双向比对，
+ *        抓「文档列了已删字段（幽灵字段）」「文档漏列真实字段」「声称数量与表格行数不符」）。
  *   2. 生成 docs/current/tech/05-config-reference.md —— 一份带中文说明的参数速查表，降低用户检索与调参成本。
  *
  * 用法：
  *   node tools/config-check.js
  *
- * 退出码：发现任何错误 (孤儿/缺失/类型/数值漂移) 时返回 1，否则 0。
+ * 退出码：发现任何错误 (孤儿/缺失/类型/数值漂移/空转参数/文档漂移) 时返回 1，否则 0。
  * 本工具零依赖，仅使用 Node 内置模块。
  * ============================================================================
  */
@@ -251,6 +253,60 @@ function findUnreadConfigFields(rsFields) {
 }
 
 // ---------------------------------------------------------------------------
+// 6) 现状文档配置清单漂移检测 (2026-09-12 新增 · 技术债审计 §1/§4 门禁补漏)
+//    规则 1–5 只保证「config.rs ↔ config.js」双向一致，**检测不出文档里写了已删除的字段**
+//    （幽灵字段）或漏列真实字段。14 号现状文档的地形配置表正是从该盲区漏过的：
+//    v1.50.18 删掉 4 个地形字段后，文档表格照旧以 ✅ 列着其中 4 个，直到 2026-09-12 才被发现。
+//    判据：文档 §16「已落地 N 个仿真字段」后的 ```text 块中的标识符
+//          ↔ config.js 的 terrain* 键，双向比对，并校验声称的数量与表格行数一致。
+// ---------------------------------------------------------------------------
+const TERRAIN_TABLE_DOC = path.join(ROOT, 'docs', 'current', 'tech', '14-terrain-and-network.md');
+
+/** 返回现状文档 §16 配置表与 config.js 之间的漂移描述数组 */
+function findDocConfigDrift(jsValues) {
+  const issues = [];
+  if (!fs.existsSync(TERRAIN_TABLE_DOC)) {
+    issues.push({ warn: true, msg: '未找到 docs/current/tech/14-terrain-and-network.md，跳过现状文档配置清单漂移校验' });
+    return issues;
+  }
+  const docName = path.basename(TERRAIN_TABLE_DOC);
+  const docText = fs.readFileSync(TERRAIN_TABLE_DOC, 'utf8');
+  const m = docText.match(/已落地\s*(\d+)\s*个仿真字段[\s\S]{0,240}?```text\n([\s\S]*?)```/);
+  if (!m) {
+    issues.push({
+      msg: `${docName}: 未定位到 §16「已落地 N 个仿真字段」+ text 代码块——若文档结构调整，请同步本门禁的匹配式`,
+    });
+    return issues;
+  }
+  const claimed = parseInt(m[1], 10);
+  const listed = [];
+  for (const line of m[2].split('\n')) {
+    const row = line.match(/^\s*[✅◐⏳✗]?\s*([A-Za-z_][A-Za-z0-9_]*)[ \t]/);
+    if (row) listed.push(row[1]);
+  }
+  const uniqListed = [...new Set(listed)];
+  for (const k of uniqListed) {
+    if (!(k in jsValues)) {
+      issues.push({
+        msg: `文档幽灵字段 (文档有/config.js 无): ${docName} §16 列了 ${k}——字段已删除时必须同步从该表格移除`,
+      });
+    }
+  }
+  const realTerrain = Object.keys(jsValues).filter(k => k.startsWith('terrain'));
+  for (const k of realTerrain) {
+    if (!uniqListed.includes(k)) {
+      issues.push({ msg: `文档漏列字段 (config.js 有/文档无): ${docName} §16 未登记 ${k}` });
+    }
+  }
+  if (claimed !== uniqListed.length) {
+    issues.push({
+      msg: `文档计数漂移: ${docName} §16 声称「已落地 ${claimed} 个仿真字段」，表格实际 ${uniqListed.length} 行`,
+    });
+  }
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
 // 主流程
 // ---------------------------------------------------------------------------
 function main() {
@@ -350,6 +406,12 @@ function main() {
     errors.push(
       `空转参数 (内核零读取): ${f.rustName} —— 两端口径一致，但 crates/ 内除 config.rs 外无任何读取点；调它不产生效果，请删除或接线`
     );
+  }
+
+  // 6) 现状文档配置清单漂移（★ 2026-09-12 技术债审计 §1 门禁补漏）
+  for (const issue of findDocConfigDrift(js.values)) {
+    if (issue.warn) warnings.push(issue.msg);
+    else errors.push(issue.msg);
   }
 
   // 输出报告

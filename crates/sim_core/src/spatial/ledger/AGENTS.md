@@ -1,7 +1,7 @@
 # ledger · 独立经济账本子系统 (AGENTS.md)
 
 > 本目录局部操作指南。全局规则以根目录 `AGENTS.md` 为准（§4.3 确定性节拍 / §4.10 测试禁令 / §4.12 超参集中化），本文件只收录本目录的职责边界、文件清单与局部易踩坑。
-> 当前机制见 `../../../../../docs/current/tech/07-ledger-and-polity.md`；已完成里程碑的历史方案归档于 `docs/archive/12-plan-ledger-refactor.md`。
+> 当前机制见 `../../../../../docs/current/tech/07-ledger-and-polity.md`；已完成里程碑的历史方案归档于 `../../../../../docs/archive/12-plan-ledger-refactor.md`。
 
 ---
 

@@ -1,5 +1,15 @@
 # Flow & Accord 死代码 / 空转机制审计
 
+> ✅ **已整改完毕（v1.50.18，2026-09-12）**：本报告 §1（编译期可证死代码 31 项）、§2（11 个空转配置字段）、
+> §3（3 个前端/工具死函数）、§4.1（三个兼容别名，实际全部零调用）**均已落实清理**，门禁 12/12 通过。
+> 并据 §2 建议新增 `tools/config-check.js` 第 5 条「空转参数」门禁（内核零读取即报错）。
+> 遗留人工判断项（§4.2 ledger 查询 API、装饰字段的规划接缝）已于 2026-09-12 随 v1.50.21 定案：
+> 三项装饰/地形字段维持删除状态（`config-check` 第 5 条禁止无消费点的字段），
+> D-B 蓝图落地时须连同唯一消费点一起加回——权威表述见
+> [`../docs/current/tech/14-terrain-and-network.md`](../docs/current/tech/14-terrain-and-network.md) §16
+> 与 [`../docs/plan/tech/06-terrain-templates.md`](../docs/plan/tech/06-terrain-templates.md) 文首更正段。
+> **本文件此后仅作历史追溯，不作为待办清单。**
+
 审计日期：2026-09-11
 方法：`cargo build` 告警 + 全仓交叉引用扫描（Rust pub 项 / WASM 导出 / JS 顶层函数 / SimConfig 字段 / 枚举变体 / 模块挂载）
 范围：`crates/` 73 个 .rs（20,668 行）、`frontend/` 32 个 .js（13,871 行）、`tools/` 24 个 .js

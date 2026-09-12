@@ -639,4 +639,4 @@ M19.1 阶段按需读取，不在 tick 中反复影子规划。M19.2/M19.3 已�
 
 新增旧枚举时同步 ActivityObservation 的两个穷尽匹配；新增 NeedKind/BranchId 时同步分支结果适配。调整真实执行行为时仍必须检查原状态写入者，而不是只更新观察映射。
 
-冻结基线、18 分支守卫、写入者清单和本阶段验证证据见 [M19.0/M19.1 审计记录](../../archive/19-m19-baseline-audit.md)，机器可读结果见 [基线报告](../../tools/baseline-m19-observation.json)。临时验证脚本按项目规定删除；既有 WASM、确定性、快照、配置及前端门禁继续使用。
+冻结基线、18 分支守卫、写入者清单和本阶段验证证据见 [M19.0/M19.1 审计记录](../../archive/19-m19-baseline-audit.md)，机器可读结果见 [基线报告](../../../tools/baseline-m19-observation.json)。临时验证脚本按项目规定删除；既有 WASM、确定性、快照、配置及前端门禁继续使用。

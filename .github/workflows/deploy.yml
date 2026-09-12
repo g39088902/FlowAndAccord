@@ -1,5 +1,5 @@
 # Flow & Accord CI/CD：push master 自动部署到腾讯云 COS
-# 环境变量（GitHub Secrets）配置说明见 docs/cicd-guide.md
+# 环境变量（GitHub Secrets）配置说明见 docs/current/tech/26-cicd.md
 name: Deploy to COS
 
 on:
@@ -55,6 +55,11 @@ jobs:
       - name: 跨文档一致性门禁
         run: node tools/cross-doc-check.js
 
+      # Markdown 相对链接可达性（2026-09-12 新增）：文档迁移/重命名后路径深度未同步即失败。
+      # 纯 Node 无依赖、秒级完成；docs/archive/ 归档正文按冻结策略已排除。
+      - name: 文档链接可达性门禁
+        run: node tools/doc-link-check.js
+
       - name: 上传构建产物 (供部署 Job 使用)
         uses: actions/upload-artifact@v4
         with:
@@ -77,7 +82,7 @@ jobs:
         run: pip install --quiet coscmd
 
       # 预检 Secret 值格式并预解析桶域名：格式错误/DNS 不可解析时秒级终止，
-      # 避免 coscmd 上传到一半才逐文件报 DNS 错误（首次部署实测踩坑，详见 docs/cicd-guide.md）
+      # 避免 coscmd 上传到一半才逐文件报 DNS 错误（首次部署实测踩坑，详见 docs/current/tech/26-cicd.md）
       - name: 预检 Secrets (格式校验 + DNS 预解析)
         env:
           COS_BUCKET: ${{ secrets.COS_BUCKET }}
@@ -106,7 +111,7 @@ jobs:
       # coscmd 增量同步整个 frontend/ 目录（--delete 清理远端多余文件，-y 跳过交互确认——
       # runner 无 stdin，不加 -y 会在 [y/N] 确认处 exit 253）
       # 随后对 .wasm 文件强制覆盖 Content-Type 为 application/wasm（部分环境 mimetypes 不识别 wasm 扩展名，
-      # 若 MIME 缺失浏览器流式编译 WebAssembly 会失败，详见 docs/cicd-guide.md 排障章节）
+      # 若 MIME 缺失浏览器流式编译 WebAssembly 会失败，详见 docs/current/tech/26-cicd.md 排障章节）
       - name: 上传至 COS
         env:
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}

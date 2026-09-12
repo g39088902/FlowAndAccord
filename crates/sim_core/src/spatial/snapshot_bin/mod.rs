@@ -1,6 +1,6 @@
 //! snapshot_bin · M4 快照零拷贝扁平二进制缓冲（FABS 帧）
 //!
-//! 隶属「性能优化规划书」里程碑 M4（`docs/16-plan-performance-optimization.md`）。
+//! 隶属「性能优化规划书」里程碑 M4（`docs/plan/tech/08-performance.md`）。
 //!
 //! # 为什么需要它
 //! 实测（v1.44.10，`node tools/profile-benchmark.js`）单次快照代价 **3,973 µs**：

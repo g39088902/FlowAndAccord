@@ -259,7 +259,7 @@ paw browser-action '{"action":"navigate","url":"http://localhost:3000","waitUnti
   && paw browser-action '{"action":"screenshot"}'
 ```
 
-截图产物落盘于 `/Users/empathy/.agent-browser/tmp/screenshots/screenshot-<ts>.png`（响应 JSON 的 `data.path`），用读图工具按绝对路径查看并验证内容，再以 Markdown 图片语法（`![alt](/绝对路径.png)`）在对话中展示。
+截图产物落盘于 `/Users/empathy/.agent-browser/tmp/screenshots/screenshot-<ts>.png`（响应 JSON 的 `data.path`），用读图工具按绝对路径查看并验证内容，再以 Markdown 图片语法 `![alt]` 加 `(绝对路径)` 的形式在对话中展示。
 
 **推荐把「导航 → 处理弹窗 → 调整画面 → 截图」全部放进同一条 bash 命令**（`&&` 串联），原因见 §7.3 坑 1。
 

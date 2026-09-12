@@ -168,7 +168,7 @@ pub(super) fn harvest_gold(
 /// 榷场互市结算：现场濒危自救（水/粮）→ 按家户需求装袋购入（水/粮/木）→ 家户黄金记账扣减。
 ///
 /// 支付顺序：先扣家户账本黄金，不足部分由随身黄金（`agent.carried_gold`）协同补足，
-/// 黄金最终流向 `LedgerRef::Void`（通缩闭环）。详见 `docs/current/16-market-pricing.md`。
+/// 黄金最终流向 `LedgerRef::Void`（通缩闭环）。详见 `docs/current/tech/09-market-pricing.md`。
 pub(super) fn buy_at_market(
     agent: &mut Agent3D,
     pois: &mut [PrimitivePoi],

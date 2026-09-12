@@ -52,6 +52,7 @@ stateDiagram-v2
 ### 1.2 第三轮：地形渲染独立 + D-A 装饰系统（★ v1.48.0 / ★ v1.49.1）
 - `render_terrain.js` 从 `render_world.js` 拆出：独立承载地形网格 / 水系地貌特征 (`drawTerrainFeatures`) / 装饰单实体绘制 (`drawAccentEntity`，★ v1.50.2 起由整层 `drawAccents()` 改写并迁出 `drawTerrain()`，改挂 `drawWorldEntities()` 深度队列) / 天空大气环境光`SimLighting` 三角；
 - D-A 装饰系统（v1.49.1）扩展了四处同步清单：新增 `TerrainAccent`（`snapshot.rs`）、FABS Section `TerrainAccents=21`（`layout.rs` + `encode.rs`）、前端解码（`snapshot-bin.js`）、`rustworld.js` `_applySnapshot` 映射 `sim.terrain.accents`；
+- ★ 2026-09-12：装饰树**季节叶色**由 `render_terrain.js` **定义**的 `window.SimTreeTint` 派生（`yearPhase`/`brownness`/`tint`，真相源＝快照 `season`+`season_progress`，逐树按 `accent.id` 抖动），调参在 `config.render.js` 的 `treeTint*`；此前该命名空间全仓无定义点（死分支），树木四季同色（契约见 `frontend/AGENTS.md` §5.11）；
 - v1.49.1 同时移除了 Pass 1 的 `RiverBank` 手绘金砂漫滩线；v1.50.3~v1.50.5 连续降噪后水系只剩「水面（Pass 2 + 2.8 波光）+ 水下游鱼（Pass 1.5）+ 浅滩涉渡（Pass 4）」，河床基底、卵石、岸线白沫与微波虚线全部移除。
 
 ### 1.3 第四轮：制度大盘抽离 ledger-ui.js（v1.3.0）
