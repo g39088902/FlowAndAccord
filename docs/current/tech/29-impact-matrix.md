@@ -18,7 +18,7 @@ stateDiagram-v2
     B --> C : 涉及 WASM/快照则双副本 + 四处同步 + FABS
     C --> D : rustworld.js::_applySnapshot 映射与 render/ledger-ui 消费
     D --> E : 涉及存档契约同步 world_save + 生成器版本门禁
-    E --> F : test-wasm / test-snapshot-bin / cross-doc-check / doc-maintenance-check + 更新影响矩阵与 changelog
+    E --> F : test-wasm / cross-doc-check / doc-maintenance-check + 更新影响矩阵与 changelog
     F --> [*] : 门禁全绿
     A --> G : 任一环节 undefined / panic / 确定性分叉
     B --> G : 同上
@@ -128,7 +128,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 | `geo/biome.rs` `GeoCell` / `SurfaceKind` | `geo/terrain.rs` 生成与采样 / `geo/query.rs` 查询 / `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/dict.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` / `render_world.js` | 地表类别是内核事实，快照与前端必须保持同构 |
 | T0 占地或曲线合法性规则 | `geo/query.rs` / `housing_system/settlement.rs` / 后续 `ecology/spawn.rs` 与路网走廊生成器 / `config.rs` + `config.js` / `./05-config-reference.md` | 房屋、道路、农业和防务应消费统一查询，不能复制坡度/禁行判据 |
 | T1 地形 profile / 生成器算法 | `geo/terrain.rs` / `world.rs` 创世 / `world_save.rs` 生成器版本门禁 / `snapshot.rs` / `snapshot_bin` / 前端特征渲染 / 确定性矩阵 | seed 重建依赖生成器版本，旧路网不得与新地貌静默组合 |
-| `TerrainFeature` 或 FABS `Terrain` section | `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/layout.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` / `test-snapshot-bin.js` | FABS 是定长/变长顺序流，字段或 section 变化必须四处同步并升格式版本 |
+| `TerrainFeature` 或 FABS `Terrain` section | `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/layout.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` | FABS 是定长/变长顺序流，字段或 section 变化必须四处同步并升格式版本 |
 
 ### 1.10 构建与部署
 
@@ -237,7 +237,7 @@ rustworld.js::_applySnapshot()
 ```
 □ 版本号：index.html 徽章 + AGENTS.md §1/§2 已自增（仅文档变更可跳过，见 AGENTS.md §4.0.1）
 □ 双副本：sim_wasm.wasm 已复制到 frontend/rust/ 和 frontend/ (仅 Rust 变更)
-□ 四处同步（★ M4）：snapshot.rs / world.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 字段一致 (仅快照变更)，门禁 `node tools/test-snapshot-bin.js`
+□ 四处同步（★ M4）：snapshot.rs / world.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 字段一致 (仅快照变更)，核对 `node tools/snapshot-check.js`（JSON 对拍门禁已于 v1.50.33 移除）
 □ 配置联动：config.rs 三处(const/字段/Default) + config.js + config-check.js 通过
 □ 测试门禁：cargo build + test-wasm.js + config-check.js 全绿
 □ 文档更新：对应 docs/current/0X-*.md + ../01-changelog.md 已追加

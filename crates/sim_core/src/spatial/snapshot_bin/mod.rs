@@ -23,13 +23,14 @@
 //! | `encode.rs` | `World3DEngine::write_snapshot_binary()` 帧编码 |
 //!
 //! # ⚠️ 四处同步铁律（新增/修改快照字段必读）
-//! 1. `snapshot.rs` — JSON 快照结构体定义
-//! 2. `world_snapshot.rs` — JSON 快照赋值
+//! 1. `snapshot.rs` — 快照结构体定义
+//! 2. `world_snapshot.rs` — 快照赋值
 //! 3. `snapshot_bin/encode.rs` — **本模块**二进制编码
 //! 4. `frontend/js/snapshot-bin.js` — 二进制解码
 //!
 //! 漏改任何一处都会让前端读到 `undefined` 或旧值；
-//! `tools/test-wasm.js` 的「二进制 ≡ JSON 深比较」断言是唯一的自动保障网。
+//! JSON 对拍门禁已随 JSON 快照通道移除（v1.50.33），四处同步依靠
+//! `snapshot-check.js` 静态核对 + `test-wasm.js` / `test-determinism.js` 回归兜底。
 //!
 //! # 确定性
 //! 本模块全程只读内核状态，**不消耗 `WorldRng`、不参与任何演化计算**，

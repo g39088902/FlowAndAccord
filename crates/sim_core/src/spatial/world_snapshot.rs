@@ -16,7 +16,7 @@ use super::world::World3DEngine;
 /// 快照生成
 ///
 /// `generate_snapshot()` 将 `World3DEngine` 的完整状态序列化为 `WorldSnapshot3D`，
-/// 经 WASM 线性内存以 JSON 形式传递给前端 `rustworld.js::_applySnapshot()`。
+/// 经 `snapshot_bin` 编码为 FABS 二进制帧（WASM 线性内存）下发给前端 `rustworld.js::_applySnapshot()`。
 ///
 /// **三处同步不变量**（根 AGENTS.md §4.5）：新增字段时必须同步修改
 /// 1. `snapshot.rs`（结构体定义）

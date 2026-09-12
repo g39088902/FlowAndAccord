@@ -159,14 +159,13 @@ FlowAndAccord/
 │   ├── profile-benchmark.js                # 性能 Profiling 基准测试与微秒级子阶段剖析器
 │   ├── rust-download.js                    # Rust 工具链下载器 (Node OpenSSL TLS 绕过系统证书异常)
 │   ├── snapshot-check.js                   # ★ 快照同步静态校验 (snapshot.rs定义 vs world_snapshot.rs赋值 vs rustworld.js映射)
-│   ├── snapshot-reader.js                  # ★ T1(v1.46.0) FABS 统一快照读取器：tools/ 全部工具唯一取值入口（FABS 优先、JSON 仅调试回退）
+│   ├── snapshot-reader.js                  # ★ T1(v1.46.0) FABS 统一快照读取器：tools/ 全部工具唯一取值入口（快照仅此一条通道）
 │   ├── test-dag.js                         # 族谱上下 5 代范围截断与布局确定性自动化测试套件
 │   ├── test-determinism.js                 # 增强型确定性矩阵测试套件 (6 大数学不变量定理验证)
 │   ├── test-itinerary.js                   # ★ M19.4d 多品类预排采收行程验证 (链路/TSP 排序/多站推进/长程确定性)
 │   ├── test-m19-differential.js            # ★ M19 差分回归 (3600 tick 存档与快照哈希逐字节一致性)
 │   ├── test-personalization.js             # ★ M19.4c 禀赋与家资个性化选策验证
 │   ├── test-preemption.js                  # ★ M19.4b 分级任务抢占验证 (危机抢占/平滑中断/行囊保全)
-│   ├── test-snapshot-bin.js                # ★ M4 四处同步防漂移门禁：FABS 二进制帧 vs JSON 真值逐字段深比较（4 场景，含跨世界驻留表）
 │   ├── test-wasm.js                        # WASM 回归测试 (确定性/防越界/防 NaN/长程稳定)
 │   └── vendor-deps.js                      # 依赖图 BFS vendor 解析器 (crates.io API 发现并下载全部依赖到 .vendor/)
 ├── .github/

@@ -40,7 +40,7 @@ let lastSnapshotTime = 0;
 let lastCheckpointRealTime = 0;
 
 // ★ M4 (v1.45.0) 二进制快照（FABS）状态
-let binSupported = true;  // INIT 后探测；解码/拉取异常时回退 JSON 并置 false
+let binSupported = true;  // INIT 后探测；异常时置 false 停止拉帧并告警
 let warnedBinFallback = false; // 回退仅告警一次
 let enumTableJson = '';   // 枚举名称表 JSON（随 READY 下发主线程，供 SnapshotBin.setEnumTables）
 const _headerTickDv = new DataView(new ArrayBuffer(40)); // 读取 FABS 帧头 tick 用
@@ -63,7 +63,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.50.32';
+  return '1.50.33';
 }
 
 function applyConfigInternal(configObj) {
@@ -376,7 +376,7 @@ self.onmessage = async function(e) {
         const result = await WebAssembly.instantiate(bytes, {});
         _wasm = result.instance.exports;
         _memory = _wasm.memory;
-        // ★ M4：探测二进制快照与枚举名称表（旧 wasm 无导出则自动回退 JSON）
+        // ★ M4：探测二进制快照与枚举名称表（快照仅此一条通道）
         binSupported = typeof _wasm.world_snapshot_bin_ptr === 'function'
           && typeof _wasm.world_snapshot_bin_len === 'function';
         enumTableJson = '';

@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
-// ★ T1：统一走 tools/snapshot-reader.js（FABS 二进制优先，JSON 仅调试回退）
+// ★ T1：统一走 tools/snapshot-reader.js（FABS 二进制，快照仅此一条通道）
 const { createSnapshotReader } = require('./snapshot-reader.js');
 
 function loadSimConfig() {

@@ -34,7 +34,7 @@ stateDiagram-v2
 | A 基线固化 | profile-benchmark 采集 B0/B1/B2，定位超线性热点 | 优化前固化基准 | 热点超线性系数>1.15 或容量阈值满足 |
 | B 立项 | M5-1 消除超线性（P2）/ M5-2 多线程 Fork-Join（条件触发） | 触发条件达成 | 拆为子项独立提交 |
 | C 子项实施 | M5-1.1~1.4 或 M5-2 并发只读 Phase 6 评估寻路 | 立项拆分 | 每子项必过门禁 |
-| D 确定性门禁 | test-determinism 6/6、test-wasm、test-snapshot-bin、config-check、frontend-check | 子项提交 | 门禁通过转验收；失败回退重测 |
+| D 确定性门禁 | test-determinism 6/6、test-wasm、config-check、frontend-check | 子项提交 | 门禁通过转验收；失败回退重测 |
 | E 验收 | B2 稳态<42µs、Phase 3/7/6 系数≤1.15、400 人新世界单拍<100µs | 门禁全过且指标达标 | 清理临时基准并升版 |
 | F 归档 | 结果写入 docs/current/01-changelog.md，bump-version | 验收完成 | 优化关闭，进入现状文档 |
 
@@ -111,7 +111,6 @@ node tools/profile-benchmark.js --preset max-yield --ticks 800000 \
 # 必过门禁
 node tools/test-wasm.js
 node tools/test-determinism.js
-node tools/test-snapshot-bin.js
 node tools/config-check.js
 node tools/frontend-check.js
 

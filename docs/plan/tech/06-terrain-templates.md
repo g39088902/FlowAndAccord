@@ -102,7 +102,6 @@ cargo test --lib
 cargo build -p sim_wasm --target wasm32-unknown-unknown --release   # 并同步 WASM 双副本
 node tools/test-wasm.js
 node tools/test-determinism.js
-node tools/test-snapshot-bin.js
 node tools/config-check.js
 node tools/frontend-check.js
 node tools/cross-doc-check.js
@@ -783,7 +782,6 @@ cargo build -p sim_wasm --target wasm32-unknown-unknown --release
 # 随后将 wasm 同步至 frontend/rust/sim_wasm.wasm 与 frontend/sim_wasm.wasm
 node tools/test-wasm.js
 node tools/test-determinism.js
-node tools/test-snapshot-bin.js
 node tools/config-check.js
 node tools/frontend-check.js
 node tools/cross-doc-check.js
@@ -978,7 +976,7 @@ pub struct RiverCenterline {
 实现门禁按改动类型执行：
 
 - Rust/配置：`cargo test --lib`、WASM 编译、双副本同步、`node tools/test-wasm.js`、`node tools/config-check.js`。
-- 快照：`node tools/test-snapshot-bin.js`，并核对 `snapshot.rs`、`world_snapshot.rs`、`encode.rs`、`snapshot-bin.js`、`rustworld.js`。
+- 快照：核对 `snapshot.rs`、`world_snapshot.rs`、`encode.rs`、`snapshot-bin.js`、`rustworld.js` 四处同步，跑 `node tools/snapshot-check.js` + `test-wasm.js`。
 - 前端：`node tools/frontend-check.js`。
 - 确定性矩阵：`node tools/test-determinism.js`（6 套件全通）。
 - 跨文档：`node tools/cross-doc-check.js`（冲突 0、漂移 0）。

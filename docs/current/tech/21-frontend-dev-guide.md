@@ -98,10 +98,10 @@ sequenceDiagram
     Rust->>Gen: 声明快照 Struct (如 ClanSnapshot / RegionSnapshot)
     Gen->>Enc: generate_snapshot() 组装（真值源）
     Enc->>Dec: FABS 定长二进制帧（生产唯一通道）
-    Dec->>Adapt: 解码为与 JSON 同构的 JS 对象
+    Dec->>Adapt: 解码为与 snapshot.rs 结构同构的 JS 对象
     Adapt->>UI: _applySnapshot() 映射
     UI->>UI: DOM 绑定与 Canvas 矢量高亮
-    Note over Gen,Dec: 防漂移门禁 node tools/test-snapshot-bin.js<br/>（JSON 仅 test-only 真值源）
+    Note over Gen,Dec: 同步核对 node tools/snapshot-check.js<br/>+ test-wasm / test-determinism 回归（JSON 通道已移除）
 ```
 
 ### 2.1 M2~M4 快照结构体（已落地，与 `snapshot.rs` 实际定义一致）

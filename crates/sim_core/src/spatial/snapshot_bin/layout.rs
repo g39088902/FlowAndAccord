@@ -15,18 +15,19 @@
 //!
 //! # ⚠️ 四处同步铁律
 //! 修改任何字段编码必须同步四处，否则前端读到 `undefined` 或类型错误：
-//! 1. `snapshot.rs`（JSON 快照结构体定义）
-//! 2. `world_snapshot.rs`（JSON 快照赋值）
+//! 1. `snapshot.rs`（快照结构体定义）
+//! 2. `world_snapshot.rs`（快照赋值）
 //! 3. `snapshot_bin/encode.rs`（**本模块**二进制编码）
 //! 4. `frontend/js/snapshot-bin.js`（二进制解码）
 //!
-//! `tools/test-wasm.js` 的「二进制 ≡ JSON 深比较」断言是这四处同步的唯一自动保障网。
+//! JSON 对拍门禁已随 JSON 快照通道移除（v1.50.33），四处同步依靠
+//! `snapshot-check.js` 静态核对 + `test-wasm.js` / `test-determinism.js` 回归兜底。
 
 /// 帧魔数 `"FABS"`（Flow & Accord Binary Snapshot），小端存储为 `46 41 42 53`
 pub const MAGIC: [u8; 4] = *b"FABS";
 
 /// 帧格式版本。**结构性**变更（增删 section 或改字段编码）时必须 +1；
-/// 前端 `snapshot-bin.js` 校验不匹配即回退 JSON 通道。
+/// 前端 `snapshot-bin.js` 校验不匹配即拒绝整帧（返回 null，上层告警）。
 /// v1.50.30：2 -> 3（D-B1-4 新增 `TerrainSubFeatures=22` section，见下方枚举）。
 pub const FORMAT_VERSION: u16 = 3;
 

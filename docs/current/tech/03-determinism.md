@@ -113,7 +113,6 @@ graph TD
 | :--- | :--- |
 | `node tools/test-wasm.js` | 同种子逐字节、防越界、防 NaN、长程稳定、存读档 |
 | `node tools/test-determinism.js` | 6 大定理：多种子 / 分批独立性 / 快照无副作用 / 存读档 / … |
-| `node tools/test-snapshot-bin.js` | FABS 二进制帧 ≡ JSON 快照同构 |
 | `node tools/config-check.js` | Rust `SimConfig` ↔ 前端 `config.js` 字段/类型/默认值零漂移 |
 | `node tools/cross-doc-check.js` | 跨文档事实指纹一致（避免文档间口径冲突） |
 | `node tools/bump-version.js --check` | 版本号定义点零漂移 |

@@ -56,7 +56,7 @@
 
 - [ ] **D-B1-9 阶段一代码收口：退出条件验证 + 门禁证据 + 文档同步**
     - 跨构建验收：以阶段一之前的提交 `5f09236` 为基准，记录最终候选提交及两个 WASM 的 SHA256；按 06 号 §5.1 的 D-B1 跨构建比较契约执行临时差分验证。`test-wasm.js` / `test-determinism.js` 仅验证各自构建的回归与确定性，不能替代新旧构建比较。`TERRAIN_GENERATOR_VERSION` 保持 4，`SAVE_FORMAT_VERSION` 不动。
-    - 门禁与产物：汇总 D-B1-1～7 最终候选产物的 R.5 门禁证据（cargo test/build、WASM 双副本、test-wasm / test-determinism / test-snapshot-bin / config-check / frontend-check / cross-doc-check）；证据必须对应最终产物。若收口发现代码问题，修复后先按 §4.9 升版、重编译并同步双副本，再对最终产物运行适用门禁；不得用升版前结果替代最终验证。
+    - 门禁与产物：汇总 D-B1-1～7 最终候选产物的 R.5 门禁证据（cargo test/build、WASM 双副本、test-wasm / test-determinism / config-check / frontend-check / cross-doc-check）；证据必须对应最终产物。若收口发现代码问题，修复后先按 §4.9 升版、重编译并同步双副本，再对最终产物运行适用门禁；不得用升版前结果替代最终验证。
     - 文档同步：复核 06 号 R.1/§2.3/§18 的状态（缓存实际通过后才清零 D-A 遗留，D-B 注入仍待后续阶段）、07 号装饰实现状态及 TA-09 待交付状态；涉及现状事实时同步 14 号及受影响局部 AGENTS.md。有代码/契约改动时追加 [01-changelog.md](docs/current/01-changelog.md) 版本条目。
     - 纯验证/文档收口：已有最终产物验收证据且未改代码或契约时，不额外升版、不重编译、不新增 changelog 版本条目、不重复运行代码测试；缺少的阶段验收证据仍须补齐。文档提交执行 `git status --short`、`git diff --check`、`doc-maintenance-check`、`doc-link-check`、`cross-doc-check`、`bump-version --check`（发布文档维护检查追加 `--strict`）。
     - 出处：§5.1 D-B1 退出条件、§18.4/§18.5、R.5、根 AGENTS.md §4.0/§4.1/§4.9。

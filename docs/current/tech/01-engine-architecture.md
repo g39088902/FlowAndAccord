@@ -105,7 +105,7 @@ rustworld.js::_applySnapshot()
 ```
 
 > **快照字段四处同步**（M4 起）：`snapshot.rs` → `world_snapshot.rs` → `snapshot_bin/encode.rs`
-> → `snapshot-bin.js` + `rustworld.js`。防漂移门禁是 `node tools/test-snapshot-bin.js`。
+> → `snapshot-bin.js` + `rustworld.js`。回归兜底是 `test-wasm.js` / `test-determinism.js`（JSON 对拍门禁已于 v1.50.33 随 JSON 快照通道移除）。
 > 详见 [`15 快照与存档`](./06-snapshot-and-save.md)。
 
 ---
@@ -128,7 +128,7 @@ rustworld.js::_applySnapshot()
 | :--- | :--- |
 | 单文件 ≤ 800 行 | 前端与 Rust 均遵守；超出按职责拆分并为新目录补局部 `AGENTS.md` |
 | 目录级 `AGENTS.md` | 每个复杂目录维护一份，聚焦职责边界、文件清单与局部易踩坑 |
-| 持久化测试禁令 | 不提交临时单元测试；长期验证走 `test-wasm.js` / `test-determinism.js` / `test-snapshot-bin.js` / `config-check.js` / `frontend-check.js` |
+| 持久化测试禁令 | 不提交临时单元测试；长期验证走 `test-wasm.js` / `test-determinism.js` / `config-check.js` / `frontend-check.js` |
 | 文档纪律 | 规划不写入现状文档；机制落地后才更新 `docs/current/`、局部 AGENTS、changelog 与版本 |
 
 完整约定见 [`66 不变量`](./28-invariants.md) 与 [`68 工作流`](./30-workflow.md)。

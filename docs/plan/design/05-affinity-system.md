@@ -159,7 +159,7 @@ pub struct AffinityLink {
 
 - **确定性**：R5 已声明零 RNG 消耗；新增任何按 agents 顺序遍历的逻辑保持既有消费顺序契约，同种子逐字节一致必须通过 `node tools/test-wasm.js`；
 - **存档**：好感度表随 `WorldSave` 持久化（逐条 `(peer_id, value, last_changed_tick)`）；因字段新增，`SAVE_FORMAT_VERSION` 手工 +1 并同步 `world_save.rs` 与 `save-ui.js`（根 AGENTS.md §4.9）；
-- **快照四处同步**（根 AGENTS.md §4.5）：`snapshot.rs` 结构 → `world.rs` `generate_snapshot()` 赋值 → `snapshot_bin/encode.rs` 定长编码（每人 36 条 × 定长字段，建议只编码条目数 + 非零条目）→ `snapshot-bin.js` 解码 + `rustworld.js` `_applySnapshot()`；新增等级名须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`；防漂移门禁 `node tools/test-snapshot-bin.js`；
+- **快照四处同步**（根 AGENTS.md §4.5）：`snapshot.rs` 结构 → `world.rs` `generate_snapshot()` 赋值 → `snapshot_bin/encode.rs` 定长编码（每人 36 条 × 定长字段，建议只编码条目数 + 非零条目）→ `snapshot-bin.js` 解码 + `rustworld.js` `_applySnapshot()`；新增等级名须同步 `snapshot_bin/dict.rs` 的 `*_code()`/`*_table()`；同步核对 `node tools/snapshot-check.js`（JSON 对拍门禁已于 v1.50.33 随 JSON 快照通道移除）；
 - **跨世界失效**：好感度表随 Agent 存亡，不设独立缓存，无 STR_TAB 式跨世界串味风险；读档重建后表内容从存档恢复，禁止用快照回写内存表；
 - **死亡清理**：peer 死亡时条目去留二选一（见 §9 O2），落地前须定案并写入不变量；Agent 自身死亡即整表消亡（继承「对亡父印象」属 23 号 P3 传承，不在本表）。
 

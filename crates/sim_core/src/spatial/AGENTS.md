@@ -129,7 +129,7 @@ snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.4
 3. **二进制编码**：`snapshot_bin/encode.rs::write_snapshot_binary()`（FABS 帧，字段顺序/枚举码位必须与 1、2 等价）
 4. **映射**：`frontend/js/rustworld.js::_applySnapshot()` + `frontend/js/snapshot-bin.js` 解码器（产物与 JSON 逐字段同构）
 
-新增字段时**四处**必须同步，否则前端读到 `undefined`；防漂移自动网 = `tools/test-snapshot-bin.js`「二进制 ≡ JSON 深比较」门禁。详见根 AGENTS.md §4.5。
+新增字段时**四处**必须同步，否则前端读到 `undefined`；JSON 对拍门禁已随 JSON 快照通道移除（v1.50.33），同步核对走 `tools/snapshot-check.js` + `test-wasm.js` / `test-determinism.js`。详见根 AGENTS.md §4.5。
 
 > ⚠️ 枚举口径：二进制帧的闭集枚举（state/poiType/roadClass/houseTier/resourceKind/season/householdRole/gender/transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步修改 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 

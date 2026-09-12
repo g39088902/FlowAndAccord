@@ -84,7 +84,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.32';
+        this._appVersion = '1.50.33';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -154,7 +154,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.32';
+            this._appVersion = msg.appVersion || '1.50.33';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -423,7 +423,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.32';
+        return this._appVersion || '1.50.33';
       }
 
       /**
@@ -574,7 +574,7 @@
         this.currentSeason = snap.season;
         this.temperature = snap.temperature;
         this.seasonTimer = snap.season_timer != null ? snap.season_timer : 0.0;
-        // ★ 动态季节光照：季节内进度（FABS/JSON 均已下发，此前未映射）
+        // ★ 动态季节光照：季节内进度（快照帧已下发，此前未映射）
         this.seasonProgress = (typeof snap.season_progress === 'number' && isFinite(snap.season_progress))
           ? snap.season_progress : null;
         this.elNinoPhase = snap.el_nino_phase != null ? snap.el_nino_phase : 0.0;
@@ -759,7 +759,7 @@
         //   · 快照携带完整几何（snap.lanes 为数组）：全量重建 Map + O(n) 反向车道查找；
         //   · 增量帧（snap.lanes === null，仅 LANE_WEAR）：复用缓存对象，只覆写 wear ——
         //     消灭每帧 812 个对象重建与 O(n²) 反查（812² ≈ 66 万次内层比较）。
-        if (snap.lanes) { // 携带完整几何（数组）；JSON 通道恒为数组
+        if (snap.lanes) { // 携带完整几何（数组）；增量帧为 null
           const lanes = new Map();
           const laneOrder = [];
           for (const l of snap.lanes) {

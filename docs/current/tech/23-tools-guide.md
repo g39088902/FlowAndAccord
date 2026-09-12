@@ -1,7 +1,7 @@
 # 23. 🛠️ 仿真内核与工程工具箱操作指南 (tools/)
 
 > **模块索引**：[← 返回 ../README.md 全景索引](../README.md)
-> **工具定位**：`tools/` 目录下的 25 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
+> **工具定位**：`tools/` 目录下的 24 个工具脚本均为基于 Node.js 原生模块的**零依赖工具**，覆盖契约门禁、内核确定性测试、微秒级性能基准、无头仿真诊断、世系族谱数据生成与版本自动化治理。
 
 ---
 
@@ -31,7 +31,7 @@ stateDiagram-v2
 
 **不变量**（违反即出 bug）：
 - 门禁 exit 1 即阻断发布，须先修复契约再继续；纯文档变更不升版不跑测试（`doc-maintenance-check` 通过 + `--check` 零漂移）。
-- 改动快照字段须同时跑 `snapshot-check.js` + `test-snapshot-bin.js`（★ M4 四处同步防漂移门禁）。
+- 改动快照字段须跑 `snapshot-check.js` + `test-wasm.js` / `test-determinism.js` 回归（JSON 对拍门禁已于 v1.50.33 随 JSON 快照通道移除）。
 - `bump-version.js` 以 `index.html` 徽章为唯一真相源，改动代码必须升版，仅文档变更例外。
 
 ## 1. 📂 工具全景速查总表
@@ -43,10 +43,10 @@ stateDiagram-v2
 | 3 | **`frontend-check.js`** | 契约门禁 | 前端全部 JS 语法检查 + `getElementById` DOM ID 存在性双向校验 | `node tools/frontend-check.js` | 0=通过, 1=语法/ID缺失 |
 | 4 | **`code-map-check.js`** | 契约门禁 | 实际文件树 vs `./31-code-map.md` 登记清单交叉比对，捕获文档与代码漂移 | `node tools/code-map-check.js` | 0=通过, 1=未登记/无效登记 |
 | 5 | **`doc-maintenance-check.js`** | 契约门禁 | 依据 `docs/doc-maintenance.json` 检查各模块文档的新鲜度与复核周期 | `node tools/doc-maintenance-check.js` | 0=体检完成 (追加 `--strict` 时漂移报 1) |
-| 6 | **`snapshot-reader.js`** | 工具公共模块 | ★ T1 的唯一快照访问入口：优先读取 FABS 并复用前端解码器；JSON 调试导出仅作为缺失二进制时的兼容降级 | 被 6 个快照工具 `require()` | 非独立 CLI |
+| 6 | **`snapshot-reader.js`** | 工具公共模块 | ★ T1 的唯一快照访问入口：读取 FABS 并复用前端解码器（快照仅此一条通道） | 被多个快照工具 `require()` | 非独立 CLI |
 | 7 | **`test-wasm.js`** | 内核测试 | Node 无头运行 WASM，验证确定性、长程稳定（防越界/防NaN）、存读档状态一致 | `node tools/test-wasm.js` | 0=通过, 1=失败抛出 |
 | 8 | **`test-determinism.js`** | 内核测试 | **最高级确定性门禁**：验证 6 大数学定理（多种子/分批独立/快照只读/重放一致等） | `node tools/test-determinism.js` | 0=矩阵全通, 1=确定性分叉 |
-| 9 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 8 大子阶段耗时占比与 ★ T1 后的 FABS 编码/解码；支持优化前后加速比对比、`--with-legacy-json` 调试对照、`--preset max-yield` 压力场景、`--set` 覆写与 `--pops` 自定义规模档位 | `node tools/profile-benchmark.js` | 0=完成采样 |
+| 9 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 8 大子阶段耗时占比与 FABS 编码/解码；支持优化前后加速比对比、`--preset max-yield` 压力场景、`--set` 覆写与 `--pops` 自定义规模档位 | `node tools/profile-benchmark.js` | 0=完成采样 |
 | 10 | **`diagnose.js`** | 诊断排障 | 确定性无头诊断，指定种子与 Tick 极速复现并嗅探死因、贫困、行为卡死 | `node tools/diagnose.js -s 42 -t 3000` | 0=完成诊断 |
 | 11 | **`gold_mining_analysis.js`** | 专项分析 | 专门用于深入排查和追踪族人“为何不淘金/采金”的家户物资与马斯洛行为链路 | `node tools/gold_mining_analysis.js` | 0=完成分析 |
 | 12 | **`gen-dag-testdata.js`** | 族谱工具 | 驱动内核跑满数十万 Tick 累积族人档案库，裁剪直系血脉生成 DAG 测试集 | `node tools/gen-dag-testdata.js` | 0=生成完成 |
@@ -59,10 +59,9 @@ stateDiagram-v2
 | 19 | **`test-itinerary.js`** | 行为矩阵 | ★ M19.4d 多品类预排采收行程验证：链路生成 / TSP 最近邻排序 / 多站顺路推进 / 异常清空 / 多种子长程确定性 | `node tools/test-itinerary.js` | 0=矩阵全通, 1=断言失败 |
 | 20 | **`gen-m19-baseline.js`** | 基线工具 | ★ M19.0 冻结基线生成：长程演化导出观察基线（`tools/baseline-m19-observation.json`） | `node tools/gen-m19-baseline.js` | 0=生成完成 |
 | 21 | **`test-m19-differential.js`** | 行为矩阵 | ★ M19 差分回归：3600 tick 存档与快照哈希逐字节一致性（M19 基线回归） | `node tools/test-m19-differential.js` | 0=矩阵全通, 1=断言失败 |
-| 22 | **`test-snapshot-bin.js`** | 契约门禁 | ★ M4 四处同步防漂移门禁：FABS 二进制帧 vs JSON 真值逐字段深比较（4 场景，含跨世界驻留表） | `node tools/test-snapshot-bin.js` | 0=全绿, 1=不一致 |
-| 23 | **`cross-doc-check.js`** | 契约门禁 | 跨文档事实指纹一致性：同一事实在多篇文档值不同即冲突，配置字段另与 config.js / config.rs 权威比对 | `node tools/cross-doc-check.js` | 0=全部一致, 1=冲突/漂移 |
-| 24 | **`test-dag.js`** | 族谱测试 | 直系血脉上下 5 代范围截断、闭合边拓扑、布局确定性与独立页导出自动化套件 | `node tools/test-dag.js` | 0=测试全通, 1=断言失败 |
-| 25 | **`doc-link-check.js`** | 契约门禁 | ★ Markdown 相对链接可达性门禁：文档迁移/重命名后路径深度未同步即报错） | `node tools/doc-link-check.js` | 0=全部可达, 1=存在失效链接 |
+| 22 | **`cross-doc-check.js`** | 契约门禁 | 跨文档事实指纹一致性：同一事实在多篇文档值不同即冲突，配置字段另与 config.js / config.rs 权威比对 | `node tools/cross-doc-check.js` | 0=全部一致, 1=冲突/漂移 |
+| 23 | **`test-dag.js`** | 族谱测试 | 直系血脉上下 5 代范围截断、闭合边拓扑、布局确定性与独立页导出自动化套件 | `node tools/test-dag.js` | 0=测试全通, 1=断言失败 |
+| 24 | **`doc-link-check.js`** | 契约门禁 | ★ Markdown 相对链接可达性门禁：文档迁移/重命名后路径深度未同步即报错） | `node tools/doc-link-check.js` | 0=全部可达, 1=存在失效链接 |
 
 ---
 
@@ -85,13 +84,13 @@ stateDiagram-v2
   1. `crates/sim_core/src/spatial/snapshot.rs`（结构体定义）
   2. `crates/sim_core/src/spatial/world_snapshot.rs`（Rust 数据赋值）
   3. `frontend/js/rustworld.js`（前端接收与映射）
-- ⚠️ **★ M4 起真正的不变量是「四处同步」**：本工具只做静态登记核对；**二进制编码/解码是否漂移由
-  `tools/test-snapshot-bin.js`（§3.x）把关**——它把 FABS 帧与 JSON 真值逐字段深比较（4 场景，含跨世界驻留表）。
-  改动快照字段后**两者都要跑**。
+- ⚠️ **★ M4 起真正的不变量是「四处同步」**：本工具只做静态登记核对；二进制编码/解码的回归由
+  `test-wasm.js` / `test-determinism.js` 兜底（JSON 对拍门禁已于 v1.50.33 随 JSON 快照通道移除）。
+  改动快照字段后**都要跑**。
 - **常用命令**：
   ```bash
   node tools/snapshot-check.js
-  node tools/test-snapshot-bin.js   # ★ M4 防漂移，必跑
+  node tools/test-wasm.js           # 快照回归，必跑
   ```
 
 ### 2.3 `frontend-check.js` · 前端语法与 DOM 健全性门禁
@@ -150,7 +149,7 @@ stateDiagram-v2
 ## 3. 内核仿真测试与性能基准工具
 
 ### 3.1 `snapshot-reader.js` · FABS 统一快照读取器
-- **目标**：让所有 Node 工具经同一条 FABS 解码链取得与旧 JSON 快照逐字段同构的对象，彻底消除工具侧双通道漂移。
+- **目标**：让所有 Node 工具经同一条 FABS 解码链取得与 `snapshot.rs` 快照结构逐字段同构的对象（JSON 双通道时代的漂移风险已随 JSON 通道移除而终结）。
 - **约束**（v1.46.0 起）：**不提供**解码对象复用——对象池化经实测为负收益（快照对象全部短命，V8 新生代回收更划算，池化只会导致对象晋升老生代），故 `setReuse()` 已退化为**空操作**，工具侧与浏览器共用同一条「每帧全新对象」路径。用于字符串确定性比对时，读取器会先请求全量地形，避免增量帧导致假分叉。
 - ⚠️ **跨世界缓存**：FABS 驻留表（`STR_TAB`）在前端解码器中**永久缓存**，判据是「`start_index == 0` 视为全新驻留表并清空缓存」——因为新世界 / 读档重建的 `epoch` 恒为 0，**不能**用 epoch 判断是否换世界。工具侧在 `world_load` / `world_create` 之后需显式调用 `reader.resetCaches()`。
 - **使用方式**：
@@ -186,17 +185,7 @@ stateDiagram-v2
   node tools/test-determinism.js
   ```
 
-### 3.4 `test-snapshot-bin.js` · ★ M4 四处同步防漂移门禁
-- **目标**：把 FABS 二进制帧与 JSON 快照（test-only 真值源）**逐字段深比较**，是「四处同步」唯一的自动网。
-- **4 个场景**：`[1/4]` 创世帧（地形+路网全量）· `[2/4]` 稳态帧 + 增量帧（无地形/无路网几何，仅 LANE_WEAR）·
-  `[3/4]` 存读档后帧 · `[4/4]` **换世界后**（★ v1.46.0：不调 `resetCaches()` 直接建第二个世界，验证跨世界驻留表缓存失效；
-  回退该修复会报 129 处不一致）。
-- **常用命令**：
-  ```bash
-  node tools/test-snapshot-bin.js      # 全绿输出 ALL_BIN_JSON_EQUAL
-  ```
-
-### 3.5 `profile-benchmark.js` · 性能 Profiling 与子阶段耗时剖析
+### 3.4 `profile-benchmark.js` · 性能 Profiling 与子阶段耗时剖析
 - **目标**：微秒级精度度量内核性能，为优化提供量化基准。
 - **核心功能**：
   - 测算总体 TPS 与单 Tick 耗时（µs）；

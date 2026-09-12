@@ -262,7 +262,7 @@ M08 只增加非紧急工作的准备余量，不能要求体力超过容量或�
 
 ### 9.2 快照与界面
 
-遵守 `snapshot.rs → world_snapshot.rs → snapshot_bin/encode.rs → snapshot-bin.js + rustworld.js` 同步链；生产读取仍走 FABS，JSON 调试接口只用于既有漂移比对门禁。
+遵守 `snapshot.rs → world_snapshot.rs → snapshot_bin/encode.rs → snapshot-bin.js + rustworld.js` 同步链；读取只走 FABS（JSON 调试接口与漂移比对门禁已于 v1.50.33 移除）。
 
 常规快照仅提供记忆数量与当前主要影响。选中人物时通过后续新增的只读详情请求获取最多 24 条摘要，不能默认每帧为全体人物生成长文本。详情协议应返回世界身份与快照 tick，前端切换世界或人物后丢弃过期响应；未来新增接口须更新 WASM 局部文档。
 

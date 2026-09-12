@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.50.32` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.50.33` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 </div>
 
@@ -211,7 +211,7 @@ node frontend/server.js
 | 表现层 | 原生静态前端（ES6+） + 双主题 Canvas 渲染管线 + 动态季节光照 + 微观水生生境 |
 | 存储引擎 | File System Access API 原生文件磁盘直写 + IndexedDB 句柄持久化 + localStorage 降级三槽位 |
 | 可调超参 | **233 个**参数集中于 `frontend/js/config.js` 及拆分配置文件（含升级成本矩阵；光照 / 渲染为独立纯前端配置），与 Rust 内核 `SimConfig` 字段一一对应，改完刷新即生效，无需重新编译 |
-| 质量门禁 | `test-wasm.js`（确定性 / 防越界 / 防 NaN）+ `test-determinism.js`（6 大矩阵）+ `config-check.js`（超参对齐）+ `test-snapshot-bin.js`（FABS ≡ JSON）+ `diagnose.js`（无头诊断） |
+| 质量门禁 | `test-wasm.js`（确定性 / 防越界 / 防 NaN）+ `test-determinism.js`（6 大矩阵）+ `config-check.js`（超参对齐）+ `diagnose.js`（无头诊断） |
 
 ---
 

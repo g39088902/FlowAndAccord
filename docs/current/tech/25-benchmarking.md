@@ -111,10 +111,8 @@ node tools/profile-benchmark.js --ticks 3000 --compare baseline.json
 
 #### C. 快照编码与通信开销（Snapshot Overhead）
 
-> ★ T1（v1.46.0）：JSON 快照通道已从生产与工具链路移除。基准工具现在**只**测量 FABS 二进制通道：
+> ★ v1.50.33：JSON 快照通道已彻底移除。基准工具**只**测量 FABS 二进制通道：
 > `world_snapshot_bin_ptr()`（Rust 编码）+ 内存拷出 + `SnapshotBin.decode`（JS 解码）。
-> 想同时量化已废弃 JSON 通道的代价，加 `--with-legacy-json`（会调用 test-only 的
-> `world_snapshot_json_debug_ptr`，仅供对照，不要用于生产结论）。
 
 - 默认配置（88 人）稳态帧约 $46\text{ KB}$；满载档（442 人）约 $144\text{ KB}$；
 - 体积相对同帧 JSON 压缩 **$8\sim 12$ 倍**；

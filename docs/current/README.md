@@ -1,7 +1,7 @@
 # 现状 · 已实现功能全景
 
 > 本目录描述**当前代码中真实存在的行为**。未实现的设计一律在 [`../plan/`](../plan/)。
-> **版本**：v1.50.32（演进记录见 [./01-changelog.md](./01-changelog.md)）。
+> **版本**：v1.50.33（演进记录见 [./01-changelog.md](./01-changelog.md)）。
 > 修改代码前的快速入口见 [`tech/30-workflow.md`](tech/30-workflow.md)。
 
 ---

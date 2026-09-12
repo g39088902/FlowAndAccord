@@ -1,7 +1,7 @@
 //! sim_wasm — 将 sim_core 编译为 wasm32-unknown-unknown 的零依赖桥接模块
 //!
 //! 前端通过 `WebAssembly.instantiate` 加载本模块，调用导出函数推进确定性仿真，
-//! 并从 wasm 线性内存读取 JSON 快照（不依赖 wasm-bindgen）。
+//! 并从 wasm 线性内存读取 FABS 二进制快照（不依赖 wasm-bindgen）。
 //! 所有导出均为 extern "C"，AOT 可解析；world_create 的 seed 参数保证可复现。
 
 use sim_core::config::SimConfig;
@@ -167,48 +167,11 @@ pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ★ T1（v1.46.0）JSON 快照通道已退化为「测试专用调试导出」
-//
-// 原 `world_snapshot_ptr/len` 是双通道并存时代的遗留：前端主链路与 tools/ 全部
-// 依赖它，B2 满载档下单帧代价高达 11,096 µs（编码 + 解析），且存在 JSON/FABS
-// 字段漂移风险。T1 之后：
-//   · 生产链路（sim_worker.js / rustworld.js）只有 FABS 一条通道；
-//   · tools/ 下 6 个工具统一走 tools/snapshot-reader.js（FABS 优先）；
-//   · **唯一**保留 JSON 的理由：`tools/test-snapshot-bin.js` 需要它作为
-//     「四处同步」防漂移门禁的**真值源**——没有它，二进制编码就失去了可比对基准。
-//
-// ⚠️ 因此本导出被重命名为 `world_snapshot_json_debug_*` 并明确标注 test-only。
-//    除 test-snapshot-bin.js 外，任何代码（前端或工具）都不得调用。
-// ═══════════════════════════════════════════════════════════════
-static mut SNAPSHOT_JSON_DEBUG_BUF: Vec<u8> = Vec::new();
-
-/// 【TEST-ONLY】序列化当前世界快照为 JSON，返回缓冲起始指针。
-/// 仅供 `tools/test-snapshot-bin.js` 做二进制↔JSON 深比较，禁止生产/工具调用。
-#[no_mangle]
-pub extern "C" fn world_snapshot_json_debug_ptr() -> u32 {
-    unsafe {
-        if let Some(w) = WORLD.as_ref() {
-            let snap = w.generate_snapshot();
-            if let Ok(json) = serde_json::to_string(&snap) {
-                SNAPSHOT_JSON_DEBUG_BUF = json.into_bytes();
-            }
-        }
-        SNAPSHOT_JSON_DEBUG_BUF.as_ptr() as u32
-    }
-}
-
-/// 【TEST-ONLY】返回上述 JSON 快照字节长度
-#[no_mangle]
-pub extern "C" fn world_snapshot_json_debug_len() -> u32 {
-    unsafe { SNAPSHOT_JSON_DEBUG_BUF.len() as u32 }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // ★ M4 快照零拷贝扁平二进制缓冲（FABS 帧，v1.45.0）
 //
-// 前端优先走二进制通道（见 sim_worker.js::pullSnapshotBin），本通道只是
-// 输出一个**只读**的自描述二进制帧；它等价于 JSON 快照，但体积小约 18 倍
-// 且无需 `JSON.parse`。两条通道都只读内核状态，不消耗 WorldRng。
+// 快照只有这一条通道（原 JSON 通道已于 v1.50.33 彻底移除）：输出一个**只读**
+// 的自描述二进制帧，前端 `sim_worker.js::pullSnapshotBin` 直接读取。
+// 全程只读内核状态，不消耗 WorldRng。
 // 实现见 crates/sim_core/src/spatial/snapshot_bin/。
 // ═══════════════════════════════════════════════════════════════
 

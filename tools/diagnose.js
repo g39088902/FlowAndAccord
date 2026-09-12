@@ -16,7 +16,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const WASM_PATH = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
-// ★ T1：统一快照取值入口（FABS 二进制优先，JSON 仅调试回退）
+// ★ T1：统一快照取值入口（FABS 二进制，快照仅此一条通道）
 const { createSnapshotReader } = require('./snapshot-reader.js');
 
 // ═══════════════════════════════════════════════════════════════
@@ -229,7 +229,7 @@ async function main() {
   const { instance } = await WebAssembly.instantiate(wasmBytes, {});
   const ex = instance.exports;
 
-  // ★ T1：统一走通用读取器（FABS 二进制优先，JSON 仅调试回退）
+  // ★ T1：统一走通用读取器（FABS 二进制，快照仅此一条通道）
   const reader = createSnapshotReader(ex);
 
   function getSnapshot() {

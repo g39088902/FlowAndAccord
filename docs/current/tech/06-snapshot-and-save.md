@@ -161,7 +161,7 @@ World3DEngine
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.32**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.33**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
 
@@ -203,14 +203,14 @@ World3DEngine
 | # | 位置 | 职责 |
 |---|---|---|
 | ① | `crates/sim_core/src/spatial/snapshot.rs` | 快照结构体**定义** |
-| ② | `crates/sim_core/src/spatial/world_snapshot.rs::generate_snapshot()` | 从世界状态**赋值**（★ T1 起为 test-only 真值源） |
+| ② | `crates/sim_core/src/spatial/world_snapshot.rs::generate_snapshot()` | 从世界状态**赋值** |
 | ③ | `crates/sim_core/src/spatial/snapshot_bin/encode.rs::write_snapshot_binary()` | **FABS 定长二进制编码**（生产唯一通道，字段顺序/枚举码位须与 ①② 等价） |
-| ④ | `frontend/js/snapshot-bin.js`（解码）+ `frontend/js/rustworld.js::_applySnapshot()`（映射） | 前端消费，产物须与 JSON **逐字段同构** |
+| ④ | `frontend/js/snapshot-bin.js`（解码）+ `frontend/js/rustworld.js::_applySnapshot()`（映射） | 前端消费，产物须与 ①② **逐字段同构** |
 
-- **防漂移自动网**：`node tools/test-snapshot-bin.js`（二进制 ≡ JSON 深比较）。遗漏任何一处都会导致前端读到 `undefined` 或展示旧值。
+- **同步核对**：`node tools/snapshot-check.js`（静态核对 ①②④）+ `test-wasm.js` / `test-determinism.js` 回归（JSON 对拍门禁 `test-snapshot-bin.js` 已于 v1.50.33 随 JSON 快照通道移除）。遗漏任何一处都会导致前端读到 `undefined` 或展示旧值。
 - **枚举口径**：二进制帧的闭集枚举（state / poiType / roadClass / houseTier / resourceKind / season / householdRole / gender / transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 - **★ v1.50.30 D-B1-4**：`FORMAT_VERSION` 2 → 3，新增 `SectionKind::TerrainSubFeatures = 22`（地图模板子特征，JSON 字段 `terrain_sub_features`；静态地形脏帧才输出，本阶段恒空数组，注入自阶段二起）；`dict.rs` 同步注册 `terrainSubFeatureKind` 名称表（`TerrainSubFeatureKind` 8 变体与 `TerrainFeatureKind` 是两套编号空间）。
-- **★ T1（v1.46.0）通道收敛**：JSON 快照通道已从生产与工具链路移除——`tools/` 全部工具统一走 `tools/snapshot-reader.js`（FABS 优先），前端 `sim_worker.js` 已删除 JSON 回退；`crates/sim_wasm` 仅保留 **test-only** 的 `world_snapshot_json_debug_ptr/len`（仅供 `test-snapshot-bin.js` 做真值比对，**禁止**其它任何代码调用）。
+- **★ v1.50.33 通道收敛完成**：JSON 快照通道彻底移除——T1（v1.46.0）曾将其收敛为 test-only 真值源（`world_snapshot_json_debug_ptr/len`）供 `test-snapshot-bin.js` 对拍；现该导出与门禁脚本均已删除，生产与工具链路只剩 FABS 一条通道（`tools/` 统一走 `tools/snapshot-reader.js`）。
 - 前端 DOM ID 必须与 `render_inspector.js` / `main.js` 中的 `getElementById` 完全匹配（见 `frontend/AGENTS.md` §四）。
 
 ### 7.2 🔴 跨世界必须让驻留表缓存失效（★ T1 缺陷修复，v1.46.0）
@@ -221,7 +221,7 @@ FABS 的**字符串驻留表（`STR_TAB`）在前端解码器里永久缓存**�
 - ❌ **也不能改成「全局单调递增 epoch」**——那会让同种子两个世界的帧字节不再相等，直接击穿确定性矩阵。
 - ✅ 工具侧（`snapshot-reader.js`）在 `world_load` / `world_create` 之后必须显式 `reader.resetCaches()`；浏览器侧由 `start_index == 0` 自动清空（`rustworld.js` 已在处理 READY / LOAD_RESULT / REWIND_RESULT / REWIND 时调用 `SnapshotBin.resetCaches()`）。
 
-**回归门禁** = `node tools/test-snapshot-bin.js` 场景 **[4/4] 换世界后**（去掉修复会报 129 处不一致）。
+**回归验证** = `node tools/test-determinism.js` 存读档套件（原 `test-snapshot-bin.js` 场景 [4/4] 换世界后曾捕获 129 处串味，该门禁已随 JSON 通道移除）。
 
 ---
 

@@ -65,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.32)"]
+    F --> G["浏览器 UI (版本: v1.50.33)"]
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
@@ -120,7 +120,7 @@ node frontend/server.js           # http://localhost:3000
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.32`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.33`**。
 
 ---
 
@@ -152,7 +152,7 @@ node frontend/server.js           # http://localhost:3000
 ```
 □ 版本号：node tools/bump-version.js --patch（自动同步全部定义点，见 §4.9；仅文档变更可跳过，见 §4.0.1）
 □ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
-□ 四处同步（M4）：快照字段变更时 snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 一致（门禁：node tools/test-snapshot-bin.js）
+□ 四处同步（M4）：快照字段变更时 snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 一致（JSON 对拍门禁已随 JSON 快照通道移除，跑 node tools/snapshot-check.js + test-wasm.js 回归）
 □ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
 □ 配置联动：新增超参时 config.rs(字段+doc 注释) + config.js + examples/config.json + config-check.js 通过（含第 5 条「空转参数」消费点门禁）
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
@@ -197,7 +197,7 @@ node frontend/server.js           # http://localhost:3000
 ### 4.5 🟠 快照四处同步（★ M4 · 跨模块硬约束）
 
 给 agent/house/poi 新增快照字段时必须**四处**同步：① `snapshot.rs`（定义）② `world_snapshot.rs::generate_snapshot()`（赋值）③ `snapshot_bin/encode.rs`（FABS 二进制编码，字段顺序/枚举码位与 ①② 等价）④ `snapshot-bin.js`（解码）+ `rustworld.js::_applySnapshot()`（映射）。
-**防漂移自动网 = `node tools/test-snapshot-bin.js`**；新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()` / `*_table()`。
+JSON 对拍门禁（test-snapshot-bin.js）已于 v1.50.33 随 JSON 快照通道移除，同步核对走 `node tools/snapshot-check.js` + `test-wasm.js` / `test-determinism.js` 回归兜底；新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()` / `*_table()`。
 
 → 详见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §7、`spatial/AGENTS.md` §3.3、`frontend/AGENTS.md` §5.2。
 
@@ -205,7 +205,7 @@ node frontend/server.js           # http://localhost:3000
 
 FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「这是不是一张全新的驻留表」的**唯一正确判据是 `STR_TAB.start_index == 0`**——**不能**用 `epoch`（任何新世界恒为 0，会串味），也**不能**改成全局单调递增 epoch（会击穿确定性）。工具侧（`snapshot-reader.js`）在 `world_load` / `world_create` 后必须显式 `resetCaches()`。
 
-→ 详见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §7.2、`frontend/AGENTS.md` §5.2。回归门禁 = `node tools/test-snapshot-bin.js` 场景 **[4/4] 换世界后**。
+→ 详见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §7.2、`frontend/AGENTS.md` §5.2。回归验证 = `node tools/test-determinism.js` 存读档套件（换世界后地名/人名无串味）。
 
 ### 4.6 🟡 模块粒度与单文件行数规范（全局）
 

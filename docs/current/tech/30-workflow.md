@@ -38,7 +38,7 @@ stateDiagram-v2
 
 ## 1. 先判定任务类型
 
-先读根 `AGENTS.md` §4。快照主链路已采用 M4 二进制：字段变更还必须检查 `snapshot_bin/encode.rs`、`snapshot-bin.js` 并运行 `node tools/test-snapshot-bin.js`。JSON 赋值实际位于 `world_snapshot.rs`。
+先读根 `AGENTS.md` §4。快照主链路已采用 M4 二进制：字段变更还必须检查 `snapshot_bin/encode.rs`、`snapshot-bin.js`，并跑 `node tools/snapshot-check.js` + `test-wasm.js` / `test-determinism.js`（JSON 对拍门禁已于 v1.50.33 随 JSON 快照通道移除）。快照赋值位于 `world_snapshot.rs`。
 
 | 任务关键词 | 首先阅读 | 最小门禁 |
 |---|---|---|
@@ -109,7 +109,7 @@ node tools/test-wasm.js
 ```
 
 - [ ] WASM 双副本已同步。
-- [ ] 快照字段**四处同步**（★ M4）：`snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `snapshot_bin/encode.rs` / `frontend/js/snapshot-bin.js`+`rustworld.js`，并跑 `node tools/test-snapshot-bin.js`。
+- [ ] 快照字段**四处同步**（★ M4）：`snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `snapshot_bin/encode.rs` / `frontend/js/snapshot-bin.js`+`rustworld.js`，并跑 `node tools/snapshot-check.js`。
 - [ ] 若改动驻留表 / `STR_TAB` / 新增 `world_create` 调用点：跨世界缓存失效判据仍为 `start_index == 0`（根 `AGENTS.md` §4.5.1，勿改用 `epoch`）。
 - [ ] 同种子确定性、无 NaN、无越界、长程稳定性通过。
 - [ ] 若涉及配置，额外运行 `node tools/config-check.js`。
@@ -168,7 +168,7 @@ node tools/bump-version.js --check        # 一致性校验，非升版
 ```
 
 - [ ] **不升版**：跳过 `node tools/bump-version.js --patch / --minor / <版本>`，也不得手工改动任何版本号定义点。
-- [ ] **不重跑测试**：跳过 `cargo build / cargo test`、`node tools/test-wasm.js`、`config-check.js`、`frontend-check.js`、`test-snapshot-bin.js`、`diagnose.js --check all` 等全部测试门禁（无行为/契约变化，测试结果不受影响）。
+- [ ] **不重跑测试**：跳过 `cargo build / cargo test`、`node tools/test-wasm.js`、`config-check.js`、`frontend-check.js`、`diagnose.js --check all` 等全部测试门禁（无行为/契约变化，测试结果不受影响）。
 - [ ] 文档维护体检通过；`bump-version.js --check` 零漂移（确认本次文档改动未波及版本号定义点）。
 - [ ] 不新增 changelog 版本条目（`../01-changelog.md` 按版本归档，无升版即无条目）；若修订了机制描述，仍按根 `AGENTS.md` §5 分层守则同步对应 `docs/current/` 模块文档与局部 AGENTS.md。
 

@@ -1,20 +1,20 @@
 // === snapshot-bin.js · M4 FABS 二进制快照解码器 (v1.46.0) ===
-// 将 sim_worker 转移来的 FABS 二进制帧（ArrayBuffer）解码为与 JSON 快照**逐字段同构**的 JS 对象，
+// 将 sim_worker 转移来的 FABS 二进制帧（ArrayBuffer）解码为与 snapshot.rs 快照结构**逐字段同构**的 JS 对象，
 // rustworld.js::_applySnapshot 无需任何下游改动即可直接消费。
 //
 // 帧格式契约见 crates/sim_core/src/spatial/snapshot_bin/layout.rs；
 // 字段编码顺序见 crates/sim_core/src/spatial/snapshot_bin/encode.rs。
 //
 // ⚠️ 四处同步铁律：snapshot.rs → world_snapshot.rs → snapshot_bin/encode.rs → 本文件。
-//    任何字段增删必须四处同步，否则前端读到 undefined。自动保障网 = tools/test-wasm.js 深比较断言。
+//    任何字段增删必须四处同步，否则前端读到 undefined。回归兜底 = test-wasm.js / test-determinism.js。
 //
-// 解码产物与 JSON 快照的差异（rustworld 感知的 M4 增量接口）：
+// 解码产物的 M4 增量接口（rustworld 感知）：
 //   1. snap.geom_version (number) — 路网拓扑签名；(node_count << 32) | lane_count
 //   2. snap.strtab_epoch   (number) — 字符串驻留表世代号（引擎重置时 +1，前端据此清缓存）
 //   3. snap.lanes —— 仅当本帧携带 LANE_GEO 时为完整车道对象数组；否则为 null
 //   4. snap.nodes —— 同上（null = 复用缓存）
 //   5. snap.lane_wear  —— 恒为 Float32Array（与车道下标一一对应），rustworld 据此覆写缓存对象 wear
-//   6. snap.terrain_cells —— 无地形帧为空数组 []（与 JSON 快照行为一致）
+//   6. snap.terrain_cells —— 无地形帧为空数组 []
 
 (function (global) {
   'use strict';
@@ -98,7 +98,7 @@
   // 主解码入口
   // ────────────────────────────────────────────────
   // uint8: Uint8Array（worker 转移的二进制帧）
-  // 返回值：与 JSON 快照同构的普通对象；magic/版本不符返回 null（上层回退 JSON）
+  // 返回值：与快照结构同构的普通对象；magic/版本不符返回 null（上层告警并跳过该帧）
   function decode(uint8) {
     if (!uint8 || !uint8.length) return null;
     if (uint8[0] !== MAGIC0 || uint8[1] !== 0x41 || uint8[2] !== 0x42 || uint8[3] !== 0x53) return null;
@@ -663,7 +663,7 @@
   }
 
   // ────────────────────────────────────────────────
-  // 子结构解码助手（返回与 JSON 快照同构的形状）
+  // 子结构解码助手（返回与 snapshot.rs 快照结构同构的形状）
   // ────────────────────────────────────────────────
   function readActiveTask(r) {
     if (r.u8() !== 1) return null;
@@ -728,7 +728,7 @@
       u16: function () { var v = dv.getUint16(off, true); off += 2; return v; },
       u32: function () { var v = dv.getUint32(off, true); off += 4; return v; },
       u64: function () { var lo = dv.getUint32(off, true), hi = dv.getUint32(off + 4, true); off += 8; return lo + hi * 4294967296; },
-      // 普通 f32 按 serde_json 语义读取：非有限值（±Infinity/NaN）→ null（与 JSON 通道逐字段一致）
+      // 普通 f32 读取：非有限值（±Infinity/NaN）→ null（与原 JSON 通道语义一致，前端 null 判断兼容）
       f32: function () { var v = dv.getFloat32(off, true); off += 4; return v; },
       optU32: function () { var v = dv.getUint32(off, true); off += 4; return v === NONE_U32 ? null : v; },
       optU64: function () { var lo = dv.getUint32(off, true), hi = dv.getUint32(off + 4, true); off += 8; return (lo === NONE_U32 && hi === NONE_U32) ? null : lo + hi * 4294967296; },
@@ -741,7 +741,7 @@
 
   var SnapshotBin = {
     FORMAT_VERSION: FORMAT_VERSION,
-    // 注入枚举名称表（worker INIT 时随 READY 下发；失败或缺省时解码出的枚举为 ''，可被 JSON 回退覆盖）
+    // 注入枚举名称表（worker INIT 时随 READY 下发；失败或缺省时解码出的枚举为 ''）
     setEnumTables: function (jsonStr) {
       try {
         _EN = JSON.parse(jsonStr);

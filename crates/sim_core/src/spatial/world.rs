@@ -183,7 +183,7 @@ impl World3DEngine {
     /// 强制下一帧二进制快照重发**全部**静态几何（地形 + 路网拓扑）。
     ///
     /// 用于初始化、读档、重置，以及前端显式请求地形时（`world_require_terrain`）。
-    /// 注意：JSON 通道不受本方法影响（它只看 `terrain_dirty`）。
+    /// 路网几何走独立的签名增量（`last_geom_sig`），与本脏位互不影响。
     pub fn require_full_geometry(&self) {
         self.terrain_dirty.set(true);
         self.last_geom_sig.set(u64::MAX);

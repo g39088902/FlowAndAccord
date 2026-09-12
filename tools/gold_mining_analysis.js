@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 const WASM_PATH = path.join(__dirname, '..', 'frontend', 'rust', 'sim_wasm.wasm');
-// ★ T1：统一快照取值入口（FABS 二进制优先，JSON 仅调试回退）
+// ★ T1：统一快照取值入口（FABS 二进制，快照仅此一条通道）
 const { createSnapshotReader } = require('./snapshot-reader.js');
 
 // 触发器阈值（与 Rust config.rs 一致）
@@ -230,7 +230,7 @@ async function main() {
   // 创建世界（与前端一致：grid=60, size=764, seed=42, 20人）
   wasm.world_create(0, 764.0, 42, 20, cfg.countCamps || 4);
 
-  // ★ T1：统一走通用读取器（FABS 二进制优先，JSON 仅调试回退）
+  // ★ T1：统一走通用读取器（FABS 二进制，快照仅此一条通道）
   const reader = createSnapshotReader(wasm);
 
   function getSnapshot() {
