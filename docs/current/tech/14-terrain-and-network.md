@@ -497,7 +497,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
   ├─ oxbow_lake      [20%]  牛轭湖 — 裁弯取直后废弃的弯道弧（WaterBody 特征），月牙形，
   │                         两端封口与主河新直道相接；★ 前置：主河须先迁移为参数化中心线
   │                         并具备蜿蜒列，否则几何上不可能（见 §5.4.C）
-  ├─ river_cliff     [25%]  河谷峭壁 — 部分河段（1-2 段）两侧生成 Cliff 特征（高 6-12m），
+  ├─ river_cliff     [25%]  河谷峭壁 — 首版规划主河单侧一段 Cliff，尺度与准入见 06 号 §5.4.D，
   │                         对应地表写入 NO_BUILD | 硬禁行（slope >= 34° → RockFace/NO_WALK）
   ├─ riverside_forest [50%] 河岸林带 — 河阶上方沿河分布条形装饰 Tree 群（20-30 个），
   │                         非密集（树间距 >15m），不遮挡河岸取水视线
@@ -553,7 +553,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 - ✅ `terrain_network.rs` 引入地形感知路网，通过 `corridor::route` A* 走廊与浅滩连接跨河，消除了直线车道穿深水的问题。
 - ✅ `LaneEdge3D` 增加 `LaneTerrainProfile`，A* 边权与 Agent 移动速度按地形成本折算，软地/河岸/浅滩产生真实通行减速。
 - ✅ 水源 POI 聚合接入 `WaterPool`，多个岸点共享水池库存与自然再生（T2）。
-- ✅ 快照与 FABS 格式版本 2 支持河流折线、岸带、浅滩连接等特征下发。
+- ✅ 快照与 FABS（`FORMAT_VERSION = 3`，★ v1.50.30 D-B1-4 起，含 `SectionKind::TerrainSubFeatures = 22`）支持河流折线、岸带、浅滩连接等特征下发。
 - ✅ `render_terrain.js` 的 `drawFeatureItem` 绘制水系特征（`River`/`RiverBank`/`ShallowFord`/`SpringValley`）；v1.47.7 起 `Ridge`/`Saddle`/`Terrace` 三类轮廓绘制已随特征删除。
 
 T0 基础契约、T1 山地、T2 水系骨干与 D-A 装饰层已全链路打通。剩余工作分解为：
