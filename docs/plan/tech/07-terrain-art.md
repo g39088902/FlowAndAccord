@@ -182,7 +182,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 - [地形生成与高程采样](../../../crates/sim_core/src/geo/terrain.rs) / [水系与共享水池](../../../crates/sim_core/src/geo/hydrology.rs) / [地表装饰生成](../../../crates/sim_core/src/geo/accents.rs) / [地表查询与占地校验](../../../crates/sim_core/src/geo/query.rs)：内核地理事实唯一真相源，`sample_elevation` 仍为最近邻采样，不能把渲染平滑误认为物理采样已平滑。
 - [地形感知路网](../../../crates/sim_core/src/spatial/terrain_network.rs)：走廊合法性、浅滩跨河授权与 `LaneTerrainProfile` 通行代价。
 - [颜色计算](../../../frontend/js/math.js)（`computeElevationColor`，唯一着色入口）/ [颜色兜底与投影](../../../frontend/js/main.js)（`getElevationColor` 只做委托 + 纯色兜底）/ [季节光照](../../../frontend/js/lighting.js)（`SimLighting`，光源真相）。
-- [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`，`_terrainCached` 单标志控制整块地形与特征缓存）。
+- [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`；★ v1.50.33 D-B1-7 起 `_terrainCached` 仅管地形网格，静态特征/装饰/子特征三通道独立裁决，`_invalidateWorldStaticCaches()` 随世界生命周期失效）。
 - [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
 - [渲染表现层参数](../../../frontend/js/config.render.js)（`window.RENDER_CONFIG`，不注入 WASM、不并入 SIM_CONFIG）。
 - [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 4 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
@@ -440,7 +440,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 
 ### 10.2 缓存失效契约
 
-- **现状**：`rustworld.js` 以单个 `_terrainCached` 同时管理网格与地貌特征，并在 READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 时清除。
+- **现状**：★ v1.50.33 D-B1-7 起静态地形缓存已拆分——`_terrainCached` 仅管地形网格（cells + 光照数组）；features/accents/subFeatures 三通道独立裁决（`null`=未发送保留旧值、明确静态帧整组替换），并在 READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 时由 `_invalidateWorldStaticCaches()` 随消息生命周期整体失效（含 `AccentModel` 模型缓存），契约见 06 号 §18.4。
 - **跨世界字符串表**：缓存失效以 `STR_TAB.start_index == 0` 为唯一判据，**不得**改用 FABS epoch，也不得改成全局单调递增 epoch（前者会串味、后者击穿确定性，见根 AGENTS.md §4.5.1）；工具侧在 `world_load` / `world_create` 后显式 `reader.resetCaches()`。
 - **装饰缓存键**：纯局部几何键覆盖 kind/ID/素材风格版本与影响几何的参数（或等价显式失效），几何变动才要求重建或递增风格版本；不依赖季节、光向、相机的骨架无需加入这些键。若派生数据依赖世界或地形，额外覆盖世界内容身份；profile/生成器版本相同不代表同一世界。逐帧受光不烘焙进骨架缓存；确有季相或屏幕派生缓存时才覆盖对应季节档位、相机、画布尺寸与 DPR。
 - **模型生命周期与分工**：READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 显式清理模型缓存，验收与冷缓存重建一致；`STR_TAB.start_index==0` 仅用于上条字符串表，不替代模型清理。D-B1-7 负责静态数据通道与总体拆分（06 号 §18.4），TA-04-7 负责受光新增缓存依赖及生命周期接入，两者不重复实施。

@@ -36,9 +36,9 @@
 | T0 地表查询与完整曲线校验 | ✅ 主体落地 | `sample_cell` / `validate_footprint` / `validate_curve` 原语、房屋完整占地消费、浅滩与陆路走廊（§2.3） | 生存连通分量与往返成本诊断、`flat_baseline` 行为等价（§18.1 ⏳） |
 | T1 山口聚落 | ✅ 已落地 | `mountain_pass_v1`；v1.50.17 修复主脊通行力：坡度 36.2°~40.8°、绕行比 2.17~4.80、可行走连通分量恒 1（§9.3.1，指 14 号） | 有界重试与简化 profile 回退（§18.2 ⏳）；支脊未实现；子特征注入未实施 |
 | T2 两岸河谷 | ✅ 已落地 | 主河/浅滩/河阶/泉谷、共享水池聚合取水、地形感知路网、T1/T2 随机轮换（§2.3） | 子特征注入未实施 |
-| D-A 装饰基础 | ✅ 已落地 | Tree/Boulder/Bush/RockCluster/GrassTuft 生成与绘制、季节叶色 `SimTreeTint`、FABS Section 21（§2.3） | 装饰缓存与地形共用待拆分验证（§18.4 ⏳） |
+| D-A 装饰基础 | ✅ 已落地 | Tree/Boulder/Bush/RockCluster/GrassTuft 生成与绘制、季节叶色 `SimTreeTint`、FABS Section 21（§2.3） | 装饰缓存拆分与静态数据更新契约已落地（★ v1.50.33 D-B1-7，§18.4 ✅） |
 
-> 按 §20 的口径：T0/T1/T2 主体达标，**遗留 3 项门禁待办**（§18.1 ×2、§18.2 ×1）——「失败有界且可解释」这最后一块由阶段二补齐；装饰缓存拆分验证随阶段一收口。
+> 按 §20 的口径：T0/T1/T2 主体达标，**遗留 3 项门禁待办**（§18.1 ×2、§18.2 ×1）——「失败有界且可解释」这最后一块由阶段二补齐；装饰缓存拆分验证已随阶段一收口（★ v1.50.33 D-B1-7）。
 
 ### R.2 路线总览（依赖解锁图）
 
@@ -310,8 +310,8 @@ stateDiagram-v2
 | T0 地表查询与完整曲线校验 | ✅ 主体已落地 | `GeoCell` 扩展 `SurfaceKind`/肥力/水体关联/标志；`geo/query.rs` 提供 `sample_cell`/`validate_footprint`/稳定失败码；房屋实体化消费完整占地；`TerrainMap::validate_curve` 走廊校验原语；`geo/corridor.rs` 浅滩与陆路寻路 | 生态落位（`ecology/spawn.rs`）部分生存硬约束优化；`terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现本步时一并加回 |
 | T1 山口聚落（丘陵/山脊/山口连续起伏） | ✅ 已落地（v1.47.1/v1.47.2；v1.47.7 移除台地） | `mountain_pass_v1` profile；局部 `relief_rng` 派生主脊/山口连续起伏；存档版本门禁；前端按地表类别渲染。v1.47.7：删除台地压平与 `Ridge`/`Saddle`/`Terrace` 特征及前端轮廓绘制 | 山口地貌参数已配置化（`terrainPassRidgeWidth` / `terrainPassRidgeAmplitude`）；支脊未实现；子特征注入待规划。v1.50.17 完成主脊通行力修复（§9.3.1） |
 | T2 静态主河/浅滩/河阶/泉谷 | ✅ 已落地 | `river_valley_v1` profile + 生成器版本 3（v1.47.7 起，与 T1 共用全局版本）；主河生成（`geo/hydrology.rs`），单调河床下凹与水面静态；低滩（`NO_BUILD`）与河阶（`RiverTerrace`）；两处静态浅滩走廊（`ShallowFord`，跨水授权）；共享水池 `WaterPool` 聚合取水与稳定扣减；地形感知路网（`spatial/terrain_network.rs`）与 `LaneTerrainProfile` 边权通行代价折算；占地校验拒绝浅水（`WaterCovered`）；存档格式升级为 7；10 个 T2 配置参数；前端河道/岸线/浅滩特征渲染与 HUD 水量去重；支持 T1/T2 模板按种子哈希随机轮换（`terrainProfile: 'random'`） | 子特征注入待规划 |
-| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_accents.js::drawAccentEntity()`（★ v1.50.23 自 `render_terrain.js` 迁出；Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`，个体形态缓存 `accent-model.js`）；配置字段现存 2 个（`terrainAccentDensity` + `terrainAccentSubFeatures`，后者已于 v1.50.29 由 D-B1-1 连同消费点加回，见文首更正段），`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 已生成并接入前端绘制；装饰缓存标志仍与地形共用 |
-| D-B 装饰系统扩展 | ◐ 部分落地 | RockCluster/GrassTuft 已生成并绘制；子特征模型、快照骨架与选择器已落地 | 装饰缓存拆分与阶段一代码收口验收待完成；子特征注入仍待后续阶段 |
+| D-A 装饰系统基础（Tree/Boulder/Bush） | ✅ 已落地（v1.49.1；v1.49.2/v1.49.3/v1.50.10 打磨） | `geo/accents.rs`（`AccentKind` 5 变体、`TerrainAccent`、`generate_accents()`、`ACCENT_RNG_SALT`）；`TerrainMap.accents` 字段 + 随 `terrain_state` 入档；FABS `SectionKind::TerrainAccents = 21`；前端 `render_accents.js::drawAccentEntity()`（★ v1.50.23 自 `render_terrain.js` 迁出；Tree 四瓣层叠树冠 / Boulder 多边形岩体 / Bush 三瓣灌丛，含叶片斑驳纹理与季节叶色 `SimTreeTint`，个体形态缓存 `accent-model.js`）；配置字段现存 2 个（`terrainAccentDensity` + `terrainAccentSubFeatures`，后者已于 v1.50.29 由 D-B1-1 连同消费点加回，见文首更正段），`terrainTreeSeasonTint` 已于 v1.50.18 删除（见文首更正段） | RockCluster/GrassTuft 已生成并接入前端绘制；装饰缓存已与地形网格缓存拆分（★ v1.50.33 D-B1-7） |
+| D-B 装饰系统扩展 | ◐ 部分落地 | RockCluster/GrassTuft 已生成并绘制；子特征模型、快照骨架与选择器已落地；装饰缓存拆分已完成（★ v1.50.33 D-B1-7） | 阶段一代码收口验收（D-B1-9）待完成；子特征注入仍待后续阶段 |
 | T1 子特征注入 | ⏳ 未实施 | — | 山脚湖（T1 鞍部静水）；山涧飞瀑（主脊跌水）；密林山坡（装饰树群）；裸岩露头（陡坡岩石） |
 | T2 子特征注入 | ⏳ 未实施 | — | 牛轭湖（回水湾）；河谷峭壁（河段两侧 Cliff）；河岸林带（沿河装饰树列）；碎石浅滩（河滩石砾） |
 | T4 动态水文、桥梁、土地演化 | ⏳ 未实施 | — | — |
@@ -752,7 +752,7 @@ D-B2/P1 改变 `TerrainFeatureKind`、`TerrainMap` 或 profile 时，必须在�
 | 配置 | `config.rs`、`frontend/js/config.js`、`tools/config-check.js` | 新 profile 白名单；新增字段必须同时落到这 3 处 + `examples/config.json`（探针用），并由 `config-check.js` 校验；**不得再引入无消费点的字段**——`config-check.js` 第 5 条「空转参数」规则会直接报错（三个遗留字段已于 v1.50.18 清理完毕；待加回清单见文首更正段与 R.5） |
 | 快照 JSON | `spatial/snapshot.rs`、`spatial/world_snapshot.rs` | `TerrainSubFeatureSnapshot` 及 `terrain_sub_features`；静态地形脏帧才发送 |
 | FABS | `snapshot_bin/layout.rs`、`encode.rs`、`dict.rs`、`frontend/js/snapshot-bin.js` | `FORMAT_VERSION` 由当前 **2** 递增为 **3**（旧 JS 枚举表无法可靠展示新 code，故必须递增）；新增 `TerrainSubFeatures=22`。记录固定为 `id:u32,kind:u8,anchor:Vec3,bounds_min:Vec3,bounds_max:Vec3,feature_count:u8,feature_ids...,accent_start:opt_u32,accent_end:opt_u32,align4`；同步 feature/accent 枚举表 |
-| 前端状态 | `frontend/js/rustworld.js` | 映射 `terrain.subFeatures`；在 READY/LOAD/REWIND/RESET 及 `STR_TAB.start_index==0` 时和 features/accents 一起清除 |
+| 前端状态 | `frontend/js/rustworld.js` | 映射 `terrain.subFeatures`（★ v1.50.33 D-B1-7 已落地，契约详见 §18.4）：features/accents/subFeatures 三通道独立于地形网格缓存——静态帧（数组，可为空）整组替换、增量帧（`null`）保留旧值；READY/LOAD/REWIND/RESET 按消息生命周期整体失效静态数据与 `AccentModel` 模型缓存（`_invalidateWorldStaticCaches()`）；`STR_TAB.start_index==0` 仅清字符串驻留表，不替代世界生命周期处理 |
 | Canvas | `frontend/js/render_terrain.js`、`render_accents.js`（★ v1.50.23 装饰已迁入，装饰统一深度队列在后者），必要时 `render_world.js` | `WaterBody` 按静水多边形绘制；`Waterfall` 绘制折线/白沫；`Cliff` 绘制岩层阴影；`RockCluster`/`GrassTuft` 通过统一深度队列绘制，不能恢复整层落笔 |
 | 存档 | `spatial/world_save.rs` 与存读档测试路径 | `TerrainMap` 自动序列化 sub_features（容器字段可加 `#[serde(default)]`）；保存/加载严格校验 `terrain_generator_version` 与 `terrain_profile`，跨版本旧档明确报错、不静默重生成；**本阶段必须把 `TERRAIN_GENERATOR_VERSION` 从当前 4 递增到 5**（P1 新增 3 个 profile 时再递增一次），`SAVE_FORMAT_VERSION` 仅在 `WorldSave` 结构本身变化时才递增（当前 7） |
 
@@ -944,14 +944,14 @@ pub struct RiverCenterline {
 - ✅ 装饰密度与配置 `terrainAccentDensity` 呈线性关系（density=0 时无装饰；density=2 时数量约 2x 默认）。
 - ✅ 装饰并入统一深度队列后按相机深度正确遮挡（v1.50.2），不再「远树压近树」或「近树被远人穿透」。
 - ✅ FABS Section 21 编码/解码与 JSON 深比较通过（`test-snapshot-bin.js`）。
-- ⏳ 换世界/读档/重置后装饰缓存无旧数据残留——当前依赖单一 `_terrainCached`，拆分后需独立验证。
+- ✅ 换世界/读档/重置后装饰缓存无旧数据残留——★ v1.50.33 D-B1-7 拆分单一 `_terrainCached`：装饰缓存（features/accents/subFeatures 三通道）独立于地形网格缓存，静态数据与 `AccentModel` 模型缓存随 READY/LOAD/REWIND/RESET 消息生命周期整体失效、随新世界静态帧重建；临时独立用例（22 断言，§4.10 提交前已删）覆盖普通增量帧保留、真实 FABS/JSON 增量帧 `null` 语义、非空→空集合（含 subFeatures 非空夹具）、同 profile/生成器版本换世界、LOAD 失败不清缓存与模型缓存清理；`test-snapshot-bin` 4 场景全通。
 
-**装饰缓存拆分的静态数据更新契约（待 D-B1-7 实施）**：
+**装饰缓存拆分的静态数据更新契约（★ v1.50.33 D-B1-7 已实施）**：
 
-- 普通增量帧没有发送静态 section 时，保留已有 accents/subFeatures；不能仅凭解码器默认空数组清空缓存。
-- 明确携带静态全量数据的帧，即使装饰集合为空，也必须替换旧值。实现须保留 section 是否存在或等价的静态帧标识；JSON 通道采用对应的明确静态帧语义，不能用装饰数组长度猜测是否发送。
-- READY/LOAD/REWIND/RESET 按实际消息生命周期使静态数据及 `AccentModel` 模型缓存失效，并在新世界完整静态数据到达后重建；世界切换不能只靠 profile、生成器版本或复用的 accent ID 判断。字符串驻留表继续按 `STR_TAB.start_index==0` 清理，该判据不替代世界生命周期处理。
-- 临时用例覆盖普通增量帧保留、同 profile/生成器版本换世界、非空→空、LOAD/REWIND/RESET 和模型缓存清理；subFeatures 暂无非空生产者时使用临时非空夹具，不新增模拟注入行为来完成缓存验收。通过后才把上方缓存项标为完成，临时脚本不进入提交。
+- 普通增量帧没有发送静态 section（快照三通道为 `null`）时，保留已有 features/accents/subFeatures；不能仅凭解码器默认空数组清空缓存。
+- 明确携带静态全量数据的帧（三通道为数组，**可为空**），即使装饰集合为空，也必须替换旧值。解码器以 `null`（section 缺席）区分数组（section 在场）；JSON 调试通道同语义（`Option<Vec<_>>`，`None` 序列化为 `null`），不能用装饰数组长度猜测是否发送。
+- READY/LOAD/REWIND/RESET 按实际消息生命周期使静态数据及 `AccentModel` 模型缓存失效（`rustworld.js::_invalidateWorldStaticCaches()`），并在新世界完整静态数据到达后重建；世界切换不能只靠 profile、生成器版本或复用的 accent ID 判断。字符串驻留表继续按 `STR_TAB.start_index==0` 清理，该判据不替代世界生命周期处理。
+- 临时用例已覆盖普通增量帧保留、真实 FABS/JSON 增量帧 `null` 语义、同 profile/生成器版本换世界、非空→空（含 subFeatures 非空夹具）、LOAD 失败不清缓存与模型缓存清理（22 断言全通，脚本按 §4.10 于提交前删除，不进入提交）。
 
 ### 18.5 D-B 子特征注入门禁
 

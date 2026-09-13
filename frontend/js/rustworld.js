@@ -37,7 +37,8 @@
         this.empires = [];                 // ★ M5: 帝国/联邦上层登记簿
         this.expeditionTargets = new Map();// ★ M4: 远征目标反查表 agent_id -> camp_id
         this.auctionHistory = [];          // ★ 房屋报价中心历史受理记录 (256 环形缓冲区)
-        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [] };
+        // ★ D-B1-7：静态地形三通道容器恒在（features/accents/subFeatures），装饰缓存独立于网格缓存
+        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [] };
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
         this.totalDeaths = 0;
@@ -84,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.32';
+        this._appVersion = '1.50.34';
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
 
@@ -154,7 +155,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.32';
+            this._appVersion = msg.appVersion || '1.50.34';
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
@@ -165,8 +166,10 @@
               if (msg.enumTableJson) window.SnapshotBin.setEnumTables(msg.enumTableJson);
               window.SnapshotBin.resetCaches();
             }
-            // ★ TA-01：引擎全新 → 装饰个体模型缓存失效（换世界不残留旧形态，07-terrain-art.md §10.2）
-            if (window.AccentModel) window.AccentModel.resetCache();
+            // ★ TA-01 建，★ D-B1-7 改：引擎全新 → 静态地形数据（features/accents/subFeatures）
+            //   与装饰个体模型缓存随 READY 消息生命周期整体失效（06 号 §18.4），
+            //   待新世界强制地形帧到达后重建（换世界不残留旧形态，07-terrain-art.md §10.2）
+            this._invalidateWorldStaticCaches();
             if (msg.snapshot) {
               // ★ 动态季节光照：全新引擎 → 光相立即对齐（不做平滑）
               if (window.SimLighting) window.SimLighting.resync();
@@ -223,8 +226,8 @@
             if (msg.ok && msg.snapshot) {
               // ★ M4：读档后引擎重建 → 清空解码器字符串缓存与车道几何缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
-              // ★ TA-01：读档重建 → 装饰个体模型缓存失效
-              if (window.AccentModel) window.AccentModel.resetCache();
+              // ★ D-B1-7：读档世界替换 → 静态地形数据与装饰模型缓存随 LOAD_RESULT 生命周期失效
+              this._invalidateWorldStaticCaches();
               // ★ 动态季节光照：读档时间可能倒退 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -240,8 +243,8 @@
             }
             if (msg.ok && msg.snapshot) {
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
-              // ★ TA-01：回溯重建 → 装饰个体模型缓存失效
-              if (window.AccentModel) window.AccentModel.resetCache();
+              // ★ D-B1-7：回溯重建 → 静态地形数据与装饰模型缓存随 REWIND_RESULT 生命周期失效
+              this._invalidateWorldStaticCaches();
               // ★ 动态季节光照：时光倒流时间倒退 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -261,8 +264,8 @@
             if (msg.snapshot) {
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
-              // ★ TA-01：重置后引擎全新 → 装饰个体模型缓存失效
-              if (window.AccentModel) window.AccentModel.resetCache();
+              // ★ D-B1-7：重置后引擎全新 → 静态地形数据与装饰模型缓存随 RESET_DONE 生命周期失效
+              this._invalidateWorldStaticCaches();
               // ★ 动态季节光照：重置 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -290,6 +293,18 @@
         if (!meta || typeof meta !== 'object') return;
         if (Number.isFinite(meta.minTick)) this._rewindMinTick = meta.minTick;
         if (Number.isFinite(meta.checkpointCount)) this._rewindCheckpointCount = meta.checkpointCount;
+      }
+
+      // ★ D-B1-7：世界生命周期静态缓存失效（06 号 §18.4 静态数据更新契约）
+      // READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 四类消息意味着引擎世界已重建或替换：
+      // 静态地形数据（features/accents/subFeatures）与 AccentModel 个体模型缓存必须随消息
+      // 生命周期整体失效，待新世界的完整静态数据（强制地形帧）到达后重建。
+      // 失效判据是消息本身，而非 profile、生成器版本或 accent ID 是否复用（同种子世界这些完全相同）；
+      // 字符串驻留表仍由 SnapshotBin 侧 `STR_TAB.start_index==0` 既有契约单独清理，两者互不替代。
+      _invalidateWorldStaticCaches() {
+        this._terrainCached = false;
+        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [] };
+        if (window.AccentModel) window.AccentModel.resetCache();
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -423,7 +438,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.32';
+        return this._appVersion || '1.50.34';
       }
 
       /**
@@ -596,7 +611,20 @@
           this.logEvent(snap.last_mutation_event, '');
         }
 
-        // --- 地形 (仅首次/重开时重建，静态网格空数组时跳过) ---
+        // --- 地形（★ D-B1-7 装饰缓存拆分 · 06 号 §18.4 静态数据更新契约）---
+        // 静态三通道（features / accents / subFeatures）与地形网格缓存（cells + 光照数组）相互独立：
+        //   · null（FABS 无该 section / JSON 调试快照为 null）= 本帧未发送 → 一律保留旧值；
+        //   · 数组（可为空）= 明确携带静态全量数据 → 即使空集合也必须整组替换旧值；
+        //   · 严禁以数组长度、terrain_cells 是否存在或 profile/生成器版本猜测「是否发送」；
+        //     世界切换的静态失效由 READY/LOAD/REWIND/RESET 消息生命周期保证（_invalidateWorldStaticCaches）。
+        const hasStaticFeatures = Array.isArray(snap.terrain_features);
+        const hasStaticAccents = Array.isArray(snap.terrain_accents);
+        const hasStaticSubFeatures = Array.isArray(snap.terrain_sub_features);
+        const nextFeatures = hasStaticFeatures ? snap.terrain_features : this.terrain.features;
+        const nextAccents = hasStaticAccents ? snap.terrain_accents : this.terrain.accents;
+        const nextSubFeatures = hasStaticSubFeatures ? snap.terrain_sub_features : this.terrain.subFeatures;
+
+        // 地形网格（仅首次/重开时整组重建，静态网格空数组时跳过）
         if ((!this._terrainCached || forceTerrain) && snap.terrain_cells && snap.terrain_cells.length > 0) {
           const w = snap.grid_w, h = snap.grid_h;
           const worldSize = snap.world_size || 764.0;
@@ -658,19 +686,24 @@
             cells,
             nx: nxArr, ny: nyArr, nz: nzArr, ao: aoArr,
             albR, albG, albB,
-            features: snap.terrain_features || [],
-            accents: snap.terrain_accents || [],
-            // ★ v1.50.30 D-B1-4：地图模板子特征（调试/诊断稳定事实源，本阶段恒空）。
-            //   与 features/accents 同生命周期：READY/LOAD/REWIND/RESET 的强制地形重建
-            //   会整组替换，不残留上一世界数据。
-            subFeatures: snap.terrain_sub_features || [],
+            features: nextFeatures,
+            accents: nextAccents,
+            // ★ v1.50.30 D-B1-4 / ★ D-B1-7：地图模板子特征（调试/诊断稳定事实源，本阶段恒空集合）。
+            //   数据通道独立于网格缓存：随静态帧整组替换（可为空集合），增量帧（null）保留旧值。
+            subFeatures: nextSubFeatures,
             generatorVersion: snap.terrain_generator_version || 0,
             profile: snap.terrain_profile || '',
           };
           this._terrainCached = true;
           // 地形重建后强制下一帧整片重着色（光相未变也要重写新数组对应的 cell.color）
           if (window.SimLighting) window.SimLighting.markDirty();
-          if (window.RiverLife) window.RiverLife.init(this.terrain.features, this._engineSeed);
+          if (window.RiverLife) window.RiverLife.init(nextFeatures, this._engineSeed);
+        } else if (hasStaticFeatures || hasStaticAccents || hasStaticSubFeatures) {
+          // ★ D-B1-7：网格缓存命中（或本帧无网格）但明确携带静态 section → 只替换静态数组，
+          //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧，RiverLife 仍随网格重建
+          this.terrain.features = nextFeatures;
+          this.terrain.accents = nextAccents;
+          this.terrain.subFeatures = nextSubFeatures;
         }
 
         // --- POI ---

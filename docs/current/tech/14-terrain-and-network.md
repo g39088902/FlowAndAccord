@@ -732,8 +732,11 @@ Agent 到达河岸取水点 (WaterAccessPoint)
 ```rust
 pub struct WorldSnapshot3D {
     pub terrain_cells: Vec<GeoCellSnapshot>,
-    pub terrain_features: Vec<TerrainFeatureSnapshot>,   // ✅
-    pub terrain_accents: Vec<TerrainAccentSnapshot>,     // ✅ v1.49.1
+    // ★ v1.50.33 D-B1-7 静态帧语义：None（JSON 序列化为 null）= 本帧未发送；
+    //   Some(vec) = 明确静态帧（可为空集合），消费方禁止用数组长度猜测是否发送
+    pub terrain_features: Option<Vec<TerrainFeatureSnapshot>>,        // ✅ v1.49.1
+    pub terrain_accents: Option<Vec<TerrainAccentSnapshot>>,          // ✅ v1.49.1
+    pub terrain_sub_features: Option<Vec<TerrainSubFeatureSnapshot>>, // ✅ v1.50.30 D-B1-4
     pub terrain_generator_version: u32,                  // ✅
     pub terrain_profile: String,                         // ✅
     // 既有字段保持不变
@@ -751,7 +754,7 @@ pub struct GeoCellSnapshot {
 
 快照原则：
 
-- 地形静态数据只在 `terrain_dirty` 为 true 时发出；普通 tick 帧发送空数组并复用前端缓存。✅ 已实现（`terrain_features`/`terrain_accents` 仅脏帧输出，其余帧为空 Vec）。
+- 地形静态数据只在 `terrain_dirty` 为 true 时发出；普通 tick 帧不发送静态字段并复用前端缓存。✅ 已实现（★ v1.50.33 D-B1-7：`terrain_features`/`terrain_accents`/`terrain_sub_features` 均为 `Option<Vec<_>>`——脏帧发 `Some(vec)`（可为空集合），其余帧为 `None`（JSON `null`/FABS section 缺席同为 `null`）；前端以 `Array.isArray` 区分「明确静态帧」与「未发送」，非静态帧保留旧值，明确空集合也必须替换）。
 - `terrain_content_version` 由内核根据生成器版本、地图参数和内容摘要生成，前端只用于缓存键，不参与模拟 RNG。◐ 当前用 `terrain_generator_version + terrain_profile` 表达版本事实，`terrain_content_version` 未单独引入。
 - 水池库存是动态事实，应随 POI/水资源快照发送；水体轮廓、岸点和特征几何是静态事实。
 - 所有 `Vec` 按**固定的、可复现的**顺序输出；不能依赖 HashMap 顺序。✅ 特征按**生成顺序**输出（T2 水系实际为 `ShallowFord=10/11` → `River=1` → `RiverBank=20/21` → `SpringValley=30`，既非 ID 升序也不等于本节早期版本列的省略 `River` 的顺序）；装饰按 ID 升序（`accents.rs` 末尾 `sort_by_key`）。ID 升序是 §5.2 对 D-B1 的要求，当前未实现。
@@ -759,7 +762,7 @@ pub struct GeoCellSnapshot {
 
 ### 14.2 FABS 二进制帧
 
-✅ 已落地。FABS 地形记录布局已扩展，格式版本 `FORMAT_VERSION = 2`：
+✅ 已落地。FABS 地形记录布局已扩展，格式版本 `FORMAT_VERSION = 3`（★ v1.50.30 D-B1-4 起为 3，新增 `SectionKind::TerrainSubFeatures = 22`）：
 
 1. ✅ `snapshot.rs` 增加字段。
 2. ✅ `world_snapshot.rs` 完成 JSON 赋值。
@@ -784,9 +787,9 @@ section 记录使用变长顶点列表，未知 section 仍可按 `byte_len` 跳
 
 前端映射：
 
-- ✅ `rustworld.js::_applySnapshot()` 已把静态快照映射到 `this.terrain.cells`（含 `surfaceKind`/`naturalFertility`/`waterBodyId`/`featureFlags`）与 `this.terrain.features`/`accents`/`generatorVersion`/`profile`。
+- ✅ `rustworld.js::_applySnapshot()` 已把静态快照映射到 `this.terrain.cells`（含 `surfaceKind`/`naturalFertility`/`waterBodyId`/`featureFlags`）与 `this.terrain.features`/`accents`/`subFeatures`/`generatorVersion`/`profile`。
 - ✅ `SnapshotBin.resetCaches()` 在 READY、LOAD_RESULT、REWIND_RESULT、RESET_DONE 时继续执行；跨世界缓存失效仍以 `STR_TAB.start_index == 0` 为准，不能改用 epoch。
-- ⏳ `this._terrainCached` 仍是单一标志（§15.4）：当前在 T1/T2/D-A 范围内够用，引入 D-B 装饰扩充并独立控制缓存大小时应拆分为 `terrainGridCached`/`terrainFeatureCached`/`terrainAccentCached`。
+- ✅ 静态地形缓存已拆分（★ v1.50.33 D-B1-7，原「单一 `_terrainCached`」待办已落地）：`_terrainCached` 仅管地形网格（cells + 光照数组）；features/accents/subFeatures 三通道独立裁决——`null`（未发送）保留旧值、明确静态帧（数组，可为空）整组替换；静态数据与 `AccentModel` 模型缓存由 `_invalidateWorldStaticCaches()` 随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 消息生命周期整体失效（06 号 §18.4 契约）。
 
 ### 14.3 生成器版本与读档规则
 

@@ -65,6 +65,11 @@ window.AccentModel = window.AccentModel || (function () {
     return chance > 0 && _accentHash(id, 400) < chance;
   }
 
+  // —— TA-11-3 RockCluster / GrassTuft 骨架参数读取（config.render.js；缺省回退与原值一致）——
+  function cfgNum(v, fallback) {
+    return Number.isFinite(v) ? v : fallback;
+  }
+
   function styleVersion() {
     const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentModelStyleVersion;
     return Number.isFinite(v) ? v : 1;
@@ -241,12 +246,20 @@ window.AccentModel = window.AccentModel || (function () {
   }
 
   // ── RockCluster（D-B1-6，06 号 §5.5）：anchor 前端派生 2–5 颗子石 ──
+  // 数量/散布/半径参数走 config.render.js（TA-11-3），缺省回退与原硬编码逐位一致。
   // stones：{ x, y } 世界单位水平偏移（未乘 accent.scale/zoom，rotation 由绘制层施加）、
   // { r } 子石半径、{ shape[6] } 逐顶点半径变化系数（沿用 Boulder 七边形变径画法）、
   // { rot } 自转角、{ lite } 岩面明暗色差通道。首颗为主石（居中、最大），其余碎石散布。
   function rockClusterSkeleton(id, vSeed) {
-    const n = 2 + Math.floor(_accentHash(id, 600) * 4); // 2~5 颗（§5.5）
-    const spread = 3.2 + vSeed * 1.2;                    // 簇散布半径（世界单位）
+    const cfg = window.RENDER_CONFIG || {};
+    const minStones = cfgNum(cfg.accentRockClusterMinStones, 2);
+    const maxStones = cfgNum(cfg.accentRockClusterMaxStones, 5);
+    const n = minStones + Math.floor(_accentHash(id, 600) * Math.max(1, maxStones - minStones + 1)); // 2~5 颗（§5.5）
+    const spread = cfgNum(cfg.accentRockClusterSpreadBase, 3.2) + vSeed * cfgNum(cfg.accentRockClusterSpreadVar, 1.2); // 簇散布半径（世界单位）
+    const mainRBase = cfgNum(cfg.accentRockClusterMainRadiusBase, 2.4);
+    const mainRVar = cfgNum(cfg.accentRockClusterMainRadiusVar, 1.0);
+    const debrisRBase = cfgNum(cfg.accentRockClusterDebrisRadiusBase, 1.1);
+    const debrisRVar = cfgNum(cfg.accentRockClusterDebrisRadiusVar, 1.3);
     const stones = [];
     for (let i = 0; i < n; i++) {
       const h1 = _accentHash(id, 610 + i * 5);
@@ -262,7 +275,7 @@ window.AccentModel = window.AccentModel || (function () {
       stones.push({
         x: Math.cos(ang) * dist,
         y: Math.sin(ang) * dist,
-        r: i === 0 ? 2.4 + h3 * 1.0 : 1.1 + h3 * 1.3, // 主石最大，其余碎石
+        r: i === 0 ? mainRBase + h3 * mainRVar : debrisRBase + h3 * debrisRVar, // 主石最大，其余碎石
         rot: h4 * Math.PI * 2,
         lite: _accentHash(id, 614 + i * 5),
         shape: shape,
@@ -273,10 +286,18 @@ window.AccentModel = window.AccentModel || (function () {
 
   // ── GrassTuft（D-B1-6，06 号 §5.5）：3–6 根短草线 ──
   // 每根草叶：根部偏移 (bx,by) + 叶尖水平外倾 (tx,ty) + 叶高 h（世界单位，低于灌木）。
+  // 叶数/株高/根部聚拢参数走 config.render.js（TA-11-3），缺省回退与原硬编码逐位一致。
   // 颜色由绘制层按当前季节派生（同 Tree：SimTreeTint，不读存档 tint）；
   // lite 为个体色差通道。草叶形态是 id 纯函数，暂停/读档/回溯逐位重建。
   function grassTuftSkeleton(id, vSeed) {
-    const n = 3 + Math.floor(_accentHash(id, 700) * 4); // 3~6 根（§5.5）
+    const cfg = window.RENDER_CONFIG || {};
+    const minBlades = cfgNum(cfg.accentGrassTuftMinBlades, 3);
+    const maxBlades = cfgNum(cfg.accentGrassTuftMaxBlades, 6);
+    const n = minBlades + Math.floor(_accentHash(id, 700) * Math.max(1, maxBlades - minBlades + 1)); // 3~6 根（§5.5）
+    const hBase = cfgNum(cfg.accentGrassTuftHeightBase, 2.4);
+    const hVar = cfgNum(cfg.accentGrassTuftHeightVar, 1.6);
+    const baseSpread = cfgNum(cfg.accentGrassTuftBaseSpread, 0.8);
+    const baseSpreadVar = cfgNum(cfg.accentGrassTuftBaseSpreadVar, 0.9);
     const blades = [];
     for (let i = 0; i < n; i++) {
       const h1 = _accentHash(id, 710 + i * 5);
@@ -284,10 +305,10 @@ window.AccentModel = window.AccentModel || (function () {
       const h3 = _accentHash(id, 712 + i * 5);
       const h4 = _accentHash(id, 713 + i * 5);
       const ang = (i / n) * Math.PI * 2 + (h1 - 0.5) * 1.6; // 方位均匀 + 抖动
-      const base = 0.8 + h4 * 0.9;       // 根部离锚点距离（簇底不完全重叠）
+      const base = baseSpread + h4 * baseSpreadVar; // 根部离锚点距离（簇底不完全重叠）
       const bx = Math.cos(ang) * base;
       const by = Math.sin(ang) * base;
-      const h = 2.4 + h2 * 1.6;          // 叶高 2.4~4.0（短草线）
+      const h = hBase + h2 * hVar;       // 叶高 2.4~4.0（短草线）
       const leanK = 0.30 + h3 * 0.45;    // 叶尖外倾比例
       blades.push({
         bx: bx, by: by,

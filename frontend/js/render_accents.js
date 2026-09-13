@@ -482,6 +482,9 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   const sk = model.skeleton;
   const rot = accent.rotation || 0;
   const cR = Math.cos(rot), sR = Math.sin(rot);
+  // 远景微碎石省略阈值（config.render.js，TA-11-3；屏幕半径 px）
+  const RC = window.RENDER_CONFIG || {};
+  const lodMinR = Number.isFinite(RC.accentRockClusterLODMinRadius) ? RC.accentRockClusterLODMinRadius : 0.6;
 
   function proj(dx, dy, dz) {
     const rx = dx * cosZ - dy * sinZ;
@@ -528,7 +531,7 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     const it = items[i];
     const st = it.st;
     const r = st.r * scaled;
-    if (r < 0.6) continue; // 微碎石在远景不可辨，直接省略
+    if (r < lodMinR) continue; // 微碎石在远景不可辨，直接省略
     // 底边贴落地点：中心上抬 0.72r（同 Boulder 屏幕纵压比），再压暗底色
     const cy = it.g.y - r * 0.72;
     // 底层（深灰，略偏背光侧）。★ TA-04-2：侧面法线取子石稳定世界方向（st.rot 水平角 + 下倾）；
@@ -569,12 +572,16 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
 // GrassTuft：3–6 根短草线（D-B1-6，06 号 §5.5）。
 // 颜色由前端按当前季节派生（同 Tree：SimTreeTint 连续季相，不读存档 tint，14 号 §7.4）；
 // 草叶不脱落——冬季以「低矮 + 枯色」表达（07 号 §6.6 目标：嫩绿→深绿→枯黄→冬季低矮枯草），
-// 叶高随 leafDensity 在 0.62~1.0 倍收缩，隆冬枯草仍在场。
+// 叶高随 leafDensity 在冬季保底系数（config.render.js，TA-11-3）~1.0 倍收缩，隆冬枯草仍在场。
 function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const rot = accent.rotation || 0;
   const cR = Math.cos(rot), sR = Math.sin(rot);
-  const hK = 0.62 + 0.38 * season.leafDensity;
+  // 隆冬低矮萎缩保底高度系数（config.render.js，TA-11-3）：hK = ratio + (1-ratio)×叶量
+  const RC = window.RENDER_CONFIG || {};
+  const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio)
+    ? RC.accentGrassTuftWinterHeightRatio : 0.62;
+  const hK = winterK + (1 - winterK) * season.leafDensity;
 
   function proj(dx, dy, dz) {
     const rx = dx * cosZ - dy * sinZ;

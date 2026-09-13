@@ -672,61 +672,71 @@ impl World3DEngine {
         let season_progress =
             ((self.season_timer + quarter_length * 0.5) % quarter_length) / quarter_length;
 
+        // ★ v1.48.0 D-A 建，★ D-B1-7 改：JSON 调试通道采用与 FABS 相同的明确静态帧语义——
+        //   静态地形脏帧发 Some(vec)（可为空集合），否则发 None（序列化为 null），
+        //   消费方不得用数组长度猜测「是否发送」。
         let terrain_features = if need_terrain {
-            self.terrain
-                .features
-                .iter()
-                .map(|feature| TerrainFeatureSnapshot {
-                    id: feature.id,
-                    kind: feature.kind.as_str().to_string(),
-                    vertices: feature.vertices.clone(),
-                    elevation: feature.elevation,
-                    width: feature.width,
-                    flags: feature.flags,
-                })
-                .collect()
+            Some(
+                self.terrain
+                    .features
+                    .iter()
+                    .map(|feature| TerrainFeatureSnapshot {
+                        id: feature.id,
+                        kind: feature.kind.as_str().to_string(),
+                        vertices: feature.vertices.clone(),
+                        elevation: feature.elevation,
+                        width: feature.width,
+                        flags: feature.flags,
+                    })
+                    .collect(),
+            )
         } else {
-            Vec::new()
+            None
         };
 
-        // ★ v1.48.0 D-A：JSON 快照装饰赋值
+        // ★ v1.48.0 D-A 建，★ D-B1-7 改：Some(可为空集合) = 明确静态帧，None = 未发送
         let terrain_accents = if need_terrain {
-            self.terrain
-                .accents
-                .iter()
-                .map(|accent| TerrainAccentSnapshot {
-                    id: accent.id,
-                    kind: accent.kind.as_str().to_string(),
-                    x: accent.pos.x,
-                    y: accent.pos.y,
-                    z: accent.pos.z,
-                    scale: accent.scale,
-                    rotation: accent.rotation_rad,
-                    tint: accent.tint,
-                })
-                .collect()
+            Some(
+                self.terrain
+                    .accents
+                    .iter()
+                    .map(|accent| TerrainAccentSnapshot {
+                        id: accent.id,
+                        kind: accent.kind.as_str().to_string(),
+                        x: accent.pos.x,
+                        y: accent.pos.y,
+                        z: accent.pos.z,
+                        scale: accent.scale,
+                        rotation: accent.rotation_rad,
+                        tint: accent.tint,
+                    })
+                    .collect(),
+            )
         } else {
-            Vec::new()
+            None
         };
 
-        // ★ D-B1-4：JSON 快照子特征赋值（本阶段容器恒空，注入自阶段二起）
+        // ★ D-B1-4 建，★ D-B1-7 改：JSON 快照子特征赋值（本阶段容器恒空集合，注入自阶段二起；
+        //   Option 语义同上：None = 未发送，Some(空) = 明确空集合）
         let terrain_sub_features = if need_terrain {
-            self.terrain
-                .sub_features
-                .iter()
-                .map(|sf| TerrainSubFeatureSnapshot {
-                    id: sf.id,
-                    kind: sf.kind.as_str().to_string(),
-                    anchor: sf.anchor,
-                    bounds_min: sf.bounds_min,
-                    bounds_max: sf.bounds_max,
-                    feature_ids: sf.feature_ids.clone(),
-                    accent_id_start: sf.accent_id_start,
-                    accent_id_end: sf.accent_id_end,
-                })
-                .collect()
+            Some(
+                self.terrain
+                    .sub_features
+                    .iter()
+                    .map(|sf| TerrainSubFeatureSnapshot {
+                        id: sf.id,
+                        kind: sf.kind.as_str().to_string(),
+                        anchor: sf.anchor,
+                        bounds_min: sf.bounds_min,
+                        bounds_max: sf.bounds_max,
+                        feature_ids: sf.feature_ids.clone(),
+                        accent_id_start: sf.accent_id_start,
+                        accent_id_end: sf.accent_id_end,
+                    })
+                    .collect(),
+            )
         } else {
-            Vec::new()
+            None
         };
 
         WorldSnapshot3D {

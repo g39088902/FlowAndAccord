@@ -42,10 +42,11 @@
     - 验收：未知 kind 直接跳过 + 开发模式计数报警，不得错画成 `Bush`（§5.5 末段）；`node tools/frontend-check.js` 通过。
     - 依赖：D-B1-5（内核先有数据）。
 
-- [ ] **D-B1-7 装饰缓存拆分 + §18.4 收口**
+- [x] **D-B1-7 装饰缓存拆分 + §18.4 收口**
     - 内容：拆分前端单一 `_terrainCached`，使装饰缓存（含新的 `subFeatures` 数据通道）独立于地形缓存；落实 06 号 §18.4 的静态数据更新契约，区分“本帧未发送”与“明确空集合”，同时处理 `AccentModel` 模型缓存。`STR_TAB.start_index==0` 继续仅按既有契约重置字符串驻留表，不以其替代完整的世界生命周期处理。
-    - 出处：§18.4 第 6 条（当前唯一 ⏳ 项）及其静态数据更新契约、§5.7 前端状态行。
-    - 验收：临时独立用例覆盖普通增量帧保留装饰、同 profile/生成器版本的世界切换、非空→空集合、READY/LOAD/REWIND/RESET 后数据与模型缓存一致；`subFeatures` 本阶段恒空，使用临时非空夹具证明旧值能被清除。通过后才将 §18.4 该项由 ⏳ 转 ✅，临时脚本不进入提交。
+    - 落地（v1.50.33）：① `snapshot.rs`/`world_snapshot.rs` 三通道改 `Option<Vec<_>>`——`None`（JSON 序列化为 `null`）= 未发送，`Some(vec)` = 明确静态帧（可为空集合），JSON 调试通道与 FABS 同语义；② `snapshot-bin.js` section 缺席时输出 `null`（对齐 lanes/nodes 约定，`FORMAT_VERSION` 保持 3）；③ `rustworld.js` 拆分——静态三通道与网格缓存独立裁决（`Array.isArray` 判明确帧，禁止用数组长度猜测），新增 `_invalidateWorldStaticCaches()` 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处随消息生命周期失效静态数据与 `AccentModel` 模型缓存。
+    - 验收：临时独立用例 22 断言全通（普通增量帧保留装饰〔含真实 FABS 增量帧与 JSON `null` 语义〕、同 profile/生成器版本 + 复用 accent ID 换世界、非空→空集合〔含 subFeatures 非空夹具、缓存命中帧与重建帧两路〕、READY/LOAD/REWIND/RESET 后数据与模型缓存一致、LOAD 失败不清缓存）；脚本按 §4.10 已于提交前删除。门禁：cargo test --lib、test-wasm ALL_TESTS_DONE、test-determinism、test-snapshot-bin 4 场景 ALL_BIN_JSON_EQUAL、config-check 233/233、frontend-check 35 文件全绿；升版重编译 WASM 双副本。
+    - 出处：§18.4 第 6 条（已由 ⏳ 转 ✅）及其静态数据更新契约（已标实施）、§5.7 前端状态行。
     - 依赖：D-B1-4（subFeatures 通道就位后拆分才有意义）、D-B1-6。
 
 - [ ] **D-B1-8 场景样板：支脊山口 + 岩壁河谷（美术侧）**

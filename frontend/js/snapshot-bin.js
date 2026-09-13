@@ -15,6 +15,10 @@
 //   4. snap.nodes —— 同上（null = 复用缓存）
 //   5. snap.lane_wear  —— 恒为 Float32Array（与车道下标一一对应），rustworld 据此覆写缓存对象 wear
 //   6. snap.terrain_cells —— 无地形帧为空数组 []（与 JSON 快照行为一致）
+//   7. ★ D-B1-7 静态帧语义（06 号 §18.4）：snap.terrain_features / terrain_accents /
+//      terrain_sub_features —— 仅静态地形脏帧携带（数组，**可为空** = 明确空集合）；
+//      否则为 null（= 本帧未发送，消费方必须保留旧值）。「未发送」≠「空集合」，
+//      与 lanes/nodes 的 null 约定一致，严禁用数组长度猜测是否发送。
 
 (function (global) {
   'use strict';
@@ -153,7 +157,8 @@
     // 故这里每帧都构造全新容器，`setReuse()` 仅为兼容旧调用点而保留的空操作。
     var snap = {
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
-      terrain_cells: [], terrain_features: [], terrain_sub_features: [], terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
+      terrain_cells: [], terrain_features: null, terrain_accents: null, terrain_sub_features: null,
+      terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
       total_births: 0, total_deaths: 0, total_deaths_natural: 0, total_deaths_unnatural: 0,
@@ -467,7 +472,7 @@
         snap.terrain_features.push(feature);
       }
     }
-    // ★ v1.48.0 D-A：解码地表装饰 Section 21
+    // ★ v1.48.0 D-A：解码地表装饰 Section 21（★ D-B1-7：section 缺席时保持默认 null = 未发送）
     if (dir[K.TERRAIN_ACCENTS]) {
       var ar = readerAt(uint8, dir[K.TERRAIN_ACCENTS].o, dir[K.TERRAIN_ACCENTS].bl);
       snap.terrain_accents = [];
@@ -486,7 +491,7 @@
         snap.terrain_accents.push(accent);
       }
     }
-    // ★ v1.50.30 D-B1-4：解码地图模板子特征 Section 22（静态地形脏帧才携带；
+    // ★ v1.50.30 D-B1-4：解码地图模板子特征 Section 22（静态地形脏帧才携带；★ D-B1-7：缺席保持 null = 未发送；
     //   记录布局 = id u32 + kind u8 + anchor/bounds_min/bounds_max 各 3×f32
     //   + feature_count u8 + feature_ids… + accent_start/end opt_u32 + align4）
     if (dir[K.TERRAIN_SUB_FEATURES]) {

@@ -83,6 +83,29 @@ window.RENDER_CONFIG = {
   accentLeafClustersBush: 8,  // 每丛灌木稳定叶簇数（基生细茎端 + 茎中段）
   accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希常绿变体比例（TA-06 前过渡）
 
+  // —— 地表装饰 RockCluster / GrassTuft 视觉形态参数（TA-11-3，07 号 §6.6/§6.7/§10.4）——
+  // 消费入口：accent-model.js（骨架派生，accent.id 纯函数入模型缓存）与
+  // render_accents.js（远景 LOD 阈值、冬季萎缩系数）。调参后刷新浏览器即生效，
+  // 无需重编译 WASM；逻辑层缺省回退值与下列数值严格一致（删任一键行为不变）。
+  accentRockClusterMinStones: 2,          // 子石最少数量（内核只下发 anchor，子石前端派生）
+  accentRockClusterMaxStones: 5,          // 子石最多数量
+  accentRockClusterSpreadBase: 3.2,       // 簇散布基准半径（世界米）
+  accentRockClusterSpreadVar: 1.2,        // 散布随机离散系数（×vSeed）
+  accentRockClusterMainRadiusBase: 2.4,   // 主石半径基准（世界米）
+  accentRockClusterMainRadiusVar: 1.0,    // 主石半径随机幅度（2.4~3.4m）
+  accentRockClusterDebrisRadiusBase: 1.1, // 伴生碎石半径基准（世界米）
+  accentRockClusterDebrisRadiusVar: 1.3,  // 伴生碎石半径随机幅度（1.1~2.4m）
+  accentRockClusterLODMinRadius: 0.6,     // 远景微碎石省略阈值（屏幕半径 px）
+
+  accentGrassTuftMinBlades: 3,            // 草叶最少叶数
+  accentGrassTuftMaxBlades: 6,            // 草叶最多叶数
+  accentGrassTuftHeightBase: 2.4,         // 基准株高下限（世界米）
+  accentGrassTuftHeightVar: 1.6,          // 株高随机幅度（2.4~4.0m）
+  accentGrassTuftBaseSpread: 0.8,         // 根部聚拢半径基准（世界米）
+  accentGrassTuftBaseSpreadVar: 0.9,      // 根部离锚点距离随机幅度（0.8~1.7m）
+  accentGrassTuftWinterHeightRatio: 0.62, // 隆冬低矮萎缩保底高度系数（0.62+0.38×叶量）
+  accentGrassTuftReedChance: 0.35,        // 水岸/河阶派生芦草外观的概率（TA-11-4 芦草变体消费）
+
   // —— 世界光向动态受光（TA-04，lighting.js 消费）——
   sunScreenEps: 0.02,         // 屏幕光心退化半径：光向接近视线（投影 len < eps）时亮部按 len/eps 平滑回冠心（lighting.js::sunScreenDirFull，TA-04-1 迁入）
 };

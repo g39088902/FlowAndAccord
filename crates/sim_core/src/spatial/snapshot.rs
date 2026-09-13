@@ -21,18 +21,27 @@ pub enum Season {
 }
 
 /// 外部渲染只读快照数据结构
+///
+/// ★ D-B1-7 静态帧语义（06 号 §18.4 静态数据更新契约）：静态地形三通道
+/// `terrain_features` / `terrain_accents` / `terrain_sub_features` 均为
+/// `Option<Vec<_>>`——`None`（JSON 序列化为 `null`）= 本帧**未发送**静态 section，
+/// 消费方必须保留既有缓存；`Some(vec)`（数组，**可为空**）= 明确携带静态全量数据，
+/// 即使空集合也必须整体替换旧值。严禁用数组长度猜测「是否发送」。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldSnapshot3D {
     pub tick: u64,
     pub terrain_cells: Vec<GeoCellSnapshot>,
+    /// 静态水系特征（None = 本帧未发送；Some(空) = 明确空集合）
     #[serde(default)]
-    pub terrain_features: Vec<TerrainFeatureSnapshot>,
+    pub terrain_features: Option<Vec<TerrainFeatureSnapshot>>,
+    /// 静态地表装饰（None = 本帧未发送；Some(空) = 明确空集合）
     #[serde(default)]
-    pub terrain_accents: Vec<TerrainAccentSnapshot>,
-    /// ★ D-B1-4：地图模板子特征快照（06 号 §5.2/§5.7）。本阶段恒为空数组
-    /// （注入自阶段二起）；随静态地形脏帧输出，是调试/诊断/跨世界缓存清理的稳定事实源
+    pub terrain_accents: Option<Vec<TerrainAccentSnapshot>>,
+    /// ★ D-B1-4：地图模板子特征快照（06 号 §5.2/§5.7）。本阶段恒为空集合
+    /// （注入自阶段二起）；随静态地形脏帧输出，是调试/诊断/跨世界缓存清理的稳定事实源。
+    /// ★ D-B1-7：Option 语义同上（None = 未发送，Some(空) = 明确空集合）
     #[serde(default)]
-    pub terrain_sub_features: Vec<TerrainSubFeatureSnapshot>,
+    pub terrain_sub_features: Option<Vec<TerrainSubFeatureSnapshot>>,
     #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
