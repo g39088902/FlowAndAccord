@@ -126,4 +126,13 @@ window.RENDER_CONFIG = {
   accentBarkBandLitAlpha: 0.55,  // 迎光带不透明度（叠于朝屏体色上混出圆柱侧面渐变）
   accentBarkBandDarkAlpha: 0.40, // 背光带不透明度（背光面弱于迎光面，避免死黑）
   accentBarkBandMinWidthPx: 2.0, // 侧面明暗最小可辨屏幕宽度（主干带 / 枝茎高光低于此省略，防远景亚像素噪声）
+
+  // —— 叶簇宽而弱亮部（TA-04-4，render_accents.js::drawAccentTree/drawAccentBush 消费）——
+  // 近景簇亮部中心沿屏幕光向偏移（lighting.js::sunScreenDirFullInto，光近视线时平滑回冠心），
+  // 颜色经受光管线随簇法线迎光程度衰减；替代 v1.50.27「屏幕固定位置白椭圆」避免塑料反光。
+  accentCrownLitOffset: 0.45, // 亮部中心偏移相对簇半径的比例（沿屏幕光向）
+  accentCrownLitRxK: 0.55,    // 亮部椭圆横半径相对簇半径的比例（宽于旧 0.42 白斑）
+  accentCrownLitRyK: 0.42,    // 亮部椭圆纵半径相对簇半径的比例
+  accentCrownLitAlpha: 0.16,  // 亮部峰值不透明度（弱于旧 0.20 小白斑，宽而弱）
+  accentCrownLitMinPx: 2.2,   // 簇屏幕半径低于此省略亮部（远景亚像素噪声）
 };

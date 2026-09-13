@@ -12,14 +12,17 @@
 // - 落叶：叶簇按 season.leafDensity 与各自 shed 次序收缩并隐藏（短过渡带淡出），
 //   **严禁整冠透明度**（§6.4 红线）；枝条全年保留——冬季裸枝清晰（落叶树余 0~5% 叶量）。
 // - 细节分级：按冠部投影像素尺寸分近/中/远三档（accentDetailNearPx/MidPx），
-//   远景只保留树形与叶量，中景画主枝，近景加二级枝、簇高光与春芽（TA-07 再做滞回）。
+//   远景只保留树形与叶量，中景画主枝，近景加二级枝、簇亮部与春芽（TA-07 再做滞回）。
 // - 受光：★ TA-04-2（v1.50.33）法线点积管线接入——叶簇/岩面颜色固定走
 //   「季节基础色 → SimLighting 漫反射+环境光（法线点积，公式单一来源 shadeRgbInto）→
 //   intensity/tint 色温」；冠内体积/AO 分档只保留与视角无关的 tZ 档，投影深度 tD
 //   不再参与明暗（同一世界表面转相机不变色）。★ TA-04-3（v1.50.39）枝干圆柱侧面明暗接入——
 //   主干三色（朝屏体色 + 迎光带 + 背光带，带位由世界光向屏幕投影驱动）替代旧固定
-//   「屏幕左上」树皮亮线；枝条/灌木茎逐段按朝屏法线受光 + 近景迎光侧细高光；
-//   叶簇渐变亮部与固定白斑移除（TA-04-4）、岩石 billboard 几何随相机细化（TA-04-5）后续接入；
+//   「屏幕左上」树皮亮线；枝条/灌木茎逐段按朝屏法线受光 + 近景迎光侧细高光。
+//   ★ TA-04-4（v1.50.40）叶簇宽而弱亮部接入——近景簇亮部中心沿屏幕光向偏移
+//   （lighting.js::sunScreenDirFullInto，光近视线时平滑回冠心），颜色经受光管线随簇法线
+//   迎光程度衰减，取代 v1.50.27「屏幕固定位置白椭圆」；旧叶簇渐变色板（hi/dapLite/dapDark，
+//   v1.50.27 两遍式树冠重构后已无引用）随之移除；岩石 billboard 几何随相机细化（TA-04-5）后续接入；
 //   GrassTuft 不在本任务受光范围（§6.5：保留季相短草线，不新增立体法线）。
 // - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
@@ -100,6 +103,7 @@ function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo, alpha) {
 // - _cylScr = 迎光侧的**屏幕偏移单位方向**（模型分量走方向剪切 + 相机投影，与几何同一套
 //   变换）：ok=false 表示退化（光向与轴向平行，或投影长度 ≈ 0），调用方跳过明暗带。
 var _ld = { x: 0, y: 0, z: 0 };              // 世界光向刮擦（drawAccentEntity 每实体经 lightDirInto 刷新）
+var _sunScr = { x: 0, y: 0, len: 0, valid: false }; // 屏幕光向刮擦（TA-04-4 叶簇亮部偏移方向，每实体经 sunScreenDirFullInto 刷新）
 var _cylLit = { x: 0, y: 0, z: 0 };
 var _cylDark = { x: 0, y: 0, z: 0 };
 var _cylFront = { x: 0, y: 0, z: 0 };
@@ -137,6 +141,18 @@ function barkBandCfg() {
   const da = RC.accentBarkBandDarkAlpha; if (Number.isFinite(da)) _barkCfg.darkA = da;
   const mp = RC.accentBarkBandMinWidthPx; if (Number.isFinite(mp)) _barkCfg.minPx = mp;
   return _barkCfg;
+}
+
+// ★ TA-04-4 叶簇亮部参数读取（config.render.js；缺省回退与集中值一致；零 GC 写入复用对象）
+var _crownCfg = { offK: 0.45, rxK: 0.55, ryK: 0.42, alpha: 0.16, minPx: 2.2 };
+function crownLitCfg() {
+  const RC = window.RENDER_CONFIG || {};
+  const o = RC.accentCrownLitOffset; if (Number.isFinite(o)) _crownCfg.offK = o;
+  const rx = RC.accentCrownLitRxK; if (Number.isFinite(rx)) _crownCfg.rxK = rx;
+  const ry = RC.accentCrownLitRyK; if (Number.isFinite(ry)) _crownCfg.ryK = ry;
+  const a = RC.accentCrownLitAlpha; if (Number.isFinite(a)) _crownCfg.alpha = a;
+  const mp = RC.accentCrownLitMinPx; if (Number.isFinite(mp)) _crownCfg.minPx = mp;
+  return _crownCfg;
 }
 
 // ★ TA-11-6 渲染热路径零 GC（07 号 §6.7/§10.2）：模块级持久刮擦缓冲，跨帧复用，
@@ -205,6 +221,9 @@ function drawAccentEntity(accent) {
   const SL = window.SimLighting;
   if (SL && SL.lightDirInto) SL.lightDirInto(_ld);
   else { _ld.x = 0; _ld.y = 0; _ld.z = 0; }
+  // ★ TA-04-4 屏幕光向刷新（世界光向完整屏幕投影，叶簇亮部偏移方向共用；缺席时置零回冠心）
+  if (SL && SL.sunScreenDirFullInto) SL.sunScreenDirFullInto(_sunScr);
+  else { _sunScr.x = 0; _sunScr.y = 0; _sunScr.len = 0; _sunScr.valid = false; }
 
   // 投影（与地形/世界实体同一套 3D → 屏幕变换）
   const rx = accent.x * cosZ - accent.y * sinZ;
@@ -240,18 +259,6 @@ function drawAccentEntity(accent) {
   }
 }
 
-// 浮点 RGB 直接交给 Canvas，避免季相按整数/色档量化。
-function accentLeafPalette(color, vSeed) {
-  const vary = (vSeed - 0.5) * 14;
-  const rgb = (factor, lift) => color.map(c => Math.max(0, Math.min(255, c * factor + lift)));
-  return {
-    base: rgb(1, vary), hi: rgb(0.85, 62),
-    rim: 'rgb(' + rgb(0.53, 0).join(',') + ')',
-    dapDark: 'rgba(' + rgb(0.66, 0).join(',') + ',0.28)',
-    dapLite: 'rgba(' + rgb(0.85, 90).join(',') + ',0.32)',
-  };
-}
-
 // 局部三维细节分级阈值（config.render.js；远景 < mid ≤ 中景 < near ≤ 近景）
 // ★ TA-11-6 零 GC：写入模块级复用对象（每装饰每帧 1 次，原先返回字面量对象）。
 var _detailLv = { mid: 7, near: 15 };
@@ -283,7 +290,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const brown = season.brownness;
   const lv = accentDetailLevels();
   const detailMid = crownR >= lv.mid;   // 中景：主枝 + 叶簇
-  const detailNear = crownR >= lv.near; // 近景：二级枝 + 簇高光 + 春芽
+  const detailNear = crownR >= lv.near; // 近景：二级枝 + 簇亮部 + 春芽
 
   // 贴地投影：叶量调制（夏季完整冠影 → 冬季稀疏枝影 + 弱接地影，§6.5 过渡做法）
   const so = _shadowOffset(1.2, 2.5, 2.0);
@@ -451,6 +458,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   // Pass B：簇本体（基色 + lite 色差，再乘冠内体积/AO 分档 × 世界光向受光）
   // ★ TA-04-2 颜色管线：季节基础色 → 漫反射+环境光（簇法线点积，accentLitFill 单一入口）
   //   → intensity/tint 色温；体积分档只留与视角无关的 tZ（tD 已移除，转相机不变色）
+  const cc = crownLitCfg();
   for (let i = 0; i < nItems; i++) {
     const it = _crownScratchPool[i];
     const c = it.c;
@@ -463,11 +471,14 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     ctx.beginPath();
     ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 近景高光：只给冠层上半部（阳光自上而来）。★ 属屏幕固定位置，TA-04-4 改由世界光向投影驱动
-    if (detailNear && it.rr > 2.2 && tZ > 0.30) {
-      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.20 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
+    // 近景簇亮部：★ TA-04-4 世界光向投影驱动（v1.50.27 屏幕固定白斑移除）——亮部中心沿
+    // 屏幕光向偏移（光近视线经 sunScreenDirFull 平滑回冠心），亮色走受光管线随簇法线
+    // 迎光程度自然衰减（取代旧「只给上半冠」tZ 启发式）；宽而弱，避免塑料反光
+    if (detailNear && it.rr > cc.minPx) {
+      ctx.fillStyle = accentLitFill(255, 252, 218, wn.x, wn.y, wn.z, 1, cc.alpha * it.v);
       ctx.beginPath();
-      ctx.ellipse(it.px - it.rr * 0.28, it.py - it.rr * 0.42, it.rr * 0.42, it.rr * 0.30, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
+        it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -640,6 +651,7 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   ctx.fill();
 
   // Pass B：簇本体 + 冠内体积/AO 分档 × 世界光向受光（★ TA-04-2，同 Tree 管线；灌木无倾干）
+  const cc = crownLitCfg();
   for (let i = 0; i < nItems; i++) {
     const it = _crownScratchPool[i];
     const c = it.c;
@@ -650,11 +662,12 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     ctx.beginPath();
     ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
     ctx.fill();
-    // 近景高光属屏幕固定位置，TA-04-4 改由世界光向投影驱动
-    if (detailNear && it.rr > 2.0 && tZ > 0.30) {
-      ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.18 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
+    // 近景簇亮部：★ TA-04-4 世界光向投影驱动（同 Tree；灌木无倾干，簇法线即世界法线）
+    if (detailNear && it.rr > cc.minPx) {
+      ctx.fillStyle = accentLitFill(255, 252, 218, c.nx, c.ny, c.nz, 1, cc.alpha * it.v);
       ctx.beginPath();
-      ctx.ellipse(it.px - it.rr * 0.28, it.py - it.rr * 0.40, it.rr * 0.40, it.rr * 0.28, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
+        it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }

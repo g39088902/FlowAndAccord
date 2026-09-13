@@ -342,7 +342,7 @@ window.SimLighting = (function () {
     const v = window.RENDER_CONFIG && window.RENDER_CONFIG.sunScreenEps;
     return (Number.isFinite(v) && v > 0) ? v : 0.02;
   }
-  function sunScreenDirFull() {
+  function sunScreenDirFullInto(out) {
     const cam = camRef();
     const eps = sunScreenEps();
     const cosZ = Math.cos(cam.rotZ || 0), sinZ = Math.sin(cam.rotZ || 0);
@@ -351,11 +351,16 @@ window.SimLighting = (function () {
     const sy = (S.lx * sinZ + S.ly * cosZ) * cosX - S.lz * sinX;
     const len = Math.hypot(sx, sy);
     if (len < eps) {
-      if (len < 1e-9) return { x: 0, y: 0, len: len, valid: false };
+      if (len < 1e-9) { out.x = 0; out.y = 0; out.len = len; out.valid = false; return out; }
       const f = len / eps;
-      return { x: (sx / len) * f, y: (sy / len) * f, len: len, valid: false };
+      out.x = (sx / len) * f; out.y = (sy / len) * f; out.len = len; out.valid = false;
+      return out;
     }
-    return { x: sx / len, y: sy / len, len: len, valid: true };
+    out.x = sx / len; out.y = sy / len; out.len = len; out.valid = true;
+    return out;
+  }
+  function sunScreenDirFull() {
+    return sunScreenDirFullInto({ x: 0, y: 0, len: 0, valid: false });
   }
 
   function compassName() {
@@ -384,6 +389,7 @@ window.SimLighting = (function () {
     shadowOffset,
     sunScreenDir,
     sunScreenDirFull,
+    sunScreenDirFullInto, // ★ TA-04-4 零 GC 变体（装饰绘制每实体刷新屏幕光向刮擦）
     shadeFace,
     shadeRgb,
     shadeRgbInto,
