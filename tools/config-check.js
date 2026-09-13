@@ -56,6 +56,12 @@ const IMPACT_OVERRIDES = {
   terrainGridRes: 'sim_wasm/lib.rs (resolve_grid_res 建世界栅格)',
   terrainPassRidgeWidth: 'geo/terrain.rs (T1 主脊高斯半宽，通行力约束)',
   terrainPassRidgeAmplitude: 'geo/terrain.rs (T1 主脊幅度，通行力约束)',
+  // ★ TB-01-5：多尺度 fBm 噪声与支脊超参
+  terrainNoiseAmplitude: 'geo/terrain.rs (fBm 振幅增益，默认 6.0 零漂移)',
+  terrainNoiseScaleBase: 'geo/terrain.rs (fBm 波长缩放，默认 300.0 零漂移)',
+  terrainBranchRidgeEnabled: 'geo/terrain.rs (支脊生成总开关)',
+  terrainBranchRidgeAmplitudeRatio: 'geo/terrain.rs (支脊振幅比中值 ×[0.85,1.15] 抖动)',
+  terrainBranchRidgeLength: 'geo/terrain.rs (支脊长度 ×[0.8,1.2] 抖动)',
   terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',
   terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',
@@ -64,6 +70,8 @@ const IMPACT_OVERRIDES = {
   terrainAccentDensity: 'geo/accents.rs (装饰密度)',
   // ★ D-B1 子特征注入总开关（06号 §5.3 第 4–5、9 步空钩子门控；选择器属 D-B1-3）
   terrainAccentSubFeatures: 'geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控)',
+  // ★ STAGE2-1 有界重试上限（06号 §5.8 / §18.2；完整阶梯降级重试环属 STAGE2-5）
+  terrainGenerationMaxRetries: 'spatial/world.rs (创世重试预算钳制；STAGE2-5 阶梯降级重试环)',
 };
 
 const IMPACT_PREFIX_RULES = [

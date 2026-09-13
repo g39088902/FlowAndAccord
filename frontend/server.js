@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = 3002; // 声明性默认端口（实际监听走下方 DEFAULT_PORT，保持同步）
+const PORT = 3004;
+
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -105,7 +106,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3002;
+const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3004;
+
 
 function startServer(port) {
   server.listen(port, () => {
@@ -115,8 +117,9 @@ function startServer(port) {
 
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
-    const nextPort = server.address() ? server.address().port + 1 : (parseInt(process.env.PORT, 10) || 3002) + 1;
-    console.log(`⚠️ Port ${e.port || 3002} is in use, trying port ${nextPort}...`);
+    const nextPort = server.address() ? server.address().port + 1 : (parseInt(process.env.PORT, 10) || 3004) + 1;
+    console.log(`⚠️ Port ${e.port || 3000} is in use, trying port ${nextPort}...`);
+
     setTimeout(() => startServer(nextPort), 200);
   } else {
     console.error('Server error:', e);

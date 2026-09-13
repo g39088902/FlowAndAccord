@@ -55,7 +55,7 @@ stateDiagram-v2
 - **道路**：管线层级反转（地表 → 道路 → 实体），默认观察为低饱和土石五级自然色阶，明艳色阶与外发光仅保留在 `R` 键热力图模式。
 - **水系**：T2 内核河道/岸线/浅滩/泉谷 + 清透碧蓝水体三层落笔（深底/主流/波光）；v1.49.1 移除手绘沙滩金砂线，v1.50.20 河面按剖分区间逐段并入深度队列。
 - **深度排序**：`drawWorldEntities()` 统一深度队列——地形格、水系、道路 16 分段、营地辖区连线、POI 底座/标记、房屋、族人、地表装饰、沙盘侧壁全部按相机深度远 → 近落笔，稳定排序保确定性，拾取遍历与绘制队列解耦。
-- **内核地貌**：T0 地表查询（`sample_elevation` / `validate_footprint`）、T1 山口聚落 `mountain_pass_v1`、T2 两岸河谷 `river_valley_v1`，`terrainProfile: 'random'` 按种子哈希 ~50% 轮换并回写入档，生成器版本 4。
+- **内核地貌**：T0 地表查询（`sample_elevation` / `validate_footprint`）、T1 山口聚落 `mountain_pass_v1`、T2 两岸河谷 `river_valley_v1`，`terrainProfile: 'random'` 按种子哈希 ~50% 轮换并回写入档，生成器版本 5（v1.50.41 TB-01 多尺度噪声与支脊系统后递增）。
 - **D-A 装饰基础**：`geo/accents.rs` 五类枚举（Tree/Bush/Boulder/RockCluster/GrassTuft，五类均已生成）、独立盐值 RNG、基数树 40 / 石 20 / 灌木 25 × 密度、FABS Section 21 持久化、前端 `drawAccentEntity` 绘制上述五类；v1.50.21 落地三档树冠季相（鲜绿 → 黄绿 → 红褐，快照季节驱动）。★ v1.50.23 TA-01：装饰代码自 `render_terrain.js` 迁出为 `accent-season.js`（SimTreeTint）/ `accent-model.js`（个体模型缓存）/ `render_accents.js`（绘制入口）三文件。
 
 ### 1.2 任务总表
@@ -97,7 +97,7 @@ stateDiagram-v2
 
 | 编号 | 任务 | 原代号 / 详见 | 难度 | 依赖 |
 | :--- | :--- | :--- | :--- | :--- |
-| TB-01 | 首版不对称支脊（06 号 §5.4.E）；多尺度物理噪声另拆后续提交，不阻塞首版样板；确定性生成 + 版本门禁 + 全图连通校验 | M1 | 高 | 06 号阶段二 |
+| TB-01 | ✅ 已落地（v1.50.36~43，TB-01-1~8 全闭环，验收记录分层归档至 changelog v1.50.36~43 条目与本文 §7.2）：多尺度 fBm 噪声 + 高度调制掩码/鞍部保护带 + 主脊域扭曲 45m + 不对称支脊 1~2 条（鞍部禁区/根部爬坡）+ SimConfig 集中化 + 生成器版本门禁 5 + 60 种子连通矩阵（components 恒 1）+ Chrome 视觉验收通过 | M1 | 高 | 06 号阶段二 |
 | TB-02 | 基座与台地内核 profile（物理生成，区别于 TA-10 表现层） | 旧 §9-2，详见 §7.4 | 高 | TB-01 |
 | TB-03 | 盆地、冲积扇与风格组合 profile；草原/半坡林地保留候选，样板通过后排期 | 旧 §9-3，详见 §7.4 | 高 | TB-01 |
 | TB-04 | D-B 子特征注入器：T1 注入山脚湖/瀑布/密林，T2 注入牛轭湖/峭壁/河岸林带，按 seed 哈希概率 | D-B、M4 | 高 | 06 号阶段二；各子特征按 06 号 R.3 解锁 |
@@ -185,7 +185,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 - [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`；★ v1.50.33 D-B1-7 起 `_terrainCached` 仅管地形网格，静态特征/装饰/子特征三通道独立裁决，`_invalidateWorldStaticCaches()` 随世界生命周期失效）。
 - [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
 - [渲染表现层参数](../../../frontend/js/config.render.js)（`window.RENDER_CONFIG`，不注入 WASM、不并入 SIM_CONFIG）。
-- [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 4 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
+- [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 5 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
 ## 4. 统一美术规则
 
@@ -365,11 +365,13 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 - ✅ T2 静态主河、浅滩、河滩与河阶已落地（v1.47.5）：水域、岸线、浅滩位置来自内核，前端只增加高光、岸石和植被（岸石/植被：TA-11 碎石群与草丛已落地 v1.50.38；资源区景观群待 TA-17）；河床先绘制，水面与岸边物体按遮挡关系组织；人物在浅滩沿内核实际路线过水并按 `terrain_shallow_water_cost` 减速。
 - ❌ **不再规划独立 T3 profile**（v1.48.0 决策）：湖泊/峡谷/瀑布通过 TB-04 子特征注入实现；湿地因视觉辨识度低明确删除。
 
-### 7.2 TB-01 · 多尺度噪声与支脊（难度：高）
+### 7.2 TB-01 · 多尺度噪声与支脊（难度：高）✅ 已落地（v1.50.36~43）
 
-- ◐ 目前是倾斜大势 + 平滑谐波 + 模板骨架。首版按 [06 号 §5.4.E](./06-terrain-templates.md#e-t1-不对称支脊骨架扩展未实施) 补不对称支脊，其候选参数、山口保护带、失败降级与种子矩阵以该节为准；多尺度物理噪声另拆后续提交，不作为 TA-09 首版依赖。
+- ✅ **多尺度物理噪声**（TB-01-1/2）：确定性 2D 梯度噪声 + 3 倍频 fBm（λ≈300/108/37.5m）接入高程场，高度调制掩码（平原 0.25 / 山体 0.90）+ 鞍部保护带（走廊内 ≤0.15）；主脊域扭曲双分量峰值归一化 45m，蛇形清晰。
+- ✅ **不对称支脊**（TB-01-3，[06 号 §5.4.E](./06-terrain-templates.md#e-t1-不对称支脊骨架扩展未实施)）：1~2 条（第 2 条 40%），φ 45°~70°、长 120~180m、鞍部禁区 ≥1.5×saddle_width 线性映射避让、根部爬坡 30%L 消交汇 NO_WALK；`TERRAIN_GENERATOR_VERSION` 4 → 5（TB-01-6，旧档按门禁拒绝）；振幅/波长/支脊参数接入 SimConfig（TB-01-5，默认零漂移）。
+- ✅ **种子矩阵与视觉验收**（TB-01-7/8）：60 种子探针矩阵 components 恒 1、buildable ≥11730、硬禁行 2.81%~4.88%、支脊检出率 100%；Chrome 视口远景蛇形主脊、中景分形褶皱与岩壁、近景平原平整均通过。
 - ⏳ 视觉细分：`sample_elevation` 当前已为双线性高程插值，`sample_cell` 仍按格索引读取离散地表事实；插值不增加物理网格分辨率。若进一步改变采样方式，必须同时核对物理采样、路网曲线、POI 和房屋接地位置；每边分辨率翻倍约使格数增至四倍，须先测生成、查询、快照与绘制成本。
-- 属确定性内核改动：新增支脊按 06 号规格走独立盐值无状态 hash，不插入共享 RNG 抽样；随生成器版本升版并跑多种子、存读档、回溯与全图连通校验。
+- 确定性内核纪律（已按此落地）：噪声/扭曲只消费世界种子 + 固定盐值（无状态 hash），支脊抽样走 `relief_rng` 专属流固定消费序，不插入共享 RNG；生成器版本已随 TB-01 升至 5，多种子、存读档、回溯与全图连通校验均已通过。
 
 ### 7.3 TB-04 · D-B 子特征注入（难度：高）
 

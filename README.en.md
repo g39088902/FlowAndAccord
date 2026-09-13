@@ -11,7 +11,8 @@
 
 <div align="center">
 
-`v1.50.40` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.50.44` · `Rust core + WebAssembly` · `Open in your browser and play`
+
 
 </div>
 
@@ -157,10 +158,10 @@ Click any figure and the Inspector on the right tells you what he **wants most r
 node frontend/server.js
 ```
 
-Then open your browser (Chrome or Edge recommended) at `http://localhost:3000`. No complex bundling, no external dependencies to install.
+Then open your browser (Chrome or Edge recommended) at `http://localhost:3003`. No complex bundling, no external dependencies to install.
 
 > - On first entry or reset, a prompt will appear to create/connect a local save file; pick or create a `.json` file to start the world — data is permanently stored on your computer's disk;
-> - If port 3000 is already occupied, a server instance is already running in the background — just open the browser directly.
+> - If port 3003 is already occupied, a server instance is already running in the background — just open the browser directly.
 
 ### Controls
 

@@ -163,6 +163,364 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
     (mix64(seed ^ salt) % 10_000) as u16
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ TB-01-1/TB-01-2 多尺度噪声内核：确定性 2D 梯度噪声 + 3 倍频 fBm。
+//
+// 只依赖整数运算（`mix64`）与 IEEE-754 精确定义的四则/取整——无 sin/cos/exp、
+// 无 `DefaultHasher`、无系统时间、无 fast-math 收缩（Rust 保证浮点不融合），
+// x86_64 / ARM64 / wasm32 下同入参逐位一致。
+//
+// ★ TB-01-2 起由 `generate_with_profile` 消费：fBm 经「高度调制掩码 × 鞍部
+// 保护带」叠加进基础高程（严禁绕过掩码全图均匀加噪，根 AGENTS.md §4 坑 #3），
+// 主脊 `across` 经 SALT_RIDGE_WARP 低频 1D 噪声域扭曲成蛇形。
+// ─────────────────────────────────────────────────────────────────────────────
+mod terrain_noise {
+    /// 多尺度噪声固定盐值 "TERRNS01"（8 个 ASCII 字符打包 u64，风格同
+    /// `ACCENT_RNG_SALT`）。一经落地永不更改——改盐值等于换图（同种子不再复现旧世界）。
+    pub(crate) const SALT_TERRAIN_NOISE: u64 = 0x5445_5252_4E53_3031;
+
+    /// 主脊域扭曲固定盐值 "RIDGEWRP"。一经落地永不更改（改盐值等于换图）。
+    pub(crate) const SALT_RIDGE_WARP: u64 = 0x5249_4447_4557_5250;
+
+    /// fBm 基准振幅/基准波长（TB-01-5 起为配置的**归一化分母**）：
+    /// `generate_with_profile` 按 `配置振幅 / AMPLITUDE_M` 与
+    /// `SCALE_BASE_M / 配置波长` 换算增益/频率缩放，默认值 6.0/300.0 时两系数
+    /// 恒为 1.0（乘 1.0 逐位精确），输出与常数版完全一致、零漂移。
+    pub(crate) const AMPLITUDE_M: f32 = 6.0;
+    pub(crate) const SCALE_BASE_M: f32 = 300.0;
+    /// 各倍频相对基准的比例：λ → 300 / 108 / 37.5 m，A → 6.0 / 2.58 / 0.87 m，
+    /// 均落在 07 号 §7.2 TB-01-1 规格区间（λ 280~360 / 90~130 / 30~45，
+    /// A 6~8 / 2.5~3.5 / 0.8~1.2）。
+    const WAVELENGTH_RATIOS: [f32; 3] = [1.0, 0.36, 0.125];
+    const AMPLITUDE_RATIOS: [f32; 3] = [1.0, 0.43, 0.145];
+
+    /// 8 个离散单位梯度向量（(±1,0)/(0,±1)/(±√2/2,±√2/2)）。
+    /// 用编译期常数表替代运行时三角函数：cos/sin 跨平台不保证逐位一致，
+    /// 常数表由编译期精确固化且查表零开销；`FRAC_1_SQRT_2` 为精确舍入常数。
+    const GRADIENTS_8: [[f32; 2]; 8] = [
+        [1.0, 0.0],
+        [-1.0, 0.0],
+        [0.0, 1.0],
+        [0.0, -1.0],
+        [std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
+        [-std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
+        [std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
+        [-std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
+    ];
+
+    /// 梯度选择哈希：格网整数坐标 + 世界种子 + 特征盐值 → [0, 8) 梯度索引。
+    /// 负坐标经 `as u64` 符号扩展后参与混合，同样逐位确定。
+    #[inline]
+    fn hash_gradient2d(ix: i32, iy: i32, seed: u64, salt: u64) -> usize {
+        let mixed = super::mix64(
+            (ix as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ (iy as u64).wrapping_mul(0xC6A4_A793_5BD1_E995)
+                ^ seed
+                ^ salt,
+        );
+        (mixed & 7) as usize
+    }
+
+    /// 单倍频 2D 梯度噪声（Perlin 风格）。输出约 [-1, 1]；格网整点处恒为 0。
+    #[inline]
+    pub(crate) fn gradient_noise_2d(x: f32, y: f32, seed: u64, salt: u64) -> f32 {
+        let x0 = x.floor();
+        let y0 = y.floor();
+        let fx = x - x0;
+        let fy = y - y0;
+        // 五次 Hermite 平滑样条 6t^5-15t^4+10t^3：二阶导连续，杜绝格网十字接缝
+        //（后续四邻域差分坡度不会在格网边界出现锯齿突变）。
+        let sx = fx * fx * fx * (fx * (fx * 6.0 - 15.0) + 10.0);
+        let sy = fy * fy * fy * (fy * (fy * 6.0 - 15.0) + 10.0);
+        let ix = x0 as i32;
+        let iy = y0 as i32;
+        let corner = |cx: i32, cy: i32, dx: f32, dy: f32| -> f32 {
+            let g = GRADIENTS_8[hash_gradient2d(cx, cy, seed, salt)];
+            g[0] * dx + g[1] * dy
+        };
+        let n00 = corner(ix, iy, fx, fy);
+        let n10 = corner(ix + 1, iy, fx - 1.0, fy);
+        let n01 = corner(ix, iy + 1, fx, fy - 1.0);
+        let n11 = corner(ix + 1, iy + 1, fx - 1.0, fy - 1.0);
+        let a = n00 + (n10 - n00) * sx;
+        let b = n01 + (n11 - n01) * sx;
+        a + (b - a) * sy
+    }
+
+    /// 3 倍频分形布朗运动（fBm）：Octave 0 宏观次级丘陵（λ≈300m，A≈6m）+
+    /// Octave 1 中观坡面褶皱（λ≈108m，A≈2.6m）+ Octave 2 微观地表细部（λ≈37.5m，A≈0.87m）。
+    /// 输出为高程增量（米），纯函数无状态，不消费任何 `WorldRng` 流。
+    #[inline]
+    pub(crate) fn fbm_terrain_3octaves(x: f32, y: f32, seed: u64) -> f32 {
+        let mut sum = 0.0f32;
+        for i in 0..3 {
+            sum += gradient_noise_2d(
+                x / (SCALE_BASE_M * WAVELENGTH_RATIOS[i]),
+                y / (SCALE_BASE_M * WAVELENGTH_RATIOS[i]),
+                seed,
+                SALT_TERRAIN_NOISE,
+            ) * (AMPLITUDE_M * AMPLITUDE_RATIOS[i]);
+        }
+        sum
+    }
+}
+
+/// ★ TB-01-2 主脊域扭曲与噪声掩码物理常数（07 号 §7.2）。TB-01-5 未把它们
+/// 收敛为 `SimConfig` 项，故保持命名常数——改值等于换图，须随
+/// `TERRAIN_GENERATOR_VERSION` 递增（TB-01-6）。
+/// 主脊域扭曲——双分量蛇形（初版单分量 12m 实测脊线横移仅 ~2.5m，蛇形不可见，
+/// 按用户反馈加强）：主弯 λ≈420m 打出整幅 S 弯 + 次摆 λ≈170m 叠加自然摆动。
+/// 振幅仅决定两分量的**形状权重**；绝对幅度由 `ridge_warp_peak_scale` 峰值
+/// 归一化兜底——梯度噪声典型输出仅 ±0.3 且随种子波动大（实测同参数下
+/// 采样峰值 20m~48m 不等），直乘振幅无法保证每个种子都得到满量级蛇形。
+/// `across += env × warp_scale × (amp_main·n₁(along·f_main) + amp_sub·n₂(along·f_sub))`。
+const RIDGE_WARP_AMP_MAIN_M: f32 = 55.0;
+/// 主弯频率（1/米）：0.0024 ↔ 波长 ~420m，全图（764m）恰好呈现一个完整 S 蛇形。
+const RIDGE_WARP_FREQ_MAIN: f32 = 0.0024;
+/// 次级摆动幅度（米）：中频小摆让蛇形不那么「规整圆弧」。
+const RIDGE_WARP_AMP_SUB_M: f32 = 18.0;
+/// 次摆频率（1/米）：0.0059 ↔ 波长 ~170m。
+const RIDGE_WARP_FREQ_SUB: f32 = 0.0059;
+/// 峰值归一化目标：归一化后脊线横向偏移的采样峰值 ≈ 45m（> 0.7× 脊半宽 62m），
+/// 蛇形肉眼明确可辨；各种子间只差形状（相位/S 形走势），不差量级。
+const RIDGE_WARP_PEAK_TARGET_M: f32 = 45.0;
+/// 峰值预采样数：along ∈ ±0.62×world（主脊出图典型跨度）均匀 160 点（≈5.4m 步距）。
+const RIDGE_WARP_PEAK_SAMPLES: usize = 160;
+/// 扭曲包络参考跨度（× world_size）：包络 = 1−(along/跨度)²，主脊两端出图处收敛到 0。
+const RIDGE_WARP_SPAN_FACTOR: f32 = 0.75;
+/// 域扭曲 1D 采样固定切片 y（任意常数；两分量取不同切片行去相关，
+/// 同盐不同坐标即得独立噪声，无需第二盐值）。
+const RIDGE_WARP_SLICE_Y_MAIN: f32 = 137.0;
+const RIDGE_WARP_SLICE_Y_SUB: f32 = 911.0;
+/// 高度调制掩码权重下限（平原，规格 0.20~0.30 取中值）。
+const NOISE_WEIGHT_PLAIN: f32 = 0.25;
+/// 高度调制掩码权重上限（山体，规格 0.8~1.0 取中值偏上）。
+const NOISE_WEIGHT_MOUNTAIN: f32 = 0.90;
+/// 掩码权重过渡带的 h_norm 下沿/跨度：h_norm ≤ 0.30 全平原权重，≥ 0.70 全山体权重。
+const NOISE_WEIGHT_HNORM_LOW: f32 = 0.30;
+const NOISE_WEIGHT_HNORM_SPAN: f32 = 0.40;
+/// 鞍部山口保护带噪声衰减下限（规格：走廊内振幅 ≤ 0.15）。
+const SADDLE_NOISE_FLOOR: f32 = 0.15;
+/// 鞍部保护带外过渡带宽度（× saddle_width）：走廊外 0.5×saddle_width 内平滑恢复满权重。
+const SADDLE_NOISE_RAMP: f32 = 0.5;
+
+/// ★ TB-01-3 支脊几何常数（07 号 §7.2 / 06 号 §3.2）。TB-01-5 已把「总开关 /
+/// 振幅比中值 / 延伸长度」收敛为 `SimConfig`（`terrain_branch_ridge_*`），
+/// 本组余下常数保持命名常数——改值等于换图，须随 `TERRAIN_GENERATOR_VERSION`
+/// 递增（TB-01-6）。
+/// 第 2 条支脊出现概率（第 1 条 100% 出现）。
+const BRANCH_RIDGE_PROB_SECOND: f32 = 0.40;
+/// 支脊与主脊夹角范围（弧度）：规格 φ ≈ 45°~70°。
+const BRANCH_PHI_MIN_RAD: f32 = 45.0f32.to_radians();
+const BRANCH_PHI_MAX_RAD: f32 = 70.0f32.to_radians();
+/// 支脊延伸长度抖动（× `terrain_branch_ridge_length`）：默认 150m → 120~180m（规格区间）。
+const BRANCH_LEN_JITTER_MIN: f32 = 0.8;
+const BRANCH_LEN_JITTER_MAX: f32 = 1.2;
+/// 支脊横截面宽度（× 主脊宽度）取值范围；振幅 = `terrain_branch_ridge_amplitude_ratio`
+/// × [0.85, 1.15] 抖动 × 主脊振幅（默认 0.48 → 0.408~0.552，规格 0.40~0.55）。
+/// 幅宽比中值 0.48/0.675 → 支脊侧翼最大坡度 ≈ 0.858×0.48/0.675 ≈ 0.61（31°），
+/// 扣除噪声掩码后实测 18°~28°，符合「地形引导屏障但不过分陡峭」规格。
+const BRANCH_WIDTH_RATIO_MIN: f32 = 0.60;
+const BRANCH_WIDTH_RATIO_MAX: f32 = 0.75;
+const BRANCH_AMP_JITTER_MIN: f32 = 0.85;
+const BRANCH_AMP_JITTER_MAX: f32 = 1.15;
+/// 鞍部禁区系数：支脊锚点沿脊距离必须 ≥ 1.5 × saddle_width（规格硬约束），
+/// 杜绝支脊扎入山口走廊阻断全图唯一交通通道。
+const BRANCH_SADDLE_FORBID_FACTOR: f32 = 1.5;
+/// 支脊轴向衰减包络根部爬坡段（× L）：支脊在根部前 30% 长度内由 0 平滑升至
+/// 满包络。没有爬坡时支脊在 d∥=0 直接以满振幅叠在主脊侧翼上，交汇处梯度
+/// 超硬禁行线（实测根部四分带 72.8°），NO_WALK 斑块把主脊与支脊之间的楔形区
+/// 封口，全图通行连通分量碎成 2~4 块（验收要求恒为 1）。支脊自身最大梯度
+/// 0.858×A/W ≈ 33.9° 恰在 34° 线下，爬坡消去交汇叠加后支脊自身不再产 NO_WALK。
+const BRANCH_ROOT_RAMP: f32 = 0.3;
+/// 支脊根部的图内安全边距（米）：锚点沿脊范围收窄到「脊线仍在图内」的区段，
+/// 根部距图缘至少此边距；再配合支脊朝图心倾斜（lean = −sign(anchor)），
+/// 保证整条支脊（最长 180m + 高斯横截面）不出图——出图后高程采样被钳到
+/// 边缘格，支脊会退化成不可见的贴边直线（seed 2 实测踩坑）。
+const BRANCH_ROOT_MARGIN_M: f32 = 40.0;
+
+/// 单点原始扭曲位移（米，未归一化）：包络 × 双分量噪声和。
+#[inline]
+fn ridge_warp_raw(along: f32, world_size: f32, seed: u64) -> f32 {
+    let env_n = along / (RIDGE_WARP_SPAN_FACTOR * world_size);
+    let envelope = (1.0 - env_n * env_n).clamp(0.0, 1.0);
+    envelope
+        * (RIDGE_WARP_AMP_MAIN_M
+            * terrain_noise::gradient_noise_2d(
+                along * RIDGE_WARP_FREQ_MAIN,
+                RIDGE_WARP_SLICE_Y_MAIN,
+                seed,
+                terrain_noise::SALT_RIDGE_WARP,
+            )
+            + RIDGE_WARP_AMP_SUB_M
+                * terrain_noise::gradient_noise_2d(
+                    along * RIDGE_WARP_FREQ_SUB,
+                    RIDGE_WARP_SLICE_Y_SUB,
+                    seed,
+                    terrain_noise::SALT_RIDGE_WARP,
+                ))
+}
+
+/// 扭曲峰值归一化系数：预采样主脊出图跨度（±0.62×world）上的 |warp| 采样峰值，
+/// 返回 `target / peak`，使任何种子的脊线蛇形横移都达到 `RIDGE_WARP_PEAK_TARGET_M`
+/// 量级（形状仍由种子决定，只锁量级）。纯函数 + 固定采样点序，跨平台逐位确定；
+/// peak≈0 时回退 1.0（理论不可达，防御性兜底）。
+fn ridge_warp_peak_scale(world_size: f32, seed: u64) -> f32 {
+    let span = 0.62 * world_size;
+    let mut peak = 0.0f32;
+    for i in 0..RIDGE_WARP_PEAK_SAMPLES {
+        let a = -span + (i as f32 + 0.5) * (2.0 * span / RIDGE_WARP_PEAK_SAMPLES as f32);
+        peak = peak.max(ridge_warp_raw(a, world_size, seed).abs());
+    }
+    if peak > 1e-3 {
+        RIDGE_WARP_PEAK_TARGET_M / peak
+    } else {
+        1.0
+    }
+}
+
+/// ★ TB-01-3 单条支脊：从主脊侧翼向外延伸的直线高斯山脊。
+/// 根部钉在锚点处**扭曲后**的主脊线上（root 已扣除 `warp(anchor)` 横移），
+/// 轴线方向 = 主脊 along 轴按夹角 φ（45°~70°）偏向指定一侧。
+/// ★ TB-01-7 起公开并随 [`TerrainMap::branch_ridges`] 暴露给诊断探针
+/// （`terrain_probe.rs` 据此计算支脊侧翼坡度与支脊区绕行比）。
+#[derive(Debug, Clone)]
+pub struct BranchRidge {
+    /// 根部世界坐标（锚点在扭曲后主脊线上的落点）。
+    pub root_x: f32,
+    pub root_y: f32,
+    /// 支脊轴线单位方向（世界系）。
+    pub dir_x: f32,
+    pub dir_y: f32,
+    /// 延伸长度（米）/ 高斯横截面宽度（米）/ 振幅（米）。
+    pub length: f32,
+    pub width: f32,
+    pub amplitude: f32,
+}
+
+impl BranchRidge {
+    /// 支脊高程贡献：高斯横截面 × 沿轴线衰减包络 `(1 − d∥/L)²`（规格公式）
+    /// × 根部爬坡（前 `BRANCH_ROOT_RAMP`×L 由 0 平滑升至满幅），
+    /// 轴线段 `0 ≤ d∥ ≤ L` 之外恒为 0（根部融入主脊、末梢自然归零）。
+    #[inline]
+    fn elevation_at(&self, wx: f32, wy: f32) -> f32 {
+        let dx = wx - self.root_x;
+        let dy = wy - self.root_y;
+        let d_par = dx * self.dir_x + dy * self.dir_y;
+        if !(0.0..=self.length).contains(&d_par) {
+            return 0.0;
+        }
+        let d_perp = -dx * self.dir_y + dy * self.dir_x;
+        let t = d_par / self.length;
+        let u = (t / BRANCH_ROOT_RAMP).min(1.0);
+        let ramp = u * u * (3.0 - 2.0 * u);
+        self.amplitude
+            * (-(d_perp / self.width).powi(2)).exp()
+            * (1.0 - t)
+            * (1.0 - t)
+            * ramp
+    }
+}
+
+/// 支脊锚点允许范围的沿脊半宽：把「扭曲后脊线仍留在图内（边距
+/// `BRANCH_ROOT_MARGIN_M`）」的沿脊区段解析出来。脊线点 = a·u_along + c·u_across，
+/// 其中 |c| ≤ ridge_offset 振幅上界 + 扭曲峰值；对 x/y 两轴分别解
+/// |a·t + c·t⊥| ≤ half − margin（t ∈ {cosθ, sinθ}），取更紧的一条。
+fn branch_anchor_bound(world_size: f32, theta_cos: f32, theta_sin: f32) -> f32 {
+    let half = world_size / 2.0;
+    let c_bound = 0.08 * world_size + RIDGE_WARP_PEAK_TARGET_M;
+    let slack = (half - BRANCH_ROOT_MARGIN_M - c_bound).max(0.0);
+    let bx = slack / theta_cos.abs().max(1e-3);
+    let by = slack / theta_sin.abs().max(1e-3);
+    bx.min(by).clamp(0.0, half)
+}
+
+/// 鞍部禁区避让下的支脊锚点抽样：把 `gen_range(0,1)` 线性映射到
+/// `[−bound, saddle−1.5sw] ∪ [saddle+1.5sw, +bound]` 的允许集（禁区长度先扣再映射），
+/// 拒绝式重试会改变 RNG 消费次数，线性映射保持单次消费且分布均匀。
+fn sample_branch_anchor(
+    rng: &mut WorldRng,
+    a_bound: f32,
+    saddle_along: f32,
+    saddle_width: f32,
+) -> f32 {
+    let forbid = BRANCH_SADDLE_FORBID_FACTOR * saddle_width;
+    let left_end = (saddle_along - forbid).clamp(-a_bound, a_bound);
+    let right_start = (saddle_along + forbid).clamp(-a_bound, a_bound);
+    let left_len = left_end + a_bound;
+    let total = left_len + (a_bound - right_start);
+    if total <= 1.0 {
+        // 禁区吞没全轴（理论不可达：saddle_width ≤ 0.19×world），防御性兜底取远端。
+        return if saddle_along >= 0.0 { -a_bound } else { a_bound };
+    }
+    let p = rng.gen_range(0.0, 1.0) * total;
+    if p < left_len {
+        -a_bound + p
+    } else {
+        right_start + (p - left_len)
+    }
+}
+
+/// 支脊参数抽样（★ relief_rng 专属消费，顺序固定：侧向硬币 → 每条
+/// [存在性(仅第2条) → 锚点 → 夹角 → 长度 → 宽度 → 振幅]）。
+/// 第 1 条 100% 出现、第 2 条 40%；两条强制分居主脊相反两侧（不对称山势），
+/// 侧向由种子掷硬币决定第 1 条朝向，避免图图同构。
+/// 锚点限制在脊线图内区段（`branch_anchor_bound`），且支脊沿脊分量朝图心倾斜
+/// （lean = −sign(anchor)），两项共同保证最长支脊的末梢也不出图。
+/// ★ TB-01-5：长度/振幅改走配置——长度 = `branch_len_base` × [0.8, 1.2] 抖动、
+/// 振幅 = `amp_ratio` × [0.85, 1.15] 抖动 × 主脊振幅；RNG 消费次数与顺序不变。
+fn sample_branch_ridges(
+    rng: &mut WorldRng,
+    world_size: f32,
+    seed: u64,
+    theta_cos: f32,
+    theta_sin: f32,
+    ridge_offset: f32,
+    saddle_along: f32,
+    saddle_width: f32,
+    ridge_width: f32,
+    ridge_amplitude: f32,
+    warp_scale: f32,
+    branch_len_base: f32,
+    amp_ratio: f32,
+) -> Vec<BranchRidge> {
+    let a_bound = branch_anchor_bound(world_size, theta_cos, theta_sin);
+    let mut out = Vec::with_capacity(2);
+    let first_side = if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
+    for i in 0..2usize {
+        if i == 1 && !rng.gen_bool(BRANCH_RIDGE_PROB_SECOND) {
+            break;
+        }
+        let side = if i == 0 { first_side } else { -first_side };
+        let anchor = sample_branch_anchor(rng, a_bound, saddle_along, saddle_width);
+        let phi = rng.gen_range(BRANCH_PHI_MIN_RAD, BRANCH_PHI_MAX_RAD);
+        let length =
+            branch_len_base * rng.gen_range(BRANCH_LEN_JITTER_MIN, BRANCH_LEN_JITTER_MAX);
+        let width = rng.gen_range(BRANCH_WIDTH_RATIO_MIN, BRANCH_WIDTH_RATIO_MAX) * ridge_width;
+        let amplitude = amp_ratio
+            * rng.gen_range(BRANCH_AMP_JITTER_MIN, BRANCH_AMP_JITTER_MAX)
+            * ridge_amplitude;
+        // 根部钉在锚点处扭曲后的主脊线上：脊线点 = anchor·u_along + (offset − warp)·u_across。
+        let warp_anchor = ridge_warp_raw(anchor, world_size, seed) * warp_scale;
+        let root_x = anchor * theta_cos + (ridge_offset - warp_anchor) * (-theta_sin);
+        let root_y = anchor * theta_sin + (ridge_offset - warp_anchor) * theta_cos;
+        // 轴线方向 = lean·u_along·cosφ + side·u_across·sinφ（φ 为与主脊轴的锐夹角）；
+        // lean 朝图心倾斜（沿脊分量指向 |along| 减小方向），保证支脊整体留在图内。
+        let lean = if anchor >= 0.0 { -1.0 } else { 1.0 };
+        let (sin_phi, cos_phi) = phi.sin_cos();
+        out.push(BranchRidge {
+            root_x,
+            root_y,
+            dir_x: lean * theta_cos * cos_phi - side * theta_sin * sin_phi,
+            dir_y: lean * theta_sin * cos_phi + side * theta_cos * sin_phi,
+            length,
+            width,
+            amplitude,
+        });
+    }
+    out
+}
+
 /// 在某一类（结构型 / 视觉型）内按 `TerrainSubFeatureKind` **升序**逐个判定，
 /// **首个命中者即选定并立即停止**该类的后续判定（§5.3 互斥裁决）。
 ///
@@ -276,10 +634,17 @@ pub struct TerrainSubFeature {
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
 ///           同时移除 `generate_with_profile` 无配置的兼容入口，旧存档按版本门禁拒绝）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 4;
+/// v1.50.41（mac）/ v1.50.40（master）：4 -> 5（两条分支各自递增后于本合并汇合——
+///           mac：TB-01 多尺度 fBm 噪声与支脊系统；master：S7-02 新增 `grassland_plain_v1`
+///           低幅高程场/残丘/泉溪洼地分支。旧存档按版本门禁拒绝）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 5;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
+/// 阶段七插队模板：平地草原（06 号 §4.1 · STAGE-07-TODO S7-02）。
+/// 低幅起伏平原 + 孤立残丘 + 泉溪洼地；**无水面**（清泉 POI 仍由生态层布点，
+/// 洼地只落 `SpringValley` 特征语义与 SoftGround 凹圈）。
+pub const TERRAIN_PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 
 /// 纯确定性自然地形生成引擎。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -303,6 +668,11 @@ pub struct TerrainMap {
     /// `#[serde(default)]`：旧档缺字段时默认空数组，`SAVE_FORMAT_VERSION` 不递增。
     #[serde(default)]
     pub sub_features: Vec<TerrainSubFeature>,
+    /// ★ TB-01-7 诊断字段：本次生成实际抽样的支脊几何（≤2 条；仅山口 profile 且
+    /// `terrain_branch_ridge_enabled` 时非空）。仅供 `terrain_probe.rs` 等工具读取，
+    /// `#[serde(skip)]` 保证存档 JSON 字节不变（读档按种子重建时会重新填充）。
+    #[serde(skip)]
+    pub branch_ridges: Vec<BranchRidge>,
     pub hydrology: super::hydrology::Hydrology,
 }
 
@@ -331,6 +701,7 @@ impl TerrainMap {
             features: Vec::new(),
             accents: Vec::new(),
             sub_features: Vec::new(),
+            branch_ridges: Vec::new(),
             hydrology: Default::default(),
         }
     }
@@ -341,6 +712,13 @@ impl TerrainMap {
     /// `0.16~0.23 × world_size` 与 `24~34m`，最大梯度仅 6.7~13.4°，全图无格越过
     /// `terrain_max_walk_slope`，山口不产生任何通行约束）。详见
     /// `docs/plan/tech/06-terrain-templates.md` §9.3.1。
+    ///
+    /// ★ TB-01-2：原 2 组平滑正弦波谐波由「高度调制掩码 × 鞍部保护带」调制的
+    /// 3 倍频 fBm 取代（平原权重 0.25、山体 0.90、山口走廊 ≤0.15）；主脊
+    /// `across` 施加低频域扭曲（幅度 12m、λ 200m、两端包络收敛）。
+    /// 确定性：噪声/扭曲只消费世界种子 + 固定盐值（`terrain_noise` 模块），
+    /// 不占用任何 `WorldRng` 流；`relief_rng` 消费顺序 = T1-R 四连抽后追加
+    /// 支脊抽样（TB-01-3：侧向硬币 → 锚点/夹角/长度/宽度/振幅，第 2 条先掷 40% 存在性）。
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
@@ -360,14 +738,18 @@ impl TerrainMap {
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
         self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
-        self.tilt_magnitude = rng.gen_range(54.0, 66.0);
+        // ★ S7-02 草原：基础倾斜压到 16~24（坡度主体 2°~8°）。抽取数不变（1 次），
+        //   仅区间不同——T1/T2 路径的 rng 消费序列与取值逐位不变。
+        self.tilt_magnitude = if self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN {
+            rng.gen_range(16.0, 24.0)
+        } else {
+            rng.gen_range(54.0, 66.0)
+        };
         let tilt_cos = self.tilt_angle_rad.cos();
         let tilt_sin = self.tilt_angle_rad.sin();
-        let p1_x: f32 = rng.gen_range(0.0, 100.0);
-        let p1_y: f32 = rng.gen_range(0.0, 100.0);
-        let p2_x: f32 = rng.gen_range(0.0, 100.0);
-        let p2_y: f32 = rng.gen_range(0.0, 100.0);
         let theta = relief_rng.gen_range(-0.18, 0.18);
+        let theta_cos = theta.cos();
+        let theta_sin = theta.sin();
         let ridge_offset = relief_rng.gen_range(-0.08, 0.08) * self.world_size;
         // ★ T1-R：主脊宽度/幅度走配置（禁止散落字面量）。通行力约束：
         //   高斯主脊最大梯度 ≈ 0.858 × amplitude / width，必须显著大于
@@ -379,9 +761,95 @@ impl TerrainMap {
         // 鞍部若过窄会把山口本身夹成不可通行，故下限从 0.10 放宽到 0.14。
         let saddle_width = relief_rng.gen_range(0.14, 0.19) * self.world_size;
 
+        // ★ S7-02 平地草原辅助特征参数（只消费 relief_rng 局部流；T1/T2 不进入本块，
+        //   消费序列与逐位输出不受影响）。
+        //   残丘：高斯最大梯度 ≈ 0.858 × A/R，A/R ∈ [0.19, 0.31] → 峰值坡度
+        //   ≈ 9.3°~14.9°，叠加低幅基础波动后严格 < 18°（不产生通行障碍）。
+        let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
+        let grass_mounds: Vec<(f32, f32, f32, f32)> = if is_grassland {
+            let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 { 1 } else { 2 };
+            let mut placed: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(mound_count);
+            for i in 0..mound_count {
+                let mut ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+                let rad = relief_rng.gen_range(0.30, 0.42) * self.world_size;
+                let amp = relief_rng.gen_range(6.5, 9.5);
+                let mrad = amp / relief_rng.gen_range(0.19, 0.31);
+                // 两丘潜在重叠时把第二丘转到对侧（不额外消费 RNG，保持确定性）
+                if i > 0 {
+                    if let Some(&(px, py, _, pr)) = placed.first() {
+                        let (cx, cy) = (ang.cos() * rad, ang.sin() * rad);
+                        if (cx - px).hypot(cy - py) < pr + mrad {
+                            ang += std::f32::consts::PI;
+                        }
+                    }
+                }
+                placed.push((ang.cos() * rad, ang.sin() * rad, amp, mrad));
+            }
+            placed
+        } else {
+            Vec::new()
+        };
+        // 泉溪洼地锚点候选：2 处，锚在中心近域（图心=初始营地，泉眼是最近水源地理）；
+        // 落点会在 raw 填充后吸附到局部最低格（「在低洼处开辟微凹地」）。
+        let grass_depressions: Vec<(f32, f32, f32, f32)> = if is_grassland {
+            (0..2)
+                .map(|_| {
+                    let ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+                    let rad = relief_rng.gen_range(0.08, 0.28) * self.world_size;
+                    let depth = relief_rng.gen_range(1.4, 2.2);
+                    let drad = relief_rng.gen_range(24.0, 34.0);
+                    (ang.cos() * rad, ang.sin() * rad, depth, drad)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
+        // ★ S7-02 草原：基础谐波振幅削减 60%（×0.4）。×1.0 对 T1/T2 是 IEEE 位精确乘法。
+        let wave_scale = if is_grassland { 0.4f32 } else { 1.0f32 };
         let mut raw = vec![0.0f32; self.grid_width * self.grid_height];
+        // ★ TB-01-2：主脊域扭曲峰值归一化系数（仅山口 profile 消费；0 = 不扭曲）。
+        let warp_scale = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
+            ridge_warp_peak_scale(self.world_size, seed)
+        } else {
+            0.0
+        };
+        // ★ TB-01-3：不对称支脊 1~2 条（仅山口 profile；relief_rng 专属流抽样，
+        //   侧向硬币 + 鞍部禁区 ≥1.5×saddle_width 线性映射，见 sample_branch_ridges）。
+        //   ★ TB-01-5：总开关/长度/振幅比走配置；开关关闭时 relief_rng 消费序
+        //   在 saddle_width 后即止（同种子地形不同，但各自确定性不破坏）。
+        let branch_ridges = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS
+            && config.terrain_branch_ridge_enabled
+        {
+            sample_branch_ridges(
+                &mut relief_rng,
+                self.world_size,
+                seed,
+                theta_cos,
+                theta_sin,
+                ridge_offset,
+                saddle_along,
+                saddle_width,
+                ridge_width,
+                ridge_amplitude,
+                warp_scale,
+                // 防御性下限：SimConfig::default() 为零值兑底，避免零长度/零振幅支脊。
+                config.terrain_branch_ridge_length.max(1.0),
+                config.terrain_branch_ridge_amplitude_ratio.max(0.1),
+            )
+        } else {
+            Vec::new()
+        };
+        // ★ TB-01-7：支脊几何暴露给诊断探针（serde(skip)，不影响存档）。
+        self.branch_ridges = branch_ridges.clone();
+        // ★ TB-01-5：fBm 振幅/波长走配置。输出对两者均线性——坐标按
+        //   SCALE_BASE_M/配置波长 预缩放（各倍频波长同比例缩放），输出按
+        //   配置振幅/AMPLITUDE_M 增益；默认 300.0/6.0 时两系数恒为 1.0
+        //   （×1.0 逐位精确），与常数版输出零漂移。
+        let noise_freq_k = terrain_noise::SCALE_BASE_M / config.terrain_noise_scale_base.max(1.0);
+        let noise_amp_k = config.terrain_noise_amplitude.max(0.0) / terrain_noise::AMPLITUDE_M;
 
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
@@ -397,22 +865,152 @@ impl TerrainMap {
                 };
                 let proj = (wx * tilt_cos + wy * tilt_sin) / half_size.max(1.0);
                 let base_tilt = proj * (self.tilt_magnitude * 0.5);
-                let wave_large = ((wx * 0.006 + p1_x).sin() * (wy * 0.006 + p1_y).cos()) * 5.0;
-                let wave_medium = ((wx * 0.014 + p2_x).cos() + (wy * 0.014 + p2_y).sin()) * 2.5;
-                let mut elev = base_tilt + wave_large + wave_medium;
+                // ★ TB-01-2：正弦波谐波（wave_large/wave_medium）由经掩码调制的
+                // 3 倍频 fBm 取代（见循环尾部），基础高程只剩整体倾斜。
+                let mut elev = base_tilt;
+                let mut saddle_noise_damp = 1.0f32;
 
                 if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
                     // v1.47.7：删除平顶高台（台地压平）。只保留主脊与山口鞍部的连续起伏地貌。
-                    let along = wx * theta.cos() + wy * theta.sin();
-                    let across = -wx * theta.sin() + wy * theta.cos() - ridge_offset;
+                    // ★ TB-01-2 主脊域扭曲：沿脊轴的低频 1D 噪声横向推动 across，
+                    //   使笔直主脊呈明显蛇形（双分量：主弯 S 形 + 次级摆动）；
+                    //   包络 (1−(along/0.75·world)²) 让主脊两端（出图处）扭曲
+                    //   自然收敛，杜绝脊线斜刺出界。
+                    let along = wx * theta_cos + wy * theta_sin;
+                    let warp = ridge_warp_raw(along, self.world_size, seed) * warp_scale;
+                    let across = -wx * theta_sin + wy * theta_cos - ridge_offset + warp;
                     let ridge = ridge_amplitude * (-(across / ridge_width.max(1.0)).powi(2)).exp();
                     let saddle = (-((along - saddle_along) / saddle_width.max(1.0)).powi(2)).exp();
-                    elev = elev + ridge - ridge * 0.90 * saddle;
+                    elev += ridge - ridge * 0.90 * saddle;
+                    // ★ TB-01-2 鞍部山口保护带：走廊内（|Δalong| ≤ saddle_width）噪声
+                    //   振幅压到 15%，走廊外 0.5×saddle_width 内平滑恢复满权重，
+                    //   保证全图唯一交通通道平缓无坑洼。
+                    let d_corr = ((along - saddle_along).abs() - saddle_width)
+                        / (SADDLE_NOISE_RAMP * saddle_width);
+                    let t = d_corr.clamp(0.0, 1.0);
+                    saddle_noise_damp =
+                        SADDLE_NOISE_FLOOR + (1.0 - SADDLE_NOISE_FLOOR) * (t * t * (3.0 - 2.0 * t));
+                    // ★ TB-01-3 支脊叠加：高斯横截面 × (1−d∥/L)² 轴向衰减包络，
+                    //   锚点距鞍部 ≥ 1.5×saddle_width，山口走廊不受支脊坡度侵扰。
+                    for br in &branch_ridges {
+                        elev += br.elevation_at(wx, wy);
+                    }
                 }
+
+                // ★ S7-02 孤立残丘：高斯缓丘叠加（1~2 处，中心外围；远景地标 + 高肥力坡脚）
+                for &(mx, my, amp, mrad) in &grass_mounds {
+                    let dx = wx - mx;
+                    let dy = wy - my;
+                    elev += amp * (-(dx * dx + dy * dy) / (mrad * mrad)).exp();
+                }
+                // ★ TB-01-2 高度调制掩码：h_norm ≥ 0.70（山体）权重升至满格、
+                //   ≤ 0.30（平原生活区）衰减到 0.25——高频噪声在低平地带近乎静默，
+                //   严禁全图均匀加噪（根 AGENTS.md §4 坑 #3：平原 ±2m 噪声即产生
+                //   大面积 NO_BUILD 红格）。
+                let h_norm = ((elev + 45.0) / 100.0).clamp(0.0, 1.0);
+                let w_t = ((h_norm - NOISE_WEIGHT_HNORM_LOW) / NOISE_WEIGHT_HNORM_SPAN).clamp(0.0, 1.0);
+                let weight = NOISE_WEIGHT_PLAIN
+                    + (NOISE_WEIGHT_MOUNTAIN - NOISE_WEIGHT_PLAIN)
+                        * (w_t * w_t * w_t * (w_t * (w_t * 6.0 - 15.0) + 10.0));
+                elev += terrain_noise::fbm_terrain_3octaves(wx * noise_freq_k, wy * noise_freq_k, seed)
+                    * noise_amp_k
+                    * weight
+                    * saddle_noise_damp;
                 raw[gy * self.grid_width + gx] = elev;
             }
         }
 
+        // ★ S7-02 泉溪洼地：候选锚点吸附到局部最低格（「在低洼处开辟微凹地」），
+        //   高斯微凹盆直接雕入 raw（在坡度派生之前）；凹圈带（0.7R~1.5R）标记
+        //   SoftGround，盆心保持 DryGround。无水体、无水面。
+        let mut soft_ring = if grass_depressions.is_empty() {
+            Vec::new()
+        } else {
+            vec![false; self.grid_width * self.grid_height]
+        };
+        let mut springs: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
+        if !grass_depressions.is_empty() {
+            let gw = self.world_size / (self.grid_width.max(2) - 1) as f32;
+            let to_grid = |v: f32, n: usize| {
+                ((v / self.world_size + 0.5) * (n - 1) as f32)
+                    .round()
+                    .clamp(10.0, (n - 11) as f32) as usize
+            };
+            for (di, &(cwx, cwy, depth, drad)) in grass_depressions.iter().enumerate() {
+                let (cgx, cgy) = (to_grid(cwx, self.grid_width), to_grid(cwy, self.grid_height));
+                let mut best = (cgx, cgy);
+                let mut best_e = f32::MAX;
+                for wy in cgy.saturating_sub(8)..=(cgy + 8).min(self.grid_height - 1) {
+                    for wx in cgx.saturating_sub(8)..=(cgx + 8).min(self.grid_width - 1) {
+                        let e = raw[wy * self.grid_width + wx];
+                        if e < best_e {
+                            best_e = e;
+                            best = (wx, wy);
+                        }
+                    }
+                }
+                let (mut sx, mut sy) = best;
+                let mut swx = (sx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                let mut swy = (sy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                // 与已接受洼地过近时沿连线外推到 0.22×world_size（确定性修正，不消费 RNG）
+                if di > 0 {
+                    if let Some(&(pgx, pgy, _, _, _, _)) = springs.first() {
+                        let pwx = (pgx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let pwy = (pgy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let min_dist = 0.22 * self.world_size;
+                        let d = (swx - pwx).hypot(swy - pwy);
+                        if d < min_dist && d > 1e-3 {
+                            let k = min_dist / d;
+                            swx = pwx + (swx - pwx) * k;
+                            swy = pwy + (swy - pwy) * k;
+                            sx = to_grid(swx, self.grid_width);
+                            sy = to_grid(swy, self.grid_height);
+                        }
+                    }
+                }
+                // 水源锚定半径（§1.4 草原 water≤160m）：吸附点偏向图缘的种子沿径向
+                // 收拢盆心到 0.20×world_size ≈153m 界内（确定性修正，不消费 RNG）。
+                let max_anchor_r = 0.20 * self.world_size;
+                let anchor_r = swx.hypot(swy);
+                if anchor_r > max_anchor_r {
+                    let k = max_anchor_r / anchor_r;
+                    swx *= k;
+                    swy *= k;
+                    sx = to_grid(swx, self.grid_width);
+                    sy = to_grid(swy, self.grid_height);
+                }
+                let reach = (drad * 1.8 / gw).ceil() as i32;
+                for dy in -reach..=reach {
+                    for dx in -reach..=reach {
+                        let gx = sx as i32 + dx;
+                        let gy = sy as i32 + dy;
+                        if gx < 0 || gy < 0 || gx >= self.grid_width as i32 || gy >= self.grid_height as i32 {
+                            continue;
+                        }
+                        let cell_wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let cell_wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let ddx = cell_wx - swx;
+                        let ddy = cell_wy - swy;
+                        let d2 = ddx * ddx + ddy * ddy;
+                        let idx = gy as usize * self.grid_width + gx as usize;
+                        raw[idx] -= depth * (-(d2) / (drad * drad)).exp();
+                        let d = d2.sqrt();
+                        if d >= drad * 0.7 && d <= drad * 1.5 {
+                            soft_ring[idx] = true;
+                        }
+                    }
+                }
+                springs.push((sx, sy, swx, swy, depth, drad));
+            }
+        }
+
+        // ★ TB-01-4 坡度重算与地表属性映射（14号文 §9.2 步骤 2~5）：在复合高程场
+        //   （倾斜 + fBm + 主脊/支脊/残丘/泉溪洼地）上统一重算——4 邻域中心差分，
+        //   图边界自动退化为单侧差分（`saturating_sub` / `min` 钳位，杜绝贴边通行
+        //   误判）；阈值即物理契约：≥34° RockFace+NO_WALK、20~34° SoftGround、
+        //   <20° DryGround、≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 /
+        //   terrainMaxBuildSlope=16 之上再留工程余量）。新支脊/噪声接入高程场后
+        //   无需改动本段，自然生效。
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
                 let idx = gy * self.grid_width + gx;
@@ -424,8 +1022,17 @@ impl TerrainMap {
                 let dy = if self.grid_height <= 1 { 0.0 } else { (down - up) / (((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)) as f32 * cell_step_y.max(0.001)) };
                 let slope = (dx * dx + dy * dy).sqrt().atan().to_degrees();
                 let normalized_height = ((raw[idx] + 45.0) / 100.0).clamp(0.0, 1.0);
-                let fertility = (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0);
-                let surface_kind = if slope >= 34.0 { SurfaceKind::RockFace } else if slope >= 20.0 { SurfaceKind::SoftGround } else { SurfaceKind::DryGround };
+                // ★ S7-02 草甸沃土：肥力基线抬高（可建格均值 0.85~0.95）；T1/T2 公式不变。
+                let fertility = if is_grassland {
+                    (0.97 - slope / 70.0 * 0.5 - normalized_height * 0.10).clamp(0.1, 1.0)
+                } else {
+                    (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0)
+                };
+                // ★ S7-02 泉溪洼地凹圈：低坡软地带优先于坡度派生（草原全域坡度 < 18°，
+                //   不会与 RockFace 冲突）；软地只慢行不禁建（06 号 §4.1）。
+                let surface_kind = if !soft_ring.is_empty() && soft_ring[idx] {
+                    SurfaceKind::SoftGround
+                } else if slope >= 34.0 { SurfaceKind::RockFace } else if slope >= 20.0 { SurfaceKind::SoftGround } else { SurfaceKind::DryGround };
                 let mut flags = 0u16;
                 if slope >= 18.0 { flags |= TERRAIN_FLAG_NO_BUILD; }
                 if surface_kind.is_hard_blocked() { flags |= TERRAIN_FLAG_NO_WALK; }
@@ -437,6 +1044,65 @@ impl TerrainMap {
                     water_body_id: None,
                     feature_flags: flags,
                 };
+            }
+        }
+
+        // ★ S7-02 安置泉眼特征：每处洼地一条 `SpringValley`（三顶点自坡缘汇入盆心，
+        //   语义与 T2 泉谷一致；无水体、无水面，清泉 POI 仍由生态层布点）。
+        for (i, &(sx, sy, swx, swy, depth, drad)) in springs.iter().enumerate() {
+            let level = raw[sy * self.grid_width + sx];
+            self.features.push(TerrainFeature {
+                id: 30 + i as u32,
+                kind: TerrainFeatureKind::SpringValley,
+                vertices: vec![
+                    Vec3::new(swx - drad, swy + drad * 0.55, level + depth * 0.85),
+                    Vec3::new(swx - drad * 0.35, swy + drad * 0.18, level + depth * 0.35),
+                    Vec3::new(swx, swy, level),
+                ],
+                elevation: level,
+                width: 4.0,
+                flags: 0,
+            });
+        }
+    }
+
+    /// T2 `river_valley_v1` 陆地区域基础生成（★ STAGE2-2 公式解耦，06 号 §5.3 兼容性拆分）。
+    ///
+    /// 旧实现中「河阶外低丘」公式内联在 `hydrology.rs::generate_river` 的全图覆写里，
+    /// 水系阶段把前置地貌全部冲刷，统一地表派生无法局部生效。现将该公式**逐字**提取为
+    /// 本函数：铺满全图写陆地基底——高程用旧 else 分支原式（`u` 夹取、山脊项、浮点次序
+    /// 不改），地表 `DryGround`、肥力 `0.75`、flags `0`、无水体归属；随后
+    /// `hydrology.rs::generate_river` 只覆盖水系影响带。拆分前后最终网格逐比特等价：
+    /// 带内河阶格的山脊项恒为 +0.0，本函数写出的高程即旧实现的最终值。
+    ///
+    /// 流水线定位：06 号 §5.3 第 2 步 `generate_base_relief` 的 river_valley 分支前身
+    ///（阶段化管线重构属 STAGE2-3）。
+    pub fn generate_river_valley_base_relief(
+        &mut self,
+        geom: &super::hydrology::RiverGeometry,
+        config: &SimConfig,
+    ) {
+        let size = self.world_size;
+        let level = geom.level;
+        let bank = geom.bank;
+        let terrace = geom.terrace;
+        for gy in 0..self.grid_height {
+            for gx in 0..self.grid_width {
+                let p = self.grid_pos(gx, gy);
+                let d = (p.x - geom.center(p.y, size)).abs();
+                let w = geom.half_width(p.y, size);
+                let outside = (d - w).max(0.0);
+                let c = &mut self.cells[gy * self.grid_width + gx];
+                // 旧 T2 河阶外低丘公式（原 else 分支逐字保留）
+                let u = ((outside - bank) / terrace).clamp(0.0, 1.0);
+                c.elevation = level + 2.0 + u * 2.0
+                    + ((outside - bank - terrace).max(0.0) / size
+                        * config.terrain_ridge_amplitude.max(1.0))
+                        * (0.8 + 0.2 * (p.y / 90.0).sin());
+                c.surface_kind = SurfaceKind::DryGround;
+                c.water_body_id = None;
+                c.feature_flags = 0;
+                c.natural_fertility = 0.75;
             }
         }
     }

@@ -201,6 +201,21 @@ pub struct SimConfig {
     pub terrain_pass_ridge_width: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊幅度 (m)。
     pub terrain_pass_ridge_amplitude: f32,
+    /// ★ TB-01-5：多尺度 fBm 噪声基础振幅 (m)。Octave 0（宏观次级丘陵）基准；
+    /// Octave 1/2 按固定比例 0.43/0.145 跟随。默认 6.0。
+    pub terrain_noise_amplitude: f32,
+    /// ★ TB-01-5：fBm 宏观基础波长 (m)。Octave 0 基准；Octave 1/2 按固定比例
+    /// 0.36/0.125 跟随（默认 300 → λ 300/108/37.5m）。默认 300.0。
+    pub terrain_noise_scale_base: f32,
+    /// ★ TB-01-5：支脊生成总开关（T1 山口 profile）。false = 不生成支脊，
+    /// `relief_rng` 消费序在鞍部宽度后即止（确定性不破坏，仅同种子地形不同）。
+    pub terrain_branch_ridge_enabled: bool,
+    /// ★ TB-01-5：支脊与主脊的振幅比中值。每条支脊实际取
+    /// 本值 × [0.85, 1.15] 均匀抖动（默认 0.48 → 0.408~0.552，规格 0.40~0.55）。
+    pub terrain_branch_ridge_amplitude_ratio: f32,
+    /// ★ TB-01-5：支脊基础延伸长度 (m)。每条支脊实际取
+    /// 本值 × [0.8, 1.2] 均匀抖动（默认 150 → 120~180，规格区间）。
+    pub terrain_branch_ridge_length: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,
     pub terrain_river_water_level: f32,
@@ -220,6 +235,12 @@ pub struct SimConfig {
     /// 唯一消费点 = `geo/hydrology.rs::generate_with_config` 的 §5.3 第 4–5、9 步空钩子门控；
     /// 阶段一钩子为空操作（开关两态下世界输出逐字节等价），选择器实现属 D-B1-3、完整阶段化流水线属阶段二。
     pub terrain_accent_sub_features: bool,
+    /// ★ STAGE2-1（06号 R.5 / §5.8 / §18.2）：创世有界重试上限。
+    /// 语义 = 初始创世失败（静态几何校验/生存诊断）时，阶梯降级重试的最大次数
+    /// （0 = 只尝试一次；默认 3，唯一真相源 = 前端 config.js）。唯一消费点 =
+    /// `spatial/world.rs::new_seeded_with_config` 建世界入口的无界大值钳制（防重试环失控）；
+    /// 完整阶梯降级重试环（禁子特征 → 无子特征 → flat_baseline）属 STAGE2-5。
+    pub terrain_generation_max_retries: u32,
 
 // 8. 四季更迭与宏观气候
     pub season_year_length: f32,
