@@ -1,0 +1,3322 @@
+[
+ {
+  "seed": 0,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 7.303672790527344,
+    "y": -162.35000610351562
+   },
+   "shore": 37,
+   "bank": 37,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 258.5177307128906,
+    "y": 241.44863891601562
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 641,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 1,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -210.932373046875,
+    "y": 144.34280395507812
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 293.8016052246094,
+    "y": 202.66574096679688
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 2,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 37.74702072143555,
+    "y": -162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 18
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 152.94281005859375,
+    "y": 212.24111938476562
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 673,
+  "waterCells": 644,
+  "bankCells": 673,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 3,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -150.8739471435547,
+    "y": 67.41178131103516
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -32.7857666015625,
+    "y": 296.3850402832031
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 4,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -87.38743591308594,
+    "y": -162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 15
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -123.34944152832031,
+    "y": 190.00460815429688
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 644,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 5,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 104.76351928710938,
+    "y": -290.1512451171875
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": -189.3949432373047,
+    "y": -9.63025188446045
+   },
+   "forest": 67
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 6,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -45.56789016723633,
+    "y": 162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 19
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 35.310943603515625,
+    "y": 202.2353057861328
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 664,
+  "waterCells": 646,
+  "bankCells": 664,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 7,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 91.82040405273438,
+    "y": 245.89572143554688
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -247.17648315429688,
+    "y": 150.87396240234375
+   },
+   "forest": 50
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 8,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -10.12137222290039,
+    "y": 162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 15
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 41.73111343383789,
+    "y": 41.73111343383789
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 678,
+  "waterCells": 645,
+  "bankCells": 678,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 9,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -274.786376953125,
+    "y": 131.81753540039062
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -57.433624267578125,
+    "y": 60.52484130859375
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 10,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -10.854373931884766,
+    "y": 162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 18.817962646484375,
+    "y": 209.16439819335938
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 682,
+  "waterCells": 644,
+  "bankCells": 682,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 11,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -240.67288208007812,
+    "y": -243.5383758544922
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": 99.51261901855469,
+    "y": 35.310943603515625
+   },
+   "forest": 58
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 12,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -7.459865570068359,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -173.25022888183594,
+    "y": -234.63165283203125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 677,
+  "waterCells": 646,
+  "bankCells": 677,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 13,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -247.17648315429688,
+    "y": 35.310943603515625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -259.9775695800781,
+    "y": 163.41293334960938
+   },
+   "forest": 17
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 14,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 18.422517776489258,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -127.93055725097656,
+    "y": 158.98843383789062
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 678,
+  "waterCells": 647,
+  "bankCells": 678,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 15,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 168.8663330078125,
+    "y": -302.7113037109375
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 126.59375,
+    "y": -41.810333251953125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 16,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 39.52116394042969,
+    "y": -162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 18
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 274.6761169433594,
+    "y": -114.28648376464844
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 672,
+  "waterCells": 644,
+  "bankCells": 672,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 17,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -289.96795654296875,
+    "y": 239.50534057617188
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 171.77581787109375,
+    "y": -215.9868927001953
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 18,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 13,
+    "type": "WaterSource",
+    "x": 50.082061767578125,
+    "y": 0
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 17
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -125.18928527832031,
+    "y": 290.7726745605469
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 677,
+  "waterCells": 646,
+  "bankCells": 677,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 19,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 17.810302734375,
+    "y": 100.48248291015625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -270.4908447265625,
+    "y": -77.50599670410156
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 20,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 6.826057434082031,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 106.96768188476562,
+    "y": 1.5145263671875
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 678,
+  "waterCells": 642,
+  "bankCells": 678,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 21,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 291.8099060058594,
+    "y": 151.78192138671875
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 183.07803344726562,
+    "y": 302.3665466308594
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 22,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -6.576698303222656,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 211.70272827148438,
+    "y": 297.3646545410156
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 638,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 23,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -174.8150177001953,
+    "y": -200.5332794189453
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -289.2950134277344,
+    "y": 125.64947509765625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 24,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 7.686008453369141,
+    "y": -162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -265.568603515625,
+    "y": -234.350830078125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 679,
+  "waterCells": 640,
+  "bankCells": 679,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 25,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 179.6788330078125,
+    "y": -76.33847045898438
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 154.317626953125,
+    "y": -231.00877380371094
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 26,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 8.118606567382812,
+    "y": -162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 46.98577880859375,
+    "y": 202.80792236328125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 674,
+  "waterCells": 641,
+  "bankCells": 674,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 27,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -198.66651916503906,
+    "y": -222.707275390625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -50.27061462402344,
+    "y": -234.24075317382812
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 28,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 13,
+    "type": "WaterSource",
+    "x": 43.04265594482422,
+    "y": 0
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -123.33949279785156,
+    "y": -231.72146606445312
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 642,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 29,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 124.43084716796875,
+    "y": -80.38664245605469
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -136.5946807861328,
+    "y": 295.0744934082031
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 30,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -89.13733673095703,
+    "y": -162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 15
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 184.020751953125,
+    "y": -282.8080139160156
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 643,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 31,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 107.53915405273438,
+    "y": -142.51797485351562
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -265.5136413574219,
+    "y": 0.12188720703125
+   },
+   "forest": 50
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 32,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 6.862518310546875,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -79.20787048339844,
+    "y": 42.78125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 676,
+  "waterCells": 640,
+  "bankCells": 676,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 33,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -198.22518920898438,
+    "y": -12.1103515625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": 182.9748077392578,
+    "y": -16.050418853759766
+   },
+   "forest": 67
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 34,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 26.12749671936035,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 18
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 166.58172607421875,
+    "y": -239.72076416015625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 684,
+  "waterCells": 638,
+  "bankCells": 684,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 35,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 300.0372619628906,
+    "y": 298.9708557128906
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 237.46542358398438,
+    "y": 55.46258544921875
+   },
+   "forest": 34
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 36,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.4405288696289,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -119.25041198730469,
+    "y": -196.7644500732422
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 682,
+  "waterCells": 641,
+  "bankCells": 682,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 37,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 170.41134643554688,
+    "y": -239.27218627929688
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -102.91120910644531,
+    "y": 280.4357604980469
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 38,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 12,
+    "type": "WaterSource",
+    "x": -24.138206481933594,
+    "y": 0
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -289.72747802734375,
+    "y": 221.00778198242188
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 682,
+  "waterCells": 637,
+  "bankCells": 682,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 39,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 135.539794921875,
+    "y": 233.59359741210938
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 15.79693603515625,
+    "y": 280.1662902832031
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 40,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 24.463932037353516,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -176.8581085205078,
+    "y": 208.27169799804688
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 641,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 41,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -163.7142791748047,
+    "y": -80.2520980834961
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -163.7142791748047,
+    "y": 73.83195495605469
+   },
+   "forest": 55
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 42,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -6.782386779785156,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -3.2100839614868164,
+    "y": 28.890777587890625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 640,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 43,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 36.196258544921875,
+    "y": -246.1918182373047
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -141.97537231445312,
+    "y": 26.312774658203125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 44,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 32.099159240722656,
+    "y": -162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 18
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -286.7436218261719,
+    "y": 147.495849609375
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 678,
+  "waterCells": 640,
+  "bankCells": 678,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 45,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 96.77838134765625,
+    "y": -100.277587890625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -26.789581298828125,
+    "y": -77.71688842773438
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 46,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -6.827281951904297,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -102.92840576171875,
+    "y": 59.795684814453125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 679,
+  "waterCells": 641,
+  "bankCells": 679,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 47,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 225.46664428710938,
+    "y": 190.51205444335938
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -205.05322265625,
+    "y": 255.51315307617188
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 48,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -6.600151062011719,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -72.78236389160156,
+    "y": 148.83737182617188
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 639,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 49,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -227.9159698486328,
+    "y": -3.2100839614868164
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 85.03631591796875,
+    "y": -33.2705078125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 50,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -89.98631286621094,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 304.5409240722656,
+    "y": -141.04763793945312
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 682,
+  "waterCells": 643,
+  "bankCells": 682,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 51,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -40.875396728515625,
+    "y": -295.6626892089844
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": 157.29412841796875,
+    "y": -3.2100839614868164
+   },
+   "forest": 22
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 52,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 13,
+    "type": "WaterSource",
+    "x": 17.980541229248047,
+    "y": 0
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 17
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 162.41375732421875,
+    "y": 272.3084411621094
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 669,
+  "waterCells": 646,
+  "bankCells": 669,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 53,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -197.2813262939453,
+    "y": -280.70562744140625
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -293.414306640625,
+    "y": -160.1432647705078
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 54,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -80.42738342285156,
+    "y": -162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 13
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -21.56390380859375,
+    "y": 36.171783447265625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 643,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 55,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -86.70388793945312,
+    "y": 9.836212158203125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -266.26153564453125,
+    "y": 140.51705932617188
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 56,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 6.908836364746094,
+    "y": -162.35000610351562
+   },
+   "shore": 37,
+   "bank": 37,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -28.89075469970703,
+    "y": 41.73111343383789
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 644,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 57,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -241.850341796875,
+    "y": -232.06634521484375
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": -131.42091369628906,
+    "y": 118.994384765625
+   },
+   "forest": 4
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 58,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.46707153320312,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 292.2911071777344,
+    "y": -2.379913330078125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 679,
+  "waterCells": 643,
+  "bankCells": 679,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 59,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -68.21734619140625,
+    "y": -248.3298797607422
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -267.32464599609375,
+    "y": 19.324371337890625
+   },
+   "forest": 38
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 60,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 15.497013092041016,
+    "y": -162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 17
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -84.63719177246094,
+    "y": 159.72384643554688
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 680,
+  "waterCells": 642,
+  "bankCells": 680,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 61,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -194.3509063720703,
+    "y": -264.7472839355469
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": 87.3603515625,
+    "y": -13.630126953125
+   },
+   "forest": 7
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 62,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 13,
+    "type": "WaterSource",
+    "x": 56.19890213012695,
+    "y": 0
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 17
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -19.670166015625,
+    "y": 41.888824462890625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 644,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 63,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -177.6956787109375,
+    "y": 138.79669189453125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -290.18255615234375,
+    "y": 12.685516357421875
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 64,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -45.520023345947266,
+    "y": 162.35000610351562
+   },
+   "shore": 35,
+   "bank": 35,
+   "wat": 19
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 261.5884094238281,
+    "y": -128.55975341796875
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 661,
+  "waterCells": 648,
+  "bankCells": 661,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 65,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -43.910919189453125,
+    "y": 191.39990234375
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": 170.13446044921875,
+    "y": 80.25212097167969
+   },
+   "forest": 57
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 66,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -9.483955383300781,
+    "y": 162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 15
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 236.71353149414062,
+    "y": -66.12139892578125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 679,
+  "waterCells": 644,
+  "bankCells": 679,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 67,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 47.299072265625,
+    "y": -277.86566162109375
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": 131.22787475585938,
+    "y": -5.907073974609375
+   },
+   "forest": 25
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 68,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 11,
+    "type": "WaterSource",
+    "x": 8.128471374511719,
+    "y": -162.35000610351562
+   },
+   "shore": 34,
+   "bank": 34,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -245.5770263671875,
+    "y": 46.423309326171875
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 674,
+  "waterCells": 641,
+  "bankCells": 674,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 69,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -125.85745239257812,
+    "y": -289.4737548828125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 291.3400573730469,
+    "y": 159.45419311523438
+   },
+   "forest": 9
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 70,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 14,
+    "type": "WaterSource",
+    "x": -7.153347015380859,
+    "y": 162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 16
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 0.2923583984375,
+    "y": 111.99209594726562
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 681,
+  "waterCells": 644,
+  "bankCells": 681,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 71,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -97.13951110839844,
+    "y": 11.748565673828125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 80.41806030273438,
+    "y": -44.455108642578125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 72,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.52969360351562,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -243.8603057861328,
+    "y": 51.411346435546875
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 675,
+  "waterCells": 644,
+  "bankCells": 675,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 73,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 47.290802001953125,
+    "y": -187.38009643554688
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 32,
+    "type": "WoodForest",
+    "x": 266.4369812011719,
+    "y": -48.1512565612793
+   },
+   "forest": 42
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 74,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.38175964355469,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -41.7310905456543,
+    "y": 28.890777587890625
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 678,
+  "waterCells": 642,
+  "bankCells": 678,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 75,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 16.231353759765625,
+    "y": 11.652130126953125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 31,
+    "type": "WoodForest",
+    "x": -240.07009887695312,
+    "y": -141.7428436279297
+   },
+   "forest": 44
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 76,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.18183135986328,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 294.6227722167969,
+    "y": -288.4124755859375
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 679,
+  "waterCells": 641,
+  "bankCells": 679,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 77,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 48.15127944946289,
+    "y": -93.0924301147461
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -122.41839599609375,
+    "y": 9.408203125
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 78,
+  "profile": "river_valley_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": -90.39593505859375,
+    "y": -162.35000610351562
+   },
+   "shore": 36,
+   "bank": 36,
+   "wat": 14
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": 28.890777587890625,
+    "y": 73.83195495605469
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 682,
+  "waterCells": 638,
+  "bankCells": 682,
+  "featKinds": {
+   "ShallowFord": 2,
+   "River": 1,
+   "RiverBank": 2,
+   "SpringValley": 1
+  },
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ },
+ {
+  "seed": 79,
+  "profile": "mountain_pass_v1",
+  "gen": 6,
+  "water": {
+   "poi": {
+    "id": 10,
+    "type": "WaterSource",
+    "x": 59.986297607421875,
+    "y": -205.00128173828125
+   },
+   "shore": 0,
+   "bank": 0,
+   "wat": 0
+  },
+  "wood": {
+   "poi": {
+    "id": 30,
+    "type": "WoodForest",
+    "x": -146.8360595703125,
+    "y": -190.20181274414062
+   },
+   "forest": 0
+  },
+  "woodTrees": 0,
+  "shoreCells": 0,
+  "waterCells": 0,
+  "bankCells": 0,
+  "featKinds": {},
+  "accKinds": {
+   "Tree": 40,
+   "Boulder": 20,
+   "Bush": 25,
+   "RockCluster": 12,
+   "GrassTuft": 60
+  },
+  "poiCount": 23,
+  "poiTypes": "CCCCWWWWWWBBBBBBWWWSSGM"
+ }
+]
