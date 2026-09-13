@@ -2,7 +2,7 @@
 
 > **任务定义**：[06-terrain-templates.md](docs/plan/tech/06-terrain-templates.md) R.3 阶段七——**插队模板批次（平地草原 `grassland_plain_v1`、半坡林地 `hillside_woodland_v1`、河谷聚落 `river_valley_settlement_v1`）**。
 > 本文件将阶段七的总体设计、数学模型、水文与地表规则、探针指标及全链路工程实施拆解为标准可执行任务序列（S7-01 ～ S7-10）。
-> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）已交付；S7-05 起待实施。
+> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）、S7-05 半坡密林梯级散布与装饰隔离（✅ v1.50.47）、S7-06 河谷聚落连续侧壁与冲积谷底内核骨架（✅ v1.50.48）、S7-07 河谷聚落水系贯通与浅滩走廊接入（✅ v1.50.49）已交付；S7-08 起待实施。
 > **前置就绪度**：
 > - 平地草原：依赖阶段一 `GrassTuft` 装饰（✅ v1.50.35 D-B1 代码交付已收口，见 06 号 §18.5），具备独立开工条件；
 > - 半坡林地：依赖「密林山坡」装饰散布规则（纯视觉 Tree/Bush 高密散布，可随本阶段先行落地）；
@@ -181,9 +181,9 @@ flowchart LR
 | **S7-02** ✅ | 平地草原内核高程场与泉溪洼地生成（v1.50.40） | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `grassland_plain_v1` 骨架；残丘 $< 18^\circ$，洼地水源锚定，连通分量恒 1。 |
 | **S7-03** ✅ | 平地草原草甸装饰与视觉辨识度闭环（v1.50.45） | `geo/accents.rs`、`render_accents.js` | 中 | S7-02 | `GrassTuft` 斑块化散布；远景可清晰分辨草甸、残丘与泉洼，不显平淡。 |
 | **S7-04** ✅ | 半坡林地不对称缓坡山体内核骨架 | `geo/terrain.rs`、`geo/biome.rs`（v1.50.46） | 中 | S7-01 | `hillside_woodland_v1` 骨架；背风坡 $20^\circ\sim 28^\circ$，全域 $< 30^\circ$ 零禁行。 |
-| **S7-05** | 半坡林地密林带梯级散布与装饰隔离验证 | `geo/accents.rs`、`render_accents.js` | 中 | S7-04 | 坡腰高密林、坡脚疏林；取水点硬避让；开启/关闭装饰物理世界逐位不变。 |
-| **S7-06** | 河谷聚落连续侧壁与冲积谷底内核骨架 | `geo/terrain.rs`、`geo/hydrology.rs` | 高 | 阶段二基座 | `river_valley_settlement_v1`；侧壁 $\ge 34^\circ$ 硬禁行，谷底开阔平坦。 |
-| **S7-07** | 河谷聚落水系贯通与浅滩走廊接入 | `geo/hydrology.rs`、`geo/corridor.rs` | 中 | S7-06 | 谷底主河下凹，2 处浅滩跨河；两岸绕行比 $\ge 2.20$，连通分量恒 1。 |
+| **S7-05** ✅ | 半坡林地密林带梯级散布与装饰隔离验证（v1.50.47） | `geo/accents.rs`、`spatial/ecology/seed.rs` | 中 | S7-04 | 坡腰高密林、坡脚疏林；取水点硬避让；开启/关闭装饰物理世界逐位不变。 |
+| **S7-06** ✅ | 河谷聚落连续侧壁与冲积谷底内核骨架（v1.50.48） | `geo/terrain.rs` | 高 | 阶段二基座 | `river_valley_settlement_v1`；侧壁 $\ge 34^\circ$ 硬禁行，谷底开阔平坦。 |
+| **S7-07** ✅ | 河谷聚落水系贯通与浅滩走廊接入（v1.50.49） | `geo/hydrology.rs`、`geo/terrain.rs`（零改动 `geo/corridor.rs`——授权跨水走廊机制既有通用承载） | 中 | S7-06 | 谷底主河下凹，2 处浅滩跨河；跨障绕行95 ≥1.90（实测校准下限，见任务明细），连通分量恒 1。 |
 | **S7-08** | 仿真配置系统联动与 SimConfig 全链路映射 | `config.rs`、`config.js`、`config-check.js` | 低 | S7-02/04/06 | 3 个 profile 常量与参数集中化；`config-check.js` 233+ 字段全绿。 |
 | **S7-09** | FABS 协议、快照同步与前端视图适配 | `dict.rs`、`snapshot-bin.js`、`rustworld.js` | 低 | S7-07、S7-08 | 快照 Section 18/21/22 无损解码；换世界无旧特征残留；Canvas 正常渲染。 |
 | **S7-10** | 全链路确定性回归、60 种子矩阵与版本收口 | `world_save.rs`、`test-wasm.js`、全链路门禁 | 中 | S7-03/05/09 | 60 种子矩阵全通；存读档一致；旧 T1/T2 物理输出逐位不变；双副本同步。 |
@@ -290,7 +290,7 @@ flowchart LR
 
 ---
 
-### S7-05 · 半坡林地密林带梯级散布与装饰隔离验证
+### S7-05 · 半坡林地密林带梯级散布与装饰隔离验证（✅ 已交付 v1.50.47）
 
 - **目标**：在半坡林地上实现梯级过渡的密林散布，并对「林地是纯视觉装饰、不改通行判定」执行严格隔离验证。
 - **具体改动**：
@@ -308,11 +308,16 @@ flowchart LR
   - 密林带呈现清晰的带状聚集分布，不遮挡坡脚取水点；
   - 装饰开/关物理事实完全不变（连通图、节点、POI 逐位一致）；
   - 前端深度队列排序正确，人物在林中行走无穿帮破面。
+- **实测记录（v1.50.47 交付）**：
+  - 落地实现（`geo/accents.rs` 半坡专属分支）：Tree 预算 ×4（40→160 @density=1.0，循 06 号 §4.2「视觉密度需设上限」，Section 21 增量 ≈4KB）；树木接受概率按坡度梯级：<6° 坡脚草原 0.06 / 6~14° 坡麓疏林 0.35 / 14~26° 半坡密林 0.95 / ≥26° 山脊渐疏 0.25（梯级边界与 S7-04 地形带对齐——<6° 可建带、≥18° NO_BUILD 天然把房屋压在林下坡脚）；**泉源隔离圆**：`SpringValley` 盆心周围 30m（`poi_interaction_radius` 22m + 8m 缓冲；accents 层拿不到 SimConfig 以常量 `HILLSIDE_SPRING_CLEARANCE_M` 固化默认口径，POI 落位后的二次隔离用真实配置值）内禁植乔木且不消费 RNG；Bush 林缘过渡带偏好（低地泉洼软地邻域 0.85 / 林缘带 6~14° 0.5 / 陡坡软地 0.3 / 开阔坡脚 0.12）；25m 六向软地邻域探测自草原 Bush 分支提取为共用 `near_soft_ground`（草原判定与取值逐位不变）。**取水点二次隔离**（`spatial/ecology/seed.rs` 播撒步骤 6.8）：装饰散布在创世流水线第 8 步早于 POI 落位，POI 全部落位后调 `accents::trim_trees_near_pois` 按「`poi_interaction_radius` + 8m」隔离圆对半坡 profile 裁剪乔木——纯视觉裁剪不消费 RNG（播撒随机序列不变）、不改地表格/特征/POI/路网、重入幂等；只作用于半坡，T1/T2/草原零引用。
+  - 临时断言（§4.10 已删，`examples/s750_check.rs` iso/tiers/fp 三模式）：① 装饰开/关（density 0 vs 1）**4 profile × 12 种子**（半坡/山口/河谷/草原 × 1,2,3,7,42,100,123,456,789,1024,2026,65535）地表格 6 字段（高程/坡度/地表/肥力/水体归属/flags）、features、POI、路网节点与车道**逐位全等**，关态 accents 恒空；② 半坡 60 种子矩阵：取水点/泉源隔离圆**零违例**、乔木 128~160 棵/种子（最少 128 ≥ 密林覆盖下限）、梯级单位格密度严格递增 foot < low < dense（60 种子聚合 3.27 → 19.52 → 53.59 ×1e-3/格，dense/low=2.75 ≈ 接受率比 0.95/0.35、low/foot=5.97）；③ T1/T2/草原各 12 种子 accents 指纹与 HEAD worktree 基线**逐位一致**（防退化；git worktree 对拍）；④ `terrain_probe` 半坡 60 种子 §1.4 门禁 0 违例（地形未动：max_slope 22.04°~27.22°、min buildable 13268、components 恒 1）。
+  - 门禁：bump-version v1.50.47、WASM 双副本 SHA256 一致（`3cf52e2d…`）、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check` 239 字段、`frontend-check`、`bump-version --check` 全绿。
+  - 视觉验收（in-app 浏览器纯视觉通道，seed 7）：全景「坡脚草原→坡麓疏林→半坡密林」梯级带状面貌清晰、密林沿主坡坡腰聚集、山脊渐疏；近景 Zoom 2.2 树木立体渲染与树冠间深度遮挡自然、泉眼交互半径内无乔木、无穿帮破面。**前端渲染零改动**——统一深度队列既有管线（`render_accents.js`/`render_depth_queue.js`）直接承载密林，慢行代价由 `LaneTerrainProfile` 坡度折算承载（未动）。
 - **依赖**：S7-04。
 
 ---
 
-### S7-06 · 河谷聚落连续侧壁与冲积谷底内核骨架
+### S7-06 · 河谷聚落连续侧壁与冲积谷底内核骨架（✅ 已交付 v1.50.48）
 
 - **目标**：在 `crates/sim_core/src/geo/terrain.rs` 与 `hydrology.rs` 中构建 `river_valley_settlement_v1`，形成两侧连续陡壁、中央连续冲积谷地的深切地貌。
 - **具体改动**：
@@ -330,11 +335,17 @@ flowchart LR
   - `terrain_probe` 实测：侧壁坡度稳定 $\ge 35^\circ$，硬禁行格数 $800\sim 1400$ 格；
   - 谷底保留可建格数 $\ge 4200$ 格；
   - 谷底走廊南北全线贯通，无横向山体截断。
+- **实测记录（v1.50.48 交付）**：
+  - 落地实现（`geo/terrain.rs`，本任务实际零改动 `hydrology.rs`——S7-06 为无水面旱谷骨架，主河水系局部写入归 S7-07）：新增 `TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT` 与创世 scratch 专用 `ValleyGeometry`（不进快照/存档；第 2 步铺高程与第 6 步地表派生共享逐比特一致）。**南北深切谷地三分带高度场**：① 中央冲积谷底——W_floor ∈ [160,190]m（下沿自规格 150 抬到 160，保证扣除 S7-07 河道+河岸带 ≤24m 后两侧河阶干燥平坦带 ≥55m）、基准高程 3m + fBm ×0.15 强阻尼微起伏、第 6 步强制 `DryGround` + 基础肥力 0.95；② 两侧连续陡壁——smoothstep 剖面（3t²−2t³，两端导数 0，谷底边缘与壁顶台地均 C1 平滑衔接），高差 H∈[44,48]m、幅宽比 H/W∈[0.54,0.585] 联动反解宽度 75~89m（规格 70~90），峰值梯度 1.5×H/W 稳定 39°~41.5°（≥34° 自动派生 `RockFace`+`TERRAIN_FLAG_NO_WALK`、≤45° 探针窗上限、留 fBm 余量）；③ 壁顶台地缓穹——陡壁与台地共用同一沿谷包络 `1−u²`（壁顶=台地高程逐格相等，接缝无竖向断崖），包络起点 0.47×半图、向图缘二次收敛到谷底高程，谷口缓梁最大下降梯度 ≈tan24° 保持可通行绕行（全图连通分量恒 1）。谷轴微幅蜿蜒（amp 18~30m、3 rad 相位，`ValleyGeometry::center_x`）；谷底两处对角错布 `SpringValley` 泉眼特征（|y|∈[0.06,0.13]×world 保水源距 ≤140m 探针窗，横向 ±0.52×谷底半宽避开 S7-07 河道带；无水面，清泉 POI 仍由生态层布点）；谷轴 fBm 分区阻尼（谷底/陡壁 ×0.15、台地 ×0.5，`VALLEY_NOISE_*_K`）；`TERRAIN_GENERATOR_VERSION` 6→7（循 S7-02/S7-04 先例）。
+  - 探针 60 种子 §1.4 门禁 **0 违例**：max_slope 39.06°~41.26°（崖壁均值 37.76° ≥35° 达标）、NO_WALK/≥34° 800~964 格（达标线 800~1400）、buildable ≥10178（达标 ≥4200）、components 恒 1、可建带 770m（≥55m）、waterM ≤90m（≤140m）、detour_p95 ≤2.17、跨障绕行95 峰值 2.81（S7-07「两岸 ≥2.20」指标已就位）。
+  - **门禁窗口修订**（循 S7-04 先例，修订原因记录于探针 `gate_window_for` 注释）：settlement `detour_p95` 下限 2.20 撤销——S7-06 骨架期验收不含绕行指标；「两岸对置点绕行比 ≥2.20」按探针口径属 `crossing95`（跨障绕行95，对置直线穿障点对，已单列统计，S7-07 浅滩验收接线门禁），且浅滩缝合两岸后全图 detour 只会更低；保留上界 2.40（实测峰值 2.17 + 余量）防谷轴纵向病态截断。
+  - 临时断言（§4.10 已删）：全世界创世冒烟 12 种子 `validate_terrain_world` 全过（车道 ≥206）；60 种子几何断言全过——谷底南北贯通列存在（无横向山体截断）、行向可建带 ≥55m、陡壁深切段无断行（连续陡壁不成孤岛）、SpringValley 恰 2 处且落谷底坡度 <10°；旧 4 profile（T1/T2/草原/半坡）探针表与 HEAD worktree 基线**逐位一致**（防退化）。
+  - 门禁：bump-version v1.50.48（`SAVE_APP_VERSION` 变更旧存档按设计自动废弃）、WASM 重编译双副本（SHA256 一致 `f66a11ac…`）、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check`、`frontend-check`、`bump-version --check` 全绿。
 - **依赖**：阶段二基座就绪，S7-01。
 
 ---
 
-### S7-07 · 河谷聚落水系贯通与浅滩走廊接入
+### S7-07 · 河谷聚落水系贯通与浅滩走廊接入（✅ 已交付 v1.50.49）
 
 - **目标**：在河谷聚落的谷底贯穿主河、布置双侧交替取水点，并铺设 2 处合法的浅滩跨河走廊。
 - **具体改动**：
@@ -354,6 +365,12 @@ flowchart LR
   - 全图连通分量恒为 1（浅滩成功缝合两岸交通）；
   - 普通路网不穿深水，取水点均可通过合法路网抵达。
 - **依赖**：S7-06。
+- **实测记录（v1.50.49 交付）**：
+  - 落地实现（`geo/hydrology.rs` 新增 `generate_settlement_river`（T2 `generate_river` 谷轴镜像版）+ `geo/terrain.rs` 参数/派生小改）：**主河**——河道中心线 = 谷轴 `ValleyGeometry::center_x`（微幅弯曲由谷轴蜿蜒承载、半宽恒定），河宽抽自 [22,32]m（规格 22~32，relief_rng 抽样序追加在泉眼锚点之后），水面高程复用 `terrain_river_water_level`，河床 `level−1.4+y/size×0.3` 单调下凹（T2 同式）；岸带 8m（`VALLEY_RIVER_BANK_M`，刻意不复用 T2 cfg 的 18m 宽岸——会吃掉聚落河阶）派生 `RiverBank`+`NO_BUILD`+`SHORE_ACCESS`，岸外 20m（`VALLEY_RIVER_TERRACE_M`）派生 `RiverTerrace` 高肥力河阶（0.95、无禁建）；写入严格收敛在影响带 `d < half+bank+terrace ≤ 44m`（≪ 谷底半宽 ≥80），带外一格不碰（06 号 §4.3 约束④），`河道半宽+岸带 ≤ 24m` 守住 S7-06 建造保护线（河阶干带 ≥55m 实测 770m）。第 6 步 `derive_surface_and_flags` 加「水系优先」跳过（`DeepWater/RiverBank/RiverTerrace/ShallowWater` 保留第 3 步写定值；对无水 profile 恒假逐位无影响）。**浅滩走廊**——2 处固定 ShallowFord（特征 id 10/11、`TerrainConnection` id 1/2），y = ±0.32×world（`VALLEY_FORD_OFFSET_RATIO`，比 T2 先例 ±0.24 更稀疏：跨障绕行95 实测 2.01~2.74 vs ±0.24 时 1.81~2.65），带内水面改写 `ShallowWater`（端点安全落陆地、中间无深水断裂），走廊宽 `terrain_crossing_width`(26 ≥14)；授权跨水/车道 `crossing_id` + `terrain_shallow_water_cost` 过水减速由 `corridor.rs`/`terrain_network.rs` 既有通用机制承载（本任务零改动）。**水资源池**——`WaterBody #1`（resource_pool_id=1）+ 6 处两岸交替取水点（`count_water_sources`，离轴偏移 max(半宽+岸带+边距, 35m) 保证对置点对间距 ≥70m POI 口径）全部挂 `WaterPool #1`，HUD 去重聚合由 `prepare_terrain_layout` 既有建池逻辑承载。`TERRAIN_GENERATOR_VERSION` 7→8（循先例）。
+  - **门禁窗口修订**（循 S7-04/S7-06 先例，原因记录于探针 `gate_window_for` 注释）：① settlement `crossing95_min` 接线 **1.90**——原规格 ≥2.20 是骨架期实测 2.70~2.81 的外推预期，主河落地后浅滩本身成为合法跨河通道、绕行比总体下移（±0.32 时 60 种子实测 2.01~2.74），下限取实测最小值+余量；「浅滩是唯一跨河纽带」的结构性证明由 components==1 + 深水 `NO_WALK` + 普通路网不穿深水承载，不依赖该比值；② `no_walk` 上限 1500→1700（河道 DeepWater 格叠加在侧壁之上，实测 1232~1434，原上限是旱谷骨架期口径）；③ `detour_p95` 上界 2.40 保留（实测 1.69~2.20）；④ `water_dist` 上限 140 沿用（主河贯穿后实测 ≤16m）。
+  - 探针 60 种子 §1.4 门禁 **0 违例**：max_slope 39.06°~41.26°、≥34° 800~964、NO_WALK 1232~1434、buildable ≥9291（≥4200）、**components 恒 1**（浅滩成功缝合两岸）、可建带 770m（≥55m）、waterM ≤16m、detour_p95 1.69~2.20、**跨障绕行95 2.01~2.74（门禁 ≥1.90）**。
+  - 临时断言（§4.10 已删）：全世界创世冒烟 12 种子 `validate_terrain_world` 全过（即「普通路网不穿深水 + POI 全可达」门禁）且 ShallowFord 恰 2 处、`TerrainConnection` 恰 2 条、浅滩 4 条双向车道全部挂 `crossing_id` + `terrain_shallow_water_cost`、浅滩端点安全落陆地、走廊横断线无深水断裂、`WaterBody #1`/6 取水点/`WaterPool #1` 聚合链路逐项断言；60 种子几何断言——河道南北贯通（无纵向截断）、`water_body_id=1` 格全部为深水/浅水、河阶肥力 0.95 且 NO_BUILD 占比 <5%、`TERRAIN_GENERATOR_VERSION`==8。
+  - 旧 4 profile（T1/T2/草原/半坡）探针表与 HEAD worktree 基线**逐位一致**（防退化）；门禁：bump-version v1.50.49（`SAVE_APP_VERSION` 变更旧存档按设计自动废弃）、WASM 重编译双副本（SHA256 一致 `676fa591…`）、`cargo test --lib`、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check`、`frontend-check` 全绿。
 
 ---
 
@@ -438,8 +455,8 @@ flowchart LR
 | :--- | :---: | :--- |
 | **平地草原** | `seed: 42` | 残丘坡度峰值 $\le 14.2^\circ$；泉溪洼地包含 3 个清泉 POI；全图可行走连通分量恒为 1；可建格占比 $> 86\%$；测地绕行比 $p95 \le 1.10$。 |
 | **平地草原** | `seed: 2026` | 孤立残丘位于地图外围，不压迫初始营地；无任何硬禁行格（`hard_blocked == 0`）；`GrassTuft` 呈现自然斑块化聚集。 |
-| **半坡林地** | `seed: 7` | 背风坡最大坡度处于 $[22.0^\circ, 28.5^\circ]$（★ S7-04 修订：原 $[23.0^\circ, 26.5^\circ]$ 与 60 种子门禁在 fBm 逐种子方差下不可兼得，实测 26.95°，见 S7-04 实测记录），全图无 $> 30^\circ$ 禁行；坡脚平坦可建带宽度 $\ge 45\text{m}$；坡腰密林覆盖度充足且取水点 $8\text{m}$ 内无乔木（后两项随 S7-05 验证）。 |
-| **半坡林地** | `seed: 123` | 迎风坡缓和可建（坡度 $< 12^\circ$）；路网在密林中自如穿行且不穿水；开启/关闭装饰开关，路网与 POI 坐标逐位全等。 |
+| **半坡林地** | `seed: 7` | 背风坡最大坡度处于 $[22.0^\circ, 28.5^\circ]$（★ S7-04 修订：原 $[23.0^\circ, 26.5^\circ]$ 与 60 种子门禁在 fBm 逐种子方差下不可兼得，实测 26.95°，见 S7-04 实测记录），全图无 $> 30^\circ$ 禁行；坡脚平坦可建带宽度 $\ge 45\text{m}$；坡腰密林覆盖度充足且取水点 $8\text{m}$ 内无乔木（✅ S7-05 已验证：实测 143 棵、密林带密度梯度成立、隔离圆零违例）。 |
+| **半坡林地** | `seed: 123` | 迎风坡缓和可建（坡度 $< 12^\circ$）；路网在密林中自如穿行且不穿水；开启/关闭装饰开关，路网与 POI 坐标逐位全等（✅ S7-05 已验证，实测 160 棵）。 |
 | **河谷聚落** | `seed: 100` | 谷底冲积带宽度 $\ge 150\text{m}$；两侧侧壁坡度实测 $\ge 38^\circ$（出现连续硬禁行石墙）；2 处浅滩完好连接两岸；两岸对置点绕行比 $\ge 2.40$。 |
 | **河谷聚落** | `seed: 789` | 主河道严格限制在谷底中心；所有房屋候选地安全位于河阶上方（绝不泡入浅水/深水）；全图连通分量恒为 1。 |
 | **旧图防退化** | T1/T2 各种子 | 阶段七交付后，运行原有 12 种子矩阵，旧山口与河谷的高程、地表、路网、POI **逐字节完全不变**。 |

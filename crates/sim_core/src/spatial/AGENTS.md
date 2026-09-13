@@ -167,6 +167,7 @@ snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.4
 - 遍历 agents 时按 Vec 顺序（即 id 升序），不可用 HashMap 迭代
 - POI 初始化播撒按固定类型顺序（营地→泉→果→木→石→金）
 - 新增 RNG 消费点会改变后续所有随机数，导致同种子逐字节不一致
+- ★ S7-05：播撒步骤 6.8 的半坡取水点装饰裁剪（`accents::trim_trees_near_pois`）插在榷场播撒与过渡节点之间——**不消费任何 RNG**，只读 POI 坐标过滤 `terrain.accents`；改动此处时不得引入随机消耗，也不得扩到其他 profile（T1/T2/草原 accents 逐位不变是 S7-10 门禁）
 
 `test-wasm.js` 的同种子一致性校验会捕获此类回归。
 

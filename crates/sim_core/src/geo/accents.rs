@@ -1,10 +1,14 @@
 //! accents.rs · 地表装饰系统（D-A 装饰系统基础，v1.48.0；★ D-B1-5 补齐 RockCluster/GrassTuft；
-//! ★ S7-03 草原草甸斑块化散布与孤树压制）
+//! ★ S7-03 草原草甸斑块化散布与孤树压制；★ S7-05 半坡林地密林梯级散布与取水点隔离）
 //!
 //! 装饰层是独立于地貌特征（`TerrainFeature`）之外的纯视觉要素集合。
 //! 使用独立 `accent_rng` 加盐生成，不消费模拟 RNG、不参与通行/资源/碰撞计算。
 //! ★ S7-03：`grassland_plain_v1` 走专属预算与斑块调制分支（见 `GRASSLAND_*` 常数与
 //! `grass_patch_field`）——只改该 profile 的装饰分布，T1/T2 路径零引用、逐位不变。
+//! ★ S7-05：`hillside_woodland_v1` 走专属密林梯级分支（见 `HILLSIDE_*` 常数）——
+//! Tree 预算 ×4、按坡度梯级接受（坡脚草原→坡麓疏林→半坡密林→山脊渐疏）、
+//! 泉源隔离圆禁植乔木；另提供 `trim_trees_near_pois()` 供生态播撒收尾在 POI
+//! 全部落位后执行「交互半径 + 8m」取水点二次隔离（纯视觉裁剪，不消费 RNG）。
 //!
 //! # 四处同步
 //! 装饰数据需要同步四处（根 AGENTS.md §4.5）：
@@ -14,7 +18,7 @@
 //! 4. `frontend/js/snapshot-bin.js`（FABS Section 21 解码）
 
 use super::biome::SurfaceKind;
-use super::terrain::TERRAIN_PROFILE_GRASSLAND_PLAIN;
+use super::terrain::{TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND};
 use crate::rng::WorldRng;
 use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
@@ -92,6 +96,28 @@ const SALT_GRASS_PATCH_LARGE: u64 = 0x4752_5350_4154_4C31;
 /// 斑块小频固定盐值 "GRSPATS1"。同上，永不更改。
 const SALT_GRASS_PATCH_SMALL: u64 = 0x4752_5350_4154_5331;
 
+// ── ★ S7-05（STAGE-07-TODO S7-05）半坡林地密林梯级散布常数 ──
+// 只被 `is_hillside` 分支消费，T1/T2/草原装饰路径零引用（输出逐位不变）；
+// 装饰是纯视觉要素，改值不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构。
+/// 密林意象：半坡 Tree 预算 ×4（40 → 160 @density=1.0，仍受 `terrain_accent_density`
+/// 乘子调制；06 号 §4.2「视觉密度需设上限」——160 棵 ×24B ≈ 4KB Section 21 增量可控）。
+const HILLSIDE_TREE_BUDGET_RATIO: f32 = 4.0;
+/// 梯级接受概率（与坡度正相关，形成 06 号 §4.2「坡脚草原 → 坡麓疏林 →
+/// 半坡密林 → 山脊渐疏」的生态演替面貌；梯级边界与 S7-04 地形带对齐——
+/// <6° 坡脚可建草原带、6~14° 林缘缓坡、14~26° 中陡密林带（NO_BUILD ≥18°
+/// 天然把房屋压到林下坡脚）、≥26° 脊线渐疏）。
+const HILLSIDE_TREE_P_FOOT: f32 = 0.06;
+const HILLSIDE_TREE_P_LOW: f32 = 0.35;
+const HILLSIDE_TREE_P_DENSE: f32 = 0.95;
+const HILLSIDE_TREE_P_RIDGE: f32 = 0.25;
+/// 泉源隔离圆半径（米）：清泉 POI 交互半径 `poi_interaction_radius` 默认 22m
+/// + 8m 缓冲（06 号 §4.2「坡脚泉源周围 r + 8.0m 内禁止放置乔木」）。装饰层
+/// 拿不到 `SimConfig`，以常量固化默认值；POI 落位后的二次隔离用真实配置值
+/// （`ecology/seed.rs` 调 `trim_trees_near_pois`），两道防线口径一致。
+const HILLSIDE_SPRING_CLEARANCE_M: f32 = 30.0;
+/// 泉洼软地邻域探测半径（米）：与 S7-03 草原 Bush 同款 25m 六向邻点语义。
+const HILLSIDE_BUSH_SOFT_PROBE_M: f32 = 25.0;
+
 /// 使用独立 accent_rng 在地形表面散布装饰物。
 ///
 /// 在创世流水线第 8 步调用（★ STAGE2-3；地貌与水系定稿后、路网/房屋/POI 尚未放置，
@@ -101,6 +127,10 @@ const SALT_GRASS_PATCH_SMALL: u64 = 0x4752_5350_4154_5331;
 /// GrassTuft 预算 ×8 并经「双频哈希斑块 × 残丘坡度疏草」调制分布、
 /// Bush 向泉溪洼地凹圈（`SoftGround` 软地带）聚集。草原无水面（S7-02），
 /// 深水/浅水过滤天然恒真。T1/T2 的预算与偏好判定完全不变。
+/// ★ S7-05：`hillside_woodland_v1` 走专属分支——Tree 预算 ×4（密林）、
+/// 按坡度梯级接受、泉源隔离圆禁植乔木、Bush 走林缘过渡带偏好
+/// （见 `HILLSIDE_*` 常数）。半坡取水点二次隔离在本函数之外，由
+/// `ecology/seed.rs` 于 POI 落位后调 `trim_trees_near_pois()` 收口。
 pub fn generate_accents(
     terrain: &super::terrain::TerrainMap,
     density: f32,
@@ -114,10 +144,17 @@ pub fn generate_accents(
     }
 
     let density = density.clamp(0.0, 2.0);
-    // ★ S7-03 草原专属预算倍率（Tree ×0.2 / GrassTuft ×8；其余种类与通用一致，
-    // Bush 聚集靠偏好而非预算，总量仍受控）。
+    // ★ S7-03 草原 / ★ S7-05 半坡专属预算倍率（草原 Tree ×0.2 / GrassTuft ×8；
+    // 半坡 Tree ×4 密林；其余种类与通用一致，Bush 聚集靠偏好而非预算，总量仍受控）。
     let is_grassland = terrain.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
-    let tree_ratio = if is_grassland { GRASSLAND_TREE_BUDGET_RATIO } else { 1.0 };
+    let is_hillside = terrain.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
+    let tree_ratio = if is_grassland {
+        GRASSLAND_TREE_BUDGET_RATIO
+    } else if is_hillside {
+        HILLSIDE_TREE_BUDGET_RATIO
+    } else {
+        1.0
+    };
     let grass_tuft_ratio =
         if is_grassland { GRASSLAND_GRASS_TUFT_BUDGET_RATIO } else { 1.0 };
     let tree_count = ((BASE_TREE_COUNT as f32) * tree_ratio * density).round() as usize;
@@ -144,7 +181,38 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |_wx, _wy, cell, rng| {
+        |wx, wy, cell, rng| {
+            // ★ S7-05 半坡密林梯级散布：树木接受概率与坡度正相关（中陡坡高密成林，
+            //   平缓坡脚疏落），泉源隔离圆（`SpringValley` 盆心周围
+            //   `HILLSIDE_SPRING_CLEARANCE_M` 内）直接拒绝且不消费 RNG。
+            //   半坡地表只有 DryGround/SoftGround（S7-04 无 RockFace/水面），
+            //   既有外层禁区过滤天然恒真。纯地形/特征查询 + 1 次 gen_range，
+            //   T1/T2/草原判定与 accent_rng 消费序逐位不受影响。
+            if is_hillside {
+                for f in &terrain.features {
+                    if f.kind != super::terrain::TerrainFeatureKind::SpringValley {
+                        continue;
+                    }
+                    if let Some(c) = f.vertices.last() {
+                        let dx = wx - c.x;
+                        let dy = wy - c.y;
+                        if dx * dx + dy * dy < HILLSIDE_SPRING_CLEARANCE_M * HILLSIDE_SPRING_CLEARANCE_M {
+                            return false;
+                        }
+                    }
+                }
+                let slope = cell.slope_angle_deg;
+                let p = if slope < 6.0 {
+                    HILLSIDE_TREE_P_FOOT
+                } else if slope < 14.0 {
+                    HILLSIDE_TREE_P_LOW
+                } else if slope < 26.0 {
+                    HILLSIDE_TREE_P_DENSE
+                } else {
+                    HILLSIDE_TREE_P_RIDGE
+                };
+                return rng.gen_range(0.0, 1.0) < p;
+            }
             // ★ v1.49.3 放宽：平地（含 0 坡）与河流两岸（河滩/河阶，喜湿）均可生树，
             // 仅仍排除水面/岩壁等禁区（外层已过滤 NO_WALK/水体）
             match cell.surface_kind {
@@ -222,18 +290,28 @@ pub fn generate_accents(
                 //   灌木，形成水源的视觉提示——候选点本格或 25m 六向邻点命中软地即视为
                 //   「洼地邻域」高概率接受，开阔干地只零星点缀（预算不变、聚集靠偏好；
                 //   邻域探测是纯地形查询，不消费 accent_rng、不写任何格子）。
-                let near_soft = match cell.surface_kind {
-                    SurfaceKind::SoftGround => true,
-                    SurfaceKind::DryGround => (0..6).any(|k| {
-                        let ang = std::f32::consts::TAU * k as f32 / 6.0;
-                        terrain
-                            .sample_cell(wx + 25.0 * ang.cos(), wy + 25.0 * ang.sin())
-                            .surface_kind
-                            == SurfaceKind::SoftGround
-                    }),
-                    _ => false,
+                return rng.gen_range(0.0, 1.0) < if near_soft_ground(terrain, wx, wy) {
+                    0.85
+                } else {
+                    0.12
                 };
-                return rng.gen_range(0.0, 1.0) < if near_soft { 0.85 } else { 0.12 };
+            }
+            if is_hillside {
+                // ★ S7-05 半坡林缘过渡带：泉洼软地邻域（低地软地，25m 探测语义与草原
+                //   同款）聚集灌木提示水源；林缘缓坡带（6~14°）中等密度灌丛衔接密林
+                //   与坡脚草原；陡坡软地（20~34°，坡度派生）林下灌丛稀疏点缀；开阔
+                //   坡脚干地零星分布。纯地形查询 + 逐分支 1 次 gen_range。
+                let slope = cell.slope_angle_deg;
+                if slope < 20.0 && near_soft_ground(terrain, wx, wy) {
+                    return rng.gen_range(0.0, 1.0) < 0.85;
+                }
+                if (6.0..14.0).contains(&slope) {
+                    return rng.gen_range(0.0, 1.0) < 0.5;
+                }
+                if slope >= 20.0 {
+                    return rng.gen_range(0.0, 1.0) < 0.3;
+                }
+                return rng.gen_range(0.0, 1.0) < 0.12;
             }
             // Bush 偏好林缘过渡带（SoftGround 且肥力中等）
             if cell.surface_kind == SurfaceKind::SoftGround {
@@ -361,6 +439,51 @@ fn smooth_patch_field(wx: f32, wy: f32, lambda_m: f32, seed: u64, salt: u64) -> 
 fn grass_patch_field(wx: f32, wy: f32, seed: u64) -> f32 {
     0.62 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_LARGE_M, seed, SALT_GRASS_PATCH_LARGE)
         + 0.38 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_SMALL_M, seed, SALT_GRASS_PATCH_SMALL)
+}
+
+/// 候选点本格或 `HILLSIDE_BUSH_SOFT_PROBE_M` 六向邻点命中 `SoftGround`（泉洼软地
+/// 邻域探测；★ S7-03 自草原 Bush 分支内联提取为共用 helper，草原判定与取值逐位
+/// 不变——探测是纯地形查询，不消费 accent_rng、不写任何格子）。
+fn near_soft_ground(terrain: &super::terrain::TerrainMap, wx: f32, wy: f32) -> bool {
+    match terrain.sample_cell(wx, wy).surface_kind {
+        SurfaceKind::SoftGround => true,
+        SurfaceKind::DryGround => (0..6).any(|k| {
+            let ang = std::f32::consts::TAU * k as f32 / 6.0;
+            terrain
+                .sample_cell(
+                    wx + HILLSIDE_BUSH_SOFT_PROBE_M * ang.cos(),
+                    wy + HILLSIDE_BUSH_SOFT_PROBE_M * ang.sin(),
+                )
+                .surface_kind
+                == SurfaceKind::SoftGround
+        }),
+        _ => false,
+    }
+}
+
+/// ★ S7-05 取水点二次隔离（STAGE-07-TODO S7-05 · 06 号 §4.2「不遮挡取水点」）：
+/// 在给定隔离圆内的 `Tree` 装饰裁掉，其余种类与圈外装饰原样保留（id 不重排）。
+///
+/// 装饰散布在创世流水线第 8 步，早于生态播撒（POI 尚未落位），故「所有 POI
+/// 周围 r + 8.0m 内禁植乔木」由 `ecology/seed.rs` 在 POI 全部落位后调用本函数
+/// 收口。纯视觉裁剪：不消费任何 RNG、不改地表格/特征/POI/路网，重入幂等
+/// （同 POI 集重复调用结果不变）。
+pub fn trim_trees_near_pois(
+    accents: &mut Vec<TerrainAccent>,
+    poi_positions: &[Vec3],
+    clearance_m: f32,
+) {
+    let clearance_sq = clearance_m * clearance_m;
+    accents.retain(|a| {
+        if a.kind != AccentKind::Tree {
+            return true;
+        }
+        poi_positions.iter().all(|p| {
+            let dx = a.pos.x - p.x;
+            let dy = a.pos.y - p.y;
+            dx * dx + dy * dy >= clearance_sq
+        })
+    });
 }
 
 /// 生成指定种类和数量的装饰物

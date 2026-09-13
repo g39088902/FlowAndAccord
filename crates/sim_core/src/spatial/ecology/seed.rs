@@ -7,6 +7,7 @@
 //! ⚠️ 步骤顺序即 RNG 消费顺序与路网构建顺序，**不得重排**。
 
 use super::super::graph::LaneGraph3D;
+use super::super::vec3::Vec3;
 use super::super::world::World3DEngine;
 use super::spawn::SeedLayout;
 
@@ -25,6 +26,21 @@ impl World3DEngine {
         self.spawn_stone_pois(&mut layout);
         self.spawn_gold_pois(&mut layout);
         self.spawn_market_pois(&mut layout);
+        // 6.8 ★ S7-05（STAGE-07-TODO S7-05）半坡林地取水点隔离：装饰散布在创世
+        //    流水线第 8 步（早于 POI 落位），故在 POI 全部落位后按
+        //    「poi_interaction_radius + 8m」隔离圆裁剪乔木装饰（06 号 §4.2
+        //    「不遮挡取水点」）。纯视觉裁剪：不消费 RNG（播撒随机序列不变）、
+        //    不改地表格/特征/POI/路网；只作用于半坡 profile，T1/T2/草原
+        //    装饰路径零引用（输出逐位不变）。
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_HILLSIDE_WOODLAND {
+            let poi_positions: Vec<Vec3> = self.pois.iter().map(|p| p.pos).collect();
+            let clearance = self.config.poi_interaction_radius + 8.0;
+            crate::geo::accents::trim_trees_near_pois(
+                &mut self.terrain.accents,
+                &poi_positions,
+                clearance,
+            );
+        }
         // 7. 地形过渡节点
         self.spawn_terrain_transition_nodes(&mut layout);
         // 8. 全图路网连接

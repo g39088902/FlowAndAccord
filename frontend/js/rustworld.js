@@ -381,12 +381,10 @@
         return this.marriages.filter(m => m.husbandId === numId || m.wifeId === numId);
       }
 
-      // ============ 引擎驱动 (Web Worker 异步解耦) ============
       tick() {
         // 仿真由 Worker 独立线程按 speedMult 自主推进与节流投递，主线程 tick 保持零阻塞
       }
 
-      // ============ 🐞 调试统计 ============
       getDebugStats() {
         const mem = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
         const isStalled = !this._isPaused && this._lastSnapshotRealTime && (performance.now() - this._lastSnapshotRealTime > 1500);
@@ -432,7 +430,6 @@
         }
       }
 
-      // ============ 💾 读档 / 存档 (v1.7.0 / v1.38.0 Worker 适配) ============
 
       /** 读取内核最近一次存档/读档错误文本（无错误返回空串） */
       readSaveError() {
@@ -500,7 +497,6 @@
         });
       }
 
-      // ============ ⏪ 时光倒流控制器支持 ============
       _recordHistoryCheckpoint() {
         // 历史检查点由 Worker 在步进时自主录制与管理，主线程免重复开销
       }
@@ -558,7 +554,6 @@
         while (list.children.length > 8) list.removeChild(list.firstChild);
       }
 
-      // ============ 快照拉取与视图映射 ============
       _pullSnapshot(forceTerrain) {
         if (this._worker && forceTerrain) {
           this._worker.postMessage({ type: 'REQUIRE_TERRAIN' });
