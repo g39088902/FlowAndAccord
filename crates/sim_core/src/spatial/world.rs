@@ -97,6 +97,10 @@ pub struct World3DEngine {
     /// 与当前签名不一致时才重发 `LANE_GEO`/`NODE`（建房会新增节点与车道）。
     /// 初值 `u64::MAX` 保证首帧必然下发。
     pub last_geom_sig: std::cell::Cell<u64>,
+    /// ★ STAGE2-5 创世诊断记录（requested/effective profile、降级原因与全部
+    /// 尝试）。进程内诊断事实，不入存档（存档经 `terrain.profile` 保持有效
+    /// 模板，读档重建后恒为 None）。
+    pub creation_diagnostic: Option<super::creation_fallback::WorldCreationDiagnostic>,
 }
 
 impl World3DEngine {
@@ -109,24 +113,54 @@ impl World3DEngine {
         Self::new_seeded_with_config(grid_res, world_size, seed, SimConfig::default())
     }
 
-    /// 指定种子和自定义配置的确定性世界构建
+    /// 指定种子和自定义配置的确定性世界构建（**旧无失败语义兼容入口**）。
+    ///
+    /// ★ STAGE2-5 起生产路径走 [`Self::new_seeded_with_config_bounded`]（有界
+    /// 降级 + 门禁 + 诊断）；本方法保留给探针/工具/图鉴等既有调用点，行为
+    /// 契约不变：永返回一个世界。正常配置下等价于有界构造器首试通过；仅在
+    /// 全部降级策略耗尽（退化零值配置等）时兜底直建 flat_baseline 候选
+    /// （门禁不再阻断，`creation_diagnostic.end_reason = "legacy_fallback"`）。
     pub fn new_seeded_with_config(
         grid_res: usize,
         world_size: f32,
         seed: u64,
         config: SimConfig,
     ) -> Self {
-        let mut config = config;
-        // ★ STAGE2-1（06号 R.5 / §5.8 / §18.2）：创世有界重试上限接线。
-        // 语义 = 初始创世失败（静态几何校验/生存诊断）时阶梯降级重试的最大次数
-        // （0 = 只尝试一次，是合法值，不做下限改写）。此处建世界入口先钳制无界大值，
-        // 防止 STAGE2-5 重试环失控；规整结果写回 config（同下方 terrain_profile 写回
-        // 先例）供重试环与诊断读取——超限值有真实效果，满足 config-check 第 5 条
-        // 「空转参数」门禁；完整阶梯降级重试环（禁子特征 → 无子特征 → flat_baseline）
-        // 属 STAGE2-5。
-        config.terrain_generation_max_retries = config.terrain_generation_max_retries.min(8);
+        let fallback_cfg = config.clone();
+        match Self::new_seeded_with_config_bounded(grid_res, world_size, seed, config, &mut |_| {}) {
+            Ok(w) => w,
+            Err(mut diag) => {
+                // 兜底：基线候选直建（不跑门禁），保证旧调用点恒得一个世界。
+                // 必须基于用户原配置施加 flat_baseline，不得退化成零值默认配置。
+                diag.end_reason = "legacy_fallback".to_string();
+                let mut cfg = fallback_cfg;
+                cfg.terrain_profile =
+                    crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+                let mut world = Self::build_candidate(
+                    grid_res,
+                    world_size,
+                    seed,
+                    cfg,
+                    &crate::geo::terrain::GenesisOverrides::default(),
+                );
+                world.creation_diagnostic = Some(diag);
+                world
+            }
+        }
+    }
+
+    /// ★ STAGE2-5 单个候选世界的构建（原 `new_seeded_with_config` 构造体逐字
+    /// 迁入）：地形生成（第 0–9 步）+ 配置写回 + 引擎骨架。**不含**任何门禁
+    /// 与生态播撒——生态（第 10 步）由调用方 `seed_primitive_ecology` 执行。
+    pub(crate) fn build_candidate(
+        grid_res: usize,
+        world_size: f32,
+        seed: u64,
+        mut config: SimConfig,
+        overrides: &crate::geo::terrain::GenesisOverrides,
+    ) -> Self {
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_with_config(seed, &config);
+        terrain.generate_with_config_overrides(seed, &config, overrides);
         config.terrain_profile = terrain.profile.clone();
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
@@ -185,6 +219,7 @@ impl World3DEngine {
             regions_arrival_dirty: true,
             strtab: std::cell::RefCell::new(super::snapshot_bin::StrTab::new()),
             last_geom_sig: std::cell::Cell::new(u64::MAX),
+            creation_diagnostic: None,
         }
     }
 

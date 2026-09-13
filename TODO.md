@@ -1,8 +1,7 @@
 # TODO
 
-> **当前拆分对象**：[06 号地形方案 R.3 阶段二 · 生成组合基座与有界回退](docs/plan/tech/06-terrain-templates.md)（独立专项任务序列已拆入根目录 [STAGE2-TODO.md](STAGE2-TODO.md)；阶段一归档见下）。每项标注出处章节与验收方式；阶段门禁以 06 号 R.5 速查与 §5.8/§18 为准。
+> **阶段二已收官（2026-09-13）**：[06 号地形方案 R.3 阶段二 · 生成组合基座与有界回退](docs/plan/tech/06-terrain-templates.md) 的 STAGE2-1～8 全部交付；专项任务文档 STAGE2-TODO.md 已随收官归档删除，分层验收证据（合法基线等价差分 + 拒绝/降级统计 + 三项遗留门禁销项）见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md)。后续阶段按 06 号 R.3/R.6 逐项拆分开工。
 > **纪律**：一次提交只做一件事（§5.1 禁止合并大改）；含 Rust 改动的任务完成后重编译 WASM 并同步双副本；纯勾选/文档修订不升版。
-> **阶段二退出条件**：按 06 号 R.6/§5.8 分层验收：纯重构保持包含 TB-01/S7-02 的当前合法世界逐字节不变（当前生成器版本 5）；新增拒绝与自动降级单独提交并评估版本。重试配置已加回但循环未实现；补齐生存诊断、flat_baseline 等价与有界回退 3 项门禁。详见 [STAGE2-TODO.md](STAGE2-TODO.md)。
 
 ## 阶段一 · D-B1 装饰扩展与骨架
 
@@ -65,23 +64,23 @@
     - 依赖：D-B1-1～7 全部完成（D-B1-8 可后置）。
     - ✅ **验收结果（2026-09-13）：阶段一代码交付完成**——跨构建差分按 06 号 §5.1 契约全项执行：基准 `5f09236`（v1.50.28）vs 候选 `f21e573`（v1.50.35），2 profile × 12 固定种子 × `terrainAccentSubFeatures` 开关两态，高程+完整地表格、完整路网、完整 POI 规范化导出逐字节比较，三组配对各 24/24 全等；`TERRAIN_GENERATOR_VERSION` 两侧均 4、`SAVE_FORMAT_VERSION` 未动。R.5 七项门禁全绿（证据与 SHA256 记录见 06 号 §18.5 验收记录）。D-B1-8 / TA-09 保持未完成、按 07 号波次后置。
 
-## 阶段二 · 生成组合基座与有界回退（D-B2 公共前置）
+## 阶段二 · 生成组合基座与有界回退（D-B2 公共前置）✅ 已收官（2026-09-13）
 
-> 完整任务分解、技术细节与验收契约详见专项任务文档：**[STAGE2-TODO.md](STAGE2-TODO.md)**。
+> 分层验收按 06 号 R.6/§5.8 执行：纯重构保持包含 TB-01/S7-02 的合法世界逐字节不变（收口对拍：基准 `5527a9e` vs 候选 `c6a59f7`，T1/T2 × seed 0–59 × 支脊两态 4 组聚合指纹全等）；新增拒绝与降级独立提交评估版本。任务明细与验收证据已归档：changelog v1.50.39~49 条目 + [14 号 §8.2](docs/current/tech/14-terrain-and-network.md) 收口记录。
 
 | 任务编号 | 任务名称 | 核心涉及文件 | 状态 | 依赖 |
 | :--- | :--- | :--- | :---: | :--- |
 | **STAGE2-1** | 配置字段加回：有界重试上限 `terrainGenerationMaxRetries` | `config.rs` / `config.js` / `config-check.js` | ✅ 已完成（v1.50.39） | — |
 | **STAGE2-2** | T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心） | `geo/hydrology.rs` / `geo/terrain.rs` | ✅ 已完成（v1.50.40） | — |
-| **STAGE2-3** | 创世流水线阶段化重构（0–11 步无歧义管线） | `geo/terrain.rs` / `geo/hydrology.rs` | ⏳ 待办 | STAGE2-2 |
-| **STAGE2-4** | 静态地形几何校验与稳定 ID 断言落地（§5.2 / §5.3 第 7 步） | `geo/terrain.rs` / `geo/hydrology.rs` | ⏳ 待办 | STAGE2-3 |
-| **STAGE2-5** | 有界失败降级与重试机制（§5.8 阶梯回退环） | `geo/terrain.rs` / `spatial/world.rs` | ⏳ 待办 | STAGE2-1, STAGE2-4, STAGE2-6, STAGE2-7 |
-| **STAGE2-6** | 初始营地生存连通分量与往返成本诊断（补齐 §18.1 门禁） | `geo/query.rs` / `ecology/spawn.rs` | ⏳ 待办 | STAGE2-3 |
-| **STAGE2-7** | `flat_baseline` 行为等价基线支持（补齐 §18.1 门禁） | `geo/terrain.rs` / `config.rs` | ⏳ 待办 | STAGE2-3 |
-| **STAGE2-8** | 阶段二代码收口：跨构建差分全等验证 + 遗留门禁销项 + 文档同步 | 全链路 / 验收脚本 / 文档 | ⏳ 待办 | STAGE2-1～7 |
+| **STAGE2-3** | 创世流水线阶段化重构（0–11 步无歧义管线；完整几何事务域随阶段三注入启用） | `geo/terrain.rs` / `geo/hydrology.rs` | ◐ 框架交付（v1.50.45） | STAGE2-2 |
+| **STAGE2-4** | 静态地形几何校验与稳定 ID 断言落地（§5.2 / §5.3 第 7 步） | `geo/validation.rs` / `geo/terrain.rs` | ✅ 已完成（v1.50.47） | STAGE2-3 |
+| **STAGE2-5** | 有界失败降级与重试机制（§5.8 阶梯回退环） | `spatial/creation_fallback.rs` / `spatial/world.rs` | ✅ 已完成（v1.50.49） | STAGE2-1, STAGE2-4, STAGE2-6, STAGE2-7 |
+| **STAGE2-6** | 初始营地生存连通分量与往返成本诊断（补齐 §18.1 门禁） | `spatial/survival_diagnosis.rs` | ✅ 已完成（v1.50.47） | STAGE2-3 |
+| **STAGE2-7** | `flat_baseline` 显式诊断/降级基线（补齐 §18.1 门禁） | `geo/terrain.rs` / `spatial/world_save.rs` | ✅ 已完成（v1.50.48） | STAGE2-3 |
+| **STAGE2-8** | 阶段二代码收口：跨构建差分全等验证 + 遗留门禁销项 + 文档同步 | 全链路 / 验收脚本 / 文档 | ✅ 已完成（v1.50.49 文档收口） | STAGE2-1～7 |
 
 ## 未拆分阶段
 
 阶段七已拆入 [STAGE-07-TODO.md](STAGE-07-TODO.md)，S7-01/02 已完成；T1 支脊已由 TB-01 交付，不再重复建任务。其余子特征、D-C、P1、R0 与远期静态模板按 [06 号 R.3](docs/plan/tech/06-terrain-templates.md)逐项解锁、开工时拆分；T4 动态扩展另立项。
 
-开工约束：阶段二 STAGE2-2 已完成；剩余按 06 号 R.6 先做流水线、诊断与基线，再集成回退。阶段三剩余物理项按 §5.4.D 岩壁离散尺度探针准入，候选参数不得当作已验证默认值。
+开工约束：阶段二已收官，无剩余项；阶段三剩余物理项按 §5.4.D 岩壁离散尺度探针准入，候选参数不得当作已验证默认值。

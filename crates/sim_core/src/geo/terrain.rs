@@ -591,6 +591,14 @@ pub(crate) fn plan_subfeatures(
     plan
 }
 
+/// ★ STAGE2-5 创世覆盖（降级策略 → 生成器的唯一通道）。默认值 = 无覆盖，
+/// 输出与无参路径逐位一致。
+#[derive(Debug, Clone, Default)]
+pub struct GenesisOverrides {
+    /// 结构子特征禁用掩码（`1 << TerrainSubFeatureKind as u32`）。
+    pub disabled_subfeature_mask: u32,
+}
+
 /// §5.3 创世流水线各阶段间传递的临时数据（★ STAGE2-3）。
 ///
 /// 全部为单次创世内的过程 scratch：不进快照、不进存档、不参与 tick。
@@ -705,7 +713,10 @@ pub struct TerrainSubFeature {
 ///           低幅高程场/残丘/泉溪洼地分支。旧存档按版本门禁拒绝）
 /// v1.50.46：5 -> 6（S7-04 新增 `hillside_woodland_v1` 不对称缓坡山体分支；
 ///           既有 T1/T2/草原路径逐位不变，递增遵循 S7-02 先例——新分支入库即换版）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 6;
+/// v1.50.48：6 -> 7（STAGE2-7 新增 `flat_baseline` 显式诊断/降级基线分支——
+/// 倾斜-only 平地，无 fBm/山脊/洼地/水系。既有 T1/T2/草原/半坡路径逐位不变，
+/// 递增遵循 S7-02 先例——新分支入库即换版）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 7;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -721,6 +732,14 @@ pub const TERRAIN_PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 /// S7-02 洼地语义（`SpringValley` 特征 + SoftGround 凹圈，无水面）。
 /// 林地是装饰层事实（S7-05 梯级散布），本分支不写任何林地地表。
 pub const TERRAIN_PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
+/// ★ STAGE2-7 显式诊断/降级基线（06 号 §5.8「基线先验收」）：倾斜-only 平地。
+/// 无 fBm/山脊/支脊/洼地/水系/特征——仅保留世界倾斜（16~24m 跨度）与第 6 步
+/// 统一坡度/地表/肥力/flags 派生，供几何校验、生存诊断与有界回退环（STAGE2-5）
+/// 作为**显式降级目标**与诊断对照。
+/// ⚠️ 只经显式指定进入，**永不加入 `random` 映射**（`resolve_profile` 不分派它）；
+/// 不宣称与旧 T0 等价（旧 T0 生成源已随 v1.50.17 兼容壳删除、基底公式被
+/// TB-01-2 取代，无可验证旧基准——基准缺口已在 06 号 §5.8 记录）。
+pub const TERRAIN_PROFILE_FLAT_BASELINE: &str = "flat_baseline";
 
 /// 纯确定性自然地形生成引擎。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -812,11 +831,14 @@ impl TerrainMap {
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
         self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
-        // ★ S7-02 草原 / ★ S7-04 半坡林地：基础倾斜压到 16~24（主地貌由专属
-        //   特征承担，坡度主体 2°~8°）。抽取数不变（1 次），仅区间不同——
+        // ★ S7-02 草原 / ★ S7-04 半坡林地 / ★ STAGE2-7 flat_baseline：基础倾斜
+        //   压到 16~24（主地貌由专属特征承担，坡度主体 2°~8°；flat_baseline
+        //   则只有倾斜本身）。抽取数不变（1 次），仅区间不同——
         //   T1/T2 路径的 rng 消费序列与取值逐位不变。
-        let low_relief =
-            self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
+        let is_flat_baseline = self.profile == TERRAIN_PROFILE_FLAT_BASELINE;
+        let low_relief = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN
+            || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND
+            || is_flat_baseline;
         self.tilt_magnitude = if low_relief {
             rng.gen_range(16.0, 24.0)
         } else {
@@ -1028,10 +1050,17 @@ impl TerrainMap {
                 let weight = NOISE_WEIGHT_PLAIN
                     + (NOISE_WEIGHT_MOUNTAIN - NOISE_WEIGHT_PLAIN)
                         * (w_t * w_t * w_t * (w_t * (w_t * 6.0 - 15.0) + 10.0));
-                elev += terrain_noise::fbm_terrain_3octaves(wx * noise_freq_k, wy * noise_freq_k, seed)
-                    * noise_amp_k
-                    * weight
-                    * saddle_noise_damp;
+                // ★ STAGE2-7 flat_baseline：跳过 fBm 叠加（也不进上方任何 profile
+                //   专属块）——elev 恒为基础倾斜，本分支即「倾斜-only」诊断基线。
+                if !is_flat_baseline {
+                    elev += terrain_noise::fbm_terrain_3octaves(
+                        wx * noise_freq_k,
+                        wy * noise_freq_k,
+                        seed,
+                    ) * noise_amp_k
+                        * weight
+                        * saddle_noise_damp;
+                }
                 raw[gy * self.grid_width + gx] = elev;
             }
         }
@@ -1233,6 +1262,19 @@ impl TerrainMap {
     /// `relief_rng` 消费顺序；第 3 步 hydro_rng 独立流；第 8 步 accent_rng 独立流；
     /// 子特征判定一律走无状态整数混合（`mix64`），严禁在阶段间插入共享流抽样。
     pub fn generate_with_config(&mut self, seed: u64, config: &SimConfig) {
+        self.generate_with_config_overrides(seed, config, &GenesisOverrides::default());
+    }
+
+    /// ★ STAGE2-5 创世覆盖通道：`disabled_subfeature_mask` 位屏蔽结构子特征
+    /// （`1 << TerrainSubFeatureKind as u32`，见 `creation_fallback::STRUCTURAL_SUBFEATURE_MASK`）。
+    /// 只改变「注入什么」，**不改变任何 RNG 消费**（第 4 步规划是纯 hash，
+    /// 过滤发生在规划产出之后）；阶段二注入器为空时无物理效果。
+    pub fn generate_with_config_overrides(
+        &mut self,
+        seed: u64,
+        config: &SimConfig,
+        overrides: &GenesisOverrides,
+    ) {
         // 0. 解析 profile（纯整数判别，不消费 WorldRng）
         self.profile = resolve_profile(seed, &config.terrain_profile);
         self.seed = seed;
@@ -1249,9 +1291,16 @@ impl TerrainMap {
         self.generate_base_relief(seed, config, &mut scratch);
         // 3. 静态水系（T2 主河；P1 预留）
         self.apply_profile_static_hydrology(config, &scratch);
-        // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）
+        // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）；
+        //    STAGE2-5 降级掩码在规划产出后过滤结构子特征（不触碰 RNG）。
         let mut sub_plan =
             plan_subfeatures(seed, &self.profile, config.terrain_accent_sub_features);
+        if overrides.disabled_subfeature_mask != 0 {
+            sub_plan.retain(|p| {
+                !p.kind.is_structural()
+                    || overrides.disabled_subfeature_mask & (1 << (p.kind as u32)) == 0
+            });
+        }
         // 5. 子特征几何管线 5a–5d（阶段二空注入，接口就位）
         self.apply_subfeature_pipeline(&mut sub_plan);
         // 6. 全图唯一定稿坡度 + 派生/合并 flags
@@ -1455,13 +1504,14 @@ impl TerrainMap {
 
     /// §5.3 第 7 步：静态几何校验。
     ///
-    /// ★ STAGE2-4 落地完整断言集（特征 ID 升序唯一、T2 水系 ID 范围保护、水体
-    /// 顶点双副本一致、浅滩端点合法性、边界安全与禁行/禁建一致性）；阶段二先
-    /// 接线已落地的稳定 ID 校验。失败 Err 由 STAGE2-5 有界重试环消费。
-    pub(crate) fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
-        self.validate_sub_features_sorted_unique()
-            .map_err(|_| "SubFeatureIdsUnsortedOrDuplicated")?;
-        Ok(())
+    /// ★ STAGE2-4 完整断言集已落地（断言实现见 `geo/validation.rs`）：特征 ID
+    /// 唯一/归属/kind 一致、子特征 ID 升序唯一 + 引用存在、水体轮廓双副本逐字节
+    /// 一致（主河水体 1 ↔ `River` 特征 1）、取水点/授权走廊引用与边界、浅滩端点
+    /// 在陆侧、cells 水域归属与 NO_WALK/NO_BUILD 一致。校验器只读不修复、
+    /// 不重排既有 `features` 生成顺序（T2 为 10、11、1、20、21、30，排序会改
+    /// 变快照字节）。失败 Err 由 STAGE2-5 有界重试环消费（本阶段仍不启用拒绝）。
+    pub fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
+        super::validation::validate_static_terrain_geometry(self)
     }
 
     /// §5.3 第 8 步：通用地表装饰散布（既有 accent_rng 独立流，消费顺序不变）。

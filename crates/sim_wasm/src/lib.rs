@@ -51,6 +51,10 @@ fn resolve_grid_res(grid_res: u32, config: &SimConfig) -> usize {
 /// 创建世界并注入初始生态 (grid_res=0 表示按配置 terrain_grid_res，world_size=764, seed 可复现，agent_count=20)
 /// 优先使用前端通过 world_apply_config_buf 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
+///
+/// ★ STAGE2-5：走有界降级构造器（几何/路网/生存门禁 + §5.8 阶梯降级），
+/// 初始化彻底失败时返回 1（原因见 `world_last_error_ptr/len`）且**不替换**
+/// 既有世界；成功返回 0。
 #[no_mangle]
 pub extern "C" fn world_create(
     grid_res: u32,
@@ -61,19 +65,30 @@ pub extern "C" fn world_create(
 ) -> i32 {
     unsafe {
         let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
-        let mut w = World3DEngine::new_seeded_with_config(
+        let result = World3DEngine::new_seeded_with_config_bounded(
             resolve_grid_res(grid_res, &config),
             world_size,
             seed as u64,
             config,
+            &mut |w: &mut World3DEngine| {
+                if camp_count > 0 {
+                    w.config.count_camps = camp_count as usize;
+                }
+                w.seed_primitive_ecology(agent_count as usize);
+            },
         );
-        if camp_count > 0 {
-            w.config.count_camps = camp_count as usize;
+        match result {
+            Ok(w) => {
+                WORLD = Some(w);
+                clear_error();
+                0
+            }
+            Err(diag) => {
+                set_error(&diag.summary());
+                1
+            }
         }
-        w.seed_primitive_ecology(agent_count as usize);
-        WORLD = Some(w);
     }
-    0
 }
 
 /// 创建仅含地貌的只读世界：复用正式游戏相同的确定性地形生成链路，但不播撒

@@ -237,9 +237,9 @@ pub struct SimConfig {
     pub terrain_accent_sub_features: bool,
     /// ★ STAGE2-1（06号 R.5 / §5.8 / §18.2）：创世有界重试上限。
     /// 语义 = 初始创世失败（静态几何校验/生存诊断）时，阶梯降级重试的最大次数
-    /// （0 = 只尝试一次；默认 3，唯一真相源 = 前端 config.js）。唯一消费点 =
-    /// `spatial/world.rs::new_seeded_with_config` 建世界入口的无界大值钳制（防重试环失控）；
-    /// 完整阶梯降级重试环（禁子特征 → 无子特征 → flat_baseline）属 STAGE2-5。
+    /// （0 = 只尝试一次；默认 3，唯一真相源 = 前端 config.js）。消费点 =
+    /// `spatial/creation_fallback.rs::new_seeded_with_config_bounded` 有界降级环
+    /// （★ STAGE2-5 落地：入口钳制 ≤8 + 阶梯降级 + 策略去重 + 诊断记录）。
     pub terrain_generation_max_retries: u32,
 
 // 8. 四季更迭与宏观气候
