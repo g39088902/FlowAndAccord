@@ -14,7 +14,7 @@
 | 编号 | 任务 | 涉及文件 | 难度 | 依赖 | 状态 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TB-01-1** | 纯确定性 2D 梯度噪声与无状态分形 fBm 内核实现 | `crates/sim_core/src/geo/terrain.rs` | 中 | — | ✅ 已实施（v1.50.36：`terrain_noise` 模块，未接入高程采样，接入随 TB-01-2） |
-| **TB-01-2** | 高程与区域调制掩码（Masking）及主脊域扭曲（Domain Warping） | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-1 | ⏳ 待实施 |
+| **TB-01-2** | 高程与区域调制掩码（Masking）及主脊域扭曲（Domain Warping） | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-1 | ✅ 已实施（v1.50.37：fBm 接入高程场，掩码 0.25/0.90 + 鞍部保护带 0.15 + 域扭曲双分量峰值归一化 45m/λ420m+170m 两端收敛；初版 12m 蛇形不可见，已按反馈加强） |
 | **TB-01-3** | T1 不对称支脊（Branch Ridges）几何模型与鞍部禁区避让 | `crates/sim_core/src/geo/terrain.rs` | 高 | TB-01-2 | ⏳ 待实施 |
 | **TB-01-4** | 四邻域差分坡度重算与地表属性重新映射 | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-3 | ⏳ 待实施 |
 | **TB-01-5** | 仿真配置集中化与 SimConfig 全链路接入 | `config.rs` / `config.js` / `examples/config.json` | 低 | TB-01-3 | ⏳ 待实施 |
@@ -59,11 +59,12 @@
      - **鞍部山口保护带**：在鞍部走廊区域（$\vert \text{along} - \text{saddle\_along} \vert < \text{saddle\_width}$），高频噪声振幅强制衰减至 $\le 0.15$，确保通道平缓无坑洼。
   2. **主脊域扭曲（Domain Warping 蛇形蜿蜒）**：
      - 原直线坐标：$\text{across} = -wx \cdot \sin\theta + wy \cdot \cos\theta - \text{ridge\_offset}$；
-     - 引入低频扰动：$\text{across}_{\text{warped}} = \text{across} + \text{warp\_amp} \times \text{noise}(\text{along} \cdot 0.005, \text{seed}_{\text{warp}})$；
-     - $\text{warp\_amp} \approx 10.0\text{m}\sim 15.0\text{m}$，并在主脊两端自然收敛，使横跨地图的主脊呈现出优雅自然的轻微蛇形曲线，告别直线标尺感。
+     - 引入低频扰动：$\text{across}_{\text{warped}} = \text{across} + \text{warp}(\text{along}, \text{seed}_{\text{warp}})$；
+     - ~~$\text{warp\_amp} \approx 10.0\text{m}\sim 15.0\text{m}$~~（**实施修订 v1.50.37**：初版单分量 12m 实测横移仅 ~2.5m，蛇形不可见，按用户反馈加强为双分量——主弯 λ≈420m + 次摆 λ≈170m，并以峰值归一化把各种子横移峰值锁定到 45m（> 0.7× 脊半宽），形状随种子、量级恒定）；
+     - 在主脊两端自然收敛（包络 $1-(\text{along}/0.75\cdot\text{world})^2$），主脊呈明显蛇形曲线，告别直线标尺感。
 - **现状核对**：`across` 当前严格为线性投影，主脊没有任何侧向弯曲。
 - **出处**：[07-terrain-art.md](docs/plan/tech/07-terrain-art.md) §4.4「尺度层次」、§7.2。
-- **验收**：主脊脊线具备可见但平缓的弯曲度，两端不出界；平原区地表高度起伏平顺，不产生微型凹坑。
+- **验收**：主脊脊线具备**肉眼明确可辨**的蛇形弯曲度（横移峰值 ≈45m），两端不出界；平原区地表高度起伏平顺，不产生微型凹坑。
 - **依赖**：TB-01-1。
 
 ---

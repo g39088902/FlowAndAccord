@@ -164,21 +164,34 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ★ TB-01-1 多尺度噪声内核：确定性 2D 梯度噪声 + 3 倍频 fBm（07 号 §7.2）。
+// ★ TB-01-1/TB-01-2 多尺度噪声内核：确定性 2D 梯度噪声 + 3 倍频 fBm。
 //
 // 只依赖整数运算（`mix64`）与 IEEE-754 精确定义的四则/取整——无 sin/cos/exp、
 // 无 `DefaultHasher`、无系统时间、无 fast-math 收缩（Rust 保证浮点不融合），
 // x86_64 / ARM64 / wasm32 下同入参逐位一致。
 //
-// ⚠️ 本模块暂未被高程采样消费（`allow(dead_code)`）：无掩码的全图均匀加噪会
-// 击穿平原生活区（根 AGENTS.md §4 易踩坑 #3），必须与 TB-01-2 的高度/区域
-// 调制掩码、鞍部保护带同期接入。接入后移除本 `allow`。
+// ★ TB-01-2 起由 `generate_with_profile` 消费：fBm 经「高度调制掩码 × 鞍部
+// 保护带」叠加进基础高程（严禁绕过掩码全图均匀加噪，根 AGENTS.md §4 坑 #3），
+// 主脊 `across` 经 SALT_RIDGE_WARP 低频 1D 噪声域扭曲成蛇形。
 // ─────────────────────────────────────────────────────────────────────────────
-#[allow(dead_code)]
 mod terrain_noise {
     /// 多尺度噪声固定盐值 "TERRNS01"（8 个 ASCII 字符打包 u64，风格同
     /// `ACCENT_RNG_SALT`）。一经落地永不更改——改盐值等于换图（同种子不再复现旧世界）。
     pub(crate) const SALT_TERRAIN_NOISE: u64 = 0x5445_5252_4E53_3031;
+
+    /// 主脊域扭曲固定盐值 "RIDGEWRP"。一经落地永不更改（改盐值等于换图）。
+    pub(crate) const SALT_RIDGE_WARP: u64 = 0x5249_4447_4557_5250;
+
+    /// fBm 基准振幅/基准波长。数值已对齐 TB-01-5 计划的 SimConfig 默认值
+    /// （`terrain_noise_amplitude = 6.0` / `terrain_noise_scale_base = 300.0`），
+    /// TB-01-5 落地后改由配置驱动，届时输出零漂移。
+    const AMPLITUDE_M: f32 = 6.0;
+    const SCALE_BASE_M: f32 = 300.0;
+    /// 各倍频相对基准的比例：λ → 300 / 108 / 37.5 m，A → 6.0 / 2.58 / 0.87 m，
+    /// 均落在 07 号 §7.2 TB-01-1 规格区间（λ 280~360 / 90~130 / 30~45，
+    /// A 6~8 / 2.5~3.5 / 0.8~1.2）。
+    const WAVELENGTH_RATIOS: [f32; 3] = [1.0, 0.36, 0.125];
+    const AMPLITUDE_RATIOS: [f32; 3] = [1.0, 0.43, 0.145];
 
     /// 8 个离散单位梯度向量（(±1,0)/(0,±1)/(±√2/2,±√2/2)）。
     /// 用编译期常数表替代运行时三角函数：cos/sin 跨平台不保证逐位一致，
@@ -233,27 +246,100 @@ mod terrain_noise {
         a + (b - a) * sy
     }
 
-    /// 3 倍频 fBm 基准参数（07 号 §7.2 TB-01-1 规格，取区间中值）。
-    /// 波长单位米；接入 `SimConfig`（`terrain_noise_amplitude` /
-    /// `terrain_noise_scale_base`）由 TB-01-5 落地，届时此处改为消费配置。
-    const OCTAVE_WAVELENGTHS_M: [f32; 3] = [320.0, 110.0, 38.0];
-    const OCTAVE_AMPLITUDES_M: [f32; 3] = [7.0, 3.0, 1.0];
-
-    /// 3 倍频分形布朗运动（fBm）：Octave 0 宏观次级丘陵（λ≈320m，A≈7m）+
-    /// Octave 1 中观坡面褶皱（λ≈110m，A≈3m）+ Octave 2 微观地表细部（λ≈38m，A≈1m）。
+    /// 3 倍频分形布朗运动（fBm）：Octave 0 宏观次级丘陵（λ≈300m，A≈6m）+
+    /// Octave 1 中观坡面褶皱（λ≈108m，A≈2.6m）+ Octave 2 微观地表细部（λ≈37.5m，A≈0.87m）。
     /// 输出为高程增量（米），纯函数无状态，不消费任何 `WorldRng` 流。
     #[inline]
     pub(crate) fn fbm_terrain_3octaves(x: f32, y: f32, seed: u64) -> f32 {
         let mut sum = 0.0f32;
         for i in 0..3 {
             sum += gradient_noise_2d(
-                x / OCTAVE_WAVELENGTHS_M[i],
-                y / OCTAVE_WAVELENGTHS_M[i],
+                x / (SCALE_BASE_M * WAVELENGTH_RATIOS[i]),
+                y / (SCALE_BASE_M * WAVELENGTH_RATIOS[i]),
                 seed,
                 SALT_TERRAIN_NOISE,
-            ) * OCTAVE_AMPLITUDES_M[i];
+            ) * (AMPLITUDE_M * AMPLITUDE_RATIOS[i]);
         }
         sum
+    }
+}
+
+/// ★ TB-01-2 主脊域扭曲与噪声掩码物理常数（07 号 §7.2）。TB-01-5 未把它们
+/// 收敛为 `SimConfig` 项，故保持命名常数——改值等于换图，须随
+/// `TERRAIN_GENERATOR_VERSION` 递增（TB-01-6）。
+/// 主脊域扭曲——双分量蛇形（初版单分量 12m 实测脊线横移仅 ~2.5m，蛇形不可见，
+/// 按用户反馈加强）：主弯 λ≈420m 打出整幅 S 弯 + 次摆 λ≈170m 叠加自然摆动。
+/// 振幅仅决定两分量的**形状权重**；绝对幅度由 `ridge_warp_peak_scale` 峰值
+/// 归一化兜底——梯度噪声典型输出仅 ±0.3 且随种子波动大（实测同参数下
+/// 采样峰值 20m~48m 不等），直乘振幅无法保证每个种子都得到满量级蛇形。
+/// `across += env × warp_scale × (amp_main·n₁(along·f_main) + amp_sub·n₂(along·f_sub))`。
+const RIDGE_WARP_AMP_MAIN_M: f32 = 55.0;
+/// 主弯频率（1/米）：0.0024 ↔ 波长 ~420m，全图（764m）恰好呈现一个完整 S 蛇形。
+const RIDGE_WARP_FREQ_MAIN: f32 = 0.0024;
+/// 次级摆动幅度（米）：中频小摆让蛇形不那么「规整圆弧」。
+const RIDGE_WARP_AMP_SUB_M: f32 = 18.0;
+/// 次摆频率（1/米）：0.0059 ↔ 波长 ~170m。
+const RIDGE_WARP_FREQ_SUB: f32 = 0.0059;
+/// 峰值归一化目标：归一化后脊线横向偏移的采样峰值 ≈ 45m（> 0.7× 脊半宽 62m），
+/// 蛇形肉眼明确可辨；各种子间只差形状（相位/S 形走势），不差量级。
+const RIDGE_WARP_PEAK_TARGET_M: f32 = 45.0;
+/// 峰值预采样数：along ∈ ±0.62×world（主脊出图典型跨度）均匀 160 点（≈5.4m 步距）。
+const RIDGE_WARP_PEAK_SAMPLES: usize = 160;
+/// 扭曲包络参考跨度（× world_size）：包络 = 1−(along/跨度)²，主脊两端出图处收敛到 0。
+const RIDGE_WARP_SPAN_FACTOR: f32 = 0.75;
+/// 域扭曲 1D 采样固定切片 y（任意常数；两分量取不同切片行去相关，
+/// 同盐不同坐标即得独立噪声，无需第二盐值）。
+const RIDGE_WARP_SLICE_Y_MAIN: f32 = 137.0;
+const RIDGE_WARP_SLICE_Y_SUB: f32 = 911.0;
+/// 高度调制掩码权重下限（平原，规格 0.20~0.30 取中值）。
+const NOISE_WEIGHT_PLAIN: f32 = 0.25;
+/// 高度调制掩码权重上限（山体，规格 0.8~1.0 取中值偏上）。
+const NOISE_WEIGHT_MOUNTAIN: f32 = 0.90;
+/// 掩码权重过渡带的 h_norm 下沿/跨度：h_norm ≤ 0.30 全平原权重，≥ 0.70 全山体权重。
+const NOISE_WEIGHT_HNORM_LOW: f32 = 0.30;
+const NOISE_WEIGHT_HNORM_SPAN: f32 = 0.40;
+/// 鞍部山口保护带噪声衰减下限（规格：走廊内振幅 ≤ 0.15）。
+const SADDLE_NOISE_FLOOR: f32 = 0.15;
+/// 鞍部保护带外过渡带宽度（× saddle_width）：走廊外 0.5×saddle_width 内平滑恢复满权重。
+const SADDLE_NOISE_RAMP: f32 = 0.5;
+
+/// 单点原始扭曲位移（米，未归一化）：包络 × 双分量噪声和。
+#[inline]
+fn ridge_warp_raw(along: f32, world_size: f32, seed: u64) -> f32 {
+    let env_n = along / (RIDGE_WARP_SPAN_FACTOR * world_size);
+    let envelope = (1.0 - env_n * env_n).clamp(0.0, 1.0);
+    envelope
+        * (RIDGE_WARP_AMP_MAIN_M
+            * terrain_noise::gradient_noise_2d(
+                along * RIDGE_WARP_FREQ_MAIN,
+                RIDGE_WARP_SLICE_Y_MAIN,
+                seed,
+                terrain_noise::SALT_RIDGE_WARP,
+            )
+            + RIDGE_WARP_AMP_SUB_M
+                * terrain_noise::gradient_noise_2d(
+                    along * RIDGE_WARP_FREQ_SUB,
+                    RIDGE_WARP_SLICE_Y_SUB,
+                    seed,
+                    terrain_noise::SALT_RIDGE_WARP,
+                ))
+}
+
+/// 扭曲峰值归一化系数：预采样主脊出图跨度（±0.62×world）上的 |warp| 采样峰值，
+/// 返回 `target / peak`，使任何种子的脊线蛇形横移都达到 `RIDGE_WARP_PEAK_TARGET_M`
+/// 量级（形状仍由种子决定，只锁量级）。纯函数 + 固定采样点序，跨平台逐位确定；
+/// peak≈0 时回退 1.0（理论不可达，防御性兜底）。
+fn ridge_warp_peak_scale(world_size: f32, seed: u64) -> f32 {
+    let span = 0.62 * world_size;
+    let mut peak = 0.0f32;
+    for i in 0..RIDGE_WARP_PEAK_SAMPLES {
+        let a = -span + (i as f32 + 0.5) * (2.0 * span / RIDGE_WARP_PEAK_SAMPLES as f32);
+        peak = peak.max(ridge_warp_raw(a, world_size, seed).abs());
+    }
+    if peak > 1e-3 {
+        RIDGE_WARP_PEAK_TARGET_M / peak
+    } else {
+        1.0
     }
 }
 
@@ -435,6 +521,12 @@ impl TerrainMap {
     /// `0.16~0.23 × world_size` 与 `24~34m`，最大梯度仅 6.7~13.4°，全图无格越过
     /// `terrain_max_walk_slope`，山口不产生任何通行约束）。详见
     /// `docs/plan/tech/06-terrain-templates.md` §9.3.1。
+    ///
+    /// ★ TB-01-2：原 2 组平滑正弦波谐波由「高度调制掩码 × 鞍部保护带」调制的
+    /// 3 倍频 fBm 取代（平原权重 0.25、山体 0.90、山口走廊 ≤0.15）；主脊
+    /// `across` 施加低频域扭曲（幅度 12m、λ 200m、两端包络收敛）。
+    /// 确定性：噪声/扭曲只消费世界种子 + 固定盐值（`terrain_noise` 模块），
+    /// 不占用任何 `WorldRng` 流；`relief_rng` 消费顺序与 T1-R 完全一致。
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
@@ -457,11 +549,9 @@ impl TerrainMap {
         self.tilt_magnitude = rng.gen_range(54.0, 66.0);
         let tilt_cos = self.tilt_angle_rad.cos();
         let tilt_sin = self.tilt_angle_rad.sin();
-        let p1_x: f32 = rng.gen_range(0.0, 100.0);
-        let p1_y: f32 = rng.gen_range(0.0, 100.0);
-        let p2_x: f32 = rng.gen_range(0.0, 100.0);
-        let p2_y: f32 = rng.gen_range(0.0, 100.0);
         let theta = relief_rng.gen_range(-0.18, 0.18);
+        let theta_cos = theta.cos();
+        let theta_sin = theta.sin();
         let ridge_offset = relief_rng.gen_range(-0.08, 0.08) * self.world_size;
         // ★ T1-R：主脊宽度/幅度走配置（禁止散落字面量）。通行力约束：
         //   高斯主脊最大梯度 ≈ 0.858 × amplitude / width，必须显著大于
@@ -476,6 +566,12 @@ impl TerrainMap {
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
         let mut raw = vec![0.0f32; self.grid_width * self.grid_height];
+        // ★ TB-01-2：主脊域扭曲峰值归一化系数（仅山口 profile 消费；0 = 不扭曲）。
+        let warp_scale = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
+            ridge_warp_peak_scale(self.world_size, seed)
+        } else {
+            0.0
+        };
 
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
@@ -491,18 +587,45 @@ impl TerrainMap {
                 };
                 let proj = (wx * tilt_cos + wy * tilt_sin) / half_size.max(1.0);
                 let base_tilt = proj * (self.tilt_magnitude * 0.5);
-                let wave_large = ((wx * 0.006 + p1_x).sin() * (wy * 0.006 + p1_y).cos()) * 5.0;
-                let wave_medium = ((wx * 0.014 + p2_x).cos() + (wy * 0.014 + p2_y).sin()) * 2.5;
-                let mut elev = base_tilt + wave_large + wave_medium;
+                // ★ TB-01-2：正弦波谐波（wave_large/wave_medium）由经掩码调制的
+                // 3 倍频 fBm 取代（见循环尾部），基础高程只剩整体倾斜。
+                let mut elev = base_tilt;
+                let mut saddle_noise_damp = 1.0f32;
 
                 if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
                     // v1.47.7：删除平顶高台（台地压平）。只保留主脊与山口鞍部的连续起伏地貌。
-                    let along = wx * theta.cos() + wy * theta.sin();
-                    let across = -wx * theta.sin() + wy * theta.cos() - ridge_offset;
+                    // ★ TB-01-2 主脊域扭曲：沿脊轴的低频 1D 噪声横向推动 across，
+                    //   使笔直主脊呈明显蛇形（双分量：主弯 S 形 + 次级摆动）；
+                    //   包络 (1−(along/0.75·world)²) 让主脊两端（出图处）扭曲
+                    //   自然收敛，杜绝脊线斜刺出界。
+                    let along = wx * theta_cos + wy * theta_sin;
+                    let warp = ridge_warp_raw(along, self.world_size, seed) * warp_scale;
+                    let across = -wx * theta_sin + wy * theta_cos - ridge_offset + warp;
                     let ridge = ridge_amplitude * (-(across / ridge_width.max(1.0)).powi(2)).exp();
                     let saddle = (-((along - saddle_along) / saddle_width.max(1.0)).powi(2)).exp();
-                    elev = elev + ridge - ridge * 0.90 * saddle;
+                    elev += ridge - ridge * 0.90 * saddle;
+                    // ★ TB-01-2 鞍部山口保护带：走廊内（|Δalong| ≤ saddle_width）噪声
+                    //   振幅压到 15%，走廊外 0.5×saddle_width 内平滑恢复满权重，
+                    //   保证全图唯一交通通道平缓无坑洼。
+                    let d_corr = ((along - saddle_along).abs() - saddle_width)
+                        / (SADDLE_NOISE_RAMP * saddle_width);
+                    let t = d_corr.clamp(0.0, 1.0);
+                    saddle_noise_damp =
+                        SADDLE_NOISE_FLOOR + (1.0 - SADDLE_NOISE_FLOOR) * (t * t * (3.0 - 2.0 * t));
                 }
+
+                // ★ TB-01-2 高度调制掩码：h_norm ≥ 0.70（山体）权重升至满格、
+                //   ≤ 0.30（平原生活区）衰减到 0.25——高频噪声在低平地带近乎静默，
+                //   严禁全图均匀加噪（根 AGENTS.md §4 坑 #3：平原 ±2m 噪声即产生
+                //   大面积 NO_BUILD 红格）。
+                let h_norm = ((elev + 45.0) / 100.0).clamp(0.0, 1.0);
+                let w_t = ((h_norm - NOISE_WEIGHT_HNORM_LOW) / NOISE_WEIGHT_HNORM_SPAN).clamp(0.0, 1.0);
+                let weight = NOISE_WEIGHT_PLAIN
+                    + (NOISE_WEIGHT_MOUNTAIN - NOISE_WEIGHT_PLAIN)
+                        * (w_t * w_t * w_t * (w_t * (w_t * 6.0 - 15.0) + 10.0));
+                elev += terrain_noise::fbm_terrain_3octaves(wx, wy, seed)
+                    * weight
+                    * saddle_noise_damp;
                 raw[gy * self.grid_width + gx] = elev;
             }
         }
@@ -593,4 +716,3 @@ impl TerrainMap {
         Ok(())
     }
 }
-
