@@ -387,6 +387,9 @@ window.SimLighting = (function () {
     shadowLen: () => S.shadowLen,
     shadowAlpha: () => S.shadowAlpha,
     shadowOffset,
+    // ★ TA-04-6 零分配变体：世界阴影方向（单位向量）+ 影长系数写入调用方复用对象
+    //   （深度队列计算影梢世界落点消费；enabled=false 对照路径同样经 applyShadowVector 维护）
+    shadowDirInto: (out) => { out.x = S.shadowWx; out.y = S.shadowWy; out.len = S.shadowLen; return out; },
     sunScreenDir,
     sunScreenDirFull,
     sunScreenDirFullInto, // ★ TA-04-4 零 GC 变体（装饰绘制每实体刷新屏幕光向刮擦）
