@@ -416,6 +416,18 @@
         "crates/sim_core/src/spatial/decisions/**/*.rs",
         "docs/current/design/06-agent-behavior-design.md"
       ]
+    },
+    {
+      "id": "design-terrain-implementation",
+      "path": "docs/current/design/07-terrain-implementation.md",
+      "owner": "product",
+      "lastReviewed": "2026-09-13",
+      "sources": [
+        "crates/sim_core/src/geo/**/*.rs",
+        "crates/sim_core/src/config.rs",
+        "docs/current/tech/14-terrain-and-network.md",
+        "docs/current/design/07-terrain-implementation.md"
+      ]
     }
   ]
 }
