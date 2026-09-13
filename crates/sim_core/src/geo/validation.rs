@@ -15,7 +15,7 @@
 //! 5. cells 水域归属与 NO_WALK/NO_BUILD 通行标志一致。
 //!
 //! 兼容性边界：全部规则对当前 T1/T2/草原/半坡矩阵必须平凡通过；新增会拒绝
-//! 旧合法世界的规则按行为变更拆分并评估版本（STAGE2-TODO §STAGE2-4）。
+//! 旧合法世界的规则按行为变更拆分并评估版本（验收证据见 14 号文 §8.2）。
 
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
