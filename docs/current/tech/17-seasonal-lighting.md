@@ -309,7 +309,7 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 ## 6. 边界与不变量
 
 1. **零内核改动**：不动 Rust、不动 WASM、不动快照字段、不动存档结构（`SAVE_FORMAT_VERSION` 保持 7）。唯一碰 Rust 的连带影响是版本号自增会改 `world_save.rs::SAVE_APP_VERSION`（§9）。
-2. **确定性边界**：光照纯表现层，不消耗 `WorldRng`、不写模拟状态、不进存档；限速器依赖真实帧时间，因此**不参与**逐字节确定性承诺。`test-wasm.js` / `test-determinism.js` / `test-snapshot-bin.js` 必须保持全绿（它们不渲染）。
+2. **确定性边界**：光照纯表现层，不消耗 `WorldRng`、不写模拟状态、不进存档；限速器依赖真实帧时间，因此**不参与**逐字节确定性承诺。`test-wasm.js` / `test-determinism.js` 必须保持全绿（它们不渲染）。
 3. **季节唯一真相源**：光相只消费 `season / season_progress / season_timer / temperature`。**严禁**前端另建计时器或按 `Date.now()` 推季节。
 4. **图层铁律**：天空背景与大气色洗只能落在 §4-L4 的两个固定插入点；阴影是贴地图元；立体实体仍走 `drawWorldEntities()` 统一深度队列（`frontend/AGENTS.md` §5.9）。
 5. **不预告不存在的事实**：光照不得暗示内核没有的机制（无昼夜、无云雨、无洪水）。天色只表达“当季光照”，不表达降水。
@@ -378,7 +378,6 @@ cargo build -p sim_wasm --target wasm32-unknown-unknown --release
 Copy-Item target\wasm32-unknown-unknown\release\sim_wasm.wasm frontend\rust\sim_wasm.wasm -Force
 Copy-Item target\wasm32-unknown-unknown\release\sim_wasm.wasm frontend\sim_wasm.wasm -Force
 node tools/test-wasm.js             # ALL_TESTS_DONE
-node tools/test-snapshot-bin.js     # 快照未改，作为回归网
 ```
 
 > ⚠️ 升版会让 `SAVE_APP_VERSION` 变化，按 v1.37.1 的设计**旧存档自动作废**——这是本项目既有规则，不是本方案引入的副作用（`./06-snapshot-and-save.md`）。

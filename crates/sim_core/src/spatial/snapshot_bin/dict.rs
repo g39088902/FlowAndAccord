@@ -6,8 +6,7 @@
 //!
 //! # 不变量的守护方式
 //! - `*_code()` 使用**穷尽 `match`**：枚举新增变体时编译直接报错，强制同步本文件；
-//! - `*_table()` 用 `as_str()` / 常量数组生成名称，与 JSON 快照的序列化口径一致；
-//! - `tools/test-wasm.js` 的「二进制 ≡ JSON 深比较」断言是最终防线，任何口径不一致都会红。
+//! - `*_table()` 用 `as_str()` / 常量数组生成名称，名称表随 `world_enum_table_*` 下发，前端按码位还原；
 
 use crate::spatial::agent::{Gender, PrimitiveActionState};
 use crate::spatial::graph::{NodeType, RoadClass};
@@ -316,7 +315,7 @@ pub fn house_tier_table() -> Vec<&'static str> {
 // ═══════════════════════════════════════════════════════════════
 // 资源品类 ResourceKind（5 变体）
 //
-// ⚠ JSON 快照用 `format!("{:?}", rk)` 序列化，故名称表必须与 `Debug` 输出逐字一致。
+// ⚠ 名称表由 `Debug` 输出派生（`format!("{:?}", rk)`），必须与变体名逐字一致。
 // ═══════════════════════════════════════════════════════════════
 
 #[inline]
@@ -352,7 +351,7 @@ pub fn resource_kind_table() -> Vec<&'static str> {
 // ═══════════════════════════════════════════════════════════════
 // 四季 Season（4 变体）
 //
-// ⚠ JSON 快照用 `world_snapshot.rs` 的 match 输出 "Spring" 等字面量。
+// ⚠ 名称取 `world_snapshot.rs` 的 match 输出 "Spring" 等字面量。
 // ═══════════════════════════════════════════════════════════════
 
 #[inline]
@@ -387,7 +386,7 @@ pub fn household_role_table() -> Vec<&'static str> {
 // ═══════════════════════════════════════════════════════════════
 // 流水事由 TransferReason（22 变体）
 //
-// ⚠ JSON 快照用 `format!("{:?}", r)` 序列化，名称为变体名本身。
+// ⚠ 名称由 `Debug` 输出派生，为变体名本身。
 // ═══════════════════════════════════════════════════════════════
 
 #[inline]

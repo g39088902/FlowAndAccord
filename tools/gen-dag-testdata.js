@@ -23,7 +23,7 @@ const FOCUS_ID = arg('focus', '') ? parseInt(arg('focus', ''), 10) : null;
 const TD = 1 / 60; // simulationDt，严禁改动
 
 const ROOT = path.resolve(__dirname, '..');
-// ★ T1：统一快照取值入口（FABS 二进制优先，JSON 仅调试回退）
+// ★ T1：统一快照取值入口（FABS 二进制，快照仅此一条通道）
 const { createSnapshotReader } = require('./snapshot-reader.js');
 const wasmPath = path.join(ROOT, 'frontend', 'rust', 'sim_wasm.wasm');
 if (!fs.existsSync(wasmPath)) throw new Error('wasm not found: ' + wasmPath);
@@ -54,7 +54,7 @@ function summarize(arr) {
   const { instance } = await WebAssembly.instantiate(bytes, {});
   const ex = instance.exports;
 
-  // ★ T1：统一走通用读取器（FABS 二进制优先，JSON 仅调试回退）
+  // ★ T1：统一走通用读取器（FABS 二进制，快照仅此一条通道）
   const reader = createSnapshotReader(ex);
 
   function readSnapshot() {

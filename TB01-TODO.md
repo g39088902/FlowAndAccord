@@ -189,7 +189,7 @@
      - `cargo test --lib`
      - `node tools/test-wasm.js`
      - `node tools/test-determinism.js`
-     - `node tools/test-snapshot-bin.js`
+     - `node tools/snapshot-check.js`
      - `node tools/config-check.js`
      - `node tools/frontend-check.js`
      - `node tools/doc-maintenance-check.js`
@@ -279,7 +279,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 # 3. 确定性与门禁测试
 node tools/test-wasm.js
 node tools/test-determinism.js
-node tools/test-snapshot-bin.js
+node tools/snapshot-check.js
 node tools/config-check.js
 node tools/frontend-check.js
 node tools/doc-maintenance-check.js

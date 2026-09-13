@@ -72,10 +72,10 @@
 
 - [ ] **H-05 快照四处同步 + 存档**
     - 内容：`AgentSnapshot` 新增 `hormones` 定长子结构（12×f32 + chronic_stress + crash_timers，纯数值无新枚举字符串、不触 STR_TAB），完整走 ① `spatial/snapshot.rs` 定义 → ② `world_snapshot.rs::generate_snapshot()` 赋值 → ③ `snapshot_bin/encode.rs` FABS 编码 → ④ `snapshot-bin.js` 解码 + `rustworld.js::_applySnapshot()` 映射（根 AGENTS.md §4.5 四处同步铁律）。
-    - **【已校订】`FORMAT_VERSION` 必须 +1，不是「评估」选项**：`snapshot_bin/layout.rs:13` 明确「各 Section 内部为**顺序流（非定长 stride）**」，AGENT section 追加 12×f32 后既有解码器按旧偏移读取会**全部错位**（静默产生 NaN / 乱值，`test-snapshot-bin.js` 未必能捕获）。**决策**：`layout.rs:31` `FORMAT_VERSION` **3 → 4（强制）**，并同步 `frontend/js/snapshot-bin.js:27` 的 `FORMAT_VERSION = 3` → `4`（该处为硬判据 `dv.getUint16(OFF_VERSION) !== FORMAT_VERSION → return null`）。
+    - **【已校订】`FORMAT_VERSION` 必须 +1，不是「评估」选项**：`snapshot_bin/layout.rs:13` 明确「各 Section 内部为**顺序流（非定长 stride）**」，AGENT section 追加 12×f32 后既有解码器按旧偏移读取会**全部错位**（静默产生 NaN / 乱值，`snapshot-check.js` 静态核对未必能捕获）。**决策**：`layout.rs:31` `FORMAT_VERSION` **3 → 4（强制）**，并同步 `frontend/js/snapshot-bin.js:27` 的 `FORMAT_VERSION = 3` → `4`（该处为硬判据 `dv.getUint16(OFF_VERSION) !== FORMAT_VERSION → return null`）。
     - **【已校订】存档 `SAVE_FORMAT_VERSION` 保持不变 = 7**：H-02 已定「旧存档兼容用 `#[serde(default)]`」，而存档走 **serde JSON 全量**（`world_save.rs:78` `agents: Vec<Agent3D>`），非二进制定长——`#[serde(default)]` 天然向后兼容，**不得**同时 +1（原文档「结构不兼容时手工 +1」与 H-02 的 serde(default) 方案互斥）。先例见 `geo/terrain.rs:256/303`：`#[serde(default)]` 保证旧档加载默认空，`SAVE_FORMAT_VERSION` **不递增**。**注意**：旧档本无激素数据，读出即默认零值，这与「读档不得重置」不矛盾（新档才需保证不重置），措辞以本条为准。
     - 出处：04 号 §7 快照 / 存档行、根 AGENTS.md §4.5 / §4.5.1 / §4.9。
-    - 验收：`node tools/test-snapshot-bin.js` 全场景通过；**新增**「旧 wasm + 新 JS」与「新 wasm + 旧 JS」两种混搭组合均返回 null（版本不符安全降级）而非静默错读；存读档回归（含换世界后 `STR_TAB.start_index == 0` 缓存判据不受影响）。
+    - 验收：`node tools/snapshot-check.js` + `test-wasm.js` 全绿；**新增**「旧 wasm + 新 JS」与「新 wasm + 旧 JS」两种混搭组合均返回 null（版本不符安全降级）而非静默错读；存读档回归（含换世界后 `STR_TAB.start_index == 0` 缓存判据不受影响）。
     - 依赖：H-04。
 
 - [ ] **H-06 前端 Inspector「🧬 激素基调」面板**
@@ -86,8 +86,7 @@
     - 依赖：H-05（数据通道就位）。
 
 - [ ] **H-07 P0 收口：稳定性 + 等价性 + 门禁升版**
-    - 内容：① 长程运行激素曲线无 NaN / 无越界（test-wasm 长程套件 + 临时钳制断言，验证后删除）；② **等价性验证**：test-determinism 6 套件（多种子 / 分批独立性 / 快照无副作用 / 存读档）；③ 全量门禁：test-wasm / test-determinism / test-snapshot-bin / config-check / frontend-check / cross-doc-check / doc-link-check / doc-maintenance-check；④ `node tools/bump-version.js --patch` → 重编译 WASM 同步双副本；⑤ 文档同步：04 号状态注、[01-changelog.md](docs/current/01-changelog.md)、`docs/current/README.md` 模块登记、相关局部 AGENTS.md（agent 结构与 tick 顺序变化涉及 `spatial/AGENTS.md`）。
-    - **【已校订】等价性判据改为「阶段起始态」而非「改动前基线」**：H-03 改动了 tick 阶段内容、H-05 改了快照格式（FORMAT_VERSION 3→4）、H-20 会改 RNG 消费——**「改动前基线」在 P0 之后即失效**，后续阶段（H-10/H-19）再要求「与改动前对照」已无意义。**决策**：每阶段收口时**重新生成基线**（存档 + 快照哈希），在 changelog 记录基线变更点与原因；跨阶段只保证「**开关关闭 = 该阶段起始态逐字节等价**」。P0 阶段因开关尚未引入（见 H-01 修订），等价性判据 = 「与 H-01 开工前基线逐字节一致」——这是**唯一**一次可用的「改动前基线」对照，须在此阶段完成。
+    - 内容：① 长程运行激素曲线无 NaN / 无越界（test-wasm 长程套件 + 临时钳制断言，验证后删除）；② **等价性验证**：test-determinism 6 套件（多种子 / 分批独立性 / 快照无副作用 / 存读档）；③ 全量门禁：test-wasm / test-determinism / snapshot-check / config-check / frontend-check / cross-doc-check / doc-link-check / doc-maintenance-check；④ `node tools/bump-version.js --patch` → 重编译 WASM 同步双副本；⑤ 文档同步：04 号状态注、[01-changelog.md](docs/current/01-changelog.md)、`docs/current/README.md` 模块登记、相关局部 AGENTS.md（agent 结构与 tick 顺序变化涉及 `spatial/AGENTS.md`）。
     - 出处：04 号 §8 P0 完成条件、§9 验收、根 AGENTS.md §4.0 / §4.1 / §4.9 / §4.10。
     - 验收：P0 完成条件逐条复核（任意长程无 NaN / 与开工前基线逐字节等价 / 脉冲可追溯）后标记 P0 完成。
     - 依赖：H-01~06。

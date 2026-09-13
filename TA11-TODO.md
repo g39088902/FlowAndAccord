@@ -60,10 +60,10 @@
      - ② `crates/sim_core/src/spatial/world_snapshot.rs`：`generate_snapshot()` 中赋值 `kind: accent.kind.as_str().to_string()`；
      - ③ `crates/sim_core/src/spatial/snapshot_bin/encode.rs`：FABS Section 21 正确写入 `accent_kind_code(accent.kind)`；
      - ④ `frontend/js/snapshot-bin.js`：Section 21 解码时映射 `kind = _enumTables.accentKind[kindCode]`，并由 `rustworld.js` 正确挂载至 `sim.accents`。
-  3. **自动化测试守卫**：将 RockCluster 与 GrassTuft 的快照解析纳入 `tools/test-snapshot-bin.js` 覆盖场景。
-- **现状核对**：快照四处同步已于 D-B1-4/5 同步就绪，`node tools/test-snapshot-bin.js` 4/4 场景（创世帧、稳态帧、存读档后帧、跨世界驻留表失效帧）已全绿。
+  3. **自动化测试守卫**：将 RockCluster 与 GrassTuft 的快照解析纳入 `tools/snapshot-check.js` 静态核对与 `test-wasm.js` 回归覆盖场景。
+- **现状核对**：快照四处同步已于 D-B1-4/5 同步就绪，`node tools/snapshot-check.js` 静态核对全绿（JSON 对拍门禁已随 JSON 快照通道移除，回归兜底走 `test-wasm.js` / `test-determinism.js` 存读档与跨世界场景）。
 - **出处**：[07-terrain-art.md](docs/plan/tech/07-terrain-art.md) §10.1、§10.4、根 AGENTS.md §4.5。
-- **验收**：`node tools/test-snapshot-bin.js` 退出码为 0，输出 `ALL_BIN_JSON_EQUAL ✅`。
+- **验收**：`node tools/snapshot-check.js` 退出码为 0。
 - **依赖**：TA-11-1。
 - **落地记录**：已于 D-B1-4/5 落地并通过全量快照比对门禁。
 
@@ -207,7 +207,7 @@
      - 若改动 Rust 代码，重编译 WASM 并同步双副本至 `frontend/rust/` 与 `frontend/`；
      - `node tools/test-wasm.js`（WASM 确定性与长程稳定）；
      - `node tools/test-determinism.js`（增强型确定性矩阵全通）；
-     - `node tools/test-snapshot-bin.js`（快照二进制与 JSON 零漂移）；
+     - `node tools/snapshot-check.js`（快照单通道静态核对）；
      - `node tools/config-check.js`（配置一致性无孤儿参数）；
      - `node tools/frontend-check.js`（前端 JS 语法与 DOM ID 完整）；
      - `node tools/doc-link-check.js`（Markdown 链接全可达）；
@@ -237,5 +237,5 @@
 | **四季节相** | 草丛嫩绿→深绿→秋金白穗→冬季低矮枯草；隆冬草叶不脱落且不消失；碎石四季常在无突变 | TA-11-4 | 跨年连续运行观察 |
 | **地表贴合** | 碎石底部微阴影接地，斜坡与河滩无悬空感；严格避开深水、浅水及禁行岩壁（`NO_WALK`） | TA-11-1、TA-11-5 | T1 山口与 T2 河谷模板切片遍历 |
 | **视口与性能** | 零每帧 GC 内存分配；视口剔除平滑无边缘截断；符合 §11.3 绘制增量 $\le 3\text{ms}$ 预算 | TA-11-6 | Chrome Performance / Memory Profile |
-| **确定性与生命周期** | 换世界/读档/回溯模型完全一致，无跨世界残留；独立加盐 RNG，不扰动模拟实体决策 | TA-11-1、TA-11-6 | `test-determinism.js`、`test-snapshot-bin.js` |
+| **确定性与生命周期** | 换世界/读档/回溯模型完全一致，无跨世界残留；独立加盐 RNG，不扰动模拟实体决策 | TA-11-1、TA-11-6 | `test-determinism.js` |
 | **工程质量** | 表现层配置集中于 `config.render.js`；单文件不超 800 行；快照四处同步与双副本就绪 | TA-11-2、TA-11-3、TA-11-8 | `frontend-check.js`、`config-check.js`、`bump-version.js` |

@@ -238,7 +238,7 @@ render.js 原 2128 行（800 行规范的 2.6 倍），v1.7.1 拆分为 5 个文
 
 **前端消费方**可能还包括 render.js / ledger-ui.js / decision-viz-view.js / dag.js，需同步更新读取逻辑。
 
-遗漏任何一处都会导致前端 `undefined` 或展示旧值；防漂移自动网 = `node tools/test-snapshot-bin.js`（二进制 ≡ JSON 逐字段深比较）。
+遗漏任何一处都会导致前端 `undefined` 或展示旧值；JSON 对拍门禁已随 JSON 快照通道移除（v1.50.33），同步核对走 `node tools/snapshot-check.js` + `test-wasm.js` / `test-determinism.js`。
 
 > ★ M4 相关派生缓存：`snapshot-bin.js` 维护跨帧字符串驻留缓存（引擎重建/读档/重置时必须调用 `SnapshotBin.resetCaches()`，rustworld 已在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 处理器调用）；**★ v1.46.0 起解码器自身也用 `STR_TAB.start_index == 0` 判「全新驻留表」自动清缓存**——判据**不能**用 `strtab_epoch`（新世界恒为 0，会导致换世界后 id→字符串串味，见根 AGENTS.md §4.5.1）；`rustworld.js` 维护车道/节点几何缓存（`_laneCache`/`_geomVersion`），增量帧（`snap.lanes===null`）只覆写 `wear`。**★ v1.50.33 D-B1-7**：静态地形三通道（features/accents/subFeatures）缓存与地形网格缓存（`_terrainCached`）拆分——增量帧三通道为 `null`（未发送）一律保留旧值、明确静态帧（数组，可为空）整组替换；静态数据与 `AccentModel` 模型缓存由 `_invalidateWorldStaticCaches()` 随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 消息生命周期失效（`STR_TAB.start_index==0` 判据仅管字符串驻留表，不替代世界生命周期处理，契约见 docs/plan/tech/06-terrain-templates.md §18.4）。
 
