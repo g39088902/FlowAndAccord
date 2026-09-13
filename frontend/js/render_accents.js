@@ -23,6 +23,11 @@
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
 //   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
 //
+// ★ TA-11-6（07 号 §6.7/§10.2）渲染热路径零 GC：模块级持久刮擦缓冲（碎石池 / 草叶池 /
+//   冠簇池 Tree·Bush 共用）+ projTo 复用点投影 + shearNormalInto / lightShadowOffset(out)
+//   零分配法线与阴影偏移 + 稳定性插入排序替代 items.sort()——装饰绘制循环稳态零逐帧堆分配
+//   （池条目只在容量不足时创建，字段每帧整体覆写；刮擦对象严禁跨绘制调用持有）。
+//
 // 职责分工（§6.7）：
 // - accent-season.js：季相与物种曲线（window.SimTreeTint 唯一生产者）
 // - accent-model.js：稳定形态派生 + 个体模型缓存（骨架 / 叶簇次序 / extent）
@@ -76,6 +81,60 @@ function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo) {
   const g = Math.max(0, Math.min(255, Math.round(_litOut[1] * kAo)));
   const b = Math.max(0, Math.min(255, Math.round(_litOut[2] * kAo)));
   return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+}
+
+// ★ TA-11-6 渲染热路径零 GC（07 号 §6.7/§10.2）：模块级持久刮擦缓冲，跨帧复用，
+// 稳态零逐帧堆分配。纪律：① 池条目只在容量不足时创建，字段每帧整体覆写；
+// ② 投影/法线/阴影偏移写入复用点对象（projTo / shearNormalInto / _shadowOffset），
+// 严禁返回字面量对象；③ 排序用稳定性插入排序 _sortScratch（n ≤ 16，无 sort() 闭包
+// 与临时包装分配，等深度次序与 Array.prototype.sort 一致）；④ 刮擦对象严禁跨绘制
+// 调用持有（同帧顺序复用，无重入）。
+var _ptA = { x: 0, y: 0, d: 0 }; // 共享投影点刮擦（各绘制函数内即取即用）
+var _ptB = { x: 0, y: 0, d: 0 };
+var _ptC = { x: 0, y: 0, d: 0 };
+var _ptD = { x: 0, y: 0, d: 0 };
+var _nrm = { x: 0, y: 0, z: 0 };         // 倾干剪切法线刮擦（shearNormalInto 消费）
+var _so = { x: 0, y: 0, alphaScale: 1 }; // 贴地阴影偏移刮擦（lightShadowOffset out 参数消费）
+
+// 碎石池条目 { st, g:{x,y,d} }；草叶池条目 { b, bx, by, tx, ty, h, d }；
+// 冠簇池条目（Tree/Bush 共用）{ c, px, py, pd, rr, v }。
+var _rockScratchPool = [];
+var _grassScratchPool = [];
+var _crownScratchPool = [];
+function _rockScratch(i) {
+  const p = _rockScratchPool;
+  while (p.length <= i) p.push({ st: null, g: { x: 0, y: 0, d: 0 }, d: 0 }); // d 镜像 g.d（扁平排序键）
+  return p[i];
+}
+function _grassScratch(i) {
+  const p = _grassScratchPool;
+  while (p.length <= i) p.push({ b: null, bx: 0, by: 0, tx: 0, ty: 0, h: 0, d: 0 });
+  return p[i];
+}
+function _crownScratch(i) {
+  const p = _crownScratchPool;
+  while (p.length <= i) p.push({ c: null, px: 0, py: 0, pd: 0, rr: 0, v: 0 });
+  return p[i];
+}
+
+// 稳定性插入排序（升序，按条目 key 字段）：n 小（叶 ≤ 6 / 簇 ≤ 24 / 石 ≤ 5），零分配。
+function _sortScratch(pool, n, key) {
+  for (let i = 1; i < n; i++) {
+    const it = pool[i];
+    const k = it[key];
+    let j = i - 1;
+    while (j >= 0 && pool[j][key] > k) { pool[j + 1] = pool[j]; j--; }
+    pool[j + 1] = it;
+  }
+}
+
+// 贴地阴影偏移零分配包装（render_world.js::lightShadowOffset 的 out 参数消费）
+function _shadowOffset(legacyX, legacyY, height) {
+  if (typeof lightShadowOffset === 'function') return lightShadowOffset(legacyX, legacyY, height, _so);
+  _so.x = legacyX * camera.zoom;
+  _so.y = legacyY * camera.zoom;
+  _so.alphaScale = 1;
+  return _so;
 }
 
 function drawAccentEntity(accent) {
@@ -138,12 +197,13 @@ function accentLeafPalette(color, vSeed) {
 }
 
 // 局部三维细节分级阈值（config.render.js；远景 < mid ≤ 中景 < near ≤ 近景）
+// ★ TA-11-6 零 GC：写入模块级复用对象（每装饰每帧 1 次，原先返回字面量对象）。
+var _detailLv = { mid: 7, near: 15 };
 function accentDetailLevels() {
   const RC = window.RENDER_CONFIG || {};
-  return {
-    mid: Number.isFinite(RC.accentDetailMidPx) ? RC.accentDetailMidPx : 7,
-    near: Number.isFinite(RC.accentDetailNearPx) ? RC.accentDetailNearPx : 15,
-  };
+  _detailLv.mid = Number.isFinite(RC.accentDetailMidPx) ? RC.accentDetailMidPx : 7;
+  _detailLv.near = Number.isFinite(RC.accentDetailNearPx) ? RC.accentDetailNearPx : 15;
+  return _detailLv;
 }
 
 // 叶簇脱落可见度（§6.4：先变色后减叶，短过渡带收缩淡出，禁止整冠透明度）。
@@ -156,6 +216,8 @@ function accentClusterVisibility(leaf, shed, fade) {
 
 // Tree：局部三维骨架乔木 —— 锥形倾干 + 主枝/二级枝 + 枝端椭球叶簇 + 贴地投影
 // scaled = accent.scale(0.7~1.4) × camera.zoom；season 为 TA-02 连续季相输出。
+// ★ TA-11-6 零 GC：投影走 projTo 复用点（top=_ptA / 枝 a=_ptB / 枝 b=_ptC / 簇·芽=_ptD），
+// 叶簇收集走 _crownScratchPool 冠簇池，簇间排序走稳定性插入排序（原 items.sort 闭包移除）。
 function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const vSeed = model.vSeed;
@@ -168,9 +230,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const detailNear = crownR >= lv.near; // 近景：二级枝 + 簇高光 + 春芽
 
   // 贴地投影：叶量调制（夏季完整冠影 → 冬季稀疏枝影 + 弱接地影，§6.5 过渡做法）
-  const so = (typeof lightShadowOffset === 'function')
-    ? lightShadowOffset(1.2, 2.5, 2.0)
-    : { x: 1.2 * camera.zoom, y: 2.5 * camera.zoom, alphaScale: 1 };
+  const so = _shadowOffset(1.2, 2.5, 2.0);
   const shadowK = 0.55 + 0.45 * leaf;
   ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.17 * so.alphaScale * (0.72 + 0.28 * leaf)).toFixed(3) + ')';
   ctx.beginPath();
@@ -180,20 +240,20 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   // 倾干剪切（世界 x，随个体 rotation 稳定；模型只存直立骨架）
   const leanShear = Math.cos(accent.rotation || 0) * 0.22;
 
-  // 局部三维 → 屏幕：与锚点同一套相机变换；d 越大越靠近视点（同深度队列公式）
-  function proj(dx, dy, dz) {
+  // 局部三维 → 屏幕：与锚点同一套相机变换（★ TA-11-6 写入复用点，零分配）；
+  // d 越大越靠近视点（同深度队列公式）
+  function projTo(dx, dy, dz, out) {
     const wx = dx + leanShear * dz;
     const rx = wx * cosZ - dy * sinZ;
     const ry = wx * sinZ + dy * cosZ;
-    return {
-      x: sx + rx * scaled,
-      y: sy + (ry * cosX - dz * sinX) * scaled,
-      d: ry * sinX + dz * cosX,
-    };
+    out.x = sx + rx * scaled;
+    out.y = sy + (ry * cosX - dz * sinX) * scaled;
+    out.d = ry * sinX + dz * cosX;
   }
 
   // 主干：底粗顶细的锥形曲干（沿用 v1.49.3 形状与配色，顶点改由三维投影得出）
-  const top = proj(0, 0, sk.trunkH);
+  const top = _ptA;
+  projTo(0, 0, sk.trunkH, top);
   const bw = Math.max(1.2, crownR * 0.17);
   const tw = Math.max(0.6, bw * 0.45);
   ctx.fillStyle = 'rgb(86, 62, 42)';
@@ -222,8 +282,9 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     ctx.lineCap = 'round';
     for (let i = 0; i < sk.segments.length; i++) {
       const seg = sk.segments[i];
-      const a = proj(seg.x1, seg.y1, seg.z1);
-      const b = proj(seg.x2, seg.y2, seg.z2);
+      const a = _ptB, b = _ptC;
+      projTo(seg.x1, seg.y1, seg.z1, a);
+      projTo(seg.x2, seg.y2, seg.z2, b);
       ctx.lineWidth = Math.max(0.5, bw * seg.wK);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
@@ -235,28 +296,25 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 
   // 叶簇：按 leafDensity × shed 次序收缩隐藏（§6.4）；色差随 brownness 加深（秋色簇间先后）
-  // ★ v1.50.27 漫画风两遍式树冠（用户反馈「内部簇间深描边太重」）：
-  //   旧画法逐簇「深色 rim 椭圆 + 本体椭圆」，相邻簇叠压处 rim 压在邻簇本体上，
-  //   冠内全是深色分界线，整冠读作一堆描边气泡。新画法：
-  //   Pass A 树冠剪影——全部可见簇先用同一「冠影色」（叶色压暗偏冷）扩边铺底，
-  //   重叠合并成一整块剪影，深色只留在整冠外缘一圈与簇间空隙（读作冠内阴影）；
-  //   Pass B 逐簇本体——基色 + lite 色差，再乘冠内体积明暗（下暗上亮、远暗近亮），
-  //   用体积分档替代描边提供立体感；近景高光只给冠层上半部。
+  // ★ v1.50.27 漫画风两遍式树冠：Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗。
+  //   ★ TA-11-6 零 GC：可见簇收集进冠簇池（字段覆写，稳态零分配）。
   const lw = Math.max(0.4, 0.5 * scaled);
   const fade = 0.09;
   const jitterAmp = 6 + 26 * brown;
-  const items = [];
+  let nItems = 0;
   for (let i = 0; i < sk.clusters.length; i++) {
     const c = sk.clusters[i];
     const v = accentClusterVisibility(leaf, c.shed, fade);
     if (v < 0.06) continue;
-    const p = proj(c.x, c.y, c.z);
+    const p = _ptD;
+    projTo(c.x, c.y, c.z, p);
     if (p.y < -40 || p.y > h + 40) continue; // 簇级视口剔除
     const rr = c.r * scaled * v;
     if (rr < 0.5) continue;
-    items.push({ p: p, c: c, rr: rr, v: v });
+    const it = _crownScratch(nItems++);
+    it.c = c; it.px = p.x; it.py = p.y; it.pd = p.d; it.rr = rr; it.v = v;
   }
-  items.sort(function (a, b) { return a.p.d - b.p.d; }); // 簇间画家排序：远 → 近
+  _sortScratch(_crownScratchPool, nItems, 'pd'); // 簇间画家排序：远 → 近（稳定）
 
   // 冠内体积/AO 分档基准：对整副骨架（非当帧可见簇）求 z 范围——
   // 秋季掉叶时幸存簇的明暗不随可见集跳变；纯 id 派生，读档/回溯逐位一致。
@@ -276,33 +334,34 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
     Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
   ctx.beginPath();
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
+  for (let i = 0; i < nItems; i++) {
+    const it = _crownScratchPool[i];
     const sw = lw + it.rr * 0.16;
-    ctx.moveTo(it.p.x + it.rr + sw, it.p.y);
-    ctx.ellipse(it.p.x, it.p.y, it.rr + sw, it.rr * 0.78 + sw, 0, 0, Math.PI * 2);
+    ctx.moveTo(it.px + it.rr + sw, it.py);
+    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * 0.78 + sw, 0, 0, Math.PI * 2);
   }
   ctx.fill();
 
   // Pass B：簇本体（基色 + lite 色差，再乘冠内体积/AO 分档 × 世界光向受光）
   // ★ TA-04-2 颜色管线：季节基础色 → 漫反射+环境光（簇法线点积，accentLitFill 单一入口）
   //   → intensity/tint 色温；体积分档只留与视角无关的 tZ（tD 已移除，转相机不变色）
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const j = (it.c.lite - 0.5) * 2 * jitterAmp;
-    const tZ = (it.c.z - zLo) / zSpan;   // 冠内高度 0 底 → 1 顶（体积/AO 档）
+  for (let i = 0; i < nItems; i++) {
+    const it = _crownScratchPool[i];
+    const c = it.c;
+    const j = (c.lite - 0.5) * 2 * jitterAmp;
+    const tZ = (c.z - zLo) / zSpan;      // 冠内高度 0 底 → 1 顶（体积/AO 档）
     const kZ = 0.80 + 0.20 * tZ;
-    // 簇法线（模型层冠包络外向法线）经倾干剪切逆转置补偿转到世界空间
-    const wn = window.AccentModel.shearNormal(it.c.nx, it.c.ny, it.c.nz, leanShear);
+    // 簇法线（模型层冠包络外向法线）经倾干剪切逆转置补偿转到世界空间（★ 零 GC Into 变体）
+    const wn = window.AccentModel.shearNormalInto(c.nx, c.ny, c.nz, leanShear, _nrm);
     ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, wn.x, wn.y, wn.z, kZ);
     ctx.beginPath();
-    ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
+    ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
     // 近景高光：只给冠层上半部（阳光自上而来）。★ 属屏幕固定位置，TA-04-4 改由世界光向投影驱动
     if (detailNear && it.rr > 2.2 && tZ > 0.30) {
       ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.20 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
-      ctx.ellipse(it.p.x - it.rr * 0.28, it.p.y - it.rr * 0.42, it.rr * 0.42, it.rr * 0.30, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(it.px - it.rr * 0.28, it.py - it.rr * 0.42, it.rr * 0.42, it.rr * 0.30, -0.4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -313,7 +372,8 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const br = Math.max(0.7, crownR * 0.055);
     for (let i = 0; i < sk.branchTips.length; i++) {
       const t = sk.branchTips[i];
-      const p = proj(t.x, t.y, t.z + 0.3);
+      const p = _ptD;
+      projTo(t.x, t.y, t.z + 0.3, p);
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, br, br * 1.3, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -363,6 +423,8 @@ function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
 }
 
 // Bush：局部三维细茎灌木 —— 基生多茎 + 茎端椭球叶簇 + 微投影（§6.4：不缩小乔木冒充灌木）
+// ★ TA-11-6 零 GC：投影走 projTo 复用点（茎 a=_ptB / b=_ptC / 控制点=_ptD / 簇=_ptA），
+// 叶簇收集走 _crownScratchPool 冠簇池 + 稳定性插入排序。
 function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const vSeed = model.vSeed;
@@ -373,24 +435,20 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const detailNear = r >= lv.near;
 
   // 贴地微投影（叶量调制）
-  const so = (typeof lightShadowOffset === 'function')
-    ? lightShadowOffset(1.2, 2.5, 0.7)
-    : { x: 1.2 * camera.zoom, y: 2.5 * camera.zoom, alphaScale: 1 };
+  const so = _shadowOffset(1.2, 2.5, 0.7);
   const shadowK = 0.60 + 0.40 * leaf;
   ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.15 * so.alphaScale * (0.75 + 0.25 * leaf)).toFixed(3) + ')';
   ctx.beginPath();
   ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, r * 0.95 * shadowK, r * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 局部三维 → 屏幕（灌木无倾干）
-  function proj(dx, dy, dz) {
+  // 局部三维 → 屏幕（灌木无倾干；★ TA-11-6 写入复用点，零分配）
+  function projTo(dx, dy, dz, out) {
     const rx = dx * cosZ - dy * sinZ;
     const ry = dx * sinZ + dy * cosZ;
-    return {
-      x: sx + rx * scaled,
-      y: sy + (ry * cosX - dz * sinX) * scaled,
-      d: ry * sinX + dz * cosX,
-    };
+    out.x = sx + rx * scaled;
+    out.y = sy + (ry * cosX - dz * sinX) * scaled;
+    out.d = ry * sinX + dz * cosX;
   }
 
   // 细茎（全年保留；冬季枯枝为主）
@@ -400,10 +458,11 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     ctx.lineWidth = Math.max(0.5, 0.9 * scaled);
     for (let i = 0; i < sk.segments.length; i++) {
       const seg = sk.segments[i];
-      const a = proj(seg.x1, seg.y1, seg.z1);
-      const b = proj(seg.x2, seg.y2, seg.z2);
+      const a = _ptB, b = _ptC, c = _ptD;
+      projTo(seg.x1, seg.y1, seg.z1, a);
+      projTo(seg.x2, seg.y2, seg.z2, b);
       // 控制点取 40% 高度处、水平位置取 55% 外倾 —— 茎先直立后外弯
-      const c = proj(seg.x2 * 0.55, seg.y2 * 0.55, seg.z2 * 0.40);
+      projTo(seg.x2 * 0.55, seg.y2 * 0.55, seg.z2 * 0.40, c);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.quadraticCurveTo(c.x, c.y, b.x, b.y);
@@ -413,22 +472,23 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 
   // 叶簇：同 Tree 的脱落/色差/排序规则，扁压 squash 让簇丛贴地
-  // ★ v1.50.27 与 Tree 同步改两遍式剪影 + 体积明暗（去逐簇深描边），并修复
-  //   旧版高光 `0.18 * it.v` 的 it.v 未入 items 恒 NaN、高光从未生效的问题
+  // ★ v1.50.27 与 Tree 同步改两遍式剪影 + 体积明暗；★ TA-11-6 零 GC 冠簇池收集。
   const lw = Math.max(0.4, 0.45 * scaled);
   const fade = 0.09;
   const jitterAmp = 6 + 26 * brown;
-  const items = [];
+  let nItems = 0;
   for (let i = 0; i < sk.clusters.length; i++) {
     const c = sk.clusters[i];
     const v = accentClusterVisibility(leaf, c.shed, fade);
     if (v < 0.06) continue;
-    const p = proj(c.x, c.y, c.z);
+    const p = _ptA;
+    projTo(c.x, c.y, c.z, p);
     const rr = c.r * scaled * v;
     if (rr < 0.5) continue;
-    items.push({ p: p, c: c, rr: rr, v: v });
+    const it = _crownScratch(nItems++);
+    it.c = c; it.px = p.x; it.py = p.y; it.pd = p.d; it.rr = rr; it.v = v;
   }
-  items.sort(function (a, b) { return a.p.d - b.p.d; });
+  _sortScratch(_crownScratchPool, nItems, 'pd');
 
   // 冠内体积/AO 分档基准（同 Tree：整副骨架求范围，秋季幸存簇明暗不随可见集跳变；
   // ★ TA-04-2 起投影深度 tD 不参与明暗，只留与视角无关的 tZ 档）
@@ -446,29 +506,30 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
     Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
   ctx.beginPath();
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
+  for (let i = 0; i < nItems; i++) {
+    const it = _crownScratchPool[i];
     const sw = lw + it.rr * 0.16;
-    ctx.moveTo(it.p.x + it.rr + sw, it.p.y);
-    ctx.ellipse(it.p.x, it.p.y, it.rr + sw, it.rr * 0.72 + sw, 0, 0, Math.PI * 2);
+    ctx.moveTo(it.px + it.rr + sw, it.py);
+    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * 0.72 + sw, 0, 0, Math.PI * 2);
   }
   ctx.fill();
 
   // Pass B：簇本体 + 冠内体积/AO 分档 × 世界光向受光（★ TA-04-2，同 Tree 管线；灌木无倾干）
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const j = (it.c.lite - 0.5) * 2 * jitterAmp;
-    const tZ = (it.c.z - zLo) / zSpan;
+  for (let i = 0; i < nItems; i++) {
+    const it = _crownScratchPool[i];
+    const c = it.c;
+    const j = (c.lite - 0.5) * 2 * jitterAmp;
+    const tZ = (c.z - zLo) / zSpan;
     const kZ = 0.80 + 0.20 * tZ;
-    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, it.c.nx, it.c.ny, it.c.nz, kZ);
+    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, c.nx, c.ny, c.nz, kZ);
     ctx.beginPath();
-    ctx.ellipse(it.p.x, it.p.y, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
+    ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
     ctx.fill();
     // 近景高光属屏幕固定位置，TA-04-4 改由世界光向投影驱动
     if (detailNear && it.rr > 2.0 && tZ > 0.30) {
       ctx.fillStyle = 'rgba(255, 252, 218, ' + (0.18 * it.v * (0.35 + 0.65 * tZ)).toFixed(3) + ')';
       ctx.beginPath();
-      ctx.ellipse(it.p.x - it.rr * 0.28, it.p.y - it.rr * 0.40, it.rr * 0.40, it.rr * 0.28, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(it.px - it.rr * 0.28, it.py - it.rr * 0.40, it.rr * 0.40, it.rr * 0.28, -0.4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -496,14 +557,13 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   const shadowAlpha = Number.isFinite(RC.accentRockClusterShadowAlpha) ? RC.accentRockClusterShadowAlpha : 0.14;
   const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
 
-  function proj(dx, dy, dz) {
+  // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
+  function projTo(dx, dy, dz, out) {
     const rx = dx * cosZ - dy * sinZ;
     const ry = dx * sinZ + dy * cosZ;
-    return {
-      x: sx + rx * scaled,
-      y: sy + (ry * cosX - dz * sinX) * scaled,
-      d: ry * sinX + dz * cosX,
-    };
+    out.x = sx + rx * scaled;
+    out.y = sy + (ry * cosX - dz * sinX) * scaled;
+    out.d = ry * sinX + dz * cosX;
   }
 
   // 岩面个体色差：lite 通道小幅整体明暗（±10），保持 Boulder 低饱和灰岩色板（§4.1）。
@@ -517,26 +577,27 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     ];
   }
 
-  // 子石收集 + 深度画家排序（远 → 近）
-  const items = [];
+  // 子石收集 + 深度画家排序（远 → 近；★ TA-11-6 碎石池 + 稳定性插入排序，零分配）
+  let nItems = 0;
   for (let i = 0; i < sk.stones.length; i++) {
     const st = sk.stones[i];
     const gx = st.x * cR - st.y * sR;
     const gy = st.x * sR + st.y * cR;
-    items.push({ st: st, g: proj(gx, gy, 0) });
+    const it = _rockScratch(nItems++);
+    it.st = st;
+    projTo(gx, gy, 0, it.g);
+    it.d = it.g.d;
   }
-  items.sort(function (a, b) { return a.g.d - b.g.d; });
+  _sortScratch(_rockScratchPool, nItems, 'd');
 
   // 微接触落底阴影（先画，被子石压住）：簇群整片 + 逐石接触椭圆（主石略强）
-  const so = (typeof lightShadowOffset === 'function')
-    ? lightShadowOffset(0.6, 1.2, 0.4)
-    : { x: 0.6 * camera.zoom, y: 1.2 * camera.zoom, alphaScale: 1 };
+  const so = _shadowOffset(0.6, 1.2, 0.4);
   ctx.fillStyle = 'rgba(25, 20, 15, ' + (shadowAlpha * so.alphaScale).toFixed(3) + ')';
   ctx.beginPath();
   ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
+  for (let i = 0; i < nItems; i++) {
+    const it = _rockScratchPool[i];
     const r = it.st.r * scaled;
     if (r < lodMinR) continue;
     ctx.fillStyle = 'rgba(25, 20, 15, ' + ((it.st === sk.stones[0] ? stoneShadowAlpha + 0.02 : stoneShadowAlpha) * so.alphaScale).toFixed(3) + ')';
@@ -545,8 +606,8 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     ctx.fill();
   }
 
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
+  for (let i = 0; i < nItems; i++) {
+    const it = _rockScratchPool[i];
     const st = it.st;
     const r = st.r * scaled;
     if (r < lodMinR) continue; // 微碎石在远景不可辨，直接省略
@@ -644,47 +705,51 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     ? RC.accentGrassTuftWinterHeightRatio : 0.62;
   const hK = winterK + (1 - winterK) * season.leafDensity;
 
-  function proj(dx, dy, dz) {
+  // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
+  function projTo(dx, dy, dz, out) {
     const rx = dx * cosZ - dy * sinZ;
     const ry = dx * sinZ + dy * cosZ;
-    return {
-      x: sx + rx * scaled,
-      y: sy + (ry * cosX - dz * sinX) * scaled,
-      d: ry * sinX + dz * cosX,
-    };
+    out.x = sx + rx * scaled;
+    out.y = sy + (ry * cosX - dz * sinX) * scaled;
+    out.d = ry * sinX + dz * cosX;
   }
 
   // 草色 + 芦花穗量/穗色：季相派生单一入口 grassSeasonColor（TA-11-4，见本文件上方）
   const sc = grassSeasonColor(season);
 
   // 贴地接触投影（弱于灌木）
-  const so = (typeof lightShadowOffset === 'function')
-    ? lightShadowOffset(0.8, 1.6, 0.5)
-    : { x: 0.8 * camera.zoom, y: 1.6 * camera.zoom, alphaScale: 1 };
+  const so = _shadowOffset(0.8, 1.6, 0.5);
   ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.10 * so.alphaScale).toFixed(3) + ')';
   ctx.beginPath();
   ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, 2.6 * scaled, 1.1 * scaled, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 草叶收集 + 深度画家排序（叶尖投影深度，远 → 近）
-  const items = [];
+  // 草叶收集 + 深度画家排序（叶尖投影深度，远 → 近；★ TA-11-6 草叶池 + 稳定性插入排序，零分配）
+  let nItems = 0;
   for (let i = 0; i < sk.blades.length; i++) {
     const b = sk.blades[i];
-    const bx = b.bx * cR - b.by * sR;
-    const by = b.bx * sR + b.by * cR;
-    const tx = b.tx * cR - b.ty * sR;
-    const ty = b.tx * sR + b.ty * cR;
-    items.push({ b: b, bx: bx, by: by, tx: tx, ty: ty, h: b.h * hK, d: proj(tx, ty, b.h * hK).d });
+    const it = _grassScratch(nItems++);
+    it.b = b;
+    it.bx = b.bx * cR - b.by * sR;
+    it.by = b.bx * sR + b.by * cR;
+    it.tx = b.tx * cR - b.ty * sR;
+    it.ty = b.tx * sR + b.ty * cR;
+    it.h = b.h * hK;
+    projTo(it.tx, it.ty, it.h, _ptA);
+    it.d = _ptA.d;
   }
-  items.sort(function (a, b2) { return a.d - b2.d; });
+  _sortScratch(_grassScratchPool, nItems, 'd');
 
   ctx.lineCap = 'round';
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i];
-    const p0 = proj(it.bx, it.by, 0);
-    const p1 = proj(it.tx, it.ty, it.h);
+  for (let i = 0; i < nItems; i++) {
+    const it = _grassScratchPool[i];
+    const p0 = _ptB;
+    const p1 = _ptC;
+    const c = _ptD;
+    projTo(it.bx, it.by, 0, p0);
+    projTo(it.tx, it.ty, it.h, p1);
     // 控制点：半高、外倾 25% —— 叶先立后弯不僵硬
-    const c = proj(it.bx + (it.tx - it.bx) * 0.25, it.by + (it.ty - it.by) * 0.25, it.h * 0.5);
+    projTo(it.bx + (it.tx - it.bx) * 0.25, it.by + (it.ty - it.by) * 0.25, it.h * 0.5, c);
     const k = 0.86 + 0.28 * it.b.lite; // 个体色差（同 Tree/Bush lite 通道语义）
     ctx.strokeStyle = 'rgb(' +
       Math.round(Math.max(0, Math.min(255, sc.r * k))) + ',' +

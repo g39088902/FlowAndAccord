@@ -18,7 +18,7 @@
 | **TA-11-3** | 渲染表现层配置集中化与魔数解耦 | `config.render.js` / `accent-model.js` / `render_accents.js` | 低 | TA-11-2 | ✅ 已落地（v1.50.34） |
 | **TA-11-4** | 草丛生态形态扩展：水岸芦草变体与季相微调 | `accent-model.js` / `render_accents.js` / `config.render.js` | 中 | TA-11-3 | ✅ 已落地 |
 | **TA-11-5** | 碎石群地貌表现升级：微接触阴影与岩面分层 | `render_accents.js` / `config.render.js` | 低 | TA-11-3 | ✅ 已落地 |
-| **TA-11-6** | 渲染热路径零 GC 改造与缓存生命周期审计 | `render_accents.js` / `accent-model.js` / `rustworld.js` | 中 | TA-11-4、TA-11-5 | ⏳ 待实施 |
+| **TA-11-6** | 渲染热路径零 GC 改造与缓存生命周期审计 | `render_accents.js` / `accent-model.js` / `rustworld.js` | 中 | TA-11-4、TA-11-5 | ✅ 已落地 |
 | **TA-11-7** | Chrome 端到端四季视觉与动态操作验收 | 前端视口 / 浏览器交互环境 | 中 | TA-11-6 | ⏳ 待实施 |
 | **TA-11-8** | 门禁全绿、版本规范自增与规划文档状态同步 | 全链路门禁 / `07-terrain-art.md` / `01-changelog.md` | 低 | TA-11-7 | ⏳ 待实施 |
 
@@ -169,6 +169,7 @@
   - Chrome DevTools 内存面板录制 60 秒平稳运行 Profile，装饰绘制循环中 `items` 对象分配量为 0（零每帧内存阶梯上升）；
   - 执行重置世界（RESET）或加载存档（LOAD），模型缓存平稳释放重建，无内存泄漏与旧世界 ID 串味。
 - **依赖**：TA-11-4、TA-11-5。
+- **落地记录**：✅ 已落地（v1.50.37，绘制指令序列对拍零行为漂移）。①刮擦池三件（`render_accents.js` 模块级持久缓冲）：`_rockScratchPool`（`{st, g:{x,y,d}, d}`）/ `_grassScratchPool`（`{b, bx, by, tx, ty, h, d}`）/ `_crownScratchPool`（Tree/Bush 共用 `{c, px, py, pd, rr, v}`），条目只在容量不足时创建、字段每帧整体覆写——四类装饰的 `const items = []` + 逐条目字面量分配全部移除；②投影与法线零分配：四绘制函数 `proj()` 改 `projTo(..., out)` 写入复用点 `_ptA~_ptD`，`accent-model.js` 新增 `shearNormalInto`（原 `shearNormal` 保留兼容），`render_world.js::lightShadowOffset` 加向后兼容可选 `out` 参数（经 `_shadowOffset` 包装消费 `_so`），`accentDetailLevels` 改写模块级复用对象；③排序零分配：`items.sort(闭包)` 改稳定性插入排序 `_sortScratch`（等深度次序与 `Array.prototype.sort` 一致）；④包围盒校准：`extentOf` GrassTuft 5→7（芦草 6.0 + 穗高位），核对 `drawAccentEntity` upMargin/xMargin 覆盖芦草与碎石外散；⑤缓存生命周期：`rustworld.js::_invalidateWorldStaticCaches` 在 READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 四事件调用 `AccentModel.resetCache()`（D-B1-7 已接，审计确认无改动）；⑥未知类型防御复核有效。临时断言（§4.10 已删）：重构后 vs git HEAD 基线 **29326 条桩 ctx 绘制指令逐位一致**；200 帧后池长度收敛 rock 5 / grass 6 / crown 16 零增长；未知 kind 3s 窗口限频 1 条。剩余已知逐帧小对象（`SimTreeTint.sample` 结果对象、`SimLighting.shadowOffset` 返回对象）属 accent-season/lighting 层契约，不在本任务文件范围。门禁 `frontend-check` / `cargo test --lib` / 重编译 WASM 双副本 / `test-wasm` / `test-determinism`(6/6) / `config-check` / `doc-link-check` / `cross-doc-check` / `bump --check` 全绿。
 
 ---
 

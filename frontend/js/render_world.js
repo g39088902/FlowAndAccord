@@ -12,12 +12,16 @@ const RC = window.RENDER_CONFIG || {};
 
 // ★ 动态季节光照：贴地阴影偏移 = 世界空间光向 → 屏幕投影（随相机旋转）
 //   关闭动态光照时回退 v1.47.11 的固定屏幕偏移，保证 A/B 对照
-function lightShadowOffset(legacyX, legacyY, height) {
+// 传入 out（复用点对象）时零分配写入（★ TA-11-6 热路径消费）；省略时保持返回新对象的既有行为。
+function lightShadowOffset(legacyX, legacyY, height, out) {
   const L = window.SimLighting;
   if (L && L.enabled()) {
     const o = L.shadowOffset(height);
-    return { x: o.dx, y: o.dy, alphaScale: Math.max(0.75, Math.min(1.5, L.shadowAlpha() / 0.24)) };
+    const alphaScale = Math.max(0.75, Math.min(1.5, L.shadowAlpha() / 0.24));
+    if (out) { out.x = o.dx; out.y = o.dy; out.alphaScale = alphaScale; return out; }
+    return { x: o.dx, y: o.dy, alphaScale: alphaScale };
   }
+  if (out) { out.x = legacyX * camera.zoom; out.y = legacyY * camera.zoom; out.alphaScale = 1; return out; }
   return { x: legacyX * camera.zoom, y: legacyY * camera.zoom, alphaScale: 1 };
 }
 

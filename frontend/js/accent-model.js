@@ -115,6 +115,16 @@ window.AccentModel = window.AccentModel || (function () {
     return { x: nx / len, y: ny / len, z: wz / len };
   }
 
+  // ★ TA-11-6 零 GC 变体：同 shearNormal 公式，结果写入调用方复用的 out 对象（热路径消费）。
+  function shearNormalInto(nx, ny, nz, s, out) {
+    const wz = nz - s * nx;
+    const len = Math.hypot(nx, ny, wz) || 1;
+    out.x = nx / len;
+    out.y = ny / len;
+    out.z = wz / len;
+    return out;
+  }
+
   // ── Tree：锥形主干 + 主枝/二级枝 + 叶簇（§6.4：每树 12~24 簇，枝条全年保留）──
   // segments：枝干线段（局部三维端点 + 相对干宽系数 wK）；clusters：叶簇
   // （局部三维附着点 + 世界单位半径 r + 稳定脱落次序 shed + 色差通道 lite）。
@@ -348,7 +358,7 @@ window.AccentModel = window.AccentModel || (function () {
     if (kind === 'Bush') return 8;
     if (kind === 'Boulder') return 7;
     if (kind === 'RockCluster') return 10; // 主石半径×1.2 变径上限 + 散布
-    if (kind === 'GrassTuft') return 5;    // 短草叶高上限
+    if (kind === 'GrassTuft') return 7;    // ★ TA-11-6：5→7 覆盖芦草株高（6.0）+ 芦花穗（+1.5）高位
     return 8;
   }
 
@@ -385,7 +395,8 @@ window.AccentModel = window.AccentModel || (function () {
   return {
     get: get,
     resetCache: resetCache,
-    shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置），绘制层每帧消费
+    shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置）——返回新对象，兼容外部调用
+    shearNormalInto: shearNormalInto, // ★ TA-11-6 零 GC 变体（写入调用方复用 out），热路径消费
     hash: _accentHash, // 对外别名（避免消费方绕过本文件直接依赖全局函数名）
   };
 })();
