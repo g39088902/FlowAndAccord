@@ -55,7 +55,7 @@ stateDiagram-v2
 - **道路**：管线层级反转（地表 → 道路 → 实体），默认观察为低饱和土石五级自然色阶，明艳色阶与外发光仅保留在 `R` 键热力图模式。
 - **水系**：T2 内核河道/岸线/浅滩/泉谷 + 清透碧蓝水体三层落笔（深底/主流/波光）；v1.49.1 移除手绘沙滩金砂线，v1.50.20 河面按剖分区间逐段并入深度队列。
 - **深度排序**：`drawWorldEntities()` 统一深度队列——地形格、水系、道路 16 分段、营地辖区连线、POI 底座/标记、房屋、族人、地表装饰、沙盘侧壁全部按相机深度远 → 近落笔，稳定排序保确定性，拾取遍历与绘制队列解耦。
-- **内核地貌**：T0 地表查询（`sample_elevation` / `validate_footprint`）、T1 山口聚落 `mountain_pass_v1`、T2 两岸河谷 `river_valley_v1`，`terrainProfile: 'random'` 按种子哈希 ~50% 轮换并回写入档，生成器版本 4。
+- **内核地貌**：T0 地表查询（`sample_elevation` / `validate_footprint`）、T1 山口聚落 `mountain_pass_v1`、T2 两岸河谷 `river_valley_v1`，`terrainProfile: 'random'` 按种子哈希 ~50% 轮换并回写入档，生成器版本 5（v1.50.41 TB-01 多尺度噪声与支脊系统后递增）。
 - **D-A 装饰基础**：`geo/accents.rs` 五类枚举（Tree/Bush/Boulder/RockCluster/GrassTuft，五类均已生成）、独立盐值 RNG、基数树 40 / 石 20 / 灌木 25 × 密度、FABS Section 21 持久化、前端 `drawAccentEntity` 绘制上述五类；v1.50.21 落地三档树冠季相（鲜绿 → 黄绿 → 红褐，快照季节驱动）。★ v1.50.23 TA-01：装饰代码自 `render_terrain.js` 迁出为 `accent-season.js`（SimTreeTint）/ `accent-model.js`（个体模型缓存）/ `render_accents.js`（绘制入口）三文件。
 
 ### 1.2 任务总表
@@ -185,7 +185,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 - [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`；★ v1.50.33 D-B1-7 起 `_terrainCached` 仅管地形网格，静态特征/装饰/子特征三通道独立裁决，`_invalidateWorldStaticCaches()` 随世界生命周期失效）。
 - [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
 - [渲染表现层参数](../../../frontend/js/config.render.js)（`window.RENDER_CONFIG`，不注入 WASM、不并入 SIM_CONFIG）。
-- [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 4 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
+- [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 5 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
 ## 4. 统一美术规则
 

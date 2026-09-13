@@ -631,7 +631,9 @@ pub struct TerrainSubFeature {
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
 ///           同时移除 `generate_with_profile` 无配置的兼容入口，旧存档按版本门禁拒绝）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 4;
+/// v1.50.41：4 -> 5（TB-01 多尺度 fBm 噪声与支脊系统：高程场实质性变更，
+///           旧路网叠加新地貌会幽灵穿模，旧存档按版本门禁拒绝）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 5;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

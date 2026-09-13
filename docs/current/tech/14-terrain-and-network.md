@@ -49,7 +49,7 @@ stateDiagram-v2
 - T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
 - `TerrainMap::validate_curve` 对贝塞尔路线进行按长度自适应采样并检查走廊两侧地表；当前已提供 T0 校验原语，后续路网生成器接入后再替换现有全图直线铺路。
-- 地形生成器版本为 `4`（v1.50.17 T1-R 主脊通行力修复后递增；此前 v1.47.7 为 3），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
+- 地形生成器版本为 `5`（v1.50.41 TB-01 多尺度噪声与支脊系统落地后递增；此前 v1.50.17 T1-R 主脊通行力修复为 4、v1.47.7 为 3），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
 
 ### 贝塞尔曲线 3D 路网 (`LaneGraph3D`)
 - 节点与双向三次贝塞尔曲线车道构成拓扑网络，曲线定义见 `curve.rs`。
@@ -334,7 +334,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 ### 9.1 RNG 分域与 Profile 模板选择
 
-✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 3`（v1.47.7 删除 T1 台地压平后递增）：
+✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 5`（v1.50.41 TB-01 多尺度噪声与支脊系统后递增；此前 v1.50.17 为 4、v1.47.7 为 3）：
 
 ```text
 terrain_seed = seed
