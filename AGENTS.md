@@ -48,7 +48,7 @@
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
-| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：39 JS 文件职责边界（含 M4 `snapshot-bin.js` 与 S4-02 资源景观套件）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
+| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：40 JS 文件职责边界（含 M4 `snapshot-bin.js` 与 S4-02/S4-03 资源景观套件）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -65,13 +65,13 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.47)"]
+    F --> G["浏览器 UI (版本: v1.50.48)"]
 
 ```
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化 + ★ M4 FABS 二进制帧快照、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（39 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`render_accents.js`/`render_grass.js` 与 S4-02 资源景观套件 `landscape-model.js`/`render_landscapes.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+- **`frontend/`**：原生静态前端（40 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`render_accents.js`/`render_grass.js` 与 S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
 ---
 
@@ -122,7 +122,7 @@ node frontend/server.js           # http://localhost:3004
 
 1. 访问 `http://localhost:3004`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.47`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.48`**。
 
 
 ---

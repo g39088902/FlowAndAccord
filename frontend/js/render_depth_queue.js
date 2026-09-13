@@ -362,6 +362,10 @@ function drawWorldEntities() {
   }
 
   // ── 6. 立体实体（原 v1.47.9 队列，收集顺序 = 同深度 tie-break 次序）──
+  // ★ S4-03 遮罩同步（幂等；内部先 LandscapeModel.sync 再按签名更新保护区脏桶），
+  //   须先于装饰收集执行——装饰遮蔽判定（保护区命中 ∨ 景观重叠去重）按修订号缓存。
+  const _mask = window.LandscapeMask;
+  if (_mask) _mask.sync(sim);
   // POI 标记：图标/储量环/门牌以锚点为中心半径 ~14-22 世界单位，同样走足迹感知深度
   for (const poi of sim.pois || []) {
     const dd = _decalDepth(poi.pos.x, poi.pos.y, RC.poiMarkerFootprintR || 20, cosZ, sinZ, cosX, sinX);
@@ -372,6 +376,9 @@ function drawWorldEntities() {
   }
   const terrainAccents = (terrain && terrain.accents) || [];
   for (const accent of terrainAccents) {
+    // ★ S4-03：落入保护区（道路/房屋/POI）或与可见景观子图元重叠的基础装饰整体隐藏，
+    //   源数组保持不变（避让只隐藏表现；贴地投影随同不入队）
+    if (_mask && _mask.accentHidden(accent)) continue;
     // ★ v1.50.13 石头/灌木宽约 6 世界单位，走足迹感知深度消除底边残缝
     const dd = _decalDepth(accent.x, accent.y, RC.accentFootprintR || 8, cosZ, sinZ, cosX, sinX);
     _depthItem(DEPTH_ACCENT, accent, 0, dd != null ? dd : _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX));
@@ -388,6 +395,7 @@ function drawWorldEntities() {
     for (const accent of terrainAccents) {
       const kind = accent.kind;
       if (kind !== 'Tree' && kind !== 'Bush') continue;
+      if (_mask && _mask.accentHidden(accent)) continue; // ★ S4-03：被遮蔽装饰的投影随同隐藏
       const skel = window.AccentModel.get(accent).skeleton;
       if (!skel) continue;
       const hWorld = skel.trunkH * accent.scale;

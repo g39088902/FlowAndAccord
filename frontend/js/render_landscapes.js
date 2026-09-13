@@ -1,9 +1,11 @@
 // === 资源景观绘制接入层（★ S4-02，STAGE-04-TODO §3.1/§3.4）===
 // LandscapeModel 派生组（landscape-model.js）→ 统一深度队列的接入层：
 // - collectLandscapes(...)：由 render_depth_queue.js::drawWorldEntities() 在装饰阴影段之后
-//   调用——先 LandscapeModel.sync(sim)（静态签名变化才重建几何），再把每个子图元与
-//   树/灌木贴地投影分别入队（DEPTH_LANDSCAPE / DEPTH_LANDSCAPE_SHADOW，深度口径与
-//   装饰一致走 _decalDepth 足迹感知深度）。**本层不做绘制逻辑，也严禁把配方/索引搬进队列层**。
+//   调用——先 LandscapeModel.sync(sim)（静态签名变化才重建几何；遮罩层已在装饰段前同步过，
+//   此处幂等兜底），再把每个子图元与树/灌木贴地投影分别入队（DEPTH_LANDSCAPE /
+//   DEPTH_LANDSCAPE_SHADOW，深度口径与装饰一致走 _decalDepth 足迹感知深度）。
+//   **本层不做绘制逻辑，也严禁把配方/索引/遮罩搬进队列层**；保护区遮蔽判定委托
+//   landscape-mask.js::childHidden（S4-03），被遮蔽子图元连同投影不入队。
 // - drawLandscapeChild / drawLandscapeShadowGround：深度队列分发入口——立体树石草复用
 //   render_accents.js / render_grass.js 既有图元（drawAccentTree/Boulder/Bush/RockCluster/
 //   GrassTuft），阴影复用 render_shadows.js::drawAccentShadowFor（模型参数化主体），
@@ -83,6 +85,10 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
     const children = groups[gi].children;
     for (let ci = 0; ci < children.length; ci++) {
       const child = children[ci];
+      // ★ S4-03 保护区遮蔽：道路/房屋/POI 命中的子图元整体隐藏（阴影随同不入队），
+      //   判定已在占据网格重建时预判（child._masked），此处零距离计算
+      const LM = window.LandscapeMask;
+      if (LM && LM.childHidden(child)) continue;
       // 视口粗剔除（与装饰同余量口径）：屏外子图元不入队、不占预算
       const rx = child.x * cosZ - child.y * sinZ;
       const ry = child.x * sinZ + child.y * cosZ;

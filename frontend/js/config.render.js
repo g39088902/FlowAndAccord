@@ -157,6 +157,16 @@ window.RENDER_CONFIG = {
   landscapeStyleVersion: 1,     // 景观配方风格版本（组缓存/模型缓存键组成部分；调值整体重建）
   landscapeCacheMaxGroups: 256, // 景观组模型缓存上限（超限整体清空，不 LRU；§3.2 有界缓存）
   landscapeFrameChildBudget: 420, // 每帧入队子图元（含阴影）硬上限；按固定遍历序截断（§3.4 预算）
+  // —— 景观遮罩（★ S4-03，STAGE-04-TODO §3.3；landscape-mask.js 消费）——
+  // 全部距离/半径均为**世界单位**（遮罩查询在世界空间命中，不涉及显示像素；
+  // 世界 → 屏幕换算只在绘制端经 camera.zoom 一次）。
+  landscapeMaskEnabled: true,   // 遮罩总开关（false = 景观与基础装饰全部按原样绘制；纯前端开关）
+  landscapeMaskBinSize: 96,     // 保护区空间分桶边长（世界单位；查询先取足迹相交桶再精确测距）
+  landscapeMaskLaneRadius: 9,   // 车道胶囊保护半径（世界单位，含路面与磨损外晕余量）
+  landscapeMaskLaneSamples: 36, // 每条车道采样细分上限（目标弦距 ≤10 世界单位，弦差须小于留白余量；异常段退化为端点包围区）
+  landscapeMaskHouseRadius: 18, // 房屋保守保护圆（世界单位：Tier4 半宽 8.4 + 接触影 + 入口余量；入口未映射按周边整体保护）
+  landscapeMaskPoiExtraRadius: 4, // POI 操作区在 max(底座半径, 图标世界尺寸~12) 基础上的额外余量（复用 poiBase* 同源键；poiMarkerFootprintR 是深度辅助半径非视觉占地，禁用作保护半径）
+  landscapeMaskMargin: 2,       // 通用留白余量（世界单位；车道采样弦差须小于该值）
   landscapeRecipes: {           // 配方表（role 顺序 = 候选生成顺序；slots = 每 role 候选上限 K）
     Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草；水面候选由模型层拒绝（不画新泉池）
       { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },

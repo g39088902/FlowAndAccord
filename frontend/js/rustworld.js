@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.47';
+        this._appVersion = '1.50.48';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.47';
+            this._appVersion = msg.appVersion || '1.50.48';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -309,6 +309,8 @@
         if (window.AccentModel) window.AccentModel.resetCache();
         // ★ S4-02：资源景观组缓存与装饰模型缓存同一消息生命周期失效（换世界不残留旧景观组）
         if (window.LandscapeModel) window.LandscapeModel.resetCache();
+        // ★ S4-03：保护区索引与占据网格同一生命周期失效（不使用旧世界索引）
+        if (window.LandscapeMask) window.LandscapeMask.resetCache();
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -442,7 +444,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.47';
+        return this._appVersion || '1.50.48';
 
       }
 

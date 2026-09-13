@@ -161,6 +161,7 @@ window.LandscapeModel = window.LandscapeModel || (function () {
   const _groups = [];       // 当前世界组列表（poi 顺序，稳定）
   const _groupByKey = new Map();
   let _staticSig = null;    // 静态事实签名（POI id/type/pos + 地形网格标识 + 配方版本）
+  let _version = 0;         // 组几何版本号（每次重建 +1；★ S4-03 遮罩占据网格以此判重建）
 
   function resetCache() {
     _groups.length = 0;
@@ -263,6 +264,7 @@ window.LandscapeModel = window.LandscapeModel || (function () {
     if (sig !== _staticSig) {
       resetCache();
       _staticSig = sig;
+      _version++;
       _terr = terrainReady(sim.terrain) ? sim.terrain : null;
       // 地形不可用 → 不生成任何组（单组派生失败回退基础标记，待静态帧到达后重建）
       if (!_terr) return;
@@ -300,6 +302,7 @@ window.LandscapeModel = window.LandscapeModel || (function () {
     groups: groups,
     groupOf: groupOf,
     resetCache: resetCache,
+    version: function () { return _version; }, // ★ S4-03 遮罩占据网格重建判据
     // 暴露给临时验收断言与 render_landscapes 的只读帮助函数（不进入任何持久化测试）
     hash32: hash32,
     sampleElevation: sampleElevation,

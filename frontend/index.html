@@ -26,7 +26,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.47</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.48</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1397,6 +1397,8 @@
   <script src="js/accent-model.js"></script>
   <!-- ★ S4-02 资源景观模型层（配方/slot/固定哈希/组缓存；依赖 RENDER_CONFIG，模型解析用 AccentModel.getByKey） -->
   <script src="js/landscape-model.js"></script>
+  <!-- ★ S4-03 景观遮罩层（道路/房屋/POI 保护区 + 空间分桶 + 脏桶失效 + 装饰去重；依赖 LandscapeModel） -->
+  <script src="js/landscape-mask.js"></script>
   <script src="js/render_terrain.js"></script>
   <script src="js/render_accents.js"></script>
   <script src="js/render_grass.js"></script>
