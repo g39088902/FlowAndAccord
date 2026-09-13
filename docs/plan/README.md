@@ -34,7 +34,7 @@
 | :---: | :--- | :--- |
 | 01 | [在办方案融合设计](tech/01-integration-contracts.md) | 跨专项共享契约权威：家庭资源/预约、L2 选策、物资与身体、土地通行、事实观察 |
 | 02 | [人物记忆与经验传承](tech/02-memory-system.md) | 实施方案，未排期；P0 只记事实 → P3 家庭传承 |
-| 03 | [内部市场](tech/03-internal-market.md) | 售货员撮合 + 有限订单簿（替代已废弃的 AMM 方案） |
+| 03 | [内部市场](tech/03-internal-market.md) | 产品设计已复核，未排期；自主兼职售货员 + 实物托管 + 有限订单簿；[实施任务序列](../../INTERNAL_MARKET_IMPLEMENTATION_PLAN.md) |
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；对应 design/07 的任务、接触结算、物资与存档契约 |
 | 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.3 维护 16 张模板的批次与能力前置，R.6 区分任务依赖、验收与 random 准入 |

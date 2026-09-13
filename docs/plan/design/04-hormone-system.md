@@ -10,7 +10,7 @@
 > - **代谢轴（总闸门）**：甲状腺素。
 >
 > 激素不新增需求种类、不直接决定行为，只**调制**既有决策分支的阈值、候选成本、需求层级权重与生理消耗速率，让同一个人在不同时期表现出可观察的动力、情绪、联结、竞争、生育与代谢差异，并为[关系 × 生产](./03-social-relations.md)提供生理载体。
-> **关联文档**：[15 四季气候](../../current/tech/15-seasons-climate.md)（季节性情感 / 供暖）· [10 代谢与禀赋](../../current/tech/10-agent-life-cycle.md)（气质遗传 / 受孕流产分娩 / 性别二态）· [11 决策引擎](../../current/tech/11-decision-engine.md)（接入点）· [05 狩猎防御](../tech/05-hunting-defense.md)（vitality / 战斗）· [02 日常生活](./02-everyday-life.md)（照料 / 作息 / 成长）· [02 记忆](../tech/02-memory-system.md)（编码耦合）· [03 售货员撮合市场](../tech/03-internal-market.md)（信任折扣）· [01 融合设计](../tech/01-integration-contracts.md)（L2 选策 / 身体契约）· [03 关系 × 生产](./03-social-relations.md)（催产素 = 关系的生理通道）· **[任务分解：hormone-TODO.md](../../../hormone-TODO.md)**。
+> **关联文档**：[15 四季气候](../../current/tech/15-seasons-climate.md)（季节性情感 / 供暖）· [10 代谢与禀赋](../../current/tech/10-agent-life-cycle.md)（气质遗传 / 受孕流产分娩 / 性别二态）· [11 决策引擎](../../current/tech/11-decision-engine.md)（接入点）· [05 狩猎防御](../tech/05-hunting-defense.md)（vitality / 战斗）· [02 日常生活](./02-everyday-life.md)（照料 / 作息 / 成长）· [02 记忆](../tech/02-memory-system.md)（编码耦合）· [03 售货员撮合市场](../tech/03-internal-market.md)（可选关系破平）· [01 融合设计](../tech/01-integration-contracts.md)（L2 选策 / 身体契约）· [03 关系 × 生产](./03-social-relations.md)（催产素 = 关系的生理通道）· **[任务分解：hormone-TODO.md](../../../hormone-TODO.md)**。
 >
 > **【已校订 v1.50.32】交叉引用编号口径**：本文原使用「29-A2 / 29-B4 / 29-B5 / 29-B6」指代关系类机制，但 29 号是 [`docs/current/tech/29-impact-matrix.md`](../../current/tech/29-impact-matrix.md)（影响矩阵），**不含 A2/B4/B5/B6 章节**。这些编号实为 [03 号人际依赖与敌对关系](./03-social-relations.md) §3/§4 的**A2 熟人互惠与求助、B4 税政对抗、B5 宗族世仇、B6 偷窃与侵占**。全文已统一改为 **A2 / B4 / B5 / B6** 短编号并指向 03 号文档。**注意**：A2「熟人互惠」在 03 号 §7 落地优先级中列第 2 位，**当前尚未落地**。
 
