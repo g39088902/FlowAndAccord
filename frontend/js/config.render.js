@@ -185,17 +185,20 @@ window.RENDER_CONFIG = {
       { role: 'shade',   modelKind: 'GroundPatch', slots: 2, radiusMin: 8,  radiusMax: 12, tone: 'shade' },
       { role: 'foliage', modelKind: 'Bush',        slots: 3, scaleMin: 0.45, scaleMax: 0.7, footprint: 8, stockRole: 'detail' },
     ] },
-    Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）
-      { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
-    Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草（不画成阻路峭壁）
-      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
-    Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架（禁止整片发光/扩矿，归 S4-05 细节）
-      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
+      Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）+ 果实点簇（q 显隐）
+        { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'fruit', modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 36, radiusMin: 5, radiusMax: 8, tone: 'berry', stockRole: 'detail' },
+      ] },
+      Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草 + 可采面明暗（不画成阻路峭壁）
+        { role: 'rock',   modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+        { role: 'grass',  modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'quarry', modelKind: 'GroundPatch', slots: 1, rMin: 26, rMax: 34, radiusMin: 6, radiusMax: 9, tone: 'quarry', stockRole: 'detail' },
+      ] },
+      Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架 + 矿脉斑点（禁止整片发光/扩矿，归 S4-05）
+        { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'vein',  modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 34, radiusMin: 4, radiusMax: 7, tone: 'gold', stockRole: 'detail' },
+      ] },
   },
 };

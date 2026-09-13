@@ -210,11 +210,11 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 **失败处理**：水体关系不明只展示陆侧点缀；预算超限先减枝叶细节与覆盖范围，再复测。
 **验收证据**：至少近景泉边、近景林地两套可复现场景；取水/采木入口可选，资源数据与原 Inspector 一致。
 
-### 4.5 S4-05 · 其余通用资源配方
+### 4.5 S4-05 · 其余通用资源配方 ✅（2026-09-14，验收记录见 §10）
 
-- [ ] 分别交付 Berry、Stone、Gold 配方；复用采样、遮罩、库存丰度和绘制公共入口。
-- [ ] 验证果实、矿脉细节的单调丰度关系与缺失值处理，禁止库存影响几何重抽。
-- [ ] 验证邻接资源区与基础 accents 的去重，资源中心始终可辨认。
+- [x] 分别交付 Berry、Stone、Gold 配方；复用采样、遮罩、库存丰度和绘制公共入口。（配方 v3（RECIPE_VERSION 2→3）：Berry +`fruit` 果实点簇 ×2（tone 'berry'）、Stone +`quarry` 可采面明暗 ×1、Gold +`vein` 矿脉斑点 ×2——三者均为 `stockRole:'detail'` 的 GroundPatch，完整复用 S4-04 的极坐标采样/坡度拒绝/遮罩脏桶/`childActive` 机制与 `drawLandscapeGroundPatch` 绘制入口；点簇几何构建期预计算 `child.dots`（10 点归一化偏移，r=sqrt 盘分布），q 只驱动**绘制期**可见点数 `round(n×q)` 与 quarry 的 globalAlpha——连续强度单调，绝不参与几何重抽；gold 哑光矿脉斑**严禁发光**）
+- [x] 验证果实、矿脉细节的单调丰度关系与缺失值处理，禁止库存影响几何重抽。（临时断言 23 组：0/半/满全子图元几何逐位一致且 `version()` 不变；detail 激活数 0 ≤ 半 ≤ 满、0 时全隐；可见点数随 q 单调不减；q 缺失/maxStock≤0/NaN → detail 全隐骨架保留；浏览器 Berry/Stone/Gold 满与零态页内像素差分 5963/5163/8251px）
+- [x] 验证邻接资源区与基础 accents 的去重，资源中心始终可辨认。（邻接组 Berry#23 ↔ Water#13 相距 51.8m 共享车道走廊 → 两 Group 子图元分别 4/9、4/8 被遮蔽（遮罩机制正常）；detail 子图元不入占据桶不误藏基础装饰（S4-04 语义沿用）；fruit 内缘距 POI 中心 25 > 操作区半径 18——采收中心与图标恒无遮挡）
 
 **失败处理**：某配方失败只关闭该配方；不阻塞已通过的泉水/林地样板。
 **验收证据**：每类至少一组 seed/tick 固定截图，0/半满/满库存临时夹具，界面库存及物理状态不变。
@@ -490,3 +490,23 @@ profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：泉边 = seed 
 ### 9.5 复现流程
 
 泉边：URL `?seed=34`（不能用 seed 0，§6.6 注 1）→ 注入 §6.6 注 4 UI 隐藏样式 → `aim(1.05, 0.6, 4.0, 26.13, -162.35, 2)`（世界点居中：`panX = 640 - w/2 - (x·cosZ - y·sinZ)·zoom`，`panY = 360 - h/2 - ((x·sinZ + y·cosZ)·cosX - z·sinX)·zoom`）→ 门禁暂停态手动 `render(performance.now())` + `sim-canvas.toDataURL()`。林地：`?seed=31` + `aim(1.05, 0.6, 3.0, 43.46, 118.56, 0)`。库存三态：改 `RENDER_CONFIG.landscapeDetailQFloor/QCeil` 后须 `LandscapeModel.resetCache()`（qThreshold 为构建期常量），q 实况 = 150/200 = 0.75。
+
+## 10. 验收记录 · S4-05 果丛、石矿、金矿配方推广（2026-09-14）
+
+> 按 §5.3 模板记录。临时 Node 验收断言（23 组）已按根 AGENTS.md §4.10 用后删除，不持久化。
+
+```text
+任务 ID / 状态 / 日期：S4-05 / ✅ 完成 / 2026-09-14
+基准提交 / 候选提交 / 应用版本：基准 9650325（分支 c2，已并入 master S7-05~07）/ 候选 = 本次提交 / 1.50.51（升版器 12 定义点同步）
+WASM 双副本 SHA256：frontend/rust/ = frontend/ = 087bcad05b79dc36…（升版 SAVE_APP_VERSION 后重编译，双副本同值）
+模拟配置 SHA256 / 渲染配置摘要：SIM_CONFIG 239 字段未变（S4-01 冻结基线仍有效）；RENDER_CONFIG 顶层键数不变（75；仅 landscapeRecipes 配方表 v2→v3：Berry +fruit、Stone +quarry、Gold +vein，键内结构与回退表逐位一致）
+profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：seed 34 / river_valley_v1（含 S7-05~07 地形变更的合并后内核）/ tick 0（创世暂停）/ 相机 rotX 1.05 / rotZ 0.6 / zoom 8，中心分别为 Berry#23 (76.8, -51.5)、Stone#41 (-299.8, 89.4)、Gold#50 (284.0, -92.5)（Stone#40 全组被车道区遮蔽 0/5 可见，改用 #41；§6.4 冻结表 POI 坐标在合并后内核未漂移）
+设备 / Chrome 版本 / 视口 / DPR：Chromium IAB（win32）视口 1280×720 / DPR 1；库存款三态经页内 currentStock 临时夹具（§4.5 验收明确允许；暂停态截图用、截后恢复、不落存档，界面库存环与派生层同源同步）
+执行门禁、退出码及日志位置：cargo test --lib 0 失败；cargo build wasm release 通过 + 双副本同步；test-wasm ALL_TESTS_DONE；test-determinism 6/6；config-check 239/239；frontend-check 全过；doc-link-check / cross-doc-check 0 冲突 / doc-maintenance-check / bump-version --check 12 点零漂移；git diff --check 干净
+物理差分 / 模型确定性 / 避让违例 / 标签与命中检查：物理字段差分 0（sync + childActive 前后 sim 串化逐位一致）；模型确定性 23/23（0/半/满全子图元几何逐位一致且 version() 不变——库存不参与几何重抽；detail 激活数 0 ≤ 半 ≤ 满、0 时全隐；可见点数 round(n×q) 随 q 单调不减；点偏移 ∈ ±0.85r、两两 fruit/vein 点簇互不重；role 半径带 26..36 / 26..34 生效；q 缺失 / maxStock≤0 / NaN → detail 全隐骨架保留；坡面拒绝照常；清缓存重建 / 独立沙盒 / 缺省回退表三者逐项一致）；避让 = 邻接组 Berry#23 ↔ Water#13（51.8m 共享走廊）分别 4/9、4/8 遮蔽、fruit 内缘距中心 25 > 操作区 18 中心恒可辨；标签不适用（S4-06/07）
+基准与候选 p50/p95/p99 / 首帧与缓存重建 / 缓存规模：本任务为 detail 贴地片推广（机制与 S4-04 同链路，点簇绘制为单 path 批量 arc，增量远低于 S4-04 已测链增量，不重复整链实测；S4-08 总验收统一复测）；缓存规模 = seed34 Berry 9 子图元（bush5+grass2+fruit2）/ Stone 5 / Gold 6，组上限与帧预算沿用既有配置
+截图与原始记录路径：evidence/S4-05/screenshots/ 9 张（berry/stone/gold × q 满/半/零，seed34 zoom8 固定相机）；页内满 vs 零像素差分 berry 5963 / stone 5163 / gold 8251 px
+失败项、降级与后续任务：验收中发现夹具陡坡区按设计拒绝 1 枚 vein 候选（跳过不重编号，非缺陷）；无遗留失败。后续：S4-06 标签候选层（依赖 S4-01 文字入口盘点）；S4-08 收口时对五类配方做统一性能与视觉总验收
+```
+
+**S4-05 交付边界说明**：果实/矿脉以**点簇贴地片**表达（构建期静态几何 + 绘制期连续强度），不新增拾取实体、不改 Inspector 数据；Berry 保留采收中心原图标与储量环，Stone 可采面为灰斑明暗（不修改坡度/碰撞），Gold 哑光矿脉斑禁整片发光/扩矿——全部符合 §3.2 放置约束。三配方任一失败可经 landscapeRecipes 单独关 role，不阻塞泉边/林地样板。

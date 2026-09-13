@@ -13,6 +13,10 @@
 //   ★ S4-04：GroundPatch 贴地色差片（Water 湿润土 / Wood 林下暗部）为本地两遍式椭圆图元
 //   （无 AccentModel 模型、无受光法线）；可采细节子图元（stockRole 'detail'）由
 //   LandscapeModel.childActive 按 q ≥ qThreshold 过滤显隐——骨架零影响。
+//   ★ S4-05：新增 berry（果实点簇）/ gold（矿脉斑点）/ quarry（可采面明暗）三种 detail
+//   贴地片——点簇几何构建期预计算（child.dots），q 只驱动绘制期可见点数（round(n×q)）
+//   与 quarry 的 globalAlpha 强度（连续单调）；点色恒为常量 + globalAlpha，零字符串分配；
+//   gold 哑光**严禁发光**（无 shadowBlur/亮晕），collect 时组 q 镜像到 child._q。
 // - 模型命名空间：子图元模型经 AccentModel.getByKey（完整 key 通道，'L#' 前缀）解析，
 //   与 accent.id 缓存键隔离；模型内容 = (modelKind, visualSeed) 纯函数。
 // - 配置关态（RENDER_CONFIG.landscapeEnabled=false）：collect 直接返回，零入队零同步，
@@ -95,6 +99,8 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
       // ★ S4-04 可采细节（stockRole 'detail'）：q ≥ qThreshold 才显示——骨架恒可见，
       //   库存 0/中间/满只改变 detail 显隐数量（单调），不影响入队几何
       if (!window.LandscapeModel.childActive(groups[gi], child)) continue;
+      // ★ S4-05 detail 贴地片绘制期消费的组丰度镜像（表现缓存；q 有效由 childActive 保证）
+      if (child.stockRole === 'detail') child._q = groups[gi].q;
       // 视口粗剔除（与装饰同余量口径）：屏外子图元不入队、不占预算
       const rx = child.x * cosZ - child.y * sinZ;
       const ry = child.x * sinZ + child.y * cosZ;
@@ -194,10 +200,18 @@ function _gpStyles(season) {
   s = {
     wetOuter: mk('74,62,46', 0.28), wetInner: mk('74,62,46', 0.22),
     shadeOuter: mk('26,34,22', 0.15), shadeInner: mk('26,34,22', 0.13),
+    // ★ S4-05：berry 繁茂浅绿基底 / gold 岩屑暗基底（点簇 detail 的底层贴地色差）
+    berryOuter: mk('113,137,66', 0.12), berryInner: mk('113,137,66', 0.10),
+    goldOuter: mk('96,88,72', 0.14), goldInner: mk('96,88,72', 0.11),
   };
   _gpStyleCache[season] = s;
   return s;
 }
+// 点簇/可采面 detail 的点与颜色常量（绘制期 q 只改可见点数与 globalAlpha——零字符串分配）
+var _gpDot = {
+  berry: { col: 'rgb(146,52,70)', n: 10, rK: 0.16, minR: 1.5 },   // 深浆果红，哑光
+  gold: { col: 'rgb(191,155,74)', n: 10, rK: 0.14, minR: 1.2 },   // 哑光金矿脉斑，禁发光（无 shadowBlur/亮晕）
+};
 function drawLandscapeGroundPatch(child) {
   const scale = camera.zoom;
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
@@ -215,10 +229,47 @@ function drawLandscapeGroundPatch(child) {
   const offR = r * 0.18;
   const ix = sx + Math.cos(child.rot) * offR;
   const iy = sy + Math.sin(child.rot) * offR * cosX;
-  ctx.fillStyle = wet ? st.wetOuter : st.shadeOuter;
+  const isBerry = child.tone === 'berry', isGold = child.tone === 'gold', isQuarry = child.tone === 'quarry';
+  // 基底（berry/gold/quarry 为 detail：α 随 q 的部分走 globalAlpha，样式串恒为预建常量）
+  if (isQuarry) {
+    // 可采面明暗：整体 α 随 q 线性增强（0 时近乎无痕，满时明显采挖痕）
+    const q = child._q || 0;
+    ctx.globalAlpha = 0.06 + 0.16 * q;
+    ctx.fillStyle = 'rgb(120,114,104)';
+    ctx.beginPath(); ctx.ellipse(sx, sy, r, ryEll, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.05 + 0.13 * q;
+    ctx.beginPath(); ctx.ellipse(ix, iy, r * 0.62, ryEll * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    return;
+  }
+  ctx.fillStyle = wet ? st.wetOuter : isBerry ? st.berryOuter : isGold ? st.goldOuter : st.shadeOuter;
   ctx.beginPath(); ctx.ellipse(sx, sy, r, ryEll, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = wet ? st.wetInner : st.shadeInner;
+  ctx.fillStyle = wet ? st.wetInner : isBerry ? st.berryInner : isGold ? st.goldInner : st.shadeInner;
   ctx.beginPath(); ctx.ellipse(ix, iy, r * 0.62, ryEll * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+  // ★ S4-05 点簇 detail：可见点数 = round(n × q)（连续强度单调，§3.2）；冬季 α 减弱
+  if (isBerry || isGold) {
+    const dot = _gpDot[isBerry ? 'berry' : 'gold'];
+    const q = child._q || 0;
+    const n = Math.min(dot.n, Math.round(dot.n * q));
+    if (n <= 0) return;
+    const dr = Math.max(dot.minR, r * dot.rK);
+    let alpha = 0.92;
+    if (sim.currentSeason === 'Winter') {
+      const k = Number.isFinite((window.RENDER_CONFIG || {}).landscapeGroundWinterAlphaRatio)
+        ? (window.RENDER_CONFIG || {}).landscapeGroundWinterAlphaRatio : 0.6;
+      alpha *= k;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = dot.col;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const ox = child.dots[i * 2] * r, oy = child.dots[i * 2 + 1] * r * cosX;
+      ctx.moveTo(sx + ox + dr, sy + oy);
+      ctx.arc(sx + ox, sy + oy, dr, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 }
 
 // ── 分发：树/灌木子图元贴地投影（复用 render_shadows.js 模型参数化主体）──
