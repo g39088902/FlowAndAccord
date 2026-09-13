@@ -155,7 +155,7 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 
 | 状态 | ID | 交付物 | 直接前置 | 对应计划 |
 |---|---|---|---|---|
-| [ ] | S4-01 | 数据适配清单与冻结基准 | D-B1 | 阶段四开工 |
+| [x] | S4-01 | 数据适配清单与冻结基准（2026-09-13，记录见 §6） | D-B1 | 阶段四开工 |
 | [ ] | S4-02 | 稳定景观模型与配方基础 | S4-01 | TA-17 基础 |
 | [ ] | S4-03 | 最终几何索引、避让与动态失效 | S4-01、S4-02 | TA-14 |
 | [ ] | S4-04 | 泉边与林地局部样板 | S4-02、S4-03 | TA-17 样板 |
@@ -170,12 +170,12 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 
 依赖顺序：`01 → 02 → 03 → 04 → 05`；标签线为 `01 → 06 → 07`，07 还需 04 提供真实拥挤样板；两线汇入 08。这里表示开发依赖，不要求使用并行智能体。
 
-### 4.1 S4-01 · 冻结接口与基准
+### 4.1 S4-01 · 冻结接口与基准 ✅（2026-09-13，验收记录见 §6）
 
-- [ ] 读取前端指南、06 号 R.3/§19、07 号 §5.3/§6.6/§8，记录实际开工提交、应用/生成器版本、WASM SHA256、完整模拟配置和渲染配置摘要。
-- [ ] 输出 POI 类型映射、库存、地表高程、车道全曲线、房屋轮廓/入口、真实岸点可用性的生产者—消费者清单；缺字段明确首版降级或独立跨层任务。
-- [ ] 固定 T1/T2 各 12 个种子及三个样板场景（泉边、林地、密集聚落），记录场景实际 seed/tick/视图/相机/存档摘要；场景名称不能代替 seed。
-- [ ] 盘点文字、悬浮、实体拾取和缓存事件入口；保存改前截图及性能原始值。
+- [x] 读取前端指南、06 号 R.3/§19、07 号 §5.3/§6.6/§8，记录实际开工提交、应用/生成器版本、WASM SHA256、完整模拟配置和渲染配置摘要。
+- [x] 输出 POI 类型映射、库存、地表高程、车道全曲线、房屋轮廓/入口、真实岸点可用性的生产者—消费者清单；缺字段明确首版降级或独立跨层任务。
+- [x] 固定 T1/T2 各 12 个种子及三个样板场景（泉边、林地、密集聚落），记录场景实际 seed/tick/视图/相机/存档摘要；场景名称不能代替 seed。
+- [x] 盘点文字、悬浮、实体拾取和缓存事件入口；保存改前截图及性能原始值。
 
 **失败处理**：无法证明水面关联时采用陆侧素材；无法复现样板时补记录后再开工，不以规划中的字段充当已有接口。
 **验收证据**：适配表、冻结清单、基线截图与原始性能记录；无运行时代码变更。
@@ -326,3 +326,75 @@ profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：
 **通用阶段四完成**：S4-01～S4-08 全部通过；五类资源景观、动态避让和标签交互均有证据；性能达标；模拟不变；文档同步。S4-X1～X4 按各自前置逐项退出，保持未完成状态不会伪装成通用阶段阻塞。
 
 本文本身是纯规划交付，不执行以上实施命令、不升版、不追加代码版本 changelog；本次只执行文档检查。
+
+## 6. 验收记录 · S4-01 数据适配清单与冻结基准（2026-09-13）
+
+> 无运行时代码变更；所有证据存于 `evidence/S4-01/`（配置快照 / 种子筛选原始数据 / 冻结存档 / 基线截图 / 性能原始值）。临时筛选脚本已按根 AGENTS.md §4.10 用后删除。
+
+### 6.1 冻结基线信息
+
+| 项 | 值 |
+|---|---|
+| 实际开工提交 | `a6623a6`（分支 `c4`，Merge master into test；本文 §头部记录的复核基线 `7e0f8b7` 之后 master 并入了 S7-04 半坡林地 v1.50.46） |
+| 应用版本 / 生成器版本 | `1.50.46` / **6**（★ 偏差记录：本文头部写「生成器版本 5」是 7e0f8b7 基线的历史值，实际开工 HEAD 的 `TERRAIN_GENERATOR_VERSION`（crates/sim_core/src/geo/terrain.rs:708）已为 6，本阶段开工以 6 为准；存档结构版本 7 不变） |
+| WASM 双副本 SHA256 | `frontend/rust/sim_wasm.wasm` = `frontend/sim_wasm.wasm` = `75de958cc677d3affe6a56da4c54ba39e40653312c26b2097f3e456f23f3f732` |
+| 模拟配置 | `SIM_CONFIG` 239 字段（config.js + decision-order + house-upgrade-cost 合并后），SHA256 `94b8446650b42cd1c3ac99fc2755e528db74139e635181b0d76d575e5ddbfbfa`，全文 → `evidence/S4-01/sim-config-frozen.json` |
+| 渲染配置 | `RENDER_CONFIG` 59 键，SHA256 `4bd29400b09bf3f54724cfcbc65801288a602bf23154d6a839f8fa649c70a04e`，全文 → `evidence/S4-01/render-config-frozen.json` |
+| 快照 | FABS FORMAT_VERSION=3，section 清单与增量缺席语义见 §6.2 第 7 行 |
+
+### 6.2 生产者—消费者适配清单（S4-02/S4-03 按此施工）
+
+| # | 数据 | 生产者（唯一来源） | 前端可获得性 | 缺口 → 首版策略 |
+|---|---|---|---|---|
+| 1 | POI 类型/坐标/库存 | POI section（u8 码位 → `dict.rs::poiType` 表 → 前端 `poiTypeMap`），`rustworld.js:712-752` | `window.sim.pois`，字段 `id/type/pos{x,y,z}/currentStock/maxStock/regenRate/…`；**每帧全量重建对象**，须按 id+字段签名判断变更（§2 要求） | POI 无半径/朝向/占地字段 → 操作区半径沿用 `RENDER_CONFIG.poiBase*`/`poiMarkerFootprintR`，新半径进配置 |
+| 2 | 地表高程 | TERRAIN section：`GeoCell{elevation, slope_angle, surface_kind, natural_fertility, water_body_id, feature_flags}` + GLOBAL `grid_w/grid_h/world_size`（120×120 / 764） | `sim.terrain.cells` 行主序（`idx=gy*w+gx`，世界坐标换算 `rustworld.js:637-641`）；**无点查询导出** | S4-02 自行双线性插值（索引换算参考 `render_depth_queue.js:96-107`）；跨陡坡贴地片按 §3.4 拆小/拒绝 |
+| 3 | 真实水面/岸点 | ① `featureFlags` **SHORE_ACCESS=1<<2**（hydrology.rs 给河岸格打标，已随快照下发、前端零消费）；② River 特征「左岸 N 点顺去+右岸 N 点逆回」闭合真水面轮廓（TERRAIN_FEATURES section，render_terrain.js::drawRiverBand 消费）；③ `surface_kind` ShallowWater/DeepWater/RiverBank | 前端从未消费 SHORE_ACCESS；River vertices 可直接用 | **`waterAccessPoint` 字段不存在**（全仓 grep 仅 POI 命名「河岸取水点 #id」）→ 按 §2 数据缺口降级：首版只画陆侧低草与岸石、不画新泉池；岸线留白以 SHORE_ACCESS 掩码 + River 轮廓距离为准 |
+| 4 | 车道全曲线 | LANE_GEO section `LaneSnapshot{p0..p3 三次贝塞尔带 z}`，`geom_version` 缓存（`rustworld.js:794-833`） | `sim.network.lanes` 每条 `lane.curve.evalPos(t)`（`makeBezierCurve`，rustworld.js:1083）可任意密度采样 | 车道无宽度字段（渲染线宽由 wear 阈值映射）→ S4-03 胶囊半径走 RENDER_CONFIG |
+| 5 | 房屋轮廓/入口 | HOUSE section 仅 `pos/tier/…`；前端 `drawHouse` 用 tier→hw/hh **硬编码视觉几何**（render_world.js:163-164），门洞是正面装饰 | 只有锚点 + tier | 无占地/入口朝向字段 → 首版按 tier→hw/hh 保守包围区 + 房屋周边留白（§3.3 第 2 条「入口未知不猜朝向」）；如需真实字段另拆跨层任务（快照四处同步） |
+| 6 | 基础 accents（去重源） | TERRAIN_ACCENTS section `{id, kind∈Tree/Bush/Boulder/RockCluster/GrassTuft, x,y,z, scale, rotation, tint}` | `sim.terrain.accents`（静态三通道缓存语义） | 实测基础装饰**不围绕 POI 生成**（80 种子筛选：全图 Tree 恒 40、Wood POI 60m 内树数 0）→ 资源景观与基础装饰重叠有限，去重仍按 §3.3 第 6 条 `(来源优先级, groupKey, slot)` |
+| 7 | 生命周期/缺席语义 | READY / LOAD_RESULT(成功) / REWIND_RESULT(成功) / RESET_DONE 四消息 → `_invalidateWorldStaticCaches()`（rustworld.js:306-310：`_terrainCached=false` + `AccentModel.resetCache()`）；**无 DOM 事件** | 新缓存只能挂这四处或拦消息语义 | 静态 section「缺席=null 保留旧值 / 数组（可空）=显式替换」须 `Array.isArray` 判定；`terrain_cells` 无地形帧为 `[]`；`STR_TAB.start_index==0` 只管驻留表 |
+| 8 | seed/版本 | `sim._engineSeed`（READY 回传覆盖）、`sim.terrain.generatorVersion/profile`、`sim.getAppVersion()` | 可直接读 | — |
+
+### 6.3 文字 / 悬浮 / 拾取 / 缓存入口盘点（S4-06/S4-07 按此抽离）
+
+- **世界画布文字共 10 处**（S4-06 抽离范围）：`drawPoiMarker` 营地图标(:93)/营地名称(:98)/舍数(:102)/资源图标(:120)；`drawHouse` 拍卖(:245)/修缮(:250)/编号(:256)；`drawAgent` 施工(:45)/流产(:74)/选中需求气泡(:143-159)/夺位(:185)。`render_hud.js` 气候预测图画在独立 canvas，不参与世界遮挡、不在本轮范围。LOD 阈值现为三处硬编码（POI 名称 z>0.50 / 库存环 z≥0.70 / 房屋编号 z>1.05），S4-06 收进 RENDER_CONFIG。
+- **悬浮**：仅道路 `updateLaneHover`（render_world.js:302，12 段采样 + `#road-hover-tooltip` 每帧 innerHTML 重建，无内部可点元素）；实体无悬浮预览路径。
+- **拾取**：`render_inspector.js:1411` click 监听（拖拽 >8px 排除）——屏幕坐标欧氏命中 agent≤25px / house≤24px / poi≤26px，收集序硬编码 agent→house→poi、agent 内部按距离排序、±16px `clickCycle` 轮转；拾取用 `project3D`（无 MAP_Z_LIFT），与渲染锚点（`projectLifted`）存在细微不一致——S4-07 标签命中映射须与原拾取对齐并回落。
+- **深度队列**：`render_depth_queue.js::drawWorldEntities()`（DEPTH_* 0..12，`_depthPool` 对象池，depth 升序稳定排序，分发循环 :422-439 结束点即 S4-06 标签层的天然挂载位）。
+
+### 6.4 冻结种子与样板场景
+
+**物理差分种子**（沿用 §5.1，后续任务执行时 T1 `mountain_pass_v1` / T2 `river_valley_v1` 各跑一组）：`1,2,3,7,42,100,123,456,789,1024,2026,65535`。
+
+**三样板场景**（无头筛选 0..79 共 80 种子，原始数据 `evidence/S4-01/seed-screening-raw.json`；浏览器实测复核 POI 布局与无头一致）：
+
+| 场景 | seed | profile | tick | 相机（rotX 1.05 / rotZ 0.6 恒定） | 世界摘要 | 证据 |
+|---|---|---|---|---|---|---|
+| 泉边 | 34 | river_valley_v1 | 0（创世暂停） | zoom 4.0，中心 = Water#11 (26.13, -162.35, z2.39) | 20 人 0 房；该水点 45m 内岸带 36 格，近旁特征 River×1 + SpringValley×1 + ShallowFord×2 | `screenshots/baseline-spring-seed34-tick0-zoom4.png` |
+| 林地 | 33 | mountain_pass_v1 | 0（创世暂停） | zoom 3.0，中心 = Wood#30 (40.97, 236.29, z4.89) | 20 人 0 房；Wood#30 45m 内 100% 可落位（无 NO_BUILD/NO_WALK/陡坡格） | `screenshots/baseline-woodland-seed33-tick0-zoom3.png` |
+| 密集聚落 | 65 | mountain_pass_v1 | 存档冻结 160000（截图时 161900） | zoom 1.6，中心 = 房屋质心 (87.6, -76.5) | 12 房 50 人；质心 200m 内 8 房；仙居村已升村 | 存档 `saves/s4-settlement-seed65-t160000.json`（SHA256 `46a3d3d89d339858619a31339e101e7122cdf38ddb1e1ef262b19cad49d7e6eb`，2714686 字符）+ `screenshots/baseline-settlement-seed65-t160314-zoom1.6.png` |
+
+聚落复现流程：创世 seed 65 → 推进 160000 ticks → `loadWorld(存档 JSON)`（存档自含配置；浏览器侧临时复制存档到 `frontend/` 供 fetch，用后删除）。两创世场景复现：URL `?seed=<n>`（**不能用 seed 0**，见 §6.6）+ 门禁态天然暂停。
+
+### 6.5 改前性能原始值（method + p50/p95/p99）
+
+方法：包装全局 `render` 绑定计 `performance.now()` 差值（含地形格/深度队列排序/实体绘制全链）；预热 300 帧后采样 900 帧；模拟运行中；场景相机同 §6.4。设备：Chromium 146（ZCode IAB，macOS arm64）、视口 1280×720 CSS、DPR 1。全文 → `evidence/S4-01/perf-baseline.json`。
+
+| 场景 | tick 区间 | render p50 | render p95 | render p99 | render max | 帧间隔 p50/p95 |
+|---|---|---|---|---|---|---|
+| 泉边 seed34 | 582→3118 | 4.1ms | 5.8ms | 6.7ms | 10.8ms | 16.7 / 16.8ms |
+| 林地 seed33 | 564→4154 | 4.5ms | 6.3ms | 7.3ms | 9.3ms | 16.7 / 16.8ms |
+| 密集聚落 seed65 | 161900→164790 | 11.2ms | 15.6ms | 17.3ms | 19.4ms | 16.7 / 17.2ms |
+
+注：实测帧间隔 p50≈16.7ms，当前主循环实际以 60FPS 运行（`render_canvas.js` TARGET_FPS=30 的节流在该路径未生效），基线如实记录；S4-02+ 的性能对照须用同方法、同场景、同相机复测（§5.1），增量口径以本表为基准。
+
+### 6.6 本次新发现的坑（后续任务必须遵守）
+
+1. **种子 0 在浏览器不可用**：`sim_worker.js` INIT/RESET 处理器 `_engineSeed = msg.seed || Date.now()`——0 为假值被吞，`?seed=0`、`initEcology(20, 0)`、RESET 消息三种入口均实际生成随机种子（前端 `sim._engineSeed` 仍显示 0，具有欺骗性）。样板场景与测试夹具禁用 seed 0；若需修此缺陷另立内核外任务，不在视觉阶段顺手改。
+2. **`world_save_ptr()` 必须先于 `world_save_len()` 调用**（对齐 `tools/test-wasm.js::saveToString`）：反序会拿到旧长度导致存档 JSON 截断（本次实测踩坑并重导）；tick 0 时反序甚至得到 0 字节。
+3. **POI 类型字符串是全名**：快照解码后为 `WaterSource/WoodForest/BerryBush/StoneQuarry/GoldMine/Market/Camp`，前端 `poiTypeMap` 才归一为 `Water/Wood/…`；写派生层配方表时须明确用哪一层。
+4. **UI 遮挡自动化截图**：门禁浮层用样式表 `#startup-save-gate{display:none !important}` 压制（!important 规则压过 save-ui 定时器写的内联样式，一次注入永久生效）；左右面板/顶栏/事件流分别隐藏 `.top-bar/.global-resource-panel/.right-panel-stack/.control-panel/.event-log`。
+
+### 6.7 执行门禁
+
+S4-01 无运行时代码变更（仅本文件 + `evidence/S4-01/` 证据），按工作流 §G 只执行文档检查：`doc-maintenance-check` / `cross-doc-check` / `doc-link-check` / `bump-version.js --check`（结果见提交时记录；纯文档不升版）。
