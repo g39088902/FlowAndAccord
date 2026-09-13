@@ -187,10 +187,10 @@ Invoke-WithTimeout -Seconds 40 -Cmd @("playwright-cli", "-s=mytask", "open", "ht
 cd ~/FlowAndAccord && node frontend/server.js &
 
 # 2. 验证服务就绪（返回 200 即可）
-sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://localhost:3003/
 
 # 3. 打开浏览器
-# （工具调用）open_url_in_browser → http://localhost:3000
+# （工具调用）open_url_in_browser → http://localhost:3003
 ```
 
 - **WASM 无需重编译**：仓库已含双副本编译产物（`frontend/rust/sim_wasm.wasm` + `frontend/sim_wasm.wasm`，均 793KB），纯运行场景跳过 §2 编译步骤。
@@ -240,21 +240,21 @@ sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
 
 > 本节由 **CatPaw 内置浏览器**（`paw browser-action`，macOS darwin/arm64）实操沉淀，与 §1-5（Windows playwright-cli）、§6（云电脑）互为补充。内置浏览器渲染在 CatPaw 预览面板中，随会话自动管理生命周期，无需安装。
 >
-> 🔴 **适用边界（先读）**：内置预览浏览器**不支持 File System Access API**，无法通过本项目的启动存档门禁（模拟一直暂停）。因此它**只适合纯视觉截图 / 布局校验**；凡涉及存档读写、模拟推进、长程演化的验证，**能用 Chrome 测试必须优先用 Chrome 测试**（playwright-cli `--browser=chrome`，见 §3；或手动开系统 Chrome 访问 `localhost:3000`）。
+> 🔴 **适用边界（先读）**：内置预览浏览器**不支持 File System Access API**，无法通过本项目的启动存档门禁（模拟一直暂停）。因此它**只适合纯视觉截图 / 布局校验**；凡涉及存档读写、模拟推进、长程演化的验证，**能用 Chrome 测试必须优先用 Chrome 测试**（playwright-cli `--browser=chrome`，见 §3；或手动开系统 Chrome 访问 `localhost:3003`）。
 >
 > 记录人：CatPaw AI Agent · 2026-09-10 · 项目版本 v1.49.2
 
 ### 7.1 工具与前置条件
 
 - **唯一驱动命令**：`paw browser-action '<json>'`——JSON 必须用**单引号**包裹（本环境 CLI 别名为 `paw`，技能文档中出现 `catdesk` 一律替换为 `paw`）。
-- **前端服务前置**：先确认 `:3000` 已有服务（`lsof -i :3000 -sTCP:LISTEN`），已在运行则**直接访问**，重复启动 `server.js` 会触发端口递增卡死问题（见根 AGENTS.md §2 步骤三）。
+- **前端服务前置**：先确认 `:3003` 已有服务（`lsof -i :3003 -sTCP:LISTEN`），已在运行则**直接访问**，重复启动 `server.js` 会触发端口递增卡死问题（见根 AGENTS.md §2 步骤三）。
 - **可批量串联**：向 `browser-action` 传 JSON 数组可顺序执行多个动作，遇错即停；也可在 bash 层用 `&&` 串联多条单命令（推荐后者，便于观察中间输出）。
 
 ### 7.2 标准截图 SOP（一次调用全做完）
 
 ```bash
-# 前置：lsof 确认 :3000 已监听
-paw browser-action '{"action":"navigate","url":"http://localhost:3000","waitUntil":"networkidle"}' \
+# 前置：lsof 确认 :3003 已监听
+paw browser-action '{"action":"navigate","url":"http://localhost:3003","waitUntil":"networkidle"}' \
   && paw browser-action '{"action":"wait","timeout":4000}' \
   && paw browser-action '{"action":"screenshot"}'
 ```

@@ -117,6 +117,14 @@ impl World3DEngine {
         config: SimConfig,
     ) -> Self {
         let mut config = config;
+        // ★ STAGE2-1（06号 R.5 / §5.8 / §18.2）：创世有界重试上限接线。
+        // 语义 = 初始创世失败（静态几何校验/生存诊断）时阶梯降级重试的最大次数
+        // （0 = 只尝试一次，是合法值，不做下限改写）。此处建世界入口先钳制无界大值，
+        // 防止 STAGE2-5 重试环失控；规整结果写回 config（同下方 terrain_profile 写回
+        // 先例）供重试环与诊断读取——超限值有真实效果，满足 config-check 第 5 条
+        // 「空转参数」门禁；完整阶梯降级重试环（禁子特征 → 无子特征 → flat_baseline）
+        // 属 STAGE2-5。
+        config.terrain_generation_max_retries = config.terrain_generation_max_retries.min(8);
         let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
         terrain.generate_with_config(seed, &config);
         config.terrain_profile = terrain.profile.clone();

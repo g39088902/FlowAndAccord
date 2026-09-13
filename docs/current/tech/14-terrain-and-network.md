@@ -885,7 +885,7 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 19 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 233）：
+✅ 已落地 20 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 234）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
@@ -907,16 +907,18 @@ render_agents.js        族人绘制                                            
 ✅ terrainRoadCorridorWidth   5.0                 道路合法走廊宽度 (m)
 ✅ terrainAccentDensity       1.0                 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
 ✅ terrainAccentSubFeatures   true                子特征注入总开关（D-B1 空钩子门控；置 false 时 06号 §5.3 第 4–5、9 步为空）
+✅ terrainGenerationMaxRetries 3                   创世有界重试上限（初始尝试之外的阶梯降级重试次数；消费点 = world.rs 建世界入口钳制，完整重试环属 STAGE2-5）
 ```
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 233）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 234）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
   T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；
-  `terrainGenerationMaxRetries`（有界重试）待阶段二**连同消费点加回**（06号 R.5）。
+  `terrainGenerationMaxRetries`（有界重试）已于 v1.50.39 由 STAGE2-1 **连同消费点加回**（见上表；
+  消费点 = `spatial/world.rs::new_seeded_with_config` 建世界入口的重试预算钳制，完整阶梯降级重试环属 STAGE2-5）。
   `terrainAccentSubFeatures`（子特征注入总开关）已于 v1.50.29 由 D-B1-1 **连同唯一消费点加回**（见上表；
   消费点 = `geo/hydrology.rs::generate_with_config` 的 06号 §5.3 第 4–5、9 步空钩子门控）。
   历史：v1.50.18 曾以「内核零读取点（空转配置）」为由删除 4 个地形字段（`config.rs` / `config.js` / `examples/config.json` 三处同步，字段总数 242 → 231 → 232，v1.50.19 新增 `terrainGridRes`）；

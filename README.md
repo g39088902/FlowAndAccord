@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.50.38` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.50.39` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 </div>
 
@@ -172,12 +172,12 @@ node frontend/server.js
 
 > ⚠️ **必须使用 Chrome 或 Edge 打开**：游戏存档依赖 Chrome 的 File System Access API 直写磁盘 `.json` 文件，Firefox / Safari 等浏览器无法建立存档、会被启动门禁阻断。
 
-然后打开 Chrome 或 Edge 访问 `http://localhost:3000`。无需复杂打包、无需安装外部依赖。
+然后打开 Chrome 或 Edge 访问 `http://localhost:3003`。无需复杂打包、无需安装外部依赖。
 
 > 🎮 **不想本地搭建？在线直接游玩**：<https://xn--fiqs8s171bcnq.com>
 
 > - 首次进入或重置时，会弹出建立/连接本地存档文件的提示，选择或新建一个 `.json` 文件即可开启世界，数据永久保存在你的电脑磁盘中；
-> - 若 3000 端口已被占用，说明服务已在后台运行中，直接浏览器访问即可。
+> - 若 3003 端口已被占用，说明服务已在后台运行中，直接浏览器访问即可。
 
 ### 操作指南
 

@@ -64,6 +64,8 @@ const IMPACT_OVERRIDES = {
   terrainAccentDensity: 'geo/accents.rs (装饰密度)',
   // ★ D-B1 子特征注入总开关（06号 §5.3 第 4–5、9 步空钩子门控；选择器属 D-B1-3）
   terrainAccentSubFeatures: 'geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控)',
+  // ★ STAGE2-1 有界重试上限（06号 §5.8 / §18.2；完整阶梯降级重试环属 STAGE2-5）
+  terrainGenerationMaxRetries: 'spatial/world.rs (创世重试预算钳制；STAGE2-5 阶梯降级重试环)',
 };
 
 const IMPACT_PREFIX_RULES = [
