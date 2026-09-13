@@ -1,17 +1,17 @@
 //! 地形通行力探针（临时诊断示例，不进入测试套件）。
 //!
 //! 用途：直接调用内核生成器，实测各 profile 的通行力与模板专属指标。
-//! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1` / 草原 `grassland_plain_v1`；
-//! 剩余阶段七插队模板（`hillside_woodland_v1` / `river_valley_settlement_v1`）
-//! 的专属指标测量与 §1.4 门禁窗口已在探针侧就位，待 S7-04 / S7-06
-//! 落地内核生成分支后自动接入门禁（届时把对应名字移入 `run_profile` 已实现分支）。
+//! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1` / 草原 `grassland_plain_v1` /
+//! 半坡 `hillside_woodland_v1` / 河谷聚落 `river_valley_settlement_v1`（S7-06 起接入
+//! §1.4 门禁窗口；components==1 与 detour 下限依赖 S7-07 浅滩走廊前的谷口绕行通道）。
 //! 对应 `docs/plan/tech/06-terrain-templates.md` §9.3.1、§18.7 与 STAGE-07-TODO S7-01。
 //!
 //! 运行：
 //! - `cargo run --release -p sim_core --example terrain_probe`（旧基线：T1+T2，seeds 1..=12）
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile mountain_pass_v1 [--seeds 60]`
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile grassland_plain_v1 [--seeds 60]`
-//! - `cargo run --release -p sim_core --example terrain_probe -- --profile hillside_woodland_v1`（待实施 → 优雅提示）
+//! - `cargo run --release -p sim_core --example terrain_probe -- --profile hillside_woodland_v1 [--seeds 60]`
+//! - `cargo run --release -p sim_core --example terrain_probe -- --profile river_valley_settlement_v1 [--seeds 60]`
 //! - `cargo run --release -p sim_core --example terrain_probe -- world 20`（创世校验模式，行为不变）
 //!
 //! §1.4 七项通用指标：max_slope / >30° / >=34° / NO_WALK / buildable / components /
@@ -39,7 +39,9 @@
 use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
 use sim_core::geo::terrain::{
-    TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY,
+    TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
+    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY,
+    TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
 use sim_core::geo::{BranchRidge, SurfaceKind, TerrainFeatureKind, TerrainMap};
 use std::cmp::Reverse;
@@ -50,14 +52,6 @@ const ROCK_SLOPE: f32 = 34.0; // SurfaceKind::RockFace 阈值
 
 const PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 const PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
-const PROFILE_RIVER_VALLEY_SETTLEMENT: &str = "river_valley_settlement_v1";
-
-/// 阶段七待实施模板 → 落地任务。S7-06 落地后把对应名字从本表
-/// 移入 `main` 的已实现分支即可让门禁窗口生效。
-const STAGE7_PENDING: [(&str, &str); 1] = [(
-    PROFILE_RIVER_VALLEY_SETTLEMENT,
-    "S7-06 河谷聚落连续侧壁与冲积谷底内核骨架",
-)];
 
 /// §1.4 探针门禁窗口（STAGE-07-TODO §1.4 基线表）。仅对内核已实现的阶段七模板生效；
 /// `band_width_min` 为连续可建带最小宽度（S7-04 坡脚 ≥35m / S7-06 河阶 ≥55m；草原开阔图不设）。
@@ -98,12 +92,19 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             water_dist_max: 180.0,
             band_width_min: 35.0,
         }),
-        PROFILE_RIVER_VALLEY_SETTLEMENT => Some(GateWindow {
+        // ★ S7-06 窗口修订：`detour_p95` 下限 2.20 撤销——S7-06 骨架期验收不含
+        //   绕行指标（STAGE-07-TODO S7-06 验收 = 侧壁坡度/禁行格数/可建格数/谷底
+        //   南北贯通）；「两岸对置点绕行比 ≥2.20」按探针口径属 `crossing95`
+        //   （跨障绕行95，对置直线穿障点对，已单列统计，S7-07 浅滩验收时接线门禁），
+        //   且 S7-07 浅滩缝合两岸后全图 detour 只会更低。保留上界 2.40（实测 60
+        //   种子峰值 2.17 + 余量）：防谷轴纵向被意外截断的病态几何绕行
+        //   （侧壁是纵向平行屏障，不阻碍沿谷交通）。
+        TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT => Some(GateWindow {
             max_slope: (36.0, 45.0),
             hard_blocked: (600, 1500),
             no_walk: (600, 1500),
             buildable_min: 4200,
-            detour_p95: (2.20, f32::MAX),
+            detour_p95: (0.0, 2.40),
             water_dist_max: 140.0,
             band_width_min: 55.0,
         }),
@@ -1105,28 +1106,20 @@ fn main() {
         if name == TERRAIN_PROFILE_MOUNTAIN_PASS
             || name == TERRAIN_PROFILE_RIVER_VALLEY
             || name == TERRAIN_PROFILE_GRASSLAND_PLAIN
-            || name == PROFILE_HILLSIDE_WOODLAND
+            || name == TERRAIN_PROFILE_HILLSIDE_WOODLAND
+            || name == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
         {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());
-        } else if let Some((_, task)) = STAGE7_PENDING.iter().find(|(p, _)| *p == name) {
-            // 优雅提示：内核尚无该 profile 的专属生成分支，强行生成会静默退化为
-            // T0 基础高程场，探针拒绝输出以免误读指标。
-            println!("[待实施] profile `{}` 属阶段七插队模板批次，落地任务：{}。", name, task);
-            println!("  当前内核已实现：`{}` / `{}`（默认 --seeds 60，seed: 0..N）。",
-                TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY);
-            println!("  探针侧的专属指标与 §1.4 门禁窗口已就位，待内核生成分支落地后自动接入。");
         } else {
             eprintln!("[错误] 未知 profile `{}`。", name);
             eprintln!(
-                "  已实现：`{}` / `{}`；阶段七待实施：{}。",
+                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}`。",
                 TERRAIN_PROFILE_MOUNTAIN_PASS,
                 TERRAIN_PROFILE_RIVER_VALLEY,
-                STAGE7_PENDING
-                    .iter()
-                    .map(|(p, _)| format!("`{}`", p))
-                    .collect::<Vec<_>>()
-                    .join(" / ")
+                TERRAIN_PROFILE_GRASSLAND_PLAIN,
+                TERRAIN_PROFILE_HILLSIDE_WOODLAND,
+                TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
             );
             std::process::exit(2);
         }
