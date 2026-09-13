@@ -52,7 +52,7 @@ flowchart LR
         P7C["河谷聚落 river_valley_settlement_v1<br/>（连续谷地·两壁夹持）"]
     end
     D1["阶段一 D-B1 ✅<br/>GrassTuft 装饰"] --> P7A
-    D3["阶段三密林规则<br/>Tree/Bush 梯度散布"] --> P7B
+    D3["密林共用散布规则（可由 S7 先交付）<br/>Tree/Bush 梯度散布"] --> P7B
     S2["阶段二流水线基座<br/>河道带局部重写"] --> P7C
 ```
 
