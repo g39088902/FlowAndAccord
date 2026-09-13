@@ -44,12 +44,12 @@ stateDiagram-v2
 ## 核心机制
 
 ### 连续 3D 地形与 T0/T1 静态地貌
-- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 `mountain_pass_v1` 与 `river_valley_v1` 间随机轮换。
+- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 `mountain_pass_v1` 与 `river_valley_v1` 间随机轮换（显式锁定值另支持 `grassland_plain_v1` 平地草原，v1.50.40 内核骨架，未过 §18 全链路验收前不加入 `random` 候选）。
 - `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面，水体相关枚举为 T2 预留。
-- T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制。
+- T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制；草原 profile 输出 `SpringValley` 泉眼特征（无水体、无水面，见 §9.7）。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
 - `TerrainMap::validate_curve` 对贝塞尔路线进行按长度自适应采样并检查走廊两侧地表；当前已提供 T0 校验原语，后续路网生成器接入后再替换现有全图直线铺路。
-- 地形生成器版本为 `4`（v1.50.17 T1-R 主脊通行力修复后递增；此前 v1.47.7 为 3），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
+- 地形生成器版本为 `5`（v1.50.40 新增草原 profile 分支递增；此前 v1.50.17 T1-R 修复为 4、v1.47.7 为 3），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
 
 ### 贝塞尔曲线 3D 路网 (`LaneGraph3D`)
 - 节点与双向三次贝塞尔曲线车道构成拓扑网络，曲线定义见 `curve.rs`。
@@ -247,7 +247,7 @@ pub enum AccentKind {
 
 装饰散布规则（当前实现，`geo/accents.rs`）：
 
-- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（`Boulder + RockFace` 为受控例外，见下）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.7 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
+- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（`Boulder + RockFace` 为受控例外，见下）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
 - **偏好**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；Boulder 偏好多坡度（>18° 直认、>10° 60% 概率）与裸露 `RockFace`（★ v1.50.10：`Boulder + RockFace` 组合放行 `NO_WALK` 禁区过滤，岩壁巨石是目标地表而非禁区）；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
 - **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25（乘密度倍率取整），各有界重试 3× 目标数；RockCluster/GrassTuft 仅枚举定义，D-B 再实现。
 - **确定性**：`accent_rng = WorldRng::new(seed ^ ACCENT_RNG_SALT)`，盐值 `0x4143_4345_4E54_3031`（"ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG。
@@ -347,7 +347,7 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'` 或 `'river_valley_v1'`）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'` 或 `'grassland_plain_v1'`）。
 - 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支：
   `(seed ^ 0x5052_4F46_494C_4531)` 对 2 取模为 0 → 实例化为 `mountain_pass_v1`（T1 山口聚落）；
   否则 → 实例化为 `river_valley_v1`（T2 两岸河谷）。
@@ -508,7 +508,22 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 
 注入规则同 §9.4（以 §5.3 为准）：无状态哈希判定、不修改 profile 命名、结构型（`oxbow_lake` / `river_cliff`）与视觉型（`riverside_forest` / `gravel_beach`）各至多一个；必须发生在 POI/营地/路网生成之前，最终布局只消费注入后的合法地表。
 
-### 9.7 装饰生成器（Accents Generator）
+### 9.7 平地草原模板（`grassland_plain_v1`）
+
+✅ 内核骨架已落地（v1.50.40，STAGE-07-TODO S7-02）。实现于 `geo/terrain.rs::generate_with_profile` 草原分支（06 号 §4.1）：
+
+定位为首张「低障碍」地图模板——无硬禁行、无水面，选址与通行近乎自由，聚落结构完全由水源分布与踩踏涌现。生成要点：
+
+1. ✅ 基础低幅：`tilt_magnitude ∈ [16.0, 24.0)`（T1/T2 为 `[54.0, 66.0)`，抽取数不变仅区间不同），基础谐波振幅 ×0.4（削减 60%），坡度主体 2°~8°。
+2. ✅ 孤立残丘：`relief_rng` 在中心外围（0.30~0.42×world_size）生成 1~2 处高斯缓丘，A∈[6.5,9.5]m、A/R∈[0.19,0.31] → 高斯最大梯度 0.858×A/R ≈ 9.3°~14.9°，严格 < 18°（远景地标 + 高肥力坡脚，不产生通行障碍）；双丘潜在重叠时第二丘确定性转对侧（不额外消费 RNG）。
+3. ✅ 泉溪洼地：2 处微凹地——锚点候选由 `relief_rng` 抽取（中心近域 0.08~0.28×world_size）后吸附 ±8 格窗局部最低格，高斯微凹盆（depth 1.4~2.2m、R 24~34m）在坡度派生前雕入 raw；凹圈带（0.7R~1.5R）写 `SoftGround`（软地仅 1.25× 慢行、不禁建），盆心保持 `DryGround`。
+4. ✅ 泉眼特征：每处洼地一条 `SpringValley` 特征（三顶点自坡缘汇入盆心，与 T2 泉谷同语义）；**无水体、无水面**，清泉 POI 仍由生态层布点（`spawn_water_pois` 随机落位，不读水面格）。
+5. ✅ 水源锚定（确定性修正，均不消费 RNG）：双洼地过近沿连线外推到 0.22×world_size；吸附点偏向图缘时盆心沿径向收拢到 0.20×world_size（≈153m，保 §1.4 water≤160m）。
+6. ✅ 草甸肥力：草原分支 `natural_fertility = 0.97 − slope/70×0.5 − nh×0.10`（可建格均值 0.91，落 0.85~0.95 带内）。
+
+隔离保证：草原分支只消费 `relief_rng` 局部流（主 `rng` 消费数不变），不读 `hydro_rng`/`accent_rng`；T1/T2 路径逐位不变（60 种子 git worktree 对拍）。探针验收（`terrain_probe --profile grassland_plain_v1 --seeds 60`）§1.4 门禁 0 违例：max_slope 9.93°~16.46°、blocked/hard/no_walk 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08、waterM 峰值 154m；mound_count 1~2、软地比 1.6%。草甸装饰散布（S7-03）与 `random` 候选（§18 全链路验收后）待落地。
+
+### 9.8 装饰生成器（Accents Generator）
 
 ✅ 已落地（v1.49.1）。实现于 `geo/accents.rs::generate_accents()`：
 
