@@ -200,12 +200,12 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 **失败处理**：无法可靠裁剪的子图元隐藏；索引异常降为无景观，不使用旧世界索引。
 **验收证据**：弯路中段、房角、采收中心、岸边入口、动态建拆房样板；临时断言统计受保护区内违例 0，物理字段差分 0。
 
-### 4.4 S4-04 · 泉边与林地样板
+### 4.4 S4-04 · 泉边与林地样板 ✅（2026-09-13，验收记录见 §9）
 
-- [ ] 实现 Water/Wood 配方，验证地表高程贴合、坡面拆分、真实水面边界与交互留白。
-- [ ] 验证林地骨架在库存 0/中间值/满值时稳定，仅可采细节变化。
-- [ ] 输出同一存档、相机和缩放的前后对照，覆盖普通/道路/资源视图及四季。
-- [ ] 记录初次建模、暖缓存绘制及旋转期间的负载，冻结首版配方数目和尺度。
+- [x] 实现 Water/Wood 配方，验证地表高程贴合、坡面拆分、真实水面边界与交互留白。（Water 增 `wet` 湿润土贴地片（role 级半径带 30..42）；Wood 增 `shade` 林下暗部贴地片；贴地片落点格心+四缘坡度 > `landscapeGroundMaxSlopeDeg`(16°) 整片拒绝（§3.4 跨陡坡首版不拆分）；水面候选沿用四邻拒绝；交互留白由 S4-03 遮罩自动覆盖——wet 半径带起点 30 保证不被 POI 操作区误杀）
+- [x] 验证林地骨架在库存 0/中间值/满值时稳定，仅可采细节变化。（Wood 新增 `foliage` 可采细节 ×3（`stockRole:'detail'`，qThreshold 构建期由 `landscapeDetailQFloor/QCeil` 区间线性映射）；临时断言 q 0/50/100 全几何逐位一致、`version()` 不变、detail 激活数 0→m→3 单调；浏览器 q 三态截图页内差分 3273px；detail 子图元不入遮罩占据网格——q 逐帧变化不触发重建也不误藏基础装饰）
+- [x] 输出同一存档、相机和缩放的前后对照，覆盖普通/道路/资源视图及四季。（`evidence/S4-04/screenshots/` 19 张：seed34 泉边 zoom4/zoom8/zoom6 道路/zoom1.6 概览 + 四季（渲染读取层覆盖 `sim.currentSeason`，暂停态截图用）；seed31 林地 zoom3 ON/OFF + q 三态；季节恒 Spring 除非文件名注明）
+- [x] 记录初次建模、暖缓存绘制及旋转期间的负载，冻结首版配方数目和尺度。（§9.3 性能首测：冷建 sync 0.7~1.2ms、首帧含个体模型冷建 18.9~50.1ms；景观链增量林地静 p95 2.7ms 达标、旋转/泉边 3.2~4.0ms 略超参考值——已按 §4.4 失败处理做零 GC 优化（贴地片填充样式预建常量），余差归 S4-08 正式设备复测；配方冻结见 §9.4）
 
 **失败处理**：水体关系不明只展示陆侧点缀；预算超限先减枝叶细节与覆盖范围，再复测。
 **验收证据**：至少近景泉边、近景林地两套可复现场景；取水/采木入口可选，资源数据与原 Inspector 一致。
@@ -438,3 +438,55 @@ profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：临时 Node �
 ```
 
 **S4-03 交付边界说明**：本任务交付的是 §3.3 遮罩语义（保护区收集 → 网格分桶 → 脏桶失效 → 隐藏与去重），**不做子图元内部裁剪**（无法可靠裁剪的实例按整体隐藏处理，符合 §4.3 失败处理条款）；遮罩半径/密度为首版保守值，S4-04/S4-05 样板验收时可经 RENDER_CONFIG 微调；车道保护不区分 wear 可见性（低磨损路当前不可见但会随通行变清晰，前瞻保护符合「道路增删必须更新遮罩」语义）。
+
+## 9. 验收记录 · S4-04 泉边与林地样板（2026-09-13）
+
+> 按 §5.3 模板记录。临时 Node 验收断言（29 组）已按根 AGENTS.md §4.10 用后删除，不持久化。
+
+### 9.1 验收记录正文
+
+```text
+任务 ID / 状态 / 日期：S4-04 / ✅ 完成 / 2026-09-13
+基准提交 / 候选提交 / 应用版本：基准 515e6d1（分支 c2）/ 候选 = 本次提交 / 1.50.49（升版器 12 定义点同步）
+WASM 双副本 SHA256：frontend/rust/ = frontend/ = b501d638060db149a07cc93bdfd58965b014c10bfaa8237b441b32c5385f3877（升版 SAVE_APP_VERSION 后重编译，双副本同值）
+模拟配置 SHA256 / 渲染配置摘要：SIM_CONFIG 239 字段未变（S4-01 冻结基线 94b84466… 仍有效）；RENDER_CONFIG 71 → 75 顶层键（新增 landscapeDetailQFloor(0.2)/QCeil(0.85)/landscapeGroundMaxSlopeDeg(16)/landscapeGroundWinterAlphaRatio(0.6) 4 键；landscapeRecipes 配方表 v2——Water +wet、Wood +shade +foliage）
+profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：泉边 = seed 34 / river_valley_v1 / tick 0（创世暂停，沿用 §6.4 冻结场景），相机 rotX 1.05 / rotZ 0.6 / zoom 4，中心 Water#11 (26.13, -162.35)；林地 = seed 31 / mountain_pass_v1 / tick 0，zoom 3，中心 Wood#30 (43.46, 118.56)（★ 场景偏差：§6.4 冻结的 seed33/Wood#30 实测被多条车道穿林，主树/贴地片/细节全部落入保护区（遮罩行为符合 §3.3 规范，最近车道距离 1.8~15.2），经 12 种子 Wood 组可见度筛选改用 seed31/Wood#30（9/14 可见、四类角色齐全），S4-01 冻结表不改动、以本条为准）；四季 = 渲染读取层覆盖 sim.currentSeason/seasonProgress（暂停态截图专用，不落存档）
+设备 / Chrome 版本 / 视口 / DPR：Chromium IAB（ZCode 内嵌，win32）视口 1280×720 CSS / DPR 1；★ 设备偏差：整帧渲染 p50 ~16ms，比 §6.5 参考设备（macOS IAB，4.1~4.5ms）慢 ~3×，绝对值不作达标判据，以同设备开/关差分与景观链独立增量为口径
+执行门禁、退出码及日志位置：cargo test --lib 0 失败；cargo build wasm release 通过 + 双副本同步；test-wasm ALL_TESTS_DONE；test-determinism 6/6 全通；config-check 239/239 + 空转参数门禁通过；frontend-check 全过；doc-link-check / cross-doc-check / code-map-check / doc-maintenance-check / bump-version --check 12 定义点零漂移；git diff --check 干净
+物理差分 / 模型确定性 / 避让违例 / 标签与命中检查：物理字段差分 0（sync + childActive + childHidden 前后 sim 串化逐位一致，跳过 _ 表现缓存；零内核逻辑变更）；模型确定性 29/29（高程贴合=全部子图元 z 与独立双线性实现 1e-9 内全等、坡面拒绝=贴地片格心+四缘全 ≤16°、水面边界=Water 组全子图元陆侧、清缓存重建与独立沙盒逐项一致、缺省回退表与 config.render.js 逐位一致、物理差分 0）；避让违例 = wet 贴地片取水走廊遮蔽与逐点真几何期望全等、POI 操作区遮蔽对 detail 照常生效；标签不适用（S4-06/07）
+基准与候选 p50/p95/p99 / 首帧与缓存重建 / 缓存规模：见 §9.3（本表不重复）；缓存规模 = seed34 实测 18 组 / 133 子图元（wet 10、shade 6、detail 9），遮罩 180 车道区 + 23 POI 区、72/133 子图元遮蔽；seed31 林地组 14 子图元
+截图与原始记录路径：evidence/S4-04/screenshots/ 19 张（泉边 zoom4 ON/OFF + 四季、zoom8 湿土 ON/OFF/冬季、zoom6 道路 ON/OFF、zoom1.6 概览 ON/OFF；林地 zoom3 ON/OFF、zoom8 q 三态）；库存款 q 操作经渲染配置阈值（表现层），未改动任何模拟事实
+失败项、降级与后续任务：验收中发现并修正 2 项——① 湿润土片首版 α 0.20/0.16 在草地底色上可辨度不足，上调至 0.28/0.22 后近景清晰；② 贴地片绘制每帧 rgba 字符串拼接违反零 GC 先例，改为 tone×季节预建常量后旋转 p95 3.3→3.2。无遗留失败。遗留观察：景观链增量旋转/高密场景 p95 3.2~4.0ms 略超 §5.1 参考值 3ms（见 §9.3 归因），S4-08 按 §5.1 完整口径在参考设备复测，若确认超限先减 Wood foliage slots(3→2) 与 shade 覆盖半径再复测。后续：S4-05 Berry/Stone/Gold 配方推广（复用 detail/GroundPatch 机制）；S4-06 标签层。
+```
+
+### 9.2 遮罩层 detail 子图元语义（S4-03 模块的行为补充）
+
+`stockRole:'detail'` 子图元在 landscape-mask.js 的占据网格重建中**只做 `_masked` 预判、不入占据桶**：其显隐随库存 q 逐帧变化而 geomRev 不变，若入桶会让基础装饰被「当前不可见的细节」误去重（关闭景观后去重残留）；细节均为小 footprint 且基础装饰不围绕 POI 生成（§6.2 第 6 行实测），不参与去重的代价可接受。`childHidden` 对 detail 照常生效（POI 操作区/车道走廊内的细节同样隐藏）。
+
+### 9.3 性能首测（§6.5 方法 · 景观链独立增量口径）
+
+方法：临时包装 `collectLandscapes` / `drawLandscapeChild` / `drawLandscapeShadowGround` 计 `performance.now()` 差值（= §5.1 要求单列的「景观增量」整条链：同步 + 遮蔽判定 + q 过滤 + 视口剔除 + 入队深度采样 + 全部子图元与贴地片绘制 + 阴影）；合成时间戳 +34ms/帧绕过 render 节流、期间 stub rAF；预热 60 帧后采样 240 帧；模拟暂停（启动存档门禁态，§6.5 基线为运行态，口径差异如实记录）。整帧开/关对照在该 IAB 上被合成器 ~16ms 量化噪声淹没（关态甚至测得反超），故以链级增量为达标口径。
+
+| 场景 | 状态 | p50 | p95 | p99 | max |
+|---|---|---|---|---|---|
+| 林地 seed31 zoom3 | 静态 | 1.5ms | 2.7ms | 3.7ms | 8.5ms |
+| 林地 seed31 zoom3 | 旋转 rotZ+0.008/帧 | 1.9ms | 3.2ms | 6.7ms | 7.0ms |
+| 泉边 seed34 zoom4 | 静态 | 2.0ms | 3.3ms | 6.8ms | 12.6ms |
+| 泉边 seed34 zoom4 | 旋转 | 1.7ms | 4.0ms | 5.6ms | 8.4ms |
+
+- 冷建模（组重建 sync 单独计时）：0.7ms（seed31）/ 1.2ms（seed34）；首帧含个体模型冷建（AccentModel `L#` 通道全冷）：18.9~50.1ms 单发；暖缓存整帧：~16-24ms（慢设备绝对值，仅记录）。
+- 达标评估：静态 p95 2.7ms ≤ 3ms 参考值达标；旋转/高密 3.2~4.0ms 略超——该设备整帧比 §6.5 参考设备慢 ~3×（16ms vs 4.1ms 同场景同法），且本机测量含包装开销与计时尾部；不调大预算数字、不移动冻结基线，S4-08 以 §5.1 完整矩阵（参考桌面设备、模拟运行态、开/关对照）复测为准；若确认超限按 §4.4 失败处理先减 Wood foliage slots(3→2) 与 shade 覆盖半径。
+
+### 9.4 首版配方冻结（数量与尺度）
+
+| 配方 | role | modelKind | slots | 尺度/半径 | 备注 |
+|---|---|---|---|---|---|
+| Water | stone / grass / **wet** | RockCluster / GrassTuft / **GroundPatch** | 2 / 4 / 2 | 0.55-0.85 / 0.8-1.2 / 半径 6-9 | wet 半径带 30-42（role 级覆盖，避开 POI 操作区误杀）；tone=wet α 0.28/0.22 |
+| Wood | tree / bush / grass / **shade** / **foliage** | Tree / Bush / GrassTuft / **GroundPatch** / Bush(detail) | 3 / 3 / 3 / 2 / 3 | 0.9-1.35 / 0.7-1.1 / 0.8-1.2 / 半径 8-12 / 0.45-0.7 | shade tone=shade α 0.15/0.13；foliage qThreshold = 0.2+0.65×(slot+0.5)/3 |
+| Berry/Stone/Gold | （S4-02 骨架不变） | — | — | — | detail/贴地片推广归 S4-05 |
+
+活体计数（浏览器实测）：seed34 全图 18 组 133 子图元（Water/组 8 = 石 2+草 4+wet 2，wet/1 常被水面/坡度拒绝）；seed31 Wood#30 组 14 子图元、9 可见（遮罩 5）。
+
+### 9.5 复现流程
+
+泉边：URL `?seed=34`（不能用 seed 0，§6.6 注 1）→ 注入 §6.6 注 4 UI 隐藏样式 → `aim(1.05, 0.6, 4.0, 26.13, -162.35, 2)`（世界点居中：`panX = 640 - w/2 - (x·cosZ - y·sinZ)·zoom`，`panY = 360 - h/2 - ((x·sinZ + y·cosZ)·cosX - z·sinX)·zoom`）→ 门禁暂停态手动 `render(performance.now())` + `sim-canvas.toDataURL()`。林地：`?seed=31` + `aim(1.05, 0.6, 3.0, 43.46, 118.56, 0)`。库存三态：改 `RENDER_CONFIG.landscapeDetailQFloor/QCeil` 后须 `LandscapeModel.resetCache()`（qThreshold 为构建期常量），q 实况 = 150/200 = 0.75。

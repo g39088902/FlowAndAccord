@@ -157,6 +157,11 @@ window.RENDER_CONFIG = {
   landscapeStyleVersion: 1,     // 景观配方风格版本（组缓存/模型缓存键组成部分；调值整体重建）
   landscapeCacheMaxGroups: 256, // 景观组模型缓存上限（超限整体清空，不 LRU；§3.2 有界缓存）
   landscapeFrameChildBudget: 420, // 每帧入队子图元（含阴影）硬上限；按固定遍历序截断（§3.4 预算）
+  // —— 可采细节与贴地片（★ S4-04，STAGE-04-TODO §3.2/§3.4；landscape-model/render_landscapes 消费）——
+  landscapeDetailQFloor: 0.2,   // detail 子图元 q 阈值映射区间下界（q ≥ threshold_i 才显示；骨架不受影响）
+  landscapeDetailQCeil: 0.85,   // detail 子图元 q 阈值映射区间上界（threshold_i = floor + (ceil-floor)·(slot+0.5)/slots）
+  landscapeGroundMaxSlopeDeg: 16, // GroundPatch 贴地片坡度拒绝阈值（度；格心+半径 0.7 四缘任一超限即拒绝，§3.4 跨陡坡不贴片）
+  landscapeGroundWinterAlphaRatio: 0.6, // 冬季贴地片 alpha 乘数（积雪覆盖湿润/阴影观感）
   // —— 景观遮罩（★ S4-03，STAGE-04-TODO §3.3；landscape-mask.js 消费）——
   // 全部距离/半径均为**世界单位**（遮罩查询在世界空间命中，不涉及显示像素；
   // 世界 → 屏幕换算只在绘制端经 camera.zoom 一次）。
@@ -168,14 +173,17 @@ window.RENDER_CONFIG = {
   landscapeMaskPoiExtraRadius: 4, // POI 操作区在 max(底座半径, 图标世界尺寸~12) 基础上的额外余量（复用 poiBase* 同源键；poiMarkerFootprintR 是深度辅助半径非视觉占地，禁用作保护半径）
   landscapeMaskMargin: 2,       // 通用留白余量（世界单位；车道采样弦差须小于该值）
   landscapeRecipes: {           // 配方表（role 顺序 = 候选生成顺序；slots = 每 role 候选上限 K）
-    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草；水面候选由模型层拒绝（不画新泉池）
+    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草 + 湿润土贴地片；水面候选由模型层拒绝（不画新泉池）
       { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
       { role: 'grass', modelKind: 'GrassTuft',   slots: 4, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+      { role: 'wet',   modelKind: 'GroundPatch', slots: 2, rMin: 30, rMax: 42, radiusMin: 6, radiusMax: 9, tone: 'wet' },
     ] },
-    Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草；避让归 S4-03 遮罩
-      { role: 'tree',  modelKind: 'Tree',        slots: 3, scaleMin: 0.9,  scaleMax: 1.35, footprint: 10.5 },
-      { role: 'bush',  modelKind: 'Bush',        slots: 3, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 3, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草 + 林下暗部；foliage=可采细节（q 显隐）；避让归 S4-03 遮罩
+      { role: 'tree',    modelKind: 'Tree',        slots: 3, scaleMin: 0.9,  scaleMax: 1.35, footprint: 10.5 },
+      { role: 'bush',    modelKind: 'Bush',        slots: 3, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+      { role: 'grass',   modelKind: 'GrassTuft',   slots: 3, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+      { role: 'shade',   modelKind: 'GroundPatch', slots: 2, radiusMin: 8,  radiusMax: 12, tone: 'shade' },
+      { role: 'foliage', modelKind: 'Bush',        slots: 3, scaleMin: 0.45, scaleMax: 0.7, footprint: 8, stockRole: 'detail' },
     ] },
     Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）
       { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },

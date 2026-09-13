@@ -10,6 +10,9 @@
 //   render_accents.js / render_grass.js 既有图元（drawAccentTree/Boulder/Bush/RockCluster/
 //   GrassTuft），阴影复用 render_shadows.js::drawAccentShadowFor（模型参数化主体），
 //   季相复用 window.SimTreeTint，光照经图元内部 accentLitFill 单一入口——**不复制光照公式**。
+//   ★ S4-04：GroundPatch 贴地色差片（Water 湿润土 / Wood 林下暗部）为本地两遍式椭圆图元
+//   （无 AccentModel 模型、无受光法线）；可采细节子图元（stockRole 'detail'）由
+//   LandscapeModel.childActive 按 q ≥ qThreshold 过滤显隐——骨架零影响。
 // - 模型命名空间：子图元模型经 AccentModel.getByKey（完整 key 通道，'L#' 前缀）解析，
 //   与 accent.id 缓存键隔离；模型内容 = (modelKind, visualSeed) 纯函数。
 // - 配置关态（RENDER_CONFIG.landscapeEnabled=false）：collect 直接返回，零入队零同步，
@@ -89,6 +92,9 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
       //   判定已在占据网格重建时预判（child._masked），此处零距离计算
       const LM = window.LandscapeMask;
       if (LM && LM.childHidden(child)) continue;
+      // ★ S4-04 可采细节（stockRole 'detail'）：q ≥ qThreshold 才显示——骨架恒可见，
+      //   库存 0/中间/满只改变 detail 显隐数量（单调），不影响入队几何
+      if (!window.LandscapeModel.childActive(groups[gi], child)) continue;
       // 视口粗剔除（与装饰同余量口径）：屏外子图元不入队、不占预算
       const rx = child.x * cosZ - child.y * sinZ;
       const ry = child.x * sinZ + child.y * cosZ;
@@ -129,6 +135,7 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
 // ── 分发：立体子图元绘制（复用装饰图元，禁复制光照/季相公式）──
 function drawLandscapeChild(child) {
   const kind = child.modelKind;
+  if (kind === 'GroundPatch') { drawLandscapeGroundPatch(child); return; } // ★ S4-04 贴地色差片（无 AccentModel 模型）
   if (kind !== 'Tree' && kind !== 'Boulder' && kind !== 'Bush' &&
       kind !== 'RockCluster' && kind !== 'GrassTuft') {
     _reportUnknownLandscapeKind(String(kind));
@@ -165,6 +172,53 @@ function drawLandscapeChild(child) {
     const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
     drawAccentGrassTuft(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX); // render_grass.js
   }
+}
+
+// ── 贴地色差片绘制（★ S4-04：Water 湿润土 'wet' / Wood 林下暗部 'shade'）──
+// 地面圆经 rotX 俯仰投影为椭圆（短轴 = r·cosX；rotZ 旋转不改变圆形投影形状）；
+// 候选格心+四缘坡度超限已在模型层拒绝（§3.4），首版不做片内分段贴坡。
+// 两遍式柔和色差：外圈弱 alpha + 内圈略深（内圈中心按子图元稳定 rot 微偏，避免同心呆板）。
+// 固定贴地色差（湿润土/林下暗部），**不走** accentLitFill 光照公式（贴地片无受光法线）；
+// 冬季按 landscapeGroundWinterAlphaRatio 减弱（积雪覆盖湿润/阴影观感）。
+// 填充样式串按 tone×季节预建常量（渲染热路径零字符串分配，同 render_accents 零 GC 先例）。
+var _gpStyleCache = { Spring: null, Summer: null, Autumn: null, Winter: null };
+function _gpStyles(season) {
+  let s = _gpStyleCache[season];
+  if (s) return s;
+  let k = 1;
+  if (season === 'Winter') {
+    const v = (window.RENDER_CONFIG || {}).landscapeGroundWinterAlphaRatio;
+    k = Number.isFinite(v) ? v : 0.6;
+  }
+  const mk = function (col, a) { return 'rgba(' + col + ',' + (a * k).toFixed(3) + ')'; };
+  s = {
+    wetOuter: mk('74,62,46', 0.28), wetInner: mk('74,62,46', 0.22),
+    shadeOuter: mk('26,34,22', 0.15), shadeInner: mk('26,34,22', 0.13),
+  };
+  _gpStyleCache[season] = s;
+  return s;
+}
+function drawLandscapeGroundPatch(child) {
+  const scale = camera.zoom;
+  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+  const rx = child.x * cosZ - child.y * sinZ;
+  const ry = child.x * sinZ + child.y * cosZ;
+  const az = (child.z || 0) + MAP_Z_LIFT;
+  const sx = w / 2 + camera.panX + rx * scale;
+  const sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+  const r = child.radius * scale;
+  if (r < 1) return;
+  const st = _gpStyles(sim.currentSeason);
+  const wet = child.tone === 'wet';
+  const ryEll = r * cosX;
+  const offR = r * 0.18;
+  const ix = sx + Math.cos(child.rot) * offR;
+  const iy = sy + Math.sin(child.rot) * offR * cosX;
+  ctx.fillStyle = wet ? st.wetOuter : st.shadeOuter;
+  ctx.beginPath(); ctx.ellipse(sx, sy, r, ryEll, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = wet ? st.wetInner : st.shadeInner;
+  ctx.beginPath(); ctx.ellipse(ix, iy, r * 0.62, ryEll * 0.62, 0, 0, Math.PI * 2); ctx.fill();
 }
 
 // ── 分发：树/灌木子图元贴地投影（复用 render_shadows.js 模型参数化主体）──

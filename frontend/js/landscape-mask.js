@@ -285,6 +285,9 @@ window.LandscapeMask = window.LandscapeMask || (function () {
 
   // ── 占据网格重建：可见景观子图元入桶 + 逐子图元预判保护区命中（child._masked）──
   // 触发条件 = 模型版本或保护区修订号变化（建房等不重建模型也会刷新 _masked）。
+  // ★ S4-04：可采细节子图元（stockRole 'detail'）只做 _masked 预判、**不入占据桶**——
+  //   其显隐随库存 q 逐帧变化而 geomRev 不变，入桶会让基础装饰被「不可见细节」误去重；
+  //   细节均为小 footprint 且基础装饰不围绕 POI 生成（S4-01 实测），不参与去重可接受。
   function rebuildOcc() {
     _occBuckets.clear();
     const LM = window.LandscapeModel;
@@ -294,7 +297,7 @@ window.LandscapeMask = window.LandscapeMask || (function () {
       for (let ci = 0; ci < children.length; ci++) {
         const child = children[ci];
         child._masked = hitZones(child.x, child.y, child.footprint); // 完整足迹判定（§3.3 第 4 条）
-        if (!child._masked) {
+        if (!child._masked && child.stockRole !== 'detail') {
           registerBbox(child.x - child.footprint, child.y - child.footprint,
             child.x + child.footprint, child.y + child.footprint, child, _occBuckets);
         }

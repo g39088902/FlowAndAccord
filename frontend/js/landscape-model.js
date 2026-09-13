@@ -32,7 +32,10 @@
 //   本层不解析个体模型（保持纯几何）。
 window.LandscapeModel = window.LandscapeModel || (function () {
   // —— 配方版本：调配方/参数即整体重建组缓存（缓存键组成部分）——
-  const RECIPE_VERSION = 1;
+  // v2（★ S4-04）：Water 增 wet 湿润土贴地片、Wood 增 shade 林下暗部贴地片与
+  // foliage 可采细节（stockRole 'detail'，qThreshold 由 q 映射）；GroundPatch 落点
+  // 增坡度拒绝（cell slopeAngle > landscapeGroundMaxSlopeDeg 跳过，§3.4 坡面拒绝）。
+  const RECIPE_VERSION = 2;
 
   // —— 固定 uint32 哈希（MurmurHash3 风格 finalizer，明确无符号整数运算）——
   function hash32() {
@@ -65,16 +68,22 @@ window.LandscapeModel = window.LandscapeModel || (function () {
 
   // —— 内置配方回退表（缺省回退与 config.render.js 集中值逐位一致）——
   // roles 顺序即候选生成顺序（固定 role/slot 序）；slots = 每 slot 群内候选上限 K。
+  // ★ S4-04：GroundPatch = 贴地色差片（radius = 视觉半径，footprint 同值供遮罩查询）；
+  //   stockRole 'detail' = 可采细节（显隐由 qThreshold ≤ q 决定，骨架不受影响）；
+  //   role 级 rMin/rMax 覆盖组半径带（wet 贴近 POI 内带岸侧）。
   function defaultRecipes() {
     return {
       Water: { rMin: 24, rMax: 46, roles: [
         { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 4, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
+        { role: 'wet', modelKind: 'GroundPatch', slots: 2, rMin: 30, rMax: 42, radiusMin: 6, radiusMax: 9, tone: 'wet' },
       ] },
       Wood: { rMin: 30, rMax: 60, roles: [
         { role: 'tree', modelKind: 'Tree', slots: 3, scaleMin: 0.9, scaleMax: 1.35, footprint: 10.5 },
         { role: 'bush', modelKind: 'Bush', slots: 3, scaleMin: 0.7, scaleMax: 1.1, footprint: 8 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 3, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
+        { role: 'shade', modelKind: 'GroundPatch', slots: 2, radiusMin: 8, radiusMax: 12, tone: 'shade' },
+        { role: 'foliage', modelKind: 'Bush', slots: 3, scaleMin: 0.45, scaleMax: 0.7, footprint: 8, stockRole: 'detail' },
       ] },
       Berry: { rMin: 22, rMax: 44, roles: [
         { role: 'bush', modelKind: 'Bush', slots: 5, scaleMin: 0.7, scaleMax: 1.1, footprint: 8 },
@@ -109,7 +118,8 @@ window.LandscapeModel = window.LandscapeModel || (function () {
 
   // —— 子图元种类包围余量（世界单位；与 AccentModel.extentOf 同源口径的本地镜像，
   //    仅供组 bounds 登记，不参与绘制）——
-  const EXTENT_BY_KIND = { Tree: 18, Bush: 8, Boulder: 7, RockCluster: 10, GrassTuft: 7 };
+  // GroundPatch 的视觉占地即 footprint（=radius），余量给小常数即可。
+  const EXTENT_BY_KIND = { Tree: 18, Bush: 8, Boulder: 7, RockCluster: 10, GrassTuft: 7, GroundPatch: 2 };
 
   // ── 地形只读工具（静态输入；索引换算同 render_depth_queue.js::_ownCellCenterDepth 口径）──
   let _terr = null; // sync 时暂存当前地形引用（本层只在 sync 内消费）
@@ -156,6 +166,34 @@ window.LandscapeModel = window.LandscapeModel || (function () {
       (gy > 0 && WATER_KINDS[cells[idx - gSize].surfaceKind]) ||
       (gy < gSize - 1 && WATER_KINDS[cells[idx + gSize].surfaceKind]));
   }
+  // 落点所在格坡度角（度；内核 slope_angle_deg 全图 4 邻域中心差分定稿值，只读）。
+  // 仅 GroundPatch 贴地片消费（§3.4：跨陡坡贴地片拆小或拒绝——首版直接拒绝，整片不悬浮穿山）。
+  function sampleSlopeDeg(x, y) {
+    const t = _terr;
+    if (!t) return Infinity; // 地形不可用 → 保守拒绝
+    const gSize = t.gridSize, cells = t.cells;
+    const half = worldHalf(cells);
+    if (half == null) return Infinity;
+    const gx = Math.max(0, Math.min(gSize - 1, Math.round(((x + half) / (2 * half)) * (gSize - 1))));
+    const gy = Math.max(0, Math.min(gSize - 1, Math.round(((y + half) / (2 * half)) * (gSize - 1))));
+    const s = cells[gy * gSize + gx].slopeAngle;
+    return Number.isFinite(s) ? s : Infinity;
+  }
+  // 贴地片坡度拒绝阈值（度）；缺省 16 与 config.render.js 集中值一致
+  function groundMaxSlopeDeg() {
+    const v = (window.RENDER_CONFIG || {}).landscapeGroundMaxSlopeDeg;
+    return Number.isFinite(v) ? v : 16;
+  }
+  // 可采细节 slot 阈值映射区间（§3.2：稳定 slot 阈值映射少量细节的连续强度；
+  // 缺省 0.2/0.85 与 config.render.js 集中值一致）
+  function detailQFloor() {
+    const v = (window.RENDER_CONFIG || {}).landscapeDetailQFloor;
+    return Number.isFinite(v) ? v : 0.2;
+  }
+  function detailQCeil() {
+    const v = (window.RENDER_CONFIG || {}).landscapeDetailQCeil;
+    return Number.isFinite(v) ? v : 0.85;
+  }
 
   // ── 组缓存（世界 token 只隔离缓存不参与视觉随机；换世界走 resetCache）──
   const _groups = [];       // 当前世界组列表（poi 顺序，稳定）
@@ -185,7 +223,9 @@ window.LandscapeModel = window.LandscapeModel || (function () {
 
   // 单组构建：遍历 roles × slots（固定顺序），逐 slot 至多 1 个候选。
   // 失败处理（STAGE-04-TODO §4.2）：地形不可用/未知类型 → 返回 null（回退基础标记）；
-  // 单个候选越界/水面 → 跳过该 slot 不重编号；未知 modelKind → 跳过该子图元。
+  // 单个候选越界/水面/贴地片超坡度 → 跳过该 slot 不重编号；未知 modelKind → 跳过该子图元。
+  // ★ S4-04：role 级 rMin/rMax 覆盖组半径带；GroundPatch 的 footprint = 视觉半径；
+  //   detail 子图元带 qThreshold（构建期由 config 区间线性映射，构建后恒定——骨架零影响）。
   function buildGroup(poi, worldSeed) {
     const recipe = recipes()[poi.type];
     if (!recipe || !TYPE_SALT[poi.type]) return null; // Camp/Market 及未知类型不生成景观
@@ -196,8 +236,10 @@ window.LandscapeModel = window.LandscapeModel || (function () {
       const roleDef = recipe.roles[ri];
       const slots = Math.max(0, Math.round(cfgNum(roleDef.slots, 0)));
       const rSalt = roleSalt(roleDef.role);
-      const rMin = cfgNum(recipe.rMin, 24), rMax = cfgNum(recipe.rMax, 46);
+      const rMin = cfgNum(roleDef.rMin, cfgNum(recipe.rMin, 24));
+      const rMax = cfgNum(roleDef.rMax, cfgNum(recipe.rMax, 46));
       const modelKind = roleDef.modelKind;
+      const isDetail = roleDef.stockRole === 'detail';
       for (let slot = 0; slot < slots; slot++) {
         const seed = hash32(worldSeed, typeSalt, poi.id, RECIPE_SALT, rSalt, slot);
         // 极坐标均匀盘采样（§3.2：r = sqrt(lerp(rMin², rMax², u))、theta = 2πv）
@@ -211,9 +253,23 @@ window.LandscapeModel = window.LandscapeModel || (function () {
         if (poi.type === 'Water' && isWaterSurface(x, y)) continue; // 水面候选拒绝（跳过不重编号）
         const z = sampleElevation(x, y);
         if (z == null) continue; // 越界/地形缺失：跳过
+        let footprint = cfgNum(roleDef.footprint, 8);
+        let radius = 0, tone = null;
+        if (modelKind === 'GroundPatch') {
+          radius = cfgNum(roleDef.radiusMin, 6) +
+            (cfgNum(roleDef.radiusMax, 9) - cfgNum(roleDef.radiusMin, 6)) * chan(seed, 14);
+          footprint = radius; // 视觉占地即查询足迹（遮罩/组 bounds 同一口径）
+          tone = roleDef.tone === 'wet' ? 'wet' : 'shade';
+          // 坡面拒绝（§3.4）：格心 + 半径 0.7 处四缘任一超阈值即拒绝——跨陡坡的贴地片
+          // 首版直接拒绝（不做片内拆分），禁止整张贴片悬浮穿山
+          const maxSlope = groundMaxSlopeDeg();
+          const sr = radius * 0.7;
+          if (sampleSlopeDeg(x, y) > maxSlope ||
+              sampleSlopeDeg(x + sr, y) > maxSlope || sampleSlopeDeg(x - sr, y) > maxSlope ||
+              sampleSlopeDeg(x, y + sr) > maxSlope || sampleSlopeDeg(x, y - sr) > maxSlope) continue;
+        }
         const scale = cfgNum(roleDef.scaleMin, 0.7) +
           (cfgNum(roleDef.scaleMax, 1.2) - cfgNum(roleDef.scaleMin, 0.7)) * chan(seed, 12);
-        const footprint = cfgNum(roleDef.footprint, 8);
         const child = {
           key: 'poi:' + poi.id + '/' + roleDef.role + '/' + slot,
           modelKind: modelKind,
@@ -224,8 +280,14 @@ window.LandscapeModel = window.LandscapeModel || (function () {
           scale: scale,
           footprint: footprint,
           bounds: footprint + EXTENT_BY_KIND[modelKind] * scale,
-          stockRole: 'skeleton',   // S4-02 基础骨架不受丰度影响；可采细节角色归 S4-04/05
+          stockRole: isDetail ? 'detail' : 'skeleton',
         };
+        if (radius > 0) { child.radius = radius; child.tone = tone; }
+        if (isDetail) {
+          // 稳定 slot 阈值：q ≥ threshold_i 才显示；构建期定值，库存变化不改几何与阈值
+          const qf = detailQFloor(), qc = detailQCeil();
+          child.qThreshold = qf + (qc - qf) * ((slot + 0.5) / Math.max(1, slots));
+        }
         if (child.bounds > bounds) bounds = child.bounds;
         children.push(child);
       }
@@ -254,6 +316,14 @@ window.LandscapeModel = window.LandscapeModel || (function () {
       group.q = null;
       group.qValid = false;
     }
+  }
+
+  // ── 可见性（★ S4-04）：骨架恒可见；detail 子图元 q ≥ qThreshold 才显示。
+  // 库存 0/中间/满只改变 detail 显隐数量（单调），骨架几何与坐标零变化（§4.4 验收口径）。
+  function childActive(group, child) {
+    if (!child) return false;
+    if (child.stockRole !== 'detail') return true;
+    return !!(group && group.qValid && group.q >= child.qThreshold);
   }
 
   // ── 世界同步：静态签名变化才重建几何；库存只刷新动态丰度字段 ──
@@ -303,9 +373,11 @@ window.LandscapeModel = window.LandscapeModel || (function () {
     groupOf: groupOf,
     resetCache: resetCache,
     version: function () { return _version; }, // ★ S4-03 遮罩占据网格重建判据
+    childActive: childActive, // ★ S4-04 detail 子图元 q 显隐判定（遮罩/绘制共用）
     // 暴露给临时验收断言与 render_landscapes 的只读帮助函数（不进入任何持久化测试）
     hash32: hash32,
     sampleElevation: sampleElevation,
     isWaterSurface: isWaterSurface,
+    sampleSlopeDeg: sampleSlopeDeg,
   };
 })();
