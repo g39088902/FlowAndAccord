@@ -163,6 +163,100 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
     (mix64(seed ^ salt) % 10_000) as u16
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ TB-01-1 多尺度噪声内核：确定性 2D 梯度噪声 + 3 倍频 fBm（07 号 §7.2）。
+//
+// 只依赖整数运算（`mix64`）与 IEEE-754 精确定义的四则/取整——无 sin/cos/exp、
+// 无 `DefaultHasher`、无系统时间、无 fast-math 收缩（Rust 保证浮点不融合），
+// x86_64 / ARM64 / wasm32 下同入参逐位一致。
+//
+// ⚠️ 本模块暂未被高程采样消费（`allow(dead_code)`）：无掩码的全图均匀加噪会
+// 击穿平原生活区（根 AGENTS.md §4 易踩坑 #3），必须与 TB-01-2 的高度/区域
+// 调制掩码、鞍部保护带同期接入。接入后移除本 `allow`。
+// ─────────────────────────────────────────────────────────────────────────────
+#[allow(dead_code)]
+mod terrain_noise {
+    /// 多尺度噪声固定盐值 "TERRNS01"（8 个 ASCII 字符打包 u64，风格同
+    /// `ACCENT_RNG_SALT`）。一经落地永不更改——改盐值等于换图（同种子不再复现旧世界）。
+    pub(crate) const SALT_TERRAIN_NOISE: u64 = 0x5445_5252_4E53_3031;
+
+    /// 8 个离散单位梯度向量（(±1,0)/(0,±1)/(±√2/2,±√2/2)）。
+    /// 用编译期常数表替代运行时三角函数：cos/sin 跨平台不保证逐位一致，
+    /// 常数表由编译期精确固化且查表零开销；`FRAC_1_SQRT_2` 为精确舍入常数。
+    const GRADIENTS_8: [[f32; 2]; 8] = [
+        [1.0, 0.0],
+        [-1.0, 0.0],
+        [0.0, 1.0],
+        [0.0, -1.0],
+        [std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
+        [-std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
+        [std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
+        [-std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
+    ];
+
+    /// 梯度选择哈希：格网整数坐标 + 世界种子 + 特征盐值 → [0, 8) 梯度索引。
+    /// 负坐标经 `as u64` 符号扩展后参与混合，同样逐位确定。
+    #[inline]
+    fn hash_gradient2d(ix: i32, iy: i32, seed: u64, salt: u64) -> usize {
+        let mixed = super::mix64(
+            (ix as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                ^ (iy as u64).wrapping_mul(0xC6A4_A793_5BD1_E995)
+                ^ seed
+                ^ salt,
+        );
+        (mixed & 7) as usize
+    }
+
+    /// 单倍频 2D 梯度噪声（Perlin 风格）。输出约 [-1, 1]；格网整点处恒为 0。
+    #[inline]
+    pub(crate) fn gradient_noise_2d(x: f32, y: f32, seed: u64, salt: u64) -> f32 {
+        let x0 = x.floor();
+        let y0 = y.floor();
+        let fx = x - x0;
+        let fy = y - y0;
+        // 五次 Hermite 平滑样条 6t^5-15t^4+10t^3：二阶导连续，杜绝格网十字接缝
+        //（后续四邻域差分坡度不会在格网边界出现锯齿突变）。
+        let sx = fx * fx * fx * (fx * (fx * 6.0 - 15.0) + 10.0);
+        let sy = fy * fy * fy * (fy * (fy * 6.0 - 15.0) + 10.0);
+        let ix = x0 as i32;
+        let iy = y0 as i32;
+        let corner = |cx: i32, cy: i32, dx: f32, dy: f32| -> f32 {
+            let g = GRADIENTS_8[hash_gradient2d(cx, cy, seed, salt)];
+            g[0] * dx + g[1] * dy
+        };
+        let n00 = corner(ix, iy, fx, fy);
+        let n10 = corner(ix + 1, iy, fx - 1.0, fy);
+        let n01 = corner(ix, iy + 1, fx, fy - 1.0);
+        let n11 = corner(ix + 1, iy + 1, fx - 1.0, fy - 1.0);
+        let a = n00 + (n10 - n00) * sx;
+        let b = n01 + (n11 - n01) * sx;
+        a + (b - a) * sy
+    }
+
+    /// 3 倍频 fBm 基准参数（07 号 §7.2 TB-01-1 规格，取区间中值）。
+    /// 波长单位米；接入 `SimConfig`（`terrain_noise_amplitude` /
+    /// `terrain_noise_scale_base`）由 TB-01-5 落地，届时此处改为消费配置。
+    const OCTAVE_WAVELENGTHS_M: [f32; 3] = [320.0, 110.0, 38.0];
+    const OCTAVE_AMPLITUDES_M: [f32; 3] = [7.0, 3.0, 1.0];
+
+    /// 3 倍频分形布朗运动（fBm）：Octave 0 宏观次级丘陵（λ≈320m，A≈7m）+
+    /// Octave 1 中观坡面褶皱（λ≈110m，A≈3m）+ Octave 2 微观地表细部（λ≈38m，A≈1m）。
+    /// 输出为高程增量（米），纯函数无状态，不消费任何 `WorldRng` 流。
+    #[inline]
+    pub(crate) fn fbm_terrain_3octaves(x: f32, y: f32, seed: u64) -> f32 {
+        let mut sum = 0.0f32;
+        for i in 0..3 {
+            sum += gradient_noise_2d(
+                x / OCTAVE_WAVELENGTHS_M[i],
+                y / OCTAVE_WAVELENGTHS_M[i],
+                seed,
+                SALT_TERRAIN_NOISE,
+            ) * OCTAVE_AMPLITUDES_M[i];
+        }
+        sum
+    }
+}
+
 /// 在某一类（结构型 / 视觉型）内按 `TerrainSubFeatureKind` **升序**逐个判定，
 /// **首个命中者即选定并立即停止**该类的后续判定（§5.3 互斥裁决）。
 ///
@@ -499,3 +593,4 @@ impl TerrainMap {
         Ok(())
     }
 }
+

@@ -13,7 +13,7 @@
 
 | 编号 | 任务 | 涉及文件 | 难度 | 依赖 | 状态 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TB-01-1** | 纯确定性 2D 梯度噪声与无状态分形 fBm 内核实现 | `crates/sim_core/src/geo/terrain.rs` | 中 | — | ⏳ 待实施 |
+| **TB-01-1** | 纯确定性 2D 梯度噪声与无状态分形 fBm 内核实现 | `crates/sim_core/src/geo/terrain.rs` | 中 | — | ✅ 已实施（v1.50.36：`terrain_noise` 模块，未接入高程采样，接入随 TB-01-2） |
 | **TB-01-2** | 高程与区域调制掩码（Masking）及主脊域扭曲（Domain Warping） | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-1 | ⏳ 待实施 |
 | **TB-01-3** | T1 不对称支脊（Branch Ridges）几何模型与鞍部禁区避让 | `crates/sim_core/src/geo/terrain.rs` | 高 | TB-01-2 | ⏳ 待实施 |
 | **TB-01-4** | 四邻域差分坡度重算与地表属性重新映射 | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-3 | ⏳ 待实施 |
