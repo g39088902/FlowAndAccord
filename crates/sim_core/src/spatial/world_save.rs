@@ -33,7 +33,7 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.50.47";
+pub const SAVE_APP_VERSION: &str = "1.50.49";
 
 
 fn default_terrain_generator_version() -> u32 {
@@ -229,7 +229,13 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
             save.terrain_generator_version, TERRAIN_GENERATOR_VERSION
         ));
     }
-    if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY {
+    // ★ STAGE2-7：flat_baseline 为显式诊断/降级基线，支持保存/加载与续演
+    //  （STAGE2-5 有界回退环的降级产物必须可复演）。草原/半坡暂未列入白名单——
+    //  其全链路验收未收口，不属本任务范围，勿顺手放行。
+    if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE
+    {
         return Err(format!("地形 profile 不受支持：{}", save.terrain_profile));
     }
 
@@ -296,6 +302,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         regions_arrival_dirty: true,
         strtab: std::cell::RefCell::new(super::snapshot_bin::StrTab::new()),
         last_geom_sig: std::cell::Cell::new(u64::MAX),
+        creation_diagnostic: None,
     };
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic

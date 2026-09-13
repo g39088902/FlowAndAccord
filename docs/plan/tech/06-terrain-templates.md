@@ -17,7 +17,7 @@
 | :--- | :--- | :--- |
 | T0 / T1 / T2 | 地表查询、山口、静态河谷、共享水池、合法路网及 T1/T2 随机轮换 | 生存成本诊断、`flat_baseline` 等价基线、有界降级共 3 项门禁（§18.1/§18.2） |
 | D-A / D-B1 | 五类通用装饰、子特征模型与选择器、FABS Section 22、静态缓存拆分；D-B1-9 代码验收完成（§18.5） | 第 5/9 步注入仍为空；TA-09 / D-B1-8 实机场景样板待交付 |
-| 阶段二 | STAGE2-1 配置已加回，当前仅在创世入口钳制上限；STAGE2-2 水系影响带收敛已完成；STAGE2-4 几何/ID 校验与 STAGE2-6 生存诊断已交付（v1.50.47，诊断未接拒绝） | STAGE2-3 完整事务域、5、7、8；配置可读取不等于已实现重试，见 R.5 |
+| 阶段二 | STAGE2-1 配置已加回，当前仅在创世入口钳制上限；STAGE2-2 水系影响带收敛已完成；STAGE2-4 几何/ID 校验与 STAGE2-6 生存诊断已交付（v1.50.47，诊断未接拒绝）；STAGE2-7 `flat_baseline` 显式基线已交付（v1.50.48，基准缺口已声明、新基线已冻结） | STAGE2-3 完整事务域、5、8；配置可读取不等于已实现重试，见 R.5 |
 | T1 骨架扩展 | TB-01 支脊与多尺度地貌已交付，生成器版本已升为 5；现状见 14 号与 [07 号 §7.2](./07-terrain-art.md) | 不再重复安排支脊开发；后续流水线重构须保持当前 T1 输出 |
 | 平地草原 | S7-01 探针与 S7-02 显式 profile 骨架已交付 | S7-03 草甸装饰及后续全链路验收；尚未加入 `random` |
 | 其余模板 / D-B2 / R0 / D-C / T4 | 规划登记与局部规格 | 按 R.3 分项解锁，未完成不得标为已发布 |
@@ -100,7 +100,7 @@ node tools/cross-doc-check.js
 | 字段 | 状态 | 当前消费与剩余工作 |
 | :--- | :--- | :--- |
 | `terrainAccentSubFeatures` | ✅ 已加回（v1.50.29 · D-B1-1，连同 §5.3 第 4–5、9 步空钩子门控） | 子特征注入总开关；置 false 时 §5.3 第 4–5、9 步为空 |
-| `terrainGenerationMaxRetries` | ◐ STAGE2-1 已加回（v1.50.39） | `SpatialWorld::new` 将配置钳制至最多 8；§5.8 回退环尚未实现，由 STAGE2-5 接入实际重试 |
+| `terrainGenerationMaxRetries` | ✅ 已加回并消费（v1.50.39 接入；v1.50.49 STAGE2-5 有界降级环落地） | `new_seeded_with_config_bounded` 语义 = 初始创世失败时阶梯降级重试的最大次数（0 = 只尝试一次）；入口钳制至最多 8，全部降级共用同一预算；夹具覆盖 0/1/N、策略去重与无解报错 |
 
 已删除且**不回加**：`terrainRidgeWidth`（T1 主脊改走 `terrainPassRidgeWidth` / `terrainPassRidgeAmplitude`）、`terrainTreeSeasonTint`（季节叶色改由前端 `SimTreeTint` 按快照季节实时派生）。
 
@@ -762,6 +762,7 @@ D-B2/P1 改变 `TerrainFeatureKind`、`TerrainMap` 或 profile 时，必须在�
 ### 5.8 有界失败、诊断与验收矩阵
 
 重试器在世界初始化入口包住 §5.3 全流程，每次在临时候选世界中生成，全部门禁通过后才发布。配置 `terrainGenerationMaxRetries` 表示**首次尝试以外的最多重试次数**（0 = 只尝试一次）；创建入口已将其钳制到最多 8，所有降级合计使用同一预算。
+✅ **STAGE2-5（v1.50.49）已落地**：`spatial/creation_fallback.rs::new_seeded_with_config_bounded`（`prepare` 钩子内完成 camp_count 覆盖与生态播撒后运行门禁链：静态几何 → 路网 → 生存诊断，失败码 `Geometry:`/`RoadNetwork:`/`Survival:` 前缀）；阶梯与去重按本节规则实现；诊断记录附着 `World3DEngine::creation_diagnostic` + 降级发布经 `last_event` 事件流展示；WASM `world_create` 失败返回 1 并经 `world_last_error_*` 上报。夹具证据（0/1/N 重试、策略去重、无解报错、降级成功与降级后存读档、合法首试矩阵与 STAGE2-7 冻结指纹逐位一致）见 STAGE2-TODO §STAGE2-5。**仍开放**：局部拒绝随阶段三几何事务注入启用；`disabled_mask` 随注入器落地后才有物理效果。
 
 ```text
 首次：请求的 profile + 已选结构/视觉子特征 + 当前骨架
@@ -775,6 +776,7 @@ D-B2/P1 改变 `TerrainFeatureKind`、`TerrainMap` 或 profile 时，必须在�
 - **物理失败降级**：先禁用已接受的结构子特征，再尝试移除可选支脊（若该 profile 已实现此策略），最后使用已验收的简化基线。每步必须产生不同的 `(effective_profile, disabled_mask, disable_spurs)`；已无结构特征时不重复尝试相同世界，不能先禁用纯视觉特征来修复物理连通问题。
 - **初始化隔离**：每次从同一 seed、冻结配置和全新局部状态开始，不继承失败尝试的 RNG、计数器、POI 或路网。相同候选策略须有相同 RNG 消费；不同地貌导致不同布局属预期，不要求不同策略消耗数量相同。失败候选不能污染最终模拟 RNG。
 - **基线先验收**：`flat_baseline` 是待实现的显式诊断/降级 profile，不进 random；其旧 T0 对照源、配置与比较字段须先冻结。自动换 profile 是显式降级，不得冒充原模板成功；effective profile 必须可保存、加载与复演。
+  ✅ **STAGE2-7（v1.50.48）已交付，基准缺口声明**：旧 T0 生成源已随 v1.50.17 无配置兼容壳删除、基底正弦波公式被 TB-01-2（v1.50.37）fBm 取代，**仓库内不存在可复现的旧 T0 冻结基准**，故 `flat_baseline` 不宣称与旧 T0 等价。实现为全新显式 profile（倾斜-only 平地：低幅倾斜 16~24 + 第 6 步统一派生，无 fBm/山脊/支脊/洼地/水系/特征；`resolve_profile` 不分派、永不进 random）。**新冻结基准**（后续比较以此为准，禁止验收失败后移动）：v1.50.48、WASM SHA256 `e4f71187b44c95e51d2520214f1e88ee1567f7a70a95dadbbea2bfaa0d1c439d`、探针冻结配置 `crates/sim_core/examples/config.json`、比较字段 = 高程/坡度/地表/肥力/flags/水系/特征/装饰/POI/节点/车道（FNV-1a 逐位）；flat_baseline seed 0–59 聚合指纹 `c71c4f8abbe18b7b`。既有 4 profile × seed 0–59 与上一提交跨构建指纹逐位全等（生成器版本按 S7-02 先例 6 → 7）；生存合格由 STAGE2-6 诊断背书（seed 0–59 零失败），存档白名单已放行、`SAVE_FORMAT_VERSION` 保持 7。
 - **范围分离**：等价重构保证原本通过校验、未触发降级的 T1/T2 物理输出不变；新增生存拒绝与自动换 profile 属行为变更，独立提交并评估生成器版本。不能同时要求“纠正所有旧失败世界”和“所有旧世界输出永远不变”。
 - **诊断记录**：至少记录 `seed/requested_profile/effective_profile/generator_version/attempt/disabled_mask/disable_spurs/failure_code`；保留首次失败和最终结果。成功注入率、降级率与硬失败率分别统计，全部降级不等于模板通过验收。
 
@@ -908,13 +910,13 @@ pub struct RiverCenterline {
 - ✅ 房屋占地跨越水域、陡坡、边界或已有占用时均返回稳定失败码，不生成实体——房屋占地已接入；其中“跨越水域”在浅水时返回 `WaterCovered`，深水返回 `DeepWater`，`Occupied` 由 `houses_clear` 判定。
 - ✅ 路线曲线任一段穿过禁行单元时创建失败；仅端点合法不能通过——`validate_curve` 与 `segment_valid` 严格检查整条贝塞尔曲线与走廊宽度覆盖。
 - ◐ 初始营地、关键资源和市场位于预期陆路连通分量，往返成本不超过生存诊断上限——诊断函数已交付（STAGE2-6，v1.50.47：`diagnose_survival`，seed 0–59 × 4 profile 矩阵校准全通过）；拒绝与重试接入待 STAGE2-5，接入前不改变创世行为。
-- ⏳ 现有无新地貌基线在关闭地形 profile 后保持行为等价——暂无 `flat_baseline` profile 开关；v1.50.17 起生成入口收敛为 `generate_with_profile(seed, profile, config)`，无配置的兼容壳已删除。
+- ◐ 现有无新地貌基线在关闭地形 profile 后保持行为等价——`flat_baseline` 显式 profile 已交付（STAGE2-7，v1.50.48，生成器版本 6 → 7）：可生成/可存读档/可续演、不进 random、生存诊断 seed 0–59 零失败；旧 T0 等价对照存在**基准缺口**（旧 T0 生成源已删除，见 §5.8 基线先验收条目的声明与新冻结基准）。
 
 ### 18.2 T1 门禁
 
 - ✅ 固定山口种子：主脊可从远景辨认，陡坡会挡路，山口存在合法连续路线——连续起伏地貌与路网感知生成已打通（v1.47.7 起不再有台地/特征轮廓绘制）；v1.50.17 修复后实测主脊最大坡度 36.2°~40.8°、可行走连通分量恒为 1（§9.3.1）。
 - ✅ 两端欧氏距离相近但越过主脊的路线成本高于经过山口的路线——v1.50.17 后主脊存在 34°+ 硬禁行带，越过主脊必须走山口；实测绕行比 2.17~4.80（§9.3.1）。
-- ⏳ 生成失败时在有界重试后使用通过校验的简化 profile，并记录失败原因——参数已由 STAGE2-1 加回并钳制上限，实际重试仍待 STAGE2-5。
+- ✅ 生成失败时在有界重试后使用通过校验的简化 profile，并记录失败原因——STAGE2-5（v1.50.49）有界降级环落地：阶梯（禁结构子特征 → 移除可选支脊 → `flat_baseline`）+ 策略去重 + 诊断记录（`creation_diagnostic`）+ 降级发布经事件流明示（不冒充原模板成功）；夹具证据见 STAGE2-TODO §STAGE2-5。
 - ✅ 历史 T1 JSON/FABS 对拍曾通过；该通道及 `test-snapshot-bin.js` 已于 v1.50.35 移除。当前执行 `snapshot-check.js`、`test-wasm.js` 与 `test-determinism.js`，核对换世界/读档/回溯无残留。
 
 ### 18.3 T2 门禁

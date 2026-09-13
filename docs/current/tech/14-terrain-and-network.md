@@ -308,7 +308,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 > **服务对象**：全部地图模板的创世流程——任何模板都必须按此顺序生成并满足「有效世界」底线。
 
 
-生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 相关的有界重试仍未消费（生存诊断已实现、未接拒绝，见下）。
+生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 有界降级环已落地（v1.50.49，`creation_fallback.rs`）：`new_seeded_with_config_bounded` 每次构建独立候选（生态播撒后）依次过静态几何校验、路网校验与生存诊断门禁，失败按 §5.8 阶梯降级（禁结构子特征 → 移除支脊 → `flat_baseline`），预算耗尽或无新策略返回错误；局部拒绝随阶段三几何事务注入启用。
 
 ```text
 种子 + 生成器版本 + 配置                    ✅
@@ -317,7 +317,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
   → 通行表面、岸带与可建区域                ✅
   → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；生存诊断已可独立调用）
   → 合法导航走廊与贴地曲线路网              ✅
-  → 连通性、占地、资源距离校验              ◐（连通性/占地已通；静态几何校验已接线〔只读〕，拒绝接入待 STAGE2-5）
+  → 连通性、占地、资源距离校验              ✅（v1.50.49 起接入创世门禁链 + 有界降级环）
   → 固定世界事实与快照 → 地表装饰与美术     ✅
 ```
 
@@ -341,7 +341,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 ### 9.1 RNG 分域与 Profile 模板选择
 
-✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 5`（v1.50.41 TB-01 多尺度噪声与支脊系统后递增；此前 v1.50.17 为 4、v1.47.7 为 3）：
+✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 7`（v1.50.48 STAGE2-7 新增 `flat_baseline` 分支后递增；此前 v1.50.46 为 6〔S7-04 半坡〕、v1.50.40/41 为 5〔S7-02 草原 / TB-01〕、v1.50.17 为 4、v1.47.7 为 3）：
 
 ```text
 terrain_seed = seed
@@ -354,10 +354,11 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'` 或 `'grassland_plain_v1'`）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'` 或 `'flat_baseline'`）。
 - 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支：
   `(seed ^ 0x5052_4F46_494C_4531)` 对 2 取模为 0 → 实例化为 `mountain_pass_v1`（T1 山口聚落）；
   否则 → 实例化为 `river_valley_v1`（T2 两岸河谷）。
+  ★ `flat_baseline`（STAGE2-7 显式诊断/降级基线，倾斜-only 平地）**永不参与 random 分派**，只能显式指定；它是 STAGE2-5 有界回退环的显式降级目标，支持存读档续演（存档 profile 白名单已放行）。
 - ⚠️ **这是种子奇偶而非哈希**：取模 2 只取 `seed ^ 盐值` 的最低位，盐值 LSB 为 1，等价于「种子为奇数 → T1、偶数 → T2」。连续种子会**严格交替**，不是随机轮换。若要真正的分散，应改为 `mix64(seed ^ salt)` 后取模 2（或取模 100 后判 `< 50`）——但这会改变既有种子的映射，需随 `TERRAIN_GENERATOR_VERSION` 一并递增。
 - 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时两套地貌按 ~50% 概率自然轮换。
 

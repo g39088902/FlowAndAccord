@@ -47,6 +47,12 @@ const _headerTickDv = new DataView(new ArrayBuffer(40)); // 读取 FABS 帧头 t
 
 function readLastError() {
   if (!_ready || typeof _wasm.world_last_error_len !== 'function') return '';
+  return readLastErrorRaw();
+}
+
+// ★ STAGE2-5：创世失败读取不依赖 _ready（INIT/RESET 路径在建世界前调用）。
+function readLastErrorRaw() {
+  if (typeof _wasm.world_last_error_len !== 'function') return '';
   const len = _wasm.world_last_error_len();
   if (!len) return '';
   const ptr = _wasm.world_last_error_ptr();
@@ -63,7 +69,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.50.47';
+  return '1.50.49';
 
 }
 
@@ -399,7 +405,11 @@ self.onmessage = async function(e) {
           // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
           _wasm.world_create_map(0, WORLD_SIZE, _engineSeed);
         } else {
-          _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+          // ★ STAGE2-5：返回码非 0 = 有界降级预算耗尽/无解，抛出并携带错误文本。
+          const rcCreate = _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+          if (rcCreate !== 0) {
+            throw new Error('世界初始化失败（含降级重试）：' + readLastErrorRaw());
+          }
           applyInitialRegenMultipliers(msg.regenMultipliers);
         }
         _ready = true;
@@ -498,7 +508,11 @@ self.onmessage = async function(e) {
           applyConfigInternal(msg.config);
         }
         // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
-        _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        // ★ STAGE2-5：返回码非 0 = 有界降级预算耗尽/无解，保留既有世界并抛出。
+        const rcReset = _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
+        if (rcReset !== 0) {
+          throw new Error('世界重置失败（含降级重试）：' + readLastErrorRaw());
+        }
         applyInitialRegenMultipliers(msg.regenMultipliers);
         historyCheckpoints = [];
         historyCommands = [];

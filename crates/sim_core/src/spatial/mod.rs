@@ -20,6 +20,7 @@ pub mod world_snapshot;
 pub mod world_tick;
 pub mod terrain_network;
 pub mod survival_diagnosis;
+pub mod creation_fallback;
 
 pub use agent::{Agent3D, AgentId, Gender, PrimitiveActionState};
 pub use curve::Curve3D;
