@@ -96,6 +96,8 @@ window.RENDER_CONFIG = {
   accentRockClusterDebrisRadiusBase: 1.1, // 伴生碎石半径基准（世界米）
   accentRockClusterDebrisRadiusVar: 1.3,  // 伴生碎石半径随机幅度（1.1~2.4m）
   accentRockClusterLODMinRadius: 0.6,     // 远景微碎石省略阈值（屏幕半径 px）
+  accentRockClusterShadowAlpha: 0.14,     // 簇群整片微接触落底阴影透明度（TA-11-5，rgba(25,20,15,α)）
+  accentRockClusterStoneShadowAlpha: 0.10,// 逐石接触椭圆阴影透明度（TA-11-5，主石自动 +0.02）
 
   accentGrassTuftMinBlades: 3,            // 草叶最少叶数
   accentGrassTuftMaxBlades: 6,            // 草叶最多叶数

@@ -17,7 +17,7 @@
 | **TA-11-2** | FABS 二进制快照与枚举字典全链路闭环核对 | `dict.rs` / `snapshot.rs` / `encode.rs` / `snapshot-bin.js` | 低 | TA-11-1 | ✅ 已建基线 |
 | **TA-11-3** | 渲染表现层配置集中化与魔数解耦 | `config.render.js` / `accent-model.js` / `render_accents.js` | 低 | TA-11-2 | ✅ 已落地（v1.50.34） |
 | **TA-11-4** | 草丛生态形态扩展：水岸芦草变体与季相微调 | `accent-model.js` / `render_accents.js` / `config.render.js` | 中 | TA-11-3 | ✅ 已落地 |
-| **TA-11-5** | 碎石群地貌表现升级：微接触阴影与岩面分层 | `render_accents.js` / `config.render.js` | 低 | TA-11-3 | ⏳ 待实施 |
+| **TA-11-5** | 碎石群地貌表现升级：微接触阴影与岩面分层 | `render_accents.js` / `config.render.js` | 低 | TA-11-3 | ✅ 已落地 |
 | **TA-11-6** | 渲染热路径零 GC 改造与缓存生命周期审计 | `render_accents.js` / `accent-model.js` / `rustworld.js` | 中 | TA-11-4、TA-11-5 | ⏳ 待实施 |
 | **TA-11-7** | Chrome 端到端四季视觉与动态操作验收 | 前端视口 / 浏览器交互环境 | 中 | TA-11-6 | ⏳ 待实施 |
 | **TA-11-8** | 门禁全绿、版本规范自增与规划文档状态同步 | 全链路门禁 / `07-terrain-art.md` / `01-changelog.md` | 低 | TA-11-7 | ⏳ 待实施 |
@@ -143,6 +143,7 @@
   - 碎石群底部具备柔和微阴影，在河滩与斜坡上具有扎实的接地感；
   - 远景缩放（`zoom < 0.6`）下微碎石自动剔除，保留主石块面；近景缩放（`zoom > 1.2`）下棱角与明暗清晰，无重叠频闪。
 - **依赖**：TA-11-3。
+- **落地记录**：✅ 已落地（模型层 `accent-model.js::rockClusterSkeleton` 一并接入，几何契约前置）。①微接触落底阴影：`drawAccentRockCluster` 改调 `lightShadowOffset(0.6, 1.2, 0.4)`，簇群整片弱椭圆 `rgba(25,20,15,0.14)` + 逐石接触椭圆 `rgba(25,20,15,0.10)`（主石自动 +0.02，透明度走新配置键 `accentRockClusterShadowAlpha` / `accentRockClusterStoneShadowAlpha`），阴影先于全部石体绘制、只落地表不压邻石；②几何分层：主石 6~7 边 / 辅石 5~6 边（哈希通道 660+i×8，各约 50% 分布），逐顶点变径加宽至 0.78~1.22 产生尖角/平钝面对比，底层改逐面片扇形填充——每面片在几何端点就地导出倾斜侧面法线（相邻顶点方位角中点水平分量 + 下倾 0.45），顶面法线近似 (0,0,1)，TA-04-5 接入时只换光源参数无需重构绘制循环；暗边轮廓钳制 0.5~0.8px；③远景 LOD（`accentRockClusterLODMinRadius`）沿用。临时断言（§4.10 已删）验证 500 id 边数区间与 shape 长度/数值界、清缓存重建逐位一致、阴影绘制次序与透明度、配置即时生效、0.4x~2.2x 四档缩放冒烟；门禁 `frontend-check` 全绿（纯前端变更，未动 Rust/WASM）。
 
 ---
 

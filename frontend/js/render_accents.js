@@ -475,9 +475,16 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
 }
 
 // RockCluster：anchor 派生 2–5 颗子石（D-B1-6，06 号 §5.5：不为子石建实体、不改碰撞/路面）。
-// 画法沿用 Boulder「深灰底 + 浅灰顶 + 暗边」三笔低饱和灰岩色板，子石形状由模型层
-// accent.id 派生（逐顶点变径，不共享 Boulder 固定纹理），按投影深度画家排序（远 → 近）；
-// 每颗子石底边贴自身落地点（v1.50.13 锚点契约），accent.rotation 只旋转水平偏移。
+// ★ TA-11-5 地貌表现升级（07 号 §6.6/§4.1）：
+// - 微接触落底阴影：簇群整片弱椭圆 + 逐石接触椭圆（lightShadowOffset(0.6,1.2,0.4)，
+//   极淡 rgba(25,20,15,0.14)，偏移随缩放与相机光向协调），消除河滩/斜坡上的漂浮感；
+//   阴影先于全部石体绘制，只落地表、不压邻石顶面。
+// - 岩面分层：主石 6~7 边 / 辅石 5~6 边非对称变径多边形（模型层 TA-11-5），底层改为
+//   逐面片扇形填充——每面片在几何端点就地导出倾斜侧面法线（方位角水平分量 + 下倾 0.45），
+//   顶面法线近似 (0,0,1)：TA-04-5 世界光向细化接入时只换光源参数、无需重构绘制循环。
+// - 暗边轮廓 0.5~0.8px 低饱和（近景清晰分离、不随缩放无限增粗）。
+// 子石按投影深度画家排序（远 → 近），每颗底边贴自身落地点（v1.50.13 锚点契约），
+// accent.rotation 只旋转水平偏移；远景微碎石按 LOD 阈值省略。
 function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const rot = accent.rotation || 0;
@@ -485,6 +492,9 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   // 远景微碎石省略阈值（config.render.js，TA-11-3；屏幕半径 px）
   const RC = window.RENDER_CONFIG || {};
   const lodMinR = Number.isFinite(RC.accentRockClusterLODMinRadius) ? RC.accentRockClusterLODMinRadius : 0.6;
+  // 微接触阴影透明度（config.render.js，TA-11-5；缺省回退与集中值一致）
+  const shadowAlpha = Number.isFinite(RC.accentRockClusterShadowAlpha) ? RC.accentRockClusterShadowAlpha : 0.14;
+  const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
 
   function proj(dx, dy, dz) {
     const rx = dx * cosZ - dy * sinZ;
@@ -507,15 +517,6 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     ];
   }
 
-  // 贴地接触投影：簇底一整片弱椭圆（先画，被子石压住）
-  const so = (typeof lightShadowOffset === 'function')
-    ? lightShadowOffset(1.0, 2.0, 0.6)
-    : { x: 1.0 * camera.zoom, y: 2.0 * camera.zoom, alphaScale: 1 };
-  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.13 * so.alphaScale).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-
   // 子石收集 + 深度画家排序（远 → 近）
   const items = [];
   for (let i = 0; i < sk.stones.length; i++) {
@@ -526,7 +527,24 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   }
   items.sort(function (a, b) { return a.g.d - b.g.d; });
 
-  const sides = 6;
+  // 微接触落底阴影（先画，被子石压住）：簇群整片 + 逐石接触椭圆（主石略强）
+  const so = (typeof lightShadowOffset === 'function')
+    ? lightShadowOffset(0.6, 1.2, 0.4)
+    : { x: 0.6 * camera.zoom, y: 1.2 * camera.zoom, alphaScale: 1 };
+  ctx.fillStyle = 'rgba(25, 20, 15, ' + (shadowAlpha * so.alphaScale).toFixed(3) + ')';
+  ctx.beginPath();
+  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const r = it.st.r * scaled;
+    if (r < lodMinR) continue;
+    ctx.fillStyle = 'rgba(25, 20, 15, ' + ((it.st === sk.stones[0] ? stoneShadowAlpha + 0.02 : stoneShadowAlpha) * so.alphaScale).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(it.g.x + so.x * 0.4, it.g.y + so.y * 0.3, r * 1.08, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const st = it.st;
@@ -534,27 +552,30 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     if (r < lodMinR) continue; // 微碎石在远景不可辨，直接省略
     // 底边贴落地点：中心上抬 0.72r（同 Boulder 屏幕纵压比），再压暗底色
     const cy = it.g.y - r * 0.72;
-    // 底层（深灰，略偏背光侧）。★ TA-04-2：侧面法线取子石稳定世界方向（st.rot 水平角 + 下倾）；
-    //   billboard 屏幕几何与随相机的法线细化归 TA-04-5
     const sb = stoneBase(st.lite, [78, 74, 68]);
     const sTop = stoneBase(st.lite, [152, 146, 138]);
-    const snx = Math.cos(st.rot), sny = Math.sin(st.rot);
-    ctx.fillStyle = accentLitFill(sb[0], sb[1], sb[2], snx, sny, -0.45, 1);
-    ctx.beginPath();
-    for (let k = 0; k < sides; k++) {
-      const angle = st.rot + (k / sides) * Math.PI * 2;
-      const rVar = r * st.shape[k];
-      const px = it.g.x + Math.cos(angle) * rVar + r * 0.18;
-      const py = cy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
-      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    // Pass 1 底层：逐面片扇形填充（深灰背光侧）。每面片法线在几何端点就地导出——
+    //   取相邻顶点方位角中点的水平分量 + 下倾 0.45（TA-04-5 分面契约预留）。
+    //   逐面片明暗差即「岩面分层」：棱角处自然出现受光/背光面过渡，无重叠频闪。
+    for (let k = 0; k < st.sides; k++) {
+      const k2 = (k + 1) % st.sides;
+      const aA = st.rot + (k / st.sides) * Math.PI * 2;
+      const aB = st.rot + (k2 / st.sides) * Math.PI * 2;
+      const rA = r * st.shape[k], rB = r * st.shape[k2];
+      const midA = st.rot + ((k + 0.5) / st.sides) * Math.PI * 2;
+      ctx.fillStyle = accentLitFill(sb[0], sb[1], sb[2], Math.cos(midA), Math.sin(midA), -0.45, 1);
+      ctx.beginPath();
+      ctx.moveTo(it.g.x + r * 0.18, cy + r * 0.18);
+      ctx.lineTo(it.g.x + Math.cos(aA) * rA + r * 0.18, cy + Math.sin(aA) * rA * 0.72 + r * 0.18);
+      ctx.lineTo(it.g.x + Math.cos(aB) * rB + r * 0.18, cy + Math.sin(aB) * rB * 0.72 + r * 0.18);
+      ctx.closePath();
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
-    // 顶面（浅灰白，法线朝上；亮暗随光向变化）
+    // Pass 2 顶面（浅灰白迎光侧，法线近似朝上；亮暗随光向变化）
     ctx.fillStyle = accentLitFill(sTop[0], sTop[1], sTop[2], 0, 0, 1, 1);
     ctx.beginPath();
-    for (let k = 0; k < sides; k++) {
-      const angle = st.rot + (k / sides) * Math.PI * 2;
+    for (let k = 0; k < st.sides; k++) {
+      const angle = st.rot + (k / st.sides) * Math.PI * 2;
       const rVar = r * st.shape[k];
       const px = it.g.x + Math.cos(angle) * rVar;
       const py = cy + Math.sin(angle) * rVar * 0.72;
@@ -562,9 +583,9 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     }
     ctx.closePath();
     ctx.fill();
-    // 暗边轮廓让碎石从地形中分离
+    // 暗边轮廓让碎石从地形中分离（0.5~0.8px 低饱和，近景不无限增粗）
     ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
-    ctx.lineWidth = Math.max(0.5, 0.8 * scaled);
+    ctx.lineWidth = Math.max(0.5, Math.min(0.8, 0.8 * scaled));
     ctx.stroke();
   }
 }
