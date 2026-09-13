@@ -24,6 +24,7 @@
 | 04 | [神经内分泌调制层](design/04-hormone-system.md) | 设计稿，未排期；四轴十一激素 |
 | 05 | [人际好感度系统](design/05-affinity-system.md) | 设计稿，未排期；36 条 -7~+7 态度表 |
 | 06 | [竞品与同类项目分析](design/06-competitor-analysis.md) | 研究基线；六维度横向比较与可借鉴方向 |
+| 07 | [狩猎、防卫与公共庇护](design/07-hunting-defense.md) | 规划设计（M18），未排期；有限狩猎、真实掠夺、自主庇护与预算兑现 |
 
 ---
 
@@ -35,7 +36,7 @@
 | 02 | [人物记忆与经验传承](tech/02-memory-system.md) | 实施方案，未排期；P0 只记事实 → P3 家庭传承 |
 | 03 | [内部市场](tech/03-internal-market.md) | 售货员撮合 + 有限订单簿（替代已废弃的 AMM 方案） |
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
-| 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；生命力解耦、民兵动员与公仓契约 |
+| 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；对应 design/07 的任务、接触结算、物资与存档契约 |
 | 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A 已落地；本文保留模板库、D-B 子特征注入蓝图与全量排期（R.3：2026-09-13 起 16 张模板全部排期） |
 | 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
