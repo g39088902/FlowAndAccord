@@ -460,7 +460,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 
 - **快照同步**：快照真值赋值文件为 `crates/sim_core/src/spatial/world_snapshot.rs`，连同 `snapshot.rs`、`snapshot_bin/encode.rs`、`snapshot-bin.js`、`rustworld.js` 一起核对；新增 accent 字段/枚举时还要同步 `snapshot_bin/dict.rs` 枚举表。
 - **配置集中**：影响模拟的参数走 `SimConfig` 全链路（当前 **232** 字段，`config.rs` 命名 const + 字段 + Default 三处，前端 `config.js` 同步并过 `config-check.js`）；纯视觉参数随各实现任务同步集中在 `frontend/js/config.render.js`（`window.RENDER_CONFIG`，不注入 WASM），审计任务不作为延后集中参数的理由；共用光源参数继续沿用 `config.lighting.js`，不重复定义。
-- **文件行数**：单文件严控 800 行以内；`render_world.js` 已约 904 行超限；★ v1.50.23 TA-01 已将装饰从 `render_terrain.js`（约 724 → 约 365 行）拆出至 accent 三件套，后续植被功能在 `render_accents.js` / `accent-model.js` / `accent-season.js` 内扩展，不再回填 `render_terrain.js`。
+- **文件行数**：单文件严控 800 行以内；★ v1.50.23 TA-01 已将装饰从 `render_terrain.js`（约 724 → 约 365 行）拆出至 accent 三件套，后续植被功能在 `render_accents.js` / `accent-model.js` / `accent-season.js` 内扩展，不再回填 `render_terrain.js`；★ TA-04-6（v1.50.46）起深度队列职责拆出为 `render_depth_queue.js`、贴地投影拆出为 `render_shadows.js`、GrassTuft 绘制拆出为 `render_grass.js`（TA-04-3 拆分），原 `render_world.js` 904 行超限已消除，相关文件均在 800 行内。
 - **持久化测试禁令**：不提交临时单元测试；临时验证跑通后删除，长期验证以 `test-wasm.js` 等既有门禁为准。
 
 ## 11. 验收与性能预算
