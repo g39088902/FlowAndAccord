@@ -1,21 +1,22 @@
 //! 地形通行力探针（临时诊断示例，不进入测试套件）。
 //!
 //! 用途：直接调用内核生成器，实测各 profile 的通行力与模板专属指标。
-//! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1`；阶段七三张插队模板
-//! （`grassland_plain_v1` / `hillside_woodland_v1` / `river_valley_settlement_v1`）
-//! 的专属指标测量与 §1.4 门禁窗口已在探针侧就位，待 S7-02 / S7-04 / S7-06
+//! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1` / 草原 `grassland_plain_v1`；
+//! 剩余阶段七插队模板（`hillside_woodland_v1` / `river_valley_settlement_v1`）
+//! 的专属指标测量与 §1.4 门禁窗口已在探针侧就位，待 S7-04 / S7-06
 //! 落地内核生成分支后自动接入门禁（届时把对应名字移入 `run_profile` 已实现分支）。
 //! 对应 `docs/plan/tech/06-terrain-templates.md` §9.3.1、§18.7 与 STAGE-07-TODO S7-01。
 //!
 //! 运行：
 //! - `cargo run --release -p sim_core --example terrain_probe`（旧基线：T1+T2，seeds 1..=12）
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile mountain_pass_v1 [--seeds 60]`
-//! - `cargo run --release -p sim_core --example terrain_probe -- --profile grassland_plain_v1`（待实施 → 优雅提示）
+//! - `cargo run --release -p sim_core --example terrain_probe -- --profile grassland_plain_v1 [--seeds 60]`
+//! - `cargo run --release -p sim_core --example terrain_probe -- --profile hillside_woodland_v1`（待实施 → 优雅提示）
 //! - `cargo run --release -p sim_core --example terrain_probe -- world 20`（创世校验模式，行为不变）
 //!
 //! §1.4 七项通用指标：max_slope / >30° / >=34° / NO_WALK / buildable / components /
-//! detour_p95，外加 waterM（初始营地=图中心 → 最近可用水源距离；地形层近似：取水点 ∪ 水面格，
-//! 清泉 POI 由生态层布点时该列记 n/a）。
+//! detour_p95，外加 waterM（初始营地=图中心 → 最近可用水源距离；地形层近似：取水点 ∪ 水面格
+//! ∪ SpringValley 泉眼顶点——草原无水面时以泉眼特征为水源锚定）。
 //! 模板专属指标（S7-01 定义）：草原 `mound_count` / `soft_ground` / `fertility`；
 //! 半坡 `windward_max` / `leeward_max` / `buildable_band`；
 //! 河谷聚落 `floor_width` / `cliff_mean` / `crossing95`。
@@ -32,8 +33,10 @@
 
 use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
-use sim_core::geo::terrain::{TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY};
-use sim_core::geo::{SurfaceKind, TerrainMap};
+use sim_core::geo::terrain::{
+    TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY,
+};
+use sim_core::geo::{SurfaceKind, TerrainFeatureKind, TerrainMap};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 
@@ -44,13 +47,9 @@ const PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 const PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 const PROFILE_RIVER_VALLEY_SETTLEMENT: &str = "river_valley_settlement_v1";
 
-/// 阶段七待实施模板 → 落地任务。S7-02/S7-04/S7-06 落地后把对应名字从本表
+/// 阶段七待实施模板 → 落地任务。S7-04/S7-06 落地后把对应名字从本表
 /// 移入 `main` 的已实现分支即可让门禁窗口生效。
-const STAGE7_PENDING: [(&str, &str); 3] = [
-    (
-        PROFILE_GRASSLAND_PLAIN,
-        "S7-02 平地草原内核高程场与泉溪洼地生成",
-    ),
+const STAGE7_PENDING: [(&str, &str); 2] = [
     (PROFILE_HILLSIDE_WOODLAND, "S7-04 半坡林地不对称缓坡山体内核骨架"),
     (
         PROFILE_RIVER_VALLEY_SETTLEMENT,
@@ -174,7 +173,8 @@ fn line_blocked(t: &TerrainMap, ax: usize, ay: usize, bx: usize, by: usize) -> b
 }
 
 /// 生活水源距离（§1.4 第 7 项，地形层近似）：图中心（初始营地）到最近可用水源格。
-/// 候选 = 水系取水点 ∪ 任意水面格；两者皆无（如 T1 清泉由生态层布点）时返回 None。
+/// 候选 = 水系取水点 ∪ 任意水面格 ∪ `SpringValley` 泉眼特征顶点（草原无水面时
+/// 泉眼即水源地理锚定）；三者皆无（如 T1 清泉由生态层布点）时返回 None。
 fn measure_water_dist(t: &TerrainMap) -> Option<f32> {
     let w = t.grid_width;
     let h = t.grid_height;
@@ -190,6 +190,14 @@ fn measure_water_dist(t: &TerrainMap) -> Option<f32> {
     for ap in &t.hydrology.access_points {
         let (gx, gy) = t.grid_index(ap.pos.x, ap.pos.y);
         consider(gx as f32, gy as f32, gy * w + gx, &mut best);
+    }
+    for f in &t.features {
+        if f.kind == TerrainFeatureKind::SpringValley {
+            for v in &f.vertices {
+                let (gx, gy) = t.grid_index(v.x, v.y);
+                consider(gx as f32, gy as f32, gy * w + gx, &mut best);
+            }
+        }
     }
     for i in 0..t.cells.len() {
         if t.cells[i].water_body_id.is_some() {
@@ -881,7 +889,10 @@ fn main() {
     }
 
     if let Some(name) = profile_arg {
-        if name == TERRAIN_PROFILE_MOUNTAIN_PASS || name == TERRAIN_PROFILE_RIVER_VALLEY {
+        if name == TERRAIN_PROFILE_MOUNTAIN_PASS
+            || name == TERRAIN_PROFILE_RIVER_VALLEY
+            || name == TERRAIN_PROFILE_GRASSLAND_PLAIN
+        {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());
         } else if let Some((_, task)) = STAGE7_PENDING.iter().find(|(p, _)| *p == name) {

@@ -2,7 +2,7 @@
 
 > **任务定义**：[06-terrain-templates.md](docs/plan/tech/06-terrain-templates.md) R.3 阶段七——**插队模板批次（平地草原 `grassland_plain_v1`、半坡林地 `hillside_woodland_v1`、河谷聚落 `river_valley_settlement_v1`）**。
 > 本文件将阶段七的总体设计、数学模型、水文与地表规则、探针指标及全链路工程实施拆解为标准可执行任务序列（S7-01 ～ S7-10）。
-> **状态**：实施中——S7-01 探针基座已交付（✅ v1.50.39）；S7-02 起待实施。
+> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）已交付；S7-03 起待实施。
 > **前置就绪度**：
 > - 平地草原：依赖阶段一 `GrassTuft` 装饰（✅ v1.50.35 D-B1 代码交付已收口，见 06 号 §18.5），具备独立开工条件；
 > - 半坡林地：依赖「密林山坡」装饰散布规则（纯视觉 Tree/Bush 高密散布，可随本阶段先行落地）；
@@ -178,7 +178,7 @@ flowchart LR
 | 任务编号 | 任务名称 | 涉及模块与核心文件 | 难度 | 前置依赖 | 交付产物与验证标准 |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | **S7-01** ✅ | 地形探针升级与三模板诊断套件基座（v1.50.39） | `sim_core/examples/terrain_probe.rs` | 低 | — | 探针支持指定 3 个新 profile，输出 7 项关键指标与连通性断言。 |
-| **S7-02** | 平地草原内核高程场与泉溪洼地生成 | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `grassland_plain_v1` 骨架；残丘 $< 18^\circ$，洼地水源锚定，连通分量恒 1。 |
+| **S7-02** ✅ | 平地草原内核高程场与泉溪洼地生成（v1.50.40） | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `grassland_plain_v1` 骨架；残丘 $< 18^\circ$，洼地水源锚定，连通分量恒 1。 |
 | **S7-03** | 平地草原草甸装饰与视觉辨识度闭环 | `geo/accents.rs`、`render_accents.js` | 中 | S7-02 | `GrassTuft` 斑块化散布；远景可清晰分辨草甸、残丘与泉洼，不显平淡。 |
 | **S7-04** | 半坡林地不对称缓坡山体内核骨架 | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `hillside_woodland_v1` 骨架；背风坡 $20^\circ\sim 28^\circ$，全域 $< 30^\circ$ 零禁行。 |
 | **S7-05** | 半坡林地密林带梯级散布与装饰隔离验证 | `geo/accents.rs`、`render_accents.js` | 中 | S7-04 | 坡腰高密林、坡脚疏林；取水点硬避让；开启/关闭装饰物理世界逐位不变。 |
@@ -208,7 +208,7 @@ flowchart LR
 
 ---
 
-### S7-02 · 平地草原内核高程场与泉溪洼地生成
+### S7-02 · 平地草原内核高程场与泉溪洼地生成（✅ 已交付 v1.50.40）
 
 - **目标**：在 `crates/sim_core/src/geo/terrain.rs` 中实现 `grassland_plain_v1` profile 的基础高度场与泉溪洼地。
 - **具体改动**：
@@ -226,6 +226,7 @@ flowchart LR
   - `hard_blocked == 0`，`blocked == 0`（全图无通行死角）；
   - `buildable >= 12000`；
   - 现有 T1/T2 profile 在同种子下输出逐字节完全一致。
+- **实测记录（v1.50.40 交付）**：60 种子（0..=59）§1.4 门禁 **0 违例**——max_slope 9.93°~16.46°（< 20°）、`>30°`/`>=34°`/`NO_WALK` 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08（< 1.15）、waterM 峰值 154m（洼地盆心水源锚定半径 ≤0.20×world_size 钳制）；模板指标——mound_count 均值 1.4/峰值 2、软地比 1.6%、可建格肥力均值 0.91（0.85~0.95 带内）。T1/T2 各 60 种子输出与 HEAD 基线**表体逐位一致**（git worktree 对拍）；另以临时断言（§4.10 已删）验证草原创世 20 种子 `validate_terrain_world` 全过、泉眼特征恒 2 处、全图无水面格。落地实现：`generate_with_profile` 草原分支（tilt 16~24 / 波形 ×0.4 / 高斯残丘 A∈[6.5,9.5]、A/R∈[0.19,0.31]→峰值梯度 9.3°~14.9°）+ 泉溪洼地雕入 raw（锚点吸附局部最低格、凹圈 0.7R~1.5R 写 SoftGround、按 T2 先例推 2 处 `SpringValley` 特征）+ 草甸肥力公式 `(0.97 − slope/70×0.5 − nh×0.10)`；`TERRAIN_GENERATOR_VERSION` 4→5（旧 T1/T2 路径逐位不变，仅算法面扩展）。
 - **依赖**：S7-01。
 
 ---

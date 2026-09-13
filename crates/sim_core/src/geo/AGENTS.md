@@ -9,7 +9,7 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出 |
-| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features`）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` |
+| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features`）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征，v1.50.40） |
 | `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ D-B1-3 §5.3 第 4–5、9 步钩子接线 |
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |
