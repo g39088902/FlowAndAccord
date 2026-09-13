@@ -151,7 +151,8 @@ pub fn generate_accents(
         |cell, rng| {
             // Boulder 偏好陡坡与裸露 RockFace。
             // ★ v1.50.10 修复：原「slope>18 且 NO_BUILD」条件在两类地貌下几乎恒为假——
-            // ① NO_BUILD 在河谷图被 hydrology::generate_river 全图重写清零；且河谷重算后
+            // ① NO_BUILD 在河谷图被陆地基底（terrain.rs::generate_river_valley_base_relief，
+            //    STAGE2-2 拆分前为 generate_river 全图重写）清零；且河谷重算后
             //    坡度普遍 <8°（河阶抬升 ≈5.7°、远丘 ≈2°）、全图无 RockFace（surface_kind 被重写）；
             // ② T1 山口图坡度构成（基础斜面 ≈4.5°/波形 ≈3~4°/主脊梯度 ≈10°）也极少超过 18°
             //    （无头实证：T1 Seed=999 修复前仅 1 颗、T2 各 Seed 均为 0）。

@@ -234,6 +234,15 @@ const FRONTEND_DERIVED_FIELDS = new Set([
   'reverseId',  // lanes 映射中前端添加的反向查找 ID
 ]);
 
+// FABS 二进制帧级字段（snapshot-bin.js 在解码帧上自添加/覆写，非 Rust WorldSnapshot3D 结构体字段；
+// v1.50.35 起 JSON 快照通道移除，rustworld.js 只消费二进制帧，检查 2 须排除这些合法读取）
+const FABS_FRAME_FIELDS = new Set([
+  'geom_version',     // 路网拓扑签名 (node_count << 32) | lane_count，车道几何缓存判据
+  'strtab_epoch',     // 字符串驻留表世代号，跨世界缓存失效判据
+  'lane_wear',        // Float32Array 车道磨损批量通道，与 lanes 下标一一对应
+  'BYTES_PER_ELEMENT', // snap 为 ArrayBuffer/TypedArray 的类型判断惯用法，非字段读取
+]);
+
 // ---------------------------------------------------------------------------
 // 主流程
 // ---------------------------------------------------------------------------
@@ -297,7 +306,7 @@ function main() {
     const topRead = jsReads.topLevel;
 
     const missingRead = topDefined.filter(f => !topRead.has(f));
-    const extraRead = [...topRead].filter(f => !worldStruct.has(f));
+    const extraRead = [...topRead].filter(f => !worldStruct.has(f) && !FABS_FRAME_FIELDS.has(f));
 
     if (missingRead.length > 0) {
       console.log(`  ⚠ WorldSnapshot3D: ${missingRead.length} 个顶层字段 rustworld.js 未读取（可能遗漏前端展示）:`);

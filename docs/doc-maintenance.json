@@ -428,6 +428,31 @@
         "docs/current/tech/14-terrain-and-network.md",
         "docs/current/design/07-terrain-implementation.md"
       ]
+    },
+    {
+      "id": "design-housing-system",
+      "path": "docs/current/design/08-housing-system.md",
+      "owner": "product",
+      "lastReviewed": "2026-09-13",
+      "sources": [
+        "crates/sim_core/src/spatial/house.rs",
+        "crates/sim_core/src/spatial/housing_system/**/*.rs",
+        "docs/current/tech/13-housing-system.md",
+        "docs/current/design/08-housing-system.md"
+      ]
+    },
+    {
+      "id": "design-market-pricing",
+      "path": "docs/current/design/09-market-pricing.md",
+      "owner": "product",
+      "lastReviewed": "2026-09-13",
+      "sources": [
+        "crates/sim_core/src/spatial/poi.rs",
+        "crates/sim_core/src/spatial/decisions/market.rs",
+        "crates/sim_core/src/spatial/ledger/journal.rs",
+        "docs/current/tech/09-market-pricing.md",
+        "docs/current/design/09-market-pricing.md"
+      ]
     }
   ]
 }

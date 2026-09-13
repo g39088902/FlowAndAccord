@@ -634,12 +634,17 @@ pub struct TerrainSubFeature {
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
 ///           同时移除 `generate_with_profile` 无配置的兼容入口，旧存档按版本门禁拒绝）
-/// v1.50.41：4 -> 5（TB-01 多尺度 fBm 噪声与支脊系统：高程场实质性变更，
-///           旧路网叠加新地貌会幽灵穿模，旧存档按版本门禁拒绝）
+/// v1.50.41（mac）/ v1.50.40（master）：4 -> 5（两条分支各自递增后于本合并汇合——
+///           mac：TB-01 多尺度 fBm 噪声与支脊系统；master：S7-02 新增 `grassland_plain_v1`
+///           低幅高程场/残丘/泉溪洼地分支。旧存档按版本门禁拒绝）
 pub const TERRAIN_GENERATOR_VERSION: u32 = 5;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
+/// 阶段七插队模板：平地草原（06 号 §4.1 · STAGE-07-TODO S7-02）。
+/// 低幅起伏平原 + 孤立残丘 + 泉溪洼地；**无水面**（清泉 POI 仍由生态层布点，
+/// 洼地只落 `SpringValley` 特征语义与 SoftGround 凹圈）。
+pub const TERRAIN_PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 
 /// 纯确定性自然地形生成引擎。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -733,7 +738,13 @@ impl TerrainMap {
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
         self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
-        self.tilt_magnitude = rng.gen_range(54.0, 66.0);
+        // ★ S7-02 草原：基础倾斜压到 16~24（坡度主体 2°~8°）。抽取数不变（1 次），
+        //   仅区间不同——T1/T2 路径的 rng 消费序列与取值逐位不变。
+        self.tilt_magnitude = if self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN {
+            rng.gen_range(16.0, 24.0)
+        } else {
+            rng.gen_range(54.0, 66.0)
+        };
         let tilt_cos = self.tilt_angle_rad.cos();
         let tilt_sin = self.tilt_angle_rad.sin();
         let theta = relief_rng.gen_range(-0.18, 0.18);
@@ -750,8 +761,54 @@ impl TerrainMap {
         // 鞍部若过窄会把山口本身夹成不可通行，故下限从 0.10 放宽到 0.14。
         let saddle_width = relief_rng.gen_range(0.14, 0.19) * self.world_size;
 
+        // ★ S7-02 平地草原辅助特征参数（只消费 relief_rng 局部流；T1/T2 不进入本块，
+        //   消费序列与逐位输出不受影响）。
+        //   残丘：高斯最大梯度 ≈ 0.858 × A/R，A/R ∈ [0.19, 0.31] → 峰值坡度
+        //   ≈ 9.3°~14.9°，叠加低幅基础波动后严格 < 18°（不产生通行障碍）。
+        let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
+        let grass_mounds: Vec<(f32, f32, f32, f32)> = if is_grassland {
+            let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 { 1 } else { 2 };
+            let mut placed: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(mound_count);
+            for i in 0..mound_count {
+                let mut ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+                let rad = relief_rng.gen_range(0.30, 0.42) * self.world_size;
+                let amp = relief_rng.gen_range(6.5, 9.5);
+                let mrad = amp / relief_rng.gen_range(0.19, 0.31);
+                // 两丘潜在重叠时把第二丘转到对侧（不额外消费 RNG，保持确定性）
+                if i > 0 {
+                    if let Some(&(px, py, _, pr)) = placed.first() {
+                        let (cx, cy) = (ang.cos() * rad, ang.sin() * rad);
+                        if (cx - px).hypot(cy - py) < pr + mrad {
+                            ang += std::f32::consts::PI;
+                        }
+                    }
+                }
+                placed.push((ang.cos() * rad, ang.sin() * rad, amp, mrad));
+            }
+            placed
+        } else {
+            Vec::new()
+        };
+        // 泉溪洼地锚点候选：2 处，锚在中心近域（图心=初始营地，泉眼是最近水源地理）；
+        // 落点会在 raw 填充后吸附到局部最低格（「在低洼处开辟微凹地」）。
+        let grass_depressions: Vec<(f32, f32, f32, f32)> = if is_grassland {
+            (0..2)
+                .map(|_| {
+                    let ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+                    let rad = relief_rng.gen_range(0.08, 0.28) * self.world_size;
+                    let depth = relief_rng.gen_range(1.4, 2.2);
+                    let drad = relief_rng.gen_range(24.0, 34.0);
+                    (ang.cos() * rad, ang.sin() * rad, depth, drad)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
         let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
+        // ★ S7-02 草原：基础谐波振幅削减 60%（×0.4）。×1.0 对 T1/T2 是 IEEE 位精确乘法。
+        let wave_scale = if is_grassland { 0.4f32 } else { 1.0f32 };
         let mut raw = vec![0.0f32; self.grid_width * self.grid_height];
         // ★ TB-01-2：主脊域扭曲峰值归一化系数（仅山口 profile 消费；0 = 不扭曲）。
         let warp_scale = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
@@ -840,6 +897,12 @@ impl TerrainMap {
                     }
                 }
 
+                // ★ S7-02 孤立残丘：高斯缓丘叠加（1~2 处，中心外围；远景地标 + 高肥力坡脚）
+                for &(mx, my, amp, mrad) in &grass_mounds {
+                    let dx = wx - mx;
+                    let dy = wy - my;
+                    elev += amp * (-(dx * dx + dy * dy) / (mrad * mrad)).exp();
+                }
                 // ★ TB-01-2 高度调制掩码：h_norm ≥ 0.70（山体）权重升至满格、
                 //   ≤ 0.30（平原生活区）衰减到 0.25——高频噪声在低平地带近乎静默，
                 //   严禁全图均匀加噪（根 AGENTS.md §4 坑 #3：平原 ±2m 噪声即产生
@@ -857,12 +920,97 @@ impl TerrainMap {
             }
         }
 
+        // ★ S7-02 泉溪洼地：候选锚点吸附到局部最低格（「在低洼处开辟微凹地」），
+        //   高斯微凹盆直接雕入 raw（在坡度派生之前）；凹圈带（0.7R~1.5R）标记
+        //   SoftGround，盆心保持 DryGround。无水体、无水面。
+        let mut soft_ring = if grass_depressions.is_empty() {
+            Vec::new()
+        } else {
+            vec![false; self.grid_width * self.grid_height]
+        };
+        let mut springs: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
+        if !grass_depressions.is_empty() {
+            let gw = self.world_size / (self.grid_width.max(2) - 1) as f32;
+            let to_grid = |v: f32, n: usize| {
+                ((v / self.world_size + 0.5) * (n - 1) as f32)
+                    .round()
+                    .clamp(10.0, (n - 11) as f32) as usize
+            };
+            for (di, &(cwx, cwy, depth, drad)) in grass_depressions.iter().enumerate() {
+                let (cgx, cgy) = (to_grid(cwx, self.grid_width), to_grid(cwy, self.grid_height));
+                let mut best = (cgx, cgy);
+                let mut best_e = f32::MAX;
+                for wy in cgy.saturating_sub(8)..=(cgy + 8).min(self.grid_height - 1) {
+                    for wx in cgx.saturating_sub(8)..=(cgx + 8).min(self.grid_width - 1) {
+                        let e = raw[wy * self.grid_width + wx];
+                        if e < best_e {
+                            best_e = e;
+                            best = (wx, wy);
+                        }
+                    }
+                }
+                let (mut sx, mut sy) = best;
+                let mut swx = (sx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                let mut swy = (sy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                // 与已接受洼地过近时沿连线外推到 0.22×world_size（确定性修正，不消费 RNG）
+                if di > 0 {
+                    if let Some(&(pgx, pgy, _, _, _, _)) = springs.first() {
+                        let pwx = (pgx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let pwy = (pgy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let min_dist = 0.22 * self.world_size;
+                        let d = (swx - pwx).hypot(swy - pwy);
+                        if d < min_dist && d > 1e-3 {
+                            let k = min_dist / d;
+                            swx = pwx + (swx - pwx) * k;
+                            swy = pwy + (swy - pwy) * k;
+                            sx = to_grid(swx, self.grid_width);
+                            sy = to_grid(swy, self.grid_height);
+                        }
+                    }
+                }
+                // 水源锚定半径（§1.4 草原 water≤160m）：吸附点偏向图缘的种子沿径向
+                // 收拢盆心到 0.20×world_size ≈153m 界内（确定性修正，不消费 RNG）。
+                let max_anchor_r = 0.20 * self.world_size;
+                let anchor_r = swx.hypot(swy);
+                if anchor_r > max_anchor_r {
+                    let k = max_anchor_r / anchor_r;
+                    swx *= k;
+                    swy *= k;
+                    sx = to_grid(swx, self.grid_width);
+                    sy = to_grid(swy, self.grid_height);
+                }
+                let reach = (drad * 1.8 / gw).ceil() as i32;
+                for dy in -reach..=reach {
+                    for dx in -reach..=reach {
+                        let gx = sx as i32 + dx;
+                        let gy = sy as i32 + dy;
+                        if gx < 0 || gy < 0 || gx >= self.grid_width as i32 || gy >= self.grid_height as i32 {
+                            continue;
+                        }
+                        let cell_wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let cell_wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let ddx = cell_wx - swx;
+                        let ddy = cell_wy - swy;
+                        let d2 = ddx * ddx + ddy * ddy;
+                        let idx = gy as usize * self.grid_width + gx as usize;
+                        raw[idx] -= depth * (-(d2) / (drad * drad)).exp();
+                        let d = d2.sqrt();
+                        if d >= drad * 0.7 && d <= drad * 1.5 {
+                            soft_ring[idx] = true;
+                        }
+                    }
+                }
+                springs.push((sx, sy, swx, swy, depth, drad));
+            }
+        }
+
         // ★ TB-01-4 坡度重算与地表属性映射（14号文 §9.2 步骤 2~5）：在复合高程场
-        //   （倾斜 + fBm + 主脊/支脊）上统一重算——4 邻域中心差分，图边界自动退化为
-        //   单侧差分（`saturating_sub` / `min` 钳位，杜绝贴边通行误判）；阈值即物理
-        //   契约：≥34° RockFace+NO_WALK、20~34° SoftGround、<20° DryGround、
-        //   ≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 / terrainMaxBuildSlope=16
-        //   之上再留工程余量）。新支脊/噪声接入高程场后无需改动本段，自然生效。
+        //   （倾斜 + fBm + 主脊/支脊/残丘/泉溪洼地）上统一重算——4 邻域中心差分，
+        //   图边界自动退化为单侧差分（`saturating_sub` / `min` 钳位，杜绝贴边通行
+        //   误判）；阈值即物理契约：≥34° RockFace+NO_WALK、20~34° SoftGround、
+        //   <20° DryGround、≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 /
+        //   terrainMaxBuildSlope=16 之上再留工程余量）。新支脊/噪声接入高程场后
+        //   无需改动本段，自然生效。
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
                 let idx = gy * self.grid_width + gx;
@@ -874,8 +1022,17 @@ impl TerrainMap {
                 let dy = if self.grid_height <= 1 { 0.0 } else { (down - up) / (((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)) as f32 * cell_step_y.max(0.001)) };
                 let slope = (dx * dx + dy * dy).sqrt().atan().to_degrees();
                 let normalized_height = ((raw[idx] + 45.0) / 100.0).clamp(0.0, 1.0);
-                let fertility = (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0);
-                let surface_kind = if slope >= 34.0 { SurfaceKind::RockFace } else if slope >= 20.0 { SurfaceKind::SoftGround } else { SurfaceKind::DryGround };
+                // ★ S7-02 草甸沃土：肥力基线抬高（可建格均值 0.85~0.95）；T1/T2 公式不变。
+                let fertility = if is_grassland {
+                    (0.97 - slope / 70.0 * 0.5 - normalized_height * 0.10).clamp(0.1, 1.0)
+                } else {
+                    (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0)
+                };
+                // ★ S7-02 泉溪洼地凹圈：低坡软地带优先于坡度派生（草原全域坡度 < 18°，
+                //   不会与 RockFace 冲突）；软地只慢行不禁建（06 号 §4.1）。
+                let surface_kind = if !soft_ring.is_empty() && soft_ring[idx] {
+                    SurfaceKind::SoftGround
+                } else if slope >= 34.0 { SurfaceKind::RockFace } else if slope >= 20.0 { SurfaceKind::SoftGround } else { SurfaceKind::DryGround };
                 let mut flags = 0u16;
                 if slope >= 18.0 { flags |= TERRAIN_FLAG_NO_BUILD; }
                 if surface_kind.is_hard_blocked() { flags |= TERRAIN_FLAG_NO_WALK; }
@@ -887,6 +1044,65 @@ impl TerrainMap {
                     water_body_id: None,
                     feature_flags: flags,
                 };
+            }
+        }
+
+        // ★ S7-02 安置泉眼特征：每处洼地一条 `SpringValley`（三顶点自坡缘汇入盆心，
+        //   语义与 T2 泉谷一致；无水体、无水面，清泉 POI 仍由生态层布点）。
+        for (i, &(sx, sy, swx, swy, depth, drad)) in springs.iter().enumerate() {
+            let level = raw[sy * self.grid_width + sx];
+            self.features.push(TerrainFeature {
+                id: 30 + i as u32,
+                kind: TerrainFeatureKind::SpringValley,
+                vertices: vec![
+                    Vec3::new(swx - drad, swy + drad * 0.55, level + depth * 0.85),
+                    Vec3::new(swx - drad * 0.35, swy + drad * 0.18, level + depth * 0.35),
+                    Vec3::new(swx, swy, level),
+                ],
+                elevation: level,
+                width: 4.0,
+                flags: 0,
+            });
+        }
+    }
+
+    /// T2 `river_valley_v1` 陆地区域基础生成（★ STAGE2-2 公式解耦，06 号 §5.3 兼容性拆分）。
+    ///
+    /// 旧实现中「河阶外低丘」公式内联在 `hydrology.rs::generate_river` 的全图覆写里，
+    /// 水系阶段把前置地貌全部冲刷，统一地表派生无法局部生效。现将该公式**逐字**提取为
+    /// 本函数：铺满全图写陆地基底——高程用旧 else 分支原式（`u` 夹取、山脊项、浮点次序
+    /// 不改），地表 `DryGround`、肥力 `0.75`、flags `0`、无水体归属；随后
+    /// `hydrology.rs::generate_river` 只覆盖水系影响带。拆分前后最终网格逐比特等价：
+    /// 带内河阶格的山脊项恒为 +0.0，本函数写出的高程即旧实现的最终值。
+    ///
+    /// 流水线定位：06 号 §5.3 第 2 步 `generate_base_relief` 的 river_valley 分支前身
+    ///（阶段化管线重构属 STAGE2-3）。
+    pub fn generate_river_valley_base_relief(
+        &mut self,
+        geom: &super::hydrology::RiverGeometry,
+        config: &SimConfig,
+    ) {
+        let size = self.world_size;
+        let level = geom.level;
+        let bank = geom.bank;
+        let terrace = geom.terrace;
+        for gy in 0..self.grid_height {
+            for gx in 0..self.grid_width {
+                let p = self.grid_pos(gx, gy);
+                let d = (p.x - geom.center(p.y, size)).abs();
+                let w = geom.half_width(p.y, size);
+                let outside = (d - w).max(0.0);
+                let c = &mut self.cells[gy * self.grid_width + gx];
+                // 旧 T2 河阶外低丘公式（原 else 分支逐字保留）
+                let u = ((outside - bank) / terrace).clamp(0.0, 1.0);
+                c.elevation = level + 2.0 + u * 2.0
+                    + ((outside - bank - terrace).max(0.0) / size
+                        * config.terrain_ridge_amplitude.max(1.0))
+                        * (0.8 + 0.2 * (p.y / 90.0).sin());
+                c.surface_kind = SurfaceKind::DryGround;
+                c.water_body_id = None;
+                c.feature_flags = 0;
+                c.natural_fertility = 0.75;
             }
         }
     }

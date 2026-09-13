@@ -50,11 +50,67 @@ impl WaterPool {
         taken
     }
 }
+
+/// T2 主河静态几何参数（★ STAGE2-2 公式解耦：陆地区域基础生成与水系影响带覆盖
+/// 共享同一份河几何，保证拆分前后逐比特等价）。
+///
+/// 由 `plan_river_geometry` 从单一 `hydro_rng`（`seed ^ 0x4859_4452_4f54_3032`）
+/// 规划：仅消费 1 次 `gen_range(-1.0, 1.0)` 相位抽取，消费顺序与旧
+/// `generate_river` 完全一致。`width_amp` 为 `(width_max - width_min).max(0.0) * 0.22`
+/// 的预乘（浮点结合次序与旧内联算式相同，逐比特同值）。
+pub struct RiverGeometry {
+    pub phase: f32,
+    pub level: f32,
+    /// `((width_min + width_max) * 0.5).max(12.0)`
+    pub width: f32,
+    /// `bank_width.max(8.0)`
+    pub bank: f32,
+    /// `terrace_width.max(20.0)`
+    pub terrace: f32,
+    pub width_amp: f32,
+}
+
+impl RiverGeometry {
+    /// 主河中心线：正弦蜿蜒，完全静态（水量由共享池维护，几何不随库存变化）。
+    #[inline]
+    pub fn center(&self, y: f32, size: f32) -> f32 {
+        size * 0.055 * (y / size * 5.0 + self.phase).sin()
+    }
+    /// 河道半宽：基准半宽 + 波动振幅。
+    #[inline]
+    pub fn half_width(&self, y: f32, size: f32) -> f32 {
+        self.width * 0.5 + self.width_amp * (y / size * 7.0).cos()
+    }
+}
+
+/// 规划 T2 主河几何（§5.3 第 3 步 `apply_profile_static_hydrology` 的参数解析前身）。
+fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
+    let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
+    let phase = rng.gen_range(-1.0, 1.0);
+    RiverGeometry {
+        phase,
+        level: cfg.terrain_river_water_level,
+        width: ((cfg.terrain_river_width_min + cfg.terrain_river_width_max) * 0.5).max(12.0),
+        bank: cfg.terrain_river_bank_width.max(8.0),
+        terrace: cfg.terrain_river_terrace_width.max(20.0),
+        width_amp: (cfg.terrain_river_width_max - cfg.terrain_river_width_min).max(0.0) * 0.22,
+    }
+}
+
 impl TerrainMap {
     pub fn generate_with_config(&mut self, seed: u64, config: &SimConfig) {
         self.generate_with_profile(seed, &config.terrain_profile, config);
         self.hydrology = Hydrology::default();
-        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY { self.generate_river(seed, config); }
+        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
+            // ★ STAGE2-2（06 号 §5.3 兼容性拆分）：T2 生成解耦为
+            // 「陆地区域基础生成（铺满全图）→ 水系影响带局部覆盖」两段。
+            // 河几何规划消费单一 hydro_rng 的 1 次 phase 抽取，种子与消费顺序
+            // 与旧 generate_river 完全一致；两段共享同一几何，保证最终网格
+            // 与拆分前逐比特等价。
+            let geom = plan_river_geometry(seed, config);
+            self.generate_river_valley_base_relief(&geom, config);
+            self.generate_river(&geom, config);
+        }
         // ★ D-B1-3（06号 §5.3 第 4–5 步钩子）：子特征注入规划与几何施加。
         // 第 4 步 `plan_subfeatures()` 已由 D-B1-3 落地——纯无状态哈希（mix64/roll_10000
         // + 固定盐值 + kind 升序互斥裁决），**不消费任何 WorldRng**、不读不写 terrain。
@@ -70,33 +126,55 @@ impl TerrainMap {
             // 空钩子占位（阶段二接管：append_subfeature_accents）。
         }
     }
-    fn generate_river(&mut self, seed: u64, cfg: &SimConfig) {
-        let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
-        let phase = rng.gen_range(-1.0, 1.0);
+    /// T2 主河水系写入（★ STAGE2-2 收敛：仅覆盖水系影响带）。
+    ///
+    /// 陆地区域（`outside >= bank + terrace`）的高程/地表/肥力/flags 已由
+    /// `terrain.rs::generate_river_valley_base_relief` 铺满全图，本函数**只写**
+    /// 横向距离落在影响带内（`d < half_width + bank + terrace`）的局部网格：
+    /// 河面、河岸、河阶三种地表覆盖 + 浅滩走廊、轮廓特征与取水点。带外一格不碰。
+    fn generate_river(&mut self, geom: &RiverGeometry, cfg: &SimConfig) {
         let size = self.world_size;
-        let level = cfg.terrain_river_water_level;
-        let width = ((cfg.terrain_river_width_min + cfg.terrain_river_width_max)*0.5).max(12.0);
-        let bank = cfg.terrain_river_bank_width.max(8.0);
-        let terrace = cfg.terrain_river_terrace_width.max(20.0);
-        let center = |y: f32| size*0.055*(y/size*5.0+phase).sin();
-        let half_width = |y: f32| width*0.5 + (cfg.terrain_river_width_max-cfg.terrain_river_width_min).max(0.0)*0.22*(y/size*7.0).cos();
+        let level = geom.level;
+        let bank = geom.bank;
+        let terrace = geom.terrace;
+        let width = geom.width;
+        let center = |y: f32| geom.center(y, size);
+        let half_width = |y: f32| geom.half_width(y, size);
         self.features.clear();
         for gy in 0..self.grid_height {
-            for gx in 0..self.grid_width {
+            let row_y = (gy as f32/(self.grid_height-1).max(1) as f32-0.5)*size;
+            // 影响带列边界（保守外扩 2 格；格内仍用原判据精确裁决，浮点边界不受影响）
+            let span = half_width(row_y) + bank + terrace;
+            let row_cx = center(row_y);
+            let gx_lo = ((((row_cx-span)/size+0.5)*(self.grid_width-1).max(1) as f32).floor() as isize - 2).max(0) as usize;
+            let gx_hi = ((((row_cx+span)/size+0.5)*(self.grid_width-1).max(1) as f32).ceil() as isize + 2)
+                .min((self.grid_width-1) as isize).max(gx_lo as isize) as usize;
+            for gx in gx_lo..=gx_hi {
                 let p = self.grid_pos(gx, gy);
                 let d = (p.x-center(p.y)).abs();
                 let w = half_width(p.y);
-                let c = &mut self.cells[gy*self.grid_width+gx];
                 let outside = (d-w).max(0.0);
-                // 单调河床；河阶外衔接低丘，水面完全静态。
-                c.elevation = if d < w { level-1.4 + p.y/size*0.3 }
-                    else if outside < bank { level + 0.4 + outside/bank*1.6 }
-                    else { let u = ((outside-bank)/terrace).clamp(0.0,1.0);
-                        level+2.0+u*2.0 + ((outside-bank-terrace).max(0.0)/size*cfg.terrain_ridge_amplitude.max(1.0))* (0.8+0.2*(p.y/90.0).sin()) };
-                c.surface_kind = if d < w { SurfaceKind::DeepWater } else if outside < bank { SurfaceKind::RiverBank }
-                    else if outside < bank+terrace { SurfaceKind::RiverTerrace } else { SurfaceKind::DryGround };
-                c.water_body_id = if d < w {Some(1)} else {None};
-                c.feature_flags = if d < w {TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_NO_WALK} else if outside < bank {TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_SHORE_ACCESS} else {0};
+                // ★ 水系影响带之外：严格保持陆地区域基础生成结果，一格不写
+                //（判据与旧 surface_kind else-if 链的补集逐比特同界）。
+                if outside >= bank+terrace { continue; }
+                let c=&mut self.cells[gy*self.grid_width+gx];
+                // 河面/河岸覆盖高程；河阶高程与陆地基底公式逐比特同值
+                //（山脊项在带内恒为 +0.0），故只覆盖地表/归属/flags。
+                if d < w {
+                    c.elevation = level-1.4 + p.y/size*0.3;
+                    c.surface_kind = SurfaceKind::DeepWater;
+                    c.water_body_id = Some(1);
+                    c.feature_flags = TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_NO_WALK;
+                } else if outside < bank {
+                    c.elevation = level + 0.4 + outside/bank*1.6;
+                    c.surface_kind = SurfaceKind::RiverBank;
+                    c.water_body_id = None;
+                    c.feature_flags = TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_SHORE_ACCESS;
+                } else {
+                    c.surface_kind = SurfaceKind::RiverTerrace;
+                    c.water_body_id = None;
+                    c.feature_flags = 0;
+                }
                 c.natural_fertility = if outside < bank+terrace {0.95} else {0.75};
             }
         }

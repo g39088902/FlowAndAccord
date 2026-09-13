@@ -115,6 +115,16 @@ window.AccentModel = window.AccentModel || (function () {
     return { x: nx / len, y: ny / len, z: wz / len };
   }
 
+  // ★ TA-11-6 零 GC 变体：同 shearNormal 公式，结果写入调用方复用的 out 对象（热路径消费）。
+  function shearNormalInto(nx, ny, nz, s, out) {
+    const wz = nz - s * nx;
+    const len = Math.hypot(nx, ny, wz) || 1;
+    out.x = nx / len;
+    out.y = ny / len;
+    out.z = wz / len;
+    return out;
+  }
+
   // ── Tree：锥形主干 + 主枝/二级枝 + 叶簇（§6.4：每树 12~24 簇，枝条全年保留）──
   // segments：枝干线段（局部三维端点 + 相对干宽系数 wK）；clusters：叶簇
   // （局部三维附着点 + 世界单位半径 r + 稳定脱落次序 shed + 色差通道 lite）。
@@ -252,7 +262,8 @@ window.AccentModel = window.AccentModel || (function () {
   // ── RockCluster（D-B1-6，06 号 §5.5）：anchor 前端派生 2–5 颗子石 ──
   // 数量/散布/半径参数走 config.render.js（TA-11-3），缺省回退与原硬编码逐位一致。
   // stones：{ x, y } 世界单位水平偏移（未乘 accent.scale/zoom，rotation 由绘制层施加）、
-  // { r } 子石半径、{ shape[6] } 逐顶点半径变化系数（沿用 Boulder 七边形变径画法）、
+  // { r } 子石半径、{ shape[sides] } 逐顶点半径变化系数（0.78~1.22，尖角与平钝面对比）、
+  // { sides } 多边形边数（★ TA-11-5：主石 6~7 / 辅石 5~6，_accentHash 派生，非对称棱角）、
   // { rot } 自转角、{ lite } 岩面明暗色差通道。首颗为主石（居中、最大），其余碎石散布。
   function rockClusterSkeleton(id, vSeed) {
     const cfg = window.RENDER_CONFIG || {};
@@ -272,9 +283,12 @@ window.AccentModel = window.AccentModel || (function () {
       const h4 = _accentHash(id, 613 + i * 5);
       const ang = h1 * Math.PI * 2;
       const dist = i === 0 ? (h2 - 0.5) * 1.2 : spread * (0.35 + h2 * 0.60); // 主石近中
+      // ★ TA-11-5 棱角扰动：主石 6~7 边 / 辅石 5~6 边（哈希通道 660+i×8，避开 630 形状块），
+      //   逐顶点变径 0.78~1.22 产生自然尖角与平钝面（不重复 Boulder 固定纹理）
+      const sides = (i === 0 ? 6 : 5) + Math.floor(_accentHash(id, 660 + i * 8) * 2);
       const shape = [];
-      for (let k = 0; k < 6; k++) {
-        shape.push(0.82 + _accentHash(id, 630 + i * 6 + k) * 0.38); // 逐顶点变径（不重复 Boulder 固定纹理）
+      for (let k = 0; k < sides; k++) {
+        shape.push(0.78 + _accentHash(id, 630 + i * 8 + k) * 0.44); // 逐顶点变径
       }
       stones.push({
         x: Math.cos(ang) * dist,
@@ -283,6 +297,7 @@ window.AccentModel = window.AccentModel || (function () {
         rot: h4 * Math.PI * 2,
         lite: _accentHash(id, 614 + i * 5),
         shape: shape,
+        sides: sides,
       });
     }
     return { spread: spread, stones: stones };
@@ -343,7 +358,7 @@ window.AccentModel = window.AccentModel || (function () {
     if (kind === 'Bush') return 8;
     if (kind === 'Boulder') return 7;
     if (kind === 'RockCluster') return 10; // 主石半径×1.2 变径上限 + 散布
-    if (kind === 'GrassTuft') return 5;    // 短草叶高上限
+    if (kind === 'GrassTuft') return 7;    // ★ TA-11-6：5→7 覆盖芦草株高（6.0）+ 芦花穗（+1.5）高位
     return 8;
   }
 
@@ -380,7 +395,8 @@ window.AccentModel = window.AccentModel || (function () {
   return {
     get: get,
     resetCache: resetCache,
-    shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置），绘制层每帧消费
+    shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置）——返回新对象，兼容外部调用
+    shearNormalInto: shearNormalInto, // ★ TA-11-6 零 GC 变体（写入调用方复用 out），热路径消费
     hash: _accentHash, // 对外别名（避免消费方绕过本文件直接依赖全局函数名）
   };
 })();
