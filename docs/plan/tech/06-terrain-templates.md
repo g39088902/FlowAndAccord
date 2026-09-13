@@ -616,7 +616,7 @@ pub const NO_RESOURCE_POOL_ID: u32 = 0;
 - `apply_subfeature_geometry` 写格子前先复制所需原高程到局部数组，**不能**边遍历边读回已改写的邻格。
 - 水面、河岸、河阶、浅滩拥有更高优先级的 `SurfaceKind`：第 6 步对它们只重算 `slope_angle_deg`，保留其既有 `surface_kind` 与 flag；只有由坡度派生的陆地格才合并 `NO_WALK`/`NO_BUILD`。峭壁可在水系带外侧写 `RockFace`。
 - ⚠️ **第 3 步需先改造既有实现**：当前 `hydrology::generate_river` 对**整张网格**无条件重写 `elevation` / `surface_kind` / `feature_flags` / `natural_fertility`（见 `geo/hydrology.rs`），第 2 步生成的基础地貌在 T2 下会被完全覆盖，且 `recompute_slopes()` 只重算坡度、不重派生 flags。本流水线落地时必须把水系写入收敛到河道带，否则第 6 步「统一重算」无从谈起。
-- **阶段二兼容性拆分（施工硬门禁，尚未实施）**：把旧 T2 河阶外低丘的高程、地表、肥力和标志公式提取为 profile 陆地区域生成，再由水系阶段只覆盖水系带；必须保持原算式、浮点运算顺序、边界判据、RNG 消费及最终坡度/flags 的结果。禁止仅缩小 `generate_river` 循环范围而留下原先被覆盖的 T0 地貌；统一派生也不得顺带更改旧 T2 的陆地分类。阶段二先提供等价路径，阶段三注入时才启用新增物理派生。
+- **阶段二兼容性拆分（施工硬门禁）**：把旧 T2 河阶外低丘的高程、地表、肥力和标志公式提取为 profile 陆地区域生成，再由水系阶段只覆盖水系带；必须保持原算式、浮点运算顺序、边界判据、RNG 消费及最终坡度/flags 的结果。禁止仅缩小 `generate_river` 循环范围而留下原先被覆盖的 T0 地貌；统一派生也不得顺带更改旧 T2 的陆地分类。阶段二先提供等价路径，阶段三注入时才启用新增物理派生。✅ **STAGE2-2（v1.50.40）已落地**：低丘公式提取为 `terrain.rs::generate_river_valley_base_relief`（陆地基底铺满全图，即第 2 步 `generate_base_relief` 的 river_valley 分支前身），`generate_river` 收敛为仅写水系影响带（per-row 列边界 + 原判据精确裁决，带外一格不碰）；两段共享 `plan_river_geometry` 的 `RiverGeometry`（hydro_rng 单次 phase 抽取，消费顺序不变）；临时对拍 120 组（双 profile × seed 0–59）逐字节 100% 全等，`TERRAIN_GENERATOR_VERSION` 保持 4。
 - **阶段二跨构建证据**：基准取已通过 D-B1-9 的最终提交，记录基准/候选提交、双副本 WASM SHA256、配置与固定种子；复用 §5.1 的物理字段规范化比较方法，显式 T1/T2 各跑 seed 0–59，开关开/关均比较高程、坡度、地表、flags、肥力、水系、POI 与路网。新旧构建各自确定性不能代替此比较。任一物理差异即不通过“基座自身不改世界”；必要的行为修正应另拆物理变更提交、递增生成器版本并重新验收，不能混入等价重构。
 - `generate_base_accents` 发生在路网/房屋尚未出现时，所以现有实现只能保证避开水面与禁行格；文档中“避开道路、房屋、POI”的描述不是当前代码事实。若未来必须做视觉避让，应新增**确定性的后处理过滤**，不得让装饰影响布局。
 

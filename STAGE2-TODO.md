@@ -46,7 +46,7 @@
 
 ### STAGE2-2 T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心）
 
-- [ ] **STAGE2-2 T2 陆地区域公式提取与水系影响带收敛**
+- [x] **STAGE2-2 T2 陆地区域公式提取与水系影响带收敛**
     - **内容**：
       1. **现状痛点**：当前 `geo/hydrology.rs::generate_river` 对整张 `120×120` 网格遍历，无条件覆写全部网格的 `elevation`、`surface_kind`、`water_body_id`、`feature_flags` 与 `natural_fertility`，将前置步骤的基础地貌全部冲刷，导致统一地表派生无法在局部生效。
       2. **公式解耦（陆地生成）**：

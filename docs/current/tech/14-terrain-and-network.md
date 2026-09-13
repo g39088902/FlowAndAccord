@@ -460,11 +460,13 @@ T1 骨架生成完成后，用无状态哈希判定是否注入子特征：
 
 ✅ 已落地（v1.47.5）。实现于 `geo/hydrology.rs::generate_river`：
 
+> ★ **STAGE2-2（v1.50.40）公式解耦与写入收敛**：旧 T2 河阶外低丘高程公式已从本函数的全图覆写中提取为 `terrain.rs::generate_river_valley_base_relief` 陆地基底函数（铺满全图写 `DryGround`/肥力 0.75/flags 0，公式逐字保留）；`generate_river` 改为**仅覆盖水系影响带**（横向距离 `d < half_width + bank + terrace` 的局部网格，带外一格不碰），两段共享 `plan_river_geometry` 规划的 `RiverGeometry`（单一 hydro_rng 单次 phase 抽取，消费顺序不变）。临时对拍验证 120 组（双 profile × seed 0–59）改造前后逐字节 100% 全等，`TERRAIN_GENERATOR_VERSION` 保持 4。
+
 T2 包含“一条蜿蜒主河 + 两处静态浅滩通道 + 两岸河阶 + 泉谷”。
 
 生成流程：
 
-1. ✅ 从 `hydro_rng` 生成主河中心线平移相位，以正弦波结合世界尺寸生成单调中心线（`center(y)`）与变宽河道带（`half_width(y)`）。
+1. ✅ 从 `hydro_rng` 生成主河中心线平移相位，以正弦波结合世界尺寸生成单调中心线（`center(y)`）与变宽河道带（`half_width(y)`）（★ STAGE2-2 起由 `plan_river_geometry` 统一规划，陆地基底与水系带共享同一几何）。
 2. ✅ 河床高程统一凹陷（`level - 1.4`），地表标记为 `DeepWater`，写入 `NO_BUILD|NO_WALK`，关联 `water_body_id = Some(1)`。
 3. ✅ 河道外缘向外生成宽度为 `bank` 的 `RiverBank`（标记 `NO_BUILD|SHORE_ACCESS`），再向外生成宽度为 `terrace` 的 `RiverTerrace`（天然高肥力 0.95，平缓河阶地表）。
 4. ✅ 在南侧（`-size*0.24`）与北侧（`size*0.24`）生成两处 `TerrainConnection` 浅滩跨水走廊，河床局部抬高为浅水（`ShallowWater`），写入 `NO_BUILD|CROSSING_CANDIDATE`，并生成 `ShallowFord` 地貌特征折线。

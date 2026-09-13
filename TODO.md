@@ -72,7 +72,7 @@
 | 任务编号 | 任务名称 | 核心涉及文件 | 状态 | 依赖 |
 | :--- | :--- | :--- | :---: | :--- |
 | **STAGE2-1** | 配置字段加回：有界重试上限 `terrainGenerationMaxRetries` | `config.rs` / `config.js` / `config-check.js` | ✅ 已完成（v1.50.39） | — |
-| **STAGE2-2** | T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心） | `geo/hydrology.rs` / `geo/terrain.rs` | ⏳ 待办 | — |
+| **STAGE2-2** | T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心） | `geo/hydrology.rs` / `geo/terrain.rs` | ✅ 已完成（v1.50.40） | — |
 | **STAGE2-3** | 创世流水线阶段化重构（0–11 步无歧义管线） | `geo/terrain.rs` / `geo/hydrology.rs` | ⏳ 待办 | STAGE2-2 |
 | **STAGE2-4** | 静态地形几何校验与稳定 ID 断言落地（§5.2 / §5.3 第 7 步） | `geo/terrain.rs` / `geo/hydrology.rs` | ⏳ 待办 | STAGE2-3 |
 | **STAGE2-5** | 有界失败降级与重试机制（§5.8 阶梯回退环） | `geo/terrain.rs` / `spatial/world.rs` | ⏳ 待办 | STAGE2-1, STAGE2-4 |

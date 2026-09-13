@@ -441,6 +441,47 @@ impl TerrainMap {
         }
     }
 
+    /// T2 `river_valley_v1` 陆地区域基础生成（★ STAGE2-2 公式解耦，06 号 §5.3 兼容性拆分）。
+    ///
+    /// 旧实现中「河阶外低丘」公式内联在 `hydrology.rs::generate_river` 的全图覆写里，
+    /// 水系阶段把前置地貌全部冲刷，统一地表派生无法局部生效。现将该公式**逐字**提取为
+    /// 本函数：铺满全图写陆地基底——高程用旧 else 分支原式（`u` 夹取、山脊项、浮点次序
+    /// 不改），地表 `DryGround`、肥力 `0.75`、flags `0`、无水体归属；随后
+    /// `hydrology.rs::generate_river` 只覆盖水系影响带。拆分前后最终网格逐比特等价：
+    /// 带内河阶格的山脊项恒为 +0.0，本函数写出的高程即旧实现的最终值。
+    ///
+    /// 流水线定位：06 号 §5.3 第 2 步 `generate_base_relief` 的 river_valley 分支前身
+    ///（阶段化管线重构属 STAGE2-3）。
+    pub fn generate_river_valley_base_relief(
+        &mut self,
+        geom: &super::hydrology::RiverGeometry,
+        config: &SimConfig,
+    ) {
+        let size = self.world_size;
+        let level = geom.level;
+        let bank = geom.bank;
+        let terrace = geom.terrace;
+        for gy in 0..self.grid_height {
+            for gx in 0..self.grid_width {
+                let p = self.grid_pos(gx, gy);
+                let d = (p.x - geom.center(p.y, size)).abs();
+                let w = geom.half_width(p.y, size);
+                let outside = (d - w).max(0.0);
+                let c = &mut self.cells[gy * self.grid_width + gx];
+                // 旧 T2 河阶外低丘公式（原 else 分支逐字保留）
+                let u = ((outside - bank) / terrace).clamp(0.0, 1.0);
+                c.elevation = level + 2.0 + u * 2.0
+                    + ((outside - bank - terrace).max(0.0) / size
+                        * config.terrain_ridge_amplitude.max(1.0))
+                        * (0.8 + 0.2 * (p.y / 90.0).sin());
+                c.surface_kind = SurfaceKind::DryGround;
+                c.water_body_id = None;
+                c.feature_flags = 0;
+                c.natural_fertility = 0.75;
+            }
+        }
+    }
+
     #[inline]
     pub fn sample_elevation(&self, wx: f32, wy: f32) -> f32 {
         let (x, y) = self.grid_coords(wx, wy);
