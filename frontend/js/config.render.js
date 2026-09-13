@@ -148,4 +148,36 @@ window.RENDER_CONFIG = {
   accentCrownLitRyK: 0.42,    // 亮部椭圆纵半径相对簇半径的比例
   accentCrownLitAlpha: 0.16,  // 亮部峰值不透明度（弱于旧 0.20 小白斑，宽而弱）
   accentCrownLitMinPx: 2.2,   // 簇屏幕半径低于此省略亮部（远景亚像素噪声）
+
+  // —— 资源景观（★ S4-02，STAGE-04-TODO §3.2；landscape-model.js / render_landscapes.js 消费）——
+  // 围绕资源 POI 的前端确定性派生景观：模型只由世界 seed / POI 类型与坐标 / 静态地形 /
+  // 配方固定盐值 / role / slot 派生；库存丰度 q 只驱动画面动态细节，绝不参与几何重抽。
+  // 本段为**纯渲染配置**，不进 SIM_CONFIG、不经 applyConfig 注入 WASM；关态完整回退原画面。
+  landscapeEnabled: true,       // 总开关（false = 零开销回退原画面路径；纯前端开关，禁写模拟事实）
+  landscapeStyleVersion: 1,     // 景观配方风格版本（组缓存/模型缓存键组成部分；调值整体重建）
+  landscapeCacheMaxGroups: 256, // 景观组模型缓存上限（超限整体清空，不 LRU；§3.2 有界缓存）
+  landscapeFrameChildBudget: 420, // 每帧入队子图元（含阴影）硬上限；按固定遍历序截断（§3.4 预算）
+  landscapeRecipes: {           // 配方表（role 顺序 = 候选生成顺序；slots = 每 role 候选上限 K）
+    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草；水面候选由模型层拒绝（不画新泉池）
+      { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 4, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草；避让归 S4-03 遮罩
+      { role: 'tree',  modelKind: 'Tree',        slots: 3, scaleMin: 0.9,  scaleMax: 1.35, footprint: 10.5 },
+      { role: 'bush',  modelKind: 'Bush',        slots: 3, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 3, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）
+      { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草（不画成阻路峭壁）
+      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架（禁止整片发光/扩矿，归 S4-05 细节）
+      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+  },
 };

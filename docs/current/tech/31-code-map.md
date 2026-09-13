@@ -123,11 +123,13 @@ FlowAndAccord/
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
 │   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (水底卵石/成群游鱼/太阳波光，纯表现层，随种子确定性重建)
 │   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出)
-│   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache)
+│   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道)
+│   │   ├── landscape-model.js              # ★ S4-02 资源景观模型层 (window.LandscapeModel：配方/slot/固定 uint32 哈希/极坐标候选/双线性高程/组缓存，静态输入派生，世界事件 resetCache)
 │   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；★ v1.50.23 装饰绘制已迁出 render_accents.js)
 │   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity 分发 + Tree/Boulder/Bush/RockCluster；★ v1.50.39 TA-04-3 cylinderShade 枝干圆柱侧面明暗，由 render_world.js 深度队列调度)
 │   │   ├── render_grass.js                 # ★ v1.50.39 GrassTuft 草丛绘制 (自 render_accents.js 迁出守 800 行上限；grassSeasonColor 季相色 + 芦草穗，复用 accent 族共享刮擦工具)
-│   │   ├── render_shadows.js               # ★ v1.50.46 TA-04-6 装饰贴地投影绘制层 (drawAccentShadowGround 树/灌木地面图元阴影：实高驱动影长 + 叶量调制夏冠影/冬枝影，复用 accent 族共享刮擦工具)
+│   │   ├── render_shadows.js               # ★ v1.50.46 TA-04-6 装饰贴地投影绘制层 (drawAccentShadowGround 树/灌木地面图元阴影：实高驱动影长 + 叶量调制夏冠影/冬枝影，复用 accent 族共享刮擦工具；★ S4-02 drawAccentShadowFor 模型参数化主体)
+│   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild/drawLandscapeShadowGround 分发；复用装饰图元/光照/季相，配置关态零开销回退)
 │   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）
 │   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效

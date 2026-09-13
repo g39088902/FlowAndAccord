@@ -35,6 +35,14 @@ function drawAccentShadowGround(accent) {
   const kind = accent.kind;
   if (kind !== 'Tree' && kind !== 'Bush') return; // 入队已过滤，防御再判
   const model = window.AccentModel.get(accent);
+  drawAccentShadowFor(accent, model);
+}
+
+// ★ S4-02 景观子图元共用主体（render_landscapes.js 消费）：模型由调用方以完整 key 通道
+// （AccentModel.getByKey，'L#' 命名空间）解析后传入，accent 与景观子图元共用同一套
+// 实高驱动影长 + 叶量调制公式（光照公式单一来源，不复制）。
+function drawAccentShadowFor(accent, model) {
+  const kind = accent.kind;
   const skel = model.skeleton;
   if (!skel) return;
   const season = window.SimTreeTint.sample(accent, sim, model.evergreen ? 'evergreen' : undefined);

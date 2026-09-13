@@ -3,8 +3,8 @@
 // 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（地形格 / 侧壁 / 水系 /
 // 游鱼 / 波光 / 道路 / 辖区连线 / POI 底座与标记 / 房屋 / 地表装饰 / ★ 树灌木贴地投影 / 族人）
 // 与按相机深度远 → 近的分发落笔。**各图元的绘制逻辑不在本文件**（地形壳层 render_terrain.js、
-// 装饰 render_accents.js / render_grass.js / render_shadows.js、房屋与 POI render_world.js、
-// 族人 render_agents.js）——本文件只做入队、排序与分发，扩展队列项时勿把绘制搬进来。
+// 装饰 render_accents.js / render_grass.js / render_shadows.js、★ S4-02 景观 render_landscapes.js、
+// 房屋与 POI render_world.js、族人 render_agents.js）——本文件只做入队、排序与分发，扩展队列项时勿把绘制搬进来。
 //
 // ★ v1.50.11 世界统一深度队列：Canvas 2D 无深度缓冲，全部图元按 project3D().depth =
 //   ry·sinX + z·cosX 升序（远 → 近）落笔，同深度保持收集原序（Array.sort 稳定）——
@@ -14,7 +14,8 @@
 //   terrainProjX, terrainProjY, BOUNDARY_WALLS（render_terrain.js）、drawTerrainCell / drawFeatureItem /
 //   drawBoundaryWallSeg（render_terrain.js）、drawPoiGroundBase / drawPoiMarker / drawHouse /
 //   drawLaneSegment / drawCampHouseLink（render_world.js）、drawAccentEntity（render_accents.js）、
-//   drawAccentShadowGround（render_shadows.js）、drawAgent（render_agents.js）、RiverLife / window.RiverLife
+//   drawAccentShadowGround（render_shadows.js）、collectLandscapes / drawLandscapeChild /
+//   drawLandscapeShadowGround（render_landscapes.js，S4-02）、drawAgent（render_agents.js）、RiverLife / window.RiverLife
 
 // ★ v1.50.15 渲染表现层参数（视觉抬升 / 足迹深度半径），来源 config.render.js
 //   （前端独立配置，不进 SIM_CONFIG——config.js 与 Rust SimConfig 严格互检）。
@@ -45,6 +46,8 @@ const DEPTH_ACCENT = 9;    // 地表装饰（a = accent）
 const DEPTH_AGENT = 10;    // 族人（a = agent）
 const DEPTH_WALL = 11;     // ★ v1.50.14 边界侧壁分段（a = 墙定义，b = 段序号；深度 = 段上沿较近端顶点）
 const DEPTH_ACCENT_SHADOW = 12; // ★ TA-04-6 树/灌木贴地投影（地面图元，a = accent；深度 = 基点/影梢足迹深度取大）
+const DEPTH_LANDSCAPE = 13;        // ★ S4-02 资源景观立体子图元（a = LandscapeChild，landscape-model.js 派生）
+const DEPTH_LANDSCAPE_SHADOW = 14; // ★ S4-02 景观树/灌木子图元贴地投影（a = LandscapeChild；深度口径同 ACCENT_SHADOW）
 
 const _depthPool = [];     // 持久深度项对象池（零每帧 GC）
 const _depthList = [];     // 每帧重建的引用列表（仅含本帧使用的项）
@@ -404,6 +407,11 @@ function drawWorldEntities() {
     }
   }
 
+  // ── 6.6 资源景观（★ S4-02：LandscapeModel 派生组 → render_landscapes.js 入队）──
+  //   配方/缓存归 landscape-model.js、子图元绘制复用装饰图元归 render_landscapes.js；
+  //   配置关态（landscapeEnabled=false）collect 直接返回，零开销回退原画面路径。
+  collectLandscapes(cosZ, sinZ, cosX, sinX);
+
   if (sim.showAgents) {
     for (const agent of sim.agents || []) {
       if (agent.isFetus) continue; // ★ M1.7 胎儿无地图实体，不参与渲染
@@ -434,6 +442,8 @@ function drawWorldEntities() {
       case DEPTH_HOUSE: drawHouse(it.a); break;
       case DEPTH_ACCENT: drawAccentEntity(it.a); break;
       case DEPTH_ACCENT_SHADOW: drawAccentShadowGround(it.a); break;
+      case DEPTH_LANDSCAPE: drawLandscapeChild(it.a); break;
+      case DEPTH_LANDSCAPE_SHADOW: drawLandscapeShadowGround(it.a); break;
       default: drawAgent(it.a);
     }
   }

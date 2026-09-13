@@ -366,15 +366,24 @@ window.AccentModel = window.AccentModel || (function () {
   function get(accent) {
     const id = (accent && accent.id) || 0;
     const kind = (accent && accent.kind) || '';
-    const key = 'v' + styleVersion() + '#' + kind + '#' + id;
-    let m = _cache.get(key);
+    return getByKey(kind, id, 'v' + styleVersion() + '#' + kind + '#' + id);
+  }
+
+  // ★ S4-02 完整 key 通道（06 号文 §3.2「若复用 AccentModel.get()，须增加完整 key 通道」）：
+  // 景观子图元（landscape-model.js）等非 accent 来源的模型，由调用方提供**自带命名空间前缀
+  // 的完整缓存 key**（如 'L#v1#Tree#<hash>'）+ 稳定整数种子，与本文件 accent 缓存共用同一
+  // 缓存池与 resetCache 生命周期，但 key 命名空间隔离——**禁止**把字符串 key 截成可能与
+  // accent.id 碰撞的整数再走 get()。模型内容仍是 (kind, seed) 的纯函数。
+  function getByKey(kind, seed, fullKey) {
+    let m = _cache.get(fullKey);
     if (m !== undefined) return m;
+    const id = seed || 0;
     const vSeed = vSeedOf(id);
     m = {
       id: id,
-      kind: kind,
+      kind: kind || '',
       vSeed: vSeed,
-      evergreen: kind === 'Tree' || kind === 'Bush' ? evergreenOf(id) : false,
+      evergreen: (kind === 'Tree' || kind === 'Bush') ? evergreenOf(id) : false,
       skeleton: kind === 'Tree' ? treeSkeleton(id, vSeed)
         : kind === 'Bush' ? bushSkeleton(id, vSeed)
         : kind === 'RockCluster' ? rockClusterSkeleton(id, vSeed)
@@ -383,7 +392,7 @@ window.AccentModel = window.AccentModel || (function () {
       extent: extentOf(kind, vSeed),
     };
     if (_cache.size >= _CACHE_MAX) _cache.clear();
-    _cache.set(key, m);
+    _cache.set(fullKey, m);
     return m;
   }
 
@@ -394,6 +403,7 @@ window.AccentModel = window.AccentModel || (function () {
 
   return {
     get: get,
+    getByKey: getByKey, // ★ S4-02 完整 key 通道（景观等非 accent 来源模型，key 命名空间隔离）
     resetCache: resetCache,
     shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置）——返回新对象，兼容外部调用
     shearNormalInto: shearNormalInto, // ★ TA-11-6 零 GC 变体（写入调用方复用 out），热路径消费
