@@ -4,6 +4,7 @@ pub mod terrain;
 pub mod hydrology;
 pub mod corridor;
 pub mod accents;
+pub mod validation;
 
 pub use biome::{GeoCell, SurfaceKind};
 pub use query::{explain_failure, sample_cell, validate_footprint, FootprintQuery, LandUseKind, TerrainFailure, TerrainQueryResult};

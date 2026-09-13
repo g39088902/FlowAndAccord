@@ -9,7 +9,8 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出 |
-| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ §5.3 创世流水线编排器 `generate_with_config()`（0–9 步私有阶段，STAGE2-3 迁入）+ 第 2 步 `generate_base_relief`（山口起伏/草原/河谷低丘，原 `generate_with_profile`）+ 第 5 步子特征几何管线（5a 快照/5b 施加桩/5c 临时坡度/5d 接受回滚，阶段二空注入）+ 第 6 步 `finalize_slope_and_surface`（全图唯一定稿坡度与派生 flags）+ 第 7 步 `validate_static_terrain_geometry`（STAGE2-4 扩充）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征） |
+| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ §5.3 创世流水线编排器 `generate_with_config()`（0–9 步私有阶段，STAGE2-3 迁入）+ 第 2 步 `generate_base_relief`（山口起伏/草原/河谷低丘，原 `generate_with_profile`）+ 第 5 步子特征几何管线（5a 快照/5b 施加桩/5c 临时坡度/5d 接受回滚，阶段二空注入）+ 第 6 步 `finalize_slope_and_surface`（全图唯一定稿坡度与派生 flags）+ 第 7 步 `validate_static_terrain_geometry`（★ STAGE2-4 起薄分发至 `validation.rs`）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征） |
+| `validation.rs` | ★ STAGE2-4（v1.50.47）§5.3 第 7 步静态几何与稳定 ID 校验断言集：特征 ID 唯一/按 profile 归属与 kind 期望映射/顶点在界、子特征升序唯一+`feature_ids` 引用存在+accent 区间配对、水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）、取水点/授权走廊引用与边界、浅滩端点在陆侧、cells 水域归属与 NO_WALK/NO_BUILD 一致、装饰 ID 连续。**只读不修复、不重排既有生成顺序**；稳定失败码由 STAGE2-5 有界重试环消费（当前第 7 步暂丢弃 Err） |
 | `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ §5.3 第 3 步 `apply_profile_static_hydrology`（T2 主河水系覆盖；`plan_river_geometry` 共享几何） |
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |

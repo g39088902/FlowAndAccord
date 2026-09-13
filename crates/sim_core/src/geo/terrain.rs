@@ -1455,13 +1455,14 @@ impl TerrainMap {
 
     /// §5.3 第 7 步：静态几何校验。
     ///
-    /// ★ STAGE2-4 落地完整断言集（特征 ID 升序唯一、T2 水系 ID 范围保护、水体
-    /// 顶点双副本一致、浅滩端点合法性、边界安全与禁行/禁建一致性）；阶段二先
-    /// 接线已落地的稳定 ID 校验。失败 Err 由 STAGE2-5 有界重试环消费。
-    pub(crate) fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
-        self.validate_sub_features_sorted_unique()
-            .map_err(|_| "SubFeatureIdsUnsortedOrDuplicated")?;
-        Ok(())
+    /// ★ STAGE2-4 完整断言集已落地（断言实现见 `geo/validation.rs`）：特征 ID
+    /// 唯一/归属/kind 一致、子特征 ID 升序唯一 + 引用存在、水体轮廓双副本逐字节
+    /// 一致（主河水体 1 ↔ `River` 特征 1）、取水点/授权走廊引用与边界、浅滩端点
+    /// 在陆侧、cells 水域归属与 NO_WALK/NO_BUILD 一致。校验器只读不修复、
+    /// 不重排既有 `features` 生成顺序（T2 为 10、11、1、20、21、30，排序会改
+    /// 变快照字节）。失败 Err 由 STAGE2-5 有界重试环消费（本阶段仍不启用拒绝）。
+    pub fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
+        super::validation::validate_static_terrain_geometry(self)
     }
 
     /// §5.3 第 8 步：通用地表装饰散布（既有 accent_rng 独立流，消费顺序不变）。

@@ -308,16 +308,16 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 > **服务对象**：全部地图模板的创世流程——任何模板都必须按此顺序生成并满足「有效世界」底线。
 
 
-生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 相关的有界重试与生存诊断仍未消费。
+生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 相关的有界重试仍未消费（生存诊断已实现、未接拒绝，见下）。
 
 ```text
 种子 + 生成器版本 + 配置                    ✅
   → 主地貌骨架与高程（T0 基础 + T1 主脊/山口）✅
   → 排水方向、河道/湖盆、水位与出口（T2）    ✅
   → 通行表面、岸带与可建区域                ✅
-  → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；POI 生存距离校验未消费查询服务）
+  → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；生存诊断已可独立调用）
   → 合法导航走廊与贴地曲线路网              ✅
-  → 连通性、占地、资源距离校验              ◐（连通性/占地已通；生存诊断上限未接）
+  → 连通性、占地、资源距离校验              ◐（连通性/占地已通；静态几何校验已接线〔只读〕，拒绝接入待 STAGE2-5）
   → 固定世界事实与快照 → 地表装饰与美术     ✅
 ```
 
@@ -326,6 +326,13 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 **有效世界至少满足**：初始居民落在干燥可达区域；每个初始营地能到达所需水粮；全局关键资源和市场在预期陆路连通分量内；每个营地有配置规定的可建面积和扩张余量；必要资源路径成本不超过经生存诊断校准的上限。连通不等于能活下来，必须测往返时间与饥渴/体力消耗。
 
 候选搜索、同成本排序、重试次数和修复顺序必须固定。失败时只在初始化阶段按固定次序调整浅滩、缓坡或候选 POI，超过有界重试次数则使用通过校验的简化模板并记录原因；禁止无限重抽种子，禁止运行中移动居民来修复地形。
+
+### 8.1 静态几何校验与生存成本诊断（v1.50.47 · STAGE2-4/6）
+
+两套只读校验服务已落地，供创世流水线与将来的有界回退环消费；当前均**不触发拒绝**（第 7 步返回值暂被丢弃，STAGE2-5 接入重试环）。
+
+- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 连续。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。
+- **生存成本诊断**（`spatial/survival_diagnosis.rs::World3DEngine::diagnose_survival`）：按实际配置枚举营地 POI（不硬编码数量），逐营地一次单源 Dijkstra（微秒整型权重，确定性）检查水/粮/市场三类资源的路网可达与往返成本。成本口径与生产寻路一致（`terrain_time_cost` 软地/浅滩折算 + 上坡 `Δz×grade_coef` 坡度折算，车道限速按创世态磨损 0 的 `road_level_factor`）；预算由现有配置推导、无新增超参：资源点与家宅两端可满仓自饮自食 ⇒ 往返允许 `2×capacity/代谢速率`（名义消化效率 1.0），市场口径同粮。输出 `SurvivalReport{camps, ok, worst_code}` 与每营地 `ResourceLinkReport{poi_id, round_trip_cost_s, budget_s}`；失败码 `SpawnDisconnected` / `SurvivalCostExceeded`。⚠️ `NodeId` 从 1 起、petgraph `NodeIndex` 从 0 起，查距必须经 `node_map` 映射；矩阵校准（v1.50.47）：4 profile × seed 0–59 全通过，市场往返最远 441.7s（预算 500s）。
 
 ## 9. 确定性创世与各地图模板的生成实现
 
