@@ -569,10 +569,50 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   }
 }
 
-// GrassTuft：3–6 根短草线（D-B1-6，06 号 §5.5）。
-// 颜色由前端按当前季节派生（同 Tree：SimTreeTint 连续季相，不读存档 tint，14 号 §7.4）；
-// 草叶不脱落——冬季以「低矮 + 枯色」表达（07 号 §6.6 目标：嫩绿→深绿→枯黄→冬季低矮枯草），
-// 叶高随 leafDensity 在冬季保底系数（config.render.js，TA-11-3）~1.0 倍收缩，隆冬枯草仍在场。
+// ★ TA-11-4 草丛季相色派生（纯函数，只依赖 SimTreeTint 季节样本输出；07 号 §6.3/§6.6）：
+// 春嫩绿萌发（budAmount 向芽色提亮）→ 夏深绿繁茂（叶色直出）→ 秋金黄枯赭（叶色直出 +
+// 枯萎混合启动）→ 冬灰枯褐（枯萎深度 = brownness×(1−叶量)，隆冬收敛至 rgb(95,88,70)，
+// 草叶不脱落）。芦草穗（plume）量随秋枯升起（brownness 0.35→0.8 渐升，flowerAmount
+// 叠加为配置预留通道），秋季淡黄白高光 → 隆冬按 litterAmount 转干灰，残穗挺立不消失。
+// 暂停/回溯/读档零抖动：颜色是季节样本的连续函数，无逐帧累积状态。
+function grassSeasonColor(season) {
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const lc = season.leafColor;
+  // 草色：季相连续叶色向草绿微偏（草比树叶更黄绿），浮点直出不做色档量化
+  let r = lc[0] * 0.96 + 10;
+  let g = lc[1] * 1.02 + 4;
+  let b = lc[2] * 0.88;
+  // 春季芽苞（§6.3）：budAmount 向嫩芽绿 (198,216,130) 提亮，隐现不抢眼
+  const budK = clamp01(season.budAmount) * 0.35;
+  r += (198 - r) * budK;
+  g += (216 - g) * budK;
+  b += (130 - b) * budK;
+  // 秋冬枯萎（§6.6「冬季低矮枯草」）：枯萎深度 = brownness×(1−叶量)×1.35（增益保证
+  // 隆冬叶量 ~0.03 时枯萎深度达 1，精确收敛枯褐色 rgb(95,88,70)；秋季仅尾部轻度混入）
+  const witherK = clamp01(clamp01(season.brownness) * (1 - clamp01(season.leafDensity)) * 1.35);
+  r += (95 - r) * witherK;
+  g += (88 - g) * witherK;
+  b += (70 - b) * witherK;
+  // 芦花穗量：秋枯进程驱动（brownness 0.35 起显 → 0.8 全开），flowerAmount 叠加预留
+  const plumeV = Math.max(season.flowerAmount || 0, clamp01((season.brownness - 0.35) / 0.45));
+  // 穗色：秋季淡黄白高光 (240,233,200) → 隆冬干灰白 (190,182,158)，litterAmount 渐变
+  const litterK = clamp01(season.litterAmount);
+  return {
+    r: r, g: g, b: b,
+    plumeV: clamp01(plumeV),
+    plumeR: 240 + (190 - 240) * litterK,
+    plumeG: 233 + (182 - 233) * litterK,
+    plumeB: 200 + (158 - 200) * litterK,
+  };
+}
+
+// GrassTuft：3–6 根短草线（D-B1-6，06 号 §5.5）；★ TA-11-4 芦草变体与季相深化。
+// 颜色由前端按当前季节派生（同 Tree：SimTreeTint 连续季相，不读存档 tint，14 号 §7.4），
+// 季相公式单一来源 = grassSeasonColor（本文件上方，07 号 §6.3/§6.6）；
+// 草叶不脱落——冬季以「低矮 + 枯色」表达（hK 隆冬收缩系数，config.render.js TA-11-3），
+// 隆冬枯草与芦秆仍在场，严禁整丛消失或纯透明。
+// 芦草（模型层 skeleton.isReed）：挺拔株形 + 顶端穗状芦花——穗量/穗色由 grassSeasonColor
+// 给出，穗几何沿叶曲线末端方向延伸（屏幕空间，画家排序与所在草叶一致）。
 function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const rot = accent.rotation || 0;
@@ -593,11 +633,8 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     };
   }
 
-  // 草色：季相连续叶色向草绿微偏（草比树叶更黄绿），浮点直出不做色档量化
-  const lc = season.leafColor;
-  const gr = Math.max(0, Math.min(255, lc[0] * 0.96 + 10));
-  const gg = Math.max(0, Math.min(255, lc[1] * 1.02 + 4));
-  const gb = Math.max(0, Math.min(255, lc[2] * 0.88));
+  // 草色 + 芦花穗量/穗色：季相派生单一入口 grassSeasonColor（TA-11-4，见本文件上方）
+  const sc = grassSeasonColor(season);
 
   // 贴地接触投影（弱于灌木）
   const so = (typeof lightShadowOffset === 'function')
@@ -629,14 +666,40 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     const c = proj(it.bx + (it.tx - it.bx) * 0.25, it.by + (it.ty - it.by) * 0.25, it.h * 0.5);
     const k = 0.86 + 0.28 * it.b.lite; // 个体色差（同 Tree/Bush lite 通道语义）
     ctx.strokeStyle = 'rgb(' +
-      Math.round(Math.max(0, Math.min(255, gr * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, gg * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, gb * k))) + ')';
-    ctx.lineWidth = Math.max(0.5, 0.62 * scaled);
+      Math.round(Math.max(0, Math.min(255, sc.r * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, sc.g * k))) + ',' +
+      Math.round(Math.max(0, Math.min(255, sc.b * k))) + ')';
+    // 芦秆略细挺（0.52 vs 0.62），与普通短草区分茎秆质感
+    ctx.lineWidth = Math.max(0.5, (it.b.plume > 0 ? 0.52 : 0.62) * scaled);
     ctx.beginPath();
     ctx.moveTo(p0.x, p0.y);
     ctx.quadraticCurveTo(c.x, c.y, p1.x, p1.y);
     ctx.stroke();
+    // ★ TA-11-4 穗状芦花：沿叶曲线末端方向的三笔花序线段（主穗顺叶弯挺出 + 两侧短穗）。
+    //   穗量 plumeV 秋枯升起、隆冬存留（干灰色），几何随隆冬 hK 收缩；
+    //   远景穗屏长 < 2px 不可辨直接省略；画家排序与所在草叶一致（叶压穗/穗压叶自然）。
+    if (it.b.plume > 0 && sc.plumeV > 0.02) {
+      const pl = it.b.plume * hK * scaled;
+      if (pl >= 2) {
+        const dx0 = p1.x - c.x, dy0 = p1.y - c.y;
+        const dl = Math.hypot(dx0, dy0) || 1;
+        const pa = Math.atan2(dy0 / dl, dx0 / dl);
+        ctx.strokeStyle = 'rgba(' +
+          Math.round(Math.max(0, Math.min(255, sc.plumeR))) + ',' +
+          Math.round(Math.max(0, Math.min(255, sc.plumeG))) + ',' +
+          Math.round(Math.max(0, Math.min(255, sc.plumeB))) + ',' +
+          (0.8 * sc.plumeV).toFixed(3) + ')';
+        ctx.lineWidth = Math.max(0.5, 0.9 * scaled);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p1.x + Math.cos(pa) * pl, p1.y + Math.sin(pa) * pl);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p1.x + Math.cos(pa + 0.45) * pl * 0.6, p1.y + Math.sin(pa + 0.45) * pl * 0.6);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p1.x + Math.cos(pa - 0.5) * pl * 0.5, p1.y + Math.sin(pa - 0.5) * pl * 0.5);
+        ctx.stroke();
+      }
+    }
   }
   ctx.lineCap = 'butt';
 }

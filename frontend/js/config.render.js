@@ -76,7 +76,7 @@ window.RENDER_CONFIG = {
 
   // —— 局部三维植被骨架（TA-03，v1.50.25；补位簇夹紧枝端修复 v1.50.26；见 §6.2/6.4）——
   // 模型/叶簇/枝干为 accent.id 稳定哈希派生，不进快照；accent-model.js 消费。
-  accentModelStyleVersion: 3,   // 骨架模型风格版本：调值即整体重建模型缓存（§10.2 缓存键契约）
+  accentModelStyleVersion: 4,   // 骨架模型风格版本：调值即整体重建模型缓存（§10.2 缓存键契约；TA-11-4 芦草骨架形态变更 3→4）
   accentDetailNearPx: 15,     // 近景：二级枝、簇高光、春芽
   accentDetailMidPx: 7,       // 中景：主枝与全部叶簇；远景只保留树形与叶量
   accentLeafClustersTree: 16, // 每棵树稳定叶簇数（§6.4 建议 12~24；由 id 派生，不进快照）
@@ -104,7 +104,14 @@ window.RENDER_CONFIG = {
   accentGrassTuftBaseSpread: 0.8,         // 根部聚拢半径基准（世界米）
   accentGrassTuftBaseSpreadVar: 0.9,      // 根部离锚点距离随机幅度（0.8~1.7m）
   accentGrassTuftWinterHeightRatio: 0.62, // 隆冬低矮萎缩保底高度系数（0.62+0.38×叶量）
-  accentGrassTuftReedChance: 0.35,        // 水岸/河阶派生芦草外观的概率（TA-11-4 芦草变体消费）
+  // —— 芦草变体（TA-11-4，07 号 §6.6「水岸可派生芦草外观」）——
+  // accent-model.js::grassTuftSkeleton 消费：稳定哈希 < ReedChance 派生 isReed；
+  // 穗量/季相枯色由 render_accents.js::grassSeasonColor 按季节样本驱动（几何不随季节变）。
+  accentGrassTuftReedChance: 0.35,        // 芦草变体派生概率（验收口径：近景约 30%~40% 草丛带穗）
+  accentGrassTuftReedHeightBase: 4.2,     // 芦草基准株高下限（世界米）
+  accentGrassTuftReedHeightVar: 1.8,      // 芦草株高随机幅度（4.2~6.0m，挺拔高于普通短草）
+  accentGrassTuftPlumeLenBase: 0.9,       // 穗状芦花长度下限（世界米）
+  accentGrassTuftPlumeLenVar: 0.6,        // 穗长随机幅度（0.9~1.5m）
 
   // —— 世界光向动态受光（TA-04，lighting.js 消费）——
   sunScreenEps: 0.02,         // 屏幕光心退化半径：光向接近视线（投影 len < eps）时亮部按 len/eps 平滑回冠心（lighting.js::sunScreenDirFull，TA-04-1 迁入）

@@ -16,7 +16,7 @@
 | **TA-11-1** | 内核生成规则与独立加盐 RNG 审计 | `crates/sim_core/src/geo/accents.rs` | 低 | — | ✅ 已建基线 |
 | **TA-11-2** | FABS 二进制快照与枚举字典全链路闭环核对 | `dict.rs` / `snapshot.rs` / `encode.rs` / `snapshot-bin.js` | 低 | TA-11-1 | ✅ 已建基线 |
 | **TA-11-3** | 渲染表现层配置集中化与魔数解耦 | `config.render.js` / `accent-model.js` / `render_accents.js` | 低 | TA-11-2 | ✅ 已落地（v1.50.34） |
-| **TA-11-4** | 草丛生态形态扩展：水岸芦草变体与季相微调 | `accent-model.js` / `render_accents.js` / `config.render.js` | 中 | TA-11-3 | ⏳ 待实施 |
+| **TA-11-4** | 草丛生态形态扩展：水岸芦草变体与季相微调 | `accent-model.js` / `render_accents.js` / `config.render.js` | 中 | TA-11-3 | ✅ 已落地 |
 | **TA-11-5** | 碎石群地貌表现升级：微接触阴影与岩面分层 | `render_accents.js` / `config.render.js` | 低 | TA-11-3 | ⏳ 待实施 |
 | **TA-11-6** | 渲染热路径零 GC 改造与缓存生命周期审计 | `render_accents.js` / `accent-model.js` / `rustworld.js` | 中 | TA-11-4、TA-11-5 | ⏳ 待实施 |
 | **TA-11-7** | Chrome 端到端四季视觉与动态操作验收 | 前端视口 / 浏览器交互环境 | 中 | TA-11-6 | ⏳ 待实施 |
@@ -121,6 +121,7 @@
   - 推进四季（春→夏→秋→冬），草丛经历「嫩绿 → 葱绿 → 金黄带白穗 → 矮萎枯草」的平滑过渡；
   - 暂停模拟、拖动镜头或回溯历史 Tick，草丛形态与颜色零抖动、零跳变。
 - **依赖**：TA-11-3。
+- **落地记录**：✅ 已落地。`accent-model.js::grassTuftSkeleton` 以稳定哈希 `_accentHash(id,720) < accentGrassTuftReedChance` 派生 `isReed`——芦草株高 4.2~6.0m（新配置键 `accentGrassTuftReedHeightBase/Var`）、叶尖外倾收敛至 0.14~0.34、每叶带穗长 `plume`（`accentGrassTuftPlumeLenBase/Var`，0.9~1.5m，非芦草恒 0），哈希通道 716+i×5 独立无碰撞；`render_accents.js` 新增季相色纯函数 `grassSeasonColor(season)`——春芽提亮（budAmount→嫩芽绿 35% 混合）→ 夏深绿 → 秋枯赭（枯萎深度 = brownness×(1−叶量)×1.35）→ 隆冬精确收敛 `rgb(95,88,70)`，芦花穗量随 brownness 0.35→0.8 渐升（flowerAmount 叠加预留）、穗色按 litterAmount 由淡黄白 `(240,233,200)` 转干灰 `(190,182,158)`、隆冬残穗挺立，穗几何为叶曲线末端三笔花序线段（随隆冬 hK 收缩，远景屏长 <2px 省略），芦秆线宽 0.52 略细于短草 0.62；`config.render.js` `accentModelStyleVersion` 3→4（芦草骨架形态变更即整体重建缓存）。临时断言（§4.10 已删）验证 2000 id 芦草比例 0.346（30%~40% 带内）、株高/穗长区间、清缓存重建逐位一致、四季颜色收敛与年环步进 ≤4.03、绘制冒烟通过；门禁 `frontend-check` / `config-check` 全绿（纯前端变更，未动 Rust/WASM）。
 
 ---
 

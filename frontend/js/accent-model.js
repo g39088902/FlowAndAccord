@@ -18,6 +18,10 @@
 //   椭球梯度归一化，id 纯函数入骨架缓存）+ 倾干剪切逆转置变换 shearNormal（依赖
 //   accent.rotation，由绘制层每帧施加）；受光公式单一来源仍归 lighting.js。
 //
+// ★ TA-11-4 GrassTuft 芦草变体（07 号 §6.6）：稳定哈希 `accentGrassTuftReedChance` 派生
+//   isReed——株高 4.2~6.0m、叶尖更收敛、顶端穗状芦花 plume 长度（几何 id 纯函数）；
+//   穗量/季相颜色由绘制层按 SimTreeTint 季节样本驱动，模型层不读季节。
+//
 // 契约（frontend/AGENTS.md §5.11 / 07-terrain-art.md §10.2）：
 // - 纯表现层：不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
 // - 模型值是 accent.id 的**纯函数**——缓存与否、何时失效都不改变像素结果，
@@ -284,11 +288,14 @@ window.AccentModel = window.AccentModel || (function () {
     return { spread: spread, stones: stones };
   }
 
-  // ── GrassTuft（D-B1-6，06 号 §5.5）：3–6 根短草线 ──
+  // ── GrassTuft（D-B1-6，06 号 §5.5）：3–6 根短草线；★ TA-11-4 水岸芦草变体 ──
   // 每根草叶：根部偏移 (bx,by) + 叶尖水平外倾 (tx,ty) + 叶高 h（世界单位，低于灌木）。
   // 叶数/株高/根部聚拢参数走 config.render.js（TA-11-3），缺省回退与原硬编码逐位一致。
-  // 颜色由绘制层按当前季节派生（同 Tree：SimTreeTint，不读存档 tint）；
-  // lite 为个体色差通道。草叶形态是 id 纯函数，暂停/读档/回溯逐位重建。
+  // ★ TA-11-4（07 号 §6.6「水岸可派生芦草外观」）：稳定哈希 `_accentHash(id,720) <
+  // accentGrassTuftReedChance` 派生芦草变体——茎秆挺拔更高（4.2~6.0m）、叶尖外倾更收敛
+  // （株形直立即芦苇荡读感）、每叶顶端带穗状芦花 plume 长度（世界单位；穗量/颜色由绘制层
+  // 按季节驱动，几何不随季节变化）。变体标志与全部几何是 id 纯函数，暂停/读档/回溯逐位重建。
+  // 颜色由绘制层按当前季节派生（同 Tree：SimTreeTint，不读存档 tint）；lite 为个体色差通道。
   function grassTuftSkeleton(id, vSeed) {
     const cfg = window.RENDER_CONFIG || {};
     const minBlades = cfgNum(cfg.accentGrassTuftMinBlades, 3);
@@ -298,6 +305,11 @@ window.AccentModel = window.AccentModel || (function () {
     const hVar = cfgNum(cfg.accentGrassTuftHeightVar, 1.6);
     const baseSpread = cfgNum(cfg.accentGrassTuftBaseSpread, 0.8);
     const baseSpreadVar = cfgNum(cfg.accentGrassTuftBaseSpreadVar, 0.9);
+    const isReed = _accentHash(id, 720) < cfgNum(cfg.accentGrassTuftReedChance, 0.35); // 芦草变体（TA-11-4）
+    const reedHBase = cfgNum(cfg.accentGrassTuftReedHeightBase, 4.2);
+    const reedHVar = cfgNum(cfg.accentGrassTuftReedHeightVar, 1.8);
+    const plumeLenBase = cfgNum(cfg.accentGrassTuftPlumeLenBase, 0.9);
+    const plumeLenVar = cfgNum(cfg.accentGrassTuftPlumeLenVar, 0.6);
     const blades = [];
     for (let i = 0; i < n; i++) {
       const h1 = _accentHash(id, 710 + i * 5);
@@ -308,17 +320,20 @@ window.AccentModel = window.AccentModel || (function () {
       const base = baseSpread + h4 * baseSpreadVar; // 根部离锚点距离（簇底不完全重叠）
       const bx = Math.cos(ang) * base;
       const by = Math.sin(ang) * base;
-      const h = hBase + h2 * hVar;       // 叶高 2.4~4.0（短草线）
-      const leanK = 0.30 + h3 * 0.45;    // 叶尖外倾比例
+      // 芦草：挺拔更高（4.2~6.0m）+ 叶尖外倾更收敛；普通短草维持 2.4~4.0m 原公式
+      const h = isReed ? reedHBase + h2 * reedHVar : hBase + h2 * hVar;
+      const leanK = isReed ? 0.14 + h3 * 0.20 : 0.30 + h3 * 0.45; // 叶尖外倾比例
       blades.push({
         bx: bx, by: by,
         tx: bx + Math.cos(ang) * h * leanK,
         ty: by + Math.sin(ang) * h * leanK,
         h: h,
         lite: _accentHash(id, 714 + i * 5),
+        // 穗状芦花长度（世界单位；非芦草恒 0）。哈希通道 716+i*5 与叶身 710+i*5 独立
+        plume: isReed ? plumeLenBase + _accentHash(id, 716 + i * 5) * plumeLenVar : 0,
       });
     }
-    return { blades: blades };
+    return { blades: blades, isReed: isReed };
   }
 
   // 锚点上方最大延伸（世界单位，未乘 zoom）——TA-07 包围体剔除的预留字段。
