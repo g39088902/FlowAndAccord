@@ -308,16 +308,16 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 > **服务对象**：全部地图模板的创世流程——任何模板都必须按此顺序生成并满足「有效世界」底线。
 
 
-生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 相关的有界重试与生存诊断仍未消费。
+生成流程如下。**T0/T1/T2/D-A 部分已实现**，标注 ✅ 的步骤为当前真实链路；`terrain_generation_max_retries` 有界降级环已落地（v1.50.49，`creation_fallback.rs`）：`new_seeded_with_config_bounded` 每次构建独立候选（生态播撒后）依次过静态几何校验、路网校验与生存诊断门禁，失败按 §5.8 阶梯降级（禁结构子特征 → 移除支脊 → `flat_baseline`），预算耗尽或无新策略返回错误；局部拒绝随阶段三几何事务注入启用。
 
 ```text
 种子 + 生成器版本 + 配置                    ✅
   → 主地貌骨架与高程（T0 基础 + T1 主脊/山口）✅
   → 排水方向、河道/湖盆、水位与出口（T2）    ✅
   → 通行表面、岸带与可建区域                ✅
-  → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；POI 生存距离校验未消费查询服务）
+  → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；生存诊断已可独立调用）
   → 合法导航走廊与贴地曲线路网              ✅
-  → 连通性、占地、资源距离校验              ◐（连通性/占地已通；生存诊断上限未接）
+  → 连通性、占地、资源距离校验              ✅（v1.50.49 起接入创世门禁链 + 有界降级环）
   → 固定世界事实与快照 → 地表装饰与美术     ✅
 ```
 
@@ -327,6 +327,36 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 候选搜索、同成本排序、重试次数和修复顺序必须固定。失败时只在初始化阶段按固定次序调整浅滩、缓坡或候选 POI，超过有界重试次数则使用通过校验的简化模板并记录原因；禁止无限重抽种子，禁止运行中移动居民来修复地形。
 
+### 8.1 静态几何校验与生存成本诊断（v1.50.47 · STAGE2-4/6）
+
+两套只读校验服务已落地，自 STAGE2-5（v1.50.49）起由世界初始化事务消费：静态几何校验在创世第 7 步运行、失败码以 `Geometry:` 前缀进入有界降级环（§8.2）；生存诊断在候选生态播撒后运行、失败码以 `Survival:` 前缀进入同一环。诊断本身保持 `&self` 只读、不改变世界。
+
+- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 连续。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。
+- **生存成本诊断**（`spatial/survival_diagnosis.rs::World3DEngine::diagnose_survival`）：按实际配置枚举营地 POI（不硬编码数量），逐营地一次单源 Dijkstra（微秒整型权重，确定性）检查水/粮/市场三类资源的路网可达与往返成本。成本口径与生产寻路一致（`terrain_time_cost` 软地/浅滩折算 + 上坡 `Δz×grade_coef` 坡度折算，车道限速按创世态磨损 0 的 `road_level_factor`）；预算由现有配置推导、无新增超参：资源点与家宅两端可满仓自饮自食 ⇒ 往返允许 `2×capacity/代谢速率`（名义消化效率 1.0），市场口径同粮。输出 `SurvivalReport{camps, ok, worst_code}` 与每营地 `ResourceLinkReport{poi_id, round_trip_cost_s, budget_s}`；失败码 `SpawnDisconnected` / `SurvivalCostExceeded`。⚠️ `NodeId` 从 1 起、petgraph `NodeIndex` 从 0 起，查距必须经 `node_map` 映射；矩阵校准（v1.50.47）：4 profile × seed 0–59 全通过，市场往返最远 441.7s（预算 500s）。
+
+### 8.2 世界初始化事务、有界降级与阶段二收口记录（v1.50.49 · STAGE2-5/8）
+
+**有界构造器**（`spatial/creation_fallback.rs::World3DEngine::new_seeded_with_config_bounded`）包住完整生成链：每个候选从冻结配置克隆 + 策略施加全新构建（`build_candidate`），`prepare` 钩子内完成 camp_count 覆盖与 `seed_primitive_ecology`（★ 路网/生存门禁必须在**已播撒生态**的候选上运行），门禁链 = 静态几何（§8.1，`Geometry:` 前缀）→ 路网读档校验（`RoadNetwork:` 前缀）→ 生存诊断（`Survival:` 前缀）；全部通过才发布。失败候选整体丢弃（RNG/计数器/POI/路网/缓存不污染最终世界）；降级阶梯（禁结构子特征 → 移除可选支脊 → `flat_baseline`）与策略键去重、预算语义按 [06 号 §5.8](../../plan/tech/06-terrain-templates.md) 执行。诊断 `WorldCreationDiagnostic` 附着 `World3DEngine::creation_diagnostic`（进程内事实，不入存档），降级发布经 `last_event` 事件流明示；WASM `world_create` 失败返回 1 + `world_last_error_*`。旧无失败语义入口 `new_seeded_with_config` 保留给探针/图鉴（纯地形候选只跑几何门禁；降级耗尽兜底直建基线并标记 `legacy_fallback`）。
+
+**STAGE2-8 收口差分记录（2026-09-13，合法基线等价验收）**：
+
+- **基准/候选**：基准 = `5527a9e`（v1.50.44，TB-01 收官 + S7-02 草原合流后、STAGE2-3 流水线重构之前，包含全部已交付物理变更；禁用 v1.50.38 旧 T1 当基线）；候选 = `c6a59f7`（v1.50.49）。两侧均为 release 原生构建直跑同版探针。
+- **WASM SHA256**：基准侧 `24c3442237e039830273df4750e72dd9dae9ec537ff1f2d360a388f49867c753`；候选侧 `d7d5f3bf942f8e3abe712ec0358ba88a5899a34b62637666b00048a3154b2302`（`frontend/rust/` + `frontend/` 双副本一致）。
+- **配置**：`crates/sim_core/examples/config.json` 在两提交间零差异（探针冻结配置）。
+- **差分字段**：高程/坡度/地表/flags/肥力/水系（水体+取水点+授权走廊+特征轮廓）/POI/路网（节点+车道拓扑与剖面）FNV-1a 逐位指纹；装饰 accents 不在字段内（S7-03 草甸装饰属表现层演进而非阶段二物理面，与分层验收边界一致）。
+- **结果**：T1/T2 × seed 0–59 × 支脊两态共 240 组，seed 级指纹与 4 组聚合指纹**基准=候选逐位全等**——山口开 `c9cc1c523bf1261e`、山口关 `846cb23e831e92c0`、河谷 `1f0907f71ed73ff1`（两态同值，支脊仅山口生效）。
+
+**新增拒绝/降级行为统计（生产路径 `bounded` + prepare，冻结配置，seed 0–59 × 4 profile）**：
+
+| 类别 | 数量 | 明细 |
+| :--- | :--- | :--- |
+| 首次通过 | 240/240 | 全部 `first_try`（默认配置下新门禁不拒绝任何合法基线世界） |
+| 特征未注入（局部拒绝） | 0 | 阶段二注入器为空 ⇒ 结构子特征掩码恒空，代码事实；随阶段三注入启用 |
+| 降级成功 | 231/240 | `terrainMaxWalkSlope=1.9°` 只放行倾斜-only 基线：山口/河谷/半坡各 60/60 降级、草原 51/60 降级；全部发布至 `flat_baseline`（`degraded=true`），最多 3 次尝试。草原 9 个首过种子 = 3/10/26/35/44/45/50/52/55 |
+| 初始化失败 | 239/240 | `agentThirstCapacity=1.0`（生存预算骤缩至 10s）令全阶梯不可过：239 个 `no_new_strategy`（山口阶梯 3 策略、河谷 2、基线 1，尝试次数 1~3）；仅河谷 seed 31 首过（极近邻生存链恰好落在预算内，属合法世界） |
+
+**三项遗留门禁销项**：生存诊断 ✅（v1.50.47 交付 + v1.50.49 拒绝接入）；flat_baseline 等价 ✅（旧 T0 基准缺口已声明、新冻结基准 v1.50.48〔WASM `e4f71187…`、基线指纹 `c71c4f8abbe18b7b`〕+ 本节收口对拍）；有界回退 ✅（v1.50.49 落地 + 本节统计）。验收全程使用临时探针，已按根 AGENTS.md §4.10 提交前删除，无持久化测试入库。
+
 ## 9. 确定性创世与各地图模板的生成实现
 
 > **服务对象**：已落地模板（T1/T2）的生成实现；新增模板的生成器按同一套 RNG 分域与版本门禁接入。
@@ -334,7 +364,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 ### 9.1 RNG 分域与 Profile 模板选择
 
-✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 5`（v1.50.41 TB-01 多尺度噪声与支脊系统后递增；此前 v1.50.17 为 4、v1.47.7 为 3）：
+✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 7`（v1.50.48 STAGE2-7 新增 `flat_baseline` 分支后递增；此前 v1.50.46 为 6〔S7-04 半坡〕、v1.50.40/41 为 5〔S7-02 草原 / TB-01〕、v1.50.17 为 4、v1.47.7 为 3）：
 
 ```text
 terrain_seed = seed
@@ -347,10 +377,11 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'` 或 `'grassland_plain_v1'`）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'` 或 `'flat_baseline'`）。
 - 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支：
   `(seed ^ 0x5052_4F46_494C_4531)` 对 2 取模为 0 → 实例化为 `mountain_pass_v1`（T1 山口聚落）；
   否则 → 实例化为 `river_valley_v1`（T2 两岸河谷）。
+  ★ `flat_baseline`（STAGE2-7 显式诊断/降级基线，倾斜-only 平地）**永不参与 random 分派**，只能显式指定；它是 STAGE2-5 有界回退环的显式降级目标，支持存读档续演（存档 profile 白名单已放行）。
 - ⚠️ **这是种子奇偶而非哈希**：取模 2 只取 `seed ^ 盐值` 的最低位，盐值 LSB 为 1，等价于「种子为奇数 → T1、偶数 → T2」。连续种子会**严格交替**，不是随机轮换。若要真正的分散，应改为 `mix64(seed ^ salt)` 后取模 2（或取模 100 后判 `< 50`）——但这会改变既有种子的映射，需随 `TERRAIN_GENERATOR_VERSION` 一并递增。
 - 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时两套地貌按 ~50% 概率自然轮换。
 

@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.49';
+        this._appVersion = '1.50.50';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.49';
+            this._appVersion = msg.appVersion || '1.50.50';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -377,12 +377,10 @@
         return this.marriages.filter(m => m.husbandId === numId || m.wifeId === numId);
       }
 
-      // ============ 引擎驱动 (Web Worker 异步解耦) ============
       tick() {
         // 仿真由 Worker 独立线程按 speedMult 自主推进与节流投递，主线程 tick 保持零阻塞
       }
 
-      // ============ 🐞 调试统计 ============
       getDebugStats() {
         const mem = (typeof performance !== 'undefined' && performance.memory) ? performance.memory : null;
         const isStalled = !this._isPaused && this._lastSnapshotRealTime && (performance.now() - this._lastSnapshotRealTime > 1500);
@@ -428,7 +426,6 @@
         }
       }
 
-      // ============ 💾 读档 / 存档 (v1.7.0 / v1.38.0 Worker 适配) ============
 
       /** 读取内核最近一次存档/读档错误文本（无错误返回空串） */
       readSaveError() {
@@ -440,7 +437,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.49';
+        return this._appVersion || '1.50.50';
 
       }
 
@@ -496,7 +493,6 @@
         });
       }
 
-      // ============ ⏪ 时光倒流控制器支持 ============
       _recordHistoryCheckpoint() {
         // 历史检查点由 Worker 在步进时自主录制与管理，主线程免重复开销
       }
@@ -554,7 +550,6 @@
         while (list.children.length > 8) list.removeChild(list.firstChild);
       }
 
-      // ============ 快照拉取与视图映射 ============
       _pullSnapshot(forceTerrain) {
         if (this._worker && forceTerrain) {
           this._worker.postMessage({ type: 'REQUIRE_TERRAIN' });

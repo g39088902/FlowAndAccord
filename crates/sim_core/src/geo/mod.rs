@@ -4,8 +4,9 @@ pub mod terrain;
 pub mod hydrology;
 pub mod corridor;
 pub mod accents;
+pub mod validation;
 
 pub use biome::{GeoCell, SurfaceKind};
 pub use query::{explain_failure, sample_cell, validate_footprint, FootprintQuery, LandUseKind, TerrainFailure, TerrainQueryResult};
-pub use terrain::{BranchRidge, TerrainFeature, TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY};
+pub use terrain::{BranchRidge, GenesisOverrides, TerrainFeature, TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_FLAT_BASELINE, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY};
 pub use accents::{AccentKind, TerrainAccent, ACCENT_RNG_SALT};

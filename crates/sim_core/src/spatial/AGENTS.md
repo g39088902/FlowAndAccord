@@ -42,6 +42,8 @@
 | `world_season.rs` | ~40 | 四季更迭与宏观环境温度演化（正弦周期拟合） | tick 调度（在 world_tick.rs） |
 | `world_save.rs` | ~205 | **读档/存档契约（v1.8.0）**：`WorldSave` 全量状态结构体 + `to_save()` + `serialize_save()` / `deserialize_save()`（格式版本门禁 + 参数校验 + agent id 唯一性校验 + 按 seed 重建地形 + `rebuild_agent_index()`） | 各实体自身的 serde 实现（在各自文件：`graph.rs` 手写路网 serde、`poi.rs` 的 `finite_f32` 助手、`rng.rs` 的 WorldRng） |
 | `terrain_network.rs` | ~111 | ★ v1.47.4 地形感知路网（`impl World3DEngine`）：`legal_land_position` 合法陆位搜索（走廊校验 + POI 最小间距）／`prepare_terrain_layout` POI 与河岸取水点落位 + 共享水池初始化／`connect_terrain_world` 浅滩跨水接入 + 稳定近邻骨架与连通分量补边／`commit_terrain_path` 走廊路径提交（★ v1.50.17 起提交前按 `corridor::validate_curve` 前置复核整条折线，全部通过才落盘，返回 bool）并写 `LaneTerrainProfile`（坡度/地表掩码/通行代价/浅滩授权）／`validate_terrain_world` **读档**全图车道校验 + POI 可达性（创世不自检，靠前置复核保证）／`sync_water_pois` 水池→POI 储量同步 | 图结构与 A* 本身（在 graph.rs）、走廊合法性原语（在 geo/corridor.rs）、水池再生（在 ecology/tick.rs） |
+| `creation_fallback.rs` | ~310 | ★ STAGE2-5（v1.50.49）世界初始化事务与有界降级集成：`new_seeded_with_config_bounded`（`prepare` 钩子内完成 camp_count 覆盖与 `seed_primitive_ecology`）每候选依次过静态几何 → 路网 → 生存诊断门禁（失败码 `Geometry:`/`RoadNetwork:`/`Survival:` 前缀），失败按 §5.8 阶梯降级（禁结构子特征〔`GenesisOverrides` 掩码，经 `generate_with_config_overrides` 过滤第 4 步规划、不触碰 RNG〕→ 移除支脊 → `flat_baseline`）；候选完全隔离（冻结配置克隆 + 全新 `WorldRng(seed)`，同策略同 seed 复现）；`WorldCreationDiagnostic` 记录 requested/effective/attempts/end_reason 附着 `creation_diagnostic`（不入存档），降级发布经 `last_event` 明示；0/预算耗尽/无新策略明确返回 Err | 拒绝策略细节调参（§5.8 权威）、局部拒绝（随阶段三几何事务启用）、存档序列化（在 world_save.rs） |
+| `survival_diagnosis.rs` | ~250 | ★ STAGE2-6（v1.50.47）生存连通与往返成本诊断（`impl World3DEngine::diagnose_survival`，**独立只读**，不接拒绝/重试）：按实际配置枚举 `Camp` POI（不硬编码数量），逐营地单源 Dijkstra（微秒整型权重）检查水（清泉∪榷场）/粮（浆果∪榷场）/市场路网可达 + 往返成本（口径复用生产寻路：`terrain_time_cost` 软地/浅滩折算 + `Δz×grade_coef` 坡度折算）；预算由现有配置推导（两端满仓自饮自食 ⇒ 往返 ≤ 2×capacity/代谢速率，名义消化 1.0），**无新增超参**；输出 `SurvivalReport`/`ResourceLinkReport` 与失败码 `SpawnDisconnected`/`SurvivalCostExceeded`，供 STAGE2-5 有界回退环消费 | 拒绝与重试决策（STAGE2-5）、世界状态修改（只读）、寻路本身（graph.rs/corridor.rs） |
 | `ecology/` | 7 文件 | 生态初始化（世界重置 + POI 播撒 + 路网构建 + 始祖生成）、POI 交互（现场采收装载、回家卸货入账、在家吃喝、榷场互市）、分娩结算。子模块：`seed.rs` 步骤编排 / `spawn.rs` POI 落位与路网 / `founder.rs` 始祖与制度登记 / `tick.rs` 交互调度壳 / `harvest.rs` 采收与采购 / `home.rs` 卸货与吃喝 | 决策（decisions/）、账本结构（ledger/） |
 | `birth.rs` | ~205 | 妊娠结算、分娩（原位复用胎儿 ID）、新生儿属性遗传、流产处理 | 受孕判定（在 agent.rs tick_metabolism）、家户入籍（在 ledger/family.rs） |
 | `bookkeeping.rs` | ~320 | M2 家庭生命周期结算：继承清算（户主死亡）+ 分家抽资（成年/丧父）。只记账本余额，不动物理库存 | 日常收付（已由 ecology/ 与 maintenance.rs 真实收付） |
@@ -206,6 +208,10 @@ world.rs 原 881 行已超 §4.6 的 800 行规范，v1.7.1 拆分为 5 个文�
 - 立宅时 `settlement.rs` 直接设置 `world_pos = site_pos` 是已有设计（FoundHome 触发的位置瞬移），与移动系统无关。
 
 详见根 AGENTS.md §4.16 与 `decisions/AGENTS.md` §4.9。
+
+### 4.7 🔴 `NodeId` 与 petgraph `NodeIndex` 是两套编号（★ STAGE2-6 踩坑沉淀，v1.50.47）
+
+`LaneGraph3D::next_node_id` 从 **1** 起自增（`add_node` 先取后加），而 petgraph `graph.add_node` 返回的 `NodeIndex` 从 **0** 起——两者恒差 1。任何「按节点查距离/查表」的逻辑（如 `survival_diagnosis.rs` 的 Dijkstra 结果表，键为 `NodeIndex.index()`）必须经 `node_map: HashMap<NodeId, NodeIndex>` 映射后再查，**严禁** `node_id as usize` 直接当索引使用——会整体错位一格且无任何报错（开发期实测导致阻断检出漏检与成本虚高）。配套坑：petgraph `remove_edge` 是 **swap_remove**（边索引不稳定），批量删边必须循环「找一条 →删一条」直到无残余，先收集边 ID 再删会留下已换位的残余边。
 
 ---
 
