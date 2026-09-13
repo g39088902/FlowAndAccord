@@ -371,6 +371,8 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 5. ✅ 生成 `natural_fertility` 的静态遮罩（`(0.92 - slope/70 - 归一化高程*0.18).clamp(0.1, 1.0)`）。T0 只透传和可视化，不接入农业产量。
 6. ⏳ 对每个初始营地、关键资源和市场执行合法地表与生存距离校验——未实施（`ecology/spawn.rs` 未消费查询服务；与之配套的有界重试参数 `terrainGenerationMaxRetries` 已于 v1.50.18 删除，实现该步时需一并加回并接线）。
 
+> ★ **TB-01-4（v1.50.39）复核**：复合高程场（倾斜 + fBm + 主脊/支脊，TB-01-2/TB-01-3）接入后，步骤 2~5 的坡度重算与地表映射**自然生效、零改动**——12 种子验证：岩壁（NO_WALK）100% 落于主脊/支脊结构带且均值高程 ≥22m（全图均值 ~5.5m），真平原最大坡度 7.2°~9.4°（<16° 门禁）且零 NO_BUILD，山口走廊 max slope 17.7°~23.2°（<30°），肥力方向正确（真平原均值 ~0.78 vs 岩壁 ~0.25），边界单侧差分生效（全格坡度有限值）。
+
 `sample_elevation` 当前使用双线性插值；离散地表事实由 `sample_cell`/`grid_index` 以最近栅格读取。若后续改变任一采样语义，必须同时复核 POI、房屋、路网和 Agent 的接地位置。
 
 ### 9.3 T1 山口聚落模板
@@ -379,7 +381,7 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ```text
 主脊：一条沿方向 theta 的长条高程增量
-支脊：最多两条低幅度分支            ⏳ 当前版本未实现支脊
+支脊：最多两条低幅度分支            ✅ 已实现（v1.50.38，TB-01-3：1~2 条不对称支脊 + 鞍部禁区）
 山口：主脊上的一个低鞍部窗口
 台地：❌ 已删除（v1.47.7 起不再生成平顶高台）
 ```
@@ -885,7 +887,7 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 19 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 233）：
+✅ 已落地 24 个仿真字段（分区 7「地形生成、地表查询与山口 profile」，全系统配置字段总计 238）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
@@ -893,6 +895,11 @@ render_agents.js        族人绘制                                            
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
 ✅ terrainPassRidgeAmplitude  53.0                ★ T1 山口主脊幅度 (m)；通行力约束见 §9.3.1
+✅ terrainNoiseAmplitude      6.0                 ★ TB-01-5 fBm 基础振幅 (m)；Octave 0 基准，1/2 倍频按 0.43/0.145 跟随
+✅ terrainNoiseScaleBase      300.0               ★ TB-01-5 fBm 宏观基础波长 (m)；1/2 倍频按 0.36/0.125 跟随
+✅ terrainBranchRidgeEnabled  true                ★ TB-01-5 支脊生成总开关（T1；false 时 relief_rng 消费序缩短）
+✅ terrainBranchRidgeAmplitudeRatio 0.48          ★ TB-01-5 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动
+✅ terrainBranchRidgeLength   150.0               ★ TB-01-5 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（→120~180）
 ✅ terrainRiverWidthMin       28.0                主河最小宽度 (m)
 ✅ terrainRiverWidthMax       42.0                主河最大宽度 (m)
 ✅ terrainRiverWaterLevel     0.0                 主河水面基准高度 (m)
@@ -911,7 +918,7 @@ render_agents.js        族人绘制                                            
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 233）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 238）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，

@@ -15,9 +15,9 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TB-01-1** | 纯确定性 2D 梯度噪声与无状态分形 fBm 内核实现 | `crates/sim_core/src/geo/terrain.rs` | 中 | — | ✅ 已实施（v1.50.36：`terrain_noise` 模块，未接入高程采样，接入随 TB-01-2） |
 | **TB-01-2** | 高程与区域调制掩码（Masking）及主脊域扭曲（Domain Warping） | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-1 | ✅ 已实施（v1.50.37：fBm 接入高程场，掩码 0.25/0.90 + 鞍部保护带 0.15 + 域扭曲双分量峰值归一化 45m/λ420m+170m 两端收敛；初版 12m 蛇形不可见，已按反馈加强） |
-| **TB-01-3** | T1 不对称支脊（Branch Ridges）几何模型与鞍部禁区避让 | `crates/sim_core/src/geo/terrain.rs` | 高 | TB-01-2 | ⏳ 待实施 |
-| **TB-01-4** | 四邻域差分坡度重算与地表属性重新映射 | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-3 | ⏳ 待实施 |
-| **TB-01-5** | 仿真配置集中化与 SimConfig 全链路接入 | `config.rs` / `config.js` / `examples/config.json` | 低 | TB-01-3 | ⏳ 待实施 |
+| **TB-01-3** | T1 不对称支脊（Branch Ridges）几何模型与鞍部禁区避让 | `crates/sim_core/src/geo/terrain.rs` | 高 | TB-01-2 | ✅ 已实施（v1.50.38：1~2 条不对称支脊（40% 双支脊）+ 鞍部禁区 ≥1.5×saddle_width 线性映射避让 + 根部爬坡消交汇 NO_WALK（连通分量恒 1）+ 图内锚点收窄/朝图心倾斜防出图钳位） |
+| **TB-01-4** | 四邻域差分坡度重算与地表属性重新映射 | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-3 | ✅ 已实施（v1.50.39：现状核对逻辑完备自然接入，补 TB-01-4 契约注释；12 种子验证岩壁 100% 落主脊/支脊、真平原 ≤9.5°/零 NO_BUILD、走廊 <23.2°、肥力方向正确） |
+| **TB-01-5** | 仿真配置集中化与 SimConfig 全链路接入 | `config.rs` / `config.js` / `examples/config.json` | 低 | TB-01-3 | ✅ 已实施（v1.50.40：5 个 `terrain_noise_*`/`terrain_branch_ridge_*` 字段四处同步 + 内核真实读取点；默认 6.0/300.0 噪声逐位零漂移，支脊长度/振幅比以抖动重参数化，临时验证实证 5 字段均驱动地形） |
 | **TB-01-6** | 生成器版本门禁升级（VERSION 4 $\to$ 5）与存读档契约对接 | `terrain.rs` / `world_save.rs` / `save-ui.js` | 低 | TB-01-4 | ⏳ 待实施 |
 | **TB-01-7** | 探针工具诊断升级与 60 种子全图连通性矩阵校验 | `crates/sim_core/examples/terrain_probe.rs` | 中 | TB-01-4、TB-01-5 | ⏳ 待实施 |
 | **TB-01-8** | 全链路确定性回归、WASM 双副本同步与文档状态闭环 | 全链路门禁 / `07-terrain-art.md` / `AGENTS.md` | 低 | TB-01-6、TB-01-7 | ⏳ 待实施 |

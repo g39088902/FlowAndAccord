@@ -176,6 +176,12 @@ window.SIM_CONFIG = {
   //   tan(terrainMaxWalkSlope)=0.577，否则主脊不挡路。详见 docs/plan/tech/06-terrain-templates.md §9.3.1。
   terrainPassRidgeWidth: 62.0, // T1 山口主脊高斯半宽 (m)
   terrainPassRidgeAmplitude: 53.0, // T1 山口主脊幅度 (m)
+  // ★ TB-01-5：多尺度 fBm 噪声与支脊超参（改值即换图，须随 TERRAIN_GENERATOR_VERSION 递增）
+  terrainNoiseAmplitude: 6.0, // fBm 基础振幅 (m)；Octave 0 基准，Octave 1/2 按 0.43/0.145 比例跟随
+  terrainNoiseScaleBase: 300.0, // fBm 宏观基础波长 (m)；Octave 1/2 按 0.36/0.125 比例跟随（默认 → λ 300/108/37.5m）
+  terrainBranchRidgeEnabled: true, // 支脊生成总开关（T1 山口 profile；false 时 relief_rng 消费序缩短）
+  terrainBranchRidgeAmplitudeRatio: 0.48, // 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动（默认 → 0.408~0.552）
+  terrainBranchRidgeLength: 150.0, // 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（默认 → 120~180m）
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数
   terrainRiverWidthMax: 42.0, // T2 地貌 / 通行参数
   terrainRiverWaterLevel: 0.0, // T2 地貌 / 通行参数

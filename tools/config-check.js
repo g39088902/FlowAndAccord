@@ -56,6 +56,12 @@ const IMPACT_OVERRIDES = {
   terrainGridRes: 'sim_wasm/lib.rs (resolve_grid_res 建世界栅格)',
   terrainPassRidgeWidth: 'geo/terrain.rs (T1 主脊高斯半宽，通行力约束)',
   terrainPassRidgeAmplitude: 'geo/terrain.rs (T1 主脊幅度，通行力约束)',
+  // ★ TB-01-5：多尺度 fBm 噪声与支脊超参
+  terrainNoiseAmplitude: 'geo/terrain.rs (fBm 振幅增益，默认 6.0 零漂移)',
+  terrainNoiseScaleBase: 'geo/terrain.rs (fBm 波长缩放，默认 300.0 零漂移)',
+  terrainBranchRidgeEnabled: 'geo/terrain.rs (支脊生成总开关)',
+  terrainBranchRidgeAmplitudeRatio: 'geo/terrain.rs (支脊振幅比中值 ×[0.85,1.15] 抖动)',
+  terrainBranchRidgeLength: 'geo/terrain.rs (支脊长度 ×[0.8,1.2] 抖动)',
   terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',
   terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',

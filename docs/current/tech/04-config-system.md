@@ -23,7 +23,7 @@ stateDiagram-v2
 
 | 状态 | 含义 | 进入条件 | 退出条件 |
 | :--- | :--- | :--- | :--- |
-| A 真相源就绪 | `config.js` 持有 233 字段权威数值，Rust 不保留字面量常量 | 开发者编辑 config.js 或世界启动 | 浏览器刷新加载 WASM |
+| A 真相源就绪 | `config.js` 持有 238 字段权威数值，Rust 不保留字面量常量 | 开发者编辑 config.js 或世界启动 | 浏览器刷新加载 WASM |
 | B 序列化注入 | `applyConfig` 将 SIM_CONFIG JSON 写入 WASM 线性内存 | Ctrl+F5 触发 world_apply_config_buf | 注入完成进入门禁 |
 | D 契约门禁 | `config-check.js` 交叉校验前后端字段/类型/默认值/空转 | 注入或改参后运行 | 全过→生效；报错→失败 |
 | C 内核生效 | Rust 经 `self.config.<字段>` 消费参数驱动仿真 | 五类校验全过 | 继续热调优或发布 |
@@ -36,12 +36,12 @@ stateDiagram-v2
 
 ## 1. 模块定位
 
-全部仿真超参数的统一配置入口。**233 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
+全部仿真超参数的统一配置入口。**238 个** `SimConfig` 字段由 `frontend/js/config.js` 及拆分配置（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 反序列化注入 Rust WASM 内存，实现免重新编译的热调优。Rust 逻辑层一律通过 `self.config.<字段>` 引用，禁止散落字面量。
 
 ## 2. 核心机制
 
 ### 2.1 全量超参数抽取
-- `SimConfig` 共 **233 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
+- `SimConfig` 共 **238 个字段**，按 14 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（3 字段）
   2. 部落民生理、代谢与生命周期（46 字段）
   3. 先天禀赋与遗传演化（9 字段）
@@ -131,7 +131,7 @@ T0/T1 已接入 6 个配置字段：
 - 改字段后重跑 `node tools/config-check.js` 即可刷新。
 
 ## 4. 关键不变量
-- `SimConfig` 当前有效字段数为 **233 个**（以 `config-check.js` 运行时输出为准）。
+- `SimConfig` 当前有效字段数为 **238 个**（以 `config-check.js` 运行时输出为准）。
 - 前端 JS 为仿真超参数的唯一数值真相源，Rust 内核不保留数值字面量常量。
 - `config.js` 字段集与类型必须与 `config.rs` 契约严格 100% 吻合。
 - `node tools/config-check.js` 与 `node tools/test-wasm.js` 双绿方为可发布状态。

@@ -183,6 +183,16 @@
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
+| `terrainNoiseAmplitude` | f32 | 6 | geo/terrain.rs (fBm 振幅增益，默认 6.0 零漂移) | fBm 基础振幅 (m)；Octave 0 基准，Octave 1/2 按 0.43/0.145 比例跟随 |
+
+## 8. 36/0.125 跟随（默认 300 → λ 300/108/37.5m）。默认 300.0。
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `terrainNoiseScaleBase` | f32 | 300 | geo/terrain.rs (fBm 波长缩放，默认 300.0 零漂移) | fBm 宏观基础波长 (m)；Octave 1/2 按 0.36/0.125 比例跟随（默认 → λ 300/108/37.5m） |
+| `terrainBranchRidgeEnabled` | bool | true | geo/terrain.rs (支脊生成总开关) | 支脊生成总开关（T1 山口 profile；false 时 relief_rng 消费序缩短） |
+| `terrainBranchRidgeAmplitudeRatio` | f32 | 0.48 | geo/terrain.rs (支脊振幅比中值 ×[0.85,1.15] 抖动) | 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动（默认 → 0.408~0.552） |
+| `terrainBranchRidgeLength` | f32 | 150 | geo/terrain.rs (支脊长度 ×[0.8,1.2] 抖动) | 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（默认 → 120~180m） |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |
@@ -198,7 +208,7 @@
 | `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
 | `terrainAccentSubFeatures` | bool | true | geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控) | ========================================================================== |
 
-## 8. 四季更迭与宏观气候
+## 9. 四季更迭与宏观气候
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -212,7 +222,7 @@
 | `berryFrostDeclineTemp` | f32 | 8 | — | 浆果开始减产的霜降气温阈值 (℃) |
 | `berryFrostZeroTemp` | f32 | 0 | — | 浆果彻底绝收休眠的冰封气温阈值 (℃) |
 
-## 9. 空间路网、限速与踩踏演化
+## 10. 空间路网、限速与踩踏演化
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -231,7 +241,7 @@
 | `roadLevelFactorMin` | f32 | 0.5 | graph.rs (等级速度加成) | 道路等级移速乘子下限 |
 | `roadLevelFactorMax` | f32 | 2.2 | graph.rs (等级速度加成) | 道路等级移速乘子上限 |
 
-## 10. 动力学移动与寻路权重
+## 11. 动力学移动与寻路权重
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -245,13 +255,13 @@
 | `roadHiddenAvoidModifier` | f32 | 2.5 | graph.rs / decisions/ (隐秘道路偏好) | A* 非偏好隐秘时隐秘道路代价乘子 |
 | `roadVisibleAvoidModifier` | f32 | 1 | graph.rs / decisions/ (可见道路偏好) | A* 非偏好隐秘时公开道路代价乘子 |
 
-## 11. 账本与婚姻登记子系统
+## 12. 账本与婚姻登记子系统
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `ledgerJournalCapacity` | usize | 64 | ledger/ (所有账本容量) | 账本流水环形缓冲容量 (每团体/家户，条) |
 
-## 12. 宗族系统
+## 13. 宗族系统
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -262,7 +272,7 @@
 | `clanMutualAidCooldownTicks` | u64 | 1800 | ledger/clan.rs (族内互助) | 族内互助冷却 (tick)，每家户每 N tick 最多接收一次 (30 游戏小时) |
 | `prestigeClanElderBonus` | u32 | 3 | ledger/clan.rs (族长威望奖励) | 宗族长老（族长）顺位任职威望奖励 |
 
-## 13. 地区与王国系统
+## 14. 地区与王国系统
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -277,7 +287,7 @@
 | `imperialPrivyIntervalTicks` | u64 | 7200 | — | 皇帝公帑结算周期 (tick)，每 N tick 结算一次 (120 游戏小时) |
 | `imperialPrivyRate` | f32 | 0.005 | — | 皇帝公帑提取比例：从下属王国公仓各品类物资中提取比例 (0.5%) |
 
-## 14. 外部市场（榷场互市）与幂律动态定价
+## 15. 外部市场（榷场互市）与幂律动态定价
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
@@ -298,7 +308,7 @@
 | `marketWealthyFamilyGold` | f32 | 200 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 豪绅家户黄金门槛 (≥此值户主面临物资短缺时80%几率赴榷场现货采购) |
 | `marketPoorFamilyGold` | f32 | 50 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 平民家户黄金门槛 (<此值严格野外自力更生，非绝境不赴榷场) |
 
-## 15. 二手房屋市场、营地中介拍卖与麦穗竞价
+## 16. 二手房屋市场、营地中介拍卖与麦穗竞价
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |

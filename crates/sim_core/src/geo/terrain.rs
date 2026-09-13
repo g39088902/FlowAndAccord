@@ -182,11 +182,12 @@ mod terrain_noise {
     /// 主脊域扭曲固定盐值 "RIDGEWRP"。一经落地永不更改（改盐值等于换图）。
     pub(crate) const SALT_RIDGE_WARP: u64 = 0x5249_4447_4557_5250;
 
-    /// fBm 基准振幅/基准波长。数值已对齐 TB-01-5 计划的 SimConfig 默认值
-    /// （`terrain_noise_amplitude = 6.0` / `terrain_noise_scale_base = 300.0`），
-    /// TB-01-5 落地后改由配置驱动，届时输出零漂移。
-    const AMPLITUDE_M: f32 = 6.0;
-    const SCALE_BASE_M: f32 = 300.0;
+    /// fBm 基准振幅/基准波长（TB-01-5 起为配置的**归一化分母**）：
+    /// `generate_with_profile` 按 `配置振幅 / AMPLITUDE_M` 与
+    /// `SCALE_BASE_M / 配置波长` 换算增益/频率缩放，默认值 6.0/300.0 时两系数
+    /// 恒为 1.0（乘 1.0 逐位精确），输出与常数版完全一致、零漂移。
+    pub(crate) const AMPLITUDE_M: f32 = 6.0;
+    pub(crate) const SCALE_BASE_M: f32 = 300.0;
     /// 各倍频相对基准的比例：λ → 300 / 108 / 37.5 m，A → 6.0 / 2.58 / 0.87 m，
     /// 均落在 07 号 §7.2 TB-01-1 规格区间（λ 280~360 / 90~130 / 30~45，
     /// A 6~8 / 2.5~3.5 / 0.8~1.2）。
@@ -303,6 +304,41 @@ const SADDLE_NOISE_FLOOR: f32 = 0.15;
 /// 鞍部保护带外过渡带宽度（× saddle_width）：走廊外 0.5×saddle_width 内平滑恢复满权重。
 const SADDLE_NOISE_RAMP: f32 = 0.5;
 
+/// ★ TB-01-3 支脊几何常数（07 号 §7.2 / 06 号 §3.2）。TB-01-5 已把「总开关 /
+/// 振幅比中值 / 延伸长度」收敛为 `SimConfig`（`terrain_branch_ridge_*`），
+/// 本组余下常数保持命名常数——改值等于换图，须随 `TERRAIN_GENERATOR_VERSION`
+/// 递增（TB-01-6）。
+/// 第 2 条支脊出现概率（第 1 条 100% 出现）。
+const BRANCH_RIDGE_PROB_SECOND: f32 = 0.40;
+/// 支脊与主脊夹角范围（弧度）：规格 φ ≈ 45°~70°。
+const BRANCH_PHI_MIN_RAD: f32 = 45.0f32.to_radians();
+const BRANCH_PHI_MAX_RAD: f32 = 70.0f32.to_radians();
+/// 支脊延伸长度抖动（× `terrain_branch_ridge_length`）：默认 150m → 120~180m（规格区间）。
+const BRANCH_LEN_JITTER_MIN: f32 = 0.8;
+const BRANCH_LEN_JITTER_MAX: f32 = 1.2;
+/// 支脊横截面宽度（× 主脊宽度）取值范围；振幅 = `terrain_branch_ridge_amplitude_ratio`
+/// × [0.85, 1.15] 抖动 × 主脊振幅（默认 0.48 → 0.408~0.552，规格 0.40~0.55）。
+/// 幅宽比中值 0.48/0.675 → 支脊侧翼最大坡度 ≈ 0.858×0.48/0.675 ≈ 0.61（31°），
+/// 扣除噪声掩码后实测 18°~28°，符合「地形引导屏障但不过分陡峭」规格。
+const BRANCH_WIDTH_RATIO_MIN: f32 = 0.60;
+const BRANCH_WIDTH_RATIO_MAX: f32 = 0.75;
+const BRANCH_AMP_JITTER_MIN: f32 = 0.85;
+const BRANCH_AMP_JITTER_MAX: f32 = 1.15;
+/// 鞍部禁区系数：支脊锚点沿脊距离必须 ≥ 1.5 × saddle_width（规格硬约束），
+/// 杜绝支脊扎入山口走廊阻断全图唯一交通通道。
+const BRANCH_SADDLE_FORBID_FACTOR: f32 = 1.5;
+/// 支脊轴向衰减包络根部爬坡段（× L）：支脊在根部前 30% 长度内由 0 平滑升至
+/// 满包络。没有爬坡时支脊在 d∥=0 直接以满振幅叠在主脊侧翼上，交汇处梯度
+/// 超硬禁行线（实测根部四分带 72.8°），NO_WALK 斑块把主脊与支脊之间的楔形区
+/// 封口，全图通行连通分量碎成 2~4 块（验收要求恒为 1）。支脊自身最大梯度
+/// 0.858×A/W ≈ 33.9° 恰在 34° 线下，爬坡消去交汇叠加后支脊自身不再产 NO_WALK。
+const BRANCH_ROOT_RAMP: f32 = 0.3;
+/// 支脊根部的图内安全边距（米）：锚点沿脊范围收窄到「脊线仍在图内」的区段，
+/// 根部距图缘至少此边距；再配合支脊朝图心倾斜（lean = −sign(anchor)），
+/// 保证整条支脊（最长 180m + 高斯横截面）不出图——出图后高程采样被钳到
+/// 边缘格，支脊会退化成不可见的贴边直线（seed 2 实测踩坑）。
+const BRANCH_ROOT_MARGIN_M: f32 = 40.0;
+
 /// 单点原始扭曲位移（米，未归一化）：包络 × 双分量噪声和。
 #[inline]
 fn ridge_warp_raw(along: f32, world_size: f32, seed: u64) -> f32 {
@@ -341,6 +377,145 @@ fn ridge_warp_peak_scale(world_size: f32, seed: u64) -> f32 {
     } else {
         1.0
     }
+}
+
+/// ★ TB-01-3 单条支脊：从主脊侧翼向外延伸的直线高斯山脊。
+/// 根部钉在锚点处**扭曲后**的主脊线上（root 已扣除 `warp(anchor)` 横移），
+/// 轴线方向 = 主脊 along 轴按夹角 φ（45°~70°）偏向指定一侧。
+struct BranchRidge {
+    /// 根部世界坐标（锚点在扭曲后主脊线上的落点）。
+    root_x: f32,
+    root_y: f32,
+    /// 支脊轴线单位方向（世界系）。
+    dir_x: f32,
+    dir_y: f32,
+    /// 延伸长度（米）/ 高斯横截面宽度（米）/ 振幅（米）。
+    length: f32,
+    width: f32,
+    amplitude: f32,
+}
+
+impl BranchRidge {
+    /// 支脊高程贡献：高斯横截面 × 沿轴线衰减包络 `(1 − d∥/L)²`（规格公式）
+    /// × 根部爬坡（前 `BRANCH_ROOT_RAMP`×L 由 0 平滑升至满幅），
+    /// 轴线段 `0 ≤ d∥ ≤ L` 之外恒为 0（根部融入主脊、末梢自然归零）。
+    #[inline]
+    fn elevation_at(&self, wx: f32, wy: f32) -> f32 {
+        let dx = wx - self.root_x;
+        let dy = wy - self.root_y;
+        let d_par = dx * self.dir_x + dy * self.dir_y;
+        if !(0.0..=self.length).contains(&d_par) {
+            return 0.0;
+        }
+        let d_perp = -dx * self.dir_y + dy * self.dir_x;
+        let t = d_par / self.length;
+        let u = (t / BRANCH_ROOT_RAMP).min(1.0);
+        let ramp = u * u * (3.0 - 2.0 * u);
+        self.amplitude
+            * (-(d_perp / self.width).powi(2)).exp()
+            * (1.0 - t)
+            * (1.0 - t)
+            * ramp
+    }
+}
+
+/// 支脊锚点允许范围的沿脊半宽：把「扭曲后脊线仍留在图内（边距
+/// `BRANCH_ROOT_MARGIN_M`）」的沿脊区段解析出来。脊线点 = a·u_along + c·u_across，
+/// 其中 |c| ≤ ridge_offset 振幅上界 + 扭曲峰值；对 x/y 两轴分别解
+/// |a·t + c·t⊥| ≤ half − margin（t ∈ {cosθ, sinθ}），取更紧的一条。
+fn branch_anchor_bound(world_size: f32, theta_cos: f32, theta_sin: f32) -> f32 {
+    let half = world_size / 2.0;
+    let c_bound = 0.08 * world_size + RIDGE_WARP_PEAK_TARGET_M;
+    let slack = (half - BRANCH_ROOT_MARGIN_M - c_bound).max(0.0);
+    let bx = slack / theta_cos.abs().max(1e-3);
+    let by = slack / theta_sin.abs().max(1e-3);
+    bx.min(by).clamp(0.0, half)
+}
+
+/// 鞍部禁区避让下的支脊锚点抽样：把 `gen_range(0,1)` 线性映射到
+/// `[−bound, saddle−1.5sw] ∪ [saddle+1.5sw, +bound]` 的允许集（禁区长度先扣再映射），
+/// 拒绝式重试会改变 RNG 消费次数，线性映射保持单次消费且分布均匀。
+fn sample_branch_anchor(
+    rng: &mut WorldRng,
+    a_bound: f32,
+    saddle_along: f32,
+    saddle_width: f32,
+) -> f32 {
+    let forbid = BRANCH_SADDLE_FORBID_FACTOR * saddle_width;
+    let left_end = (saddle_along - forbid).clamp(-a_bound, a_bound);
+    let right_start = (saddle_along + forbid).clamp(-a_bound, a_bound);
+    let left_len = left_end + a_bound;
+    let total = left_len + (a_bound - right_start);
+    if total <= 1.0 {
+        // 禁区吞没全轴（理论不可达：saddle_width ≤ 0.19×world），防御性兜底取远端。
+        return if saddle_along >= 0.0 { -a_bound } else { a_bound };
+    }
+    let p = rng.gen_range(0.0, 1.0) * total;
+    if p < left_len {
+        -a_bound + p
+    } else {
+        right_start + (p - left_len)
+    }
+}
+
+/// 支脊参数抽样（★ relief_rng 专属消费，顺序固定：侧向硬币 → 每条
+/// [存在性(仅第2条) → 锚点 → 夹角 → 长度 → 宽度 → 振幅]）。
+/// 第 1 条 100% 出现、第 2 条 40%；两条强制分居主脊相反两侧（不对称山势），
+/// 侧向由种子掷硬币决定第 1 条朝向，避免图图同构。
+/// 锚点限制在脊线图内区段（`branch_anchor_bound`），且支脊沿脊分量朝图心倾斜
+/// （lean = −sign(anchor)），两项共同保证最长支脊的末梢也不出图。
+/// ★ TB-01-5：长度/振幅改走配置——长度 = `branch_len_base` × [0.8, 1.2] 抖动、
+/// 振幅 = `amp_ratio` × [0.85, 1.15] 抖动 × 主脊振幅；RNG 消费次数与顺序不变。
+fn sample_branch_ridges(
+    rng: &mut WorldRng,
+    world_size: f32,
+    seed: u64,
+    theta_cos: f32,
+    theta_sin: f32,
+    ridge_offset: f32,
+    saddle_along: f32,
+    saddle_width: f32,
+    ridge_width: f32,
+    ridge_amplitude: f32,
+    warp_scale: f32,
+    branch_len_base: f32,
+    amp_ratio: f32,
+) -> Vec<BranchRidge> {
+    let a_bound = branch_anchor_bound(world_size, theta_cos, theta_sin);
+    let mut out = Vec::with_capacity(2);
+    let first_side = if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
+    for i in 0..2usize {
+        if i == 1 && !rng.gen_bool(BRANCH_RIDGE_PROB_SECOND) {
+            break;
+        }
+        let side = if i == 0 { first_side } else { -first_side };
+        let anchor = sample_branch_anchor(rng, a_bound, saddle_along, saddle_width);
+        let phi = rng.gen_range(BRANCH_PHI_MIN_RAD, BRANCH_PHI_MAX_RAD);
+        let length =
+            branch_len_base * rng.gen_range(BRANCH_LEN_JITTER_MIN, BRANCH_LEN_JITTER_MAX);
+        let width = rng.gen_range(BRANCH_WIDTH_RATIO_MIN, BRANCH_WIDTH_RATIO_MAX) * ridge_width;
+        let amplitude = amp_ratio
+            * rng.gen_range(BRANCH_AMP_JITTER_MIN, BRANCH_AMP_JITTER_MAX)
+            * ridge_amplitude;
+        // 根部钉在锚点处扭曲后的主脊线上：脊线点 = anchor·u_along + (offset − warp)·u_across。
+        let warp_anchor = ridge_warp_raw(anchor, world_size, seed) * warp_scale;
+        let root_x = anchor * theta_cos + (ridge_offset - warp_anchor) * (-theta_sin);
+        let root_y = anchor * theta_sin + (ridge_offset - warp_anchor) * theta_cos;
+        // 轴线方向 = lean·u_along·cosφ + side·u_across·sinφ（φ 为与主脊轴的锐夹角）；
+        // lean 朝图心倾斜（沿脊分量指向 |along| 减小方向），保证支脊整体留在图内。
+        let lean = if anchor >= 0.0 { -1.0 } else { 1.0 };
+        let (sin_phi, cos_phi) = phi.sin_cos();
+        out.push(BranchRidge {
+            root_x,
+            root_y,
+            dir_x: lean * theta_cos * cos_phi - side * theta_sin * sin_phi,
+            dir_y: lean * theta_sin * cos_phi + side * theta_cos * sin_phi,
+            length,
+            width,
+            amplitude,
+        });
+    }
+    out
 }
 
 /// 在某一类（结构型 / 视觉型）内按 `TerrainSubFeatureKind` **升序**逐个判定，
@@ -526,7 +701,8 @@ impl TerrainMap {
     /// 3 倍频 fBm 取代（平原权重 0.25、山体 0.90、山口走廊 ≤0.15）；主脊
     /// `across` 施加低频域扭曲（幅度 12m、λ 200m、两端包络收敛）。
     /// 确定性：噪声/扭曲只消费世界种子 + 固定盐值（`terrain_noise` 模块），
-    /// 不占用任何 `WorldRng` 流；`relief_rng` 消费顺序与 T1-R 完全一致。
+    /// 不占用任何 `WorldRng` 流；`relief_rng` 消费顺序 = T1-R 四连抽后追加
+    /// 支脊抽样（TB-01-3：侧向硬币 → 锚点/夹角/长度/宽度/振幅，第 2 条先掷 40% 存在性）。
     pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
         self.seed = seed;
         self.generator_version = TERRAIN_GENERATOR_VERSION;
@@ -572,6 +748,38 @@ impl TerrainMap {
         } else {
             0.0
         };
+        // ★ TB-01-3：不对称支脊 1~2 条（仅山口 profile；relief_rng 专属流抽样，
+        //   侧向硬币 + 鞍部禁区 ≥1.5×saddle_width 线性映射，见 sample_branch_ridges）。
+        //   ★ TB-01-5：总开关/长度/振幅比走配置；开关关闭时 relief_rng 消费序
+        //   在 saddle_width 后即止（同种子地形不同，但各自确定性不破坏）。
+        let branch_ridges = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS
+            && config.terrain_branch_ridge_enabled
+        {
+            sample_branch_ridges(
+                &mut relief_rng,
+                self.world_size,
+                seed,
+                theta_cos,
+                theta_sin,
+                ridge_offset,
+                saddle_along,
+                saddle_width,
+                ridge_width,
+                ridge_amplitude,
+                warp_scale,
+                // 防御性下限：SimConfig::default() 为零值兑底，避免零长度/零振幅支脊。
+                config.terrain_branch_ridge_length.max(1.0),
+                config.terrain_branch_ridge_amplitude_ratio.max(0.1),
+            )
+        } else {
+            Vec::new()
+        };
+        // ★ TB-01-5：fBm 振幅/波长走配置。输出对两者均线性——坐标按
+        //   SCALE_BASE_M/配置波长 预缩放（各倍频波长同比例缩放），输出按
+        //   配置振幅/AMPLITUDE_M 增益；默认 300.0/6.0 时两系数恒为 1.0
+        //   （×1.0 逐位精确），与常数版输出零漂移。
+        let noise_freq_k = terrain_noise::SCALE_BASE_M / config.terrain_noise_scale_base.max(1.0);
+        let noise_amp_k = config.terrain_noise_amplitude.max(0.0) / terrain_noise::AMPLITUDE_M;
 
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
@@ -612,6 +820,11 @@ impl TerrainMap {
                     let t = d_corr.clamp(0.0, 1.0);
                     saddle_noise_damp =
                         SADDLE_NOISE_FLOOR + (1.0 - SADDLE_NOISE_FLOOR) * (t * t * (3.0 - 2.0 * t));
+                    // ★ TB-01-3 支脊叠加：高斯横截面 × (1−d∥/L)² 轴向衰减包络，
+                    //   锚点距鞍部 ≥ 1.5×saddle_width，山口走廊不受支脊坡度侵扰。
+                    for br in &branch_ridges {
+                        elev += br.elevation_at(wx, wy);
+                    }
                 }
 
                 // ★ TB-01-2 高度调制掩码：h_norm ≥ 0.70（山体）权重升至满格、
@@ -623,13 +836,20 @@ impl TerrainMap {
                 let weight = NOISE_WEIGHT_PLAIN
                     + (NOISE_WEIGHT_MOUNTAIN - NOISE_WEIGHT_PLAIN)
                         * (w_t * w_t * w_t * (w_t * (w_t * 6.0 - 15.0) + 10.0));
-                elev += terrain_noise::fbm_terrain_3octaves(wx, wy, seed)
+                elev += terrain_noise::fbm_terrain_3octaves(wx * noise_freq_k, wy * noise_freq_k, seed)
+                    * noise_amp_k
                     * weight
                     * saddle_noise_damp;
                 raw[gy * self.grid_width + gx] = elev;
             }
         }
 
+        // ★ TB-01-4 坡度重算与地表属性映射（14号文 §9.2 步骤 2~5）：在复合高程场
+        //   （倾斜 + fBm + 主脊/支脊）上统一重算——4 邻域中心差分，图边界自动退化为
+        //   单侧差分（`saturating_sub` / `min` 钳位，杜绝贴边通行误判）；阈值即物理
+        //   契约：≥34° RockFace+NO_WALK、20~34° SoftGround、<20° DryGround、
+        //   ≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 / terrainMaxBuildSlope=16
+        //   之上再留工程余量）。新支脊/噪声接入高程场后无需改动本段，自然生效。
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
                 let idx = gy * self.grid_width + gx;

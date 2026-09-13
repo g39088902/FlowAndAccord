@@ -201,6 +201,21 @@ pub struct SimConfig {
     pub terrain_pass_ridge_width: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊幅度 (m)。
     pub terrain_pass_ridge_amplitude: f32,
+    /// ★ TB-01-5：多尺度 fBm 噪声基础振幅 (m)。Octave 0（宏观次级丘陵）基准；
+    /// Octave 1/2 按固定比例 0.43/0.145 跟随。默认 6.0。
+    pub terrain_noise_amplitude: f32,
+    /// ★ TB-01-5：fBm 宏观基础波长 (m)。Octave 0 基准；Octave 1/2 按固定比例
+    /// 0.36/0.125 跟随（默认 300 → λ 300/108/37.5m）。默认 300.0。
+    pub terrain_noise_scale_base: f32,
+    /// ★ TB-01-5：支脊生成总开关（T1 山口 profile）。false = 不生成支脊，
+    /// `relief_rng` 消费序在鞍部宽度后即止（确定性不破坏，仅同种子地形不同）。
+    pub terrain_branch_ridge_enabled: bool,
+    /// ★ TB-01-5：支脊与主脊的振幅比中值。每条支脊实际取
+    /// 本值 × [0.85, 1.15] 均匀抖动（默认 0.48 → 0.408~0.552，规格 0.40~0.55）。
+    pub terrain_branch_ridge_amplitude_ratio: f32,
+    /// ★ TB-01-5：支脊基础延伸长度 (m)。每条支脊实际取
+    /// 本值 × [0.8, 1.2] 均匀抖动（默认 150 → 120~180，规格区间）。
+    pub terrain_branch_ridge_length: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,
     pub terrain_river_water_level: f32,
