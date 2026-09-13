@@ -377,6 +377,8 @@ window.SimLighting = (function () {
     ambient: () => S.ambient,
     tint: () => S.tint.slice(),
     lightDir: () => ({ x: S.lx, y: S.ly, z: S.lz }),
+    // ★ TA-04-3 零分配变体：光向写入调用方复用对象（装饰绘制每实体读取，避免逐帧堆分配）
+    lightDirInto: (out) => { out.x = S.lx; out.y = S.ly; out.z = S.lz; return out; },
     shadowLen: () => S.shadowLen,
     shadowAlpha: () => S.shadowAlpha,
     shadowOffset,

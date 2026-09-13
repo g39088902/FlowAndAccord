@@ -297,7 +297,7 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 
 ### 3. Chrome 视口视觉交互验收
 
-1. 启动本地服务：`node frontend/server.js` 并使用 Chrome 访问 `http://localhost:3000`；
+1. 启动本地服务：`node frontend/server.js` 并使用 Chrome 访问 `http://localhost:3002`；
 2. 视角缩放至远景（`Zoom 0.4`）：观察主脊具有蛇形弯曲，侧向延伸出不对称支脊，山脉骨架清晰；
 3. 视角推进至中景（`Zoom 1.0`）：坡面呈现自然分形褶皱，非单调平滑色板，山崖处自然露出岩石色（$\ge 34^\circ$）；
 4. 视角推进至近景（`Zoom 2.0`）：平原区与居民区平整无麻点，房屋紧密落座无悬空，族人正常经由山口往返。

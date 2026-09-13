@@ -108,7 +108,7 @@ window.RENDER_CONFIG = {
   accentGrassTuftWinterHeightRatio: 0.62, // 隆冬低矮萎缩保底高度系数（0.62+0.38×叶量）
   // —— 芦草变体（TA-11-4，07 号 §6.6「水岸可派生芦草外观」）——
   // accent-model.js::grassTuftSkeleton 消费：稳定哈希 < ReedChance 派生 isReed；
-  // 穗量/季相枯色由 render_accents.js::grassSeasonColor 按季节样本驱动（几何不随季节变）。
+  // 穗量/季相枯色由 render_grass.js::grassSeasonColor 按季节样本驱动（几何不随季节变）。
   accentGrassTuftReedChance: 0.35,        // 芦草变体派生概率（验收口径：近景约 30%~40% 草丛带穗）
   accentGrassTuftReedHeightBase: 4.2,     // 芦草基准株高下限（世界米）
   accentGrassTuftReedHeightVar: 1.8,      // 芦草株高随机幅度（4.2~6.0m，挺拔高于普通短草）
@@ -117,4 +117,13 @@ window.RENDER_CONFIG = {
 
   // —— 世界光向动态受光（TA-04，lighting.js 消费）——
   sunScreenEps: 0.02,         // 屏幕光心退化半径：光向接近视线（投影 len < eps）时亮部按 len/eps 平滑回冠心（lighting.js::sunScreenDirFull，TA-04-1 迁入）
+
+  // —— 枝干圆柱侧面明暗（TA-04-3，render_accents.js::drawAccentTree/drawAccentBush 消费）——
+  // 迎光/背光带位置由世界光向（经倾干剪切逆转置）的屏幕投影决定——转相机/改光向明暗随动，
+  // 不以相机正面定义迎光面（07 号 §6.5 第 2 段）。调参刷新即生效，无需重编译 WASM。
+  accentBarkBandOffset: 0.38,    // 明暗带中心相对当地干宽的偏移比例（<0.5 保证带留在轮廓内，主干另有 clip 兜底）
+  accentBarkBandWidthK: 0.50,    // 明暗带线宽相对当地干宽的比例
+  accentBarkBandLitAlpha: 0.55,  // 迎光带不透明度（叠于朝屏体色上混出圆柱侧面渐变）
+  accentBarkBandDarkAlpha: 0.40, // 背光带不透明度（背光面弱于迎光面，避免死黑）
+  accentBarkBandMinWidthPx: 2.0, // 侧面明暗最小可辨屏幕宽度（主干带 / 枝茎高光低于此省略，防远景亚像素噪声）
 };

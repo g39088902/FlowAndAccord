@@ -16,15 +16,18 @@
 // - 受光：★ TA-04-2（v1.50.33）法线点积管线接入——叶簇/岩面颜色固定走
 //   「季节基础色 → SimLighting 漫反射+环境光（法线点积，公式单一来源 shadeRgbInto）→
 //   intensity/tint 色温」；冠内体积/AO 分档只保留与视角无关的 tZ 档，投影深度 tD
-//   不再参与明暗（同一世界表面转相机不变色）。枝干侧面明暗（TA-04-3）、叶簇渐变亮部
-//   与固定白斑移除（TA-04-4）、岩石 billboard 几何随相机细化（TA-04-5）后续接入；
+//   不再参与明暗（同一世界表面转相机不变色）。★ TA-04-3（v1.50.39）枝干圆柱侧面明暗接入——
+//   主干三色（朝屏体色 + 迎光带 + 背光带，带位由世界光向屏幕投影驱动）替代旧固定
+//   「屏幕左上」树皮亮线；枝条/灌木茎逐段按朝屏法线受光 + 近景迎光侧细高光；
+//   叶簇渐变亮部与固定白斑移除（TA-04-4）、岩石 billboard 几何随相机细化（TA-04-5）后续接入；
 //   GrassTuft 不在本任务受光范围（§6.5：保留季相短草线，不新增立体法线）。
 // - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
 //   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
 //
-// ★ TA-11-6（07 号 §6.7/§10.2）渲染热路径零 GC：模块级持久刮擦缓冲（碎石池 / 草叶池 /
-//   冠簇池 Tree·Bush 共用）+ projTo 复用点投影 + shearNormalInto / lightShadowOffset(out)
+// ★ TA-11-6（07 号 §6.7/§10.2）渲染热路径零 GC：模块级持久刮擦缓冲（碎石池 /
+//   冠簇池 Tree·Bush 共用；★ v1.50.39 起草叶池随 GrassTuft 绘制迁往 render_grass.js）
+//   + projTo 复用点投影 + shearNormalInto / lightShadowOffset(out)
 //   零分配法线与阴影偏移 + 稳定性插入排序替代 items.sort()——装饰绘制循环稳态零逐帧堆分配
 //   （池条目只在容量不足时创建，字段每帧整体覆写；刮擦对象严禁跨绘制调用持有）。
 //
@@ -35,7 +38,8 @@
 //
 // ★ D-B1-6（06 号文 §5.5 / §5.7 Canvas 行）：新增 RockCluster / GrassTuft 两分支——
 // RockCluster 由 anchor 按 accent.id 前端派生 2–5 颗子石（不建实体、不改碰撞/路面）；
-// GrassTuft 3–6 根短草线，颜色由前端按当前季节派生（同 Tree，不读存档 tint，14 号 §7.4）。
+// GrassTuft 3–6 根短草线（★ v1.50.39 起绘制与季相色派生在 render_grass.js，本文件
+// drawAccentEntity 只做分发），颜色由前端按当前季节派生（同 Tree，不读存档 tint，14 号 §7.4）。
 // 未知 kind 直接跳过并计数，开发模式（🐞 调试开关）下限频报警，**严禁错画成 Bush**。
 //
 // 依赖全局: ctx, camera, sim, w, h, MAP_Z_LIFT（render_world.js 定义，渲染期可用）、
@@ -67,9 +71,10 @@ function _reportUnknownAccent(kind) {
 // 基础色 → 漫反射+环境光（法线点积）→ intensity/tint 色温，再乘与视角无关的体积/AO 系数 kAo
 // 出 fill 色。基色/out 数组模块级复用（逐簇高频路径零分配）；SimLighting 缺席时退回基色
 // （加载顺序已保证，仅防御）。法线须经模型变换（含剪切逆转置）转到世界空间后传入，内部再归一化。
+// ★ TA-04-3 可选第 8 参 alpha：传了出 rgba()（枝干明暗带以透明度叠在体色上混圆柱侧面渐变）。
 var _litBase = [0, 0, 0];
 var _litOut = [0, 0, 0];
-function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo) {
+function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo, alpha) {
   const SL = window.SimLighting;
   if (SL && SL.shadeRgbInto) {
     _litBase[0] = baseR; _litBase[1] = baseG; _litBase[2] = baseB;
@@ -80,7 +85,58 @@ function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo) {
   const r = Math.max(0, Math.min(255, Math.round(_litOut[0] * kAo)));
   const g = Math.max(0, Math.min(255, Math.round(_litOut[1] * kAo)));
   const b = Math.max(0, Math.min(255, Math.round(_litOut[2] * kAo)));
-  return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+  if (alpha === undefined) return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+  return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha.toFixed(3) + ')';
+}
+
+// ★ TA-04-3 枝干圆柱侧面明暗几何（07 号 §6.5 第 2 段「枝干用少量侧面明暗表达圆柱体，
+// 不以相机正面定义迎光面」）：主干 / 枝条 / 灌木茎共用，本函数只做几何、不含光照公式
+// （颜色由调用方经 accentLitFill 单一入口求）。约定：
+// - 输入为**模型空间**量：单位轴向 (ax,ay,az)、模型空间光向/视向（调用方已做倾干剪切
+//   逆变换 x' = x − s·z，剪切依赖 accent.rotation 故不入模型缓存）；
+// - 输出三支**世界空间**代表法线（写入模块级刮擦）：_cylLit 迎光（光向垂直轴向分量）、
+//   _cylDark 背光（其反向）、_cylFront 朝屏（视向垂直轴向分量 = 圆柱可见面平均朝向），
+//   世界化走 AccentModel.shearNormalInto（剪切逆转置 n' = (nx, ny, nz − s·nx)）；
+// - _cylScr = 迎光侧的**屏幕偏移单位方向**（模型分量走方向剪切 + 相机投影，与几何同一套
+//   变换）：ok=false 表示退化（光向与轴向平行，或投影长度 ≈ 0），调用方跳过明暗带。
+var _ld = { x: 0, y: 0, z: 0 };              // 世界光向刮擦（drawAccentEntity 每实体经 lightDirInto 刷新）
+var _cylLit = { x: 0, y: 0, z: 0 };
+var _cylDark = { x: 0, y: 0, z: 0 };
+var _cylFront = { x: 0, y: 0, z: 0 };
+var _cylScr = { x: 0, y: 0, ok: false };
+function cylinderShade(ax, ay, az, shear, lmx, lmy, lmz, vmx, vmy, vmz, cosZ, sinZ, cosX, sinX) {
+  const dL = lmx * ax + lmy * ay + lmz * az;
+  let nx = lmx - dL * ax, ny = lmy - dL * ay, nz = lmz - dL * az;
+  const nl = Math.hypot(nx, ny, nz);
+  if (nl > 1e-4) { nx /= nl; ny /= nl; nz /= nl; }
+  else { nx = 0; ny = 0; nz = 1; }            // 光向 ∥ 轴向：各侧同色，_cylScr.ok 仍按投影判定
+  window.AccentModel.shearNormalInto(nx, ny, nz, shear, _cylLit);
+  window.AccentModel.shearNormalInto(-nx, -ny, -nz, shear, _cylDark);
+  const dV = vmx * ax + vmy * ay + vmz * az;
+  let fx = vmx - dV * ax, fy = vmy - dV * ay, fz = vmz - dV * az;
+  const fl = Math.hypot(fx, fy, fz);
+  if (fl > 1e-4) { fx /= fl; fy /= fl; fz /= fl; }
+  else { fx = nx; fy = ny; fz = nz; }         // 轴向正对相机：朝屏面退化，取迎光法线兜底
+  window.AccentModel.shearNormalInto(fx, fy, fz, shear, _cylFront);
+  const wx = nx + shear * nz;
+  const ex = wx * cosZ - ny * sinZ;
+  const ey = (wx * sinZ + ny * cosZ) * cosX - nz * sinX;
+  const sl = Math.hypot(ex, ey);
+  if (sl > 1e-4) { _cylScr.x = ex / sl; _cylScr.y = ey / sl; _cylScr.ok = true; }
+  else { _cylScr.x = 0; _cylScr.y = 0; _cylScr.ok = false; }
+}
+
+// ★ TA-04-3 明暗带参数读取（config.render.js；缺省回退与集中值一致；★ TA-11-6 零 GC
+// 写入模块级复用对象，每装饰每帧 1 次）
+var _barkCfg = { offK: 0.38, wK: 0.5, litA: 0.55, darkA: 0.4, minPx: 2 };
+function barkBandCfg() {
+  const RC = window.RENDER_CONFIG || {};
+  const v = RC.accentBarkBandOffset; if (Number.isFinite(v)) _barkCfg.offK = v;
+  const w = RC.accentBarkBandWidthK; if (Number.isFinite(w)) _barkCfg.wK = w;
+  const la = RC.accentBarkBandLitAlpha; if (Number.isFinite(la)) _barkCfg.litA = la;
+  const da = RC.accentBarkBandDarkAlpha; if (Number.isFinite(da)) _barkCfg.darkA = da;
+  const mp = RC.accentBarkBandMinWidthPx; if (Number.isFinite(mp)) _barkCfg.minPx = mp;
+  return _barkCfg;
 }
 
 // ★ TA-11-6 渲染热路径零 GC（07 号 §6.7/§10.2）：模块级持久刮擦缓冲，跨帧复用，
@@ -96,19 +152,13 @@ var _ptD = { x: 0, y: 0, d: 0 };
 var _nrm = { x: 0, y: 0, z: 0 };         // 倾干剪切法线刮擦（shearNormalInto 消费）
 var _so = { x: 0, y: 0, alphaScale: 1 }; // 贴地阴影偏移刮擦（lightShadowOffset out 参数消费）
 
-// 碎石池条目 { st, g:{x,y,d} }；草叶池条目 { b, bx, by, tx, ty, h, d }；
-// 冠簇池条目（Tree/Bush 共用）{ c, px, py, pd, rr, v }。
+// 碎石池条目 { st, g:{x,y,d} }；冠簇池条目（Tree/Bush 共用）{ c, px, py, pd, rr, v }；
+// （草叶池 { b, bx, by, tx, ty, h, d } 已随 GrassTuft 绘制迁往 render_grass.js）。
 var _rockScratchPool = [];
-var _grassScratchPool = [];
 var _crownScratchPool = [];
 function _rockScratch(i) {
   const p = _rockScratchPool;
   while (p.length <= i) p.push({ st: null, g: { x: 0, y: 0, d: 0 }, d: 0 }); // d 镜像 g.d（扁平排序键）
-  return p[i];
-}
-function _grassScratch(i) {
-  const p = _grassScratchPool;
-  while (p.length <= i) p.push({ b: null, bx: 0, by: 0, tx: 0, ty: 0, h: 0, d: 0 });
   return p[i];
 }
 function _crownScratch(i) {
@@ -150,6 +200,12 @@ function drawAccentEntity(accent) {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
+  // ★ TA-04-3 世界光向刷新（零分配 Into 变体；主干/枝条/茎圆柱侧面明暗共用；
+  // SimLighting 缺席时置零——cylinderShade 各向退化，各侧同色安全兜底）
+  const SL = window.SimLighting;
+  if (SL && SL.lightDirInto) SL.lightDirInto(_ld);
+  else { _ld.x = 0; _ld.y = 0; _ld.z = 0; }
+
   // 投影（与地形/世界实体同一套 3D → 屏幕变换）
   const rx = accent.x * cosZ - accent.y * sinZ;
   const ry = accent.x * sinZ + accent.y * cosZ;
@@ -180,7 +236,7 @@ function drawAccentEntity(accent) {
   } else if (kind === 'RockCluster') {
     drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX);
   } else {
-    drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
+    drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX); // render_grass.js（v1.50.39 迁出）
   }
 }
 
@@ -251,12 +307,23 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     out.d = ry * sinX + dz * cosX;
   }
 
-  // 主干：底粗顶细的锥形曲干（沿用 v1.49.3 形状与配色，顶点改由三维投影得出）
+  // 主干：底粗顶细的锥形曲干（沿用 v1.49.3 形状，顶点改由三维投影得出）
   const top = _ptA;
   projTo(0, 0, sk.trunkH, top);
   const bw = Math.max(1.2, crownR * 0.17);
   const tw = Math.max(0.6, bw * 0.45);
-  ctx.fillStyle = 'rgb(86, 62, 42)';
+
+  // ★ TA-04-3 枝干受光（§6.5「枝干用少量侧面明暗表达圆柱体」）：模型空间光向/视向
+  // （倾干剪切逆变换 x' = x − s·z）；主干轴向随剪切倾斜，三色 = 朝屏体色 / 迎光带 / 背光带，
+  // 全部经 accentLitFill 单一入口——转相机或改光向，迎光面始终朝向世界光源。
+  const lmx = _ld.x - leanShear * _ld.z, lmy = _ld.y, lmz = _ld.z;
+  const wvx = sinZ * sinX, wvy = cosZ * sinX, wvz = cosX; // 世界视向（投影深度增方向）
+  const vmx = wvx - leanShear * wvz, vmy = wvy, vmz = wvz;
+  cylinderShade(0, 0, 1, leanShear, // 模型存直立骨架：模型轴 = (0,0,1)，剪切由本层施加
+    lmx, lmy, lmz, vmx, vmy, vmz, cosZ, sinZ, cosX, sinX);
+  const barkR = 86, barkG = 62, barkB = 42;
+
+  ctx.fillStyle = accentLitFill(barkR, barkG, barkB, _cylFront.x, _cylFront.y, _cylFront.z, 1);
   ctx.strokeStyle = 'rgba(40, 28, 18, 0.38)';
   ctx.lineWidth = Math.max(0.4, 0.45 * scaled);
   ctx.beginPath();
@@ -268,29 +335,68 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   ctx.fill();
   ctx.stroke();
 
-  // 树皮受光面：沿左侧一条浅色细干，替代厚重描边提供的立体感
-  ctx.strokeStyle = 'rgba(158, 124, 92, 0.5)';
-  ctx.lineWidth = Math.max(0.4, 0.32 * scaled);
-  ctx.beginPath();
-  ctx.moveTo(sx - bw * 0.45, sy - trunkH * 0.06);
-  ctx.quadraticCurveTo(sx - bw * 0.15, sy - trunkH * 0.55, top.x - tw * 0.4, top.y + trunkH * 0.04);
-  ctx.stroke();
+  // ★ TA-04-3 侧面明暗带（替代旧「固定屏幕左上」树皮亮线 v1.49.3 遗留）：带位由世界光向
+  //   的屏幕投影决定，clip 进干轮廓防溢出；远景干宽不足 minWidthPx 时省略（亚像素噪声）。
+  const bb = barkBandCfg();
+  if (bw >= bb.minPx && _cylScr.ok) {
+    const ob = bw * bb.offK, ot = tw * bb.offK, om = (ob + ot) * 0.5;
+    ctx.save();
+    ctx.beginPath(); // 重建干轮廓作 clip（明暗带严格留在圆柱投影内）
+    ctx.moveTo(sx - bw, sy);
+    ctx.quadraticCurveTo(sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y);
+    ctx.lineTo(top.x + tw, top.y);
+    ctx.quadraticCurveTo(sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
+    ctx.closePath();
+    ctx.clip();
+    ctx.lineWidth = Math.max(0.4, bw * bb.wK);
+    ctx.strokeStyle = accentLitFill(barkR, barkG, barkB, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
+    ctx.beginPath();
+    ctx.moveTo(sx + _cylScr.x * ob, sy + _cylScr.y * ob);
+    ctx.quadraticCurveTo(sx + _cylScr.x * om, sy - trunkH * 0.55 + _cylScr.y * om,
+      top.x + _cylScr.x * ot, top.y + _cylScr.y * ot);
+    ctx.stroke();
+    ctx.strokeStyle = accentLitFill(barkR, barkG, barkB, _cylDark.x, _cylDark.y, _cylDark.z, 1, bb.darkA);
+    ctx.beginPath();
+    ctx.moveTo(sx - _cylScr.x * ob, sy - _cylScr.y * ob);
+    ctx.quadraticCurveTo(sx - _cylScr.x * om, sy - trunkH * 0.55 - _cylScr.y * om,
+      top.x - _cylScr.x * ot, top.y - _cylScr.y * ot);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // 枝条骨架（全年保留——冬季裸枝的主体，§6.4）
+  // ★ TA-04-3：枝条走同一受光管线——基色按「朝屏法线」（视向垂直段轴向分量）受光，
+  //   转相机/光向明暗随动；段宽可辨时沿迎光侧补一条细高光（少量侧面明暗，不逐段贴图）。
   if (detailMid) {
-    ctx.strokeStyle = 'rgb(96, 70, 48)';
     ctx.lineCap = 'round';
     for (let i = 0; i < sk.segments.length; i++) {
       const seg = sk.segments[i];
       const a = _ptB, b = _ptC;
       projTo(seg.x1, seg.y1, seg.z1, a);
       projTo(seg.x2, seg.y2, seg.z2, b);
-      ctx.lineWidth = Math.max(0.5, bw * seg.wK);
+      const lwSeg = Math.max(0.5, bw * seg.wK);
+      const dxs = seg.x2 - seg.x1, dys = seg.y2 - seg.y1, dzs = seg.z2 - seg.z1;
+      const segLen = Math.hypot(dxs, dys, dzs) || 1;
+      cylinderShade(dxs / segLen, dys / segLen, dzs / segLen, leanShear,
+        lmx, lmy, lmz, vmx, vmy, vmz, cosZ, sinZ, cosX, sinX);
+      ctx.strokeStyle = accentLitFill(96, 70, 48, _cylFront.x, _cylFront.y, _cylFront.z, 1);
+      ctx.lineWidth = lwSeg;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       // 控制点取中点略下垂，枝条微弯不僵硬
       ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + bw * 0.35, b.x, b.y);
       ctx.stroke();
+      // 迎光侧细高光（段宽可辨且屏幕迎光方向非退化才画）
+      if (lwSeg >= bb.minPx && _cylScr.ok) {
+        const o = lwSeg * bb.offK;
+        ctx.strokeStyle = accentLitFill(96, 70, 48, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
+        ctx.lineWidth = lwSeg * bb.wK;
+        ctx.beginPath();
+        ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
+        ctx.quadraticCurveTo((a.x + b.x) / 2 + _cylScr.x * o,
+          (a.y + b.y) / 2 + bw * 0.35 + _cylScr.y * o, b.x + _cylScr.x * o, b.y + _cylScr.y * o);
+        ctx.stroke();
+      }
     }
     ctx.lineCap = 'butt';
   }
@@ -452,10 +558,12 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 
   // 细茎（全年保留；冬季枯枝为主）
+  // ★ TA-04-3：茎走与 Tree 枝条同一受光管线（灌木无倾干，剪切 = 0）——基色按「朝屏法线」
+  //   受光，茎宽可辨时沿迎光侧补细高光；转相机/光向明暗随动。
   if (r >= lv.mid) {
-    ctx.strokeStyle = 'rgb(104, 78, 54)';
+    const bb = barkBandCfg();
+    const wvx = sinZ * sinX, wvy = cosZ * sinX, wvz = cosX; // 世界视向（灌木无剪切，模型=世界）
     ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(0.5, 0.9 * scaled);
     for (let i = 0; i < sk.segments.length; i++) {
       const seg = sk.segments[i];
       const a = _ptB, b = _ptC, c = _ptD;
@@ -463,10 +571,27 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       projTo(seg.x2, seg.y2, seg.z2, b);
       // 控制点取 40% 高度处、水平位置取 55% 外倾 —— 茎先直立后外弯
       projTo(seg.x2 * 0.55, seg.y2 * 0.55, seg.z2 * 0.40, c);
+      const lwSeg = Math.max(0.5, 0.9 * scaled);
+      const segLen = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1, seg.z2 - seg.z1) || 1;
+      cylinderShade((seg.x2 - seg.x1) / segLen, (seg.y2 - seg.y1) / segLen, (seg.z2 - seg.z1) / segLen, 0,
+        _ld.x, _ld.y, _ld.z, wvx, wvy, wvz, cosZ, sinZ, cosX, sinX);
+      ctx.strokeStyle = accentLitFill(104, 78, 54, _cylFront.x, _cylFront.y, _cylFront.z, 1);
+      ctx.lineWidth = lwSeg;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.quadraticCurveTo(c.x, c.y, b.x, b.y);
       ctx.stroke();
+      // 迎光侧细高光（茎宽可辨且屏幕迎光方向非退化才画）
+      if (lwSeg >= bb.minPx && _cylScr.ok) {
+        const o = lwSeg * bb.offK;
+        ctx.strokeStyle = accentLitFill(104, 78, 54, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
+        ctx.lineWidth = lwSeg * bb.wK;
+        ctx.beginPath();
+        ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
+        ctx.quadraticCurveTo(c.x + _cylScr.x * o, c.y + _cylScr.y * o,
+          b.x + _cylScr.x * o, b.y + _cylScr.y * o);
+        ctx.stroke();
+      }
     }
     ctx.lineCap = 'butt';
   }
@@ -649,143 +774,4 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     ctx.lineWidth = Math.max(0.5, Math.min(0.8, 0.8 * scaled));
     ctx.stroke();
   }
-}
-
-// ★ TA-11-4 草丛季相色派生（纯函数，只依赖 SimTreeTint 季节样本输出；07 号 §6.3/§6.6）：
-// 春嫩绿萌发（budAmount 向芽色提亮）→ 夏深绿繁茂（叶色直出）→ 秋金黄枯赭（叶色直出 +
-// 枯萎混合启动）→ 冬灰枯褐（枯萎深度 = brownness×(1−叶量)，隆冬收敛至 rgb(95,88,70)，
-// 草叶不脱落）。芦草穗（plume）量随秋枯升起（brownness 0.35→0.8 渐升，flowerAmount
-// 叠加为配置预留通道），秋季淡黄白高光 → 隆冬按 litterAmount 转干灰，残穗挺立不消失。
-// 暂停/回溯/读档零抖动：颜色是季节样本的连续函数，无逐帧累积状态。
-function grassSeasonColor(season) {
-  const clamp01 = v => Math.max(0, Math.min(1, v));
-  const lc = season.leafColor;
-  // 草色：季相连续叶色向草绿微偏（草比树叶更黄绿），浮点直出不做色档量化
-  let r = lc[0] * 0.96 + 10;
-  let g = lc[1] * 1.02 + 4;
-  let b = lc[2] * 0.88;
-  // 春季芽苞（§6.3）：budAmount 向嫩芽绿 (198,216,130) 提亮，隐现不抢眼
-  const budK = clamp01(season.budAmount) * 0.35;
-  r += (198 - r) * budK;
-  g += (216 - g) * budK;
-  b += (130 - b) * budK;
-  // 秋冬枯萎（§6.6「冬季低矮枯草」）：枯萎深度 = brownness×(1−叶量)×1.35（增益保证
-  // 隆冬叶量 ~0.03 时枯萎深度达 1，精确收敛枯褐色 rgb(95,88,70)；秋季仅尾部轻度混入）
-  const witherK = clamp01(clamp01(season.brownness) * (1 - clamp01(season.leafDensity)) * 1.35);
-  r += (95 - r) * witherK;
-  g += (88 - g) * witherK;
-  b += (70 - b) * witherK;
-  // 芦花穗量：秋枯进程驱动（brownness 0.35 起显 → 0.8 全开），flowerAmount 叠加预留
-  const plumeV = Math.max(season.flowerAmount || 0, clamp01((season.brownness - 0.35) / 0.45));
-  // 穗色：秋季淡黄白高光 (240,233,200) → 隆冬干灰白 (190,182,158)，litterAmount 渐变
-  const litterK = clamp01(season.litterAmount);
-  return {
-    r: r, g: g, b: b,
-    plumeV: clamp01(plumeV),
-    plumeR: 240 + (190 - 240) * litterK,
-    plumeG: 233 + (182 - 233) * litterK,
-    plumeB: 200 + (158 - 200) * litterK,
-  };
-}
-
-// GrassTuft：3–6 根短草线（D-B1-6，06 号 §5.5）；★ TA-11-4 芦草变体与季相深化。
-// 颜色由前端按当前季节派生（同 Tree：SimTreeTint 连续季相，不读存档 tint，14 号 §7.4），
-// 季相公式单一来源 = grassSeasonColor（本文件上方，07 号 §6.3/§6.6）；
-// 草叶不脱落——冬季以「低矮 + 枯色」表达（hK 隆冬收缩系数，config.render.js TA-11-3），
-// 隆冬枯草与芦秆仍在场，严禁整丛消失或纯透明。
-// 芦草（模型层 skeleton.isReed）：挺拔株形 + 顶端穗状芦花——穗量/穗色由 grassSeasonColor
-// 给出，穗几何沿叶曲线末端方向延伸（屏幕空间，画家排序与所在草叶一致）。
-function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
-  const sk = model.skeleton;
-  const rot = accent.rotation || 0;
-  const cR = Math.cos(rot), sR = Math.sin(rot);
-  // 隆冬低矮萎缩保底高度系数（config.render.js，TA-11-3）：hK = ratio + (1-ratio)×叶量
-  const RC = window.RENDER_CONFIG || {};
-  const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio)
-    ? RC.accentGrassTuftWinterHeightRatio : 0.62;
-  const hK = winterK + (1 - winterK) * season.leafDensity;
-
-  // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
-  function projTo(dx, dy, dz, out) {
-    const rx = dx * cosZ - dy * sinZ;
-    const ry = dx * sinZ + dy * cosZ;
-    out.x = sx + rx * scaled;
-    out.y = sy + (ry * cosX - dz * sinX) * scaled;
-    out.d = ry * sinX + dz * cosX;
-  }
-
-  // 草色 + 芦花穗量/穗色：季相派生单一入口 grassSeasonColor（TA-11-4，见本文件上方）
-  const sc = grassSeasonColor(season);
-
-  // 贴地接触投影（弱于灌木）
-  const so = _shadowOffset(0.8, 1.6, 0.5);
-  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.10 * so.alphaScale).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, 2.6 * scaled, 1.1 * scaled, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 草叶收集 + 深度画家排序（叶尖投影深度，远 → 近；★ TA-11-6 草叶池 + 稳定性插入排序，零分配）
-  let nItems = 0;
-  for (let i = 0; i < sk.blades.length; i++) {
-    const b = sk.blades[i];
-    const it = _grassScratch(nItems++);
-    it.b = b;
-    it.bx = b.bx * cR - b.by * sR;
-    it.by = b.bx * sR + b.by * cR;
-    it.tx = b.tx * cR - b.ty * sR;
-    it.ty = b.tx * sR + b.ty * cR;
-    it.h = b.h * hK;
-    projTo(it.tx, it.ty, it.h, _ptA);
-    it.d = _ptA.d;
-  }
-  _sortScratch(_grassScratchPool, nItems, 'd');
-
-  ctx.lineCap = 'round';
-  for (let i = 0; i < nItems; i++) {
-    const it = _grassScratchPool[i];
-    const p0 = _ptB;
-    const p1 = _ptC;
-    const c = _ptD;
-    projTo(it.bx, it.by, 0, p0);
-    projTo(it.tx, it.ty, it.h, p1);
-    // 控制点：半高、外倾 25% —— 叶先立后弯不僵硬
-    projTo(it.bx + (it.tx - it.bx) * 0.25, it.by + (it.ty - it.by) * 0.25, it.h * 0.5, c);
-    const k = 0.86 + 0.28 * it.b.lite; // 个体色差（同 Tree/Bush lite 通道语义）
-    ctx.strokeStyle = 'rgb(' +
-      Math.round(Math.max(0, Math.min(255, sc.r * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, sc.g * k))) + ',' +
-      Math.round(Math.max(0, Math.min(255, sc.b * k))) + ')';
-    // 芦秆略细挺（0.52 vs 0.62），与普通短草区分茎秆质感
-    ctx.lineWidth = Math.max(0.5, (it.b.plume > 0 ? 0.52 : 0.62) * scaled);
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.quadraticCurveTo(c.x, c.y, p1.x, p1.y);
-    ctx.stroke();
-    // ★ TA-11-4 穗状芦花：沿叶曲线末端方向的三笔花序线段（主穗顺叶弯挺出 + 两侧短穗）。
-    //   穗量 plumeV 秋枯升起、隆冬存留（干灰色），几何随隆冬 hK 收缩；
-    //   远景穗屏长 < 2px 不可辨直接省略；画家排序与所在草叶一致（叶压穗/穗压叶自然）。
-    if (it.b.plume > 0 && sc.plumeV > 0.02) {
-      const pl = it.b.plume * hK * scaled;
-      if (pl >= 2) {
-        const dx0 = p1.x - c.x, dy0 = p1.y - c.y;
-        const dl = Math.hypot(dx0, dy0) || 1;
-        const pa = Math.atan2(dy0 / dl, dx0 / dl);
-        ctx.strokeStyle = 'rgba(' +
-          Math.round(Math.max(0, Math.min(255, sc.plumeR))) + ',' +
-          Math.round(Math.max(0, Math.min(255, sc.plumeG))) + ',' +
-          Math.round(Math.max(0, Math.min(255, sc.plumeB))) + ',' +
-          (0.8 * sc.plumeV).toFixed(3) + ')';
-        ctx.lineWidth = Math.max(0.5, 0.9 * scaled);
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p1.x + Math.cos(pa) * pl, p1.y + Math.sin(pa) * pl);
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p1.x + Math.cos(pa + 0.45) * pl * 0.6, p1.y + Math.sin(pa + 0.45) * pl * 0.6);
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p1.x + Math.cos(pa - 0.5) * pl * 0.5, p1.y + Math.sin(pa - 0.5) * pl * 0.5);
-        ctx.stroke();
-      }
-    }
-  }
-  ctx.lineCap = 'butt';
 }

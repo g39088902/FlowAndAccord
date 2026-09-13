@@ -159,7 +159,7 @@ node frontend/server.js
 ```
 
 - 默认端口 `3000`，内置 `.wasm` MIME（`application/wasm`）
-- **若 3000 已被占用，说明用户已手动启动服务，Agent 不要重复启动**——直接访问 `http://localhost:3000`
+- **若 3000 已被占用，说明用户已手动启动服务，Agent 不要重复启动**——直接访问 `http://localhost:3002`
 - server.js 在端口占用时会自动递增重试（3001 → 3002 …），重复启动可能导致多实例并存
 - 每次重编译 WASM 后浏览器 `Ctrl + F5` 强制刷新清理缓存
 - server.js 以自身所在目录（`frontend/`）为静态根，须在项目根目录执行
@@ -189,7 +189,7 @@ node frontend/server.js
 | `CompileError: Invalid WebAssembly` | MIME 不对。本地 server.js 已内置正确 MIME；若用其他服务器需确保 `.wasm → application/wasm` |
 | `test-wasm.js` 确定性失败 | 新增随机消耗破坏了 WorldRng 确定性顺序（AGENTS.md §4.3）；检查新增的 `rng` 调用是否按 agent 顺序消费 |
 | `config-check.js` 报字段漂移 | 改了 `config.rs` 但没同步 `config.js`（或反之）；按报错字段名双向对齐 |
-| 端口 3000 占用 | 用户已启动服务，直接访问 `http://localhost:3000`；不要重复 `node frontend/server.js` |
+| 端口 3002 占用 | 用户已启动服务，直接访问 `http://localhost:3002`；不要重复 `node frontend/server.js` |
 | 页面 404 | 确认在项目根目录执行 `node frontend/server.js`；server.js 以 `frontend/` 为静态根 |
 
 
@@ -205,13 +205,13 @@ node frontend/server.js
 
 ## 1. 浏览器体验（推荐）
 
-启动本地 HTTP 服务（默认端口 3000）：
+启动本地 HTTP 服务（默认端口 3002）：
 ```bash
 node frontend/server.js
 ```
-访问浏览器：`http://localhost:3000`
+访问浏览器：`http://localhost:3002`
 
-> 若 3000 端口已被占用，说明前端服务已在运行，直接访问即可，无需重复启动。
+> 若 3002 端口已被占用，说明前端服务已在运行，直接访问即可，无需重复启动。
 
 > ⚠️ **v1.27.0 启动存档门禁 / ★ v1.28.0 自动读档**：页面打开后模拟默认暂停。若已连接默认存档文件（自动槽 1 = 浏览器记住的默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复）则**直接读取其内容续演**；首次使用需点击「建立存档文件」创建/连接一个本地 `.json` 存档文件（File System Access API），写入成功后才解除门禁开始模拟。请使用最新版 Chrome 或 Edge（Firefox 不支持）。
 

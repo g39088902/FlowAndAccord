@@ -1,6 +1,6 @@
 # frontend 模块 · 局部操作指南
 
-> 本目录是原生静态前端：34 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器与 ★ v1.50.23 TA-01 装饰三件套 `accent-season.js` / `accent-model.js` / `render_accents.js`）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：35 个 JS 文件（含 ★ M4 `snapshot-bin.js` 二进制解码器与 ★ v1.50.23 TA-01 装饰套件 `accent-season.js` / `accent-model.js` / `render_accents.js` / `render_grass.js`）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -25,7 +25,7 @@
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：16 条活动分支顺序 + 层级覆盖。用户调整保存到 `flowaccord.decision-order.v3`；启动时迁移 v2（b11→b8、移除 b15） | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
 | `js/config.lighting.js` | ~56 | ★ v1.48.0 `window.SIM_LIGHTING`：动态季节光照纯表现层配置（光位/强度/色温/阴影/量化档/限速）。**不并入 SIM_CONFIG**（并入会与 SimConfig 字段集比对冲突），不注入 WASM | 任何模拟行为参数（那些走 SimConfig） |
-| `js/config.render.js` | ~46 | ★ v1.50.15 `window.RENDER_CONFIG`：渲染表现层参数（mapZLift 视觉抬升 / 足迹感知深度半径 agentFootprintR·laneFootprintR·poiBase*·poiMarkerFootprintR·accentFootprintR）。★ v1.50.25 TA-03 增植被季相曲线 `accentSeasonProfiles` 与骨架参数（accentModelStyleVersion / accentDetail*Px / accentLeafClusters* / accentEvergreenChance）。★ v1.50.34 TA-11-3 增 RockCluster / GrassTuft 视觉形态参数 17 键（accentRockCluster* 9 键 + accentGrassTuft* 8 键）；★ v1.50.36 TA-11-4/5 增芦草与接触阴影 6 键（accentGrassTuftReedChance/ReedHeight*/PlumeLen* + accentRockClusterShadowAlpha/StoneShadowAlpha），accent-model.js / render_accents.js 消费。**不并入 SIM_CONFIG**（同上互检冲突），不注入 WASM；render_world.js 顶层 `const RC` 消费，须早于其加载 | 渲染深度队列（render_world.js） |
+| `js/config.render.js` | ~46 | ★ v1.50.15 `window.RENDER_CONFIG`：渲染表现层参数（mapZLift 视觉抬升 / 足迹感知深度半径 agentFootprintR·laneFootprintR·poiBase*·poiMarkerFootprintR·accentFootprintR）。★ v1.50.25 TA-03 增植被季相曲线 `accentSeasonProfiles` 与骨架参数（accentModelStyleVersion / accentDetail*Px / accentLeafClusters* / accentEvergreenChance）。★ v1.50.34 TA-11-3 增 RockCluster / GrassTuft 视觉形态参数 17 键（accentRockCluster* 9 键 + accentGrassTuft* 8 键）；★ v1.50.36 TA-11-4/5 增芦草与接触阴影 6 键（accentGrassTuftReedChance/ReedHeight*/PlumeLen* + accentRockClusterShadowAlpha/StoneShadowAlpha），accent-model.js / render_accents.js 消费；★ v1.50.39 TA-04-3 增枝干明暗带 5 键（accentBarkBandOffset/WidthK/LitAlpha/DarkAlpha/MinWidthPx，render_accents.js::barkBandCfg 消费）。**不并入 SIM_CONFIG**（同上互检冲突），不注入 WASM；render_world.js 顶层 `const RC` 消费，须早于其加载 | 渲染深度队列（render_world.js） |
 | `js/lighting.js` | ~330 | ★ v1.48.0 `window.SimLighting`：年周期光弧引擎——年度相位推导、视觉限速器、地形整片重着色、面光照、世界空间阴影、天空氛围。**必须在 rustworld.js 与渲染六件套之前加载** | DOM 操作、模拟状态写入、RNG 消费 |
 
 ### 1.2 决策引擎视图层（三件套，必须在 rustworld.js 之前加载）
@@ -50,7 +50,8 @@
 | `js/render_terrain.js` | ~365 | ★ v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造：`drawTerrainShell`（全网格顶点投影 + 沙盘基底 + ★ v1.48.2 按相机距离排序的沙盘侧壁 + ★ v1.48.1 格间抗锯齿缝隙补偿 `TERRAIN_SEAM_PX`）/ `drawTerrainCell`（单格填充，由统一深度队列调度，近处山地格可遮挡远处图标）/ `drawTerrainGrid`（'G' 键调试网格线）/ `drawFeatureItem`（单水系特征：★ v1.50.20 River 走 `drawRiverBand` 单段 clip 填充、RiverBank 单段描边、ShallowFord 浅滩踏石）/ `drawSkyBackdrop`（天空渐变与逆光光晕）/ ★ v1.50.23 TA-01 装饰代码已迁出为 accent 三件套（下方三行） | 立体实体、绘制调度（在 render_world）、HUD、共享状态 |
 | `js/accent-season.js` | ~75 | ★ v1.50.23 TA-01（docs/plan/tech/07-terrain-art.md §6.7）：**`window.SimTreeTint` 季相层**——装饰树木季节叶色的唯一生产者（`yearPhase`/`sample`/兼容 `brownness`/`tint`，消费 `RENDER_CONFIG.accentSeason*`）；TA-02 已提供连续叶色/叶量/芽/花/地被曲线。**新增消费方只能读它，不得另建季节色逻辑** | 模型几何（accent-model）、绘制（render_accents） |
 | `js/accent-model.js` | ~300 | ★ v1.50.23 TA-01：**`window.AccentModel` 模型层**——稳定形态派生 + 个体模型缓存（全局 `_accentHash` 哈希 / 个体种子 `vSeed` / `extent` 包围体预留）。★ v1.50.25 TA-03：局部三维骨架——Tree = 锥形主干 + 主枝/二级枝（segments 线段）+ 枝端/冠顶/包络叶簇；Bush = 基生细茎 + 叶簇；叶簇带稳定脱落次序 `shed` 与色差通道 `lite`（accent.id 纯函数）；缓存键 `v{accentModelStyleVersion}#kind#id`、上限 2048 条超限清空；`evergreen` 稳定哈希常绿变体（TA-06 前过渡）。★ v1.50.31 D-B1-6：`RockCluster`（内核只下发 anchor，2–5 颗子石偏移/尺度/形状全由 accent.id 哈希派生，不建实体）与 `GrassTuft`（3–6 根短草线骨架）模型分支（★ v1.50.34 TA-11-3 起两骨架的数量/散布/半径/株高参数走 `config.render.js` accentRockCluster*/accentGrassTuft*，缺省回退与原值逐位一致）。`resetCache()` 经 rustworld.js `_invalidateWorldStaticCaches()` 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处调用（★ v1.50.33 D-B1-7；与静态数据失效同一消息生命周期，换世界不残留旧模型）。★ v1.50.36 TA-11-4：GrassTuft 增哈希派生芦草变体（`skeleton.isReed`，株高 4.2~6.0m、穗长 plume 通道，概率走 `accentGrassTuftReedChance`）；★ v1.50.37 TA-11-6：`shearNormalInto` 零 GC 变体、`extentOf` GrassTuft 5→7（覆盖芦草株高与芦花穗高位） | 季相曲线（accent-season）、绘制（render_accents） |
-| `js/render_accents.js` | ~545 | ★ v1.50.23 TA-01：**装饰绘制层**——`drawAccentEntity` / `drawAccentTree` / `drawAccentBoulder` / `drawAccentBush`，仍由 render_world.js 深度队列以 DEPTH_ACCENT 调度。★ v1.50.25 TA-03：局部三维坐标走与锚点同一套相机投影（含倾干剪切），枝干全年保留，叶簇按 `leafDensity`×`shed` 次序收缩隐藏（禁整冠透明度），簇间画家排序；细节分级近/中/远三档（config.render.js accentDetail*Px）；贴地投影随叶量调制；春芽按 budAmount 绘制。★ v1.50.27 漫画风两遍式树冠：叶簇**严禁**恢复「逐簇深色 rim 描边」（簇间叠压出深色分界线）——统一「Pass A 全簇单 path 冠影色合并剪影 + Pass B 逐簇基色 × 冠内体积明暗（下暗上亮、远暗近亮，基准取整副骨架）」，近景高光只给冠层上半部。★ v1.50.31 D-B1-6：新增 `drawAccentRockCluster`（anchor 派生 2–5 颗子石，Boulder 三笔灰岩色板 + 簇内深度画家排序）与 `drawAccentGrassTuft`（3–6 根短草线，颜色由 `SimTreeTint` 按当前季节派生、不读存档 `tint`，冬季低矮枯草；★ v1.50.34 TA-11-3 起远景 LOD 省略阈值 `accentRockClusterLODMinRadius` 与冬季萎缩系数 `accentGrassTuftWinterHeightRatio` 走 `config.render.js`）；未知 kind 直接跳过 + 计数，开发模式（`sim.debugMode`）3s 限频报警，不得错画成 Bush。★ TA-04-2 世界光向受光经 `lighting.js::shadeRgbInto` 唯一公式入口接入；★ v1.50.36 TA-11-4/5 芦草白穗季相（`grassSeasonColor` 纯函数：春芽→夏深→秋金→隆冬 `rgb(95,88,70)` 草叶不脱落、穗色随 litter 转干灰）与碎石群微接触落底阴影（簇群整片 + 逐石接触椭圆，先影后石）；★ v1.50.37 TA-11-6 渲染热路径零 GC——刮擦池三件（`_rockScratchPool`/`_grassScratchPool`/`_crownScratchPool`）+ `projTo` 复用点投影 + 稳定性插入排序 `_sortScratch`（n≤16 等深次序与 `Array.sort` 一致），稳态零逐帧堆分配 | 深度队列调度（render_world）、季相（accent-season） |
+| `js/render_accents.js` | ~780 | ★ v1.50.23 TA-01：**装饰绘制层**——`drawAccentEntity`（分发；★ v1.50.39 起 GrassTuft 分发至 render_grass.js）/ `drawAccentTree` / `drawAccentBoulder` / `drawAccentBush`，仍由 render_world.js 深度队列以 DEPTH_ACCENT 调度。★ v1.50.25 TA-03：局部三维坐标走与锚点同一套相机投影（含倾干剪切），枝干全年保留，叶簇按 `leafDensity`×`shed` 次序收缩隐藏（禁整冠透明度），簇间画家排序；细节分级近/中/远三档（config.render.js accentDetail*Px）；贴地投影随叶量调制；春芽按 budAmount 绘制。★ v1.50.27 漫画风两遍式树冠：叶簇**严禁**恢复「逐簇深色 rim 描边」（簇间叠压出深色分界线）——统一「Pass A 全簇单 path 冠影色合并剪影 + Pass B 逐簇基色 × 冠内体积明暗（下暗上亮、远暗近亮，基准取整副骨架）」，近景高光只给冠层上半部。★ v1.50.31 D-B1-6：新增 `drawAccentRockCluster`（anchor 派生 2–5 颗子石，Boulder 三笔灰岩色板 + 簇内深度画家排序）与 `drawAccentGrassTuft`（3–6 根短草线，颜色由 `SimTreeTint` 按当前季节派生、不读存档 `tint`，冬季低矮枯草；★ v1.50.34 TA-11-3 起远景 LOD 省略阈值 `accentRockClusterLODMinRadius` 与冬季萎缩系数 `accentGrassTuftWinterHeightRatio` 走 `config.render.js`）；未知 kind 直接跳过 + 计数，开发模式（`sim.debugMode`）3s 限频报警，不得错画成 Bush。★ TA-04-2 世界光向受光经 `lighting.js::shadeRgbInto` 唯一公式入口接入；★ v1.50.39 TA-04-3 枝干圆柱侧面明暗——`cylinderShade()` 几何帮助函数（迎光/背光/朝屏三支世界法线 + 屏幕迎光方向，刮擦零分配；主干模型轴 (0,0,1)、剪切仅绘制层施加）+ 主干三色（朝屏体色/迎光带/背光带，带位由世界光向屏幕投影驱动、clip 防溢出）+ 枝条/茎逐段朝屏法线受光与迎光侧细高光；**严禁恢复 v1.49.3「固定屏幕左上」树皮亮线**（已移除）；明暗带 5 参数走 `config.render.js` accentBarkBand*；★ v1.50.36 TA-11-4/5 芦草白穗季相（`grassSeasonColor` 纯函数：春芽→夏深→秋金→隆冬 `rgb(95,88,70)` 草叶不脱落、穗色随 litter 转干灰）与碎石群微接触落底阴影（簇群整片 + 逐石接触椭圆，先影后石）；★ v1.50.37 TA-11-6 渲染热路径零 GC——刮擦池（`_rockScratchPool`/`_crownScratchPool`；草叶池已随 GrassTuft 迁往 render_grass.js）+ `projTo` 复用点投影 + 稳定性插入排序 `_sortScratch`（n≤16 等深次序与 `Array.sort` 一致），稳态零逐帧堆分配 | 深度队列调度（render_world）、季相（accent-season） |
+| `js/render_grass.js` | ~160 | ★ v1.50.39 自 render_accents.js 迁出（守 §4.6 800 行上限）：**GrassTuft 草丛绘制层**——`drawAccentGrassTuft`（3–6 根短草线 + 芦草变体穗状芦花）与季相色纯函数 `grassSeasonColor`（春芽→夏深→秋金→隆冬 `rgb(95,88,70)` 草叶不脱落、穗色随 litterAmount 转干灰；草丛本期**不在**世界光向受光范围，§6.5 保留季相短草线）。复用 render_accents.js 模块级共享工具（经典脚本顶层声明即全局）：`_shadowOffset`/`_sortScratch`/`_ptA~_ptD`；自带草叶池 `_grassScratchPool`/`_grassScratch`（零 GC 条目覆写）。加载顺序紧随 render_accents.js | 深度队列调度（render_world）、季相（accent-season）、模型（accent-model） |
 | `js/river_life.js` | ~300 | **★ v1.49.0 水系微观生态纯表现层**：`window.RiverLife`——`init(features, seed)`（世界重置/读档时由 rustworld.js 以 `_engineSeed` 重建，4 群 22 条游鱼沿河道中心线巡航）/ `update`（墙钟驱动，暂停时继续流动属设计决策）/ `drawFish` / `drawSunGlint`（迎光波光，强度按河道切线与光向夹角调制）；★ v1.50.3 移除水面微波虚线、★ v1.50.4 移除水底卵石层（`drawRiverbed` 及卵石数据已删除——深色扁圆石透水面观感呈"一堆深蓝色圆圈"）；在 render_terrain.js 之前加载 | 仿真状态读写、WorldRng 消耗、快照契约 |
 | `js/render_world.js` | ~700 | **世界元素绘制**（v1.7.1 拆分）：**★ v1.50.11 `drawWorldEntities()` 世界统一深度队列**（地形格 + 水系特征 + 游鱼/波光 + 道路 16 分段（`lineDashOffset` 虚线相位跨段连续）+ 营地辖区连线 + POI 底座 + POI 标记 + 房屋 + 族人 + 地表装饰，全部按 `depth = ry·sinX + z·cosX` 升序远 → 近落笔，深度项走持久对象池 `_depthPool` 零每帧 GC）/ `updateLaneHover`（道路悬浮检测 + Tooltip）/ `cacheLaneStyle` + `drawLaneSegment`（道路样式缓存与单段描边）/ drawPoiMarker（POI 图标/门牌/储量环）/ drawHouse（私宅 2.5D 微缩模型，★ v1.48.0 面法线受光 + 世界空间阴影） | 共享状态（在 render_canvas）、HUD（在 render_hud） |
 | `js/render_agents.js` | ~217 | **族人与特效绘制**（v1.7.1 拆分）：**★ v1.47.9 drawAgent（单实体绘制入口，由 `drawWorldEntities` 统一深度调度）** + 选中高亮 + 状态气泡 + 墓石 / drawCoronationEffects（登基礼花粒子特效） | 共享状态（在 render_canvas）、绘制调度（在 render_world 的 drawWorldEntities） |
@@ -79,7 +80,7 @@
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
-| `server.js` | ~122 | 静态文件开发服务器（内置 `.wasm` MIME = application/wasm）/ `POST /save-decision-order` 端点（★ v1.27.0 起仅保留兼容迁移，决策顺序保存主路径已迁至浏览器 localStorage）/ 默认 3000 端口 |
+| `server.js` | ~122 | 静态文件开发服务器（内置 `.wasm` MIME = application/wasm）/ `POST /save-decision-order` 端点（★ v1.27.0 起仅保留兼容迁移，决策顺序保存主路径已迁至浏览器 localStorage）/ 默认 3002 端口 |
 | `index.html` | ~895 行 | 单页应用骨架：Canvas 容器 / 顶栏（含存档按钮） / Inspector / 制度大盘 / 决策引擎覆层 / 存档面板 / 族谱模态 / **★ v1.27.0 启动存档门禁层 `#startup-save-gate`**（v1.28.0 起已连接默认存档时自动读档续演；v1.28.1 起权限未持久化不删记录、提供授权按钮重授）/ 30 个 script 标签按序加载（★ M4 含 `js/snapshot-bin.js`） |
 | `style.css` | — | 全局样式（顶栏/Inspector/大盘/决策视图/族谱/调试器） |
 | `rust/sim_wasm.wasm` | — | WASM 编译产物**主副本**（rustworld.js 实际 fetch 的路径） |
@@ -126,11 +127,12 @@
 24. accent-model.js           ★ v1.50.23 TA-01 装饰模型层（window.AccentModel 缓存，须早于 render_accents.js）
 25. render_terrain.js         地形网格/水系特征/天空氛围（★ v1.48.0 从 render_world.js 拆出）
 26. render_accents.js         ★ v1.50.23 TA-01 装饰绘制层（drawAccentEntity 等，早于 render_world.js）
-27. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
-28. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
-29. render_agents.js          族人/特效绘制（v1.7.1 拆分）
-30. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
-31. auction-ui.js             拍卖大盘（最后加载，独立模态）
+27. render_grass.js           ★ v1.50.39 GrassTuft 草丛绘制（自 render_accents.js 迁出，紧随其后加载）
+28. render_hud.js             HUD/大盘辅助函数（v1.7.1 拆分）
+29. render_world.js           路网/POI/房屋/世界实体统一深度队列（v1.7.1 拆分）
+30. render_agents.js          族人/特效绘制（v1.7.1 拆分）
+31. render_inspector.js       Inspector 面板/点击拾取（v1.7.1 拆分）
+32. auction-ui.js             拍卖大盘（最后加载，独立模态）
 ```
 
 **关键约束**：
@@ -139,7 +141,7 @@
 - ★ v1.48.0 `config.lighting.js`（6）与 `lighting.js`（7）必须早于 `rustworld.js`——`_applySnapshot` 建地形缓存时会调用 `SimLighting.markDirty()`，缺失则首帧不重着色
 - 改拆分配置 JS（新增全局对象）必须同步：`rustworld.js::applyConfig` 合并逻辑、`tools/config-check.js` 前端字段集、`tools/test-wasm.js` 注入
 - **`save-ui.js`（18）必须在 `main.js`（15）之后**——它读取 `window.rustWorldSim`（main.js 第 5 行挂载）调用 `saveWorld()/loadWorld()`
-- **渲染系列（21-30）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；共享全局作用域，函数声明可提升，加载顺序为 canvas→river_life→accent-season→accent-model→terrain→accents→hud→world→agents→inspector
+- **渲染系列（21-32）最后加载**，`render_canvas.js` 的 `render(now)` 主循环依赖 `window.rustWorld`、`window.dag`、`window.ledgerUI` 等全局对象；共享全局作用域，函数声明可提升，加载顺序为 canvas→river_life→accent-season→accent-model→terrain→accents→grass→hud→world→agents→inspector
 
 ---
 
