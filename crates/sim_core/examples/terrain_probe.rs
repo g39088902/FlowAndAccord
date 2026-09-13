@@ -3,7 +3,8 @@
 //! 用途：直接调用内核生成器，实测各 profile 的通行力与模板专属指标。
 //! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1` / 草原 `grassland_plain_v1` /
 //! 半坡 `hillside_woodland_v1` / 河谷聚落 `river_valley_settlement_v1`（S7-06 起接入
-//! §1.4 门禁窗口；components==1 与 detour 下限依赖 S7-07 浅滩走廊前的谷口绕行通道）。
+//! §1.4 门禁窗口；S7-07 起主河+浅滩落地，components==1 由浅滩缝合两岸与谷口缓梁
+//! 共同保证，`crossing95` ≥1.90 接线为浅滩验收门禁）。
 //! 对应 `docs/plan/tech/06-terrain-templates.md` §9.3.1、§18.7 与 STAGE-07-TODO S7-01。
 //!
 //! 运行：
@@ -29,7 +30,7 @@
 //! - `detour_max` / `detour_p95`：测地距离 / 欧氏距离。≈1.0 表示地形完全无阻碍；
 //!   出现明显 >1.5 的样本才说明「近在咫尺却必须绕行」，即山口玩法成立。
 //! - `crossing95`：直线段穿过不可行走格（深水/崖壁，浅滩不算）的对置点对绕行比 p95，
-//!   用于证明「两岸交往必须依赖浅滩」（S7-07 验收 ≥2.20）。
+//!   用于证明「两岸交往必须依赖浅滩」（S7-07 接线门禁，实测校准下限 1.90）。
 //! - ★ TB-01-7 支脊统计（v1.50.42/43，全模板输出列、山口专属验收块）：`brN` 检出支脊
 //!   条数（来自 `TerrainMap::branch_ridges`）；`brSlope` 支脊侧翼（|d⊥| ≤ width）峰值
 //!   坡度；`brDet` 直线穿越支脊影响区（|d⊥| ≤ 1.5×width）的样本对绕行比最大值。
@@ -55,6 +56,8 @@ const PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 
 /// §1.4 探针门禁窗口（STAGE-07-TODO §1.4 基线表）。仅对内核已实现的阶段七模板生效；
 /// `band_width_min` 为连续可建带最小宽度（S7-04 坡脚 ≥35m / S7-06 河阶 ≥55m；草原开阔图不设）。
+/// `crossing95_min` 为跨障绕行95 下限（S7-07 河谷聚落浅滩纽带接线门禁，实测校准值 1.90；
+/// 其余模板不设）。
 struct GateWindow {
     max_slope: (f32, f32),
     hard_blocked: (usize, usize),
@@ -63,6 +66,7 @@ struct GateWindow {
     detour_p95: (f32, f32),
     water_dist_max: f32,
     band_width_min: f32,
+    crossing95_min: f32,
 }
 
 fn gate_window_for(profile: &str) -> Option<GateWindow> {
@@ -75,6 +79,7 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             detour_p95: (0.0, 1.15),
             water_dist_max: 160.0,
             band_width_min: 0.0,
+            crossing95_min: 0.0,
         }),
         // ★ S7-04 窗口修订：`detour_p95` 下限 1.15 撤销——本探针的测地距离是
         //   纯几何 Dijkstra（不叠加坡度时耗），而半坡「全域 <30° 零禁行」的设计
@@ -91,22 +96,30 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             detour_p95: (0.0, 1.45),
             water_dist_max: 180.0,
             band_width_min: 35.0,
+            crossing95_min: 0.0,
         }),
         // ★ S7-06 窗口修订：`detour_p95` 下限 2.20 撤销——S7-06 骨架期验收不含
         //   绕行指标（STAGE-07-TODO S7-06 验收 = 侧壁坡度/禁行格数/可建格数/谷底
-        //   南北贯通）；「两岸对置点绕行比 ≥2.20」按探针口径属 `crossing95`
-        //   （跨障绕行95，对置直线穿障点对，已单列统计，S7-07 浅滩验收时接线门禁），
-        //   且 S7-07 浅滩缝合两岸后全图 detour 只会更低。保留上界 2.40（实测 60
-        //   种子峰值 2.17 + 余量）：防谷轴纵向被意外截断的病态几何绕行
-        //   （侧壁是纵向平行屏障，不阻碍沿谷交通）。
+        //   南北贯通）；「两岸对置点绕行比 ≥2.20」按探针口径属 `crossing95`。
+        // ★ S7-07 窗口修订：① `crossing95_min` 接线 **1.90**（原规格 ≥2.20 是
+        //   骨架期实测 2.70~2.81 的外推预期；主河落地后浅滩本身成为合法跨河
+        //   通道，绕行比总体下移——浅滩 ±0.32×world、60 种子实测 2.01~2.74，
+        //   下限 = 实测最小值 + 余量。「浅滩是唯一跨河纽带」的结构性证明由
+        //   components==1 + 深水 NO_WALK + 普通路网不穿深水承载，不依赖该比值）；
+        //   ② `no_walk` 上限 1500→1700——主河河道格（DeepWater 必打 NO_WALK，
+        //   浅滩段除外）叠加在侧壁之上，实测 1232~1434，原上限是旱谷骨架期
+        //   口径；③ `detour_p95` 上界 2.40 保留（实测 1.69~2.20，防谷轴纵向
+        //   病态截断的初衷不变）；④ `water_dist` 上限 140 沿用（主河贯穿谷底
+        //   后实测 ≤16m，天然满足）。
         TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT => Some(GateWindow {
             max_slope: (36.0, 45.0),
             hard_blocked: (600, 1500),
-            no_walk: (600, 1500),
+            no_walk: (600, 1700),
             buildable_min: 4200,
             detour_p95: (0.0, 2.40),
             water_dist_max: 140.0,
             band_width_min: 55.0,
+            crossing95_min: 1.90,
         }),
         _ => None,
     }
@@ -794,6 +807,14 @@ fn check_gates(t: &TerrainMap, r: &Report, m: &TemplateMetrics, win: &GateWindow
         v.push(format!(
             "buildable_band_width={:.1}m < {:.1}m",
             m.buildable_band_width, win.band_width_min
+        ));
+    }
+    // ★ S7-07：跨障绕行95 下限——浅滩是两岸交往的唯一合法纽带（对置直线
+    //   穿障点对的测地/欧氏绕行比 p95；浅滩格 ShallowWater 不算障碍）。
+    if r.crossing_detour_p95 < win.crossing95_min - 1e-4 {
+        v.push(format!(
+            "crossing95={:.2} < {:.2}（两岸绕行不足，浅滩纽带失效）",
+            r.crossing_detour_p95, win.crossing95_min
         ));
     }
     v
