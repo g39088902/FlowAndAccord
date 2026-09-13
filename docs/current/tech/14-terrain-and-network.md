@@ -362,7 +362,7 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ### 9.2 T0 基础生成器
 
-✅ 主体已落地（v1.47.1），保留 `TerrainMap` 的网格尺寸、世界尺寸和高程采样入口，生成步骤已抽取到 `generate_with_profile`：
+✅ 主体已落地（v1.47.1），保留 `TerrainMap` 的网格尺寸、世界尺寸和高程采样入口，生成步骤已抽取到 `generate_base_relief`（★ STAGE2-3 阶段化流水线第 2 步，原 `generate_with_profile`；其中坡度/地表/肥力定稿统一上移至流水线第 6 步 `finalize_slope_and_surface`——全图唯一写 slope 与派生 flags 的位置）：
 
 1. ✅ 生成基础倾斜和低频起伏，保持当前 seed 的确定性（倾斜/幅度/四相位仍从主 RNG 消费，顺序未变）。
 2. ✅ 计算完整网格高程和内部坡度；边界单元采用单侧差分而不是固定为 0，避免边缘通行误判。
@@ -454,7 +454,7 @@ T1 骨架生成完成后，用无状态哈希判定是否注入子特征：
 - **结构型**（`foot_lake` / `ridge_waterfall`）至多取一个，**视觉型**（`forested_slope` / `rocky_outcrop`）至多取一个；两者可同时存在，故每张图最多两个子特征。互斥裁决规则见 §5.3
 - 注入必须在生态播撒、营地/POI 落位与路网拓扑生成前完成；它不在运行中移动已存在的实体。最终落点以注入后的完整地表查询结果为准，不能承诺与关闭注入时坐标相同。
 
-> ✅ **D-B1-3（v1.50.30）**：**选择器**已在 `geo/terrain.rs::plan_subfeatures()` 落地——`mix64` / `roll_10000` / 每种 kind 一个固定盐值 / 按 `TerrainSubFeatureKind` 编号升序的「首个命中即停」互斥裁决，产出 `Vec<PlannedSubFeature>`（≤2，结构型在前）。它**不消费任何 `WorldRng`**、不读不写 `terrain`，由 `geo/hydrology.rs::generate_with_config` 的 `terrainAccentSubFeatures` 开关门控调用。
+> ✅ **D-B1-3（v1.50.30）**：**选择器**已在 `geo/terrain.rs::plan_subfeatures()` 落地——`mix64` / `roll_10000` / 每种 kind 一个固定盐值 / 按 `TerrainSubFeatureKind` 编号升序的「首个命中即停」互斥裁决，产出 `Vec<PlannedSubFeature>`（≤2，结构型在前）。它**不消费任何 `WorldRng`**、不读不写 `terrain`，由创世流水线第 4 步（`geo/terrain.rs::generate_with_config` 门控，★ STAGE2-3 起编排器迁至 terrain.rs）的 `terrainAccentSubFeatures` 开关门控调用。
 > ⚠️ **选中 ≠ 注入**：第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**仍是空实现**，`plan` 目前只被第 9 步空钩子读取长度，故开关两态与改动前世界输出**逐字节等价**——这是 D-B1 阶段一「旧 T1/T2 逐字节不变」退出条件成立的原因。注入器属阶段三/八。
 > 实现踩坑：候选池是 profile 作用域的，按 kind 编号扫描时「不在本 profile 池内」必须 `continue`，不能用 `?` 提前返回——否则排在 T1 候选（编号 0/1）之后的 T2 候选（4/5）永远判不到，T2 恒为空。
 
@@ -512,7 +512,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 
 ### 9.7 平地草原模板（`grassland_plain_v1`）
 
-✅ 内核骨架已落地（v1.50.40，STAGE-07-TODO S7-02）。实现于 `geo/terrain.rs::generate_with_profile` 草原分支（06 号 §4.1）：
+✅ 内核骨架已落地（v1.50.40，STAGE-07-TODO S7-02）。实现于 `geo/terrain.rs::generate_base_relief` 草原分支（创世流水线第 2 步，06 号 §4.1）：
 
 定位为首张「低障碍」地图模板——无硬禁行、无水面，选址与通行近乎自由，聚落结构完全由水源分布与踩踏涌现。生成要点：
 
@@ -944,7 +944,7 @@ render_agents.js        族人绘制                                            
   `terrainGenerationMaxRetries`（有界重试）已于 v1.50.39 由 STAGE2-1 **连同消费点加回**（见上表；
   消费点 = `spatial/world.rs::new_seeded_with_config` 建世界入口的重试预算钳制，完整阶梯降级重试环属 STAGE2-5）。
   `terrainAccentSubFeatures`（子特征注入总开关）已于 v1.50.29 由 D-B1-1 **连同唯一消费点加回**（见上表；
-  消费点 = `geo/hydrology.rs::generate_with_config` 的 06号 §5.3 第 4–5、9 步空钩子门控）。
+  消费点 = 创世流水线第 4 步（`geo/terrain.rs::generate_with_config` 门控；★ STAGE2-3 起编排器位于 terrain.rs）。
   历史：v1.50.18 曾以「内核零读取点（空转配置）」为由删除 4 个地形字段（`config.rs` / `config.js` / `examples/config.json` 三处同步，字段总数 242 → 231 → 232，v1.50.19 新增 `terrainGridRes`）；
   `tools/config-check.js` 第 5 条「空转参数」规则会拒绝任何无消费点的字段——加回字段必须连同真实读取点。
   树木季节变色**不依赖**任何配置开关——自 2026-09-12 起由前端 `SimTreeTint` 按季节派生（见 §7.4 与本节 Tree 条目）。

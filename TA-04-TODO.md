@@ -1,7 +1,7 @@
 # TA-04 TODO · 世界光向动态受光
 
 > **任务定义**：[07-terrain-art.md](docs/plan/tech/07-terrain-art.md) §1.2 任务表 TA-04（原代号 P0，详见 §6.5）——**世界光向动态受光：枝干/叶簇/Boulder/RockCluster 法线点积，移除固定屏幕亮斑，阴影随树高与叶量变化**。本文件把该任务拆为可执行任务序列，编号即建议实施顺序；每项标注出处章节与验收方式。
-> **状态**：TA-04-1 ✅ 已实现（2026-09-13，`lighting.js` 新增 `sunScreenDirFull()` 并通过 `frontend-check.js` 与 16 项冒烟断言）；TA-04-2 ✅ 已实现（2026-09-13，法线点积管线接入 Tree/Bush/Boulder/RockCluster，tD 驱动移除，`SUN_SCREEN_EPS` 迁入 `RENDER_CONFIG.sunScreenEps`，13 组 Node vm 断言 + 门禁全过）；TA-04-3 ✅ 已实现（2026-09-13，v1.50.39——枝干圆柱侧面明暗接入世界光向管线，主干三色 + 枝条/茎逐段受光 + 移除固定左上树皮亮线，20 组 vm 断言 + 门禁全过，浏览器三光位实测亮带随动）；TA-04-4 ✅ 已实现（2026-09-13，v1.50.40——叶簇宽而弱亮部接入世界光向屏幕投影，移除固定屏幕白斑与旧渐变色板死代码，17 组 vm 断言 + 门禁全过）；TA-04-5~8 待实施。`render_accents.js` 头注受光基线已随 TA-04-2 更新为「法线点积管线接入」；叶簇渐变亮部与固定白斑移除（TA-04-4）、岩石 billboard 几何细化（TA-04-5）后续消费。TA-04-1 已随提交 `cd89213` 纳入 v1.50.32；TA-04-3 交付已按根 AGENTS.md 统一升版 v1.50.39（含 TA-04-2 升版补录）并重编译同步 WASM 双副本，TA-04-8 核对最终产物证据，纯验证/文档收口不额外升版。
+> **状态**：TA-04-1 ✅ 已实现（2026-09-13，`lighting.js` 新增 `sunScreenDirFull()` 并通过 `frontend-check.js` 与 16 项冒烟断言）；TA-04-2 ✅ 已实现（2026-09-13，法线点积管线接入 Tree/Bush/Boulder/RockCluster，tD 驱动移除，`SUN_SCREEN_EPS` 迁入 `RENDER_CONFIG.sunScreenEps`，13 组 Node vm 断言 + 门禁全过）；TA-04-3 ✅ 已实现（2026-09-13，v1.50.39——枝干圆柱侧面明暗接入世界光向管线，主干三色 + 枝条/茎逐段受光 + 移除固定左上树皮亮线，20 组 vm 断言 + 门禁全过，浏览器三光位实测亮带随动）；TA-04-4 ✅ 已实现（2026-09-13，v1.50.40——叶簇宽而弱亮部接入世界光向屏幕投影，移除固定屏幕白斑与旧渐变色板死代码，17 组 vm 断言 + 门禁全过）；TA-04-5 ✅ 已实现（2026-09-13，v1.50.45——Boulder/RockCluster 子石共用 `drawStoneBody` 立体受光几何，billboard 移除 + 带法线顶面/侧面统一世界光向，16 组 vm 断言 + 门禁全过）；TA-04-6 ✅ 已实现（2026-09-13，v1.50.46——树/灌木贴地投影迁出为地面图元独立入统一深度队列，实高驱动影长 + 叶量调制夏冠影/冬枝影，含 render_world.js→render_depth_queue.js 队列模块拆分前置，19 组 vm 断言 + 门禁全过）；TA-04-7~8 待实施。`render_accents.js` 头注受光基线已随 TA-04-2 更新为「法线点积管线接入」；叶簇渐变亮部与固定白斑移除（TA-04-4）、岩石 billboard 几何细化（TA-04-5 ✅）均已消费。TA-04-1 已随提交 `cd89213` 纳入 v1.50.32；TA-04-3 交付已按根 AGENTS.md 统一升版 v1.50.39（含 TA-04-2 升版补录）并重编译同步 WASM 双副本，TA-04-8 核对最终产物证据，纯验证/文档收口不额外升版。
 > **难度**：中（单模块内有算法/设计含量，涉及照明、模型、绘制、深度队列及配置；需包含队列模块拆分成本，原 3~8 人日仅作初估）。
 > **依赖**：TA-03 ✅ 已落地（v1.50.25 / v1.50.26 / v1.50.27 枝干骨架 + 椭球叶簇 + 两遍式树冠），受光管线可直接推进；TA-04-6 须先完成深度队列相关模块拆分，TA-04-7 与 D-B1-7 共用缓存生命周期契约，实施前核对其当前状态，避免重复拆缓存。
 > **范围纪律**：纯前端视觉改动，不新增 FABS 字段、不消费共享模拟 RNG、不改变通行/资源/碰撞/建造事实；装饰仍走独立 `accent_rng`。**即使纯前端改动，统一升版仍会修改 Rust 应用版本常量，实施交付须重编译 WASM 并同步双副本**（07 号 §11.5）。新增可调参数随 TA-04-2～6 对应实现同步进入配置；TA-04-7 只作最终审计，不把参数集中推迟到收口。
@@ -15,8 +15,8 @@
 | TA-04-2 | 法线转换与点积管线：季节基础色 → 漫反射/环境光 → 光色温 | `render_accents.js` / `accent-model.js` / `config.render.js` / `lighting.js` | 中 | TA-04-1 |
 | TA-04-3 ✅ | 枝干受光：少量侧面明暗表达圆柱体 | `render_accents.js` / `config.render.js` | 低 | TA-04-2 |
 | TA-04-4 ✅ | 叶簇受光：低频分面/椭球体积，移除固定白色椭圆亮斑 | `render_accents.js` / `config.render.js` | 中 | TA-04-2 |
-| TA-04-5 | Boulder / RockCluster 受光：带法线顶面与侧面，统一场景受光方向 | `render_accents.js` / `config.render.js` | 低 | TA-04-2 |
-| TA-04-6 | 投影阴影随树高与叶量变化，地面图元单独排序 | `render_accents.js` / `render_world.js` 及拆分模块 / `config.render.js` | 中 | TA-04-2、队列模块拆分 |
+| TA-04-5 ✅ | Boulder / RockCluster 受光：带法线顶面与侧面，统一场景受光方向 | `render_accents.js` / `config.render.js` | 低 | TA-04-2 |
+| TA-04-6 ✅ | 投影阴影随树高与叶量变化，地面图元单独排序 | `render_accents.js` / `render_world.js` 及拆分模块 / `config.render.js` | 中 | TA-04-2、队列模块拆分 |
 | TA-04-7 | 视觉参数与缓存依赖/生命周期审计 | `config.render.js` / `accent-model.js` / `rustworld.js` | 低 | TA-04-3~6；与 D-B1-7 协调 |
 | TA-04-8 | 收口：§11.4 受光验收 + 性能实测 + 门禁 + 升版与文档同步 | 全链路 | 中 | TA-04-3~7 |
 
@@ -51,14 +51,15 @@
     - 依赖：TA-04-2。
     - ✅ 落地记录（2026-09-13，v1.50.40）：① **「低频分面/椭球近似」体积表达已由 TA-04-2 承载**（每簇冠包络椭球外向梯度法线入模型缓存 + Pass B 簇本体经 `accentLitFill` 点积受光），本任务不重复实现；② **近景簇亮部重写**（Tree/Bush Pass B）——亮部中心由固定屏幕偏移（−0.28/−0.42rr、固定旋转 −0.4、`tZ > 0.30` 上半冠启发式）改为**沿屏幕光向偏移** `it.px + _sunScr.x·rr·offK`（`_sunScr` 经新零分配 `SimLighting.sunScreenDirFullInto` 每实体刷新；光近视线投影 len→0 平滑回簇心，落实 TA-04-1 退化规则）；强度衰减由受光管线承担——亮色 `(255,252,218)` 经 `accentLitFill` 按簇法线（Tree 过 `shearNormalInto` 剪切逆转置、Bush 无剪切即世界法线）点积着色，迎光亮/背光自然衰减，**取代「只给上半冠」tZ 启发式**；椭圆放大宽而弱（`0.55rr×0.42rr`、峰值 alpha 0.16，旧 `0.42rr×0.30rr`、0.20/0.18），远景簇半径 < `accentCrownLitMinPx`(2.2px) 省略；③ **配置**（`config.render.js` 5 键）`accentCrownLitOffset` 0.45 / `accentCrownLitRxK` 0.55 / `accentCrownLitRyK` 0.42 / `accentCrownLitAlpha` 0.16 / `accentCrownLitMinPx` 2.2，`crownLitCfg()` 同 `barkBandCfg` 姿态（缺省回退 + 零 GC 复用对象）；④ **死代码清除**——`accentLeafPalette` 旧叶簇渐变色板（hi/rim/dapDark/dapLite，v1.50.27 两遍式树冠重构后零引用）整函数移除，07 号 §6.1「冠部径向渐变和亮斑固定屏幕左上」动机行全部收口（树皮亮线归 TA-04-3、冠部渐变/白斑归本项）；⑤ **验证**：临时 vm 断言 17 组全过（`sunScreenDirFullInto ≡ sunScreenDirFull` 且零分配写回 out、亮部中心 = 簇心 + 屏幕光向×rr×offK 逐椭圆匹配、相机旋转 90° 后按新投影公式复验、退化光向亮部回簇心、迎光法线亮部色亮于背光、5 类 × 3 相机角 × 2 光向冒烟零 NaN、`offset/MinPx` 热调生效、光向反转颜色集合改变），按 §4.10 已删除；门禁 `frontend-check` 36 文件 / `config-check` 233/233 / `cargo test --lib` / `test-wasm` / `test-determinism` 6/6 全绿；⑥ 升版 v1.50.40（12 定义点零漂移）+ 重编译同步 WASM 双副本 + changelog 条目。
 
-- [ ] **TA-04-5 Boulder / RockCluster 受光：带法线的顶面与侧面**
+- [x] **TA-04-5 Boulder / RockCluster 受光：带法线的顶面与侧面**
     - 内容：`drawAccentBoulder` 与 `drawAccentRockCluster` 的子石同步改为带法线的顶面与侧面，亮暗由同一世界光向决定，不固定规定顶面总比侧面亮；共用受光帮助函数及岩石基础色，保持子石只为视觉几何。GrassTuft 本期保留季相短草线，不新增立体法线或投影模型，不将其计入已完成动态受光的范围。
-    - 现状核对：`drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ)` 目前无受光参数、无法线分面；RockCluster 已实现，但仍使用固定深底/浅顶色。
+    - 现状核对：`drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ)` 目前无受光参数、无法线分面；RockCluster 已实现，但仍使用固定深底/浅顶色。（✅ 该核对为 TA-04-2 前快照：TA-04-2 已将两笔石面接入 `accentLitFill` 管线，TA-04-5 补齐 billboard 移除与随相机法线细化。）
     - 出处：07 号 §6.5 第 2 段、§11.4「受光」行（枝干/树冠/**灌木/岩面**亮部和地面投影协调）。
     - 验收：Boulder 与 RockCluster 子石亮暗方向均与同场景树/灌木一致，随光向与相机协调变化。
     - 依赖：TA-04-2。
+    - ✅ 落地记录（2026-09-13，v1.50.45）：① **`render_accents.js` 新增共用石体受光几何 `drawStoneBody`**（Boulder 与 RockCluster 子石同一入口）——棱柱轮廓随相机投影：底环 z=0 落地、顶环抬 `accentStoneHeightK×r`（`config.render.js` 新键，缺省 0.30），世界方位角顶点经相机 rotZ/cosX 投影（**billboard 移除**，轮廓与侧面片随相机旋转，与树/灌木同一套投影约定）；侧面逐面片法线 = 面片中点世界水平方向（直立壁 nz=0，取代旧「下倾 0.45」假法线），顶面法线 (0,0,1)，亮暗全部经 `accentLitFill` 世界光向点积——低角度阳光下面向光源的侧面可亮过顶面（亮暗次序随光向反转）；画序 = 侧面片 → 顶面（覆盖远侧片）→ 剪影描边（远侧取顶环 / 近侧取底环按 ry 符号判别）；底边贴落地点 = v1.50.13「精灵底边贴锚点」契约的几何化重述（cy = gy − max(rv·sinB)·cosX）；**移除旧 Boulder「+0.18r 固定右下偏移假侧面」与 RockCluster「0.72 固定屏幕纵压 billboard」**；零 GC（Float64Array 刮擦，sides ≤ 7）。② `drawAccentBoulder` 收敛为 `drawStoneBody` 单石包装（七边形变径公式逐位一致、lite=0.5 零偏移）；`drawAccentRockCluster` 石体循环改调 `drawStoneBody`，`stoneBase` 移除（lite 色差内联，岩石基础色两处共用同一常量路径）。③ 验证：临时 vm 断言 16 组全过（顶点屏幕方位 = 世界方位 + rotZ、迎光面片 0.859 > 背光 0.526、低角度侧面 0.885 > 顶面 0.763 / 高角度反转、固定光向转相机颜色逐位一致而位置随动、36 组相机×光照冒烟零 NaN、最低子石剪影底边精确贴落点、Tree/Bush/GrassTuft 回归、heightK 热调生效），按 §4.10 已删除；门禁 `cargo test --lib` / WASM 重编译双副本 / `test-wasm` / `test-determinism` 6/6 / `config-check` 239/239 / `frontend-check` / `doc-link-check` / `cross-doc-check` / `bump-version --check` 全绿。④ 升版 v1.50.45（12 定义点零漂移；基线已是 v1.50.44 合流版）+ 重编译同步 WASM 双副本 + changelog 条目。render_accents.js 拆分后 779 行（< 800 上限）。
 
-- [ ] **TA-04-6 投影阴影随树高与叶量变化 + 地面图元排序**
+- [x] **TA-04-6 投影阴影随树高与叶量变化 + 地面图元排序**
     - 内容：树与灌木投影继续复用 `shadowOffset(height)` 的世界光向与影长，按模型实际世界高度（模型高度 × accent.scale，不含 camera.zoom）及叶量改变覆盖与强度；夏季冠影完整，冬季以稀疏枝影和弱接地影为主。阴影作为地面图元独立加入统一深度队列，绘制逻辑归装饰层、入队和分发归队列层；删除实体绘制内对应旧阴影以免重复绘制，不新增整层阴影覆盖。样板可用簇影近似，无需逐叶阴影贴图。
     - 模块前置：`render_world.js` 当前 905 行，扩展前先将深度队列相关职责拆为单一职责模块，保持绘制行为；同步脚本加载顺序、局部 AGENTS.md 和代码地图，拆分后相关文件均应符合 800 行上限。该拆分归本项前置，不遗漏在文件范围之外。
     - 现状核对：树影已有 `shadowK = 0.55 + 0.45 * leaf` 叶量缩放，也已通过 `lightShadowOffset` 使用世界光向；问题是传入固定高度 2.0，并对屏幕偏移 x/y 分别乘 0.7/0.4，灌木也有类似近似。需改为真实高度驱动并消除屏幕轴向缩放造成的方向偏差。
@@ -66,6 +67,7 @@
     - 出处：07 号 §6.5 末段、§4.1「地形、房屋体块、族人投影与植被共用同一受光约定」、§11.4「受光」行。
     - 验收：夏影较完整、冬影稀疏减弱；高树比矮树影长、改变 zoom 不重复缩放；光向/相机变化时影偏移正确；平地与坡地均贴地，阴影不会被错误盖掉或压住前景实体，不参与拾取且不遮挡选中信息（§11.2 最小遮挡样板口径）。
     - 依赖：TA-04-2；本项先完成队列模块拆分。
+    - ✅ 落地记录（2026-09-13，v1.50.46）：① **模块前置完成**——`render_world.js` 909 行超限，深度队列职责（DEPTH_* 常量 + 对象池 + `_surfaceDepth`/`_decalDepth` + `MAP_Z_LIFT`/`projectLifted` + `RC` + `drawWorldEntities` 收集/分发 + `collectCampHouseLinks`）整体迁出为 **`render_depth_queue.js`**（458 行），render_world.js 瘦身至 507 行（保留 POI/房屋/道路绘制与 `lightShadowOffset`/`shadeHex`），纯代码搬移零行为变更；index.html 加载顺序、frontend/AGENTS.md、31 号代码地图、16 号前端概览同步。② **新增 `render_shadows.js`**（96 行，装饰层）——`drawAccentShadowGround` 三段影（接地弱影 + 稀疏枝影 α∝1−leaf + 冠影随叶量 0.30+0.70×leaf 收缩淡出，夏完整/冬稀疏）；影长 = `trunkH × accent.scale` 实高经世界光向 `shadowOffset` 驱动（zoom 只乘一次），屏幕偏移沿影向量整体落位 + 椭圆按影向旋转，**移除旧 0.7/0.4 轴向缩放**（现状核对两项缺陷收口）；远景 `accentShadowMinPx`(2.5px) 省略。③ **队列层**——新增 `DEPTH_ACCENT_SHADOW=12`：入队深度 = 世界落点（基点 + 影梢）`_decalDepth` 足迹深度取大，影梢 = 锚点 + 世界阴影方向（`SimLighting` 新增零分配 `shadowDirInto`）× 影长 × 实高，不沿用树根/树冠深度；分发调 `drawAccentShadowGround`；`drawAccentTree`/`drawAccentBush` 实体内旧阴影块删除；阴影半透明不参与拾取、不遮挡选中信息。④ **config.render.js 新增 4 键**（accentShadowAlpha 0.17 / GroundAlpha 0.12 / BranchAlpha 0.10 / MinPx 2.5）。⑤ 验证：临时 vm 断言 19 组全过（影向量逐轴精确、zoom 翻倍偏移翻倍、scale×2 偏移×2、夏 2 笔/冬 4 笔且冬冠影 α 显著弱、枝影沿影向、队列仅 Tree/Bush 入项且分发正确、影深度 decal 抬升、冒烟零 NaN、旧阴影源级删除、四文件 ≤ 800 行），按 §4.10 已删除；门禁 `cargo test --lib` / WASM 重编译双副本 / `test-wasm` / `test-determinism` 6/6 / `config-check` 239/239 / `frontend-check` 37 文件 / doc 三检 / `bump-version --check` 全绿。⑥ 升版 v1.50.46（12 定义点零漂移）+ 重编译同步 WASM 双副本 + changelog 条目。
 
 - [ ] **TA-04-7 视觉参数与模型缓存依赖审计**
     - 内容：复核 TA-04-2～6 新增可调参数已随实现进入 `config.render.js`；沿用 `config.lighting.js` 的共用光源参数，不另建光照公式或重复配置。纯视觉参数不进入 SIM_CONFIG/WASM/SimConfig 校验链路。

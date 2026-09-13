@@ -9,8 +9,8 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出 |
-| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征）+ ★ S7-04 `hillside_woodland_v1` 半坡分支（不对称高斯主坡：`GAUSS_PEAK_GRADIENT`=exp(-0.5) 峰值梯度反解宽度、`crest_shift` 岭线推离图心、`HILLSIDE_NOISE_DAMP`=0.6 噪声阻尼、洼地代码与草原共用 `foot_depressions`） |
-| `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ D-B1-3 §5.3 第 4–5、9 步钩子接线 |
+| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ §5.3 创世流水线编排器 `generate_with_config()`（0–9 步私有阶段，STAGE2-3 迁入）+ 第 2 步 `generate_base_relief`（山口起伏/草原/河谷低丘，原 `generate_with_profile`）+ 第 5 步子特征几何管线（5a 快照/5b 施加桩/5c 临时坡度/5d 接受回滚，阶段二空注入）+ 第 6 步 `finalize_slope_and_surface`（全图唯一定稿坡度与派生 flags）+ 第 7 步 `validate_static_terrain_geometry`（STAGE2-4 扩充）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征） |
+| `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ §5.3 第 3 步 `apply_profile_static_hydrology`（T2 主河水系覆盖；`plan_river_geometry` 共享几何） |
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |
 | `corridor.rs` | 廊道/路径几何分析 |
@@ -18,7 +18,7 @@
 
 ## 关键易踩坑
 
-1. **生成顺序**：`terrain.rs::generate_with_profile` 生成高程场（不含水系/装饰）；T2 `river_valley_v1` 在其后由 `terrain.rs::generate_river_valley_base_relief` 铺满全图写陆地基底（★ STAGE2-2 公式解耦：河阶外低丘公式唯一权威位置），再由 `hydrology.rs::generate_with_config` 完成水系——`generate_river` **仅覆盖水系影响带**（`d < half_width + bank + terrace`），带外一格不碰。水系生成完成后追加调用 `accents::generate_accents`。装饰不能在水系生成之前调用（会落入深水区）。
+1. **生成顺序（★ STAGE2-3 阶段化流水线）**：外部调用点只调用 `terrain.rs::generate_with_config(seed, config)`，内部按 06 号 §5.3 执行 0–9 步私有阶段：`0 resolve_profile`（不消费 WorldRng）→ `1 reset_static_terrain_state` → `2 generate_base_relief`（原 `generate_with_profile`：T0/T1 山口起伏、草原、T2 先铺倾斜+fBm 高程再由 `generate_river_valley_base_relief` 铺满全图写陆地基底——★ STAGE2-2 公式解耦：河阶外低丘公式唯一权威位置）→ `3 apply_profile_static_hydrology`（`hydrology.rs`：`generate_river` **仅覆盖水系影响带** `d < half_width + bank + terrace`，带外一格不碰）→ `4 plan_subfeatures`（纯 hash）→ `5 子特征几何管线 5a–5d`（★ 阶段二空注入）→ `6 finalize_slope_and_surface`（**全图唯一写 slope/派生 flags 的位置**；T2 只重算坡度、不改陆地分类）→ `7 validate_static_terrain_geometry`（STAGE2-4 扩充）→ `8 generate_base_accents` → `9 append_subfeature_accents`（空实现）。第 10/11 步（ecology 布局与路网、`validate_terrain_world`+生存诊断）由 `World3DEngine` 创世序列执行。阶段间临时数据走 `GenesisScratch`（T2 河几何 + 草原软地掩码），不进快照/存档。装饰在第 8 步（地貌与水系定稿后）散布，不能提前调用（会落入深水区）。
 2. **RNG 隔离**：`generate_accents` 使用 `WorldRng::new(seed ^ ACCENT_RNG_SALT)` —— `ACCENT_RNG_SALT = 0x4143_4345_4E54_3031`。此流与地形播撒、生态 POI、水系生成完全独立，保证装饰确定性可单独籽验。
 3. **`TerrainMap` 字段增删** = 影响存档序列化 + 快照四处同步（见根 AGENTS.md §4.5）。新增字段须加 `#[serde(default)]` 以保持向后兼容。
 4. **装饰储量不写入存档逻辑**：`Vec<TerrainAccent>` 在 `world_save.rs` 中随 `TerrainMap.terrain_state` 自动序列化（由 `#[derive(Serialize, Deserialize)]` 派生），无需在 `WorldSave` 中单独列出。

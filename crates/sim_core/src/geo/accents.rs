@@ -94,7 +94,7 @@ const SALT_GRASS_PATCH_SMALL: u64 = 0x4752_5350_4154_5331;
 
 /// 使用独立 accent_rng 在地形表面散布装饰物。
 ///
-/// 在 generate_with_profile 末尾调用（此时路网/房屋/POI 尚未放置，
+/// 在创世流水线第 8 步调用（★ STAGE2-3；地貌与水系定稿后、路网/房屋/POI 尚未放置，
 /// 故只根据地表的表面类别/坡度/肥力做禁区过滤）。
 ///
 /// ★ S7-03：`grassland_plain_v1` 走专属分支——Tree 预算压至 20%（孤树）、

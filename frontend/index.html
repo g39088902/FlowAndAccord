@@ -1398,7 +1398,11 @@
   <script src="js/render_terrain.js"></script>
   <script src="js/render_accents.js"></script>
   <script src="js/render_grass.js"></script>
+  <!-- ★ TA-04-6 装饰贴地投影绘制层（树/灌木地面图元阴影；复用 render_accents 共享工具） -->
+  <script src="js/render_shadows.js"></script>
   <script src="js/render_hud.js"></script>
+  <!-- ★ TA-04-6 前置拆分：世界统一深度队列层（入队/分发单一职责，须早于渲染首帧） -->
+  <script src="js/render_depth_queue.js"></script>
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>
   <script src="js/render_inspector.js"></script>
