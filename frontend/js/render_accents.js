@@ -27,6 +27,9 @@
 //   drawStoneBody：相机投影棱柱轮廓（billboard 移除，随相机旋转）+ 带法线顶面/侧面
 //   （经 accentLitFill 世界光向点积受光，不固定「顶亮侧暗」）；GrassTuft 不在本任务
 //   受光范围（§6.5：保留季相短草线，不新增立体法线）。
+//   ★ TA-04-6（v1.50.46）树/灌木贴地投影迁出为地面图元——实体的旧阴影块删除，
+//   绘制在 render_shadows.js::drawAccentShadowGround、入队/分发在 render_depth_queue.js
+//   （实高驱动影长 + 叶量调制，深度 = 基点/影梢足迹深度取大，不沿用树根/树冠深度）。
 // - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
 //   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
@@ -295,13 +298,8 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const detailMid = crownR >= lv.mid;   // 中景：主枝 + 叶簇
   const detailNear = crownR >= lv.near; // 近景：二级枝 + 簇亮部 + 春芽
 
-  // 贴地投影：叶量调制（夏季完整冠影 → 冬季稀疏枝影 + 弱接地影，§6.5 过渡做法）
-  const so = _shadowOffset(1.2, 2.5, 2.0);
-  const shadowK = 0.55 + 0.45 * leaf;
-  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.17 * so.alphaScale * (0.72 + 0.28 * leaf)).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.7, sy + so.y * 0.4, crownR * (0.85 + vSeed * 0.15) * shadowK, crownR * 0.40, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // 贴地投影已迁出为地面图元（★ TA-04-6：入队/分发归 render_depth_queue.js，绘制归
+  // render_shadows.js::drawAccentShadowGround——实高驱动影长 + 叶量调制，**严禁**在实体内恢复旧阴影）
 
   // 倾干剪切（世界 x，随个体 rotation 稳定；模型只存直立骨架）
   const leanShear = Math.cos(accent.rotation || 0) * 0.22;
@@ -586,13 +584,7 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const lv = accentDetailLevels();
   const detailNear = r >= lv.near;
 
-  // 贴地微投影（叶量调制）
-  const so = _shadowOffset(1.2, 2.5, 0.7);
-  const shadowK = 0.60 + 0.40 * leaf;
-  ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.15 * so.alphaScale * (0.75 + 0.25 * leaf)).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, r * 0.95 * shadowK, r * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // 贴地微投影已随 TA-04-6 迁往 render_shadows.js::drawAccentShadowGround（同 Tree）
 
   // 局部三维 → 屏幕（灌木无倾干；★ TA-11-6 写入复用点，零分配）
   function projTo(dx, dy, dz, out) {

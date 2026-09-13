@@ -184,7 +184,9 @@ stateDiagram-v2
 | `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接 |
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |
 | `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘（不含随身行囊均值与贫富倍差） |
-| `render_world.js` | 3D 地形、水系地貌特征（河岸/浅滩/泉谷，T1 山脊/山口/台地轮廓 v1.47.7 已删）、POI 指示环、房屋及★在售呼吸光晕与拍卖标牌、踩踏道路 |
+| `render_world.js` | 3D 地形、水系地貌特征（河岸/浅滩/泉谷，T1 山脊/山口/台地轮廓 v1.47.7 已删）、POI 指示环、房屋及★在售呼吸光晕与拍卖标牌、踩踏道路。★ v1.50.46 TA-04-6 深度队列迁往 render_depth_queue.js，本文件保留 POI/房屋/道路绘制与 lightShadowOffset/shadeHex |
+| `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 收集与分发（地形格/水系/道路/POI/房屋/装饰/树灌木贴地投影/族人） |
+| `render_shadows.js` | ★ v1.50.46 TA-04-6 装饰贴地投影绘制层：drawAccentShadowGround 树/灌木地面图元阴影（实高驱动影长 + 叶量调制，夏冠影完整/冬稀疏枝影 + 弱接地影） |
 | `render_agents.js` | 族人渲染、妊娠光环、状态气泡、登基礼花粒子 |
 | `river_life.js` | 水系微观生态纯表现层（★ v1.49.0）：水底卵石、成群游鱼、迎光太阳波光，种子联动 `_engineSeed` |
 | `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与拾取点击 |

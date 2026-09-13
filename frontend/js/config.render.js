@@ -103,6 +103,14 @@ window.RENDER_CONFIG = {
   // 棱柱轮廓随相机投影（billboard 移除），亮暗由世界光向点积决定（不固定「顶亮侧暗」）。
   accentStoneHeightK: 0.30,               // 石体高宽比：石高 = K × 石半径（侧面带高随相机 sinX 投影）
 
+  // —— 树/灌木贴地投影（TA-04-6，render_shadows.js::drawAccentShadowGround 消费）——
+  // 阴影为地面图元独立入统一深度队列（入队/分发归 render_depth_queue.js）；影长由模型实高
+  // （trunkH × accent.scale，不含 zoom）经世界光向 shadowOffset 驱动，叶量调制覆盖与强度。
+  accentShadowAlpha: 0.17,                // 冠影峰值不透明度（夏季完整冠影；随叶量 0.30+0.70×leaf 衰减）
+  accentShadowGroundAlpha: 0.12,          // 接地弱影不透明度（贴树根，冬季仍存）
+  accentShadowBranchAlpha: 0.10,          // 稀疏枝影峰值不透明度（α ∝ 1−leaf，冬季为主）
+  accentShadowMinPx: 2.5,                 // 冠屏半径低于此整组省略阴影（远景亚像素噪声）
+
   accentGrassTuftMinBlades: 3,            // 草叶最少叶数
   accentGrassTuftMaxBlades: 6,            // 草叶最多叶数
   accentGrassTuftHeightBase: 2.4,         // 基准株高下限（世界米）
