@@ -5,7 +5,27 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = 3004;
+const ROOT = path.join(__dirname, '..');
+
+// ── git 分支感知：分支名 → 版本徽章后缀 + 端口偏移（多分支并行开发互不占口）──
+// 端口 = 3000 + 分支名最后一个字符的数字（c2→3002、c3→3003）；
+// 末位非数字（master/test/mac）或非 git 环境偏移为 0（3000）。PORT 环境变量优先。
+function detectGitBranch() {
+  try {
+    const head = fs.readFileSync(path.join(ROOT, '.git', 'HEAD'), 'utf8').trim();
+    const m = head.match(/^ref: refs\/heads\/(.+)$/);
+    return m ? m[1] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const GIT_BRANCH = detectGitBranch();
+const BRANCH_PORT_OFFSET = GIT_BRANCH && /\d/.test(GIT_BRANCH.slice(-1)) ? Number(GIT_BRANCH.slice(-1)) : 0;
+const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3000 + BRANCH_PORT_OFFSET;
+// master 不带后缀（与 CI 部署产物一致），其余分支徽章显示为 v1.50.44·分支名。
+// 仅注入展示层，磁盘文件与 SAVE_APP_VERSION 恒为纯数字基线（存档门禁不受影响）。
+const BRANCH_TAG = GIT_BRANCH && GIT_BRANCH !== 'master' ? `·${GIT_BRANCH}` : '';
 
 
 const MIME_TYPES = {
@@ -97,30 +117,45 @@ const server = http.createServer((req, res) => {
         res.end(`Server Error: ${error.code}`);
       }
     } else {
+      let body = content;
+      // 仅对 index.html 注入分支后缀（Buffer → string 一次性替换，其余静态资源零开销）
+      if (extname === '.html' && BRANCH_TAG && path.basename(filePath) === 'index.html') {
+        body = content.toString('utf8').replace(
+          /(<span class="version-tag"[^>]*>v\d+\.\d+\.\d+)(<\/span>)/,
+          `$1${BRANCH_TAG}$2`
+        );
+      }
       res.writeHead(200, {
         'Content-Type': contentType,
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       });
-      res.end(content, 'utf-8');
+      res.end(body, 'utf-8');
     }
   });
 });
 
-const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3004;
-
-
 function startServer(port) {
   server.listen(port, () => {
     console.log(`🚀 Flow & Accord 3D Visualizer running at: http://localhost:${port}`);
+    if (GIT_BRANCH) {
+      console.log(`🌿 git 分支: ${GIT_BRANCH} → 端口偏移 +${BRANCH_PORT_OFFSET}${BRANCH_TAG ? `，版本徽章后缀 "${BRANCH_TAG}"` : '，徽章无后缀（master）'}`);
+    }
   });
 }
 
+const MAX_PORT_RETRY = 5;
+let portRetries = 0;
+
 server.on('error', (e) => {
   if (e.code === 'EADDRINUSE') {
-    const nextPort = server.address() ? server.address().port + 1 : (parseInt(process.env.PORT, 10) || 3004) + 1;
-    console.log(`⚠️ Port ${e.port || 3000} is in use, trying port ${nextPort}...`);
-
-    setTimeout(() => startServer(nextPort), 200);
+    portRetries++;
+    if (portRetries >= MAX_PORT_RETRY) {
+      console.error(`❌ 端口 ${e.port || DEFAULT_PORT} 持续被占用——同分支服务大概率已在运行，无需再启动新实例，退出。`);
+      process.exit(1);
+    }
+    // 只在分支自己的端口上重试，不做 +1 递增（递增会窜进其他分支的端口段）
+    console.log(`⚠️ Port ${e.port || DEFAULT_PORT} is in use, retrying (${portRetries}/${MAX_PORT_RETRY})...`);
+    setTimeout(() => startServer(DEFAULT_PORT), 500);
   } else {
     console.error('Server error:', e);
   }
