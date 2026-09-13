@@ -1,6 +1,6 @@
 # 17. 动态季节光照（年周期光弧）设计方案
 
-> **状态**：★ **P0–P3 已实现（v1.48.0）**——光相引擎、地形重着色、立体面光照、世界空间阴影、天空氛围、开关与调试读数全部落地；P4（水面镜面高光 / 浅色主题联动微调）仍未实施。口径 4 项决策已确认：年周期光弧 / 四季正方向（春东·夏南·秋西·冬北）/ 冬夏亮度拉开（0.90 / 1.08）/ 默认开启。
+> **状态**：★ **P0–P3 已实现（v1.48.0）**——光相引擎、地形重着色、立体面光照、世界空间阴影、天空氛围、开关与调试读数全部落地；P4（水面镜面高光 / 浅色主题联动微调）仍未实施。★ **立体装饰受光已随 TA-04 落地（v1.50.32~v1.50.46）**，接口见 §4.7。口径 4 项决策已确认：年周期光弧 / 四季正方向（春东·夏南·秋西·冬北）/ 冬夏亮度拉开（0.90 / 1.08）/ 默认开启。
 > **整理日期**：2026-09-09（按 v1.47.11 代码现状逐函数核对）；2026-09-09 落地为 v1.48.0，实现细节以代码与 `frontend/AGENTS.md` §5.10 为准。
 > **范围**：太阳方位/高度角、光照强度与环境项、光色温、阴影方向与长度、天空氛围；**不含**地表反照率（草色/枯黄/积雪）与素材。
 > **入口**：[文档导航](../../README.md) · [四季与热力学现状](./15-seasons-climate.md) · [地形美术规划](../../plan/tech/07-terrain-art.md) · [前端现状](./16-frontend-overview.md)。
@@ -257,7 +257,7 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 
 - `drawHouse` 落影椭圆：偏移改用 §3.6 的 `screenDelta`，长度随 `shadowLen` 缩放，透明度 `opacity = shadowOpacityBase + shadowOpacityGain·(1-sin e)`（低日头更浓）。
 - `drawAgent` 落影、`drawPoiGroundBase` 底座阴影：同公式，按各自 `objectHeight` 取系数。
-- 阴影是**贴地图元**，保持在 `drawWorldEntities()` 之前（`frontend/AGENTS.md` §5.9 的图层铁律），不得塞进实体深度队列。
+- 阴影是**贴地图元**，保持在 `drawWorldEntities()` 之前（`frontend/AGENTS.md` §5.9 的图层铁律），不得塞进实体深度队列。（★ v1.50.46 TA-04-6 起该铁律对**装饰贴地投影**失效：装饰阴影作为地面图元独立入统一深度队列 `DEPTH_ACCENT_SHADOW=12`，见 §4.7；房屋/族人/POI 底座影仍维持本条口径。）
 
 ### 4.5 L4 · 天空氛围与台缘
 
@@ -274,6 +274,19 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 - `render_hud.js` 调试监视器新增 `#dbg-light-ms`（重着色耗时）与 `#dbg-light-phase`（u 与档位），供 §9 性能验收取证；
 - `main.js` 绑定复选框（写 `SIM_LIGHTING.enabled` + 立即重着色）与可选快捷键 `L`（实现前先确认未占用）；
 - `style.css` 按 v1.47.10 的浅色适配范式补 `body.theme-light` 规则。
+
+### 4.7 立体装饰受光（★ TA-04 ✅ v1.50.32~v1.50.46）
+
+装饰（Tree/Bush/Boulder/RockCluster）已接入世界光向法线点积管线；GrassTuft 保留季相短草线，不参与受光。接口边界（权威契约见 [07 号](../../plan/tech/07-terrain-art.md) §6.5/§10.2）：
+
+- **唯一受光入口**：`render_accents.js::accentLitFill(base, nx, ny, nz, kAo, alpha)` → `SimLighting.shadeRgbInto()`（「季节基础色 → wrap 漫反射+环境光 → intensity/tint」，零分配写回 out 数组；装饰绘制层禁止复制光照公式）。
+- **屏幕光向**：`sunScreenDirFullInto(out)`（含 z 分量完整投影；`len < RENDER_CONFIG.sunScreenEps` 时按 `len/eps` 平滑回冠心，调用方无需分支）。
+- **每实体零分配读取**：`lightDirInto(out)` / `shadowDirInto(out)`（世界阴影方向 + 影长系数）。
+- **法线几何归模型层** `accent-model.js`：`attachCrownNormals()` 在 Tree/Bush 骨架构建时写入冠包络椭球外向梯度法线（随骨架缓存，id 纯函数）；`shearNormal()` 为倾干剪切（`x += s·z`）的逆转置变换 `n' = (nx, ny, nz − s·nx)`，依赖 `accent.rotation` 不入缓存、绘制层每帧施加。
+- **石体**：`drawStoneBody()`（Boulder 与 RockCluster 子石共用）棱柱轮廓随相机投影，顶面法线 (0,0,1)、侧面 = 面片中点世界水平方向——低角度阳光下迎光侧面可亮过顶面。
+- **贴地投影**：`render_shadows.js::drawAccentShadowGround` 三段影（接地弱影/稀疏枝影 α∝1−leaf/冠影随叶量 0.30+0.70×leaf），影长 = `trunkH × accent.scale` 实高经 `shadowOffset` 驱动，以世界落点独立入深度队列（§4.4 修订）。
+- **配置**：16 个可调参数集中在 `config.render.js`（`sunScreenEps` / `accentBarkBand*` 5 / `accentCrownLit*` 5 / `accentStoneHeightK` / `accentShadow*` 4），缺省回退与集中值逐键一致，不进 SIM_CONFIG/WASM 链路（TA-04-7 审计）。
+- **生命周期**：模型缓存随 D-B1-7 `_invalidateWorldStaticCaches()` 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四事件清理；`STR_TAB.start_index==0` 仅管字符串驻留表，不替代模型清理。
 
 ---
 
