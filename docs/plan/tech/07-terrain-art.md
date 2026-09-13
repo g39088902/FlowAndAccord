@@ -84,7 +84,7 @@ stateDiagram-v2
 
 | 编号 | 任务 | 原代号 / 详见 | 难度 | 依赖 |
 | :--- | :--- | :--- | :--- | :--- |
-| TA-11 | RockCluster / GrassTuft 全链路：生成器调用、枚举字典、FABS 快照、前端绘制入口；走独立盐值通道，不扰动既有抽样序列 | D-A 余项、P2，详见 §6.6 | 中 | TA-01 |
+| TA-11 ✅ v1.50.38 | RockCluster / GrassTuft 全链路：生成器调用、枚举字典、FABS 快照、前端绘制入口；走独立盐值通道，不扰动既有抽样序列（v1.50.34~v1.50.38 各子项落地，含芦草变体、碎石群微接触阴影、渲染热路径零 GC 与 Chrome 端到端验收；子项分解与验收记录见 [01-changelog.md](../../current/01-changelog.md) v1.50.29~v1.50.38 条目） | D-A 余项、P2，详见 §6.6 | 中 | TA-01 |
 | TA-12 | 世界坐标锁定的低对比度地表纹理（草斑/土纹），缩放旋转不重随机 | S1-2 | 中 | — |
 | TA-13 | 季节地表反照率调色（春嫩/夏深/秋枯/冬雪预留），消费 `season`/`season_progress`，并显式使 `cell.color` 缓存失效 | S1-4、M3 | 中 | — |
 | TA-14 | 成组分布与最终几何表现层遮罩：装饰在表现层避让路网/房屋/POI/取水点，不改通行与建造规则 | P2，详见 §6.6 | 中 | TA-11 |
@@ -149,7 +149,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 | 地面偏暗、缺少细部，背景透出明显 | `math.js::computeElevationColor` 按归一化高程着色，透明度 0.55；`main.js` 另有同类兜底函数 | ✅ 已解决：单一着色入口 + 不透明填充 + 兰伯特方向光 + AO；另有天空渐变底 `drawSkyBackdrop`（依赖季节光照开关）；`main.js::getElevationColor` 仅保留一层纯色兜底 | 世界坐标锁定的草斑/土纹（TA-12）；地貌到边界的自然收边未做 |
 | 地图边界笔直，悬在黑色背景中 | `drawTerrain` 逐格画四边形 | ✅ 已解决：微缩沙盘侧壁（四向明暗分面）+ 底部柔和投影；v1.50.14 起侧壁分段并入统一深度队列，正确遮盖贴边实体 | 未做地貌过渡到边界的自然收边 |
 | 黄、青、紫道路比地貌更抢眼，甚至划破屋顶 | `drawLanes` 在 `drawHouses` 之后绘制，高等级道路用亮黄/亮橙 + 外发光 | ✅ 已解决：道路作为地表踩踏纹理先画，房屋压在道路之上；默认低饱和土石色阶，亮色/发光只在 `R` 键热力图模式出现；v1.50.11 起道路 16 分段并入统一深度队列 | 无 |
-| 森林、水源和矿区主要像发光标记，缺少面积与体积 | `drawPois` 使用径向渐变 + Emoji + 库存环 | ◐ D-A 已落地 Tree/Bush/Boulder 装饰群（v1.49.1）与三档季相（v1.50.21）；POI 本体已降噪（底座阴影 + 温和色圆，库存环仅近景或选中显示），但标记本质仍是 Emoji 图标 | RockCluster/GrassTuft（TA-11）；资源点景观群与院地（TA-17） |
+| 森林、水源和矿区主要像发光标记，缺少面积与体积 | `drawPois` 使用径向渐变 + Emoji + 库存环 | ◐ D-A 已落地 Tree/Bush/Boulder 装饰群（v1.49.1）与三档季相（v1.50.21）；POI 本体已降噪（底座阴影 + 温和色圆，库存环仅近景或选中显示），但标记本质仍是 Emoji 图标 | RockCluster/GrassTuft 已随 TA-11 落地；资源点景观群与院地（TA-17） |
 | 聚落中的门牌、拍卖牌和状态标记重叠 | `drawHouses` 在多类房屋上直接画文字 | ◐ 已分级：房屋编号标签仅在 `zoom > 1.05` 或选中时显示，拍卖/修缮标识保留 | 标注避让与聚合（TA-16），拥挤时仍可能互相压字 |
 | 截图显示秋季，但地表仍以大片绿色为主 | 着色函数不含季节因子 | ◐ Tree/Bush 已有连续季相（TA-02，v1.50.24）；**地表** `computeElevationColor` 仍未消费 `sim.currentSeason`，且 `cell.color` 被 `rustworld.js` 缓存，改色必须显式失效 | 季节地表材质（TA-13）；几何落叶（TA-03） |
 | 跨图层「远物压近物」 | Canvas 2D 无深度缓冲，房屋/POI/族人各按数组原序整层绘制 | ✅ 已解决并持续扩展：`drawWorldEntities()` 统一深度队列，v1.50.11/v1.50.14/v1.50.20 起地形格、水系段、道路、侧壁也全部入队，按 `project3D().depth` 远 → 近绘制 | 新增世界实体必须挂进同一队列（见 `frontend/AGENTS.md` §5.9）；高树穿插遮挡待 TA-08 实测 |
@@ -175,7 +175,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 
 **统一深度队列（S2.2/P2，v1.47.8 建立、v1.50.11/14/20 扩展）**：`render_canvas.js::render()` 现行顺序为 `SimLighting.update()` → `drawSkyBackdrop()` → `drawTerrainShell()`（全网格顶点投影 + 沙盘基底/侧壁壳）→ **`drawWorldEntities()`（世界统一深度队列）** → `drawTerrainGrid()`（`G` 键调试网格）→ 登基礼花。队列内一切图元按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制，同深度保持收集原序（`Array.sort` 稳定）以维持渲染确定性，深度项走持久对象池 `_depthPool` 零每帧 GC；排序只作用于绘制，`sim.pois` / `sim.houses` / `sim.agents` 顺序与点击拾取、Inspector 遍历不变。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制**（已有三次历史教训，见 `frontend/AGENTS.md` §5.9）。
 
-**D-A 装饰基础（v1.49.1）**：`geo/accents.rs` 定义 `AccentKind`（Tree/Bush/Boulder/RockCluster/GrassTuft 五变体）与 `TerrainAccent`（id/kind/pos/scale/rotation/tint）；`generate_accents()` 使用独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40 / 巨石 20 / 灌木 25 × `terrainAccentDensity`，按地表类别/坡度/肥力过滤水体与禁区、有界重试 3×；经 FABS Section 21（约 24B/个）随 `terrain_state` 入档；前端 `render_accents.js::drawAccentEntity` 分种类绘制（★ v1.50.23 自 `render_terrain.js` 迁出）。RockCluster/GrassTuft 仅有枚举，生成器无调用、绘制入口跳过，**不能算作已实现能力**。
+**D-A 装饰基础（v1.49.1）**：`geo/accents.rs` 定义 `AccentKind`（Tree/Bush/Boulder/RockCluster/GrassTuft 五变体）与 `TerrainAccent`（id/kind/pos/scale/rotation/tint）；`generate_accents()` 使用独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40 / 巨石 20 / 灌木 25 × `terrainAccentDensity`，按地表类别/坡度/肥力过滤水体与禁区、有界重试 3×；经 FABS Section 21（约 24B/个）随 `terrain_state` 入档；前端 `render_accents.js::drawAccentEntity` 分种类绘制（★ v1.50.23 自 `render_terrain.js` 迁出）。RockCluster/GrassTuft 已随 TA-11 全链路落地（v1.50.34~v1.50.38）：内核生成 60 草丛（含哈希派生水岸芦草变体）+ 12 碎石群并入 FABS Section 21，前端 `render_accents.js` 完整绘制（芦草白穗、碎石群微接触阴影与岩面分层、四季季相），渲染热路径零 GC。
 
 ### 3.3 关键实现入口（按职责）
 
@@ -362,7 +362,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 
 - ✅ T1 山口聚落（`mountain_pass_v1`：主脊 + 山口鞍部连续起伏，v1.47.7 起不含台地）与 T2 两岸河谷（`river_valley_v1`：蜿蜒主河 + 河阶 + 两岸浅滩）均已落地；`terrainProfile: 'random'` 按种子哈希在两者间约 50% 轮换，创世后把实际模板名回写入档。
 - ✅ 用少量可控的山脊、洼地塑造轮廓，保留平缓建房区与可达资源；地形感知路网（`terrain_network.rs`）保证路线绕山、经浅滩跨河，而非直线穿水。
-- ✅ T2 静态主河、浅滩、河滩与河阶已落地（v1.47.5）：水域、岸线、浅滩位置来自内核，前端只增加高光、岸石和植被（岸石/植被待 TA-11/TA-17）；河床先绘制，水面与岸边物体按遮挡关系组织；人物在浅滩沿内核实际路线过水并按 `terrain_shallow_water_cost` 减速。
+- ✅ T2 静态主河、浅滩、河滩与河阶已落地（v1.47.5）：水域、岸线、浅滩位置来自内核，前端只增加高光、岸石和植被（岸石/植被：TA-11 碎石群与草丛已落地 v1.50.38；资源区景观群待 TA-17）；河床先绘制，水面与岸边物体按遮挡关系组织；人物在浅滩沿内核实际路线过水并按 `terrain_shallow_water_cost` 减速。
 - ❌ **不再规划独立 T3 profile**（v1.48.0 决策）：湖泊/峡谷/瀑布通过 TB-04 子特征注入实现；湿地因视觉辨识度低明确删除。
 
 ### 7.2 TB-01 · 多尺度噪声与支脊（难度：高）
@@ -436,7 +436,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 | 高程、坡度、地表类别、真实地表状态 | ✅ Rust T0/T1/T2 生成或更新，经 FABS 地形 section 传递 | 不由前端另造物理地形；静态数据只在 `terrain_dirty` 帧下发 |
 | 河湖几何、水位、岸带、浅滩与后续桥梁 | ✅ 内核 `TerrainFeature` / `WaterPool` / `TerrainConnection`；桥梁待 TC-01 | 水面高程独立于河床；禁行、可建与交互点共用内核事实，装饰不得反向决定规则 |
 | 道路、房屋、资源储量 | 现有世界快照 | 材质映射不得改变真实坐标、路线、容量与消耗 |
-| 草斑、装饰石、素材变体 | ⏳ D-A 已承载 Tree/Bush/Boulder（`accent_rng` 生成 + 世界坐标锁定：id u32 + pos Vec3 + scale + rotation + tint）；RockCluster/GrassTuft 待 TA-11 | 独立 `accent_rng` (`seed ^ 0x4143_4345_4E54_3031`)，不消费共享模拟 RNG；FABS Section 21 持久化 |
+| 草斑、装饰石、素材变体 | ✅ D-A 五变体全量承载：Tree/Bush/Boulder（v1.49.1）+ RockCluster/GrassTuft（TA-11，v1.50.34~v1.50.38，含哈希派生水岸芦草变体、碎石群微接触阴影与岩面分层）；`accent_rng` 生成 + 世界坐标锁定（id u32 + pos Vec3 + scale + rotation + tint），渲染热路径零 GC（v1.50.37） | 独立 `accent_rng` (`seed ^ 0x4143_4345_4E54_3031`)，不消费共享模拟 RNG；FABS Section 21 持久化 |
 | 季节颜色、水面微动 | ◐ 季节/气温事实已随快照下发（`season`、`season_progress`、`temperature`），Tree/Bush 连续季相已落地；地表视觉映射未做 | 截图验收固定视觉时刻；暂停与回放时不漂移；改色须让 `cell.color` 缓存失效 |
 | 缓存和缩放细节层级 | 前端派生，可随时重建 | 不写入模拟状态；换世界、载入、地形变化时失效 |
 
