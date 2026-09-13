@@ -22,8 +22,11 @@
 //   ★ TA-04-4（v1.50.40）叶簇宽而弱亮部接入——近景簇亮部中心沿屏幕光向偏移
 //   （lighting.js::sunScreenDirFullInto，光近视线时平滑回冠心），颜色经受光管线随簇法线
 //   迎光程度衰减，取代 v1.50.27「屏幕固定位置白椭圆」；旧叶簇渐变色板（hi/dapLite/dapDark，
-//   v1.50.27 两遍式树冠重构后已无引用）随之移除；岩石 billboard 几何随相机细化（TA-04-5）后续接入；
-//   GrassTuft 不在本任务受光范围（§6.5：保留季相短草线，不新增立体法线）。
+//   v1.50.27 两遍式树冠重构后已无引用）随之移除。
+//   ★ TA-04-5（v1.50.45）岩石立体受光几何接入——Boulder 与 RockCluster 子石共用
+//   drawStoneBody：相机投影棱柱轮廓（billboard 移除，随相机旋转）+ 带法线顶面/侧面
+//   （经 accentLitFill 世界光向点积受光，不固定「顶亮侧暗」）；GrassTuft 不在本任务
+//   受光范围（§6.5：保留季相短草线，不新增立体法线）。
 // - ★ v1.50.27 漫画风两遍式树冠：叶簇不再逐簇画深色 rim 轮廓（相邻簇叠压处
 //   rim 压在邻簇本体上，冠内布满深色分界线，观感像一堆描边气泡），改为
 //   Pass A 全簇统一冠影色铺合并剪影 + Pass B 逐簇体积明暗（下暗上亮、远暗近亮）。
@@ -249,7 +252,7 @@ function drawAccentEntity(accent) {
   if (kind === 'Tree') {
     drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Boulder') {
-    drawAccentBoulder(sx, sy, scaled, accent.rotation || 0, cosZ, sinZ);
+    drawAccentBoulder(sx, sy, scaled, accent.rotation || 0, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Bush') {
     drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'RockCluster') {
@@ -498,45 +501,77 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   }
 }
 
-// Boulder：不规则多边形岩石（灰白顶+深灰底+暗边）
-function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ) {
-  const r = 6 * scaled;
-  const sides = 7;
-  // ★ v1.50.13 锚点修正：七边形原以 (sx,sy) 为中心，下半岩体沉入地表之下被近处格子盖掉
-  //   （「石头半截入土」）。改为底边贴锚点：整体上移 r（多边形最大下探 0.72rVar+0.18r ≈ 1.04r）。
-  const cy = sy - r;
-  // ★ TA-04-2：两笔石面改走世界光向受光管线——顶面法线朝上，侧面取个体稳定世界方向
-  //   （accent.rotation 水平角 + 下倾 0.45），亮暗随光向/色温变化，不再固定顶亮侧暗；
-  //   屏幕 billboard 几何与随相机的法线细化归 TA-04-5（§6.5：亮暗由面朝向与光向决定）。
-  const snx = Math.cos(rot), sny = Math.sin(rot);
-  // 阴影底层（深灰，略偏右下）
-  ctx.fillStyle = accentLitFill(78, 74, 68, snx, sny, -0.45, 1);
+// ── ★ TA-04-5 石体立体受光几何（Boulder 与 RockCluster 子石共用，07 号 §6.5 第 2 段）──
+// billboard 移除：底环（z=0 落地）与顶环（抬 h = accentStoneHeightK×r）的世界方位角顶点
+// 经相机 rotZ/cosX 投影——轮廓与侧面片随相机旋转，与树/灌木同一套投影约定；
+// 侧面逐面片法线 = 面片中点世界水平方向（直立壁 nz=0），顶面法线 (0,0,1)，亮暗全部由
+// accentLitFill（世界光向点积）决定：低角度阳光下迎光侧面可亮过顶面，不固定「顶亮侧暗」。
+// 画序：侧面片（方位角序，远侧片随后被顶面覆盖）→ 顶面 → 剪影描边（远侧取顶环 / 近侧取
+// 底环，ry 符号判别；两端极端点处竖直过渡即真实剪影竖切线）。底边贴落地点（v1.50.13
+// 锚点契约的几何化重述）：cy = gy − max(rv·ryWorld)·cosX，石体整体落在锚点上方。
+// 零 GC：顶点坐标写入模块级 Float64Array 刮擦（sides ≤ 7）；lite 为岩面个体色差通道。
+var _stPx = new Float64Array(8);
+var _stRy = new Float64Array(8);
+var _stGy = new Float64Array(8);
+// Boulder 固定七边形变径（0.82~1.20），与 v1.49.3 起旧公式 r·(0.82+0.38·((i·37+13)%7)/7) 逐位一致
+var _BOULDER_SHAPE = (function () {
+  const s = [];
+  for (let i = 0; i < 7; i++) s.push(0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
+  return s;
+})();
+function rockHeightK() {
+  const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentStoneHeightK;
+  return Number.isFinite(v) ? v : 0.3;
+}
+function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sinX, strokeW) {
+  let maxRy = -Infinity;
+  for (let i = 0; i < sides; i++) {
+    const a = rot + (i / sides) * Math.PI * 2;
+    const rv = r * shape[i];
+    const ca = Math.cos(a), sa = Math.sin(a);
+    _stPx[i] = gx + rv * (ca * cosZ - sa * sinZ);
+    _stRy[i] = rv * (ca * sinZ + sa * cosZ);
+    if (_stRy[i] > maxRy) maxRy = _stRy[i];
+  }
+  const cy = gy - maxRy * cosX;
+  for (let i = 0; i < sides; i++) _stGy[i] = cy + _stRy[i] * cosX;
+  const hS = r * rockHeightK() * sinX;
+  const kL = (lite - 0.5) * 20;
+  for (let k = 0; k < sides; k++) {
+    const k2 = (k + 1) % sides;
+    const aM = rot + ((k + 0.5) / sides) * Math.PI * 2;
+    ctx.fillStyle = accentLitFill(78 + kL, 74 + kL, 68 + kL, Math.cos(aM), Math.sin(aM), 0, 1);
+    ctx.beginPath();
+    ctx.moveTo(_stPx[k], _stGy[k]);
+    ctx.lineTo(_stPx[k2], _stGy[k2]);
+    ctx.lineTo(_stPx[k2], _stGy[k2] - hS);
+    ctx.lineTo(_stPx[k], _stGy[k] - hS);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = accentLitFill(152 + kL, 146 + kL, 138 + kL, 0, 0, 1, 1);
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
-    const angle = rot + (i / sides) * Math.PI * 2;
-    const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
-    const px = sx + Math.cos(angle) * rVar + r * 0.18;
-    const py = cy + Math.sin(angle) * rVar * 0.72 + r * 0.18;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    if (i === 0) ctx.moveTo(_stPx[i], _stGy[i] - hS); else ctx.lineTo(_stPx[i], _stGy[i] - hS);
   }
   ctx.closePath();
   ctx.fill();
-  // 顶面（浅灰白色）
-  ctx.fillStyle = accentLitFill(152, 146, 138, 0, 0, 1, 1);
-  ctx.beginPath();
-  for (let i = 0; i < sides; i++) {
-    const angle = rot + (i / sides) * Math.PI * 2;
-    const rVar = r * (0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
-    const px = sx + Math.cos(angle) * rVar;
-    const py = cy + Math.sin(angle) * rVar * 0.72;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  // 暗边轮廓让岩石从地形中分离
   ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
-  ctx.lineWidth = Math.max(0.6, 0.9 * scaled);
+  ctx.lineWidth = strokeW;
+  ctx.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const py = _stRy[i] < 0 ? _stGy[i] - hS : _stGy[i];
+    if (i === 0) ctx.moveTo(_stPx[i], py); else ctx.lineTo(_stPx[i], py);
+  }
+  ctx.closePath();
   ctx.stroke();
+}
+
+// Boulder：单石，走与 RockCluster 子石同一套受光几何（drawStoneBody 共用；lite=0.5 即
+// 基础色板零偏移，七边形变径沿用 v1.50.13 旧公式逐位一致）。
+function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ, cosX, sinX) {
+  drawStoneBody(sx, sy, 6 * scaled, rot, 7, _BOULDER_SHAPE, 0.5,
+    cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled));
 }
 
 // Bush：局部三维细茎灌木 —— 基生多茎 + 茎端椭球叶簇 + 微投影（§6.4：不缩小乔木冒充灌木）
@@ -678,12 +713,10 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
 // - 微接触落底阴影：簇群整片弱椭圆 + 逐石接触椭圆（lightShadowOffset(0.6,1.2,0.4)，
 //   极淡 rgba(25,20,15,0.14)，偏移随缩放与相机光向协调），消除河滩/斜坡上的漂浮感；
 //   阴影先于全部石体绘制，只落地表、不压邻石顶面。
-// - 岩面分层：主石 6~7 边 / 辅石 5~6 边非对称变径多边形（模型层 TA-11-5），底层改为
-//   逐面片扇形填充——每面片在几何端点就地导出倾斜侧面法线（方位角水平分量 + 下倾 0.45），
-//   顶面法线近似 (0,0,1)：TA-04-5 世界光向细化接入时只换光源参数、无需重构绘制循环。
-// - 暗边轮廓 0.5~0.8px 低饱和（近景清晰分离、不随缩放无限增粗）。
-// 子石按投影深度画家排序（远 → 近），每颗底边贴自身落地点（v1.50.13 锚点契约），
-// accent.rotation 只旋转水平偏移；远景微碎石按 LOD 阈值省略。
+// - 岩面分层：主石 6~7 边 / 辅石 5~6 边非对称变径多边形（模型层 TA-11-5）；
+//   ★ TA-04-5 起子石统一走 drawStoneBody 立体受光几何（相机投影棱柱 + 带法线顶面/
+//   侧面 + 世界光向点积受光），逐面片明暗差即「岩面分层」：棱角处自然出现受光/背光面过渡。
+// 子石按投影深度画家排序（远 → 近），accent.rotation 只旋转水平偏移；远景微碎石按 LOD 阈值省略。
 function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
   const rot = accent.rotation || 0;
@@ -702,17 +735,6 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     out.x = sx + rx * scaled;
     out.y = sy + (ry * cosX - dz * sinX) * scaled;
     out.d = ry * sinX + dz * cosX;
-  }
-
-  // 岩面个体色差：lite 通道小幅整体明暗（±10），保持 Boulder 低饱和灰岩色板（§4.1）。
-  // ★ TA-04-2 起底色只承载个体色差（基础色），受光统一经 accentLitFill 走世界光向管线
-  function stoneBase(lite, base) {
-    const k = (lite - 0.5) * 20;
-    return [
-      Math.max(0, Math.min(255, base[0] + k)),
-      Math.max(0, Math.min(255, base[1] + k)),
-      Math.max(0, Math.min(255, base[2] + k)),
-    ];
   }
 
   // 子石收集 + 深度画家排序（远 → 近；★ TA-11-6 碎石池 + 稳定性插入排序，零分配）
@@ -749,42 +771,9 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     const st = it.st;
     const r = st.r * scaled;
     if (r < lodMinR) continue; // 微碎石在远景不可辨，直接省略
-    // 底边贴落地点：中心上抬 0.72r（同 Boulder 屏幕纵压比），再压暗底色
-    const cy = it.g.y - r * 0.72;
-    const sb = stoneBase(st.lite, [78, 74, 68]);
-    const sTop = stoneBase(st.lite, [152, 146, 138]);
-    // Pass 1 底层：逐面片扇形填充（深灰背光侧）。每面片法线在几何端点就地导出——
-    //   取相邻顶点方位角中点的水平分量 + 下倾 0.45（TA-04-5 分面契约预留）。
-    //   逐面片明暗差即「岩面分层」：棱角处自然出现受光/背光面过渡，无重叠频闪。
-    for (let k = 0; k < st.sides; k++) {
-      const k2 = (k + 1) % st.sides;
-      const aA = st.rot + (k / st.sides) * Math.PI * 2;
-      const aB = st.rot + (k2 / st.sides) * Math.PI * 2;
-      const rA = r * st.shape[k], rB = r * st.shape[k2];
-      const midA = st.rot + ((k + 0.5) / st.sides) * Math.PI * 2;
-      ctx.fillStyle = accentLitFill(sb[0], sb[1], sb[2], Math.cos(midA), Math.sin(midA), -0.45, 1);
-      ctx.beginPath();
-      ctx.moveTo(it.g.x + r * 0.18, cy + r * 0.18);
-      ctx.lineTo(it.g.x + Math.cos(aA) * rA + r * 0.18, cy + Math.sin(aA) * rA * 0.72 + r * 0.18);
-      ctx.lineTo(it.g.x + Math.cos(aB) * rB + r * 0.18, cy + Math.sin(aB) * rB * 0.72 + r * 0.18);
-      ctx.closePath();
-      ctx.fill();
-    }
-    // Pass 2 顶面（浅灰白迎光侧，法线近似朝上；亮暗随光向变化）
-    ctx.fillStyle = accentLitFill(sTop[0], sTop[1], sTop[2], 0, 0, 1, 1);
-    ctx.beginPath();
-    for (let k = 0; k < st.sides; k++) {
-      const angle = st.rot + (k / st.sides) * Math.PI * 2;
-      const rVar = r * st.shape[k];
-      const px = it.g.x + Math.cos(angle) * rVar;
-      const py = cy + Math.sin(angle) * rVar * 0.72;
-      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-    // 暗边轮廓让碎石从地形中分离（0.5~0.8px 低饱和，近景不无限增粗）
-    ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
-    ctx.lineWidth = Math.max(0.5, Math.min(0.8, 0.8 * scaled));
-    ctx.stroke();
+    // ★ TA-04-5：子石走与 Boulder 共用的 drawStoneBody——相机投影棱柱轮廓 + 带法线
+    //   顶面/侧面 + 世界光向点积受光（底边贴自身落地点，v1.50.13 锚点契约几何化重述）
+    drawStoneBody(it.g.x, it.g.y, r, st.rot, st.sides, st.shape, st.lite,
+      cosZ, sinZ, cosX, sinX, Math.max(0.5, Math.min(0.8, 0.8 * scaled)));
   }
 }

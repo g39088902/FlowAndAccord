@@ -99,6 +99,10 @@ window.RENDER_CONFIG = {
   accentRockClusterShadowAlpha: 0.14,     // 簇群整片微接触落底阴影透明度（TA-11-5，rgba(25,20,15,α)）
   accentRockClusterStoneShadowAlpha: 0.10,// 逐石接触椭圆阴影透明度（TA-11-5，主石自动 +0.02）
 
+  // —— 岩石立体受光几何（TA-04-5，render_accents.js::drawStoneBody 消费；Boulder 与 RockCluster 子石共用）——
+  // 棱柱轮廓随相机投影（billboard 移除），亮暗由世界光向点积决定（不固定「顶亮侧暗」）。
+  accentStoneHeightK: 0.30,               // 石体高宽比：石高 = K × 石半径（侧面带高随相机 sinX 投影）
+
   accentGrassTuftMinBlades: 3,            // 草叶最少叶数
   accentGrassTuftMaxBlades: 6,            // 草叶最多叶数
   accentGrassTuftHeightBase: 2.4,         // 基准株高下限（世界米）
