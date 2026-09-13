@@ -72,7 +72,7 @@ const MAX_RETRY_FACTOR: usize = 3;
 
 /// 使用独立 accent_rng 在地形表面散布装饰物。
 ///
-/// 在 generate_with_profile 末尾调用（此时路网/房屋/POI 尚未放置，
+/// 在创世流水线第 8 步调用（★ STAGE2-3；地貌与水系定稿后、路网/房屋/POI 尚未放置，
 /// 故只根据地表的表面类别/坡度/肥力做禁区过滤）。
 pub fn generate_accents(
     terrain: &super::terrain::TerrainMap,

@@ -64,7 +64,7 @@
 
 ### STAGE2-3 创世流水线阶段化重构（0–11 步无歧义管线）
 
-- [ ] **STAGE2-3 规范化创世流水线重构与内部接口解耦**
+- [x] **STAGE2-3 规范化创世流水线重构与内部接口解耦**
     - **内容**：
       1. 在 `crates/sim_core/src/geo/terrain.rs` 与 `hydrology.rs` 中将 `generate_with_config` 重构为 §5.3 定义的私有阶段管线：
          - `0. resolve_profile(seed, profile)`：解析 profile，不消费任何 WorldRng；

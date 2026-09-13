@@ -84,7 +84,9 @@ impl RiverGeometry {
 }
 
 /// 规划 T2 主河几何（§5.3 第 3 步 `apply_profile_static_hydrology` 的参数解析前身）。
-fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
+/// `pub(super)`：★ STAGE2-3 编排器（`terrain.rs::generate_with_config`）在第 2 步前
+/// 调用并写入流水线 scratch，第 2 步铺河谷低丘与第 3 步施加水面共用同一份几何。
+pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
     let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
     let phase = rng.gen_range(-1.0, 1.0);
     RiverGeometry {
@@ -98,32 +100,19 @@ fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
 }
 
 impl TerrainMap {
-    pub fn generate_with_config(&mut self, seed: u64, config: &SimConfig) {
-        self.generate_with_profile(seed, &config.terrain_profile, config);
-        self.hydrology = Hydrology::default();
-        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
-            // ★ STAGE2-2（06 号 §5.3 兼容性拆分）：T2 生成解耦为
-            // 「陆地区域基础生成（铺满全图）→ 水系影响带局部覆盖」两段。
-            // 河几何规划消费单一 hydro_rng 的 1 次 phase 抽取，种子与消费顺序
-            // 与旧 generate_river 完全一致；两段共享同一几何，保证最终网格
-            // 与拆分前逐比特等价。
-            let geom = plan_river_geometry(seed, config);
-            self.generate_river_valley_base_relief(&geom, config);
-            self.generate_river(&geom, config);
-        }
-        // ★ D-B1-3（06号 §5.3 第 4–5 步钩子）：子特征注入规划与几何施加。
-        // 第 4 步 `plan_subfeatures()` 已由 D-B1-3 落地——纯无状态哈希（mix64/roll_10000
-        // + 固定盐值 + kind 升序互斥裁决），**不消费任何 WorldRng**、不读不写 terrain。
-        // 第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）仍是空操作，属阶段二/三：
-        // 本阶段 `plan` 只被第 9 步空钩子形式化消费，不写任何格子、不改任何地表。
-        let sub_plan = plan_subfeatures(seed, &self.profile, config.terrain_accent_sub_features);
-        // ★ v1.48.0 D-A：散布地表装饰（在地貌与水系生成完成后，避免装饰落入深水区）
-        self.accents = super::accents::generate_accents(self, config.terrain_accent_density, seed);
-        // ★ D-B1-3（06号 §5.3 第 9 步钩子）：子特征专属装饰追加（hash 放点、不消费 accent_rng）。
-        // 阶段一为空实现——`sub_plan` 仅在此被读取长度以绑定钩子，不产生任何装饰；
-        // 阶段二接管后此处按 §5.5 追加 Accent 并回填 `accent_id_start/end`。
-        if !sub_plan.is_empty() {
-            // 空钩子占位（阶段二接管：append_subfeature_accents）。
+    /// §5.3 第 3 步 `apply_profile_static_hydrology`：静态水系施加（★ STAGE2-3
+    /// 阶段化重构）。T2 主河走 STAGE2-2 收敛版 `generate_river`（仅覆盖水系影响带，
+    /// 陆地基底已由第 2 步 river_valley 分支铺满全图）；P1 新模板的对应水面在此预留。
+    ///
+    /// 坡度定稿移交流水线第 6 步（原 `generate_river` 尾部 `recompute_slopes()`
+    /// 上移至 `finalize_slope_and_surface`，调用时序不变）。
+    pub(super) fn apply_profile_static_hydrology(
+        &mut self,
+        config: &SimConfig,
+        scratch: &super::terrain::GenesisScratch,
+    ) {
+        if let Some(geom) = scratch.river_geometry.as_ref() {
+            self.generate_river(geom, config);
         }
     }
     /// T2 主河水系写入（★ STAGE2-2 收敛：仅覆盖水系影响带）。
@@ -132,6 +121,8 @@ impl TerrainMap {
     /// `terrain.rs::generate_river_valley_base_relief` 铺满全图，本函数**只写**
     /// 横向距离落在影响带内（`d < half_width + bank + terrace`）的局部网格：
     /// 河面、河岸、河阶三种地表覆盖 + 浅滩走廊、轮廓特征与取水点。带外一格不碰。
+    /// 静态状态清空归流水线第 1 步、坡度定稿归第 6 步（★ STAGE2-3），本函数不再
+    /// 自行 `features.clear()` / `recompute_slopes()`。
     fn generate_river(&mut self, geom: &RiverGeometry, cfg: &SimConfig) {
         let size = self.world_size;
         let level = geom.level;
@@ -140,7 +131,6 @@ impl TerrainMap {
         let width = geom.width;
         let center = |y: f32| geom.center(y, size);
         let half_width = |y: f32| geom.half_width(y, size);
-        self.features.clear();
         for gy in 0..self.grid_height {
             let row_y = (gy as f32/(self.grid_height-1).max(1) as f32-0.5)*size;
             // 影响带列边界（保守外扩 2 格；格内仍用原判据精确裁决，浮点边界不受影响）
@@ -221,7 +211,6 @@ impl TerrainMap {
         let y=size*0.34; let x=center(y);
         let spring=vec![Vec3::new(x-terrace-bank,y+25.0,level+3.0),Vec3::new(x-bank,y+8.0,level+1.0),Vec3::new(x,y,level)];
         self.features.push(TerrainFeature{id:30,kind:TerrainFeatureKind::SpringValley,vertices:spring,elevation:level,width:4.0,flags:0});
-        self.recompute_slopes();
     }
     pub fn recompute_slopes(&mut self) {
         let raw:Vec<_>=self.cells.iter().map(|c|c.elevation).collect();

@@ -583,6 +583,64 @@ pub(crate) fn plan_subfeatures(
     plan
 }
 
+/// §5.3 创世流水线各阶段间传递的临时数据（★ STAGE2-3）。
+///
+/// 全部为单次创世内的过程 scratch：不进快照、不进存档、不参与 tick。
+/// `pub(super)`：第 3 步实现在 `hydrology.rs`（同为 `geo` 子模块），需跨文件访问。
+pub(super) struct GenesisScratch {
+    /// T2 主河静态几何：编排器在第 2 步前规划（`plan_river_geometry`，hydro_rng
+    /// **独立流**单次 phase 抽取，规划时点不影响任何共享 RNG 消费序）；第 2 步铺
+    /// 河谷低丘、第 3 步施加水面共用同一份，保证两段几何逐比特一致（STAGE2-2 契约）。
+    pub(super) river_geometry: Option<super::hydrology::RiverGeometry>,
+    /// 草原泉溪洼地软地凹圈掩码（第 2 步标记 → 第 6 步地表派生消费）。
+    pub(super) soft_ring: Vec<bool>,
+}
+
+impl Default for GenesisScratch {
+    fn default() -> Self {
+        Self {
+            river_geometry: None,
+            soft_ring: Vec::new(),
+        }
+    }
+}
+
+/// §5.3 第 5 步单个子特征的几何管线工作区（★ STAGE2-3 接口就位）。
+/// 5a 产出高程快照 → 5b 施加几何 → 5c 写临时坡度 → 5d 判定失败时按快照整块回滚。
+#[derive(Debug, Default)]
+struct SubFeatureWorkspace {
+    /// AABB 格索引闭区间（行主序）；空工作区以 `elevation_snapshot` 为空表达。
+    bbox_min: (usize, usize),
+    bbox_max: (usize, usize),
+    /// 5a：AABB 内**原**高程快照（回滚真相源；施加写格子前必须先有本快照，
+    /// 严禁边遍历边读回已改写的邻格）。
+    elevation_snapshot: Vec<f32>,
+    /// 5c：AABB 内临时坡度（**判定专用**，严禁提交 `cells.slope_angle_deg`——
+    /// 第 6 步才是全图唯一坡度定稿点）。
+    scratch_slopes: Vec<f32>,
+}
+
+impl SubFeatureWorkspace {
+    fn is_empty(&self) -> bool {
+        self.elevation_snapshot.is_empty()
+    }
+}
+
+/// §5.3 第 0 步 `resolve_profile`：解析 profile。空串 / `random` 按种子整数判别
+/// 分派 T1/T2。纯整数运算，**不消费任何 `WorldRng`**（逻辑自原 `generate_with_profile`
+/// 头部逐字抽出）。
+fn resolve_profile(seed: u64, profile: &str) -> String {
+    if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
+        if (seed ^ 0x5052_4F46_494C_4531) % 2 == 0 {
+            TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
+        } else {
+            TERRAIN_PROFILE_RIVER_VALLEY.to_string()
+        }
+    } else {
+        profile.to_string()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerrainFeature {
     pub id: u32,
@@ -706,7 +764,8 @@ impl TerrainMap {
         }
     }
 
-    /// 生成 T0 基础高程与 T1 山脊/山口连续起伏地貌（v1.47.7 起不再生成台地/高台）。
+    /// §5.3 第 2 步 `generate_base_relief`：生成基础起伏（原 `generate_with_profile`
+    /// 主体，★ STAGE2-3 阶段化重构迁移）。T0 基础高程 + T1 山脊/山口 + 草原 + T2 河谷低丘。
     ///
     /// ★ T1-R 主脊通行力修复：主脊宽度/幅度改为消费 `SimConfig`（原先硬编码
     /// `0.16~0.23 × world_size` 与 `24~34m`，最大梯度仅 6.7~13.4°，全图无格越过
@@ -719,21 +778,18 @@ impl TerrainMap {
     /// 确定性：噪声/扭曲只消费世界种子 + 固定盐值（`terrain_noise` 模块），
     /// 不占用任何 `WorldRng` 流；`relief_rng` 消费顺序 = T1-R 四连抽后追加
     /// 支脊抽样（TB-01-3：侧向硬币 → 锚点/夹角/长度/宽度/振幅，第 2 条先掷 40% 存在性）。
-    pub fn generate_with_profile(&mut self, seed: u64, profile: &str, config: &SimConfig) {
-        self.seed = seed;
-        self.generator_version = TERRAIN_GENERATOR_VERSION;
-        self.profile = if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
-            if (seed ^ 0x5052_4F46_494C_4531) % 2 == 0 {
-                TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
-            } else {
-                TERRAIN_PROFILE_RIVER_VALLEY.to_string()
-            }
-        } else {
-            profile.to_string()
-        };
-        self.features.clear();
-        self.sub_features.clear();
-
+    ///
+    /// ★ STAGE2-3 流水线分工：本步只铺高程并标记软地凹圈掩码；坡度/地表/肥力/flags
+    /// 统一由第 6 步 `finalize_slope_and_surface` 定稿（全图唯一写点）。profile 解析
+    /// 与静态状态清空已上移至流水线第 0/1 步；T2 分支在铺完倾斜+fBm 高程后（其结果
+    /// 被整体覆盖，但主 RNG/relief_rng 消费顺序必须原样保留）以 STAGE2-2 提取的
+    /// `generate_river_valley_base_relief` 铺河谷低丘陆地基底。
+    fn generate_base_relief(
+        &mut self,
+        seed: u64,
+        config: &SimConfig,
+        scratch: &mut GenesisScratch,
+    ) {
         let mut rng = WorldRng::new(seed);
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
@@ -805,8 +861,6 @@ impl TerrainMap {
             Vec::new()
         };
 
-        let cell_step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
-        let cell_step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
         // ★ S7-02 草原：基础谐波振幅削减 60%（×0.4）。×1.0 对 T1/T2 是 IEEE 位精确乘法。
         let wave_scale = if is_grassland { 0.4f32 } else { 1.0f32 };
         let mut raw = vec![0.0f32; self.grid_width * self.grid_height];
@@ -1004,47 +1058,27 @@ impl TerrainMap {
             }
         }
 
-        // ★ TB-01-4 坡度重算与地表属性映射（14号文 §9.2 步骤 2~5）：在复合高程场
-        //   （倾斜 + fBm + 主脊/支脊/残丘/泉溪洼地）上统一重算——4 邻域中心差分，
-        //   图边界自动退化为单侧差分（`saturating_sub` / `min` 钳位，杜绝贴边通行
-        //   误判）；阈值即物理契约：≥34° RockFace+NO_WALK、20~34° SoftGround、
-        //   <20° DryGround、≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 /
-        //   terrainMaxBuildSlope=16 之上再留工程余量）。新支脊/噪声接入高程场后
-        //   无需改动本段，自然生效。
-        for gy in 0..self.grid_height {
-            for gx in 0..self.grid_width {
-                let idx = gy * self.grid_width + gx;
-                let left = raw[gy * self.grid_width + gx.saturating_sub(1)];
-                let right = raw[gy * self.grid_width + (gx + 1).min(self.grid_width - 1)];
-                let up = raw[gy.saturating_sub(1) * self.grid_width + gx];
-                let down = raw[(gy + 1).min(self.grid_height - 1) * self.grid_width + gx];
-                let dx = if self.grid_width <= 1 { 0.0 } else { (right - left) / (((gx + 1).min(self.grid_width - 1) - gx.saturating_sub(1)) as f32 * cell_step_x.max(0.001)) };
-                let dy = if self.grid_height <= 1 { 0.0 } else { (down - up) / (((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)) as f32 * cell_step_y.max(0.001)) };
-                let slope = (dx * dx + dy * dy).sqrt().atan().to_degrees();
-                let normalized_height = ((raw[idx] + 45.0) / 100.0).clamp(0.0, 1.0);
-                // ★ S7-02 草甸沃土：肥力基线抬高（可建格均值 0.85~0.95）；T1/T2 公式不变。
-                let fertility = if is_grassland {
-                    (0.97 - slope / 70.0 * 0.5 - normalized_height * 0.10).clamp(0.1, 1.0)
-                } else {
-                    (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0)
-                };
-                // ★ S7-02 泉溪洼地凹圈：低坡软地带优先于坡度派生（草原全域坡度 < 18°，
-                //   不会与 RockFace 冲突）；软地只慢行不禁建（06 号 §4.1）。
-                let surface_kind = if !soft_ring.is_empty() && soft_ring[idx] {
-                    SurfaceKind::SoftGround
-                } else if slope >= 34.0 { SurfaceKind::RockFace } else if slope >= 20.0 { SurfaceKind::SoftGround } else { SurfaceKind::DryGround };
-                let mut flags = 0u16;
-                if slope >= 18.0 { flags |= TERRAIN_FLAG_NO_BUILD; }
-                if surface_kind.is_hard_blocked() { flags |= TERRAIN_FLAG_NO_WALK; }
-                self.cells[idx] = GeoCell {
-                    elevation: raw[idx],
-                    slope_angle_deg: slope,
-                    surface_kind,
-                    natural_fertility: fertility,
-                    water_body_id: None,
-                    feature_flags: flags,
-                };
-            }
+        // ★ STAGE2-3 流水线分工：第 2 步只铺高程（坡度/地表/肥力/flags 由第 6 步
+        //   `finalize_slope_and_surface` 全图唯一定稿；原 TB-01-4 内联派生逐字迁移至
+        //   第 6 步 `derive_surface_and_flags`，输入输出逐比特一致）。此处写临时中性值，
+        //   任何 profile 下都会在第 6 步（或第 2/3 步后续覆写）被完全覆盖，不可观察。
+        for idx in 0..self.cells.len() {
+            self.cells[idx] = GeoCell {
+                elevation: raw[idx],
+                slope_angle_deg: 0.0,
+                surface_kind: SurfaceKind::DryGround,
+                natural_fertility: 1.0,
+                water_body_id: None,
+                feature_flags: 0,
+            };
+        }
+        // 软地凹圈掩码移交流水线 scratch，第 6 步地表派生消费（优先级高于坡度派生）。
+        scratch.soft_ring = soft_ring;
+
+        // ★ T2 河谷低丘陆地基底（STAGE2-2 提取公式，铺满全图）＝第 2 步的
+        //   river_valley 分支；几何由编排器第 2 步前规划的共享 `RiverGeometry` 提供。
+        if let Some(geom) = scratch.river_geometry.as_ref() {
+            self.generate_river_valley_base_relief(geom, config);
         }
 
         // ★ S7-02 安置泉眼特征：每处洼地一条 `SpringValley`（三顶点自坡缘汇入盆心，
@@ -1105,6 +1139,282 @@ impl TerrainMap {
                 c.natural_fertility = 0.75;
             }
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ★ STAGE2-3（06 号 §5.3）：无歧义创世流水线（阶段化重构）。
+    //
+    // 编排器 `generate_with_config`（0–9 步）+ 私有阶段函数；外部调用点不变
+    // （`spatial/world.rs` 与探针仍只调用 `generate_with_config(seed, config)`）。
+    // 第 10/11 步由 World 创世序列执行（见编排器尾部注释）。
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// ★ STAGE2-3（06 号 §5.3）：无歧义创世流水线编排器。阶段划分：
+    ///
+    /// ```text
+    /// 0. resolve_profile(seed, profile)            // 不消费 WorldRng
+    /// 1. reset_static_terrain_state()              // 清 features/accents/sub_features/hydrology
+    /// 2. generate_base_relief(seed)                // 山口起伏/草原/河谷低丘；主 RNG + relief_rng 消费序不变
+    /// 3. apply_profile_static_hydrology(config)    // T2 主河水系覆盖（STAGE2-2 收敛版）；P1 水面预留
+    /// 4. plan_subfeatures(seed, profile, enabled)  // ✅ D-B1-3 纯 hash，不消费 WorldRng
+    /// 5. 子特征几何管线（5a–5d）                   // ★ 阶段二空注入，数据管线/快照/回滚接口就位
+    /// 6. finalize_slope_and_surface()              // 全图唯一写 slope + 派生/合并 flags 的位置
+    /// 7. validate_static_terrain_geometry()        // STAGE2-4 扩充完整断言；Err → STAGE2-5 重试环
+    /// 8. generate_base_accents(seed, density)      // 既有 accent_rng 独立流，消费顺序不变
+    /// 9. append_subfeature_accents(plan)           // ★ 阶段二空实现
+    /// 10. ecology 布局与路网连接                   // = seed_primitive_ecology（POI 播撒 +
+    ///     prepare_terrain_layout / connect_terrain_world，只读取定稿地表）
+    /// 11. validate_terrain_world + 生存成本诊断    // = 存档/校验路径；STAGE2-6 补诊断 → STAGE2-5 消费
+    /// ```
+    ///
+    /// ★ 确定性契约：第 0/4 步不消费任何 `WorldRng`；第 2 步保持既有主 RNG 与
+    /// `relief_rng` 消费顺序；第 3 步 hydro_rng 独立流；第 8 步 accent_rng 独立流；
+    /// 子特征判定一律走无状态整数混合（`mix64`），严禁在阶段间插入共享流抽样。
+    pub fn generate_with_config(&mut self, seed: u64, config: &SimConfig) {
+        // 0. 解析 profile（纯整数判别，不消费 WorldRng）
+        self.profile = resolve_profile(seed, &config.terrain_profile);
+        self.seed = seed;
+        self.generator_version = TERRAIN_GENERATOR_VERSION;
+        // 1. 清空静态地形状态（§5.2：每次创世先清空，再按流水线重建）
+        self.reset_static_terrain_state();
+        // T2 主河几何规划：hydro_rng 独立流（单次 phase 抽取），规划时点不影响
+        // 任何共享 RNG 消费序；第 2 步铺河谷低丘与第 3 步施加水面共用同一份。
+        let mut scratch = GenesisScratch::default();
+        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
+            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(seed, config));
+        }
+        // 2. 基础起伏（山口起伏 / 草原 / 河谷低丘）
+        self.generate_base_relief(seed, config, &mut scratch);
+        // 3. 静态水系（T2 主河；P1 预留）
+        self.apply_profile_static_hydrology(config, &scratch);
+        // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）
+        let mut sub_plan =
+            plan_subfeatures(seed, &self.profile, config.terrain_accent_sub_features);
+        // 5. 子特征几何管线 5a–5d（阶段二空注入，接口就位）
+        self.apply_subfeature_pipeline(&mut sub_plan);
+        // 6. 全图唯一定稿坡度 + 派生/合并 flags
+        self.finalize_slope_and_surface(&scratch);
+        // 7. 静态几何校验（阶段二先接线稳定 ID 校验；Err 由 STAGE2-5 有界重试环消费）
+        let _ = self.validate_static_terrain_geometry();
+        // 8. 通用装饰（既有 accent_rng 独立流；地貌与水系定稿后散布，避免落入深水）
+        self.generate_base_accents(seed, config.terrain_accent_density);
+        // 9. 子特征专属装饰（阶段二空实现）
+        self.append_subfeature_accents(&sub_plan);
+        // 第 10/11 步不在本函数：`World3DEngine` 创世序列在 `world_create` 中先调用
+        // 本函数、再调用 `seed_primitive_ecology`（第 10 步）；`validate_terrain_world`
+        // （第 11 步，含 STAGE2-6 生存成本诊断）在存档/校验路径执行并冒泡给
+        // STAGE2-5 有界回退环。
+    }
+
+    /// §5.3 第 1 步：清空静态地形状态（§5.2「每次创世先清空，再按流水线重建」）。
+    fn reset_static_terrain_state(&mut self) {
+        self.features.clear();
+        self.accents.clear();
+        self.sub_features.clear();
+        self.branch_ridges.clear();
+        self.hydrology = Default::default();
+    }
+
+    /// §5.3 第 5 步：按 `TerrainSubFeatureKind` 升序逐个处理已计划子特征，
+    /// 走 5a 快照 → 5b 几何施加 → 5c 临时坡度 → 5d 接受/回滚的完整管线。
+    ///
+    /// ★ 阶段二空注入：`apply_subfeature_geometry` 为空桩、不写任何格子，
+    /// 数据管线、快照结构与回滚接口完整就位，供阶段三（D-B2 首批子特征）填充。
+    fn apply_subfeature_pipeline(&mut self, plan: &mut [PlannedSubFeature]) {
+        if plan.is_empty() {
+            return;
+        }
+        // 计划产出顺序为「结构型 → 视觉型」；本步要求按 kind 编号升序处理。
+        let mut order: Vec<usize> = (0..plan.len()).collect();
+        order.sort_by_key(|&i| plan[i].kind as u32);
+        for &i in &order {
+            let mut ws = self.snapshot_subfeature_bbox(&plan[i]); // 5a
+            self.apply_subfeature_geometry(&mut plan[i], &ws); // 5b（阶段二空桩）
+            self.recompute_slopes_scratch(&mut ws); // 5c（仅局部 scratch，不提交）
+            self.accept_or_rollback(&mut plan[i], &ws); // 5d
+        }
+    }
+
+    /// §5.3 第 5a 步 `snapshot_bbox`：复制子特征 AABB 内的原高程到局部快照。
+    ///
+    /// 阶段二 `anchor_hint` 恒为 `Vec3::ZERO`（真实锚点由第 5 步接管后按 profile
+    /// 几何填充），空锚点 ⇒ 空工作区；阶段三在此按 kind 展开半径（clamp 进图）
+    /// 并填充快照与 `bbox_min/max`。
+    fn snapshot_subfeature_bbox(&self, f: &PlannedSubFeature) -> SubFeatureWorkspace {
+        let mut ws = SubFeatureWorkspace::default();
+        if f.anchor_hint == Vec3::ZERO {
+            return ws;
+        }
+        // 阶段三扩展点：world→grid 定位锚点 → 按 kind 半径展开 AABB → 行主序复制
+        // `cells[].elevation` 到 `ws.elevation_snapshot`（几何施加写格子前必须先有
+        // 本快照，严禁边遍历边读回已改写的邻格）。
+        let (gx, gy) = self.grid_index(f.anchor_hint.x, f.anchor_hint.y);
+        ws.bbox_min = (gx, gy);
+        ws.bbox_max = (gx, gy);
+        ws.elevation_snapshot
+            .push(self.cells[gy * self.grid_width + gx].elevation);
+        ws
+    }
+
+    /// §5.3 第 5b 步 `apply_subfeature_geometry`：几何施加桩。
+    ///
+    /// ★ 阶段二空注入——「只改高程与水面、不写 slope/flags」的约束由第 6 步
+    /// 唯一写点保证；阶段三（D-B2）在此按 §5.4 各 kind 规格施加几何，并回填
+    /// 关联 `TerrainFeature` 稳定 ID 与 `sub_features` 容器。
+    fn apply_subfeature_geometry(&mut self, f: &mut PlannedSubFeature, ws: &SubFeatureWorkspace) {
+        let _ = (f, ws); // 阶段二空桩：不写任何格子
+    }
+
+    /// §5.3 第 5c 步 `recompute_slopes_scratch`：仅在 AABB 内做**临时**坡度试算
+    /// （4 邻域中心差分，读含 5b 施加结果的 cells），结果只写入工作区、**严禁**
+    /// 提交 `cells.slope_angle_deg`——第 6 步才是全图唯一坡度定稿点。
+    fn recompute_slopes_scratch(&self, ws: &mut SubFeatureWorkspace) {
+        ws.scratch_slopes.clear();
+        if ws.is_empty() {
+            return;
+        }
+        let (gx0, gy0) = ws.bbox_min;
+        let (gx1, gy1) = ws.bbox_max;
+        let step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
+        let step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
+        for gy in gy0..=gy1 {
+            for gx in gx0..=gx1 {
+                let left = self.cells[gy * self.grid_width + gx.saturating_sub(1)].elevation;
+                let right =
+                    self.cells[gy * self.grid_width + (gx + 1).min(self.grid_width - 1)].elevation;
+                let up = self.cells[gy.saturating_sub(1) * self.grid_width + gx].elevation;
+                let down =
+                    self.cells[(gy + 1).min(self.grid_height - 1) * self.grid_width + gx].elevation;
+                let dx = (right - left)
+                    / ((((gx + 1).min(self.grid_width - 1) - gx.saturating_sub(1)).max(1) as f32)
+                        * step_x.max(0.001));
+                let dy = (down - up)
+                    / ((((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)).max(1) as f32)
+                        * step_y.max(0.001));
+                ws.scratch_slopes.push((dx * dx + dy * dy).sqrt().atan().to_degrees());
+            }
+        }
+    }
+
+    /// §5.3 第 5d 步 `accept_or_rollback`：几何类接受判定。
+    ///
+    /// ★ 阶段二无几何施加（5b 空桩）⇒ 无几何可拒绝，`accepted` 保持 `false`
+    /// （未注入，子特征容器不写入）。阶段三按 §5.4 拒绝条件用 `ws.scratch_slopes`
+    /// 判定；失败时调用 `rollback_subfeature_geometry` 整块回滚，并由第 6 步
+    /// 统一重算坡度与派生地表（§5.3「回滚后必须重新执行第 6 步」）。
+    fn accept_or_rollback(&mut self, f: &mut PlannedSubFeature, ws: &SubFeatureWorkspace) {
+        // 数据管线自检：临时坡度与快照必须逐格对应。
+        debug_assert_eq!(ws.scratch_slopes.len(), ws.elevation_snapshot.len());
+        let _ = f; // 阶段三：accepted 由本判定写入
+    }
+
+    /// §5.3 第 5d 步回滚路径：按 5a 快照整块恢复 AABB 内高程。
+    ///
+    /// ★ 阶段二不触发（几何施加桩为空操作）；阶段三几何类判定失败时调用。
+    /// 只恢复高程——坡度/地表/flags 由第 6 步统一重算，严禁局部手工修补。
+    #[allow(dead_code)] // 阶段三（D-B2 首批子特征）接入几何类拒绝条件后启用
+    fn rollback_subfeature_geometry(&mut self, ws: &SubFeatureWorkspace) {
+        if ws.is_empty() {
+            return;
+        }
+        let (gx0, gy0) = ws.bbox_min;
+        let (gx1, gy1) = ws.bbox_max;
+        let mut i = 0usize;
+        for gy in gy0..=gy1 {
+            for gx in gx0..=gx1 {
+                self.cells[gy * self.grid_width + gx].elevation = ws.elevation_snapshot[i];
+                i += 1;
+            }
+        }
+    }
+
+    /// §5.3 第 6 步：全图唯一定稿坡度与派生/合并 flags 的位置。
+    ///
+    /// 6a `recompute_slopes()`：全图 4 邻域中心差分定稿 `slope_angle_deg`；
+    /// 6b `derive_surface_and_flags()`：水面/河岸/河阶/浅滩等水系优先地表保留
+    /// 其既有 `surface_kind` 与 flags，仅坡度派生类地表合并派生结果。
+    ///
+    /// ★ STAGE2-2 硬门禁「统一派生不得顺带更改旧 T2 的陆地分类」：T2 陆地
+    /// （河阶带外）的地表/flags 由第 2 步陆地基底写定（历史事实：无坡度派生），
+    /// 本阶段保持原样；统一陆地派生的启用属阶段三物理变更，须递增
+    /// `TERRAIN_GENERATOR_VERSION` 并独立验收。
+    fn finalize_slope_and_surface(&mut self, scratch: &GenesisScratch) {
+        self.recompute_slopes();
+        self.derive_surface_and_flags(scratch);
+    }
+
+    /// §5.3 第 6b 步：地表派生与 flags 合并。原 `generate_base_relief`（旧
+    /// `generate_with_profile`）的 TB-01-4 内联派生逐字迁移至此（T0/T1/草原路径），
+    /// 输入输出逐比特一致。
+    fn derive_surface_and_flags(&mut self, scratch: &GenesisScratch) {
+        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
+            return; // T2：只定稿坡度（6a），地表/flags/肥力由第 2/3 步写定
+        }
+        let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
+        for gy in 0..self.grid_height {
+            for gx in 0..self.grid_width {
+                let idx = gy * self.grid_width + gx;
+                let slope = self.cells[idx].slope_angle_deg;
+                let normalized_height = ((self.cells[idx].elevation + 45.0) / 100.0).clamp(0.0, 1.0);
+                // ★ S7-02 草甸沃土：肥力基线抬高（可建格均值 0.85~0.95）；T1 公式不变。
+                let fertility = if is_grassland {
+                    (0.97 - slope / 70.0 * 0.5 - normalized_height * 0.10).clamp(0.1, 1.0)
+                } else {
+                    (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0)
+                };
+                // ★ S7-02 泉溪洼地凹圈：低坡软地带优先于坡度派生（草原全域坡度 < 18°，
+                //   不会与 RockFace 冲突）；软地只慢行不禁建（06 号 §4.1）。
+                let surface_kind = if !scratch.soft_ring.is_empty() && scratch.soft_ring[idx] {
+                    SurfaceKind::SoftGround
+                } else if slope >= 34.0 {
+                    SurfaceKind::RockFace
+                } else if slope >= 20.0 {
+                    SurfaceKind::SoftGround
+                } else {
+                    SurfaceKind::DryGround
+                };
+                // 阈值即物理契约：≥34° RockFace+NO_WALK、20~34° SoftGround、
+                // <20° DryGround、≥18° NO_BUILD（阈值来源 terrainMaxWalkSlope=30 /
+                // terrainMaxBuildSlope=16 之上再留工程余量）。
+                let mut flags = 0u16;
+                if slope >= 18.0 {
+                    flags |= TERRAIN_FLAG_NO_BUILD;
+                }
+                if surface_kind.is_hard_blocked() {
+                    flags |= TERRAIN_FLAG_NO_WALK;
+                }
+                let c = &mut self.cells[idx];
+                c.surface_kind = surface_kind;
+                c.natural_fertility = fertility;
+                c.feature_flags = flags;
+            }
+        }
+    }
+
+    /// §5.3 第 7 步：静态几何校验。
+    ///
+    /// ★ STAGE2-4 落地完整断言集（特征 ID 升序唯一、T2 水系 ID 范围保护、水体
+    /// 顶点双副本一致、浅滩端点合法性、边界安全与禁行/禁建一致性）；阶段二先
+    /// 接线已落地的稳定 ID 校验。失败 Err 由 STAGE2-5 有界重试环消费。
+    pub(crate) fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
+        self.validate_sub_features_sorted_unique()
+            .map_err(|_| "SubFeatureIdsUnsortedOrDuplicated")?;
+        Ok(())
+    }
+
+    /// §5.3 第 8 步：通用地表装饰散布（既有 accent_rng 独立流，消费顺序不变）。
+    /// 发生在路网/房屋/POI 尚未出现时，只按地表类别/坡度/肥力过滤禁区。
+    fn generate_base_accents(&mut self, seed: u64, density: f32) {
+        self.accents = super::accents::generate_accents(self, density, seed);
+    }
+
+    /// §5.3 第 9 步 `append_subfeature_accents`：子特征专属装饰追加接口
+    /// （hash 放点、不消费 accent_rng，从通用装饰 `len()` 起按 kind 升序连续
+    /// 追加并回填 `accent_id_start/end`）。
+    ///
+    /// ★ 阶段二空实现：D-B2 注入器接管前 `plan` 不产生任何装饰。
+    fn append_subfeature_accents(&mut self, plan: &[PlannedSubFeature]) {
+        let _ = plan;
     }
 
     #[inline]

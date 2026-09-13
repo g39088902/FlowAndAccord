@@ -15,7 +15,7 @@
 > `terrainTreeSeasonTint`（树木季节变色开关）曾于 v1.50.18 全量删除——当时它们在 `crates/` 中零读取点，
 > 属"空转配置"。现状（下文凡出现「已声明未消费」「保留该开关」「应一并清理」的表述**均以本段为准**）：
 > **`terrainAccentSubFeatures` 已于 v1.50.29（D-B1-1）连同唯一消费点加回**（§5.3 第 4–5、9 步空钩子门控，
-> 见 `geo/hydrology.rs::generate_with_config`；阶段一空操作、开关两态世界输出等价）；
+> 见创世流水线第 4 步（`geo/terrain.rs::generate_with_config` 门控；★ STAGE2-3 起编排器位于 terrain.rs）；阶段一空操作、开关两态世界输出等价）；
 > `terrainGenerationMaxRetries` 待阶段二**连同消费点加回**（R.5）；
 > `terrainTreeSeasonTint` **永久删除**——树木季节变色已不依赖任何配置开关：
 > 自 2026-09-12 起由前端 `SimTreeTint`（★ v1.50.23 起位于 `accent-season.js`，自 `render_terrain.js` 迁出）按快照季节实时派生，
@@ -619,6 +619,7 @@ pub const NO_RESOURCE_POOL_ID: u32 = 0;
 - ⚠️ **第 3 步需先改造既有实现**：当前 `hydrology::generate_river` 对**整张网格**无条件重写 `elevation` / `surface_kind` / `feature_flags` / `natural_fertility`（见 `geo/hydrology.rs`），第 2 步生成的基础地貌在 T2 下会被完全覆盖，且 `recompute_slopes()` 只重算坡度、不重派生 flags。本流水线落地时必须把水系写入收敛到河道带，否则第 6 步「统一重算」无从谈起。
 - **阶段二兼容性拆分（施工硬门禁）**：把旧 T2 河阶外低丘的高程、地表、肥力和标志公式提取为 profile 陆地区域生成，再由水系阶段只覆盖水系带；必须保持原算式、浮点运算顺序、边界判据、RNG 消费及最终坡度/flags 的结果。禁止仅缩小 `generate_river` 循环范围而留下原先被覆盖的 T0 地貌；统一派生也不得顺带更改旧 T2 的陆地分类。阶段二先提供等价路径，阶段三注入时才启用新增物理派生。✅ **STAGE2-2（v1.50.40）已落地**：低丘公式提取为 `terrain.rs::generate_river_valley_base_relief`（陆地基底铺满全图，即第 2 步 `generate_base_relief` 的 river_valley 分支前身），`generate_river` 收敛为仅写水系影响带（per-row 列边界 + 原判据精确裁决，带外一格不碰）；两段共享 `plan_river_geometry` 的 `RiverGeometry`（hydro_rng 单次 phase 抽取，消费顺序不变）；临时对拍 120 组（双 profile × seed 0–59）逐字节 100% 全等，`TERRAIN_GENERATOR_VERSION` 保持 4。
 - **阶段二跨构建证据**：基准取已通过 D-B1-9 的最终提交，记录基准/候选提交、双副本 WASM SHA256、配置与固定种子；复用 §5.1 的物理字段规范化比较方法，显式 T1/T2 各跑 seed 0–59，开关开/关均比较高程、坡度、地表、flags、肥力、水系、POI 与路网。新旧构建各自确定性不能代替此比较。任一物理差异即不通过“基座自身不改世界”；必要的行为修正应另拆物理变更提交、递增生成器版本并重新验收，不能混入等价重构。
+- ✅ **STAGE2-3（v1.50.45）阶段化重构已落地**：编排器 `generate_with_config` 迁至 `geo/terrain.rs`，按本节管线展开为私有阶段 0–9（`resolve_profile` / `reset_static_terrain_state` / `generate_base_relief`〔原 `generate_with_profile`，只铺高程、坡度/地表/肥力/flags 定稿上移第 6 步 `finalize_slope_and_surface`〕/ `apply_profile_static_hydrology`〔hydrology.rs〕/ `plan_subfeatures` / 第 5 步几何管线 5a–5d〔`SubFeatureWorkspace` 快照/施加桩/临时坡度/回滚接口就位，空注入〕/ `finalize_slope_and_surface` / `validate_static_terrain_geometry`〔先接线稳定 ID 校验，STAGE2-4 扩充〕/ `generate_base_accents` / `append_subfeature_accents`〔空实现〕）；第 10/11 步由 `World3DEngine` 创世序列执行（调用点不变）。阶段间临时数据走 `GenesisScratch`（T2 共享河几何 + 草原软地掩码，不进快照/存档）。等价验证：临时对拍 180 组（T1/T2/草原 × seed 0–59）物理字段逐位指纹 100% 全等 + 临时时序断言验证 0–9 步严格按序（脚本用后删除）；`TERRAIN_GENERATOR_VERSION` 保持 5。
 - `generate_base_accents` 发生在路网/房屋尚未出现时，所以现有实现只能保证避开水面与禁行格；文档中“避开道路、房屋、POI”的描述不是当前代码事实。若未来必须做视觉避让，应新增**确定性的后处理过滤**，不得让装饰影响布局。
 
 子特征选择器采用固定的 `mix64`，实现为私有纯函数；不得使用 `DefaultHasher`、浮点哈希或系统时间：
@@ -650,7 +651,7 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 
 **互斥裁决规则（必须按此实现，否则同种子会因代码书写顺序而换图）**：在每一类内部，按 `TerrainSubFeatureKind` **升序**逐个判定；**首个命中者即选定，并立即停止该类别的后续判定**。因此「选到哪一个」只取决于哈希值与 kind 编号顺序，与函数书写顺序、插入位置无关。`terrainAccentSubFeatures=false` 时第 4–5、9 步为空（✅ 该开关已于 v1.50.29 由 D-B1-1 按文首更正段加回并接线为空钩子门控）；D-B1 上线前相关步骤必须是空实现、不改变既有世界。
 
-> **✅ D-B1-3 已落地（v1.50.30）**：第 4 步 `plan_subfeatures()` 已在 `geo/terrain.rs` 实现（`mix64` / `roll_10000` / 8 个固定盐值 / kind 升序互斥裁决 / `PlannedSubFeature` 中间结构），并由 `geo/hydrology.rs::generate_with_config` 的开关门控调用。第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**仍为空实现**——`plan` 目前只被第 9 步空钩子读取长度，不写任何格子、不追加任何装饰，故开关两态与改动前世界输出**逐字节等价**（实测 12 种子 × 2 profile × 3 开关态，高程/地表格/水系/特征/装饰/POI/节点/车道 8 类指纹全等）。
+> **✅ D-B1-3 已落地（v1.50.30）**：第 4 步 `plan_subfeatures()` 已在 `geo/terrain.rs` 实现（`mix64` / `roll_10000` / 8 个固定盐值 / kind 升序互斥裁决 / `PlannedSubFeature` 中间结构），并由创世流水线第 4 步（`geo/terrain.rs::generate_with_config` 门控，★ STAGE2-3 起编排器位于 terrain.rs）的开关门控调用。第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**仍为空实现**——`plan` 目前只被第 9 步空钩子读取长度，不写任何格子、不追加任何装饰，故开关两态与改动前世界输出**逐字节等价**（实测 12 种子 × 2 profile × 3 开关态，高程/地表格/水系/特征/装饰/POI/节点/车道 8 类指纹全等）。
 > 实现注意（踩坑沉淀）：候选池是 **profile 作用域** 的，按 kind 编号扫描时「该 kind 不在本 profile 池内」必须 `continue` 跳过，**不能**用 `?` 提前返回 `None`——T2 的 `OxbowLake`/`RiverCliff`（编号 4/5）排在 T1 的 `FootLake`/`RidgeWaterfall`（0/1）之后，提前返回会让 T2 恒为空。
 
 ### 5.4 D-B2 四种改变物理事实的子特征
