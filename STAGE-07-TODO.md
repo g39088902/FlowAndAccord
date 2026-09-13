@@ -2,7 +2,7 @@
 
 > **任务定义**：[06-terrain-templates.md](docs/plan/tech/06-terrain-templates.md) R.3 阶段七——**插队模板批次（平地草原 `grassland_plain_v1`、半坡林地 `hillside_woodland_v1`、河谷聚落 `river_valley_settlement_v1`）**。
 > 本文件将阶段七的总体设计、数学模型、水文与地表规则、探针指标及全链路工程实施拆解为标准可执行任务序列（S7-01 ～ S7-10）。
-> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）、S7-05 半坡密林梯级散布与装饰隔离（✅ v1.50.47）、S7-06 河谷聚落连续侧壁与冲积谷底内核骨架（✅ v1.50.48）、S7-07 河谷聚落水系贯通与浅滩走廊接入（✅ v1.50.49）已交付；S7-08 起待实施。
+> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）、S7-05 半坡密林梯级散布与装饰隔离（✅ v1.50.47）、S7-06 河谷聚落连续侧壁与冲积谷底内核骨架（✅ v1.50.48）、S7-07 河谷聚落水系贯通与浅滩走廊接入（✅ v1.50.49）、S7-08 仿真配置系统联动与 SimConfig 全链路映射（✅ v1.50.51）已交付；S7-09 起待实施。
 > **前置就绪度**：
 > - 平地草原：依赖阶段一 `GrassTuft` 装饰（✅ v1.50.35 D-B1 代码交付已收口，见 06 号 §18.5），具备独立开工条件；
 > - 半坡林地：依赖「密林山坡」装饰散布规则（纯视觉 Tree/Bush 高密散布，可随本阶段先行落地）；
@@ -184,7 +184,7 @@ flowchart LR
 | **S7-05** ✅ | 半坡林地密林带梯级散布与装饰隔离验证（v1.50.47） | `geo/accents.rs`、`spatial/ecology/seed.rs` | 中 | S7-04 | 坡腰高密林、坡脚疏林；取水点硬避让；开启/关闭装饰物理世界逐位不变。 |
 | **S7-06** ✅ | 河谷聚落连续侧壁与冲积谷底内核骨架（v1.50.48） | `geo/terrain.rs` | 高 | 阶段二基座 | `river_valley_settlement_v1`；侧壁 $\ge 34^\circ$ 硬禁行，谷底开阔平坦。 |
 | **S7-07** ✅ | 河谷聚落水系贯通与浅滩走廊接入（v1.50.49） | `geo/hydrology.rs`、`geo/terrain.rs`（零改动 `geo/corridor.rs`——授权跨水走廊机制既有通用承载） | 中 | S7-06 | 谷底主河下凹，2 处浅滩跨河；跨障绕行95 ≥1.90（实测校准下限，见任务明细），连通分量恒 1。 |
-| **S7-08** | 仿真配置系统联动与 SimConfig 全链路映射 | `config.rs`、`config.js`、`config-check.js` | 低 | S7-02/04/06 | 3 个 profile 常量与参数集中化；`config-check.js` 233+ 字段全绿。 |
+| **S7-08** | 仿真配置系统联动与 SimConfig 全链路映射 | `config.rs`、`config.js`、`config-check.js` | 低 | S7-02/04/06 | 3 个 profile 常量与参数集中化；`config-check.js` 233+ 字段全绿。✅ v1.50.51（实测记录见下）。 |
 | **S7-09** | FABS 协议、快照同步与前端视图适配 | `dict.rs`、`snapshot-bin.js`、`rustworld.js` | 低 | S7-07、S7-08 | 快照 Section 18/21/22 无损解码；换世界无旧特征残留；Canvas 正常渲染。 |
 | **S7-10** | 全链路确定性回归、60 种子矩阵与版本收口 | `world_save.rs`、`test-wasm.js`、全链路门禁 | 中 | S7-03/05/09 | 60 种子矩阵全通；存读档一致；旧 T1/T2 物理输出逐位不变；双副本同步。 |
 
@@ -389,6 +389,10 @@ flowchart LR
 - **出处**：根 AGENTS.md §4.12、06 号 §5.7 配置行。
 - **验收标准**：`node tools/config-check.js` 报告全部字段一致（233+ 字段全绿，零空转警告）。
 - **依赖**：S7-02、S7-04、S7-06。
+- **实测记录（v1.50.51 交付）**：
+  - **新增 37 个 SimConfig 字段**（Rust 字段数 239→276，四路同步 `config.rs`/`config.js`/`examples/config.json`/`config-check.js` IMPACT_OVERRIDES；默认值唯一真相源 = 前端 config.js，全部默认值 = 参数化前的形态常数与字面量区间，**世界输出逐位不变**）——① **草原 S7-02**：`terrainGrasslandMoundAmpMin/Max`(6.5/9.5)、`terrainGrasslandMoundRatioMin/Max`(0.19/0.31)（残丘幅度/幅径比）；② **泉溪洼地共用 S7-02/04**：`terrainSpringDepressionDepthMin/Max`(1.4/2.2)、`terrainSpringDepressionRadiusMin/Max`(24/34)；③ **半坡 S7-04**：`terrainHillsideNoiseDamp`(0.6，即原 `HILLSIDE_NOISE_DAMP`，代码内注释早有「S7-08 配置化时收敛」承诺)、`terrainHillsideAmpMin/Max`(26/32)、`terrainHillsideLeeSlopeMin/Max`(23.0/23.2)、`terrainHillsideWindSlopeMin/Max`(8/12)、`terrainHillsideCrestShiftMin/Max`(0.18/0.30)；④ **河谷聚落 S7-06/07**：`terrainValleyFloorBaseM`(3)、`terrainValleyFloorHalfMin/Max`(80/95)、`terrainValleyWallHeightMin/Max`(44/48)、`terrainValleyWallRatioMin/Max`(0.54/0.585)、`terrainValleyMeanderAmpMin/Max`(18/30)、`terrainValleyMeanderWaves`(3，改入 `ValleyGeometry` 结构字段随第 2/6 步与 hydrology 三方共享)、`terrainValleyTaperRatio`(0.47)、`terrainValleyNoiseFloorK/WallK/UplandK`(0.15/0.15/0.5)、`terrainValleyRiverWidthMin/Max`(22/32)、`terrainValleyRiverBankM`(8)、`terrainValleyRiverTerraceM`(20)、`terrainValleyFordRatio`(0.32)、`terrainValleyAccessOffsetMinM`(35)；抽样区间字段统一防御性钳制（防零值 Default 产生空抽样区间），RNG 消费次数与顺序不变。
+  - **附带清理**：① 删除死变量 `wave_scale`（S7-02 正弦波谐波 ×0.4 削减；TB-01-2 用 fBm+高度调制掩码取代谐波后长期零消费、触发 unused warning——**不配置化**，避免制造语义空转字段；草原「低幅起伏」现由 low_relief 倾斜区间 + `NOISE_WEIGHT_PLAIN` 掩码承载）；② 删除已被字段取代的常数 `HILLSIDE_NOISE_DAMP` 与 `VALLEY_FLOOR_BASE_M`/`VALLEY_MEANDER_WAVES`/`VALLEY_WALL_TAPER_START_RATIO`/`VALLEY_NOISE_FLOOR_K`/`VALLEY_NOISE_WALL_K`/`VALLEY_NOISE_UPLAND_K`/`VALLEY_RIVER_BANK_M`/`VALLEY_RIVER_TERRACE_M`/`VALLEY_FORD_OFFSET_RATIO`/`VALLEY_ACCESS_OFFSET_MIN_M`；③ `config.js` `terrainProfile` 注释补登记 `hillside_woodland_v1` 与 `river_valley_settlement_v1`（此前漏列；3 个阶段七 profile 在 S7-10 全链路验收前仍不加入 `random` 候选）；④ 修正 hydrology.rs 两处陈旧注释（±0.24 → ±0.32、形态常数 → SimConfig）。
+  - **验证**：改动前后 `terrain_probe` 3 个新 profile 各 60 种子输出**逐位一致**（草原 maxSlope 9.61°~16.33°、半坡 22.04°~27.22°、河谷 39.06°~41.26°/跨障绕行95 峰值 2.74/水源距 ≤16m，门禁违例均 0/60）；`config-check.js` 276 字段全绿（零孤儿/缺失/类型/漂移/空转）；`TERRAIN_GENERATOR_VERSION` 保持 8（输出逐位不变不换版）；升版 v1.50.50→v1.50.51（例行 patch，`SAVE_APP_VERSION` 变更旧存档按设计自动废弃）、WASM 重编译双副本（SHA256 一致 `c61c56f2…`）。**accents 层半坡装饰常数**（Tree 预算 ×4、接受概率梯级、`HILLSIDE_SPRING_CLEARANCE_M` 30m）保持常量不配置化——accents 层拿不到 SimConfig 是 S7-05 记录的既有设计（geo/AGENTS.md 坑 #3），不制造空转字段。
 
 ---
 

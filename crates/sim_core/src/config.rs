@@ -216,6 +216,113 @@ pub struct SimConfig {
     /// ★ TB-01-5：支脊基础延伸长度 (m)。每条支脊实际取
     /// 本值 × [0.8, 1.2] 均匀抖动（默认 150 → 120~180，规格区间）。
     pub terrain_branch_ridge_length: f32,
+    // ── ★ S7-08 阶段七 3 个静态 profile 参数集中化（06号 §4.1/§4.2/§4.3）。
+    //    全部默认值 = 参数化前的 terrain.rs/hydrology.rs 形态常数（输出逐位不变）；
+    //    唯一真相源 = 前端 config.js。改任一值等于换图（同种子形态漂移），遵循
+    //    生成器版本契约——仅在需要隔离旧世界时递增 TERRAIN_GENERATOR_VERSION。──
+    /// ★ S7-02 平地草原：孤立残丘高斯幅度抽样下限 (m)。默认 6.5（规格 A∈[6.5,9.5]，
+    /// A/R∈[0.19,0.31] → 峰值坡度 ≈9.3°~14.9°，叠加低幅波动后严格 <18° 无通行障碍）。
+    pub terrain_grassland_mound_amp_min: f32,
+    /// ★ S7-02 平地草原：孤立残丘高斯幅度抽样上限 (m)。默认 9.5。
+    pub terrain_grassland_mound_amp_max: f32,
+    /// ★ S7-02 平地草原：残丘 幅度/半径比（决定峰值坡度 ≈0.858×A/R）抽样下限。默认 0.19。
+    pub terrain_grassland_mound_ratio_min: f32,
+    /// ★ S7-02 平地草原：残丘 幅度/半径比 抽样上限。默认 0.31（比值过大会把残丘
+    /// 推成通行障碍，与「低障碍模板」定位冲突——06号 §4.1 约束③）。
+    pub terrain_grassland_mound_ratio_max: f32,
+    /// ★ S7-02/S7-04 共用：泉溪洼地深度抽样下限 (m)。默认 1.4（草原/半坡各 2 处
+    /// 坡脚泉溪洼地，锚点吸附局部最低格）。
+    pub terrain_spring_depression_depth_min: f32,
+    /// ★ S7-02/S7-04 共用：泉溪洼地深度抽样上限 (m)。默认 2.2。
+    pub terrain_spring_depression_depth_max: f32,
+    /// ★ S7-02/S7-04 共用：泉溪洼地凹圈半径抽样下限 (m)。默认 24.0
+    /// （凹圈 0.7R~1.5R 写 `SoftGround`，盆心 `DryGround`）。
+    pub terrain_spring_depression_radius_min: f32,
+    /// ★ S7-02/S7-04 共用：泉溪洼地凹圈半径抽样上限 (m)。默认 34.0。
+    pub terrain_spring_depression_radius_max: f32,
+    /// ★ S7-04 半坡林地：fBm 噪声增益阻尼系数（×0.6）。半坡坡面上的噪声局部梯度
+    /// 会把 max_slope 逐种子方差推到 ±2° 以上、压穿门禁窗口（22°~28.5°）——
+    /// 用阻尼换窗口余量；其余 profile ×1.0 逐位不变。
+    pub terrain_hillside_noise_damp: f32,
+    /// ★ S7-04 半坡林地：不对称高斯主坡幅度抽样下限 (m)。默认 26.0。
+    pub terrain_hillside_amp_min: f32,
+    /// ★ S7-04 半坡林地：不对称高斯主坡幅度抽样上限 (m)。默认 32.0（幅度过大会
+    /// 使背风坡峰值 >28.5° 探针窗上限——06号 §4.2 约束①）。
+    pub terrain_hillside_amp_max: f32,
+    /// ★ S7-04 半坡林地：背风坡目标峰值坡度抽样下限 (度)。默认 23.0
+    /// （高斯峰值梯度 e^(-0.5)×A/W，以目标坡度反解宽度）。
+    pub terrain_hillside_lee_slope_min: f32,
+    /// ★ S7-04 半坡林地：背风坡目标峰值坡度抽样上限 (度)。默认 23.2（区间收紧是
+    /// S7-04 实测校准结果：叠加 fBm/倾斜后全域 max_slope 落入 22°~28.5° 门禁窗）。
+    pub terrain_hillside_lee_slope_max: f32,
+    /// ★ S7-04 半坡林地：迎风坡目标峰值坡度抽样下限 (度)。默认 8.0（宽缓可建）。
+    pub terrain_hillside_wind_slope_min: f32,
+    /// ★ S7-04 半坡林地：迎风坡目标峰值坡度抽样上限 (度)。默认 12.0
+    /// （目标 <14°，图心落迎风坡脚 <10° 可建带）。
+    pub terrain_hillside_wind_slope_max: f32,
+    /// ★ S7-04 半坡林地：脊线横移比例抽样下限（× world）。默认 0.18
+    /// （crest_shift 把脊线推离图心，陡峭带远离初始营地）。
+    pub terrain_hillside_crest_shift_min: f32,
+    /// ★ S7-04 半坡林地：脊线横移比例抽样上限（× world）。默认 0.30。
+    pub terrain_hillside_crest_shift_max: f32,
+    /// ★ S7-06 河谷聚落：谷底基准高程 (m)。默认 3.0（谷底整体近乎平坦，
+    /// 仅剩阻尼 fBm 微起伏；S7-07 主河水面低于此值下凹成河）。
+    pub terrain_valley_floor_base_m: f32,
+    /// ★ S7-06 河谷聚落：谷底半宽抽样下限 (m)。默认 80.0（⇒ W_floor ∈ [160,190]；
+    /// 下沿 80 保证扣除 S7-07 河道+岸带（≤24m）后两侧干燥平坦河阶 ≥55m——
+    /// 06号 §4.3 约束② 建造保护线，调小前必须重验）。
+    pub terrain_valley_floor_half_min: f32,
+    /// ★ S7-06 河谷聚落：谷底半宽抽样上限 (m)。默认 95.0。
+    pub terrain_valley_floor_half_max: f32,
+    /// ★ S7-06 河谷聚落：陡壁总高差抽样下限 (m)。默认 44.0（规格 40~50）。
+    pub terrain_valley_wall_height_min: f32,
+    /// ★ S7-06 河谷聚落：陡壁总高差抽样上限 (m)。默认 48.0。
+    pub terrain_valley_wall_height_max: f32,
+    /// ★ S7-06 河谷聚落：陡壁 幅宽比 H/W 抽样下限（联动反解宽度，smoothstep
+    /// 剖面峰值梯度 1.5×H/W）。默认 0.54。
+    pub terrain_valley_wall_ratio_min: f32,
+    /// ★ S7-06 河谷聚落：陡壁 幅宽比 H/W 抽样上限。默认 0.585（→ 峰值梯度
+    /// 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗——06号 §4.3 约束①）。
+    pub terrain_valley_wall_ratio_max: f32,
+    /// ★ S7-06 河谷聚落：谷轴蜿蜒振幅抽样下限 (m)。默认 18.0（远小于谷底半宽，
+    /// 图心列恒在谷底内）。
+    pub terrain_valley_meander_amp_min: f32,
+    /// ★ S7-06 河谷聚落：谷轴蜿蜒振幅抽样上限 (m)。默认 30.0。
+    pub terrain_valley_meander_amp_max: f32,
+    /// ★ S7-06 河谷聚落：谷轴蜿蜒全程完整周期数（y/world 系数）。默认 3.0
+    /// （弧度制 3 rad ≈ 半个周期，全图一道缓弯；★ S7-07 起同时是主河中心线波形）。
+    pub terrain_valley_meander_waves: f32,
+    /// ★ S7-06 河谷聚落：陡壁/台地包络起始比例（× 半图）。默认 0.47 ⇒ 深切段
+    /// 覆盖中部 47%，两侧各留 53% 半图做谷口缓梁（最大下降梯度 ≈tan24° 保证
+    /// 绕行可通行；禁行格数 800~1400 达标线，调大前必须重验探针）。
+    pub terrain_valley_taper_ratio: f32,
+    /// ★ S7-06 河谷聚落：谷底 fBm 噪声分区阻尼（× noise_amp_k）。默认 0.15
+    /// （强阻尼保「高程平缓」与峰坡窗口 ±0.15 → 坡度扰动 <0.5°）。
+    pub terrain_valley_noise_floor_k: f32,
+    /// ★ S7-06 河谷聚落：陡壁 fBm 噪声分区阻尼。默认 0.15（保峰值梯度窗口）。
+    pub terrain_valley_noise_wall_k: f32,
+    /// ★ S7-06 河谷聚落：台地 fBm 噪声分区阻尼。默认 0.5（中等阻尼出自然滚动丘陵）。
+    pub terrain_valley_noise_upland_k: f32,
+    /// ★ S7-07 河谷聚落主河：河宽抽样下限 (m)。默认 22.0（规格 22~32m，
+    /// relief_rng 抽样取半得河道半宽；与 T2 `terrain_river_width_*` 分列——
+    /// settlement 河道必须窄于 T2 才能守住谷底建造保护线）。
+    pub terrain_valley_river_width_min: f32,
+    /// ★ S7-07 河谷聚落主河：河宽抽样上限 (m)。默认 32.0。
+    pub terrain_valley_river_width_max: f32,
+    /// ★ S7-07 河谷聚落主河：低滩禁建带半宽 (m)（`RiverBank`+`NO_BUILD`+
+    /// `SHORE_ACCESS`）。默认 8.0——刻意不复用 T2 `terrain_river_bank_width`(18m)：
+    /// T2 宽岸会吃掉聚落河阶；8m 使「河道半宽(≤16)+岸带」≤24m 守住建造保护线。
+    pub terrain_valley_river_bank_m: f32,
+    /// ★ S7-07 河谷聚落主河：河阶带半宽 (m)。默认 20.0（岸带外 `RiverTerrace`
+    /// 高肥力 0.95 河阶覆盖带，同 T2 口径下限）。
+    pub terrain_valley_river_terrace_m: f32,
+    /// ★ S7-07 河谷聚落：授权浅滩 y 位置比例（× world，两岸对置 ±本值）。
+    /// 默认 0.32（比 T2 先例 ±0.24 更稀疏，跨障绕行压力更真实；须落在谷轴
+    /// 深切段内且避开泉眼带与取水点行——06号 §4.3）。
+    pub terrain_valley_ford_ratio: f32,
+    /// ★ S7-07 河谷聚落：取水点离轴最小偏移 (m)。默认 35.0（`max(河道半宽+岸带+
+    /// 边距, 本值)` 保证两岸对置取水点间距 ≥70m = `poi_min_distance` 口径）。
+    pub terrain_valley_access_offset_min_m: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,
     pub terrain_river_water_level: f32,

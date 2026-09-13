@@ -297,9 +297,6 @@ const RIDGE_WARP_SLICE_Y_SUB: f32 = 911.0;
 /// 高斯轮廓的峰值梯度系数：exp(-(d/A)²/(2W²)) 轮廓在 d=±W 处导数最大，
 /// 值 = A/W·exp(-0.5)。半坡主坡（S7-04）以「目标峰值坡度」反解宽度时消费。
 const GAUSS_PEAK_GRADIENT: f32 = 0.606_530_66; // = exp(-0.5)，std::f32::consts 无 FRAC_1_SQRT_E
-/// ★ S7-04 半坡林地 fBm 噪声增益阻尼（0.6）：换 max_slope 门禁窗口余量，
-/// 改值等于换图（同种子半坡地形不同），随 TERRAIN_GENERATOR_VERSION 门禁约束。
-const HILLSIDE_NOISE_DAMP: f32 = 0.6;
 /// 高度调制掩码权重下限（平原，规格 0.20~0.30 取中值）。
 const NOISE_WEIGHT_PLAIN: f32 = 0.25;
 /// 高度调制掩码权重上限（山体，规格 0.8~1.0 取中值偏上）。
@@ -772,9 +769,13 @@ pub struct ValleyGeometry {
     /// （规格 70~90）——幅宽比与高差联动抽样，使 smoothstep 剖面峰值梯度
     /// 1.5×H/W 稳定落在 39°~41.5°（≥34° 硬禁行、≤45° 探针窗上限）。
     pub w_wall_m: f32,
-    /// 蜿蜒振幅（米）与相位：谷轴 `center_x(y) = amp·sin(y/world·3 + phase)`，
+    /// 蜿蜒振幅（米）与相位：谷轴 `center_x(y) = amp·sin(y/world·waves + phase)`，
     /// 打破笔直槽谷的机械感；amp ∈ [18,30] 远小于谷底半宽，图心列恒在谷底内。
+    /// ★ S7-08：振幅/波形走 SimConfig（`terrain_valley_meander_amp_*` /
+    /// `terrain_valley_meander_waves`），随本结构在第 2/6 步间共享。
     pub meander_amp_m: f32,
+    /// ★ S7-08：谷轴蜿蜒全程周期数（原 `VALLEY_MEANDER_WAVES` 常数，默认 3.0）。
+    pub meander_waves: f32,
     pub meander_phase_rad: f32,
     /// 陡壁/台地包络起始 |y|（米）：|y| ≤ 此值包络恒为 1（深切段），之外按
     /// `1 − u²`（u = (|y|−起点)/(半图−起点)）二次收敛到图缘 0——谷口段陡壁
@@ -790,10 +791,12 @@ pub struct ValleyGeometry {
 }
 
 impl ValleyGeometry {
-    /// 谷轴中心线 x 坐标（南北走向 + 微幅蜿蜒）。
+    /// 谷轴中心线 x 坐标（南北走向 + 微幅蜿蜒）。★ S7-08：波形数走结构字段
+    /// （构造时从 SimConfig 读入），第 2/6 步与 hydrology 三方共享同一取值。
     #[inline]
     pub(super) fn center_x(&self, y: f32, world_size: f32) -> f32 {
-        self.meander_amp_m * (y / world_size * VALLEY_MEANDER_WAVES + self.meander_phase_rad).sin()
+        self.meander_amp_m
+            * (y / world_size * self.meander_waves + self.meander_phase_rad).sin()
     }
 
     /// 陡壁/台地公共沿谷包络（图缘收敛到 0）。最大下降梯度
@@ -810,39 +813,6 @@ impl ValleyGeometry {
         }
     }
 }
-
-// ── ★ S7-06 河谷聚落形态常数。改值等于换图（同种子谷地形态变化），
-//    随 TERRAIN_GENERATOR_VERSION 门禁约束（新分支入库即换版的既有先例）。──
-/// 谷底基准高程（米）。S7-07 主河静态水面低于此值下凹成河。
-const VALLEY_FLOOR_BASE_M: f32 = 3.0;
-/// 谷轴蜿蜒全程完整周期数：3 rad ≈ 半个周期，全图呈一道缓弯。
-const VALLEY_MEANDER_WAVES: f32 = 3.0;
-/// 陡壁/台地包络起始比例（× 半图）：0.47 ⇒ 深切段覆盖中部 47%，两侧各留
-/// 53% 半图长度做谷口缓梁（最大下降梯度 2H/(0.53×半图) ≈ tan24°，保证绕行
-/// 可通行；实测禁行格数稳定落在 800~1000，符合 06 号 §4.3 800~1400 达标线）。
-const VALLEY_WALL_TAPER_START_RATIO: f32 = 0.47;
-/// fBm 噪声分区阻尼（× noise_amp_k）：谷底/陡壁强阻尼保「高程平缓」与
-/// 峰坡窗口（±0.15 → 坡度扰动 <0.5°），台地中等阻尼出自然滚动丘陵。
-const VALLEY_NOISE_FLOOR_K: f32 = 0.15;
-const VALLEY_NOISE_WALL_K: f32 = 0.15;
-const VALLEY_NOISE_UPLAND_K: f32 = 0.5;
-/// ★ S7-07 主河岸带半宽（米）：低滩禁建带（`RiverBank` + `NO_BUILD`）。
-/// 取 8m 使「河道半宽(≤16) + 岸带」≤ 24m——S7-06 建造保护线
-/// （谷底半宽 ≥80 ⇒ 两侧干燥平坦河阶 ≥55m）。刻意不复用
-/// `terrain_river_bank_width`(18m)：T2 宽岸会吃掉聚落河阶。
-pub(super) const VALLEY_RIVER_BANK_M: f32 = 8.0;
-/// ★ S7-07 河阶带半宽（米）：岸带外 `RiverTerrace` 高肥力河阶覆盖带
-///（同 T2 口径下限 20m）；带内肥力 0.95、地表 `RiverTerrace`、无禁建 flag。
-pub(super) const VALLEY_RIVER_TERRACE_M: f32 = 20.0;
-/// ★ S7-07 浅滩 y 位置比例（× world）：±0.32——比 T2 先例 ±0.24 更稀疏，两岸
-/// 对置绕行压力更真实（跨障绕行95 实测 2.01~2.74 vs ±0.24 时 1.81~2.65）；
-/// 落在谷轴深切段（|y| < 0.47×半图）内、避开谷底泉眼（|y| ≤ 0.13×world）与
-/// 取水点行（|y| = 0.2125×world），也不与谷口缓梁重叠。
-pub(super) const VALLEY_FORD_OFFSET_RATIO: f32 = 0.32;
-/// ★ S7-07 取水点离轴最小偏移（米）：`max(河道半宽+岸带+边距, 35)`——保证
-/// 两岸对置取水点间距 ≥ 2×35 = 70m（`poi_min_distance` 口径；窄河道时
-/// T2 公式 11+8+13 ≈ 32m 偏移会让对置点对只隔 64m）。
-pub(super) const VALLEY_ACCESS_OFFSET_MIN_M: f32 = 35.0;
 
 /// ★ STAGE2-7 显式诊断/降级基线（06 号 §5.8「基线先验收」）：倾斜-only 平地。
 /// 无 fBm/山脊/支脊/洼地/水系/特征——仅保留世界倾斜（16~24m 跨度）与第 6 步
@@ -982,12 +952,18 @@ impl TerrainMap {
         let is_hillside = self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
         let grass_mounds: Vec<(f32, f32, f32, f32)> = if is_grassland {
             let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 { 1 } else { 2 };
+            // ★ S7-08：幅度/幅径比走 SimConfig（默认 6.5~9.5 / 0.19~0.31 与原
+            //   字面量逐位相同）。防御性钳制防止零值 Default 产生空抽样区间。
+            let amp_lo = config.terrain_grassland_mound_amp_min.max(0.0);
+            let amp_hi = config.terrain_grassland_mound_amp_max.max(amp_lo + 0.01);
+            let ratio_lo = config.terrain_grassland_mound_ratio_min.max(0.01);
+            let ratio_hi = config.terrain_grassland_mound_ratio_max.max(ratio_lo + 0.001);
             let mut placed: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(mound_count);
             for i in 0..mound_count {
                 let mut ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
                 let rad = relief_rng.gen_range(0.30, 0.42) * self.world_size;
-                let amp = relief_rng.gen_range(6.5, 9.5);
-                let mrad = amp / relief_rng.gen_range(0.19, 0.31);
+                let amp = relief_rng.gen_range(amp_lo, amp_hi);
+                let mrad = amp / relief_rng.gen_range(ratio_lo, ratio_hi);
                 // 两丘潜在重叠时把第二丘转到对侧（不额外消费 RNG，保持确定性）
                 if i > 0 {
                     if let Some(&(px, py, _, pr)) = placed.first() {
@@ -1011,11 +987,21 @@ impl TerrainMap {
         //   （宽缓可建，目标 <14°）；crest_shift 把脊线推离图心 0.18~0.30×world，
         //   图心落在迎风坡脚平缓带（初始营地坡度 <10° 可建），陡峭带远离营地。
         let hill_params: Option<(f32, f32, f32, f32)> = if is_hillside {
-            let amp = relief_rng.gen_range(26.0, 32.0);
-            let lee_target = relief_rng.gen_range(23.0, 23.2).to_radians().tan();
-            let wind_target = relief_rng.gen_range(8.0, 12.0).to_radians().tan();
+            // ★ S7-08：幅度/目标坡度/脊线横移走 SimConfig（默认区间与原字面量
+            //   逐位相同）。防御性钳制防止零值 Default 产生空抽样区间。
+            let amp_lo = config.terrain_hillside_amp_min.max(1.0);
+            let amp_hi = config.terrain_hillside_amp_max.max(amp_lo + 0.1);
+            let lee_lo = config.terrain_hillside_lee_slope_min.max(0.1);
+            let lee_hi = config.terrain_hillside_lee_slope_max.max(lee_lo + 0.01);
+            let wind_lo = config.terrain_hillside_wind_slope_min.max(0.1);
+            let wind_hi = config.terrain_hillside_wind_slope_max.max(wind_lo + 0.01);
+            let shift_lo = config.terrain_hillside_crest_shift_min.max(0.0);
+            let shift_hi = config.terrain_hillside_crest_shift_max.max(shift_lo + 0.001);
+            let amp = relief_rng.gen_range(amp_lo, amp_hi);
+            let lee_target = relief_rng.gen_range(lee_lo, lee_hi).to_radians().tan();
+            let wind_target = relief_rng.gen_range(wind_lo, wind_hi).to_radians().tan();
             let sgn = if relief_rng.gen_range(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
-            let crest_shift = sgn * relief_rng.gen_range(0.18, 0.30) * self.world_size;
+            let crest_shift = sgn * relief_rng.gen_range(shift_lo, shift_hi) * self.world_size;
             Some((
                 amp,
                 GAUSS_PEAK_GRADIENT * amp / wind_target, // W_wind（宽缓）
@@ -1036,11 +1022,21 @@ impl TerrainMap {
         //   河阶带 ≥55m（06 号 §4.3 建造保护）。
         let is_valley_settlement = self.profile == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT;
         let valley: Option<ValleyGeometry> = if is_valley_settlement {
+            // ★ S7-08：谷地形态参数全部走 SimConfig（默认区间与原字面量逐位相同，
+            //   抽样序不变）。防御性钳制防止零值 Default 产生空抽样区间/退化几何。
             let meander_phase_rad = relief_rng.gen_range(0.0, std::f32::consts::TAU);
-            let meander_amp_m = relief_rng.gen_range(18.0, 30.0);
-            let h_wall_m = relief_rng.gen_range(44.0, 48.0);
-            let w_wall_m = h_wall_m / relief_rng.gen_range(0.54, 0.585);
-            let floor_half_m = relief_rng.gen_range(80.0, 95.0);
+            let ma_lo = config.terrain_valley_meander_amp_min.max(0.0);
+            let ma_hi = config.terrain_valley_meander_amp_max.max(ma_lo + 0.1);
+            let meander_amp_m = relief_rng.gen_range(ma_lo, ma_hi);
+            let h_lo = config.terrain_valley_wall_height_min.max(1.0);
+            let h_hi = config.terrain_valley_wall_height_max.max(h_lo + 0.1);
+            let h_wall_m = relief_rng.gen_range(h_lo, h_hi);
+            let wr_lo = config.terrain_valley_wall_ratio_min.max(0.01);
+            let wr_hi = config.terrain_valley_wall_ratio_max.max(wr_lo + 0.001);
+            let w_wall_m = h_wall_m / relief_rng.gen_range(wr_lo, wr_hi);
+            let fh_lo = config.terrain_valley_floor_half_min.max(1.0);
+            let fh_hi = config.terrain_valley_floor_half_max.max(fh_lo + 0.1);
+            let floor_half_m = relief_rng.gen_range(fh_lo, fh_hi);
             // 谷底两处泉眼：南北对角错布（i=0 东北偏西岸、i=1 西南偏东岸语义上
             // 即「两岸各一」），|y| ∈ [0.06,0.13]×world 保证图心（初始营地）水源距
             // ≤ ~115m（探针窗 140m），横向贴谷轴 ±0.52×谷底半宽避开 S7-07 河道带。
@@ -1052,18 +1048,22 @@ impl TerrainMap {
                 let sx = x_sign * floor_half_m * 0.52;
                 spring_anchors.push((sx, sy));
             }
-            // ★ S7-07 主河半宽：河宽抽自 [22, 32]（06 号 §4.3 规格 22~32m）取半；
-            //   岸带/河阶/浅滩位置走形态常数（见 VALLEY_RIVER_*），水面高程与
-            //   跨河走廊宽度由第 3 步从 SimConfig 读取（与 T2 同源）。
-            let river_half_m = relief_rng.gen_range(22.0, 32.0) * 0.5;
+            // ★ S7-07 主河半宽：河宽抽自 `terrain_valley_river_width_min/max`（默认
+            //   [22, 32]，06 号 §4.3 规格 22~32m）取半；岸带/河阶/浅滩位置走
+            //   SimConfig（`terrain_valley_river_bank_m` 等，S7-08 集中化），水面
+            //   高程与跨河走廊宽度由第 3 步从 SimConfig 读取（与 T2 同源）。
+            let rw_lo = config.terrain_valley_river_width_min.max(0.0);
+            let rw_hi = config.terrain_valley_river_width_max.max(rw_lo + 0.1);
+            let river_half_m = relief_rng.gen_range(rw_lo, rw_hi) * 0.5;
             Some(ValleyGeometry {
-                floor_base_m: VALLEY_FLOOR_BASE_M,
+                floor_base_m: config.terrain_valley_floor_base_m,
                 floor_half_m,
                 h_wall_m,
                 w_wall_m,
                 meander_amp_m,
+                meander_waves: config.terrain_valley_meander_waves.max(0.01),
                 meander_phase_rad,
-                taper_start_m: VALLEY_WALL_TAPER_START_RATIO * self.world_size * 0.5,
+                taper_start_m: config.terrain_valley_taper_ratio.max(0.0) * self.world_size * 0.5,
                 spring_anchors,
                 river_half_m,
             })
@@ -1075,12 +1075,18 @@ impl TerrainMap {
         // ★ S7-04 半坡林地复用同一洼地语义（坡脚泉溪 = 生活供水锚点；草原创世
         //   的抽取序与取值逐位不变）。
         let foot_depressions: Vec<(f32, f32, f32, f32)> = if is_grassland || is_hillside {
+            // ★ S7-08：深度/凹圈半径走 SimConfig（默认 1.4~2.2 / 24~34 与原字面量
+            //   逐位相同；草原/半坡共用同一组）。
+            let depth_lo = config.terrain_spring_depression_depth_min.max(0.0);
+            let depth_hi = config.terrain_spring_depression_depth_max.max(depth_lo + 0.01);
+            let drad_lo = config.terrain_spring_depression_radius_min.max(1.0);
+            let drad_hi = config.terrain_spring_depression_radius_max.max(drad_lo + 0.1);
             (0..2)
                 .map(|_| {
                     let ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
                     let rad = relief_rng.gen_range(0.08, 0.28) * self.world_size;
-                    let depth = relief_rng.gen_range(1.4, 2.2);
-                    let drad = relief_rng.gen_range(24.0, 34.0);
+                    let depth = relief_rng.gen_range(depth_lo, depth_hi);
+                    let drad = relief_rng.gen_range(drad_lo, drad_hi);
                     (ang.cos() * rad, ang.sin() * rad, depth, drad)
                 })
                 .collect()
@@ -1088,8 +1094,10 @@ impl TerrainMap {
             Vec::new()
         };
 
-        // ★ S7-02 草原：基础谐波振幅削减 60%（×0.4）。×1.0 对 T1/T2 是 IEEE 位精确乘法。
-        let wave_scale = if is_grassland { 0.4f32 } else { 1.0f32 };
+        // ★ S7-08：删除死变量 `wave_scale`（S7-02 时代的正弦波谐波振幅削减 ×0.4；
+        //   TB-01-2 用 fBm + 高度调制掩码取代谐波后该变量零消费，长期触发
+        //   unused warning）。草原「低幅起伏」现由 low_relief 倾斜区间 + 掩码
+        //   平原权重（NOISE_WEIGHT_PLAIN）承载，无独立削减系数可配置。
         let mut raw = vec![0.0f32; self.grid_width * self.grid_height];
         // ★ TB-01-2：主脊域扭曲峰值归一化系数（仅山口 profile 消费；0 = 不扭曲）。
         let warp_scale = if self.profile == TERRAIN_PROFILE_MOUNTAIN_PASS {
@@ -1133,9 +1141,18 @@ impl TerrainMap {
         let noise_amp_k = config.terrain_noise_amplitude.max(0.0) / terrain_noise::AMPLITUDE_M;
         // ★ S7-04 半坡噪声阻尼：fBm 在坡面上的局部梯度会把 max_slope 的逐种子
         //   方差推到 ±2° 以上，压穿门禁窗口（22°~28.5°）与 §4.1 固定种子带
-        //   （seed 7 [23,26.5]）。半坡分支对噪声增益统一 ×0.75（其余 profile
-        //   ×1.0 逐位不变），用阻尼换窗口余量；S7-08 配置化时收敛为 SimConfig 字段。
-        let noise_amp_k = if is_hillside { noise_amp_k * HILLSIDE_NOISE_DAMP } else { noise_amp_k };
+        //   （seed 7 [23,26.5]）。半坡分支对噪声增益统一 ×配置阻尼
+        //   （terrain_hillside_noise_damp，默认 0.6；其余 profile ×1.0 逐位不变）。
+        let noise_amp_k = if is_hillside {
+            noise_amp_k * config.terrain_hillside_noise_damp.max(0.0)
+        } else {
+            noise_amp_k
+        };
+        // ★ S7-06/S7-08 河谷聚落 fBm 分区阻尼（谷底/陡壁强阻尼保「高程平缓」与
+        //   峰坡窗口，台地中等阻尼出自然滚动丘陵）：改走 SimConfig（默认 0.15/0.15/0.5）。
+        let valley_noise_floor_k = config.terrain_valley_noise_floor_k;
+        let valley_noise_wall_k = config.terrain_valley_noise_wall_k;
+        let valley_noise_upland_k = config.terrain_valley_noise_upland_k;
 
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
@@ -1171,16 +1188,16 @@ impl TerrainMap {
                     let env = vg.wall_env(wy, half_size);
                     elev = if d < vg.floor_half_m {
                         // 冲积谷底：基准高程 + 强阻尼微起伏（高程平缓、可建）
-                        vg.floor_base_m + fbm_v * VALLEY_NOISE_FLOOR_K
+                        vg.floor_base_m + fbm_v * valley_noise_floor_k
                     } else if d < vg.floor_half_m + vg.w_wall_m {
                         // 连续陡壁：峰值梯度 1.5×H/W ≈ tan(39°~41.5°)，≥34° 段
                         // 由第 6 步派生 RockFace + NO_WALK 硬禁行
                         let t = (d - vg.floor_half_m) / vg.w_wall_m;
                         let s = t * t * (3.0 - 2.0 * t);
-                        vg.floor_base_m + vg.h_wall_m * env * s + fbm_v * VALLEY_NOISE_WALL_K
+                        vg.floor_base_m + vg.h_wall_m * env * s + fbm_v * valley_noise_wall_k
                     } else {
                         // 壁顶台地缓穹：随包络向图缘收敛到谷底高程（谷口开阔）
-                        vg.floor_base_m + vg.h_wall_m * env + fbm_v * VALLEY_NOISE_UPLAND_K
+                        vg.floor_base_m + vg.h_wall_m * env + fbm_v * valley_noise_upland_k
                     };
                     raw[gy * self.grid_width + gx] = elev;
                     continue;

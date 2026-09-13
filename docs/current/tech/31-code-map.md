@@ -14,7 +14,7 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (239 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (276 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -23,8 +23,9 @@ FlowAndAccord/
 │   │       │   ├── hydrology.rs            # 水系生成（含 River/RiverBank 特征闭合轮廓）
 │   │       │   ├── accents.rs              # ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder 5 类，salt RNG）
 │   │       │   ├── query.rs                # 地表通行与建造查询
-│   │       │   ├── biome.rs                # 生物群系定义
-│   │       │   └── corridor.rs             # 廊道分析
+    │   │       │   ├── biome.rs                # 生物群系定义
+    │   │       │   ├── validation.rs          # ★ STAGE2-4 静态几何只读校验（创世与读档共用门禁）
+    │   │       │   └── corridor.rs             # 廊道分析
 │   │       └── spatial/                    # 🗺️ 空间模拟核心
 │   │           ├── mod.rs                  # spatial 模块集成入口
 │   │           ├── vec3.rs                 # 3D 向量数学库
@@ -47,6 +48,8 @@ FlowAndAccord/
 │   │           ├── world.rs                # World3DEngine 结构体定义与生命周期
 │   │           ├── world_config.rs         # 动态配置注入与 JSON 反序列化
 │   │           ├── world_save.rs           # 确定性存读档序列化与反序列化
+    │   │           ├── creation_fallback.rs    # ★ STAGE2-5 有界创世构造器（阶梯降级重试 + 策略去重 + 诊断）
+    │   │           ├── survival_diagnosis.rs   # ★ STAGE2-6 生存诊断（水/粮可达预算校验，只读）
 │   │           ├── world_season.rs         # 四季与宏观温度时变计算
 │   │           ├── world_snapshot.rs       # generate_snapshot 快照数据组装
 │   │           ├── world_tick.rs           # tick 管线调度（§4.3 固定顺序）+ 胎儿对账 + 金币继承
@@ -96,7 +99,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 239 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 276 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
@@ -191,7 +194,9 @@ FlowAndAccord/
     │   │   ├── 03-life-and-society.md           # 马斯洛六层、生命周期、房屋五级、社会结构
     │   │   ├── 04-economy.md                    # 有限生态、真实搬运、家户账本、榷场定价
     │   │   ├── 05-observation-ux.md             # 窗口模型、观察工具、操作与信息层级
-    │   │   └── 06-agent-behavior-design.md      # AI 行为设计：自治边界、严优先级马斯洛、闭环
+    │   │   ├── 06-agent-behavior-design.md      # AI 行为设计：自治边界、严优先级马斯洛、闭环
+    │   │   ├── 07-terrain-implementation.md     # 地图模板玩法规则（玩家视角）
+    │   │   └── 08-housing-system.md             # 房屋玩法规则（玩家视角）
     │   └── tech/                              # 技术方案（实现视角，目录内从 01 起顺序编号）
     │       ├── 01-engine-architecture.md        # 总体：三层解耦、tick 顺序、数据流
     │       ├── 02-core-systems-fsm.md           # 三大核心系统状态机全景
@@ -232,6 +237,7 @@ FlowAndAccord/
     │   │   ├── 03-social-relations.md           # 人际依赖与敌对 × 生产
     │   │   ├── 04-hormone-system.md             # 四轴十一激素调制层
     │   │   ├── 05-affinity-system.md            # 人际好感度系统
+    │   │   ├── 07-hunting-defense.md            # 狩猎、流寇与武力公约（玩法方向）
     │   │   └── 06-competitor-analysis.md        # 竞品与同类项目分析
     │   └── tech/                              # 技术方案（未落地实现）
     │       ├── 01-integration-contracts.md      # 跨专项共享契约权威
