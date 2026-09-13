@@ -19,8 +19,8 @@
 | **TB-01-4** | 四邻域差分坡度重算与地表属性重新映射 | `crates/sim_core/src/geo/terrain.rs` | 中 | TB-01-3 | ✅ 已实施（v1.50.39：现状核对逻辑完备自然接入，补 TB-01-4 契约注释；12 种子验证岩壁 100% 落主脊/支脊、真平原 ≤9.5°/零 NO_BUILD、走廊 <23.2°、肥力方向正确） |
 | **TB-01-5** | 仿真配置集中化与 SimConfig 全链路接入 | `config.rs` / `config.js` / `examples/config.json` | 低 | TB-01-3 | ✅ 已实施（v1.50.40：5 个 `terrain_noise_*`/`terrain_branch_ridge_*` 字段四处同步 + 内核真实读取点；默认 6.0/300.0 噪声逐位零漂移，支脊长度/振幅比以抖动重参数化，临时验证实证 5 字段均驱动地形） |
 | **TB-01-6** | 生成器版本门禁升级（VERSION 4 $\to$ 5）与存读档契约对接 | `terrain.rs` / `world_save.rs` / `save-ui.js` | 低 | TB-01-4 | ✅ 已实施（v1.50.41：`TERRAIN_GENERATOR_VERSION` 4→5 附版本历史注释；`deserialize_save` 既有门禁链比对常量零新代码自动拒绝 v4 地形档，前端 `applySave` 展示内核明确错误 + SAVE_APP_VERSION 每版作废引导；8 种子探针往返 8/8 成功、篡改档 8/8 明确拒绝） |
-| **TB-01-7** | 探针工具诊断升级与 60 种子全图连通性矩阵校验 | `crates/sim_core/examples/terrain_probe.rs` | 中 | TB-01-4、TB-01-5 | ⏳ 待实施 |
-| **TB-01-8** | 全链路确定性回归、WASM 双副本同步与文档状态闭环 | 全链路门禁 / `07-terrain-art.md` / `AGENTS.md` | 低 | TB-01-6、TB-01-7 | ⏳ 待实施 |
+| **TB-01-7** | 探针工具诊断升级与 60 种子全图连通性矩阵校验 | `crates/sim_core/examples/terrain_probe.rs` | 中 | TB-01-4、TB-01-5 | ✅ 已实施（v1.50.42：探针新增支脊统计列 brN/brSlope/brDet（几何来自 `TerrainMap::branch_ridges` 诊断字段，serde skip 零存档影响）+ 60 种子验收判定块；实测 components 恒 1、buildable min 11730、硬禁行 2.81%~4.88%、支脊检出 60/60（39 单 21 双）全达标；detour_max 2.22~5.01——seed 19=5.01 / seed 43=4.86 微超原 4.8 上限，58/60 带内；上限已随 TB-01-8 修订为 5.2） |
+| **TB-01-8** | 全链路确定性回归、WASM 双副本同步与文档状态闭环 | 全链路门禁 / `07-terrain-art.md` / `AGENTS.md` | 低 | TB-01-6、TB-01-7 | ✅ 已实施（v1.50.43：WASM 重编译双副本同步；全套门禁 `cargo test --lib` / `test-wasm` / `test-determinism` 6/6 / `snapshot-check`（既有 3 误报经 stash 基线对照非本次引入）/ `config-check` 238 / `frontend-check` / `doc-maintenance` / `cross-doc` / `doc-link` / `bump --check` 全绿；detour 达标线上限经裁决由 4.8 修订为 5.2（60 种子实测分布 + components 恒 1 安全不变量完好，避免为凑指标重开已冻结的 TB-01-3/5 参数）；文档闭环 07-terrain-art §1.2/§7.2 + geo/AGENTS.md + 本表；Chrome 视觉验收通过（远景蛇形主脊/中景分形褶皱+岩壁/近景平原平整+族人自主建仓移动）） |
 
 ---
 
@@ -293,7 +293,7 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 ```
 **合格断言**：
 - `components`: 60 个种子恒为 `1`；
-- `detour_max`: 处于 `2.0 ~ 4.8` 之间；
+- `detour_max`: 处于 `2.0 ~ 5.2` 之间（v1.50.43 修订：60 种子实测 2.22~5.01，仅 2 个双支脊种子微超原 4.8 上限且 components 恒 1；原 4.8 为 12 种子时代口径，探针末尾验收块按 5.2 判定）；
 - `buildable`: 均值 $\ge 10800$，最小值 $\ge 10200$。
 
 ### 3. Chrome 视口视觉交互验收

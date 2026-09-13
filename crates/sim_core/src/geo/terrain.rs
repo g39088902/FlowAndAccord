@@ -382,17 +382,20 @@ fn ridge_warp_peak_scale(world_size: f32, seed: u64) -> f32 {
 /// ★ TB-01-3 单条支脊：从主脊侧翼向外延伸的直线高斯山脊。
 /// 根部钉在锚点处**扭曲后**的主脊线上（root 已扣除 `warp(anchor)` 横移），
 /// 轴线方向 = 主脊 along 轴按夹角 φ（45°~70°）偏向指定一侧。
-struct BranchRidge {
+/// ★ TB-01-7 起公开并随 [`TerrainMap::branch_ridges`] 暴露给诊断探针
+/// （`terrain_probe.rs` 据此计算支脊侧翼坡度与支脊区绕行比）。
+#[derive(Debug, Clone)]
+pub struct BranchRidge {
     /// 根部世界坐标（锚点在扭曲后主脊线上的落点）。
-    root_x: f32,
-    root_y: f32,
+    pub root_x: f32,
+    pub root_y: f32,
     /// 支脊轴线单位方向（世界系）。
-    dir_x: f32,
-    dir_y: f32,
+    pub dir_x: f32,
+    pub dir_y: f32,
     /// 延伸长度（米）/ 高斯横截面宽度（米）/ 振幅（米）。
-    length: f32,
-    width: f32,
-    amplitude: f32,
+    pub length: f32,
+    pub width: f32,
+    pub amplitude: f32,
 }
 
 impl BranchRidge {
@@ -660,6 +663,11 @@ pub struct TerrainMap {
     /// `#[serde(default)]`：旧档缺字段时默认空数组，`SAVE_FORMAT_VERSION` 不递增。
     #[serde(default)]
     pub sub_features: Vec<TerrainSubFeature>,
+    /// ★ TB-01-7 诊断字段：本次生成实际抽样的支脊几何（≤2 条；仅山口 profile 且
+    /// `terrain_branch_ridge_enabled` 时非空）。仅供 `terrain_probe.rs` 等工具读取，
+    /// `#[serde(skip)]` 保证存档 JSON 字节不变（读档按种子重建时会重新填充）。
+    #[serde(skip)]
+    pub branch_ridges: Vec<BranchRidge>,
     pub hydrology: super::hydrology::Hydrology,
 }
 
@@ -688,6 +696,7 @@ impl TerrainMap {
             features: Vec::new(),
             accents: Vec::new(),
             sub_features: Vec::new(),
+            branch_ridges: Vec::new(),
             hydrology: Default::default(),
         }
     }
@@ -776,6 +785,8 @@ impl TerrainMap {
         } else {
             Vec::new()
         };
+        // ★ TB-01-7：支脊几何暴露给诊断探针（serde(skip)，不影响存档）。
+        self.branch_ridges = branch_ridges.clone();
         // ★ TB-01-5：fBm 振幅/波长走配置。输出对两者均线性——坐标按
         //   SCALE_BASE_M/配置波长 预缩放（各倍频波长同比例缩放），输出按
         //   配置振幅/AMPLITUDE_M 增益；默认 300.0/6.0 时两系数恒为 1.0

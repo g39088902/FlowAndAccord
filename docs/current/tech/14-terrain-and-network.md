@@ -424,7 +424,7 @@ T2 全部指标与修复前逐项一致（本次未触碰 T2 生成路径）
 - **参数契约（改这两个值前必读）**：主脊最大梯度 `0.858 × terrainPassRidgeAmplitude / terrainPassRidgeWidth` 必须显著大于 `tan(terrainMaxWalkSlope) = 0.577`，否则主脊不挡路；同时鞍部沿脊梯度必须显著小于同一阈值，否则山口被夹死。当前取值 0.858 × 53 / 62 = **0.733**（≈36.2°），两侧各留有余量。
 - 生成器入口收敛：`generate_with_profile(seed, profile, config)` 新增 `config` 形参，并删除无配置的兼容壳 `generate_natural_landscape`（无调用点）。
 
-**回归方式**：`crates/sim_core/examples/terrain_probe.rs` 是常驻探针（已登记 `./31-code-map.md`），直接调用内核生成器并输出上表全部指标。任何改动 T1 主脊、鞍部或 `terrain_max_walk_slope` 的提交都必须重跑它，并确认：最大坡度 > 34°、可行走连通分量恒为 1、绕行比明显大于 1、可建格数量未塌陷。
+**回归方式**：`crates/sim_core/examples/terrain_probe.rs` 是常驻探针（已登记 `./31-code-map.md`），直接调用内核生成器并输出上表全部指标。任何改动 T1 主脊、鞍部或 `terrain_max_walk_slope` 的提交都必须重跑它，并确认：最大坡度 > 34°、可行走连通分量恒为 1、绕行比明显大于 1、可建格数量未塌陷。★ TB-01-7（v1.50.42）起探针追加支脊统计列（`brN` 检出条数 / `brSlope` 侧翼峰值坡度 / `brDet` 支脊区绕行比，几何来自 `TerrainMap::branch_ridges` 诊断字段）与 60 种子验收判定块（components==1 全部 · detour 2.0~4.8 · buildable ≥10500 · 硬禁行 2%~5% · 支脊检出率 100%）。
 
 **本次同步完成的落地约束**：`TERRAIN_GENERATOR_VERSION` 3 → 4（旧存档按门禁拒绝，`SAVE_FORMAT_VERSION` 保持 7，无结构变更）；WASM 双副本同步；`cargo test --lib`、`test-wasm`、`test-determinism`、`test-snapshot-bin`、`config-check`、`frontend-check`、`cross-doc-check` 全通；配置字段总数 240 → 242，已同步 `./04-config-system.md`、`./31-code-map.md`、`./29-impact-matrix.md`、`crates/sim_core/AGENTS.md` 与 `./05-config-reference.md`。
 
