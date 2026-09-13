@@ -1,214 +1,83 @@
 # STAGE2 TODO · 地图模板生成组合基座与有界回退
 
-> **当前拆分对象**：[06 号地形方案 R.3 阶段二 · 生成组合基座与有界回退（D-B2 公共前置）](docs/plan/tech/06-terrain-templates.md)（§5.1 提交组边界、§5.2 单一真相源与稳定 ID、§5.3 创世流水线、§5.8 有界回退与验收矩阵、§18.1/§18.2 遗留门禁）。
-> **阶段定位**：D-B2 子特征注入与 P1 新模板的**公共基座工程**。本阶段负责把流水线解耦、水系带写入收敛、稳定 ID 与几何断言、阶梯重试降级以及生存诊断完整落地，为后续阶段提供安全可靠的生成架构。
-> **基线与退出条件**（06 号 R.3、§5.1、§5.3 末段）：
-> 1. **物理事实零改动**：基座自身不改世界；旧 T1/T2 的高程、坡度、地表类别、标志、肥力、水系、路网、POI 均**逐字节不变**（跨构建 120 组 0 差异）；
-> 2. **版本号稳定**：`TERRAIN_GENERATOR_VERSION` 保持 **4** 不递增，`SAVE_FORMAT_VERSION` 保持 **7** 不动，FABS `FORMAT_VERSION` 保持 **3** 不动；
-> 3. **遗留门禁销项**：补齐 R.1 遗留的 3 项门禁（§18.1 生存连通与成本诊断、§18.1 `flat_baseline` 行为等价、§18.2 有界重试）；
-> 4. **配置字段加回**：连同消费点加回 `terrainGenerationMaxRetries`，通过 `config-check.js` 第 5 条零空转门禁。
->
-> **纪律**：一次提交只做一件事（§5.1 禁止合并大改）；含 Rust 改动的任务完成后必须重编译 WASM 并同步双副本（`frontend/rust/` + `frontend/`）；纯勾选/文档修订不升版。
-
----
+> **设计权威**：[06 号方案](docs/plan/tech/06-terrain-templates.md) R.3/R.6、§5.2/§5.3/§5.8、§18.1/§18.2。此处仅维护原子任务与验收，算法不再复制一份。
+> **状态**：STAGE2-1/2 已交付；STAGE2-3 框架部分交付（流水线 0–11 步与等价 ✅ v1.50.45，完整几何事务域〔features/水体/中心线/覆盖意图/halo 备份〕⏳ 随阶段三注入启用）；4～8 未完成。已有 T1 支脊与草原骨架必须保留，当前生成器版本为 5、存档格式为 7、FABS 为 3。
+> **兼容性边界**：纯重构保持当前合法 T1/T2 的物理输出逐字节不变；新增生存拒绝、自动降级或改变生成行为另拆提交并评估版本。历史 STAGE2-2 的版本 4 对拍是历史证据，不能要求当前世界倒退。每个后续比较在开工时冻结包含 TB-01/S7-02 的基准提交、配置和 WASM 摘要，不得验收失败后换基准。
 
 ## 任务序列总览
 
-| 编号 | 任务名称 | 核心涉及文件 | 改变物理事实 | 难度 | 依赖 |
-| :--- | :--- | :--- | :---: | :---: | :--- |
-| **STAGE2-1** | 配置字段加回：有界重试上限 `terrainGenerationMaxRetries` | `config.rs` / `config.js` / `config-check.js` | 否 | 低 | — |
-| **STAGE2-2** | T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心） | `geo/hydrology.rs` / `geo/terrain.rs` | 否 | 中 | — |
-| **STAGE2-3** | 创世流水线阶段化重构（0–11 步无歧义管线） | `geo/terrain.rs` / `geo/hydrology.rs` | 否 | 中 | STAGE2-2 |
-| **STAGE2-4** | 静态地形几何校验与稳定 ID 断言落地（§5.2 / §5.3 第 7 步） | `geo/terrain.rs` / `geo/hydrology.rs` | 否 | 低 | STAGE2-3 |
-| **STAGE2-5** | 有界失败降级与重试机制（§5.8 阶梯回退环） | `geo/terrain.rs` / `spatial/world.rs` | 否 | 中 | STAGE2-1、STAGE2-4 |
-| **STAGE2-6** | 初始营地生存连通分量与往返成本诊断（补齐 §18.1 门禁） | `geo/query.rs` / `ecology/spawn.rs` / `spatial/world.rs` | 否 | 中 | STAGE2-3、STAGE2-5 |
-| **STAGE2-7** | `flat_baseline` 行为等价基线支持（补齐 §18.1 门禁） | `geo/terrain.rs` / `config.rs` | 否 | 低 | STAGE2-3、STAGE2-5 |
-| **STAGE2-8** | 阶段二代码收口：跨构建差分全等验证 + 遗留门禁销项 + 文档同步 | 全链路 / 验收脚本 / 文档 | 否 | 中 | STAGE2-1～7 |
+编号保持稳定，执行顺序按依赖而非数字大小：**2 → 3 →（4、6、7）→ 5 → 8**，其中 5 还依赖已完成的 1。诊断和基线先独立交付，重试器再消费它们。
 
----
+| 编号 | 交付物 | 状态 | 直接前置 | 验收边界 |
+| :--- | :--- | :--- | :--- | :--- |
+| STAGE2-1 | 重试配置注册与入口上限钳制 | ✅ v1.50.39 | — | 配置有读取点；不代表已有重试 |
+| STAGE2-2 | T2 陆地公式提取、水系写入限于影响带 | ✅ v1.50.40 | — | 原基准 120 组物理差分全等，证据见 06 号 §5.3 |
+| STAGE2-3 | 0–11 步流水线框架与完整几何事务接口 | ◐ v1.50.45 | 2 | 框架与对当前基准等价已交付；第 5/9 步仍无生产注入，事务完整支撑域备份待阶段三 |
+| STAGE2-4 | 几何、引用与稳定 ID 校验 | ⏳ | 3 | 不通过排序“修正”旧 features 数组 |
+| STAGE2-6 | 生存连通与往返成本诊断函数 | ⏳ | 3 | 可单独运行，输出结构化诊断；此步不启用拒绝/重试 |
+| STAGE2-7 | 显式 flat_baseline 基线 | ⏳ | 3 | 可生成、保存与续演；不进 random，不自动替代模板 |
+| STAGE2-5 | 世界初始化事务与有界降级集成 | ⏳ | 1、4、6、7 | 启用新的拒绝/降级行为，独立版本评估 |
+| STAGE2-8 | 分层差分、遗留门禁与文档收口 | ⏳ | 1～7 | 合法基线等价与失败降级分别验收 |
 
 ## 任务明细
 
-### STAGE2-1 配置字段加回：有界重试上限 `terrainGenerationMaxRetries`
+### STAGE2-1 配置接入
 
-- [x] **STAGE2-1 配置字段加回与消费点预留**
-    - **内容**：
-      1. `crates/sim_core/src/config.rs`：在 `SimConfig` 中增加 `pub terrain_generation_max_retries: u32` 字段及完整 doc 注释（沿用 `#[derive(Default)]`，不新增 const 默认值，不手写 `Default` 实现）；
-      2. `frontend/js/config.js`：添加配置默认值（唯一真相源，设为 `3`）；
-      3. `crates/sim_core/examples/config.json`：同步添加该字段；
-      4. `tools/config-check.js`：在 `IMPACT_OVERRIDES` 中增加该字段到影响面的映射（字段总数由 233 增至 234）；
-      5. **消费点防空转**：接入真实消费点（在 `geo/terrain.rs` 创世回退上限或 `world.rs` 初始化处真实读取），确保满足 `tools/config-check.js` 第 5 条「空转参数」门禁（零消费点即构建失败）。
-    - **出处**：06 号文首更正段、R.5 待加回清单、§5.8 有界回退、§18.2 T1 遗留门禁 ⏳ 项；根 [AGENTS.md](AGENTS.md) §4.0 / §4.12。
-    - **验收**：`node tools/config-check.js` 通过（字段数 234=234，第 5 条空转检查通过）。
-    - **依赖**：无（首个配置任务）。
+- [x] `terrainGenerationMaxRetries` 在 Rust、前端、示例配置及配置检查中联动；默认值取前端配置。
+- [x] 创世入口对输入钳制至最多 8，0 表示不重试。此处仅记录配置接入，实际循环由 STAGE2-5 实现。
 
----
+### STAGE2-2 水系影响带收敛
 
-### STAGE2-2 T2 陆地区域公式解耦与水系写入收敛（兼容性拆分核心）
+- [x] 提取 T2 陆地高程/地表/肥力/标志公式，水系仅覆盖河面、岸带、河阶；两段共享同一次水文规划。
+- [x] 保持原算式、浮点顺序、边界与 RNG 消费；历史双 profile × seed 0–59 的 120 组对拍全等，生成器当时保持版本 4。
 
-- [x] **STAGE2-2 T2 陆地区域公式提取与水系影响带收敛**
-    - **内容**：
-      1. **现状痛点**：当前 `geo/hydrology.rs::generate_river` 对整张 `120×120` 网格遍历，无条件覆写全部网格的 `elevation`、`surface_kind`、`water_body_id`、`feature_flags` 与 `natural_fertility`，将前置步骤的基础地貌全部冲刷，导致统一地表派生无法在局部生效。
-      2. **公式解耦（陆地生成）**：
-         - 将旧 T2 河阶外低丘（`outside >= bank + terrace`）的高程公式 `level + 2.0 + u*2.0 + ((outside - bank - terrace).max(0.0)/size * cfg.terrain_ridge_amplitude.max(1.0)) * (0.8 + 0.2*(p.y/90.0).sin())`、地表类别 `DryGround`、肥力 `0.75` 与标志 `0`，提取为 `river_valley_v1` profile 的陆地区域基础生成步骤（整合入流水线第 2 步 `generate_base_relief`）；
-      3. **水系写入收敛（水系带局部覆盖）**：
-         - `generate_river`（流水线第 3 步 `apply_profile_static_hydrology`）改写为**仅作用于水系影响带**（即横向距离 `d < half_width + bank + terrace` 的局部网格），只覆盖河面、浅滩、河岸与河阶；外侧陆地严格保持陆地生成结果；
-      4. **施工硬门禁（§5.3 兼容性拆分）**：
-         - 必须严格保持原算式、浮点运算顺序、边界判据、RNG 消费序列以及最终网格高程/坡度/地表/flags 结果 100% 逐比特一致！
-         - 严禁仅缩小循环范围而留下原先被覆盖的 T0 地貌；统一派生也不得顺带更改旧 T2 的陆地分类。
-    - **出处**：06 号 §5.3 阶段二兼容性拆分（施工硬门禁）、§1.3 第 4 条、`crates/sim_core/src/geo/AGENTS.md`。
-    - **验收**：临时对拍脚本比对显式 `river_valley_v1` 下 60 个固定种子（seed 0–59）改造前后的高程数组、地表数组、肥力数组与 flags 数组，达成 100% 逐位全等（脚本用后按 §4.10 删除）。
-    - **依赖**：无（可与 STAGE2-1 并行）。
+### STAGE2-3 流水线与事务框架
 
----
+- [x] 按 06 号 §5.3 解耦 0–11 步。提供几何校验、生存诊断和重试的接口，先用无行为变化的适配层接线，不把尚未实现的 4/6/7 当成本任务的隐含依赖。（✅ v1.50.45：编排器 `generate_with_config` 迁至 `geo/terrain.rs`，第 7 步接线 `validate_static_terrain_geometry`，第 10/11 步映射 `seed_primitive_ecology` / `validate_terrain_world`，调用点不变。）
+- [ ] 几何事务覆盖完整支撑域和坡度差分 halo，备份高程、features、水体、中心线、覆盖意图及元数据；局部失败全部回滚，第 6 步统一定稿坡度/地表。不能只备份高程。（◐ 第 6 步统一定稿已落地〔原 TB-01-4 派生逐字迁入 `finalize_slope_and_surface`，T2 只重算坡度不改陆地分类〕；`SubFeatureWorkspace` 已就位高程快照 + 整块回滚 + 局部临时坡度接口，但 features/水体/中心线/覆盖意图/差分 halo 备份未实现——随阶段三生产注入启用。）
+- [x] 保留当前 T1 主脊/支脊与 T2 分类、RNG 和集合顺序；第 5/9 步生产注入仍为空。现有草原分支通过同构建回归。（✅ 临时对拍 180 组：T1/T2/草原 × seed 0–59 逐位指纹全等；临时时序断言验证 0–9 步严格按序后删除。）
+- **验收**：固定当前基准的 T1/T2 × seed 0–59 × 开关两态逐字节全等；临时断言验证顺序、完整撤销与 halo 边界，提交前删除。
+- **依赖**：STAGE2-2。
 
-### STAGE2-3 创世流水线阶段化重构（0–11 步无歧义管线）
+### STAGE2-4 静态几何与 ID 校验
 
-- [x] **STAGE2-3 规范化创世流水线重构与内部接口解耦**
-    - **内容**：
-      1. 在 `crates/sim_core/src/geo/terrain.rs` 与 `hydrology.rs` 中将 `generate_with_config` 重构为 §5.3 定义的私有阶段管线：
-         - `0. resolve_profile(seed, profile)`：解析 profile，不消费任何 WorldRng；
-         - `1. reset_static_terrain_state()`：清空 features、accents、sub_features、hydrology；
-         - `2. generate_base_relief(seed, profile)`：生成基础起伏（山口起伏 / 河谷低丘），严格保持现有主 RNG 与 `relief_rng` 消费顺序；
-         - `3. apply_profile_static_hydrology(seed, profile, config)`：T2 主河水系覆盖（经 STAGE2-2 收敛），P1 水系预留；
-         - `4. plan_subfeatures(seed, profile, enabled)`：调用 D-B1-3 已落地的纯哈希选择器；
-         - `5. 按 kind 升序处理子特征（阶段二搭建几何管线框架）`：
-           - 5a. `snapshot_bbox(f)`：局部 AABB 内原高程快照复制；
-           - 5b. `apply_subfeature_geometry(f)`：几何施加桩（只改高程与水面，不写 slope/flags）；
-           - 5c. `recompute_slopes_scratch(f)`：AABB 局部临时坡度试算；
-           - 5d. `accept_or_rollback(f)`：几何类接受判定桩，失败时按快照整块回滚；
-           （阶段二此步保持空注入，但数据管线、快照结构与回滚接口完整就位）；
-         - `6. recompute_slopes(); derive_surface_and_flags(profile)`：全图唯一定稿坡度与派生/合并 flags 的位置（水面/河岸/河阶保留其优先 surface_kind，陆地格根据坡度合并 `NO_WALK`/`NO_BUILD`）；
-         - `7. validate_static_terrain_geometry()`：静态几何校验（调用 STAGE2-4）；
-         - `8. generate_base_accents(seed, density)`：既有 `accent_rng` 装饰生成，消费顺序不变；
-         - `9. append_subfeature_accents(seed, plan, terrain, density)`：专属装饰追加接口；
-         - `10. ecology 布局与路网连接`：仅读取定稿地表；
-         - `11. validate_terrain_world + 生存成本诊断`：输出诊断结果供有界重试消费。
-      2. **约束**：第 5 步只改高程与几何，第 6 步是全图唯一写 `slope_angle_deg` 与派生 flags 的位置；临时坡度计算仅限局部 Scratch 内存。
-    - **出处**：06 号 §5.3 无歧义创世流水线、§5.2.1 事实层分工。
-    - **验收**：现有 T1 与 T2 世界生成结果逐字节不变；临时断言验证步骤 0–11 调用时序严格执行。
-    - **依赖**：STAGE2-2。
+- [ ] 接入第 7 步，检查结构 ID 唯一、子特征 ID 升序、引用存在、边界、水域与通行标志一致。
+- [ ] 既有 T2 features 顺序为 10、11、1、20、21、30；保持数组顺序，仅检查唯一性及 ID 归属。排序会改变快照字节，不能混入等价重构。
+- [ ] 水体轮廓按明确关联验证：现有主河水体 1 对应 `River` 特征 1；未来局部湖才对应 `WaterBody` 特征。不能要求主河匹配不存在的 WaterBody 枚举记录。
+- [ ] 若发现现状缺少某个显式 flag，但查询已有等价语义，应记录差异并另评估修正，不在校验器里偷偷修复数据。
+- **验收**：当前 T1/T2 固定矩阵通过；临时破坏 ID、引用与轮廓副本能返回稳定失败码。新增会拒绝旧合法世界的规则按行为变更拆分。
+- **依赖**：STAGE2-3。
 
----
+### STAGE2-6 生存诊断
 
-### STAGE2-4 静态地形几何校验与稳定 ID 断言落地（§5.2 / §5.3 第 7 步）
+- [ ] 实现独立只读诊断：按实际配置枚举初始营地、必需资源与市场，检查预期生活区域的合法路径；不硬编码 4 个营地，不要求无关荒地全部可达。
+- [ ] 每个营地检查可用水、食物及市场路径，计算坡度/软地折算后的往返成本；对照代谢、步速、装卸和携物成本定义诊断阈值。阈值与失败码先记录并经矩阵校准，不凭地貌名推断安全。
+- [ ] 返回 `SpawnDisconnected` / `SurvivalCostExceeded` 等诊断，独立调用不改变世界；STAGE2-5 再决定是否拒绝并重试。
+- **验收**：seed 0–59 保留成本分布与全部失败种子，临时阻断水/粮路径可准确检出；若新规则拒绝原基线，不得为零失败调低门槛或隐去差异，交由 STAGE2-5 单独验收行为改变。
+- **依赖**：STAGE2-3。
 
-- [ ] **STAGE2-4 静态地形几何校验与稳定 ID 断言**
-    - **内容**：
-      1. 在 `crates/sim_core/src/geo/terrain.rs` 实现 `validate_static_terrain_geometry(&self) -> Result<(), &'static str>`：
-         - **特征 ID 升序与唯一性断言**：断言 `self.features` 集合按 `id` 严格升序排列，且所有 ID 唯一无碰撞（§5.2）；
-         - **T2 核心水系 ID 范围保护**：River=1、ShallowFord=10/11、RiverBank=20/21、SpringValley=30 绝不重排；
-         - **水体顶点双副本一致性断言**：断言 `self.hydrology.water_bodies` 中每个水体的 `vertices` 与 `self.features` 对应 `WaterBody` 特征的 `vertices` 逐字节严格相等（§5.2.1 明确要求的副本一致性校验，杜绝几何漂移）；
-         - **浅滩端点合法性**：浅滩走廊两端端点落在非深水陆侧，且授权走廊覆盖范围内格点正确标注 `CROSSING_CANDIDATE`；
-         - **边界安全与禁行/禁建一致性**：水体不溢出地图边界；`RockFace` 格点必须包含 `NO_WALK` 与 `NO_BUILD` 标志。
-      2. 将该校验接入流水线第 7 步，校验失败时直接返回明确错误码进入 STAGE2-5 重试环。
-    - **出处**：06 号 §5.2 单一真相源与稳定 ID 表、§5.2.1 事实层分工与顶点副本断言、§5.3 第 7 步。
-    - **验收**：现有 T1/T2 显式种子 0–59 全部通过校验；临时单测注入 ID 重复或顶点不一致样本能准确拦截报错。
-    - **依赖**：STAGE2-3。
+### STAGE2-7 显式基线
 
----
+- [ ] 实现 `flat_baseline` 显式诊断 profile，先冻结旧 T0 对照源、配置与比较字段；不存在可验证旧基准时须明确基准缺口，不宣称等价通过。
+- [ ] 保留现有模板及 random 映射；支持合法生态布局、道路、配置注入、保存/加载与续演，不将基线加入 random。
+- [ ] 生存合格后才允许 STAGE2-5 将其作为显式降级目标，不能把“足够平”当作生存有效的证明。
+- **验收**：与冻结基准对照、同种子复现、存读档续演；新 profile 的注册与版本兼容按 06 号 §5.7 评估。
+- **依赖**：STAGE2-3；生存准入使用 STAGE2-6 的结果，集成时由 STAGE2-5 统一检查。
 
-### STAGE2-5 有界失败降级与重试机制（§5.8 阶梯回退环）
+### STAGE2-5 有界降级集成
 
-- [ ] **STAGE2-5 有界重试与阶梯降级状态机落地**
-    - **内容**：
-      1. 在创世入口（`spatial/world.rs` 或 `geo/terrain.rs`）实现 §5.8 规定的阶梯降级逻辑：
-         - 步骤 1：尝试完整 profile + 已选子特征（初始 `disabled_mask = 0`）；
-         - 步骤 2：执行静态几何校验 `validate_static_terrain_geometry`；
-         - 步骤 3：执行生态落位、路网构建与世界合法性校验；
-         - 步骤 4：执行 STAGE2-6 生存距离与成本诊断；
-         - 步骤 5（降级阶梯）：若上述任一步骤失败：
-           - 阶梯 A：按「结构型 -> 视觉型」逆序禁用一个子特征，重置世界并重试；
-           - 阶梯 B：若仍失败，使用同 profile 的无子特征版本重试；
-           - 阶梯 C：若仍失败，在 `config.terrain_generation_max_retries` 重试上限内尝试平坦基线（`flat_baseline`，STAGE2-7）；
-           - 阶梯 D：若最终依然失败，返回携带 `seed`、`profile`、`generator_version`、`attempt`、`disabled_mask`、`failure_code` 的初始化错误。
-      2. **确定性铁律**：重试只改变明确记录的 feature mask，**严禁更换 seed、严禁改变全局 RNG 消费序列、严禁在运行中搬迁 Agent 或修补地块**。
-      3. **日志规范**：仅在重试或降级触发时输出结构化日志，正常每 tick 运行零噪音。
-    - **出处**：06 号 §5.8 有界失败、诊断与验收矩阵、§18.2 T1 门禁 ⏳ 项。
-    - **验收**：临时构造失败条件验证降级状态机阶梯流转正确；重试次数严格受 `terrain_generation_max_retries` 约束；重试期间 RNG 序列无污染。
-    - **依赖**：STAGE2-1（重试上限配置）、STAGE2-4（静态几何校验）。
+- [ ] 由世界初始化入口包住完整生成链，每次创建独立候选世界，仅在全部校验通过后发布；执行 06 号 §5.8 的局部拒绝、结构降级、可选支脊降级和基线策略。
+- [ ] 首次之外最多重试 N 次；0、预算耗尽、无新策略均明确结束；相同 `(effective_profile, disabled_mask, disable_spurs)` 不重复尝试。视觉失败不能触发物理重试。
+- [ ] 失败候选的 RNG、计数器、POI、路网和缓存全部丢弃；同策略同 seed 可复现，不能继承上一次失败的随机状态。
+- [ ] 保存并显示 requested/effective profile 与降级原因，成功降级不冒充原模板成功；存读档须保持有效模板与同 tick 续演。
+- **验收**：临时夹具覆盖局部回滚、0/1/N 重试、策略去重、无解报错及降级后存读档；合法首试矩阵保持原输出，新增拒绝/降级单独记录并按物理生成变化评估版本。
+- **依赖**：STAGE2-1、4、6、7。
 
----
+### STAGE2-8 收口
 
-### STAGE2-6 初始营地生存连通分量与往返成本诊断（补齐 §18.1 门禁）
-
-- [ ] **STAGE2-6 初始生存连通性与往返成本诊断**
-    - **内容**：
-      1. 在创世完成且路网生成完毕后（流水线第 11 步）实现生存成本与连通性诊断：
-         - **生存连通分量校验**：全部 4 个初始营地、主要水资源 POI、浆果丛 POI 与榷场必须位于同一个陆路可行走连通分量内（无不可逾越的深水或陡坡硬禁行截断）；
-         - **往返成本上限诊断**：计算每个初始营地到最近可用水源 POI 及集市的实际折算路径成本（结合 `LaneTerrainProfile` 坡度与软地慢行系数），断言往返耗时低于生存诊断上限（确保族人在开局基础代谢下不会因过远路程直接渴死/饿死）；
-      2. 诊断不通过时返回明确失败码（如 `SpawnDisconnected`、`SurvivalCostExceeded`），向外冒泡给 STAGE2-5 有界回退环进行降级。
-    - **出处**：06 号 R.1 遗留缺口、§18.1 T0 门禁第 4 条（⏳ → ✅）、§5.8、§1.3 末段。
-    - **验收**：现有 T1 与 T2 的固定种子（seed 0–59）全部通过生存诊断；记录现有世界营地到水源的往返成本基线；人为阻断水源时能被精准捕获并触发重试。
-    - **依赖**：STAGE2-3、STAGE2-5。
-
----
-
-### STAGE2-7 `flat_baseline` 行为等价基线支持（补齐 §18.1 门禁）
-
-- [ ] **STAGE2-7 `flat_baseline` 行为等价基线支持**
-    - **内容**：
-      1. 针对 §18.1 遗留门禁「现有无新地貌基线在关闭地形 profile 后保持行为等价」：
-         - 在 profile 枚举/常量与流水线中正式支持 `flat_baseline` profile（纯 T0 基础倾斜 + 平缓起伏波动，无主脊、无主河）；
-         - 确保 `flat_baseline` 可作为 STAGE2-5 阶梯回退中的终极简化保底 profile；
-         - 验证在 `flat_baseline` 下地表生成、POI 播撒、路网连通性与确定性行为正常，全图可行走连通分量恒为 1。
-      2. 该 profile 作为纯基线 profile，其生成算法与既有 T0 纯起伏逻辑严格等价。
-    - **出处**：06 号 R.1 遗留缺口、§18.1 T0 门禁第 5 条（⏳ → ✅）。
-    - **验收**：显式指定 `profile: 'flat_baseline'` 可成功创世，确定性矩阵测试全通，存读档无残留；关闭 profile 时系统平稳运行。
-    - **依赖**：STAGE2-3、STAGE2-5。
-
----
-
-### STAGE2-8 阶段二代码收口：跨构建差分全等验证 + 遗留门禁销项 + 文档同步
-
-- [ ] **STAGE2-8 阶段二验收收口与全套门禁复核**
-    - **内容**：
-      1. **跨构建物理等价差分（§5.3 施工硬门禁）**：
-         - 基准提交：阶段一收口最终产物 `4373190`（v1.50.38）；
-         - 测试矩阵：显式 `mountain_pass_v1` 与 `river_valley_v1` × seed 0–59（共 120 组），分别测试 `terrainAccentSubFeatures=false` 与 `true`；
-         - 比较范围：高程、坡度、地表类别、feature_flags、肥力、水系、POI、路网节点与车道拓扑；
-         - 判定标准：**逐字节 100% 全等（物理差异 0）**！`TERRAIN_GENERATOR_VERSION` 保持 4，`SAVE_FORMAT_VERSION` 保持 7。
-      2. **三项遗留门禁销项核对**：
-         - §18.1 生存连通分量与往返成本诊断（⏳ → ✅，由 STAGE2-6 交付）
-         - §18.1 `flat_baseline` 行为等价（⏳ → ✅，由 STAGE2-7 交付）
-         - §18.2 有界重试与简化 profile 回退（⏳ → ✅，由 STAGE2-5 交付）
-         - 06 号 R.1 状态表中 T0 与 T1 的遗留缺口全部清零！
-      3. **执行全套 R.5 通用门禁**：
-         ```powershell
-         cargo test --lib
-         cargo build -p sim_wasm --target wasm32-unknown-unknown --release
-         Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "frontend\rust\sim_wasm.wasm" -Force
-         Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "frontend\sim_wasm.wasm" -Force
-         node tools/test-wasm.js
-         node tools/test-determinism.js
-         node tools/config-check.js
-         node tools/frontend-check.js
-         node tools/cross-doc-check.js
-         node tools/doc-link-check.js
-         node tools/code-map-check.js
-         node tools/doc-maintenance-check.js
-         ```
-      4. **文档同步**：
-         - 更新 `docs/plan/tech/06-terrain-templates.md`：R.1 遗留缺口更新、R.3 阶段二状态更新、§2.3 状态表更新、§18.1/§18.2 门禁状态 ⏳ → ✅、§20 退出标准更新；
-         - 更新 `docs/current/tech/14-terrain-and-network.md`：流水线现状与配置清单同步；
-         - 更新 `TODO.md` 与根目录任务状态；
-         - 若包含 Rust 代码变更，按根 AGENTS.md §4.9 升版并同步 WASM 双副本，追加 `docs/current/01-changelog.md` 版本条目。
-    - **出处**：06 号 R.3、§5.1、§5.3 末段、§18.1、§18.2、§20。
-    - **验收**：差分 120 组零差异，门禁全绿，阶段二代码交付正式完结，解锁阶段三。
-    - **依赖**：STAGE2-1 ～ STAGE2-7 全部完成。
-
----
-
-## 门禁与验收速查表
-
-| 门禁项 | 运行命令 | 预期指标 | 对应任务 |
-| :--- | :--- | :--- | :--- |
-| **Rust 编译与测试** | `cargo test --lib` | 0 报错（无持久化单测，§4.10） | 全部 Rust 任务 |
-| **WASM 构建与双副本** | `cargo build -p sim_wasm --release` + 复制 | 双副本 SHA256 完全一致 | 全部 Rust 任务 |
-| **WASM 确定性与长程稳定** | `node tools/test-wasm.js` | `ALL_TESTS_DONE`（存读档/无NaN/无越界） | STAGE2-3, 5, 8 |
-| **确定性矩阵测试** | `node tools/test-determinism.js` | 6/6 套件全通（多种子/分批独立性/存读档） | STAGE2-3, 5, 8 |
-| **配置一致性与空转检查** | `node tools/config-check.js` | 字段数 234=234，第 5 条空转参数 0 命中 | STAGE2-1, 8 |
-| **前端代码完整性** | `node tools/frontend-check.js` | 35 个 JS 脚本语法与 DOM ID 全绿 | STAGE2-1, 8 |
-| **跨文档一致性** | `node tools/cross-doc-check.js` | 冲突 0 · 漂移 0 | STAGE2-8 |
-| **文档链接可达性** | `node tools/doc-link-check.js` | 全部相对链接可达（0 失效） | STAGE2-8 |
-| **跨构建物理等价差分** | 临时差分脚本（规范化导出） | 120 组种子 × 开关两态物理字段 100% 全等 | STAGE2-2, 8 |
+- [ ] 为纯重构候选记录基准/候选提交、两份 WASM SHA256、完整配置及其摘要；T1/T2 × seed 0–59 × 开关两态比较高程、坡度、地表、flags、肥力、水系、POI 与路网。与当前 TB-01/S7-02 基准比较，禁止使用 v1.50.38 的旧 T1 当最终基线。
+- [ ] 对新增拒绝/降级提交另报首次通过、特征未注入、降级成功、初始化失败的数量及种子；所有变更严格按版本门禁加载。
+- [ ] 三项遗留门禁按证据销项：生存诊断、flat_baseline 等价、有界回退。证据不足则保持未完成，不能机械全勾。
+- [ ] 执行 06 号 R.5 / §18.6 和根工作流的适用门禁，Rust 变更重编译 wasm32 release 并同步双副本；纯文档走工作流 §G。
+- [ ] 同步 06 号 R.1/§18/§20、14 号现状与 TODO；代码变更按根 AGENTS.md 升版并记录 changelog。
+- **依赖**：STAGE2-1～7。
