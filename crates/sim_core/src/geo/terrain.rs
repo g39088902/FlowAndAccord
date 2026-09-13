@@ -150,7 +150,9 @@ fn sub_feature_candidate(
 /// ★ 子特征判定**禁止**使用 `DefaultHasher`、浮点哈希或系统时间——它们在不同
 /// 编译目标/标准库版本下不保证结果一致，会直接击穿确定性。本函数只依赖
 /// 整数运算与 `wrapping_mul`，跨平台逐位稳定。
-fn mix64(mut x: u64) -> u64 {
+/// ★ S7-03 起 `accents.rs` 草甸斑块哈希共享同一 finalizer（pub(crate) 复用，
+/// 不复制第二份实现）。
+pub(crate) fn mix64(mut x: u64) -> u64 {
     x ^= x >> 30;
     x = x.wrapping_mul(0xbf58_476d_1ce4_e5b9);
     x ^= x >> 27;
@@ -292,6 +294,12 @@ const RIDGE_WARP_SPAN_FACTOR: f32 = 0.75;
 /// 同盐不同坐标即得独立噪声，无需第二盐值）。
 const RIDGE_WARP_SLICE_Y_MAIN: f32 = 137.0;
 const RIDGE_WARP_SLICE_Y_SUB: f32 = 911.0;
+/// 高斯轮廓的峰值梯度系数：exp(-(d/A)²/(2W²)) 轮廓在 d=±W 处导数最大，
+/// 值 = A/W·exp(-0.5)。半坡主坡（S7-04）以「目标峰值坡度」反解宽度时消费。
+const GAUSS_PEAK_GRADIENT: f32 = 0.606_530_66; // = exp(-0.5)，std::f32::consts 无 FRAC_1_SQRT_E
+/// ★ S7-04 半坡林地 fBm 噪声增益阻尼（0.6）：换 max_slope 门禁窗口余量，
+/// 改值等于换图（同种子半坡地形不同），随 TERRAIN_GENERATOR_VERSION 门禁约束。
+const HILLSIDE_NOISE_DAMP: f32 = 0.6;
 /// 高度调制掩码权重下限（平原，规格 0.20~0.30 取中值）。
 const NOISE_WEIGHT_PLAIN: f32 = 0.25;
 /// 高度调制掩码权重上限（山体，规格 0.8~1.0 取中值偏上）。
@@ -637,7 +645,9 @@ pub struct TerrainSubFeature {
 /// v1.50.41（mac）/ v1.50.40（master）：4 -> 5（两条分支各自递增后于本合并汇合——
 ///           mac：TB-01 多尺度 fBm 噪声与支脊系统；master：S7-02 新增 `grassland_plain_v1`
 ///           低幅高程场/残丘/泉溪洼地分支。旧存档按版本门禁拒绝）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 5;
+/// v1.50.46：5 -> 6（S7-04 新增 `hillside_woodland_v1` 不对称缓坡山体分支；
+///           既有 T1/T2/草原路径逐位不变，递增遵循 S7-02 先例——新分支入库即换版）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 6;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -645,6 +655,14 @@ pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
 /// 低幅起伏平原 + 孤立残丘 + 泉溪洼地；**无水面**（清泉 POI 仍由生态层布点，
 /// 洼地只落 `SpringValley` 特征语义与 SoftGround 凹圈）。
 pub const TERRAIN_PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
+/// 阶段七插队模板：半坡林地（06 号 §4.2 · STAGE-07-TODO S7-04）。
+/// 单侧不对称缓坡山体——迎风坡宽缓（目标峰值 8°~12°）、背风坡较陡
+/// （目标峰值 23°~23.2°，叠加 fBm/倾斜后全域 max_slope 落在探针门禁
+/// 22°~28.5° 窗口），**全域坡度严格 <30° 不设硬禁行**；脊线经 crest_shift
+/// 推离图心，图心落在迎风坡脚平缓带（初始营地可建）；坡脚泉溪洼地复用
+/// S7-02 洼地语义（`SpringValley` 特征 + SoftGround 凹圈，无水面）。
+/// 林地是装饰层事实（S7-05 梯级散布），本分支不写任何林地地表。
+pub const TERRAIN_PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 
 /// 纯确定性自然地形生成引擎。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -738,9 +756,12 @@ impl TerrainMap {
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
         self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
-        // ★ S7-02 草原：基础倾斜压到 16~24（坡度主体 2°~8°）。抽取数不变（1 次），
-        //   仅区间不同——T1/T2 路径的 rng 消费序列与取值逐位不变。
-        self.tilt_magnitude = if self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN {
+        // ★ S7-02 草原 / ★ S7-04 半坡林地：基础倾斜压到 16~24（主地貌由专属
+        //   特征承担，坡度主体 2°~8°）。抽取数不变（1 次），仅区间不同——
+        //   T1/T2 路径的 rng 消费序列与取值逐位不变。
+        let low_relief =
+            self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
+        self.tilt_magnitude = if low_relief {
             rng.gen_range(16.0, 24.0)
         } else {
             rng.gen_range(54.0, 66.0)
@@ -766,6 +787,7 @@ impl TerrainMap {
         //   残丘：高斯最大梯度 ≈ 0.858 × A/R，A/R ∈ [0.19, 0.31] → 峰值坡度
         //   ≈ 9.3°~14.9°，叠加低幅基础波动后严格 < 18°（不产生通行障碍）。
         let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
+        let is_hillside = self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
         let grass_mounds: Vec<(f32, f32, f32, f32)> = if is_grassland {
             let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 { 1 } else { 2 };
             let mut placed: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(mound_count);
@@ -789,9 +811,34 @@ impl TerrainMap {
         } else {
             Vec::new()
         };
+        // ★ S7-04 半坡林地主坡参数（只消费 relief_rng 局部流；其余 profile 不进入
+        //   本块，消费序列与逐位输出不受影响）。
+        //   不对称高斯主坡：峰值梯度出现在 across=±W 处，值 = exp(-0.5)×A/W——
+        //   以「目标峰值坡度」反解宽度。背风目标 19°~23°（叠加 fBm/倾斜后全域
+        //   max_slope 落入门禁 22°~28.5°，见 S7-04 实测记录）、迎风目标 8°~12°
+        //   （宽缓可建，目标 <14°）；crest_shift 把脊线推离图心 0.18~0.30×world，
+        //   图心落在迎风坡脚平缓带（初始营地坡度 <10° 可建），陡峭带远离营地。
+        let hill_params: Option<(f32, f32, f32, f32)> = if is_hillside {
+            let amp = relief_rng.gen_range(26.0, 32.0);
+            let lee_target = relief_rng.gen_range(23.0, 23.2).to_radians().tan();
+            let wind_target = relief_rng.gen_range(8.0, 12.0).to_radians().tan();
+            let sgn = if relief_rng.gen_range(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+            let crest_shift = sgn * relief_rng.gen_range(0.18, 0.30) * self.world_size;
+            Some((
+                amp,
+                GAUSS_PEAK_GRADIENT * amp / wind_target, // W_wind（宽缓）
+                GAUSS_PEAK_GRADIENT * amp / lee_target,  // W_lee（较陡）
+                crest_shift,
+            ))
+        } else {
+            None
+        };
+
         // 泉溪洼地锚点候选：2 处，锚在中心近域（图心=初始营地，泉眼是最近水源地理）；
         // 落点会在 raw 填充后吸附到局部最低格（「在低洼处开辟微凹地」）。
-        let grass_depressions: Vec<(f32, f32, f32, f32)> = if is_grassland {
+        // ★ S7-04 半坡林地复用同一洼地语义（坡脚泉溪 = 生活供水锚点；草原创世
+        //   的抽取序与取值逐位不变）。
+        let foot_depressions: Vec<(f32, f32, f32, f32)> = if is_grassland || is_hillside {
             (0..2)
                 .map(|_| {
                     let ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
@@ -850,6 +897,11 @@ impl TerrainMap {
         //   （×1.0 逐位精确），与常数版输出零漂移。
         let noise_freq_k = terrain_noise::SCALE_BASE_M / config.terrain_noise_scale_base.max(1.0);
         let noise_amp_k = config.terrain_noise_amplitude.max(0.0) / terrain_noise::AMPLITUDE_M;
+        // ★ S7-04 半坡噪声阻尼：fBm 在坡面上的局部梯度会把 max_slope 的逐种子
+        //   方差推到 ±2° 以上，压穿门禁窗口（22°~28.5°）与 §4.1 固定种子带
+        //   （seed 7 [23,26.5]）。半坡分支对噪声增益统一 ×0.75（其余 profile
+        //   ×1.0 逐位不变），用阻尼换窗口余量；S7-08 配置化时收敛为 SimConfig 字段。
+        let noise_amp_k = if is_hillside { noise_amp_k * HILLSIDE_NOISE_DAMP } else { noise_amp_k };
 
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
@@ -903,6 +955,16 @@ impl TerrainMap {
                     let dy = wy - my;
                     elev += amp * (-(dx * dx + dy * dy) / (mrad * mrad)).exp();
                 }
+                // ★ S7-04 不对称主坡：迎风（across<0）宽缓高斯 / 背风（across>0）
+                //   较窄高斯，两侧在 across=0 处导数同为 0（C1 连续，脊线圆滑无折角）。
+                //   脊线走向沿用既有 theta，横向偏移 = ridge_offset + crest_shift
+                //   （crest_shift 把陡峭带推离图心，营地落在迎风坡脚平缓带）。
+                if let Some((h_amp, w_wind, w_lee, crest_shift)) = hill_params {
+                    let across =
+                        -wx * theta_sin + wy * theta_cos - ridge_offset - crest_shift;
+                    let w = if across <= 0.0 { w_wind } else { w_lee };
+                    elev += h_amp * (-(across * across) / (2.0 * w * w)).exp();
+                }
                 // ★ TB-01-2 高度调制掩码：h_norm ≥ 0.70（山体）权重升至满格、
                 //   ≤ 0.30（平原生活区）衰减到 0.25——高频噪声在低平地带近乎静默，
                 //   严禁全图均匀加噪（根 AGENTS.md §4 坑 #3：平原 ±2m 噪声即产生
@@ -923,20 +985,20 @@ impl TerrainMap {
         // ★ S7-02 泉溪洼地：候选锚点吸附到局部最低格（「在低洼处开辟微凹地」），
         //   高斯微凹盆直接雕入 raw（在坡度派生之前）；凹圈带（0.7R~1.5R）标记
         //   SoftGround，盆心保持 DryGround。无水体、无水面。
-        let mut soft_ring = if grass_depressions.is_empty() {
+        let mut soft_ring = if foot_depressions.is_empty() {
             Vec::new()
         } else {
             vec![false; self.grid_width * self.grid_height]
         };
         let mut springs: Vec<(usize, usize, f32, f32, f32, f32)> = Vec::new();
-        if !grass_depressions.is_empty() {
+        if !foot_depressions.is_empty() {
             let gw = self.world_size / (self.grid_width.max(2) - 1) as f32;
             let to_grid = |v: f32, n: usize| {
                 ((v / self.world_size + 0.5) * (n - 1) as f32)
                     .round()
                     .clamp(10.0, (n - 11) as f32) as usize
             };
-            for (di, &(cwx, cwy, depth, drad)) in grass_depressions.iter().enumerate() {
+            for (di, &(cwx, cwy, depth, drad)) in foot_depressions.iter().enumerate() {
                 let (cgx, cgy) = (to_grid(cwx, self.grid_width), to_grid(cwy, self.grid_height));
                 let mut best = (cgx, cgy);
                 let mut best_e = f32::MAX;

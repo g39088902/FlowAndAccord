@@ -69,6 +69,13 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
   const cR = Math.cos(rot), sR = Math.sin(rot);
   // 隆冬低矮萎缩保底高度系数（config.render.js，TA-11-3）：hK = ratio + (1-ratio)×叶量
   const RC = window.RENDER_CONFIG || {};
+  // ★ S7-03 高密草甸 LOD（config.render.js）：草叶屏幕长度不足阈值的远景草丛整丛省略——
+  // 平地草原全图 ~480 丛（通用图 60 丛），全图缩放时逐叶描边成本不可控；屏幕上不足
+  // ~1.4px 的草丛只是一枚色点，整丛省略不可辨。统一深度队列与视口剔除照常先行，
+  // 本层只补「缩放过小」这一档（其余装饰种类不受影响）。
+  const hBaseLod = Number.isFinite(RC.accentGrassTuftHeightBase) ? RC.accentGrassTuftHeightBase : 2.4;
+  const lodMinPx = Number.isFinite(RC.accentGrassTuftLODMinPx) ? RC.accentGrassTuftLODMinPx : 1.4;
+  if (hBaseLod * scaled < lodMinPx) return;
   const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio)
     ? RC.accentGrassTuftWinterHeightRatio : 0.62;
   const hK = winterK + (1 - winterK) * season.leafDensity;

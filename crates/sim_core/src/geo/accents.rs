@@ -1,7 +1,10 @@
-//! accents.rs · 地表装饰系统（D-A 装饰系统基础，v1.48.0；★ D-B1-5 补齐 RockCluster/GrassTuft）
+//! accents.rs · 地表装饰系统（D-A 装饰系统基础，v1.48.0；★ D-B1-5 补齐 RockCluster/GrassTuft；
+//! ★ S7-03 草原草甸斑块化散布与孤树压制）
 //!
 //! 装饰层是独立于地貌特征（`TerrainFeature`）之外的纯视觉要素集合。
 //! 使用独立 `accent_rng` 加盐生成，不消费模拟 RNG、不参与通行/资源/碰撞计算。
+//! ★ S7-03：`grassland_plain_v1` 走专属预算与斑块调制分支（见 `GRASSLAND_*` 常数与
+//! `grass_patch_field`）——只改该 profile 的装饰分布，T1/T2 路径零引用、逐位不变。
 //!
 //! # 四处同步
 //! 装饰数据需要同步四处（根 AGENTS.md §4.5）：
@@ -11,6 +14,7 @@
 //! 4. `frontend/js/snapshot-bin.js`（FABS Section 21 解码）
 
 use super::biome::SurfaceKind;
+use super::terrain::TERRAIN_PROFILE_GRASSLAND_PLAIN;
 use crate::rng::WorldRng;
 use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
@@ -70,10 +74,33 @@ const BASE_GRASS_TUFT_COUNT: usize = 60;
 /// 候选点最大重试次数 = 3x 目标总数（防死循环）
 const MAX_RETRY_FACTOR: usize = 3;
 
+// ── ★ S7-03（STAGE-07-TODO S7-03）平地草原草甸预算与斑块调制常数 ──
+// 只被 `is_grassland` 分支消费，T1/T2 装饰路径零引用（输出逐位不变）；
+// 装饰是纯视觉要素，改值不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构。
+/// 孤树意象：草原 Tree 预算压至普通地图的 20%（06 号 §4.1「少量孤树」）。
+const GRASSLAND_TREE_BUDGET_RATIO: f32 = 0.2;
+/// 高密度草甸：草原 GrassTuft 预算 ×8（60 → 480 @density=1.0，受
+/// `config.terrain_accent_density` 乘子继续调制；斑块调制只改分布不改总量）。
+const GRASSLAND_GRASS_TUFT_BUDGET_RATIO: f32 = 8.0;
+/// 草甸斑块大频波长（米）：圈出「草甸群落」的宏观走向。
+const GRASS_PATCH_LAMBDA_LARGE_M: f32 = 95.0;
+/// 草甸斑块小频波长（米）：群落内部深浅交错的次级斑块。
+const GRASS_PATCH_LAMBDA_SMALL_M: f32 = 26.0;
+/// 斑块大频固定盐值 "GRSPATL1"（8 ASCII 字符打包 u64，风格同 `ACCENT_RNG_SALT`）。
+/// 一经落地永不更改——改盐值等于换图（同种子草原装饰不再复现）。
+const SALT_GRASS_PATCH_LARGE: u64 = 0x4752_5350_4154_4C31;
+/// 斑块小频固定盐值 "GRSPATS1"。同上，永不更改。
+const SALT_GRASS_PATCH_SMALL: u64 = 0x4752_5350_4154_5331;
+
 /// 使用独立 accent_rng 在地形表面散布装饰物。
 ///
 /// 在 generate_with_profile 末尾调用（此时路网/房屋/POI 尚未放置，
 /// 故只根据地表的表面类别/坡度/肥力做禁区过滤）。
+///
+/// ★ S7-03：`grassland_plain_v1` 走专属分支——Tree 预算压至 20%（孤树）、
+/// GrassTuft 预算 ×8 并经「双频哈希斑块 × 残丘坡度疏草」调制分布、
+/// Bush 向泉溪洼地凹圈（`SoftGround` 软地带）聚集。草原无水面（S7-02），
+/// 深水/浅水过滤天然恒真。T1/T2 的预算与偏好判定完全不变。
 pub fn generate_accents(
     terrain: &super::terrain::TerrainMap,
     density: f32,
@@ -87,11 +114,18 @@ pub fn generate_accents(
     }
 
     let density = density.clamp(0.0, 2.0);
-    let tree_count = ((BASE_TREE_COUNT as f32) * density).round() as usize;
+    // ★ S7-03 草原专属预算倍率（Tree ×0.2 / GrassTuft ×8；其余种类与通用一致，
+    // Bush 聚集靠偏好而非预算，总量仍受控）。
+    let is_grassland = terrain.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
+    let tree_ratio = if is_grassland { GRASSLAND_TREE_BUDGET_RATIO } else { 1.0 };
+    let grass_tuft_ratio =
+        if is_grassland { GRASSLAND_GRASS_TUFT_BUDGET_RATIO } else { 1.0 };
+    let tree_count = ((BASE_TREE_COUNT as f32) * tree_ratio * density).round() as usize;
     let boulder_count = ((BASE_BOULDER_COUNT as f32) * density).round() as usize;
     let bush_count = ((BASE_BUSH_COUNT as f32) * density).round() as usize;
     let rock_cluster_count = ((BASE_ROCK_CLUSTER_COUNT as f32) * density).round() as usize;
-    let grass_tuft_count = ((BASE_GRASS_TUFT_COUNT as f32) * density).round() as usize;
+    let grass_tuft_count =
+        ((BASE_GRASS_TUFT_COUNT as f32) * grass_tuft_ratio * density).round() as usize;
     let total_target = tree_count + boulder_count + bush_count + rock_cluster_count + grass_tuft_count;
     let max_retries = total_target * MAX_RETRY_FACTOR;
 
@@ -110,7 +144,7 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |cell, rng| {
+        |_wx, _wy, cell, rng| {
             // ★ v1.49.3 放宽：平地（含 0 坡）与河流两岸（河滩/河阶，喜湿）均可生树，
             // 仅仍排除水面/岩壁等禁区（外层已过滤 NO_WALK/水体）
             match cell.surface_kind {
@@ -148,7 +182,7 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |cell, rng| {
+        |_wx, _wy, cell, rng| {
             // Boulder 偏好陡坡与裸露 RockFace。
             // ★ v1.50.10 修复：原「slope>18 且 NO_BUILD」条件在两类地貌下几乎恒为假——
             // ① NO_BUILD 在河谷图被陆地基底（terrain.rs::generate_river_valley_base_relief，
@@ -182,7 +216,25 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |cell, rng| {
+        |wx, wy, cell, rng| {
+            if is_grassland {
+                // ★ S7-03 草原：泉溪洼地凹圈（S7-02 落地的 SoftGround 环带）周围聚集
+                //   灌木，形成水源的视觉提示——候选点本格或 25m 六向邻点命中软地即视为
+                //   「洼地邻域」高概率接受，开阔干地只零星点缀（预算不变、聚集靠偏好；
+                //   邻域探测是纯地形查询，不消费 accent_rng、不写任何格子）。
+                let near_soft = match cell.surface_kind {
+                    SurfaceKind::SoftGround => true,
+                    SurfaceKind::DryGround => (0..6).any(|k| {
+                        let ang = std::f32::consts::TAU * k as f32 / 6.0;
+                        terrain
+                            .sample_cell(wx + 25.0 * ang.cos(), wy + 25.0 * ang.sin())
+                            .surface_kind
+                            == SurfaceKind::SoftGround
+                    }),
+                    _ => false,
+                };
+                return rng.gen_range(0.0, 1.0) < if near_soft { 0.85 } else { 0.12 };
+            }
             // Bush 偏好林缘过渡带（SoftGround 且肥力中等）
             if cell.surface_kind == SurfaceKind::SoftGround {
                 return rng.gen_range(0.0, 1.0) < 0.7;
@@ -211,10 +263,11 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |cell, rng| {
+        |_wx, _wy, cell, rng| {
             // 候选地表（§5.5 表）：RiverBank/RiverTerrace 卵石群，或坡度 ≥ 8° 的干地裸岩群。
             // 内核只下发 anchor，2–5 颗子石由前端按 accent.id 派生（§5.5），
             // 不为子石建实体、不改变碰撞/路面——本函数天然满足（纯视觉装饰）。
+            // ★ S7-03 草原：残丘坡面（坡度 ≥ 8° 的 DryGround）天然命中裸岩群分支。
             match cell.surface_kind {
                 SurfaceKind::RiverBank => rng.gen_range(0.0, 1.0) < 0.4,
                 SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.25,
@@ -234,12 +287,23 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |cell, rng| {
+        |wx, wy, cell, rng| {
             // 候选地表（§5.5 表）：DryGround/SoftGround/RiverTerrace 且坡度 < 24°；
             // 深水/浅水/NO_WALK 已由 generate_accents_of_kind 外层禁区过滤排除。
             // 草丛是纯视觉要素，不得被当作湿地/水源/可采资源（本层不写任何格子）。
             if cell.slope_angle_deg >= 24.0 {
                 return false;
+            }
+            if is_grassland {
+                // ★ S7-03 草甸斑块化：双频哈希值噪声（大频 95m 群落走向 + 小频 26m
+                //   深浅斑块）调制接受概率（0.25~1.15，均值 ≈0.7），形成深浅交错的
+                //   草甸群落而非均匀撒点；残丘坡面（坡度 6°→14°）线性疏草露土，
+                //   泉洼软地（SoftGround）略密。纯函数调制不消费 accent_rng 额外流。
+                let base = if cell.surface_kind == SurfaceKind::SoftGround { 0.95 } else { 0.90 };
+                let slope_k =
+                    1.0 - 0.85 * ((cell.slope_angle_deg - 6.0) / 8.0).clamp(0.0, 1.0);
+                let patch_k = 0.25 + 0.90 * grass_patch_field(wx, wy, seed);
+                return rng.gen_range(0.0, 1.0) < base * slope_k * patch_k;
             }
             match cell.surface_kind {
                 SurfaceKind::DryGround => rng.gen_range(0.0, 1.0) < 0.8,
@@ -255,6 +319,50 @@ pub fn generate_accents(
     accents
 }
 
+/// 草甸斑块单格点哈希值（[0,1)）：世界种子 + 频段盐值 + 整数格坐标混合。
+/// 与 `plan_subfeatures` 同一纪律——禁用 `DefaultHasher`/浮点哈希/系统时间，
+/// 只依赖整数运算，跨平台逐位确定。
+fn grass_patch_value(ix: i64, iy: i64, seed: u64, salt: u64) -> f32 {
+    let m = super::terrain::mix64(
+        seed
+            ^ salt
+            ^ (ix as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            ^ (iy as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F),
+    );
+    ((m >> 11) as f64 / (1u64 << 53) as f64) as f32
+}
+
+/// 单频平滑值噪声：格点哈希值场经五次 Hermite 样条双线性插值（与
+/// `terrain_noise::gradient_noise_2d` 同款平滑核，二阶导连续、无格网接缝）。
+fn smooth_patch_field(wx: f32, wy: f32, lambda_m: f32, seed: u64, salt: u64) -> f32 {
+    let gx = wx / lambda_m;
+    let gy = wy / lambda_m;
+    let x0 = gx.floor();
+    let y0 = gy.floor();
+    let fx = gx - x0;
+    let fy = gy - y0;
+    let sx = fx * fx * fx * (fx * (fx * 6.0 - 15.0) + 10.0);
+    let sy = fy * fy * fy * (fy * (fy * 6.0 - 15.0) + 10.0);
+    let ix = x0 as i64;
+    let iy = y0 as i64;
+    let v00 = grass_patch_value(ix, iy, seed, salt);
+    let v10 = grass_patch_value(ix + 1, iy, seed, salt);
+    let v01 = grass_patch_value(ix, iy + 1, seed, salt);
+    let v11 = grass_patch_value(ix + 1, iy + 1, seed, salt);
+    let a = v00 + (v10 - v00) * sx;
+    let b = v01 + (v11 - v01) * sx;
+    a + (b - a) * sy
+}
+
+/// ★ S7-03 草甸斑块场（[0,1]，均值 ≈0.5）：双频哈希值噪声叠加——
+/// 大频（95m）圈出草甸群落宏观走向，小频（26m）在群落内打出深浅斑块。
+/// 纯函数：只依赖世界种子 + 固定盐值（`SALT_GRASS_PATCH_*`）与坐标，
+/// 不消费任何 `WorldRng` 流、不写任何格子，同入参跨平台逐位一致。
+fn grass_patch_field(wx: f32, wy: f32, seed: u64) -> f32 {
+    0.62 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_LARGE_M, seed, SALT_GRASS_PATCH_LARGE)
+        + 0.38 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_SMALL_M, seed, SALT_GRASS_PATCH_SMALL)
+}
+
 /// 生成指定种类和数量的装饰物
 fn generate_accents_of_kind<F>(
     accents: &mut Vec<TerrainAccent>,
@@ -267,7 +375,9 @@ fn generate_accents_of_kind<F>(
     rng: &mut WorldRng,
     accept: F,
 ) where
-    F: Fn(&super::biome::GeoCell, &mut WorldRng) -> bool,
+    // ★ S7-03 起闭包追加候选点世界坐标 (wx, wy)——草原草甸斑块调制需要位置输入；
+    // 既有偏好判定忽略这两参，RNG 消费次数与顺序不变（T1/T2 逐位不受影响）。
+    F: Fn(f32, f32, &super::biome::GeoCell, &mut WorldRng) -> bool,
 {
     let mut generated = 0;
     let mut retries = 0;
@@ -297,7 +407,7 @@ fn generate_accents_of_kind<F>(
         }
 
         // 偏好检查
-        if !accept(cell, rng) {
+        if !accept(wx, wy, cell, rng) {
             continue;
         }
 

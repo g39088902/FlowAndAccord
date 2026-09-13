@@ -52,15 +52,12 @@ const PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 const PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 const PROFILE_RIVER_VALLEY_SETTLEMENT: &str = "river_valley_settlement_v1";
 
-/// 阶段七待实施模板 → 落地任务。S7-04/S7-06 落地后把对应名字从本表
+/// 阶段七待实施模板 → 落地任务。S7-06 落地后把对应名字从本表
 /// 移入 `main` 的已实现分支即可让门禁窗口生效。
-const STAGE7_PENDING: [(&str, &str); 2] = [
-    (PROFILE_HILLSIDE_WOODLAND, "S7-04 半坡林地不对称缓坡山体内核骨架"),
-    (
-        PROFILE_RIVER_VALLEY_SETTLEMENT,
-        "S7-06 河谷聚落连续侧壁与冲积谷底内核骨架",
-    ),
-];
+const STAGE7_PENDING: [(&str, &str); 1] = [(
+    PROFILE_RIVER_VALLEY_SETTLEMENT,
+    "S7-06 河谷聚落连续侧壁与冲积谷底内核骨架",
+)];
 
 /// §1.4 探针门禁窗口（STAGE-07-TODO §1.4 基线表）。仅对内核已实现的阶段七模板生效；
 /// `band_width_min` 为连续可建带最小宽度（S7-04 坡脚 ≥35m / S7-06 河阶 ≥55m；草原开阔图不设）。
@@ -85,12 +82,19 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             water_dist_max: 160.0,
             band_width_min: 0.0,
         }),
+        // ★ S7-04 窗口修订：`detour_p95` 下限 1.15 撤销——本探针的测地距离是
+        //   纯几何 Dijkstra（不叠加坡度时耗），而半坡「全域 <30° 零禁行」的设计
+        //   铁律下不存在不可行格，几何绕行比天然 ≈1.08（与草原同底），§1.4 原表
+        //   「1.15~1.45 轻度绕行」在本口径下不可达；慢行代价由
+        //   `LaneTerrainProfile` 坡度折算（路网时耗）与 `leeward_slope_max`
+        //   指标承载，绕行压力由 `NO_BUILD`(≥18°) 把房屋压进坡脚带实现。
+        //   故仅保留上界 1.45（防出现意外的几何死区式绕行）。
         PROFILE_HILLSIDE_WOODLAND => Some(GateWindow {
             max_slope: (22.0, 28.5),
             hard_blocked: (0, 0),
             no_walk: (0, 0),
             buildable_min: 7500,
-            detour_p95: (1.15, 1.45),
+            detour_p95: (0.0, 1.45),
             water_dist_max: 180.0,
             band_width_min: 35.0,
         }),
@@ -1101,6 +1105,7 @@ fn main() {
         if name == TERRAIN_PROFILE_MOUNTAIN_PASS
             || name == TERRAIN_PROFILE_RIVER_VALLEY
             || name == TERRAIN_PROFILE_GRASSLAND_PLAIN
+            || name == PROFILE_HILLSIDE_WOODLAND
         {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());

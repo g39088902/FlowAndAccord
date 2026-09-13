@@ -65,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.44)"]
+    F --> G["浏览器 UI (版本: v1.50.46)"]
 
 ```
 
@@ -122,7 +122,7 @@ node frontend/server.js           # http://localhost:3004
 
 1. 访问 `http://localhost:3004`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.44`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.46`**。
 
 
 ---

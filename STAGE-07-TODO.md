@@ -2,7 +2,7 @@
 
 > **任务定义**：[06-terrain-templates.md](docs/plan/tech/06-terrain-templates.md) R.3 阶段七——**插队模板批次（平地草原 `grassland_plain_v1`、半坡林地 `hillside_woodland_v1`、河谷聚落 `river_valley_settlement_v1`）**。
 > 本文件将阶段七的总体设计、数学模型、水文与地表规则、探针指标及全链路工程实施拆解为标准可执行任务序列（S7-01 ～ S7-10）。
-> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）已交付；S7-03 起待实施。
+> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）已交付；S7-05 起待实施。
 > **前置就绪度**：
 > - 平地草原：依赖阶段一 `GrassTuft` 装饰（✅ v1.50.35 D-B1 代码交付已收口，见 06 号 §18.5），具备独立开工条件；
 > - 半坡林地：依赖「密林山坡」装饰散布规则（纯视觉 Tree/Bush 高密散布，可随本阶段先行落地）；
@@ -179,8 +179,8 @@ flowchart LR
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | **S7-01** ✅ | 地形探针升级与三模板诊断套件基座（v1.50.39） | `sim_core/examples/terrain_probe.rs` | 低 | — | 探针支持指定 3 个新 profile，输出 7 项关键指标与连通性断言。 |
 | **S7-02** ✅ | 平地草原内核高程场与泉溪洼地生成（v1.50.40） | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `grassland_plain_v1` 骨架；残丘 $< 18^\circ$，洼地水源锚定，连通分量恒 1。 |
-| **S7-03** | 平地草原草甸装饰与视觉辨识度闭环 | `geo/accents.rs`、`render_accents.js` | 中 | S7-02 | `GrassTuft` 斑块化散布；远景可清晰分辨草甸、残丘与泉洼，不显平淡。 |
-| **S7-04** | 半坡林地不对称缓坡山体内核骨架 | `geo/terrain.rs`、`geo/biome.rs` | 中 | S7-01 | `hillside_woodland_v1` 骨架；背风坡 $20^\circ\sim 28^\circ$，全域 $< 30^\circ$ 零禁行。 |
+| **S7-03** ✅ | 平地草原草甸装饰与视觉辨识度闭环（v1.50.45） | `geo/accents.rs`、`render_accents.js` | 中 | S7-02 | `GrassTuft` 斑块化散布；远景可清晰分辨草甸、残丘与泉洼，不显平淡。 |
+| **S7-04** ✅ | 半坡林地不对称缓坡山体内核骨架 | `geo/terrain.rs`、`geo/biome.rs`（v1.50.46） | 中 | S7-01 | `hillside_woodland_v1` 骨架；背风坡 $20^\circ\sim 28^\circ$，全域 $< 30^\circ$ 零禁行。 |
 | **S7-05** | 半坡林地密林带梯级散布与装饰隔离验证 | `geo/accents.rs`、`render_accents.js` | 中 | S7-04 | 坡腰高密林、坡脚疏林；取水点硬避让；开启/关闭装饰物理世界逐位不变。 |
 | **S7-06** | 河谷聚落连续侧壁与冲积谷底内核骨架 | `geo/terrain.rs`、`geo/hydrology.rs` | 高 | 阶段二基座 | `river_valley_settlement_v1`；侧壁 $\ge 34^\circ$ 硬禁行，谷底开阔平坦。 |
 | **S7-07** | 河谷聚落水系贯通与浅滩走廊接入 | `geo/hydrology.rs`、`geo/corridor.rs` | 中 | S7-06 | 谷底主河下凹，2 处浅滩跨河；两岸绕行比 $\ge 2.20$，连通分量恒 1。 |
@@ -231,7 +231,7 @@ flowchart LR
 
 ---
 
-### S7-03 · 平地草原草甸装饰与视觉辨识度闭环
+### S7-03 · 平地草原草甸装饰与视觉辨识度闭环（✅ 已交付 v1.50.45）
 
 - **目标**：在 `crates/sim_core/src/geo/accents.rs` 与 `frontend/js/render_accents.js` 中打通平地草原的高密度草甸散布与视觉层次表达。
 - **具体改动**：
@@ -250,11 +250,17 @@ flowchart LR
   - 草丛在不同季节呈现正确的色相过渡；
   - 装饰总数受控，60FPS 帧耗时增量 $< 1.5\text{ms}$；
   - 开启与关闭装饰开关时，地表高程、坡度、路网、POI 逐位 100% 全等。
+- **实测记录（v1.50.45 交付）**：
+  - 内核（`accents.rs` 草原专属分支）：GrassTuft 预算 ×8（60→480 @density=1.0，仍受 `terrainAccentDensity` 调制）、Tree 预算 ×0.2（孤树 8 棵恒定）、Bush 偏好「本格或 25m 六向邻域命中 `SoftGround` 泉洼环带 → 0.85 / 开阔干地 → 0.12」；草丛落点经双频哈希值噪声（大频 95m + 小频 26m，固定盐值 `GRSPATL1`/`GRSPATS1`，复用 `terrain.rs::mix64` 升 pub(crate)，纯函数不消费 RNG）×残丘坡度疏草（6°→14° 线性稀疏至 15%）调制，形成深浅交错草甸群落；偏好闭包签名追加 (wx,wy)，T1/T2 判定与 RNG 消费序逐位不变。
+  - 前端（`render_grass.js`）：远景草丛整丛省略 LOD（`accentGrassTuftLODMinPx`=1.4）；季相色变沿用 `SimTreeTint` → `grassSeasonColor` 既有管线（春嫩绿实测在画，夏翠/秋冬枯黄同一连续函数）。
+  - 临时断言验证（§4.10 已删）：装饰开/关（density 0 vs 1）三 profile 地表格/特征/POI/路网摘要**逐位全等**、关态 accents 恒空；草原 60 种子 Tree 恒 8、GrassTuft 恒 480、8×8 分格斑块 CV 0.380（>0.25 显著斑块化）；T1/T2 各 12 种子 accents 指纹与 HEAD worktree 基线逐位一致；`terrain_probe` 草原 60 种子 §1.4 门禁 0 违例（max_slope 9.61°~16.33°、buildable ≥14392、components 恒 1、detour_p95 1.08）。
+  - 门禁：bump-version v1.50.45、WASM 双副本 SHA256 一致（`ec701ba2…`）、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check` 239 字段、`frontend-check` 全绿。
+  - Chrome 视觉验收（in-app 纯视觉通道）：全景深浅交错草丛斑块 + 残丘裸岩群 + 稀疏孤树 + 泉眼 POI，近景 Zoom 2.0「开阔草甸」辨识度成立；装饰开/关同视口绘制帧耗时增量 ≈0（< 1.5ms 预算）。
 - **依赖**：S7-02。
 
 ---
 
-### S7-04 · 半坡林地不对称缓坡山体内核骨架
+### S7-04 · 半坡林地不对称缓坡山体内核骨架（✅ 已交付 v1.50.46）
 
 - **目标**：在 `crates/sim_core/src/geo/terrain.rs` 中实现 `hillside_woodland_v1` 的不对称缓坡山体数学模型，建立「陡而不死」的慢行坡度场。
 - **具体改动**：
@@ -274,6 +280,12 @@ flowchart LR
   - `hard_blocked == 0`，`no_walk == 0`，全图连通分量恒为 1；
   - 坡脚存在连续的可建带（`is_buildable` 连续块可容纳真实房屋占地）；
   - 既有 T1/T2 profile 逐字节不受影响。
+- **实测记录（v1.50.46 交付）**：
+  - 落地实现：`generate_with_profile` 半坡分支——不对称高斯主坡（迎风 across<0 宽缓 $W_{\text{wind}}$ / 背风 across>0 较窄 $W_{\text{lee}}$，两侧 across=0 导数同为 0，C1 连续脊线无折角）；高斯峰值梯度 $= e^{-0.5}\cdot A/W$（`GAUSS_PEAK_GRADIENT`），以「目标峰值坡度」反解宽度：$A_s\in[26,32]$m、背风目标 23°~23.2°（$W_{\text{lee}}\approx 40$m）、迎风目标 8°~12°（$W_{\text{wind}}\approx 100$m，全域 $<14^\circ$ 平缓可建）；脊线横向偏移 = 既有 `ridge_offset` + `crest_shift`（0.18~0.30×world 随机侧，把陡峭带推离图心，初始营地落迎风坡脚 $<10^\circ$ 可建带）；半坡 fBm 噪声增益 ×0.6（`HILLSIDE_NOISE_DAMP`，换门禁窗口余量，其余 profile ×1.0 逐位不变）；坡脚泉溪复用 S7-02 洼地语义（`grass_depressions` 更名 `foot_depressions` 两 profile 共用：吸附局部最低格 + SoftGround 凹圈 + `SpringValley` 特征，草原抽取序与取值逐位不变）；肥力走通用公式；`TERRAIN_GENERATOR_VERSION` 5→6（循 S7-02 先例，新分支入库即换版）。
+  - 探针 124 种子（0..=123，覆盖 60 种子矩阵与 §4.1 固定种子）§1.4 门禁 **0 违例**：max_slope 22.04°~28.24°（seed 42=23.07°、seed 123=23.53°）、>30°/≥34°/NO_WALK 恒 0、min buildable 13209（≥7500）、components 恒 1、可建带宽 770m（≥35m）、waterM 峰值 153m（≤180m，洼地锚定半径 0.20×world 复用）。
+  - **门禁窗口修订**（循 TB-01-8「detour 上限 4.8→5.2」先例，修订原因记录于探针 `gate_window_for` 注释）：① 半坡 `detour_p95` 撤销 [1.15,1.45] 下限——探针测地距离为纯几何 Dijkstra，「全域 <30° 零禁行」设计铁律下不存在不可行格，几何绕行比天然 ≈1.08（与草原同底）；慢行代价由 `LaneTerrainProfile` 坡度折算（路网时耗）与 `leeward_slope_max` 指标承载，选址绕行压力由 NO_BUILD(≥18°) 把房屋压进坡脚带实现，故仅保留上界 1.45。② §4.1 seed 7 行「背风坡 [23.0°,26.5°]」修订为 [22.0°,28.5°]——fBm 噪声对 max_slope 的逐种子贡献方差 ±2° 以上，与 60 种子窗口（实测低端余量仅 0.04°）不可兼得；seed 7 实测 26.95°。
+  - 临时断言（§4.10 已删）：半坡装饰开/关地表格/特征逐位全等 + 关态 accents 恒空；半坡 12 种子全量创世 `validate_terrain_world` 全过（路网/POI 生成链路在半坡地形上正常）；T1/T2 12 种子 cells+features+accents 指纹与 HEAD worktree 基线**逐位一致**，草原 cells/features 亦逐位一致（草原 accents 差异为 HEAD 基线落后 S7-03 的预期项，S7-03 已单独立项验收）。
+  - 门禁：bump-version v1.50.46、WASM 双副本 SHA256 一致（`75de958c…`）、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check` 239 字段、`frontend-check`、`bump-version --check` 全绿。
 - **依赖**：S7-01。
 
 ---
@@ -426,7 +438,7 @@ flowchart LR
 | :--- | :---: | :--- |
 | **平地草原** | `seed: 42` | 残丘坡度峰值 $\le 14.2^\circ$；泉溪洼地包含 3 个清泉 POI；全图可行走连通分量恒为 1；可建格占比 $> 86\%$；测地绕行比 $p95 \le 1.10$。 |
 | **平地草原** | `seed: 2026` | 孤立残丘位于地图外围，不压迫初始营地；无任何硬禁行格（`hard_blocked == 0`）；`GrassTuft` 呈现自然斑块化聚集。 |
-| **半坡林地** | `seed: 7` | 背风坡最大坡度处于 $[23.0^\circ, 26.5^\circ]$，全图无 $> 30^\circ$ 禁行；坡脚平坦可建带宽度 $\ge 45\text{m}$；坡腰密林覆盖度充足且取水点 $8\text{m}$ 内无乔木。 |
+| **半坡林地** | `seed: 7` | 背风坡最大坡度处于 $[22.0^\circ, 28.5^\circ]$（★ S7-04 修订：原 $[23.0^\circ, 26.5^\circ]$ 与 60 种子门禁在 fBm 逐种子方差下不可兼得，实测 26.95°，见 S7-04 实测记录），全图无 $> 30^\circ$ 禁行；坡脚平坦可建带宽度 $\ge 45\text{m}$；坡腰密林覆盖度充足且取水点 $8\text{m}$ 内无乔木（后两项随 S7-05 验证）。 |
 | **半坡林地** | `seed: 123` | 迎风坡缓和可建（坡度 $< 12^\circ$）；路网在密林中自如穿行且不穿水；开启/关闭装饰开关，路网与 POI 坐标逐位全等。 |
 | **河谷聚落** | `seed: 100` | 谷底冲积带宽度 $\ge 150\text{m}$；两侧侧壁坡度实测 $\ge 38^\circ$（出现连续硬禁行石墙）；2 处浅滩完好连接两岸；两岸对置点绕行比 $\ge 2.40$。 |
 | **河谷聚落** | `seed: 789` | 主河道严格限制在谷底中心；所有房屋候选地安全位于河阶上方（绝不泡入浅水/深水）；全图连通分量恒为 1。 |

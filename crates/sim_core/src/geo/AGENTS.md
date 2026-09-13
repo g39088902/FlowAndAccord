@@ -9,12 +9,12 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出 |
-| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征） |
+| `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入与 `SpringValley` 泉眼特征）+ ★ S7-04 `hillside_woodland_v1` 半坡分支（不对称高斯主坡：`GAUSS_PEAK_GRADIENT`=exp(-0.5) 峰值梯度反解宽度、`crest_shift` 岭线推离图心、`HILLSIDE_NOISE_DAMP`=0.6 噪声阻尼、洼地代码与草原共用 `foot_depressions`） |
 | `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ D-B1-3 §5.3 第 4–5、9 步钩子接线 |
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |
 | `corridor.rs` | 廊道/路径几何分析 |
-| `accents.rs` | ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder/RockCluster/GrassTuft，独立 salt RNG） |
+| `accents.rs` | ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder/RockCluster/GrassTuft，独立 salt RNG）+ ★ S7-03 `grassland_plain_v1` 草原专属分支（GrassTuft 预算 ×8 / Tree ×0.2 孤树 / Bush 泉洼 `SoftGround` 25m 邻域聚集 / 双频哈希草甸斑块场 `grass_patch_field`（固定盐值 `GRSPAT*`，复用 terrain.rs `mix64`）× 残丘坡度疏草——只改草原分支，T1/T2 判定与 accent_rng 消费序逐位不变） |
 
 ## 关键易踩坑
 

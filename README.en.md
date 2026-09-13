@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.50.44` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.50.46` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 
 </div>
@@ -36,7 +36,7 @@ As for "build or not, when, where, marry or not, seize the throne or not" — th
 
 ---
 
-## ✨ Eight reasons worth watching
+## ✨ Nine reasons worth watching
 
 ### 1. 🧠 Truly autonomous AI: six layers of Maslow's hierarchy + instant intentions
 
@@ -133,7 +133,17 @@ Through it all, the deterministic Rust core drives everything — same seed, run
 
 ---
 
-## 🧭 Your first session: eight moments not to miss
+### 9. 🌍 Dynamic seasonal lighting, terrain & ecology, and the creator's eye
+
+- **☀️ Dynamic seasonal lighting engine**: the light position is snapshot-driven, sweeping 360° a year — spring east / summer south / autumn west / winter north — with altitude angle and intensity evolving continuously through the seasons; brightest in midsummer, weakest in deep winter, color temperature nudged by season and temperature. Terrain shading, riverbed stone glints, and water sparkle stay coupled, toggled with the **L** hotkey.
+- **🏞️ Stylized miniature terrain**: multi-scale fBm noise relief (macro hills / slope folds / fine surface detail); the mountain-pass template's main ridge, asymmetric branch ridges, and a saddle-pass protection belt make detouring around the mountain genuinely felt; the T2 river-valley static water system, 194-vertex smooth channel, and shared pools; terrain grids shaded by unit normals, pebble fords, crystal-clear blue water with sparkling waves.
+- **🌳 3D vegetation & light reception**: continuous seasonal leaf colors (spring buds / summer deep green / autumn gold-ochre / winter bare branches), 3D branch skeletons, and a two-pass volumetric canopy; all decorations hook into world-light-direction shading — cylindrical side shading on trunks, crown highlights that track the light position and camera; reed variants of grass tufts and micro contact shadows beneath rock clusters dot the landscape.
+- **🐟 Micro aquatic ecosystem**: 4 schools / 22 fish cruise along the river channel with sinusoidal tail wagging (still flowing while paused); sun sparkle coupled with the seasonal lighting.
+- **🗺️ Map gallery page + world seed control**: the standalone "Map Gallery" page previews terrain for any seed — same seed, same terrain as the real game (read-only, no entities, no saves, no save-gate); enter any world seed (0 ~ `MAX_SAFE_INTEGER` integer) in the main UI to reproduce the exact same evolution, with `?seed=<n>` URL sharing.
+
+---
+
+## 🧭 Your first session: ten moments not to miss
 
 | ⏱️ | Moment | Where to look |
 | :--- | :--- | :--- |
@@ -143,6 +153,8 @@ Through it all, the deterministic Rust core drives everything — same seed, run
 | Desperate hour | **Straight to the Marketplace on supply failure**: water and grain run out in the wild, the household head charges to the Marketplace with household gold to buy water and grain in 2.0 steps | Map 🏪 Marketplace + Inspector live gold price & trade flow |
 | Sudden change | **The wheat-ear used-house auction**: a vacant house raises a golden breathing sign; buyers bid everything on multiple houses; the benchmark decays smoothly to break the deadlock | Floating sign on map + top-bar 🏛️ auction dashboard |
 | Power shift | **The throne expedition**: the moment the old king dies, watch whether anyone abandons a construction site and sprints to the camp to seize the throne | Event log scroller + camp crown sign |
+| Scenery watch | **Seasonal light, terrain & micro ecology**: watch the sun compass rotate through the seasons, lit terrain faces shift, crystal water sparkle, and fish cruise the channel | Terrain / water + top-bar "🧭 current light position" |
+| Creator play | **World seed & map gallery**: the same integer seed reproduces the exact same evolution; preview same-source terrain for any seed in the Map Gallery first, then pick a seed to start | Console "🧬 world seed" + "🗺️ Map Gallery" page |
 | History replay | **Rewind inspection**: missed a turning point? Drag the rewind slider or enter a tick and travel back to that moment | Top bar / console ⏪ rewind modal |
 | Long-run sediment | **Empty houses and a giant lineage tree**: ruins' foundations are left for later generations to rebuild on; open the lineage to survey the vast bloodline spanning generations | Lineage timeline + map vacant nodes |
 
@@ -158,10 +170,10 @@ Click any figure and the Inspector on the right tells you what he **wants most r
 node frontend/server.js
 ```
 
-Then open your browser (Chrome or Edge recommended) at `http://localhost:3003`. No complex bundling, no external dependencies to install.
+Then open your browser (Chrome or Edge recommended) at `http://localhost:3004`. No complex bundling, no external dependencies to install.
 
 > - On first entry or reset, a prompt will appear to create/connect a local save file; pick or create a `.json` file to start the world — data is permanently stored on your computer's disk;
-> - If port 3003 is already occupied, a server instance is already running in the background — just open the browser directly.
+> - If port 3004 is already occupied, a server instance is already running in the background — just open the browser directly.
 
 ### Controls
 
@@ -177,6 +189,8 @@ Then open your browser (Chrome or Edge recommended) at `http://localhost:3003`. 
 | **`Space` / console pause** | Globally pause / resume the simulation |
 | **Mouse wheel / right-drag** | Zoom and pan the map viewport (camera auto-follows a selected figure) |
 | **Console "🏕️ Reseed"** | Re-seed 20 founders (10 male, 10 female) and begin a brand-new civilization epic |
+| **Console "🗺️ Map Gallery"** | Open the read-only visual map page and preview same-source terrain for any seed without starting a simulation |
+| **Hotkey L** | Toggle the dynamic seasonal lighting engine (on by default) |
 | **Top bar "💾 Save" / "📂 Load"** | Three-slot saves / direct local-file read-write; save and restore evolution anytime |
 
 After modifying the Rust core and recompiling the WASM, remember to force-refresh with **`Ctrl + F5`** to clear the cache.
@@ -187,12 +201,12 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 
 | Layer | Implementation |
 | :--- | :--- |
-| Computing core | Rust deterministic core (30Hz fixed stepping, shared global `WorldRng`, byte-for-byte reproducible under the same seed, millisecond Checkpoint + Replay time rewind) |
-| Bridge layer | Zero-dependency WebAssembly export layer: linear-memory JSON snapshots & static high-throughput buffers |
+| Computing core | Rust deterministic core (60Hz fixed stepping, shared global `WorldRng`, byte-for-byte reproducible under the same seed, millisecond Checkpoint + Replay time rewind) |
+| Bridge layer | Zero-dependency WebAssembly export layer with **FABS fixed-length binary frame snapshots** (the only snapshot channel since v1.50.35; 23× steady-frame compression, 3.5× faster decoding) |
 | Presentation layer | Native static frontend (ES6+) + dual-theme Canvas rendering pipeline, zero front-end build chain |
 | Storage engine | File System Access API native disk writes + IndexedDB handle persistence + localStorage fallback with three slots |
-| Tunable hyper-parameters | **233** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
-| Quality gates | `node tools/test-wasm.js` (determinism / bounds-safety / no-NaN / long-run stability) + `config-check.js` (frontend-backend parameter alignment) + `diagnose.js` (headless diagnostic engine) |
+| Tunable hyper-parameters | **239** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
+| Quality gates | `node tools/test-wasm.js` (determinism / bounds-safety / no-NaN / long-run stability) + `config-check.js` (frontend-backend parameter alignment) + `snapshot-check.js` (snapshot four-way sync) + `diagnose.js` (headless diagnostic engine) |
 
 ---
 
@@ -210,13 +224,17 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 - ✅ ⓪ Instant intention layer: 6-layer Maslow decision engine with 16 dynamically orchestrated branches (v1.29.0; consolidated v1.46.12)
 - ✅ Time-rewind controller + dual-theme UI (v1.33.0)
 - ✅ **M19** Decision-architecture decoupling: intent / strategy / primitive three-layer split, multi-resource TSP itinerary, graded preemption (v1.46.8 ~ v1.46.10)
-- ✅ **M4 FABS** binary snapshot channel: 23× steady-frame compression, 3.5× faster decoding (v1.45.3 / v1.46.0)
+- ✅ **M4 FABS** binary snapshot channel: 23× steady-frame compression, 3.5× faster decoding (v1.45.3 / v1.46.0; the only snapshot channel since v1.50.35, JSON debug channel removed)
 - ✅ **Terrain system**: T1 mountain-pass settlement / T2 river-valley static water / shared water pools / terrain-aware road network / dynamic terrain-normal shading (v1.47.1 ~ v1.48.2)
 - ✅ **Dynamic seasonal lighting**: 360° annual sun arc, coupled terrain / riverbed / glint (v1.48.0)
 - ✅ **Micro aquatic habitat**: fish schools / sun glints (v1.49.0; v1.50.3 ~ v1.50.6 visual noise reduction)
 - ✅ **D-A decoration system**: stylized trees / bushes / boulders scattered on an independent RNG, seasonal tints (v1.49.1 ~ v1.49.3)
 - ✅ **Decorative seasonality & 3D foliage (TA-01 ~ TA-03)**: continuous leaf-color seasonality, 3D branch skeletons, two-pass canopy (v1.50.21 ~ v1.50.27)
-- ✅ **Map gallery page + world seed control**: terrain-template previews / `?seed=` share & reproduce (v1.50.0)
+- ✅ **Vegetation lighting & rendering depth (TA-04 / TA-11)**: world-light-direction shading (wide soft crown highlights / cylindrical trunk shading / normal-dot coloring), reed grass variants & deeper seasonality, rock-cluster micro contact shadows & stratified rock faces, zero-GC hot-path rendering & centralized render config (v1.50.31 ~ v1.50.40)
+- ✅ **Multi-scale noise terrain with main & branch ridges (TB-01)**: deterministic fBm noise core, height-modulation masks, saddle-pass protection belt, asymmetric branch ridges, 4-neighbor slope contract & generator version gate (TERRAIN_GENERATOR_VERSION 5), 60-seed connectivity matrix (v1.50.36 ~ v1.50.43)
+- ✅ **Terrain template stage one (D-B1)**: RockCluster / GrassTuft sub-feature kernel generation & frontend drawing, sub-feature data model & FABS Section 22 snapshots, sub-feature selector & decor cache split (v1.50.29 ~ v1.50.34)
+- ✅ **Terrain template expansion kickoff (S7 / STAGE2)**: grassland-plain kernel elevation & spring-creek hollows (grassland_plain_v1), T2 water-write convergence & land-relief decoupling, three-template diagnostic suite & bounded genesis retries (v1.50.39 ~ v1.50.40)
+- ✅ **Map gallery page + world seed control**: terrain-template previews / `?seed=` share & reproduce (v1.50.0; v1.50.16 rewired to the real render pipeline — same seed, same terrain)
 
 **🔜 Planned** (ordered by player value & validation cost; see [docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md))
 
@@ -229,7 +247,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 - 🔜 **M16** Generative social & chronicles (optional): template-generated facts + async LLM tabloids / diaries, never altering simulation facts
 - 🔜 **M17** Scaling the core (on demand): ECS & zero-copy snapshots only when performance and population data prove the need
 - 🔜 **M18** Hunting, raiders & the force convention: deer hunts / bandit raids / militia mobilization & public-granary bounties
-- 🔜 **Map template expansion**: tablelands, river deltas, bays, fjords, valleys, peninsulas, islands, desert oases, alluvial fans, karst and more — 14 planned (un-scheduled)
+- 🔜 **Map template expansion**: the grassland-plain kernel elevation is shipped (v1.50.40); hillside woodland / river-valley settlement, plus tablelands, deltas, and more remain planned
 - 🔜 **M5-2** Condition-triggered multithreaded fork-join (engineering backlog)
 
 ---
@@ -243,7 +261,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | [docs/current/](./docs/current/) | Per-module mechanism docs (road network / ecology POIs / seasons / metabolism & reproduction / housing / decision AI / frontend / config / ledger / market / save / impact matrix) |
 | [./docs/current/tech/19-ui-implementation.md](./docs/current/tech/19-ui-implementation.md) · [./docs/current/tech/20-society-ledger-ui.md](./docs/current/tech/20-society-ledger-ui.md) · [./docs/current/tech/21-frontend-dev-guide.md](./docs/current/tech/21-frontend-dev-guide.md) | UI page panorama · society-ledger UI implementation · frontend development guide |
 | [./docs/plan/design/01-roadmap.md](./docs/plan/design/01-roadmap.md) | Long-term project roadmap |
-| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 233 tunable hyper-parameters (auto-generated) |
+| [./docs/current/tech/05-config-reference.md](./docs/current/tech/05-config-reference.md) | Quick reference for the 239 tunable hyper-parameters (auto-generated) |
 
 ---
 
