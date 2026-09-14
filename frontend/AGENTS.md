@@ -97,8 +97,8 @@
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
-| `map.html` / `map.css` | ~65 / ~90 | **独立只读地图页**：将正式游戏的 Canvas 视图嵌入 `?mapOnly=1&nogate=1` 模式；地图页自身不创建实体、不读写存档，叠加种子控件与说明。 |
-| `js/map-view.js` | ~45 | 地图图鉴编排脚本：把种子更新为 `index.html?seed=<n>&mapOnly=1&nogate=1` 内嵌页，随机换种子并同步「在正式游戏中使用此种子」链接。 |
+| `map.html` / `map.css` | ~60 / ~70 | **独立只读地图页**：将正式游戏的 Canvas 视图嵌入 `?mapOnly=1&nogate=1` 模式；地图页自身不创建实体、不读写存档，叠加种子控件、当前地形类型展示与说明。 |
+| `js/map-view.js` | ~120 | 地图图鉴编排脚本：把种子更新为 `index.html?seed=<n>&mapOnly=1&nogate=1` 内嵌页，根据种子确定性预测并与引擎首帧回传同步展示当前地形类型名称，随机换种子并同步「在正式游戏中使用此种子」链接。 |
 
 **同种子契约**：`mapOnly=1` 经 `rustworld.js → sim_worker.js → sim_wasm::world_create_map` 调用与正式游戏相同的 `World3DEngine::new_seeded_with_config` / `TerrainMap::generate_with_config`；但不调用 `seed_primitive_ecology`，故地图页只含地形、水系和自然装饰，绝不能自行实现哈希噪声或模板绘制。
 

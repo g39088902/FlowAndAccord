@@ -24,6 +24,14 @@
         <input id="terrain-seed" class="map-input" type="number" min="0" max="9007199254740991" step="1" inputmode="numeric" value="20260910">
         <button id="btn-reroll" class="map-button" type="button">刷新地图</button>
       </div>
+
+      <div class="map-type-row">
+        <span class="map-control-label">当前地形类型</span>
+        <div id="terrain-type-badge" class="terrain-type-badge">
+          <span id="terrain-type-name" class="terrain-type-name">—</span>
+          <span id="terrain-type-id" class="terrain-type-id"></span>
+        </div>
+      </div>
       <a id="btn-use-in-game" class="map-use-button" href="index.html" title="以当前种子启动正式游戏">在正式游戏中使用此种子</a>
       <div class="map-seed-note">地图页不会创建或读取存档。滚轮缩放；左键拖拽平移；右键拖拽旋转视角。</div>
 
@@ -37,9 +45,15 @@
     <section class="map-caption" aria-live="polite">
       <div class="map-title">正式世界地貌</div>
       <p class="map-description">读取同一套确定性 TerrainMap 数据和正式游戏的渲染管线。这里刻意不生成 Agent、POI、房屋、账本或路网。</p>
-      <div class="map-tags"><span>确定性种子</span><span>WASM 地形</span><span>只读预览</span></div>
+      <div class="map-tags">
+        <span id="terrain-type-tag" class="map-tag-profile">—</span>
+        <span>确定性种子</span>
+        <span>WASM 地形</span>
+        <span>只读预览</span>
+      </div>
     </section>
   </main>
+  <script src="js/config.js"></script>
   <script src="js/map-view.js"></script>
 </body>
 </html>

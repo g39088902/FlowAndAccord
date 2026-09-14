@@ -38,6 +38,9 @@ body { background: #d9e5e0; }
 .map-use-button { display:block; margin-top:9px; padding:9px 10px; border-radius:9px; text-align:center; text-decoration:none; color:#255c6e; background:#d9eef0; border:1px solid #9ecdd3; font-size:12px; font-weight:800; }
 .map-use-button:hover { color:#fff; background:#347789; border-color:#347789; }
 .map-seed-note { margin-top:7px; color:#6d8179; font-size:10px; line-height:1.45; }
+.terrain-type-badge { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; padding: 0 10px; background: rgba(255, 255, 255, .92); border: 1px solid #c8d7d0; border-radius: 9px; }
+.terrain-type-name { font-size: 13px; font-weight: 750; color: #234233; }
+.terrain-type-id { font-size: 11px; color: #698078; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .map-legend { margin-top:17px; padding-top: 13px; border-top: 1px solid #d9e4df; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; color: #61766e; font-size: 11px; }
 .legend-dot { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; vertical-align: -1px; }
 .legend-land { background: #9fb76a; }.legend-water { background: #5b9fbe; }.legend-vegetation { background: #4d8058; }
@@ -46,6 +49,7 @@ body { background: #d9e5e0; }
 .map-description { margin: 8px 0 14px; color: #587067; line-height: 1.6; font-size: 13px; }
 .map-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .map-tags span { padding: 4px 8px; border-radius: 999px; color: #487060; background: #e4eee7; font-size: 11px; font-weight: 700; }
+.map-tags span.map-tag-profile { background: #d4ede1; color: #1a563a; border: 1px solid #99d6b7; }
 .map-hint { right: 24px; top: 94px; padding: 8px 11px; border-radius: 9px; color: #6c837a; font-size: 11px; }
 
 @media (max-width: 680px) {
