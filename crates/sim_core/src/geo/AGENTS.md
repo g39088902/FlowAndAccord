@@ -19,6 +19,8 @@
 
 ## 关键易踩坑
 
+- **局部坡度与定稿同源**：第 5c 步试算和第 6 步全图定稿均调用 `hydrology.rs::slope_from_elevation`；不要再复制中心差分公式或仅在局部钳制步长。试算只读高程、只写 scratch；全图定稿只写 `slope_angle_deg`，不需要复制高程数组。方形生产网格步长与既有定稿运算次序保持不变。
+
 1. **生成顺序（★ STAGE2-3 阶段化流水线）**：外部调用点只调用 `terrain.rs::generate_with_config(seed, config)`，内部按 06 号 §5.3 执行 0–9 步私有阶段：`0 resolve_profile`（不消费 WorldRng）→ `1 reset_static_terrain_state` → `2 generate_base_relief`（原 `generate_with_profile`：T0/T1 山口起伏、草原、T2 先铺倾斜+fBm 高程再由 `generate_river_valley_base_relief` 铺满全图写陆地基底——★ STAGE2-2 公式解耦：河阶外低丘公式唯一权威位置）→ `3 apply_profile_static_hydrology`（`hydrology.rs`：`generate_river` **仅覆盖水系影响带** `d < half_width + bank + terrace`，带外一格不碰）→ `4 plan_subfeatures`（纯 hash）→ `5 子特征几何管线 5a–5d`（★ 阶段二空注入）→ `6 finalize_slope_and_surface`（**全图唯一写 slope/派生 flags 的位置**；T2 只重算坡度、不改陆地分类）→ `7 validate_static_terrain_geometry`（STAGE2-4 扩充）→ `8 generate_base_accents` → `9 append_subfeature_accents`（空实现）。第 10/11 步（ecology 布局与路网、`validate_terrain_world`+生存诊断）由 `World3DEngine` 创世序列执行。阶段间临时数据走 `GenesisScratch`（T2 河几何 + 草原软地掩码），不进快照/存档。装饰在第 8 步（地貌与水系定稿后）散布，不能提前调用（会落入深水区）。
 2. **RNG 隔离**：`generate_accents` 使用 `WorldRng::new(seed ^ ACCENT_RNG_SALT)` —— `ACCENT_RNG_SALT = 0x4143_4345_4E54_3031`。此流与地形播撒、生态 POI、水系生成完全独立，保证装饰确定性可单独籽验。★ S7-05 半坡专属判定（泉源隔离圆 / 梯级概率 / `near_soft_ground` / `trim_trees_near_pois`）均为纯地形·特征查询，**不消费 accent_rng**；偏好闭包内改判定时严禁增减 `gen_range` 次数（会换掉同种子装饰分布）。
 3. **装饰早于 POI（★ S7-05 两道防线口径）**：装饰散布在流水线第 8 步，POI 由生态播撒落位——accents 层拿不到 `SimConfig`，泉源隔离圆半径以常量 `HILLSIDE_SPRING_CLEARANCE_M`（30m = 默认交互半径 22 + 8）固化；「所有 POI 周围 r+8m」由 `ecology/seed.rs` 在 POI 落位后调 `trim_trees_near_pois(config.poi_interaction_radius + 8.0)` 收口。两处口径必须一致；裁剪只作用于 `hillside_woodland_v1`（T1/T2/草原 accents 逐位不变是 S7-10 门禁）。

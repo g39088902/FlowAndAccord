@@ -153,7 +153,7 @@
       "id": "terrain-and-network",
       "path": "docs/current/tech/14-terrain-and-network.md",
       "owner": "sim-core/geo",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-14",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/spatial/graph.rs",

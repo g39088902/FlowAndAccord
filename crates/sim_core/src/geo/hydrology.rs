@@ -320,14 +320,34 @@ impl TerrainMap {
             self.hydrology.access_points.push(WaterAccessPoint{id:i as u32+1,water_body_id:1,resource_pool_id:1,pos:p,nearest_node_id:None,interaction_radius:cfg.poi_interaction_radius});
         }
     }
+    /// 对有效格索引读取当前高程的四邻域差分，不读缓存坡度、不修改地表。
+    /// 子特征局部试算与全图定稿必须共用此判据，保留既有运算次序与
+    /// 步长口径（生产为方形网格，两轴沿用 grid_width），边缘使用单侧差分。
+    #[inline]
+    pub(crate) fn slope_from_elevation(&self, x: usize, y: usize) -> f32 {
+        let step = self.world_size / (self.grid_width - 1).max(1) as f32;
+        let (l, r, u, d) = (
+            x.saturating_sub(1),
+            (x + 1).min(self.grid_width - 1),
+            y.saturating_sub(1),
+            (y + 1).min(self.grid_height - 1),
+        );
+        let dx = (self.cells[y * self.grid_width + r].elevation
+            - self.cells[y * self.grid_width + l].elevation)
+            / ((r - l).max(1) as f32 * step);
+        let dy = (self.cells[d * self.grid_width + x].elevation
+            - self.cells[u * self.grid_width + x].elevation)
+            / ((d - u).max(1) as f32 * step);
+        (dx * dx + dy * dy).sqrt().atan().to_degrees()
+    }
+
     pub fn recompute_slopes(&mut self) {
-        let raw:Vec<_>=self.cells.iter().map(|c|c.elevation).collect();
-        let step=self.world_size/(self.grid_width-1).max(1) as f32;
-        for y in 0..self.grid_height {for x in 0..self.grid_width {
-            let (l,r,u,d)=(x.saturating_sub(1),(x+1).min(self.grid_width-1),y.saturating_sub(1),(y+1).min(self.grid_height-1));
-            let dx=(raw[y*self.grid_width+r]-raw[y*self.grid_width+l])/((r-l).max(1) as f32*step);
-            let dy=(raw[d*self.grid_width+x]-raw[u*self.grid_width+x])/((d-u).max(1) as f32*step);
-            self.cells[y*self.grid_width+x].slope_angle_deg=(dx*dx+dy*dy).sqrt().atan().to_degrees();
-        }}
+        for y in 0..self.grid_height {
+            for x in 0..self.grid_width {
+                // 此循环只写 slope，不写 elevation，无需复制全图高程。
+                let slope = self.slope_from_elevation(x, y);
+                self.cells[y * self.grid_width + x].slope_angle_deg = slope;
+            }
+        }
     }
 }

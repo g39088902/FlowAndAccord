@@ -329,6 +329,8 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 ### 8.1 静态几何校验与生存成本诊断（v1.50.47 · STAGE2-4/6）
 
+**局部坡度与定稿共用判据**（v1.50.51）：第 5c 步只读当前高程，使用 `hydrology.rs::slope_from_elevation` 计算工作区临时坡度，第 6 步全图定稿调用同一函数。四邻域差分、边缘单侧差分和浮点运算次序保持既有定稿语义；生产方形网格两轴沿用 `world_size/(grid_width-1)` 步长，不额外钳制局部步长。全图循环只写坡度，不改高程，因此不再分配全图高程副本。此项为 RiverCliff 尺度准入统一计算口径，尚未启用几何注入、改变地表阈值或完成岩壁验收。
+
 两套只读校验服务已落地，自 STAGE2-5（v1.50.49）起由世界初始化事务消费：静态几何校验在创世第 7 步运行、失败码以 `Geometry:` 前缀进入有界降级环（§8.2）；生存诊断在候选生态播撒后运行、失败码以 `Survival:` 前缀进入同一环。诊断本身保持 `&self` 只读、不改变世界。
 
 - **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 连续。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。

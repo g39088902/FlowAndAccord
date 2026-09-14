@@ -1603,23 +1603,9 @@ impl TerrainMap {
         }
         let (gx0, gy0) = ws.bbox_min;
         let (gx1, gy1) = ws.bbox_max;
-        let step_x = self.world_size / self.grid_width.saturating_sub(1).max(1) as f32;
-        let step_y = self.world_size / self.grid_height.saturating_sub(1).max(1) as f32;
         for gy in gy0..=gy1 {
             for gx in gx0..=gx1 {
-                let left = self.cells[gy * self.grid_width + gx.saturating_sub(1)].elevation;
-                let right =
-                    self.cells[gy * self.grid_width + (gx + 1).min(self.grid_width - 1)].elevation;
-                let up = self.cells[gy.saturating_sub(1) * self.grid_width + gx].elevation;
-                let down =
-                    self.cells[(gy + 1).min(self.grid_height - 1) * self.grid_width + gx].elevation;
-                let dx = (right - left)
-                    / ((((gx + 1).min(self.grid_width - 1) - gx.saturating_sub(1)).max(1) as f32)
-                        * step_x.max(0.001));
-                let dy = (down - up)
-                    / ((((gy + 1).min(self.grid_height - 1) - gy.saturating_sub(1)).max(1) as f32)
-                        * step_y.max(0.001));
-                ws.scratch_slopes.push((dx * dx + dy * dy).sqrt().atan().to_degrees());
+                ws.scratch_slopes.push(self.slope_from_elevation(gx, gy));
             }
         }
     }

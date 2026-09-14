@@ -1,0 +1,24 @@
+RiverCliff prerequisite: shared slope predicate verification
+Date: 2026-09-14
+Base source: 77fffc7; baseline workspace WASM app 1.50.50
+Candidate: same source + hydrology.rs/terrain.rs shared slope change, app 1.50.51
+Generator version 8; save format 7; FABS 3 unchanged.
+Configuration: frontend defaults from the three JS files below, merged before each world creation.
+Map differential: T1/T2 x seed 0..59 x terrainAccentSubFeatures false/true = 240.
+Full world differential: mountain_pass_v1, river_valley_v1, grassland_plain_v1, hillside_woodland_v1, river_valley_settlement_v1, flat_baseline x seed 0/42 = 12.
+Comparison: JSON.stringify of independent FABS readers, resetCaches after every world creation; complete returned snapshots, no field exclusions.
+World size 764, config grid resolution, full worlds: 20 agents and config.countCamps.
+Temporary Rust assertions: 14,554 local slope samples bitwise equal to original full-grid formula; whole-grid and point AABB, empty workspace, 1x1/2x2/7x7/9x5/120x120, tiny size 0.0001; scratch leaves serialized terrain unchanged and final pass preserves elevations.
+The original final-pass width-based step is preserved, including rectangular legacy behavior; this is not a rectangular-grid geometry correction.
+Temporary test module and differential script deleted after verification.
+No browser visual/performance claim; no RiverCliff scale admission claim.
+Gate results: cargo test --lib PASS; release wasm build PASS; test-wasm ALL_TESTS_DONE; test-determinism 6/6 PASS; config 239/239 PASS; frontend syntax 41 files and DOM PASS.
+Build warnings: existing unused-variable and static-mut references.
+Differential result: {"maps":240,"worlds":12,"allEqual":true,"snapshotSha256":"ccc41f1f8ad569021ce28e1d6a877d355286aea38ffcb5c0ed43e06642769fad"}
+SHA256:
+c57facdaa09579ca0193f2b6611b4cbc39d8db066a2adb2005ac089b91c36be4  /private/tmp/flowaccord-slope-baseline.wasm
+fb176772f858340865993894e94d662ecb480e6adc85690ae4a6e7457df389ef  frontend/rust/sim_wasm.wasm
+fb176772f858340865993894e94d662ecb480e6adc85690ae4a6e7457df389ef  frontend/sim_wasm.wasm
+16e6cec887a7e2e241836e9ecf51d64923f2edb0072f047b3cd90b6acb476182  frontend/js/config.js
+862c69376b261074900fbf9b16608527434df42bb3287b8158887f49e0ea62d3  frontend/js/config.decision-order.js
+ef802d427944fcf2f8cec7f18adc5b5f28b0660e37ef5521c2c0acc18ead689d  frontend/js/config.house-upgrade-cost.js
