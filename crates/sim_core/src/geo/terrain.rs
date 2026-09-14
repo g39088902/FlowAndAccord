@@ -644,15 +644,22 @@ impl SubFeatureWorkspace {
 }
 
 /// §5.3 第 0 步 `resolve_profile`：解析 profile。空串 / `random` 按种子整数判别
-/// 分派 T1/T2。纯整数运算，**不消费任何 `WorldRng`**（逻辑自原 `generate_with_profile`
+/// 分派候选池。纯整数运算，**不消费任何 `WorldRng`**（逻辑自原 `generate_with_profile`
 /// 头部逐字抽出）。
 fn resolve_profile(seed: u64, profile: &str) -> String {
     if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
-        if (seed ^ 0x5052_4F46_494C_4531) % 2 == 0 {
-            TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
-        } else {
-            TERRAIN_PROFILE_RIVER_VALLEY.to_string()
-        }
+        // ★ S7-10：random 候选池 2→5（阶段七 3 张新图各 ~20% 均衡入列，06 号
+        //  §20 退出标准；`flat_baseline` 永不入列）。5 路判别替代旧 T1/T2 奇偶
+        //  判别——同种子在 random 下的落点允许改变（收口设计如此）；显式
+        //  profile 的输出不受影响，T1/T2 旧世界逐字节不变约束仍然成立。
+        const RANDOM_CANDIDATES: [&str; 5] = [
+            TERRAIN_PROFILE_MOUNTAIN_PASS,
+            TERRAIN_PROFILE_RIVER_VALLEY,
+            TERRAIN_PROFILE_GRASSLAND_PLAIN,
+            TERRAIN_PROFILE_HILLSIDE_WOODLAND,
+            TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+        ];
+        RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 5) as usize].to_string()
     } else {
         profile.to_string()
     }

@@ -26,7 +26,7 @@
 
   <div class="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.51</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.52</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -54,6 +54,10 @@
       <div class="stat-item stat-item-interactive" id="stat-item-season" title="鼠标悬停查看未来 49 年气候演化折线图">
         <div class="stat-val" id="stat-season" style="color:#f59e0b;">🌸 春季</div>
         <div class="stat-lbl" id="stat-temp" style="color:#e2e8f0; font-weight:600;">21.5°C</div>
+      </div>
+      <div class="stat-item" id="stat-item-map" title="当前地图模板（内核已解析的地貌 profile）· 悬停查看地形参数">
+        <div class="stat-val" id="stat-map-profile" style="color:#a78bfa; font-size:13px;">—</div>
+        <div class="stat-lbl">🗺️ 地图模板</div>
       </div>
       <div class="stat-item">
         <div class="stat-val" id="stat-births" style="color:#38bdf8;">0</div>
@@ -844,6 +848,8 @@
     </div>
     <div class="debug-row"><span>⏱️ 模拟 Tick</span><span id="dbg-tick" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚡ 每秒 Tick</span><span id="dbg-tick-rate" class="mono-num">0</span></div>
+    <div class="debug-row"><span>🗺️ 地图模板</span><span id="dbg-map-profile" class="mono-num">—</span></div>
+    <div class="debug-row"><span>🌍 地形生成器</span><span id="dbg-terrain-gen" class="mono-num">—</span></div>
     <div class="debug-row"><span>👑 国王内帑总额</span><span id="dbg-royal-privy" class="mono-num">0.00 🪙</span></div>
     <div class="debug-row"><span>🖼️ 渲染 FPS</span><span id="dbg-fps" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚙️ 内核步进</span><span id="dbg-tick-ms" class="mono-num">0.00 ms</span></div>

@@ -44,7 +44,7 @@ stateDiagram-v2
 ## 核心机制
 
 ### 连续 3D 地形与 T0/T1 静态地貌
-- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 `mountain_pass_v1` 与 `river_valley_v1` 间随机轮换（显式锁定值另支持 `grassland_plain_v1` 平地草原，v1.50.40 内核骨架，未过 §18 全链路验收前不加入 `random` 候选）。
+- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 5 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 河谷聚落）间按种子确定性轮换（★ S7-10 起 random 候选池 2→5，各 ~20%；`flat_baseline` 诊断基线永不入列）。
 - `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面，水体相关枚举为 T2 预留。
 - T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制；草原 profile 输出 `SpringValley` 泉眼特征（无水体、无水面，见 §9.7）。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
@@ -377,13 +377,12 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'` 或 `'flat_baseline'`）。
-- 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支：
-  `(seed ^ 0x5052_4F46_494C_4531)` 对 2 取模为 0 → 实例化为 `mountain_pass_v1`（T1 山口聚落）；
-  否则 → 实例化为 `river_valley_v1`（T2 两岸河谷）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'`、`'river_valley_settlement_v1'` 或 `'flat_baseline'`）。
+- 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支（★ S7-10 候选池 2→5）：
+  `(seed ^ 0x5052_4F46_494C_4531) % 5` 依序实例化为 `mountain_pass_v1`（T1 山口）/ `river_valley_v1`（T2 两岸河谷）/ `grassland_plain_v1`（平地草原）/ `hillside_woodland_v1`（半坡林地）/ `river_valley_settlement_v1`（河谷聚落），各 ~20%。
   ★ `flat_baseline`（STAGE2-7 显式诊断/降级基线，倾斜-only 平地）**永不参与 random 分派**，只能显式指定；它是 STAGE2-5 有界回退环的显式降级目标，支持存读档续演（存档 profile 白名单已放行）。
-- ⚠️ **这是种子奇偶而非哈希**：取模 2 只取 `seed ^ 盐值` 的最低位，盐值 LSB 为 1，等价于「种子为奇数 → T1、偶数 → T2」。连续种子会**严格交替**，不是随机轮换。若要真正的分散，应改为 `mix64(seed ^ salt)` 后取模 2（或取模 100 后判 `< 50`）——但这会改变既有种子的映射，需随 `TERRAIN_GENERATOR_VERSION` 一并递增。
-- 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时两套地貌按 ~50% 概率自然轮换。
+- ⚠️ **取模作用于原始异或值而非 mix64 哈希**：连续种子的落点按 `% 5` 同余循环分布，非哈希均匀分散。S7-10 扩池改变了既有种子在 random 下的落点（旧 T1/T2 奇偶交替 → 5 路取模），属 §20 收口设计——显式 profile 的输出不受影响，旧存档记录的是已实例化模板名，读档不受影响。
+- 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时五套地貌各 ~20% 均衡轮换。
 
 要求：
 
@@ -554,7 +553,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 5. ✅ 水源锚定（确定性修正，均不消费 RNG）：双洼地过近沿连线外推到 0.22×world_size；吸附点偏向图缘时盆心沿径向收拢到 0.20×world_size（≈153m，保 §1.4 water≤160m）。
 6. ✅ 草甸肥力：草原分支 `natural_fertility = 0.97 − slope/70×0.5 − nh×0.10`（可建格均值 0.91，落 0.85~0.95 带内）。
 
-隔离保证：草原分支只消费 `relief_rng` 局部流（主 `rng` 消费数不变），不读 `hydro_rng`/`accent_rng`；T1/T2 路径逐位不变（60 种子 git worktree 对拍）。探针验收（`terrain_probe --profile grassland_plain_v1 --seeds 60`）§1.4 门禁 0 违例：max_slope 9.93°~16.46°、blocked/hard/no_walk 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08、waterM 峰值 154m；mound_count 1~2、软地比 1.6%。草甸装饰散布（S7-03）与 `random` 候选（§18 全链路验收后）待落地。
+隔离保证：草原分支只消费 `relief_rng` 局部流（主 `rng` 消费数不变），不读 `hydro_rng`/`accent_rng`；T1/T2 路径逐位不变（60 种子 git worktree 对拍）。探针验收（`terrain_probe --profile grassland_plain_v1 --seeds 60`）§1.4 门禁 0 违例：max_slope 9.93°~16.46°、blocked/hard/no_walk 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08、waterM 峰值 154m；mound_count 1~2、软地比 1.6%。草甸装饰散布已随 S7-03 落地；`random` 候选已随 S7-10 全链路收口入列（候选池 2→5）。
 
 ### 9.8 装饰生成器（Accents Generator）
 
@@ -850,7 +849,7 @@ pub terrain_generator_version: u32,     // 当前为 4（v1.50.17 T1-R 主脊通
 pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1"
 ```
 
-`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验：仅 `mountain_pass_v1` 与 `river_valley_v1` 被接受。
+`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验白名单（★ S7-10 扩容）：`mountain_pass_v1`、`river_valley_v1`、`grassland_plain_v1`、`hillside_woodland_v1`、`river_valley_settlement_v1`、`flat_baseline` 六者被接受，其余报错拒绝（禁止静默回退）。
 
 读档规则：
 
@@ -938,7 +937,7 @@ render_agents.js        族人绘制                                            
 ✅ 已落地 62 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原 profile」，全系统配置字段总计 276；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数）：
 
 ```text
-✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "flat_baseline"（新 profile 未过全链路验收前不入 random）
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "flat_baseline"（诊断基线，永不入 random）；★ S7-10 起其余 5 profile 全部参与 random 轮换
 ✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
@@ -1005,7 +1004,7 @@ render_agents.js        族人绘制                                            
 实现约束：
 
 - ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 276）。
-- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
+- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 5` 确定性五路分支到 T1/T2/草原/半坡/河谷聚落（★ S7-10 候选池扩容）。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
   T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；

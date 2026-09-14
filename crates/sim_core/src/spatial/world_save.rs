@@ -33,7 +33,7 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.50.51";
+pub const SAVE_APP_VERSION: &str = "1.50.52";
 
 
 fn default_terrain_generator_version() -> u32 {
@@ -230,11 +230,15 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         ));
     }
     // ★ STAGE2-7：flat_baseline 为显式诊断/降级基线，支持保存/加载与续演
-    //  （STAGE2-5 有界回退环的降级产物必须可复演）。草原/半坡暂未列入白名单——
-    //  其全链路验收未收口，不属本任务范围，勿顺手放行。
+    //  （STAGE2-5 有界回退环的降级产物必须可复演）。
+    // ★ S7-10：阶段七 3 个新 profile 全链路验收收口后正式入列白名单
+    //  （grassland_plain_v1 / hillside_woodland_v1 / river_valley_settlement_v1）。
     if save.terrain_profile != TERRAIN_PROFILE_MOUNTAIN_PASS
         && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY
         && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_GRASSLAND_PLAIN
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_HILLSIDE_WOODLAND
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
     {
         return Err(format!("地形 profile 不受支持：{}", save.terrain_profile));
     }
