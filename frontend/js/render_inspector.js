@@ -67,7 +67,7 @@ const HormoneTrend = (() => {
       if (prev) {
         if (tick < prev.tick) {
           // tick 回退（读档/回溯/换世界兜底）：丢弃旧样本，本拍不产出速率
-          samples.set(agentId, { tick, vals });
+          samples.set(agentId, { tick, vals: vals.slice() });
           return null;
         }
         if (tick > prev.tick) {
@@ -75,7 +75,8 @@ const HormoneTrend = (() => {
           rates = vals.map((v, i) => (v - prev.vals[i]) / hours);
         }
       }
-      samples.set(agentId, { tick, vals });
+      // 存副本而非引用：上游若原地复用 levels 数组，引用会让 prev.vals 恒等于当前值 → 恒 0 假趋势
+      samples.set(agentId, { tick, vals: vals.slice() });
       return rates;
     },
     /** 世界生命周期（READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE）与选中对象变化时清理 */
