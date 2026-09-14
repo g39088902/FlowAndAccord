@@ -241,7 +241,7 @@ sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://localhost:3004/
 
 > 本节由 **CatPaw 内置浏览器**（`paw browser-action`，macOS darwin/arm64）实操沉淀，与 §1-5（Windows playwright-cli）、§6（云电脑）互为补充。内置浏览器渲染在 CatPaw 预览面板中，随会话自动管理生命周期，无需安装。
 >
-> 🔴 **适用边界（先读）**：内置预览浏览器**不支持 File System Access API**，无法通过本项目的启动存档门禁（模拟一直暂停）。因此它**只适合纯视觉截图 / 布局校验**；凡涉及存档读写、模拟推进、长程演化的验证，**能用 Chrome 测试必须优先用 Chrome 测试**（playwright-cli `--browser=chrome`，见 §3；或手动开系统 Chrome 访问 `localhost:3004`）。
+> 🔴 **适用边界（先读）**：内置预览浏览器**不支持 File System Access API**，无法通过本项目的启动存档门禁（模拟一直暂停）。因此：**存档链路（建档/读档/续演）的验证必须用 Chrome**（playwright-cli `--browser=chrome`，见 §3；或手动开系统 Chrome 访问 `localhost:3004`）。**沙箱/环境禁止外启浏览器进程时（如 CatPaw 会话），允许用内置预览浏览器 + `?nogate=1` 旁路**（v1.50.8 起隐藏门禁弹窗并直接解除暂停，仅内存演算）完成视觉截图、布局校验、性能采样、季相/镜头/生命周期等**非存档链路**验证——模拟可正常推进与交互。两条硬边界：① `?nogate=1` 不证明存档链路，受限环境中的建档/读档验证项如实标注 NOT_RUN/待补测；② 会话退出时只清理自己的 tab 与临时产物。
 
 >
 > 记录人：CatPaw AI Agent · 2026-09-10 · 项目版本 v1.49.2

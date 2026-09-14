@@ -563,7 +563,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 ### 11.5 实施门禁
 
 - 本文为规划与现状对照文档；纯文档改动不升版、不构建 WASM，交付前运行文档维护体检、跨文档一致性检查与 `bump-version.js --check`。
-- 后续前端实现运行 `frontend-check.js`，按[浏览器指南](../../current/tech/27-browser-automation.md)做视觉与交互验收（必须用 Chrome，存档依赖 File System Access API）；使用[性能指南](../../current/tech/25-benchmarking.md)建立基线。
+- 后续前端实现运行 `frontend-check.js`，按[浏览器指南](../../current/tech/27-browser-automation.md)做视觉与交互验收（优先 Chrome 做存档链路验证；沙箱禁止外启浏览器时允许内置预览浏览器 + `?nogate=1` 做视觉/性能/生命周期等非存档验证，见 27 号 §7）；使用[性能指南](../../current/tech/25-benchmarking.md)建立基线。
 - 涉及 Rust/版本常量变更时重编译并同步 WASM 双副本，执行 `cargo test --lib`、`test-wasm.js` 与适用的确定性门禁；**即使首期植被改造只改前端，统一升版仍会修改 Rust 应用版本常量，实施交付仍需重编译并同步 WASM 双副本**。
 - 涉及快照字段执行 `snapshot-check.js` + `test-wasm.js`；配置变更执行 `config-check.js`；地形行为变化增加多种子、存读档和回溯诊断。行为有意变化时不能要求新旧生成算法结果相同，但同版本同种子必须确定性一致。
 - 不提交临时单元测试；各阶段实现完成后再同步现状文档、版本和 changelog，不能把本文的规划写成已实现机制。

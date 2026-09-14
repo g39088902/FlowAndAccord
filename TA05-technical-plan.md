@@ -179,7 +179,7 @@ report.md              # 结论、缺陷、修复复验及门禁输出摘要
 
 ## 9. 实施纪律与文档收口
 
-实施前阅读 [根 AGENTS.md](AGENTS.md)、[frontend/AGENTS.md](frontend/AGENTS.md)、[工作流](docs/current/tech/30-workflow.md)、[浏览器指南](docs/current/tech/27-browser-automation.md)、[性能指南](docs/current/tech/25-benchmarking.md)。测试优先 Chrome；3004 已有服务时复用；临时浏览器会话退出时只清理自己的会话。
+实施前阅读 [根 AGENTS.md](AGENTS.md)、[frontend/AGENTS.md](frontend/AGENTS.md)、[工作流](docs/current/tech/30-workflow.md)、[浏览器指南](docs/current/tech/27-browser-automation.md)、[性能指南](docs/current/tech/25-benchmarking.md)。验证环境优先 Chrome（存档链路验证只能用 Chrome）；**沙箱禁止外启浏览器进程时允许内置预览浏览器 + `?nogate=1` 旁路**完成视觉/性能/生命周期等非存档验证（§6 边界不变：不证明建档/读档链路，受限环境中存档项如实标注 NOT_RUN/待补测）；3004 已有服务时复用；临时浏览器会话退出时只清理自己的会话。
 
 | 变更类型 | 必做事项 |
 | :--- | :--- |

@@ -47,7 +47,7 @@ stateDiagram-v2
 1. **浏览器槽位**：三槽位落 `localStorage`，适合中小存档；
 2. **本地文件直写**（v1.11.0）：用户通过 File System Access API 连接一个本地 `.json` 文件后，存档直写用户磁盘，**不受浏览器存储配额限制**，适合长时间运行后的大存档。
 
-> 🔴 **浏览器要求**：本地文件直写依赖 **Chrome / Edge 的 File System Access API**（Firefox / Safari 无 `showSaveFilePicker`）；且 ★ v1.27.0 起启动存档门禁要求先建立/连接可写存档才解除模拟暂停——**一切浏览器测试能用 Chrome 必须优先用 Chrome**，否则门禁无法通过。
+> 🔴 **浏览器要求**：本地文件直写依赖 **Chrome / Edge 的 File System Access API**（Firefox / Safari 无 `showSaveFilePicker`）；且 ★ v1.27.0 起启动存档门禁要求先建立/连接可写存档才解除模拟暂停。**存档链路的建立与验证必须用 Chrome/Edge**；Agent 自动化在沙箱禁止外启浏览器时，可用内置预览浏览器 + `?nogate=1` 旁路（v1.50.8，仅内存演算）做视觉/性能/季相等非存档验证——该旁路**不证明建档/读档链路**，受限环境中的存档验证项如实标注 NOT_RUN/待补测（环境选择口径见根 AGENTS.md §4 铁律与 [27 号指南](./27-browser-automation.md) §7）。
 
 **三条设计红线**：
 
