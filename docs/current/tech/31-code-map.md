@@ -104,10 +104,10 @@ FlowAndAccord/
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── config.poi-rates.js             # POI 产速本地偏好 (localStorage 倍率，world_create 前读取，可复现演化)
-│   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG)
+│   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG；★ TA-12 terrainTexture 配置组 12 键含 detailFadePx LOD 淡入区间)
 │   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
-│   │   ├── terrain-texture.js              # ★ TA-12-2 世界坐标锁定地表纹理模型层 (window.TerrainTexture：固定整数哈希/独立属性通道/世界桶候选/草斑土纹图元/材质筛选/有界缓存与分批构建；drawCell·refreshPalette 为 TA-12-3/4 接口占位；世界事件 invalidate)
-│   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影)
+│   │   ├── terrain-texture.js              # ★ TA-12 世界坐标锁定地表纹理模型层 (window.TerrainTexture：固定整数哈希/独立属性通道/世界桶候选/草斑土纹图元/材质筛选/有界缓存与分批构建；★ TA-12-3 clipToRect/buildFragments 跨格预裁剪 + drawCell 四角双线性贴面投影；★ TA-12-4 refreshPalette 共用受光色档；★ TA-12-5 invalidate 生命周期；★ TA-12-7 _lodFade live LOD 热调修复)
+│   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影；★ TA-12-4 lightParams/shadeAlbedoInto 共用受光步骤 + 批次末尾通知 TerrainTexture.refreshPalette)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
 │   │   ├── decision-viz.js                 # 决策可视化窗口控制器与状态桥接
@@ -130,13 +130,13 @@ FlowAndAccord/
 │   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道)
 │   │   ├── landscape-model.js              # ★ S4-02 资源景观模型层 (window.LandscapeModel：配方/slot/固定 uint32 哈希/极坐标候选/双线性高程/组缓存，静态输入派生，世界事件 resetCache；★ S4-03 version() 组几何版本号；★ S4-04 配方 v2：GroundPatch 贴地片 + 坡度拒绝 sampleSlopeDeg + stockRole detail/qThreshold + childActive；★ S4-05 配方 v3：Berry fruit/Stone quarry/Gold vein detail 贴地片 + 点簇 dots 预计算)
 │   │   ├── landscape-mask.js               # ★ S4-03 景观遮罩层 (window.LandscapeMask：道路胶囊带/房屋/POI 保护区 + 世界网格分桶 + 字段签名脏桶失效 + 装饰去重；源数组只隐藏不移除，世界事件 resetCache；★ S4-04 detail 子图元只预判 _masked 不入占据桶)
-│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；★ v1.50.23 装饰绘制已迁出 render_accents.js)
+│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；★ v1.50.23 装饰绘制已迁出 render_accents.js；★ TA-12-3 drawTerrainCell 基底后调用 TerrainTexture.drawCell 同深度落笔)
 │   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity 分发 + Tree/Boulder/Bush/RockCluster；★ v1.50.39 TA-04-3 cylinderShade 枝干圆柱侧面明暗，由 render_world.js 深度队列调度)
 │   │   ├── render_grass.js                 # ★ v1.50.39 GrassTuft 草丛绘制 (自 render_accents.js 迁出守 800 行上限；grassSeasonColor 季相色 + 芦草穗，复用 accent 族共享刮擦工具)
 │   │   ├── render_shadows.js               # ★ v1.50.46 TA-04-6 装饰贴地投影绘制层 (drawAccentShadowGround 树/灌木地面图元阴影：实高驱动影长 + 叶量调制夏冠影/冬枝影，复用 accent 族共享刮擦工具；★ S4-02 drawAccentShadowFor 模型参数化主体)
 │   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild/drawLandscapeShadowGround 分发；复用装饰图元/光照/季相，配置关态零开销回退；★ S4-03 被遮蔽子图元连同投影不入队；★ S4-04 detail 子图元 childActive q 过滤 + drawLandscapeGroundPatch 贴地色差片，填充样式预建常量零 GC；★ S4-05 berry/gold 点簇（round(10×q) 可见点数）+ quarry globalAlpha 渐强 + child._q 镜像)
 │   │   ├── label-layout.js                # ★ S4-06 标签候选层与屏幕布局 (window.LabelLayout：提案池/字体测量缓存/固定备选位[首选/镜像/同排左右]/屏幕网格冲突检测/UI 禁入矩形/overlay 通道；pinned 恒接受占格 + ordinary 可省略；候选 ≤4 有界；关态回退旧直接绘制)
-│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰及其投影跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels 提案 + drawSelectedNeedBubbleOverlay 交互覆盖)
+│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰及其投影跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels 提案 + drawSelectedNeedBubbleOverlay 交互覆盖；★ TA-12-3 帧首 TerrainTexture.prepare 分批准备)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）；★ S4-06 proposePoiLabels/proposeHouseLabels 提案 + 绘制消费 posOf（未安置即省略；LOD 阈值收进 config.render）
 │   │   ├── render_agents.js                # 族人粒子、行囊搬运与登基礼花特效（★ S4-06 需求气泡迁 overlay 层 drawSelectedNeedBubbleOverlay；施工/流产/夺位角标 pinned + posOf 消费）
 │   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染

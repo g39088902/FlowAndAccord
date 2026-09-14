@@ -391,7 +391,10 @@
       }
       if (!m.terrain.cells || !m.terrain.cells[i00]) return 0;
       const cfg = m.cfg;
-      const f0 = cfg.detailFadePx[0], f1 = cfg.detailFadePx[1];
+      // ★ TA-12-7：LOD 区间读 live 值（prepare 每帧刷新的 this._lodFade）而非建模型时冻结的
+      //   m.cfg——detailFadePx 不入 configRevision（热调不触发重建），若读 m.cfg 热调将静默失效。
+      const fade = this._lodFade || cfg.detailFadePx;
+      const f0 = fade[0], f1 = fade[1];
       const fragPrim = m.fragPrim, fragVOff = m.fragVOff, fragVCount = m.fragVCount;
       const fragU = m.fragU, fragV = m.fragV, sizes = m.sizes, signs = m.signs, tones = m.tones;
       const off = rec.off, cnt = rec.cnt;
@@ -460,6 +463,7 @@
     // 返回是否已全部就绪（分批未完成时为 false，消费方只画就绪部分）。
     prepare(terrain, config) {
       const cfg = resolveConfig(config);
+      this._lodFade = cfg.detailFadePx; // ★ TA-12-7：LOD 区间 live 化（drawCell 每帧读新值，热调即生效）
       if (!cfg.enabled || !terrain || !terrain.cells || !(terrain.gridSize > 0)) {
         if (this._model) this.invalidate('disabled-or-no-terrain');
         return false;
@@ -515,6 +519,7 @@
     _shadeEpochR: -1,
     _shadeFn: null, // relightTerrain 批次注入的共用受光步骤（lighting.js::shadeAlbedoInto）
     _lp: null,      // 注入的本趟光照参数快照（null = drawCell 时经 SimLighting.lightParams 现取）
+    _lodFade: null, // ★ TA-12-7 live LOD 区间（prepare 每帧自 resolveConfig 刷新；热调不重建也生效）
     _out3: [0, 0, 0],
 
     // ★ TA-12-4 受光色档：反照率小幅等比扰动（±eff，tone 量化 4 档，档差 ≤1% 明度不可辨）
