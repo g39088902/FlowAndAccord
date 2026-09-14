@@ -323,6 +323,30 @@ pub struct SimConfig {
     /// ★ S7-07 河谷聚落：取水点离轴最小偏移 (m)。默认 35.0（`max(河道半宽+岸带+
     /// 边距, 本值)` 保证两岸对置取水点间距 ≥70m = `poi_min_distance` 口径）。
     pub terrain_valley_access_offset_min_m: f32,
+    /// ★ TB-02 台地聚落：台面最小抬升高度 (m)。默认 18.0。
+    pub terrain_plateau_height_min: f32,
+    /// ★ TB-02 台地聚落：台面最大抬升高度 (m)。默认 26.0。
+    pub terrain_plateau_height_max: f32,
+    /// ★ TB-02 台地聚落：台面半宽相对世界尺寸比例。默认 0.22。
+    pub terrain_plateau_half_width_ratio: f32,
+    /// ★ TB-02 台地聚落：台面半深相对世界尺寸比例。默认 0.18。
+    pub terrain_plateau_half_depth_ratio: f32,
+    /// ★ TB-02 台地聚落：台面圆角相对最小半尺寸比例。默认 0.35。
+    pub terrain_plateau_corner_radius_ratio: f32,
+    /// ★ TB-02 台地聚落：普通台缘过渡带宽度对高差比率（B_edge = ratio * H）。默认 0.6。
+    pub terrain_plateau_edge_band_ratio: f32,
+    /// ★ TB-02 台地聚落：入口缓坡过渡带宽度对高差比率（B_ramp = ratio * H）。默认 4.0。
+    pub terrain_plateau_ramp_band_ratio: f32,
+    /// ★ TB-02 台地聚落：缓坡核心横向宽度 (m)。默认 36.0 (>= 32m)。
+    pub terrain_plateau_ramp_width: f32,
+    /// ★ TB-02 台地聚落：缓坡肩部横向过渡宽度 (m)。默认 24.0。
+    pub terrain_plateau_ramp_shoulder_width: f32,
+    /// ★ TB-02 台地聚落：台面区域噪声阻尼增益。默认 0.20。
+    pub terrain_plateau_top_noise_gain: f32,
+    /// ★ TB-02 台地聚落：缓坡入口区域噪声阻尼增益。默认 0.12。
+    pub terrain_plateau_ramp_noise_gain: f32,
+    /// ★ TB-02 台地聚落：台缘轮廓低频扰动幅度 (m)。默认 6.0。
+    pub terrain_plateau_outline_warp: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,
     pub terrain_river_water_level: f32,

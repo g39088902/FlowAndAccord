@@ -103,6 +103,7 @@ const MAP_TEMPLATE_LABELS = {
   grassland_plain_v1: '🌾 平地草原',
   hillside_woodland_v1: '🌲 半坡林地',
   river_valley_settlement_v1: '🏔️ 河谷聚落',
+  plateau_settlement_v1: '🏕️ 台地聚落',
   flat_baseline: '📐 诊断基线',
 };
 

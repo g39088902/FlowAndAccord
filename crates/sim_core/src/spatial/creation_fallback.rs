@@ -307,6 +307,9 @@ impl World3DEngine {
         }
         self.validate_terrain_world()
             .map_err(|e| format!("RoadNetwork:{}", e))?;
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU_SETTLEMENT {
+            self.validate_plateau_gates()?;
+        }
         let report = self.diagnose_survival();
         if !report.ok {
             let code = report

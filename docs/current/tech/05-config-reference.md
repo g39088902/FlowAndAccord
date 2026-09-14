@@ -230,6 +230,18 @@
 | `terrainValleyRiverTerraceM` | f32 | 20 | geo/hydrology.rs (S7-07 河阶带半宽) | 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带 |
 | `terrainValleyFordRatio` | f32 | 0.32 | geo/hydrology.rs (S7-07 授权浅滩 y 位置比例) | 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏 |
 | `terrainValleyAccessOffsetMinM` | f32 | 35 | geo/hydrology.rs (S7-07 取水点离轴最小偏移；POI 间距) | 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径 |
+| `terrainPlateauHeightMin` | f32 | 18 | geo/plateau.rs (TB-02 台面最小抬升高度) | 台面最小抬升高度 (m)；规格 18~26 |
+| `terrainPlateauHeightMax` | f32 | 26 | geo/plateau.rs (TB-02 台面最大抬升高度) | 台面最大抬升高度 (m) |
+| `terrainPlateauHalfWidthRatio` | f32 | 0.22 | geo/plateau.rs (TB-02 台面半宽相对世界比例) | 台面半宽相对世界尺寸比例；0.22×768 ≈ 169m |
+| `terrainPlateauHalfDepthRatio` | f32 | 0.18 | geo/plateau.rs (TB-02 台面半深相对世界比例) | 台面半深相对世界尺寸比例；0.18×768 ≈ 138m |
+| `terrainPlateauCornerRadiusRatio` | f32 | 0.35 | geo/plateau.rs (TB-02 台面圆角比例) | 台面圆角相对最小半尺寸比例；0.35×138 ≈ 48m |
+| `terrainPlateauEdgeBandRatio` | f32 | 0.6 | geo/plateau.rs (TB-02 台缘过渡带宽度比例；≥34° 硬禁行) | 普通台缘过渡带宽度对高差比率；B_edge = 0.6H，峰坡 ~68° ≥34° 硬禁行 |
+| `terrainPlateauRampBandRatio` | f32 | 4 | geo/plateau.rs (TB-02 入口缓坡过渡带宽度比例；≤30° 可行走) | 入口缓坡过渡带宽度对高差比率；B_ramp = 4.0H，峰坡 ~20.6° ≤30° 可行走 |
+| `terrainPlateauRampWidth` | f32 | 36 | geo/plateau.rs (TB-02 缓坡核心横向宽度) | 缓坡核心横向宽度 (m)；≥32m |
+| `terrainPlateauRampShoulderWidth` | f32 | 24 | geo/plateau.rs (TB-02 缓坡肩部横向过渡宽度) | 缓坡肩部横向过渡宽度 (m)；光滑过渡至 edge_band |
+| `terrainPlateauTopNoiseGain` | f32 | 0.2 | geo/plateau.rs (TB-02 台面区域噪声阻尼增益) | 台面区域噪声阻尼增益；起伏平缓保 ≥3 处房屋可建 |
+| `terrainPlateauRampNoiseGain` | f32 | 0.12 | geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益) | 缓坡入口区域噪声阻尼增益；走廊平缓保可走 |
+| `terrainPlateauOutlineWarp` | f32 | 6 | geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度) | 台缘轮廓低频扰动幅度 (m) |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |

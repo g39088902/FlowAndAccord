@@ -41,8 +41,8 @@ use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
 use sim_core::geo::terrain::{
     TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY,
-    TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+    TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
 use sim_core::geo::{BranchRidge, SurfaceKind, TerrainFeatureKind, TerrainMap};
 use std::cmp::Reverse;
@@ -120,6 +120,16 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             water_dist_max: 140.0,
             band_width_min: 55.0,
             crossing95_min: 1.90,
+        }),
+        TERRAIN_PROFILE_PLATEAU_SETTLEMENT => Some(GateWindow {
+            max_slope: (42.0, 58.0),
+            hard_blocked: (150, 350),
+            no_walk: (150, 350),
+            buildable_min: 4000,
+            detour_p95: (0.0, 3.50),
+            water_dist_max: 180.0,
+            band_width_min: 32.0,
+            crossing95_min: 0.0,
         }),
         _ => None,
     }
@@ -1129,18 +1139,20 @@ fn main() {
             || name == TERRAIN_PROFILE_GRASSLAND_PLAIN
             || name == TERRAIN_PROFILE_HILLSIDE_WOODLAND
             || name == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
+            || name == TERRAIN_PROFILE_PLATEAU_SETTLEMENT
         {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());
         } else {
             eprintln!("[错误] 未知 profile `{}`。", name);
             eprintln!(
-                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}`。",
+                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}` / `{}`。",
                 TERRAIN_PROFILE_MOUNTAIN_PASS,
                 TERRAIN_PROFILE_RIVER_VALLEY,
                 TERRAIN_PROFILE_GRASSLAND_PLAIN,
                 TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-                TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
+                TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+                TERRAIN_PROFILE_PLATEAU_SETTLEMENT
             );
             std::process::exit(2);
         }

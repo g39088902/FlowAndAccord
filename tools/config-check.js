@@ -111,6 +111,19 @@ const IMPACT_OVERRIDES = {
   terrainValleyRiverTerraceM: 'geo/hydrology.rs (S7-07 河阶带半宽)',
   terrainValleyFordRatio: 'geo/hydrology.rs (S7-07 授权浅滩 y 位置比例)',
   terrainValleyAccessOffsetMinM: 'geo/hydrology.rs (S7-07 取水点离轴最小偏移；POI 间距)',
+  // ★ TB-02 台地聚落形态参数（06号 §5.6 / TB-02）
+  terrainPlateauHeightMin: 'geo/plateau.rs (TB-02 台面最小抬升高度)',
+  terrainPlateauHeightMax: 'geo/plateau.rs (TB-02 台面最大抬升高度)',
+  terrainPlateauHalfWidthRatio: 'geo/plateau.rs (TB-02 台面半宽相对世界比例)',
+  terrainPlateauHalfDepthRatio: 'geo/plateau.rs (TB-02 台面半深相对世界比例)',
+  terrainPlateauCornerRadiusRatio: 'geo/plateau.rs (TB-02 台面圆角比例)',
+  terrainPlateauEdgeBandRatio: 'geo/plateau.rs (TB-02 台缘过渡带宽度比例；≥34° 硬禁行)',
+  terrainPlateauRampBandRatio: 'geo/plateau.rs (TB-02 入口缓坡过渡带宽度比例；≤30° 可行走)',
+  terrainPlateauRampWidth: 'geo/plateau.rs (TB-02 缓坡核心横向宽度)',
+  terrainPlateauRampShoulderWidth: 'geo/plateau.rs (TB-02 缓坡肩部横向过渡宽度)',
+  terrainPlateauTopNoiseGain: 'geo/plateau.rs (TB-02 台面区域噪声阻尼增益)',
+  terrainPlateauRampNoiseGain: 'geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益)',
+  terrainPlateauOutlineWarp: 'geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度)',
 };
 
 const IMPACT_PREFIX_RULES = [

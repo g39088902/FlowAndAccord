@@ -227,6 +227,19 @@ window.SIM_CONFIG = {
   terrainValleyRiverTerraceM: 20.0,   // 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带
   terrainValleyFordRatio: 0.32,       // 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏
   terrainValleyAccessOffsetMinM: 35.0, // 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径
+  // ── TB-02 台地聚落（plateau_settlement_v1）──
+  terrainPlateauHeightMin: 18.0,      // 台面最小抬升高度 (m)；规格 18~26
+  terrainPlateauHeightMax: 26.0,      // 台面最大抬升高度 (m)
+  terrainPlateauHalfWidthRatio: 0.22, // 台面半宽相对世界尺寸比例；0.22×768 ≈ 169m
+  terrainPlateauHalfDepthRatio: 0.18, // 台面半深相对世界尺寸比例；0.18×768 ≈ 138m
+  terrainPlateauCornerRadiusRatio: 0.35, // 台面圆角相对最小半尺寸比例；0.35×138 ≈ 48m
+  terrainPlateauEdgeBandRatio: 0.6,   // 普通台缘过渡带宽度对高差比率；B_edge = 0.6H，峰坡 ~68° ≥34° 硬禁行
+  terrainPlateauRampBandRatio: 4.0,   // 入口缓坡过渡带宽度对高差比率；B_ramp = 4.0H，峰坡 ~20.6° ≤30° 可行走
+  terrainPlateauRampWidth: 36.0,      // 缓坡核心横向宽度 (m)；≥32m
+  terrainPlateauRampShoulderWidth: 24.0, // 缓坡肩部横向过渡宽度 (m)；光滑过渡至 edge_band
+  terrainPlateauTopNoiseGain: 0.20,   // 台面区域噪声阻尼增益；起伏平缓保 ≥3 处房屋可建
+  terrainPlateauRampNoiseGain: 0.12,  // 缓坡入口区域噪声阻尼增益；走廊平缓保可走
+  terrainPlateauOutlineWarp: 6.0,     // 台缘轮廓低频扰动幅度 (m)
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数
   terrainRiverWidthMax: 42.0, // T2 地貌 / 通行参数
   terrainRiverWaterLevel: 0.0, // T2 地貌 / 通行参数

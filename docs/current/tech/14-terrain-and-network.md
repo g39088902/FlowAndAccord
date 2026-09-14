@@ -936,10 +936,10 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 62 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原 profile」，全系统配置字段总计 276；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数）：
+✅ 已落地 74 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 288；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数；★ v1.50.54 TB-02 台地聚落 12 个形态参数）：
 
 ```text
-✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "flat_baseline"（诊断基线，永不入 random）；★ S7-10 起其余 5 profile 全部参与 random 轮换
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "plateau_settlement_v1" | "flat_baseline"（诊断基线，永不入 random）；★ S7-10/TB-02 起其余 6 profile 全部参与 random 轮换
 ✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
@@ -986,6 +986,18 @@ render_agents.js        族人绘制                                            
 ✅ terrainValleyRiverTerraceM 20.0                ★ S7-07 河阶带半宽 (m)；RiverTerrace 高肥力 0.95 覆盖带
 ✅ terrainValleyFordRatio     0.32                ★ S7-07 授权浅滩 y 位置比例（±×world）；比 T2 ±0.24 更稀疏
 ✅ terrainValleyAccessOffsetMinM 35.0             ★ S7-07 取水点离轴最小偏移 (m)；对置点对间距 ≥70m POI 口径
+✅ terrainPlateauHeightMin       18.0                ★ TB-02 台面抬升基准高度抽样下限 (m)
+✅ terrainPlateauHeightMax       26.0                ★ TB-02 台面抬升基准高度抽样上限 (m)
+✅ terrainPlateauHalfWidthRatio  0.30                ★ TB-02 台面核心平顶半宽比例 (x 方向)
+✅ terrainPlateauHalfDepthRatio  0.22                ★ TB-02 台面核心平顶半深比例 (y 方向)
+✅ terrainPlateauCornerRadiusRatio 0.08              ★ TB-02 圆角矩形倒角半径比例
+✅ terrainPlateauEdgeBandRatio   0.60                ★ TB-02 台缘陡坡过渡带宽度相对高度倍率 (B=0.6H)
+✅ terrainPlateauRampBandRatio   4.00                ★ TB-02 入口缓坡过渡带宽度相对高度倍率 (B=4.0H)
+✅ terrainPlateauRampWidth       32.0                ★ TB-02 入口走廊核心通径宽度 (m)
+✅ terrainPlateauRampShoulderWidth 16.0              ★ TB-02 入口走廊两侧过渡肩宽 (m)
+✅ terrainPlateauTopNoiseGain    0.15                ★ TB-02 台面平顶噪声阻尼增益
+✅ terrainPlateauRampNoiseGain   0.15                ★ TB-02 入口缓坡走廊噪声阻尼增益
+✅ terrainPlateauOutlineWarp     10.0                ★ TB-02 台缘轮廓微幅扭曲波幅 (m)
 ✅ terrainRiverWidthMin       28.0                主河最小宽度 (m)
 ✅ terrainRiverWidthMax       42.0                主河最大宽度 (m)
 ✅ terrainRiverWaterLevel     0.0                 主河水面基准高度 (m)
@@ -1005,8 +1017,8 @@ render_agents.js        族人绘制                                            
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 276）。
-- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 5` 确定性五路分支到 T1/T2/草原/半坡/河谷聚落（★ S7-10 候选池扩容）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 288）。
+- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 6` 确定性六路分支到 T1/T2/草原/半坡/河谷聚落/台地聚落（★ TB-02 候选池扩容）。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
   T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；

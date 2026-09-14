@@ -608,6 +608,8 @@ pub(super) struct GenesisScratch {
     /// ★ S7-06 河谷聚落谷地几何：第 2 步 settlement 分支抽样构建（relief_rng
     /// 局部流），第 6 步地表派生（谷底肥力 0.95 / 陡壁 RockFace 判定）共用同一份。
     pub(super) valley_geometry: Option<ValleyGeometry>,
+    /// ★ TB-02 台地聚落静态几何：第 2 步 plateau 分支构建，第 10 步路网接入消费。
+    pub(super) plateau_geometry: Option<super::plateau::PlateauGeometry>,
     /// 草原泉溪洼地软地凹圈掩码（第 2 步标记 → 第 6 步地表派生消费）。
     pub(super) soft_ring: Vec<bool>,
 }
@@ -617,6 +619,7 @@ impl Default for GenesisScratch {
         Self {
             river_geometry: None,
             valley_geometry: None,
+            plateau_geometry: None,
             soft_ring: Vec::new(),
         }
     }
@@ -648,18 +651,17 @@ impl SubFeatureWorkspace {
 /// 头部逐字抽出）。
 fn resolve_profile(seed: u64, profile: &str) -> String {
     if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
-        // ★ S7-10：random 候选池 2→5（阶段七 3 张新图各 ~20% 均衡入列，06 号
-        //  §20 退出标准；`flat_baseline` 永不入列）。5 路判别替代旧 T1/T2 奇偶
-        //  判别——同种子在 random 下的落点允许改变（收口设计如此）；显式
-        //  profile 的输出不受影响，T1/T2 旧世界逐字节不变约束仍然成立。
-        const RANDOM_CANDIDATES: [&str; 5] = [
+        // ★ TB-02-09：random 候选池 5→6（台地聚落加入候选池，各 ~16.7% 均衡入列；`flat_baseline` 永不入列）。
+        // 6 路判别；显式 profile 的输出不受影响，旧世界逐字节不变约束仍然成立。
+        const RANDOM_CANDIDATES: [&str; 6] = [
             TERRAIN_PROFILE_MOUNTAIN_PASS,
             TERRAIN_PROFILE_RIVER_VALLEY,
             TERRAIN_PROFILE_GRASSLAND_PLAIN,
             TERRAIN_PROFILE_HILLSIDE_WOODLAND,
             TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+            TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
         ];
-        RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 5) as usize].to_string()
+        RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 6) as usize].to_string()
     } else {
         profile.to_string()
     }
@@ -730,7 +732,10 @@ pub struct TerrainSubFeature {
 /// v1.50.49：7 -> 8（S7-07 settlement 分支接入主河水系——谷轴河道下凹 + 岸带/
 ///           河阶/2 浅滩走廊 + WaterPool #1 取水点；第 6 步派生跳过水系写定
 ///           地表。settlement 同种子地形变化；既有 4 profile 路径逐位不变）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 8;
+/// v1.50.54：8 -> 9（TB-02 新增 `plateau_settlement_v1` 台地聚落分支——平缓且
+///           可建的台面 + 连续陡峭台缘 RockFace 硬禁行 + 两个可通过道路走廊的
+///           缓坡入口 + 坡脚 SpringValley 泉眼水源；既有 5 profile 路径逐位不变）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 9;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -754,6 +759,11 @@ pub const TERRAIN_PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 /// 下凹与浅滩走廊在此带内局部写入）；谷底两处 `SpringValley` 泉眼特征锚定
 /// 生活水源（无水面，清泉 POI 仍由生态层布点）。
 pub const TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT: &str = "river_valley_settlement_v1";
+/// TB-02 模板：台地聚落（06 号 §5.6 / 07 号 §7.4）。
+/// 圆角矩形台面（平缓、起伏 <16°、可建 ≥3 处房屋）+ 真实阻路陡峭台缘（B=0.6H，
+/// 峰坡 ~68° ≥34° 派生 RockFace + NO_WALK）+ 两个可通过道路走廊的缓坡入口（B=4.0H，
+/// 峰坡 ~20.6° ≤30° 可行走、核心宽 ≥32m）+ 坡脚两处 SpringValley 泉眼生活水源。
+pub const TERRAIN_PROFILE_PLATEAU_SETTLEMENT: &str = "plateau_settlement_v1";
 
 /// ★ S7-06 河谷聚落静态谷地几何（创世 scratch 专用，不进快照/存档）。
 ///
@@ -926,9 +936,11 @@ impl TerrainMap {
         //   整体覆写，倾斜只保持「低幅地貌」的语义一致）。抽取数不变（1 次），
         //   仅区间不同——T1/T2 路径的 rng 消费序列与取值逐位不变。
         let is_flat_baseline = self.profile == TERRAIN_PROFILE_FLAT_BASELINE;
+        let is_plateau = self.profile == TERRAIN_PROFILE_PLATEAU_SETTLEMENT;
         let low_relief = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN
             || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND
             || self.profile == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
+            || is_plateau
             || is_flat_baseline;
         self.tilt_magnitude = if low_relief {
             rng.gen_range(16.0, 24.0)
@@ -1101,6 +1113,18 @@ impl TerrainMap {
             Vec::new()
         };
 
+        // ★ TB-02 台地聚落静态几何参数（只消费 relief_rng 局部流；其余 profile 不进入
+        //   本块，消费序列与逐位输出不受影响）。
+        let plateau = if is_plateau {
+            Some(super::plateau::PlateauGeometry::plan(
+                &mut relief_rng,
+                self.world_size,
+                config,
+            ))
+        } else {
+            None
+        };
+
         // ★ S7-08：删除死变量 `wave_scale`（S7-02 时代的正弦波谐波振幅削减 ×0.4；
         //   TB-01-2 用 fBm + 高度调制掩码取代谐波后该变量零消费，长期触发
         //   unused warning）。草原「低幅起伏」现由 low_relief 倾斜区间 + 掩码
@@ -1207,6 +1231,18 @@ impl TerrainMap {
                         vg.floor_base_m + vg.h_wall_m * env + fbm_v * valley_noise_upland_k
                     };
                     raw[gy * self.grid_width + gx] = elev;
+                    continue;
+                }
+
+                // ★ TB-02 台地聚落：高程场采样（圆角矩形 SDF + 分离过渡带 + 缓坡入口 + 噪声遮罩）。
+                if let Some(pg) = plateau.as_ref() {
+                    let fbm_v = terrain_noise::fbm_terrain_3octaves(
+                        wx * noise_freq_k,
+                        wy * noise_freq_k,
+                        seed,
+                    ) * noise_amp_k;
+                    let warp_v = ridge_warp_raw(wy, self.world_size, seed);
+                    raw[gy * self.grid_width + gx] = pg.elevation_at(wx, wy, base_tilt, fbm_v, warp_v);
                     continue;
                 }
 
@@ -1380,6 +1416,8 @@ impl TerrainMap {
         // ★ S7-06 谷地几何移交流水线 scratch，第 6 步地表派生消费（谷底/陡壁分区）。
         //   clone 仅含 2 个泉眼锚点的轻量几何（scratch 专用，随后泉眼特征仍需读取）。
         scratch.valley_geometry = valley.clone();
+        // ★ TB-02 台地几何移交流水线 scratch，第 10 步路网接入消费。
+        scratch.plateau_geometry = plateau.clone();
 
         // ★ T2 河谷低丘陆地基底（STAGE2-2 提取公式，铺满全图）＝第 2 步的
         //   river_valley 分支；几何由编排器第 2 步前规划的共享 `RiverGeometry` 提供。
@@ -1422,6 +1460,31 @@ impl TerrainMap {
                     vertices: vec![
                         Vec3::new(sx - 26.0, sy + 14.0, level + 1.2),
                         Vec3::new(sx - 9.0, sy + 5.0, level + 0.4),
+                        Vec3::new(sx, sy, level),
+                    ],
+                    elevation: level,
+                    width: 4.0,
+                    flags: 0,
+                });
+            }
+        }
+
+        // ★ TB-02 台地坡脚泉眼特征：两处对置的 `SpringValley`（无水面，水源地理锚定 + 清泉 POI 落点；
+        //   顶点自坡脚汇入泉位，高程取局部地表）。
+        if let Some(pg) = plateau.as_ref() {
+            let to_grid = |v: f32, n: usize| {
+                ((v / self.world_size + 0.5) * (n - 1).max(1) as f32)
+                    .round()
+                    .clamp(0.0, (n - 1) as f32) as usize
+            };
+            for (i, &(sx, sy)) in pg.spring_anchors.iter().enumerate() {
+                let level = raw[to_grid(sy, self.grid_height) * self.grid_width + to_grid(sx, self.grid_width)];
+                self.features.push(TerrainFeature {
+                    id: 30 + i as u32,
+                    kind: TerrainFeatureKind::SpringValley,
+                    vertices: vec![
+                        Vec3::new(sx - 16.0, sy + 8.0, level + 1.0),
+                        Vec3::new(sx - 6.0, sy + 3.0, level + 0.3),
                         Vec3::new(sx, sy, level),
                     ],
                     elevation: level,

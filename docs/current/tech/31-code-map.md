@@ -14,18 +14,19 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (276 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (288 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
 │   │       │   ├── mod.rs                  # geo 模块入口
 │   │       │   ├── terrain.rs              # 连续 3D 地形高程采样
+│   │       │   ├── plateau.rs              # ★ TB-02 台地聚落几何与过渡带 (PlateauGeometry)
 │   │       │   ├── hydrology.rs            # 水系生成（含 River/RiverBank 特征闭合轮廓）
 │   │       │   ├── accents.rs              # ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder 5 类，salt RNG）
 │   │       │   ├── query.rs                # 地表通行与建造查询
-    │   │       │   ├── biome.rs                # 生物群系定义
-    │   │       │   ├── validation.rs          # ★ STAGE2-4 静态几何只读校验（创世与读档共用门禁）
-    │   │       │   └── corridor.rs             # 廊道分析
+│   │       │   ├── biome.rs                # 生物群系定义
+│   │       │   ├── validation.rs          # ★ STAGE2-4 静态几何只读校验（创世与读档共用门禁）
+│   │       │   └── corridor.rs             # 廊道分析
 │   │       └── spatial/                    # 🗺️ 空间模拟核心
 │   │           ├── mod.rs                  # spatial 模块集成入口
 │   │           ├── vec3.rs                 # 3D 向量数学库
@@ -99,7 +100,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 276 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 288 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)

@@ -20,7 +20,8 @@
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
     TerrainFeatureKind, TerrainMap, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_RIVER_VALLEY,
+    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT, TERRAIN_PROFILE_RIVER_VALLEY,
+    TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
 
 use crate::spatial::vec3::Vec3;
@@ -40,8 +41,11 @@ fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
             30 => Some(TerrainFeatureKind::SpringValley),
             _ => None,
         },
-        // 草原 / 半坡：仅泉眼特征（第 2 步洼地安置 `30 + i`，i ∈ 0..2）。
-        TERRAIN_PROFILE_GRASSLAND_PLAIN | TERRAIN_PROFILE_HILLSIDE_WOODLAND => match id {
+        // 草原 / 半坡 / 河谷聚落 / 台地聚落：仅泉眼特征（第 2 步洼地/坡脚安置 `30 + i`，i ∈ 0..2）。
+        TERRAIN_PROFILE_GRASSLAND_PLAIN
+        | TERRAIN_PROFILE_HILLSIDE_WOODLAND
+        | TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
+        | TERRAIN_PROFILE_PLATEAU_SETTLEMENT => match id {
             30 | 31 => Some(TerrainFeatureKind::SpringValley),
             _ => None,
         },
