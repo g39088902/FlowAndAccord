@@ -26,7 +26,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.56</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.57</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1397,6 +1397,8 @@
   <script src="js/config.lighting.js"></script>
   <!-- ★ v1.50.15 渲染表现层参数（视觉抬升/足迹深度半径），须早于 render_world.js -->
   <script src="js/config.render.js"></script>
+  <!-- ★ TB-03-11 景观风格样式表（window.TerrainStyle，profile→基调白名单 + 反照率乘色；纯表现层，须早于 math.js 首帧消费） -->
+  <script src="js/terrain-style.js"></script>
   <!-- ★ TA-12-2 世界纹样模型层（window.TerrainTexture，确定性草斑/土纹图元；须早于 rustworld.js 与渲染入口，加载时不读 Canvas 全局） -->
   <script src="js/terrain-texture.js"></script>
   <script src="js/lighting.js"></script>

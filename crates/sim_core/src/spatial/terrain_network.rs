@@ -30,13 +30,39 @@ impl World3DEngine {
                 }
             }
         }
+        // ★ TB-03 冲积扇：清泉 POI 重锚到扇缘泉眼候选（2 处对置；其余清泉若
+        //   数量 >2 走 legal_land_position，扇面坡度全域可建不阻断）。
+        let is_fan = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN;
+        let fan_geom = if is_fan { self.get_fan_geometry() } else { None };
+        if let Some(fg) = fan_geom.as_ref() {
+            let mut w_idx = 0;
+            for p in &mut self.pois {
+                if p.poi_type == super::poi::PoiType::WaterSource && w_idx < fg.spring_anchors.len() {
+                    let (sx, sy) = fg.spring_anchors[w_idx];
+                    let pos = Vec3::new(sx, sy, self.terrain.sample_elevation(sx, sy));
+                    p.pos = pos;
+                    if let Some(n) = p.nearest_node_id {
+                        self.network.graph[*self.network.node_map.get(&n).unwrap()].pos = pos;
+                    }
+                    w_idx += 1;
+                }
+            }
+        }
+        // ★ TB-03 静水新模板取水点命名（盆地泉池 / 湖岸；旧模板保持「河岸」语义）
+        let water_poi_label = if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
+            "泉池取水点"
+        } else if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+            "湖岸取水点"
+        } else {
+            "河岸取水点"
+        };
         for i in 0..self.pois.len(){
             let access=if self.pois[i].poi_type==super::poi::PoiType::WaterSource {
                 self.terrain.hydrology.access_points.get((self.pois[i].id-10) as usize).cloned()
             }else{None};
             let pos=if let Some(a)=access {
                 self.pois[i].water_pool_id=Some(a.resource_pool_id);self.pois[i].access_point_id=Some(a.id);
-                self.pois[i].name=format!("河岸取水点 #{}",a.id);
+                self.pois[i].name=format!("{} #{}",water_poi_label,a.id);
                 a.pos
             }else if is_plateau && self.pois[i].poi_type == super::poi::PoiType::WaterSource && (self.pois[i].id == 10 || self.pois[i].id == 11) {
                 self.pois[i].pos
@@ -61,8 +87,17 @@ impl World3DEngine {
         self.water_pools.clear();
         if !self.terrain.hydrology.water_bodies.is_empty(){
             let ids:Vec<_>=self.pois.iter().filter(|p|p.water_pool_id==Some(1)).map(|p|p.id).collect();
-            let max=self.config.stock_max_water*ids.len() as f32;
-            self.water_pools.push(crate::geo::hydrology::WaterPool{id:1,current_stock:max*0.75,max_stock:max,regen_rate:self.config.regen_base_water*ids.len() as f32,source_poi_ids:ids});
+            // ★ TB-03 静水新模板：总池预算一次按配置建立（`stockMaxWater×countWater`/
+            //   `regenBaseWater×countWater`），实际岸点只镜像池状态、不再乘入预算；
+            //   `countWater=0` ⇒ 空池走生存门禁明确失败/降级，不额外发库存。
+            //   旧河流路径保持「按已绑定岸点数乘算」等价输出。
+            let n_budget = if crate::geo::terrain::is_static_water_profile(&self.terrain.profile) {
+                self.config.count_water_sources as usize
+            } else {
+                ids.len()
+            };
+            let max=self.config.stock_max_water*n_budget as f32;
+            self.water_pools.push(crate::geo::hydrology::WaterPool{id:1,current_stock:max*0.75,max_stock:max,regen_rate:self.config.regen_base_water*n_budget as f32,source_poi_ids:ids});
             self.sync_water_pois();
         }
     }
@@ -266,6 +301,254 @@ impl World3DEngine {
             return Err("PlateauRampBBlocked".into());
         }
 
+        Ok(())
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ★ TB-03 盆地绿洲 / 山前冲积扇 / 湖畔盆地：几何重放与模板专属门禁。
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// 重放 `relief_rng` 头部公共消费（4 次），供 TB-03 几何重放入口复用。
+    fn replay_relief_rng(&self) -> crate::rng::WorldRng {
+        let mut relief_rng = crate::rng::WorldRng::new(self.terrain.seed ^ 0x5245_4c49_4546_5431);
+        let _theta = relief_rng.gen_range(-0.18, 0.18);
+        let _ridge_offset = relief_rng.gen_range(-0.08, 0.08) * self.terrain.world_size;
+        let _saddle_along = relief_rng.gen_range(-0.12, 0.12) * self.terrain.world_size;
+        let _saddle_width = relief_rng.gen_range(0.14, 0.19) * self.terrain.world_size;
+        relief_rng
+    }
+
+    /// 重放基础倾斜平面（与 `generate_base_relief` 的 `base_tilt` 同式）。
+    fn replay_tilt(&self) -> (f32, f32) {
+        let mut rng = crate::rng::WorldRng::new(self.terrain.seed);
+        let tilt_angle = rng.gen_range(0.0, std::f32::consts::TAU);
+        (tilt_angle.cos(), tilt_angle.sin())
+    }
+
+    /// 重新派生冲积扇几何（纯函数，仅读 seed 与 config，不消费共享 RNG）。
+    pub fn get_fan_geometry(&self) -> Option<crate::geo::FanGeometry> {
+        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN {
+            return None;
+        }
+        let mut relief_rng = self.replay_relief_rng();
+        Some(crate::geo::FanGeometry::plan(
+            &mut relief_rng,
+            self.terrain.world_size,
+            &self.config,
+        ))
+    }
+
+    /// 重新派生盆地绿洲几何（含静水计划与泉池平坦基准）。
+    pub fn get_basin_geometry(&self) -> Option<crate::geo::BasinGeometry> {
+        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
+            return None;
+        }
+        let mut relief_rng = self.replay_relief_rng();
+        let (tilt_cos, tilt_sin) = self.replay_tilt();
+        let half = self.terrain.world_size * 0.5;
+        // 倾斜幅度：重放主 RNG 第二抽（与生成路径同序同值）
+        let mut rng = crate::rng::WorldRng::new(self.terrain.seed);
+        let _angle = rng.gen_range(0.0, std::f32::consts::TAU);
+        let tilt_magnitude = rng.gen_range(16.0, 24.0);
+        let tilt_at = |wx: f32, wy: f32| -> f32 {
+            ((wx * tilt_cos + wy * tilt_sin) / half.max(1.0)) * (tilt_magnitude * 0.5)
+        };
+        Some(crate::geo::BasinGeometry::plan(
+            &mut relief_rng,
+            self.terrain.world_size,
+            &self.config,
+            tilt_at,
+        ))
+    }
+
+    /// 重新派生湖畔盆地几何（含静水计划与干岸平坦基准）。
+    pub fn get_lake_geometry(&self) -> Option<crate::geo::LakeGeometry> {
+        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+            return None;
+        }
+        let mut relief_rng = self.replay_relief_rng();
+        let (tilt_cos, tilt_sin) = self.replay_tilt();
+        let half = self.terrain.world_size * 0.5;
+        let mut rng = crate::rng::WorldRng::new(self.terrain.seed);
+        let _angle = rng.gen_range(0.0, std::f32::consts::TAU);
+        let tilt_magnitude = rng.gen_range(16.0, 24.0);
+        let tilt_at = |wx: f32, wy: f32| -> f32 {
+            ((wx * tilt_cos + wy * tilt_sin) / half.max(1.0)) * (tilt_magnitude * 0.5)
+        };
+        Some(crate::geo::LakeGeometry::plan(
+            &mut relief_rng,
+            self.terrain.world_size,
+            &self.config,
+            tilt_at,
+        ))
+    }
+
+    /// 模板公共子校验：在区域内按格网扫描完整占地合法且互不重叠的房屋候选
+    ///（≥3 通过）。合法性完全由实际定稿格子裁决（坡度/NO_BUILD/水体/地表），
+    /// 不依赖生成期锚点（TB-03-06 实测：固定锚点会落在扇侧陡缘/岸环禁建带）。
+    fn count_spaced_buildable<F: Fn(f32, f32) -> bool>(&self, region: F) -> usize {
+        let mut picked: Vec<Vec3> = Vec::new();
+        let step = 3usize;
+        for gy in (0..self.terrain.grid_height).step_by(step) {
+            for gx in (0..self.terrain.grid_width).step_by(step) {
+                let p = self.terrain.grid_pos(gx, gy);
+                if !region(p.x, p.y) {
+                    continue;
+                }
+                // 互不重叠：间距 ≥ 3×footprint_half_extent（非重叠完整占地）
+                if picked.iter().any(|q| q.distance_to(&p) < self.config.terrain_footprint_half_extent * 3.0) {
+                    continue;
+                }
+                let res = crate::geo::validate_footprint(
+                    &self.terrain,
+                    crate::geo::FootprintQuery {
+                        center: Vec3::new(p.x, p.y, self.terrain.sample_elevation(p.x, p.y)),
+                        half_extents: (
+                            self.config.terrain_footprint_half_extent,
+                            self.config.terrain_footprint_half_extent,
+                        ),
+                        rotation_rad: 0.0,
+                        use_kind: crate::geo::LandUseKind::House,
+                    },
+                    self.config.terrain_max_build_slope,
+                );
+                if res.valid {
+                    picked.push(p);
+                    if picked.len() >= 3 {
+                        return 3;
+                    }
+                }
+            }
+        }
+        picked.len()
+    }
+
+    /// 岸点干地合法性：全部取水岸点必须落在真实干地（无水体归属、非硬禁行）。
+    fn validate_access_points_dry(&self) -> Result<(), String> {
+        for ap in &self.terrain.hydrology.access_points {
+            let (gx, gy) = self.terrain.grid_index(ap.pos.x, ap.pos.y);
+            let c = &self.terrain.cells[gy * self.terrain.grid_width + gx];
+            if c.water_body_id.is_some()
+                || c.feature_flags & crate::geo::biome::TERRAIN_FLAG_NO_WALK != 0
+            {
+                return Err("WaterAccessInvalid".into());
+            }
+        }
+        Ok(())
+    }
+
+    /// TB-03 冲积扇专有门禁：扇面房屋候选完整占地 + 山口→扇缘全宽干地走廊。
+    pub fn validate_fan_gates(&self) -> Result<(), String> {
+        let Some(fg) = self.get_fan_geometry() else {
+            return Ok(());
+        };
+        // 扇面生活带：r < 0.9L 且 |θ| < 0.85α（浅沟格 NO_BUILD 自动被占地校验排除）
+        let buildable = self.count_spaced_buildable(|wx, wy| {
+            let (r, th) = fg.world_to_fan(wx, wy);
+            r < 0.9 * fg.length && th.abs() < 0.85 * fg.half_angle
+        });
+        if buildable < 3 {
+            return Err("FanBuildAreaInsufficient".into());
+        }
+        // 全宽干地走廊：山口内 20m → 扇缘锚点；干沟 SoftGround 可慢行横跨，
+        // 走廊被阻断 ⇒ 生成失败（不能建路后回填高程）。
+        let a = Vec3::new(
+            fg.mouth_anchor.0 + fg.dir_x * 20.0,
+            fg.mouth_anchor.1 + fg.dir_y * 20.0,
+            0.0,
+        );
+        let b = Vec3::new(fg.edge_anchor.0, fg.edge_anchor.1, 0.0);
+        let mut a = a;
+        a.z = self.terrain.sample_elevation(a.x, a.y);
+        let mut b = b;
+        b.z = self.terrain.sample_elevation(b.x, b.y);
+        if corridor::route(&self.terrain, a, b, &self.config).is_none() {
+            return Err("FanDryCorridorBlocked".into());
+        }
+        Ok(())
+    }
+
+    /// TB-03 盆地绿洲专有门禁：盆底生活带房屋候选完整占地 + 出口走廊 + 岸点干地合法。
+    pub fn validate_basin_gates(&self) -> Result<(), String> {
+        let Some(bg) = self.get_basin_geometry() else {
+            return Ok(());
+        };
+        // 盆底生活带：q < 0.72（岸环/泉池/盆壁自动被占地校验排除）
+        let buildable = self.count_spaced_buildable(|wx, wy| {
+            let (q, _) = bg.q_at(wx, wy);
+            q < 0.72
+        });
+        if buildable < 3 {
+            return Err("BasinBuildAreaInsufficient".into());
+        }
+        self.validate_access_points_dry()?;
+        // 出口走廊：泉池岸点（真实干地）→ 沿出口方向越过低脊（1.3×semi_b）的
+        // 路由必须存在。⚠️ 不能以池心为起点——池心是 DeepWater（TB-03-06 实测）。
+        let (dir_x, dir_y) = (bg.exit_theta.cos(), bg.exit_theta.sin());
+        let (ax, ay) = bg
+            .water
+            .as_ref()
+            .and_then(|p| p.access_points.first().copied())
+            .unwrap_or((bg.pool_cx, bg.pool_cy));
+        let mut a = Vec3::new(ax, ay, 0.0);
+        a.z = self.terrain.sample_elevation(a.x, a.y);
+        let bx = bg.center_x + dir_x * bg.semi_b * 1.3;
+        let by = bg.center_y + dir_y * bg.semi_b * 1.3;
+        let mut b = Vec3::new(bx, by, 0.0);
+        b.z = self.terrain.sample_elevation(b.x, b.y);
+        if corridor::route(&self.terrain, a, b, &self.config).is_none() {
+            return Err("BasinExitBlocked".into());
+        }
+        Ok(())
+    }
+
+    /// TB-03 湖畔盆地专有门禁：环岸生活带房屋候选完整占地 + 环岸通路 +
+    /// 双出口可达 + 岸点干地合法。
+    pub fn validate_lakeside_gates(&self) -> Result<(), String> {
+        let Some(lg) = self.get_lake_geometry() else {
+            return Ok(());
+        };
+        // 环岸生活带：水线外退距+占地余量 → 平台外缘（0.42×均半轴）
+        let r_mean = (lg.semi_a + lg.semi_b) * 0.5;
+        let setback = lg.shore_setback_m + self.config.terrain_footprint_half_extent * 2.0;
+        let buildable = self.count_spaced_buildable(|wx, wy| {
+            let d = lg.shore_distance(wx, wy);
+            d > setback && d < 0.42 * r_mean
+        });
+        if buildable < 3 {
+            return Err("LakeBuildAreaInsufficient".into());
+        }
+        self.validate_access_points_dry()?;
+        // 环岸全宽通路：两个取水岸点之间必须存在陆路路由（湖体阻断直穿，
+        // 路由经环湖干岸绕行）。
+        if let Some(plan) = lg.water.as_ref() {
+            if plan.access_points.len() == 2 {
+                let (ax, ay) = plan.access_points[0];
+                let (bx, by) = plan.access_points[1];
+                let mut a = Vec3::new(ax, ay, 0.0);
+                a.z = self.terrain.sample_elevation(ax, ay);
+                let mut b = Vec3::new(bx, by, 0.0);
+                b.z = self.terrain.sample_elevation(bx, by);
+                if corridor::route(&self.terrain, a, b, &self.config).is_none() {
+                    return Err("LakeShoreDisconnected".into());
+                }
+            }
+        }
+        // 双出口：各出口方向自水线外平台（r_out+退距+8m）到岭外（r_out×2.55）
+        // 必须可达。⚠️ 起终点不能用固定比例半径——湖半轴独立抽样（a/b 可达
+        // 1.6:1），固定比例点在窄轴方向会落进湖里（TB-03-08 实测踩坑）。
+        for &e in &lg.exit_thetas {
+            let (r_out_e, _) = lg.outline_radius_at(e - lg.rotation_rad);
+            let d1 = r_out_e + lg.shore_setback_m + 8.0;
+            let d2 = r_out_e * 2.55;
+            let mut a = Vec3::new(lg.center_x + e.cos() * d1, lg.center_y + e.sin() * d1, 0.0);
+            a.z = self.terrain.sample_elevation(a.x, a.y);
+            let mut b = Vec3::new(lg.center_x + e.cos() * d2, lg.center_y + e.sin() * d2, 0.0);
+            b.z = self.terrain.sample_elevation(b.x, b.y);
+            if corridor::route(&self.terrain, a, b, &self.config).is_none() {
+                return Err("LakeShoreDisconnected".into());
+            }
+        }
         Ok(())
     }
 }

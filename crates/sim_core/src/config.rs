@@ -347,6 +347,56 @@ pub struct SimConfig {
     pub terrain_plateau_ramp_noise_gain: f32,
     /// ★ TB-02 台地聚落：台缘轮廓低频扰动幅度 (m)。默认 6.0。
     pub terrain_plateau_outline_warp: f32,
+    // ── ★ TB-03 盆地绿洲 / 山前冲积扇 / 湖畔盆地模板参数（仅对应 profile 消费；
+    //    默认值唯一真相源 = 前端 config.js；改任一值等于换图，遵循
+    //    TERRAIN_GENERATOR_VERSION 契约）──
+    /// ★ TB-03 山前冲积扇：扇体长度比例（× world_size，山口→扇缘）。默认 0.42。
+    pub terrain_fan_length_ratio: f32,
+    /// ★ TB-03 山前冲积扇：扇半角（度，角向窗口 ±α）。默认 30.0。
+    pub terrain_fan_half_angle_deg: f32,
+    /// ★ TB-03 山前冲积扇：山口到扇缘总高差 (m)。默认 30.0
+    /// （smoothstep 径向剖面峰值梯度 1.5×A/L ≈ tan(8°)；扇头侧缘配合
+    /// `MIN_ANG_EDGE_M=110` 横向梯度 ≤ tan(22°)，不产生横贯扇面的硬禁行墙）。
+    pub terrain_fan_amplitude: f32,
+    /// ★ TB-03 山前冲积扇：干浅沟数量上限（1~2，relief_rng 掷存在性）。默认 2。
+    pub terrain_fan_gully_count_max: u32,
+    /// ★ TB-03 山前冲积扇：干浅沟最大深度 (m)。默认 2.2（沟内 SoftGround+NO_BUILD，可慢行；
+    /// 叠加扇面坡度后横向梯度 < 30°，不产生硬禁行）。
+    pub terrain_fan_gully_depth_m: f32,
+    /// ★ TB-03 山前冲积扇：干浅沟横截面全宽 (m)。默认 20.0（须跨越多个格子）。
+    pub terrain_fan_gully_width_m: f32,
+    /// ★ TB-03 山前冲积扇：干浅沟中心线角向蜿蜒幅度（弧度）。默认 0.12。
+    pub terrain_fan_gully_meander_amp_rad: f32,
+    /// ★ TB-03 盆地绿洲：盆地半轴比例（× world_size，椭圆 a/b 共用基准）。默认 0.34。
+    pub terrain_basin_semi_axis_ratio: f32,
+    /// ★ TB-03 盆地绿洲：盆深 (m，中心相对盆缘下凹总量)。默认 34.0。
+    pub terrain_basin_depth_m: f32,
+    /// ★ TB-03 盆地绿洲：外缘低脊高度 (m)。默认 3.0（有限支撑环抱轮廓，出口处归零）。
+    pub terrain_basin_rim_height_m: f32,
+    /// ★ TB-03 盆地绿洲：陆路出口角宽（度，出口走廊在盆地轮廓上的角向全宽）。默认 34.0。
+    pub terrain_basin_exit_width_deg: f32,
+    /// ★ TB-03 盆地绿洲：中心泉池半径抽样下限 (m)。默认 10.0（06 号 §5.6 初值）。
+    pub terrain_basin_pool_radius_min_m: f32,
+    /// ★ TB-03 盆地绿洲：中心泉池半径抽样上限 (m)。默认 14.0。
+    pub terrain_basin_pool_radius_max_m: f32,
+    /// ★ TB-03 盆地绿洲：泉池床最大深度 (m，池床相对盆底)。默认 2.2（水面位于池床之上、岸环最低地表之下）。
+    pub terrain_basin_pool_depth_m: f32,
+    /// ★ TB-03 盆地绿洲：泉池外干燥岸环宽 (m)。默认 12.0（NO_BUILD 禁建安全环，可步行；生活带在岸环外）。
+    pub terrain_basin_bank_ring_m: f32,
+    /// ★ TB-03 盆地绿洲：盆底/盆壁噪声阻尼增益。默认 0.30（出口与盆底生活带噪声受额外抑制）。
+    pub terrain_basin_noise_gain: f32,
+    /// ★ TB-03 湖畔盆地：湖半轴比例抽样下限（× world_size）。默认 0.10。
+    pub terrain_lake_semi_axis_ratio_min: f32,
+    /// ★ TB-03 湖畔盆地：湖半轴比例抽样上限。默认 0.16（椭圆两轴各自独立抽样）。
+    pub terrain_lake_semi_axis_ratio_max: f32,
+    /// ★ TB-03 湖畔盆地：湖床最大深度 (m)。默认 3.5（静水湖，水位恒定）。
+    pub terrain_lake_depth_m: f32,
+    /// ★ TB-03 湖畔盆地：水岸安全退距 (m)。默认 10.0（岸线外 NO_BUILD 缓冲，其外才是可建干岸）。
+    pub terrain_lake_shore_setback_m: f32,
+    /// ★ TB-03 湖畔盆地：湖岸低频径向扰动幅度 (m)。默认 14.0（限制凹度、不生成岛屿）。
+    pub terrain_lake_outline_warp_m: f32,
+    /// ★ TB-03 湖畔盆地：环岸噪声阻尼增益。默认 0.30（环岸干岸带平缓可建）。
+    pub terrain_lake_noise_gain: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,
     pub terrain_river_water_level: f32,

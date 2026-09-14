@@ -284,6 +284,13 @@ function drawFeatureItem(feature, idx) {
     return;
   }
 
+  // ★ TB-03 静水闭合水体（盆地泉池 / 湖畔大湖）：分块绘制（idx = 块号 + 1），
+  //   不套 River 的成对岸线条带协议；水色与河面共用，不启用 RiverLife 流纹。
+  if (feature.kind === 'WaterBody') {
+    drawWaterBodyTile(feature, idx | 0, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+    return;
+  }
+
   const vLen = feature.vertices.length;
   _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
 
@@ -361,6 +368,71 @@ function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
   ctx.clip();
 
   // 整多边形填充（clip 限定只落本段）：底层深水基底 + 主流水体，与旧整河填充同色同透明度
+  ctx.beginPath();
+  ctx.moveTo(_featProjX[0], _featProjY[0]);
+  for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
+  ctx.fill();
+  ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
+  ctx.fill();
+  ctx.restore();
+}
+
+// ★ TB-03 静水分块网格（由顶点 AABB 推导；与 render_depth_queue.js 收集段同式。
+//   特征快照在网格重建/静态替换时整体换新对象，块网格缓存在特征对象上安全）。
+const WB_TILE_STEP = 32;
+function _wbTileGrid(feature) {
+  if (feature._wbTiles) return feature._wbTiles;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const v = feature.vertices;
+  for (let i = 0; i < v.length; i++) {
+    if (v[i].x < minX) minX = v[i].x;
+    if (v[i].x > maxX) maxX = v[i].x;
+    if (v[i].y < minY) minY = v[i].y;
+    if (v[i].y > maxY) maxY = v[i].y;
+  }
+  const nx = Math.max(1, Math.ceil((maxX - minX) / WB_TILE_STEP));
+  const ny = Math.max(1, Math.ceil((maxY - minY) / WB_TILE_STEP));
+  feature._wbTiles = { minX, minY, nx, ny };
+  return feature._wbTiles;
+}
+
+// ★ TB-03 静水单块绘制（idx = 块号 + 1）：clip 到该块世界矩形内、再整闭合多边形
+//   两遍填充（深水基底 + 主水体，与河面同色同透明度）。分块参与统一深度排序，
+//   近岸人物与房屋不被整湖一项盖住（TB-03-IMPLEMENTATION-PLAN §7.3）。
+function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
+  const g = _wbTileGrid(feature);
+  const t = idx - 1;
+  if (t < 0 || t >= g.nx * g.ny) return;
+  const tx = t % g.nx, ty = (t / g.nx) | 0;
+  const x0 = g.minX + tx * WB_TILE_STEP;
+  const y0 = g.minY + ty * WB_TILE_STEP;
+  const x1 = x0 + WB_TILE_STEP;
+  const y1 = y0 + WB_TILE_STEP;
+
+  // 投影块四角（世界 → 屏幕，与 _projectFeatureVertices 同式）
+  const proj = (wx, wy) => {
+    const rx = wx * cosZ - wy * sinZ;
+    const ry = wx * sinZ + wy * cosZ;
+    const y2 = ry * cosX - (feature.elevation || 0) * sinX;
+    return [cx + rx * scale, cy + y2 * scale];
+  };
+  const c0 = proj(x0, y0), c1 = proj(x1, y0), c2 = proj(x1, y1), c3 = proj(x0, y1);
+
+  const v = feature.vertices, vLen = v.length;
+  _projectFeatureVertices(v, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(c0[0], c0[1]);
+  ctx.lineTo(c1[0], c1[1]);
+  ctx.lineTo(c2[0], c2[1]);
+  ctx.lineTo(c3[0], c3[1]);
+  ctx.closePath();
+  ctx.clip();
+
+  // 整多边形填充（clip 限定只落本块）：与 drawRiverBand 同色的双层水面
   ctx.beginPath();
   ctx.moveTo(_featProjX[0], _featProjY[0]);
   for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);

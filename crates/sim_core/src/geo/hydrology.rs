@@ -120,6 +120,28 @@ impl TerrainMap {
         if let Some(vg) = scratch.valley_geometry.as_ref() {
             self.generate_settlement_river(vg, config);
         }
+        // ★ TB-03 静水（盆地泉池 / 湖畔大湖）：`WaterBody` 特征 #1 + 水体 #1 + 岸点
+        //   独立于主河逻辑、零流向静水语义、connections 为空。
+        if let Some(bg) = scratch.basin_geometry.as_ref() {
+            if let Some(plan) = bg.water.as_ref() {
+                super::static_water::apply_static_water(
+                    self,
+                    plan,
+                    config,
+                    |wx, wy| bg.pool_bed_elevation(wx, wy),
+                );
+            }
+        }
+        if let Some(lg) = scratch.lake_geometry.as_ref() {
+            if let Some(plan) = lg.water.as_ref() {
+                super::static_water::apply_static_water(
+                    self,
+                    plan,
+                    config,
+                    |wx, wy| lg.lake_bed_elevation(wx, wy),
+                );
+            }
+        }
     }
     /// T2 主河水系写入（★ STAGE2-2 收敛：仅覆盖水系影响带）。
     ///

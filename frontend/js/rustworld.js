@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.56';
+        this._appVersion = '1.50.57';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.56';
+            this._appVersion = msg.appVersion || '1.50.57';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -172,6 +172,14 @@
             //   与装饰个体模型缓存随 READY 消息生命周期整体失效（06 号 §18.4），
             //   待新世界强制地形帧到达后重建（换世界不残留旧形态，07-terrain-art.md §10.2）
             this._invalidateWorldStaticCaches();
+            // ★ TB-03-11：按（配置 profile + 世界 seed）确定性激活景观风格基调；
+            //   随本处的缓存失效链一起换世界重建（纯表现层，不触及模拟状态）。
+            if (window.TerrainStyle) {
+              window.TerrainStyle.activate(
+                (typeof SIM_CONFIG !== 'undefined' && SIM_CONFIG.terrainProfile) || 'random',
+                this._engineSeed
+              );
+            }
             if (msg.snapshot) {
               // ★ 动态季节光照：全新引擎 → 光相立即对齐（不做平滑）
               if (window.SimLighting) window.SimLighting.resync();
@@ -230,6 +238,9 @@
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               // ★ D-B1-7：读档世界替换 → 静态地形数据与装饰模型缓存随 LOAD_RESULT 生命周期失效
               this._invalidateWorldStaticCaches();
+              // ★ TB-03-11：读档世界可能来自其他模板/seed（快照不携带 profile/seed），
+              //   风格调回中性基调，避免张冠李戴的乘色（纯视觉，物理不变）。
+              if (window.TerrainStyle) window.TerrainStyle.deactivate();
               // ★ 动态季节光照：读档时间可能倒退 → 光相立即对齐
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
@@ -449,7 +460,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.56';
+        return this._appVersion || '1.50.57';
 
       }
 

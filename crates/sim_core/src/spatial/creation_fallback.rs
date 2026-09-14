@@ -310,6 +310,16 @@ impl World3DEngine {
         if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU_SETTLEMENT {
             self.validate_plateau_gates()?;
         }
+        // ★ TB-03 模板专属门禁（房屋候选/走廊/岸点；失败码计入 Geometry 前缀语义）
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN {
+            self.validate_fan_gates()?;
+        }
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
+            self.validate_basin_gates()?;
+        }
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+            self.validate_lakeside_gates()?;
+        }
         let report = self.diagnose_survival();
         if !report.ok {
             let code = report

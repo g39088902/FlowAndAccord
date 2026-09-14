@@ -94,9 +94,18 @@ impl World3DEngine {
     }
 
     /// 2. 生成清泉水源（ID 段位 10-15）
+    ///
+    /// ★ TB-03：数量按 profile 决定（`water_source_poi_count`）——盆地绿洲 1 个
+    /// （小泉池塞不下多个满足 POI 间距的岸点）、湖畔盆地 2 个（双湖岸取水点），
+    /// 其余 profile 恒为 `count_water_sources`（既有数量语义不变）。不先创建
+    /// 多余水源再删除以绕开 RNG 与 ID 规则。
     pub(super) fn spawn_water_pois(&mut self, layout: &mut SeedLayout) {
         let radius_ratio = self.config.poi_spawn_radius_resource;
-        for i in 0..self.config.count_water_sources {
+        let water_count = crate::geo::terrain::water_source_poi_count(
+            &self.terrain.profile,
+            self.config.count_water_sources,
+        );
+        for i in 0..water_count {
             let pos = self.find_spaced_poi_pos(&mut layout.poi_positions, radius_ratio);
             let node_id = self.network.add_node(pos, NodeType::GroundIntersection);
             layout.all_node_ids.push(node_id);

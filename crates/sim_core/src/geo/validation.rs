@@ -19,9 +19,10 @@
 
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
-    TerrainFeatureKind, TerrainMap, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT, TERRAIN_PROFILE_RIVER_VALLEY,
-    TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+    is_static_water_profile, TerrainFeatureKind, TerrainMap, TERRAIN_PROFILE_ALLUVIAL_FAN,
+    TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
+    TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+    TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
 
 use crate::spatial::vec3::Vec3;
@@ -41,12 +42,19 @@ fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
             30 => Some(TerrainFeatureKind::SpringValley),
             _ => None,
         },
-        // 草原 / 半坡 / 河谷聚落 / 台地聚落：仅泉眼特征（第 2 步洼地/坡脚安置 `30 + i`，i ∈ 0..2）。
+        // 草原 / 半坡 / 河谷聚落 / 台地聚落 / ★ TB-03 冲积扇：仅泉眼特征（第 2 步洼地/坡脚/扇缘安置 `30 + i`，i ∈ 0..2）。
         TERRAIN_PROFILE_GRASSLAND_PLAIN
         | TERRAIN_PROFILE_HILLSIDE_WOODLAND
         | TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
-        | TERRAIN_PROFILE_PLATEAU_SETTLEMENT => match id {
+        | TERRAIN_PROFILE_PLATEAU_SETTLEMENT
+        | TERRAIN_PROFILE_ALLUVIAL_FAN => match id {
             30 | 31 => Some(TerrainFeatureKind::SpringValley),
+            _ => None,
+        },
+        // ★ TB-03 盆地绿洲 / 湖畔盆地：水体特征 #1（静水 `WaterBody`），无泉眼
+        //（水源地理锚定由静水岸点承担，不再安置 `SpringValley`）。
+        TERRAIN_PROFILE_BASIN_OASIS | TERRAIN_PROFILE_LAKESIDE_BASIN => match id {
+            1 => Some(TerrainFeatureKind::WaterBody),
             _ => None,
         },
         // 山口：现状零特征；未来 D-B2 子特征走 100–127 段（由调用方放行）。
@@ -140,16 +148,61 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
             return Err("WaterBodyOutlineInvalid");
         }
         // 明确关联：水体轮廓必须有一份同 id 的 `TerrainFeature` 副本，逐字节相等。
-        // 主河水体 1 的特征 kind 必须是 `River`（水面多边形）；未来局部湖对应
-        // `WaterBody` 特征——该枚举变体随 D-B2 落地，在此之前不按 kind 拒绝其他水体。
+        // ★ TB-03 起按 profile 与真实种类检查：旧河流水体 #1 必须匹配 `River`；
+        //   静水新模板（盆地/湖畔）水体 #1 必须匹配 `WaterBody`——不得把静水
+        //   误标成河流以绕过校验。不删除种类校验。
         let Some(feat) = t.features.iter().find(|f| f.id == wb.id) else {
             return Err("WaterBodyFeatureMissing");
         };
-        if wb.id == 1 && feat.kind != TerrainFeatureKind::River {
-            return Err("WaterBodyFeatureMissing");
+        if wb.id == 1 {
+            let expect = if is_static_water_profile(&t.profile) {
+                TerrainFeatureKind::WaterBody
+            } else {
+                TerrainFeatureKind::River
+            };
+            if feat.kind != expect {
+                return Err("WaterBodyFeatureMissing");
+            }
         }
         if feat.vertices != wb.vertices {
             return Err("WaterBodyOutlineMismatch");
+        }
+        // ★ TB-03 静水语义：零流向、无授权走廊（不沿用浅滩跨水授权）；静水
+        //   闭合轮廓额外校验闭合性与自交（不套河流条带协议）。
+        if is_static_water_profile(&t.profile) {
+            if wb.flow_direction.x != 0.0 || wb.flow_direction.y != 0.0 || wb.flow_direction.z != 0.0 {
+                return Err("StaticWaterOutlineInvalid");
+            }
+            if !t.hydrology.connections.is_empty() {
+                return Err("StaticWaterOutlineInvalid");
+            }
+        }
+    }
+    // ★ TB-03 静水闭合轮廓：`WaterBody` 特征顶点必须闭合（末点=首点）且
+    //   非自交（O(n²) 段相交普查，n ≤ ~50，创世一次性开销可忽略）。
+    for f in &t.features {
+        if f.kind != TerrainFeatureKind::WaterBody {
+            continue;
+        }
+        let v = &f.vertices;
+        if v.len() < 8 {
+            return Err("StaticWaterOutlineInvalid");
+        }
+        let first = v[0];
+        let last = v[v.len() - 1];
+        if (first.x - last.x).abs() > 1e-4 || (first.y - last.y).abs() > 1e-4 {
+            return Err("StaticWaterOutlineInvalid");
+        }
+        let n = v.len() - 1; // 末点为闭合重复点，段区间 [0, n-1]
+        for i in 0..n {
+            for j in (i + 2)..n {
+                if i == 0 && j == n - 1 {
+                    continue; // 首末段共享闭合点，相邻不算
+                }
+                if segments_intersect(&v[i], &v[i + 1], &v[j], &v[j + 1]) {
+                    return Err("StaticWaterOutlineInvalid");
+                }
+            }
         }
     }
     // 取水点：水体引用存在 + 落位在界。
@@ -236,6 +289,40 @@ fn validate_accents(t: &TerrainMap) -> Result<(), &'static str> {
 
 fn vertices_bounded(vertices: &[Vec3], half: f32) -> bool {
     vertices.iter().all(|v| pos_bounded(v, half))
+}
+
+/// 二维线段相交判定（严格相交含端点接触；相邻段共享端点由调用方排除）。
+/// 跨立试验 + 叉积零点共线区间判定，纯浮点确定性。
+fn segments_intersect(p1: &Vec3, p2: &Vec3, p3: &Vec3, p4: &Vec3) -> bool {
+    let d1x = p2.x - p1.x;
+    let d1y = p2.y - p1.y;
+    let d2x = p4.x - p3.x;
+    let d2y = p4.y - p3.y;
+    let cross = |ax: f32, ay: f32, bx: f32, by: f32| ax * by - ay * bx;
+    let denom = cross(d1x, d1y, d2x, d2y);
+    let ex = p3.x - p1.x;
+    let ey = p3.y - p1.y;
+    let s_num = cross(ex, ey, d2x, d2y);
+    let t_num = cross(ex, ey, d1x, d1y);
+    const EPS: f32 = 1e-9;
+    if denom.abs() < EPS {
+        // 平行：共线且区间重叠才算相交（退化情况按不相交处理）
+        if s_num.abs() > EPS || t_num.abs() > EPS {
+            return false;
+        }
+        let d1sq = d1x * d1x + d1y * d1y;
+        let t0 = if d1sq > EPS {
+            (ex * d1x + ey * d1y) / d1sq
+        } else {
+            0.0
+        };
+        let t1 = t0 + (d2x * d1x + d2y * d1y) / d1sq.max(EPS);
+        let (lo, hi) = if t0 <= t1 { (t0, t1) } else { (t1, t0) };
+        return hi >= -EPS && lo <= 1.0 + EPS;
+    }
+    let s = s_num / denom;
+    let t = t_num / denom;
+    s >= -EPS && s <= 1.0 + EPS && t >= -EPS && t <= 1.0 + EPS
 }
 
 fn pos_bounded(v: &Vec3, half: f32) -> bool {

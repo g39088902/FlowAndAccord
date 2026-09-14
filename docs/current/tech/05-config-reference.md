@@ -179,7 +179,7 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 120 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m） |
-| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架）| 'hillside_woodland_v1'（★ v1.50.51 S7-08 登记：半坡林地，v1.50.46 内核骨架）| 'river_valley_settlement_v1'（★ v1.50.51 S7-08 登记：河谷聚落，v1.50.48/49 内核+水系）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；★ S7-10 全链路验收收口：random 候选池扩为 T1/T2/草原/半坡/河谷聚落 5 张（各 ~20%）；flat_baseline 永不入 random；影响地形重建与存档门禁 |
+| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地绿洲/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地绿洲：大盆地+中心小泉池+单岸点共享池）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
@@ -242,6 +242,28 @@
 | `terrainPlateauTopNoiseGain` | f32 | 0.2 | geo/plateau.rs (TB-02 台面区域噪声阻尼增益) | 台面区域噪声阻尼增益；起伏平缓保 ≥3 处房屋可建 |
 | `terrainPlateauRampNoiseGain` | f32 | 0.12 | geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益) | 缓坡入口区域噪声阻尼增益；走廊平缓保可走 |
 | `terrainPlateauOutlineWarp` | f32 | 6 | geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度) | 台缘轮廓低频扰动幅度 (m) |
+| `terrainFanLengthRatio` | f32 | 0.42 | geo/alluvial_fan.rs (TB-03 扇体长度比例) | 扇体长度比例（×worldSize，山口→扇缘） |
+| `terrainFanHalfAngleDeg` | f32 | 30 | geo/alluvial_fan.rs (TB-03 扇半角) | 扇半角（度，角向窗口 ±α） |
+| `terrainFanAmplitude` | f32 | 30 | geo/alluvial_fan.rs (TB-03 山口到扇缘总高差) | 山口到扇缘总高差 (m)；1.5×A/L ≈ tan(8°) 扇头侧缘 ≤tan(22°) |
+| `terrainFanGullyCountMax` | u32 | 2 | geo/alluvial_fan.rs (TB-03 干浅沟数量上限) | 干浅沟数量上限（1~2，relief_rng 掷存在性） |
+| `terrainFanGullyDepthM` | f32 | 2.2 | geo/alluvial_fan.rs (TB-03 干浅沟最大深度) | 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行 |
+| `terrainFanGullyWidthM` | f32 | 20 | geo/alluvial_fan.rs (TB-03 干浅沟横截面全宽) | 干浅沟横截面全宽 (m)；须跨越多个格子 |
+| `terrainFanGullyMeanderAmpRad` | f32 | 0.12 | geo/alluvial_fan.rs (TB-03 干浅沟角向蜿蜒幅度) | 干浅沟中心线角向蜿蜒幅度（弧度） |
+| `terrainBasinSemiAxisRatio` | f32 | 0.34 | geo/basin.rs (TB-03 盆地半轴比例) | 盆地半轴比例（×worldSize，椭圆 a/b 共用基准） |
+| `terrainBasinDepthM` | f32 | 34 | geo/basin.rs (TB-03 盆深) | 盆深 (m，中心相对盆缘下凹总量) |
+| `terrainBasinRimHeightM` | f32 | 3 | geo/basin.rs (TB-03 外缘低脊高度) | 外缘低脊高度 (m)；有限支撑环抱轮廓，出口处归零 |
+| `terrainBasinExitWidthDeg` | f32 | 34 | geo/basin.rs (TB-03 陆路出口角宽) | 陆路出口角宽（度）；首版至少一个明确出口 |
+| `terrainBasinPoolRadiusMinM` | f32 | 10 | geo/basin.rs (TB-03 中心泉池半径抽样下限) | 中心泉池半径抽样下限 (m)；06 §5.6 初值 |
+| `terrainBasinPoolRadiusMaxM` | f32 | 14 | geo/basin.rs (TB-03 中心泉池半径抽样上限) | 中心泉池半径抽样上限 (m) |
+| `terrainBasinPoolDepthM` | f32 | 2.2 | geo/basin.rs (TB-03 泉池床最大深度) | 泉池床最大深度 (m)；水面位于池床之上、岸环最低地表之下 |
+| `terrainBasinBankRingM` | f32 | 12 | geo/basin.rs (TB-03 泉池外干燥岸环宽) | 泉池外干燥岸环宽 (m)；NO_BUILD 禁建安全环，生活带在岸环外 |
+| `terrainBasinNoiseGain` | f32 | 0.3 | geo/basin.rs (TB-03 盆底噪声阻尼增益) | 盆底/盆壁噪声阻尼增益；出口与生活带噪声额外抑制 |
+| `terrainLakeSemiAxisRatioMin` | f32 | 0.1 | geo/lakeside.rs (TB-03 湖半轴比例抽样下限) | 湖半轴比例抽样下限（×worldSize） |
+| `terrainLakeSemiAxisRatioMax` | f32 | 0.16 | geo/lakeside.rs (TB-03 湖半轴比例抽样上限) | 湖半轴比例抽样上限；椭圆两轴各自独立抽样 |
+| `terrainLakeDepthM` | f32 | 3.5 | geo/lakeside.rs (TB-03 湖床最大深度) | 湖床最大深度 (m)；静水湖水位恒定 |
+| `terrainLakeShoreSetbackM` | f32 | 10 | geo/lakeside.rs (TB-03 水岸安全退距) | 水岸安全退距 (m)；岸线外 NO_BUILD 缓冲，其外为可建干岸 |
+| `terrainLakeOutlineWarpM` | f32 | 14 | geo/lakeside.rs (TB-03 湖岸低频径向扰动幅度) | 湖岸低频径向扰动幅度 (m)；限制凹度、不生成岛屿 |
+| `terrainLakeNoiseGain` | f32 | 0.3 | geo/lakeside.rs (TB-03 环岸噪声阻尼增益) | 环岸噪声阻尼增益；环岸干岸带平缓可建 |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |

@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
   terrainGridRes: 120, // 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m）
-  terrainProfile: 'random', // 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架）| 'hillside_woodland_v1'（★ v1.50.51 S7-08 登记：半坡林地，v1.50.46 内核骨架）| 'river_valley_settlement_v1'（★ v1.50.51 S7-08 登记：河谷聚落，v1.50.48/49 内核+水系）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；★ S7-10 全链路验收收口：random 候选池扩为 T1/T2/草原/半坡/河谷聚落 5 张（各 ~20%）；flat_baseline 永不入 random；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地绿洲/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地绿洲：大盆地+中心小泉池+单岸点共享池）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
@@ -240,6 +240,31 @@ window.SIM_CONFIG = {
   terrainPlateauTopNoiseGain: 0.20,   // 台面区域噪声阻尼增益；起伏平缓保 ≥3 处房屋可建
   terrainPlateauRampNoiseGain: 0.12,  // 缓坡入口区域噪声阻尼增益；走廊平缓保可走
   terrainPlateauOutlineWarp: 6.0,     // 台缘轮廓低频扰动幅度 (m)
+  // ── TB-03 山前冲积扇（alluvial_fan_v1）──
+  terrainFanLengthRatio: 0.42,        // 扇体长度比例（×worldSize，山口→扇缘）
+  terrainFanHalfAngleDeg: 30.0,       // 扇半角（度，角向窗口 ±α）
+  terrainFanAmplitude: 30.0,          // 山口到扇缘总高差 (m)；1.5×A/L ≈ tan(8°) 扇头侧缘 ≤tan(22°)
+  terrainFanGullyCountMax: 2,         // 干浅沟数量上限（1~2，relief_rng 掷存在性）
+  terrainFanGullyDepthM: 2.2,         // 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行
+  terrainFanGullyWidthM: 20.0,        // 干浅沟横截面全宽 (m)；须跨越多个格子
+  terrainFanGullyMeanderAmpRad: 0.12, // 干浅沟中心线角向蜿蜒幅度（弧度）
+  // ── TB-03 盆地绿洲（basin_oasis_v1）──
+  terrainBasinSemiAxisRatio: 0.34,    // 盆地半轴比例（×worldSize，椭圆 a/b 共用基准）
+  terrainBasinDepthM: 34.0,           // 盆深 (m，中心相对盆缘下凹总量)
+  terrainBasinRimHeightM: 3.0,        // 外缘低脊高度 (m)；有限支撑环抱轮廓，出口处归零
+  terrainBasinExitWidthDeg: 34.0,     // 陆路出口角宽（度）；首版至少一个明确出口
+  terrainBasinPoolRadiusMinM: 10.0,   // 中心泉池半径抽样下限 (m)；06 §5.6 初值
+  terrainBasinPoolRadiusMaxM: 14.0,   // 中心泉池半径抽样上限 (m)
+  terrainBasinPoolDepthM: 2.2,        // 泉池床最大深度 (m)；水面位于池床之上、岸环最低地表之下
+  terrainBasinBankRingM: 12.0,        // 泉池外干燥岸环宽 (m)；NO_BUILD 禁建安全环，生活带在岸环外
+  terrainBasinNoiseGain: 0.30,        // 盆底/盆壁噪声阻尼增益；出口与生活带噪声额外抑制
+  // ── TB-03 湖畔盆地（lakeside_basin_v1）──
+  terrainLakeSemiAxisRatioMin: 0.10,  // 湖半轴比例抽样下限（×worldSize）
+  terrainLakeSemiAxisRatioMax: 0.16,  // 湖半轴比例抽样上限；椭圆两轴各自独立抽样
+  terrainLakeDepthM: 3.5,             // 湖床最大深度 (m)；静水湖水位恒定
+  terrainLakeShoreSetbackM: 10.0,     // 水岸安全退距 (m)；岸线外 NO_BUILD 缓冲，其外为可建干岸
+  terrainLakeOutlineWarpM: 14.0,      // 湖岸低频径向扰动幅度 (m)；限制凹度、不生成岛屿
+  terrainLakeNoiseGain: 0.30,         // 环岸噪声阻尼增益；环岸干岸带平缓可建
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数
   terrainRiverWidthMax: 42.0, // T2 地貌 / 通行参数
   terrainRiverWaterLevel: 0.0, // T2 地貌 / 通行参数

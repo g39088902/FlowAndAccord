@@ -104,6 +104,9 @@ const MAP_TEMPLATE_LABELS = {
   hillside_woodland_v1: '🌲 半坡林地',
   river_valley_settlement_v1: '🏔️ 河谷聚落',
   plateau_settlement_v1: '🏕️ 台地聚落',
+  alluvial_fan_v1: '🏜️ 山前冲积扇',
+  basin_oasis_v1: '🏝️ 盆地绿洲',
+  lakeside_basin_v1: '🌊 湖畔盆地',
   flat_baseline: '📐 诊断基线',
 };
 
