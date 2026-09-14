@@ -83,6 +83,6 @@
 
 ## 未拆分阶段
 
-阶段七已拆入 [STAGE-07-TODO.md](STAGE-07-TODO.md)并**全部交付**（S7-01~S7-10，v1.50.39~52 收口；3 张新 profile 已入存读档白名单与 `random` 候选池）。阶段四通用部分（D-C 通用资源景观与标签避让聚合，S4-01~S4-08，v1.50.46~53）已**全部收口交付**（技术架构与机制详见 [16-frontend-overview.md](docs/current/tech/16-frontend-overview.md) §2.16～§2.18）；特定地貌专属景观群与院地任务见 [STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md](STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md)（随对应注入器逐项交付）。其余子特征、P1、R0 与远期静态模板按 [06 号 R.3](docs/plan/tech/06-terrain-templates.md)逐项解锁、开工时拆分；T4 动态扩展另立项。
+阶段七已拆入 [STAGE-07-TODO.md](STAGE-07-TODO.md)并**全部交付**（S7-01~S7-10，v1.50.39~52 收口；3 张新 profile 已入存读档白名单与 `random` 候选池）。阶段四通用部分（D-C 通用资源景观与标签避让聚合，S4-01~S4-08，v1.50.46~53）已**全部收口交付**（技术架构与机制详见 [16-frontend-overview.md](docs/current/tech/16-frontend-overview.md) §2.16～§2.18）；特定地貌专属景观群与院地任务见 [STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md](STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md)（随对应注入器逐项交付）。**TB-02 基座与台地内核（台地聚落模板 `plateau_settlement_v1`）已全部收口交付**（TB-02-01~10，v1.50.54；SDF 圆角矩形台面 + 陡壁过渡带 $B=0.6H$ + 双入口缓坡 $B=4.0H$ + 坡脚双泉溪与双接入路网 + 专属门禁 + 随机池准入，60/60 种子全通；专项施工文档 TB-02-IMPLEMENTATION-PLAN.md 已随收官归档清理，分层验收证据见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md) 与 changelog v1.50.54；表现层对接见 [07 号](docs/plan/tech/07-terrain-art.md) TA-10）。其余子特征、P1、R0 与远期静态模板按 [06 号 R.3](docs/plan/tech/06-terrain-templates.md)逐项解锁、开工时拆分；T4 动态扩展另立项。
 
 开工约束：阶段二已收官，无剩余项；阶段三剩余物理项按 §5.4.D 岩壁离散尺度探针准入，候选参数不得当作已验证默认值。
