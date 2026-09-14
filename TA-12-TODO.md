@@ -153,10 +153,12 @@ TA-13 后续改变反照率时，应统一标记基底颜色和纹理色档失�
   - 交付：基线记录与样板清单；不得从已有截图猜 seed，不跳过正式存档门禁。
   - ⚠️ 遗留：无纹理渲染基线 p50≈83ms 本身已超 16ms 参考预算；T1/T2 两次采样窗口尺寸被外部改动不一致，TA-12-7 A/B 前须固定窗口并重测基线（详见 TA-12-BASELINE.md §3）。
 
-- [ ] **TA-12-2 确定性世界纹样模型（约 1 日，依赖 1）**
+- [x] **TA-12-2 确定性世界纹样模型（约 1 日，依赖 1）** ✅ 2026-09-14 完成（`frontend/js/terrain-texture.js`，`window.TerrainTexture`）。
   - 新增模块与集中配置，完成固定整数哈希、独立属性通道、世界桶候选、草斑/土纹几何及材质筛选。
   - 临时验证负坐标、不同遍历顺序、清缓存重建和分批生成得到相同模型；相机变化不改变顶点摘要。
   - 交付：模型接口、配置消费点；测试脚本临时使用后删除。
+  - ✅ 实施记录：模块 414 行（<800 上限），配置组 `RENDER_CONFIG.terrainTexture` 11 键（detailFadePx 留待 TA-12-3）；index.html 于 config.render.js 后、lighting.js 前登记；`invalidate('world')` 接入 `rustworld.js::_invalidateWorldStaticCaches`（READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处随消息生命周期）；`drawCell`/`refreshPalette` 为 TA-12-3/4 接口占位。临时验证 29 项断言全绿后已删除：一次成型/分批（budget=0）/清缓存重建/逆序与键序逐桶输出摘要一致、相机参数无输入通道（顶点摘要不变）、负坐标位模式无 NaN、无图元中心落水系（ShallowWater/DeepWater/RiverBank）、顶点不越沙盘边界、材质权重单调性（水 0/陡岩 0/平地土纹低覆盖）、styleVersion 换纹样而 contrast 只改明度且幅度 ∈ [contrast, contrastMax]、enabled=false 不建模、null 地形安全拒绝、缺省回退可用、cacheMaxBytes 两级确定性收敛（候选降档→哈希抽稀桶）。开发中修复两处缺陷：`pushSoil` 顶点误全推入 vx（vy 空）、草斑形状哈希槽位 k*8 跨候选碰撞（改 k*16）。合成地形样板 6973 图元 / 33343 顶点 / 3366 桶 / 427 KB（上限 8 MiB），单次全量构建 ~14 ms。
+  - ⚠️ 版本号未升（按本文 §8 由 TA-12-8 统一升版 + WASM 双副本 + changelog 收口；本子任务纯前端 JS，无需重编译 WASM）。
 
 - [ ] **TA-12-3 逐格裁剪与深度接入（约 1~1.5 日，依赖 2）**
   - 实现跨格分片和双线性贴面投影；接入 `drawTerrainCell` 基底之后，不增加独立纹理队列项。

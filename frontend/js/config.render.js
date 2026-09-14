@@ -149,6 +149,26 @@ window.RENDER_CONFIG = {
   accentCrownLitAlpha: 0.16,  // 亮部峰值不透明度（弱于旧 0.20 小白斑，宽而弱）
   accentCrownLitMinPx: 2.2,   // 簇屏幕半径低于此省略亮部（远景亚像素噪声）
 
+  // —— 世界坐标锁定地表纹理（★ TA-12-2，TA-12-TODO §3/§5；terrain-texture.js 消费）——
+  // CPU 确定性派生小型世界空间图元（草斑/土纹）：固定整数哈希 + 独立属性通道 + 世界桶候选，
+  // 位置/形状/方向固定在世界空间，缩放/旋转/暂停/刷新/存读档不重新抽样（首期不依赖 _engineSeed）。
+  // 纯渲染配置，不进 SIM_CONFIG、不经 applyConfig 注入 WASM；所有数字须有真实消费点（§5.3）。
+  terrainTexture: {
+    enabled: true,             // 总开关（false = 不构建模型、不绘制；纯前端开关）
+    styleVersion: 1,           // 纹样派生算法版本（哈希输入之一；调值整体换纹样并重建）
+    bucketSizeWorld: 12,       // 世界桶边长（世界单位）
+    grassCandidates: 3,        // 每桶草斑候选上限（非保证密度，经低频密度场 × 材质权重筛选）
+    soilCandidates: 2,         // 每桶土纹候选上限
+    grassSizeRange: [2, 6],    // 草斑直径区间（世界单位）
+    soilLengthRange: [1, 3],   // 土纹长度区间（世界单位）
+    soilWidthRange: [0.2, 0.5],// 土纹宽度区间（世界单位；禁止屏幕固定宽度）
+    contrast: 0.04,            // 明度扰动基准幅度（相对原反照率等比例，§4.1 建议 3%~5%）
+    contrastMax: 0.08,         // 明度扰动上限（§4.1 上限 8%）
+    cacheMaxBytes: 8388608,    // 模型缓存上限 8 MiB（超出按候选数等比例确定性截断）
+    buildBudgetMs: 2,          // 分批构建每帧预算（未就绪格 TA-12-3 只画原基底）
+    // detailFadePx: [2,5] 归 TA-12-3 随 drawCell LOD 落地时登记（§4.2 特征尺度淡入区间）
+  },
+
   // —— 资源景观（★ S4-02，STAGE-04-TODO §3.2；landscape-model.js / render_landscapes.js 消费）——
   // 围绕资源 POI 的前端确定性派生景观：模型只由世界 seed / POI 类型与坐标 / 静态地形 /
   // 配方固定盐值 / role / slot 派生；库存丰度 q 只驱动画面动态细节，绝不参与几何重抽。

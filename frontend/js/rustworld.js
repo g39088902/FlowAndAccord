@@ -311,6 +311,9 @@
         if (window.LandscapeModel) window.LandscapeModel.resetCache();
         // ★ S4-03：保护区索引与占据网格同一生命周期失效（不使用旧世界索引）
         if (window.LandscapeMask) window.LandscapeMask.resetCache();
+        // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
+        // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
+        if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）

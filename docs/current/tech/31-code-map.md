@@ -103,6 +103,7 @@ FlowAndAccord/
 │   │   ├── config.poi-rates.js             # POI 产速本地偏好 (localStorage 倍率，world_create 前读取，可复现演化)
 │   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
+│   │   ├── terrain-texture.js              # ★ TA-12-2 世界坐标锁定地表纹理模型层 (window.TerrainTexture：固定整数哈希/独立属性通道/世界桶候选/草斑土纹图元/材质筛选/有界缓存与分批构建；drawCell·refreshPalette 为 TA-12-3/4 接口占位；世界事件 invalidate)
 │   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
