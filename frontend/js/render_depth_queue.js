@@ -149,6 +149,10 @@ function drawWorldEntities() {
   // 道路悬浮检测 + Tooltip（先于收集，isHovered 供分段高亮样式使用）
   updateLaneHover();
 
+  // ★ S4-06 标签布局层：帧起点重置提案池/冲突网格/UI 禁入矩形
+  const _LL = window.LabelLayout;
+  if (_LL) _LL.beginFrame(w, h);
+
   const depthOf = (px, py, pz) => (px * sinZ + py * cosZ) * sinX + (pz || 0) * cosX;
 
   const terrain = sim.terrain;
@@ -370,9 +374,11 @@ function drawWorldEntities() {
   for (const poi of sim.pois || []) {
     const dd = _decalDepth(poi.pos.x, poi.pos.y, RC.poiMarkerFootprintR || 20, cosZ, sinZ, cosX, sinX);
     _depthItem(DEPTH_POI, poi, 0, dd != null ? dd : _surfaceDepth(poi.pos.x, poi.pos.y, poi.pos.z, cosZ, sinZ, cosX, sinX));
+    if (_LL) proposePoiLabels(poi); // ★ S4-06 POI 标签提案（与标记同循环，条件含 LOD 阈值）
   }
   for (const house of sim.houses || []) {
     _depthItem(DEPTH_HOUSE, house, 0, _surfaceDepth(house.pos.x, house.pos.y, house.pos.z, cosZ, sinZ, cosX, sinX));
+    if (_LL) proposeHouseLabels(house); // ★ S4-06 房屋标签提案
   }
   const terrainAccents = (terrain && terrain.accents) || [];
   for (const accent of terrainAccents) {
@@ -429,8 +435,14 @@ function drawWorldEntities() {
       //   伸进的更近格后画，把小人的腿脚盖掉（「半截入土」）。
       const dd = _decalDepth(agent.pos.x, agent.pos.y, RC.agentFootprintR || 18, cosZ, sinZ, cosX, sinX);
       _depthItem(DEPTH_AGENT, agent, 0, dd != null ? dd : _surfaceDepth(agent.pos.x, agent.pos.y, agent.pos.z, cosZ, sinZ, cosX, sinX));
+      if (_LL) proposeAgentLabels(agent); // ★ S4-06 族人角标提案（含选中目标捕获）
     }
   }
+
+  // ★ S4-06 标签布局安置：分发循环前按 (优先级, 收集序) 稳定排序逐个安置——
+  //   pinned 恒接受占格，ordinary 依次尝试 [首选/镜像/右/左] 四个固定备选位，
+  //   屏幕网格冲突检测 + UI 禁入矩形，全部失败即省略（失败处理见 STAGE-04-TODO §4.6）。
+  if (_LL) _LL.resolve();
 
   list.sort((a, b) => a.depth - b.depth);
 
@@ -455,6 +467,10 @@ function drawWorldEntities() {
       default: drawAgent(it.a);
     }
   }
+
+  // ★ S4-06 交互覆盖标签：选中族人需求气泡在世界层之上强制安置（不参与地形遮挡）；
+  //   挂在队列分发循环结束后——§6.3「分发循环结束点即标签层的天然挂载位」。
+  drawSelectedNeedBubbleOverlay();
 }
 
 // ★ v1.50.11：选中营地辖区连线逐条入统一深度队列（中点近似深度——选择辅助线，允许穿越山地的小误差）。

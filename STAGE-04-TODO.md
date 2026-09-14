@@ -219,12 +219,12 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 **失败处理**：某配方失败只关闭该配方；不阻塞已通过的泉水/林地样板。
 **验收证据**：每类至少一组 seed/tick 固定截图，0/半满/满库存临时夹具，界面库存及物理状态不变。
 
-### 4.6 S4-06 · 标签基础布局
+### 4.6 S4-06 · 标签基础布局 ✅（2026-09-14，验收记录见 §11）
 
-- [ ] 抽离本轮文字入口，建立候选/字体测量/矩形/优先级/固定备选位置接口。
-- [ ] 实现屏幕网格冲突检测、UI 禁入矩形、普通标签省略，保证算法候选数有界。
-- [ ] 区分普通世界标签与交互覆盖标签，保留普通标记的地形遮挡行为。
-- [ ] 适配 Canvas DPR、缩放、旋转、resize 与字体变更，移除旧入口的重复文字。
+- [x] 抽离本轮文字入口，建立候选/字体测量/矩形/优先级/固定备选位置接口。（新增 label-layout.js（window.LabelLayout ~330 行）：帧内三段式挂载 drawWorldEntities——beginFrame → proposePoi/House/AgentLabels 收集 → list.sort() 前 resolve() 按 (优先级,收集序) 稳定安置；字体测量缓存（font+text→宽，上限 2048）；矩形模型 CJK/拉丁 0.85/0.35em、emoji 独占文本墨迹近似框 0.72/0.10em）
+- [x] 实现屏幕网格冲突检测、UI 禁入矩形、普通标签省略，保证算法候选数有界。（每标签固定备选位 ≤4 [首选→锚点镜像→首选同排右→左]；冲突网格 labelGridCellSize 分桶+链表非全对扫描；UI 禁入 labelUiRectIds 节流重测+resize 置脏；普通标签全败即省略，提案上限 labelMaxProposals=160 超限按收集序丢弃）
+- [x] 区分普通世界标签与交互覆盖标签，保留普通标记的地形遮挡行为。（pinned=实体锚定标记恒接受占格 / ordinary=可省略文字；普通标签仍在实体深度落笔——山后标签不透山[房屋编号近景裁剪证据：被更近地形格正常遮挡，新旧路径一致]；选中族人需求气泡自 drawAgent 迁出 overlay 通道 drawSelectedNeedBubbleOverlay，分发循环后强制安置不省略不参与地形遮挡）
+- [x] 适配 Canvas DPR、缩放、旋转、resize 与字体变更，移除旧入口的重复文字。（坐标全 CSS px = ctx 逻辑坐标，DPR 由 main.js setTransform 承担本层不感知；锚点逐帧重投影缩放/旋转自然适配；resize 事件置脏 UI 矩形 + 每帧传入 w/h；字体串含 px 变更自然换测量键；10 处文字入口全部改单点消费 posOf，无残留直接绘制）
 
 **失败处理**：普通标签无合法位置即省略，保留实体与信息面板访问。
 **验收证据**：固定输入下接受顺序稳定、普通已接受矩形互不相交；山后普通标签不透山，原实体命中顺序不变。
@@ -510,3 +510,23 @@ profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：seed 34 / rive
 ```
 
 **S4-05 交付边界说明**：果实/矿脉以**点簇贴地片**表达（构建期静态几何 + 绘制期连续强度），不新增拾取实体、不改 Inspector 数据；Berry 保留采收中心原图标与储量环，Stone 可采面为灰斑明暗（不修改坡度/碰撞），Gold 哑光矿脉斑禁整片发光/扩矿——全部符合 §3.2 放置约束。三配方任一失败可经 landscapeRecipes 单独关 role，不阻塞泉边/林地样板。
+
+## 11. 验收记录 · S4-06 标签候选层与基础布局（2026-09-14）
+
+> 按 §5.3 模板记录。沙盒断言（24 组）已按根 AGENTS.md §4.10 用后删除，不持久化。
+
+```text
+任务 ID / 状态 / 日期：S4-06 / ✅ 完成 / 2026-09-14
+基准提交 / 候选提交 / 应用版本：基准 09ada7d（分支 c2，v1.50.51）/ 候选 = 本次提交 / 1.50.52（升版器 12 定义点同步）
+WASM 双副本 SHA256：frontend/rust/ = frontend/ =（升版 SAVE_APP_VERSION 后重编译，双副本同值）
+模拟配置 SHA256 / 渲染配置摘要：SIM_CONFIG 239 字段未变（零内核变更）；RENDER_CONFIG 75 → 85 键（+标签布局 10 键：labelLayoutEnabled/labelGridCellSize/labelMaxProposals/labelRectPadPx/labelSidePadPx/labelUiRefreshFrames/labelUiRectIds + LOD 收编 labelPoiNameMinZoom 0.50/labelStockRingMinZoom 0.70/labelHouseNumberMinZoom 1.05——三处旧硬编码缺省值与旧值逐位一致）
+profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：seed 65 / mountain_pass_v1 / 创世 STEP 重放 160000 ticks（12 房 50 人，与 §6.4 冻结基线一致）/ 相机 rotX 1.05 / rotZ 0.6 / zoom 1.6 / 中心 = 房屋质心 (87.6, -76.5) / 春季。§6.4 的 seed65 冻结存档（v1.50.46）已被 SAVE_APP_VERSION 门禁按设计废弃——改用「创世 + STEP 批量 world_tick_steps 重放」复现同一世界（确定性保证，房屋/人口计数核对一致）
+设备 / Chrome 版本 / 视口 / DPR：Chromium IAB（win32）视口 1280×720 / DPR 1；UI 面板以注入样式隐藏（截图画面用）
+执行门禁、退出码及日志位置：WASM 重编译 + 双副本同步；test-wasm ALL_TESTS_DONE（确定性/防越界/防 NaN/存读档）；config-check 239/239；frontend-check 42 文件语法 + DOM ID；doc-link-check 全过；code-map-check label-layout.js 已登记（余 6 项为 master 合并既有警告）；沙盒断言 24/24（提交前已删）
+物理差分 / 模型确定性 / 避让违例 / 标签与命中检查：物理字段差分 0（纯前端表现层，未触碰 rustworld.js 数据面与 sim 状态写入）；标签 = 固定输入两帧接受矩形逐位一致（稳定排序双键 pri+收集序）；已接受普通矩形两两不相交（沙盒 + 浏览器 seed65 密集聚落双验，相交 0）；候选数有界 ≤4/标签、提案上限截断（proposed=10/dropped=20）；UI 禁入矩形命中省略；围死省略（36 pinned 环堵四备选位全败 → omitted）；关态 posOf 恒 false 完整回退旧路径；拾取命中 house#3 正确（render_inspector.js 未改动，命中顺序不变）
+基准与候选 p50/p95/p99 / 首帧与缓存重建 / 缓存规模：ON/OFF 全帧像素差分 2989px（zoom1.6 密集聚落 1280×720——差异仅标签位置局部，世界渲染零扰动）；布局层为 O(提案数 × 备选位 × 网格邻域)，提案 ≤41 时 resolve 微秒级，不构成帧耗时热点（S4-08 总验收统一复测）；字体测量缓存上限 2048 条
+截图与原始记录路径：evidence/S4-06/screenshots/ 5 张——settlement-seed65-t160000-labels-on/off-zoom1.6.png（聚落对照：4/4 营地名称 + 11/12 房屋编号 + 1/3 舍数，ON 态省略 3 全为真冲突）、settlement-seed65-house3-label-crop.png（房屋编号被更近地形格正常遮挡 = 山后不透山证据）、agent-selected-bubble-crop.png（需求气泡 overlay 安置在选中族人上方，避开标签矩形）、settlement-seed65-closeup-zoom3.2.png（近景：名称/舍数/图标无互压）
+失败项、降级与后续任务：验收中发现并修正 2 项——① emoji 独占文本矩形沿用 0.85/0.35em 文本模型过大（墨迹仅 ~0.72em），密集聚落 4 营地名称全部被自家/邻图标框系统性挤掉，改墨迹近似框（0.72/0.10em）后 4/4 恢复；② 左右备选位原贴锚点水平排（必撞 pinned 图标框），改为与首选同排横移后有效。无遗留失败。后续：S4-07 聚合、选中/悬浮兜底与交互回归（依赖本任务 + S4-04；UI 禁入矩形默认 labelUiRectIds=null——Inspector 等覆盖区避让的默认启用与 DOM 快照缓存归 S4-07 收口）
+```
+
+**S4-06 交付边界说明**：本任务交付布局层机制与基础布局（候选/测量/矩形/优先级/备选位/冲突检测/禁入/省略/overlay 通道）；同类标签聚合、选中/悬浮双目标强制保留、引线与边缘分行兜底、布局滞回归 S4-07。`labelUiRectIds` 默认 null（只避开画布边界）——机制已在沙盒验证，默认启用待 S4-07 与 DOM 交互回归一起收口。

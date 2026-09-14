@@ -131,9 +131,10 @@ FlowAndAccord/
 │   │   ├── render_grass.js                 # ★ v1.50.39 GrassTuft 草丛绘制 (自 render_accents.js 迁出守 800 行上限；grassSeasonColor 季相色 + 芦草穗，复用 accent 族共享刮擦工具)
 │   │   ├── render_shadows.js               # ★ v1.50.46 TA-04-6 装饰贴地投影绘制层 (drawAccentShadowGround 树/灌木地面图元阴影：实高驱动影长 + 叶量调制夏冠影/冬枝影，复用 accent 族共享刮擦工具；★ S4-02 drawAccentShadowFor 模型参数化主体)
 │   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild/drawLandscapeShadowGround 分发；复用装饰图元/光照/季相，配置关态零开销回退；★ S4-03 被遮蔽子图元连同投影不入队；★ S4-04 detail 子图元 childActive q 过滤 + drawLandscapeGroundPatch 贴地色差片，填充样式预建常量零 GC；★ S4-05 berry/gold 点簇（round(10×q) 可见点数）+ quarry globalAlpha 渐强 + child._q 镜像)
-│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰及其投影跳过)
-│   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）
-│   │   ├── render_agents.js                # 族人粒子、马斯洛气泡、行囊搬运与登基礼花特效
+│   │   ├── label-layout.js                # ★ S4-06 标签候选层与屏幕布局 (window.LabelLayout：提案池/字体测量缓存/固定备选位[首选/镜像/同排左右]/屏幕网格冲突检测/UI 禁入矩形/overlay 通道；pinned 恒接受占格 + ordinary 可省略；候选 ≤4 有界；关态回退旧直接绘制)
+│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰及其投影跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels 提案 + drawSelectedNeedBubbleOverlay 交互覆盖)
+│   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）；★ S4-06 proposePoiLabels/proposeHouseLabels 提案 + 绘制消费 posOf（未安置即省略；LOD 阈值收进 config.render）
+│   │   ├── render_agents.js                # 族人粒子、行囊搬运与登基礼花特效（★ S4-06 需求气泡迁 overlay 层 drawSelectedNeedBubbleOverlay；施工/流产/夺位角标 pinned + posOf 消费）
 │   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染
 │   │   └── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
 │   ├── rust/

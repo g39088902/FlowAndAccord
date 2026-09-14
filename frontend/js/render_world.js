@@ -77,10 +77,86 @@ function poiTintColor(poi) {
   return 'rgba(2, 132, 199, 0.25)';
 }
 
+// ★ S4-06 标签布局层（label-layout.js）消费刮擦：posOf 命中时写入文字基线位
+const _llPos = { x: 0, y: 0 };
+function _llActive() {
+  const LL = window.LabelLayout;
+  return LL && LL.active() ? LL : null;
+}
+
+// 房屋视觉半宽/半高（tier → 微缩模型几何，drawHouse 与标签提案共用同一套数值）
+function houseHalfW(house, z) {
+  return (house.tier === 'Tier0Warehouse' ? 5.25 : (house.tier === 'Tier4Manor' ? 8.4 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
+}
+function houseHalfH(house, z) {
+  return (house.tier === 'Tier0Warehouse' ? 4.55 : (house.tier === 'Tier4Manor' ? 9.1 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
+}
+
+// ★ S4-06 POI 标签提案（收集阶段由 render_depth_queue 调用；条件与 drawPoiMarker 消费侧一一对应）。
+// 键位 = poi.id * 16 + LabelLayout.KEY_POI_*；锚点 = projectLifted 精灵锚点（与绘制一致）。
+// 图标为 pinned（恒接受占格不移位），营地名称/舍数为 ordinary（可省略、四备选位）。
+function proposePoiLabels(poi) {
+  const LL = _llActive();
+  if (!LL) return;
+  const RC = window.RENDER_CONFIG || {};
+  const z = camera.zoom;
+  const p2D = projectLifted(poi.pos);
+  const x = p2D.x, y = p2D.y;
+  if (x < -80 || x > w + 80 || y < -80 || y > h + 80) return; // 视口外不提案（绘制亦不可见）
+  const kb = poi.id * 16;
+  if (poi.type === 'Camp') {
+    const lvl = poi.level || 0;
+    const campIcon = lvl >= 4 ? '🏛️' : (lvl >= 2 ? '🏘️' : '🏕️');
+    LL.propose(kb + LL.KEY_POI_ICON, 0, x, y, campIcon, `${Math.floor((13 + lvl * 2) * z)}px sans-serif`, 0, 4 * z, true);
+    if (z > (RC.labelPoiNameMinZoom || 0.50)) {
+      LL.propose(kb + LL.KEY_POI_NAME, 2, x, y, poi.campTitle || poi.name,
+        `bold ${Math.max(9, Math.floor(10 * z))}px sans-serif`, 0, -(11 + lvl * 2) * z, false);
+      if (poi.boundHouses > 0) {
+        LL.propose(kb + LL.KEY_POI_COUNT, 3, x, y, `${poi.boundHouses}舍`,
+          `${Math.max(8, Math.floor(9 * z))}px sans-serif`, 0, (14 + lvl * 2) * z, false);
+      }
+    }
+  } else {
+    const poiIcon = poi.type === 'Berry' ? '🍒' : poi.type === 'Wood' ? '🌲' : poi.type === 'Stone' ? '🪨' : poi.type === 'Gold' ? '🪙' : poi.type === 'Market' ? '🏪' : '💧';
+    LL.propose(kb + LL.KEY_RES_ICON, 0, x, y, poiIcon, `${Math.floor(12 * z)}px sans-serif`, 0, 4 * z, true);
+  }
+}
+
+// ★ S4-06 房屋标签提案：拍卖/修缮高优先级（状态警示优先安置），房屋编号普通级
+// （选中时升为高优先级）。条件与 drawHouse 消费侧一一对应。
+function proposeHouseLabels(house) {
+  const LL = _llActive();
+  if (!LL) return;
+  const RC = window.RENDER_CONFIG || {};
+  const z = camera.zoom;
+  const p2D = projectLifted(house.pos);
+  const x = p2D.x, y = p2D.y;
+  if (x < -80 || x > w + 80 || y < -80 || y > h + 80) return;
+  const isVacant = house.ownerId == null;
+  const isAuction = isVacant && house.auctionPhase != null;
+  const kb = house.id * 16;
+  const hh = houseHalfH(house, z);
+  const isSel = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
+  if (isAuction) {
+    const plaqueLabel = house.highestBid > 0 ? `🔨 ${house.auctionPhase || '竞价'} · ${house.highestBid.toFixed(0)}G` : `🔨 ${house.auctionPhase || '招租'}`;
+    LL.propose(kb + LL.KEY_HOUSE_AUCTION, 1, x, y, plaqueLabel, 'bold 8px sans-serif', 0, -hh * 1.7, false);
+  } else if (house.isRepairing) {
+    LL.propose(kb + LL.KEY_HOUSE_REPAIR, 1, x, y, `🔧修缮 (${Math.round(house.durability)}%)`, '8px sans-serif', 0, -hh * 1.6, false);
+  } else if (z > (RC.labelHouseNumberMinZoom || 1.05) || isSel) {
+    const isWarehouse = house.tier === 'Tier0Warehouse';
+    const tierLabel = isWarehouse ? '仓' : (house.tier === 'Tier1ThatchedHut' ? '茅' : (house.tier === 'Tier2LeanTo' ? '宅' : (house.tier === 'Tier3Homestead' ? '庄' : '堡')));
+    LL.propose(kb + LL.KEY_HOUSE_NUM, isSel ? 1 : 4, x, y, `#${house.id}${tierLabel}`, '8px sans-serif', 0, hh * 0.8, false);
+  }
+}
+
 // POI 标记（图标 / 门牌 / 储量环 / 选中环）：参与统一深度排序，被近处实体正常遮挡。
+// ★ S4-06：文字消费标签层落位——图标 pinned（posOf 确认已登记），名称/舍数 ordinary
+// （未安置即省略）；布局关态走旧直接绘制路径，行为与 v1.50.51 逐位一致。
 function drawPoiMarker(poi) {
   const z = camera.zoom;
-  const showDetailRings = z >= 0.70;
+  const RC = window.RENDER_CONFIG || {};
+  const showDetailRings = z >= (RC.labelStockRingMinZoom || 0.70);
+  const LL = _llActive();
   const p2D = projectLifted(poi.pos); // ★ v1.50.12 精灵锚点略抬于地表（贴地底座仍用 project3D）
   const isSelected = sim.selectionType === 'poi' && sim.selectedPoiId === poi.id;
   const x = p2D.x, y = p2D.y;
@@ -90,16 +166,22 @@ function drawPoiMarker(poi) {
     ctx.font = `${Math.floor((13 + (poi.level || 0) * 2) * z)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#d97706';
-    ctx.fillText(campIcon, x, y + 4 * z);
+    if (!LL || LL.posOf(poi.id * 16 + LL.KEY_POI_ICON, _llPos)) {
+      ctx.fillText(campIcon, x, y + 4 * z);
+    }
 
-    if (z > 0.50) {
+    if (z > (RC.labelPoiNameMinZoom || 0.50)) {
       ctx.font = `bold ${Math.max(9, Math.floor(10 * z))}px sans-serif`;
       ctx.fillStyle = '#fef08a';
-      ctx.fillText(poi.campTitle || poi.name, x, y - (11 + (poi.level || 0) * 2) * z);
+      if (!LL || LL.posOf(poi.id * 16 + LL.KEY_POI_NAME, _llPos)) {
+        ctx.fillText(poi.campTitle || poi.name, LL ? _llPos.x : x, LL ? _llPos.y : y - (11 + (poi.level || 0) * 2) * z);
+      }
       if (poi.boundHouses > 0) {
         ctx.font = `${Math.max(8, Math.floor(9 * z))}px sans-serif`;
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillText(`${poi.boundHouses}舍`, x, y + (14 + (poi.level || 0) * 2) * z);
+        if (!LL || LL.posOf(poi.id * 16 + LL.KEY_POI_COUNT, _llPos)) {
+          ctx.fillText(`${poi.boundHouses}舍`, LL ? _llPos.x : x, LL ? _llPos.y : y + (14 + (poi.level || 0) * 2) * z);
+        }
       }
     }
   } else {
@@ -113,11 +195,13 @@ function drawPoiMarker(poi) {
     else if (poi.type === 'Gold') { poiIcon = '🪙'; borderCol = '#d97706'; }
     else if (poi.type === 'Market') { poiIcon = '🏪'; borderCol = '#d97706'; }
 
-    // 图标
+    // 图标（pinned：posOf 确认已登记）
     ctx.font = `${Math.floor(12 * z)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillStyle = poiTintColor(poi);
-    ctx.fillText(poiIcon, x, y + 4 * z);
+    if (!LL || LL.posOf(poi.id * 16 + LL.KEY_RES_ICON, _llPos)) {
+      ctx.fillText(poiIcon, x, y + 4 * z);
+    }
 
     // 仅在局部放大或选中时才展示细线库存环，全景视口保持整洁
     if ((showDetailRings || isSelected) && poi.type !== 'Market') {
@@ -141,7 +225,9 @@ function drawPoiMarker(poi) {
 }
 function drawHouse(house) {
   const z = camera.zoom;
-  const showLabels = z > 1.05;
+  const RC = window.RENDER_CONFIG || {};
+  const showLabels = z > (RC.labelHouseNumberMinZoom || 1.05);
+  const LL = _llActive();
 
   const p2D = projectLifted(house.pos); // ★ v1.50.12 精灵锚点略抬于地表
   const isSelected = sim.selectionType === 'house' && sim.selectedHouseId === house.id;
@@ -159,9 +245,9 @@ function drawHouse(house) {
   ctx.ellipse(x + hShadow.x, y + hShadow.y, sW, sH, -0.12, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. 2.5D 微缩建筑模型体块 (宽高缩小至原来的 70%)
-  const hw = (isWarehouse ? 5.25 : (house.tier === 'Tier4Manor' ? 8.4 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
-  const hh = (isWarehouse ? 4.55 : (house.tier === 'Tier4Manor' ? 9.1 : (house.tier === 'Tier3Homestead' ? 6.65 : 5.25))) * z;
+  // 2. 2.5D 微缩建筑模型体块 (宽高缩小至原来的 70%) —— 半宽/半高与标签提案共用同一套数值
+  const hw = houseHalfW(house, z);
+  const hh = houseHalfH(house, z);
 
   // 墙体配色：空置房为古朴风化灰，有主房为温润奶油白/木质暖色
   const wallFront = isVacant ? '#d1c7b7' : (isWarehouse ? '#b8966c' : '#ede3d1');
@@ -237,23 +323,30 @@ function drawHouse(house) {
   }
 
   // 3. 悬浮拍卖标牌或修缮标识 (全景降噪，仅在近景/选中或关键状态展示)
+  //    ★ S4-06：文字消费标签层落位（未安置即省略）；关态走旧直接绘制路径
   if (isAuction) {
     const plaqueLabel = house.highestBid > 0 ? `🔨 ${house.auctionPhase || '竞价'} · ${house.highestBid.toFixed(0)}G` : `🔨 ${house.auctionPhase || '招租'}`;
     ctx.font = 'bold 8px sans-serif';
     ctx.fillStyle = '#f59e0b';
     ctx.textAlign = 'center';
-    ctx.fillText(plaqueLabel, x, y - hh * 1.7);
+    if (!LL || LL.posOf(house.id * 16 + LL.KEY_HOUSE_AUCTION, _llPos)) {
+      ctx.fillText(plaqueLabel, LL ? _llPos.x : x, LL ? _llPos.y : y - hh * 1.7);
+    }
   } else if (house.isRepairing) {
     ctx.font = '8px sans-serif';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
-    ctx.fillText(`🔧修缮 (${Math.round(house.durability)}%)`, x, y - hh * 1.6);
+    if (!LL || LL.posOf(house.id * 16 + LL.KEY_HOUSE_REPAIR, _llPos)) {
+      ctx.fillText(`🔧修缮 (${Math.round(house.durability)}%)`, LL ? _llPos.x : x, LL ? _llPos.y : y - hh * 1.6);
+    }
   } else if (showLabels || isSelected) {
     const tierLabel = isWarehouse ? '仓' : (house.tier === 'Tier1ThatchedHut' ? '茅' : (house.tier === 'Tier2LeanTo' ? '宅' : (house.tier === 'Tier3Homestead' ? '庄' : '堡')));
     ctx.font = '8px sans-serif';
     ctx.fillStyle = isVacant ? '#94a3b8' : '#e2e8f0';
     ctx.textAlign = 'center';
-    ctx.fillText(`#${house.id}${tierLabel}`, x, y + hh * 0.8);
+    if (!LL || LL.posOf(house.id * 16 + LL.KEY_HOUSE_NUM, _llPos)) {
+      ctx.fillText(`#${house.id}${tierLabel}`, LL ? _llPos.x : x, LL ? _llPos.y : y + hh * 0.8);
+    }
   }
 
   if (isSelected) {
