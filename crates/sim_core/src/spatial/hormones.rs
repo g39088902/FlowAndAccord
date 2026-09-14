@@ -61,6 +61,19 @@ pub struct AgentHormones {
     pub prev_bag_full: bool,
     /// 边界跟踪：上一拍体力是否已满
     pub prev_stamina_full: bool,
+
+    // ── ★ H-04 耦合累计器与峰后窗口边沿跟踪 ─────────────────────────────────
+    /// 营养不足累计器（饥渴匮乏按 dt 累积、饱食良好缓慢恢复，驱动「营养→THY」基线下调）
+    /// 有界 [0.0, 100.0]，随 H-05 存档契约完整持久化
+    #[serde(default)]
+    pub nutrition_deficit: f32,
+    /// EP 峰后窗口边沿跟踪：上一拍内啡肽是否处于峰值阈上
+    /// （越阈上升沿触发崩解窗口一次，阈上不续满，落阈后重新武装——禁止低位每拍重新续期）
+    #[serde(default)]
+    pub prev_ep_peak: bool,
+    /// ADR 峰后窗口边沿跟踪：上一拍肾上腺素是否处于峰值阈上（语义同上）
+    #[serde(default)]
+    pub prev_adr_peak: bool,
 }
 
 impl Default for AgentHormones {
@@ -83,6 +96,9 @@ impl Default for AgentHormones {
             initialized: false,
             prev_bag_full: false,
             prev_stamina_full: false,
+            nutrition_deficit: 0.0,
+            prev_ep_peak: false,
+            prev_adr_peak: false,
         }
     }
 }
@@ -192,7 +208,40 @@ impl AgentHormones {
             initialized: true,
             prev_bag_full: false,
             prev_stamina_full: false,
+            nutrition_deficit: 0.0,
+            prev_ep_peak: false,
+            prev_adr_peak: false,
         }
+    }
+
+    /// ★ H-04 合成有效基线：性别/年龄/孕程基线 + 耦合下调项
+    ///
+    /// 三项耦合互相独立、各自保留来源（后续生殖开关可单独阻断生殖轴项）：
+    /// - CORT→5-HT：慢性压力侵蚀情绪基调（`chronic_stress` 高位时血清素基线临时下调）；
+    /// - CORT→AND：慢性应激压制生殖轴（HPG 轴，「乱世无心成家」；H-17 生殖抑制沿用本项）；
+    /// - 营养→THY：长期营养不良代谢节流（`nutrition_deficit` 高位时甲状腺素基线下调）。
+    pub fn effective_baselines(
+        &self,
+        gender: Gender,
+        age: f32,
+        is_pregnant: bool,
+        config: &SimConfig,
+    ) -> HormoneBaselines {
+        let mut b = Self::synthesize_baselines(gender, age, is_pregnant, config);
+        let chronic = (self.chronic_stress / 100.0).clamp(0.0, 1.0);
+        let malnutrition = (self.nutrition_deficit / 100.0).clamp(0.0, 1.0);
+        b.serotonin = (b.serotonin - chronic * config.hormone_couple_chronic_5ht_drop).max(0.0);
+        b.androgen = (b.androgen - chronic * config.hormone_couple_chronic_and_drop).max(0.0);
+        b.thyroxine =
+            (b.thyroxine - malnutrition * config.hormone_couple_nutrition_thy_drop).max(0.0);
+        b
+    }
+
+    /// ★ H-04 NE 焦虑标签（游戏规则标签，非医学判断）：
+    /// 高 NE + 低 5-HT 时视为「焦虑警觉」状态，供 Inspector 与后续行为消费方观察。
+    pub fn is_anxious(&self, config: &SimConfig) -> bool {
+        self.norepinephrine >= config.hormone_anxiety_ne_threshold
+            && self.serotonin <= config.hormone_anxiety_5ht_threshold
     }
 
     /// 若未初始化（如读取缺失字段的旧存档），则基于当前身体状态合成基线初始化
@@ -208,8 +257,12 @@ impl AgentHormones {
         }
     }
 
-    /// 离散线性回归与慢性压力演化 (在代谢阶段末尾执行)
+    /// 离散线性回归、耦合增量与慢性压力演化 (在代谢阶段末尾执行)
     /// level += alpha * (baseline - level), alpha = clamp(decay_rate * dt, 0, 1)
+    ///
+    /// ★ H-04 耦合契约：以本次更新前的一份激素值计算全部增量，再统一提交——
+    /// 慢性压力/营养不足累计读的是回归前的 CORT/饥渴状态，有效基线在回归开始前一次合成，
+    /// 杜绝按字段写入顺序产生隐式级联（同输入同输出，无回路数值爆炸）。
     pub fn tick_regression(
         &mut self,
         dt: f32,
@@ -218,7 +271,9 @@ impl AgentHormones {
         age: f32,
         is_pregnant: bool,
     ) {
-        let b = Self::synthesize_baselines(gender, age, is_pregnant, config);
+        // 更新前快照：有效基线（含慢性压力/营养耦合下调）与本拍慢性压力判定输入
+        let b = self.effective_baselines(gender, age, is_pregnant, config);
+        let pre_cortisol = self.cortisol;
 
         #[inline]
         fn regress(level: &mut f32, baseline: f32, decay_rate: f32, dt: f32) {
@@ -269,23 +324,48 @@ impl AgentHormones {
             + alpha_th * (b.dopamine_threshold - self.dopamine_threshold))
             .clamp(1.0, 100.0);
 
-        // 慢性压力累计
-        if self.cortisol > 60.0 {
+        // 慢性压力累计（使用回归前的皮质醇快照；高位累加、低位线性消退，双侧有界可恢复）
+        if pre_cortisol > 60.0 {
             self.chronic_stress =
-                (self.chronic_stress + (self.cortisol - 60.0) * 0.1 * dt).min(100.0);
-        } else if self.cortisol < 40.0 {
+                (self.chronic_stress + (pre_cortisol - 60.0) * 0.1 * dt).min(100.0);
+        } else if pre_cortisol < 40.0 {
             self.chronic_stress = (self.chronic_stress - 0.5 * dt).max(0.0);
         }
 
-        // 余韵计时器每拍递减
+        // 余韵计时器每拍饱和递减（可退出，无永久续期）
         for timer in &mut self.crash_timers {
             *timer = timer.saturating_sub(1);
+        }
+
+        // ★ H-04 EP 峰后过劳崩解窗口：越阈上升沿触发一次，阈上不续满，落阈后重新武装
+        if !self.prev_ep_peak && self.endorphin >= config.hormone_ep_peak_threshold {
+            self.crash_timers[0] = (config.hormone_ep_crash_hours * 60.0) as u32;
+            self.prev_ep_peak = true;
+        } else if self.endorphin < config.hormone_ep_peak_threshold {
+            self.prev_ep_peak = false;
+        }
+
+        // ★ H-04 ADR 峰后深度疲劳窗口：同一边沿触发语义（爆发预支，事后偿还）
+        if !self.prev_adr_peak && self.adrenaline >= config.hormone_adr_peak_threshold {
+            self.crash_timers[1] = (config.hormone_adr_fatigue_hours * 60.0) as u32;
+            self.prev_adr_peak = true;
+        } else if self.adrenaline < config.hormone_adr_peak_threshold {
+            self.prev_adr_peak = false;
         }
     }
 
     #[inline]
     fn add_pulse(val: &mut f32, pulse: f32) {
         *val = (*val + pulse).clamp(0.0, 100.0);
+    }
+
+    /// ★ H-04 OT→压力缓冲：催产素社会支持缓冲急性应激皮质醇脉冲。
+    /// 缓冲比例 = hormone_couple_ot_buffer_ratio × (OT/100)，使用脉冲注入前的 OT 值；
+    /// 仅作用于离散应激事件脉冲（流产/丧偶/丧子），持续输入速率是否缓冲由 H-14 另行定案。
+    fn add_stress_pulse(&mut self, amount: f32, config: &SimConfig) {
+        let ratio = config.hormone_couple_ot_buffer_ratio.clamp(0.0, 1.0);
+        let ot = (self.oxytocin / 100.0).clamp(0.0, 1.0);
+        Self::add_pulse(&mut self.cortisol, amount * (1.0 - ot * ratio));
     }
 
     /// 升级房屋
@@ -309,9 +389,9 @@ impl AgentHormones {
 
     /// 流产 (女方)
     pub fn on_miscarriage(&mut self, config: &SimConfig) {
-        Self::add_pulse(&mut self.cortisol, config.hormone_pulse_miscarriage_cort);
+        self.add_stress_pulse(config.hormone_pulse_miscarriage_cort, config);
         self.progesterone = config.hormone_prog_non_pregnant_baseline;
-        // 产后/流产脆弱窗口 (以 tick 计)
+        // 产后/流产脆弱窗口 (以 tick 计)；仅由分娩/流产等明确事件开启，无低位续期路径
         self.crash_timers[2] = (config.agent_miscarriage_cooldown * 60.0) as u32;
     }
 
@@ -320,7 +400,7 @@ impl AgentHormones {
         Self::add_pulse(&mut self.oxytocin, config.hormone_pulse_birth_mother_ot);
         Self::add_pulse(&mut self.dopamine, config.hormone_pulse_birth_mother_da);
         self.progesterone = config.hormone_prog_non_pregnant_baseline;
-        // 产后情绪脆弱窗口
+        // 产后情绪脆弱窗口；仅由分娩事件开启
         self.crash_timers[2] = (config.agent_postpartum_cooldown * 60.0) as u32;
     }
 
@@ -363,20 +443,14 @@ impl AgentHormones {
 
     /// 丧偶
     pub fn on_bereavement_spouse(&mut self, config: &SimConfig) {
-        Self::add_pulse(
-            &mut self.cortisol,
-            config.hormone_pulse_bereavement_spouse_cort,
-        );
+        self.add_stress_pulse(config.hormone_pulse_bereavement_spouse_cort, config);
         self.oxytocin = (self.oxytocin - config.hormone_pulse_bereavement_spouse_ot_crash).max(0.0);
         self.serotonin = (self.serotonin - config.hormone_pulse_bereavement_spouse_5ht_crash).max(0.0);
     }
 
     /// 丧子
     pub fn on_bereavement_child(&mut self, config: &SimConfig) {
-        Self::add_pulse(
-            &mut self.cortisol,
-            config.hormone_pulse_bereavement_child_cort,
-        );
+        self.add_stress_pulse(config.hormone_pulse_bereavement_child_cort, config);
         self.oxytocin = (self.oxytocin - config.hormone_pulse_bereavement_child_ot_crash).max(0.0);
         self.serotonin = (self.serotonin - config.hormone_pulse_bereavement_child_5ht_crash).max(0.0);
     }
@@ -400,6 +474,19 @@ impl AgentHormones {
         {
             Self::add_pulse(&mut self.cortisol, config.hormone_rate_deprivation_cort * dt);
         }
+        // ★ H-04 营养→THY 累计器：饥渴匮乏持续累积、饱食良好缓慢恢复（双侧有界、可恢复）；
+        // 阈值复用既有临界/饱食判据，累计量驱动 tick_regression 的 THY 有效基线下调
+        if hunger <= config.decision_critical_hunger
+            || thirst <= config.decision_critical_thirst
+        {
+            self.nutrition_deficit = (self.nutrition_deficit
+                + config.hormone_nutrition_deficit_rate * dt)
+                .min(100.0);
+        } else if hunger >= 40.0 && thirst >= 40.0 {
+            self.nutrition_deficit = (self.nutrition_deficit
+                - config.hormone_nutrition_deficit_recovery * dt)
+                .max(0.0);
+        }
         // 临界自救危机：肾上腺素累加
         if hunger <= config.agent_miscarriage_threshold
             || thirst <= config.agent_miscarriage_threshold
@@ -410,6 +497,52 @@ impl AgentHormones {
         if cohabiting {
             Self::add_pulse(&mut self.oxytocin, config.hormone_rate_cohabitation_ot * dt);
             Self::add_pulse(&mut self.serotonin, config.hormone_rate_cohabitation_5ht * dt);
+        }
+    }
+
+    /// ★ H-05/H-06 生成 UI 观察快照（唯一构造入口，world_snapshot.rs 与 snapshot_bin/encode.rs 共用）。
+    /// 只传 UI 必需项；水平/基线数组顺序固定见 [`super::snapshot::HormoneSnapshot`]。
+    pub fn observe(
+        &self,
+        gender: Gender,
+        age: f32,
+        is_pregnant: bool,
+        config: &SimConfig,
+    ) -> super::snapshot::HormoneSnapshot {
+        let b = self.effective_baselines(gender, age, is_pregnant, config);
+        super::snapshot::HormoneSnapshot {
+            levels: [
+                self.dopamine,
+                self.dopamine_threshold,
+                self.serotonin,
+                self.endorphin,
+                self.oxytocin,
+                self.cortisol,
+                self.adrenaline,
+                self.norepinephrine,
+                self.androgen,
+                self.estrogen,
+                self.progesterone,
+                self.thyroxine,
+            ],
+            baselines: [
+                b.dopamine,
+                b.dopamine_threshold,
+                b.serotonin,
+                b.endorphin,
+                b.oxytocin,
+                b.cortisol,
+                b.adrenaline,
+                b.norepinephrine,
+                b.androgen,
+                b.estrogen,
+                b.progesterone,
+                b.thyroxine,
+            ],
+            chronic_stress: self.chronic_stress,
+            nutrition_deficit: self.nutrition_deficit,
+            crash_timers: self.crash_timers,
+            anxious: self.is_anxious(config),
         }
     }
 }

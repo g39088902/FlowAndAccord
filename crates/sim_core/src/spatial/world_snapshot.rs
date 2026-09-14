@@ -10,8 +10,7 @@ use super::snapshot::{
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
     TerrainAccentSnapshot, TerrainFeatureSnapshot, TerrainSubFeatureSnapshot,
     TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
-};
-use super::world::World3DEngine;
+};use super::world::World3DEngine;
 
 /// 快照生成
 ///
@@ -328,6 +327,10 @@ impl World3DEngine {
                 coronation_pending: agent.coronation_pending,
                 courtship_target_id: agent.courtship_target_id,
                 family_stock_active: agent.family_stock_active,
+                // ★ H-05 激素观察快照（唯一构造入口 AgentHormones::observe，二进制编码同源）
+                hormones: agent
+                    .hormones
+                    .observe(agent.gender, agent.age, agent.is_pregnant, &self.config),
                 active_task: agent
                     .active_task
                     .as_ref()

@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.55';
+        this._appVersion = '1.50.56';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.55';
+            this._appVersion = msg.appVersion || '1.50.56';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -316,6 +316,9 @@
         // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
         // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
         if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
+        // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
+        //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
+        if (window.HormoneTrend) window.HormoneTrend.reset();
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -446,7 +449,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.55';
+        return this._appVersion || '1.50.56';
 
       }
 
@@ -917,6 +920,15 @@
             surname: a.surname || '',
             prestige: a.prestige || 0,
             familyStockActive: a.family_stock_active || [false, false, false, false, false],
+            // ★ H-05 激素观察快照透传（P0 只读观察；数组顺序见 snapshot-bin.js readHormones）
+            hormones: a.hormones ? {
+              levels: a.hormones.levels || null,
+              baselines: a.hormones.baselines || null,
+              chronicStress: a.hormones.chronic_stress || 0,
+              nutritionDeficit: a.hormones.nutrition_deficit || 0,
+              crashTimers: a.hormones.crash_timers || [0, 0, 0],
+              anxious: a.hormones.anxious || false,
+            } : null,
             marriageHistoryCount: a.marriage_history_count || 0,
             householdId: a.household_id != null ? a.household_id : null,
             householdRole: a.household_role || 'None',

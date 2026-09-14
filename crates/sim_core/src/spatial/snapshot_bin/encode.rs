@@ -215,6 +215,24 @@ impl World3DEngine {
                 } else {
                     w.u8(0);
                 }
+                // ★ H-05 激素观察块（FABS v4 追加在 AGENT 记录尾部；与 JSON 快照逐字段等价）。
+                // 布局 = 12×f32 水平 + 12×f32 有效基线 + f32 慢性压力 + f32 营养不足
+                // + 3×u32 余韵计时器 + u8 NE 焦虑标签。
+                // 数组顺序固定：DA、DA阈值、5-HT、EP、OT、CORT、ADR、NE、AND、EST、PROG、THY。
+                // 唯一构造入口 AgentHormones::observe（world_snapshot.rs 同源，杜绝双写漂移）。
+                let hs = agent.hormones.observe(agent.gender, agent.age, agent.is_pregnant, &self.config);
+                for &v in hs.levels.iter() {
+                    w.f32(v);
+                }
+                for &v in hs.baselines.iter() {
+                    w.f32(v);
+                }
+                w.f32(hs.chronic_stress);
+                w.f32(hs.nutrition_deficit);
+                for &t in hs.crash_timers.iter() {
+                    w.u32(t);
+                }
+                w.u8(hs.anxious as u8);
             }
             w.align4();
             secs.push(Sec::new(

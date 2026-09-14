@@ -24,7 +24,9 @@
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 3; // v1.50.30 D-B1-4：新增 TERRAIN_SUB_FEATURES section
+  var FORMAT_VERSION = 4; // v1.50.56 H-05：AGENT 顺序流尾部追加激素观察块（新旧混搭双向拒绝解码）
+  // ★ H-05 激素水平/基线数组固定顺序（与 snapshot.rs::HormoneSnapshot 文档一致）
+  var HORMONE_LEVEL_LEN = 12;
   var NONE_U32 = 0xffffffff;
   var NONE_F32_NAN = NaN;
 
@@ -278,6 +280,7 @@
           courtship_target_id: ar.optU32(),
           family_stock_active: [ar.u8() === 1, ar.u8() === 1, ar.u8() === 1, ar.u8() === 1, ar.u8() === 1],
           active_task: readActiveTask(ar),
+          hormones: readHormones(ar),
         };
         snap.agents.push(a);
       }
@@ -685,6 +688,23 @@
       primitive_kind: strOf(r.u32()),
       primitive_detail: strOf(r.u32()),
       itinerary: strOf(r.u32()),
+    };
+  }
+
+  // ★ H-05 激素观察块解码（FABS v4；布局见 snapshot_bin/encode.rs AGENT 段尾部注释）
+  // levels/baselines 顺序：DA、DA阈值、5-HT、EP、OT、CORT、ADR、NE、AND、EST、PROG、THY
+  function readHormones(r) {
+    var levels = new Array(HORMONE_LEVEL_LEN);
+    for (var i = 0; i < HORMONE_LEVEL_LEN; i++) levels[i] = r.f32();
+    var baselines = new Array(HORMONE_LEVEL_LEN);
+    for (var j = 0; j < HORMONE_LEVEL_LEN; j++) baselines[j] = r.f32();
+    return {
+      levels: levels,
+      baselines: baselines,
+      chronic_stress: r.f32(),
+      nutrition_deficit: r.f32(),
+      crash_timers: [r.u32(), r.u32(), r.u32()],
+      anxious: r.u8() === 1,
     };
   }
 

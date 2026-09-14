@@ -366,5 +366,17 @@
   "hormoneRateDeprivationCort": 3.0,
   "hormoneRateCriticalAdr": 5.0,
   "hormoneRateCohabitationOt": 2.5,
-  "hormoneRateCohabitation5ht": 1.5
+  "hormoneRateCohabitation5ht": 1.5,
+  "hormoneCoupleChronic5htDrop": 20.0,
+  "hormoneCoupleChronicAndDrop": 30.0,
+  "hormoneCoupleOtBufferRatio": 0.5,
+  "hormoneCoupleNutritionThyDrop": 25.0,
+  "hormoneNutritionDeficitRate": 2.0,
+  "hormoneNutritionDeficitRecovery": 4.0,
+  "hormoneEpPeakThreshold": 80.0,
+  "hormoneEpCrashHours": 2.0,
+  "hormoneAdrPeakThreshold": 70.0,
+  "hormoneAdrFatigueHours": 1.0,
+  "hormoneAnxietyNeThreshold": 60.0,
+  "hormoneAnxiety5htThreshold": 30.0
 }

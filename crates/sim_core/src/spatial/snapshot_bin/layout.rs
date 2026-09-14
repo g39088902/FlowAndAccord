@@ -29,7 +29,9 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 /// 帧格式版本。**结构性**变更（增删 section 或改字段编码）时必须 +1；
 /// 前端 `snapshot-bin.js` 校验不匹配即拒绝整帧（返回 null，上层告警）。
 /// v1.50.30：2 -> 3（D-B1-4 新增 `TerrainSubFeatures=22` section，见下方枚举）。
-pub const FORMAT_VERSION: u16 = 3;
+/// v1.50.56（H-05）：3 -> 4（AGENT 顺序流尾部追加激素观察块：12 水平 + 12 有效基线
+/// + 慢性压力 + 营养不足 + 3 余韵计时器 + NE 焦虑标签；新旧解码器双向拒绝错版帧）。
+pub const FORMAT_VERSION: u16 = 4;
 
 /// Header 定长（字节）
 ///

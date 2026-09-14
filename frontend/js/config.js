@@ -430,4 +430,18 @@ window.SIM_CONFIG = {
   hormoneRateCriticalAdr: 5.0, // 临界求生自救肾上腺素持续增长速率 (/游戏小时)
   hormoneRateCohabitationOt: 2.5, // 夫妻在宅共处催产素持续增长速率 (/游戏小时)
   hormoneRateCohabitation5ht: 1.5, // 夫妻在宅共处血清素持续增长速率 (/游戏小时)
+
+  // ★ H-04 耦合与峰后窗口
+  hormoneCoupleChronic5htDrop: 20.0, // 慢性压力满值时血清素有效基线最大下调量 (CORT→5-HT)
+  hormoneCoupleChronicAndDrop: 30.0, // 慢性压力满值时雄激素有效基线最大下调量 (CORT→AND 生殖轴压制)
+  hormoneCoupleOtBufferRatio: 0.5, // 催产素满值时离散应激皮质醇脉冲的缓冲比例上限 (OT→压力缓冲)
+  hormoneCoupleNutritionThyDrop: 25.0, // 营养不足满值时甲状腺素有效基线最大下调量 (营养→THY 节流)
+  hormoneNutritionDeficitRate: 2.0, // 饥渴匮乏时营养不足累计速率 (/游戏小时)
+  hormoneNutritionDeficitRecovery: 4.0, // 饱食良好时营养不足恢复速率 (/游戏小时)
+  hormoneEpPeakThreshold: 80.0, // 内啡肽峰后崩解窗口触发峰值阈值 (越阈上升沿触发)
+  hormoneEpCrashHours: 2.0, // 内啡肽峰后过劳崩解窗口时长 (游戏小时)
+  hormoneAdrPeakThreshold: 70.0, // 肾上腺素峰后疲劳窗口触发峰值阈值 (越阈上升沿触发)
+  hormoneAdrFatigueHours: 1.0, // 肾上腺素峰后深度疲劳窗口时长 (游戏小时)
+  hormoneAnxietyNeThreshold: 60.0, // NE 焦虑标签的去甲肾上腺素下限 (高NE+低5-HT)
+  hormoneAnxiety5htThreshold: 30.0, // NE 焦虑标签的血清素上限
 };

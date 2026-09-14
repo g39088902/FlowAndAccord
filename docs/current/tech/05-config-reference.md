@@ -433,3 +433,20 @@
 | `hormoneRateCriticalAdr` | f32 | 5 | spatial/hormones.rs (神经内分泌调制) | 临界求生自救肾上腺素持续增长速率 (/游戏小时) |
 | `hormoneRateCohabitationOt` | f32 | 2.5 | spatial/hormones.rs (神经内分泌调制) | 夫妻在宅共处催产素持续增长速率 (/游戏小时) |
 | `hormoneRateCohabitation5ht` | f32 | 1.5 | spatial/hormones.rs (神经内分泌调制) | 夫妻在宅共处血清素持续增长速率 (/游戏小时) |
+
+## 18. 1 四轴十一激素系统 · 耦合与峰后窗口超参
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `hormoneCoupleChronic5htDrop` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 慢性压力满值时血清素有效基线最大下调量 (CORT→5-HT) |
+| `hormoneCoupleChronicAndDrop` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | 慢性压力满值时雄激素有效基线最大下调量 (CORT→AND 生殖轴压制) |
+| `hormoneCoupleOtBufferRatio` | f32 | 0.5 | spatial/hormones.rs (神经内分泌调制) | 催产素满值时离散应激皮质醇脉冲的缓冲比例上限 (OT→压力缓冲) |
+| `hormoneCoupleNutritionThyDrop` | f32 | 25 | spatial/hormones.rs (神经内分泌调制) | 营养不足满值时甲状腺素有效基线最大下调量 (营养→THY 节流) |
+| `hormoneNutritionDeficitRate` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 饥渴匮乏时营养不足累计速率 (/游戏小时) |
+| `hormoneNutritionDeficitRecovery` | f32 | 4 | spatial/hormones.rs (神经内分泌调制) | 饱食良好时营养不足恢复速率 (/游戏小时) |
+| `hormoneEpPeakThreshold` | f32 | 80 | spatial/hormones.rs (神经内分泌调制) | 内啡肽峰后崩解窗口触发峰值阈值 (越阈上升沿触发) |
+| `hormoneEpCrashHours` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 内啡肽峰后过劳崩解窗口时长 (游戏小时) |
+| `hormoneAdrPeakThreshold` | f32 | 70 | spatial/hormones.rs (神经内分泌调制) | 肾上腺素峰后疲劳窗口触发峰值阈值 (越阈上升沿触发) |
+| `hormoneAdrFatigueHours` | f32 | 1 | spatial/hormones.rs (神经内分泌调制) | 肾上腺素峰后深度疲劳窗口时长 (游戏小时) |
+| `hormoneAnxietyNeThreshold` | f32 | 60 | spatial/hormones.rs (神经内分泌调制) | NE 焦虑标签的去甲肾上腺素下限 (高NE+低5-HT) |
+| `hormoneAnxiety5htThreshold` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | NE 焦虑标签的血清素上限 |

@@ -527,6 +527,32 @@ pub struct SimConfig {
     pub hormone_rate_critical_adr: f32,
     pub hormone_rate_cohabitation_ot: f32,
     pub hormone_rate_cohabitation_5ht: f32,
+
+    // 15.1 四轴十一激素系统 · 耦合与峰后窗口超参 (H-04)
+    /// chronic_stress=100 时血清素有效基线最大下调量（CORT→5-HT 抑制，单位同激素水平）
+    pub hormone_couple_chronic_5ht_drop: f32,
+    /// chronic_stress=100 时雄激素有效基线最大下调量（CORT→AND 生殖轴压制，H-17 沿用）
+    pub hormone_couple_chronic_and_drop: f32,
+    /// OT=100 时离散应激 CORT 脉冲的缓冲比例上限（OT→压力缓冲）
+    pub hormone_couple_ot_buffer_ratio: f32,
+    /// nutrition_deficit=100 时甲状腺素有效基线最大下调量（营养→THY 节流）
+    pub hormone_couple_nutrition_thy_drop: f32,
+    /// 饥渴匮乏时营养不足累计速率 (/游戏小时)
+    pub hormone_nutrition_deficit_rate: f32,
+    /// 饱食良好时营养不足恢复速率 (/游戏小时)
+    pub hormone_nutrition_deficit_recovery: f32,
+    /// 内啡肽峰后崩解窗口的触发峰值阈值（越阈上升沿触发）
+    pub hormone_ep_peak_threshold: f32,
+    /// 内啡肽峰后过劳崩解窗口时长 (游戏小时)
+    pub hormone_ep_crash_hours: f32,
+    /// 肾上腺素峰后疲劳窗口的触发峰值阈值（越阈上升沿触发）
+    pub hormone_adr_peak_threshold: f32,
+    /// 肾上腺素峰后深度疲劳窗口时长 (游戏小时)
+    pub hormone_adr_fatigue_hours: f32,
+    /// NE 焦虑标签的去甲肾上腺素下限（高 NE + 低 5-HT = 焦虑警觉）
+    pub hormone_anxiety_ne_threshold: f32,
+    /// NE 焦虑标签的血清素上限
+    pub hormone_anxiety_5ht_threshold: f32,
 }
 
 impl SimConfig {

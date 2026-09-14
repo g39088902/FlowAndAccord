@@ -306,6 +306,31 @@ pub struct LaneSnapshot {
     pub concealment: f32,
 }
 
+/// ★ H-05/H-06 激素观察快照（UI 必需项；由 `AgentHormones::observe()` 唯一构造）。
+///
+/// `levels` / `baselines` 为定长 12 元素数组，顺序固定：
+/// `[0]`多巴胺 DA、`[1]`**DA 奖赏阈值**（不是第十二种激素，UI 须单独标示）、
+/// `[2]`血清素 5-HT、`[3]`内啡肽 EP、`[4]`催产素 OT、`[5]`皮质醇 CORT、
+/// `[6]`肾上腺素 ADR、`[7]`去甲肾上腺素 NE、`[8]`雄激素 AND、`[9]`雌激素 EST、
+/// `[10]`孕激素 PROG、`[11]`甲状腺素 THY。
+/// `baselines` 为本拍有效基线（已含慢性压力 5-HT/AND 与营养不足 THY 的耦合下调）。
+/// FABS 帧编码顺序与此处字段声明顺序一致（v1.50.x FORMAT_VERSION 4）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HormoneSnapshot {
+    /// 11 激素水平 + DA 奖赏阈值（顺序见结构体文档）
+    pub levels: [f32; 12],
+    /// 有效基线（与 levels 同序；含 CORT→5-HT、CORT→AND、营养→THY 耦合下调）
+    pub baselines: [f32; 12],
+    /// 慢性压力累计器 [0.0, 100.0]
+    pub chronic_stress: f32,
+    /// 营养不足累计器 [0.0, 100.0]（营养→THY 节流驱动）
+    pub nutrition_deficit: f32,
+    /// 余韵计时器 (tick)：`[0]`EP 崩解、`[1]`ADR 疲劳、`[2]`产后/流产脆弱
+    pub crash_timers: [u32; 3],
+    /// NE 焦虑标签（高 NE + 低 5-HT，游戏规则标签）
+    pub anxious: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSnapshot {
     pub id: AgentId,
@@ -402,6 +427,8 @@ pub struct AgentSnapshot {
     /// ★ M19.4 活动任务透视快照（意图-策略-原语三栏透视与决策可解释性）
     #[serde(default)]
     pub active_task: Option<ActiveTaskSnapshot>,
+    /// ★ H-05 激素观察快照（P0 只读观察；观察快照不参与存档，内部完整状态走存档契约）
+    pub hormones: HormoneSnapshot,
 }
 
 /// ★ M19.4 活动任务快照（意图-策略-原语三栏透视与决策可解释性）
