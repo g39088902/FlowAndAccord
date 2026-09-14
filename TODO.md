@@ -83,6 +83,6 @@
 
 ## 未拆分阶段
 
-阶段七已拆入 [STAGE-07-TODO.md](STAGE-07-TODO.md)并**全部交付**（S7-01~S7-10，v1.50.39~52 收口；3 张新 profile 已入存读档白名单与 `random` 候选池）。其余子特征、D-C、P1、R0 与远期静态模板按 [06 号 R.3](docs/plan/tech/06-terrain-templates.md)逐项解锁、开工时拆分；T4 动态扩展另立项。
+阶段七（插队模板批次）已**全部交付**并随收官归档删除专项文档 STAGE-07-TODO.md（S7-01~S7-10，v1.50.39~52 收口；3 张新 profile 已入存读档白名单与 `random` 候选池，探针门禁基线收编于 [06 号 §18.8](docs/plan/tech/06-terrain-templates.md)）。其余子特征、D-C、P1、R0 与远期静态模板按 [06 号 R.3](docs/plan/tech/06-terrain-templates.md)逐项解锁、开工时拆分；T4 动态扩展另立项。
 
 开工约束：阶段二已收官，无剩余项；阶段三剩余物理项按 §5.4.D 岩壁离散尺度探针准入，候选参数不得当作已验证默认值。
