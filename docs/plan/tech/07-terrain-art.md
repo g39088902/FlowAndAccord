@@ -277,7 +277,7 @@ S1 已落地部分见 §3.2；本节只保留 S1 未完成项与信息减噪任�
 
 先给 `computeElevationColor` 加季节因子（春嫩、夏深、秋枯草色；冬季覆雪待明确气候数据契约后再接入），再**显式使 `cell.color` 缓存失效**——`rustworld.js` 的 `_terrainCached` 是单标志，只改颜色函数而继续用旧缓存会毫无效果。与 [17 号光照方案](../../current/tech/17-seasonal-lighting.md)分工：本节改反照率，光向/色温归光照方案，共用 `SimLighting.phase()`，禁止两套季节时钟（§4.3）。
 
-### 5.3 TA-16 · 标注避让与聚合（✅ 已落地，v1.50.52~53，S4-06/S4-07 验收见 [STAGE-04-TODO](../../../STAGE-04-TODO.md) §11/§12）
+### 5.3 TA-16 · 标注避让与聚合（✅ 已落地，v1.50.52~53，S4-06/S4-07，详见 [16 号文](../../current/tech/16-frontend-overview.md) §2.18）
 
 已由 `label-layout.js` 统一接管世界画布文字入口：统一网格冲突检测（`labelGridCellSize` 48px 分桶）、UI 禁入矩形（支持 5 处控制面板动态刷新）、同类普通房屋编号聚合徽标（`🏠 N舍`，点击展开成员跳转卡）、选中与悬浮双目标强制保留（落入 UI 覆盖区或画布外时自动转入 `#label-fallback-dock` 边缘提示槽位并拉出虚线引线）、有限布局滞回（`_prevSlotMap` + `labelHysteresisPx` 4px 消除临界微抖动）及 DOM 快照缓存（`_lastDockHtml` / `_lastClusterHtml`，严格杜绝高频 DOM 重排与事件断流，守住根 AGENTS.md §4.15 红线）。
 

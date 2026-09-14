@@ -171,25 +171,89 @@ stateDiagram-v2
 - DOM 统计节流：顶栏与大盘以 10 FPS 降频更新。
 - 族谱视口虚拟化：DOM 数量恒定在视口容量+缓冲。
 
-### 2.16 frontend/js 文件清单
+### 2.16 微观资源景观派生系统（★ v1.50.47~51，D-C 通用资源景观）
+围绕全图真实资源 POI（Water/Wood/Berry/Stone/Gold）的前端确定性派生微观景观群，由 `landscape-model.js`（模型派生与缓存）与 `render_landscapes.js`（深度队列接入绘制）协作完成：
+- **纯表现层与确定性派生**：
+  - 数据形态：`LandscapeGroup { key: "poi:<id>", recipe, recipeVersion, anchor, geometrySignature, children[], bounds, q }` 与 `LandscapeChild { key: "poi:<id>/<role>/<slot>", modelKind, visualSeed, dx, dy, x, y, z, rot, scale, footprint, bounds, stockRole }`。
+  - 确定性哈希：子图元种子通过 MurmurHash3 风格整数算法（`worldSeed ^ poi.id ^ roleSalt ^ slot`）派生，使用严格 `Math.imul` 与 `>>>0` 无符号整数运算，**禁止** `Math.random`、系统时间或消费模拟主 `WorldRng`。
+  - 极坐标采样：候选位置按 $r = \sqrt{\text{lerp}(r_{\min}^2, r_{\max}^2, u)}$、$	heta = 2\pi v$ 盘分布采样，变换至世界坐标后逐点通过双线性插值采样静态高程场。
+  - 坡度与水面拒绝：贴地片落点格心与四缘任一坡度 $> \text{landscapeGroundMaxSlopeDeg}(16^\circ)$ 时整片拒绝（防止贴片悬浮穿山）；Water 配方候选四邻落入浅水/深水时拒绝，仅画陆侧岸石与低草，**严禁凭空扩张水域**。
+- **五类通用配方与单调库存丰度**：
+  - **Water**：陆侧岸石 + 小片低草 + `wet` 湿润土贴地色差片（role 级 30~42 半径带覆盖，避开 POI 操作区）。
+  - **Wood**：主树 + 林缘灌木 + `shade` 林下暗部贴地片 + `foliage` 可采枝叶细节（`stockRole: 'detail'`）。
+  - **Berry**：不规则低灌木簇 + `fruit` 深浆果红点簇（构建期预计算 10 点盘分布静态几何，绘制期可见点数随 $q$ 单调递增）。
+  - **Stone**：岩石露头 + 碎石 + `quarry` 可采面明暗灰斑（透明度随 $q$ 线性增强）。
+  - **Gold**：岩石骨架 + `vein` 哑光矿脉斑点（**严禁发光或亮晕**）。
+  - **库存丰度单调映射**：$q = \text{clamp}(\text{currentStock} / \text{maxStock}, 0, 1)$。库存变化仅驱动可采细节显隐与点簇可见度，**骨架与候选几何绝对不参与重抽**。
+- **性能与渲染接入**：
+  - 贴地色差片填充样式常量预建（`_gpStyles`），渲染热路径零字符串分配与零 GC。
+  - 子图元与投影分别入统一深度队列（`DEPTH_LANDSCAPE=13`，`DEPTH_LANDSCAPE_SHADOW=14`），随相机远近统一遮挡。
+  - 关态（`landscapeEnabled=false`）零入队零同步，完整回退基础 POI 标记。
+
+### 2.17 最终世界几何遮罩自适应避让（★ v1.50.48，TA-14 表现层几何遮罩）
+由于基础装饰 accents 早于道路、房屋与 POI 产生，表现层在最终世界几何到达后通过 `landscape-mask.js` 进行确定性后处理裁剪：
+- **表现层后处理原则**：物理世界（路网、房屋、地表格、POI）与源数组（`terrain.accents` / `LandscapeModel` 组）只读不变；遮罩只管理可见性与入队裁剪，关闭遮罩即完整还原基础装饰。
+- **三大保护区收集**：
+  - **车道保护区**：全段采样三次贝塞尔曲线胶囊带（8 点粗估弧长 → 弦距 $\le 10$ 世界单位细分，上限 36 点，弯道弦差小于留白余量；异常段退化为端点/中点包围圆）。
+  - **房屋保护区**：保守圆（半径 18），无需猜测门朝向，全面保护周边作业区。
+  - **POI 操作区**：半径 $\max(\text{底座半径}, \text{图标世界尺寸}) + \text{余量}$（注意：`poiMarkerFootprintR` 是深度辅助半径，严禁用作保护半径以免误杀资源环）。
+- **空间索引与动态脏桶失效**：
+  - 世界平面网格分桶（`binSize` 96），查询时先取足迹相交桶再做精确圆-圆/圆-线段测距，杜绝全图遍历扫描。
+  - 房屋/POI 集合签名逐实体 diff，车道根据 `geom_version + 条数` 变化判定（道路磨损 wear 不触发遮罩重建）；修订号 `geomRev` 驱动占据网格更新与判定缓存 `accent._lm`，稳态每帧零重复计算。
+- **去重与细节语义**：
+  - 来源优先级：可见景观 > 基础装饰。被保护区隐藏的景观子图元不参与去重。
+  - 可采细节（`stockRole: 'detail'`）只做遮蔽预判，**不入占据桶**，防止细节随库存变化时误藏基础装饰。
+
+### 2.18 世界标注布局、聚合与交互兜底引擎（★ v1.50.52~53，TA-16 标注避让与聚合）
+世界画布文字统一由 `label-layout.js`（`window.LabelLayout`）接管，消灭拥挤压字、山后透视与高频重排：
+- **统一文字入口与帧内管线**：
+  - 抽离 10 处文字入口（POI 图标/名称/舍数/资源图标、房屋拍卖/修缮/编号、小人施工/流产/夺位）。
+  - 帧内三段式挂载：`beginFrame(w, h)` 重置提案池 → 实体收集阶段提交 `propose` → `resolve` 统一按 `(优先级, 收集序)` 稳定排序安置。
+- **屏幕网格冲突检测与分级避让**：
+  - 屏幕网格分桶（`labelGridCellSize` 48px）快速检测相交，并避开 UI 禁入覆盖区（顶栏、Inspector、账本大盘、均值面板、资源面板）。
+  - **pinned 实体锚定标**（POI 图标、小人动作标）：恒接受占格不移位。
+  - **ordinary 普通文字**（营地名/舍数、房屋编号/拍卖标）：依次尝试 [首选 → 锚点镜像 → 同排右 → 同排左] 4 个备选位，全部冲突则省略。
+  - **山后不透山**：普通标签仍在实体所属深度落笔，严格遵循世界地形深度遮挡；只有选中需求气泡走 `overlayPlace` 顶层交互通道。
+- **同类普通房屋编号聚合徽标**：
+  - 低缩放（$z \le \text{labelClusterMaxZoom}$ 0.95）或近邻拥挤（$\text{labelClusterRadiusPx}$ 36px）下，普通房屋编号自动聚合成 `🏠 N舍` 数量徽标。
+  - 选中与悬浮房屋保持单体不被吸收；点击徽标弹出只读成员列表（`#label-cluster-popup`），支持定位与选中。
+- **选中与悬浮双目标停靠兜底与引线**：
+  - 选中（Selected）与悬浮（Hovered）实体强制保留；若投影被 UI 面板遮挡或溢出画布边界，自动回落至画布左边缘提示槽位（`#label-fallback-dock`），各占独立行。
+  - `drawLeaderLines` 绘制带阻尼的虚线引线连接提示卡片与世界真实投影锚点。
+- **交互抗抖与 DOM 缓存红线**：
+  - `_prevSlotMap` + `labelHysteresisPx`(4px) 有限布局滞回，微小移动时首选位须有充裕空间才切回，彻底消除临界跳位抖动。
+  - 严格遵守根 AGENTS.md §4.15 红线：`syncFallbackDockDOM` 与 `openClusterPopup` 引入内容快照缓存（`_lastDockHtml` / `_lastClusterHtml`），HTML 未变绝不重新赋值 `innerHTML`，消灭高频 DOM 重排与事件断流。
+  - 生命周期契约：`_invalidateWorldStaticCaches()` 显式调用 `LabelLayout.resetCache()`，换世界与读档零残留。
+
+### 2.19 frontend/js 文件清单
 | 文件 | 职责 |
 | :--- | :--- |
 | `config.js` | 全局动态数值配置（window.SIM_CONFIG） |
+| `config.render.js` | 渲染配置与表现层调参入口（window.RENDER_CONFIG：景观配方/遮罩/标签布局/光照/LOD 阈值） |
 | `config.decision-order.js` | 决策分支评估顺序持久化配置（启动注入权威默认值；★ v1.27.0 起用户调整保存到浏览器 localStorage） |
 | `config.house-upgrade-cost.js` | 房屋升级材料成本矩阵 20 字段（M8 拆分） |
 | `decision-viz-data.js` | 决策引擎 16 条活动分支的统一名称与元数据（b11 已并入 b8，采购为资源策略） |
 | `decision-viz-view.js` | 决策引擎视图层：单列布局、拖拽换序、分界线吸附、缩放平移、检查器 |
 | `decision-viz.js` | 决策引擎集成层：启动合并顺序配置 → SIM_CONFIG；拖动热注入 + ★ v1.27.0 保存到 localStorage |
 | `math.js` | 3D 向量与投影变换 |
-| `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接 |
+| `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接、生命周期缓存失效 |
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |
-| `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘（不含随身行囊均值与贫富倍差） |
-| `render_world.js` | 3D 地形、水系地貌特征（河岸/浅滩/泉谷，T1 山脊/山口/台地轮廓 v1.47.7 已删）、POI 指示环、房屋及★在售呼吸光晕与拍卖标牌、踩踏道路。★ v1.50.46 TA-04-6 深度队列迁往 render_depth_queue.js，本文件保留 POI/房屋/道路绘制与 lightShadowOffset/shadeHex |
-| `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 收集与分发（地形格/水系/道路/POI/房屋/装饰/树灌木贴地投影/族人） |
-| `render_shadows.js` | ★ v1.50.46 TA-04-6 装饰贴地投影绘制层：drawAccentShadowGround 树/灌木地面图元阴影（实高驱动影长 + 叶量调制，夏冠影完整/冬稀疏枝影 + 弱接地影） |
+| `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘 |
+| `render_world.js` | 3D 地形、水系地貌特征、POI 指示环、房屋模型及拍卖标牌、踩踏道路 |
+| `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 统一调度与实体悬浮检测 |
+| `render_shadows.js` | ★ v1.50.46 TA-04-6 装饰贴地投影绘制层：drawAccentShadowGround / drawAccentShadowFor 树/灌木地面图元阴影 |
+| `accent-model.js` | ★ v1.50.23 装饰模型派生与缓存（Tree/Bush/Boulder/RockCluster/GrassTuft + ★ S4-02 景观子图元 'L#' 命名空间通道） |
+| `accent-season.js` | ★ v1.50.23 动态季相颜色派生系统（树叶色彩相位调制与季节过渡） |
+| `render_accents.js` | ★ v1.50.23 装饰立体图元绘制（树木/灌木/岩石/碎石群） |
+| `render_grass.js` | ★ v1.50.39 GrassTuft 丛草独立绘制层 |
+| `landscape-model.js` | ★ S4-02 资源景观模型层（五类 POI 配方、uint32 确定性哈希、极坐标盘采样、双线性高程、丰度单调映射） |
+| `landscape-mask.js` | ★ S4-03 最终世界几何遮罩层（车道贝塞尔采样胶囊带、房屋保守圆、POI 操作区空间分桶避让、字段签名脏桶失效） |
+| `render_landscapes.js` | ★ S4-02 资源景观绘制接入层（子图元与阴影入统一深度队列、GroundPatch 贴地色差片绘制） |
+| `label-layout.js` | ★ S4-06/07 世界标注布局与聚合引擎（网格冲突检测、同类房屋编号聚合、双目标强制保留与边缘停靠虚线引线、有限滞回与 DOM 快照缓存） |
+| `terrain-texture.js` | ★ TA-12-2 确定性地表纹样模型层（世界网格分桶草斑土纹图元，缩放旋转不重随机） |
 | `render_agents.js` | 族人渲染、妊娠光环、状态气泡、登基礼花粒子 |
 | `river_life.js` | 水系微观生态纯表现层（★ v1.49.0）：水底卵石、成群游鱼、迎光太阳波光，种子联动 `_engineSeed` |
-| `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与拾取点击 |
+| `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与智能拾取（优先命中聚合徽标与 LabelLayout 安置标签） |
 | `main.js` | 页面交互、相机控制、快捷键、无头模式 |
 | `save-ui.js` | 本地文件与槽位存档/读档系统 |
 | `dag.js` / `dag-*.js` | 直系血脉时间轴族谱四件套（布局/渲染/新标签页/编排） |
@@ -208,4 +272,4 @@ stateDiagram-v2
 - `config.js`：所有数值参数的唯一前端入口。
 
 ## 5. 调参入口
-前端无独立配置文件，所有数值参数通过 `config.js` 驱动，见 [./05-config-reference.md](./05-config-reference.md)。
+前端无独立配置文件，所有数值参数通过 `config.js`（仿真超参）与 `config.render.js`（纯视觉与布局超参）驱动，见 [./05-config-reference.md](./05-config-reference.md)。
