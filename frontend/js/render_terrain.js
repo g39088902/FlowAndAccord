@@ -231,6 +231,16 @@ function drawTerrainCell(i00, i10, i11, i01) {
   ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
   ctx.closePath();
   ctx.fill();
+
+  // ★ TA-12-3 世界坐标锁定地表纹理：本格纹样分片在基底之后立即绘制，与基底同属
+  //   DEPTH_CELL——不新增深度队列项、不抬 Z、不调用 projectLifted/_decalDepth（TA-12-TODO §3.3.4）。
+  //   分片几何在模型构建期已预裁剪到本格世界矩形（terrain-texture.js::buildFragments），
+  //   此处只消费分片 (u,v) 做四角双线性凸组合投影——恒在本格四边形内，无需额外视口剔除；
+  //   纹理分片不跟随防缝外扩（TERRAIN_SEAM_PX 仅作用于上方基底填充路径，§3.3.5）。
+  //   lod = camera.zoom（统一世界→CSS 像素尺度；DPR 不参与），由模块内换算特征尺度淡入。
+  if (window.TerrainTexture) {
+    window.TerrainTexture.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
+  }
 }
 
 // ★ v1.50.11 地形网格线（调试叠加，'G' 键切换）：从 drawTerrain 拆出独立整层。

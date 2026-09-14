@@ -166,7 +166,10 @@ window.RENDER_CONFIG = {
     contrastMax: 0.08,         // 明度扰动上限（§4.1 上限 8%）
     cacheMaxBytes: 8388608,    // 模型缓存上限 8 MiB（超出按候选数等比例确定性截断）
     buildBudgetMs: 2,          // 分批构建每帧预算（未就绪格 TA-12-3 只画原基底）
-    // detailFadePx: [2,5] 归 TA-12-3 随 drawCell LOD 落地时登记（§4.2 特征尺度淡入区间）
+    // ★ TA-12-3 LOD：特征尺度 = 图元特征尺寸(世界单位) × camera.zoom(世界→CSS 像素)，
+    //   在 [2,5] CSS px 区间 smoothstep 淡入（远景隐去细土纹、草斑平滑减弱，§4.2）；
+    //   只作用于绘制透明度，不改变纹样身份 → 不触发模型重建。
+    detailFadePx: [2, 5],
   },
 
   // —— 资源景观（★ S4-02，STAGE-04-TODO §3.2；landscape-model.js / render_landscapes.js 消费）——

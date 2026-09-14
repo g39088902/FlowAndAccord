@@ -214,6 +214,10 @@ function drawWorldEntities() {
   //    深度取四角 world 坐标均值（深度公式对 wx/wy/elev 线性，均值即格心深度）；
   //    与立体实体同队列排序后，近处山地格后落笔即遮挡山后图标。
   if (hasTerrain) {
+    // ★ TA-12-3 世界纹样模型每帧一次分批准备（幂等；buildBudgetMs 预算内推进桶构建，
+    //   未就绪帧 TerrainTexture.drawCell 自动跳过、只画原基底）。参数取 RENDER_CONFIG
+    //   （纯渲染配置，不经 applyConfig 注入 WASM）；世界级失效已由 _invalidateWorldStaticCaches 钩住。
+    if (window.TerrainTexture) window.TerrainTexture.prepare(terrain, RC);
     const cells = terrain.cells;
     const gSize = terrain.gridSize;
     for (let gy = 0; gy < gSize - 1; gy++) {
