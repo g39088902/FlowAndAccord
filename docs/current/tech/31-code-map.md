@@ -249,7 +249,12 @@ FlowAndAccord/
     │       ├── 05-hunting-defense.md            # 狩猎、流寇与武力公约
     │       ├── 06-terrain-templates.md          # 地图模板库与 D-B 子特征蓝图
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
-    │       └── 08-performance.md                # 仅保留未完成的性能优化
+    │       ├── 08-performance.md                # 仅保留未完成的性能优化
+    │       └── assets/                          # 专项归档（实施/验收/验证记录）
+    │           ├── ta09/slope-verification.txt    # TA-09 RiverCliff 局部试算验证记录
+    │           └── ta12/                          # TA-12 地表纹理专项归档（v1.50.53 完成后归档）
+    │               ├── TA-12-TODO.md              # TA-12 实施清单与验收记录（八任务全闭环）
+    │               └── TA-12-BASELINE.md          # TA-12-1 无纹理基线记录与样板清单
 ```
 
 ## 1. 目录级 AGENTS.md

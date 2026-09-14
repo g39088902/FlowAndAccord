@@ -1,7 +1,7 @@
 # TA-12 技术实施方案与任务列表 · 世界坐标锁定的地表纹理
 
 > **状态：已实施完成（v1.50.53，2026-09-14）。** 八个子任务全部完成并经门禁与实测验收；文中参数为首轮建议值，性能数字与验收结论以 §6 各任务实施记录为准。
-> **任务来源**：[地形美术规划](docs/plan/tech/07-terrain-art.md) §1.2 TA-12、§5.1、§10.2、§11.3。本文按用户要求放在项目根目录，作为 TA-12 专项实施清单。
+> **任务来源**：[地形美术规划](../../../../../docs/plan/tech/07-terrain-art.md) §1.2 TA-12、§5.1、§10.2、§11.3。原按用户要求放于项目根目录；TA-12 完成收口后归档至 `docs/plan/tech/assets/ta12/`（同 TA-09 验证记录先例）。
 > **交付目标**：在现有纯色地表上增加低对比草斑和土纹；位置、形状和方向固定在世界空间，缩放、旋转、暂停、刷新及存读档不重新抽样。远景维持地貌主色，中近景呈现适量细节。
 
 ## 1. 范围与实施决策
@@ -23,12 +23,12 @@ TA-12 不依赖 TA-04~TA-08 或内核新地形任务，可以独立实施。以�
 
 | 位置 | 当前职责 | TA-12 接入方式 |
 |---|---|---|
-| [math.js](frontend/js/math.js) | `computeTerrainAlbedo` 按高程、坡度、肥力和水陆类别计算基色；`computeElevationColor` 提供固定光路径 | 保持主色公式；如需共享草/土权重，提取无行为变化的材质权重帮助函数，避免另写一套阈值 |
-| [rustworld.js](frontend/js/rustworld.js) | `_applySnapshot` 建立 `wx/wy/elev`、地表类别、法线、反照率和 `cell.color`；静态地形按需替换 | 地形重建通知纹理模型失效；不改变静态快照各通道的 null/空数组语义 |
-| [lighting.js](frontend/js/lighting.js) | `relightTerrain` 按光档写回 `cell.color`，包含大气色洗 | 提供同批更新的少量纹理色档，复用受光公式，避免解析 CSS 颜色或每帧造字符串 |
-| [render_terrain.js](frontend/js/render_terrain.js) | `drawTerrainShell` 批量投影顶点；`drawTerrainCell` 绘制外扩防缝四边形 | 在单格基底填充后绘制该格的纹理分片，保持原格深度 |
-| [render_depth_queue.js](frontend/js/render_depth_queue.js) | 当前 `drawWorldEntities`、地形格剔除、队列排序与 `DEPTH_CELL` 分发所在地 | 复用已有可见格和调用；不为每个草斑增加深度项 |
-| [config.render.js](frontend/js/config.render.js)、[index.html](frontend/index.html) | 视觉配置和原生脚本依赖顺序 | 集中参数，登记新模块；同时检索其他页面是否复用同一渲染入口 |
+| [math.js](../../../../../frontend/js/math.js) | `computeTerrainAlbedo` 按高程、坡度、肥力和水陆类别计算基色；`computeElevationColor` 提供固定光路径 | 保持主色公式；如需共享草/土权重，提取无行为变化的材质权重帮助函数，避免另写一套阈值 |
+| [rustworld.js](../../../../../frontend/js/rustworld.js) | `_applySnapshot` 建立 `wx/wy/elev`、地表类别、法线、反照率和 `cell.color`；静态地形按需替换 | 地形重建通知纹理模型失效；不改变静态快照各通道的 null/空数组语义 |
+| [lighting.js](../../../../../frontend/js/lighting.js) | `relightTerrain` 按光档写回 `cell.color`，包含大气色洗 | 提供同批更新的少量纹理色档，复用受光公式，避免解析 CSS 颜色或每帧造字符串 |
+| [render_terrain.js](../../../../../frontend/js/render_terrain.js) | `drawTerrainShell` 批量投影顶点；`drawTerrainCell` 绘制外扩防缝四边形 | 在单格基底填充后绘制该格的纹理分片，保持原格深度 |
+| [render_depth_queue.js](../../../../../frontend/js/render_depth_queue.js) | 当前 `drawWorldEntities`、地形格剔除、队列排序与 `DEPTH_CELL` 分发所在地 | 复用已有可见格和调用；不为每个草斑增加深度项 |
+| [config.render.js](../../../../../frontend/js/config.render.js)、[index.html](../../../../../frontend/index.html) | 视觉配置和原生脚本依赖顺序 | 集中参数，登记新模块；同时检索其他页面是否复用同一渲染入口 |
 
 注意 `terrain.cells` 实际是顶点阵列，四个顶点组成一个可绘制格；不能将顶点数量当作纹理单元数量。当前单格颜色取 `c00.color`，本次不顺带改变地形基底的着色粒度。
 
@@ -229,7 +229,7 @@ TA-13 后续改变反照率时，应统一标记基底颜色和纹理色档失�
     - 升版与 WASM：`node tools/bump-version.js --patch`（v1.50.52 → **v1.50.53**，12 定义点自动同步）→ `cargo build -p sim_wasm --target wasm32-unknown-unknown --release` → 双副本 `frontend/rust/` + `frontend/` 同步（1,388,401 字节）；`SAVE_APP_VERSION` 变更旧存档按设计自动废弃。
     - 门禁结果（全绿）：`frontend-check` ✅ · `config-check`（276 字段）✅ · `cargo test --lib`（0 用例，§4.10 设计使然）✅ · `test-wasm` ALL_TESTS_DONE（确定性/防越界/防 NaN/存读档/app_version 拒绝）✅ · `test-determinism` 6/6 套件 ✅ · `code-map-check`（228 扫描 216 登记 0 错误）✅ · `doc-link-check`（732 链接 0 失效）✅ · `cross-doc-check`（冲突 0 漂移 0）✅ · `bump-version --check`（12 定义点零漂移）✅ · `git diff --check` ✅。
     - `doc-maintenance-check --strict` exit=1：21 篇 NEEDS_REVIEW 均为**存量状态**（已验证 HEAD 无本次变更时同样 exit=1，且清单不含本次触碰的任何文档）；非 strict 模式 OK=19 全过。
-    - 文档同步：[01-changelog.md](docs/current/01-changelog.md) 追加 v1.50.53 里程碑条目；[frontend/AGENTS.md](frontend/AGENTS.md) §1.1 terrain-texture.js 行更新（~680 行 + TA-12-5/6/7 收口与 `_lodFade` 修复契约）；[31-code-map.md](docs/current/tech/31-code-map.md) terrain-texture/lighting/render_terrain/render_depth_queue/config.render 五行状态刷新；[19-ui-implementation.md](docs/current/tech/19-ui-implementation.md) §1 图层渲染顺序补 TA-12 纹理落笔说明；[07 号规划](docs/plan/tech/07-terrain-art.md) §1.2 TA-12 标 ✅ v1.50.53；本文头部队列与状态行更新。
+    - 文档同步：[01-changelog.md](../../../../../docs/current/01-changelog.md) 追加 v1.50.53 里程碑条目；[frontend/AGENTS.md](../../../../../frontend/AGENTS.md) §1.1 terrain-texture.js 行更新（~680 行 + TA-12-5/6/7 收口与 `_lodFade` 修复契约）；[31-code-map.md](../../../../../docs/current/tech/31-code-map.md) terrain-texture/lighting/render_terrain/render_depth_queue/config.render 五行状态刷新；[19-ui-implementation.md](../../../../../docs/current/tech/19-ui-implementation.md) §1 图层渲染顺序补 TA-12 纹理落笔说明；[07 号规划](../../../../../docs/plan/tech/07-terrain-art.md) §1.2 TA-12 标 ✅ v1.50.53；本文头部队列与状态行更新。
     - 临时断言与夹具：TA-12-2/4/5 临时 Node 脚本均已用后删除（无残留）；浏览器端采样器为页面内存注入，刷新即消失，无文件落盘。
     - 遗留保留项（如实未完成）：性能「新增耗时 p95 差 ≤3 ms」目标在本机未达成（增量 +30~110ms，数据见任务 7），预算取舍待明确接受；seed 元信息缺省直接读档的端到端复测依赖同版本样板存档（当前环境无 File System Access 建档自动化能力），该场景已由单元断言覆盖。
 
@@ -246,15 +246,15 @@ TA-13 后续改变反照率时，应统一标记基底颜色和纹理色档失�
 | 数据边界 | 开关纹理运行相同 seed 与 Tick | 世界事实与既有确定性门禁不受影响；不新增存档/FABS 字段 |
 | 性能 | §6 第 7 项全部负载 | 主线程渲染+UI p95 目标 ≤16 ms；新增耗时 p95 差 ≤3 ms；吞吐下降 ≤约5%；纹理缓存 ≤8 MiB |
 
-性能目标继承 [07 号 §11.3](docs/plan/tech/07-terrain-art.md)，8 MiB 是本任务建议的更小子预算。若基线本身超总预算，应同时报告基线超标与增量结果，不能声称总预算已通过。任何预算调整需提交原始数据与取舍并获得明确接受，不能自行放宽后标绿。
+性能目标继承 [07 号 §11.3](../../../../../docs/plan/tech/07-terrain-art.md)，8 MiB 是本任务建议的更小子预算。若基线本身超总预算，应同时报告基线超标与增量结果，不能声称总预算已通过。任何预算调整需提交原始数据与取舍并获得明确接受，不能自行放宽后标绿。
 
 性能记录至少包括：场景标识、开关状态、预热/采样时长、主线程 p50/p95、纹理绘制耗时、重着色耗时、冷重建首帧和重复重建 p95、模拟 ticks/s、缓存峰值与 GC 观察。尚未实施前不得填入推测成绩。
 
 ## 8. 验证与文档维护
 
-实施遵循 [根 AGENTS.md](AGENTS.md)、[前端 AGENTS.md](frontend/AGENTS.md)、[开发工作流](docs/current/tech/30-workflow.md)、[浏览器自动化指南](docs/current/tech/27-browser-automation.md) 与 [性能指南](docs/current/tech/25-benchmarking.md)。
+实施遵循 [根 AGENTS.md](../../../../../AGENTS.md)、[前端 AGENTS.md](../../../../../frontend/AGENTS.md)、[开发工作流](../../../../../docs/current/tech/30-workflow.md)、[浏览器自动化指南](../../../../../docs/current/tech/27-browser-automation.md) 与 [性能指南](../../../../../docs/current/tech/25-benchmarking.md)。
 
-**本次仅编写方案**：不升版、不构建 WASM、不运行模拟回归；执行文档维护、跨文档事实、链接和版本一致性检查。根目录位置按本次用户要求执行。
+**本次仅编写方案**：不升版、不构建 WASM、不运行模拟回归；执行文档维护、跨文档事实、链接和版本一致性检查。（当时放于项目根目录；完成后已归档至本目录。）
 
 **后续代码实施交付**：
 
