@@ -170,6 +170,45 @@ window.SimLighting = (function () {
     S.shadowAlpha = clamp(c.shadowOpacityBase + c.shadowOpacityGain * (1 - Math.sin(elevRad)), 0.05, 0.6);
   }
 
+  // ── ★ TA-12-4 共用地形受光步骤（无分配）：「输入反照率 → 最终 RGB」唯一公式入口 ──
+  // relightTerrain（基底色）与 TerrainTexture 纹理色档共用：法线 wrap 漫反射 → AO×强度 →
+  // 光档钳制 → tint 色温 → 大气色洗烘焙，保证纹理与基底同一光档、同一色洗顺序——
+  // 纹理对「反照率小幅等比扰动」施光，严禁对最终已色洗颜色重复施光。
+  // lp = lightParams() 每趟预取一次（避免逐格读 cfg/主题类名）；out[0..2] 为 0~255 整数，
+  // 与 relightTerrain 写回的 cell.color 同源同值（关闭纹理时原基底颜色逐值一致的验收基准）。
+  function lightParams() {
+    const c = cfg();
+    const tr = S.tint[0], tg = S.tint[1], tb = S.tint[2];
+    const lightTheme = !!(c.respectLightTheme && document.body && document.body.classList.contains('theme-light'));
+    const washA = c.enabled ? c.skyWash * (lightTheme ? 0.55 : 1) : 0;
+    return {
+      amb: S.ambient, inv: 1 - S.ambient, wrap: c.wrap, invWrap: 1 / (1 + c.wrap),
+      lx: S.lx, ly: S.ly, lz: S.lz,
+      kMin: c.lightMin, kMax: c.lightMax, inten: S.intensity,
+      tr, tg, tb, washA,
+      washR: Math.min(255, 140 * tr), washG: Math.min(255, 150 * tg), washB: Math.min(255, 172 * tb),
+    };
+  }
+  function shadeAlbedoInto(lp, cx, cy, cz, ao, br, bg, bb, out) {
+    let dot = cx * lp.lx + cy * lp.ly + cz * lp.lz;
+    dot = dot < -1 ? -1 : (dot > 1 ? 1 : dot);
+    let wd = (dot + lp.wrap) * lp.invWrap;
+    wd = wd < 0 ? 0 : (wd > 1 ? 1 : wd);
+    let k = (lp.amb + lp.inv * wd) * ao * lp.inten;
+    k = k < lp.kMin ? lp.kMin : (k > lp.kMax ? lp.kMax : k);
+    let r = br * k * lp.tr, g = bg * k * lp.tg, b = bb * k * lp.tb;
+    r = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
+    g = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
+    b = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
+    if (lp.washA > 0) {
+      r = Math.round(r + (lp.washR - r) * lp.washA);
+      g = Math.round(g + (lp.washG - g) * lp.washA);
+      b = Math.round(b + (lp.washB - b) * lp.washA);
+    }
+    out[0] = r; out[1] = g; out[2] = b;
+    return out;
+  }
+
   // ── 地形整片重着色：预存法线/反照率/AO 后原地写回 cell.color ──
   function relightTerrain(sim) {
     const t0 = performance.now();
@@ -177,24 +216,14 @@ window.SimLighting = (function () {
     const cells = terr && terr.cells;
     if (!cells || !cells.length) { S.lastMs = 0; S.dirty = false; return; }
 
-    const c = cfg();
-    const amb = S.ambient, inv = 1 - amb, wrap = c.wrap, invWrap = 1 / (1 + wrap);
-    const lx = S.lx, ly = S.ly, lz = S.lz;
-    const tr = S.tint[0], tg = S.tint[1], tb = S.tint[2];
-    const kMin = c.lightMin, kMax = c.lightMax, inten = S.intensity;
+    // ★ TA-12-4 受光参数（含主题色洗）每趟预取一次，逐格走共用步骤 shadeAlbedoInto
+    const lp = lightParams();
+    const palette = new Map(); // 每趟清空：趟内去重、趟间不累积
+    const out = [0, 0, 0];     // 共用步骤复用输出（趟内单实例，零逐格分配）
 
     const nx = terr.nx, ny = terr.ny, nz = terr.nz, aoA = terr.ao;
     const ar = terr.albR, ag = terr.albG, ab = terr.albB;
     const hasPre = !!(nx && ny && nz && aoA && ar && ag && ab);
-    const palette = new Map(); // 每趟清空：趟内去重、趟间不累积
-
-    // ★ v1.50.11 大气色洗烘焙：色洗原先是 render 管线里「贴地图元之后、立体实体之前」的
-    //   整屏 fillRect，但地形格并入统一深度队列后与实体交错落笔，整屏矩形会把实体一起洗灰。
-    //   现按 drawAtmosphereWash 的同一公式（当季 tint 调色 × skyWash 透明度 × 浅色主题 0.55 系数）
-    //   直接混入 cell.color，观感不变且零每帧成本；仅动态光照模式生效（旧固定光对照路径无色洗）。
-    const lightTheme = !!(c.respectLightTheme && document.body && document.body.classList.contains('theme-light'));
-    const washA = c.enabled ? c.skyWash * (lightTheme ? 0.55 : 1) : 0;
-    const washR = Math.min(255, 140 * tr), washG = Math.min(255, 150 * tg), washB = Math.min(255, 172 * tb);
 
     for (let i = 0; i < cells.length; i++) {
       const cell = cells[i];
@@ -214,28 +243,12 @@ window.SimLighting = (function () {
         br = alb.r; bg = alb.g; bb = alb.b;
       }
 
-      let dot = cx * lx + cy * ly + cz * lz;
-      dot = clamp(dot, -1, 1);
-      let wd = (dot + wrap) * invWrap;
-      wd = clamp(wd, 0, 1);
-      const k = clamp((amb + inv * wd) * ao * inten, kMin, kMax);
+      shadeAlbedoInto(lp, cx, cy, cz, ao, br, bg, bb, out);
 
-      let r = br * k * tr, g = bg * k * tg, b = bb * k * tb;
-      r = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
-      g = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
-      b = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
-
-      // ★ v1.50.11 大气色洗烘焙（见上方注释）
-      if (washA > 0) {
-        r = Math.round(r + (washR - r) * washA);
-        g = Math.round(g + (washG - g) * washA);
-        b = Math.round(b + (washB - b) * washA);
-      }
-
-      const key = (r << 16) | (g << 8) | b;
+      const key = (out[0] << 16) | (out[1] << 8) | out[2];
       let str = palette.get(key);
       if (str === undefined) {
-        str = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+        str = 'rgb(' + out[0] + ', ' + out[1] + ', ' + out[2] + ')';
         palette.set(key, str);
       }
       cell.color = str;
@@ -244,6 +257,11 @@ window.SimLighting = (function () {
     S.lastMs = performance.now() - t0;
     S.dirty = false;
     S.relightCount++;
+    // ★ TA-12-4 更新通知：重着色批次完成后刷新纹理色档（只换颜色不换几何）。
+    //   动态光/固定光兜底/明暗主题/光档变动全部经此批次流过，禁止遗留上一光档颜色；
+    //   lp = 本趟参数快照，纹理色档与基底色保证同一光照输入。
+    const TT = window.TerrainTexture;
+    if (TT && typeof TT.refreshPalette === 'function') TT.refreshPalette(terr, shadeAlbedoInto, lp);
   }
 
   // ── 立体实体面光照：相对旧固定光归一化，保证「换模型不换观感」 ──
@@ -396,6 +414,9 @@ window.SimLighting = (function () {
     shadeFace,
     shadeRgb,
     shadeRgbInto,
+    // ★ TA-12-4 共用地形受光步骤（TerrainTexture 纹理色档消费；relightTerrain 同源）
+    lightParams,
+    shadeAlbedoInto,
     lastMs: () => S.lastMs,
     relightCount: () => S.relightCount,
     // 时间跳变（读档 / 重置 / 时光倒流 / 无头恢复）后立即对齐，不做平滑

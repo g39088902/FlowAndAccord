@@ -160,15 +160,24 @@ TA-13 后续改变反照率时，应统一标记基底颜色和纹理色档失�
   - ✅ 实施记录：模块 414 行（<800 上限），配置组 `RENDER_CONFIG.terrainTexture` 11 键（detailFadePx 留待 TA-12-3）；index.html 于 config.render.js 后、lighting.js 前登记；`invalidate('world')` 接入 `rustworld.js::_invalidateWorldStaticCaches`（READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四处随消息生命周期）；`drawCell`/`refreshPalette` 为 TA-12-3/4 接口占位。临时验证 29 项断言全绿后已删除：一次成型/分批（budget=0）/清缓存重建/逆序与键序逐桶输出摘要一致、相机参数无输入通道（顶点摘要不变）、负坐标位模式无 NaN、无图元中心落水系（ShallowWater/DeepWater/RiverBank）、顶点不越沙盘边界、材质权重单调性（水 0/陡岩 0/平地土纹低覆盖）、styleVersion 换纹样而 contrast 只改明度且幅度 ∈ [contrast, contrastMax]、enabled=false 不建模、null 地形安全拒绝、缺省回退可用、cacheMaxBytes 两级确定性收敛（候选降档→哈希抽稀桶）。开发中修复两处缺陷：`pushSoil` 顶点误全推入 vx（vy 空）、草斑形状哈希槽位 k*8 跨候选碰撞（改 k*16）。合成地形样板 6973 图元 / 33343 顶点 / 3366 桶 / 427 KB（上限 8 MiB），单次全量构建 ~14 ms。
   - ⚠️ 版本号未升（按本文 §8 由 TA-12-8 统一升版 + WASM 双副本 + changelog 收口；本子任务纯前端 JS，无需重编译 WASM）。
 
-- [ ] **TA-12-3 逐格裁剪与深度接入（约 1~1.5 日，依赖 2）**
-  - 实现跨格分片和双线性贴面投影；接入 `drawTerrainCell` 基底之后，不增加独立纹理队列项。
-  - 保留防缝外扩，核对图元跨桶/格边唯一归属、水陆过滤、地图边界与退化多边形处理。
-  - 交付：四方位平地/陡坡/河岸接缝对照，近路、房屋、POI 和族人覆盖顺序与纯色版一致。
+- [x] **TA-12-3 逐格裁剪与深度接入（约 1~1.5 日，依赖 2）** ✅ 2026-09-14 完成（`terrain-texture.js::clipToRect`/`buildFragments`/`drawCell` + `render_terrain.js::drawTerrainCell`、`render_depth_queue.js::prepare` 接入）。
+  - 构建期 Sutherland–Hodgman 跨格预裁剪（模块级 Float64 scratch，零构建期分配）：图元 AABB → 触及格范围 → 逐格裁剪出分片并登记 `(u,v)` 贴面坐标；目标格材料过滤（水系/权重 0 格零分片）；finalize 拍平为紧凑 typed arrays + `fragsByCell` 范围表（Map 迭代序 = 固定桶行主序，拍平结果与分批/遍历顺序无关）。
+  - 绘制期 `drawCell` 四角双线性凸组合投影（权重非负和为 1 → 分片恒在本格四边形凸包内），由 `drawTerrainCell` 在基底之后调用，与基底同属 DEPTH_CELL——不新增队列项、不抬 Z、不调用 projectLifted；防缝外扩 TERRAIN_SEAM_PX 仅作用于基底路径；LOD `detailFadePx=[2,5]` CSS px smoothstep 淡入（`lod=camera.zoom`，DPR 不参与），globalAlpha 用毕恢复。
+  - 边界处理：跨桶唯一归属（图元只由中心桶生成一次）、图元中心离沙盘边界 ≥ 半径 + 0.5、退化分片（<3 顶点）与 NaN/退化投影安全跳过保留基底、`detailFadePx` 热调不触发模型重建（不入 configRevision）。
+  - ✅ 临时验证 25 项断言全绿后已删除：UV ∈ [0,1]、格键合法、水系格零分片、分片质心回含原多边形（抽样 600）、跨 x/y 格边界共享边顶点逐点一致、drawCell 填充计数/色串格式/globalAlpha 恢复/两次调用逐值一致、lod=0.01 全剔除、NaN 投影零落笔、一次成型 == 分批（budget=0）拍平摘要逐字节一致、失效重建一致。合成地形样板 3887 图元 / 4944 分片 / 1206 格 / 478 KB。
+  - ✅ 浏览器冒烟（localhost:3005，门禁弹窗隐藏后截图）：stats ready=true、frags=15805、drawCells=379851、drawFrags=589254、bytes≈1.2 MiB（< 8 MiB），地形渲染无异常色块/黑屏/接缝错位，控制台无 terrain-texture 相关报错。⚠️ 四方位接缝人工对照与覆盖顺序目检未自动化（`camera` 为主线程闭包变量非 `window.camera`，自动化无法调相机）；跨格接缝已由共享边逐点一致断言 + 分片凸包投影断言机器覆盖，如需可在 Chrome 手动旋转视角补验。
+  - ⚠️ 版本号未升（按本文 §8 由 TA-12-8 统一升版 + WASM 双副本 + changelog 收口；本子任务纯前端 JS，无需重编译 WASM；曾误升 v1.50.53 已整体回退）。
 
-- [ ] **TA-12-4 共用受光与低对比色档（约 0.5~1 日，依赖 3）**
+- [x] **TA-12-4 共用受光与低对比色档（约 0.5~1 日，依赖 3）** ✅ 2026-09-14 完成（`lighting.js::lightParams`/`shadeAlbedoInto` + `terrain-texture.js::refreshPalette`/`_shadeFor`）。
   - 提取共用地形着色步骤并验证关闭纹理时原基底颜色逐值一致；接入有限纹理色档与更新通知。
   - 完成动态光/固定光、明暗主题、光档变动与强度为零回退；确认不改原反照率和模拟输入。
   - 交付：纯色/纹理 A/B、固定世界光旋转相机对照；无固定屏幕高光、无全图色偏。
+  - ✅ 实施记录（2026-09-14，`lighting.js` + `terrain-texture.js`）：
+    - 共用受光步骤提取为 `lighting.js::lightParams()`（每趟预取光档/色温/主题色洗参数）+ `shadeAlbedoInto(lp, …)`（法线 wrap 漫反射 → AO×强度 → 光档钳制 → tint 色温 → 大气色洗烘焙，零分配写 out[0..2]）；`relightTerrain` 逐格改走同一函数，两接口均导出供纹理层消费。
+    - `relightTerrain` 重着色批次末尾显式通知 `TerrainTexture.refreshPalette(terr, shadeAlbedoInto, lp)`（更新通知与地形重着色批次绑定；几何不变）。
+    - 纹理色档改为「反照率小幅等比扰动（tone 量化 4 档，±4%~8%）→ 同一共用受光管线」，取代 TA-12-3 临时「已色洗最终色等比缩放」；按格惰性预存 8 档（sign×lvl）去重缓存（key = ci×8+sign×4+lvl），热路径只读缓存、零 rgb 串解析（`parseRgbKey` 已删）；无受光入口/无 cell 安全返回 null 跳过分片保留基底。drawCell 保留 terrain+relightCount epoch 兜底失效，refreshPalette 显式清缓存并注入 shadeFn/lp 快照（固定光兜底/明暗主题/光档变动全部经批次流过，不遗留上一光档颜色）。
+    - ✅ 临时验证 31 项断言全绿后已删除：重构后基底色与 git HEAD 旧内联公式逐值一致（预存数组路径 + 无数组回退路径全格比对）、反照率预存数组逐值不变、refreshPalette 清缓存+注入、色档 == albedo×mul 共用受光输出（抽样 200）、色档与基底差 ≤8% 低对比、drawCell 落笔/有限/globalAlpha 恢复/rgb 串格式、固定光兜底（washA=0、颜色更换不遗留）、浅色主题 wash 0.55 系数逐值一致、光档变动（resync 换季）基底与色档同步更新、lightMin 钳制下合法色串、无 SimLighting 安全回退零落笔、两文件行数 ≤800。
+    - ⚠️ 纯色/纹理 A/B 截图与固定世界光旋转相机对照未自动化（同 TA-12-3 遗留，`camera` 为闭包变量）；由 TA-12-6/7 Chrome 验收统一覆盖。版本号未升（归 TA-12-8 统一收口）。
 
 - [ ] **TA-12-5 LOD、缓存与世界生命周期（约 0.5~1 日，依赖 4）**
   - 完成按 CSS 尺度淡入、内存统计及上限、四类生命周期失效、新静态网格替换与 null 增量帧保留。
