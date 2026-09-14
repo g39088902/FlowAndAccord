@@ -24,9 +24,9 @@
     <canvas id="sim-canvas"></canvas>
   </div>
 
-  <div class="top-bar">
+  <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.52</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.53</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -120,7 +120,7 @@
   </div>
 
   <!-- 左侧：全地图资源总览与产速调控窗口 (水/果/木/石) -->
-  <div class="global-resource-panel">
+  <div class="global-resource-panel" id="global-resource-panel">
     <div class="panel-header">
       <span>🌐 全图生态总余量大盘</span>
       <span id="global-eco-health" style="color:#10b981; font-size:10px;">资源丰盛</span>
@@ -219,6 +219,12 @@
 
   <!-- 道路悬浮提示 Tooltip -->
   <div class="road-tooltip" id="road-hover-tooltip"></div>
+
+  <!-- ★ S4-07 画布边缘分行兜底提示区 (选中/悬浮双目标强制保留，引线连接) -->
+  <div class="label-fallback-dock" id="label-fallback-dock" style="display:none;"></div>
+
+  <!-- ★ S4-07 聚合徽标只读成员列表弹窗 (点击数量徽标展开) -->
+  <div class="label-cluster-popup" id="label-cluster-popup" style="display:none;"></div>
 
   <!-- 右侧面板容器：全局活人均值 / 生态图例 / Inspector -->
   <div class="right-panel-stack">

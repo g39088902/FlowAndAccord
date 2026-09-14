@@ -232,9 +232,15 @@ window.RENDER_CONFIG = {
   labelRectPadPx: 2,              // 标签矩形四周外扩余量（CSS px，相交判定保守侧）
   labelSidePadPx: 10,             // 左右备选位与锚点的水平间距（CSS px）
   labelUiRefreshFrames: 10,       // UI 禁入矩形重测帧间隔（DOM getBoundingClientRect 节流；resize 立即重测）
-  labelUiRectIds: null,           // UI 禁入矩形元素 ID 列表（null = 只避开画布边界；隐藏/出画布元素自动跳过）
+  labelUiRectIds: ['top-bar', 'inspector-card', 'ledger-panel', 'global-averages-card', 'global-resource-panel'], // UI 禁入矩形元素 ID 列表（避开覆盖区；隐藏/折叠元素自动跳过）
   // 旧硬编码 LOD 阈值收编（STAGE-04-TODO §6.3：POI 名称 z>0.50 / 库存环 z≥0.70 / 房屋编号 z>1.05）
   labelPoiNameMinZoom: 0.50,      // 营地名称/舍数显示的最小缩放（原 drawPoiMarker 硬编码）
   labelStockRingMinZoom: 0.70,    // POI 库存环显示的最小缩放（原 showDetailRings 硬编码；选中态恒显示）
   labelHouseNumberMinZoom: 1.05,  // 房屋编号显示的最小缩放（原 drawHouse showLabels 硬编码；选中态恒显示）
+  // ★ S4-07 聚合与交互兜底（STAGE-04-TODO §4.7；label-layout.js / render_inspector.js 消费）
+  labelClusterEnabled: true,      // 聚合总开关（低缩放/拥挤时同类普通标签聚合为数量徽标）
+  labelClusterMaxZoom: 0.95,      // 触发房屋标签聚合的最高缩放门槛（<= 此缩放或近邻密集时聚合）
+  labelClusterRadiusPx: 36,       // 屏幕聚类半径（CSS px；同类普通标签在此距离内聚合）
+  labelHysteresisPx: 4,           // 有限布局滞回裕量（CSS px；消除缓慢平移时的临界跳位抖动）
+  labelLeaderLineEnabled: true,   // 边缘兜底引线开关（绘制从实体到边缘提示区的引线）
 };

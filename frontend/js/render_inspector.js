@@ -1412,6 +1412,27 @@ canvas.addEventListener('click', e => {
   if (totalDragDist > 8) return;
   const clickX = e.clientX, clickY = e.clientY;
 
+  // ★ S4-07 智能交互拾取优先级：聚合徽标 > LabelLayout 已安置标签 > Canvas 原有欧氏距离实体
+  const LL = window.LabelLayout;
+  if (LL && LL.active()) {
+    const hit = LL.hitTest(clickX, clickY);
+    if (hit) {
+      if (hit.isCluster) {
+        LL.openClusterPopup(hit);
+        return;
+      }
+      sim.selectionType = hit.ownerType;
+      if (hit.ownerType === 'agent') sim.selectedAgentId = hit.ownerId;
+      else if (hit.ownerType === 'house') sim.selectedHouseId = hit.ownerId;
+      else if (hit.ownerType === 'poi') sim.selectedPoiId = hit.ownerId;
+      clickCycle = { x: clickX, y: clickY };
+      if (typeof LL.closeClusterPopup === 'function') LL.closeClusterPopup();
+      if (typeof updateInspector === 'function') updateInspector();
+      return;
+    }
+  }
+  if (LL && typeof LL.closeClusterPopup === 'function') LL.closeClusterPopup();
+
   // 收集光标下所有可选中元素，按渲染层级自上而下排序: agent (就近优先) -> house -> poi
   const targets = [];
   const agentHits = [];

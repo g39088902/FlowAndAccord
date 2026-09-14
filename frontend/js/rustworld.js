@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.52';
+        this._appVersion = '1.50.53';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.52';
+            this._appVersion = msg.appVersion || '1.50.53';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -311,6 +311,8 @@
         if (window.LandscapeModel) window.LandscapeModel.resetCache();
         // ★ S4-03：保护区索引与占据网格同一生命周期失效（不使用旧世界索引）
         if (window.LandscapeMask) window.LandscapeMask.resetCache();
+        // ★ S4-06/S4-07：标签布局与交互缓存同一生命周期失效（清空测量、滞回、停靠与聚合弹窗）
+        if (window.LabelLayout) window.LabelLayout.resetCache();
         // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
         // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
         if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
@@ -444,7 +446,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.52';
+        return this._appVersion || '1.50.53';
 
       }
 

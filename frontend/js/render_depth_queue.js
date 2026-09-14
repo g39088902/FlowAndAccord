@@ -137,6 +137,55 @@ var _qShDir = { x: 0, y: 0, len: 1 };
 // 选中营地辖区连线暂存（收集阶段定位，绘制阶段消费）
 let _selLinkCamp = null;
 
+// ★ S4-07 实体悬浮检测（同步 sim.hoveredEntity，供标签兜底与高亮使用）
+function updateEntityHover() {
+  if (typeof mousePos === 'undefined' || mousePos.x < 0 || mousePos.y < 0 || (typeof isDragging !== 'undefined' && isDragging)) {
+    if (sim) sim.hoveredEntity = null;
+    return;
+  }
+  const hx = mousePos.x, hy = mousePos.y;
+  const _LL = window.LabelLayout;
+  if (_LL && _LL.active()) {
+    if (typeof _LL.isPointInUi === 'function' && _LL.isPointInUi(hx, hy)) {
+      if (sim) sim.hoveredEntity = null;
+      return;
+    }
+    const hit = _LL.hitTest(hx, hy);
+    if (hit && !hit.isCluster && hit.ownerType && hit.ownerId != null) {
+      if (sim) sim.hoveredEntity = { type: hit.ownerType, id: hit.ownerId };
+      return;
+    }
+  }
+  let best = null;
+  let minD = 25;
+  if (sim && sim.showAgents && sim.agents) {
+    for (let i = 0; i < sim.agents.length; i++) {
+      const a = sim.agents[i];
+      if (a.isFetus) continue;
+      const p = project3D(a.pos);
+      const d = Math.hypot(hx - p.x, hy - p.y);
+      if (d <= minD) { minD = d; best = { type: 'agent', id: a.id }; }
+    }
+  }
+  if (sim && sim.houses) {
+    for (let i = 0; i < sim.houses.length; i++) {
+      const h = sim.houses[i];
+      const p = project3D(h.pos);
+      const d = Math.hypot(hx - p.x, hy - p.y);
+      if (d <= Math.min(minD, 24)) { minD = d; best = { type: 'house', id: h.id }; }
+    }
+  }
+  if (sim && sim.pois) {
+    for (let i = 0; i < sim.pois.length; i++) {
+      const poi = sim.pois[i];
+      const p = project3D(poi.pos);
+      const d = Math.hypot(hx - p.x, hy - p.y);
+      if (d <= Math.min(minD, 26)) { minD = d; best = { type: 'poi', id: poi.id }; }
+    }
+  }
+  if (sim) sim.hoveredEntity = best;
+}
+
 function drawWorldEntities() {
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
@@ -148,6 +197,8 @@ function drawWorldEntities() {
 
   // 道路悬浮检测 + Tooltip（先于收集，isHovered 供分段高亮样式使用）
   updateLaneHover();
+  // ★ S4-07 实体悬浮检测（同步 sim.hoveredEntity）
+  updateEntityHover();
 
   // ★ S4-06 标签布局层：帧起点重置提案池/冲突网格/UI 禁入矩形
   const _LL = window.LabelLayout;
@@ -471,6 +522,13 @@ function drawWorldEntities() {
   // ★ S4-06 交互覆盖标签：选中族人需求气泡在世界层之上强制安置（不参与地形遮挡）；
   //   挂在队列分发循环结束后——§6.3「分发循环结束点即标签层的天然挂载位」。
   drawSelectedNeedBubbleOverlay();
+
+  // ★ S4-07 聚合徽标、边缘引线与停靠区 DOM 状态同步
+  if (_LL) {
+    _LL.drawClusters(ctx);
+    _LL.drawLeaderLines(ctx);
+    _LL.syncFallbackDockDOM();
+  }
 }
 
 // ★ v1.50.11：选中营地辖区连线逐条入统一深度队列（中点近似深度——选择辅助线，允许穿越山地的小误差）。
