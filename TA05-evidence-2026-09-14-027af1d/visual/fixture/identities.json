@@ -1,0 +1,121 @@
+{
+ "world": {
+  "seed": 42,
+  "url": "http://localhost:3004/?nogate=1&seed=42",
+  "accents_total": 157,
+  "seasonAtBuild": "Spring",
+  "generator": "TERRAIN_GENERATOR_VERSION=8",
+  "appVersion": "v1.50.52"
+ },
+ "model": {
+  "styleVersion": "无显式版本常量（accent-model.js 无 VERSION 字段，2026-09-14 核对）",
+  "detailThresholds": {
+   "accentDetailMidPx": 7,
+   "accentDetailNearPx": 15
+  },
+  "accentEvergreenChance": 0.24,
+  "accentFootprintR": 8
+ },
+ "primary": [
+  {
+   "role": "落叶乔木",
+   "kind": "Tree",
+   "id": 0,
+   "orig": {
+    "x": -19.48,
+    "y": 6.73,
+    "z": 1.87,
+    "scale": 1.1894,
+    "rotation": 0.4375,
+    "tint": 0
+   },
+   "modelEvergreen": false
+  },
+  {
+   "role": "落叶灌木",
+   "kind": "Bush",
+   "id": 77,
+   "orig": {
+    "x": -56.98,
+    "y": 9.94,
+    "z": 3.16,
+    "scale": 1.1525,
+    "rotation": 1.7574,
+    "tint": 0
+   },
+   "modelEvergreen": false
+  },
+  {
+   "role": "岩石",
+   "kind": "Boulder",
+   "id": 44,
+   "orig": {
+    "x": -14.6,
+    "y": 15.1,
+    "z": 1.7,
+    "scale": 1.3929,
+    "rotation": 0.4038,
+    "tint": 0
+   }
+  }
+ ],
+ "supplementary": [
+  {
+   "role": "常绿保护对照",
+   "kind": "Tree",
+   "id": 36,
+   "orig": {
+    "x": 31.3,
+    "y": -71.0,
+    "z": 1.6,
+    "scale": 1.1318,
+    "rotation": 1.6331,
+    "tint": 0
+   },
+   "modelEvergreen": true
+  },
+  {
+   "role": "坡地/高地补充",
+   "kind": "Tree",
+   "id": 12,
+   "orig": {
+    "x": -366.5,
+    "y": 226.2,
+    "z": 14.34,
+    "scale": 1.242,
+    "rotation": 0.0,
+    "tint": 0
+   },
+   "modelEvergreen": false,
+   "note": "高地个体；矩阵坡地/边缘项由夹具与 TA-04 既有坡地验收共同覆盖"
+  }
+ ],
+ "fixture": {
+  "method": "同 id/kind/scale/rotation/tint 克隆，仅改 x/y/z；z=落点真实地表 elev（terrain.cells 双线性格）；LandscapeMask.accentHidden 全 false；走生产绘制管线 drawAccentEntity，无专用美术代码",
+  "selectionRule": "脚本扫描：距自然装饰≥24u、POI≥62u、房屋≥50u、非水、elev≤9、四连位间距 46u、整体最靠近世界中心",
+  "finalSpots": [
+   [
+    -200,
+    56,
+    8.29
+   ],
+   [
+    -154,
+    56,
+    6.57
+   ],
+   [
+    -108,
+    56,
+    5.07
+   ],
+   [
+    -62,
+    56,
+    3.6
+   ]
+  ],
+  "transformRecorded": true,
+  "cleanedUp": true
+ }
+}

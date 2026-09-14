@@ -1,0 +1,329 @@
+{
+ "task": "TA-05-6 正式性能采样（未改渲染代码：现状绝对耗时+重复波动）",
+ "method": "TA-05-1 同口径：rAF 包装整帧回调、drawWorldEntities 包装统一队列、12s 预热 + 60s 采样、nearest-rank p95、3 轮",
+ "rounds": [
+  {
+   "round": 1,
+   "phase": "initial",
+   "cases": [
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1726,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 10106,
+     "tick1": 10124,
+     "unifiedQueueMs": {
+      "n": 1726,
+      "p50": 12.4,
+      "p95": 14.8,
+      "p99": 17,
+      "mean": 12.634,
+      "max": 33.1
+     },
+     "mainThreadTickMs": {
+      "n": 1726,
+      "p95": 0,
+      "mean": 0.0007
+     },
+     "case": "P1·初始·固定"
+    },
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1706,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 19214,
+     "tick1": 19232,
+     "unifiedQueueMs": {
+      "n": 1706,
+      "p50": 12.8,
+      "p95": 14.8,
+      "p99": 16.5,
+      "mean": 12.93,
+      "max": 25.8
+     },
+     "mainThreadTickMs": {
+      "n": 1706,
+      "p95": 0,
+      "mean": 0.0007
+     },
+     "case": "P2·初始·连续旋转"
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "phase": "initial",
+   "cases": [
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1703,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 28328,
+     "tick1": 28346,
+     "unifiedQueueMs": {
+      "n": 1703,
+      "p50": 12.8,
+      "p95": 16.7,
+      "p99": 19.9,
+      "mean": 13.222,
+      "max": 25
+     },
+     "mainThreadTickMs": {
+      "n": 1703,
+      "p95": 0,
+      "mean": 0.001
+     },
+     "case": "P1·初始·固定"
+    },
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1707,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 37430,
+     "tick1": 37452,
+     "unifiedQueueMs": {
+      "n": 1707,
+      "p50": 12.8,
+      "p95": 15.2,
+      "p99": 17.5,
+      "mean": 12.997,
+      "max": 26.8
+     },
+     "mainThreadTickMs": {
+      "n": 1707,
+      "p95": 0,
+      "mean": 0.0007
+     },
+     "case": "P2·初始·连续旋转"
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "phase": "initial",
+   "cases": [
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1717,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 46538,
+     "tick1": 46556,
+     "unifiedQueueMs": {
+      "n": 1717,
+      "p50": 12.8,
+      "p95": 14.6,
+      "p99": 16.1,
+      "mean": 12.91,
+      "max": 18.1
+     },
+     "mainThreadTickMs": {
+      "n": 1717,
+      "p95": 0,
+      "mean": 0.001
+     },
+     "case": "P1·初始·固定"
+    },
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1706,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 55638,
+     "tick1": 55666,
+     "unifiedQueueMs": {
+      "n": 1706,
+      "p50": 12.6,
+      "p95": 14.9,
+      "p99": 16.9,
+      "mean": 12.8,
+      "max": 28.2
+     },
+     "mainThreadTickMs": {
+      "n": 1706,
+      "p95": 0,
+      "mean": 0.0011
+     },
+     "case": "P2·初始·连续旋转"
+    }
+   ]
+  },
+  {
+   "round": 1,
+   "phase": "highdensity",
+   "cases": [
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1728,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6967004,
+     "tick1": 6967020,
+     "unifiedQueueMs": {
+      "n": 1728,
+      "p50": 13.5,
+      "p95": 16,
+      "p99": 17.8,
+      "mean": 13.674,
+      "max": 21.9
+     },
+     "mainThreadTickMs": {
+      "n": 1728,
+      "p95": 0,
+      "mean": 0.001
+     },
+     "case": "P3·高密·固定"
+    },
+    {
+     "wallSec": 60.6,
+     "frames": 0,
+     "drawn": 1719,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6975566,
+     "tick1": 6975634,
+     "unifiedQueueMs": {
+      "n": 1719,
+      "p50": 14,
+      "p95": 17.6,
+      "p99": 22.9,
+      "mean": 14.361,
+      "max": 34.9
+     },
+     "mainThreadTickMs": {
+      "n": 1719,
+      "p95": 0,
+      "mean": 0.0005
+     },
+     "case": "P4·高密·连续旋转"
+    }
+   ]
+  },
+  {
+   "round": 2,
+   "phase": "highdensity",
+   "cases": [
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1724,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6966924,
+     "tick1": 6966942,
+     "unifiedQueueMs": {
+      "n": 1724,
+      "p50": 14.5,
+      "p95": 19.1,
+      "p99": 26,
+      "mean": 15.013,
+      "max": 44.8
+     },
+     "mainThreadTickMs": {
+      "n": 1724,
+      "p95": 0,
+      "mean": 0.0002
+     },
+     "case": "P3·高密·固定"
+    },
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1736,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6975500,
+     "tick1": 6975534,
+     "unifiedQueueMs": {
+      "n": 1736,
+      "p50": 13.7,
+      "p95": 16.9,
+      "p99": 20.7,
+      "mean": 14.139,
+      "max": 110.8
+     },
+     "mainThreadTickMs": {
+      "n": 1736,
+      "p95": 0,
+      "mean": 0.0003
+     },
+     "case": "P4·高密·连续旋转"
+    }
+   ]
+  },
+  {
+   "round": 3,
+   "phase": "highdensity",
+   "cases": [
+    {
+     "wallSec": 60.5,
+     "frames": 0,
+     "drawn": 1789,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6975564,
+     "tick1": 6975564,
+     "unifiedQueueMs": {
+      "n": 1789,
+      "p50": 15,
+      "p95": 23.9,
+      "p99": 31.6,
+      "mean": 16.11,
+      "max": 47.7
+     },
+     "mainThreadTickMs": {
+      "n": 1789,
+      "p95": 0,
+      "mean": 0.0004
+     },
+     "case": "P3·高密·固定"
+    },
+    {
+     "wallSec": 60.2,
+     "frames": 0,
+     "drawn": 1782,
+     "rafMs": [],
+     "rafInt": [],
+     "tick0": 6958488,
+     "tick1": 6958488,
+     "unifiedQueueMs": {
+      "n": 1782,
+      "p50": 15.7,
+      "p95": 27.9,
+      "p99": 33.9,
+      "mean": 17.45,
+      "max": 60.6
+     },
+     "mainThreadTickMs": {
+      "n": 1782,
+      "p95": 0,
+      "mean": 0.0003
+     },
+     "case": "P4·高密·连续旋转"
+    }
+   ]
+  }
+ ],
+ "loadStart": {
+  "speed": 2,
+  "pop": 20,
+  "tick": 1014
+ },
+ "highDensityTick": 6958488,
+ "highDensityLoad": {
+  "pop": 68,
+  "houses": 29,
+  "accents": 157
+ }
+}

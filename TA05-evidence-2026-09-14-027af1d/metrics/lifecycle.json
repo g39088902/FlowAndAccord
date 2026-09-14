@@ -1,0 +1,75 @@
+{
+ "task": "TA-05-5 生命周期",
+ "items": [
+  {
+   "item": "真实快照推进",
+   "status": "PASS",
+   "detail": {
+    "tick": "978→100842（16x，~1000tps）→174594",
+    "note": "16x 下季节以 ~240 tick/年 快速轮转；lc-real-advance-a/b 截图 + tick 增长为证；agent 20→42→…"
+   }
+  },
+  {
+   "item": "暂停/继续 无漂移",
+   "status": "PASS",
+   "detail": {
+    "acc0": "x/y/z 前后逐位一致",
+    "season": "Summer→Summer"
+   }
+  },
+  {
+   "item": "REWIND 回溯",
+   "status": "PASS",
+   "detail": {
+    "target": 174594,
+    "tickAfter": 174594,
+    "accentsIdentical": true,
+    "note": "accents/季节随快照回滚；lc-rewind 截图"
+   }
+  },
+  {
+   "item": "RESET 同种子冷重建",
+   "status": "PASS",
+   "detail": {
+    "seed": 42,
+    "n": 157,
+    "note": "accents 数量与身份表一致；lc-reset42 截图"
+   }
+  },
+  {
+   "item": "RESET 换种子(43) 不复用旧世界",
+   "status": "PASS",
+   "detail": {
+    "n43": 157,
+    "differsFrom42": true
+   }
+  },
+  {
+   "item": "高倍速 1024x",
+   "status": "PASS",
+   "detail": {
+    "tick": 1277856,
+    "tpsApprox": 63283.2
+   }
+  },
+  {
+   "item": "交互选择/关闭Inspector",
+   "status": "PASS",
+   "detail": {
+    "sel": "{\"sel\":241,\"selType\":\"agent\"}",
+    "close": "esc",
+    "followOff": "{\"follow\":false}"
+   }
+  },
+  {
+   "item": "动态光 开→关→开",
+   "status": "PASS",
+   "detail": "三张对照图落盘"
+  },
+  {
+   "item": "LOAD 文件存档链路",
+   "status": "NOT_RUN",
+   "detail": "预览浏览器无 File System Access API；按 §6 口径须 Chrome 补测建档/读档"
+  }
+ ]
+}

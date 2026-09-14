@@ -288,7 +288,17 @@ paw browser-action '{"action":"navigate","url":"http://localhost:3004","waitUnti
    返回 `"no canvas"` 同样说明会话已重置（见坑 1）。
 6. **🟡 点击 canvas 选坐标会误选实体**：本项目 canvas 支持点选族人/房屋/地标，用坐标点击调镜头时容易顺手打开 Inspector 弹窗挡住画面。**对策**：调镜头统一用 WheelEvent（不产生 click 语义）；误开的面板可通过 evaluate 找「关闭选中窗口」按钮 `.click()` 关闭。
 
-### 7.4 收尾与卫生
+### 7.4 ⚡ 高频 Canvas 页面的截图与采样管线（2026-09-14 TA-05 实战沉淀）
+
+预览面板**隐藏**（用户未看预览面板）时：rAF 节流至 ~1-7fps、CDP `Page.captureScreenshot` 大概率超时、`setInterval` 同样被节流。可靠管线：
+
+1. **截图**：`render(performance.now()+9999)` 传未来时间戳过 `FRAME_INTERVAL` 门控强制同步重绘（直接 `render()` 会被门控吞掉；`sim.headless=true` 分支也会跳过绘制），随后 `canvas.toDataURL('image/jpeg',0.85)` 存到 `window.__shot`，evaluate 分块 `substr(60000)` 取回 base64 解码落盘。每张截图必须「设相机 → 强制重绘 → 捕获」在**同一个 evaluate** 内完成（跨调用会话可能重置）。
+2. **隐藏环境产帧/性能采样**：Web Worker 定时器（`setInterval(postMessage,33)`）**不受**后台节流，onmessage 里驱动 `render()`（≈29fps）；统计只算实际执行绘制的帧（以被包装的 `drawWorldEntities` 调用为准）。
+3. **相机写入语义**：`camera.panX/panY` 是屏幕空间偏移；居中世界点 须 `panX=-rx*zoom`（rx=x·cosZ−y·sinZ；y2=(x·sinZ+y·cosZ)·cosX−z·sinX，同 render_canvas.js 跟随逻辑）。
+4. **运行时事实**：主线程 tick 字段=`sim.tickCount`；`sim.speedMult=N` 直改生效；REWIND=`await sim.rewindToTick(t)`；S4-03 `LandscapeMask.accentHidden()` 会静默隐藏 POI 保护区/景观重叠区内的 accent（追加测试实体前必须过该判据）。
+5. **卫生**：长跑脚本用 `python3 -u`（stdout 缓冲会误判卡死）；启动前 `pkill -f` 清残留进程，避免多进程同抢一个浏览器 tab。
+
+### 7.5 收尾与卫生
 
 - 任务结束后 `tab_list` 检查残留 tab，`tab_close`（不带 index 关当前）逐一关闭，避免占用 4 个 tab 的会话上限。
 - 截图产物位于 CatPaw 临时目录，不进工作区、不入 git；若用户要求落盘到工作区再显式复制。
