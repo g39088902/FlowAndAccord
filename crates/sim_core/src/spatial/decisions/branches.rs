@@ -262,6 +262,13 @@ impl BranchId {
                         && is_house_member(house, a)
                         && is_male_adult(a, cfg)
                     {
+                        // ★ H-08/H-09 高阶意愿等待：Tier0→Tier1 安居需求豁免（根 AGENTS.md §1
+                        // 「不能把 b8 的 Tier0→Tier1 安居需求一并当作高阶欲望压制」）；
+                        // 其余高阶升级（T1→2/T2→3/T3→4）在低意愿乘子且低谷未达窗口时推迟（有界可恢复）。
+                        // 等待写在分支条件内部（自包含铁律），不改成本矩阵与 MaslowLevel 归属。
+                        if house.tier != HouseTier::Tier0Warehouse && a.hormones.will_deferred(cfg) {
+                            return None;
+                        }
                         let at_home = at_home_door(d, a, house)
                             && a.active_task.is_none()
                             && a.state == PrimitiveActionState::RestingAtCamp;
@@ -361,6 +368,9 @@ impl BranchId {
                     if !gated
                         && d.has_available_node(a, NodePool::Gold)
                         && a.gold_mining_cooldown <= 0.0
+                        // ★ H-08/H-09 意愿等待：在原金币采集冷却之上接低意愿推迟（有界窗口）。
+                        // 不改 4 级庄园门禁 / all_stocked / 冷却 / 行囊判据语义，危机解除后自动恢复。
+                        && !a.hormones.will_deferred(cfg)
                     {
                         return Some(Need {
                             level: MaslowLevel::SelfActualization,

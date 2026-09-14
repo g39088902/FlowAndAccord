@@ -211,6 +211,12 @@ stateDiagram-v2
 | `harvest.rs` | 现场采收判定 + 仓储满额查询；★ v1.27.0 水/粮目标关闭时优先转 `try_route_to_market` 再折返 |
 | `scheduler.rs` | tick_decisions 调度 + ★M4 登基物理执行器 `execute_pending_coronations` + ★求偶结婚执行器 `execute_pending_courtships` / build_decision_context |
 
+### 3.7 ★ H-08/H-09 激素意愿通道（v1.50.63 起，默认关闭）
+- **唯一合成入口** `hormones.rs::will_multiplier()`：DA 驱动力项 `1 + gain × (raw_drive − 1)` 与 H-09 CORT 危机聚焦压制项（归一化皮质醇 × 压制强度）在钳制前线性叠加，合成后只钳制一次到 `[hormone_da_drive_mult_min, max]`（默认 [0.75, 1.35]）。总开关 `hormone_effects_enabled`（默认关）关闭时恒 1.0，行为与 RNG 消费逐位等价。
+- **唯一行为消费入口** `hormones.rs::will_deferred()`：乘子低于放行阈值（默认 0.85）且低谷累计 `da_low_streak` 未达窗口（默认 4 游戏小时）时推迟高阶分支；窗口耗尽无条件放行（有界、可恢复）。低谷累计在激素回归阶段更新（乘子低或消沉判定成立时累计、恢复时回落），完整存档。
+- **接线点（仅两处，分支条件内部自包含）**：b8 高阶升级（Tier0→Tier1 安居豁免，根 AGENTS.md §1）；b13 积累财富（在原金币采集冷却之上）。不改成本矩阵 / `all_stocked` / `family_stock_on` 施密特触发器 / 编排与 MaslowLevel 归属；b1/b2/b3/b4/b12 求生与安居链路零激素引用。
+- 消沉判定用 `raw_drive = dopamine / max(threshold, ε)` 与独立阈值，禁用「钳制值 < 下限」恒假判断；低谷的自然来源是奖赏阈值漂移（变率强化）。
+
 ## 4. 关键不变量
 - 所有决策为确定性执行，无概率掷骰（v0.9.44 起全部收敛）。
 - 决策节拍默认 120 tick；`simulation_dt` 固定为 1/60，不得修改。
@@ -218,10 +224,12 @@ stateDiagram-v2
 - 中途掉头必须通过 `turn_around_and_route_to` 保持坐标连续性，严禁闪现瞬移。
 - ★ M4 夺位远征由决策分支 `B14SeekThrone` 在马斯洛引擎内驱动（生理层最高档），不消耗 `WorldRng`；登基由世界物理执行器 `execute_pending_coronations` 完成，夺位者登基/放弃后恢复正常决策。
 - ★ v1.16.0 结婚由决策分支 `B16Courtship` 在马斯洛引擎内驱动（第三层：归属与爱），仅成年单身男性发起，以「魅力 libido 最高优先 → 距离最近 → ID 升序」选定单身女性目标；成婚由世界物理执行器 `execute_pending_courtships` 完成原子登记与女方转入男方家户。
+- ★ H-08/H-09 激素不写行动状态、不替代 `transition.rs`、不改用户配置的分支顺序与层级（调制不指挥）；意愿等待必须保持有界可恢复，求生边界（b1/b2/b3/b4）不入调制域。
 
 ## 5. 与其他模块接口
 - `frontend/js/decision-viz*.js` + `config.decision-order.js`：决策引擎可视化视图拖动卡片/分界线 → ★ v1.27.0 起保存到浏览器 localStorage（★ v1.29.0 起键 `flowaccord.decision-order.v2`，旧键 v1 启动时自动迁移 0→6）→ `rustWorld.applyConfig()` 热注入本模块 `decision_eval_order`（顺序+层级覆盖）。
 - `agent.rs`：读取生理指标与行囊状态，写入 agent.state（含 `SeekingThrone`）与路径。
+- `hormones.rs`：★ H-08/H-09 意愿通道只读消费（`will_deferred` 仅在 b8/b13 分支条件内部调用），不写激素状态。
 - `ecology/`：采收与卸货的物理执行。
 - `housing_system/`：FoundHome/BuildHouse/RepairHouse 的物理执行。
 - `graph.rs`：A\* 寻路与路径规划。

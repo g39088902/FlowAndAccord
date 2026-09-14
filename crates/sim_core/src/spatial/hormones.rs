@@ -74,6 +74,13 @@ pub struct AgentHormones {
     /// ADR 峰后窗口边沿跟踪：上一拍肾上腺素是否处于峰值阈上（语义同上）
     #[serde(default)]
     pub prev_adr_peak: bool,
+
+    // ── ★ H-08 行为意愿通道累计器 ────────────────────────────────────────
+    /// 低意愿（消沉低谷）累计时长（游戏小时）：意愿乘子低于放行阈值或消沉判定成立时按 dt 累计，
+    /// 恢复后按 `hormone_da_low_streak_recovery` 回落至 0；上限钳制在意愿等待窗口。
+    /// 有界、可恢复、随 H-05 契约完整持久化；唯一行为消费点 = [`Self::will_deferred`]（b8 高阶升级 / b13）。
+    #[serde(default)]
+    pub da_low_streak: f32,
 }
 
 impl Default for AgentHormones {
@@ -99,6 +106,7 @@ impl Default for AgentHormones {
             nutrition_deficit: 0.0,
             prev_ep_peak: false,
             prev_adr_peak: false,
+            da_low_streak: 0.0,
         }
     }
 }
@@ -211,6 +219,7 @@ impl AgentHormones {
             nutrition_deficit: 0.0,
             prev_ep_peak: false,
             prev_adr_peak: false,
+            da_low_streak: 0.0,
         }
     }
 
@@ -242,6 +251,51 @@ impl AgentHormones {
     pub fn is_anxious(&self, config: &SimConfig) -> bool {
         self.norepinephrine >= config.hormone_anxiety_ne_threshold
             && self.serotonin <= config.hormone_anxiety_5ht_threshold
+    }
+
+    // ══════════ ★ H-08/H-09 行为意愿通道（唯一合成入口，纯函数，不耗 RNG） ══════════
+
+    /// ★ H-08 DA 原始驱动力：`dopamine / max(threshold, ε)`，**不做钳制**——
+    /// 消沉判定必须使用本原始值与独立阈值，禁止用「已钳制到下限的乘子」做低值判断。
+    pub fn raw_drive(&self, config: &SimConfig) -> f32 {
+        self.dopamine / self.dopamine_threshold.max(config.hormone_da_drive_epsilon)
+    }
+
+    /// ★ H-08/H-09 意愿乘子唯一合成入口：各来源在钳制前线性叠加，合成后**只钳制一次**到
+    /// `[hormone_da_drive_mult_min, hormone_da_drive_mult_max]`（初始候选 [0.75, 1.35]，以配置为准）。
+    /// 来源（钳制前线性叠加）：
+    /// - DA 驱动力项：`1 + gain × (raw_drive − 1)`（H-08）；
+    /// - CORT 危机聚焦压制项：归一化皮质醇 × 压制强度（H-09，「压力让人只顾眼前」）。
+    /// 总开关关闭时恒返回 1.0（关闭等价性契约：不改变任何既有公式与运算顺序）。
+    pub fn will_multiplier(&self, config: &SimConfig) -> f32 {
+        if !config.hormone_effects_enabled {
+            return 1.0;
+        }
+        let da_term = 1.0 + config.hormone_da_drive_mult_gain * (self.raw_drive(config) - 1.0);
+        // ★ H-09 CORT 危机聚焦：急性高皮质醇在同一意愿通道内压制高阶欲望（仅调制意愿，
+        // 不改升级扣账成本、不提高 all_stocked 判据、不绕过 family_stock_on 施密特触发器）
+        let cort = (self.cortisol / 100.0).clamp(0.0, 1.0);
+        let cort_term = cort * config.hormone_cort_will_suppress;
+        (da_term - cort_term).clamp(
+            config.hormone_da_drive_mult_min,
+            config.hormone_da_drive_mult_max,
+        )
+    }
+
+    /// ★ H-08 消沉判定：原始驱动力低于独立阈值（游戏规则标签；禁用「钳制值 < 下限」式恒假判断）。
+    pub fn is_depressed(&self, config: &SimConfig) -> bool {
+        config.hormone_effects_enabled
+            && self.raw_drive(config) < config.hormone_da_depression_threshold
+    }
+
+    /// ★ H-08/H-09 分支意愿等待判定（b8 高阶升级 / b13 积累财富唯一行为消费入口）：
+    /// 意愿乘子低于放行阈值且低谷累计未达等待窗口 → 本拍推迟高阶分支；
+    /// 低谷持续累计达窗口后无条件放行（有界、可恢复，禁止每次评估重置等待形成永久不启动）。
+    /// 总开关关闭时恒 false。
+    pub fn will_deferred(&self, config: &SimConfig) -> bool {
+        config.hormone_effects_enabled
+            && self.will_multiplier(config) < config.hormone_da_will_defer_mult
+            && self.da_low_streak < config.hormone_da_will_defer_hours
     }
 
     /// 若未初始化（如读取缺失字段的旧存档），则基于当前身体状态合成基线初始化
@@ -351,6 +405,22 @@ impl AgentHormones {
             self.prev_adr_peak = true;
         } else if self.adrenaline < config.hormone_adr_peak_threshold {
             self.prev_adr_peak = false;
+        }
+
+        // ★ H-08 低意愿（消沉低谷）累计：总开关关闭时保持惰性（不累计、不回落，行为零影响）。
+        // 累计条件取「意愿乘子 < 放行阈值」∪「消沉判定」——任一成立即累计，保证任意配置下
+        // 意愿等待有界（等待成立 ⟹ 累计进行 ⟹ 窗口必达，无永久不启动）；恢复后按速率回落至 0。
+        if config.hormone_effects_enabled {
+            let low_will = self.will_multiplier(config) < config.hormone_da_will_defer_mult
+                || self.is_depressed(config);
+            if low_will {
+                self.da_low_streak = (self.da_low_streak + dt)
+                    .min(config.hormone_da_will_defer_hours.max(0.0));
+            } else {
+                self.da_low_streak = (self.da_low_streak
+                    - config.hormone_da_low_streak_recovery * dt)
+                    .max(0.0);
+            }
         }
     }
 

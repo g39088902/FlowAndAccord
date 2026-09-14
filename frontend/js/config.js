@@ -465,4 +465,18 @@ window.SIM_CONFIG = {
   hormoneAdrFatigueHours: 1.0, // 肾上腺素峰后深度疲劳窗口时长 (游戏小时)
   hormoneAnxietyNeThreshold: 60.0, // NE 焦虑标签的去甲肾上腺素下限 (高NE+低5-HT)
   hormoneAnxiety5htThreshold: 30.0, // NE 焦虑标签的血清素上限
+
+  // ==========================================================================
+  // 15.2 四轴十一激素系统 · 行为意愿通道超参 (H-08 / H-09 · P1)
+  // ==========================================================================
+  hormoneEffectsEnabled: false, // ★ 行为效果总开关：关闭时意愿乘子恒 1.0、低谷累计惰性、分支等待不生效（行为逐位等价）
+  hormoneDaDriveEpsilon: 0.05, // DA 原始驱动力除数正下界 ε (raw_drive = dopamine / max(threshold, ε))
+  hormoneDaDriveMultGain: 1.0, // DA 驱动力→意愿乘子线性增益 (乘子 = 1 + gain×(raw_drive−1)，钳制前)
+  hormoneDaDriveMultMin: 0.75, // 意愿乘子钳制下限
+  hormoneDaDriveMultMax: 1.35, // 意愿乘子钳制上限
+  hormoneDaDepressionThreshold: 0.9, // 消沉判定独立阈值：raw_drive 低于该值视为消沉（低谷累计；禁用钳制值判定）
+  hormoneDaWillDeferMult: 0.85, // 意愿等待放行阈值：合成乘子低于该值时 b8 高阶升级/b13 进入有界等待
+  hormoneDaWillDeferHours: 4.0, // 意愿等待窗口（游戏小时）：低谷累计达窗口后高阶分支无条件放行 (0 = 禁用)
+  hormoneDaLowStreakRecovery: 2.0, // 低谷累计恢复速率 (/游戏小时)：意愿恢复后 da_low_streak 回落速率
+  hormoneCortWillSuppress: 0.25, // H-09 CORT 危机聚焦压制强度（归一化皮质醇在钳制前对意愿乘子的线性减量）
 };

@@ -468,3 +468,18 @@
 | `hormoneAdrFatigueHours` | f32 | 1 | spatial/hormones.rs (神经内分泌调制) | 肾上腺素峰后深度疲劳窗口时长 (游戏小时) |
 | `hormoneAnxietyNeThreshold` | f32 | 60 | spatial/hormones.rs (神经内分泌调制) | NE 焦虑标签的去甲肾上腺素下限 (高NE+低5-HT) |
 | `hormoneAnxiety5htThreshold` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | NE 焦虑标签的血清素上限 |
+
+## 19. 1 四轴十一激素系统 · 行为意愿通道超参
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `hormoneEffectsEnabled` | bool | false | spatial/hormones.rs + decisions/branches.rs (行为意愿通道总开关) | ★ 行为效果总开关：关闭时意愿乘子恒 1.0、低谷累计惰性、分支等待不生效（行为逐位等价） |
+| `hormoneDaDriveEpsilon` | f32 | 0.05 | spatial/hormones.rs (神经内分泌调制) | DA 原始驱动力除数正下界 ε (raw_drive = dopamine / max(threshold, ε)) |
+| `hormoneDaDriveMultGain` | f32 | 1 | spatial/hormones.rs (神经内分泌调制) | DA 驱动力→意愿乘子线性增益 (乘子 = 1 + gain×(raw_drive−1)，钳制前) |
+| `hormoneDaDriveMultMin` | f32 | 0.75 | spatial/hormones.rs (神经内分泌调制) | 意愿乘子钳制下限 |
+| `hormoneDaDriveMultMax` | f32 | 1.35 | spatial/hormones.rs (神经内分泌调制) | 意愿乘子钳制上限 |
+| `hormoneDaDepressionThreshold` | f32 | 0.9 | spatial/hormones.rs (消沉判定与低谷累计) | 消沉判定独立阈值：raw_drive 低于该值视为消沉（低谷累计；禁用钳制值判定） |
+| `hormoneDaWillDeferMult` | f32 | 0.85 | decisions/branches.rs (b8 高阶升级/b13 意愿等待放行阈值) | 意愿等待放行阈值：合成乘子低于该值时 b8 高阶升级/b13 进入有界等待 |
+| `hormoneDaWillDeferHours` | f32 | 4 | spatial/hormones.rs + decisions/branches.rs (意愿等待窗口) | 意愿等待窗口（游戏小时）：低谷累计达窗口后高阶分支无条件放行 (0 = 禁用) |
+| `hormoneDaLowStreakRecovery` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 低谷累计恢复速率 (/游戏小时)：意愿恢复后 da_low_streak 回落速率 |
+| `hormoneCortWillSuppress` | f32 | 0.25 | spatial/hormones.rs (CORT 危机聚焦压制 · H-09) | H-09 CORT 危机聚焦压制强度（归一化皮质醇在钳制前对意愿乘子的线性减量） |

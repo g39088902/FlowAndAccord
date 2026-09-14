@@ -147,6 +147,12 @@ const IMPACT_OVERRIDES = {
   terrainLakeShoreSetbackM: 'geo/lakeside.rs (TB-03 水岸安全退距)',
   terrainLakeOutlineWarpM: 'geo/lakeside.rs (TB-03 湖岸低频径向扰动幅度)',
   terrainLakeNoiseGain: 'geo/lakeside.rs (TB-03 环岸噪声阻尼增益)',
+  // ★ H-08/H-09 行为意愿通道（hormone 前缀规则只指向 hormones.rs，行为接线点需显式覆盖）
+  hormoneEffectsEnabled: 'spatial/hormones.rs + decisions/branches.rs (行为意愿通道总开关)',
+  hormoneDaWillDeferMult: 'decisions/branches.rs (b8 高阶升级/b13 意愿等待放行阈值)',
+  hormoneDaWillDeferHours: 'spatial/hormones.rs + decisions/branches.rs (意愿等待窗口)',
+  hormoneDaDepressionThreshold: 'spatial/hormones.rs (消沉判定与低谷累计)',
+  hormoneCortWillSuppress: 'spatial/hormones.rs (CORT 危机聚焦压制 · H-09)',
 };
 
 const IMPACT_PREFIX_RULES = [

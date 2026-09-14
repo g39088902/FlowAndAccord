@@ -396,5 +396,15 @@
   "hormoneAdrPeakThreshold": 70.0,
   "hormoneAdrFatigueHours": 1.0,
   "hormoneAnxietyNeThreshold": 60.0,
-  "hormoneAnxiety5htThreshold": 30.0
+  "hormoneAnxiety5htThreshold": 30.0,
+  "hormoneEffectsEnabled": false,
+  "hormoneDaDriveEpsilon": 0.05,
+  "hormoneDaDriveMultGain": 1.0,
+  "hormoneDaDriveMultMin": 0.75,
+  "hormoneDaDriveMultMax": 1.35,
+  "hormoneDaDepressionThreshold": 0.9,
+  "hormoneDaWillDeferMult": 0.85,
+  "hormoneDaWillDeferHours": 4.0,
+  "hormoneDaLowStreakRecovery": 2.0,
+  "hormoneCortWillSuppress": 0.25
 }

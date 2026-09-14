@@ -185,3 +185,18 @@ v1.9.0 起远征不再由世界系统前置扫描触发，改为**马斯洛决�
 若行囊未满且家户该品类仍短缺，`decide_drinking`/`decide_foraging` 的 `finished` 判据不成立，Agent 会在资源点**原地持续采集**，
 根本不会进入 `try_continue_harvesting`，表现为「预排队列不生效 / 行程不推进」的**假故障**。
 同类坑亦见于「家宅已备满」类场景——须同时把 `family_stock_active` 置位或直接给足账本余额。
+
+### 4.16 🔴 ★ H-08/H-09 激素意愿等待（v1.50.63 起 · 默认关闭 · 调制不指挥）
+
+- **唯一行为消费入口**：`hormones.rs::will_deferred()`，本目录**仅两处调用**——`branches.rs` 的
+  b8 高阶升级（`house.tier != Tier0Warehouse` 时，Tier0→Tier1 安居豁免）与 b13 积累财富
+  （在原 `gold_mining_cooldown` 之上）。新增高阶分支接入意愿等待须先过 hormone-TODO 对应任务验收。
+- **硬边界**：意愿等待写在**分支条件内部**（自包含铁律）；不改成本矩阵 / `all_stocked` /
+  `family_stock_on` 施密特触发器 / 编排与 `MaslowLevel` 归属；b1/b2/b3/b4/b12 求生与安居链路
+  **零激素引用**（极低 DA 仍能命中 b1/b2，衰弱/临界自救守卫不变）。
+- **有界性**：等待由激素层 `da_low_streak` 累计器支撑（低意愿乘子或消沉判定成立时累计、
+  恢复时回落、上限钳制在等待窗口），窗口耗尽无条件放行——禁止在分支评估处新增每拍重置的等待计时
+  （会形成永久不启动）。
+- **开关契约**：总开关 `hormone_effects_enabled` 默认关闭；关闭时乘子恒 1.0、等待恒 false，
+  行为与 RNG 消费逐位等价（回归门禁 = 投影对照 + test-determinism）。
+- 消沉判定在激素层完成（`raw_drive` 与独立阈值），本目录**不得**自行读激素水平拼装判断条件。

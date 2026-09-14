@@ -595,6 +595,30 @@ pub struct SimConfig {
     pub hormone_anxiety_ne_threshold: f32,
     /// NE 焦虑标签的血清素上限
     pub hormone_anxiety_5ht_threshold: f32,
+
+    // 15.1 四轴十一激素系统 · 行为意愿通道超参 (H-08 / H-09 · P1)
+    /// ★ 行为效果总开关（H-08）：关闭时意愿乘子恒为 1.0、低谷累计惰性、分支等待不生效，
+    /// 既有行为与 RNG 消费逐位等价（§1.4 开关覆盖全部行为路径）
+    pub hormone_effects_enabled: bool,
+    /// DA 原始驱动力除数正下界 ε（raw_drive = dopamine / max(threshold, ε)，防零除）
+    pub hormone_da_drive_epsilon: f32,
+    /// DA 驱动力→意愿乘子线性增益（乘子 = 1 + gain × (raw_drive − 1)，钳制前）
+    pub hormone_da_drive_mult_gain: f32,
+    /// 意愿乘子钳制下限（初始候选 0.75）
+    pub hormone_da_drive_mult_min: f32,
+    /// 意愿乘子钳制上限（初始候选 1.35）
+    pub hormone_da_drive_mult_max: f32,
+    /// ★ H-08 消沉判定独立阈值：raw_drive 低于该值视为消沉（低谷累计；禁用钳制值判定）
+    pub hormone_da_depression_threshold: f32,
+    /// ★ H-08 意愿等待放行阈值：合成意愿乘子低于该值时高阶分支（b8 高阶升级 / b13）进入有界等待
+    pub hormone_da_will_defer_mult: f32,
+    /// ★ H-08 意愿等待窗口（游戏小时）：低谷累计达窗口后高阶分支无条件放行（0 = 禁用等待）
+    pub hormone_da_will_defer_hours: f32,
+    /// ★ H-08 低谷累计恢复速率（/游戏小时）：意愿恢复后 da_low_streak 的回落速率
+    pub hormone_da_low_streak_recovery: f32,
+    /// ★ H-09 CORT 危机聚焦压制强度：归一化皮质醇 (=cortisol/100) 在钳制前对意愿乘子的线性减量
+    /// （仅调制意愿，不改升级扣账成本 / all_stocked 判据 / family_stock_on 触发器）
+    pub hormone_cort_will_suppress: f32,
 }
 
 impl SimConfig {
