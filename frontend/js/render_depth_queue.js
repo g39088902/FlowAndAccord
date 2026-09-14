@@ -329,6 +329,33 @@ function drawWorldEntities() {
           d = d0 > d1 ? d0 : d1;
         }
         _depthItem(DEPTH_FEATURE, f, 0, d + 0.05);
+      } else if (f.kind === 'WaterBody') {
+        // ★ TB-03 静水闭合水体：按 32m 世界块分块入队（整湖以最大顶点深度入队
+        // 会盖住近岸人物与房屋，TB-03-IMPLEMENTATION-PLAN §7.3）。块网格与
+        // render_terrain.js::_wbTileGrid 同式；块深度 = 块四角在水面高程下的
+        // 最大深度。idx = 块号 + 1（0 保留给整条绘制项）。
+        const STEP = 32;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let vi = 0; vi < vs.length; vi++) {
+          if (vs[vi].x < minX) minX = vs[vi].x;
+          if (vs[vi].x > maxX) maxX = vs[vi].x;
+          if (vs[vi].y < minY) minY = vs[vi].y;
+          if (vs[vi].y > maxY) maxY = vs[vi].y;
+        }
+        const nx = Math.max(1, Math.ceil((maxX - minX) / STEP));
+        const ny = Math.max(1, Math.ceil((maxY - minY) / STEP));
+        const lvl = f.elevation || 0;
+        for (let ty = 0; ty < ny; ty++) {
+          for (let tx = 0; tx < nx; tx++) {
+            const x0 = minX + tx * STEP, y0 = minY + ty * STEP;
+            const x1 = x0 + STEP, y1 = y0 + STEP;
+            // 块四角任一在水面高程下的深度取最大（空块照常入队，绘制端 clip 兜底）
+            const d = Math.max(
+              depthOf(x0, y0, lvl), depthOf(x1, y0, lvl),
+              depthOf(x1, y1, lvl), depthOf(x0, y1, lvl));
+            _depthItem(DEPTH_FEATURE, f, ty * nx + tx + 1, d);
+          }
+        }
       } else {
         let dmax = -Infinity;
         for (let vi = 0; vi < vs.length; vi++) {

@@ -113,6 +113,15 @@
         }
       }
 
+      // ★ TB-03-11 景观风格乘色（纯表现层；未激活/旧模板/未列地类 = 不改）。
+      //   只改颜色观感，不触及任何模拟状态；世界切换经 SimLighting.markDirty 重建反照率。
+      const tint = window.TerrainStyle ? window.TerrainStyle.tintFor(surfaceKind) : null;
+      if (tint) {
+        r = Math.min(255, r * tint[0]);
+        g = Math.min(255, g * tint[1]);
+        b = Math.min(255, b * tint[2]);
+      }
+
       return { r, g, b };
     }
 

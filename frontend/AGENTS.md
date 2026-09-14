@@ -20,7 +20,7 @@
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
 | `js/math.js` | ~75 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影） | 任何业务逻辑 |
-| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（288 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
+| `js/config.js` | ~215 | `window.SIM_CONFIG` 全局数值配置（310 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
 | `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：16 条活动分支顺序 + 层级覆盖。用户调整保存到 `flowaccord.decision-order.v3`；启动时迁移 v2（b11→b8、移除 b15） | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
@@ -108,13 +108,14 @@
 
 ```
 1. math.js                    零依赖基础（含 computeTerrainAlbedo 反照率/光照分解）
-2. config.js                  SIM_CONFIG (288 字段，含拆分配置合计)
+2. config.js                  SIM_CONFIG (310 字段，含拆分配置合计)
 3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
 4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
 5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)
 6. config.lighting.js         ★ v1.48.0 SIM_LIGHTING 动态季节光照前端配置（纯表现层，不注入 WASM）
 7. config.render.js           ★ v1.50.15 RENDER_CONFIG 渲染表现层参数（视觉抬升/足迹深度半径，须早于 render_world.js）
 7b. terrain-texture.js        ★ TA-12-2 地表纹样模型层（window.TerrainTexture，须早于 rustworld.js；加载时不读 Canvas/DOM 全局）
+7c. terrain-style.js          ★ TB-03-11 景观风格样式表（window.TerrainStyle：profile→基调白名单 + 世界 seed 固定盐选型 + 逐 SurfaceKind 反照率乘色，math.js::computeTerrainAlbedo 末尾消费；纯表现层，样式开关物理零变化；READY 激活 / LOAD_RESULT 回中性）
 8. lighting.js                ★ v1.48.0 年周期光弧引擎 SimLighting（须早于 rustworld.js 与渲染六件套）
 8. decision-viz-data.js       分支元数据
 9. decision-viz-view.js       决策视图 DOM 渲染

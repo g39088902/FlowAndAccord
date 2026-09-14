@@ -14,13 +14,17 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (288 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (310 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
 │   │       │   ├── mod.rs                  # geo 模块入口
 │   │       │   ├── terrain.rs              # 连续 3D 地形高程采样
 │   │       │   ├── plateau.rs              # ★ TB-02 台地聚落几何与过渡带 (PlateauGeometry)
+│   │       │   ├── alluvial_fan.rs         # ★ TB-03 山前冲积扇几何与干浅沟 (FanGeometry)
+│   │       │   ├── basin.rs                # ★ TB-03 盆地绿洲几何与中心泉池 (BasinGeometry)
+│   │       │   ├── lakeside.rs             # ★ TB-03 湖畔盆地几何与环湖干岸 (LakeGeometry)
+│   │       │   ├── static_water.rs         # ★ TB-03 静水共用规划：闭合扰动椭圆轮廓/cells 涂写/WaterBody 特征与岸点登记 (StaticWaterPlan)
 │   │       │   ├── hydrology.rs            # 水系生成（含 River/RiverBank 特征闭合轮廓）
 │   │       │   ├── accents.rs              # ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder 5 类，salt RNG）
 │   │       │   ├── query.rs                # 地表通行与建造查询
@@ -100,7 +104,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 288 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 310 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
@@ -108,6 +112,7 @@ FlowAndAccord/
 │   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG；★ TA-12 terrainTexture 配置组 12 键含 detailFadePx LOD 淡入区间)
 │   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
 │   │   ├── terrain-texture.js              # ★ TA-12 世界坐标锁定地表纹理模型层 (window.TerrainTexture：固定整数哈希/独立属性通道/世界桶候选/草斑土纹图元/材质筛选/有界缓存与分批构建；★ TA-12-3 clipToRect/buildFragments 跨格预裁剪 + drawCell 四角双线性贴面投影；★ TA-12-4 refreshPalette 共用受光色档；★ TA-12-5 invalidate 生命周期；★ TA-12-7 _lodFade live LOD 热调修复)
+│   │   ├── terrain-style.js                # ★ TB-03-11 景观风格样式表 (window.TerrainStyle：profile→基调白名单/世界 seed 固定盐选型/逐 SurfaceKind 反照率乘色；纯表现层)
 │   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影；★ TA-12-4 lightParams/shadeAlbedoInto 共用受光步骤 + 批次末尾通知 TerrainTexture.refreshPalette)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
