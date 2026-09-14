@@ -23,7 +23,8 @@
 use super::world::World3DEngine;
 use crate::config::SimConfig;
 use crate::geo::terrain::{
-    TERRAIN_PROFILE_FLAT_BASELINE, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS,
+    TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_FLAT_BASELINE,
+    TERRAIN_PROFILE_MOUNTAIN_PASS,
 };
 
 /// 结构子特征掩码位（`1 << TerrainSubFeatureKind as u32`）。
@@ -78,12 +79,13 @@ impl GenesisStrategy {
                 disable_spurs: true,
             });
         }
-        // 3. 尚非基线 → 使用显式简化基线（掩码归零：基线无子特征可禁用）。
-        if !facts.is_baseline {
+        // 3. 兜底显式降级至已验收的 flat_baseline（STAGE2-7）。
+        //    若当前已是 flat_baseline，阶梯真正耗尽（不自环）。
+        if self.effective_profile != TERRAIN_PROFILE_FLAT_BASELINE {
             return Some(GenesisStrategy {
                 effective_profile: TERRAIN_PROFILE_FLAT_BASELINE.to_string(),
                 disabled_mask: 0,
-                disable_spurs: false,
+                disable_spurs: true,
             });
         }
         None
@@ -96,8 +98,6 @@ struct StrategyFacts {
     has_structural_sub_features: bool,
     /// 候选生成时支脊仍开启（山口 profile 且开关开启）。
     spurs_active: bool,
-    /// 候选已是 `flat_baseline`（阶梯尽头）。
-    is_baseline: bool,
 }
 
 /// 单次尝试记录（§5.8 诊断记录字段：attempt/disabled_mask/disable_spurs/
@@ -275,7 +275,6 @@ impl World3DEngine {
                 has_structural_sub_features: !candidate.terrain.sub_features.is_empty(),
                 spurs_active: effective == TERRAIN_PROFILE_MOUNTAIN_PASS
                     && candidate.config.terrain_branch_ridge_enabled,
-                is_baseline: effective == TERRAIN_PROFILE_FLAT_BASELINE,
             };
             match strategy.next(&facts) {
                 Some(next) if !tried_keys.contains(&next.key()) => {
@@ -331,3 +330,4 @@ impl World3DEngine {
         Ok(())
     }
 }
+

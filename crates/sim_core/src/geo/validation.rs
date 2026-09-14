@@ -19,9 +19,8 @@
 
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
-    is_static_water_profile, TerrainFeatureKind, TerrainMap, TERRAIN_PROFILE_ALLUVIAL_FAN,
-    TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-    TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+    is_static_water_profile, TerrainFeatureKind, TerrainMap,
+    TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS,
     TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
 
@@ -35,31 +34,18 @@ const BOUND_EPSILON_M: f32 = 0.5;
 /// 未来子特征 ID 段（T1 100–127 / T2 200–227）由调用方另行放行。
 fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
     match profile {
-        TERRAIN_PROFILE_RIVER_VALLEY => match id {
+        TERRAIN_PROFILE_RIVER_VALLEY | TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT => match id {
             1 => Some(TerrainFeatureKind::River),
             10 | 11 => Some(TerrainFeatureKind::ShallowFord),
             20 | 21 => Some(TerrainFeatureKind::RiverBank),
-            30 => Some(TerrainFeatureKind::SpringValley),
             _ => None,
         },
-        // 草原 / 半坡 / 河谷聚落 / 台地聚落 / ★ TB-03 冲积扇：仅泉眼特征（第 2 步洼地/坡脚/扇缘安置 `30 + i`，i ∈ 0..2）。
-        TERRAIN_PROFILE_GRASSLAND_PLAIN
-        | TERRAIN_PROFILE_HILLSIDE_WOODLAND
-        | TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
-        | TERRAIN_PROFILE_PLATEAU_SETTLEMENT
-        | TERRAIN_PROFILE_ALLUVIAL_FAN => match id {
-            30 | 31 => Some(TerrainFeatureKind::SpringValley),
-            _ => None,
-        },
-        // ★ TB-03 盆地绿洲 / 湖畔盆地：水体特征 #1（静水 `WaterBody`），无泉眼
-        //（水源地理锚定由静水岸点承担，不再安置 `SpringValley`）。
-        TERRAIN_PROFILE_BASIN_OASIS | TERRAIN_PROFILE_LAKESIDE_BASIN => match id {
+        // ★ TB-03 湖畔盆地：水体特征 #1（静水 `WaterBody`）
+        TERRAIN_PROFILE_LAKESIDE_BASIN => match id {
             1 => Some(TerrainFeatureKind::WaterBody),
             _ => None,
         },
-        // 山口：现状零特征；未来 D-B2 子特征走 100–127 段（由调用方放行）。
-        TERRAIN_PROFILE_MOUNTAIN_PASS => None,
-        // 未知 / 未来 profile：不做归属断言（避免拒绝尚未登记的合法布局）。
+        // 山口 / 盆地 / 草原 / 半坡 / 台地聚落 / 冲积扇：零核心特征
         _ => None,
     }
 }

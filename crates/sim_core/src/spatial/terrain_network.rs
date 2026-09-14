@@ -30,7 +30,7 @@ impl World3DEngine {
                 }
             }
         }
-        // ★ TB-03 冲积扇：清泉 POI 重锚到扇缘泉眼候选（2 处对置；其余清泉若
+        // ★ TB-03 冲积扇：清泉 POI 重锚到扇缘水源候选（2 处对置；其余清泉若
         //   数量 >2 走 legal_land_position，扇面坡度全域可建不阻断）。
         let is_fan = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN;
         let fan_geom = if is_fan { self.get_fan_geometry() } else { None };
@@ -48,10 +48,8 @@ impl World3DEngine {
                 }
             }
         }
-        // ★ TB-03 静水新模板取水点命名（盆地泉池 / 湖岸；旧模板保持「河岸」语义）
-        let water_poi_label = if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
-            "泉池取水点"
-        } else if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+        // ★ TB-03 静水新模板取水点命名（湖岸；旧模板保持「河岸」语义）
+        let water_poi_label = if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
             "湖岸取水点"
         } else {
             "河岸取水点"
@@ -305,7 +303,7 @@ impl World3DEngine {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ★ TB-03 盆地绿洲 / 山前冲积扇 / 湖畔盆地：几何重放与模板专属门禁。
+    // ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地：几何重放与模板专属门禁。
     // ═══════════════════════════════════════════════════════════════════
 
     /// 重放 `relief_rng` 头部公共消费（4 次），供 TB-03 几何重放入口复用。
@@ -338,7 +336,7 @@ impl World3DEngine {
         ))
     }
 
-    /// 重新派生盆地绿洲几何（含静水计划与泉池平坦基准）。
+    /// 重新派生盆地几何。
     pub fn get_basin_geometry(&self) -> Option<crate::geo::BasinGeometry> {
         if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
             return None;
@@ -468,29 +466,22 @@ impl World3DEngine {
         Ok(())
     }
 
-    /// TB-03 盆地绿洲专有门禁：盆底生活带房屋候选完整占地 + 出口走廊 + 岸点干地合法。
+    /// TB-03 盆地专有门禁：盆底平坦生活带房屋候选完整占地 + 出口走廊。
     pub fn validate_basin_gates(&self) -> Result<(), String> {
         let Some(bg) = self.get_basin_geometry() else {
             return Ok(());
         };
-        // 盆底生活带：q < 0.72（岸环/泉池/盆壁自动被占地校验排除）
+        // 盆底生活带：q < 0.82（盆壁与高山自动被占地校验排除）
         let buildable = self.count_spaced_buildable(|wx, wy| {
             let (q, _) = bg.q_at(wx, wy);
-            q < 0.72
+            q < 0.82
         });
         if buildable < 3 {
             return Err("BasinBuildAreaInsufficient".into());
         }
-        self.validate_access_points_dry()?;
-        // 出口走廊：泉池岸点（真实干地）→ 沿出口方向越过低脊（1.3×semi_b）的
-        // 路由必须存在。⚠️ 不能以池心为起点——池心是 DeepWater（TB-03-06 实测）。
+        // 出口走廊：盆心 (center_x, center_y) → 沿出口方向越过高山 (1.3×semi_b) 的路由必须存在。
         let (dir_x, dir_y) = (bg.exit_theta.cos(), bg.exit_theta.sin());
-        let (ax, ay) = bg
-            .water
-            .as_ref()
-            .and_then(|p| p.access_points.first().copied())
-            .unwrap_or((bg.pool_cx, bg.pool_cy));
-        let mut a = Vec3::new(ax, ay, 0.0);
+        let mut a = Vec3::new(bg.center_x, bg.center_y, 0.0);
         a.z = self.terrain.sample_elevation(a.x, a.y);
         let bx = bg.center_x + dir_x * bg.semi_b * 1.3;
         let by = bg.center_y + dir_y * bg.semi_b * 1.3;

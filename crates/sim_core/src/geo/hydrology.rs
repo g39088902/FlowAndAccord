@@ -120,18 +120,8 @@ impl TerrainMap {
         if let Some(vg) = scratch.valley_geometry.as_ref() {
             self.generate_settlement_river(vg, config);
         }
-        // ★ TB-03 静水（盆地泉池 / 湖畔大湖）：`WaterBody` 特征 #1 + 水体 #1 + 岸点
+        // ★ TB-03 静水（湖畔大湖）：`WaterBody` 特征 #1 + 水体 #1 + 岸点
         //   独立于主河逻辑、零流向静水语义、connections 为空。
-        if let Some(bg) = scratch.basin_geometry.as_ref() {
-            if let Some(plan) = bg.water.as_ref() {
-                super::static_water::apply_static_water(
-                    self,
-                    plan,
-                    config,
-                    |wx, wy| bg.pool_bed_elevation(wx, wy),
-                );
-            }
-        }
         if let Some(lg) = scratch.lake_geometry.as_ref() {
             if let Some(plan) = lg.water.as_ref() {
                 super::static_water::apply_static_water(
@@ -235,10 +225,6 @@ impl TerrainMap {
             let p=Vec3::new(x,y,self.sample_elevation(x,y));
             self.hydrology.access_points.push(WaterAccessPoint{id:i as u32+1,water_body_id:1,resource_pool_id:1,pos:p,nearest_node_id:None,interaction_radius:cfg.poi_interaction_radius});
         }
-        // 泉谷为通向主河的浅沟，不产生第二份水库存。
-        let y=size*0.34; let x=center(y);
-        let spring=vec![Vec3::new(x-terrace-bank,y+25.0,level+3.0),Vec3::new(x-bank,y+8.0,level+1.0),Vec3::new(x,y,level)];
-        self.features.push(TerrainFeature{id:30,kind:TerrainFeatureKind::SpringValley,vertices:spring,elevation:level,width:4.0,flags:0});
     }
 
     /// ★ S7-07 河谷聚落主河水系写入（T2 `generate_river` 的谷轴镜像版）。

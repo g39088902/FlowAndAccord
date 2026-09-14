@@ -16,8 +16,7 @@
 //! - `cargo run --release -p sim_core --example terrain_probe -- world 20`（创世校验模式，行为不变）
 //!
 //! §1.4 七项通用指标：max_slope / >30° / >=34° / NO_WALK / buildable / components /
-//! detour_p95，外加 waterM（初始营地=图中心 → 最近可用水源距离；地形层近似：取水点 ∪ 水面格
-//! ∪ SpringValley 泉眼顶点——草原无水面时以泉眼特征为水源锚定）。
+//! detour_p95，外加 waterM（初始营地=图中心 → 最近可用水源距离；地形层近似：取水点 ∪ 水面格）。
 //! 模板专属指标（S7-01 定义）：草原 `mound_count` / `soft_ground` / `fertility`；
 //! 半坡 `windward_max` / `leeward_max` / `buildable_band`；
 //! 河谷聚落 `floor_width` / `cliff_mean` / `crossing95`。
@@ -40,7 +39,8 @@
 use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
 use sim_core::geo::terrain::{
-    TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND,
+    TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_GRASSLAND_PLAIN,
+    TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_LAKESIDE_BASIN,
     TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
     TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
 };
@@ -77,7 +77,7 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             no_walk: (0, 0),
             buildable_min: 12000,
             detour_p95: (0.0, 1.15),
-            water_dist_max: 160.0,
+            water_dist_max: f32::INFINITY,
             band_width_min: 0.0,
             crossing95_min: 0.0,
         }),
@@ -94,7 +94,7 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             no_walk: (0, 0),
             buildable_min: 7500,
             detour_p95: (0.0, 1.45),
-            water_dist_max: 180.0,
+            water_dist_max: f32::INFINITY,
             band_width_min: 35.0,
             crossing95_min: 0.0,
         }),
@@ -127,7 +127,7 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             no_walk: (150, 350),
             buildable_min: 4000,
             detour_p95: (0.0, 3.50),
-            water_dist_max: 180.0,
+            water_dist_max: f32::INFINITY,
             band_width_min: 32.0,
             crossing95_min: 0.0,
         }),
@@ -295,8 +295,7 @@ fn line_blocked(t: &TerrainMap, ax: usize, ay: usize, bx: usize, by: usize) -> b
 }
 
 /// 生活水源距离（§1.4 第 7 项，地形层近似）：图中心（初始营地）到最近可用水源格。
-/// 候选 = 水系取水点 ∪ 任意水面格 ∪ `SpringValley` 泉眼特征顶点（草原无水面时
-/// 泉眼即水源地理锚定）；三者皆无（如 T1 清泉由生态层布点）时返回 None。
+/// 候选 = 水系取水点 ∪ 任意水面格；两者皆无（如清泉由生态层布点）时返回 None。
 fn measure_water_dist(t: &TerrainMap) -> Option<f32> {
     let w = t.grid_width;
     let h = t.grid_height;
@@ -806,12 +805,14 @@ fn check_gates(t: &TerrainMap, r: &Report, m: &TemplateMetrics, win: &GateWindow
             r.detour_p95, win.detour_p95.0, win.detour_p95.1
         ));
     }
-    match r.water_dist {
-        None => v.push("water_dist 无数据（图内无取水点/水面格）".to_string()),
-        Some(d) if d > win.water_dist_max => {
-            v.push(format!("water_dist={:.0}m > {:.0}m", d, win.water_dist_max))
+    if win.water_dist_max.is_finite() {
+        match r.water_dist {
+            None => v.push("water_dist 无数据（图内无取水点/水面格）".to_string()),
+            Some(d) if d > win.water_dist_max => {
+                v.push(format!("water_dist={:.0}m > {:.0}m", d, win.water_dist_max))
+            }
+            _ => {}
         }
-        _ => {}
     }
     if win.band_width_min > 0.0 && m.buildable_band_width < win.band_width_min {
         v.push(format!(
@@ -1140,19 +1141,25 @@ fn main() {
             || name == TERRAIN_PROFILE_HILLSIDE_WOODLAND
             || name == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
             || name == TERRAIN_PROFILE_PLATEAU_SETTLEMENT
+            || name == TERRAIN_PROFILE_ALLUVIAL_FAN
+            || name == TERRAIN_PROFILE_BASIN_OASIS
+            || name == TERRAIN_PROFILE_LAKESIDE_BASIN
         {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());
         } else {
             eprintln!("[错误] 未知 profile `{}`。", name);
             eprintln!(
-                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}` / `{}`。",
+                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}`。",
                 TERRAIN_PROFILE_MOUNTAIN_PASS,
                 TERRAIN_PROFILE_RIVER_VALLEY,
                 TERRAIN_PROFILE_GRASSLAND_PLAIN,
                 TERRAIN_PROFILE_HILLSIDE_WOODLAND,
                 TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
-                TERRAIN_PROFILE_PLATEAU_SETTLEMENT
+                TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+                TERRAIN_PROFILE_ALLUVIAL_FAN,
+                TERRAIN_PROFILE_BASIN_OASIS,
+                TERRAIN_PROFILE_LAKESIDE_BASIN
             );
             std::process::exit(2);
         }

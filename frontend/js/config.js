@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
   terrainGridRes: 120, // 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m）
-  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地绿洲/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地绿洲：大盆地+中心小泉池+单岸点共享池）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
@@ -248,15 +248,11 @@ window.SIM_CONFIG = {
   terrainFanGullyDepthM: 2.2,         // 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行
   terrainFanGullyWidthM: 20.0,        // 干浅沟横截面全宽 (m)；须跨越多个格子
   terrainFanGullyMeanderAmpRad: 0.12, // 干浅沟中心线角向蜿蜒幅度（弧度）
-  // ── TB-03 盆地绿洲（basin_oasis_v1）──
-  terrainBasinSemiAxisRatio: 0.34,    // 盆地半轴比例（×worldSize，椭圆 a/b 共用基准）
-  terrainBasinDepthM: 34.0,           // 盆深 (m，中心相对盆缘下凹总量)
-  terrainBasinRimHeightM: 3.0,        // 外缘低脊高度 (m)；有限支撑环抱轮廓，出口处归零
-  terrainBasinExitWidthDeg: 34.0,     // 陆路出口角宽（度）；首版至少一个明确出口
-  terrainBasinPoolRadiusMinM: 10.0,   // 中心泉池半径抽样下限 (m)；06 §5.6 初值
-  terrainBasinPoolRadiusMaxM: 14.0,   // 中心泉池半径抽样上限 (m)
-  terrainBasinPoolDepthM: 2.2,        // 泉池床最大深度 (m)；水面位于池床之上、岸环最低地表之下
-  terrainBasinBankRingM: 12.0,        // 泉池外干燥岸环宽 (m)；NO_BUILD 禁建安全环，生活带在岸环外
+  // ── TB-03 盆地（basin_oasis_v1）──
+  terrainBasinSemiAxisRatio: 0.42,    // 盆地半轴比例（×worldSize，椭圆 a/b 共用基准，广阔平坦盆底）
+  terrainBasinDepthM: 18.0,           // 盆深 (m，中心相对盆底起伏基准下凹总量)
+  terrainBasinRimHeightM: 42.0,       // 外缘高耸山体基底高度 (m)；雄峻环抱高山，出口处受控归低
+  terrainBasinExitWidthDeg: 38.0,     // 陆路出口角宽（度）；首版至少一个明确出口
   terrainBasinNoiseGain: 0.30,        // 盆底/盆壁噪声阻尼增益；出口与生活带噪声额外抑制
   // ── TB-03 湖畔盆地（lakeside_basin_v1）──
   terrainLakeSemiAxisRatioMin: 0.10,  // 湖半轴比例抽样下限（×worldSize）

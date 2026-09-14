@@ -318,7 +318,7 @@ pub struct SimConfig {
     pub terrain_valley_river_terrace_m: f32,
     /// ★ S7-07 河谷聚落：授权浅滩 y 位置比例（× world，两岸对置 ±本值）。
     /// 默认 0.32（比 T2 先例 ±0.24 更稀疏，跨障绕行压力更真实；须落在谷轴
-    /// 深切段内且避开泉眼带与取水点行——06号 §4.3）。
+    /// 深切段内且避开取水点行——06号 §4.3）。
     pub terrain_valley_ford_ratio: f32,
     /// ★ S7-07 河谷聚落：取水点离轴最小偏移 (m)。默认 35.0（`max(河道半宽+岸带+
     /// 边距, 本值)` 保证两岸对置取水点间距 ≥70m = `poi_min_distance` 口径）。
@@ -347,7 +347,7 @@ pub struct SimConfig {
     pub terrain_plateau_ramp_noise_gain: f32,
     /// ★ TB-02 台地聚落：台缘轮廓低频扰动幅度 (m)。默认 6.0。
     pub terrain_plateau_outline_warp: f32,
-    // ── ★ TB-03 盆地绿洲 / 山前冲积扇 / 湖畔盆地模板参数（仅对应 profile 消费；
+    // ── ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地模板参数（仅对应 profile 消费；
     //    默认值唯一真相源 = 前端 config.js；改任一值等于换图，遵循
     //    TERRAIN_GENERATOR_VERSION 契约）──
     /// ★ TB-03 山前冲积扇：扇体长度比例（× world_size，山口→扇缘）。默认 0.42。
@@ -367,23 +367,15 @@ pub struct SimConfig {
     pub terrain_fan_gully_width_m: f32,
     /// ★ TB-03 山前冲积扇：干浅沟中心线角向蜿蜒幅度（弧度）。默认 0.12。
     pub terrain_fan_gully_meander_amp_rad: f32,
-    /// ★ TB-03 盆地绿洲：盆地半轴比例（× world_size，椭圆 a/b 共用基准）。默认 0.34。
+    /// ★ TB-03 盆地：盆地半轴比例（× world_size，椭圆 a/b 共用基准，广阔平坦盆底）。默认 0.42。
     pub terrain_basin_semi_axis_ratio: f32,
-    /// ★ TB-03 盆地绿洲：盆深 (m，中心相对盆缘下凹总量)。默认 34.0。
+    /// ★ TB-03 盆地：盆深 (m，中心相对盆底起伏基准下凹总量)。默认 18.0。
     pub terrain_basin_depth_m: f32,
-    /// ★ TB-03 盆地绿洲：外缘低脊高度 (m)。默认 3.0（有限支撑环抱轮廓，出口处归零）。
+    /// ★ TB-03 盆地：外缘高耸山体基底高度 (m)。默认 42.0（雄峻环抱高山，出口处受控归低）。
     pub terrain_basin_rim_height_m: f32,
-    /// ★ TB-03 盆地绿洲：陆路出口角宽（度，出口走廊在盆地轮廓上的角向全宽）。默认 34.0。
+    /// ★ TB-03 盆地：陆路出口角宽（度，出口走廊在盆地轮廓上的角向全宽）。默认 38.0。
     pub terrain_basin_exit_width_deg: f32,
-    /// ★ TB-03 盆地绿洲：中心泉池半径抽样下限 (m)。默认 10.0（06 号 §5.6 初值）。
-    pub terrain_basin_pool_radius_min_m: f32,
-    /// ★ TB-03 盆地绿洲：中心泉池半径抽样上限 (m)。默认 14.0。
-    pub terrain_basin_pool_radius_max_m: f32,
-    /// ★ TB-03 盆地绿洲：泉池床最大深度 (m，池床相对盆底)。默认 2.2（水面位于池床之上、岸环最低地表之下）。
-    pub terrain_basin_pool_depth_m: f32,
-    /// ★ TB-03 盆地绿洲：泉池外干燥岸环宽 (m)。默认 12.0（NO_BUILD 禁建安全环，可步行；生活带在岸环外）。
-    pub terrain_basin_bank_ring_m: f32,
-    /// ★ TB-03 盆地绿洲：盆底/盆壁噪声阻尼增益。默认 0.30（出口与盆底生活带噪声受额外抑制）。
+    /// ★ TB-03 盆地：盆底/盆壁噪声阻尼增益。默认 0.30（出口与盆底生活带噪声受额外抑制）。
     pub terrain_basin_noise_gain: f32,
     /// ★ TB-03 湖畔盆地：湖半轴比例抽样下限（× world_size）。默认 0.10。
     pub terrain_lake_semi_axis_ratio_min: f32,

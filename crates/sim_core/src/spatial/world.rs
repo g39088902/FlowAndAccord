@@ -130,17 +130,14 @@ impl World3DEngine {
         match Self::new_seeded_with_config_bounded(grid_res, world_size, seed, config, &mut |_| {}) {
             Ok(w) => w,
             Err(mut diag) => {
-                // 兜底：基线候选直建（不跑门禁），保证旧调用点恒得一个世界。
-                // 必须基于用户原配置施加 flat_baseline，不得退化成零值默认配置。
+                // 兜底：候选直建（不跑门禁），保证旧调用点恒得一个世界。
+                // 保持用户原请求的 profile，不篡改为 flat_baseline。
                 diag.end_reason = "legacy_fallback".to_string();
-                let mut cfg = fallback_cfg;
-                cfg.terrain_profile =
-                    crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
                 let mut world = Self::build_candidate(
                     grid_res,
                     world_size,
                     seed,
-                    cfg,
+                    fallback_cfg,
                     &crate::geo::terrain::GenesisOverrides::default(),
                 );
                 world.creation_diagnostic = Some(diag);

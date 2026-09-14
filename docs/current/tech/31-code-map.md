@@ -14,7 +14,7 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (380 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (376 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -22,7 +22,7 @@ FlowAndAccord/
 │   │       │   ├── terrain.rs              # 连续 3D 地形高程采样
 │   │       │   ├── plateau.rs              # ★ TB-02 台地聚落几何与过渡带 (PlateauGeometry)
 │   │       │   ├── alluvial_fan.rs         # ★ TB-03 山前冲积扇几何与干浅沟 (FanGeometry)
-│   │       │   ├── basin.rs                # ★ TB-03 盆地绿洲几何与中心泉池 (BasinGeometry)
+│   │       │   ├── basin.rs                # ★ TB-03 盆地几何与环抱高山 (BasinGeometry)
 │   │       │   ├── lakeside.rs             # ★ TB-03 湖畔盆地几何与环湖干岸 (LakeGeometry)
 │   │       │   ├── static_water.rs         # ★ TB-03 静水共用规划：闭合扰动椭圆轮廓/cells 涂写/WaterBody 特征与岸点登记 (StaticWaterPlan)
 │   │       │   ├── hydrology.rs            # 水系生成（含 River/RiverBank 特征闭合轮廓）
@@ -105,7 +105,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 380 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 376 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)

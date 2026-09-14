@@ -1,27 +1,16 @@
-//! basin.rs · TB-03 盆地绿洲静态几何与高程规划。
+//! basin.rs · 盆地静态几何与高程规划。
 //!
-//! 负责独立静态模板 `basin_oasis_v1` 的物理高程骨架（TB-03-IMPLEMENTATION-PLAN §4）：
-//! 1. 连续椭圆盆地：`z(p) = base(p) − D·F(q) + rim(p) + protected_noise(p)`，
-//!    `F(q) = (1−q²)²`（q<1；中心和外界一阶导数为零，无生硬接缝）；
-//!    `rim` 为有限支撑外缘低脊（sin² 剖面，两端导数为零），出口方向归零；
-//! 2. 至少一个明确陆路出口：角向窗口内盆壁梯度阻尼 + 低脊归零 + 噪声强抑制，
-//!    出口、盆底生活带连通外缘；不靠临时提高居民体力预算补救；
-//! 3. 中心小泉池：半径 10~14m（06 号 §5.6 初值），池区局部平坦化（水位与池床/
-//!    岸环关系由几何保证），静水由 `static_water.rs` 施加（水体 id=1 ↔ 池 id=1），
-//!    紧邻 NO_BUILD 干燥岸环（可步行、禁建），可建生活带在岸环外盆底。
-//!
-//! 首版单实际取水岸点（`water_source_poi_count`）；池总预算 = `stockMaxWater×countWater`，
-//! 不按岸点乘算（`prepare_terrain_layout` 静水路径）。
-//!
-//! 纯确定性：几何由创世 `GenesisScratch` 共享，不进快照/存档；参数抽样走
-//! `relief_rng` 专属局部流（消费序固定：盆心横移 ×2 → 旋转 → 短半轴比 →
-//! 出口方向 → 池偏移方向 → 池偏移距离 → 池半径）。
+//! 负责独立静态模板 `basin_oasis_v1` 的物理高程骨架：
+//! 1. 广袤平坦盆底生活带：中心平缓开阔，提供大面积无障碍平地（q <= 0.82）；
+//! 2. 环抱雄峻高山 (0.82 < q <= 1.05)：自盆底向外陡峭攀升至 +rim_height_m（42m），
+//!    峰值坡度稳定在 38°~45°，自然派生 RockFace 与 NO_WALK 连续高山硬屏障；
+//! 3. 陆路出口走廊：出口方向角向窗口内山壁梯度阻尼，保持平缓垭口（< 19°）连通外缘；
+//! 4. 外围崇山峻岭 (q > 1.05)：维持高山基底与连绵峰峦。
 
 use crate::config::SimConfig;
 use crate::rng::WorldRng;
-use super::static_water::{build_closed_ellipse_outline, StaticWaterPlan};
 
-/// 盆地绿洲静态几何（创世 scratch 专用，不进快照/存档）。
+/// 盆地静态几何（创世 scratch 专用，不进快照/存档）。
 #[derive(Debug, Clone)]
 pub struct BasinGeometry {
     /// 盆心世界坐标
@@ -34,35 +23,18 @@ pub struct BasinGeometry {
     /// 盆地半轴（米）：a 沿局部 u 轴、b 沿局部 v 轴（b = a × b_ratio）
     pub semi_a: f32,
     pub semi_b: f32,
-    /// 盆深（米，中心相对盆缘下凹总量）
+    /// 径向山峦低频扭曲相位（弧度）
+    pub warp_phase1: f32,
+    pub warp_phase2: f32,
+    /// 盆深（米，中心相对盆底起伏基准下凹总量）
     pub depth_m: f32,
-    /// 外缘低脊高度（米）
+    /// 外缘高耸山体基底高度（米）
     pub rim_height_m: f32,
     /// 陆路出口方向角（世界系弧度）与角向半宽（弧度）
     pub exit_theta: f32,
     pub exit_half_rad: f32,
-    /// 泉池中心（世界坐标）与半径（米）
-    pub pool_cx: f32,
-    pub pool_cy: f32,
-    pub pool_radius: f32,
-    /// 泉池床最大深度（米）
-    pub pool_depth_m: f32,
-    /// 泉池外干燥岸环宽（米，NO_BUILD 禁建安全环）
-    pub bank_ring_m: f32,
     /// 盆底噪声阻尼增益
     pub noise_gain: f32,
-    /// 泉池区平坦基准高程（米，第 2 步解析计算：局部倾斜 + 盆地下凹，不含噪声）
-    pub pool_datum: f32,
-    /// 静水计划（第 2 步末尾构建；第 3 步消费）
-    pub water: Option<StaticWaterPlan>,
-}
-
-/// sin² 剖面（两端导数为零的低脊/包络基元）。
-#[inline]
-fn sin2_profile(u: f32) -> f32 {
-    let u = u.clamp(0.0, 1.0);
-    let s = (std::f32::consts::PI * u).sin();
-    s * s
 }
 
 #[inline]
@@ -73,38 +45,27 @@ fn smoothstep(t: f32) -> f32 {
 
 impl BasinGeometry {
     /// 从 `relief_rng` 专属流抽取参数构建盆地静态几何。
-    ///
-    /// `tilt_at`：基础倾斜平面（世界坐标 → 高程米），供泉池平坦基准解析计算
-    ///（与 `generate_base_relief` 的 `base_tilt` 同式，保证第 2 步逐位一致）。
     pub fn plan<T: Fn(f32, f32) -> f32>(
         relief_rng: &mut WorldRng,
         world_size: f32,
         config: &SimConfig,
-        tilt_at: T,
+        _tilt_at: T,
     ) -> Self {
         let cx = relief_rng.gen_range(-0.04, 0.04) * world_size;
         let cy = relief_rng.gen_range(-0.04, 0.04) * world_size;
         let rotation_rad = relief_rng.gen_range(-0.30, 0.30);
         let (sin_rot, cos_rot) = rotation_rad.sin_cos();
-        let semi_a = config.terrain_basin_semi_axis_ratio.clamp(0.20, 0.42) * world_size;
-        let semi_b = semi_a * relief_rng.gen_range(0.80, 0.95);
-        let depth_m = config.terrain_basin_depth_m.max(6.0);
-        let rim_height_m = config.terrain_basin_rim_height_m.max(0.0);
+        let semi_a = config.terrain_basin_semi_axis_ratio.clamp(0.20, 0.48) * world_size;
+        let semi_b = semi_a * relief_rng.gen_range(0.75, 0.92);
         let exit_theta = relief_rng.gen_range(0.0, std::f32::consts::TAU);
         let exit_half_rad = config.terrain_basin_exit_width_deg.max(12.0).to_radians() * 0.5;
-        let pool_dir = relief_rng.gen_range(0.0, std::f32::consts::TAU);
-        let pool_dist = relief_rng.gen_range(0.0, 0.10) * semi_b;
-        let pool_cx = cx + pool_dir.cos() * pool_dist;
-        let pool_cy = cy + pool_dir.sin() * pool_dist;
-        // 池半径：[min, max] 单次抽样（区间无效时钳制为单点）
-        let r_min = config.terrain_basin_pool_radius_min_m.max(4.0);
-        let r_max = config.terrain_basin_pool_radius_max_m.max(r_min + 0.1);
-        let pool_radius = relief_rng.gen_range(r_min, r_max);
-        let pool_depth_m = config.terrain_basin_pool_depth_m.max(0.5);
-        let bank_ring_m = config.terrain_basin_bank_ring_m.max(4.0);
+        let warp_phase1 = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+        let warp_phase2 = relief_rng.gen_range(0.0, std::f32::consts::TAU);
+        let depth_m = config.terrain_basin_depth_m.max(6.0);
+        let rim_height_m = config.terrain_basin_rim_height_m.max(0.0);
         let noise_gain = config.terrain_basin_noise_gain.clamp(0.0, 1.0);
 
-        let mut geom = Self {
+        Self {
             center_x: cx,
             center_y: cy,
             rotation_rad,
@@ -112,70 +73,30 @@ impl BasinGeometry {
             sin_rot,
             semi_a,
             semi_b,
+            warp_phase1,
+            warp_phase2,
             depth_m,
             rim_height_m,
             exit_theta,
             exit_half_rad,
-            pool_cx,
-            pool_cy,
-            pool_radius,
-            pool_depth_m,
-            bank_ring_m,
             noise_gain,
-            pool_datum: 0.0,
-            water: None,
-        };
-
-        // 泉池基准：局部倾斜 + 盆地下凹（不含噪声）。静水水位 = datum − 2.0m；
-        // 岸环地面 = 基准 ±（池邻倾斜 ~1m + 阻尼噪声 ~0.25m）恒高于水位
-        //（≥0.75m 余量），池床最低 = datum − 2.0 − pool_depth < 水位——
-        // 「水面位于池床之上、岸环最低地表之下」由几何保证。
-        // ⚠️ 不做整片平坦化：盆底曲率 F(q) 在 40~120m 内变化 ~10m，混合环会产生
-        // 33°+ 陡坡环阻断出口（TB-03-06 实测踩坑），改为池邻噪声强抑制。
-        let (q, theta_pc) = geom.q_at(pool_cx, pool_cy);
-        geom.pool_datum = tilt_at(pool_cx, pool_cy) + geom.basin_dz(q, theta_pc, pool_cx, pool_cy).0;
-
-        // 静水计划：泉池闭合轮廓（微小扰动，半径恒正）+ 水位 + 单取水岸点
-        //（位于出口方向岸环内，真实干地；id=1 按槽位分配）。
-        let level = geom.pool_datum - 2.0;
-        let outline = build_closed_ellipse_outline(
-            geom.pool_cx,
-            geom.pool_cy,
-            geom.pool_radius,
-            geom.pool_radius,
-            0.0,
-            0.04,
-            0.0,
-            0.0,
-            0.0,
-            20,
-        );
-        let ap_r = geom.pool_radius + 9.0;
-        let access_points = vec![(
-            geom.pool_cx + geom.exit_theta.cos() * ap_r,
-            geom.pool_cy + geom.exit_theta.sin() * ap_r,
-        )];
-        geom.water = Some(StaticWaterPlan {
-            water_body_id: 1,
-            level,
-            outline,
-            center_x: geom.pool_cx,
-            center_y: geom.pool_cy,
-            shore_ring_m: bank_ring_m,
-            access_points,
-        });
-        geom
+        }
     }
 
     /// 世界坐标 → 盆地局部椭圆坐标 (q, θ)。
+    /// 引入低频角向径向扰动（3θ + 5θ），打破正圆/纯椭圆机械感，形成山峦山岬与凹湾。
     #[inline]
     pub fn q_at(&self, wx: f32, wy: f32) -> (f32, f32) {
         let dx = wx - self.center_x;
         let dy = wy - self.center_y;
         let u = dx * self.cos_rot + dy * self.sin_rot;
         let v = -dx * self.sin_rot + dy * self.cos_rot;
-        let q = ((u / self.semi_a).powi(2) + (v / self.semi_b).powi(2)).sqrt();
-        (q, v.atan2(u))
+        let q_base = ((u / self.semi_a).powi(2) + (v / self.semi_b).powi(2)).sqrt();
+        let theta = v.atan2(u);
+        let warp = 1.0 + 0.12 * (3.0 * theta + self.warp_phase1).sin()
+            + 0.07 * (5.0 * theta + self.warp_phase2).cos();
+        let q = q_base / warp.max(0.6);
+        (q, theta)
     }
 
     /// 角向出口掩码：1 在出口窗口内、0 窗外（肩部 smooth 过渡）。
@@ -191,50 +112,49 @@ impl BasinGeometry {
         1.0 - smoothstep((d - self.exit_half_rad) / blend.max(1e-3))
     }
 
-    /// 盆地下凹 + 低脊高程增量（米）与噪声权重。
-    /// 返回 (dz, noise_weight)；`F(q) = (1−q²)²` 在 q=0/1 处一阶导数为零。
-    /// 噪声权重在出口走廊内强抑制，并在泉池邻域（半径 + 岸环 + 15m）进一步
-    /// 压到 ~15%（岸环地面方差控制，服务水位/池床关系）。
-    pub fn basin_dz(&self, q: f32, theta: f32, wx: f32, wy: f32) -> (f32, f32) {
+    /// 盆地下凹 + 环抱高山高程增量（米）与噪声权重。
+    /// 返回 (dz, noise_weight)。
+    ///
+    /// 分区剖面：
+    /// 1. 盆底广袤平坦生活带 (q <= 0.82)：中心平缓下凹 -depth_m，平地超大面积延展，
+    ///    边缘平缓过渡到 -0.80*depth_m（保证生活与营建面积最大化）；
+    /// 2. 环抱高山山壁 (0.82 < q <= 1.05)：自盆底向外雄峻攀升至 +rim_height_m（总高差 55~65m），
+    ///    峰值坡度稳定在 38°~45°，自动派生 RockFace 与 NO_WALK 环状硬屏障；
+    ///    出口走廊内（em 趋近 1）攀升幅度受控抑制（保留 saddle 垭口走廊，坡度 < 19° 保持畅通）；
+    /// 3. 外围崇山峻岭 (q > 1.05)：基底恒定于 +rim_height_m，由高频 fBm 噪声雕琢出连绵山岳，
+    ///    出口走廊方向延续为通畅山谷；
+    /// 4. 噪声权重在生活区/走廊受控阻尼，而在外围山地维持高粗糙度。
+    pub fn basin_dz(&self, q: f32, theta: f32, _wx: f32, _wy: f32) -> (f32, f32) {
         let em = self.exit_mask(theta);
-        let f = if q < 1.0 {
-            let c = 1.0 - q * q;
-            c * c
+
+        let dz = if q <= 0.82 {
+            let t_floor = smoothstep(q / 0.82);
+            -self.depth_m * (1.0 - 0.20 * t_floor)
+        } else if q <= 1.05 {
+            let t_wall = (q - 0.82) / 0.23;
+            let s = smoothstep(t_wall);
+            let z_start = -self.depth_m * 0.80;
+            let z_rim = self.rim_height_m * (1.0 - 0.85 * em);
+            z_start + (z_rim - z_start) * s
         } else {
-            0.0
+            self.rim_height_m * (1.0 - 0.85 * em)
         };
-        // 出口走廊：盆壁梯度阻尼 60%（wall_band 只作用于盆壁段），低脊归零
-        let wall_band = smoothstep((q - 0.55) / 0.25);
-        let dz = -self.depth_m * f * (1.0 - 0.6 * em * wall_band)
-            + self.rim_height_m * sin2_profile((q - 1.0) / 0.14) * (1.0 - em);
-        // 噪声权重：盆底阻尼；出口走廊再抑制；泉池邻域强抑制
-        let d_pool = (wx - self.pool_cx).hypot(wy - self.pool_cy);
-        let pool_prox = 1.0 - smoothstep((d_pool - self.pool_radius - self.bank_ring_m - 5.0) / 20.0);
-        let mut weight = self.noise_gain * (1.0 - 0.7 * em);
-        weight *= 1.0 - 0.85 * pool_prox;
+
+        // 噪声权重：山壁段保持低噪（0.18）避免单调陡坡出现死区微台阶；
+        // 外缘群山充分起伏（0.65）；出口走廊强抑制（-70%）。
+        let wall_weight = 0.18;
+        let upland_weight = 0.65;
+        let base_weight = if q <= 0.82 {
+            self.noise_gain
+        } else if q <= 1.05 {
+            let t = (q - 0.82) / 0.23;
+            self.noise_gain + (wall_weight - self.noise_gain) * t
+        } else {
+            let t = ((q - 1.05) / 0.30).clamp(0.0, 1.0);
+            wall_weight + (upland_weight - wall_weight) * smoothstep(t)
+        };
+
+        let weight = base_weight * (1.0 - 0.70 * em);
         (dz, weight)
-    }
-
-    /// 点到泉池水线的有向距离（米）：负值在水内。轮廓为近圆（扰动 ±4%），
-    /// 用「到池心距离 − 局部轮廓半径」近似（误差 < 扰动脉冲，岸环判据已留余量）。
-    #[inline]
-    pub fn shore_distance(&self, wx: f32, wy: f32) -> f32 {
-        let d = (wx - self.pool_cx).hypot(wy - self.pool_cy);
-        d - self.pool_radius * 1.02
-    }
-
-    /// 是否落在泉池干燥岸环（水线外 0~bank_ring 米；NO_BUILD 禁建安全环）。
-    pub fn on_shore_ring(&self, wx: f32, wy: f32) -> bool {
-        let d = self.shore_distance(wx, wy);
-        d > 0.0 && d <= self.bank_ring_m
-    }
-
-    /// 泉池水下格高程剖面（第 3 步 `apply_static_water` 消费；与平坦基准同源）。
-    pub fn pool_bed_elevation(&self, wx: f32, wy: f32) -> f32 {
-        let d = (wx - self.pool_cx).hypot(wy - self.pool_cy);
-        let u = (d / self.pool_radius.max(1.0)).min(1.0);
-        let depth = 0.35 + (self.pool_depth_m - 0.35) * (1.0 - u * u);
-        let level = self.pool_datum - 2.0;
-        level - depth
     }
 }

@@ -124,7 +124,7 @@ const IMPACT_OVERRIDES = {
   terrainPlateauTopNoiseGain: 'geo/plateau.rs (TB-02 台面区域噪声阻尼增益)',
   terrainPlateauRampNoiseGain: 'geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益)',
   terrainPlateauOutlineWarp: 'geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度)',
-  // ★ TB-03 盆地绿洲 / 山前冲积扇 / 湖畔盆地形态参数
+  // ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地形态参数
   terrainFanLengthRatio: 'geo/alluvial_fan.rs (TB-03 扇体长度比例)',
   terrainFanHalfAngleDeg: 'geo/alluvial_fan.rs (TB-03 扇半角)',
   terrainFanAmplitude: 'geo/alluvial_fan.rs (TB-03 山口到扇缘总高差)',

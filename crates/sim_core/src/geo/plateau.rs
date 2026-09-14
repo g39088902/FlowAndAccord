@@ -135,7 +135,7 @@ impl PlateauGeometry {
         geom.ramp_b_top = geom.local_to_world(half_width - 14.0, 0.0);
         geom.ramp_b_bottom = geom.local_to_world(half_width + ramp_band + 16.0, 0.0);
 
-        // 坡脚泉眼候选锚点：两处，分别位于 Ramp A 与 Ramp B 坡脚平原侧向
+        // 坡脚水源候选锚点：两处，分别位于 Ramp A 与 Ramp B 坡脚平原侧向
         let s0_u = -half_width - ramp_band - 32.0;
         let s0_v = -42.0;
         let s1_u = half_width + ramp_band + 32.0;
