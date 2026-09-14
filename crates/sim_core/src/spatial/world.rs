@@ -288,6 +288,15 @@ impl World3DEngine {
         self.agents.get_mut(idx)
     }
 
+    /// 按 AgentId O(1) 可变查找，并利用字段拆分借用同时借出对 config 的不可变引用
+    pub fn agent_and_config_mut(
+        &mut self,
+        id: AgentId,
+    ) -> Option<(&mut Agent3D, &crate::config::SimConfig)> {
+        let idx = *self.agent_index.get(&id)?;
+        Some((&mut self.agents[idx], &self.config))
+    }
+
     /// 追加一条房屋拍卖受理记录（成交或流拍，放入 256 容量环形缓冲区）
     pub fn push_auction_history(&mut self, record: HouseAuctionHistoryRecord) {
         while self.auction_history.len() >= AUCTION_HISTORY_CAPACITY {

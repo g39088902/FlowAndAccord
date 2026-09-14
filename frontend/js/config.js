@@ -363,6 +363,71 @@ window.SIM_CONFIG = {
   houseAuctionMinBidGold: 0.01,       // 单次出价最低家户黄金门槛 (低于此值不出价)
   houseAuctionBidHistoryCapacity: 128, // 单次拍卖会话报价流水环形缓冲容量 (条)
   houseAuctionCrownShareWeight: 1.0,  // 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额)
-  houseAuctionBenchmarkDecayRate: 0.02, // ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭
+  houseAuctionBenchmarkDecayRate: 0.02, // 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭
   marketPriceBaseWood: 0.15,          // 木材基准金价 (保留：待榷市扩展承载木材后作单价基准)
+
+  // ==========================================================================
+  // 15. 四轴十一激素系统 · 动力学首批超参 (H-01 / H-02 / H-03)
+  // ==========================================================================
+  hormoneDaBaseline: 50.0, // 多巴胺基础基线
+  hormoneDaThresholdBaseline: 50.0, // 多巴胺奖赏阈值基线
+  hormone5htBaseline: 50.0, // 血清素基础基线
+  hormoneEpBaseline: 20.0, // 内啡肽静息基线
+  hormoneOtBaseline: 50.0, // 催产素基础基线
+  hormoneCortBaseline: 20.0, // 皮质醇静息基线
+  hormoneAdrBaseline: 10.0, // 肾上腺素静息基线
+  hormoneNeBaseline: 30.0, // 去甲肾上腺素静息基线
+  hormoneAndMaleBaseline: 60.0, // 雄激素成年男性基线
+  hormoneAndFemaleBaseline: 10.0, // 雄激素女性与幼童基线
+  hormoneEstFemaleBaseline: 50.0, // 雌激素育龄女性基线
+  hormoneEstOtherBaseline: 10.0, // 雌激素男性/幼童/更年期基线
+  hormoneEstMenopauseAge: 50.0, // 雌激素女性更年期起始年龄
+  hormoneProgPregnantBaseline: 70.0, // 孕激素妊娠期基线
+  hormoneProgNonPregnantBaseline: 10.0, // 孕激素非孕/男性基线
+  hormoneThyBaseline: 50.0, // 甲状腺素基础代谢基线
+
+  hormoneDaDecay: 0.5, // 多巴胺向基线回归速率 (/游戏小时)
+  hormoneDaThresholdDecay: 0.04, // 多巴胺奖赏阈值慢速回归速率 (/游戏小时)
+  hormoneDaThresholdDriftRatio: 0.2, // 多巴胺阈值漂移比例
+  hormone5htDecay: 0.2, // 血清素向基线回归速率 (/游戏小时)
+  hormoneEpDecay: 2.0, // 内啡肽向基线回归速率 (/游戏小时)
+  hormoneOtDecay: 0.3, // 催产素向基线回归速率 (/游戏小时)
+  hormoneCortDecay: 0.4, // 皮质醇向基线回归速率 (/游戏小时)
+  hormoneAdrDecay: 12.0, // 肾上腺素向基线回归速率 (/游戏小时)
+  hormoneNeDecay: 0.5, // 去甲肾上腺素向基线回归速率 (/游戏小时)
+  hormoneAndDecay: 0.1, // 雄激素向基线回归速率 (/游戏小时)
+  hormoneEstDecay: 0.1, // 雌激素向基线回归速率 (/游戏小时)
+  hormoneProgDecay: 0.1, // 孕激素向基线回归速率 (/游戏小时)
+  hormoneThyDecay: 0.05, // 甲状腺素向基线回归速率 (/游戏小时)
+
+  hormonePulseUpgradeDa: 20.0, // 房屋升级成功多巴胺脉冲量
+  hormonePulseMarriageDa: 25.0, // 成婚多巴胺脉冲量
+  hormonePulseMarriageOt: 30.0, // 成婚催产素脉冲量
+  hormonePulseMarriage5ht: 15.0, // 成婚血清素脉冲量
+  hormonePulseConceptionProg: 50.0, // 受孕成功孕激素抬升脉冲量
+  hormonePulseMiscarriageCort: 40.0, // 流产皮质醇应激脉冲量
+  hormonePulseBirthMotherOt: 35.0, // 母亲顺利分娩催产素脉冲量
+  hormonePulseBirthMotherDa: 20.0, // 母亲顺利分娩多巴胺脉冲量
+  hormonePulseBirthFatherOt: 20.0, // 父亲迎来新生儿催产素脉冲量
+  hormonePulseBirthFatherDa: 15.0, // 父亲迎来新生儿多巴胺脉冲量
+  hormonePulseCoronationDa: 40.0, // 登基加冕多巴胺脉冲量
+  hormonePulseCoronationAnd: 25.0, // 登基加冕雄激素脉冲量
+  hormonePulseCoronation5ht: 20.0, // 登基加冕血清素脉冲量
+  hormonePulseBagFullDa: 5.0, // 行囊装满多巴胺边界脉冲量
+  hormonePulseMealDa: 2.0, // 现场进食/自饮多巴胺小脉冲量
+  hormonePulseUnloadDa: 4.0, // 回家卸货入账多巴胺脉冲量
+  hormonePulseFullStamina5ht: 5.0, // 满体力跨界血清素脉冲量
+  hormonePulseFullStaminaDa: 3.0, // 满体力跨界多巴胺脉冲量
+  hormonePulseBereavementSpouseCort: 50.0, // 丧偶皮质醇脉冲量
+  hormonePulseBereavementSpouseOtCrash: 40.0, // 丧偶催产素崩落幅度
+  hormonePulseBereavementSpouse5htCrash: 30.0, // 丧偶血清素崩落幅度
+  hormonePulseBereavementChildCort: 40.0, // 丧子皮质醇脉冲量
+  hormonePulseBereavementChildOtCrash: 30.0, // 丧子催产素崩落幅度
+  hormonePulseBereavementChild5htCrash: 20.0, // 丧子血清素崩落幅度
+
+  hormoneRateWellFed5ht: 2.0, // 长期饱食良好血清素持续增长速率 (/游戏小时)
+  hormoneRateDeprivationCort: 3.0, // 饥渴匮乏警戒皮质醇持续增长速率 (/游戏小时)
+  hormoneRateCriticalAdr: 5.0, // 临界求生自救肾上腺素持续增长速率 (/游戏小时)
+  hormoneRateCohabitationOt: 2.5, // 夫妻在宅共处催产素持续增长速率 (/游戏小时)
+  hormoneRateCohabitation5ht: 1.5, // 夫妻在宅共处血清素持续增长速率 (/游戏小时)
 };

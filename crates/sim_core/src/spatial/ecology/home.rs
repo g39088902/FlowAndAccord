@@ -25,12 +25,14 @@ pub(super) fn rest_at_camp(
     // 房屋 pantry 已删除：无容量上限、无房屋等级/0 级门槛，凡有家户即享家庭储备。
     if agent.home_house_id.is_some() {
         if let Some(hh_hid) = household_registry.household_of(agent.id) {
+            let mut any_unloaded = false;
             let deposit_rate = unload_res * dt;
             // —— 卸货入账：水 ——
             if agent.carried_water > 0.01 {
                 let d = agent.carried_water.min(deposit_rate);
                 agent.carried_water -= d;
                 if d > 0.001 {
+                    any_unloaded = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.credit(ResourceKind::Water, d);
                         hh.group.ledger.push_transfer(TransferRecord {
@@ -49,6 +51,7 @@ pub(super) fn rest_at_camp(
                 let d = agent.carried_food.min(deposit_rate);
                 agent.carried_food -= d;
                 if d > 0.001 {
+                    any_unloaded = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.credit(ResourceKind::Food, d);
                         hh.group.ledger.push_transfer(TransferRecord {
@@ -67,6 +70,7 @@ pub(super) fn rest_at_camp(
                 let d = agent.carried_wood.min(deposit_rate);
                 agent.carried_wood -= d;
                 if d > 0.001 {
+                    any_unloaded = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.credit(ResourceKind::Wood, d);
                         hh.group.ledger.push_transfer(TransferRecord {
@@ -85,6 +89,7 @@ pub(super) fn rest_at_camp(
                 let d = agent.carried_stone.min(deposit_rate);
                 agent.carried_stone -= d;
                 if d > 0.001 {
+                    any_unloaded = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.credit(ResourceKind::Stone, d);
                         hh.group.ledger.push_transfer(TransferRecord {
@@ -103,6 +108,7 @@ pub(super) fn rest_at_camp(
                 let deposit = agent.carried_gold.min(unload_gold * dt);
                 agent.carried_gold = (agent.carried_gold - deposit).max(0.0);
                 if deposit > 0.001 {
+                    any_unloaded = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.credit(ResourceKind::Gold, deposit);
                         hh.group.ledger.push_transfer(TransferRecord {
@@ -116,7 +122,14 @@ pub(super) fn rest_at_camp(
                     }
                 }
             }
+
+            if any_unloaded {
+                agent.hormones.on_unload(config);
+                agent.hormones.prev_bag_full = false;
+            }
+
             // —— 吃喝：从家户账本真实扣减 ——
+            let mut any_meal = false;
             let ledger_water = household_registry
                 .get(hh_hid)
                 .map(|hh| hh.group.ledger.balance(ResourceKind::Water))
@@ -127,6 +140,7 @@ pub(super) fn rest_at_camp(
                     .min(config.camp_home_consume_rate * dt);
                 agent.thirst = (agent.thirst + drink_amount).min(config.agent_thirst_capacity);
                 if drink_amount > 0.001 {
+                    any_meal = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.record_consumption(
                             LedgerRef::Family(hh_hid),
@@ -148,6 +162,7 @@ pub(super) fn rest_at_camp(
                     .min(config.camp_home_consume_rate * dt);
                 agent.hunger = (agent.hunger + eat_amount).min(config.agent_hunger_capacity);
                 if eat_amount > 0.001 {
+                    any_meal = true;
                     if let Some(hh) = household_registry.get_mut(hh_hid) {
                         hh.group.ledger.record_consumption(
                             LedgerRef::Family(hh_hid),
@@ -158,6 +173,9 @@ pub(super) fn rest_at_camp(
                         );
                     }
                 }
+            }
+            if any_meal {
+                agent.hormones.on_meal(config);
             }
         }
     }

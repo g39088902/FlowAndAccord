@@ -936,7 +936,7 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 74 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 288；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数；★ v1.50.54 TB-02 台地聚落 12 个形态参数）：
+✅ 已落地 74 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 346；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数；★ v1.50.54 TB-02 台地聚落 12 个形态参数）：
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "plateau_settlement_v1" | "flat_baseline"（诊断基线，永不入 random）；★ S7-10/TB-02 起其余 6 profile 全部参与 random 轮换
@@ -1017,7 +1017,7 @@ render_agents.js        族人绘制                                            
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 288）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 346）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 6` 确定性六路分支到 T1/T2/草原/半坡/河谷聚落/台地聚落（★ TB-02 候选池扩容）。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，

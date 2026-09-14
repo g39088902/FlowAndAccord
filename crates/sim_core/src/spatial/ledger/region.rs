@@ -473,8 +473,9 @@ impl World3DEngine {
                     };
                     if ok {
                         let bonus = self.config.prestige_king_bonus;
-                        if let Some(agent) = self.agent_by_id_mut(id) {
+                        if let Some((agent, config)) = self.agent_and_config_mut(id) {
                             agent.prestige = agent.prestige.saturating_add(bonus);
+                            agent.hormones.on_coronation(config);
                             // ★ v1.22.0 封王即终止远征：清除登基决心/远征目标，回到营地休整。
                             //   （否则刚封王的始祖仍处 SeekingThrone，下拍把自家营地误判为「王位易主」再次远征 → 一人双王）
                             agent.coronation_pending = None;
@@ -612,8 +613,9 @@ impl World3DEngine {
                             camp_name, dead_king_id, heir_id
                         ));
                         let bonus = self.config.prestige_king_bonus;
-                        if let Some(agent) = self.agent_by_id_mut(heir_id) {
+                        if let Some((agent, config)) = self.agent_and_config_mut(heir_id) {
                             agent.prestige = agent.prestige.saturating_add(bonus);
+                            agent.hormones.on_coronation(config);
                         }
                     }
                 }

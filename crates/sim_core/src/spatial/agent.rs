@@ -1,6 +1,7 @@
 use super::decisions::branches::BranchId;
 use super::decisions::strategy::ActiveTask;
 use super::graph::{LaneEdge3D, LaneGraph3D, LaneId, NodeId};
+use super::hormones::AgentHormones;
 use super::poi::PoiId;
 use super::vec3::Vec3;
 use crate::config::*;
@@ -225,6 +226,9 @@ pub struct Agent3D {
     pub harvest_queue: [Option<BranchId>; 4],
     pub build_timer: f32,          // 正在营建/升级当前房屋投入的累计工时 (秒)
     pub gold_mining_cooldown: f32, // 淘金冷却时间 (秒)
+    /// ★ H-02 Agent 神经内分泌系统状态（定长结构，11 激素 + 1 DA 阈值 + 慢性累计器与计时器）
+    #[serde(default)]
+    pub hormones: AgentHormones,
 
     // 代际传承与家庭血缘
     pub generation: u32, // 世代代数 (始祖为第1代，子一代为第2代，依此类推)
@@ -355,6 +359,7 @@ impl Agent3D {
             harvest_queue: [None; 4],
             build_timer: 0.0,
             gold_mining_cooldown: 0.0,
+            hormones: AgentHormones::new_with_config(gender, initial_age, false, config),
             generation: 1,
             spouse_id: None,
             mother_id: None,
@@ -579,6 +584,7 @@ impl Agent3D {
                 self.pregnancy_progress = 0.0;
                 self.miscarriage_alert_timer = config.agent_miscarriage_alert_duration;
                 self.miscarriage_cooldown_timer = config.agent_miscarriage_cooldown;
+                self.hormones.on_miscarriage(config);
                 return Some(format!("🥀 痛惜！女性部落民 #{} 生存指标跌破20%安全线(<{:.1}单位)，导致流产 ({:.0}小时内休养不可受孕)！", self.id, miscarry_threshold, config.agent_miscarriage_cooldown));
             }
 
@@ -601,14 +607,25 @@ impl Agent3D {
             let recovery_rate =
                 config.agent_rest_stamina_recovery_rate * (self.sleep_efficiency / 100.0);
             self.stamina = (self.stamina + recovery_rate * dt).min(config.agent_stamina_capacity);
-        } else if self.state == PrimitiveActionState::RepairingHouse {
-            self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt)
-                .max(config.agent_labor_stamina_floor);
-        } else if self.state == PrimitiveActionState::GatheringWood
-            || self.state == PrimitiveActionState::MiningStone
-        {
-            self.stamina = (self.stamina - config.agent_gather_stamina_burn * dt)
-                .max(config.agent_labor_stamina_floor);
+            if !self.hormones.prev_stamina_full
+                && self.stamina >= config.agent_stamina_capacity - 0.01
+            {
+                self.hormones.on_full_stamina(config);
+                self.hormones.prev_stamina_full = true;
+            }
+        } else {
+            if self.stamina < config.agent_stamina_capacity - 1.0 {
+                self.hormones.prev_stamina_full = false;
+            }
+            if self.state == PrimitiveActionState::RepairingHouse {
+                self.stamina = (self.stamina - config.agent_repair_stamina_burn * dt)
+                    .max(config.agent_labor_stamina_floor);
+            } else if self.state == PrimitiveActionState::GatheringWood
+                || self.state == PrimitiveActionState::MiningStone
+            {
+                self.stamina = (self.stamina - config.agent_gather_stamina_burn * dt)
+                    .max(config.agent_labor_stamina_floor);
+            }
         }
 
         event_msg

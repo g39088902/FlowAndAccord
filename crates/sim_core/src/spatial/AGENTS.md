@@ -30,6 +30,7 @@
 | `poi.rs` | ~235 | PrimitivePoi 实体定义（23 处 POI：营地4/泉6/果6/木3/石2/金1/榷场互市1）、ID 段位、储量再生与水粮木三库存计价、★ v1.28.0 `MarketTradeRecord` 与榷场流水环形缓冲 | 采收逻辑、初始化布局 |
 | `house.rs` | ~115 | House 实体（5 阶等级、耐久度、户主绑定）、HouseSnapshot | 施工计时、升级判定、继承（这些在 housing_system/） |
 | `agent.rs` | ~530 | Agent3D 实体（生理代谢、随身行囊、状态机、运动、施密特触发器、威望）、百家姓库、Gender/PrimitiveActionState 枚举 | 决策逻辑（在 decisions/）、POI 交互（在 ecology/） |
+| `hormones.rs` | ~415 | AgentHormones 神经内分泌状态机、基线合成、线性回归衰减、离散脉冲响应与持续累积 | 行为状态机切换（在 decisions/） |
 
 ### 1.3 系统层（tick 调度 + 跨实体逻辑）
 

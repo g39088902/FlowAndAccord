@@ -33,7 +33,7 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 7;
 /// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.50.54";
+pub const SAVE_APP_VERSION: &str = "1.50.55";
 
 
 fn default_terrain_generator_version() -> u32 {
@@ -316,6 +316,15 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         && !world.household_registry.households.is_empty()
     {
         world.household_registry.rebuild_active_households();
+    }
+    // ★ H-02 缺字段容错：若载入的旧存档缺少激素数据，依据身体属性补齐初始基线
+    for agent in &mut world.agents {
+        agent.hormones.initialize_with_config(
+            agent.gender,
+            agent.age,
+            agent.is_pregnant,
+            &world.config,
+        );
     }
     world.validate_terrain_world()?;
     Ok(world)

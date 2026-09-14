@@ -153,6 +153,8 @@ const IMPACT_PREFIX_RULES = [
   { prefix: 'agentStamina', mod: 'agent.rs (体力容量)' },
   { prefix: 'agentBase', mod: 'agent.rs (基础代谢/速度)' },
 
+  { prefix: 'hormone', mod: 'spatial/hormones.rs (神经内分泌调制)' },
+
   { prefix: 'decisionFoundHome', mod: 'decisions/founding.rs (立宅选址)' },
   { prefix: 'decisionFamilyStock', mod: 'decisions/ (家户补货滞回触发器 §4.8)' },
   { prefix: 'decisionPoi', mod: 'decisions/routing.rs / decisions/harvest.rs (施密特触发器 §4.2)' },

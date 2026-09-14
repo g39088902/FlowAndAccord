@@ -142,7 +142,7 @@ impl World3DEngine {
 
             // ── 7. 注册亲子关系（O(1) 可变查找）
             // ★ M1.7 胎儿已在受孕时加入父母 children_ids，此处仅在缺失时补录，避免重复
-            if let Some(mother) = self.agent_by_id_mut(mother_id) {
+            if let Some((mother, config)) = self.agent_and_config_mut(mother_id) {
                 if !mother.children_ids.contains(&baby_id) {
                     mother.children_ids.push(baby_id);
                 }
@@ -150,14 +150,16 @@ impl World3DEngine {
                 mother.prestige = mother.prestige.saturating_add(1);
                 mother.pregnancy_father_id = None;
                 mother.pregnancy_child_id = None; // 胎儿 ID 已由新生儿实体继承
+                mother.hormones.on_birth_mother(config);
             }
             if let Some(fid) = father_id {
-                if let Some(father) = self.agent_by_id_mut(fid) {
+                if let Some((father, config)) = self.agent_and_config_mut(fid) {
                     if !father.children_ids.contains(&baby_id) {
                         father.children_ids.push(baby_id);
                     }
                     // ★ M6 威望·子嗣因子：父亲威望 +1
                     father.prestige = father.prestige.saturating_add(1);
+                    father.hormones.on_birth_father(config);
                 }
             }
 

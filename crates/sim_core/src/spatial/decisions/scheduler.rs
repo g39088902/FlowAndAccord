@@ -152,13 +152,14 @@ impl World3DEngine {
             .iter()
             .find(|p| p.poi_type == crate::spatial::poi::PoiType::Camp && p.id == camp_id)
             .and_then(|p| self.find_nearest_node(p.pos));
-        if let Some(agent) = self.agent_by_id_mut(agent_id) {
+        if let Some((agent, config)) = self.agent_and_config_mut(agent_id) {
             super::transition::finish_task(agent);
             agent.current_need = Some("SelfActualization·King".to_string());
             agent.coronation_pending = None;
             agent.expedition_target_camp = None;
             if coronated {
                 agent.prestige = agent.prestige.saturating_add(bonus);
+                agent.hormones.on_coronation(config);
             }
             if agent.home_house_id.is_none() {
                 if let Some(node) = camp_node {
@@ -250,9 +251,10 @@ impl World3DEngine {
                 .transfer_member(female_id, male_hid, tick);
 
             // 更新男方状态
-            if let Some(male) = self.agent_by_id_mut(male_id) {
+            if let Some((male, config)) = self.agent_and_config_mut(male_id) {
                 male.spouse_id = Some(female_id);
                 male.courtship_target_id = None;
+                male.hormones.on_marriage(config);
                 if male.state == crate::spatial::agent::PrimitiveActionState::SeekingCourtship {
                     super::transition::finish_task(male);
                 }
@@ -268,8 +270,9 @@ impl World3DEngine {
                     (h.id, h.door_node_id)
                 });
 
-            let is_remarriage = if let Some(female) = self.agent_by_id_mut(female_id) {
+            let is_remarriage = if let Some((female, config)) = self.agent_and_config_mut(female_id) {
                 female.spouse_id = Some(male_id);
+                female.hormones.on_marriage(config);
                 if let Some((house_id, door_node_id)) = house_info {
                     female.home_house_id = Some(house_id);
                     female.home_camp_node = door_node_id;

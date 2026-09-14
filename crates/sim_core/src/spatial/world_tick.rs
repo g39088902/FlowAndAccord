@@ -161,6 +161,7 @@ impl World3DEngine {
     pub fn tick_phase_metabolism_and_child(&mut self, dt: f32) {
         // 2. 代谢与繁衍（受孕瞬间需为胎儿占号，故将发号器取出循环外，循环结束回写）
         let mut next_agent_id = self.next_agent_id;
+        let mut newly_dead = Vec::new();
         for agent in &mut self.agents {
             if agent.is_fetus {
                 continue;
@@ -185,6 +186,7 @@ impl World3DEngine {
                         mother_id: agent.mother_id,
                         tick: self.tick_counter,
                     });
+                    newly_dead.push((agent.spouse_id, agent.father_id, agent.mother_id));
                 }
                 if event.contains("流产") {
                     self.total_miscarriages += 1;
@@ -194,6 +196,31 @@ impl World3DEngine {
         }
         self.next_agent_id = next_agent_id;
 
+        // 丧偶与丧子应激脉冲注入在世亲属
+        for (spouse_id, father_id, mother_id) in newly_dead {
+            if let Some(sid) = spouse_id {
+                if let Some((s, config)) = self.agent_and_config_mut(sid) {
+                    if s.is_alive && !s.is_fetus {
+                        s.hormones.on_bereavement_spouse(config);
+                    }
+                }
+            }
+            if let Some(fid) = father_id {
+                if let Some((f, config)) = self.agent_and_config_mut(fid) {
+                    if f.is_alive && !f.is_fetus {
+                        f.hormones.on_bereavement_child(config);
+                    }
+                }
+            }
+            if let Some(mid) = mother_id {
+                if let Some((m, config)) = self.agent_and_config_mut(mid) {
+                    if m.is_alive && !m.is_fetus {
+                        m.hormones.on_bereavement_child(config);
+                    }
+                }
+            }
+        }
+
         // 生育改为马斯洛“养育小孩”行动：仅处理男性自主下达且妻子仍满足原受孕条件的意图
         self.execute_pending_childcare();
 
@@ -202,6 +229,31 @@ impl World3DEngine {
 
         // 2.5 ★ v1.47.0 逝者随身遗物归集 (全部物资瞬移入家户账本，参与后续遗产分配)
         self.settle_death_cargo();
+
+        // 2.6 ★ H-03 四轴十一激素系统每拍回归与持续生理/社会输入累加
+        for i in 0..self.agents.len() {
+            if !self.agents[i].is_alive || self.agents[i].is_fetus {
+                continue;
+            }
+            let is_cohabiting = if let Some(sid) = self.agents[i].spouse_id {
+                if let Some(s_idx) = self.agent_index.get(&sid).copied() {
+                    let s = &self.agents[s_idx];
+                    s.is_alive
+                        && !s.is_fetus
+                        && self.agents[i].home_house_id.is_some()
+                        && self.agents[i].home_house_id == s.home_house_id
+                        && self.agents[i].world_pos.distance_to(&s.world_pos)
+                            <= self.config.poi_interaction_radius
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            let a = &mut self.agents[i];
+            a.hormones.accumulate_continuous(dt, &self.config, a.hunger, a.thirst, is_cohabiting);
+            a.hormones.tick_regression(dt, &self.config, a.gender, a.age, a.is_pregnant);
+        }
     }
 
     /// 子阶段 2: POI 实际采收提取、分娩与死亡尸骸消逝
@@ -318,6 +370,7 @@ impl World3DEngine {
             self.agents[wi].pregnancy_father_id = Some(male_id);
             self.agents[wi].pregnancy_child_id = Some(next_id);
             self.agents[wi].pregnancy_progress = 0.0;
+            self.agents[wi].hormones.on_conception(&self.config);
             next_id += 1;
             self.last_event = Some(format!(
                 "🤰 女性部落民 #{} 在丈夫 #{} 的养育行动下成功受孕！",

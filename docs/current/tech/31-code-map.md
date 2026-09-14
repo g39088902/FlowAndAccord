@@ -14,7 +14,7 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (288 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (346 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -36,6 +36,7 @@ FlowAndAccord/
 │   │           ├── poi.rs                  # 23 处 POI 实体定义 (营地4/泉6/果6/木3/石2/金1/榷场互市1)
 │   │           ├── house.rs                # 5 阶房屋模型、耐久度与户主绑定 (M6 起无仓储，家户账本为唯一真相源)
 │   │           ├── agent.rs                # 部落民实体、生理代谢、随身行囊、运动与状态机
+│   │           ├── hormones.rs             # ★ H-01~03 神经内分泌状态机、基线合成、线性回归与离散脉冲响应
 │   │           ├── ecology/                # 🌲 生态子模块 (7 文件)：播撒 + POI 采收装载 + 卸货入账 + 榷场结算
 │   │           │   ├── mod.rs              # 生态子模块入口与拆分说明
 │   │           │   ├── seed.rs             # 世界重置入口 + 播撒步骤编排 + 收尾 (索引/脏标记/APSP)
@@ -100,7 +101,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 288 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 346 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)

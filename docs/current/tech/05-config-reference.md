@@ -368,5 +368,68 @@
 | `houseAuctionMinBidGold` | f32 | 0.01 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次出价最低家户黄金门槛 (低于此值不出价) |
 | `houseAuctionBidHistoryCapacity` | usize | 128 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 单次拍卖会话报价流水环形缓冲容量 (条) |
 | `houseAuctionCrownShareWeight` | f32 | 1 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 王国公户遗产分账份额权重 (与人类受益人同等参与份额制分配，无人类受益人时独得全额) |
-| `houseAuctionBenchmarkDecayRate` | f32 | 0.02 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | ★ v1.30.0 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭 |
+| `houseAuctionBenchmarkDecayRate` | f32 | 0.02 | housing_system/auction.rs (竞价冷却/报价流水/遗产分账) | 麦穗决策期标杆衰减速率 (金/模拟秒)：无人击穿时标杆线性下调至底价，防高标杆+空钱袋双锁死；≤0 关闭 |
 | `marketPriceBaseWood` | f32 | 0.15 | poi.rs / ecology/ / market.rs (外部市场与动态定价) | 木材基准金价 (保留：待榷市扩展承载木材后作单价基准) |
+
+## 17. 四轴十一激素系统 · 动力学首批超参
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `hormoneDaBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 多巴胺基础基线 |
+| `hormoneDaThresholdBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 多巴胺奖赏阈值基线 |
+| `hormone5htBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 血清素基础基线 |
+| `hormoneEpBaseline` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 内啡肽静息基线 |
+| `hormoneOtBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 催产素基础基线 |
+| `hormoneCortBaseline` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 皮质醇静息基线 |
+| `hormoneAdrBaseline` | f32 | 10 | spatial/hormones.rs (神经内分泌调制) | 肾上腺素静息基线 |
+| `hormoneNeBaseline` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | 去甲肾上腺素静息基线 |
+| `hormoneAndMaleBaseline` | f32 | 60 | spatial/hormones.rs (神经内分泌调制) | 雄激素成年男性基线 |
+| `hormoneAndFemaleBaseline` | f32 | 10 | spatial/hormones.rs (神经内分泌调制) | 雄激素女性与幼童基线 |
+| `hormoneEstFemaleBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 雌激素育龄女性基线 |
+| `hormoneEstOtherBaseline` | f32 | 10 | spatial/hormones.rs (神经内分泌调制) | 雌激素男性/幼童/更年期基线 |
+| `hormoneEstMenopauseAge` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 雌激素女性更年期起始年龄 |
+| `hormoneProgPregnantBaseline` | f32 | 70 | spatial/hormones.rs (神经内分泌调制) | 孕激素妊娠期基线 |
+| `hormoneProgNonPregnantBaseline` | f32 | 10 | spatial/hormones.rs (神经内分泌调制) | 孕激素非孕/男性基线 |
+| `hormoneThyBaseline` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 甲状腺素基础代谢基线 |
+| `hormoneDaDecay` | f32 | 0.5 | spatial/hormones.rs (神经内分泌调制) | 多巴胺向基线回归速率 (/游戏小时) |
+| `hormoneDaThresholdDecay` | f32 | 0.04 | spatial/hormones.rs (神经内分泌调制) | 多巴胺奖赏阈值慢速回归速率 (/游戏小时) |
+| `hormoneDaThresholdDriftRatio` | f32 | 0.2 | spatial/hormones.rs (神经内分泌调制) | 多巴胺阈值漂移比例 |
+| `hormone5htDecay` | f32 | 0.2 | spatial/hormones.rs (神经内分泌调制) | 血清素向基线回归速率 (/游戏小时) |
+| `hormoneEpDecay` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 内啡肽向基线回归速率 (/游戏小时) |
+| `hormoneOtDecay` | f32 | 0.3 | spatial/hormones.rs (神经内分泌调制) | 催产素向基线回归速率 (/游戏小时) |
+| `hormoneCortDecay` | f32 | 0.4 | spatial/hormones.rs (神经内分泌调制) | 皮质醇向基线回归速率 (/游戏小时) |
+| `hormoneAdrDecay` | f32 | 12 | spatial/hormones.rs (神经内分泌调制) | 肾上腺素向基线回归速率 (/游戏小时) |
+| `hormoneNeDecay` | f32 | 0.5 | spatial/hormones.rs (神经内分泌调制) | 去甲肾上腺素向基线回归速率 (/游戏小时) |
+| `hormoneAndDecay` | f32 | 0.1 | spatial/hormones.rs (神经内分泌调制) | 雄激素向基线回归速率 (/游戏小时) |
+| `hormoneEstDecay` | f32 | 0.1 | spatial/hormones.rs (神经内分泌调制) | 雌激素向基线回归速率 (/游戏小时) |
+| `hormoneProgDecay` | f32 | 0.1 | spatial/hormones.rs (神经内分泌调制) | 孕激素向基线回归速率 (/游戏小时) |
+| `hormoneThyDecay` | f32 | 0.05 | spatial/hormones.rs (神经内分泌调制) | 甲状腺素向基线回归速率 (/游戏小时) |
+| `hormonePulseUpgradeDa` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 房屋升级成功多巴胺脉冲量 |
+| `hormonePulseMarriageDa` | f32 | 25 | spatial/hormones.rs (神经内分泌调制) | 成婚多巴胺脉冲量 |
+| `hormonePulseMarriageOt` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | 成婚催产素脉冲量 |
+| `hormonePulseMarriage5ht` | f32 | 15 | spatial/hormones.rs (神经内分泌调制) | 成婚血清素脉冲量 |
+| `hormonePulseConceptionProg` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 受孕成功孕激素抬升脉冲量 |
+| `hormonePulseMiscarriageCort` | f32 | 40 | spatial/hormones.rs (神经内分泌调制) | 流产皮质醇应激脉冲量 |
+| `hormonePulseBirthMotherOt` | f32 | 35 | spatial/hormones.rs (神经内分泌调制) | 母亲顺利分娩催产素脉冲量 |
+| `hormonePulseBirthMotherDa` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 母亲顺利分娩多巴胺脉冲量 |
+| `hormonePulseBirthFatherOt` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 父亲迎来新生儿催产素脉冲量 |
+| `hormonePulseBirthFatherDa` | f32 | 15 | spatial/hormones.rs (神经内分泌调制) | 父亲迎来新生儿多巴胺脉冲量 |
+| `hormonePulseCoronationDa` | f32 | 40 | spatial/hormones.rs (神经内分泌调制) | 登基加冕多巴胺脉冲量 |
+| `hormonePulseCoronationAnd` | f32 | 25 | spatial/hormones.rs (神经内分泌调制) | 登基加冕雄激素脉冲量 |
+| `hormonePulseCoronation5ht` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 登基加冕血清素脉冲量 |
+| `hormonePulseBagFullDa` | f32 | 5 | spatial/hormones.rs (神经内分泌调制) | 行囊装满多巴胺边界脉冲量 |
+| `hormonePulseMealDa` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 现场进食/自饮多巴胺小脉冲量 |
+| `hormonePulseUnloadDa` | f32 | 4 | spatial/hormones.rs (神经内分泌调制) | 回家卸货入账多巴胺脉冲量 |
+| `hormonePulseFullStamina5ht` | f32 | 5 | spatial/hormones.rs (神经内分泌调制) | 满体力跨界血清素脉冲量 |
+| `hormonePulseFullStaminaDa` | f32 | 3 | spatial/hormones.rs (神经内分泌调制) | 满体力跨界多巴胺脉冲量 |
+| `hormonePulseBereavementSpouseCort` | f32 | 50 | spatial/hormones.rs (神经内分泌调制) | 丧偶皮质醇脉冲量 |
+| `hormonePulseBereavementSpouseOtCrash` | f32 | 40 | spatial/hormones.rs (神经内分泌调制) | 丧偶催产素崩落幅度 |
+| `hormonePulseBereavementSpouse5htCrash` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | 丧偶血清素崩落幅度 |
+| `hormonePulseBereavementChildCort` | f32 | 40 | spatial/hormones.rs (神经内分泌调制) | 丧子皮质醇脉冲量 |
+| `hormonePulseBereavementChildOtCrash` | f32 | 30 | spatial/hormones.rs (神经内分泌调制) | 丧子催产素崩落幅度 |
+| `hormonePulseBereavementChild5htCrash` | f32 | 20 | spatial/hormones.rs (神经内分泌调制) | 丧子血清素崩落幅度 |
+| `hormoneRateWellFed5ht` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 长期饱食良好血清素持续增长速率 (/游戏小时) |
+| `hormoneRateDeprivationCort` | f32 | 3 | spatial/hormones.rs (神经内分泌调制) | 饥渴匮乏警戒皮质醇持续增长速率 (/游戏小时) |
+| `hormoneRateCriticalAdr` | f32 | 5 | spatial/hormones.rs (神经内分泌调制) | 临界求生自救肾上腺素持续增长速率 (/游戏小时) |
+| `hormoneRateCohabitationOt` | f32 | 2.5 | spatial/hormones.rs (神经内分泌调制) | 夫妻在宅共处催产素持续增长速率 (/游戏小时) |
+| `hormoneRateCohabitation5ht` | f32 | 1.5 | spatial/hormones.rs (神经内分泌调制) | 夫妻在宅共处血清素持续增长速率 (/游戏小时) |

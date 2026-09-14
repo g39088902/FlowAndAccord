@@ -139,6 +139,7 @@ impl World3DEngine {
         if let Some(oid) = owner_id {
             if let Some(owner) = self.agents.iter_mut().find(|a| a.id == oid) {
                 owner.prestige = owner.prestige.saturating_add(1);
+                owner.hormones.on_upgrade(cfg);
             }
         }
 

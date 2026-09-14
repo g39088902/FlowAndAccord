@@ -36,6 +36,9 @@ pub(super) fn harvest_water(
         if need > 0.01 {
             let extracted = if let Some(ref mut p)=pool {p.extract(need.min(rate_res*dt))}else{poi.extract(need.min(rate_res*dt))};
             agent.thirst = (agent.thirst + extracted).min(config.agent_thirst_capacity);
+            if extracted > 0.01 {
+                agent.hormones.on_meal(config);
+            }
         }
         if agent_hid.is_some() && agent.carried_water < carry_cap && poi.current_stock > 0.01 {
             let load = (carry_cap - agent.carried_water).min(rate_res * dt);
@@ -43,6 +46,10 @@ pub(super) fn harvest_water(
             agent.carried_water = (agent.carried_water + extracted).min(carry_cap);
             agent.cumulative_mined += extracted;
             agent.cumulative_mined_water += extracted;
+            if !agent.hormones.prev_bag_full && agent.carried_water >= carry_cap - 0.01 {
+                agent.hormones.on_bag_full(config);
+                agent.hormones.prev_bag_full = true;
+            }
         }
     }
 }
@@ -66,6 +73,9 @@ pub(super) fn harvest_food(
         if need > 0.01 {
             let extracted = poi.extract(need.min(rate_res * dt));
             agent.hunger = (agent.hunger + extracted).min(config.agent_hunger_capacity);
+            if extracted > 0.01 {
+                agent.hormones.on_meal(config);
+            }
         }
         if agent_hid.is_some() && agent.carried_food < carry_cap && poi.current_stock > 0.01 {
             let load = (carry_cap - agent.carried_food).min(rate_res * dt);
@@ -73,6 +83,10 @@ pub(super) fn harvest_food(
             agent.carried_food = (agent.carried_food + extracted).min(carry_cap);
             agent.cumulative_mined += extracted;
             agent.cumulative_mined_food += extracted;
+            if !agent.hormones.prev_bag_full && agent.carried_food >= carry_cap - 0.01 {
+                agent.hormones.on_bag_full(config);
+                agent.hormones.prev_bag_full = true;
+            }
         }
     }
 }
@@ -106,6 +120,10 @@ pub(super) fn harvest_wood(
             agent.carried_wood = (agent.carried_wood + extracted).min(carry_cap);
             agent.cumulative_mined += extracted;
             agent.cumulative_mined_wood += extracted;
+            if !agent.hormones.prev_bag_full && agent.carried_wood >= carry_cap - 0.01 {
+                agent.hormones.on_bag_full(config);
+                agent.hormones.prev_bag_full = true;
+            }
         }
     }
 }
@@ -139,6 +157,10 @@ pub(super) fn harvest_stone(
             agent.carried_stone = (agent.carried_stone + extracted).min(carry_cap);
             agent.cumulative_mined += extracted;
             agent.cumulative_mined_stone += extracted;
+            if !agent.hormones.prev_bag_full && agent.carried_stone >= carry_cap - 0.01 {
+                agent.hormones.on_bag_full(config);
+                agent.hormones.prev_bag_full = true;
+            }
         }
     }
 }
