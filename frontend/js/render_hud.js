@@ -95,6 +95,22 @@ if (waterPct < 20 || berryPct < 20 || woodPct < 20) {
 // 顶栏统计 / 调试监视器 / 全局均值大盘 / 账本面板 / 格式化工具
 // 依赖: render_canvas.js 中声明的共享变量 (dbgRenderMs, dbgFrameMs 等)
 
+// ★ S7-09：地图模板中文名对照（key = 内核已解析的 terrain.profile，随快照头下发；
+//   世界切换由 READY/LOAD/REWIND/RESET 缓存失效生命周期整体刷新，无上一局残留）
+const MAP_TEMPLATE_LABELS = {
+  mountain_pass_v1: '⛰️ 山口',
+  river_valley_v1: '🏞️ 河谷',
+  grassland_plain_v1: '🌾 平地草原',
+  hillside_woodland_v1: '🌲 半坡林地',
+  river_valley_settlement_v1: '🏔️ 河谷聚落',
+  flat_baseline: '📐 诊断基线',
+};
+
+function mapTemplateLabel(profile) {
+  if (!profile) return '—';
+  return MAP_TEMPLATE_LABELS[profile] || profile;
+}
+
 function updateDebugHud(now) {
   if (!sim.debugMode || now - dbgHudUpdate < 200) return;
   dbgHudUpdate = now;
@@ -111,6 +127,10 @@ function updateDebugHud(now) {
 
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
+  // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格）
+  const terr0 = sim.terrain || {};
+  dbgSetText('dbg-map-profile', terr0.profile || '—');
+  dbgSetText('dbg-terrain-gen', (terr0.profile ? `v${terr0.generatorVersion ?? '?'} · ${terr0.gridSize ?? '?'}²` : '—'));
   dbgSetText('dbg-royal-privy', ((sim.totalRoyalPrivy || 0).toFixed(1)) + ' 单位');
   dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
   dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
@@ -176,6 +196,22 @@ function updateTopBarStats(now) {
   document.getElementById('stat-season').textContent = seasonIcons[sim.currentSeason] || '🌸 春季';
   document.getElementById('stat-temp').textContent = `${sim.temperature.toFixed(1)}°C`;
   document.getElementById('stat-temp').style.color = sim.currentSeason === 'Winter' ? '#38bdf8' : (sim.currentSeason === 'Summer' ? '#f59e0b' : '#e2e8f0');
+
+  // ★ S7-09：顶栏地图模板名称展示（变更守护：仅在世界切换真正换名时写 DOM，
+  //   避免高频 textContent 重写；title 携带地形参数明细）
+  const mapValEl = document.getElementById('stat-map-profile');
+  if (mapValEl) {
+    const terr = sim.terrain || {};
+    const prof = terr.profile || '';
+    const label = mapTemplateLabel(prof);
+    if (mapValEl._lastLabel !== label) {
+      mapValEl._lastLabel = label;
+      mapValEl.textContent = label;
+      mapValEl.title = prof
+        ? `地貌 profile：${prof} · 地形生成器 v${terr.generatorVersion ?? '?'} · 网格 ${terr.gridSize ?? '?'}×${terr.gridSize ?? '?'}`
+        : '等待首个地形快照…';
+    }
+  }
 
   // ★ 动态季节光照：当前光位读数（方位 + 高度角）
   const sunEl = document.getElementById('stat-sun');

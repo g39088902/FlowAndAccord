@@ -2,7 +2,7 @@
 
 > **任务定义**：[06-terrain-templates.md](docs/plan/tech/06-terrain-templates.md) R.3 阶段七——**插队模板批次（平地草原 `grassland_plain_v1`、半坡林地 `hillside_woodland_v1`、河谷聚落 `river_valley_settlement_v1`）**。
 > 本文件将阶段七的总体设计、数学模型、水文与地表规则、探针指标及全链路工程实施拆解为标准可执行任务序列（S7-01 ～ S7-10）。
-> **状态**：实施中——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）、S7-05 半坡密林梯级散布与装饰隔离（✅ v1.50.47）、S7-06 河谷聚落连续侧壁与冲积谷底内核骨架（✅ v1.50.48）、S7-07 河谷聚落水系贯通与浅滩走廊接入（✅ v1.50.49）、S7-08 仿真配置系统联动与 SimConfig 全链路映射（✅ v1.50.51）已交付；S7-09 起待实施。
+> **状态**：✅ **全部闭环**（v1.50.52）——S7-01 探针基座（✅ v1.50.39）、S7-02 平地草原内核骨架（✅ v1.50.40）、S7-03 草甸装饰与辨识度闭环（✅ v1.50.45）、S7-04 半坡林地内核骨架（✅ v1.50.46）、S7-05 半坡密林梯级散布与装饰隔离（✅ v1.50.47）、S7-06 河谷聚落连续侧壁与冲积谷底内核骨架（✅ v1.50.48）、S7-07 河谷聚落水系贯通与浅滩走廊接入（✅ v1.50.49）、S7-08 仿真配置系统联动与 SimConfig 全链路映射（✅ v1.50.51）、S7-09 FABS 协议、快照同步与前端视图适配（✅ v1.50.52）、S7-10 全链路确定性回归、60 种子矩阵与版本收口（✅ v1.50.52）全部交付。
 > **前置就绪度**：
 > - 平地草原：依赖阶段一 `GrassTuft` 装饰（✅ v1.50.35 D-B1 代码交付已收口，见 06 号 §18.5），具备独立开工条件；
 > - 半坡林地：依赖「密林山坡」装饰散布规则（纯视觉 Tree/Bush 高密散布，可随本阶段先行落地）；
@@ -185,8 +185,8 @@ flowchart LR
 | **S7-06** ✅ | 河谷聚落连续侧壁与冲积谷底内核骨架（v1.50.48） | `geo/terrain.rs` | 高 | 阶段二基座 | `river_valley_settlement_v1`；侧壁 $\ge 34^\circ$ 硬禁行，谷底开阔平坦。 |
 | **S7-07** ✅ | 河谷聚落水系贯通与浅滩走廊接入（v1.50.49） | `geo/hydrology.rs`、`geo/terrain.rs`（零改动 `geo/corridor.rs`——授权跨水走廊机制既有通用承载） | 中 | S7-06 | 谷底主河下凹，2 处浅滩跨河；跨障绕行95 ≥1.90（实测校准下限，见任务明细），连通分量恒 1。 |
 | **S7-08** | 仿真配置系统联动与 SimConfig 全链路映射 | `config.rs`、`config.js`、`config-check.js` | 低 | S7-02/04/06 | 3 个 profile 常量与参数集中化；`config-check.js` 233+ 字段全绿。✅ v1.50.51（实测记录见下）。 |
-| **S7-09** | FABS 协议、快照同步与前端视图适配 | `dict.rs`、`snapshot-bin.js`、`rustworld.js` | 低 | S7-07、S7-08 | 快照 Section 18/21/22 无损解码；换世界无旧特征残留；Canvas 正常渲染。 |
-| **S7-10** | 全链路确定性回归、60 种子矩阵与版本收口 | `world_save.rs`、`test-wasm.js`、全链路门禁 | 中 | S7-03/05/09 | 60 种子矩阵全通；存读档一致；旧 T1/T2 物理输出逐位不变；双副本同步。 |
+| **S7-09** ✅ | FABS 协议、快照同步与前端视图适配（v1.50.52） | `dict.rs`、`snapshot-bin.js`、`rustworld.js` | 低 | S7-07、S7-08 | 快照 Section 18/21/22 无损解码；换世界无旧特征残留；Canvas 正常渲染。实测记录见下。 |
+| **S7-10** ✅ | 全链路确定性回归、60 种子矩阵与版本收口（v1.50.52） | `world_save.rs`、`test-wasm.js`、全链路门禁 | 中 | S7-03/05/09 | 60 种子矩阵全通；存读档一致；旧 T1/T2 物理输出逐位不变；双副本同步。实测记录见下。 |
 
 ---
 
@@ -416,6 +416,10 @@ flowchart LR
   - 切换不同 profile 重置世界时，地貌与装饰无任何上一局残留；
   - `node tools/frontend-check.js` 35 文件全绿。
 - **依赖**：S7-07、S7-08。
+- **实测记录（v1.50.52 交付）**：
+  - **链路现状清点（先证既有完备，再补实缺口）**：① FABS——快照头 `terrain_profile` 字符串经 StrTab 驻留随 Section 0 下发、`snapshot-bin.js:208` 解码、`rustworld.js:697` 映射入 `terrain.profile`；Section 18/21/22（TerrainFeatures/TerrainAccents/TerrainSubFeatures）静态三通道对新 profile 天然数据驱动；`dict.rs` 枚举字典已全覆盖本阶段全部变体（SurfaceKind 7 变体含 `RockFace`/`RiverTerrace`/`ShallowWater`、TerrainFeatureKind 4 变体含 `ShallowFord`/`SpringValley`、SubFeature 8 变体、AccentKind 5 变体含 `GrassTuft`），**本任务零枚举新增、零编码改动**。② 缓存失效——`rustworld.js` READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四消息 `_invalidateWorldStaticCaches()`（地形网格 + AccentModel + LandscapeModel + LandscapeMask 整体失效）与 `STR_TAB.start_index==0` 驻留表契约（§4.5.1）既有完备，换世界无旧特征残留由既有生命周期保证。③ Canvas——`computeTerrainAlbedo` 对 `ShallowWater/DeepWater/RiverBank` 有专属底模、`RockFace`/`RiverTerrace`/草甸走「坡度-肥力连续路径」自然成色，河谷侧壁/冲积色带/浅滩由数据驱动既有管线直接承载，**无需 profile 分支**；密林与草簇经统一深度队列（S7-03/S7-05 已验收）。
+  - **实缺口补齐（展示层）**：① 顶栏新增「🗺️ 地图模板」统计项（`stat-map-profile`）——`render_hud.js::MAP_TEMPLATE_LABELS` 中文名对照（⛰️ 山口/🏞️ 河谷/🌾 平地草原/🌲 半坡林地/🏔️ 河谷聚落/📐 诊断基线，未知 profile 回退显示原名），title 悬停展示 profile 原名 + 生成器版本 + 网格规格；`_lastLabel` 变更守护防高频 textContent 重写。② 调试监视器新增「🗺️ 地图模板」「🌍 地形生成器」两行（`dbg-map-profile`/`dbg-terrain-gen`：resolved profile 与 `v8 · 120²`），诊断时可直接核对 resolved 模板与生成器版本口径。
+- **验收标准**：前端运行无控制台报错（渲染管线零改动 + 新增展示仅 textContent/title 写入）；切换 profile 重置世界无上一局残留（既有缓存失效生命周期承载）；`node tools/frontend-check.js` 全绿（新增 4 DOM ID 校验通过）。
 
 ---
 
@@ -446,6 +450,12 @@ flowchart LR
   - WASM 双副本哈希一致；
   - 文档链接可达且无事实漂移。
 - **依赖**：S7-03、S7-05、S7-09。
+- **实测记录（v1.50.52 交付）**：
+  - **存读档白名单合法化**：`world_save.rs::deserialize_save` profile 闭集校验 3→6 正式入列 `grassland_plain_v1`/`hillside_woodland_v1`/`river_valley_settlement_v1`（连同既有 `mountain_pass_v1`/`river_valley_v1`/`flat_baseline`）；未知 profile 仍报错拒绝（禁止静默回退）；`save-ui.js` 结构零改动（`SAVE_FORMAT_VERSION` 保持 7，本版无 `WorldSave` 结构变更）。
+  - **random 候选池扩容（§20 退出标准 1.3）**：`geo/terrain.rs::resolve_profile` 由 T1/T2 奇偶二分改为 **5 路取模**——`(seed ^ 0x5052_4F46_494C_4531) % 5` 依序映射山口/河谷/草原/半坡/河谷聚落各 ~20%；`flat_baseline` 永不入列；纯整数运算不消费 WorldRng。**同种子 random 落点改变属收口设计**（旧存档记录的是已实例化模板名，读档与续演不受影响；显式 profile 输出不受影响）；`config.js` `terrainProfile` 注释与 14 号文 §2/§7/§16 同步改写（含「取模作用于原始异或值而非 mix64 哈希」口径修订——旧「奇偶严格交替」警示随 %2 弃用一并改写为 %5 同余循环口径）。
+  - **跨构建旧世界物理不变性**：HEAD 基线 worktree（c8ac977）对拍 T1/T2 各 24 种子（0..=23）`terrain_probe` 输出**逐字节一致**（diff 全空）——`TERRAIN_GENERATOR_VERSION` 保持 8 的证据。
+  - **60 种子矩阵（3×60 全过）**：草原 maxSlope 9.61°~16.33°/buildable ≥14392/components 恒 1/detour_p95 1.08；半坡 22.04°~27.22°/buildable ≥13268/>30° 恒 0；河谷 39.06°~41.26°/NO_WALK 1232~1434/buildable ≥9291/跨障绕行95 2.01~2.74/水源距 ≤16m/components 恒 1——§1.4 门禁违例 **0/60 × 3**，窗口与 S7-08 记录完全一致。
+  - **门禁**：`cargo test --lib`（0 tests，§4.10 设计）、WASM 重编译双副本 SHA256 一致 `fd6e9858…`、`test-wasm` ALL_TESTS_DONE、`test-determinism` 6/6、`config-check` 276 字段、`frontend-check`、`doc-link-check`、`cross-doc-check`（冲突 0 漂移 0）、`code-map-check`（0 err 0 warn）、`bump-version --check` 全绿；升版 v1.50.51→v1.50.52（`SAVE_APP_VERSION` 变更旧存档按设计自动废弃）。**阶段七（插队模板批次 S7-01~S7-10）全部闭环。**
 
 ---
 
