@@ -210,21 +210,21 @@ LOD 以投影尺寸和可见范围决定保留的细节：远景保留资源识�
 **失败处理**：水体关系不明只展示陆侧点缀；预算超限先减枝叶细节与覆盖范围，再复测。
 **验收证据**：至少近景泉边、近景林地两套可复现场景；取水/采木入口可选，资源数据与原 Inspector 一致。
 
-### 4.5 S4-05 · 其余通用资源配方
+### 4.5 S4-05 · 其余通用资源配方 ✅（2026-09-14，验收记录见 §10）
 
-- [ ] 分别交付 Berry、Stone、Gold 配方；复用采样、遮罩、库存丰度和绘制公共入口。
-- [ ] 验证果实、矿脉细节的单调丰度关系与缺失值处理，禁止库存影响几何重抽。
-- [ ] 验证邻接资源区与基础 accents 的去重，资源中心始终可辨认。
+- [x] 分别交付 Berry、Stone、Gold 配方；复用采样、遮罩、库存丰度和绘制公共入口。（配方 v3（RECIPE_VERSION 2→3）：Berry +`fruit` 果实点簇 ×2（tone 'berry'）、Stone +`quarry` 可采面明暗 ×1、Gold +`vein` 矿脉斑点 ×2——三者均为 `stockRole:'detail'` 的 GroundPatch，完整复用 S4-04 的极坐标采样/坡度拒绝/遮罩脏桶/`childActive` 机制与 `drawLandscapeGroundPatch` 绘制入口；点簇几何构建期预计算 `child.dots`（10 点归一化偏移，r=sqrt 盘分布），q 只驱动**绘制期**可见点数 `round(n×q)` 与 quarry 的 globalAlpha——连续强度单调，绝不参与几何重抽；gold 哑光矿脉斑**严禁发光**）
+- [x] 验证果实、矿脉细节的单调丰度关系与缺失值处理，禁止库存影响几何重抽。（临时断言 23 组：0/半/满全子图元几何逐位一致且 `version()` 不变；detail 激活数 0 ≤ 半 ≤ 满、0 时全隐；可见点数随 q 单调不减；q 缺失/maxStock≤0/NaN → detail 全隐骨架保留；浏览器 Berry/Stone/Gold 满与零态页内像素差分 5963/5163/8251px）
+- [x] 验证邻接资源区与基础 accents 的去重，资源中心始终可辨认。（邻接组 Berry#23 ↔ Water#13 相距 51.8m 共享车道走廊 → 两 Group 子图元分别 4/9、4/8 被遮蔽（遮罩机制正常）；detail 子图元不入占据桶不误藏基础装饰（S4-04 语义沿用）；fruit 内缘距 POI 中心 25 > 操作区半径 18——采收中心与图标恒无遮挡）
 
 **失败处理**：某配方失败只关闭该配方；不阻塞已通过的泉水/林地样板。
 **验收证据**：每类至少一组 seed/tick 固定截图，0/半满/满库存临时夹具，界面库存及物理状态不变。
 
-### 4.6 S4-06 · 标签基础布局
+### 4.6 S4-06 · 标签基础布局 ✅（2026-09-14，验收记录见 §11）
 
-- [ ] 抽离本轮文字入口，建立候选/字体测量/矩形/优先级/固定备选位置接口。
-- [ ] 实现屏幕网格冲突检测、UI 禁入矩形、普通标签省略，保证算法候选数有界。
-- [ ] 区分普通世界标签与交互覆盖标签，保留普通标记的地形遮挡行为。
-- [ ] 适配 Canvas DPR、缩放、旋转、resize 与字体变更，移除旧入口的重复文字。
+- [x] 抽离本轮文字入口，建立候选/字体测量/矩形/优先级/固定备选位置接口。（新增 label-layout.js（window.LabelLayout ~330 行）：帧内三段式挂载 drawWorldEntities——beginFrame → proposePoi/House/AgentLabels 收集 → list.sort() 前 resolve() 按 (优先级,收集序) 稳定安置；字体测量缓存（font+text→宽，上限 2048）；矩形模型 CJK/拉丁 0.85/0.35em、emoji 独占文本墨迹近似框 0.72/0.10em）
+- [x] 实现屏幕网格冲突检测、UI 禁入矩形、普通标签省略，保证算法候选数有界。（每标签固定备选位 ≤4 [首选→锚点镜像→首选同排右→左]；冲突网格 labelGridCellSize 分桶+链表非全对扫描；UI 禁入 labelUiRectIds 节流重测+resize 置脏；普通标签全败即省略，提案上限 labelMaxProposals=160 超限按收集序丢弃）
+- [x] 区分普通世界标签与交互覆盖标签，保留普通标记的地形遮挡行为。（pinned=实体锚定标记恒接受占格 / ordinary=可省略文字；普通标签仍在实体深度落笔——山后标签不透山[房屋编号近景裁剪证据：被更近地形格正常遮挡，新旧路径一致]；选中族人需求气泡自 drawAgent 迁出 overlay 通道 drawSelectedNeedBubbleOverlay，分发循环后强制安置不省略不参与地形遮挡）
+- [x] 适配 Canvas DPR、缩放、旋转、resize 与字体变更，移除旧入口的重复文字。（坐标全 CSS px = ctx 逻辑坐标，DPR 由 main.js setTransform 承担本层不感知；锚点逐帧重投影缩放/旋转自然适配；resize 事件置脏 UI 矩形 + 每帧传入 w/h；字体串含 px 变更自然换测量键；10 处文字入口全部改单点消费 posOf，无残留直接绘制）
 
 **失败处理**：普通标签无合法位置即省略，保留实体与信息面板访问。
 **验收证据**：固定输入下接受顺序稳定、普通已接受矩形互不相交；山后普通标签不透山，原实体命中顺序不变。
@@ -490,3 +490,43 @@ profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：泉边 = seed 
 ### 9.5 复现流程
 
 泉边：URL `?seed=34`（不能用 seed 0，§6.6 注 1）→ 注入 §6.6 注 4 UI 隐藏样式 → `aim(1.05, 0.6, 4.0, 26.13, -162.35, 2)`（世界点居中：`panX = 640 - w/2 - (x·cosZ - y·sinZ)·zoom`，`panY = 360 - h/2 - ((x·sinZ + y·cosZ)·cosX - z·sinX)·zoom`）→ 门禁暂停态手动 `render(performance.now())` + `sim-canvas.toDataURL()`。林地：`?seed=31` + `aim(1.05, 0.6, 3.0, 43.46, 118.56, 0)`。库存三态：改 `RENDER_CONFIG.landscapeDetailQFloor/QCeil` 后须 `LandscapeModel.resetCache()`（qThreshold 为构建期常量），q 实况 = 150/200 = 0.75。
+
+## 10. 验收记录 · S4-05 果丛、石矿、金矿配方推广（2026-09-14）
+
+> 按 §5.3 模板记录。临时 Node 验收断言（23 组）已按根 AGENTS.md §4.10 用后删除，不持久化。
+
+```text
+任务 ID / 状态 / 日期：S4-05 / ✅ 完成 / 2026-09-14
+基准提交 / 候选提交 / 应用版本：基准 9650325（分支 c2，已并入 master S7-05~07）/ 候选 = 本次提交 / 1.50.51（升版器 12 定义点同步）
+WASM 双副本 SHA256：frontend/rust/ = frontend/ = 087bcad05b79dc36…（升版 SAVE_APP_VERSION 后重编译，双副本同值）
+模拟配置 SHA256 / 渲染配置摘要：SIM_CONFIG 239 字段未变（S4-01 冻结基线仍有效）；RENDER_CONFIG 顶层键数不变（75；仅 landscapeRecipes 配方表 v2→v3：Berry +fruit、Stone +quarry、Gold +vein，键内结构与回退表逐位一致）
+profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：seed 34 / river_valley_v1（含 S7-05~07 地形变更的合并后内核）/ tick 0（创世暂停）/ 相机 rotX 1.05 / rotZ 0.6 / zoom 8，中心分别为 Berry#23 (76.8, -51.5)、Stone#41 (-299.8, 89.4)、Gold#50 (284.0, -92.5)（Stone#40 全组被车道区遮蔽 0/5 可见，改用 #41；§6.4 冻结表 POI 坐标在合并后内核未漂移）
+设备 / Chrome 版本 / 视口 / DPR：Chromium IAB（win32）视口 1280×720 / DPR 1；库存款三态经页内 currentStock 临时夹具（§4.5 验收明确允许；暂停态截图用、截后恢复、不落存档，界面库存环与派生层同源同步）
+执行门禁、退出码及日志位置：cargo test --lib 0 失败；cargo build wasm release 通过 + 双副本同步；test-wasm ALL_TESTS_DONE；test-determinism 6/6；config-check 239/239；frontend-check 全过；doc-link-check / cross-doc-check 0 冲突 / doc-maintenance-check / bump-version --check 12 点零漂移；git diff --check 干净
+物理差分 / 模型确定性 / 避让违例 / 标签与命中检查：物理字段差分 0（sync + childActive 前后 sim 串化逐位一致）；模型确定性 23/23（0/半/满全子图元几何逐位一致且 version() 不变——库存不参与几何重抽；detail 激活数 0 ≤ 半 ≤ 满、0 时全隐；可见点数 round(n×q) 随 q 单调不减；点偏移 ∈ ±0.85r、两两 fruit/vein 点簇互不重；role 半径带 26..36 / 26..34 生效；q 缺失 / maxStock≤0 / NaN → detail 全隐骨架保留；坡面拒绝照常；清缓存重建 / 独立沙盒 / 缺省回退表三者逐项一致）；避让 = 邻接组 Berry#23 ↔ Water#13（51.8m 共享走廊）分别 4/9、4/8 遮蔽、fruit 内缘距中心 25 > 操作区 18 中心恒可辨；标签不适用（S4-06/07）
+基准与候选 p50/p95/p99 / 首帧与缓存重建 / 缓存规模：本任务为 detail 贴地片推广（机制与 S4-04 同链路，点簇绘制为单 path 批量 arc，增量远低于 S4-04 已测链增量，不重复整链实测；S4-08 总验收统一复测）；缓存规模 = seed34 Berry 9 子图元（bush5+grass2+fruit2）/ Stone 5 / Gold 6，组上限与帧预算沿用既有配置
+截图与原始记录路径：evidence/S4-05/screenshots/ 9 张（berry/stone/gold × q 满/半/零，seed34 zoom8 固定相机）；页内满 vs 零像素差分 berry 5963 / stone 5163 / gold 8251 px
+失败项、降级与后续任务：验收中发现夹具陡坡区按设计拒绝 1 枚 vein 候选（跳过不重编号，非缺陷）；无遗留失败。后续：S4-06 标签候选层（依赖 S4-01 文字入口盘点）；S4-08 收口时对五类配方做统一性能与视觉总验收
+```
+
+**S4-05 交付边界说明**：果实/矿脉以**点簇贴地片**表达（构建期静态几何 + 绘制期连续强度），不新增拾取实体、不改 Inspector 数据；Berry 保留采收中心原图标与储量环，Stone 可采面为灰斑明暗（不修改坡度/碰撞），Gold 哑光矿脉斑禁整片发光/扩矿——全部符合 §3.2 放置约束。三配方任一失败可经 landscapeRecipes 单独关 role，不阻塞泉边/林地样板。
+
+## 11. 验收记录 · S4-06 标签候选层与基础布局（2026-09-14）
+
+> 按 §5.3 模板记录。沙盒断言（24 组）已按根 AGENTS.md §4.10 用后删除，不持久化。
+
+```text
+任务 ID / 状态 / 日期：S4-06 / ✅ 完成 / 2026-09-14
+基准提交 / 候选提交 / 应用版本：基准 09ada7d（分支 c2，v1.50.51）/ 候选 = 本次提交 / 1.50.52（升版器 12 定义点同步）
+WASM 双副本 SHA256：frontend/rust/ = frontend/ =（升版 SAVE_APP_VERSION 后重编译，双副本同值）
+模拟配置 SHA256 / 渲染配置摘要：SIM_CONFIG 239 字段未变（零内核变更）；RENDER_CONFIG 75 → 85 键（+标签布局 10 键：labelLayoutEnabled/labelGridCellSize/labelMaxProposals/labelRectPadPx/labelSidePadPx/labelUiRefreshFrames/labelUiRectIds + LOD 收编 labelPoiNameMinZoom 0.50/labelStockRingMinZoom 0.70/labelHouseNumberMinZoom 1.05——三处旧硬编码缺省值与旧值逐位一致）
+profile / seed / tick / 存档摘要 / 相机 / 视图 / 季相：seed 65 / mountain_pass_v1 / 创世 STEP 重放 160000 ticks（12 房 50 人，与 §6.4 冻结基线一致）/ 相机 rotX 1.05 / rotZ 0.6 / zoom 1.6 / 中心 = 房屋质心 (87.6, -76.5) / 春季。§6.4 的 seed65 冻结存档（v1.50.46）已被 SAVE_APP_VERSION 门禁按设计废弃——改用「创世 + STEP 批量 world_tick_steps 重放」复现同一世界（确定性保证，房屋/人口计数核对一致）
+设备 / Chrome 版本 / 视口 / DPR：Chromium IAB（win32）视口 1280×720 / DPR 1；UI 面板以注入样式隐藏（截图画面用）
+执行门禁、退出码及日志位置：WASM 重编译 + 双副本同步；test-wasm ALL_TESTS_DONE（确定性/防越界/防 NaN/存读档）；config-check 239/239；frontend-check 42 文件语法 + DOM ID；doc-link-check 全过；code-map-check label-layout.js 已登记（余 6 项为 master 合并既有警告）；沙盒断言 24/24（提交前已删）
+物理差分 / 模型确定性 / 避让违例 / 标签与命中检查：物理字段差分 0（纯前端表现层，未触碰 rustworld.js 数据面与 sim 状态写入）；标签 = 固定输入两帧接受矩形逐位一致（稳定排序双键 pri+收集序）；已接受普通矩形两两不相交（沙盒 + 浏览器 seed65 密集聚落双验，相交 0）；候选数有界 ≤4/标签、提案上限截断（proposed=10/dropped=20）；UI 禁入矩形命中省略；围死省略（36 pinned 环堵四备选位全败 → omitted）；关态 posOf 恒 false 完整回退旧路径；拾取命中 house#3 正确（render_inspector.js 未改动，命中顺序不变）
+基准与候选 p50/p95/p99 / 首帧与缓存重建 / 缓存规模：ON/OFF 全帧像素差分 2989px（zoom1.6 密集聚落 1280×720——差异仅标签位置局部，世界渲染零扰动）；布局层为 O(提案数 × 备选位 × 网格邻域)，提案 ≤41 时 resolve 微秒级，不构成帧耗时热点（S4-08 总验收统一复测）；字体测量缓存上限 2048 条
+截图与原始记录路径：evidence/S4-06/screenshots/ 5 张——settlement-seed65-t160000-labels-on/off-zoom1.6.png（聚落对照：4/4 营地名称 + 11/12 房屋编号 + 1/3 舍数，ON 态省略 3 全为真冲突）、settlement-seed65-house3-label-crop.png（房屋编号被更近地形格正常遮挡 = 山后不透山证据）、agent-selected-bubble-crop.png（需求气泡 overlay 安置在选中族人上方，避开标签矩形）、settlement-seed65-closeup-zoom3.2.png（近景：名称/舍数/图标无互压）
+失败项、降级与后续任务：验收中发现并修正 2 项——① emoji 独占文本矩形沿用 0.85/0.35em 文本模型过大（墨迹仅 ~0.72em），密集聚落 4 营地名称全部被自家/邻图标框系统性挤掉，改墨迹近似框（0.72/0.10em）后 4/4 恢复；② 左右备选位原贴锚点水平排（必撞 pinned 图标框），改为与首选同排横移后有效。无遗留失败。后续：S4-07 聚合、选中/悬浮兜底与交互回归（依赖本任务 + S4-04；UI 禁入矩形默认 labelUiRectIds=null——Inspector 等覆盖区避让的默认启用与 DOM 快照缓存归 S4-07 收口）
+```
+
+**S4-06 交付边界说明**：本任务交付布局层机制与基础布局（候选/测量/矩形/优先级/备选位/冲突检测/禁入/省略/overlay 通道）；同类标签聚合、选中/悬浮双目标强制保留、引线与边缘分行兜底、布局滞回归 S4-07。`labelUiRectIds` 默认 null（只避开画布边界）——机制已在沙盒验证，默认启用待 S4-07 与 DOM 交互回归一起收口。

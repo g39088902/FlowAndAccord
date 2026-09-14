@@ -185,17 +185,36 @@ window.RENDER_CONFIG = {
       { role: 'shade',   modelKind: 'GroundPatch', slots: 2, radiusMin: 8,  radiusMax: 12, tone: 'shade' },
       { role: 'foliage', modelKind: 'Bush',        slots: 3, scaleMin: 0.45, scaleMax: 0.7, footprint: 8, stockRole: 'detail' },
     ] },
-    Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）
-      { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
-    Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草（不画成阻路峭壁）
-      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
-    Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架（禁止整片发光/扩矿，归 S4-05 细节）
-      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-    ] },
+      Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）+ 果实点簇（q 显隐）
+        { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'fruit', modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 36, radiusMin: 5, radiusMax: 8, tone: 'berry', stockRole: 'detail' },
+      ] },
+      Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草 + 可采面明暗（不画成阻路峭壁）
+        { role: 'rock',   modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+        { role: 'grass',  modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'quarry', modelKind: 'GroundPatch', slots: 1, rMin: 26, rMax: 34, radiusMin: 6, radiusMax: 9, tone: 'quarry', stockRole: 'detail' },
+      ] },
+      Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架 + 矿脉斑点（禁止整片发光/扩矿，归 S4-05）
+        { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+        { role: 'vein',  modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 34, radiusMin: 4, radiusMax: 7, tone: 'gold', stockRole: 'detail' },
+      ] },
   },
+
+  // —— 标签布局（★ S4-06，STAGE-04-TODO §4.6；label-layout.js / render_world.js / render_agents.js 消费）——
+  // 世界画布文字统一候选层：pinned（实体锚定标记）恒接受占格；ordinary（可省略文字）
+  // 依次尝试 [首选/锚点镜像/正右/正左] 固定备选位，屏幕网格冲突 + UI 禁入矩形，全败即省略。
+  // 本段为**纯渲染配置**，不进 SIM_CONFIG、不经 applyConfig 注入 WASM；关态完整回退旧直接绘制。
+  labelLayoutEnabled: true,       // 总开关（false = 全部文字走 v1.50.51 旧直接绘制路径；纯前端开关）
+  labelGridCellSize: 48,          // 屏幕冲突网格单元边长（CSS px；矩形相交查询先取单元再精确 AABB）
+  labelMaxProposals: 160,         // 每帧普通标签提案上限（超出按收集序丢弃；pinned 恒受实体数约束）
+  labelRectPadPx: 2,              // 标签矩形四周外扩余量（CSS px，相交判定保守侧）
+  labelSidePadPx: 10,             // 左右备选位与锚点的水平间距（CSS px）
+  labelUiRefreshFrames: 10,       // UI 禁入矩形重测帧间隔（DOM getBoundingClientRect 节流；resize 立即重测）
+  labelUiRectIds: null,           // UI 禁入矩形元素 ID 列表（null = 只避开画布边界；隐藏/出画布元素自动跳过）
+  // 旧硬编码 LOD 阈值收编（STAGE-04-TODO §6.3：POI 名称 z>0.50 / 库存环 z≥0.70 / 房屋编号 z>1.05）
+  labelPoiNameMinZoom: 0.50,      // 营地名称/舍数显示的最小缩放（原 drawPoiMarker 硬编码）
+  labelStockRingMinZoom: 0.70,    // POI 库存环显示的最小缩放（原 showDetailRings 硬编码；选中态恒显示）
+  labelHouseNumberMinZoom: 1.05,  // 房屋编号显示的最小缩放（原 drawHouse showLabels 硬编码；选中态恒显示）
 };

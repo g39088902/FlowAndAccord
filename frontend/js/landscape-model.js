@@ -35,7 +35,11 @@ window.LandscapeModel = window.LandscapeModel || (function () {
   // v2（★ S4-04）：Water 增 wet 湿润土贴地片、Wood 增 shade 林下暗部贴地片与
   // foliage 可采细节（stockRole 'detail'，qThreshold 由 q 映射）；GroundPatch 落点
   // 增坡度拒绝（cell slopeAngle > landscapeGroundMaxSlopeDeg 跳过，§3.4 坡面拒绝）。
-  const RECIPE_VERSION = 2;
+  // v3（★ S4-05）：Berry 增 fruit 果实点簇、Stone 增 quarry 可采面明暗、Gold 增 vein
+  // 矿脉斑点——三者均为 stockRole 'detail' 的 GroundPatch，复用 S4-04 采样/遮罩/丰度
+  // 公共入口；点簇子图元构建期预计算 dots 平铺偏移（静态几何），q 只控制**绘制期**
+  // 可见点数/α 强度（连续强度单调，§3.2），绝不参与几何重抽。
+  const RECIPE_VERSION = 3;
 
   // —— 固定 uint32 哈希（MurmurHash3 风格 finalizer，明确无符号整数运算）——
   function hash32() {
@@ -88,14 +92,17 @@ window.LandscapeModel = window.LandscapeModel || (function () {
       Berry: { rMin: 22, rMax: 44, roles: [
         { role: 'bush', modelKind: 'Bush', slots: 5, scaleMin: 0.7, scaleMax: 1.1, footprint: 8 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 2, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
+        { role: 'fruit', modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 36, radiusMin: 5, radiusMax: 8, tone: 'berry', stockRole: 'detail' },
       ] },
       Stone: { rMin: 22, rMax: 42, roles: [
         { role: 'rock', modelKind: 'RockCluster', slots: 2, scaleMin: 1.0, scaleMax: 1.5, footprint: 12 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 2, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
+        { role: 'quarry', modelKind: 'GroundPatch', slots: 1, rMin: 26, rMax: 34, radiusMin: 6, radiusMax: 9, tone: 'quarry', stockRole: 'detail' },
       ] },
       Gold: { rMin: 22, rMax: 42, roles: [
         { role: 'rock', modelKind: 'RockCluster', slots: 2, scaleMin: 1.0, scaleMax: 1.5, footprint: 12 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 2, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
+        { role: 'vein', modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 34, radiusMin: 4, radiusMax: 7, tone: 'gold', stockRole: 'detail' },
       ] },
     };
   }
@@ -254,12 +261,13 @@ window.LandscapeModel = window.LandscapeModel || (function () {
         const z = sampleElevation(x, y);
         if (z == null) continue; // 越界/地形缺失：跳过
         let footprint = cfgNum(roleDef.footprint, 8);
-        let radius = 0, tone = null;
+        let radius = 0, tone = null, childDots = null;
         if (modelKind === 'GroundPatch') {
           radius = cfgNum(roleDef.radiusMin, 6) +
             (cfgNum(roleDef.radiusMax, 9) - cfgNum(roleDef.radiusMin, 6)) * chan(seed, 14);
           footprint = radius; // 视觉占地即查询足迹（遮罩/组 bounds 同一口径）
-          tone = roleDef.tone === 'wet' ? 'wet' : 'shade';
+          tone = roleDef.tone === 'wet' ? 'wet' : roleDef.tone === 'berry' ? 'berry' :
+            roleDef.tone === 'gold' ? 'gold' : roleDef.tone === 'quarry' ? 'quarry' : 'shade';
           // 坡面拒绝（§3.4）：格心 + 半径 0.7 处四缘任一超阈值即拒绝——跨陡坡的贴地片
           // 首版直接拒绝（不做片内拆分），禁止整张贴片悬浮穿山
           const maxSlope = groundMaxSlopeDeg();
@@ -267,6 +275,17 @@ window.LandscapeModel = window.LandscapeModel || (function () {
           if (sampleSlopeDeg(x, y) > maxSlope ||
               sampleSlopeDeg(x + sr, y) > maxSlope || sampleSlopeDeg(x - sr, y) > maxSlope ||
               sampleSlopeDeg(x, y + sr) > maxSlope || sampleSlopeDeg(x, y - sr) > maxSlope) continue;
+          // ★ S4-05 点簇 detail（berry/gold）：构建期预计算 10 个归一化点偏移（静态几何，
+          //   r=sqrt 均匀盘分布 × 0.85r 内）；q 只控制绘制期可见点数——绝不参与几何重抽
+          if (tone === 'berry' || tone === 'gold') {
+            const dots = [];
+            for (let d = 0; d < 10; d++) {
+              const du = chan(seed, 20 + d * 2), dv = chan(seed, 21 + d * 2);
+              const dr = Math.sqrt(du) * 0.85, dt = dv * Math.PI * 2;
+              dots.push(Math.cos(dt) * dr, Math.sin(dt) * dr);
+            }
+            childDots = dots;
+          }
         }
         const scale = cfgNum(roleDef.scaleMin, 0.7) +
           (cfgNum(roleDef.scaleMax, 1.2) - cfgNum(roleDef.scaleMin, 0.7)) * chan(seed, 12);
@@ -283,6 +302,7 @@ window.LandscapeModel = window.LandscapeModel || (function () {
           stockRole: isDetail ? 'detail' : 'skeleton',
         };
         if (radius > 0) { child.radius = radius; child.tone = tone; }
+        if (childDots) child.dots = childDots;
         if (isDetail) {
           // 稳定 slot 阈值：q ≥ threshold_i 才显示；构建期定值，库存变化不改几何与阈值
           const qf = detailQFloor(), qc = detailQCeil();
