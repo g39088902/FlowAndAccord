@@ -22,6 +22,16 @@
 //   isReed——株高 4.2~6.0m、叶尖更收敛、顶端穗状芦花 plume 长度（几何 id 纯函数）；
 //   穗量/季相颜色由绘制层按 SimTreeTint 季节样本驱动，模型层不读季节。
 //
+// ★ TA-06（07 号 §6.3）植被物种变体：由 accent.id 稳定哈希派生 6 个物种——三乔木轮廓
+//   （broad 阔冠落叶 / sparse 疏冠落叶 / conifer 锥形常绿轮生层）+ 三灌木变体（multiStem
+//   落叶多茎 / flowering 花灌木 / lowEvergreen 低矮常绿）+ 花灌木固定花位花色。物种派生
+//   是 (kind, id) 的**纯函数**（哈希全新 800 段，997/998 保留给季相 jitter）：不读季节、
+//   相机、光向、accent.tint/scale、地表类别与世界 seed；同一 id 在 accent 通道与 'L#'
+//   景观通道得到同一物种。零持久化：不新增快照字段/FABS section/模拟参数；非 Tree/Bush
+//   返回 undefined（GrassTuft/Boulder/RockCluster 零影响）。骨架输出 crownR / trunkH /
+//   footprintR / crownSquash 作为冠幅·实高·深度足迹·扁压的**唯一几何真相源**（绘制层/
+//   阴影层/深度队列统一读模型，§3.8）。
+//
 // 契约（frontend/AGENTS.md §5.11 / 07-terrain-art.md §10.2）：
 // - 纯表现层：不消耗 WorldRng、不写模拟状态、不入快照、不参与内核确定性承诺。
 // - 模型值是 accent.id 的**纯函数**——缓存与否、何时失效都不改变像素结果，
@@ -61,17 +71,64 @@ window.AccentModel = window.AccentModel || (function () {
     return kind === 'Bush' ? 8 : 16;
   }
 
-  // 稳定哈希常绿变体（TA-06 物种自动分配落地前的过渡接口；配置预留键，v1.50.25 起消费）。
-  // 常绿 profile 叶量全年 ≥94%，叶簇永不脱落——冬季雪线场景里保留常绿骨架层次。
-  function evergreenOf(id) {
-    const cfg = window.RENDER_CONFIG || {};
-    const chance = Number.isFinite(cfg.accentEvergreenChance) ? cfg.accentEvergreenChance : 0;
-    return chance > 0 && _accentHash(id, 400) < chance;
-  }
-
   // —— TA-11-3 RockCluster / GrassTuft 骨架参数读取（config.render.js；缺省回退与原值一致）——
   function cfgNum(v, fallback) {
     return Number.isFinite(v) ? v : fallback;
+  }
+
+  // ── ★ TA-06 物种派生（07 号 §6.3；TA-06-2）──
+  // 物种登记表：silhouette/variant 键与 config.render.js 权重表、参数表键严格一致；
+  // profile 映射到 accent-season.js 的四条季相曲线（floweringBush 首次真实消费）。
+  var _TREE_SPECIES = {
+    broad: { silhouette: 'broad', profile: 'deciduousTree' },
+    sparse: { silhouette: 'sparse', profile: 'deciduousTree' },
+    conifer: { silhouette: 'conifer', profile: 'evergreen' },
+  };
+  var _BUSH_SPECIES = {
+    multiStem: { silhouette: 'multiStem', profile: 'deciduousBush' },
+    flowering: { silhouette: 'flowering', profile: 'floweringBush' },
+    lowEvergreen: { silhouette: 'lowEvergreen', profile: 'evergreen' },
+  };
+  // 权重表缺省回退（与 config.render.js 建议值一致；非法/缺省配置不致命）
+  var _TREE_WEIGHTS_FALLBACK = { broad: 0.42, sparse: 0.34, conifer: 0.24 };
+  var _BUSH_WEIGHTS_FALLBACK = { multiStem: 0.56, flowering: 0.24, lowEvergreen: 0.20 };
+
+  // 单一 u 值按**累积权重表**查表分配（权重先归一化）——不用 u<chance 多次独立抽样，
+  // 避免变体间比例相互干扰（§3.1）。非法/缺省回退 fallbackKey。
+  function _weightedPick(u, table, fallbackKey) {
+    let total = 0;
+    for (const k in table) {
+      const w = table[k];
+      if (Number.isFinite(w) && w > 0) total += w;
+    }
+    if (!(total > 0)) return fallbackKey;
+    let acc = 0, last = fallbackKey;
+    for (const k in table) {
+      const w = table[k];
+      if (!(Number.isFinite(w) && w > 0)) continue;
+      acc += w / total;
+      if (u < acc) return k;
+      last = k;
+    }
+    return last;
+  }
+
+  // 物种派生唯一入口：(kind, id) 的纯函数 → { silhouette, profile }；非 Tree/Bush 返回
+  // undefined（非植被种类零影响，§4.7）。哈希走全新 800 段：800 乔木 / 802 灌木 /
+  // 810+i×3 花位花色 / 841+ 锥形轮生层（997/998 保留给季相 jitter，400 随旧过渡接口删除释放、不复用）。
+  // ★ 扩展预留：未来「按地表类别/坡度/景观配方偏置物种」须在本函数内新增显式参数并 bump
+  //   accentModelStyleVersion，**禁止**在绘制层临时按环境改写物种（会破坏读档/回溯一致性）。
+  function speciesOf(kind, id) {
+    const w = (window.RENDER_CONFIG || {}).accentSpeciesWeights || {};
+    if (kind === 'Tree') {
+      const key = _weightedPick(_accentHash(id, 800), w.tree || _TREE_WEIGHTS_FALLBACK, 'broad');
+      return _TREE_SPECIES[key] || _TREE_SPECIES.broad;
+    }
+    if (kind === 'Bush') {
+      const key = _weightedPick(_accentHash(id, 802), w.bush || _BUSH_WEIGHTS_FALLBACK, 'multiStem');
+      return _BUSH_SPECIES[key] || _BUSH_SPECIES.multiStem;
+    }
+    return undefined;
   }
 
   function styleVersion() {
@@ -125,15 +182,64 @@ window.AccentModel = window.AccentModel || (function () {
     return out;
   }
 
-  // ── Tree：锥形主干 + 主枝/二级枝 + 叶簇（§6.4：每树 12~24 簇，枝条全年保留）──
+  // ── Tree：★ TA-06 三轮廓骨架（§3.2）：broad 阔冠落叶 / sparse 疏冠落叶 / conifer 锥形常绿 ──
+  // 结构沿 TA-03：锥形主干 + 主枝/二级枝 + 挂在真实枝条上的椭球叶簇（v1.50.26 悬空簇纪律）；
+  // 参数由 config.render.js::accentTreeSilhouettes 按轮廓提供（物种由 speciesOf 派生）。
   // segments：枝干线段（局部三维端点 + 相对干宽系数 wK）；clusters：叶簇
   // （局部三维附着点 + 世界单位半径 r + 稳定脱落次序 shed + 色差通道 lite）。
-  function treeSkeleton(id, vSeed) {
-    const N = clusterCount('Tree');
-    const trunkH = 6.5 + vSeed * 2.5;      // 与 v1.49.3 干高公式逐位一致
-    const crownR = 8.5;                    // 冠包络基准半径（同旧四瓣树冠）
-    const P = 5 + Math.floor(_accentHash(id, 210) * 2); // 主枝 5~6
+  // 模型输出 crownR / trunkH / footprintR / crownSquash / leanShearK 为该轮廓真值（§3.8）。
+  function _treeSilParams(silhouette) {
+    const t = (window.RENDER_CONFIG || {}).accentTreeSilhouettes || {};
+    const p = t[silhouette] || t.broad || {};
+    return {
+      trunkHBase: cfgNum(p.trunkHBase, 5.6),
+      trunkHVar: cfgNum(p.trunkHVar, 1.6),
+      crownR: cfgNum(p.crownR, 10.5),
+      branchMin: Math.max(1, Math.round(cfgNum(p.branchMin, 6))),
+      branchMax: Math.max(1, Math.round(cfgNum(p.branchMax, 7))),
+      subBranchPer: Math.max(0, Math.round(cfgNum(p.subBranchPer, 1))),
+      subLenK: cfgNum(p.subLenK, 0.5),
+      subDroop: cfgNum(p.subDroop, 0.35),
+      clusterFactor: cfgNum(p.clusterFactor, 1.15),
+      clusterRBase: cfgNum(p.clusterRBase, 2.3),
+      clusterRVar: cfgNum(p.clusterRVar, 1.3),
+      elevMin: cfgNum(p.elevMin, 0.30),
+      elevMax: cfgNum(p.elevMax, 0.75),
+      crownSquash: cfgNum(p.crownSquash, 0.78),
+      footprintR: cfgNum(p.footprintR, 13),
+      leanShearK: cfgNum(p.leanShearK, 1.0),
+      whorlLayersMin: Math.max(2, Math.round(cfgNum(p.whorlLayersMin, 4))),
+      whorlLayersMax: Math.max(2, Math.round(cfgNum(p.whorlLayersMax, 6))),
+      whorlBranchesMin: Math.max(2, Math.round(cfgNum(p.whorlBranchesMin, 3))),
+      whorlBranchesMax: Math.max(2, Math.round(cfgNum(p.whorlBranchesMax, 5))),
+    };
+  }
+
+  function _treeSilResult(sp, trunkH, segments, mainSegOnly, clusters) {
+    const branchTips = [];
+    for (let i = 0; i < segments.length; i++) {
+      if (!mainSegOnly || mainSegOnly.indexOf(i) >= 0) {
+        branchTips.push({ x: segments[i].x2, y: segments[i].y2, z: segments[i].z2 });
+      }
+    }
+    attachCrownNormals(clusters);
+    return {
+      silhouette: sp._name,
+      trunkH: trunkH, crownR: sp.crownR,
+      crownSquash: sp.crownSquash, footprintR: sp.footprintR, leanShearK: sp.leanShearK,
+      segments: segments, branchTips: branchTips, clusters: clusters,
+    };
+  }
+
+  // broad / sparse：主干锥形 + 主枝 + 二级枝 + 挂枝叶簇（TA-03 同构，参数按轮廓）。
+  // sparse 二级枝更长更上扬（subLenK 0.62 / subDroop 0.18），冠内自然出空隙。
+  function _broadSparseSkeleton(id, vSeed, sp) {
+    const N = Math.max(6, Math.round(clusterCount('Tree') * sp.clusterFactor));
+    const trunkH = sp.trunkHBase + vSeed * sp.trunkHVar;
+    const crownR = sp.crownR;
+    const P = sp.branchMin + Math.floor(_accentHash(id, 210) * (sp.branchMax - sp.branchMin + 1));
     const segments = [];
+    const mainSegIdx = [];                 // 主枝线段索引（补位簇锚定 + 春芽定位）
     const tips = [];                       // 叶簇附着点（主枝端 → 二级枝端 → 冠顶 → 枝上补位）
     for (let i = 0; i < P; i++) {
       const h1 = _accentHash(id, 220 + i);
@@ -142,39 +248,40 @@ window.AccentModel = window.AccentModel || (function () {
       const h4 = _accentHash(id, 284 + i);
       const ang = (i / P) * Math.PI * 2 + (h1 - 0.5) * 1.1; // 方位角（均匀布点 + 抖动）
       const hFrac = 0.55 + h2 * 0.32;                        // 着生高度（干上部）
-      const elev = 0.5 + h3 * 0.55;                          // 仰角 ~29°..60°
+      const elev = sp.elevMin + h3 * (sp.elevMax - sp.elevMin); // 仰角带按轮廓
       const blen = crownR * (0.46 + h4 * 0.20);              // 枝长
       const oz = trunkH * hFrac;
       const ce = Math.cos(elev);
       const tx = Math.cos(ang) * ce * blen;
       const ty = Math.sin(ang) * ce * blen;
       const tz = oz + Math.sin(elev) * blen;
+      mainSegIdx.push(segments.length);
       segments.push({ x1: 0, y1: 0, z1: oz, x2: tx, y2: ty, z2: tz, wK: 0.42 });
       tips.push({ x: tx, y: ty, z: tz });
-      // 二级枝：沿主枝 55%~85% 处分叉，仰角更平，长为主枝一半
-      const t = 0.55 + _accentHash(id, 300 + i) * 0.30;
-      const sang = ang + (i & 1 ? 1 : -1) * (0.55 + _accentHash(id, 320 + i) * 0.5);
-      const selev = Math.max(0.15, elev - 0.35 - _accentHash(id, 340 + i) * 0.2);
-      const slen = blen * 0.5;
-      const bx = tx * t, by = ty * t, bz = oz + (tz - oz) * t;
-      segments.push({
-        x1: bx, y1: by, z1: bz,
-        x2: bx + Math.cos(sang) * Math.cos(selev) * slen,
-        y2: by + Math.sin(sang) * Math.cos(selev) * slen,
-        z2: bz + Math.sin(selev) * slen,
-        wK: 0.24,
-      });
-      tips.push({
-        x: segments[segments.length - 1].x2,
-        y: segments[segments.length - 1].y2,
-        z: segments[segments.length - 1].z2,
-      });
+      // 二级枝：subBranchPer 条（broad 1 / sparse 2），槽位 k 保持通道块连续不交叉
+      for (let s = 0; s < sp.subBranchPer; s++) {
+        const k = i * sp.subBranchPer + s;
+        const t = 0.55 + _accentHash(id, 300 + k) * 0.30;
+        const sang = ang + (k & 1 ? 1 : -1) * (0.55 + _accentHash(id, 320 + k) * 0.5);
+        const selev = Math.max(0.15, elev - sp.subDroop - _accentHash(id, 340 + k) * 0.2);
+        const slen = blen * sp.subLenK;
+        const bx = tx * t, by = ty * t, bz = oz + (tz - oz) * t;
+        segments.push({
+          x1: bx, y1: by, z1: bz,
+          x2: bx + Math.cos(sang) * Math.cos(selev) * slen,
+          y2: by + Math.sin(sang) * Math.cos(selev) * slen,
+          z2: bz + Math.sin(selev) * slen,
+          wK: 0.24,
+        });
+        tips.push({
+          x: segments[segments.length - 1].x2,
+          y: segments[segments.length - 1].y2,
+          z: segments[segments.length - 1].z2,
+        });
+      }
     }
-    // ★ v1.50.26 悬空叶簇修复：补位簇一律挂在真实枝条上。
-    // 旧版冠顶/补位簇用抽象球面包络定位（z 最高 trunkH+0.95×crownR），而枝端最高只到
-    // trunkH×hFrac+sin(elev)×blen，矮干树两者差可达 2~7 单位——满冠时被邻簇掩盖，
-    // 秋冬叶量下降后幸存的高位补位簇即悬空于裸枝之外（实测 id=22 簇距最近枝 7.16）。
-    // 冠顶簇：贴最高枝端内侧偏上，读作树冠顶点；补位簇：锚定主枝线段 55%~95% 参数位。
+    // ★ v1.50.26 悬空叶簇修复（TA-06 沿用）：补位簇一律挂在真实枝条上——
+    // 冠顶簇贴最高枝端内侧偏上；补位簇锚定主枝线段 55%~95% 参数位。禁抽象球面包络定位。
     let topTip = tips[0];
     for (let i = 1; i < tips.length; i++) {
       if (tips[i].z > topTip.z) topTip = tips[i];
@@ -183,7 +290,7 @@ window.AccentModel = window.AccentModel || (function () {
     while (tips.length < N) {
       const hA = _accentHash(id, 360 + tips.length);
       const hB = _accentHash(id, 380 + tips.length);
-      const seg = segments[(Math.floor(hA * P) % P) * 2]; // 锚定主枝线段
+      const seg = segments[mainSegIdx[Math.floor(hA * P) % P]]; // 锚定主枝线段
       const t = 0.55 + hB * 0.40;
       tips.push({
         x: seg.x2 * t + (hA - 0.5) * 0.9,
@@ -201,23 +308,128 @@ window.AccentModel = window.AccentModel || (function () {
         x: t.x + (h1 - 0.5) * 1.6,
         y: t.y + (h2 - 0.5) * 1.6,
         z: Math.max(1.2, t.z + (h1 - 0.5) * 1.2 + 0.4),
-        r: 2.1 + _accentHash(id, 460 + i) * 1.2,
+        r: sp.clusterRBase + _accentHash(id, 460 + i) * sp.clusterRVar,
         shed: _accentHash(id, 480 + i), // 稳定脱落次序：值小先落（§6.4）
         lite: _accentHash(id, 500 + i), // 个体色差通道（秋色簇间黄红先后，§6.3）
       });
     }
-    const branchTips = [];
-    for (let i = 0; i < segments.length; i += 2) {
-      branchTips.push({ x: segments[i].x2, y: segments[i].y2, z: segments[i].z2 });
-    }
-    attachCrownNormals(clusters);
-    return { trunkH: trunkH, crownR: crownR, segments: segments, branchTips: branchTips, clusters: clusters };
+    return _treeSilResult(sp, trunkH, segments, mainSegIdx, clusters);
   }
 
-  // ── Bush：基生多细茎（§6.4：灌木由根部发出多根细茎，不缩小乔木冒充）+ 叶簇 ──
-  function bushSkeleton(id, vSeed) {
-    const N = clusterCount('Bush');
-    const S = 4 + Math.floor(_accentHash(id, 310) * 3); // 茎 4~6
+  // conifer 锥形常绿（§3.2）：轮生 4~6 层 × 每层 3~5 短枝，层半径自下而上线性收缩至顶梢；
+  // 全部叶簇锚定轮生短枝端（禁抽象球面包络）。evergreen profile 叶量 ≥0.94 + fade 0.09 下
+  // accentClusterVisibility 恒 ≥0.27 ≥0.06 显示阈（无掉簇特例分支——禁在可见度函数加 kind 判断，
+  // 若实测掉簇优先调曲线）。倾干幅度按轮廓收敛（leanShearK 0.45，针叶树读感挺直）。
+  // 哈希通道（全新 800 段）：841 层数 / 842+l 层高 / 851+l 每层枝数 / 860+l×5+b 枝方位 / 890+l×5+b 枝长。
+  function _coniferSkeleton(id, vSeed, sp) {
+    const N = Math.max(8, Math.round(clusterCount('Tree') * sp.clusterFactor)); // ≈21（簇小而扁）
+    const trunkH = sp.trunkHBase + vSeed * sp.trunkHVar;
+    const L = sp.whorlLayersMin + Math.floor(_accentHash(id, 841) * (sp.whorlLayersMax - sp.whorlLayersMin + 1));
+    const perLayerCap = Math.max(2, Math.floor((N - 1) / L)); // 顶梢簇占 1 名额；簇数不超 N
+    const segments = [];
+    const tips = [];
+    for (let l = 0; l < L; l++) {
+      const hZ = _accentHash(id, 842 + l);
+      const B = Math.min(perLayerCap,
+        sp.whorlBranchesMin + Math.floor(_accentHash(id, 851 + l) * (sp.whorlBranchesMax - sp.whorlBranchesMin + 1)));
+      const oz = trunkH * Math.min(0.92, 0.30 + (l / Math.max(1, L - 1)) * 0.60 + (hZ - 0.5) * 0.06);
+      const layerR = sp.crownR * (1 - 0.70 * (l / Math.max(1, L - 1))); // 底层最宽 → 顶梢 30%
+      for (let b = 0; b < B; b++) {
+        const hA = _accentHash(id, 860 + l * 5 + b);
+        const hB = _accentHash(id, 890 + l * 5 + b);
+        const ang = (b / B) * Math.PI * 2 + (hA - 0.5) * 0.5;
+        const elev = sp.elevMin + hB * (sp.elevMax - sp.elevMin); // 近水平略上扬（轮生枝读感）
+        const blen = layerR * (0.88 + hA * 0.18);
+        const tx = Math.cos(ang) * Math.cos(elev) * blen;
+        const ty = Math.sin(ang) * Math.cos(elev) * blen;
+        const tz = oz + Math.sin(elev) * blen;
+        segments.push({ x1: 0, y1: 0, z1: oz, x2: tx, y2: ty, z2: tz, wK: 0.34 });
+        tips.push({ x: tx, y: ty, z: tz });
+      }
+    }
+    // 顶梢簇（干顶，塔形收尖）；簇序自下而上，簇数恒 ≤ N
+    tips.push({ x: 0, y: 0, z: trunkH + 0.4 });
+    const clusters = [];
+    for (let i = 0; i < tips.length; i++) {
+      const t = tips[i];
+      const h1 = _accentHash(id, 420 + i);
+      const h2 = _accentHash(id, 440 + i);
+      clusters.push({
+        x: t.x + (h1 - 0.5) * 0.8,
+        y: t.y + (h2 - 0.5) * 0.8,
+        z: Math.max(1.2, t.z + (h1 - 0.5) * 0.6 + 0.2),
+        r: sp.clusterRBase + _accentHash(id, 460 + i) * sp.clusterRVar,
+        shed: _accentHash(id, 480 + i),
+        lite: _accentHash(id, 500 + i),
+      });
+    }
+    return _treeSilResult(sp, trunkH, segments, null, clusters);
+  }
+
+  function treeSkeleton(id, vSeed, silhouette) {
+    const sp = _treeSilParams(silhouette);
+    sp._name = silhouette || 'broad';
+    if (sp._name === 'conifer') return _coniferSkeleton(id, vSeed, sp);
+    return _broadSparseSkeleton(id, vSeed, sp);
+  }
+
+  // ── Bush：★ TA-06 三变体（§3.3）：multiStem 落叶多茎 / flowering 花灌木 / lowEvergreen 低矮常绿 ──
+  // 基生多细茎（§6.4：灌木由根部发出多根细茎，不缩小乔木冒充；07 号 §6.4 红线）+ 叶簇。
+  // 三变体共用同一结构，只改茎数/茎高/外倾/簇参数/扁压（crownSquash 驱动绘制层簇压缩）。
+  // crownR 由模型统一输出（multiStem = 5.5 + 1.2×vSeed，与旧绘制口径一致——修正历史漂移，§3.8）；
+  // trunkH = heightBase + heightVar×0.5（multiStem 复现旧值 4.2，驱动贴地影长）。
+  function _bushVariantParams(variant) {
+    const t = (window.RENDER_CONFIG || {}).accentBushVariants || {};
+    const p = t[variant] || t.multiStem || {};
+    return {
+      stemMin: Math.max(2, Math.round(cfgNum(p.stemMin, 4))),
+      stemMax: Math.max(2, Math.round(cfgNum(p.stemMax, 6))),
+      heightBase: cfgNum(p.heightBase, 3.4),
+      heightVar: cfgNum(p.heightVar, 1.6),
+      outKMin: cfgNum(p.outKMin, 0.38),
+      outKMax: cfgNum(p.outKMax, 0.68),
+      clusterFactor: cfgNum(p.clusterFactor, 1.0),
+      clusterRBase: cfgNum(p.clusterRBase, 1.5),
+      clusterRVar: cfgNum(p.clusterRVar, 0.9),
+      crownRBase: cfgNum(p.crownRBase, 5.5),
+      crownRVar: cfgNum(p.crownRVar, 1.2),
+      crownSquash: cfgNum(p.crownSquash, 0.72),
+      footprintR: cfgNum(p.footprintR, 8),
+    };
+  }
+
+  // ★ TA-06-7 花位（§3.4）：构建期固定点——在**可见簇外围**预生成（宿主簇序 + 方位角 +
+  // 外围距离 + 花色板槽位全部由 _accentHash(id, 810+i×3…) 派生）。花色低饱和三色板逐点选定。
+  // 花量（flowerAmount）只在绘制层决定可见点数与 alpha，**绝不参与花位重抽**
+  // （对齐 S4-04「库存不参与几何」的同一纪律）；花朵属几何 → 入骨架缓存，花量属季相 → 不入。
+  function _bushFlowers(id, clusters) {
+    const cfg = window.RENDER_CONFIG || {};
+    const maxDots = Math.max(1, Math.round(cfgNum(cfg.accentFlowerDotsMax, 9)));
+    const nCl = clusters.length;
+    if (!nCl) return null;
+    const flowers = [];
+    for (let i = 0; i < maxDots; i++) {
+      const c = clusters[i % nCl];
+      const hA = _accentHash(id, 810 + i * 3);      // 方位角
+      const hB = _accentHash(id, 811 + i * 3);      // 外围距离（0.85~1.30 × 宿主簇半径）
+      const hC = _accentHash(id, 812 + i * 3);      // 花色板槽位（0/1/2）
+      const a = hA * Math.PI * 2;
+      const d = c.r * (0.85 + hB * 0.45);
+      flowers.push({
+        x: c.x + Math.cos(a) * d,
+        y: c.y + Math.sin(a) * d,
+        z: Math.max(0.5, c.z + (hB - 0.5) * c.r * 0.6),
+        ci: i % nCl,                                 // 宿主簇（随宿主簇显隐/法线受光）
+        hue: Math.floor(hC * 3) % 3,
+      });
+    }
+    return flowers;
+  }
+
+  function bushSkeleton(id, vSeed, variant) {
+    const vp = _bushVariantParams(variant);
+    const N = Math.max(4, Math.round(clusterCount('Bush') * vp.clusterFactor));
+    const S = vp.stemMin + Math.floor(_accentHash(id, 310) * (vp.stemMax - vp.stemMin + 1));
     const segments = [];
     const tips = [];
     for (let i = 0; i < S; i++) {
@@ -225,14 +437,14 @@ window.AccentModel = window.AccentModel || (function () {
       const h2 = _accentHash(id, 214 + i);
       const h3 = _accentHash(id, 216 + i);
       const ang = (i / S) * Math.PI * 2 + (h1 - 0.5) * 1.3; // 方位角
-      const hgt = 3.4 + h2 * 1.6;      // 茎高（世界单位，整体 ≈ 旧灌木体量）
-      const outK = 0.38 + h3 * 0.30;   // 顶端水平外倾比例
+      const hgt = vp.heightBase + h2 * vp.heightVar;        // 茎高（世界单位，变体区间）
+      const outK = vp.outKMin + h3 * (vp.outKMax - vp.outKMin); // 顶端水平外倾比例
       const tx = Math.cos(ang) * hgt * outK;
       const ty = Math.sin(ang) * hgt * outK;
       segments.push({ x1: 0, y1: 0, z1: 0, x2: tx, y2: ty, z2: hgt, wK: 1 });
       tips.push({ x: tx, y: ty, z: hgt });
     }
-    // 茎中段补位簇（45%~75% 高度）
+    // 茎中段补位簇（45%~75% 高度，锚定真实茎段）
     let k = 0;
     while (tips.length < N) {
       const st = segments[k % S];
@@ -250,13 +462,21 @@ window.AccentModel = window.AccentModel || (function () {
         x: t.x + (h1 - 0.5) * 1.0,
         y: t.y + (h2 - 0.5) * 1.0,
         z: Math.max(0.8, t.z + (h1 - 0.5) * 0.8 + 0.3),
-        r: 1.5 + _accentHash(id, 460 + i) * 0.9,
+        r: vp.clusterRBase + _accentHash(id, 460 + i) * vp.clusterRVar,
         shed: _accentHash(id, 480 + i),
         lite: _accentHash(id, 500 + i),
       });
     }
     attachCrownNormals(clusters);
-    return { trunkH: 4.2, crownR: 6.5, segments: segments, branchTips: [], clusters: clusters };
+    return {
+      silhouette: variant || 'multiStem',
+      trunkH: vp.heightBase + vp.heightVar * 0.5, // multiStem 复现旧 4.2（贴地影长驱动）
+      crownR: vp.crownRBase + vSeed * vp.crownRVar, // 唯一几何真相源（修正与绘制口径的历史漂移）
+      crownSquash: vp.crownSquash, footprintR: vp.footprintR, leanShearK: 1.0,
+      segments: segments, branchTips: [], clusters: clusters,
+      // 花灌木专属：构建期固定花位（其余变体恒 null，绘制层零花点）
+      flowers: (variant === 'flowering') ? _bushFlowers(id, clusters) : null,
+    };
   }
 
   // ── RockCluster（D-B1-6，06 号 §5.5）：anchor 前端派生 2–5 颗子石 ──
@@ -351,14 +571,21 @@ window.AccentModel = window.AccentModel || (function () {
     return { blades: blades, isReed: isReed };
   }
 
-  // 锚点上方最大延伸（世界单位，未乘 zoom）——TA-07 包围体剔除的预留字段。
-  // 仅作信息登记，当前视口剔除仍走 render_accents.js 的既有余量公式。
-  function extentOf(kind, vSeed) {
-    if (kind === 'Tree') return (6.5 + vSeed * 2.5) + 8.5 * 1.3; // trunkH + 冠顶余量
-    if (kind === 'Bush') return 8;
+  // 锚点上方最大延伸（世界单位，未乘 zoom）——★ TA-06-3 起对 Tree/Bush 由**骨架实际几何**
+  // 求值（锥形常绿更高更窄，旧 kind+vSeed 估算会低估）；其余种类保留旧常量。
+  // TA-07 包围体剔除的预留字段：仅作信息登记，当前视口剔除仍走 render_accents.js 的既有余量公式。
+  function extentOf(kind, vSeed, sk) {
+    if (sk) {
+      let e = sk.trunkH || 0;
+      const cl = sk.clusters;
+      if (cl) for (let i = 0; i < cl.length; i++) { const t = cl[i].z + cl[i].r; if (t > e) e = t; }
+      const sg = sk.segments;
+      if (sg) for (let i = 0; i < sg.length; i++) { if (sg[i].z2 > e) e = sg[i].z2; }
+      return e * 1.06 + 0.5; // 冠缘余量
+    }
     if (kind === 'Boulder') return 7;
     if (kind === 'RockCluster') return 10; // 主石半径×1.2 变径上限 + 散布
-    if (kind === 'GrassTuft') return 7;    // ★ TA-11-6：5→7 覆盖芦草株高（6.0）+ 芦花穗（+1.5）高位
+    if (kind === 'GrassTuft') return 7;
     return 8;
   }
 
@@ -379,17 +606,22 @@ window.AccentModel = window.AccentModel || (function () {
     if (m !== undefined) return m;
     const id = seed || 0;
     const vSeed = vSeedOf(id);
+    // ★ TA-06-2 物种派生：(kind, id) 纯函数；非 Tree/Bush 返回 undefined（零影响）。
+    // profile 为季相单一入口（render_accents / render_shadows / render_landscapes 直接消费）。
+    const species = speciesOf(kind, id);
+    const sk = kind === 'Tree' ? treeSkeleton(id, vSeed, species ? species.silhouette : 'broad')
+      : kind === 'Bush' ? bushSkeleton(id, vSeed, species ? species.silhouette : 'multiStem')
+      : kind === 'RockCluster' ? rockClusterSkeleton(id, vSeed)
+      : kind === 'GrassTuft' ? grassTuftSkeleton(id, vSeed)
+      : null;
     m = {
       id: id,
       kind: kind || '',
       vSeed: vSeed,
-      evergreen: (kind === 'Tree' || kind === 'Bush') ? evergreenOf(id) : false,
-      skeleton: kind === 'Tree' ? treeSkeleton(id, vSeed)
-        : kind === 'Bush' ? bushSkeleton(id, vSeed)
-        : kind === 'RockCluster' ? rockClusterSkeleton(id, vSeed)
-        : kind === 'GrassTuft' ? grassTuftSkeleton(id, vSeed)
-        : null,
-      extent: extentOf(kind, vSeed),
+      species: species,                                  // { silhouette, profile } / undefined
+      profile: species ? species.profile : undefined,    // ★ TA-06-2 profile 单一入口
+      skeleton: sk,
+      extent: extentOf(kind, vSeed, sk),
     };
     if (_cache.size >= _CACHE_MAX) _cache.clear();
     _cache.set(fullKey, m);
@@ -407,6 +639,7 @@ window.AccentModel = window.AccentModel || (function () {
     resetCache: resetCache,
     shearNormal: shearNormal, // TA-04-2 倾干剪切法线变换（逆转置）——返回新对象，兼容外部调用
     shearNormalInto: shearNormalInto, // ★ TA-11-6 零 GC 变体（写入调用方复用 out），热路径消费
+    speciesOf: speciesOf, // ★ TA-06-2 物种派生（(kind,id) 纯函数 → { silhouette, profile }）
     hash: _accentHash, // 对外别名（避免消费方绕过本文件直接依赖全局函数名）
   };
 })();

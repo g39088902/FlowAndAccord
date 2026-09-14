@@ -494,7 +494,7 @@ function drawWorldEntities() {
       }
       const tipX = accent.x + sxw * slen * hWorld;
       const tipY = accent.y + syw * slen * hWorld;
-      const fp = (kind === 'Tree' ? 10.5 : 8) * accent.scale; // 冠幅足迹（世界单位，含变径余量）
+      const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * accent.scale; // ★ TA-06-8 冠幅足迹读模型（世界单位）
       const dBase = _decalDepth(accent.x, accent.y, fp, cosZ, sinZ, cosX, sinX);
       const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
       let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;

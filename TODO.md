@@ -41,6 +41,10 @@
     - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测）。
     - 聚焦树木与植被群落在 Canvas 视口下的高质量层次打样。
 
+- [ ] **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**
+    - 详见 [TA-06 实施方案](TA-06-TODO.md) 与 [07 号文 §6.3/§11.4](docs/plan/tech/07-terrain-art.md)；TA-06 现状 ◐ v1.50.64（实现与静态/数值验证已落地：物种派生 + 三乔木轮廓 + 三灌木变体 + 花朵图元 + 冠幅单一来源联动；**待补**：Chrome 视觉·受光·四季矩阵验收与证据包、性能 A/B、景观共用通道抽查、LOAD 链路——建议与 TA-05 LOAD 补测合并为同一次 Chrome 存档会话）。
+    - 由 `accent.id` 稳定哈希派生 6 物种，零新增持久化字段/FABS section/模拟参数。
+
 - [ ] **TA-10 台地聚落表现层打样**
     - 详见 [07 号文 §8](docs/plan/tech/07-terrain-art.md)
     - 对接 TB-02 台地聚落内核，实现台地边缘陡壁断崖质感、坡顶平台聚落景观与双入口缓坡路面表达。

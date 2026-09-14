@@ -42,8 +42,15 @@
 //
 // 职责分工（§6.7）：
 // - accent-season.js：季相与物种曲线（window.SimTreeTint 唯一生产者）
-// - accent-model.js：稳定形态派生 + 个体模型缓存（骨架 / 叶簇次序 / extent）
-// - 本文件：模型投影、色板与色差、细节分级、视口剔除、绘制入口
+// - accent-model.js：稳定形态派生（★ TA-06 三乔木轮廓 + 三灌木变体 + 花位）+ 个体模型缓存
+// - 本文件：模型投影、色板与色差、细节分级、视口剔除、Tree/Boulder/RockCluster 绘制入口
+// - ★ render_bush.js（TA-06-5 自本文件迁出）：灌木（Bush）绘制与花朵图元；复用本文件的
+//   模块级共享刮擦与受光工具，必须晚于本文件加载（index.html 已按序注册）
+//
+// ★ TA-06（07 号 §6.3）三乔木轮廓接入：drawAccentTree 按 model.species.silhouette 落笔，
+//   但**画序不分支**——阔冠（宽扁冠）/疏冠（簇少而分散，冠内自然出空隙）/锥形常绿（轮生层
+//   枝序 + 扁椭簇 + 收敛倾干）的差异全部来自 accent-model.js 输出的骨架几何；冠幅/干高/
+//   扁压/倾干幅度一律读模型（§3.8 单一几何真相源，连带修正旧三处硬编码漂移）。
 //
 // ★ D-B1-6（06 号文 §5.5 / §5.7 Canvas 行）：新增 RockCluster / GrassTuft 两分支——
 // RockCluster 由 anchor 按 accent.id 前端派生 2–5 颗子石（不建实体、不改碰撞/路面）；
@@ -246,10 +253,13 @@ function drawAccentEntity(accent) {
   if (sx < -xMargin || sx > w + xMargin || sy < -upMargin || sy > h + 20) return;
 
   // Tree/Bush/GrassTuft 共用连续季相（TA-02/D-B1-6；GrassTuft 同 Tree 逻辑，颜色按当前
-  // 季节派生，不读存档 tint）；常绿变体走 evergreen profile（叶量全年 ≥94%）
+  // 季节派生，不读存档 tint）。★ TA-06-2：profile 走**单一入口 model.profile**
+  // （speciesOf 由 (kind,id) 纯函数派生：阔冠/疏冠 → deciduousTree、锥形常绿 → evergreen、
+  // 落叶多茎 → deciduousBush、花灌木 → floweringBush、低矮常绿 → evergreen；非 Tree/Bush
+  // 为 undefined，GrassTuft 仍回退 deciduousTree——非植被零影响）。
   const model = window.AccentModel.get(accent);
   const season = (kind === 'Boulder' || kind === 'RockCluster') ? null
-    : window.SimTreeTint.sample(accent, sim, model.evergreen ? 'evergreen' : undefined);
+    : window.SimTreeTint.sample(accent, sim, model.profile);
 
   const scaled = accent.scale * scale;
   if (kind === 'Tree') {
@@ -283,14 +293,18 @@ function accentClusterVisibility(leaf, shed, fade) {
   return t <= 0 ? 0 : (t >= 1 ? 1 : t);
 }
 
-// Tree：局部三维骨架乔木 —— 锥形倾干 + 主枝/二级枝 + 枝端椭球叶簇 + 贴地投影
+// Tree：局部三维骨架乔木 —— 锥形倾干 + 主枝/二级枝 + 枝端椭球叶簇（贴地投影归 render_shadows.js）
 // scaled = accent.scale(0.7~1.4) × camera.zoom；season 为 TA-02 连续季相输出。
+// ★ TA-06-6 三轮廓接入：冠幅/干高/扁压/倾干幅度全部读模型（sk.crownR / sk.trunkH /
+//   sk.crownSquash / sk.leanShearK，§3.8 单一几何真相源）；锥形常绿走轮生层枝序 + 扁椭簇 +
+//   收敛倾干（针叶树挺直读感）；疏冠簇少而分散（靠簇数与半径自然出冠内空隙），两遍式树冠画序
+//   对所有轮廓一致——绘制层不按轮廓改画序，差异全部来自模型几何。
 // ★ TA-11-6 零 GC：投影走 projTo 复用点（top=_ptA / 枝 a=_ptB / 枝 b=_ptC / 簇·芽=_ptD），
 // 叶簇收集走 _crownScratchPool 冠簇池，簇间排序走稳定性插入排序（原 items.sort 闭包移除）。
 function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
   const sk = model.skeleton;
-  const vSeed = model.vSeed;
-  const crownR = 8.5 * scaled;
+  const squash = sk.crownSquash || 0.78;   // ★ TA-06：冠簇扁压系数（锥形常绿更扁）
+  const crownR = (sk.crownR || 8.5) * scaled;
   const trunkH = sk.trunkH * scaled;
   const leaf = season.leafDensity;
   const brown = season.brownness;
@@ -301,8 +315,8 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   // 贴地投影已迁出为地面图元（★ TA-04-6：入队/分发归 render_depth_queue.js，绘制归
   // render_shadows.js::drawAccentShadowGround——实高驱动影长 + 叶量调制，**严禁**在实体内恢复旧阴影）
 
-  // 倾干剪切（世界 x，随个体 rotation 稳定；模型只存直立骨架）
-  const leanShear = Math.cos(accent.rotation || 0) * 0.22;
+  // 倾干剪切（世界 x，随个体 rotation 稳定；★ TA-06：幅度按轮廓收敛，锥形常绿挺直）
+  const leanShear = Math.cos(accent.rotation || 0) * 0.22 * (sk.leanShearK || 1);
 
   // 局部三维 → 屏幕：与锚点同一套相机变换（★ TA-11-6 写入复用点，零分配）；
   // d 越大越靠近视点（同深度队列公式）
@@ -452,7 +466,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const it = _crownScratchPool[i];
     const sw = lw + it.rr * 0.16;
     ctx.moveTo(it.px + it.rr + sw, it.py);
-    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * 0.78 + sw, 0, 0, Math.PI * 2);
+    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * squash + sw, 0, 0, Math.PI * 2);
   }
   ctx.fill();
 
@@ -470,7 +484,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const wn = window.AccentModel.shearNormalInto(c.nx, c.ny, c.nz, leanShear, _nrm);
     ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, wn.x, wn.y, wn.z, kZ);
     ctx.beginPath();
-    ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.78, 0, 0, Math.PI * 2);
+    ctx.ellipse(it.px, it.py, it.rr, it.rr * squash, 0, 0, Math.PI * 2);
     ctx.fill();
     // 近景簇亮部：★ TA-04-4 世界光向投影驱动（v1.50.27 屏幕固定白斑移除）——亮部中心沿
     // 屏幕光向偏移（光近视线经 sunScreenDirFull 平滑回冠心），亮色走受光管线随簇法线
@@ -570,134 +584,6 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
 function drawAccentBoulder(sx, sy, scaled, rot, cosZ, sinZ, cosX, sinX) {
   drawStoneBody(sx, sy, 6 * scaled, rot, 7, _BOULDER_SHAPE, 0.5,
     cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled));
-}
-
-// Bush：局部三维细茎灌木 —— 基生多茎 + 茎端椭球叶簇 + 微投影（§6.4：不缩小乔木冒充灌木）
-// ★ TA-11-6 零 GC：投影走 projTo 复用点（茎 a=_ptB / b=_ptC / 控制点=_ptD / 簇=_ptA），
-// 叶簇收集走 _crownScratchPool 冠簇池 + 稳定性插入排序。
-function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX) {
-  const sk = model.skeleton;
-  const vSeed = model.vSeed;
-  const r = (5.5 + vSeed * 1.2) * scaled;
-  const leaf = season.leafDensity;
-  const brown = season.brownness;
-  const lv = accentDetailLevels();
-  const detailNear = r >= lv.near;
-
-  // 贴地微投影已随 TA-04-6 迁往 render_shadows.js::drawAccentShadowGround（同 Tree）
-
-  // 局部三维 → 屏幕（灌木无倾干；★ TA-11-6 写入复用点，零分配）
-  function projTo(dx, dy, dz, out) {
-    const rx = dx * cosZ - dy * sinZ;
-    const ry = dx * sinZ + dy * cosZ;
-    out.x = sx + rx * scaled;
-    out.y = sy + (ry * cosX - dz * sinX) * scaled;
-    out.d = ry * sinX + dz * cosX;
-  }
-
-  // 细茎（全年保留；冬季枯枝为主）
-  // ★ TA-04-3：茎走与 Tree 枝条同一受光管线（灌木无倾干，剪切 = 0）——基色按「朝屏法线」
-  //   受光，茎宽可辨时沿迎光侧补细高光；转相机/光向明暗随动。
-  if (r >= lv.mid) {
-    const bb = barkBandCfg();
-    const wvx = sinZ * sinX, wvy = cosZ * sinX, wvz = cosX; // 世界视向（灌木无剪切，模型=世界）
-    ctx.lineCap = 'round';
-    for (let i = 0; i < sk.segments.length; i++) {
-      const seg = sk.segments[i];
-      const a = _ptB, b = _ptC, c = _ptD;
-      projTo(seg.x1, seg.y1, seg.z1, a);
-      projTo(seg.x2, seg.y2, seg.z2, b);
-      // 控制点取 40% 高度处、水平位置取 55% 外倾 —— 茎先直立后外弯
-      projTo(seg.x2 * 0.55, seg.y2 * 0.55, seg.z2 * 0.40, c);
-      const lwSeg = Math.max(0.5, 0.9 * scaled);
-      const segLen = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1, seg.z2 - seg.z1) || 1;
-      cylinderShade((seg.x2 - seg.x1) / segLen, (seg.y2 - seg.y1) / segLen, (seg.z2 - seg.z1) / segLen, 0,
-        _ld.x, _ld.y, _ld.z, wvx, wvy, wvz, cosZ, sinZ, cosX, sinX);
-      ctx.strokeStyle = accentLitFill(104, 78, 54, _cylFront.x, _cylFront.y, _cylFront.z, 1);
-      ctx.lineWidth = lwSeg;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.quadraticCurveTo(c.x, c.y, b.x, b.y);
-      ctx.stroke();
-      // 迎光侧细高光（茎宽可辨且屏幕迎光方向非退化才画）
-      if (lwSeg >= bb.minPx && _cylScr.ok) {
-        const o = lwSeg * bb.offK;
-        ctx.strokeStyle = accentLitFill(104, 78, 54, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
-        ctx.lineWidth = lwSeg * bb.wK;
-        ctx.beginPath();
-        ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
-        ctx.quadraticCurveTo(c.x + _cylScr.x * o, c.y + _cylScr.y * o,
-          b.x + _cylScr.x * o, b.y + _cylScr.y * o);
-        ctx.stroke();
-      }
-    }
-    ctx.lineCap = 'butt';
-  }
-
-  // 叶簇：同 Tree 的脱落/色差/排序规则，扁压 squash 让簇丛贴地
-  // ★ v1.50.27 与 Tree 同步改两遍式剪影 + 体积明暗；★ TA-11-6 零 GC 冠簇池收集。
-  const lw = Math.max(0.4, 0.45 * scaled);
-  const fade = 0.09;
-  const jitterAmp = 6 + 26 * brown;
-  let nItems = 0;
-  for (let i = 0; i < sk.clusters.length; i++) {
-    const c = sk.clusters[i];
-    const v = accentClusterVisibility(leaf, c.shed, fade);
-    if (v < 0.06) continue;
-    const p = _ptA;
-    projTo(c.x, c.y, c.z, p);
-    const rr = c.r * scaled * v;
-    if (rr < 0.5) continue;
-    const it = _crownScratch(nItems++);
-    it.c = c; it.px = p.x; it.py = p.y; it.pd = p.d; it.rr = rr; it.v = v;
-  }
-  _sortScratch(_crownScratchPool, nItems, 'pd');
-
-  // 冠内体积/AO 分档基准（同 Tree：整副骨架求范围，秋季幸存簇明暗不随可见集跳变；
-  // ★ TA-04-2 起投影深度 tD 不参与明暗，只留与视角无关的 tZ 档）
-  let zLo = Infinity, zHi = -Infinity;
-  for (let i = 0; i < sk.clusters.length; i++) {
-    const c = sk.clusters[i];
-    if (c.z < zLo) zLo = c.z;
-    if (c.z > zHi) zHi = c.z;
-  }
-  const zSpan = Math.max(0.001, zHi - zLo);
-
-  // Pass A：统一冠影色剪影（重叠即并集）
-  ctx.fillStyle = 'rgb(' +
-    Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4)) + ',' +
-    Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
-    Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
-  ctx.beginPath();
-  for (let i = 0; i < nItems; i++) {
-    const it = _crownScratchPool[i];
-    const sw = lw + it.rr * 0.16;
-    ctx.moveTo(it.px + it.rr + sw, it.py);
-    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * 0.72 + sw, 0, 0, Math.PI * 2);
-  }
-  ctx.fill();
-
-  // Pass B：簇本体 + 冠内体积/AO 分档 × 世界光向受光（★ TA-04-2，同 Tree 管线；灌木无倾干）
-  const cc = crownLitCfg();
-  for (let i = 0; i < nItems; i++) {
-    const it = _crownScratchPool[i];
-    const c = it.c;
-    const j = (c.lite - 0.5) * 2 * jitterAmp;
-    const tZ = (c.z - zLo) / zSpan;
-    const kZ = 0.80 + 0.20 * tZ;
-    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, c.nx, c.ny, c.nz, kZ);
-    ctx.beginPath();
-    ctx.ellipse(it.px, it.py, it.rr, it.rr * 0.72, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // 近景簇亮部：★ TA-04-4 世界光向投影驱动（同 Tree；灌木无倾干，簇法线即世界法线）
-    if (detailNear && it.rr > cc.minPx) {
-      ctx.fillStyle = accentLitFill(255, 252, 218, c.nx, c.ny, c.nz, 1, cc.alpha * it.v);
-      ctx.beginPath();
-      ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
-        it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 }
 
 // RockCluster：anchor 派生 2–5 颗子石（D-B1-6，06 号 §5.5：不为子石建实体、不改碰撞/路面）。

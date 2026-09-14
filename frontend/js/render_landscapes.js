@@ -127,7 +127,7 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
       const hWorld = skel.trunkH * child.scale;
       const tipX = child.x + _lsShDir.x * _lsShDir.len * hWorld;
       const tipY = child.y + _lsShDir.y * _lsShDir.len * hWorld;
-      const fp = (kind === 'Tree' ? 10.5 : 8) * child.scale;
+      const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * child.scale; // ★ TA-06-8 冠幅足迹读模型
       const dBase = _decalDepth(child.x, child.y, fp, cosZ, sinZ, cosX, sinX);
       const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
       let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;
@@ -164,18 +164,20 @@ function drawLandscapeChild(child) {
 
   const view = landscapeChildView(child);
   const scaled = child.scale * scale;
+  // ★ TA-06-2：profile 走模型单一入口（树木三轮廓 / 灌木三变体自动作用于景观子图元；
+  // GrassTuft 为 undefined 回退 deciduousTree，芦草穗量不受 floweringBush 曲线影响）。
   if (kind === 'Tree') {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentTree(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Boulder') {
     drawAccentBoulder(sx, sy, scaled, child.rot, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Bush') {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentBush(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'RockCluster') {
     drawAccentRockCluster(view, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX);
   } else {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentGrassTuft(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX); // render_grass.js
   }
 }

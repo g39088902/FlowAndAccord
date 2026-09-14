@@ -15,6 +15,10 @@
 // 零 GC（TA-11-6 纪律）：参数读取写模块级复用对象，阴影偏移走 render_accents.js::_shadowOffset
 // （out 参数消费）；GrassTuft 贴地弱投影与 RockCluster 微接触阴影不在本文件（各自原文件保留）。
 //
+// ★ TA-06-8 冠幅/实高单一来源：LOD 冠屏半径与冠影宽度改读模型 skel.crownR（不再按 kind 硬编码
+//   8.5 / 5.5+vSeed×1.2），profile 走 model.profile 单一入口——变体切换后阴影与实体冠幅始终一致
+//   （锥形常绿窄长影 / 阔冠宽影 / 低矮常绿贴地弱影），影长仍 = skel.trunkH × accent.scale。
+//
 // 依赖全局: ctx, camera, sim, w, h, MAP_Z_LIFT（render_depth_queue.js）、lightShadowOffset
 //   （render_world.js）、_shadowOffset（render_accents.js 共享刮擦）、window.AccentModel、
 //   window.SimTreeTint、window.RENDER_CONFIG。
@@ -45,7 +49,9 @@ function drawAccentShadowFor(accent, model) {
   const kind = accent.kind;
   const skel = model.skeleton;
   if (!skel) return;
-  const season = window.SimTreeTint.sample(accent, sim, model.evergreen ? 'evergreen' : undefined);
+  // ★ TA-06-8：profile 与冠幅均读模型（profile 单一入口；冠幅为唯一几何真相源）——
+  // 锥形常绿窄冠 → 窄长影、阔冠 → 宽影、低矮常绿 → 贴地弱影，与实体冠幅天然一致。
+  const season = window.SimTreeTint.sample(accent, sim, model.profile);
   const leaf = season.leafDensity;
   const vSeed = model.vSeed;
   const scale = camera.zoom;
@@ -59,8 +65,8 @@ function drawAccentShadowFor(accent, model) {
   const sx = w / 2 + camera.panX + rx * scale;
   const sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
 
-  // LOD：冠屏半径过小整组省略（远景亚像素噪声）
-  const crownR = (kind === 'Tree' ? 8.5 : (5.5 + vSeed * 1.2)) * accent.scale * scale;
+  // LOD：冠屏半径过小整组省略（远景亚像素噪声）；冠幅 = 模型冠半径 × accent.scale × zoom
+  const crownR = (skel.crownR || (kind === 'Tree' ? 8.5 : 6.5)) * accent.scale * scale;
   const cfg = accentShadowCfg();
   if (crownR < cfg.minPx) return;
 

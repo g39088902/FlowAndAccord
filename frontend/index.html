@@ -26,7 +26,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.62</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.64</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1429,6 +1429,9 @@
   <script src="js/landscape-mask.js"></script>
   <script src="js/render_terrain.js"></script>
   <script src="js/render_accents.js"></script>
+  <!-- ★ TA-06-5 灌木绘制层（drawAccentBush + 花朵图元；复用 render_accents 共享刮擦/受光工具，
+       必须晚于 render_accents.js、早于 render_landscapes.js（其分派 drawAccentBush）） -->
+  <script src="js/render_bush.js"></script>
   <script src="js/render_grass.js"></script>
   <!-- ★ TA-04-6 装饰贴地投影绘制层（树/灌木地面图元阴影；复用 render_accents 共享工具） -->
   <script src="js/render_shadows.js"></script>

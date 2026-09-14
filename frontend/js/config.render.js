@@ -69,19 +69,61 @@ window.RENDER_CONFIG = {
       [0.960, 0.95, [66, 104, 66], 0.35, 0, 0, 0],
     ],
   },
-  // 花灌木复用落叶灌木叶历，只覆写开花量；物种分配与花朵绘制留给 TA-06/03。
+  // 花灌木复用落叶灌木叶历，只覆写开花量（speciesOf 派生 flowering 变体时消费）。
   accentFlowerCycle: [[0.00, 1], [0.08, 0.55], [0.16, 0], [0.88, 0], [0.96, 0.65]],
-  treeTintYellowBand: 0.32,   // tint() 兼容输出，正式绘制不再量化为三档
-  treeTintRedBand: 0.72,
 
-  // —— 局部三维植被骨架（TA-03，v1.50.25；补位簇夹紧枝端修复 v1.50.26；见 §6.2/6.4）——
+  // —— ★ TA-06 植被物种变体（三乔木轮廓 + 三灌木变体 + 花朵图元；07 号 §6.3/§10.2）——
+  // ★ 本组为几何输入，调值必须同步 bump accentModelStyleVersion，否则旧模型缓存不会重建（§10.2）。
+  accentModelStyleVersion: 5, // 骨架模型风格版本：调值即整体重建模型缓存（TA-06 三乔木/三灌木骨架形态变更 4→5）
+  accentSpeciesWeights: {
+    // 累积权重表（speciesOf 单 u 值查表分配；乔木常绿占比维持 0.24 与旧 accentEvergreenChance 一致，冬季观感不突变）
+    tree: { broad: 0.42, sparse: 0.34, conifer: 0.24 },
+    // 灌木常绿 0.20 ≈ 现状 0.24 的灌木侧份额
+    bush: { multiStem: 0.56, flowering: 0.24, lowEvergreen: 0.20 },
+  },
+  // 三乔木轮廓参数（accent-model.js::treeSkeleton 消费；世界单位，未乘 accent.scale/zoom）。
+  // broad 阔冠落叶（宽扁外展）/ sparse 疏冠落叶（枝形清晰、冠内空隙大）/ conifer 锥形常绿（窄塔轮生层）。
+  accentTreeSilhouettes: {
+    broad:   { trunkHBase: 5.6, trunkHVar: 1.6, crownR: 10.5, branchMin: 6, branchMax: 7, subBranchPer: 1,
+               subLenK: 0.50, subDroop: 0.35, clusterFactor: 1.15, clusterRBase: 2.3, clusterRVar: 1.3,
+               elevMin: 0.30, elevMax: 0.75, crownSquash: 0.78, footprintR: 13, leanShearK: 1.0 },
+    sparse:  { trunkHBase: 7.2, trunkHVar: 2.4, crownR: 8.8, branchMin: 4, branchMax: 5, subBranchPer: 2,
+               subLenK: 0.62, subDroop: 0.18, clusterFactor: 0.70, clusterRBase: 1.8, clusterRVar: 1.0,
+               elevMin: 0.55, elevMax: 1.05, crownSquash: 0.78, footprintR: 11, leanShearK: 1.0 },
+    conifer: { trunkHBase: 8.5, trunkHVar: 2.5, crownR: 4.8, branchMin: 0, branchMax: 0, subBranchPer: 0,
+               clusterFactor: 1.30, clusterRBase: 1.3, clusterRVar: 0.7, elevMin: 0.12, elevMax: 0.42,
+               whorlLayersMin: 4, whorlLayersMax: 6, whorlBranchesMin: 3, whorlBranchesMax: 5,
+               crownSquash: 0.62, footprintR: 6, leanShearK: 0.45 }, // 倾干收敛（针叶树读感挺直）
+  },
+  // 三灌木变体参数（accent-model.js::bushSkeleton 消费）：multiStem=现状基准逐值复现
+  // （crownR 5.5+1.2×vSeed 修正历史漂移——与绘制口径统一为模型单一来源）。
+  accentBushVariants: {
+    multiStem:    { stemMin: 4, stemMax: 6, heightBase: 3.4, heightVar: 1.6, outKMin: 0.38, outKMax: 0.68,
+                    clusterFactor: 1.0, clusterRBase: 1.5, clusterRVar: 0.9,
+                    crownRBase: 5.5, crownRVar: 1.2, crownSquash: 0.72, footprintR: 8 },
+    flowering:    { stemMin: 4, stemMax: 6, heightBase: 3.0, heightVar: 1.4, outKMin: 0.30, outKMax: 0.55,
+                    clusterFactor: 1.0, clusterRBase: 1.4, clusterRVar: 0.8,
+                    crownRBase: 4.8, crownRVar: 1.0, crownSquash: 0.72, footprintR: 6.5 },
+    lowEvergreen: { stemMin: 5, stemMax: 8, heightBase: 1.8, heightVar: 1.0, outKMin: 0.45, outKMax: 0.75,
+                    clusterFactor: 1.1, clusterRBase: 1.2, clusterRVar: 0.7,
+                    crownRBase: 5.0, crownRVar: 1.0, crownSquash: 0.55, footprintR: 5.5 }, // 扁压铺展、贴地弱影
+  },
+  // 花朵图元（render_bush.js 消费）：花位/花色构建期固定（模型 flowers[]），花量只决定
+  // 可见点数 round(K×flowerAmount) 与 alpha；低饱和三色板，禁发光/禁径向渐变光晕（§4.1）。
+  accentFlowerDotsMax: 9,      // 单株花位上限（构建期生成，花量再按比例显隐）
+  // 花点屏幕半径 = 宿主簇屏幕半径 × K。K 取 0.30 使「近景档（冠屏半径 ≥ accentDetailNearPx）」
+  // 起花点即 ≥ minPx 可辨（实测 zoom 3 ≈ 1.3~2.0px 可见、zoom 1.6 及以下亚像素整组省略）；
+  // 首轮建议值 0.09 会让花点在近景仍只有 0.4~0.6px，验收项「花灌木春季可见花」不可达，故上调。
+  accentFlowerDotRadiusK: 0.30,
+  accentFlowerMinPx: 1.2,      // 花点屏幕半径低于此该点省略（远景亚像素噪声）
+  accentFlowerPalette: [[246, 242, 232], [226, 190, 186], [238, 224, 168]], // 白 / 淡粉 / 淡黄（低饱和）
+
+  // —— 局部三维植被骨架（TA-03，v1.50.25；TA-06 起轮廓参数上移 accentTreeSilhouettes/accentBushVariants）——
   // 模型/叶簇/枝干为 accent.id 稳定哈希派生，不进快照；accent-model.js 消费。
-  accentModelStyleVersion: 4,   // 骨架模型风格版本：调值即整体重建模型缓存（§10.2 缓存键契约；TA-11-4 芦草骨架形态变更 3→4）
   accentDetailNearPx: 15,     // 近景：二级枝、簇高光、春芽
   accentDetailMidPx: 7,       // 中景：主枝与全部叶簇；远景只保留树形与叶量
-  accentLeafClustersTree: 16, // 每棵树稳定叶簇数（§6.4 建议 12~24；由 id 派生，不进快照）
-  accentLeafClustersBush: 8,  // 每丛灌木稳定叶簇数（基生细茎端 + 茎中段）
-  accentEvergreenChance: 0.24,// 现有 Tree/Bush 无物种字段时的稳定哈希常绿变体比例（TA-06 前过渡）
+  accentLeafClustersTree: 16, // 每棵树基准叶簇数（§6.4 建议 12~24；×轮廓 clusterFactor 得实际簇数）
+  accentLeafClustersBush: 8,  // 每丛灌木基准叶簇数（基生细茎端 + 茎中段；×变体 clusterFactor）
 
   // —— 地表装饰 RockCluster / GrassTuft 视觉形态参数（TA-11-3，07 号 §6.6/§6.7/§10.4）——
   // 消费入口：accent-model.js（骨架派生，accent.id 纯函数入模型缓存）与
