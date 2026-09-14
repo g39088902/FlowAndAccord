@@ -544,7 +544,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 
 ### 9.7 平地草原模板（`grassland_plain_v1`）
 
-✅ 内核骨架已落地（v1.50.40，STAGE-07-TODO S7-02）。实现于 `geo/terrain.rs::generate_base_relief` 草原分支（创世流水线第 2 步，06 号 §4.1）：
+✅ 内核骨架已落地（v1.50.40 · S7-02，专项文档 STAGE-07-TODO.md 已随收官归档删除，探针门禁基线见 06 号 §18.8）。实现于 `geo/terrain.rs::generate_base_relief` 草原分支（创世流水线第 2 步，06 号 §4.1）：
 
 定位为首张「低障碍」地图模板——无硬禁行、无水面，选址与通行近乎自由，聚落结构完全由水源分布与踩踏涌现。生成要点：
 
@@ -552,10 +552,10 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 2. ✅ 孤立残丘：`relief_rng` 在中心外围（0.30~0.42×world_size）生成 1~2 处高斯缓丘，A∈[6.5,9.5]m、A/R∈[0.19,0.31] → 高斯最大梯度 0.858×A/R ≈ 9.3°~14.9°，严格 < 18°（远景地标 + 高肥力坡脚，不产生通行障碍）；双丘潜在重叠时第二丘确定性转对侧（不额外消费 RNG）。
 3. ✅ 泉溪洼地：2 处微凹地——锚点候选由 `relief_rng` 抽取（中心近域 0.08~0.28×world_size）后吸附 ±8 格窗局部最低格，高斯微凹盆（depth 1.4~2.2m、R 24~34m）在坡度派生前雕入 raw；凹圈带（0.7R~1.5R）写 `SoftGround`（软地仅 1.25× 慢行、不禁建），盆心保持 `DryGround`。
 4. ✅ 泉眼特征：每处洼地一条 `SpringValley` 特征（三顶点自坡缘汇入盆心，与 T2 泉谷同语义）；**无水体、无水面**，清泉 POI 仍由生态层布点（`spawn_water_pois` 随机落位，不读水面格）。
-5. ✅ 水源锚定（确定性修正，均不消费 RNG）：双洼地过近沿连线外推到 0.22×world_size；吸附点偏向图缘时盆心沿径向收拢到 0.20×world_size（≈153m，保 §1.4 water≤160m）。
+5. ✅ 水源锚定（确定性修正，均不消费 RNG）：双洼地过近沿连线外推到 0.22×world_size；吸附点偏向图缘时盆心沿径向收拢到 0.20×world_size（≈153m，保 06 号 §18.8 water≤160m 门禁）。
 6. ✅ 草甸肥力：草原分支 `natural_fertility = 0.97 − slope/70×0.5 − nh×0.10`（可建格均值 0.91，落 0.85~0.95 带内）。
 
-隔离保证：草原分支只消费 `relief_rng` 局部流（主 `rng` 消费数不变），不读 `hydro_rng`/`accent_rng`；T1/T2 路径逐位不变（60 种子 git worktree 对拍）。探针验收（`terrain_probe --profile grassland_plain_v1 --seeds 60`）§1.4 门禁 0 违例：max_slope 9.93°~16.46°、blocked/hard/no_walk 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08、waterM 峰值 154m；mound_count 1~2、软地比 1.6%。草甸装饰散布已随 S7-03 落地；`random` 候选已随 S7-10 全链路收口入列（候选池 2→5）。
+隔离保证：草原分支只消费 `relief_rng` 局部流（主 `rng` 消费数不变），不读 `hydro_rng`/`accent_rng`；T1/T2 路径逐位不变（60 种子 git worktree 对拍）。探针验收（`terrain_probe --profile grassland_plain_v1 --seeds 60`）06 号 §18.8 门禁 0 违例：max_slope 9.93°~16.46°、blocked/hard/no_walk 恒 0、min buildable 14396、components 恒 1、detour_p95 恒 1.08、waterM 峰值 154m；mound_count 1~2、软地比 1.6%。草甸装饰散布已随 S7-03 落地；`random` 候选已随 S7-10 全链路收口入列（候选池 2→5）。
 
 ### 9.8 装饰生成器（Accents Generator）
 

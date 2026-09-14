@@ -68,7 +68,7 @@ stateDiagram-v2
 | TA-02 ✅ v1.50.24 | 统一植被季相生产器：`SimTreeTint` 扩展 `sample()`，输出连续叶色/叶量/芽/花/地被落叶，替代 v1.50.21 的三档映射 | P0，详见 §6.3 | 中 | TA-01 |
 | TA-03 ✅ v1.50.25 | 局部三维枝干骨架 + 椭球叶簇 + 稳定脱落次序，真正落叶露枝、冬季 0~5% 叶量（含稳定哈希常绿变体过渡接口，TA-06 前消费 `accentEvergreenChance`） | P0，详见 §6.4 | 高 | TA-02 |
 | TA-04 ✅ | 世界光向动态受光：枝干/叶簇/Boulder/RockCluster 法线点积，移除固定屏幕亮斑，阴影随树高与叶量变化 | P0，详见 §6.5 | 中 | TA-03 |
-| TA-05 | P0 样板闭环：一株落叶树、一株落叶灌木、一块岩石，验证四季、四方位旋转与帧耗时 | P0，验收见 §11.4 | 中 | TA-03、TA-04 |
+| TA-05 ◐ 2026-09-14 | P0 样板闭环：一株落叶树、一株落叶灌木、一块岩石，验证四季、四方位旋转与帧耗时——视觉/季相/受光/生命周期（除 LOAD）已通过；LOAD 存档链路 NOT_RUN 待 Chrome 补测；性能仅现状归档（未改代码无差分），高密拖动预算处置仍待用户取舍；**保持未完成状态** | P0，验收记录见 §11.4；方案与遗留事项见 [09 植被样板验证](./09-vegetation-verification.md)；精简证据包 [assets/ta05-evidence-2026-09-14](./assets/ta05-evidence-2026-09-14/report.md)（全量原始截图见 git 历史 5c9a661） | 中 | TA-03、TA-04 |
 
 **波次二 · 普及优化与组合地貌样板**
 
@@ -560,10 +560,12 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 | 生命周期 | 暂停季相与飘叶冻结；读档/回溯可重建；换世界缓存结果与冷重建一致、不串入旧数据；动态光开关往返正常；高倍速下不频闪 |
 | 性能 | 按 §11.3 同设备同负载对照，新增绘制 p95 增量目标 ≤ 3 ms；首轮实测（TA-04-8）：3/4 场景达标，高密·拖动最差视角超标且主体归因非 TA-04 范畴，处置待用户取舍（§11.3） |
 
+**TA-05 验收记录（◐ 2026-09-14，内置预览浏览器 + `?nogate=1`，种子 42，v1.50.52，HEAD `1ef2660`，零代码改动）**：三对象 = 落叶 Tree#0 / 落叶 Bush#77 / Boulder#44（常绿对照 Tree#36，高地补充 Tree#12），身份表与受控夹具方法见[证据包 identities.json](./assets/ta05-evidence-2026-09-14/visual/fixture/identities.json)；夹具以同 id/kind/scale/rotation/tint 克隆改坐标走生产管线，选点过 `LandscapeMask.accentHidden` 判据。①四季与边界 PASS：同株春芽(芽量0.64)/夏满冠/秋金黄/冬枝可辨，冬落叶树叶量 0.03~0.04（规格 0~0.05）、常绿 0.94 保持轮廓，四季交界 1−ε/ε 两侧连续无跳变，先变色后减叶，岩石材质不随季相变色，`yearPhase` 回环（春季中部）与季分箱边界分别覆盖（[season-sampling.json](./assets/ta05-evidence-2026-09-14/metrics/season-sampling.json)，26 点 × 4 对象数值 + 季相样张）。②96 视图主矩阵（四季×四方位×两俯角×三缩放，细节三档全覆盖）+ 受光分离（azimuthOffsetDeg 0/90/180/270 投影翻转）+ 光近视线退化 + 视口四边 + 整圈旋转扫掠 PASS，无悬空/入土/裁断/跳层。③生命周期：真实快照推进、暂停/继续、REWIND 精确回滚、RESET 同种子冷重建一致、换种子不复用旧世界、1024x 无频闪、交互/共享模型、动态光开→关→开 全部 PASS；**LOAD 文件存档 NOT_RUN**（预览浏览器无 File System Access API，须 Chrome 补测）。④性能：未改渲染代码无 A/B 差分，现状绝对耗时已归档（初始世界统一队列 p95 14.6~16.7ms；高密 16.0~27.9ms 方差大，面板隐藏 + Worker 驱动产帧 + 1024x 演化扰动口径受限，吞吐不可靠不产结论）——TA-04-8 高密·拖动超标处置仍待用户取舍（§11.3）。**TA-05 保持未完成**：余 LOAD 补测 +（如需严格判定）Chrome 可见面板环境性能复测。报告：[assets/ta05-evidence-2026-09-14/report.md](./assets/ta05-evidence-2026-09-14/report.md)；方法论与遗留事项：[09 植被样板验证](./09-vegetation-verification.md)。
+
 ### 11.5 实施门禁
 
 - 本文为规划与现状对照文档；纯文档改动不升版、不构建 WASM，交付前运行文档维护体检、跨文档一致性检查与 `bump-version.js --check`。
-- 后续前端实现运行 `frontend-check.js`，按[浏览器指南](../../current/tech/27-browser-automation.md)做视觉与交互验收（必须用 Chrome，存档依赖 File System Access API）；使用[性能指南](../../current/tech/25-benchmarking.md)建立基线。
+- 后续前端实现运行 `frontend-check.js`，按[浏览器指南](../../current/tech/27-browser-automation.md)做视觉与交互验收（优先 Chrome 做存档链路验证；沙箱禁止外启浏览器时允许内置预览浏览器 + `?nogate=1` 做视觉/性能/生命周期等非存档验证，见 27 号 §7）；使用[性能指南](../../current/tech/25-benchmarking.md)建立基线。
 - 涉及 Rust/版本常量变更时重编译并同步 WASM 双副本，执行 `cargo test --lib`、`test-wasm.js` 与适用的确定性门禁；**即使首期植被改造只改前端，统一升版仍会修改 Rust 应用版本常量，实施交付仍需重编译并同步 WASM 双副本**。
 - 涉及快照字段执行 `snapshot-check.js` + `test-wasm.js`；配置变更执行 `config-check.js`；地形行为变化增加多种子、存读档和回溯诊断。行为有意变化时不能要求新旧生成算法结果相同，但同版本同种子必须确定性一致。
 - 不提交临时单元测试；各阶段实现完成后再同步现状文档、版本和 changelog，不能把本文的规划写成已实现机制。

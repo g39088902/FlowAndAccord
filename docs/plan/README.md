@@ -40,6 +40,7 @@
 | 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.3 维护 16 张模板的批次与能力前置，R.6 区分任务依赖、验收与 random 准入 |
 | 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
+| 09 | [植被样板验证（TA-05）](tech/09-vegetation-verification.md) | ◐ 已实施：样板验证方法论与遗留事项（LOAD 补测、Chrome 性能复测、TA-04-8 预算取舍）；验收权威在 07 号 §11.4 |
 
 ---
 

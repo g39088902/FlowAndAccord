@@ -1,0 +1,12 @@
+{
+ "meta": null,
+ "eval": {
+  "modelVer": "no_field",
+  "detail": {
+   "mid": 7,
+   "near": 15
+  },
+  "evergreenChance": 0.24,
+  "footprintR": 8
+ }
+}

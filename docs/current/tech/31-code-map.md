@@ -252,7 +252,17 @@ FlowAndAccord/
     │       ├── 06-terrain-templates.md          # 地图模板库与 D-B 子特征蓝图
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       ├── 08-performance.md                # 仅保留未完成的性能优化
+    │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
+    │           ├── ta05-evidence-2026-09-14/      # TA-05 精简证据包（2026-09-14 收口归档）
+    │           │   ├── manifest.json                # 证据清单
+    │           │   ├── report.md                    # 精简证据包报告
+    │           │   ├── metrics/baseline-ta051.json  # TA-05-1 基线指标
+    │           │   ├── metrics/lifecycle.json       # 真实生命周期采样指标
+    │           │   ├── metrics/perf-ta056.json      # 性能采样指标
+    │           │   ├── metrics/season-sampling.json # 季相采样指标
+    │           │   ├── visual/fixture/config-and-model-version.json  # 夹具配置与模型版本
+    │           │   └── visual/fixture/identities.json                # 样板身份指纹（视觉矩阵截图 jpg 不逐张登记）
     │           ├── ta09/slope-verification.txt    # TA-09 RiverCliff 局部试算验证记录
     │           └── ta12/                          # TA-12 地表纹理专项归档（v1.50.53 完成后归档）
     │               ├── TA-12-TODO.md              # TA-12 实施清单与验收记录（八任务全闭环）

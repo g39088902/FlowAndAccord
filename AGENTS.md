@@ -118,7 +118,7 @@ node frontend/server.js           # http://localhost:3004
 
 ### 步骤四：浏览器访问
 
-> ⚠️ **必须使用 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/06-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。能用 Chrome 测试必须优先用 Chrome 测试。
+> ⚠️ **存档依赖 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/06-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。玩家与存档链路验证请使用 Chrome/Edge；Agent 自动化在沙箱禁止外启浏览器时，可用内置预览浏览器 + `?nogate=1` 旁路做非存档链路验证（边界见 §4 铁律与 [27 号指南](./docs/current/tech/27-browser-automation.md) §7）。
 
 1. 访问 `http://localhost:3004`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
@@ -146,7 +146,7 @@ node frontend/server.js           # http://localhost:3004
 > 模块内的机制细节、数值口径与调用链一律在**对应模块文档**中维护（同一事实只在一个权威位置，见 §5）。
 > 条目按「最常踩 → 最隐蔽」排序，**编号长期稳定**，可安全交叉引用；找细节请顺「详见 →」跳转。
 
-> 🔴 **浏览器测试铁律**：本项目存档依赖 **Chrome 的 File System Access API**（直写磁盘 `.json`，启动存档门禁未建立存档前模拟一直暂停）。一切浏览器验证（手动或自动化）**能用 Chrome 测试必须优先用 Chrome 测试**；Firefox / Safari / CatPaw 内置预览浏览器只能做纯视觉截图，无法走通存档与模拟推进链路。
+> 🔴 **浏览器验证环境选择**：本项目存档依赖 **Chrome 的 File System Access API**（直写磁盘 `.json`，启动存档门禁未建立存档前模拟一直暂停）。环境允许启动 Chrome 时**优先用 Chrome**（存档链路验证只能用它）；**沙箱/环境禁止外启浏览器进程时（如 CatPaw 会话），允许用内置预览浏览器 + `?nogate=1` 旁路**（v1.50.8 起隐藏门禁弹窗并直接解除暂停，仅内存演算）完成视觉、性能、季相、镜头与生命周期等非存档链路验证。两条硬边界：① `?nogate=1` 不连接任何存档文件，**不得用于证明建档/读档链路**，受限环境中的存档验证项必须如实标注 NOT_RUN/待补测；② 内置预览浏览器与 Firefox / Safari 均无法走通真实存档读写。
 
 ### 4.0 ✅ 改动前快速自检（10 秒扫完）
 

@@ -38,7 +38,7 @@
       - `TA-17-COURTYARD` 聚落房屋院地与门前通道留白（依赖门洞矢量确认）
 
 - [ ] **TA-05 P0 植被打样技术方案**
-    - 详见专项技术方案：[TA05-technical-plan.md](TA05-technical-plan.md)
+    - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测）。
     - 聚焦树木与植被群落在 Canvas 视口下的高质量层次打样。
 
 - [ ] **TA-10 台地聚落表现层打样**
