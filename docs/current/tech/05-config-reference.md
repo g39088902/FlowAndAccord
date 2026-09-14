@@ -179,7 +179,7 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 120 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m） |
-| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架；未通过 §18 全链路验收前不加入 random 候选）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；影响地形重建与存档门禁 |
+| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架）| 'hillside_woodland_v1'（★ v1.50.51 S7-08 登记：半坡林地，v1.50.46 内核骨架）| 'river_valley_settlement_v1'（★ v1.50.51 S7-08 登记：河谷聚落，v1.50.48/49 内核+水系）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；3 个阶段七 profile 均未通过 §18 全链路验收前不加入 random 候选；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
@@ -193,6 +193,43 @@
 | `terrainBranchRidgeEnabled` | bool | true | geo/terrain.rs (支脊生成总开关) | 支脊生成总开关（T1 山口 profile；false 时 relief_rng 消费序缩短） |
 | `terrainBranchRidgeAmplitudeRatio` | f32 | 0.48 | geo/terrain.rs (支脊振幅比中值 ×[0.85,1.15] 抖动) | 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动（默认 → 0.408~0.552） |
 | `terrainBranchRidgeLength` | f32 | 150 | geo/terrain.rs (支脊长度 ×[0.8,1.2] 抖动) | 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（默认 → 120~180m） |
+| `terrainGrasslandMoundAmpMin` | f32 | 6.5 | geo/terrain.rs (S7-02 草原残丘幅度抽样下限) | 残丘高斯幅度抽样下限 (m)；A/R∈[0.19,0.31] → 峰值坡度 ≈9.3°~14.9° |
+| `terrainGrasslandMoundAmpMax` | f32 | 9.5 | geo/terrain.rs (S7-02 草原残丘幅度抽样上限) | 残丘高斯幅度抽样上限 (m) |
+| `terrainGrasslandMoundRatioMin` | f32 | 0.19 | geo/terrain.rs (S7-02 草原残丘幅径比下限) | 残丘 幅度/半径比 抽样下限（峰值坡度 ≈0.858×A/R） |
+| `terrainGrasslandMoundRatioMax` | f32 | 0.31 | geo/terrain.rs (S7-02 草原残丘幅径比上限) | 残丘 幅度/半径比 抽样上限（过大→残丘成通行障碍） |
+| `terrainSpringDepressionDepthMin` | f32 | 1.4 | geo/terrain.rs (S7-02/04 泉溪洼地深度下限) | 洼地深度抽样下限 (m) |
+| `terrainSpringDepressionDepthMax` | f32 | 2.2 | geo/terrain.rs (S7-02/04 泉溪洼地深度上限) | 洼地深度抽样上限 (m) |
+| `terrainSpringDepressionRadiusMin` | f32 | 24 | geo/terrain.rs (S7-02/04 泉溪洼地凹圈半径下限) | 洼地凹圈半径抽样下限 (m)；凹圈 0.7R~1.5R 写 SoftGround |
+| `terrainSpringDepressionRadiusMax` | f32 | 34 | geo/terrain.rs (S7-02/04 泉溪洼地凹圈半径上限) | 洼地凹圈半径抽样上限 (m) |
+| `terrainHillsideNoiseDamp` | f32 | 0.6 | geo/terrain.rs (S7-04 半坡 fBm 噪声增益阻尼) | fBm 噪声增益阻尼（换 max_slope 门禁窗口 22°~28.5° 余量） |
+| `terrainHillsideAmpMin` | f32 | 26 | geo/terrain.rs (S7-04 半坡主坡幅度抽样下限) | 不对称高斯主坡幅度抽样下限 (m) |
+| `terrainHillsideAmpMax` | f32 | 32 | geo/terrain.rs (S7-04 半坡主坡幅度抽样上限) | 主坡幅度抽样上限 (m)；过大→背风峰值压穿 28.5° 窗 |
+| `terrainHillsideLeeSlopeMin` | f32 | 23 | geo/terrain.rs (S7-04 背风坡目标峰值坡度下限) | 背风坡目标峰值坡度抽样下限 (度)；按目标坡度反解宽度 |
+| `terrainHillsideLeeSlopeMax` | f32 | 23.2 | geo/terrain.rs (S7-04 背风坡目标峰值坡度上限) | 背风坡目标峰值坡度抽样上限 (度) |
+| `terrainHillsideWindSlopeMin` | f32 | 8 | geo/terrain.rs (S7-04 迎风坡目标峰值坡度下限) | 迎风坡目标峰值坡度抽样下限 (度)；宽缓可建 |
+| `terrainHillsideWindSlopeMax` | f32 | 12 | geo/terrain.rs (S7-04 迎风坡目标峰值坡度上限) | 迎风坡目标峰值坡度抽样上限 (度)；目标 <14° |
+| `terrainHillsideCrestShiftMin` | f32 | 0.18 | geo/terrain.rs (S7-04 脊线横移比例下限 ×world) | 脊线横移比例抽样下限（×world；陡峭带远离初始营地） |
+| `terrainHillsideCrestShiftMax` | f32 | 0.3 | geo/terrain.rs (S7-04 脊线横移比例上限 ×world) | 脊线横移比例抽样上限（×world） |
+| `terrainValleyFloorBaseM` | f32 | 3 | geo/terrain.rs (S7-06 谷底基准高程) | 谷底基准高程 (m)；主河水面低于此值下凹成河 |
+| `terrainValleyFloorHalfMin` | f32 | 80 | geo/terrain.rs (S7-06 谷底半宽抽样下限；建造保护线) | 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线 |
+| `terrainValleyFloorHalfMax` | f32 | 95 | geo/terrain.rs (S7-06 谷底半宽抽样上限) | 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190] |
+| `terrainValleyWallHeightMin` | f32 | 44 | geo/terrain.rs (S7-06 陡壁总高差抽样下限) | 陡壁总高差抽样下限 (m)；规格 40~50 |
+| `terrainValleyWallHeightMax` | f32 | 48 | geo/terrain.rs (S7-06 陡壁总高差抽样上限) | 陡壁总高差抽样上限 (m) |
+| `terrainValleyWallRatioMin` | f32 | 0.54 | geo/terrain.rs (S7-06 陡壁幅宽比 H/W 下限) | 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W） |
+| `terrainValleyWallRatioMax` | f32 | 0.585 | geo/terrain.rs (S7-06 陡壁幅宽比 H/W 上限；峰值梯度窗) | H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗 |
+| `terrainValleyMeanderAmpMin` | f32 | 18 | geo/terrain.rs (S7-06 谷轴蜿蜒振幅下限) | 谷轴蜿蜒振幅抽样下限 (m)；远小于谷底半宽 |
+| `terrainValleyMeanderAmpMax` | f32 | 30 | geo/terrain.rs (S7-06 谷轴蜿蜒振幅上限) | 谷轴蜿蜒振幅抽样上限 (m) |
+| `terrainValleyMeanderWaves` | f32 | 3 | geo/terrain.rs (S7-06 谷轴蜿蜒周期数；S7-07 兼主河波形) | 谷轴蜿蜒全程周期数（y/world 系数；S7-07 起兼作主河中心线波形） |
+| `terrainValleyTaperRatio` | f32 | 0.47 | geo/terrain.rs (S7-06 陡壁/台地包络起始比例；谷口缓梁) | 陡壁/台地包络起始比例（×半图）；深切段中部 47%，谷口缓梁保绕行 |
+| `terrainValleyNoiseFloorK` | f32 | 0.15 | geo/terrain.rs (S7-06 谷底 fBm 分区阻尼) | 谷底 fBm 分区阻尼（强阻尼保高程平缓与峰坡窗口） |
+| `terrainValleyNoiseWallK` | f32 | 0.15 | geo/terrain.rs (S7-06 陡壁 fBm 分区阻尼) | 陡壁 fBm 分区阻尼（保峰值梯度窗口） |
+| `terrainValleyNoiseUplandK` | f32 | 0.5 | geo/terrain.rs (S7-06 台地 fBm 分区阻尼) | 台地 fBm 分区阻尼（中等阻尼出滚动丘陵） |
+| `terrainValleyRiverWidthMin` | f32 | 22 | geo/terrain.rs (S7-07 主河河宽抽样下限) | 主河河宽抽样下限 (m)；规格 22~32，取半为半宽 |
+| `terrainValleyRiverWidthMax` | f32 | 32 | geo/terrain.rs (S7-07 主河河宽抽样上限) | 主河河宽抽样上限 (m) |
+| `terrainValleyRiverBankM` | f32 | 8 | geo/hydrology.rs (S7-07 低滩禁建带半宽；建造保护线) | 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸（会吃掉聚落河阶） |
+| `terrainValleyRiverTerraceM` | f32 | 20 | geo/hydrology.rs (S7-07 河阶带半宽) | 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带 |
+| `terrainValleyFordRatio` | f32 | 0.32 | geo/hydrology.rs (S7-07 授权浅滩 y 位置比例) | 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏 |
+| `terrainValleyAccessOffsetMinM` | f32 | 35 | geo/hydrology.rs (S7-07 取水点离轴最小偏移；POI 间距) | 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径 |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |

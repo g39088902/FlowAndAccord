@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
   terrainGridRes: 120, // 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m）
-  terrainProfile: 'random', // 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架；未通过 §18 全链路验收前不加入 random 候选）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机T1山口/T2河谷）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（固定草原，v1.50.40 内核骨架）| 'hillside_woodland_v1'（★ v1.50.51 S7-08 登记：半坡林地，v1.50.46 内核骨架）| 'river_valley_settlement_v1'（★ v1.50.51 S7-08 登记：河谷聚落，v1.50.48/49 内核+水系）| 'flat_baseline'（★ v1.50.48 STAGE2-7 显式诊断/降级基线：倾斜-only 平地，永不加入 random，仅用于诊断对照与有界回退降级目标）；3 个阶段七 profile 均未通过 §18 全链路验收前不加入 random 候选；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
@@ -182,6 +182,51 @@ window.SIM_CONFIG = {
   terrainBranchRidgeEnabled: true, // 支脊生成总开关（T1 山口 profile；false 时 relief_rng 消费序缩短）
   terrainBranchRidgeAmplitudeRatio: 0.48, // 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动（默认 → 0.408~0.552）
   terrainBranchRidgeLength: 150.0, // 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（默认 → 120~180m）
+  // ★ v1.50.51 S7-08：阶段七 3 个静态 profile 形态参数集中化（06号 §4.1/§4.2/§4.3）。
+  //   默认值 = 参数化前 terrain.rs/hydrology.rs 形态常数（世界输出逐位不变）。
+  //   改任一值等于换图（同种子形态漂移），须遵循 TERRAIN_GENERATOR_VERSION 契约；
+  //   各字段的保护线约束（建造保护线/门禁窗口）详见 sim_core config.rs doc 注释。
+  // ── S7-02 平地草原（grassland_plain_v1）──
+  terrainGrasslandMoundAmpMin: 6.5,   // 残丘高斯幅度抽样下限 (m)；A/R∈[0.19,0.31] → 峰值坡度 ≈9.3°~14.9°
+  terrainGrasslandMoundAmpMax: 9.5,   // 残丘高斯幅度抽样上限 (m)
+  terrainGrasslandMoundRatioMin: 0.19, // 残丘 幅度/半径比 抽样下限（峰值坡度 ≈0.858×A/R）
+  terrainGrasslandMoundRatioMax: 0.31, // 残丘 幅度/半径比 抽样上限（过大→残丘成通行障碍）
+  // ── S7-02/S7-04 共用：泉溪洼地（草原/半坡各 2 处坡脚泉溪）──
+  terrainSpringDepressionDepthMin: 1.4,  // 洼地深度抽样下限 (m)
+  terrainSpringDepressionDepthMax: 2.2,  // 洼地深度抽样上限 (m)
+  terrainSpringDepressionRadiusMin: 24.0, // 洼地凹圈半径抽样下限 (m)；凹圈 0.7R~1.5R 写 SoftGround
+  terrainSpringDepressionRadiusMax: 34.0, // 洼地凹圈半径抽样上限 (m)
+  // ── S7-04 半坡林地（hillside_woodland_v1）──
+  terrainHillsideNoiseDamp: 0.6,      // fBm 噪声增益阻尼（换 max_slope 门禁窗口 22°~28.5° 余量）
+  terrainHillsideAmpMin: 26.0,        // 不对称高斯主坡幅度抽样下限 (m)
+  terrainHillsideAmpMax: 32.0,        // 主坡幅度抽样上限 (m)；过大→背风峰值压穿 28.5° 窗
+  terrainHillsideLeeSlopeMin: 23.0,   // 背风坡目标峰值坡度抽样下限 (度)；按目标坡度反解宽度
+  terrainHillsideLeeSlopeMax: 23.2,   // 背风坡目标峰值坡度抽样上限 (度)
+  terrainHillsideWindSlopeMin: 8.0,   // 迎风坡目标峰值坡度抽样下限 (度)；宽缓可建
+  terrainHillsideWindSlopeMax: 12.0,  // 迎风坡目标峰值坡度抽样上限 (度)；目标 <14°
+  terrainHillsideCrestShiftMin: 0.18, // 脊线横移比例抽样下限（×world；陡峭带远离初始营地）
+  terrainHillsideCrestShiftMax: 0.30, // 脊线横移比例抽样上限（×world）
+  // ── S7-06/S7-07 河谷聚落（river_valley_settlement_v1）──
+  terrainValleyFloorBaseM: 3.0,       // 谷底基准高程 (m)；主河水面低于此值下凹成河
+  terrainValleyFloorHalfMin: 80.0,    // 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线
+  terrainValleyFloorHalfMax: 95.0,    // 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190]
+  terrainValleyWallHeightMin: 44.0,   // 陡壁总高差抽样下限 (m)；规格 40~50
+  terrainValleyWallHeightMax: 48.0,   // 陡壁总高差抽样上限 (m)
+  terrainValleyWallRatioMin: 0.54,    // 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W）
+  terrainValleyWallRatioMax: 0.585,   // H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗
+  terrainValleyMeanderAmpMin: 18.0,   // 谷轴蜿蜒振幅抽样下限 (m)；远小于谷底半宽
+  terrainValleyMeanderAmpMax: 30.0,   // 谷轴蜿蜒振幅抽样上限 (m)
+  terrainValleyMeanderWaves: 3.0,     // 谷轴蜿蜒全程周期数（y/world 系数；S7-07 起兼作主河中心线波形）
+  terrainValleyTaperRatio: 0.47,      // 陡壁/台地包络起始比例（×半图）；深切段中部 47%，谷口缓梁保绕行
+  terrainValleyNoiseFloorK: 0.15,     // 谷底 fBm 分区阻尼（强阻尼保高程平缓与峰坡窗口）
+  terrainValleyNoiseWallK: 0.15,      // 陡壁 fBm 分区阻尼（保峰值梯度窗口）
+  terrainValleyNoiseUplandK: 0.5,     // 台地 fBm 分区阻尼（中等阻尼出滚动丘陵）
+  terrainValleyRiverWidthMin: 22.0,   // 主河河宽抽样下限 (m)；规格 22~32，取半为半宽
+  terrainValleyRiverWidthMax: 32.0,   // 主河河宽抽样上限 (m)
+  terrainValleyRiverBankM: 8.0,       // 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸（会吃掉聚落河阶）
+  terrainValleyRiverTerraceM: 20.0,   // 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带
+  terrainValleyFordRatio: 0.32,       // 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏
+  terrainValleyAccessOffsetMinM: 35.0, // 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径
   terrainRiverWidthMin: 28.0, // T2 地貌 / 通行参数
   terrainRiverWidthMax: 42.0, // T2 地貌 / 通行参数
   terrainRiverWaterLevel: 0.0, // T2 地貌 / 通行参数

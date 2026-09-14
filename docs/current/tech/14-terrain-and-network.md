@@ -937,10 +937,10 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 25 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原 profile」，全系统配置字段总计 239）：
+✅ 已落地 62 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原 profile」，全系统配置字段总计 276；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数）：
 
 ```text
-✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1"
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "flat_baseline"（新 profile 未过全链路验收前不入 random）
 ✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
@@ -950,6 +950,43 @@ render_agents.js        族人绘制                                            
 ✅ terrainBranchRidgeEnabled  true                ★ TB-01-5 支脊生成总开关（T1；false 时 relief_rng 消费序缩短）
 ✅ terrainBranchRidgeAmplitudeRatio 0.48          ★ TB-01-5 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动
 ✅ terrainBranchRidgeLength   150.0               ★ TB-01-5 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（→120~180）
+✅ terrainGrasslandMoundAmpMin 6.5                ★ S7-02 草原残丘高斯幅度抽样下限 (m)；A∈[6.5,9.5]
+✅ terrainGrasslandMoundAmpMax 9.5                ★ S7-02 草原残丘高斯幅度抽样上限 (m)
+✅ terrainGrasslandMoundRatioMin 0.19             ★ S7-02 草原残丘 幅度/半径比 抽样下限（峰值坡度 ≈0.858×A/R）
+✅ terrainGrasslandMoundRatioMax 0.31             ★ S7-02 草原残丘 幅度/半径比 抽样上限
+✅ terrainSpringDepressionDepthMin 1.4            ★ S7-02/04 泉溪洼地深度抽样下限 (m)
+✅ terrainSpringDepressionDepthMax 2.2            ★ S7-02/04 泉溪洼地深度抽样上限 (m)
+✅ terrainSpringDepressionRadiusMin 24.0          ★ S7-02/04 泉溪洼地凹圈半径抽样下限 (m)
+✅ terrainSpringDepressionRadiusMax 34.0          ★ S7-02/04 泉溪洼地凹圈半径抽样上限 (m)
+✅ terrainHillsideNoiseDamp   0.6                 ★ S7-04 半坡 fBm 噪声增益阻尼（换 max_slope 门禁窗口余量）
+✅ terrainHillsideAmpMin      26.0                ★ S7-04 半坡不对称主坡幅度抽样下限 (m)
+✅ terrainHillsideAmpMax      32.0                ★ S7-04 半坡不对称主坡幅度抽样上限 (m)
+✅ terrainHillsideLeeSlopeMin 23.0                ★ S7-04 背风坡目标峰值坡度抽样下限 (度)；按目标坡度反解宽度
+✅ terrainHillsideLeeSlopeMax 23.2                ★ S7-04 背风坡目标峰值坡度抽样上限 (度)
+✅ terrainHillsideWindSlopeMin 8.0                ★ S7-04 迎风坡目标峰值坡度抽样下限 (度)；宽缓可建
+✅ terrainHillsideWindSlopeMax 12.0               ★ S7-04 迎风坡目标峰值坡度抽样上限 (度)
+✅ terrainHillsideCrestShiftMin 0.18              ★ S7-04 脊线横移比例抽样下限（×world）
+✅ terrainHillsideCrestShiftMax 0.30              ★ S7-04 脊线横移比例抽样上限（×world）
+✅ terrainValleyFloorBaseM    3.0                 ★ S7-06 谷底基准高程 (m)；主河水面低于此值下凹成河
+✅ terrainValleyFloorHalfMin  80.0                ★ S7-06 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线
+✅ terrainValleyFloorHalfMax  95.0                ★ S7-06 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190]
+✅ terrainValleyWallHeightMin 44.0                ★ S7-06 陡壁总高差抽样下限 (m)；规格 40~50
+✅ terrainValleyWallHeightMax 48.0                ★ S7-06 陡壁总高差抽样上限 (m)
+✅ terrainValleyWallRatioMin  0.54                ★ S7-06 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W）
+✅ terrainValleyWallRatioMax  0.585               ★ S7-06 H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗
+✅ terrainValleyMeanderAmpMin 18.0                ★ S7-06 谷轴蜿蜒振幅抽样下限 (m)
+✅ terrainValleyMeanderAmpMax 30.0                ★ S7-06 谷轴蜿蜒振幅抽样上限 (m)
+✅ terrainValleyMeanderWaves  3.0                 ★ S7-06 谷轴蜿蜒全程周期数；S7-07 起兼作主河中心线波形
+✅ terrainValleyTaperRatio    0.47                ★ S7-06 陡壁/台地包络起始比例（×半图）；谷口缓梁保绕行连通
+✅ terrainValleyNoiseFloorK   0.15                ★ S7-06 谷底 fBm 分区阻尼（强阻尼保高程平缓）
+✅ terrainValleyNoiseWallK    0.15                ★ S7-06 陡壁 fBm 分区阻尼（保峰值梯度窗口）
+✅ terrainValleyNoiseUplandK  0.5                 ★ S7-06 台地 fBm 分区阻尼（出滚动丘陵）
+✅ terrainValleyRiverWidthMin 22.0                ★ S7-07 主河河宽抽样下限 (m)；规格 22~32，取半为半宽
+✅ terrainValleyRiverWidthMax 32.0                ★ S7-07 主河河宽抽样上限 (m)
+✅ terrainValleyRiverBankM    8.0                 ★ S7-07 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸
+✅ terrainValleyRiverTerraceM 20.0                ★ S7-07 河阶带半宽 (m)；RiverTerrace 高肥力 0.95 覆盖带
+✅ terrainValleyFordRatio     0.32                ★ S7-07 授权浅滩 y 位置比例（±×world）；比 T2 ±0.24 更稀疏
+✅ terrainValleyAccessOffsetMinM 35.0             ★ S7-07 取水点离轴最小偏移 (m)；对置点对间距 ≥70m POI 口径
 ✅ terrainRiverWidthMin       28.0                主河最小宽度 (m)
 ✅ terrainRiverWidthMax       42.0                主河最大宽度 (m)
 ✅ terrainRiverWaterLevel     0.0                 主河水面基准高度 (m)
@@ -969,7 +1006,7 @@ render_agents.js        族人绘制                                            
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 239）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 276）。
 - ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 2` 确定性分支到 `mountain_pass_v1` 或 `river_valley_v1`。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，

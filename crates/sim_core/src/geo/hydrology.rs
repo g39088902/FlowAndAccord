@@ -115,7 +115,7 @@ impl TerrainMap {
             self.generate_river(geom, config);
         }
         // ★ S7-07 河谷聚落主河：谷轴即河轴（`ValleyGeometry::center_x` 承载微幅
-        //   蜿蜒），河宽/岸带/河阶形态常数随谷地几何移交；写入同样严格收敛在
+        //   蜿蜒），河宽/岸带/河阶形态参数（SimConfig）随谷地几何移交；写入同样严格收敛在
         //   河道影响带（06 号 §4.3 约束④「不得向两侧山壁外溢」）。
         if let Some(vg) = scratch.valley_geometry.as_ref() {
             self.generate_settlement_river(vg, config);
@@ -232,8 +232,12 @@ impl TerrainMap {
     fn generate_settlement_river(&mut self, vg: &super::terrain::ValleyGeometry, cfg: &SimConfig) {
         let size = self.world_size;
         let level = cfg.terrain_river_water_level;
-        let bank = VALLEY_RIVER_BANK_M;
-        let terrace = VALLEY_RIVER_TERRACE_M;
+        // ★ S7-08：岸带/河阶/浅滩位置/取水点偏移全部走 SimConfig（默认值 = 参数化前
+        //   的 terrain.rs 形态常数，输出逐位不变；字段 doc 注释载明保护线约束）。
+        let bank = cfg.terrain_valley_river_bank_m.max(0.0);
+        let terrace = cfg.terrain_valley_river_terrace_m.max(0.0);
+        let ford_ratio = cfg.terrain_valley_ford_ratio;
+        let access_offset_min = cfg.terrain_valley_access_offset_min_m.max(0.0);
         let half = vg.river_half_m;
         let center = |y: f32| vg.center_x(y, size);
         for gy in 0..self.grid_height {
@@ -272,13 +276,13 @@ impl TerrainMap {
                 c.natural_fertility = 0.95;
             }
         }
-        // 授权浅滩走廊：±0.24×world 两处（T2 先例位置，落谷轴深切段中部），端点
+        // 授权浅滩走廊：±ford_ratio×world（默认 0.32，S7-08 起走 SimConfig）两处，端点
         // 超出保守栅格岸线，普通道路只能接到陆地端点；带内水面改写
         // `ShallowWater`（过水减速由 `terrain_shallow_water_cost` 在车道 profile
         // 上承载，授权见 `corridor::segment_valid` 的 connection 判据）。
         let margin = size/(self.grid_width-1).max(1) as f32*2.0;
         let crossing_width = cfg.terrain_crossing_width.max(12.0);
-        for (i,y) in [-size*VALLEY_FORD_OFFSET_RATIO,size*VALLEY_FORD_OFFSET_RATIO].into_iter().enumerate() {
+        for (i,y) in [-size*ford_ratio,size*ford_ratio].into_iter().enumerate() {
             let reach = half+bank+margin;
             let mut a = Vec3::new(center(y)-reach,y,0.0);
             let mut b = Vec3::new(center(y)+reach,y,0.0);
@@ -315,7 +319,7 @@ impl TerrainMap {
         for i in 0..n {
             let side=if i%2==0 {-1.0} else {1.0};
             let y=((i/2+1) as f32/((n+1)/2+1) as f32-0.5)*size*0.85;
-            let x=center(y)+side*(half+bank+margin).max(VALLEY_ACCESS_OFFSET_MIN_M);
+            let x=center(y)+side*(half+bank+margin).max(access_offset_min);
             let p=Vec3::new(x,y,self.sample_elevation(x,y));
             self.hydrology.access_points.push(WaterAccessPoint{id:i as u32+1,water_body_id:1,resource_pool_id:1,pos:p,nearest_node_id:None,interaction_radius:cfg.poi_interaction_radius});
         }
