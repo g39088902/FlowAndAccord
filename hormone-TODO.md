@@ -88,7 +88,7 @@
   - 验收：`snapshot-check.js`、WASM 与确定性存读档回归；同构建连续推进与存读档后续跑一致。
   - 来源：根 AGENTS.md §4.5/§4.5.1/§4.9、[快照与存档](docs/current/tech/06-snapshot-and-save.md)。
 
-- [x] **H-06 Inspector 激素面板**
+- [x] **H-06 激素观察面板**
   - 按四轴显示十一激素、有效基线与状态标签；DA 奖赏阈值单独标示。趋势用相同世界/Agent 的两个样本除以实际 tick 差，不把快照间隔视为固定。
   - 在 `READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE` 生命周期消息和选中对象变化时清理趋势缓存，tick 回退作额外保护；同 tick 不做差分。正常倍速/降频导致 tick 跳跃，不应因此清空缓存。
   - 不用 `strtab_epoch` 判断换世界，它在新世界可重复。字符串缓存与 UI 趋势缓存各按自己的契约处理。
@@ -96,6 +96,7 @@
   - 验收：Chrome 下测试换世界（含相同种子）、同 tick 读档、rewind、倍速、选人切换；无假趋势、无交互失效。
   - 验收记录（v1.50.58）：面板四轴/基线/标签/DA 阈值行渲染正常；采样器单测（同 tick、tick 回退、实际 tick 差速率、原地复用防御、reset 首样）全过；选人切换、RESET_DONE 换世界、REWIND_RESULT 回溯实测清缓存；64x 倍速 14000+ tick 跳跃缓存存活；控制台零报错。`HormoneTrend` 补 `vals.slice()` 防御性拷贝（调用方原地复用数组会致恒 0 假趋势）。「同 tick 读档」NOT_RUN（建档依赖 File System Access API 用户手势；LOAD_RESULT 与 rewind/reset 走同一清理行，代码核查 + rewind 实测覆盖 tick 回退兜底）。证据详见 changelog v1.50.58。
   - 来源：根 AGENTS.md §4.15、`rustworld.js::_invalidateWorldStaticCaches`。
+  - 位置演进：v1.50.56 初版位于 Inspector；v1.50.64 融合进 Inspector 详情窗口并修复布局畸变；v1.50.65 迁入「详细档案与族谱」模态（`.lineage-hormone-block`，紧随先天禀赋分节），DOM ID 与数据驱动逻辑不变。
 
 - [x] **H-07 P0 收口**
   - 开工前保存基准构建、配置、种子和固定采样 tick。以各构建匹配的快照解码器生成**既有状态投影**，比对 Agent、POI、房屋、账本、任务、事件及 RNG 状态；仅排除新增激素字段和明确的版本/协议元数据，不能排除行为字段来获得通过。

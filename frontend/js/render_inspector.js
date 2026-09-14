@@ -120,7 +120,9 @@ function _ensureHormoneRows() {
   rowsEl.appendChild(th);
 }
 
-/** ★ H-06 激素面板更新（P0 只读观察；仅展示个体状态，气质功能未实现时无气质项） */
+/** ★ H-06 激素面板更新（P0 只读观察；仅展示个体状态，气质功能未实现时无气质项）。
+ *  ★ v1.50.65 面板 DOM 已自 Inspector 迁入「详细档案与族谱」模态（#lineage-modal 内
+ *  .lineage-hormone-block），本函数仅负责数据驱动；模态关闭时随父级 display:none 隐藏。 */
 function updateHormonePanel(selAgent, worldTick) {
   const box = document.getElementById('insp-hormone-box');
   if (!box) return;
@@ -129,7 +131,8 @@ function updateHormonePanel(selAgent, worldTick) {
     box.style.display = 'none';
     return;
   }
-  // ★ v1.50.64 融合进详情窗口：块级堆叠（与家户归属卡一致）。此前用 'flex' 未设
+  // ★ v1.50.65 面板迁入族谱模态后仍用 'block' 块级堆叠（模态 body 为 flex column，
+  // box 作为普通块级子项参与纵向排布）。历史教训：v1.50.63 前用 'flex' 未设
   // flex-direction，默认 row 把标题挤成左侧竖条、计量行偏右，视觉上像独立小窗。
   box.style.display = 'block';
   _ensureHormoneRows();
@@ -1149,8 +1152,9 @@ if (sim.selectionType === 'house' && sim.selectedHouseId !== null) {
     const thirstFillEl = document.getElementById('insp-thirst-fill');
     if (thirstFillEl) thirstFillEl.style.width = `${Math.round((selAgent.thirst / 50.0) * 100)}%`;
 
-    // ★ H-06 四轴十一激素观察面板（趋势按实际 tick 差计算，不把快照间隔视为固定）
-    updateHormonePanel(selAgent, sim.tickCount || 0);
+// ★ H-06 四轴十一激素观察面板（趋势按实际 tick 差计算，不把快照间隔视为固定；
+// ★ v1.50.65 面板 DOM 位于族谱模态，此处照常逐帧驱动，模态关闭时更新在隐藏子树上进行）
+updateHormonePanel(selAgent, sim.tickCount || 0);
 
     // ★ v1.9.0 饱食/口渴/体力每秒变化速度（按游戏时间秒；Task1 进度条悬停）
     const _gdt = _gameDt();

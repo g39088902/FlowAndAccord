@@ -26,7 +26,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.64</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.65</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -512,19 +512,6 @@
           </div>
         </div>
 
-        <!-- ★ H-06 四轴十一激素观察面板（★ v1.50.64 融合进详情窗口：紧随生存健康指标，
-             与家户归属同款块级分节样式，不再独立成窗） -->
-        <div class="ledger-household-card" id="insp-hormone-box" style="display:none;">
-          <div class="ledger-card-title">
-            <span>🧬 神经内分泌 · 四轴</span>
-            <span id="insp-hormone-status" class="ledger-role-badge">—</span>
-          </div>
-          <div id="insp-hormone-rows" style="display:flex; flex-direction:column; gap:3px;"></div>
-          <div style="font-size:8.5px; color:#64748b; line-height:1.4; padding-top:3px;" id="insp-hormone-foot">
-            状态标签: <span id="insp-hormone-labels">—</span>
-          </div>
-        </div>
-
         <!-- 🎒 随身行囊: 紧凑胶囊展示 -->
         <div class="carry-card" id="insp-carry-box">
           <div class="carry-header">
@@ -937,6 +924,19 @@
             <span id="lineage-traits-source" class="lineage-traits-source-badge">均值100 · 标准差20</span>
           </div>
           <div id="lineage-self-traits" class="lineage-traits-grid"></div>
+        </div>
+
+        <!-- ★ H-06 四轴十一激素观察面板（★ v1.50.65 自 Inspector 迁入「详细档案与族谱」：
+             紧随先天禀赋与生命指标，与禀赋分节同款样式；随选中族人逐帧刷新，模态关闭随父级隐藏） -->
+        <div class="lineage-hormone-block" id="insp-hormone-box" style="display:none;">
+          <div class="lineage-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>🧬 神经内分泌 · 四轴</span>
+            <span id="insp-hormone-status" class="lineage-traits-source-badge">—</span>
+          </div>
+          <div id="insp-hormone-rows" style="display:flex; flex-direction:column; gap:3px; margin-top:6px;"></div>
+          <div style="font-size:9px; color:#64748b; line-height:1.4; padding-top:2px;" id="insp-hormone-foot">
+            状态标签: <span id="insp-hormone-labels">—</span>
+          </div>
         </div>
 
         <!-- 关系网四宫格 -->

@@ -491,8 +491,9 @@
       pointer-events: auto;
       transition: all 0.2s ease;
     }
-    /* ★ v1.50.64 激素面板融合进详情后内容变高：桌面端限高 + 内部滚动（弹收缩不弹拉伸，
-       矮内容保持自然高度，高内容在列内滚动，不再被底部播报浮窗遮挡随身行囊/家户归属） */
+    /* ★ v1.50.64 起桌面端限高 + 内部滚动（弹收缩不弹拉伸：矮内容保持自然高度，高内容在列内
+       滚动，不再被底部播报浮窗遮挡；★ v1.50.65 激素分节已迁往族谱模态，此滚动保障家户
+       大事记等长内容依旧可达，予以保留） */
     #inspector-card {
       flex: 0 1 auto;
       min-height: 0;
@@ -1241,6 +1242,30 @@
       height: 100%;
       border-radius: 2px;
       transition: width 0.25s ease;
+    }
+
+    /* ★ v1.50.65 H-06 激素观察分节（自 Inspector 迁入族谱模态）：与禀赋分节同款容器；
+       显隐由 updateHormonePanel 置 display:block（初始 inline none），计量行惰性构建
+       一次后只更新 textContent/width，遵守内容快照缓存红线，不高频重建 */
+    .lineage-hormone-block {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .lineage-hormone-block .lineage-section-title {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .lineage-hormone-block .meter-bg {
+      height: 4px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .lineage-hormone-block .meter-fill {
+      height: 100%;
+      border-radius: 2px;
     }
 
     .lineage-modal-grid {
@@ -4804,6 +4829,10 @@ body.theme-light .lineage-section {
 }
 body.theme-light .lineage-trait {
   background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .lineage-hormone-block {
+  background: #f8fafc;
   border-color: #e2e8f0;
 }
 
