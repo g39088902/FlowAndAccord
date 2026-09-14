@@ -4,6 +4,7 @@
 > 验证环境：CatPaw 内置预览浏览器（Chromium 148，`?nogate=1` 受控会话）+ macOS 26.3 / Apple M2；按 2026-09-14 用户确认口径（根 AGENTS.md §4 铁律）用于视觉/季相/生命周期/性能等**非存档链路**验证。**LOAD 文件存档链路 NOT_RUN**（预览浏览器无 File System Access API），须 Chrome 补测。
 > 会话基线：CSS 视口 1218×851、DPR 2（画布 1522×1063，dpr 封顶 1.25）；种子 42；v1.50.52；WASM 双副本 SHA256 `de98896c…b75f`（TA-05-1 manifest 固化）。
 > ★ 本轮环境事实（对后续复测有用）：预览面板隐藏时 rAF 节流至 ~7fps 且 CDP `Page.captureScreenshot` 高频超时；本包全部截图经「设相机 → `render(now+9999)` 过帧门控强制同步重绘 → canvas.toDataURL 分块取回」管线采集，均对应强制重绘后的真实生产帧。
+> ★ 2026-09-14 收口清理：本包已从仓库根目录迁入 `docs/plan/tech/assets/ta05-evidence-2026-09-14/`，并按「只保留可复现与复测所需」原则删减——原始 150 张截图（夹具 134 + 真实世界 16）中保留 19 张关键样张（基准/四季中心/交界/受光/主矩阵两端/真实场景/REWIND 代表帧），空 saves/ 与其余 131 张样张已删除；**全量原始文件见 git 历史 `5c9a661`**（TA05-evidence-2026-09-14-027af1d/）。方法论与遗留事项见 [09 植被样板验证](../../09-vegetation-verification.md)。
 
 ## 一、三对象身份（TA-05-2）
 
@@ -116,14 +117,18 @@
 ```text
 manifest.json                  # TA-05-1 环境固化（复用）
 visual/fixture/identities.json # 三对象身份表 + 夹具方法
-visual/fixture/season-*.jpg    # 16 张季相
-visual/fixture/matrix-*.jpg    # 96 张主矩阵
-visual/fixture/lightsep/lightdeg/edge/rot-sweep-*.jpg
-visual/fixture/fixture-baseline_spring_z4.6_{marked,clean}.jpg
-visual/world/real-*.jpg        # 真实场景基准（4 张）
-visual/world/lc-*.jpg          # 生命周期 9 张
+visual/fixture/                # 关键样张 17 张：基准 marked/clean、四季中心 ×4、
+                               # 春↔夏与冬↔春边界 1−ε/ε ×4、受光 az000/az180 + 退化、
+                               # 主矩阵两端、rot-sweep-0、edge-bottom
+visual/world/                  # real-tree0 真实基准 + lc-rewind 生命周期代表帧
 metrics/season-sampling.json   # 季相数值采样（26 点 × 4 对象）
 metrics/lifecycle.json         # 生命周期逐项结论
 metrics/perf-ta056.json        # 性能 3 轮 × P1~P4 原始样本与统计
 metrics/baseline-ta051.json    # TA-05-1 pilot 基线（复用对照）
+
+# 以下原始全量截图已于 2026-09-14 收口清理时删除（共 131 张：夹具 117 + 真实世界 14，另删空 saves/），
+# 验证结论与逐项判定见本报告正文，全量文件见 git 历史 5c9a661：
+#   matrix-*（其余 94 张）、season-*（其余 8 张）、lightsep-az{090,270}、
+#   lightdeg-az060、edge-{left,right,top}、rot-sweep-{45..315}、
+#   fixture-baseline z3.2/z4.2、visual/world/real-* 其余 5 张与 lc-* 其余 9 张
 ```
