@@ -129,7 +129,9 @@ function updateHormonePanel(selAgent, worldTick) {
     box.style.display = 'none';
     return;
   }
-  box.style.display = 'flex';
+  // ★ v1.50.64 融合进详情窗口：块级堆叠（与家户归属卡一致）。此前用 'flex' 未设
+  // flex-direction，默认 row 把标题挤成左侧竖条、计量行偏右，视觉上像独立小窗。
+  box.style.display = 'block';
   _ensureHormoneRows();
 
   // 趋势采样：levels[1] 即 DA 阈值，速率按同下标复用（数组直传避免每帧分配）

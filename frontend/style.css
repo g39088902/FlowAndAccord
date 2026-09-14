@@ -282,6 +282,7 @@
     .right-panel-stack {
       position: absolute;
       top: 88px; right: 20px;
+      bottom: 248px; /* ★ v1.50.64 底界让位于事件播报浮窗（bottom 20 + 高 216 + 12 缝隙），列内溢出由 #inspector-card 内部滚动承接 */
       width: 350px;
       display: flex;
       flex-direction: column;
@@ -490,6 +491,15 @@
       pointer-events: auto;
       transition: all 0.2s ease;
     }
+    /* ★ v1.50.64 激素面板融合进详情后内容变高：桌面端限高 + 内部滚动（弹收缩不弹拉伸，
+       矮内容保持自然高度，高内容在列内滚动，不再被底部播报浮窗遮挡随身行囊/家户归属） */
+    #inspector-card {
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    #inspector-card::-webkit-scrollbar { width: 4px; }
+    #inspector-card::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 2px; }
     .inspector-title {
       font-weight: 700;
       color: #38bdf8;
