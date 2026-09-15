@@ -56,11 +56,13 @@ let _depthPoolUsed = 0;
 function _depthItem(kind, a, b, depth) {
   let it = _depthPool[_depthPoolUsed];
   if (it === undefined) {
-    it = { kind: 0, a: null, b: 0, c: 0, d: 0, depth: 0, s1x: 0, s1y: 0, s2x: 0, s2y: 0, dash: 0 };
+    // ★ TA-07：ex/ey = 锚点屏幕坐标（装饰/景观/阴影项；绘制端零重投影）
+    //   lod = 本项是否已由入队端剔除并写入屏幕 AABB（1 = 绘制端无需再剔；每次复用清零）
+    it = { kind: 0, a: null, b: 0, c: 0, d: 0, depth: 0, s1x: 0, s1y: 0, s2x: 0, s2y: 0, dash: 0, ex: 0, ey: 0, lod: 0 };
     _depthPool.push(it);
   }
   _depthPoolUsed++;
-  it.kind = kind; it.a = a; it.b = b; it.depth = depth;
+  it.kind = kind; it.a = a; it.b = b; it.depth = depth; it.lod = 0;
   _depthList.push(it);
   return it;
 }
@@ -463,13 +465,45 @@ function drawWorldEntities() {
     if (_LL) proposeHouseLabels(house); // ★ S4-06 房屋标签提案
   }
   const terrainAccents = (terrain && terrain.accents) || [];
+  // ★ TA-07-6 入队前两级剔除（§3.5）：一级 kind 级保守常数（**零模型访问** ⇒ 屏外个体不付
+  //   AccentModel.get()，冷缓存/相机跳变时不构建屏外骨架）→ 二级模型真值 bounds 精剔；
+  //   屏外个体还不付 _decalDepth（3 次 _ownCellCenterDepth）、不进 list.sort()、不进分发循环。
+  //   遮罩判定（LandscapeMask.accentHidden）保持在剔除**之前**——被遮罩个体不付剔除成本。
+  const AL = window.AccentLOD;
+  const cullOn = !!(AL && AL.cfg().cullOn);
   for (const accent of terrainAccents) {
     // ★ S4-03：落入保护区（道路/房屋/POI）或与可见景观子图元重叠的基础装饰整体隐藏，
     //   源数组保持不变（避让只隐藏表现；贴地投影随同不入队）
     if (_mask && _mask.accentHidden(accent)) continue;
+    const rxA = accent.x * cosZ - accent.y * sinZ;
+    const ryA = accent.x * sinZ + accent.y * cosZ;
+    const azA = (accent.z || 0) + MAP_Z_LIFT;
+    const sxA = cx + rxA * scale;
+    const syA = cy + (ryA * cosX - azA * sinX) * scale;
+    if (cullOn) {
+      const scA = (accent.scale || 1) * scale;
+      const kbA = AL.kindBounds(accent.kind);
+      if (!AL.visible(AL.aabbOf(sxA, syA, kbA, AL.SHEAR_MAX, scA, cosX, sinX, AL.aabb))) {
+        AL.stats().cullCoarse++; continue;
+      }
+      const mA = window.AccentModel.get(accent);
+      const bA = AL.modelBounds(mA, accent.kind);
+      if (!AL.visible(AL.aabbOf(sxA, syA, bA, AL.leanShear(accent, mA), scA, cosX, sinX, AL.aabb))) {
+        AL.stats().cullFine++; continue;
+      }
+    }
     // ★ v1.50.13 石头/灌木宽约 6 世界单位，走足迹感知深度消除底边残缝
     const dd = _decalDepth(accent.x, accent.y, RC.accentFootprintR || 8, cosZ, sinZ, cosX, sinX);
-    _depthItem(DEPTH_ACCENT, accent, 0, dd != null ? dd : _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX));
+    const itA = _depthItem(DEPTH_ACCENT, accent, 0, dd != null ? dd : _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX));
+    // ★ TA-07：屏幕 AABB（s1x/s1y = 左下、s2x/s2y = 右上）与锚点屏幕坐标（ex/ey）随深度项
+    //   传递 ⇒ 绘制端零重投影、零重剔除，且与入队端共享**同一个** AABB（§3.5 口径唯一红线）
+    itA.ex = sxA; itA.ey = syA;
+    if (cullOn) {
+      // lod=1 ⇒ 绘制端不再重剔（消费**同一个** AABB）；剔除关态时绘制端按现状自算自剔
+      itA.lod = 1;
+      itA.s1x = AL.aabb.x0; itA.s1y = AL.aabb.y0; itA.s2x = AL.aabb.x1; itA.s2y = AL.aabb.y1;
+      AL.stats().enqueued++;
+    }
   }
   // ── 6.5 树/灌木贴地投影（★ TA-04-6 地面图元独立入队，绘制归 render_shadows.js 装饰层）──
   //   深度由世界落点（基点 + 影梢）的足迹深度取大——不沿用树根/树冠深度；
@@ -484,6 +518,21 @@ function drawWorldEntities() {
       const kind = accent.kind;
       if (kind !== 'Tree' && kind !== 'Bush') continue;
       if (_mask && _mask.accentHidden(accent)) continue; // ★ S4-03：被遮蔽装饰的投影随同隐藏
+      const rxS = accent.x * cosZ - accent.y * sinZ;
+      const ryS = accent.x * sinZ + accent.y * cosZ;
+      const azS = (accent.z || 0) + MAP_Z_LIFT;
+      const sxS = cx + rxS * scale;
+      const syS = cy + (ryS * cosX - azS * sinX) * scale;
+      // ★ TA-07 一级粗剔：影长可达「实高 × shadowReachK」（shadowLenMax 2.40，见
+      //   config.lighting.js），须按该上界外扩后再判，否则会剔掉「树在屏外、影在屏内」的个体。
+      if (cullOn) {
+        const scS = (accent.scale || 1) * scale;
+        const kbS = AL.kindBounds(kind);
+        const aS = AL.aabbOf(sxS, syS, kbS, AL.SHEAR_MAX, scS, cosX, sinX, AL.aabb);
+        const reach = kbS.zMax * AL.cfg().shadowReachK * scS; // 影长上界（任意方向）：AABB 各向同扩
+        aS.x0 -= reach; aS.x1 += reach; aS.y0 -= reach; aS.y1 += reach;
+        if (!AL.visible(aS)) { AL.stats().cullCoarse++; continue; }
+      }
       const skel = window.AccentModel.get(accent).skeleton;
       if (!skel) continue;
       const hWorld = skel.trunkH * accent.scale;
@@ -494,12 +543,27 @@ function drawWorldEntities() {
       }
       const tipX = accent.x + sxw * slen * hWorld;
       const tipY = accent.y + syw * slen * hWorld;
+      const soX = ((tipX - accent.x) * cosZ - (tipY - accent.y) * sinZ) * scale;
+      const soY = ((tipX - accent.x) * sinZ + (tipY - accent.y) * cosZ) * cosX * scale;
+      // ★ TA-07 二级精剔：冠影 + 影梢两圆并集（保守：冠幅取模型 crownR 全幅、shadowK 取 1）
+      if (cullOn) {
+        const crownRS = (skel.crownR || (kind === 'Tree' ? 8.5 : 6.5)) * (accent.scale || 1) * scale;
+        if (!AL.visible(AL.shadowAabb(sxS, syS, crownRS, 1, soX, soY, AL.aabb))) {
+          AL.stats().cullFine++; continue;
+        }
+      }
       const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * accent.scale; // ★ TA-06-8 冠幅足迹读模型（世界单位）
       const dBase = _decalDepth(accent.x, accent.y, fp, cosZ, sinZ, cosX, sinX);
       const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
       let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;
       if (d == null) d = _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX);
-      _depthItem(DEPTH_ACCENT_SHADOW, accent, 0, d);
+      const itS = _depthItem(DEPTH_ACCENT_SHADOW, accent, 0, d);
+      itS.ex = sxS; itS.ey = syS; // ★ TA-07 锚点屏幕坐标随深度项传递（阴影绘制端零重投影）
+      if (cullOn) {
+        itS.lod = 1; // 绘制端不再重剔（关态时绘制端按现状自算自剔，见 render_shadows.js）
+        itS.s1x = AL.aabb.x0; itS.s1y = AL.aabb.y0; itS.s2x = AL.aabb.x1; itS.s2y = AL.aabb.y1;
+        AL.stats().enqueued++;
+      }
     }
   }
 
@@ -542,10 +606,11 @@ function drawWorldEntities() {
       case DEPTH_POI_BASE: drawPoiGroundBase(it.a); break;
       case DEPTH_POI: drawPoiMarker(it.a); break;
       case DEPTH_HOUSE: drawHouse(it.a); break;
-      case DEPTH_ACCENT: drawAccentEntity(it.a); break;
-      case DEPTH_ACCENT_SHADOW: drawAccentShadowGround(it.a); break;
-      case DEPTH_LANDSCAPE: drawLandscapeChild(it.a); break;
-      case DEPTH_LANDSCAPE_SHADOW: drawLandscapeShadowGround(it.a); break;
+      // ★ TA-07-6：装饰/阴影/景观四项把深度项整体传给绘制端（消费入队端 AABB 与锚点屏幕坐标）
+      case DEPTH_ACCENT: drawAccentEntity(it.a, it); break;
+      case DEPTH_ACCENT_SHADOW: drawAccentShadowGround(it.a, it); break;
+      case DEPTH_LANDSCAPE: drawLandscapeChild(it.a, it); break;
+      case DEPTH_LANDSCAPE_SHADOW: drawLandscapeShadowGround(it.a, it); break;
       default: drawAgent(it.a);
     }
   }

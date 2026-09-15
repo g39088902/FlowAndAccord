@@ -22,7 +22,7 @@
 //   （无收集/排序，故无需专用池）；花量与季相同源（accentFlowerCycle），冬夏自然归零。
 //
 // 依赖全局: ctx, camera, w, h（render_world.js/main.js）、accentLitFill / cylinderShade /
-//   accentDetailLevels / accentClusterVisibility / barkBandCfg / crownLitCfg /
+//   accentClusterVisibility / barkBandCfg / crownLitCfg / window.AccentLOD（★ TA-07 判档入口）/
 //   _ptA~_ptD / _crownScratch / _crownScratchPool / _sortScratch / _ld / _sunScr
 //   （render_accents.js 共享，禁在本文件复制）、window.AccentModel、window.SimTreeTint、window.RENDER_CONFIG。
 
@@ -35,9 +35,12 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const squash = sk.crownSquash || 0.72;   // ★ TA-06：簇扁压系数（lowEvergreen 更扁、贴地铺展）
   const leaf = season.leafDensity;
   const brown = season.brownness;
-  const lv = accentDetailLevels();
-  const detailMid = r >= lv.mid;   // 中景：茎 + 叶簇（★ TA-06-7 花朵图元的细节门槛）
-  const detailNear = r >= lv.near;
+  // ★ TA-07 三档判档（AccentLOD 唯一入口；featurePx = 模型冠幅 × accent.scale × zoom，
+  //   阈值 7/15 带滞回）。灌木细茎 segTier 恒 0 ⇒ 中景与近景枝量一致，只有簇子集与亮部分档。
+  const AL = window.AccentLOD;
+  const tier = AL.tierFor(accent, 'Bush', model, scaled);
+  const detailMid = tier >= AL.MID;   // 中景：茎 + 叶簇（★ TA-06-7 花朵图元的细节门槛）
+  const detailNear = tier >= AL.NEAR;
 
   // 贴地微投影已随 TA-04-6 迁往 render_shadows.js::drawAccentShadowGround（同 Tree）
 
@@ -53,7 +56,7 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   // 细茎（全年保留；冬季枯枝为主）
   // ★ TA-04-3：茎走与 Tree 枝条同一受光管线（灌木无倾干，剪切 = 0）——基色按「朝屏法线」
   //   受光，茎宽可辨时沿迎光侧补细高光；转相机/光向明暗随动。
-  if (r >= lv.mid) {
+  if (detailMid) {
     const bb = barkBandCfg();
     const wvx = sinZ * sinX, wvy = cosZ * sinX, wvz = cosX; // 世界视向（灌木无剪切，模型=世界）
     ctx.lineCap = 'round';
@@ -94,13 +97,18 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const lw = Math.max(0.4, 0.45 * scaled);
   const fade = 0.09;
   const jitterAmp = 6 + 26 * brown;
+  // ★ TA-07 远景档取模型预生成的簇子集（同 Tree 口径；Bush 簇数 8~9，子集通常即全簇）
+  const farIdx = (tier === AL.FAR) ? model.farClusters : null;
+  const clN = farIdx ? farIdx.length : sk.clusters.length;
   let nItems = 0;
-  for (let i = 0; i < sk.clusters.length; i++) {
-    const c = sk.clusters[i];
+  for (let k = 0; k < clN; k++) {
+    const c = farIdx ? sk.clusters[farIdx[k]] : sk.clusters[k];
     const v = accentClusterVisibility(leaf, c.shed, fade);
     if (v < 0.06) continue;
     const p = _ptA;
     projTo(c.x, c.y, c.z, p);
+    // ★ TA-07 补簇级视口剔除（旧实现灌木侧无剔除；x/y 双向判据与 Tree 同口径）
+    if (p.y < -40 || p.y > h + 40 || p.x < -40 || p.x > w + 40) continue;
     const rr = c.r * scaled * v;
     if (rr < 0.5) continue;
     const it = _crownScratch(nItems++);

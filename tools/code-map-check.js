@@ -77,12 +77,14 @@ function scanActualFiles() {
 // 3. 构建代码地图中的"目录→文件"映射（基于树形缩进）
 // ---------------------------------------------------------------------------
 function parseCodeMapTree(text) {
-  const blockRe = /```text\n([\s\S]*?)```/g;
+  // ★ 行尾归一：工作副本在 core.autocrlf=true 的 Windows 环境下为 CRLF，围栏标记后紧跟
+  //   \r 会让 /```text\n…/ 匹配失败 ⇒ 解析出 0 条登记、全量误报警告。先统一成 LF 再解析。
+  const blockRe = /```text\r?\n([\s\S]*?)```/g;
   const blockMatch = blockRe.exec(text);
   if (!blockMatch) return { dirs: new Map(), files: new Set() };
 
   const block = blockMatch[1];
-  const lines = block.split('\n');
+  const lines = block.replace(/\r\n/g, '\n').split('\n');
 
   // 用栈维护当前路径前缀
   const pathStack = []; // [{ indent, name }]

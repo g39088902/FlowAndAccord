@@ -35,17 +35,19 @@ function accentShadowCfg() {
 }
 
 // Tree/Bush：贴地投影地面图元（统一深度队列 DEPTH_ACCENT_SHADOW 分发入口）
-function drawAccentShadowGround(accent) {
+// ★ TA-07-6：第二参 it = 深度队列项（可选）——入队端已完成剔除并把锚点屏幕坐标写入 ex/ey，
+//   绘制端零重投影、零重剔除（入队端与绘制端消费**同一个** AABB，§3.5 口径唯一红线）。
+function drawAccentShadowGround(accent, it) {
   const kind = accent.kind;
   if (kind !== 'Tree' && kind !== 'Bush') return; // 入队已过滤，防御再判
   const model = window.AccentModel.get(accent);
-  drawAccentShadowFor(accent, model);
+  drawAccentShadowFor(accent, model, it);
 }
 
 // ★ S4-02 景观子图元共用主体（render_landscapes.js 消费）：模型由调用方以完整 key 通道
 // （AccentModel.getByKey，'L#' 命名空间）解析后传入，accent 与景观子图元共用同一套
 // 实高驱动影长 + 叶量调制公式（光照公式单一来源，不复制）。
-function drawAccentShadowFor(accent, model) {
+function drawAccentShadowFor(accent, model, it) {
   const kind = accent.kind;
   const skel = model.skeleton;
   if (!skel) return;
@@ -58,12 +60,17 @@ function drawAccentShadowFor(accent, model) {
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
 
-  // 锚点投影（与 drawAccentEntity 同一套相机变换）
-  const rx = accent.x * cosZ - accent.y * sinZ;
-  const ry = accent.x * sinZ + accent.y * cosZ;
-  const az = (accent.z || 0) + MAP_Z_LIFT;
-  const sx = w / 2 + camera.panX + rx * scale;
-  const sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+  // 锚点投影（与 drawAccentEntity 同一套相机变换）；it 存在时直接消费入队端结果
+  let sx, sy;
+  if (it) {
+    sx = it.ex; sy = it.ey;
+  } else {
+    const rx = accent.x * cosZ - accent.y * sinZ;
+    const ry = accent.x * sinZ + accent.y * cosZ;
+    const az = (accent.z || 0) + MAP_Z_LIFT;
+    sx = w / 2 + camera.panX + rx * scale;
+    sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+  }
 
   // LOD：冠屏半径过小整组省略（远景亚像素噪声）；冠幅 = 模型冠半径 × accent.scale × zoom
   const crownR = (skel.crownR || (kind === 'Tree' ? 8.5 : 6.5)) * accent.scale * scale;
@@ -74,9 +81,14 @@ function drawAccentShadowFor(accent, model) {
   const hWorld = skel.trunkH * accent.scale;
   const so = _shadowOffset(kind === 'Tree' ? 1.2 : 1.0, kind === 'Tree' ? 2.5 : 2.0, hWorld);
 
-  // 视口剔除（覆盖 = 锚点 ± 冠幅与影梢的包络）
-  const ext = crownR * 1.8 + Math.abs(so.x) + Math.abs(so.y);
-  if (sx + ext < 0 || sx - ext > w || sy + ext < 0 || sy - ext > h) return;
+  // ★ TA-07 视口剔除改走 AccentLOD.shadowAabb（冠影 + 影梢两圆并集，解析解）——取代旧
+  //   「crownR×1.8 + |so|」经验系数包络（§2.3-2 漂移收口）；入队端已剔除（it.lod===1）
+  //   时不再重剔，独立调用或剔除关态时按现状自算自剔（关态完整回退现状路径）。
+  if (!it || it.lod !== 1) {
+    const shadowK0 = 0.55 + 0.45 * leaf;
+    const AL = window.AccentLOD;
+    if (AL && !AL.visible(AL.shadowAabb(sx, sy, crownR * (0.85 + model.vSeed * 0.15), shadowK0, so.x, so.y, AL.aabb))) return;
+  }
 
   const shadowK = 0.55 + 0.45 * leaf;           // 叶量 → 覆盖缩放（沿用旧口径）
   const kA = so.alphaScale;                     // 季节光照不透明度调制（lightShadowOffset）

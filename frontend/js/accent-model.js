@@ -7,7 +7,9 @@
 //   Bush = 基生多细茎 + 茎端/茎中段叶簇（不缩小乔木模型冒充灌木）。叶簇带稳定脱落次序
 //   `shed`（0 先落 → 1 后落）与个体色差通道 `lite`——季节叶量下降时按次序收缩并隐藏叶簇，
 //   春季按萌芽曲线恢复**同一批稳定位置**；暂停、读档、回溯后不重新随机抽样。
-//   后续 TA-07（包围体剔除 / 局部几何缓存分级）在本文件扩展。
+//   ★ TA-07-3 在本文件扩展：**真值包围体** bounds{rH,zMin,zMax,yUp}（由骨架几何求值，取代
+//   extentOf 的 kind 级硬编码常数）+ **分级几何索引** farClusters（远景簇子集，半径降序前 K）/
+//   segTier（0 主枝 / 1 二级枝）/ stoneMain；三者均为 (kind,id) 纯函数，随现有缓存键入缓存。
 //
 // ★ D-B1-6（06 号文 §5.5）：RockCluster = 内核只下发一个 anchor，2–5 颗子石的偏移/尺度/
 //   形状全部由 accent.id 哈希派生（纯函数，读档/回溯逐位一致），**不为子石建实体、
@@ -131,6 +133,13 @@ window.AccentModel = window.AccentModel || (function () {
     return undefined;
   }
 
+  // 远景簇子集上限（config.render.js::accentLODFarMaxClusters；**几何输入**，调值须同步
+  // bump accentModelStyleVersion，否则旧缓存不重建）
+  function farMaxClusters() {
+    const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentLODFarMaxClusters;
+    return (typeof v === 'number' && isFinite(v) && v >= 1) ? Math.round(v) : 8;
+  }
+
   function styleVersion() {
     const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentModelStyleVersion;
     return Number.isFinite(v) ? v : 1;
@@ -161,6 +170,132 @@ window.AccentModel = window.AccentModel || (function () {
       const len = Math.hypot(gx, gy, gz) || 1;
       c.nx = gx / len; c.ny = gy / len; c.nz = gz / len;
     }
+  }
+
+  // ── ★ TA-07-3 真值包围体（07 号 §6.7 / TA-07-TODO §3.4）：由**骨架几何**求值，取代
+  //    extentOf 的 kind 级硬编码常数（旧 Tree 8.5×1.3 / Bush 8 / Boulder 7 / RockCluster 10 /
+  //    GrassTuft 7 全部作废）。局部包围体（**世界单位**，未乘 accent.scale / camera.zoom）：
+  //   rH   水平最大 reach：簇/枝/石/草叶顶点的 max hypot(x,y) + 该点自身半径
+  //   zMax 竖直上界（含簇球半径 / 石体高 / 芦花穗长）；zMin 竖直下界（簇球下沉时取负）
+  //   yUp  屏幕竖直**额外**上界（世界单位 × cosX × scaled）：石体底环按 v1.50.13「底边贴
+  //        落地点」契约整体落在锚点上方（非以锚点为心的对称圆盘），不显式登记会让远景
+  //        石体顶部被剔除（漏画 = 可见缺陷）。
+  //   rS   「球体半径」上界（世界单位 × scaled，**不乘 cosX**）：叶簇/子石是屏幕空间球，
+  //        竖直方向按全半径外扩（水平已由 rH 计入），漏掉它会让低俯角（cosX→0）下冠顶
+  //        被误剔；芦花穗沿任意屏幕方向延伸，同样计入本项。
+  // 倾干剪切（wx = dx + s·dz，s = leanShear）的水平补偿 |s|·zMax 由 accent-lod.js 在求屏幕
+  // AABB 时施加——s 依赖 accent.rotation，**不入模型缓存**。
+  // 恒为保守上界（宁多画不漏画）：簇球按完整半径计入水平与竖直两侧，草叶穗长按任意方向计。
+  function boundsOf(kind, sk) {
+    var b = { rH: 8, zMin: 0, zMax: 8, yUp: 0, rS: 0 };
+    if (!sk) {
+      // Boulder：无骨架（绘制层直接给 6×scaled 石半径 + 固定七边形变径）
+      var rb = boulderRadius() * 1.20;             // 变径上限 1.20（_BOULDER_SHAPE 最大值）
+      b.rH = rb; b.zMax = boulderRadius() * stoneHeightK(); b.zMin = 0; b.yUp = rb; b.rS = 0;
+      return b;
+    }
+    var rH = 0, zMax = 0, zMin = 0, rS = 0;
+    var i, c, h;
+    if (sk.clusters) {
+      for (i = 0; i < sk.clusters.length; i++) {
+        c = sk.clusters[i];
+        h = Math.sqrt(c.x * c.x + c.y * c.y) + c.r;
+        if (h > rH) rH = h;
+        if (c.r > rS) rS = c.r;
+        if (c.z + c.r > zMax) zMax = c.z + c.r;
+        if (c.z - c.r < zMin) zMin = c.z - c.r;
+      }
+    }
+    if (sk.segments) {
+      for (i = 0; i < sk.segments.length; i++) {
+        var s1 = sk.segments[i];
+        var ha = Math.sqrt(s1.x1 * s1.x1 + s1.y1 * s1.y1);
+        var hb = Math.sqrt(s1.x2 * s1.x2 + s1.y2 * s1.y2);
+        if (ha > rH) rH = ha;
+        if (hb > rH) rH = hb;
+        if (s1.z1 > zMax) zMax = s1.z1;
+        if (s1.z2 > zMax) zMax = s1.z2;
+        if (s1.z1 < zMin) zMin = s1.z1;
+        if (s1.z2 < zMin) zMin = s1.z2;
+      }
+    }
+    if (sk.stones) { // RockCluster：子石散布 + 逐石外接（含 1.22 变径上限）
+      for (i = 0; i < sk.stones.length; i++) {
+        var st = sk.stones[i];
+        h = Math.sqrt(st.x * st.x + st.y * st.y) + st.r * 1.22;
+        if (h > rH) rH = h;
+        if (st.r * 1.22 * stoneHeightK() > zMax) zMax = st.r * 1.22 * stoneHeightK();
+        if (st.r * 1.22 > rS) rS = st.r * 1.22;      // 子石顶面/侧面为屏幕空间球体
+      }
+      if (sk.spread * 1.05 > rH) rH = sk.spread * 1.05; // 簇群整片接触阴影椭圆（rx = spread×1.05）
+      b.yUp = rH;                                       // 子石底环同样贴落地点
+    }
+    if (sk.blades) { // GrassTuft：叶身 + 穗状芦花（穗沿任意屏幕方向延伸，水平竖直各计一次）
+      var maxPlume = 0;
+      for (i = 0; i < sk.blades.length; i++) {
+        var bl = sk.blades[i];
+        h = Math.sqrt(bl.tx * bl.tx + bl.ty * bl.ty);
+        if (Math.sqrt(bl.bx * bl.bx + bl.by * bl.by) > h) h = Math.sqrt(bl.bx * bl.bx + bl.by * bl.by);
+        if (bl.plume > maxPlume) maxPlume = bl.plume;
+        if (h + bl.plume > rH) rH = h + bl.plume;
+        if (bl.h + bl.plume > zMax) zMax = bl.h + bl.plume;
+      }
+      if (2.6 > rH) rH = 2.6; // 贴地接触投影椭圆（rx = 2.6×scaled，render_grass.js:99）
+      if (maxPlume > rS) rS = maxPlume;             // 穗沿任意屏幕方向延伸（不计 cosX）
+    }
+    if (sk.trunkH) {
+      var trunkHalfW = (sk.crownR || 8.5) * 0.17; // 主干锥形底半宽（render_accents.js bw 口径）
+      if (trunkHalfW > rH) rH = trunkHalfW;
+      if (sk.trunkH > zMax) zMax = sk.trunkH;
+    }
+    b.rH = rH; b.zMin = zMin; b.zMax = zMax; b.rS = rS;
+    return b;
+  }
+  function stoneHeightK() {
+    var v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentStoneHeightK;
+    return typeof v === 'number' && isFinite(v) ? v : 0.3;
+  }
+  function boulderRadius() { return 6; } // drawAccentBoulder 入参石半径（世界单位）
+
+  // ── ★ TA-07-3 分级几何索引（§3.6；全部为 (kind, id) 纯函数，随现有缓存键入缓存）──
+  // farClusters：远景簇子集——按簇半径降序取前 K（同径按数组序稳定 tie-break），再按原
+  //   索引升序回排（保持既有画家次序），Uint8Array 存储免每帧排序/筛选。
+  // segTier：逐段 tier（0 主枝 / 1 二级枝；Bush 与 conifer 恒 0）——中景只遍历 tier 0，
+  //   免每帧按 wK 判别（旧实现把主枝 0.42 与二级枝 0.24 混在同一数组，中景实际全画）。
+  function farClusterIndices(clusters, maxN) {
+    var n = clusters.length;
+    if (!n) return new Uint8Array(0);
+    var k = Math.min(n, Math.max(1, maxN | 0));
+    var ord = [];
+    for (var i = 0; i < n; i++) ord.push(i);
+    // 稳定插入排序（按 r 降序；等径保持原序）
+    for (var a = 1; a < n; a++) {
+      var key = ord[a], kr = clusters[key].r;
+      var j = a - 1;
+      while (j >= 0 && clusters[ord[j]].r < kr) { ord[j + 1] = ord[j]; j--; }
+      ord[j + 1] = key;
+    }
+    var out = new Uint8Array(k);
+    for (var m = 0; m < k; m++) out[m] = ord[m];
+    // 回排为原索引升序（保持既有画家次序；n ≤ 24，插入排序零闭包分配）
+    for (var b2 = 1; b2 < k; b2++) {
+      var kk = out[b2];
+      var jj = b2 - 1;
+      while (jj >= 0 && out[jj] > kk) { out[jj + 1] = out[jj]; jj--; }
+      out[jj + 1] = kk;
+    }
+    return out;
+  }
+  function segTierOf(segments, mainSegIdx) {
+    var n = segments ? segments.length : 0;
+    var t = new Uint8Array(n); // 缺省 0 = 主枝
+    if (!mainSegIdx) return t;  // conifer 轮生枝 / Bush 细茎：全部视为主枝
+    for (var i = 0; i < n; i++) t[i] = 1;
+    for (var m = 0; m < mainSegIdx.length; m++) {
+      var idx = mainSegIdx[m];
+      if (idx >= 0 && idx < n) t[idx] = 0;
+    }
+    return t;
   }
 
   // 倾干剪切（局部点变换 x += s·z）下的法线变换 = 变换矩阵的逆转置：n' = (nx, ny, nz − s·nx)。
@@ -228,6 +363,8 @@ window.AccentModel = window.AccentModel || (function () {
       trunkH: trunkH, crownR: sp.crownR,
       crownSquash: sp.crownSquash, footprintR: sp.footprintR, leanShearK: sp.leanShearK,
       segments: segments, branchTips: branchTips, clusters: clusters,
+      // ★ TA-07-3 分级几何：逐段 tier（0 主枝 / 1 二级枝）——中景只遍历 tier 0（§3.2）
+      segTier: segTierOf(segments, mainSegOnly),
     };
   }
 
@@ -474,6 +611,8 @@ window.AccentModel = window.AccentModel || (function () {
       crownR: vp.crownRBase + vSeed * vp.crownRVar, // 唯一几何真相源（修正与绘制口径的历史漂移）
       crownSquash: vp.crownSquash, footprintR: vp.footprintR, leanShearK: 1.0,
       segments: segments, branchTips: [], clusters: clusters,
+      // ★ TA-07-3：灌木细茎全部视为主枝（恒 0），中景与近景画法一致
+      segTier: segTierOf(segments, null),
       // 花灌木专属：构建期固定花位（其余变体恒 null，绘制层零花点）
       flowers: (variant === 'flowering') ? _bushFlowers(id, clusters) : null,
     };
@@ -571,21 +710,12 @@ window.AccentModel = window.AccentModel || (function () {
     return { blades: blades, isReed: isReed };
   }
 
-  // 锚点上方最大延伸（世界单位，未乘 zoom）——★ TA-06-3 起对 Tree/Bush 由**骨架实际几何**
-  // 求值（锥形常绿更高更窄，旧 kind+vSeed 估算会低估）；其余种类保留旧常量。
-  // TA-07 包围体剔除的预留字段：仅作信息登记，当前视口剔除仍走 render_accents.js 的既有余量公式。
-  function extentOf(kind, vSeed, sk) {
-    if (sk) {
-      let e = sk.trunkH || 0;
-      const cl = sk.clusters;
-      if (cl) for (let i = 0; i < cl.length; i++) { const t = cl[i].z + cl[i].r; if (t > e) e = t; }
-      const sg = sk.segments;
-      if (sg) for (let i = 0; i < sg.length; i++) { if (sg[i].z2 > e) e = sg[i].z2; }
-      return e * 1.06 + 0.5; // 冠缘余量
-    }
-    if (kind === 'Boulder') return 7;
-    if (kind === 'RockCluster') return 10; // 主石半径×1.2 变径上限 + 散布
-    if (kind === 'GrassTuft') return 7;
+  // 锚点上方最大延伸（世界单位，未乘 zoom）——★ TA-07-3 起由**真值包围体**单一来源派生
+  // （旧 kind 级硬编码常数 Boulder 7 / RockCluster 10 / GrassTuft 7 全部作废，与 TA-06-3
+  //  「Tree/Bush 由骨架几何求值」同源，消除两处各算一套的漂移）。
+  function extentOf(kind, vSeed, sk, bounds) {
+    if (bounds) return bounds.zMax * 1.06 + 0.5; // 冠缘余量（沿用 TA-06-3 口径）
+    if (kind === 'Boulder') return 7;            // 无骨架种类：bounds 已覆盖，此处仅兜底
     return 8;
   }
 
@@ -614,6 +744,9 @@ window.AccentModel = window.AccentModel || (function () {
       : kind === 'RockCluster' ? rockClusterSkeleton(id, vSeed)
       : kind === 'GrassTuft' ? grassTuftSkeleton(id, vSeed)
       : null;
+    // ★ TA-07-3 真值包围体 + 分级几何索引（§3.6）：全部为 (kind, id) 纯函数，随本条目缓存；
+    //   只增字段，不改 _CACHE_MAX / 生命周期 / 缓存键构造（07 号 §10.2 契约不变）。
+    var bounds = boundsOf(kind, sk);
     m = {
       id: id,
       kind: kind || '',
@@ -621,7 +754,12 @@ window.AccentModel = window.AccentModel || (function () {
       species: species,                                  // { silhouette, profile } / undefined
       profile: species ? species.profile : undefined,    // ★ TA-06-2 profile 单一入口
       skeleton: sk,
-      extent: extentOf(kind, vSeed, sk),
+      bounds: bounds,                                    // ★ TA-07-3 { rH, zMin, zMax, yUp } 真值
+      // 远景簇子集（半径降序前 accentLODFarMaxClusters；几何输入 → 调值须 bump 风格版本）
+      farClusters: sk && sk.clusters ? farClusterIndices(sk.clusters, farMaxClusters()) : null,
+      segTier: (sk && sk.segTier) || null,               // 逐段 tier（0 主枝 / 1 二级枝）
+      stoneMain: 0,                                      // RockCluster 主石索引（恒 0，显式登记）
+      extent: extentOf(kind, vSeed, sk, bounds),
     };
     if (_cache.size >= _CACHE_MAX) _cache.clear();
     _cache.set(fullKey, m);
