@@ -16,22 +16,22 @@
     river_valley_v1: '🏞️ 河谷',
     grassland_plain_v1: '🌾 平地草原',
     hillside_woodland_v1: '🌲 半坡林地',
-    river_valley_settlement_v1: '🏔️ 河谷聚落',
-    plateau_settlement_v1: '🏕️ 台地聚落',
+    plateau_v1: '🏕️ 台地',
     alluvial_fan_v1: '🏜️ 山前冲积扇',
     basin_oasis_v1: '⛰️ 盆地',
     lakeside_basin_v1: '🌊 湖畔盆地',
     flat_baseline: '📐 诊断基线',
   };
 
-  // 与 sim_core geo/terrain.rs::resolve_profile 完全一致的 9 路 random 候选池
+  // 与 sim_core geo/terrain.rs::resolve_profile 完全一致的 8 路 random 候选池
+  //（v1.50.68 砍需求：原 9 路中删除 river_valley_settlement_v1，
+  //  plateau_settlement_v1 更名 plateau_v1）
   const RANDOM_CANDIDATES = [
     'mountain_pass_v1',
     'river_valley_v1',
     'grassland_plain_v1',
     'hillside_woodland_v1',
-    'river_valley_settlement_v1',
-    'plateau_settlement_v1',
+    'plateau_v1',
     'alluvial_fan_v1',
     'basin_oasis_v1',
     'lakeside_basin_v1',
@@ -47,7 +47,7 @@
       return cfgProfile;
     }
     const s = BigInt(Math.max(0, Number(seed) || 0));
-    const idx = Number(((s ^ PROFILE_SALT) % 9n + 9n) % 9n);
+    const idx = Number(((s ^ PROFILE_SALT) % 8n + 8n) % 8n);
     return RANDOM_CANDIDATES[idx] || RANDOM_CANDIDATES[0];
   }
 

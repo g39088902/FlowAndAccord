@@ -20,3 +20,6 @@ node_modules
 *.swp
 *.swo
 *~
+
+# 本地评审工件（实机验收截图/评审报告；changelog 可引用、不入库）
+reviews/

@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
   terrainGridRes: 120, // 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m）
-  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
@@ -206,28 +206,7 @@ window.SIM_CONFIG = {
   terrainHillsideWindSlopeMax: 12.0,  // 迎风坡目标峰值坡度抽样上限 (度)；目标 <14°
   terrainHillsideCrestShiftMin: 0.18, // 脊线横移比例抽样下限（×world；陡峭带远离初始营地）
   terrainHillsideCrestShiftMax: 0.30, // 脊线横移比例抽样上限（×world）
-  // ── S7-06/S7-07 河谷聚落（river_valley_settlement_v1）──
-  terrainValleyFloorBaseM: 3.0,       // 谷底基准高程 (m)；主河水面低于此值下凹成河
-  terrainValleyFloorHalfMin: 80.0,    // 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线
-  terrainValleyFloorHalfMax: 95.0,    // 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190]
-  terrainValleyWallHeightMin: 44.0,   // 陡壁总高差抽样下限 (m)；规格 40~50
-  terrainValleyWallHeightMax: 48.0,   // 陡壁总高差抽样上限 (m)
-  terrainValleyWallRatioMin: 0.54,    // 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W）
-  terrainValleyWallRatioMax: 0.585,   // H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗
-  terrainValleyMeanderAmpMin: 18.0,   // 谷轴蜿蜒振幅抽样下限 (m)；远小于谷底半宽
-  terrainValleyMeanderAmpMax: 30.0,   // 谷轴蜿蜒振幅抽样上限 (m)
-  terrainValleyMeanderWaves: 3.0,     // 谷轴蜿蜒全程周期数（y/world 系数；S7-07 起兼作主河中心线波形）
-  terrainValleyTaperRatio: 0.47,      // 陡壁/台地包络起始比例（×半图）；深切段中部 47%，谷口缓梁保绕行
-  terrainValleyNoiseFloorK: 0.15,     // 谷底 fBm 分区阻尼（强阻尼保高程平缓与峰坡窗口）
-  terrainValleyNoiseWallK: 0.15,      // 陡壁 fBm 分区阻尼（保峰值梯度窗口）
-  terrainValleyNoiseUplandK: 0.5,     // 台地 fBm 分区阻尼（中等阻尼出滚动丘陵）
-  terrainValleyRiverWidthMin: 22.0,   // 主河河宽抽样下限 (m)；规格 22~32，取半为半宽
-  terrainValleyRiverWidthMax: 32.0,   // 主河河宽抽样上限 (m)
-  terrainValleyRiverBankM: 8.0,       // 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸（会吃掉聚落河阶）
-  terrainValleyRiverTerraceM: 20.0,   // 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带
-  terrainValleyFordRatio: 0.32,       // 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏
-  terrainValleyAccessOffsetMinM: 35.0, // 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径
-  // ── TB-02 台地聚落（plateau_settlement_v1）──
+  // ── TB-02 台地（plateau_v1，原 plateau_settlement_v1）──
   terrainPlateauHeightMin: 18.0,      // 台面最小抬升高度 (m)；规格 18~26
   terrainPlateauHeightMax: 26.0,      // 台面最大抬升高度 (m)
   terrainPlateauHalfWidthRatio: 0.22, // 台面半宽相对世界尺寸比例；0.22×768 ≈ 169m
@@ -241,13 +220,16 @@ window.SIM_CONFIG = {
   terrainPlateauRampNoiseGain: 0.12,  // 缓坡入口区域噪声阻尼增益；走廊平缓保可走
   terrainPlateauOutlineWarp: 6.0,     // 台缘轮廓低频扰动幅度 (m)
   // ── TB-03 山前冲积扇（alluvial_fan_v1）──
-  terrainFanLengthRatio: 0.42,        // 扇体长度比例（×worldSize，山口→扇缘）
-  terrainFanHalfAngleDeg: 30.0,       // 扇半角（度，角向窗口 ±α）
-  terrainFanAmplitude: 30.0,          // 山口到扇缘总高差 (m)；1.5×A/L ≈ tan(8°) 扇头侧缘 ≤tan(22°)
-  terrainFanGullyCountMax: 2,         // 干浅沟数量上限（1~2，relief_rng 掷存在性）
-  terrainFanGullyDepthM: 2.2,         // 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行
-  terrainFanGullyWidthM: 20.0,        // 干浅沟横截面全宽 (m)；须跨越多个格子
+  terrainFanLengthRatio: 0.58,        // 扇体长度比例（×worldSize，山口→扇缘）；v1.50.68 提升（>2m 覆盖 ≈15.5%）
+  terrainFanHalfAngleDeg: 38.0,       // 扇半角（度，角向窗口 ±α）；v1.50.68 扩角
+  terrainFanAmplitude: 52.0,          // 山口到扇缘总高差 (m)；v1.50.68 提升；双段剖面扇头陡段 ≈10° + 侧缘 150m 过渡 ≤tan(19°)
+  terrainFanGullyCountMax: 4,         // 干浅沟数量上限（3~4 均匀掷，放射沟系；v1.50.68）
+  terrainFanGullyDepthM: 4.5,         // 干浅沟最大深度 (m)；≥0.6 格目视可辨；沟内 DryGround+NO_BUILD 色差带可慢行
+  terrainFanGullyWidthM: 22.0,        // 干浅沟横截面全宽 (m)；须跨越多个格子
   terrainFanGullyMeanderAmpRad: 0.12, // 干浅沟中心线角向蜿蜒幅度（弧度）
+  terrainFanTopBandRatio: 0.32,       // 粒度分带：扇顶砾石带外缘（t=r/L）；带内肥力折减（v1.50.68）
+  terrainFanEdgeBandRatio: 0.68,      // 粒度分带：扇缘沃土带内缘（t=r/L）；带内肥力 ×1.10（v1.50.68）
+  terrainFanTopFertilityScale: 0.75,  // 粒度分带：扇顶带肥力折减系数；干燥低肥命中裸岩 accents（v1.50.68）
   // ── TB-03 盆地（basin_oasis_v1）──
   terrainBasinSemiAxisRatio: 0.42,    // 盆地半轴比例（×worldSize，椭圆 a/b 共用基准，广阔平坦盆底）
   terrainBasinDepthM: 18.0,           // 盆深 (m，中心相对盆底起伏基准下凹总量)

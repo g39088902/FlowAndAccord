@@ -265,108 +265,62 @@ pub struct SimConfig {
     pub terrain_hillside_crest_shift_min: f32,
     /// ★ S7-04 半坡林地：脊线横移比例抽样上限（× world）。默认 0.30。
     pub terrain_hillside_crest_shift_max: f32,
-    /// ★ S7-06 河谷聚落：谷底基准高程 (m)。默认 3.0（谷底整体近乎平坦，
-    /// 仅剩阻尼 fBm 微起伏；S7-07 主河水面低于此值下凹成河）。
-    pub terrain_valley_floor_base_m: f32,
-    /// ★ S7-06 河谷聚落：谷底半宽抽样下限 (m)。默认 80.0（⇒ W_floor ∈ [160,190]；
-    /// 下沿 80 保证扣除 S7-07 河道+岸带（≤24m）后两侧干燥平坦河阶 ≥55m——
-    /// 06号 §4.3 约束② 建造保护线，调小前必须重验）。
-    pub terrain_valley_floor_half_min: f32,
-    /// ★ S7-06 河谷聚落：谷底半宽抽样上限 (m)。默认 95.0。
-    pub terrain_valley_floor_half_max: f32,
-    /// ★ S7-06 河谷聚落：陡壁总高差抽样下限 (m)。默认 44.0（规格 40~50）。
-    pub terrain_valley_wall_height_min: f32,
-    /// ★ S7-06 河谷聚落：陡壁总高差抽样上限 (m)。默认 48.0。
-    pub terrain_valley_wall_height_max: f32,
-    /// ★ S7-06 河谷聚落：陡壁 幅宽比 H/W 抽样下限（联动反解宽度，smoothstep
-    /// 剖面峰值梯度 1.5×H/W）。默认 0.54。
-    pub terrain_valley_wall_ratio_min: f32,
-    /// ★ S7-06 河谷聚落：陡壁 幅宽比 H/W 抽样上限。默认 0.585（→ 峰值梯度
-    /// 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗——06号 §4.3 约束①）。
-    pub terrain_valley_wall_ratio_max: f32,
-    /// ★ S7-06 河谷聚落：谷轴蜿蜒振幅抽样下限 (m)。默认 18.0（远小于谷底半宽，
-    /// 图心列恒在谷底内）。
-    pub terrain_valley_meander_amp_min: f32,
-    /// ★ S7-06 河谷聚落：谷轴蜿蜒振幅抽样上限 (m)。默认 30.0。
-    pub terrain_valley_meander_amp_max: f32,
-    /// ★ S7-06 河谷聚落：谷轴蜿蜒全程完整周期数（y/world 系数）。默认 3.0
-    /// （弧度制 3 rad ≈ 半个周期，全图一道缓弯；★ S7-07 起同时是主河中心线波形）。
-    pub terrain_valley_meander_waves: f32,
-    /// ★ S7-06 河谷聚落：陡壁/台地包络起始比例（× 半图）。默认 0.47 ⇒ 深切段
-    /// 覆盖中部 47%，两侧各留 53% 半图做谷口缓梁（最大下降梯度 ≈tan24° 保证
-    /// 绕行可通行；禁行格数 800~1400 达标线，调大前必须重验探针）。
-    pub terrain_valley_taper_ratio: f32,
-    /// ★ S7-06 河谷聚落：谷底 fBm 噪声分区阻尼（× noise_amp_k）。默认 0.15
-    /// （强阻尼保「高程平缓」与峰坡窗口 ±0.15 → 坡度扰动 <0.5°）。
-    pub terrain_valley_noise_floor_k: f32,
-    /// ★ S7-06 河谷聚落：陡壁 fBm 噪声分区阻尼。默认 0.15（保峰值梯度窗口）。
-    pub terrain_valley_noise_wall_k: f32,
-    /// ★ S7-06 河谷聚落：台地 fBm 噪声分区阻尼。默认 0.5（中等阻尼出自然滚动丘陵）。
-    pub terrain_valley_noise_upland_k: f32,
-    /// ★ S7-07 河谷聚落主河：河宽抽样下限 (m)。默认 22.0（规格 22~32m，
-    /// relief_rng 抽样取半得河道半宽；与 T2 `terrain_river_width_*` 分列——
-    /// settlement 河道必须窄于 T2 才能守住谷底建造保护线）。
-    pub terrain_valley_river_width_min: f32,
-    /// ★ S7-07 河谷聚落主河：河宽抽样上限 (m)。默认 32.0。
-    pub terrain_valley_river_width_max: f32,
-    /// ★ S7-07 河谷聚落主河：低滩禁建带半宽 (m)（`RiverBank`+`NO_BUILD`+
-    /// `SHORE_ACCESS`）。默认 8.0——刻意不复用 T2 `terrain_river_bank_width`(18m)：
-    /// T2 宽岸会吃掉聚落河阶；8m 使「河道半宽(≤16)+岸带」≤24m 守住建造保护线。
-    pub terrain_valley_river_bank_m: f32,
-    /// ★ S7-07 河谷聚落主河：河阶带半宽 (m)。默认 20.0（岸带外 `RiverTerrace`
-    /// 高肥力 0.95 河阶覆盖带，同 T2 口径下限）。
-    pub terrain_valley_river_terrace_m: f32,
-    /// ★ S7-07 河谷聚落：授权浅滩 y 位置比例（× world，两岸对置 ±本值）。
-    /// 默认 0.32（比 T2 先例 ±0.24 更稀疏，跨障绕行压力更真实；须落在谷轴
-    /// 深切段内且避开取水点行——06号 §4.3）。
-    pub terrain_valley_ford_ratio: f32,
-    /// ★ S7-07 河谷聚落：取水点离轴最小偏移 (m)。默认 35.0（`max(河道半宽+岸带+
-    /// 边距, 本值)` 保证两岸对置取水点间距 ≥70m = `poi_min_distance` 口径）。
-    pub terrain_valley_access_offset_min_m: f32,
-    /// ★ TB-02 台地聚落：台面最小抬升高度 (m)。默认 18.0。
+    /// ★ TB-02 台地：台面最小抬升高度 (m)。默认 18.0。
     pub terrain_plateau_height_min: f32,
-    /// ★ TB-02 台地聚落：台面最大抬升高度 (m)。默认 26.0。
+    /// ★ TB-02 台地：台面最大抬升高度 (m)。默认 26.0。
     pub terrain_plateau_height_max: f32,
-    /// ★ TB-02 台地聚落：台面半宽相对世界尺寸比例。默认 0.22。
+    /// ★ TB-02 台地：台面半宽相对世界尺寸比例。默认 0.22。
     pub terrain_plateau_half_width_ratio: f32,
-    /// ★ TB-02 台地聚落：台面半深相对世界尺寸比例。默认 0.18。
+    /// ★ TB-02 台地：台面半深相对世界尺寸比例。默认 0.18。
     pub terrain_plateau_half_depth_ratio: f32,
-    /// ★ TB-02 台地聚落：台面圆角相对最小半尺寸比例。默认 0.35。
+    /// ★ TB-02 台地：台面圆角相对最小半尺寸比例。默认 0.35。
     pub terrain_plateau_corner_radius_ratio: f32,
-    /// ★ TB-02 台地聚落：普通台缘过渡带宽度对高差比率（B_edge = ratio * H）。默认 0.6。
+    /// ★ TB-02 台地：普通台缘过渡带宽度对高差比率（B_edge = ratio * H）。默认 0.6。
     pub terrain_plateau_edge_band_ratio: f32,
-    /// ★ TB-02 台地聚落：入口缓坡过渡带宽度对高差比率（B_ramp = ratio * H）。默认 4.0。
+    /// ★ TB-02 台地：入口缓坡过渡带宽度对高差比率（B_ramp = ratio * H）。默认 4.0。
     pub terrain_plateau_ramp_band_ratio: f32,
-    /// ★ TB-02 台地聚落：缓坡核心横向宽度 (m)。默认 36.0 (>= 32m)。
+    /// ★ TB-02 台地：缓坡核心横向宽度 (m)。默认 36.0 (>= 32m)。
     pub terrain_plateau_ramp_width: f32,
-    /// ★ TB-02 台地聚落：缓坡肩部横向过渡宽度 (m)。默认 24.0。
+    /// ★ TB-02 台地：缓坡肩部横向过渡宽度 (m)。默认 24.0。
     pub terrain_plateau_ramp_shoulder_width: f32,
-    /// ★ TB-02 台地聚落：台面区域噪声阻尼增益。默认 0.20。
+    /// ★ TB-02 台地：台面区域噪声阻尼增益。默认 0.20。
     pub terrain_plateau_top_noise_gain: f32,
-    /// ★ TB-02 台地聚落：缓坡入口区域噪声阻尼增益。默认 0.12。
+    /// ★ TB-02 台地：缓坡入口区域噪声阻尼增益。默认 0.12。
     pub terrain_plateau_ramp_noise_gain: f32,
-    /// ★ TB-02 台地聚落：台缘轮廓低频扰动幅度 (m)。默认 6.0。
+    /// ★ TB-02 台地：台缘轮廓低频扰动幅度 (m)。默认 6.0。
     pub terrain_plateau_outline_warp: f32,
     // ── ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地模板参数（仅对应 profile 消费；
     //    默认值唯一真相源 = 前端 config.js；改任一值等于换图，遵循
     //    TERRAIN_GENERATOR_VERSION 契约）──
-    /// ★ TB-03 山前冲积扇：扇体长度比例（× world_size，山口→扇缘）。默认 0.42。
+    /// ★ TB-03 山前冲积扇：扇体长度比例（× world_size，山口→扇缘）。默认 0.58
+    /// （v1.50.68 辨识度改善：扇面 >2m 增量覆盖 ≈15.5%，原 0.42 仅 ≈9%）。
     pub terrain_fan_length_ratio: f32,
-    /// ★ TB-03 山前冲积扇：扇半角（度，角向窗口 ±α）。默认 30.0。
+    /// ★ TB-03 山前冲积扇：扇半角（度，角向窗口 ±α）。默认 38.0（v1.50.68 扩角）。
     pub terrain_fan_half_angle_deg: f32,
-    /// ★ TB-03 山前冲积扇：山口到扇缘总高差 (m)。默认 30.0
-    /// （smoothstep 径向剖面峰值梯度 1.5×A/L ≈ tan(8°)；扇头侧缘配合
-    /// `MIN_ANG_EDGE_M=110` 横向梯度 ≤ tan(22°)，不产生横贯扇面的硬禁行墙）。
+    /// ★ TB-03 山前冲积扇：山口到扇缘总高差 (m)。默认 52.0（v1.50.68 提升，
+    /// 双段凸形径向剖面：扇头 0~0.2L 陡段 ≈10° 形成山口堆 + 其后缓段 ≤6°；
+    /// 扇头侧缘配合 `MIN_ANG_EDGE_M=150` 横向梯度 ≤ tan(19°)，不产生横贯扇面
+    /// 的硬禁行墙）。
     pub terrain_fan_amplitude: f32,
-    /// ★ TB-03 山前冲积扇：干浅沟数量上限（1~2，relief_rng 掷存在性）。默认 2。
+    /// ★ TB-03 山前冲积扇：干浅沟数量上限（v1.50.68 起 3~4 均匀掷，放射沟系）。默认 4。
     pub terrain_fan_gully_count_max: u32,
-    /// ★ TB-03 山前冲积扇：干浅沟最大深度 (m)。默认 2.2（沟内 SoftGround+NO_BUILD，可慢行；
-    /// 叠加扇面坡度后横向梯度 < 30°，不产生硬禁行）。
+    /// ★ TB-03 山前冲积扇：干浅沟最大深度 (m)。默认 4.5（v1.50.68 提升，≥0.6 格
+    /// 目视可辨；沟内 DryGround+NO_BUILD 色差带，可慢行；叠加扇面坡度后横向
+    /// 梯度 < 30°，不产生硬禁行）。
     pub terrain_fan_gully_depth_m: f32,
-    /// ★ TB-03 山前冲积扇：干浅沟横截面全宽 (m)。默认 20.0（须跨越多个格子）。
+    /// ★ TB-03 山前冲积扇：干浅沟横截面全宽 (m)。默认 22.0（须跨越多个格子）。
     pub terrain_fan_gully_width_m: f32,
     /// ★ TB-03 山前冲积扇：干浅沟中心线角向蜿蜒幅度（弧度）。默认 0.12。
     pub terrain_fan_gully_meander_amp_rad: f32,
+    /// ★ TB-03 山前冲积扇：粒度分带——扇顶砾石带外缘（t = r/L）。默认 0.32
+    /// （v1.50.68 新增；带内 DryGround + 肥力折减）。
+    pub terrain_fan_top_band_ratio: f32,
+    /// ★ TB-03 山前冲积扇：粒度分带——扇缘沃土带内缘（t = r/L）。默认 0.68
+    /// （v1.50.68 新增；带内肥力 ×1.10 后 clamp）。
+    pub terrain_fan_edge_band_ratio: f32,
+    /// ★ TB-03 山前冲积扇：粒度分带——扇顶带肥力折减系数。默认 0.75
+    /// （v1.50.68 新增；干燥低肥命中裸岩 accents，扇顶粗颗粒意象）。
+    pub terrain_fan_top_fertility_scale: f32,
     /// ★ TB-03 盆地：盆地半轴比例（× world_size，椭圆 a/b 共用基准，广阔平坦盆底）。默认 0.42。
     pub terrain_basin_semi_axis_ratio: f32,
     /// ★ TB-03 盆地：盆深 (m，中心相对盆底起伏基准下凹总量)。默认 18.0。

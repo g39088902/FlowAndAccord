@@ -13,7 +13,7 @@
 - **阶段二（STAGE2-1～8）**：生成组合基座与有界回退环，v1.50.39～49 交付收口。详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **阶段四通用部分（S4-01～08）**：通用 POI 景观群与几何遮罩避让、标签聚合，v1.50.46～53 交付收口。详见 [16 号 §2.16～§2.18](docs/current/tech/16-frontend-overview.md#216-资源地貌与景观群表现层landscape-model--render_landscapes-v15046-d-c)。
 - **阶段七（S7-01～10）**：独立地图模板（平地草原、半坡林地、河谷聚落），v1.50.39～52 交付收口。原 `STAGE-07-TODO.md` 已随收官归档清理，详见 [06 号 §4.1～§4.3](docs/plan/tech/06-terrain-templates.md#41-平地草原grassland_plain_v1设计登记2026-09-11排期2026-09-13阶段七插队位)。
-- **TB-02 台地聚落内核（TB-02-01～10）**：台地聚落模板 `plateau_settlement_v1`，v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
+- **TB-02 台地内核（TB-02-01～10）**：台地模板（原 `plateau_settlement_v1`，v1.50.68 更名 `plateau_v1`，显示名"台地聚落"→"台地"），v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **TA-12-2 地表纹样表现层**：`terrain-texture.js` 坡度分带与 fBm 纹理采样，v1.50.54 交付收口。详见 [01-changelog.md](docs/current/01-changelog.md)。
 
 ---
@@ -45,9 +45,9 @@
     - 详见 [TA-06 实施方案](TA-06-TODO.md) 与 [07 号文 §6.3/§11.4](docs/plan/tech/07-terrain-art.md)；TA-06 现状 ◐ v1.50.64（实现与静态/数值验证已落地：物种派生 + 三乔木轮廓 + 三灌木变体 + 花朵图元 + 冠幅单一来源联动；**待补**：Chrome 视觉·受光·四季矩阵验收与证据包、性能 A/B、景观共用通道抽查、LOAD 链路——建议与 TA-05 LOAD 补测合并为同一次 Chrome 存档会话）。
     - 由 `accent.id` 稳定哈希派生 6 物种，零新增持久化字段/FABS section/模拟参数。
 
-- [ ] **TA-10 台地聚落表现层打样**
+- [ ] **TA-10 台地表现层打样**
     - 详见 [07 号文 §8](docs/plan/tech/07-terrain-art.md)
-    - 对接 TB-02 台地聚落内核，实现台地边缘陡壁断崖质感、坡顶平台聚落景观与双入口缓坡路面表达。
+    - 对接 TB-02 台地内核（plateau_v1），实现台地边缘陡壁断崖质感、坡顶平台景观与双入口缓坡路面表达。
 
 ---
 

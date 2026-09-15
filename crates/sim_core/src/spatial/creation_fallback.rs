@@ -306,7 +306,7 @@ impl World3DEngine {
         }
         self.validate_terrain_world()
             .map_err(|e| format!("RoadNetwork:{}", e))?;
-        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU_SETTLEMENT {
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU {
             self.validate_plateau_gates()?;
         }
         // ★ TB-03 模板专属门禁（房屋候选/走廊/岸点；失败码计入 Geometry 前缀语义）

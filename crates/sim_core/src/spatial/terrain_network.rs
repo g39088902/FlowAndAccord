@@ -13,7 +13,7 @@ impl World3DEngine {
     }
     pub(crate) fn prepare_terrain_layout(&mut self) {
         let mut occupied:Vec<Vec3>=self.terrain.hydrology.access_points.iter().map(|a|a.pos).collect();
-        let is_plateau = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU_SETTLEMENT;
+        let is_plateau = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU;
         let plateau_geom = if is_plateau { self.get_plateau_geometry() } else { None };
         if let Some(pg) = plateau_geom.as_ref() {
             let mut w_idx = 0;
@@ -188,7 +188,7 @@ impl World3DEngine {
 
     /// 重新派生台地几何（纯函数，仅读 seed 与 config，不消费共享 RNG）。
     pub fn get_plateau_geometry(&self) -> Option<crate::geo::PlateauGeometry> {
-        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_PLATEAU_SETTLEMENT {
+        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_PLATEAU {
             return None;
         }
         let mut relief_rng = crate::rng::WorldRng::new(self.terrain.seed ^ 0x5245_4c49_4546_5431);
@@ -245,7 +245,7 @@ impl World3DEngine {
         }
     }
 
-    /// TB-02 台地聚落专有门禁校验（房屋候选区与双入口连通性）。
+    /// TB-02 台地专有门禁校验（房屋候选区与双入口连通性）。
     pub fn validate_plateau_gates(&self) -> Result<(), String> {
         let Some(pg) = self.get_plateau_geometry() else {
             return Ok(());

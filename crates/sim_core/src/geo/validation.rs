@@ -21,7 +21,7 @@ use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
     is_static_water_profile, TerrainFeatureKind, TerrainMap,
     TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS,
-    TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+    TERRAIN_PROFILE_RIVER_VALLEY,
 };
 
 use crate::spatial::vec3::Vec3;
@@ -34,7 +34,7 @@ const BOUND_EPSILON_M: f32 = 0.5;
 /// 未来子特征 ID 段（T1 100–127 / T2 200–227）由调用方另行放行。
 fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
     match profile {
-        TERRAIN_PROFILE_RIVER_VALLEY | TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT => match id {
+        TERRAIN_PROFILE_RIVER_VALLEY => match id {
             1 => Some(TerrainFeatureKind::River),
             10 | 11 => Some(TerrainFeatureKind::ShallowFord),
             20 | 21 => Some(TerrainFeatureKind::RiverBank),
@@ -45,7 +45,7 @@ fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
             1 => Some(TerrainFeatureKind::WaterBody),
             _ => None,
         },
-        // 山口 / 盆地 / 草原 / 半坡 / 台地聚落 / 冲积扇：零核心特征
+        // 山口 / 盆地 / 草原 / 半坡 / 台地 / 冲积扇：零核心特征
         _ => None,
     }
 }

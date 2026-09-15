@@ -2,9 +2,8 @@
 //!
 //! 用途：直接调用内核生成器，实测各 profile 的通行力与模板专属指标。
 //! 现覆盖 T1 `mountain_pass_v1` / T2 `river_valley_v1` / 草原 `grassland_plain_v1` /
-//! 半坡 `hillside_woodland_v1` / 河谷聚落 `river_valley_settlement_v1`（S7-06 起接入
-//! §1.4 门禁窗口；S7-07 起主河+浅滩落地，components==1 由浅滩缝合两岸与谷口缓梁
-//! 共同保证，`crossing95` ≥1.90 接线为浅滩验收门禁）。
+//! 半坡 `hillside_woodland_v1` / 台地 `plateau_v1`（v1.50.68 起模板池 8 路；
+//! 原河谷聚落模板已删除）。
 //! 对应 `docs/plan/tech/06-terrain-templates.md` §9.3.1、§18.7 与 STAGE-07-TODO S7-01。
 //!
 //! 运行：
@@ -12,14 +11,13 @@
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile mountain_pass_v1 [--seeds 60]`
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile grassland_plain_v1 [--seeds 60]`
 //! - `cargo run --release -p sim_core --example terrain_probe -- --profile hillside_woodland_v1 [--seeds 60]`
-//! - `cargo run --release -p sim_core --example terrain_probe -- --profile river_valley_settlement_v1 [--seeds 60]`
 //! - `cargo run --release -p sim_core --example terrain_probe -- world 20`（创世校验模式，行为不变）
 //!
 //! §1.4 七项通用指标：max_slope / >30° / >=34° / NO_WALK / buildable / components /
 //! detour_p95，外加 waterM（初始营地=图中心 → 最近可用水源距离；地形层近似：取水点 ∪ 水面格）。
 //! 模板专属指标（S7-01 定义）：草原 `mound_count` / `soft_ground` / `fertility`；
-//! 半坡 `windward_max` / `leeward_max` / `buildable_band`；
-//! 河谷聚落 `floor_width` / `cliff_mean` / `crossing95`。
+//! 半坡 `windward_max` / `leeward_max` / `buildable_band`（原河谷聚落专属指标
+//! `floor_width` / `cliff_mean` / `crossing95` 随模板删除一并下线）。
 //!
 //! 关键指标口径：
 //! - `max_slope_deg`：全图最大格子坡度。低于 `terrain_max_walk_slope`(30°) 则永远不挡路。
@@ -41,8 +39,8 @@ use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
 use sim_core::geo::terrain::{
     TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_GRASSLAND_PLAIN,
     TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_LAKESIDE_BASIN,
-    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
-    TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
+    TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU,
+    TERRAIN_PROFILE_RIVER_VALLEY,
 };
 use sim_core::geo::{BranchRidge, SurfaceKind, TerrainFeatureKind, TerrainMap};
 use std::cmp::Reverse;
@@ -55,9 +53,7 @@ const PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 const PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
 
 /// §1.4 探针门禁窗口（STAGE-07-TODO §1.4 基线表）。仅对内核已实现的阶段七模板生效；
-/// `band_width_min` 为连续可建带最小宽度（S7-04 坡脚 ≥35m / S7-06 河阶 ≥55m；草原开阔图不设）。
-/// `crossing95_min` 为跨障绕行95 下限（S7-07 河谷聚落浅滩纽带接线门禁，实测校准值 1.90；
-/// 其余模板不设）。
+/// `band_width_min` 为连续可建带最小宽度（S7-04 坡脚 ≥35m；草原开阔图不设）。
 struct GateWindow {
     max_slope: (f32, f32),
     hard_blocked: (usize, usize),
@@ -98,30 +94,7 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             band_width_min: 35.0,
             crossing95_min: 0.0,
         }),
-        // ★ S7-06 窗口修订：`detour_p95` 下限 2.20 撤销——S7-06 骨架期验收不含
-        //   绕行指标（STAGE-07-TODO S7-06 验收 = 侧壁坡度/禁行格数/可建格数/谷底
-        //   南北贯通）；「两岸对置点绕行比 ≥2.20」按探针口径属 `crossing95`。
-        // ★ S7-07 窗口修订：① `crossing95_min` 接线 **1.90**（原规格 ≥2.20 是
-        //   骨架期实测 2.70~2.81 的外推预期；主河落地后浅滩本身成为合法跨河
-        //   通道，绕行比总体下移——浅滩 ±0.32×world、60 种子实测 2.01~2.74，
-        //   下限 = 实测最小值 + 余量。「浅滩是唯一跨河纽带」的结构性证明由
-        //   components==1 + 深水 NO_WALK + 普通路网不穿深水承载，不依赖该比值）；
-        //   ② `no_walk` 上限 1500→1700——主河河道格（DeepWater 必打 NO_WALK，
-        //   浅滩段除外）叠加在侧壁之上，实测 1232~1434，原上限是旱谷骨架期
-        //   口径；③ `detour_p95` 上界 2.40 保留（实测 1.69~2.20，防谷轴纵向
-        //   病态截断的初衷不变）；④ `water_dist` 上限 140 沿用（主河贯穿谷底
-        //   后实测 ≤16m，天然满足）。
-        TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT => Some(GateWindow {
-            max_slope: (36.0, 45.0),
-            hard_blocked: (600, 1500),
-            no_walk: (600, 1700),
-            buildable_min: 4200,
-            detour_p95: (0.0, 2.40),
-            water_dist_max: 140.0,
-            band_width_min: 55.0,
-            crossing95_min: 1.90,
-        }),
-        TERRAIN_PROFILE_PLATEAU_SETTLEMENT => Some(GateWindow {
+        TERRAIN_PROFILE_PLATEAU => Some(GateWindow {
             max_slope: (42.0, 58.0),
             hard_blocked: (150, 350),
             no_walk: (150, 350),
@@ -544,6 +517,12 @@ struct TemplateMetrics {
     valley_floor_width: f32,
     /// 河谷：崖壁格（`RockFace`）平均坡度。
     cliff_slope_mean: f32,
+    /// ★ v1.50.68 冲积扇：扇面图面覆盖率（z_fan 增量 >2m 的格占比；非 fan 恒 0）。
+    fan_coverage: f32,
+    /// ★ v1.50.68 冲积扇：可见干沟条数（中心深 ≥4m；非 fan 恒 0）。
+    fan_gully_visible: usize,
+    /// ★ v1.50.68 冲积扇：全图最大高差（max−min elevation，山口堆体量指标）。
+    fan_relief: f32,
 }
 
 fn measure_template_metrics(t: &TerrainMap) -> TemplateMetrics {
@@ -749,6 +728,33 @@ fn measure_template_metrics(t: &TerrainMap) -> TemplateMetrics {
         }
     }
 
+    // ★ v1.50.68 冲积扇指标：扇面图面覆盖率（z_fan 增量 >2m 格占比）、
+    // 可见干沟条数（中心深 ≥4m）与全图最大高差（山口堆体量）。
+    // 非 fan profile（几何为 None）恒 0，不参与其他模板窗口。
+    let (fan_coverage, fan_gully_visible, fan_relief) = match t.fan_geometry.as_ref() {
+        Some(fg) => {
+            let mut covered = 0usize;
+            for gy in 0..h {
+                for gx in 0..w {
+                    let (wx, wy) = cell_world(t, gx, gy);
+                    let (zf, _) = fg.elevation_at(wx, wy);
+                    if zf > 2.0 {
+                        covered += 1;
+                    }
+                }
+            }
+            let gully_n = fg.gullies.iter().filter(|g| g.depth >= 4.0).count();
+            let mut emax = f32::MIN;
+            let mut emin = f32::MAX;
+            for c in &t.cells {
+                emax = emax.max(c.elevation);
+                emin = emin.min(c.elevation);
+            }
+            (covered as f32 / n as f32, gully_n, emax - emin)
+        }
+        None => (0.0, 0, 0.0),
+    };
+
     TemplateMetrics {
         mound_count,
         soft_ground_ratio,
@@ -758,6 +764,9 @@ fn measure_template_metrics(t: &TerrainMap) -> TemplateMetrics {
         buildable_band_width: band_max as f32 * cell_step,
         valley_floor_width: floor_max as f32 * cell_step,
         cliff_slope_mean,
+        fan_coverage,
+        fan_gully_visible,
+        fan_relief,
     }
 }
 
@@ -857,8 +866,17 @@ fn print_metrics_summary(metrics: &[TemplateMetrics], cross95_max: f32, water_ma
         .map(|m| m.valley_floor_width)
         .fold(f32::MAX, f32::min);
     let cliff_mean = metrics.iter().map(|m| m.cliff_slope_mean).sum::<f32>() / cnt;
+    let fan_cov_min = metrics
+        .iter()
+        .map(|m| m.fan_coverage)
+        .fold(f32::MAX, f32::min);
+    let fan_gully_min = metrics.iter().map(|m| m.fan_gully_visible).min().unwrap_or(0);
+    let fan_relief_min = metrics
+        .iter()
+        .map(|m| m.fan_relief)
+        .fold(f32::MAX, f32::min);
     println!(
-        "--- 模板指标 · mound_count 均值={:.1}/峰值={} · 软地比 均值={:.1}% · 肥力 均值={:.2} · 迎风坡max 峰值={:.2}° · 背风坡max 峰值={:.2}° · 可建带宽 最小={:.0}m · 谷底宽 最小={:.0}m · 崖壁坡度 均值={:.2}° · 跨障绕行95 峰值={:.2} · 水源距 峰值={}",
+        "--- 模板指标 · mound_count 均值={:.1}/峰值={} · 软地比 均值={:.1}% · 肥力 均值={:.2} · 迎风坡max 峰值={:.2}° · 背风坡max 峰值={:.2}° · 可建带宽 最小={:.0}m · 谷底宽 最小={:.0}m · 崖壁坡度 均值={:.2}° · 跨障绕行95 峰值={:.2} · 水源距 峰值={} · 扇面覆盖 最小={:.1}% · 可见干沟 最少={} · 全图高差 最小={:.0}m",
         mound_mean,
         mound_max,
         soft_mean * 100.0,
@@ -869,7 +887,10 @@ fn print_metrics_summary(metrics: &[TemplateMetrics], cross95_max: f32, water_ma
         floor_min,
         cliff_mean,
         cross95_max,
-        water_max.map_or("n/a".to_string(), |d| format!("{:.0}m", d))
+        water_max.map_or("n/a".to_string(), |d| format!("{:.0}m", d)),
+        fan_cov_min * 100.0,
+        fan_gully_min,
+        fan_relief_min,
     );
 }
 
@@ -967,6 +988,39 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
                     size,
                     cell_desc(&t, *gx, *gy)
                 );
+            }
+        }
+        // ★ v1.50.68 冲积扇专属验收（G1/G2/G3 量化口径；独立于 GateWindow）。
+        if profile == TERRAIN_PROFILE_ALLUVIAL_FAN {
+            let m = metrics.last().copied().unwrap();
+            let mut fan_fails: Vec<String> = Vec::new();
+            // G1 门槛标定：>2m 增量实测 ≈15.5%（扇区几何占比 ≈22%，扇缘角向衰减与
+            // 2m 阈裁剪掉外环；旧 0.42 参数同口径 ≈9%，改善比 ≈1.7 倍）。首跑 60 种子
+            // 恒 15.4~15.5%，据此标 0.14（原解析估匕 20% 系未扣衰减口径）。
+            if m.fan_coverage < 0.14 {
+                fan_fails.push(format!(
+                    "fan_coverage={:.1}% < 14%（扇体体量不足）",
+                    m.fan_coverage * 100.0
+                ));
+            }
+            if m.fan_gully_visible < 3 {
+                fan_fails.push(format!(
+                    "fan_gully_visible={} < 3（放射干沟不足）",
+                    m.fan_gully_visible
+                ));
+            }
+            if m.fan_relief < 40.0 {
+                fan_fails.push(format!(
+                    "fan_relief={:.1}m < 40m（山口堆意象不足）",
+                    m.fan_relief
+                ));
+            }
+            for v in &fan_fails {
+                println!("    [GATE FAIL] seed={} {}", seed, v);
+            }
+            if !fan_fails.is_empty() {
+                gate_fail_seeds += 1;
+                gate_fail_items += fan_fails.len();
             }
         }
         cross95_max = cross95_max.max(r.crossing_detour_p95);
@@ -1139,8 +1193,7 @@ fn main() {
             || name == TERRAIN_PROFILE_RIVER_VALLEY
             || name == TERRAIN_PROFILE_GRASSLAND_PLAIN
             || name == TERRAIN_PROFILE_HILLSIDE_WOODLAND
-            || name == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
-            || name == TERRAIN_PROFILE_PLATEAU_SETTLEMENT
+            || name == TERRAIN_PROFILE_PLATEAU
             || name == TERRAIN_PROFILE_ALLUVIAL_FAN
             || name == TERRAIN_PROFILE_BASIN_OASIS
             || name == TERRAIN_PROFILE_LAKESIDE_BASIN
@@ -1150,13 +1203,12 @@ fn main() {
         } else {
             eprintln!("[错误] 未知 profile `{}`。", name);
             eprintln!(
-                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}`。",
+                "  已实现：`{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}` / `{}`。",
                 TERRAIN_PROFILE_MOUNTAIN_PASS,
                 TERRAIN_PROFILE_RIVER_VALLEY,
                 TERRAIN_PROFILE_GRASSLAND_PLAIN,
                 TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-                TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
-                TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+                TERRAIN_PROFILE_PLATEAU,
                 TERRAIN_PROFILE_ALLUVIAL_FAN,
                 TERRAIN_PROFILE_BASIN_OASIS,
                 TERRAIN_PROFILE_LAKESIDE_BASIN

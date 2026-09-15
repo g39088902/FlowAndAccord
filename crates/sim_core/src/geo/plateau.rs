@@ -1,6 +1,6 @@
-//! plateau.rs · TB-02 台地聚落静态几何与高程规划。
+//! plateau.rs · TB-02 台地静态几何与高程规划。
 //!
-//! 负责独立静态模板 `plateau_settlement_v1` 的物理高程骨架：
+//! 负责独立静态模板 `plateau_v1` 的物理高程骨架：
 //! 1. 平缓且可建的台面（圆角矩形 SDF $d \le 0$）；
 //! 2. 真实阻路的陡峭台缘（$B = \text{edge\_band} = 0.6H \implies$ 峰坡 $\ge 34^\circ \implies \text{RockFace} + \text{NO\_WALK}$）；
 //! 3. 两个可以通过生产道路走廊的缓坡入口（$B = \text{ramp\_band} = 4.0H \implies$ 峰坡 $\le 30^\circ$、核心宽度 $\ge 32\text{m}$、肩部平滑过渡）；
@@ -11,7 +11,7 @@
 use crate::config::SimConfig;
 use crate::rng::WorldRng;
 
-/// 台地聚落静态几何（创世 scratch 专用，不进快照/存档）。
+/// 台地静态几何（创世 scratch 专用，不进快照/存档）。
 #[derive(Debug, Clone)]
 pub struct PlateauGeometry {
     /// 台心世界坐标 (wx, wy)

@@ -44,7 +44,7 @@ stateDiagram-v2
 ## 核心机制
 
 ### 连续 3D 地形与 T0/T1 静态地貌
-- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 5 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 河谷聚落）间按种子确定性轮换（★ S7-10 起 random 候选池 2→5，各 ~20%；`flat_baseline` 诊断基线永不入列）。
+- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 湖畔盆地）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。
 - `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面，水体相关枚举为 T2 预留。
 - T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制；草原 profile 包含泉溪低洼地形（见 §9.7）。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
@@ -379,9 +379,9 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'`、`'river_valley_settlement_v1'` 或 `'flat_baseline'`）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'`、`'plateau_v1'`、`'alluvial_fan_v1'`、`'basin_oasis_v1'`、`'lakeside_basin_v1'` 或 `'flat_baseline'`）。
 - 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支（★ S7-10 候选池 2→5）：
-  `(seed ^ 0x5052_4F46_494C_4531) % 5` 依序实例化为 `mountain_pass_v1`（T1 山口）/ `river_valley_v1`（T2 两岸河谷）/ `grassland_plain_v1`（平地草原）/ `hillside_woodland_v1`（半坡林地）/ `river_valley_settlement_v1`（河谷聚落），各 ~20%。
+  `(seed ^ 0x5052_4F46_494C_4531) % 8` 依序实例化为 `mountain_pass_v1`（T1 山口）/ `river_valley_v1`（T2 两岸河谷）/ `grassland_plain_v1`（平地草原）/ `hillside_woodland_v1`（半坡林地）/ `plateau_v1`（台地）/ `alluvial_fan_v1`（山前冲积扇）/ `basin_oasis_v1`（盆地）/ `lakeside_basin_v1`（湖畔盆地），各 ~12.5%（★ v1.50.68 砍需求后 8 路；原 9 路中的 `river_valley_settlement_v1` 已删除，同一种子的 random 映射随之改变）。
   ★ `flat_baseline`（STAGE2-7 显式诊断/降级基线，倾斜-only 平地）**永不参与 random 分派**，只能显式指定；它是 STAGE2-5 有界回退环的显式降级目标，支持存读档续演（存档 profile 白名单已放行）。
 - ⚠️ **取模作用于原始异或值而非 mix64 哈希**：连续种子的落点按 `% 5` 同余循环分布，非哈希均匀分散。S7-10 扩池改变了既有种子在 random 下的落点（旧 T1/T2 奇偶交替 → 5 路取模），属 §20 收口设计——显式 profile 的输出不受影响，旧存档记录的是已实例化模板名，读档不受影响。
 - 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时五套地貌各 ~20% 均衡轮换。
@@ -847,11 +847,11 @@ section 记录使用变长顶点列表，未知 section 仍可按 `byte_len` 跳
 ✅ 已落地。`WorldSave` 包含：
 
 ```rust
-pub terrain_generator_version: u32,     // 当前为 4（v1.50.17 T1-R 主脊通行力修复后递增）
+pub terrain_generator_version: u32,     // 当前为 11（v1.50.68 砍需求：删除河谷聚落/台地更名后递增）
 pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1"
 ```
 
-`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验白名单（★ S7-10 扩容）：`mountain_pass_v1`、`river_valley_v1`、`grassland_plain_v1`、`hillside_woodland_v1`、`river_valley_settlement_v1`、`flat_baseline` 六者被接受，其余报错拒绝（禁止静默回退）。
+`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验白名单：`mountain_pass_v1`、`river_valley_v1`、`grassland_plain_v1`、`hillside_woodland_v1`、`plateau_v1`、`alluvial_fan_v1`、`basin_oasis_v1`、`lakeside_basin_v1`、`flat_baseline` 九者被接受，其余报错拒绝（禁止静默回退；原 `river_valley_settlement_v1` 已随 v1.50.68 删除，旧档同时因生成器版本门禁被拒）。
 
 读档规则：
 
@@ -936,10 +936,10 @@ render_agents.js        族人绘制                                            
 > **服务对象**：全部地图模板的可调参数。
 
 
-✅ 已落地 92 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 376；★ v1.50.51 S7-08 集中化阶段七 3 个 profile 的 37 个形态参数；★ v1.50.54 TB-02 台地聚落 12 个形态参数；★ v1.50.55 TB-03 盆地/冲积扇/湖畔盆地 22 个形态参数；★ v1.50.55 TB-03 冲积扇/盆地/湖畔 profile 纳入）：
+✅ 已落地 75 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 369；★ v1.50.51 S7-08 集中化 3 profile 的 37 形态参数；★ v1.50.54 TB-02 台地 12 形态参数；★ v1.50.55 TB-03 盆地/冲积扇/湖畔 22 形态参数并纳入 profile；★ v1.50.68 砍需求删河谷聚落 20 形态参数、冲积扇辨识度改善增 3 形态参数并调扇系默认值）：
 
 ```text
-✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "river_valley_settlement_v1" | "plateau_settlement_v1" | "alluvial_fan_v1"（★ TB-03 冲积扇）| "basin_oasis_v1"（★ TB-03 盆地）| "lakeside_basin_v1"（★ TB-03 湖畔盆地）| "flat_baseline"（诊断基线，永不入 random）；★ TB-03-13 起其余 9 profile 全部参与 random 轮换
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "plateau_v1"（台地，原 plateau_settlement_v1）| "alluvial_fan_v1"（★ TB-03 冲积扇）| "basin_oasis_v1"（★ TB-03 盆地）| "lakeside_basin_v1"（★ TB-03 湖畔盆地）| "flat_baseline"（诊断基线，永不入 random）；★ v1.50.68 起 8 profile 参与 random 轮换（原 9 路中的河谷聚落已删除）
 ✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
@@ -966,26 +966,6 @@ render_agents.js        族人绘制                                            
 ✅ terrainHillsideWindSlopeMax 12.0               ★ S7-04 迎风坡目标峰值坡度抽样上限 (度)
 ✅ terrainHillsideCrestShiftMin 0.18              ★ S7-04 脊线横移比例抽样下限（×world）
 ✅ terrainHillsideCrestShiftMax 0.30              ★ S7-04 脊线横移比例抽样上限（×world）
-✅ terrainValleyFloorBaseM    3.0                 ★ S7-06 谷底基准高程 (m)；主河水面低于此值下凹成河
-✅ terrainValleyFloorHalfMin  80.0                ★ S7-06 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线
-✅ terrainValleyFloorHalfMax  95.0                ★ S7-06 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190]
-✅ terrainValleyWallHeightMin 44.0                ★ S7-06 陡壁总高差抽样下限 (m)；规格 40~50
-✅ terrainValleyWallHeightMax 48.0                ★ S7-06 陡壁总高差抽样上限 (m)
-✅ terrainValleyWallRatioMin  0.54                ★ S7-06 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W）
-✅ terrainValleyWallRatioMax  0.585               ★ S7-06 H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗
-✅ terrainValleyMeanderAmpMin 18.0                ★ S7-06 谷轴蜿蜒振幅抽样下限 (m)
-✅ terrainValleyMeanderAmpMax 30.0                ★ S7-06 谷轴蜿蜒振幅抽样上限 (m)
-✅ terrainValleyMeanderWaves  3.0                 ★ S7-06 谷轴蜿蜒全程周期数；S7-07 起兼作主河中心线波形
-✅ terrainValleyTaperRatio    0.47                ★ S7-06 陡壁/台地包络起始比例（×半图）；谷口缓梁保绕行连通
-✅ terrainValleyNoiseFloorK   0.15                ★ S7-06 谷底 fBm 分区阻尼（强阻尼保高程平缓）
-✅ terrainValleyNoiseWallK    0.15                ★ S7-06 陡壁 fBm 分区阻尼（保峰值梯度窗口）
-✅ terrainValleyNoiseUplandK  0.5                 ★ S7-06 台地 fBm 分区阻尼（出滚动丘陵）
-✅ terrainValleyRiverWidthMin 22.0                ★ S7-07 主河河宽抽样下限 (m)；规格 22~32，取半为半宽
-✅ terrainValleyRiverWidthMax 32.0                ★ S7-07 主河河宽抽样上限 (m)
-✅ terrainValleyRiverBankM    8.0                 ★ S7-07 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸
-✅ terrainValleyRiverTerraceM 20.0                ★ S7-07 河阶带半宽 (m)；RiverTerrace 高肥力 0.95 覆盖带
-✅ terrainValleyFordRatio     0.32                ★ S7-07 授权浅滩 y 位置比例（±×world）；比 T2 ±0.24 更稀疏
-✅ terrainValleyAccessOffsetMinM 35.0             ★ S7-07 取水点离轴最小偏移 (m)；对置点对间距 ≥70m POI 口径
 ✅ terrainPlateauHeightMin       18.0                ★ TB-02 台面抬升基准高度抽样下限 (m)
 ✅ terrainPlateauHeightMax       26.0                ★ TB-02 台面抬升基准高度抽样上限 (m)
 ✅ terrainPlateauHalfWidthRatio  0.30                ★ TB-02 台面核心平顶半宽比例 (x 方向)
@@ -998,13 +978,16 @@ render_agents.js        族人绘制                                            
 ✅ terrainPlateauTopNoiseGain    0.15                ★ TB-02 台面平顶噪声阻尼增益
 ✅ terrainPlateauRampNoiseGain   0.15                ★ TB-02 入口缓坡走廊噪声阻尼增益
 ✅ terrainPlateauOutlineWarp     10.0                ★ TB-02 台缘轮廓微幅扭曲波幅 (m)
-✅ terrainFanLengthRatio      0.42                ★ TB-03 冲积扇扇体长度比例（×worldSize，山口→扇缘）
-✅ terrainFanHalfAngleDeg     30.0                ★ TB-03 冲积扇扇半角（度，角向窗口 ±α）
-✅ terrainFanAmplitude        30.0                ★ TB-03 山口到扇缘总高差 (m)；1.5×A/L ≈ tan(8°)，扇头侧缘配合 110m 最小过渡弧宽 ≤tan(22°)
-✅ terrainFanGullyCountMax    2                   ★ TB-03 干浅沟数量上限（1~2，relief_rng 掷存在性）
-✅ terrainFanGullyDepthM      2.2                 ★ TB-03 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行
-✅ terrainFanGullyWidthM      20.0                ★ TB-03 干浅沟横截面全宽 (m)；须跨越多个格子
+✅ terrainFanLengthRatio      0.58                ★ TB-03 冲积扇扇体长度比例（×worldSize，山口→扇缘）；v1.50.68 提升（>2m 增量覆盖 ≈15.5%，原 0.42 仅 ≈9%）
+✅ terrainFanHalfAngleDeg     38.0                ★ TB-03 冲积扇扇半角（度，角向窗口 ±α）；v1.50.68 扩角
+✅ terrainFanAmplitude        52.0                ★ TB-03 山口到扇缘总高差 (m)；v1.50.68 提升——双段凸形径向剖面（扇头 0~0.2L 陡段 ≈10° 山口堆 + 其后缓段 ≤6°），扇头侧缘配合 150m 最小过渡弧宽 ≤tan(19°)
+✅ terrainFanGullyCountMax    4                   ★ TB-03 干浅沟数量上限（v1.50.68 起 3~4 均匀掷，放射沟系）
+✅ terrainFanGullyDepthM      4.5                 ★ TB-03 干浅沟最大深度 (m)；v1.50.68 提升 ≥0.6 格目视可辨；沟内 DryGround+NO_BUILD 色差带可慢行
+✅ terrainFanGullyWidthM      22.0                ★ TB-03 干浅沟横截面全宽 (m)；v1.50.68 提升；须跨越多个格子
 ✅ terrainFanGullyMeanderAmpRad 0.12               ★ TB-03 干浅沟中心线角向蜿蜒幅度（弧度）
+✅ terrainFanTopBandRatio     0.32                ★ TB-03 粒度分带——扇顶砾石带外缘（t=r/L）；v1.50.68 新增，带内 DryGround + 肥力折减
+✅ terrainFanEdgeBandRatio    0.68                ★ TB-03 粒度分带——扇缘沃土带内缘（t=r/L）；v1.50.68 新增，带内肥力 ×1.10 后 clamp
+✅ terrainFanTopFertilityScale 0.75               ★ TB-03 粒度分带——扇顶带肥力折减系数；v1.50.68 新增，干燥低肥命中裸岩 accents
 ✅ terrainBasinSemiAxisRatio  0.36                ★ TB-03 盆地半轴比例（×worldSize，椭圆 a/b 共用基准，广阔平坦盆底）
 ✅ terrainBasinDepthM         18.0                ★ TB-03 盆深 (m，中心相对盆底起伏基准下凹总量)
 ✅ terrainBasinRimHeightM     42.0                ★ TB-03 外缘高耸山体基底高度 (m)；雄峻环抱高山，出口处受控归低
@@ -1035,8 +1018,8 @@ render_agents.js        族人绘制                                            
 
 实现约束：
 
-- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 376）。
-- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 9` 确定性九路分支到 T1/T2/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地/湖畔盆地（★ TB-03-13 候选池扩容）。
+- ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 369）。
+- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 8` 确定性八路分支到 T1/T2/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地（★ v1.50.68 砍需求：候选池 9→8，删除河谷聚落、台地聚落更名台地）。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
   T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；

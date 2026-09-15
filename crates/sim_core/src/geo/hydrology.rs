@@ -114,12 +114,6 @@ impl TerrainMap {
         if let Some(geom) = scratch.river_geometry.as_ref() {
             self.generate_river(geom, config);
         }
-        // ★ S7-07 河谷聚落主河：谷轴即河轴（`ValleyGeometry::center_x` 承载微幅
-        //   蜿蜒），河宽/岸带/河阶形态参数（SimConfig）随谷地几何移交；写入同样严格收敛在
-        //   河道影响带（06 号 §4.3 约束④「不得向两侧山壁外溢」）。
-        if let Some(vg) = scratch.valley_geometry.as_ref() {
-            self.generate_settlement_river(vg, config);
-        }
         // ★ TB-03 静水（湖畔大湖）：`WaterBody` 特征 #1 + 水体 #1 + 岸点
         //   独立于主河逻辑、零流向静水语义、connections 为空。
         if let Some(lg) = scratch.lake_geometry.as_ref() {
@@ -227,111 +221,6 @@ impl TerrainMap {
         }
     }
 
-    /// ★ S7-07 河谷聚落主河水系写入（T2 `generate_river` 的谷轴镜像版）。
-    ///
-    /// 陆地（冲积谷底/陡壁/台地）已由 `terrain.rs::generate_base_relief` 铺满全图，
-    /// 本函数**只写**横向距离落在河道影响带内（`d < river_half + bank + terrace`
-    /// ≤ 16+8+20 = 44m ≪ 谷底半宽 ≥80m）的局部网格：河面、河岸、河阶三种地表
-    /// 覆盖 + 浅滩走廊、轮廓特征与两岸取水点，带外一格不碰（06 号 §4.3 约束④
-    /// 「水系写入不得向两侧山壁外溢」）。河道中心线 = 谷轴
-    /// `ValleyGeometry::center_x`（微幅弯曲由谷轴蜿蜒承载、半宽恒定）；水面高程
-    /// `terrain_river_water_level` 与走廊宽度 `terrain_crossing_width` 与 T2 同源
-    /// （SimConfig）。坡度定稿归流水线第 6 步；本函数不自行重算坡度。
-    fn generate_settlement_river(&mut self, vg: &super::terrain::ValleyGeometry, cfg: &SimConfig) {
-        let size = self.world_size;
-        let level = cfg.terrain_river_water_level;
-        // ★ S7-08：岸带/河阶/浅滩位置/取水点偏移全部走 SimConfig（默认值 = 参数化前
-        //   的 terrain.rs 形态常数，输出逐位不变；字段 doc 注释载明保护线约束）。
-        let bank = cfg.terrain_valley_river_bank_m.max(0.0);
-        let terrace = cfg.terrain_valley_river_terrace_m.max(0.0);
-        let ford_ratio = cfg.terrain_valley_ford_ratio;
-        let access_offset_min = cfg.terrain_valley_access_offset_min_m.max(0.0);
-        let half = vg.river_half_m;
-        let center = |y: f32| vg.center_x(y, size);
-        for gy in 0..self.grid_height {
-            let row_y = (gy as f32/(self.grid_height-1).max(1) as f32-0.5)*size;
-            // 影响带列边界（保守外扩 2 格；格内仍用原判据精确裁决，与 T2 同式）
-            let span = half + bank + terrace;
-            let row_cx = center(row_y);
-            let gx_lo = ((((row_cx-span)/size+0.5)*(self.grid_width-1).max(1) as f32).floor() as isize - 2).max(0) as usize;
-            let gx_hi = ((((row_cx+span)/size+0.5)*(self.grid_width-1).max(1) as f32).ceil() as isize + 2)
-                .min((self.grid_width-1) as isize).max(gx_lo as isize) as usize;
-            for gx in gx_lo..=gx_hi {
-                let p = self.grid_pos(gx, gy);
-                let d = (p.x-center(p.y)).abs();
-                let outside = (d-half).max(0.0);
-                // ★ 水系影响带之外：严格保持谷地基底生成结果，一格不写。
-                if outside >= bank+terrace { continue; }
-                let c=&mut self.cells[gy*self.grid_width+gx];
-                if d < half {
-                    // 单调下凹河床 + 静态水面：河宽 22~32m（规格），河床沿 y 缓降。
-                    c.elevation = level-1.4 + p.y/size*0.3;
-                    c.surface_kind = SurfaceKind::DeepWater;
-                    c.water_body_id = Some(1);
-                    c.feature_flags = TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_NO_WALK;
-                } else if outside < bank {
-                    // 低滩禁建带：自水面缓升（T2 同式），派生 `RiverBank`。
-                    c.elevation = level + 0.4 + outside/bank*1.6;
-                    c.surface_kind = SurfaceKind::RiverBank;
-                    c.water_body_id = None;
-                    c.feature_flags = TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_SHORE_ACCESS;
-                } else {
-                    // 高肥力河阶：谷底高程（第 2 步写定）不动，只改地表归属。
-                    c.surface_kind = SurfaceKind::RiverTerrace;
-                    c.water_body_id = None;
-                    c.feature_flags = 0;
-                }
-                c.natural_fertility = 0.95;
-            }
-        }
-        // 授权浅滩走廊：±ford_ratio×world（默认 0.32，S7-08 起走 SimConfig）两处，端点
-        // 超出保守栅格岸线，普通道路只能接到陆地端点；带内水面改写
-        // `ShallowWater`（过水减速由 `terrain_shallow_water_cost` 在车道 profile
-        // 上承载，授权见 `corridor::segment_valid` 的 connection 判据）。
-        let margin = size/(self.grid_width-1).max(1) as f32*2.0;
-        let crossing_width = cfg.terrain_crossing_width.max(12.0);
-        for (i,y) in [-size*ford_ratio,size*ford_ratio].into_iter().enumerate() {
-            let reach = half+bank+margin;
-            let mut a = Vec3::new(center(y)-reach,y,0.0);
-            let mut b = Vec3::new(center(y)+reach,y,0.0);
-            a.z=self.sample_elevation(a.x,a.y); b.z=self.sample_elevation(b.x,b.y);
-            let crossing = TerrainConnection {id:i as u32+1,start:a,end:b,width:crossing_width,node_a:None,node_b:None};
-            for gy in 0..self.grid_height { for gx in 0..self.grid_width {
-                let p=self.grid_pos(gx,gy);
-                if (p.y-y).abs() <= crossing.width*0.5 && self.cells[gy*self.grid_width+gx].water_body_id.is_some() {
-                    let c=&mut self.cells[gy*self.grid_width+gx];
-                    c.surface_kind=SurfaceKind::ShallowWater; c.elevation=level-0.25;
-                    c.feature_flags=TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_CROSSING_CANDIDATE;
-                }
-            }}
-            self.features.push(TerrainFeature{id:10+i as u32,kind:TerrainFeatureKind::ShallowFord,vertices:vec![a,b],elevation:level,width:crossing_width,flags:0});
-            self.hydrology.connections.push(crossing);
-        }
-        let mut left=Vec::new(); let mut right=Vec::new();
-        for i in 0..=96 {
-            let y=(i as f32/96.0-0.5)*size;
-            left.push(Vec3::new(center(y)-half,y,level));
-            right.push(Vec3::new(center(y)+half,y,level));
-        }
-        let mut outline=left.clone(); outline.extend(right.iter().rev().copied());
-        self.hydrology.water_bodies.push(WaterBody{id:1,level,flow_direction:Vec3::new(0.0,-1.0,0.0),resource_pool_id:1,vertices:outline.clone()});
-        self.features.push(TerrainFeature{id:1,kind:TerrainFeatureKind::River,vertices:outline,elevation:level,width:half*2.0,flags:0});
-        for (i,vertices) in [left,right].into_iter().enumerate() {
-            self.features.push(TerrainFeature{id:20+i as u32,kind:TerrainFeatureKind::RiverBank,vertices,elevation:level,width:bank,flags:0});
-        }
-        // 两岸交替取水点：全部挂 `WaterPool #1`（`resource_pool_id = 1`），HUD 水量
-        // 去重聚合由 `terrain_network.rs::prepare_terrain_layout` 统一建池。离轴
-        // 偏移取 max(河道半宽+岸带+边距, 35m)，保证两岸对置取水点间距 ≥
-        // 2×35 = 70m（`poi_min_distance` 口径）。
-        let n=cfg.count_water_sources;
-        for i in 0..n {
-            let side=if i%2==0 {-1.0} else {1.0};
-            let y=((i/2+1) as f32/((n+1)/2+1) as f32-0.5)*size*0.85;
-            let x=center(y)+side*(half+bank+margin).max(access_offset_min);
-            let p=Vec3::new(x,y,self.sample_elevation(x,y));
-            self.hydrology.access_points.push(WaterAccessPoint{id:i as u32+1,water_body_id:1,resource_pool_id:1,pos:p,nearest_node_id:None,interaction_radius:cfg.poi_interaction_radius});
-        }
-    }
     /// 对有效格索引读取当前高程的四邻域差分，不读缓存坡度、不修改地表。
     /// 子特征局部试算与全图定稿必须共用此判据，保留既有运算次序与
     /// 步长口径（生产为方形网格，两轴沿用 grid_width），边缘使用单侧差分。

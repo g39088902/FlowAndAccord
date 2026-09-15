@@ -608,10 +608,7 @@ pub(super) struct GenesisScratch {
     /// **独立流**单次 phase 抽取，规划时点不影响任何共享 RNG 消费序）；第 2 步铺
     /// 河谷低丘、第 3 步施加水面共用同一份，保证两段几何逐比特一致（STAGE2-2 契约）。
     pub(super) river_geometry: Option<super::hydrology::RiverGeometry>,
-    /// ★ S7-06 河谷聚落谷地几何：第 2 步 settlement 分支抽样构建（relief_rng
-    /// 局部流），第 6 步地表派生（谷底肥力 0.95 / 陡壁 RockFace 判定）共用同一份。
-    pub(super) valley_geometry: Option<ValleyGeometry>,
-    /// ★ TB-02 台地聚落静态几何：第 2 步 plateau 分支构建，第 10 步路网接入消费。
+    /// ★ TB-02 台地静态几何：第 2 步 plateau 分支构建，第 10 步路网接入消费。
     pub(super) plateau_geometry: Option<super::plateau::PlateauGeometry>,
     /// ★ TB-03 冲积扇静态几何：第 2 步构建（扇面高程 + 干沟 + 锚点），第 6 步
     /// 地表派生（干沟 `SoftGround|NO_BUILD` 覆盖意图）与第 10 步门禁消费。
@@ -629,7 +626,6 @@ impl Default for GenesisScratch {
     fn default() -> Self {
         Self {
             river_geometry: None,
-            valley_geometry: None,
             plateau_geometry: None,
             fan_geometry: None,
             basin_geometry: None,
@@ -665,21 +661,20 @@ impl SubFeatureWorkspace {
 /// 头部逐字抽出）。
 fn resolve_profile(seed: u64, profile: &str) -> String {
     if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
-        // ★ TB-03-13：random 候选池 6→9（冲积扇/盆地/湖畔盆地通过各自
-        //   M1 物理门禁与 60 种子矩阵后准入，各 ~11.1% 均衡入列；
-        //   `flat_baseline` 永不入列）。9 路判别；显式 profile 的输出不受影响。
-        const RANDOM_CANDIDATES: [&str; 9] = [
+        // ★ v1.50.68：random 候选池 9→8（砍需求：删除河谷聚落模板，台地聚落
+        //   更名台地）。各 ~12.5% 均衡入列；`flat_baseline` 永不入列。8 路判别；
+        //   显式 profile 的输出不受影响，但同一种子在旧版的 random 映射不保留。
+        const RANDOM_CANDIDATES: [&str; 8] = [
             TERRAIN_PROFILE_MOUNTAIN_PASS,
             TERRAIN_PROFILE_RIVER_VALLEY,
             TERRAIN_PROFILE_GRASSLAND_PLAIN,
             TERRAIN_PROFILE_HILLSIDE_WOODLAND,
-            TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT,
-            TERRAIN_PROFILE_PLATEAU_SETTLEMENT,
+            TERRAIN_PROFILE_PLATEAU,
             TERRAIN_PROFILE_ALLUVIAL_FAN,
             TERRAIN_PROFILE_BASIN_OASIS,
             TERRAIN_PROFILE_LAKESIDE_BASIN,
         ];
-        RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 9) as usize].to_string()
+        RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 8) as usize].to_string()
     } else {
         profile.to_string()
     }
@@ -757,7 +752,14 @@ pub struct TerrainSubFeature {
 ///           / `lakeside_basin_v1` 湖畔盆地三个分支 + `TerrainFeatureKind::WaterBody`
 ///           静水水体特征；三个新 profile 各自自包含、互不影响，既有 6 profile
 ///           路径逐位不变。递增遵循「新分支入库即换版」先例）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 10;
+/// v1.50.68：10 -> 12（砍需求：删除 `river_valley_settlement_v1` 深切河谷模板、
+///           `plateau_settlement_v1` 更名 `plateau_v1`，random 候选池 9→8，
+///           全部种子的 random 映射随之改变、显式 profile 不受影响；
+///           冲积扇辨识度改善：双段凸形径向剖面 + 山口高程帽 + 干沟 3~4 条
+///           放射系 + 沟带 DryGround 色差 + 粒度分带，参数默认值同步调整，
+///           同一种子的扇面形态随之改变，其余 profile 逐位不变）
+///           ——两次跃迁同版交付：河谷删除贡献 11，扇面改善贡献 12。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 12;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -772,18 +774,11 @@ pub const TERRAIN_PROFILE_GRASSLAND_PLAIN: &str = "grassland_plain_v1";
 /// S7-02 洼地语义（SoftGround 凹圈）。
 /// 林地是装饰层事实（S7-05 梯级散布），本分支不写任何林地地表。
 pub const TERRAIN_PROFILE_HILLSIDE_WOODLAND: &str = "hillside_woodland_v1";
-/// 阶段七插队模板：河谷聚落（06 号 §4.3 · STAGE-07-TODO S7-06）。
-/// 南北走向深切河谷——中央连续冲积谷底（宽 160~190m、高程平缓、基础肥力 0.95）
-/// + 两侧连续陡壁（smoothstep 剖面，峰坡 39°~41° ≥34° 自动派生 `RockFace` +
-/// `TERRAIN_FLAG_NO_WALK` 硬禁行）+ 壁顶台地缓穹（沿谷轴向图缘二次收敛，谷口
-/// 坡度 ≤22° 保持全图通行连通）。谷底保留 ≥55m 干燥平坦河阶带（S7-07 主河
-/// 下凹与浅滩走廊在此带内局部写入）；谷底规划两处生活水源锚点（清泉 POI 由生态层布点）。
-pub const TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT: &str = "river_valley_settlement_v1";
-/// TB-02 模板：台地聚落（06 号 §5.6 / 07 号 §7.4）。
+/// TB-02 模板：台地（原名“台地聚落”，v1.50.68 更名；06 号 §5.6 / 07 号 §7.4）。
 /// 圆角矩形台面（平缓、起伏 <16°、可建 ≥3 处房屋）+ 真实阻路陡峭台缘（B=0.6H，
 /// 峰坡 ~68° ≥34° 派生 RockFace + NO_WALK）+ 两个可通过道路走廊的缓坡入口（B=4.0H，
 /// 峰坡 ~20.6° ≤30° 可行走、核心宽 ≥32m）+ 坡脚两处生活水源锚点。
-pub const TERRAIN_PROFILE_PLATEAU_SETTLEMENT: &str = "plateau_settlement_v1";
+pub const TERRAIN_PROFILE_PLATEAU: &str = "plateau_v1";
 /// ★ TB-03 模板：山前冲积扇（07 号 §7.4 / TB-03-IMPLEMENTATION-PLAN §5）。
 /// 山口锚点到扇缘的连续缓坡（smoothstep 径向剖面 + 角向窗口）+ 1~2 条真实干浅沟
 /// （`SoftGround|NO_BUILD`、无水面、可慢行）+ 至少一条山口→扇缘全宽干地走廊；
@@ -813,72 +808,6 @@ pub fn water_source_poi_count(profile: &str, count_water_sources: usize) -> usiz
         2
     } else {
         count_water_sources
-    }
-}
-
-/// ★ S7-06 河谷聚落静态谷地几何（创世 scratch 专用，不进快照/存档）。
-///
-/// 由 `generate_base_relief` 的 settlement 分支从 `relief_rng` 抽样构建
-///（消费序：蜿蜒相位 → 蜿蜒振幅 → 谷深 → 陡壁幅宽比 → 谷底半宽 → 水源锚点×2
-/// → ★ S7-07 主河半宽），
-/// 第 2 步铺高程与第 6 步地表派生共用同一份，保证两段几何逐比特一致。
-/// ★ S7-07：谷轴中心线同时是主河中心线（河道位于谷底中心，微幅弯曲由谷轴
-/// 蜿蜒承载）；河宽/岸带/河阶几何随本结构移交第 3 步水系局部写入。
-#[derive(Debug, Clone)]
-pub struct ValleyGeometry {
-    /// 谷底基准高程（米）：谷底整体近乎平坦，仅剩阻尼 fBm 微起伏。
-    pub floor_base_m: f32,
-    /// 谷底半宽（米）：抽自 [80, 95] ⇒ W_floor ∈ [160,190]（规格 150~190，
-    /// 下沿抬到 160 以保证扣除 S7-07 河道+河岸带后两侧河阶干燥平坦带 ≥55m）。
-    pub floor_half_m: f32,
-    /// 陡壁总高差（米）：抽自 [44, 48]（规格 40~50）。
-    pub h_wall_m: f32,
-    /// 陡壁宽度（米）：由 幅宽比 H/W ∈ [0.54, 0.585] 反解 W = H/比 ∈ [75,89]
-    /// （规格 70~90）——幅宽比与高差联动抽样，使 smoothstep 剖面峰值梯度
-    /// 1.5×H/W 稳定落在 39°~41.5°（≥34° 硬禁行、≤45° 探针窗上限）。
-    pub w_wall_m: f32,
-    /// 蜿蜒振幅（米）与相位：谷轴 `center_x(y) = amp·sin(y/world·waves + phase)`，
-    /// 打破笔直槽谷的机械感；amp ∈ [18,30] 远小于谷底半宽，图心列恒在谷底内。
-    /// ★ S7-08：振幅/波形走 SimConfig（`terrain_valley_meander_amp_*` /
-    /// `terrain_valley_meander_waves`），随本结构在第 2/6 步间共享。
-    pub meander_amp_m: f32,
-    /// ★ S7-08：谷轴蜿蜒全程周期数（原 `VALLEY_MEANDER_WAVES` 常数，默认 3.0）。
-    pub meander_waves: f32,
-    pub meander_phase_rad: f32,
-    /// 陡壁/台地包络起始 |y|（米）：|y| ≤ 此值包络恒为 1（深切段），之外按
-    /// `1 − u²`（u = (|y|−起点)/(半图−起点)）二次收敛到图缘 0——谷口段陡壁
-    /// 降为 ≤30° 缓梁、台地 sinks 到谷底高程，全图连通分量保持 1。
-    pub taper_start_m: f32,
-    /// 谷底水源锚点（世界坐标，2 处对角错布）：第 2 步末尾据此保留
-    /// （水源地理锚定 + 生态清泉 POI 落点）。
-    pub spring_anchors: Vec<(f32, f32)>,
-    /// ★ S7-07 主河半宽（米）：河宽抽自 [22, 32]（规格 22~32m）取半。恒定半宽
-    /// （「微幅弯曲」由谷轴蜿蜒承载）；半宽 + 岸带 8m ≤ 24m，守住 S7-06 建造
-    /// 保护线（谷底半宽 ≥80 时两侧干燥平坦河阶 ≥55m）。
-    pub river_half_m: f32,
-}
-
-impl ValleyGeometry {
-    /// 谷轴中心线 x 坐标（南北走向 + 微幅蜿蜒）。★ S7-08：波形数走结构字段
-    /// （构造时从 SimConfig 读入），第 2/6 步与 hydrology 三方共享同一取值。
-    #[inline]
-    pub(super) fn center_x(&self, y: f32, world_size: f32) -> f32 {
-        self.meander_amp_m
-            * (y / world_size * self.meander_waves + self.meander_phase_rad).sin()
-    }
-
-    /// 陡壁/台地公共沿谷包络（图缘收敛到 0）。最大下降梯度
-    /// `2×H/(半图−起点)` ≈ 0.39（21.5° @H=45），远低于 30° 可行走线——
-    /// 谷口段是绕行通道而非断崖。
-    #[inline]
-    pub(super) fn wall_env(&self, y: f32, half_size: f32) -> f32 {
-        let ay = y.abs();
-        if ay <= self.taper_start_m {
-            1.0
-        } else {
-            let u = ((ay - self.taper_start_m) / (half_size - self.taper_start_m).max(1.0)).min(1.0);
-            1.0 - u * u
-        }
     }
 }
 
@@ -918,6 +847,11 @@ pub struct TerrainMap {
     /// `#[serde(skip)]` 保证存档 JSON 字节不变（读档按种子重建时会重新填充）。
     #[serde(skip)]
     pub branch_ridges: Vec<BranchRidge>,
+    /// ★ v1.50.68 诊断字段：冲积扇静态几何（仅 `alluvial_fan_v1` 非空）。
+    /// 仅供 `terrain_probe.rs` 等工具读取扇面覆盖率/干沟指标；
+    /// `#[serde(skip)]` 保证存档 JSON 字节不变（branch_ridges 同款先例）。
+    #[serde(skip)]
+    pub fan_geometry: Option<super::alluvial_fan::FanGeometry>,
     pub hydrology: super::hydrology::Hydrology,
 }
 
@@ -947,6 +881,7 @@ impl TerrainMap {
             accents: Vec::new(),
             sub_features: Vec::new(),
             branch_ridges: Vec::new(),
+            fan_geometry: None,
             hydrology: Default::default(),
         }
     }
@@ -981,20 +916,18 @@ impl TerrainMap {
         let mut relief_rng = WorldRng::new(seed ^ 0x5245_4c49_4546_5431);
         let half_size = self.world_size / 2.0;
         self.tilt_angle_rad = rng.gen_range(0.0, std::f32::consts::TAU);
-        // ★ S7-02 草原 / ★ S7-04 半坡林地 / ★ S7-06 河谷聚落 / ★ STAGE2-7
-        //   flat_baseline：基础倾斜压到 16~24（主地貌由专属特征承担，坡度主体
-        //   2°~8°；flat_baseline 则只有倾斜本身；河谷聚落的高程被谷地公式
-        //   整体覆写，倾斜只保持「低幅地貌」的语义一致）。抽取数不变（1 次），
+        // ★ S7-02 草原 / ★ S7-04 半坡林地 / ★ STAGE2-7 flat_baseline：
+        //   基础倾斜压到 16~24（主地貌由专属特征承担，坡度主体 2°~8°；
+        //   flat_baseline 则只有倾斜本身）。抽取数不变（1 次），
         //   仅区间不同——T1/T2 路径的 rng 消费序列与取值逐位不变。
         let is_flat_baseline = self.profile == TERRAIN_PROFILE_FLAT_BASELINE;
-        let is_plateau = self.profile == TERRAIN_PROFILE_PLATEAU_SETTLEMENT;
+        let is_plateau = self.profile == TERRAIN_PROFILE_PLATEAU;
         // ★ TB-03 三个新模板：低幅基础倾斜（主地貌由专属特征承担，与草原/半坡同口径）
         let is_fan = self.profile == TERRAIN_PROFILE_ALLUVIAL_FAN;
         let is_basin = self.profile == TERRAIN_PROFILE_BASIN_OASIS;
         let is_lakeside = self.profile == TERRAIN_PROFILE_LAKESIDE_BASIN;
         let low_relief = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN
             || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND
-            || self.profile == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT
             || is_plateau
             || is_fan
             || is_basin
@@ -1089,64 +1022,6 @@ impl TerrainMap {
             None
         };
 
-        // ★ S7-06 河谷聚落谷地参数（只消费 relief_rng 局部流；其余 profile 不进入
-        //   本块，消费序列与逐位输出不受影响）。抽样序固定：蜿蜒相位 → 蜿蜒振幅 →
-        //   谷深 → 陡壁幅宽比 → 谷底半宽 → 水源锚点×2（各 1 次 y 偏移）
-        //   → ★ S7-07 主河半宽。
-        //   幅宽比与谷深联动反解陡壁宽度，使 smoothstep 剖面峰值梯度 1.5×H/W
-        //   稳定落在 39°~41.5°（≥34° 硬禁行线下留噪声余量、≤45° 探针窗上限）；
-        //   谷底半宽下沿 80 保证扣除 S7-07 河道+河岸带（≤24m）后两侧干燥平坦
-        //   河阶带 ≥55m（06 号 §4.3 建造保护）。
-        let is_valley_settlement = self.profile == TERRAIN_PROFILE_RIVER_VALLEY_SETTLEMENT;
-        let valley: Option<ValleyGeometry> = if is_valley_settlement {
-            // ★ S7-08：谷地形态参数全部走 SimConfig（默认区间与原字面量逐位相同，
-            //   抽样序不变）。防御性钳制防止零值 Default 产生空抽样区间/退化几何。
-            let meander_phase_rad = relief_rng.gen_range(0.0, std::f32::consts::TAU);
-            let ma_lo = config.terrain_valley_meander_amp_min.max(0.0);
-            let ma_hi = config.terrain_valley_meander_amp_max.max(ma_lo + 0.1);
-            let meander_amp_m = relief_rng.gen_range(ma_lo, ma_hi);
-            let h_lo = config.terrain_valley_wall_height_min.max(1.0);
-            let h_hi = config.terrain_valley_wall_height_max.max(h_lo + 0.1);
-            let h_wall_m = relief_rng.gen_range(h_lo, h_hi);
-            let wr_lo = config.terrain_valley_wall_ratio_min.max(0.01);
-            let wr_hi = config.terrain_valley_wall_ratio_max.max(wr_lo + 0.001);
-            let w_wall_m = h_wall_m / relief_rng.gen_range(wr_lo, wr_hi);
-            let fh_lo = config.terrain_valley_floor_half_min.max(1.0);
-            let fh_hi = config.terrain_valley_floor_half_max.max(fh_lo + 0.1);
-            let floor_half_m = relief_rng.gen_range(fh_lo, fh_hi);
-            // 谷底两处生活水源：南北对角错布（i=0 东北偏西岸、i=1 西南偏东岸语义上
-            // 即「两岸各一」），|y| ∈ [0.06,0.13]×world 保证图心（初始营地）水源距
-            // ≤ ~115m（探针窗 140m），横向贴谷轴 ±0.52×谷底半宽避开 S7-07 河道带。
-            let mut spring_anchors = Vec::with_capacity(2);
-            for i in 0..2usize {
-                let y_sign = if i == 0 { 1.0 } else { -1.0 };
-                let x_sign = if i == 0 { -1.0 } else { 1.0 };
-                let sy = y_sign * relief_rng.gen_range(0.06, 0.13) * self.world_size;
-                let sx = x_sign * floor_half_m * 0.52;
-                spring_anchors.push((sx, sy));
-            }
-            // ★ S7-07 主河半宽：河宽抽自 `terrain_valley_river_width_min/max`（默认
-            //   [22, 32]，06 号 §4.3 规格 22~32m）取半；岸带/河阶/浅滩位置走
-            //   SimConfig（`terrain_valley_river_bank_m` 等，S7-08 集中化），水面
-            //   高程与跨河走廊宽度由第 3 步从 SimConfig 读取（与 T2 同源）。
-            let rw_lo = config.terrain_valley_river_width_min.max(0.0);
-            let rw_hi = config.terrain_valley_river_width_max.max(rw_lo + 0.1);
-            let river_half_m = relief_rng.gen_range(rw_lo, rw_hi) * 0.5;
-            Some(ValleyGeometry {
-                floor_base_m: config.terrain_valley_floor_base_m,
-                floor_half_m,
-                h_wall_m,
-                w_wall_m,
-                meander_amp_m,
-                meander_waves: config.terrain_valley_meander_waves.max(0.01),
-                meander_phase_rad,
-                taper_start_m: config.terrain_valley_taper_ratio.max(0.0) * self.world_size * 0.5,
-                spring_anchors,
-                river_half_m,
-            })
-        } else {
-            None
-        };
         // 泉溪洼地锚点候选：2 处，锚在中心近域（图心=初始营地，是最近水源地理）；
         // 落点会在 raw 填充后吸附到局部最低格（「在低洼处开辟微凹地」）。
         // ★ S7-04 半坡林地复用同一洼地语义（坡脚泉溪 = 生活供水锚点；草原创世
@@ -1171,7 +1046,7 @@ impl TerrainMap {
             Vec::new()
         };
 
-        // ★ TB-02 台地聚落静态几何参数（只消费 relief_rng 局部流；其余 profile 不进入
+        // ★ TB-02 台地静态几何参数（只消费 relief_rng 局部流；其余 profile 不进入
         //   本块，消费序列与逐位输出不受影响）。
         let plateau = if is_plateau {
             Some(super::plateau::PlateauGeometry::plan(
@@ -1268,12 +1143,6 @@ impl TerrainMap {
         } else {
             noise_amp_k
         };
-        // ★ S7-06/S7-08 河谷聚落 fBm 分区阻尼（谷底/陡壁强阻尼保「高程平缓」与
-        //   峰坡窗口，台地中等阻尼出自然滚动丘陵）：改走 SimConfig（默认 0.15/0.15/0.5）。
-        let valley_noise_floor_k = config.terrain_valley_noise_floor_k;
-        let valley_noise_wall_k = config.terrain_valley_noise_wall_k;
-        let valley_noise_upland_k = config.terrain_valley_noise_upland_k;
-
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
                 let wx = if self.grid_width <= 1 {
@@ -1293,37 +1162,7 @@ impl TerrainMap {
                 let mut elev = base_tilt;
                 let mut saddle_noise_damp = 1.0f32;
 
-                // ★ S7-06 河谷聚落：谷地高程场整体覆写（谷底/陡壁/台地三分带）。
-                //   剖面 smoothstep（3t²−2t³）两端导数为 0——谷底边缘与壁顶台地
-                //   均 C1 平滑衔接（06 号 §4.3「山坡与谷底边缘平滑连续」）；
-                //   陡壁+台地共用同一沿谷包络 wall_env（壁顶=台地高程逐格相等，
-                //   不会在接缝处产生竖向断崖），包络在谷口段二次收敛保证绕行连通。
-                if let Some(vg) = valley.as_ref() {
-                    let fbm_v = terrain_noise::fbm_terrain_3octaves(
-                        wx * noise_freq_k,
-                        wy * noise_freq_k,
-                        seed,
-                    ) * noise_amp_k;
-                    let d = (wx - vg.center_x(wy, self.world_size)).abs();
-                    let env = vg.wall_env(wy, half_size);
-                    elev = if d < vg.floor_half_m {
-                        // 冲积谷底：基准高程 + 强阻尼微起伏（高程平缓、可建）
-                        vg.floor_base_m + fbm_v * valley_noise_floor_k
-                    } else if d < vg.floor_half_m + vg.w_wall_m {
-                        // 连续陡壁：峰值梯度 1.5×H/W ≈ tan(39°~41.5°)，≥34° 段
-                        // 由第 6 步派生 RockFace + NO_WALK 硬禁行
-                        let t = (d - vg.floor_half_m) / vg.w_wall_m;
-                        let s = t * t * (3.0 - 2.0 * t);
-                        vg.floor_base_m + vg.h_wall_m * env * s + fbm_v * valley_noise_wall_k
-                    } else {
-                        // 壁顶台地缓穹：随包络向图缘收敛到谷底高程（谷口开阔）
-                        vg.floor_base_m + vg.h_wall_m * env + fbm_v * valley_noise_upland_k
-                    };
-                    raw[gy * self.grid_width + gx] = elev;
-                    continue;
-                }
-
-                // ★ TB-02 台地聚落：高程场采样（圆角矩形 SDF + 分离过渡带 + 缓坡入口 + 噪声遮罩）。
+                // ★ TB-02 台地：高程场采样（圆角矩形 SDF + 分离过渡带 + 缓坡入口 + 噪声遮罩）。
                 if let Some(pg) = plateau.as_ref() {
                     let fbm_v = terrain_noise::fbm_terrain_3octaves(
                         wx * noise_freq_k,
@@ -1544,9 +1383,6 @@ impl TerrainMap {
         }
         // 软地凹圈掩码移交流水线 scratch，第 6 步地表派生消费（优先级高于坡度派生）。
         scratch.soft_ring = soft_ring;
-        // ★ S7-06 谷地几何移交流水线 scratch，第 6 步地表派生消费（谷底/陡壁分区）。
-        //   clone 仅含 2 个水源锚点的轻量几何（scratch 专用）。
-        scratch.valley_geometry = valley.clone();
         // ★ TB-02 台地几何移交流水线 scratch，第 10 步路网接入消费。
         scratch.plateau_geometry = plateau.clone();
         // ★ TB-03 三个新模板几何移交流水线 scratch（第 3 步静水 / 第 6 步覆盖意图 /
@@ -1554,6 +1390,11 @@ impl TerrainMap {
         scratch.fan_geometry = fan.clone();
         scratch.basin_geometry = basin.clone();
         scratch.lake_geometry = lake.clone();
+        // ★ v1.50.68：冲积扇几何暴露给诊断探针（serde(skip)，不影响存档）。
+        //   赋值必须在扇面规划写入 scratch 之后（branch_ridges 同款先例）；
+        //   非 fan profile 保持 None。此前误置于支脊抽样处（扇面规划之前），
+        //   导致探针 fan_coverage/gully/relief 恒 0、G1/G2/G3 门禁全假阳。
+        self.fan_geometry = scratch.fan_geometry.clone();
 
         // ★ T2 河谷低丘陆地基底（STAGE2-2 提取公式，铺满全图）＝第 2 步的
         //   river_valley 分支；几何由编排器第 2 步前规划的共享 `RiverGeometry` 提供。
@@ -1819,11 +1660,6 @@ impl TerrainMap {
             return; // T2：只定稿坡度（6a），地表/flags/肥力由第 2/3 步写定
         }
         let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
-        // ★ S7-06 河谷聚落：谷底/陡壁分区派生。谷底（冲积带，扣除 S7-07 水系
-        //   写定带）强制 DryGround + 基础肥力 0.95（06 号 §4.3「高程平缓、基础
-        //   肥力 0.95」）；陡壁与台地走通用坡度派生（≥34° RockFace + NO_WALK
-        //   硬禁行、20~34° SoftGround、≥18° NO_BUILD）。
-        let valley = scratch.valley_geometry.as_ref();
         // ★ TB-03 覆盖意图（§3.2 优先级：真实深水已由水系写定并在上方跳过；
         //   干沟软地禁建 → 干燥岸带/安全退距禁建 → 普通坡度派生）。
         //   深水禁行禁建不可被取消；覆盖意图只叠加 NO_BUILD/SoftGround，不取消
@@ -1852,11 +1688,6 @@ impl TerrainMap {
                 }
                 let slope = self.cells[idx].slope_angle_deg;
                 let normalized_height = ((self.cells[idx].elevation + 45.0) / 100.0).clamp(0.0, 1.0);
-                let on_floor = valley.map_or(false, |vg| {
-                    let wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * world_size;
-                    let wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * world_size;
-                    (wx - vg.center_x(wy, world_size)).abs() < vg.floor_half_m
-                });
                 // ★ TB-03 覆盖判据（仅新模板进入，旧 profile 恒 false、逐位无影响）
                 let (wx, wy) = if needs_world_pos {
                     (
@@ -1868,20 +1699,46 @@ impl TerrainMap {
                 };
                 let gully_cover = fan_g.map_or(false, |fg| fg.gully_depth_at(wx, wy).1);
                 let shore_cover = lake_g.map_or(false, |lg| lg.on_shore_ring(wx, wy));
+                // ★ v1.50.68 粒度分带：扇顶砾石带肥力折减 / 扇缘沃土带上调
+                //   （带比与折减系数由 FanGeometry 从 SimConfig 读入，第 2/6 步
+                //   共享；仅扇面角窗内生效，扇外与草原路径逐位不变）。
                 // ★ S7-02 草甸沃土：肥力基线抬高（可建格均值 0.85~0.95）；T1 公式不变。
-                let fertility = if on_floor {
-                    0.95
-                } else if is_grassland {
+                let fertility = if is_grassland {
                     (0.97 - slope / 70.0 * 0.5 - normalized_height * 0.10).clamp(0.1, 1.0)
                 } else {
                     (0.92 - slope / 70.0 - normalized_height * 0.18).clamp(0.1, 1.0)
+                };
+                let fertility = match fan_g {
+                    Some(fg) => {
+                        let (fr, ftheta) = fg.world_to_fan(wx, wy);
+                        let band = if fr < fg.length
+                            && (fr < fg.cap_radius || ftheta.abs() <= fg.half_angle)
+                        {
+                            let ft = fr / fg.length;
+                            if ft < fg.top_band_ratio {
+                                Some(fg.top_fertility_scale)
+                            } else if ft >= fg.edge_band_ratio {
+                                Some(1.10)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+                        match band {
+                            Some(s) => (fertility * s).clamp(0.1, 1.0),
+                            None => fertility,
+                        }
+                    }
+                    None => fertility,
                 };
                 // ★ S7-02 泉溪洼地凹圈：低坡软地带优先于坡度派生（草原全域坡度 < 18°，
                 //   不会与 RockFace 冲突）；软地只慢行不禁建（06 号 §4.1）。
                 //   ★ TB-03 干沟软地禁建：覆盖意图优先于坡度派生（可慢行、禁建）。
                 let surface_kind = if gully_cover {
-                    SurfaceKind::SoftGround
-                } else if on_floor {
+                    // ★ v1.50.68 干沟色差带：SoftGround → DryGround（与扇面草色
+                    //   形成对比，落地评审「放射干沟视觉锚点」建议；NO_BUILD
+                    //   禁建可慢行语义不变，仅地表类别变化）。
                     SurfaceKind::DryGround
                 } else if !scratch.soft_ring.is_empty() && scratch.soft_ring[idx] {
                     SurfaceKind::SoftGround

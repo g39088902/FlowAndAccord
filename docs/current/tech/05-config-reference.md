@@ -179,7 +179,7 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 120 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m） |
-| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 9 张候选池：T1山口/T2河谷/草原/半坡/河谷聚落/台地聚落/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~11.1%）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'river_valley_settlement_v1'（河谷聚落）| 'plateau_settlement_v1'（台地聚落，v1.50.54）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
+| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
@@ -210,26 +210,6 @@
 | `terrainHillsideWindSlopeMax` | f32 | 12 | geo/terrain.rs (S7-04 迎风坡目标峰值坡度上限) | 迎风坡目标峰值坡度抽样上限 (度)；目标 <14° |
 | `terrainHillsideCrestShiftMin` | f32 | 0.18 | geo/terrain.rs (S7-04 脊线横移比例下限 ×world) | 脊线横移比例抽样下限（×world；陡峭带远离初始营地） |
 | `terrainHillsideCrestShiftMax` | f32 | 0.3 | geo/terrain.rs (S7-04 脊线横移比例上限 ×world) | 脊线横移比例抽样上限（×world） |
-| `terrainValleyFloorBaseM` | f32 | 3 | geo/terrain.rs (S7-06 谷底基准高程) | 谷底基准高程 (m)；主河水面低于此值下凹成河 |
-| `terrainValleyFloorHalfMin` | f32 | 80 | geo/terrain.rs (S7-06 谷底半宽抽样下限；建造保护线) | 谷底半宽抽样下限 (m)；下沿 80 守两侧河阶干带 ≥55m 建造保护线 |
-| `terrainValleyFloorHalfMax` | f32 | 95 | geo/terrain.rs (S7-06 谷底半宽抽样上限) | 谷底半宽抽样上限 (m)；⇒ W_floor ∈ [160,190] |
-| `terrainValleyWallHeightMin` | f32 | 44 | geo/terrain.rs (S7-06 陡壁总高差抽样下限) | 陡壁总高差抽样下限 (m)；规格 40~50 |
-| `terrainValleyWallHeightMax` | f32 | 48 | geo/terrain.rs (S7-06 陡壁总高差抽样上限) | 陡壁总高差抽样上限 (m) |
-| `terrainValleyWallRatioMin` | f32 | 0.54 | geo/terrain.rs (S7-06 陡壁幅宽比 H/W 下限) | 陡壁幅宽比 H/W 抽样下限（smoothstep 峰值梯度 1.5×H/W） |
-| `terrainValleyWallRatioMax` | f32 | 0.585 | geo/terrain.rs (S7-06 陡壁幅宽比 H/W 上限；峰值梯度窗) | H/W 抽样上限；→ 峰值梯度 39°~41.5° ≥34° 硬禁行且 ≤45° 探针窗 |
-| `terrainValleyMeanderAmpMin` | f32 | 18 | geo/terrain.rs (S7-06 谷轴蜿蜒振幅下限) | 谷轴蜿蜒振幅抽样下限 (m)；远小于谷底半宽 |
-| `terrainValleyMeanderAmpMax` | f32 | 30 | geo/terrain.rs (S7-06 谷轴蜿蜒振幅上限) | 谷轴蜿蜒振幅抽样上限 (m) |
-| `terrainValleyMeanderWaves` | f32 | 3 | geo/terrain.rs (S7-06 谷轴蜿蜒周期数；S7-07 兼主河波形) | 谷轴蜿蜒全程周期数（y/world 系数；S7-07 起兼作主河中心线波形） |
-| `terrainValleyTaperRatio` | f32 | 0.47 | geo/terrain.rs (S7-06 陡壁/台地包络起始比例；谷口缓梁) | 陡壁/台地包络起始比例（×半图）；深切段中部 47%，谷口缓梁保绕行 |
-| `terrainValleyNoiseFloorK` | f32 | 0.15 | geo/terrain.rs (S7-06 谷底 fBm 分区阻尼) | 谷底 fBm 分区阻尼（强阻尼保高程平缓与峰坡窗口） |
-| `terrainValleyNoiseWallK` | f32 | 0.15 | geo/terrain.rs (S7-06 陡壁 fBm 分区阻尼) | 陡壁 fBm 分区阻尼（保峰值梯度窗口） |
-| `terrainValleyNoiseUplandK` | f32 | 0.5 | geo/terrain.rs (S7-06 台地 fBm 分区阻尼) | 台地 fBm 分区阻尼（中等阻尼出滚动丘陵） |
-| `terrainValleyRiverWidthMin` | f32 | 22 | geo/terrain.rs (S7-07 主河河宽抽样下限) | 主河河宽抽样下限 (m)；规格 22~32，取半为半宽 |
-| `terrainValleyRiverWidthMax` | f32 | 32 | geo/terrain.rs (S7-07 主河河宽抽样上限) | 主河河宽抽样上限 (m) |
-| `terrainValleyRiverBankM` | f32 | 8 | geo/hydrology.rs (S7-07 低滩禁建带半宽；建造保护线) | 低滩禁建带半宽 (m)；刻意不复用 T2 的 18m 宽岸（会吃掉聚落河阶） |
-| `terrainValleyRiverTerraceM` | f32 | 20 | geo/hydrology.rs (S7-07 河阶带半宽) | 河阶带半宽 (m)；岸带外 RiverTerrace 高肥力 0.95 覆盖带 |
-| `terrainValleyFordRatio` | f32 | 0.32 | geo/hydrology.rs (S7-07 授权浅滩 y 位置比例) | 授权浅滩 y 位置比例（±×world）；比 T2 先例 ±0.24 更稀疏 |
-| `terrainValleyAccessOffsetMinM` | f32 | 35 | geo/hydrology.rs (S7-07 取水点离轴最小偏移；POI 间距) | 取水点离轴最小偏移 (m)；保证对置点对间距 ≥70m POI 口径 |
 | `terrainPlateauHeightMin` | f32 | 18 | geo/plateau.rs (TB-02 台面最小抬升高度) | 台面最小抬升高度 (m)；规格 18~26 |
 | `terrainPlateauHeightMax` | f32 | 26 | geo/plateau.rs (TB-02 台面最大抬升高度) | 台面最大抬升高度 (m) |
 | `terrainPlateauHalfWidthRatio` | f32 | 0.22 | geo/plateau.rs (TB-02 台面半宽相对世界比例) | 台面半宽相对世界尺寸比例；0.22×768 ≈ 169m |
@@ -242,13 +222,16 @@
 | `terrainPlateauTopNoiseGain` | f32 | 0.2 | geo/plateau.rs (TB-02 台面区域噪声阻尼增益) | 台面区域噪声阻尼增益；起伏平缓保 ≥3 处房屋可建 |
 | `terrainPlateauRampNoiseGain` | f32 | 0.12 | geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益) | 缓坡入口区域噪声阻尼增益；走廊平缓保可走 |
 | `terrainPlateauOutlineWarp` | f32 | 6 | geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度) | 台缘轮廓低频扰动幅度 (m) |
-| `terrainFanLengthRatio` | f32 | 0.42 | geo/alluvial_fan.rs (TB-03 扇体长度比例) | 扇体长度比例（×worldSize，山口→扇缘） |
-| `terrainFanHalfAngleDeg` | f32 | 30 | geo/alluvial_fan.rs (TB-03 扇半角) | 扇半角（度，角向窗口 ±α） |
-| `terrainFanAmplitude` | f32 | 30 | geo/alluvial_fan.rs (TB-03 山口到扇缘总高差) | 山口到扇缘总高差 (m)；1.5×A/L ≈ tan(8°) 扇头侧缘 ≤tan(22°) |
-| `terrainFanGullyCountMax` | u32 | 2 | geo/alluvial_fan.rs (TB-03 干浅沟数量上限) | 干浅沟数量上限（1~2，relief_rng 掷存在性） |
-| `terrainFanGullyDepthM` | f32 | 2.2 | geo/alluvial_fan.rs (TB-03 干浅沟最大深度) | 干浅沟最大深度 (m)；沟内 SoftGround+NO_BUILD 可慢行 |
-| `terrainFanGullyWidthM` | f32 | 20 | geo/alluvial_fan.rs (TB-03 干浅沟横截面全宽) | 干浅沟横截面全宽 (m)；须跨越多个格子 |
+| `terrainFanLengthRatio` | f32 | 0.58 | geo/alluvial_fan.rs (TB-03 扇体长度比例；v1.50.68 提升) | 扇体长度比例（×worldSize，山口→扇缘）；v1.50.68 提升（>2m 覆盖 ≈15.5%） |
+| `terrainFanHalfAngleDeg` | f32 | 38 | geo/alluvial_fan.rs (TB-03 扇半角；v1.50.68 扩角) | 扇半角（度，角向窗口 ±α）；v1.50.68 扩角 |
+| `terrainFanAmplitude` | f32 | 52 | geo/alluvial_fan.rs (TB-03 山口到扇缘总高差；v1.50.68 提升) | 山口到扇缘总高差 (m)；v1.50.68 提升；双段剖面扇头陡段 ≈10° + 侧缘 150m 过渡 ≤tan(19°) |
+| `terrainFanGullyCountMax` | u32 | 4 | geo/alluvial_fan.rs (TB-03 干浅沟数量上限；v1.50.68 改 3~4 掷) | 干浅沟数量上限（3~4 均匀掷，放射沟系；v1.50.68） |
+| `terrainFanGullyDepthM` | f32 | 4.5 | geo/alluvial_fan.rs (TB-03 干浅沟最大深度；v1.50.68 提升) | 干浅沟最大深度 (m)；≥0.6 格目视可辨；沟内 DryGround+NO_BUILD 色差带可慢行 |
+| `terrainFanGullyWidthM` | f32 | 22 | geo/alluvial_fan.rs (TB-03 干浅沟横截面全宽) | 干浅沟横截面全宽 (m)；须跨越多个格子 |
 | `terrainFanGullyMeanderAmpRad` | f32 | 0.12 | geo/alluvial_fan.rs (TB-03 干浅沟角向蜿蜒幅度) | 干浅沟中心线角向蜿蜒幅度（弧度） |
+| `terrainFanTopBandRatio` | f32 | 0.32 | geo/terrain.rs (v1.50.68 扇顶砾石带外缘 t=r/L) | 粒度分带：扇顶砾石带外缘（t=r/L）；带内肥力折减（v1.50.68） |
+| `terrainFanEdgeBandRatio` | f32 | 0.68 | geo/terrain.rs (v1.50.68 扇缘沃土带内缘 t=r/L) | 粒度分带：扇缘沃土带内缘（t=r/L）；带内肥力 ×1.10（v1.50.68） |
+| `terrainFanTopFertilityScale` | f32 | 0.75 | geo/terrain.rs (v1.50.68 扇顶带肥力折减系数) | 粒度分带：扇顶带肥力折减系数；干燥低肥命中裸岩 accents（v1.50.68） |
 | `terrainBasinSemiAxisRatio` | f32 | 0.42 | geo/basin.rs (TB-03 盆地半轴比例) | 盆地半轴比例（×worldSize，椭圆 a/b 共用基准，广阔平坦盆底） |
 | `terrainBasinDepthM` | f32 | 18 | geo/basin.rs (TB-03 盆深) | 盆深 (m，中心相对盆底起伏基准下凹总量) |
 | `terrainBasinRimHeightM` | f32 | 42 | geo/basin.rs (TB-03 外缘低脊高度) | 外缘高耸山体基底高度 (m)；雄峻环抱高山，出口处受控归低 |

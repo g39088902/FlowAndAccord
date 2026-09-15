@@ -54,25 +54,26 @@
 
   let _active = null; // { id, tints }
 
-  // 与内核 resolve_profile 同式的 random 判别（9 路候选池，TB-03-13 起）。
+  // 与内核 resolve_profile 同式的 random 判别（8 路候选池；v1.50.68 砍需求
+  //   删除 river_valley_settlement_v1，plateau_settlement_v1 更名 plateau_v1）。
   // 仅用于风格选型；内核侧降级（flat_baseline）时本推断可能偏差——纯视觉，可接受。
   const RANDOM_CANDIDATES = [
     'mountain_pass_v1', 'river_valley_v1', 'grassland_plain_v1',
-    'hillside_woodland_v1', 'river_valley_settlement_v1', 'plateau_settlement_v1',
+    'hillside_woodland_v1', 'plateau_v1',
     'alluvial_fan_v1', 'basin_oasis_v1', 'lakeside_basin_v1',
   ];
-  // 内核常量 0x5052_4F46_494C_4531 拆半（JS 无 u64）：2^32 % 9 = 4，
-  // value % 9 = (hi % 9) × 4 + (lo % 9)（模乘同余）。
+  // 内核常量 0x5052_4F46_494C_4531 拆半（JS 无 u64）：2^32 % 8 = 0，
+  // value % 8 = (hi % 8) × 0 + (lo % 8) = lo % 8（模乘同余，高半部不参与）。
   const SALT_HI = 0x50524F46 >>> 0;
   const SALT_LO = 0x494C4531 >>> 0;
-  const POW32_MOD9 = 4;
+  const POW32_MOD8 = 0;
 
   function resolveEffectiveProfile(profile, seed) {
     if (!profile || profile === 'random') {
       const s = (Number(seed) >>> 0);
-      const hi = SALT_HI % 9;
+      const hi = SALT_HI % 8;
       const lo = ((s >>> 0) ^ SALT_LO) >>> 0;
-      const idx = (hi * POW32_MOD9 + (lo % 9)) % 9;
+      const idx = (hi * POW32_MOD8 + (lo % 8)) % 8;
       return RANDOM_CANDIDATES[idx];
     }
     return profile;
