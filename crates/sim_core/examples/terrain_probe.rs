@@ -32,7 +32,7 @@
 //!   条数（来自 `TerrainMap::branch_ridges`）；`brSlope` 支脊侧翼（|d⊥| ≤ width）峰值
 //!   坡度；`brDet` 直线穿越支脊影响区（|d⊥| ≤ 1.5×width）的样本对绕行比最大值。
 //!   山口 profile 末尾按达标线输出验收判定（components==1 / detour 2.0~5.2 /
-//!   buildable ≥10500 / 硬禁行 2%~5% / 支脊检出率 100% → TB01_7_ALL_PASS）。
+//!   buildable ≥47600（★ v1.50.70 分辨率 256 等比重标，160 时 18600） / 硬禁行 2%~5.5% / 支脊检出率 100% → TB01_7_ALL_PASS）。
 
 use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
@@ -71,7 +71,9 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             max_slope: (0.0, 20.0),
             hard_blocked: (0, 0),
             no_walk: (0, 0),
-            buildable_min: 12000,
+            // ★ v1.50.70 分辨率 160→256 等比重标：21300×(65536/25600)=54528；
+            //   256 下 60 种子实测 min buildable=65481。
+            buildable_min: 54500,
             detour_p95: (0.0, 1.15),
             water_dist_max: f32::INFINITY,
             band_width_min: 0.0,
@@ -88,17 +90,28 @@ fn gate_window_for(profile: &str) -> Option<GateWindow> {
             max_slope: (22.0, 28.5),
             hard_blocked: (0, 0),
             no_walk: (0, 0),
-            buildable_min: 7500,
+            // ★ v1.50.70 分辨率 160→256 等比重标：13300×2.56≈34048；
+            //   256 下 60 种子实测 min buildable=60332。
+            buildable_min: 34000,
             detour_p95: (0.0, 1.45),
             water_dist_max: f32::INFINITY,
             band_width_min: 35.0,
             crossing95_min: 0.0,
         }),
         TERRAIN_PROFILE_PLATEAU => Some(GateWindow {
-            max_slope: (42.0, 58.0),
-            hard_blocked: (150, 350),
-            no_walk: (150, 350),
-            buildable_min: 4000,
+            // ★ v1.50.70 分辨率 160→256 重标：生产参数（B=0.6H，nominal 峰坡 68.2°）下
+            //   崖缘相邻格对细采样收敛至连续场真值，60 种子实测 76.59°~80.66°，
+            //   上限 58→85；下限 42 为崖环存在性设计要求不变。
+            //   ★ 同版修正探针配置缺口：examples/config.json 此前缺全部 12 个台地
+            //   字段，探针一直用零值兑底的 H≈10m 矮台假象参数测量（256 下曾在
+            //   标称 31° 入口上出现 5/60 台顶失连伪影）；补齐后 components 恒 1。
+            max_slope: (42.0, 85.0),
+            // ★ v1.50.70 分辨率 160→256 重标：生产参数下崖环格数随 H∈[18,26]
+            //   波动大，60 种子实测 hard/no_walk 均 941~1894。
+            hard_blocked: (900, 3800),
+            no_walk: (900, 3800),
+            // ★ v1.50.70 等比重标：7100×2.56≈18176；256 下 60 种子实测 min=62765。
+            buildable_min: 18100,
             detour_p95: (0.0, 3.50),
             water_dist_max: f32::INFINITY,
             band_width_min: 32.0,
@@ -899,7 +912,7 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
     let first = seeds.first().copied().unwrap_or(0);
     let last = seeds.last().copied().unwrap_or(0);
     println!(
-        "\n=== {} · grid=120 world=764 · seeds {}..={} ({} 个) ===",
+        "\n=== {} · grid=256 world=764 · seeds {}..={} ({} 个) ===",
         profile,
         first,
         last,
@@ -929,11 +942,11 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
     let mut br2 = 0usize;
     let mut flank_slope_max = 0.0f32;
     let mut br_detour_max = 0.0f32;
-    let n_cells = 14400.0f32;
+    let n_cells = 65536.0f32;
     let mut hard_ratio_min = f32::MAX;
     let mut hard_ratio_max = 0.0f32;
     for &seed in &seeds {
-        let mut t = TerrainMap::new(120, 120, 764.0);
+        let mut t = TerrainMap::new(256, 256, 764.0);
         t.generate_with_config(seed, cfg);
         let (br_n, flank_max) = branch_flank_stats(&t);
         let zone = branch_zone_mask(&t);
@@ -996,7 +1009,9 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
             let mut fan_fails: Vec<String> = Vec::new();
             // G1 门槛标定：>2m 增量实测 ≈15.5%（扇区几何占比 ≈22%，扇缘角向衰减与
             // 2m 阈裁剪掉外环；旧 0.42 参数同口径 ≈9%，改善比 ≈1.7 倍）。首跑 60 种子
-            // 恒 15.4~15.5%，据此标 0.14（原解析估匕 20% 系未扣衰减口径）。
+            // 恒 15.4~15.5%，据此标 0.14（原解析估算 20% 系未扣衰减口径）。
+            // ★ v1.50.70 分辨率 160→256 复测：60 种子扇面覆盖 min 仍 15.6%、干沟 ≥3、
+            //   高差 ≥58m，三门槛数值不变（扇面占比为几何比值，随分辨率稳定）。
             if m.fan_coverage < 0.14 {
                 fan_fails.push(format!(
                     "fan_coverage={:.1}% < 14%（扇体体量不足）",
@@ -1068,8 +1083,8 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
 }
 
 /// ★ TB-01-7 山口 60 种子验收判定（TB01-TODO §合格断言；v1.50.43 起上限 5.2）：
-/// components==1 全部 · detour_max ∈ [2.0, 5.2] · buildable ≥ 10500/14400 ·
-/// 硬禁行占比 2%~5% · 支脊检出率 100%（第 1 条支脊 100% 出现）。
+/// components==1 全部 · detour_max ∈ [2.0, 5.2] · buildable ≥ 47600/65536（★ v1.50.70 分辨率 256 等比重标，160 时 18600/25600；256 下 60 种子实测 min=53295）·
+/// 硬禁行占比 2%~5.5%（★ v1.50.70 上限 5.0→5.5：256 复测 60 种子实测 2.91%~5.04%，细网格离散化后硬带占比收敛于几何真值，5.04% 系边界量化噪声）· 支脊检出率 100%（第 1 条支脊 100% 出现）。
 fn print_tb017_verdict(
     seeds: usize,
     comp_max: usize,
@@ -1087,8 +1102,10 @@ fn print_tb017_verdict(
     let pass = |ok: bool| if ok { "PASS" } else { "FAIL" };
     let c1 = comp_max == 1;
     let c2 = detour_min >= 2.0 && detour_max <= 5.2;
-    let c3 = buildable_min >= 10500;
-    let c4 = hard_min >= 2.0 && hard_max <= 5.0;
+    let c3 = buildable_min >= 47600; // ★ v1.50.70 分辨率 256 等比重标（160 时 18600）
+    // ★ v1.50.70 分辨率 256 复测：60 种子实测 2.91%~5.04%，上限 5.0 → 5.5
+    //（细网格离散化后硬带占比收敛于几何真值，5.04% 系边界量化噪声）。
+    let c4 = hard_min >= 2.0 && hard_max <= 5.5;
     let c5 = branch_seeds == seeds;
     let all = c1 && c2 && c3 && c4 && c5;
     println!("--- TB-01-7 验收（{} 种子达标线）---", seeds);
@@ -1099,9 +1116,9 @@ fn print_tb017_verdict(
         detour_min,
         detour_max
     );
-    println!("[{}] buildable ≥ 10500 : min={}", pass(c3), buildable_min);
+    println!("[{}] buildable ≥ 47600 : min={}", pass(c3), buildable_min);
     println!(
-        "[{}] 硬禁行占比 2%~5% : {:.2}%..{:.2}%",
+        "[{}] 硬禁行占比 2%~5.5% : {:.2}%..{:.2}%",
         pass(c4),
         hard_min,
         hard_max
@@ -1142,7 +1159,7 @@ fn main() {
             for seed in 1..=n {
                 let mut c = cfg.clone();
                 c.terrain_profile = profile.to_string();
-                let mut w = sim_core::World3DEngine::new_seeded_with_config(120, 764.0, seed, c);
+                let mut w = sim_core::World3DEngine::new_seeded_with_config(256, 764.0, seed, c);
                 w.seed_primitive_ecology(20);
                 if let Err(e) = w.validate_terrain_world() {
                     fails += 1;

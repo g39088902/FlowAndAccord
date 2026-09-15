@@ -167,7 +167,7 @@ window.SIM_CONFIG = {
   //   world_create 的 grid_res 传 0 时内核回落到本值；非 0 值可显式覆盖（仅供测试）。
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
-  terrainGridRes: 120, // 地形栅格每边格数（120 → 步长 764/119 ≈ 6.42m）
+  terrainGridRes: 256, // 地形栅格每边格数（v1.50.70 由 160 提升；256 → 步长 764/255 ≈ 2.996m）
   terrainProfile: 'random', // 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size

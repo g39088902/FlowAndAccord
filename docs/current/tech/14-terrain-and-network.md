@@ -940,7 +940,7 @@ render_agents.js        族人绘制                                            
 
 ```text
 ✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "plateau_v1"（台地，原 plateau_settlement_v1）| "alluvial_fan_v1"（★ TB-03 冲积扇）| "basin_oasis_v1"（★ TB-03 盆地）| "lakeside_basin_v1"（★ TB-03 湖畔盆地）| "flat_baseline"（诊断基线，永不入 random）；★ v1.50.68 起 8 profile 参与 random 轮换（原 9 路中的河谷聚落已删除）
-✅ terrainGridRes             120                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/119 ≈ 6.42m）
+✅ terrainGridRes             256                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/255 ≈ 2.996m；v1.50.70 由 160 提升）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
 ✅ terrainPassRidgeAmplitude  53.0                ★ T1 山口主脊幅度 (m)；通行力约束见 §9.3.1
@@ -973,11 +973,11 @@ render_agents.js        族人绘制                                            
 ✅ terrainPlateauCornerRadiusRatio 0.08              ★ TB-02 圆角矩形倒角半径比例
 ✅ terrainPlateauEdgeBandRatio   0.60                ★ TB-02 台缘陡坡过渡带宽度相对高度倍率 (B=0.6H)
 ✅ terrainPlateauRampBandRatio   4.00                ★ TB-02 入口缓坡过渡带宽度相对高度倍率 (B=4.0H)
-✅ terrainPlateauRampWidth       32.0                ★ TB-02 入口走廊核心通径宽度 (m)
-✅ terrainPlateauRampShoulderWidth 16.0              ★ TB-02 入口走廊两侧过渡肩宽 (m)
-✅ terrainPlateauTopNoiseGain    0.15                ★ TB-02 台面平顶噪声阻尼增益
-✅ terrainPlateauRampNoiseGain   0.15                ★ TB-02 入口缓坡走廊噪声阻尼增益
-✅ terrainPlateauOutlineWarp     10.0                ★ TB-02 台缘轮廓微幅扭曲波幅 (m)
+✅ terrainPlateauRampWidth       36.0                ★ TB-02 入口走廊核心通径宽度 (m)
+✅ terrainPlateauRampShoulderWidth 24.0              ★ TB-02 入口走廊两侧过渡肩宽 (m)
+✅ terrainPlateauTopNoiseGain    0.20                ★ TB-02 台面平顶噪声阻尼增益
+✅ terrainPlateauRampNoiseGain   0.12                ★ TB-02 入口缓坡走廊噪声阻尼增益（v1.50.70 修正本表 0.15 旧漂移）
+✅ terrainPlateauOutlineWarp     6.0                 ★ TB-02 台缘轮廓微幅扭曲波幅 (m)
 ✅ terrainFanLengthRatio      0.58                ★ TB-03 冲积扇扇体长度比例（×worldSize，山口→扇缘）；v1.50.68 提升（>2m 增量覆盖 ≈15.5%，原 0.42 仅 ≈9%）
 ✅ terrainFanHalfAngleDeg     38.0                ★ TB-03 冲积扇扇半角（度，角向窗口 ±α）；v1.50.68 扩角
 ✅ terrainFanAmplitude        52.0                ★ TB-03 山口到扇缘总高差 (m)；v1.50.68 提升——双段凸形径向剖面（扇头 0~0.2L 陡段 ≈10° 山口堆 + 其后缓段 ≤6°），扇头侧缘配合 150m 最小过渡弧宽 ≤tan(19°)

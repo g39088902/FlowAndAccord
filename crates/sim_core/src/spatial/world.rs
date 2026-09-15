@@ -84,7 +84,7 @@ pub struct World3DEngine {
     pub last_royal_payout_tick: u64,
     /// 上次帝国公帑结算 tick；与国王内帑使用相同的 6000 tick 周期但独立记账。
     pub last_imperial_payout_tick: u64,
-    /// 地形快照脏位标记：仅在初次生成、载入存档或显式请求时为 true 并导出网格单元 (120x120, 14400 单元)
+    /// 地形快照脏位标记：仅在初次生成、载入存档或显式请求时为 true 并导出网格单元（分辨率由 terrainGridRes 配置；v1.50.70 默认 256x256 = 65536 单元）
     pub terrain_dirty: std::cell::Cell<bool>,
     /// 地区居民到达时序脏位标记：仅在新成员加入/变动时置为 true 并按需排序
     pub regions_arrival_dirty: bool,

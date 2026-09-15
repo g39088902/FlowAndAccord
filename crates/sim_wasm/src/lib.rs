@@ -34,7 +34,9 @@ fn clear_error() {
 
 /// 地形栅格分辨率兜底值（每边格数）。仅当配置既未注入、调用方又传 0 时生效，
 /// 保证 `SimConfig::default()`（`terrain_grid_res = 0`）场景下也能建出合法世界。
-const TERRAIN_GRID_RES_FALLBACK: usize = 120;
+/// ★ v1.50.70：随前端 `terrainGridRes` 默认值 160 → 256 同步（两处必须保持一致，
+/// 否则未注入配置的工具会静默生成旧分辨率世界，造成两套确定性基线漂移）。
+const TERRAIN_GRID_RES_FALLBACK: usize = 256;
 
 /// 解析实际生效的地形栅格分辨率：调用方传非 0 值则显式覆盖（仅供测试参数化），
 /// 否则回落到 `SimConfig::terrain_grid_res`，使配置成为全项目分辨率的单一真相源。

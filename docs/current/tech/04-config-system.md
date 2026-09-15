@@ -79,7 +79,7 @@ T0/T1 已接入 6 个配置字段：
 
 | 字段 | 当前默认值 | 作用 |
 | :--- | :--- | :--- |
-| `terrainGridRes` | `120` | ★ v1.50.19 地形栅格每边格数（分辨率单一真相源，见下） |
+| `terrainGridRes` | `256` | ★ v1.50.19 地形栅格每边格数（分辨率单一真相源，见下；v1.50.70 由 160 提升） |
 | `terrainProfile` | `mountain_pass_v1` | 地形生成 profile 与存档重建口径 |
 | `terrainMaxWalkSlope` | `30.0` | 道路/走廊的最大允许坡度 |
 | `terrainMaxBuildSlope` | `16.0` | 房屋完整占地的最大允许坡度 |
@@ -93,8 +93,8 @@ T0/T1 已接入 6 个配置字段：
   `tools/baseline-m19-observation.json` 更误记为 `60 × 60`，与实际严重不符。
 - 现已抽离为 `terrainGridRes`，内核 `sim_wasm::resolve_grid_res()` 成为唯一消费点：
   `world_create` / `world_create_map` 的 `grid_res` 形参**传 0 即回落本配置**；传非 0 值可显式覆盖（仅供测试参数化）。
-  配置缺失时（`SimConfig::default()` 下 `terrain_grid_res = 0`）再有常量兜底 120。
-- 当前 120 × 120，世界尺寸 764m → 网格步长 764/119 ≈ **6.42m**。
+  配置缺失时（`SimConfig::default()` 下 `terrain_grid_res = 0`）再有常量兜底 256（v1.50.70 起随前端默认值同步，两处必须一致）。
+- 当前 256 × 256，世界尺寸 764m → 网格步长 764/255 ≈ **2.996m**（v1.50.70 由 160 × 160 提升）。
 - ⚠️ 改动本值会改变地形形态、POI 落位与全部确定性基线，并使旧存档因 `SAVE_APP_VERSION` 变更而废弃；
   调整后必须重跑全量门禁，并参考 `./25-benchmarking.md` 建立性能基准（格子数按 res² 增长）。
 
