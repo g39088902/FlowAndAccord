@@ -80,6 +80,9 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
   if (!groups.length) return;
 
   const budget = Number.isFinite(RC.landscapeFrameChildBudget) ? RC.landscapeFrameChildBudget : 420;
+  // ★ TA-07：入队前剔除总开关（accentLODCullEnabled；关态完整回退「不剔除 + 绘制端自算」路径）
+  const AL0 = window.AccentLOD;
+  const cullOn = !!(AL0 && AL0.cfg().cullOn);
   const scale = camera.zoom;
   const cx = w / 2 + camera.panX, cy = h / 2 + camera.panY;
   let used = 0;
@@ -101,20 +104,34 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
       if (!window.LandscapeModel.childActive(groups[gi], child)) continue;
       // ★ S4-05 detail 贴地片绘制期消费的组丰度镜像（表现缓存；q 有效由 childActive 保证）
       if (child.stockRole === 'detail') child._q = groups[gi].q;
-      // 视口粗剔除（与装饰同余量口径）：屏外子图元不入队、不占预算
+      // ★ TA-07 视口剔除（AccentLOD 解析式 AABB 取代旧「与装饰同款」44/14 启发余量）：
+      // 屏外子图元不入队、不占预算；GroundPatch 无模型，直接用自身半径拼装包围体。
       const rx = child.x * cosZ - child.y * sinZ;
       const ry = child.x * sinZ + child.y * cosZ;
       const az = (child.z || 0) + MAP_Z_LIFT;
       const sx = cx + rx * scale;
       const sy = cy + (ry * cosX - az * sinX) * scale;
-      const upMargin = 24 + 44 * scale;
-      const xMargin = 24 + 14 * scale;
-      if (sx < -xMargin || sx > w + xMargin || sy < -upMargin || sy > h + 20) continue;
+      const AL = window.AccentLOD;
+      if (cullOn) {
+        const isPatch = child.modelKind === 'GroundPatch';
+        const b = isPatch ? AL.boundsScratch(child.radius, 0, 0, 0) : AL.kindBounds(child.modelKind);
+        const a = AL.aabbOf(sx, sy, b, AL.SHEAR_MAX,
+          isPatch ? scale : (child.scale || 1) * scale, cosX, sinX, AL.aabb);
+        if (!AL.visible(a)) continue;
+      }
 
       if (used >= budget) return; // 有界截断（固定遍历序）
       const dd = _decalDepth(child.x, child.y, child.footprint, cosZ, sinZ, cosX, sinX);
-      _depthItem(DEPTH_LANDSCAPE, child, 0,
+      const lit = _depthItem(DEPTH_LANDSCAPE, child, 0,
         dd != null ? dd : _surfaceDepth(child.x, child.y, child.z, cosZ, sinZ, cosX, sinX));
+      // ★ TA-07：屏幕 AABB（s1x/s1y = 左下、s2x/s2y = 右上）与锚点屏幕坐标（ex/ey）随深度项
+      // 传递，绘制端零重投影、零重剔除（入队端与绘制端消费**同一个** AABB，§3.5 红线）。
+      lit.ex = sx; lit.ey = sy;
+      if (cullOn) {
+        // lod=1 ⇒ 绘制端不再重剔（消费**同一个** AABB）；剔除关态时绘制端按现状自算自剔
+        lit.lod = 1;
+        lit.s1x = AL.aabb.x0; lit.s1y = AL.aabb.y0; lit.s2x = AL.aabb.x1; lit.s2y = AL.aabb.y1;
+      }
       used++;
 
       // 树/灌木子图元的贴地投影独立入队（同装饰 TA-04-6 口径：基点/影梢足迹深度取大，
@@ -127,21 +144,25 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
       const hWorld = skel.trunkH * child.scale;
       const tipX = child.x + _lsShDir.x * _lsShDir.len * hWorld;
       const tipY = child.y + _lsShDir.y * _lsShDir.len * hWorld;
-      const fp = (kind === 'Tree' ? 10.5 : 8) * child.scale;
+      const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * child.scale; // ★ TA-06-8 冠幅足迹读模型
       const dBase = _decalDepth(child.x, child.y, fp, cosZ, sinZ, cosX, sinX);
       const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
       let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;
       if (d == null) d = _surfaceDepth(child.x, child.y, child.z, cosZ, sinZ, cosX, sinX);
-      _depthItem(DEPTH_LANDSCAPE_SHADOW, child, 0, d);
+      const sit = _depthItem(DEPTH_LANDSCAPE_SHADOW, child, 0, d);
+      // 锚点屏幕坐标随深度项传递（阴影绘制端零重投影）
+      if (window.AccentLOD) { sit.ex = sx; sit.ey = sy; }
       used++;
     }
   }
 }
 
 // ── 分发：立体子图元绘制（复用装饰图元，禁复制光照/季相公式）──
-function drawLandscapeChild(child) {
+// ★ TA-07-6：第二参 it = 深度队列项（可选）——入队端已把 AABB 与锚点屏幕坐标写入，
+//   绘制端直接消费（口径唯一）；缺省时按 AccentLOD 自算（保持独立可调用与可测性）。
+function drawLandscapeChild(child, it) {
   const kind = child.modelKind;
-  if (kind === 'GroundPatch') { drawLandscapeGroundPatch(child); return; } // ★ S4-04 贴地色差片（无 AccentModel 模型）
+  if (kind === 'GroundPatch') { drawLandscapeGroundPatch(child, it); return; } // ★ S4-04 贴地色差片（无 AccentModel 模型）
   if (kind !== 'Tree' && kind !== 'Boulder' && kind !== 'Bush' &&
       kind !== 'RockCluster' && kind !== 'GrassTuft') {
     _reportUnknownLandscapeKind(String(kind));
@@ -152,30 +173,42 @@ function drawLandscapeChild(child) {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  const rx = child.x * cosZ - child.y * sinZ;
-  const ry = child.x * sinZ + child.y * cosZ;
-  const az = (child.z || 0) + MAP_Z_LIFT;
-  const sx = w / 2 + camera.panX + rx * scale;
-  const sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
-
-  const upMargin = 24 + 44 * scale;
-  const xMargin = 24 + 14 * scale;
-  if (sx < -xMargin || sx > w + xMargin || sy < -upMargin || sy > h + 20) return;
+  let sx, sy;
+  if (it) {
+    sx = it.ex; sy = it.ey;
+  } else {
+    const rx = child.x * cosZ - child.y * sinZ;
+    const ry = child.x * sinZ + child.y * cosZ;
+    const az = (child.z || 0) + MAP_Z_LIFT;
+    sx = w / 2 + camera.panX + rx * scale;
+    sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+    const AL0 = window.AccentLOD;
+    // 入队端已剔除（it.lod===1）时不再重剔；独立调用或剔除关态时按 AccentLOD 自算自剔
+    if (!it || it.lod !== 1) {
+      if (AL0 && AL0.cfg().cullOn) {
+        const a0 = AL0.aabbOf(sx, sy, AL0.kindBounds(kind), AL0.SHEAR_MAX,
+          (child.scale || 1) * scale, cosX, sinX, AL0.aabb);
+        if (!AL0.visible(a0)) return;
+      }
+    }
+  }
 
   const view = landscapeChildView(child);
   const scaled = child.scale * scale;
+  // ★ TA-06-2：profile 走模型单一入口（树木三轮廓 / 灌木三变体自动作用于景观子图元；
+  // GrassTuft 为 undefined 回退 deciduousTree，芦草穗量不受 floweringBush 曲线影响）。
   if (kind === 'Tree') {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentTree(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Boulder') {
-    drawAccentBoulder(sx, sy, scaled, child.rot, cosZ, sinZ, cosX, sinX);
+    drawAccentBoulder(view, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'Bush') {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentBush(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX);
   } else if (kind === 'RockCluster') {
     drawAccentRockCluster(view, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX);
   } else {
-    const season = window.SimTreeTint.sample(view, sim, model.evergreen ? 'evergreen' : undefined);
+    const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentGrassTuft(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX); // render_grass.js
   }
 }
@@ -212,17 +245,24 @@ var _gpDot = {
   berry: { col: 'rgb(146,52,70)', n: 10, rK: 0.16, minR: 1.5 },   // 深浆果红，哑光
   gold: { col: 'rgb(191,155,74)', n: 10, rK: 0.14, minR: 1.2 },   // 哑光金矿脉斑，禁发光（无 shadowBlur/亮晕）
 };
-function drawLandscapeGroundPatch(child) {
+function drawLandscapeGroundPatch(child, it) {
   const scale = camera.zoom;
   const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-  const rx = child.x * cosZ - child.y * sinZ;
-  const ry = child.x * sinZ + child.y * cosZ;
-  const az = (child.z || 0) + MAP_Z_LIFT;
-  const sx = w / 2 + camera.panX + rx * scale;
-  const sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+  let sx, sy;
+  if (it) {
+    sx = it.ex; sy = it.ey;
+  } else {
+    const rx = child.x * cosZ - child.y * sinZ;
+    const ry = child.x * sinZ + child.y * cosZ;
+    const az = (child.z || 0) + MAP_Z_LIFT;
+    sx = w / 2 + camera.panX + rx * scale;
+    sy = h / 2 + camera.panY + (ry * cosX - az * sinX) * scale;
+  }
   const r = child.radius * scale;
-  if (r < 1) return;
+  // ★ TA-07：硬编码 1px 收编为 RENDER_CONFIG.accentLODGroundPatchMinPx（缺省 1.0，行为不变）
+  const AL = window.AccentLOD;
+  if (r < (AL ? AL.cfg().gpMin : 1)) return;
   const st = _gpStyles(sim.currentSeason);
   const wet = child.tone === 'wet';
   const ryEll = r * cosX;
@@ -273,8 +313,8 @@ function drawLandscapeGroundPatch(child) {
 }
 
 // ── 分发：树/灌木子图元贴地投影（复用 render_shadows.js 模型参数化主体）──
-function drawLandscapeShadowGround(child) {
+function drawLandscapeShadowGround(child, it) {
   const kind = child.modelKind;
   if (kind !== 'Tree' && kind !== 'Bush') return; // 入队已过滤，防御再判
-  drawAccentShadowFor(landscapeChildView(child), landscapeChildModel(child));
+  drawAccentShadowFor(landscapeChildView(child), landscapeChildModel(child), it);
 }

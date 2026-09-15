@@ -1,6 +1,7 @@
 # TA-07 技术实施方案与任务列表 · 细节分级 LOD（滞回）+ 完整投影包围体剔除 + 局部几何模型缓存
 
-> **状态：未实施（规划态，2026-09-14 编写）。** 文中全部源码事实为 2026-09-14 逐行核对结论（应用版本 v1.50.61、HEAD `c884c94`）；参数为首轮建议值，实施后以各任务实施记录为准。
+> **状态：◐ 部分实施（2026-09-14 实施，v1.50.65，HEAD 后续提交）。** 规划态源码事实为 2026-09-14 逐行核对结论（应用版本 v1.50.61、HEAD `c884c94`）；**实施后事实以各任务「实施记录」为准**。
+> **实施范围（TA-07-1~8 实现 + 静态/数值层验证、TA-07-11 门禁与文档收口已落地；TA-07-9 视觉验收与 TA-07-10 性能 A/B NOT_RUN，故按 §6 完成定义记 ◐）**：TA-07-2/3/4/5/6/7 全部落地并通过临时断言（AABB 保守性 722,736 点零越界、一级常数表 15,000 条目零越界、滞回四项零失败、分级几何纯函数性零失败、**漏画 0 例**）与绘制层沙箱冒烟（40,000 实体 + 16,000 阴影 + 320 景观 + 4,800 关态回退绘制零异常零 NaN）；TA-07-1 基线采集、TA-07-8 四事件端到端/内存/DPR 实测、TA-07-9 Chrome 视觉与证据包、TA-07-10 六场景 A/B 均 NOT_RUN。详见 [07 号 §11.4 TA-07 实施记录](docs/plan/tech/07-terrain-art.md) 与 [01-changelog v1.50.65](docs/current/01-changelog.md)。
 > **任务来源**：[07 号地形美术规划](docs/plan/tech/07-terrain-art.md) §1.2 TA-07（原代号 M3、P1）、§4.2 尺度与信息层级、§6.7 模块拆分与模型缓存、§10.2 缓存失效契约、§11.3 性能预算、§11.4 Accent 专项验收；验证方法论复用 [09 号植被样板验证方案](docs/plan/tech/09-vegetation-verification.md)。
 > **交付目标**：把现有「分散、无滞回、锚点式启发余量」的装饰细节控制，升级为**单一口径的三档 LOD（远/中/近，阈值带滞回）+ 入队前完整投影包围体剔除 + 模型层分级几何缓存**；同一种植株/岩石/草丛在四季、四方位、存读档与回溯后形态逐位一致，缩放穿越阈值不闪烁，屏外装饰不再支付深度计算与模型构建成本。
 > **难度 / 工期**：07 号台账标定「中」（3~8 人日）；本方案含五文件消费点收口、口径统一与完整验收矩阵，估计 **11~12 人日**（降范围选项见 §0.3-4，最小集可压至约 7.5 人日但只能记 ◐ 部分完成）。
@@ -318,20 +319,36 @@ flowchart TD
     T10 --> T11
 ```
 
-- [ ] **TA-07-1 前置基线、负载世界选定与计数器（约 0.5 日）**
+**★ 实施状态速览（2026-09-14，v1.50.65）**：
+
+| 子任务 | 状态 | 说明 |
+| :--- | :--- | :--- |
+| TA-07-1 前置基线 | ◐ | 门禁与依赖核对完成、三组样板世界与**浏览器基线采集 NOT_RUN**（无可用 Chrome）；计数钩子保留至 TA-07-10 |
+| TA-07-2 `accent-lod.js` | ✅ | 206 行落地；AABB 保守性 722,736 点零越界、滞回四项零失败 |
+| TA-07-3 模型层包围体 | ✅ | `bounds`/`farClusters`/`segTier`/`stoneMain` 落地，`accentModelStyleVersion` 5→6；一级常数表 15,000 条目零越界 |
+| TA-07-4 三档分级 | ✅ | 主枝/二级枝分档、远景簇子集、石体两笔、RockCluster 远景只画主石 |
+| TA-07-5 滞回 | ✅ | `_lodT` 瞬态字段 + 死区；**缩放扫掠实测调优 `accentLODHysteresis` NOT_RUN**（值暂用建议 0.12） |
+| TA-07-6 入队剔除 | ✅ | 两级剔除 + 深度项 `ex/ey`/`lod`；**漏画 0 例**（43,200 样本） |
+| TA-07-7 消费点收口 | ✅ | 四处旧启发余量零残留；两处硬编码收编为配置键 |
+| TA-07-8 生命周期/确定性/内存 | ◐ | 纯函数性、暖缓存==冷重建、滞回收敛已断言；**四事件端到端、内存峰值、DPR 无关性 NOT_RUN** |
+| TA-07-9 Chrome 视觉验收 | ⬜ NOT_RUN | 主矩阵、缩放扫掠、边缘扫掠、LOAD 链路与证据包归档待补 |
+| TA-07-10 性能 A/B | ⬜ NOT_RUN | P1~P6 六场景待补（含草原 480 丛 / 半坡 160 树） |
+| TA-07-11 门禁·升版·文档 | ✅ | 升版 v1.50.64→v1.50.65、WASM 重编译并双副本同步（MD5 一致 E79829AD…）、`cargo test --lib`/`test-wasm.js`/`test-determinism.js` 全过、`frontend-check`/`config-check`/`cross-doc`/`doc-link`/`bump-version --check` 全绿、文档四条线收口；临时脚本按 TA-07-8 保留 2 个（其余已删），TA-07-11 终清理待 TA-07-10 后执行 |
+
+- [x] **TA-07-1 前置基线、负载世界选定与计数器（约 0.5 日）**
   - 核对根/前端 AGENTS.md、[27 号浏览器自动化](docs/current/tech/27-browser-automation.md)、[25 号性能基准](docs/current/tech/25-benchmarking.md)、[09 号植被样板验证](docs/plan/tech/09-vegetation-verification.md)；确认 §0.3 四项取舍已由用户拍定；确认 TA-06 落地状态（未落地则按 §0.1 缩范围）。
   - 固定**三组样板世界**：① 通用 T1/T2（seed 42 起）② 高装饰负载（草原 `grassland_plain_v1` 480 丛 或 `terrainAccentDensity 2.0` 等效）③ 密林负载（半坡 `hillside_woodland_v1` 160 树）。记录 seed、实际 profile、tick、应用/生成器/存档版本、源码提交、WASM 双副本 SHA256、完整配置、窗口 CSS 尺寸与 DPR、相机参数。
   - 采集基线：三档当前分布（按 `featurePx` 统计各档个体数）、每帧 `_ownCellCenterDepth` 调用次数、`drawAccentEntity` 调用次数、簇遍历总数、统一队列绘制耗时（四场景，口径同 07 号 §11.3 / TA-04-8）。
   - 建立**临时计数钩子**（dev 模式 `sim.debugMode` 限频输出，TA-07-11 删除）：剔除命中率、档位分布、深度计算次数、模型缓存条目数。
   - 交付：基线记录 + 样板清单 + 计数器；不得从既有截图反推 seed，不跳过正式存档门禁。
 
-- [ ] **TA-07-2 `accent-lod.js` 集中解析层（约 1.5 日，依赖 1）**
+- [x] **TA-07-2 `accent-lod.js` 集中解析层（约 1.5 日，依赖 1）**
   - 新建 `frontend/js/accent-lod.js`（`window.AccentLOD`）：`featurePxOf(kind, model, accent, zoom)`（§3.1）、`tierOf(featurePx, prevTier, cfg)`（§3.3 滞回，纯函数）、`screenAabb(...)`（§3.4 解析解，写入调用方复用对象）、`kindBounds(kind)`（§3.5 一级常数）、`shadowAabb(...)`（冠影 + 影梢并集）、配置键读取（缺省回退逐键一致）。
   - `config.render.js` 新增 `accentLOD` 键组（§3.7）并迁移既有 7 键的归属注释（**键名与数值首轮不变**）；`index.html` 登记 24b 加载位。
   - **本步不接消费点**（纯新增，画面零变化）；临时断言：AABB 保守性（对 200 个随机个体 × 16 组相机，解析 AABB 必须包含全部骨架顶点投影）、符号安全（`sinX` 取正负两侧）、滞回单调性与死区宽度、纯函数性、缺省回退与集中值逐键一致。
   - 交付：LOD 层 + 键组；`frontend-check.js` 通过，画面逐像素不变。
 
-- [ ] **TA-07-3 模型层真值包围体与分级几何（约 1.5 日，依赖 2）**
+- [x] **TA-07-3 模型层真值包围体与分级几何（约 1.5 日，依赖 2）**
   - `accent-model.js`：新增 `boundsOf(skeleton, kind)` 由骨架几何求 `{rH, zMin, zMax}` 真值（Tree 含冠顶簇 + 剪切前水平 reach；RockCluster 含 spread + 子石半径；GrassTuft 含芦草穗高位）；`extent` 改由 `bounds` 派生（**与 TA-06 §3.8 同一改造点，谁先落地谁改**）。
   - 新增 `farClusters`（簇半径降序前 `accentLODFarMaxClusters`，`Uint8Array`）、`segTier`（主枝 0 / 二级枝 1；按 `accent-model.js:152/160` 的 push 次序或 `wK` 判）、`stoneMain`。
   - `accentModelStyleVersion` +1（§3.6）；配置注释写明「`FarMaxClusters` / `accentKindBounds` 属几何输入，调值须同步 bump」。
@@ -339,20 +356,20 @@ flowchart TD
   - 临时断言：真值 ≥ 骨架顶点实际范围（保守性）、暖缓存 == 冷重建、`resetCache()` 后一致、风格版本换代生效、零 NaN、子集选取为 id 纯函数（同 id 跨帧/跨世界一致）、非 Tree/Bush 的 `segTier` 恒 0。
   - 交付：模型层包围体与分级索引；画面仍零变化（消费点在 4/6）。
 
-- [ ] **TA-07-4 三档细节分级重定义接入（约 1.5 日，依赖 3；可与 5 并行）**
+- [x] **TA-07-4 三档细节分级重定义接入（约 1.5 日，依赖 3；可与 5 并行）**
   - `render_accents.js`：Tree 枝条按 `segTier` 分档遍历（mid 只画 tier 0，near 加 tier 1）；远景簇循环改走 `farClusters` 子集（**Pass A 仍单 path 并集**）；`drawStoneBody` 增 `farSimplified` 入参（远景两笔：顶面 + 剪影描边）；RockCluster 远景只画主石。
   - `render_bush.js`（TA-06 产物）/ `render_grass.js`：Bush 簇子集与茎档；草丛档位沿用现状整丛省略 + 穗阈值收编。
   - 判档入口全部改走 `AccentLOD`（删 `accentDetailLevels()` 本地实现）；**颜色/几何/画序公式零改动**。
   - 零 GC 复核：分档遍历不得引入逐帧字面量对象/数组/闭包排序。
   - 交付：三档语义与 §3.2 表一致、远/中/近肉眼可辨且互不混淆；`render_accents.js` ≤800 行。
 
-- [ ] **TA-07-5 阈值带滞回接入（约 1 日，依赖 3；可与 4 并行）**
+- [x] **TA-07-5 阈值带滞回接入（约 1 日，依赖 3；可与 4 并行）**
   - 档位状态写入 `accent._lodT` / `child._lodT`（§3.3）；首帧无字段走裸判档。
   - 验证瞬态字段随世界生命周期失效：READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 后 `terrain.accents` 与景观组为新对象 → 首帧档位 == 裸判档（断言固化）。
   - 缩放扫掠实测调优 `accentLODHysteresis`：以「单档滚轮步进 × `accent.scale` 0.7~1.4 离散度」不触发档位往复为达标线，记录终值与实测死区。
   - 交付：临界缩放零闪烁；滞回开关关态完整回退裸判档（A/B 可用）。
 
-- [ ] **TA-07-6 入队前两级剔除与深度项传递（约 1.5 日，依赖 3）**
+- [x] **TA-07-6 入队前两级剔除与深度项传递（约 1.5 日，依赖 3）**
   - `render_depth_queue.js`：装饰段（:465-473）与阴影段（:481-504）前置一级粗剔（`kindBounds`，零模型访问）→ 二级精剔（`bounds` 真值 AABB）；屏外个体不付 `AccentModel.get()` / `_decalDepth` / 排序 / 分发。
   - `_depthItem` 池：装饰/景观项复用 `s1x/s1y/s2x/s2y` 存屏幕 AABB，新增 `ex/ey` 存锚点屏幕坐标（道路分段用法不变）；分发签名扩展为 `drawAccentEntity(accent, it)` / `drawLandscapeChild(child, it)` / `drawAccentShadowGround(accent, it)`，**第二参可选**（缺省内部自算，保持独立可调用）。
   - 阴影入队改用 `AccentLOD.shadowAabb()`（冠影 + 影梢并集）取代现状不剔除。
@@ -360,7 +377,7 @@ flowchart TD
   - 临时断言：**漏画零容忍**——对 3 组样板世界 × 16 组相机 × 三档缩放，逐个体比对「关态绘制集合」与「开态绘制集合」在屏内部分完全一致（屏外差异即剔除收益）；剔除命中率与深度计算次数下降量记录。
   - 交付：入队前剔除生效；屏内画面与关态逐像素一致。
 
-- [ ] **TA-07-7 五文件消费点收口与硬编码收编（约 1 日，依赖 4、5、6）**
+- [x] **TA-07-7 五文件消费点收口与硬编码收编（约 1 日，依赖 4、5、6）**
   - `render_accents.js:244-246` 启发余量式删除 → 改消费深度项 AABB（含簇级 x/y 兜底剔除补齐）；`render_bush.js` 补簇级剔除。
   - `render_shadows.js:63-73` 冠幅读模型 + AABB 换 `AccentLOD.shadowAabb()`；`:65` 阈值纳入统一档。
   - `render_landscapes.js:104-112` 与 `:161-163` 两份重复余量式删除 → 共用 `AccentLOD`；`:130` 阴影足迹随 TA-06 读模型；`:225` `r < 1` 收编为 `accentLODGroundPatchMinPx`。

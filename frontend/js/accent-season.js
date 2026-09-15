@@ -1,8 +1,10 @@
-// === Accent 连续季相（TA-02）===
+// === Accent 连续季相（TA-02；★ TA-06-2 清理兼容接口）===
 // SimTreeTint 是 Tree/Bush 季相唯一生产者。只读快照，不累计帧状态、不用墙钟/RNG。
 // sample(accent, sim, profile?) 返回 0..1 叶/芽/花/落叶量与浮点 RGB 反照率。
 // profile: deciduousTree / deciduousBush / evergreen / floweringBush；省略时按 kind。
-// 常绿/花灌木先提供曲线接口，实际物种分配属于 TA-06。几何落叶属于 TA-03。
+// ★ TA-06 起物种与 profile 由 accent-model.js::speciesOf 派生（模型对象 model.profile 为
+// 单一入口）；花灌木首次真实消费 floweringBush（叶历沿用落叶灌木 + accentFlowerCycle 覆写花量）。
+// 曲线本身不改（07 号 §6.3：物种分配只负责把正确 profile 送进来）。几何落叶属于 TA-03。
 // 依赖 config.render.js 与 accent-model.js（渲染期均已加载）。
 window.SimTreeTint = window.SimTreeTint || (function () {
   const SEASON_INDEX = { Spring: 0, Summer: 1, Autumn: 2, Winter: 3 };
@@ -72,9 +74,7 @@ window.SimTreeTint = window.SimTreeTint || (function () {
     const { a, b, t } = segment(cfg().accentSeasonProfiles.deciduousTree, u);
     return clamp01(mix(a[6], b[6], t));
   }
-  function tint(accent, sim, profile) {
-    const b = sample(accent, sim, profile).brownness;
-    return b >= cfg().treeTintRedBand ? 2 : (b >= cfg().treeTintYellowBand ? 1 : 0);
-  }
-  return { yearPhase, sample, brownness, tint };
+  // ★ TA-06-2：旧 tint() 三档量化兼容接口连同 treeTintYellowBand/treeTintRedBand 一并删除
+  //（全仓无消费点；07 号 §6.3 要求迁移完成后统一清理，避免两套年历并存）。
+  return { yearPhase, sample, brownness };
 })();

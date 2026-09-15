@@ -69,13 +69,12 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
   const cR = Math.cos(rot), sR = Math.sin(rot);
   // 隆冬低矮萎缩保底高度系数（config.render.js，TA-11-3）：hK = ratio + (1-ratio)×叶量
   const RC = window.RENDER_CONFIG || {};
-  // ★ S7-03 高密草甸 LOD（config.render.js）：草叶屏幕长度不足阈值的远景草丛整丛省略——
-  // 平地草原全图 ~480 丛（通用图 60 丛），全图缩放时逐叶描边成本不可控；屏幕上不足
-  // ~1.4px 的草丛只是一枚色点，整丛省略不可辨。统一深度队列与视口剔除照常先行，
-  // 本层只补「缩放过小」这一档（其余装饰种类不受影响）。
-  const hBaseLod = Number.isFinite(RC.accentGrassTuftHeightBase) ? RC.accentGrassTuftHeightBase : 2.4;
-  const lodMinPx = Number.isFinite(RC.accentGrassTuftLODMinPx) ? RC.accentGrassTuftLODMinPx : 1.4;
-  if (hBaseLod * scaled < lodMinPx) return;
+  // ★ S7-03 高密草甸 LOD：草叶屏幕长度不足阈值的远景草丛整丛省略——平地草原全图 ~480 丛
+  // （通用图 60 丛），全图缩放时逐叶描边成本不可控；屏幕上不足 ~1.4px 的草丛只是一枚色点，
+  // 整丛省略不可辨。★ TA-07：判据统一走 AccentLOD 特征尺度口径（株高基准 × accent.scale ×
+  // zoom，CSS px），阈值键 accentGrassTuftLODMinPx 归属 accentLOD 键组（数值不变）。
+  const AL = window.AccentLOD;
+  if (AL && AL.featurePx('GrassTuft', model, scaled) < AL.cfg().grassTuftMin) return;
   const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio)
     ? RC.accentGrassTuftWinterHeightRatio : 0.62;
   const hK = winterK + (1 - winterK) * season.leafDensity;
@@ -91,6 +90,8 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
 
   // 草色 + 芦花穗量/穗色：季相派生单一入口 grassSeasonColor（TA-11-4，见本文件上方）
   const sc = grassSeasonColor(season);
+  // ★ TA-07 芦花穗省略阈值（accentLODPlumeMinPx；走 AccentLOD 单一读取入口）
+  const plumeMinPx = AL ? AL.cfg().plumeMin : 2;
 
   // 贴地接触投影（弱于灌木）
   const so = _shadowOffset(0.8, 1.6, 0.5);
@@ -141,7 +142,8 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     //   远景穗屏长 < 2px 不可辨直接省略；画家排序与所在草叶一致（叶压穗/穗压叶自然）。
     if (it.b.plume > 0 && sc.plumeV > 0.02) {
       const pl = it.b.plume * hK * scaled;
-      if (pl >= 2) {
+      // ★ TA-07：硬编码 2px 收编为 RENDER_CONFIG.accentLODPlumeMinPx（缺省 2.0，行为不变）
+      if (pl >= plumeMinPx) {
         const dx0 = p1.x - c.x, dy0 = p1.y - c.y;
         const dl = Math.hypot(dx0, dy0) || 1;
         const pa = Math.atan2(dy0 / dl, dx0 / dl);
