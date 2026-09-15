@@ -3,14 +3,17 @@
 // 子模块: render_world.js (地形/路网/POI/房屋) / render_agents.js (族人/特效) / render_inspector.js (面板/拾取) / render_hud.js (HUD/大盘)
 
 // ==========================================
-// 30 FPS 渲染主循环
+// 渲染主循环（支持 30 / 60 FPS，默认 60 追求流畅）
 // ==========================================
 let frameCount = 0, lastFpsUpdate = performance.now();
 let lastRenderTime = performance.now();
 let lastUiUpdate = performance.now();
 let lastTopBarUpdate = performance.now(); // 📊 顶栏数据栏独立节流 (无头模式下同样刷新)
-const TARGET_FPS = 30;
-const FRAME_INTERVAL = 1000 / TARGET_FPS;
+const DEFAULT_TARGET_FPS = 60;
+function getTargetFps() {
+  const rc = window.RENDER_CONFIG;
+  return (rc && typeof rc.targetFps === 'number' && rc.targetFps > 0) ? rc.targetFps : DEFAULT_TARGET_FPS;
+}
 
 // ==========================================
 // 🐞 调试模式: 帧耗时 / FPS / 内存采样与 HUD 刷新
@@ -130,11 +133,13 @@ function render(now) {
 
   if (!now) now = performance.now();
   const elapsed = now - lastRenderTime;
+  const targetFps = getTargetFps();
+  const frameInterval = 1000 / targetFps;
 
-  if (elapsed < FRAME_INTERVAL - 1.5) {
+  if (elapsed < frameInterval - 1.5) {
     return;
   }
-  lastRenderTime = now - (elapsed % FRAME_INTERVAL);
+  lastRenderTime = now - (elapsed % frameInterval);
 
   const frameStart = performance.now();
   sim.tick();

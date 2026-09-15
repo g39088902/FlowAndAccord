@@ -305,8 +305,12 @@
     return m;
   }
 
-  // drawCell 逐分片屏幕坐标 scratch（容量同裁剪上限 16；热路径零分配）
+  // drawCell 逐分片屏幕坐标与批处理 scratch（容量同裁剪上限 16；热路径零分配）
   const _fx = new Float64Array(16), _fy = new Float64Array(16);
+  const _MAX_CELL_FRAGS = 64;
+  const _bHead = new Int8Array(8);
+  const _bNext = new Int8Array(_MAX_CELL_FRAGS);
+  const _bAlpha = new Float32Array(_MAX_CELL_FRAGS);
 
   // 把模型中 [firstPrim, kinds.length) 的新图元预裁剪到各触及格，登记分片（u,v 相对本格 0~1）。
   // 归属规则（§3.3）：图元只由中心桶生成一次（跨桶不重复），分片按「触及格」登记；
@@ -374,6 +378,7 @@
     // 参数（零分配约定）：i00 = 本格左上顶点索引；p00..p01 = 四角投影坐标（CSS px）；
     //   lod = 世界→CSS 像素尺度（camera.zoom，DPR 不参与）。
     // 返回本格实际绘制的分片数（未就绪 / 无分片 / 全 LOD 剔除为 0）。
+    // ★ 性能优化：按 8 档受光色桶合并同色 Path2D 子路径，将大量单独 ctx.fill() 聚合为批次绘制。
     drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, lod) {
       const m = this._model;
       if (!m || m.cursor < m.pending.length || m.cellFrags) return 0; // 未就绪/未拍平只画基底
@@ -398,41 +403,140 @@
       const fragPrim = m.fragPrim, fragVOff = m.fragVOff, fragVCount = m.fragVCount;
       const fragU = m.fragU, fragV = m.fragV, sizes = m.sizes, signs = m.signs, tones = m.tones;
       const off = rec.off, cnt = rec.cnt;
-      let drawn = 0, alphaUsed = false;
-      for (let f = 0; f < cnt; f++) {
+      if (cnt <= 0) return 0;
+
+      // 快速双线性投影基底（消除每顶点重复减法）
+      const dx10 = p10x - p00x, dy10 = p10y - p00y;
+      const dx01 = p01x - p00x, dy01 = p01y - p00y;
+      const dxDiag = p11x - p10x - dx01, dyDiag = p11y - p10y - dy01;
+
+      const cMin = cfg.contrast, span = cfg.contrastMax - cfg.contrast;
+      _bHead.fill(-1);
+      let hasFrags = false;
+      const fragLimit = cnt < _MAX_CELL_FRAGS ? cnt : _MAX_CELL_FRAGS;
+
+      for (let f = 0; f < fragLimit; f++) {
         const fi = off + f, p = fragPrim[fi];
-        // LOD（§4.2）：特征尺度 = 图元特征尺寸 × 世界→CSS 像素尺度；detailFadePx 间 smoothstep
         const pxSize = sizes[p] * lod;
-        let a;
-        if (f1 <= f0) a = pxSize >= f0 ? 1 : 0;
-        else if (pxSize >= f1) a = 1;
-        else if (pxSize <= f0) continue;
-        else a = smoothstep(f0, f1, pxSize);
-        const shade = this._shadeFor(i00, signs[p], tones[p]);
-        if (shade === null) continue;
-        const n = fragVCount[fi], vo = fragVOff[fi];
-        // 先算坐标并做非法投影守卫（§3.3：NaN/退化 → 跳过分片保留基底，不得产生 NaN）
-        let acc = 0;
-        for (let i = 0; i < n; i++) {
-          const u = fragU[vo + i], v = fragV[vo + i];
-          const w10 = u * (1 - v), w11 = u * v;
-          const w00 = (1 - u) * (1 - v), w01 = (1 - u) * v;
-          const sx = w00 * p00x + w10 * p10x + w11 * p11x + w01 * p01x;
-          const sy = w00 * p00y + w10 * p10y + w11 * p11y + w01 * p01y;
-          _fx[i] = sx; _fy[i] = sy;
-          acc += sx + sy;
-        }
-        if (!isFinite(acc)) continue;
-        ctx.beginPath();
-        ctx.moveTo(_fx[0], _fy[0]);
-        for (let i = 1; i < n; i++) ctx.lineTo(_fx[i], _fy[i]);
-        ctx.closePath();
-        ctx.fillStyle = shade;
-        if (a < 1) { ctx.globalAlpha = a; alphaUsed = true; }
-        ctx.fill();
-        drawn++;
+        if (pxSize <= f0) continue;
+        const a = (f1 <= f0 || pxSize >= f1) ? 1 : smoothstep(f0, f1, pxSize);
+        const sign = signs[p];
+        const tone = tones[p];
+        let lvl = span > 0 ? ((tone - cMin) / span * 4) | 0 : 0;
+        if (lvl < 0) lvl = 0; else if (lvl > 3) lvl = 3;
+        const bKey = (sign > 0 ? 4 : 0) + lvl;
+
+        _bAlpha[f] = a;
+        _bNext[f] = _bHead[bKey];
+        _bHead[bKey] = f;
+        hasFrags = true;
       }
-      if (alphaUsed) ctx.globalAlpha = 1; // §4.1：LOD globalAlpha 用毕必须恢复 Canvas 状态
+      if (!hasFrags) return 0;
+
+      let drawn = 0;
+      for (let bKey = 0; bKey < 8; bKey++) {
+        let f = _bHead[bKey];
+        if (f === -1) continue;
+
+        const sign = bKey >= 4 ? 1 : -1;
+        const lvl = bKey & 3;
+        const tone = cMin + (lvl + 0.5) * span * 0.25;
+        const shade = this._shadeFor(i00, sign, tone);
+        if (shade === null) continue;
+
+        let cur = f;
+        let allOpaque = true;
+        while (cur !== -1) {
+          if (_bAlpha[cur] < 1) { allOpaque = false; break; }
+          cur = _bNext[cur];
+        }
+
+        if (allOpaque) {
+          ctx.beginPath();
+          cur = f;
+          while (cur !== -1) {
+            const fi = off + cur;
+            const n = fragVCount[fi], vo = fragVOff[fi];
+            let acc = 0;
+            for (let i = 0; i < n; i++) {
+              const u = fragU[vo + i], v = fragV[vo + i];
+              const sx = p00x + u * dx10 + v * dx01 + u * v * dxDiag;
+              const sy = p00y + u * dy10 + v * dy01 + u * v * dyDiag;
+              _fx[i] = sx; _fy[i] = sy;
+              acc += sx + sy;
+            }
+            if (isFinite(acc)) {
+              ctx.moveTo(_fx[0], _fy[0]);
+              for (let i = 1; i < n; i++) ctx.lineTo(_fx[i], _fy[i]);
+              ctx.closePath();
+              drawn++;
+            }
+            cur = _bNext[cur];
+          }
+          ctx.fillStyle = shade;
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          let hasOpaque = false;
+          cur = f;
+          while (cur !== -1) {
+            if (_bAlpha[cur] >= 1) {
+              const fi = off + cur;
+              const n = fragVCount[fi], vo = fragVOff[fi];
+              let acc = 0;
+              for (let i = 0; i < n; i++) {
+                const u = fragU[vo + i], v = fragV[vo + i];
+                const sx = p00x + u * dx10 + v * dx01 + u * v * dxDiag;
+                const sy = p00y + u * dy10 + v * dy01 + u * v * dyDiag;
+                _fx[i] = sx; _fy[i] = sy;
+                acc += sx + sy;
+              }
+              if (isFinite(acc)) {
+                ctx.moveTo(_fx[0], _fy[0]);
+                for (let i = 1; i < n; i++) ctx.lineTo(_fx[i], _fy[i]);
+                ctx.closePath();
+                drawn++;
+                hasOpaque = true;
+              }
+            }
+            cur = _bNext[cur];
+          }
+          if (hasOpaque) {
+            ctx.fillStyle = shade;
+            ctx.fill();
+          }
+
+          cur = f;
+          while (cur !== -1) {
+            const a = _bAlpha[cur];
+            if (a < 1) {
+              const fi = off + cur;
+              const n = fragVCount[fi], vo = fragVOff[fi];
+              let acc = 0;
+              for (let i = 0; i < n; i++) {
+                const u = fragU[vo + i], v = fragV[vo + i];
+                const sx = p00x + u * dx10 + v * dx01 + u * v * dxDiag;
+                const sy = p00y + u * dy10 + v * dy01 + u * v * dyDiag;
+                _fx[i] = sx; _fy[i] = sy;
+                acc += sx + sy;
+              }
+              if (isFinite(acc)) {
+                ctx.beginPath();
+                ctx.moveTo(_fx[0], _fy[0]);
+                for (let i = 1; i < n; i++) ctx.lineTo(_fx[i], _fy[i]);
+                ctx.closePath();
+                ctx.fillStyle = shade;
+                ctx.globalAlpha = a;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                drawn++;
+              }
+            }
+            cur = _bNext[cur];
+          }
+        }
+      }
+
       this._stats.drawCells++;
       this._stats.drawFrags += drawn;
       return drawn;
