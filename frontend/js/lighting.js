@@ -262,6 +262,8 @@ window.SimLighting = (function () {
     //   lp = 本趟参数快照，纹理色档与基底色保证同一光照输入。
     const TT = window.TerrainTexture;
     if (TT && typeof TT.refreshPalette === 'function') TT.refreshPalette(terr, shadeAlbedoInto, lp);
+    // ★ v1.50.72：重着色批次完成后刷新地形离屏分块缓存
+    if (window.TerrainChunkCache) window.TerrainChunkCache.invalidate();
   }
 
   // ── 立体实体面光照：相对旧固定光归一化，保证「换模型不换观感」 ──

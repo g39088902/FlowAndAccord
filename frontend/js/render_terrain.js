@@ -43,6 +43,8 @@ let _hEdgeNormX = new Float32Array(3600);
 let _hEdgeNormY = new Float32Array(3600);
 let _vEdgeNormX = new Float32Array(3600);
 let _vEdgeNormY = new Float32Array(3600);
+let _projRelX = new Float32Array(3600);
+let _projRelY = new Float32Array(3600);
 
 // 预分配水系与特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
 let _featProjX = new Float32Array(512);
@@ -145,6 +147,8 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
     _hEdgeNormY = new Float32Array(totalVertices);
     _vEdgeNormX = new Float32Array(totalVertices);
     _vEdgeNormY = new Float32Array(totalVertices);
+    _projRelX = new Float32Array(totalVertices);
+    _projRelY = new Float32Array(totalVertices);
   }
 
   const cx = w / 2 + camera.panX;
@@ -159,8 +163,12 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
     const rx = c.wx * cosZ - c.wy * sinZ;
     const ry = c.wx * sinZ + c.wy * cosZ;
     const y2 = ry * cosX - c.elev * sinX;
-    terrainProjX[i] = cx + rx * scale;
-    terrainProjY[i] = cy + y2 * scale;
+    const prx = rx * scale;
+    const pry = y2 * scale;
+    _projRelX[i] = prx;
+    _projRelY[i] = pry;
+    terrainProjX[i] = cx + prx;
+    terrainProjY[i] = cy + pry;
   }
 
   // 预计算水平与垂直共享边外法线（7,080 条边一次成型，耗时约 0.15ms，消除每帧 1.4 万次逐格重复开方）
@@ -229,14 +237,16 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 // 地形格与 POI 标记/房屋/族人/装饰同队列按相机深度远 → 近落笔，
 // 近处山地格后落笔即可遮挡站在山后的远处图标（旧整层先画导致图标透山可见）。
 // 视口粗剔除在队列收集阶段完成（同一 20px 余量）。
-function drawTerrainCell(i00, i10, i11, i01) {
-  const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
-  const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
-  const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
-  const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
+function drawTerrainCellToCtx(targetCtx, i00, i10, i11, i01, srcX, srcY) {
+  const pX = srcX || terrainProjX;
+  const pY = srcY || terrainProjY;
+  const p00x = pX[i00], p00y = pY[i00];
+  const p10x = pX[i10], p10y = pY[i10];
+  const p11x = pX[i11], p11y = pY[i11];
+  const p01x = pX[i01], p01y = pY[i01];
 
   const c00 = sim.terrain.cells[i00];
-  ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
+  targetCtx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
 
   // ★ v1.48.1 无缝拼接（直接查表预计算法线，消除每帧 1.4 万次 Math.sqrt 与向量计算）
   const n0x = _hEdgeNormX[i00], n0y = _hEdgeNormY[i00];
@@ -244,13 +254,13 @@ function drawTerrainCell(i00, i10, i11, i01) {
   const n2x = -_hEdgeNormX[i01], n2y = -_hEdgeNormY[i01];
   const n3x = -_vEdgeNormX[i00], n3y = -_vEdgeNormY[i00];
 
-  ctx.beginPath();
-  ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
-  ctx.closePath();
-  ctx.fill();
+  targetCtx.beginPath();
+  targetCtx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
+  targetCtx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
+  targetCtx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
+  targetCtx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
+  targetCtx.closePath();
+  targetCtx.fill();
 
   // ★ TA-12-3 世界坐标锁定地表纹理：本格纹样分片在基底之后立即绘制，与基底同属
   //   DEPTH_CELL——不新增深度队列项、不抬 Z、不调用 projectLifted/_decalDepth（TA-12-TODO §3.3.4）。
@@ -259,8 +269,12 @@ function drawTerrainCell(i00, i10, i11, i01) {
   //   纹理分片不跟随防缝外扩（TERRAIN_SEAM_PX 仅作用于上方基底填充路径，§3.3.5）。
   //   lod = camera.zoom（统一世界→CSS 像素尺度；DPR 不参与），由模块内换算特征尺度淡入。
   if (window.TerrainTexture) {
-    window.TerrainTexture.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
+    window.TerrainTexture.drawCell(targetCtx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
   }
+}
+
+function drawTerrainCell(i00, i10, i11, i01) {
+  drawTerrainCellToCtx(ctx, i00, i10, i11, i01);
 }
 
 // ★ v1.50.11 地形网格线（调试叠加，'G' 键切换）：从 drawTerrain 拆出独立整层。
@@ -463,3 +477,253 @@ function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) 
   ctx.fill();
   ctx.restore();
 }
+
+// ==========================================
+// ★ v1.50.72 地形离屏瓦片分块烘焙缓存（TerrainChunkCache）
+// ==========================================
+function drawTerrainChunk(chunk) {
+  if (!chunk || !chunk.canvas) return;
+  const cx = w / 2 + camera.panX;
+  const cy = h / 2 + camera.panY;
+  ctx.drawImage(chunk.canvas, cx + chunk.bX_rel, cy + chunk.bY_rel);
+}
+
+function _createChunkCanvas(width, height) {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    try {
+      return new OffscreenCanvas(width, height);
+    } catch (e) {}
+  }
+  if (typeof document !== 'undefined' && document.createElement) {
+    const c = document.createElement('canvas');
+    c.width = width;
+    c.height = height;
+    return c;
+  }
+  return null;
+}
+
+const TerrainChunkCache = {
+  _chunks: [],
+  _gridSize: 0,
+  _lastRotZ: null,
+  _lastRotX: null,
+  _lastZoom: null,
+  _lastRelightCount: -1,
+  _lastTerrainRef: null,
+  _dirtyAll: true,
+
+  invalidate() {
+    this._dirtyAll = true;
+    for (let i = 0; i < this._chunks.length; i++) {
+      this._chunks[i].dirty = true;
+    }
+  },
+
+  init(terrain) {
+    const gSize = terrain.gridSize || 60;
+    this._gridSize = gSize;
+    const nCells = gSize - 1;
+    const RC = window.RENDER_CONFIG;
+    const chunksPerAxis = (RC && typeof RC.terrainChunkGridCount === 'number' && RC.terrainChunkGridCount > 0) ? RC.terrainChunkGridCount : 6;
+    this._chunks = [];
+
+    for (let cy = 0; cy < chunksPerAxis; cy++) {
+      const gy0 = Math.floor(cy * nCells / chunksPerAxis);
+      const gy1 = Math.floor((cy + 1) * nCells / chunksPerAxis);
+      for (let cx = 0; cx < chunksPerAxis; cx++) {
+        const gx0 = Math.floor(cx * nCells / chunksPerAxis);
+        const gx1 = Math.floor((cx + 1) * nCells / chunksPerAxis);
+
+        let minElev = Infinity, maxElev = -Infinity;
+        for (let gy = gy0; gy <= gy1; gy++) {
+          const row = gy * gSize;
+          for (let gx = gx0; gx <= gx1; gx++) {
+            const c = terrain.cells[row + gx];
+            if (c) {
+              if (c.elev < minElev) minElev = c.elev;
+              if (c.elev > maxElev) maxElev = c.elev;
+            }
+          }
+        }
+        const deltaElev = maxElev - minElev;
+
+        const c00 = terrain.cells[gy0 * gSize + gx0];
+        const c11 = terrain.cells[gy1 * gSize + gx1];
+        const minWx = Math.min(c00.wx, c11.wx), maxWx = Math.max(c00.wx, c11.wx);
+        const minWy = Math.min(c00.wy, c11.wy), maxWy = Math.max(c00.wy, c11.wy);
+
+        const canvas = _createChunkCanvas(32, 32);
+
+        this._chunks.push({
+          id: this._chunks.length,
+          cx, cy, gx0, gx1, gy0, gy1,
+          minElev, maxElev, deltaElev,
+          isMountain: deltaElev >= 3.0,
+          wx0: minWx - 2.0, wx1: maxWx + 2.0,
+          wy0: minWy - 2.0, wy1: maxWy + 2.0,
+          canvas,
+          ctx: canvas ? canvas.getContext('2d') : null,
+          bX_rel: 0, bY_rel: 0, bW: 0, bH: 0,
+          minDepth: 0, maxDepth: 0,
+          dirty: true,
+        });
+      }
+    }
+    this._dirtyAll = true;
+    this._lastTerrainRef = terrain;
+  },
+
+  chunkHasEntity(chunk) {
+    if (!sim) return false;
+    const x0 = chunk.wx0, x1 = chunk.wx1, y0 = chunk.wy0, y1 = chunk.wy1;
+    if (sim.agents) {
+      for (let i = 0; i < sim.agents.length; i++) {
+        const a = sim.agents[i];
+        if (a.isFetus || !a.isAlive) continue;
+        const p = a.pos;
+        if (p && p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) return true;
+      }
+    }
+    if (sim.houses) {
+      for (let i = 0; i < sim.houses.length; i++) {
+        const p = sim.houses[i].pos;
+        if (p && p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) return true;
+      }
+    }
+    if (sim.pois) {
+      for (let i = 0; i < sim.pois.length; i++) {
+        const p = sim.pois[i].pos;
+        if (p && p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) return true;
+      }
+    }
+    return false;
+  },
+
+  bakeChunk(chunk, gSize) {
+    if (!chunk.canvas || !chunk.ctx) return;
+    let relMinX = Infinity, relMaxX = -Infinity;
+    let relMinY = Infinity, relMaxY = -Infinity;
+
+    for (let gy = chunk.gy0; gy <= chunk.gy1; gy++) {
+      const row = gy * gSize;
+      for (let gx = chunk.gx0; gx <= chunk.gx1; gx++) {
+        const idx = row + gx;
+        const px = _projRelX[idx], py = _projRelY[idx];
+        if (px < relMinX) relMinX = px;
+        if (px > relMaxX) relMaxX = px;
+        if (py < relMinY) relMinY = py;
+        if (py > relMaxY) relMaxY = py;
+      }
+    }
+
+    const pad = 4;
+    const bX = Math.floor(relMinX) - pad;
+    const bY = Math.floor(relMinY) - pad;
+    const bW = Math.max(1, Math.ceil(relMaxX) - bX + pad);
+    const bH = Math.max(1, Math.ceil(relMaxY) - bY + pad);
+
+    if (chunk.canvas.width !== bW || chunk.canvas.height !== bH) {
+      chunk.canvas.width = bW;
+      chunk.canvas.height = bH;
+    }
+
+    const cCtx = chunk.ctx;
+    cCtx.clearRect(0, 0, bW, bH);
+    cCtx.save();
+    cCtx.translate(-bX, -bY);
+
+    for (let gy = chunk.gy0; gy < chunk.gy1; gy++) {
+      const r0 = gy * gSize, r1 = r0 + gSize;
+      for (let gx = chunk.gx0; gx < chunk.gx1; gx++) {
+        const i00 = r0 + gx;
+        drawTerrainCellToCtx(cCtx, i00, i00 + 1, r1 + gx + 1, r1 + gx, _projRelX, _projRelY);
+      }
+    }
+    cCtx.restore();
+
+    chunk.bX_rel = bX;
+    chunk.bY_rel = bY;
+    chunk.bW = bW;
+    chunk.bH = bH;
+    chunk.dirty = false;
+  },
+
+  updateAndEnqueue(cells, gSize, depthOf, _depthItem, w, h, DEPTH_CELL, DEPTH_CHUNK) {
+    const terrain = sim.terrain;
+    if (this._chunks.length === 0 || this._lastTerrainRef !== terrain) {
+      this.init(terrain);
+    }
+
+    const L = window.SimLighting;
+    const relightCount = (L && typeof L.relightCount === 'function') ? L.relightCount() : 0;
+    if (this._dirtyAll ||
+        camera.rotZ !== this._lastRotZ ||
+        camera.rotX !== this._lastRotX ||
+        camera.zoom !== this._lastZoom ||
+        relightCount !== this._lastRelightCount) {
+      this._lastRotZ = camera.rotZ;
+      this._lastRotX = camera.rotX;
+      this._lastZoom = camera.zoom;
+      this._lastRelightCount = relightCount;
+      this._dirtyAll = false;
+      for (let i = 0; i < this._chunks.length; i++) {
+        this._chunks[i].dirty = true;
+      }
+    }
+
+    const cx = w / 2 + camera.panX;
+    const cy = h / 2 + camera.panY;
+
+    for (let k = 0; k < this._chunks.length; k++) {
+      const chunk = this._chunks[k];
+
+      if (chunk.dirty) {
+        this.bakeChunk(chunk, gSize);
+      }
+
+      const scrX = cx + chunk.bX_rel;
+      const scrY = cy + chunk.bY_rel;
+      if (scrX + chunk.bW < -20 || scrX > w + 20 || scrY + chunk.bH < -20 || scrY > h + 20) {
+        continue;
+      }
+
+      let dMin = Infinity, dMax = -Infinity;
+      for (let gy = chunk.gy0; gy <= chunk.gy1; gy++) {
+        const row = gy * gSize;
+        for (let gx = chunk.gx0; gx <= chunk.gx1; gx++) {
+          const c = cells[row + gx];
+          const d = depthOf(c.wx, c.wy, c.elev);
+          if (d < dMin) dMin = d;
+          if (d > dMax) dMax = d;
+        }
+      }
+      chunk.minDepth = dMin;
+      chunk.maxDepth = dMax;
+
+      if (!chunk.canvas || !chunk.ctx || (chunk.isMountain && this.chunkHasEntity(chunk))) {
+        for (let gy = chunk.gy0; gy < chunk.gy1; gy++) {
+          const r0 = gy * gSize, r1 = r0 + gSize;
+          for (let gx = chunk.gx0; gx < chunk.gx1; gx++) {
+            const i00 = r0 + gx;
+            const i10 = i00 + 1;
+            const i11 = r1 + gx + 1;
+            const i01 = r1 + gx;
+
+            const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
+            const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
+              (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
+              (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
+              (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
+            it.c = i11; it.d = i01;
+          }
+        }
+      } else {
+        _depthItem(DEPTH_CHUNK, chunk, 0, chunk.minDepth - 0.05);
+      }
+    }
+  }
+};
+
+window.drawTerrainChunk = drawTerrainChunk;
+window.TerrainChunkCache = TerrainChunkCache;

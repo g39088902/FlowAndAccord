@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.71';
+        this._appVersion = '1.50.72';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.71';
+            this._appVersion = msg.appVersion || '1.50.72';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -330,6 +330,8 @@
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
         //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
         if (window.HormoneTrend) window.HormoneTrend.reset();
+        // ★ v1.50.72：地形离屏分块瓦片缓存随世界生命周期失效
+        if (window.TerrainChunkCache) window.TerrainChunkCache.invalidate();
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -460,7 +462,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.71';
+        return this._appVersion || '1.50.72';
 
       }
 

@@ -48,6 +48,7 @@ const DEPTH_WALL = 11;     // ★ v1.50.14 边界侧壁分段（a = 墙定义，
 const DEPTH_ACCENT_SHADOW = 12; // ★ TA-04-6 树/灌木贴地投影（地面图元，a = accent；深度 = 基点/影梢足迹深度取大）
 const DEPTH_LANDSCAPE = 13;        // ★ S4-02 资源景观立体子图元（a = LandscapeChild，landscape-model.js 派生）
 const DEPTH_LANDSCAPE_SHADOW = 14; // ★ S4-02 景观树/灌木子图元贴地投影（a = LandscapeChild；深度口径同 ACCENT_SHADOW）
+const DEPTH_CHUNK = 15;            // ★ v1.50.72 地形离屏瓦片分块（a = chunk）
 
 const _depthPool = [];     // 持久深度项对象池（零每帧 GC）
 const _depthList = [];     // 每帧重建的引用列表（仅含本帧使用的项）
@@ -222,28 +223,34 @@ function drawWorldEntities() {
     if (window.TerrainTexture) window.TerrainTexture.prepare(terrain, RC);
     const cells = terrain.cells;
     const gSize = terrain.gridSize;
-    for (let gy = 0; gy < gSize - 1; gy++) {
-      const rowOffset0 = gy * gSize;
-      const rowOffset1 = rowOffset0 + gSize;
-      for (let gx = 0; gx < gSize - 1; gx++) {
-        const i00 = rowOffset0 + gx;
-        const i10 = i00 + 1;
-        const i11 = rowOffset1 + gx + 1;
-        const i01 = rowOffset1 + gx;
+    const useChunkCache = (RC.terrainChunkCacheEnabled !== false) && window.TerrainChunkCache;
 
-        // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
-        const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-        const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-        const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-        const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-        if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
+    if (useChunkCache) {
+      window.TerrainChunkCache.updateAndEnqueue(cells, gSize, depthOf, _depthItem, w, h, DEPTH_CELL, DEPTH_CHUNK);
+    } else {
+      for (let gy = 0; gy < gSize - 1; gy++) {
+        const rowOffset0 = gy * gSize;
+        const rowOffset1 = rowOffset0 + gSize;
+        for (let gx = 0; gx < gSize - 1; gx++) {
+          const i00 = rowOffset0 + gx;
+          const i10 = i00 + 1;
+          const i11 = rowOffset1 + gx + 1;
+          const i01 = rowOffset1 + gx;
 
-        const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
-        const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
-          (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
-          (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
-          (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
-        it.c = i11; it.d = i01;
+          // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
+          const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+          const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+          const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+          const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+          if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
+
+          const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
+          const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
+            (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
+            (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
+            (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
+          it.c = i11; it.d = i01;
+        }
       }
     }
 
@@ -597,6 +604,7 @@ function drawWorldEntities() {
     const it = list[i];
     switch (it.kind) {
       case DEPTH_CELL: drawTerrainCell(it.a, it.b, it.c, it.d); break;
+      case DEPTH_CHUNK: drawTerrainChunk(it.a); break;
       case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
       case DEPTH_FEATURE: drawFeatureItem(it.a, it.b); break;
       case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
