@@ -939,8 +939,8 @@
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(11, 18, 32, 0.98));
       border: 1px solid rgba(56, 189, 248, 0.35);
       border-radius: 16px;
-      width: 620px;
-      max-width: min(620px, 94vw);
+      width: 940px;
+      max-width: min(960px, 94vw);
       max-height: 88vh;
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.08);
       padding: 18px 22px;
@@ -1034,8 +1034,30 @@
     }
     .lineage-modal-body {
       display: flex;
+      flex-direction: row;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    /* ★ v1.50.67 双列布局：左档案列（角色卡+禀赋+激素）、右亲属列（关系网+子嗣+威望）；
+       列容器为透明包装，仅承担纵向排布与弹性分配，窄屏回退单列 */
+    .lineage-col {
+      display: flex;
       flex-direction: column;
       gap: 11px;
+      min-width: 0;
+      flex: 1 1 0;
+    }
+    .lineage-col-profile { flex: 1.15 1 0; }
+    .lineage-col-kin { flex: 1 1 0; }
+    @media (max-width: 900px) {
+      .lineage-modal-card {
+        width: min(620px, 94vw);
+        max-width: min(620px, 94vw);
+      }
+      .lineage-modal-body {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
 
     /* 核心角色卡片 Hero Card */
@@ -1270,6 +1292,7 @@
 
     .lineage-modal-grid {
       display: grid;
+      /* ★ v1.50.67 父/母各仅一人，同行双列；配偶/私宅/子嗣/威望 inline 通栏 */
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }

@@ -1,7 +1,9 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.50.66**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.50.67**。
+
+| **v1.50.67** | **「详细档案与族谱」模态拉宽 + 双列布局（纯前端表现层，零内核逻辑变更）**：① **宽度提升**——`.lineage-modal-card` 620px → 940px（max-width min(960px, 94vw)），告别窄长形态；② **双列布局**——`.lineage-modal-body` 改横向双列：左档案列 `.lineage-col-profile`（角色 Hero 卡 + 先天禀赋 + 神经内分泌激素分节，flex 1.15）、右亲属列 `.lineage-col-kin`（关系网 + 后代子嗣 + 威望荣誉，flex 1），列容器为透明包装不承载主题样式，全部 DOM ID 不变、`render_inspector.js` / `dag.js` 零逻辑变更；③ **关系网排布优化**——右列宫格父亲/母亲同行双列（各仅一人不占整行），配偶/私宅/后代子嗣/威望荣誉通栏卡片（inline `grid-column: 1/-1`）；④ **窄屏回退**——≤900px 视口回退 620px 单列堆叠（媒体查询）；⑤ **验证**——frontend-check 全绿、bump-check 12 点一致、test-wasm ALL_TESTS_DONE（SAVE_APP_VERSION 变更随版重编译双副本）、test-determinism 6/6、config-check 386 字段一致、doc 系门禁全过，浏览器 `?nogate=1` 实机验收：宽版双列排布左右分栏正常、激素分节居左列、亲属/子嗣/威望居右列、既有交互（亲眷芯片穿梭/直系族谱跳转/Esc 关闭）不受影响。**升版 v1.50.66 → v1.50.67，`SAVE_APP_VERSION` 变更旧存档按设计自动废弃。** | frontend(index.html, style.css) / docs(01-changelog, 19-ui-implementation) / version |
 
 | **v1.50.66** | **Merge branch 'c2' into master：合并 TA-06 植被轮廓与物种变体 + TA-07 装饰细节分级 LOD 与完整投影剔除（纯前端表现层，零内核逻辑变更）**：① **合并内容**——纳入 c2 侧 2 提交：98847c8「TA-06 植被轮廓与物种变体：三乔木轮廓 + 三灌木变体 + 花灌木花朵图元」与 418447d「TA-07 装饰细节分级 LOD（阈值带滞回）+ 完整投影包围体剔除 + 模型层分级几何」；与 master 侧激素面板双迭代（v1.50.64 融合 Inspector / v1.50.65 迁入族谱模态）并行开发期间两侧各自消耗了 v1.50.64/65 序号，本合并以 v1.50.66 重新对齐唯一真相源；② **冲突解决**——changelog 双轨条目按版本倒序交叉保留（同版本号 master 条目在前），wasm 双副本以合并后源码重编译覆盖，版本定义点因两侧同值 v1.50.65 自动合并、随版统一升至 v1.50.66；③ **验证**——frontend-check / config-check（386 字段一致）/ code-map-check（0 警告，c2 新增 accent-lod.js、render_bush.js 等文件登记完整）/ doc-link-check / cross-doc-check（0 冲突）/ doc-maintenance-check / snapshot-check / test-wasm ALL_TESTS_DONE / test-determinism 6/6 / bump-check 12 点一致全绿；浏览器 `?nogate=1` 实机冒烟：合并构建世界渲染正常，TA-06 乔木/灌木/花灌木与 TA-07 草丛 LOD 装饰出图，湖畔盆地与村落正常，Inspector 无激素分节（激素迁入族谱模态语义保持），模拟推进与播报正常。**升版 v1.50.65 → v1.50.66，`SAVE_APP_VERSION` 变更旧存档按设计自动废弃。** | merge(github/c2: 98847c8, 418447d) / docs(01-changelog) / version |
 

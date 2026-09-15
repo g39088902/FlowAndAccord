@@ -26,7 +26,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.66</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.67</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -894,6 +894,7 @@
         </div>
       </div>
       <div class="lineage-modal-body">
+        <div class="lineage-col lineage-col-profile">
         <!-- 当前部落民核心属性卡片 -->
         <div id="lineage-modal-self-card" class="lineage-self-card">
           <div class="lineage-self-main">
@@ -938,7 +939,10 @@
             状态标签: <span id="insp-hormone-labels">—</span>
           </div>
         </div>
+        </div>
 
+        <!-- ★ v1.50.67 双列布局：右侧亲属列（关系网 + 后代子嗣 + 威望） -->
+        <div class="lineage-col lineage-col-kin">
         <!-- 关系网四宫格 -->
         <div class="lineage-modal-grid">
           <div class="lineage-section">
@@ -953,13 +957,13 @@
               <span id="insp-lineage-mother"><span style="color:#64748b;">— (开局始祖代)</span></span>
             </div>
           </div>
-          <div class="lineage-section">
+          <div class="lineage-section" style="grid-column: 1 / -1;">
             <div class="lineage-section-title">💍 配偶眷属 (Spouse)</div>
             <div class="lineage-section-content">
               <span id="insp-lineage-spouse"><span style="color:#64748b;">未婚单身</span></span>
             </div>
           </div>
-          <div class="lineage-section">
+          <div class="lineage-section" style="grid-column: 1 / -1;">
             <div class="lineage-section-title">🏠 私宅归属 (House)</div>
             <div class="lineage-section-content">
               <span id="insp-lineage-house"><span style="color:#64748b;">居于营地 (无私宅)</span></span>
@@ -983,6 +987,7 @@
               <span id="insp-prestige-val" class="lineage-prestige-val">暂无威望</span>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
