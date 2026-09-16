@@ -130,10 +130,23 @@ function updateDebugHud(now) {
 
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
-  // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格）
+  // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格 / 渲染总面数）
   const terr0 = sim.terrain || {};
   dbgSetText('dbg-map-profile', terr0.profile || '—');
   dbgSetText('dbg-terrain-gen', (terr0.profile ? `v${terr0.generatorVersion ?? '?'} · ${terr0.gridSize ?? '?'}²` : '—'));
+  const gSize0 = terr0.gridSize || 0;
+  const hasTerrData = !!(terr0.cells && terr0.cells.length >= gSize0 * gSize0 && gSize0 > 1);
+  const totalTerrainFaces = hasTerrData ? (gSize0 - 1) * (gSize0 - 1) : 0;
+  if (totalTerrainFaces > 0) {
+    const renderedFaces = (sim.showTerrain && !sim.headless) ? dbgTerrainRenderedCells : 0;
+    dbgSetText('dbg-terrain-faces', `${renderedFaces.toLocaleString('en-US')} / ${totalTerrainFaces.toLocaleString('en-US')}`);
+    const facesEl = dbgEl('dbg-terrain-faces');
+    if (facesEl) {
+      facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 全地图网格总面数：${totalTerrainFaces.toLocaleString('en-US')} 面 (${gSize0 - 1}×${gSize0 - 1} Quads)`;
+    }
+  } else {
+    dbgSetText('dbg-terrain-faces', '—');
+  }
   dbgSetText('dbg-royal-privy', ((sim.totalRoyalPrivy || 0).toFixed(1)) + ' 单位');
   dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
   dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');

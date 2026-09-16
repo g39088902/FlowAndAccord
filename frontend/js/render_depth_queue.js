@@ -215,6 +215,8 @@ function drawWorldEntities() {
   // ── 1. 地形格入队（★ 本修复核心）──
   //    深度取四角 world 坐标均值（深度公式对 wx/wy/elev 线性，均值即格心深度）；
   //    与立体实体同队列排序后，近处山地格后落笔即遮挡山后图标。
+  let renderedTerrainCells = 0;
+  dbgTerrainRenderedCells = 0;
   if (hasTerrain) {
     // ★ TA-12-3 世界纹样模型每帧一次分批准备（幂等；buildBudgetMs 预算内推进桶构建，
     //   未就绪帧 TerrainTexture.drawCell 自动跳过、只画原基底）。参数取 RENDER_CONFIG
@@ -238,6 +240,7 @@ function drawWorldEntities() {
         const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
         if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
 
+        renderedTerrainCells++;
         const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
         const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
           (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
@@ -246,6 +249,7 @@ function drawWorldEntities() {
         it.c = i11; it.d = i01;
       }
     }
+    dbgTerrainRenderedCells = renderedTerrainCells;
 
     // ── 1.5 边界侧壁分段入队（★ v1.50.14）──
     //    侧壁是地图边界处最靠近相机的几何：贴边实体的底座/圆环伸过边界线的部分

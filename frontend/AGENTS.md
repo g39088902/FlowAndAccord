@@ -221,6 +221,7 @@ main.js::事件绑定
 | `chk-dynamic-light` | main.js / index.html / style.css | ★ v1.48.0 动态季节光照开关（`L` 键同源触发，`change` 事件热切换） |
 | `stat-sun` | render_hud.js / index.html | ★ v1.48.0 当前光位读数（方位 + 高度角） |
 | `dbg-light-ms` / `dbg-light-phase` | render_hud.js / index.html | ★ v1.48.0 光照重着色耗时与光相/光档调试读数 |
+| `dbg-terrain-faces` | render_hud.js / index.html | 当前视口与全图地形渲染总面数读数 |
 | `version-tag` | index.html | 版本徽章 · **版本号唯一真相源**（由 `node tools/bump-version.js --patch` 自动同步至 SAVE_APP_VERSION 等全部定义点，勿手工改） |
 
 **搜索方法**：改 ID 前用 `grep -r "旧ID" frontend/` 确认所有引用点。

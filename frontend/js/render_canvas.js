@@ -17,6 +17,7 @@ const FRAME_INTERVAL = 1000 / TARGET_FPS;
 // ==========================================
 let dbgRenderMs = 0, dbgFrameMs = 0, dbgCurrentFps = 0, dbgHudUpdate = performance.now();
 let dbgLastTick = 0, dbgLastTickSec = performance.now(); // ⚡ 每秒真实 Tick 速率采样基准
+let dbgTerrainRenderedCells = 0; // 🐞 当前帧视口内实际渲染的地形面数 (Quad 格数)
 const dbgElCache = {};
 
 // ★ M4: 夺位远征视口动态标牌与登基礼花状态
@@ -149,6 +150,7 @@ function render(now) {
   // 🧠 无头模式: 只推进模拟，跳过全部画布渲染与 DOM 刷新
   if (sim.headless) {
     dbgRenderMs = 0;
+    dbgTerrainRenderedCells = 0;
     if (sim.debugMode) dbgFrameMs += ((performance.now() - frameStart) - dbgFrameMs) * 0.15;
     return;
   }
