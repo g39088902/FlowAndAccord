@@ -537,15 +537,33 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
 // ── ★ TA-04-5 石体立体受光几何（Boulder 与 RockCluster 子石共用，07 号 §6.5 第 2 段）──
 // billboard 移除：底环（z=0 落地）与顶环（抬 h = accentStoneHeightK×r）的世界方位角顶点
 // 经相机 rotZ/cosX 投影——轮廓与侧面片随相机旋转，与树/灌木同一套投影约定；
-// 侧面逐面片法线 = 面片中点世界水平方向（直立壁 nz=0），顶面法线 (0,0,1)，亮暗全部由
-// accentLitFill（世界光向点积）决定：低角度阳光下迎光侧面可亮过顶面，不固定「顶亮侧暗」。
+// 侧面逐面片法线 = 面片中点世界水平方向（直立壁 nz=0），顶面法线取地表法线（倾斜面受光
+// 随坡度自然变化），亮暗全部由 accentLitFill（世界光向点积）决定。
+// ★ v1.50.72 贴合地形：底环/顶环各顶点沿局部地形坡度 (dzdx,dzdy) 偏移 dz = dx·dzdx + dy·dzdy，
+// 石体随坡面倾斜、不再水平悬浮；平地 dzdx=dzdy=0 时退化为原始行为。
 // 画序：侧面片（方位角序，远侧片随后被顶面覆盖）→ 顶面 → 剪影描边（远侧取顶环 / 近侧取
 // 底环，ry 符号判别；两端极端点处竖直过渡即真实剪影竖切线）。底边贴落地点（v1.50.13
-// 锚点契约的几何化重述）：cy = gy − max(rv·ryWorld)·cosX，石体整体落在锚点上方。
+// 锚点契约的几何化重述）：cy = gy − max(bot_i)，石体整体落在锚点上方。
 // 零 GC：顶点坐标写入模块级 Float64Array 刮擦（sides ≤ 7）；lite 为岩面个体色差通道。
 var _stPx = new Float64Array(8);
 var _stRy = new Float64Array(8);
 var _stGy = new Float64Array(8);
+var _stDzS = new Float64Array(8); // 逐顶点地形坡度屏幕 Y 偏移（v1.50.72 贴合地形）
+// 地形坡度刮擦（零 GC）：_terrainSlopeAt 写入、drawAccentBoulder / drawAccentRockCluster 消费
+var _slope = { dzdx: 0, dzdy: 0 };
+function _terrainSlopeAt(wx, wy) {
+  var t = sim.terrain;
+  if (!t || !t.cells) { _slope.dzdx = 0; _slope.dzdy = 0; return _slope; }
+  var gSize = t.gridSize, cells = t.cells;
+  var half = cells[gSize * gSize - 1].wx;
+  if (!(half > 0)) { _slope.dzdx = 0; _slope.dzdy = 0; return _slope; }
+  var gx = Math.max(0, Math.min(gSize - 1, Math.round(((wx + half) / (2 * half)) * (gSize - 1))));
+  var gy = Math.max(0, Math.min(gSize - 1, Math.round(((wy + half) / (2 * half)) * (gSize - 1))));
+  var cell = cells[gy * gSize + gx];
+  _slope.dzdx = cell.dzdx || 0;
+  _slope.dzdy = cell.dzdy || 0;
+  return _slope;
+}
 // Boulder 固定七边形变径（0.82~1.20），与 v1.49.3 起旧公式 r·(0.82+0.38·((i·37+13)%7)/7) 逐位一致
 var _BOULDER_SHAPE = (function () {
   const s = [];
@@ -556,18 +574,25 @@ function rockHeightK() {
   const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentStoneHeightK;
   return Number.isFinite(v) ? v : 0.3;
 }
-function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sinX, strokeW, farSimplified) {
-  let maxRy = -Infinity;
+function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sinX, strokeW, farSimplified, dzdx, dzdy) {
+  // ★ v1.50.72 贴合地形：dzdx/dzdy 为落点局部地形坡度（世界单位高程/水平距离），
+  // 缺省 0 = 平地，退化为原始水平石体。逐顶点 dz = dx·dzdx + dy·dzdy 偏移底环/顶环，
+  // 石体盘面随坡面倾斜；顶面法线取地表法线 (-dzdx,-dzdy,1)/|n|。
+  var sDzdx = dzdx || 0, sDzdy = dzdy || 0;
+  let maxBot = -Infinity;
   for (let i = 0; i < sides; i++) {
     const a = rot + (i / sides) * Math.PI * 2;
     const rv = r * shape[i];
     const ca = Math.cos(a), sa = Math.sin(a);
     _stPx[i] = gx + rv * (ca * cosZ - sa * sinZ);
     _stRy[i] = rv * (ca * sinZ + sa * cosZ);
-    if (_stRy[i] > maxRy) maxRy = _stRy[i];
+    // 世界偏移 (dx,dy) = (rv_world·ca, rv_world·sa)；rv 已含 zoom，dz 投影 = rv·(ca·dzdx+sa·dzdy)·sinX
+    _stDzS[i] = rv * (ca * sDzdx + sa * sDzdy) * sinX;
+    const bot = _stRy[i] * cosX - _stDzS[i];
+    if (bot > maxBot) maxBot = bot;
   }
-  const cy = gy - maxRy * cosX;
-  for (let i = 0; i < sides; i++) _stGy[i] = cy + _stRy[i] * cosX;
+  const cy = gy - maxBot;
+  for (let i = 0; i < sides; i++) _stGy[i] = cy + _stRy[i] * cosX - _stDzS[i];
   const hS = r * rockHeightK() * sinX;
   const kL = (lite - 0.5) * 20;
   // ★ TA-07 远景两笔简化（§3.2/§0.3-3①）：省掉 sides 次侧面片受光（7 次 accentLitFill +
@@ -585,7 +610,9 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
     ctx.closePath();
     ctx.fill();
   }
-  ctx.fillStyle = accentLitFill(152 + kL, 146 + kL, 138 + kL, 0, 0, 1, 1);
+  // 顶面法线 = 地表法线（平地退化为 (0,0,1)）
+  var nLen = Math.hypot(sDzdx, sDzdy, 1);
+  ctx.fillStyle = accentLitFill(152 + kL, 146 + kL, 138 + kL, -sDzdx / nLen, -sDzdy / nLen, 1 / nLen, 1);
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
     if (i === 0) ctx.moveTo(_stPx[i], _stGy[i] - hS); else ctx.lineTo(_stPx[i], _stGy[i] - hS);
@@ -609,8 +636,9 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
 function drawAccentBoulder(owner, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX) {
   const AL = window.AccentLOD;
   const far = AL && AL.cfg().stoneFar && AL.tierFor(owner, 'Boulder', model, scaled) === AL.FAR;
+  const sl = _terrainSlopeAt(owner.x, owner.y);
   drawStoneBody(sx, sy, 6 * scaled, (owner && owner.rotation) || 0, 7, _BOULDER_SHAPE, 0.5,
-    cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled), far);
+    cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled), far, sl.dzdx, sl.dzdy);
 }
 
 // RockCluster：anchor 派生 2–5 颗子石（D-B1-6，06 号 §5.5：不为子石建实体、不改碰撞/路面）。
@@ -636,6 +664,9 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   // 微接触阴影透明度（config.render.js，TA-11-5；缺省回退与集中值一致）
   const shadowAlpha = Number.isFinite(RC.accentRockClusterShadowAlpha) ? RC.accentRockClusterShadowAlpha : 0.14;
   const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
+  // ★ v1.50.72 贴合地形：簇群锚点坡度用于全部子石（子石间距远小于地形格，同一坡度足够准确）
+  const sl = _terrainSlopeAt(accent.x, accent.y);
+  const clDzdx = sl.dzdx, clDzdy = sl.dzdy;
 
   // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
   function projTo(dx, dy, dz, out) {
@@ -685,6 +716,6 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
     // ★ TA-04-5：子石走与 Boulder 共用的 drawStoneBody——相机投影棱柱轮廓 + 带法线
     //   顶面/侧面 + 世界光向点积受光（底边贴自身落地点，v1.50.13 锚点契约几何化重述）
     drawStoneBody(it.g.x, it.g.y, r, st.rot, st.sides, st.shape, st.lite,
-      cosZ, sinZ, cosX, sinX, Math.max(0.5, Math.min(0.8, 0.8 * scaled)), farSimplified);
+      cosZ, sinZ, cosX, sinX, Math.max(0.5, Math.min(0.8, 0.8 * scaled)), farSimplified, clDzdx, clDzdy);
   }
 }
