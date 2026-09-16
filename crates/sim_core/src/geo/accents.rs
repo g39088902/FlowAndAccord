@@ -250,27 +250,13 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |_wx, _wy, cell, rng| {
-            // Boulder 偏好陡坡与裸露 RockFace。
-            // ★ v1.50.10 修复：原「slope>18 且 NO_BUILD」条件在两类地貌下几乎恒为假——
-            // ① NO_BUILD 在河谷图被陆地基底（terrain.rs::generate_river_valley_base_relief，
-            //    STAGE2-2 拆分前为 generate_river 全图重写）清零；且河谷重算后
-            //    坡度普遍 <8°（河阶抬升 ≈5.7°、远丘 ≈2°）、全图无 RockFace（surface_kind 被重写）；
-            // ② T1 山口图坡度构成（基础斜面 ≈4.5°/波形 ≈3~4°/主脊梯度 ≈10°）也极少超过 18°
-            //    （无头实证：T1 Seed=999 修复前仅 1 颗、T2 各 Seed 均为 0）。
-            // 装饰是纯视觉要素，不参与通行/建造判定，故只依赖坡度本身，门槛降至 10°。
-            if cell.slope_angle_deg > 18.0 {
-                return true;
-            }
-            if cell.slope_angle_deg > 10.0 {
-                return rng.gen_range(0.0, 1.0) < 0.6;
-            }
-            // 河谷图补充：巨石以「河滩卵石 / 河阶散石」形态点缀平缓河谷
-            match cell.surface_kind {
-                SurfaceKind::RiverBank => rng.gen_range(0.0, 1.0) < 0.5,
-                SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.25,
-                _ => false,
-            }
+        |_wx, _wy, cell, _rng| {
+            // ★ v1.50.73 反转：陡坡（≥18°）禁石——巨石不再向坡面聚集；其余地表等权
+            // 随机接受（xy 候选点由 generate_accents_of_kind 全图均匀 roll，与面数无关）。
+            // 判定只读坡度、不消费 accent_rng；同种子装饰分布整体重排属预期视觉变更，
+            // 装饰是纯视觉要素，不递增 TERRAIN_GENERATOR_VERSION、不动快照结构。
+            // 18° 阈值与 NO_BUILD 派生线一致（terrain.rs §6「阈值即物理契约」）。
+            cell.slope_angle_deg < 18.0
         },
     );
 
@@ -341,17 +327,12 @@ pub fn generate_accents(
         terrain,
         half_size,
         &mut accent_rng,
-        |_wx, _wy, cell, rng| {
-            // 候选地表（§5.5 表）：RiverBank/RiverTerrace 卵石群，或坡度 ≥ 8° 的干地裸岩群。
-            // 内核只下发 anchor，2–5 颗子石由前端按 accent.id 派生（§5.5），
-            // 不为子石建实体、不改变碰撞/路面——本函数天然满足（纯视觉装饰）。
-            // ★ S7-03 草原：残丘坡面（坡度 ≥ 8° 的 DryGround）天然命中裸岩群分支。
-            match cell.surface_kind {
-                SurfaceKind::RiverBank => rng.gen_range(0.0, 1.0) < 0.4,
-                SurfaceKind::RiverTerrace => rng.gen_range(0.0, 1.0) < 0.25,
-                SurfaceKind::DryGround => cell.slope_angle_deg >= 8.0,
-                _ => false,
-            }
+        |_wx, _wy, cell, _rng| {
+            // ★ v1.50.73：与 Boulder 同规——陡坡（≥18°）禁石群，其余地表等权随机
+            // （原 §5.5「卵石群/裸岩群」偏好表作废）。内核只下发 anchor，2–5 颗子石由
+            // 前端按 accent.id 派生（§5.5），不为子石建实体、不改变碰撞/路面——
+            // 本函数天然满足（纯视觉装饰）。不消费 accent_rng。
+            cell.slope_angle_deg < 18.0
         },
     );
 
@@ -515,16 +496,12 @@ fn generate_accents_of_kind<F>(
         // 查地表
         let cell = terrain.sample_cell(wx, wy);
 
-        // 禁区检查：水、岩壁、禁行地表
+        // 禁区检查：水、禁行地表。
+        // ★ v1.50.73：移除 v1.50.10 的「Boulder+RockFace 放行」豁免——RockFace 恒由
+        // ≥34° 派生（terrain.rs §6），本就被陡坡禁石规则拒绝，豁免已成死代码。
         if cell.surface_kind == SurfaceKind::DeepWater
             || cell.surface_kind == SurfaceKind::ShallowWater
-        {
-            continue;
-        }
-        // ★ v1.50.10：RockFace 必打 NO_WALK，但对 Boulder 是目标地表而非禁区——
-        // 岩壁巨石属纯视觉装饰，放行到偏好检查（RockFace → 直接接受）
-        if cell.feature_flags & super::biome::TERRAIN_FLAG_NO_WALK != 0
-            && !(kind == AccentKind::Boulder && cell.surface_kind == SurfaceKind::RockFace)
+            || cell.feature_flags & super::biome::TERRAIN_FLAG_NO_WALK != 0
         {
             continue;
         }

@@ -247,9 +247,9 @@ pub enum AccentKind {
 
 装饰散布规则（当前实现，`geo/accents.rs`）：
 
-- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（`Boulder + RockFace` 为受控例外，见下）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
-- **偏好**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；Boulder 偏好多坡度（>18° 直认、>10° 60% 概率）与裸露 `RockFace`（★ v1.50.10：`Boulder + RockFace` 组合放行 `NO_WALK` 禁区过滤，岩壁巨石是目标地表而非禁区）；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
-- **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25（乘密度倍率取整），各有界重试 3× 目标数；RockCluster/GrassTuft 仅枚举定义，D-B 再实现。
+- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
+- **偏好**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表等权随机**（xy 候选点全图均匀 roll、与面数无关；原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
+- **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25、RockCluster 12、GrassTuft 60（乘密度倍率取整；RockCluster/GrassTuft 由 ★ D-B1-5 落地），有界重试 3× 目标数。
 - **确定性**：`accent_rng = WorldRng::new(seed ^ ACCENT_RNG_SALT)`，盐值 `0x4143_4345_4E54_3031`（"ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG。
 - **持久化**：`TerrainMap.accents: Vec<TerrainAccent>`（`#[serde(default)]`）随 `terrain_state` 一并入档，读档后逐字节恢复。
 
