@@ -336,4 +336,11 @@ window.RENDER_CONFIG = {
     sameSurfaceKind: true,  // 严格限制同材质类型 (草地/岩壁/浅滩等不跨类合并)
     pathBatching: true,     // 方案 A：地形同色路径合批 (连续同色单元合并至单次 fill)
   },
+
+  // —— 地表反照率数据层平滑（★ v1.50.74 地表贴图插值；math.js::smoothAlbedoField 消费）——
+  // 世界建缓存时对 albR/G/B 做边缘感知盒式模糊（半径 r 格）：陆地格间硬色阶变连续
+  // 渐变；水格（DeepWater/ShallowWater）作屏障不混色，水陆边界无晕圈。
+  // 建缓存一次性消费（~几 ms），每帧零成本；relightTerrain 与 TerrainTexture 色档自动拾取。
+  // ⚠️ 改值需重开世界/刷新页面生效（不随帧重建）；0 = 关（回退原始逐格色场）。
+  terrainAlbedoSmoothRadius: 2,
 };

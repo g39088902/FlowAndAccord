@@ -197,6 +197,9 @@ const TERRAIN_BATCH_MAX = 512;
 let _batchColor = null;
 let _batchCount = 0;
 const _batchI00 = new Int32Array(TERRAIN_BATCH_MAX);
+const _batchI10 = new Int32Array(TERRAIN_BATCH_MAX);
+const _batchI11 = new Int32Array(TERRAIN_BATCH_MAX);
+const _batchI01 = new Int32Array(TERRAIN_BATCH_MAX);
 const _batchP00X = new Float32Array(TERRAIN_BATCH_MAX);
 const _batchP00Y = new Float32Array(TERRAIN_BATCH_MAX);
 const _batchP10X = new Float32Array(TERRAIN_BATCH_MAX);
@@ -210,24 +213,54 @@ function flushTerrainBatch() {
   if (_batchColor === null || _batchCount === 0) return;
   ctx.fillStyle = _batchColor;
   ctx.fill();
-  if (window.TerrainTexture) {
-    const zoom = camera.zoom;
-    for (let bi = 0; bi < _batchCount; bi++) {
-      window.TerrainTexture.drawCell(
-        ctx,
-        _batchI00[bi],
-        _batchP00X[bi], _batchP00Y[bi],
-        _batchP10X[bi], _batchP10Y[bi],
-        _batchP11X[bi], _batchP11Y[bi],
-        _batchP01X[bi], _batchP01Y[bi],
-        zoom
-      );
-    }
+  const zoom = camera.zoom;
+  for (let bi = 0; bi < _batchCount; bi++) {
+    drawTerrainTextureForQuad(
+      _batchI00[bi], _batchI10[bi], _batchI11[bi], _batchI01[bi],
+      _batchP00X[bi], _batchP00Y[bi],
+      _batchP10X[bi], _batchP10Y[bi],
+      _batchP11X[bi], _batchP11Y[bi],
+      _batchP01X[bi], _batchP01Y[bi],
+      zoom
+    );
   }
   _batchColor = null;
   _batchCount = 0;
 }
 window.flushTerrainBatch = flushTerrainBatch;
+
+// ★ v1.50.75 地表纹样按格展开（修复 v1.50.71 贪婪合并后「地面纹理脏兮兮」）：
+//   TerrainTexture.drawCell 把 i00 格内 uv∈[0,1]² 的纹样片段双线性映射到传入四角——
+//   合并 quad 只传 i00 一格 → 该格 2~6m 草斑/土纹被拉伸 8×成大黑印、其余格纹样缺失。
+//   修复：1×1 quad 走原单格快路径；合并 quad 展开为逐格 drawCell（每格用自己的四角
+//   投影坐标），纹样位置/密度与未合并时逐位一致；基底 fill 仍按合并 quad 合批
+//   （面数压减收益保留，仅纹样落笔次数回到合并前水平，受 detailFadePx LOD 调制）。
+function drawTerrainTextureForQuad(i00, i10, i11, i01, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom) {
+  const TT = window.TerrainTexture;
+  if (!TT) return;
+  const gSize = sim.terrain.gridSize;
+  const colSpan = i10 - i00;
+  const rowSpan = (i01 - i00) / gSize;
+  if (colSpan === 1 && rowSpan === 1) {
+    TT.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom);
+    return;
+  }
+  // 非轴对齐/退化兜底（不应发生）：按单格画，宁可少画不画错位
+  if (colSpan < 1 || rowSpan < 1 || !Number.isInteger(rowSpan) || (i01 - i00) % gSize !== 0) {
+    TT.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom);
+    return;
+  }
+  const gy0 = Math.floor(i00 / gSize), gx0 = i00 - gy0 * gSize;
+  const TPX = terrainProjX, TPY = terrainProjY;
+  for (let r = 0; r < rowSpan; r++) {
+    const rowBase = (gy0 + r) * gSize;
+    for (let c = 0; c < colSpan; c++) {
+      const j00 = rowBase + gx0 + c;
+      const j10 = j00 + 1, j11 = j00 + gSize + 1, j01 = j00 + gSize;
+      TT.drawCell(ctx, j00, TPX[j00], TPY[j00], TPX[j10], TPY[j10], TPX[j11], TPY[j11], TPX[j01], TPY[j01], zoom);
+    }
+  }
+}
 
 // ★ v1.50.11 单个地形格四边形填充（由 render_world.js 统一深度队列调度）。
 // 原 drawTerrain 的「视口裁剪 + 逐格填充」整层循环迁出为单格入口：
@@ -284,14 +317,15 @@ function drawTerrainCell(i00, i10, i11, i01) {
 
   if (!batchingEnabled) {
     ctx.fill();
-    if (window.TerrainTexture) {
-      window.TerrainTexture.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
-    }
+    drawTerrainTextureForQuad(i00, i10, i11, i01, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
     return;
   }
 
   const idx = _batchCount++;
   _batchI00[idx] = i00;
+  _batchI10[idx] = i10;
+  _batchI11[idx] = i11;
+  _batchI01[idx] = i01;
   _batchP00X[idx] = p00x; _batchP00Y[idx] = p00y;
   _batchP10X[idx] = p10x; _batchP10Y[idx] = p10y;
   _batchP11X[idx] = p11x; _batchP11Y[idx] = p11y;

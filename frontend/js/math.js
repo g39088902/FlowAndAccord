@@ -131,6 +131,54 @@
       return Math.max(0.70, 1.0 - (slopeDeg / 65.0) * 0.30);
     }
 
+    // ★ v1.50.74 数据层反照率平滑（地表贴图插值；与 computeTerrainAlbedo 同居基座层）：
+    //   对反照率场做水平→垂直两趟半径 r 均值（盒式近似高斯），陆地格间硬边界变连续
+    //   渐变；waterMask 非 0 的水格视为屏障——水格输出保持原值、陆格只平均陆格邻居，
+    //   水陆边界不产生混色晕圈（RiverBank 算陆格，允许与干地互混柔化岸线）。
+    //   就地写回传入数组（调用方在世界建缓存时一次性消费，之后 relightTerrain 与
+    //   TerrainTexture 色档自动拾取平滑后场，绘制层/深度队列零改动）。
+    //   复杂度 O(N·(2r+1))·2 趟 · 3 通道：N=65,536、r=2 时约 400 万次加法，~几 ms。
+    function smoothAlbedoField(albR, albG, albB, w, h, waterMask, radius) {
+      const n = w * h;
+      const tmpR = new Float32Array(n), tmpG = new Float32Array(n), tmpB = new Float32Array(n);
+      for (let pass = 0; pass < 2; pass++) {
+        const horizontal = pass === 0;
+        const srcR = horizontal ? albR : tmpR, srcG = horizontal ? albG : tmpG, srcB = horizontal ? albB : tmpB;
+        const dstR = horizontal ? tmpR : albR, dstG = horizontal ? tmpG : albG, dstB = horizontal ? tmpB : albB;
+        for (let y = 0; y < h; y++) {
+          const rowBase = y * w;
+          for (let x = 0; x < w; x++) {
+            const idx = rowBase + x;
+            if (waterMask[idx]) {
+              dstR[idx] = srcR[idx]; dstG[idx] = srcG[idx]; dstB[idx] = srcB[idx];
+              continue;
+            }
+            let sr = 0, sg = 0, sb = 0, cnt = 0;
+            for (let d = -radius; d <= radius; d++) {
+              let j;
+              if (horizontal) {
+                const nx = x + d;
+                if (nx < 0 || nx >= w) continue;
+                j = rowBase + nx;
+              } else {
+                const ny = y + d;
+                if (ny < 0 || ny >= h) continue;
+                j = ny * w + x;
+              }
+              if (waterMask[j]) continue; // 屏障：不计水格
+              sr += srcR[j]; sg += srcG[j]; sb += srcB[j]; cnt++;
+            }
+            if (cnt === 0) {
+              dstR[idx] = srcR[idx]; dstG[idx] = srcG[idx]; dstB[idx] = srcB[idx];
+            } else {
+              const inv = 1 / cnt;
+              dstR[idx] = sr * inv; dstG[idx] = sg * inv; dstB[idx] = sb * inv;
+            }
+          }
+        }
+      }
+    }
+
     // 静态光照组合入口（v1.47.11 行为，作为动态光照关闭时的对照路径与兜底）
     // 光源来自左上方俯视: L = normalize(-0.45, -0.60, 0.66)
     function computeElevationColor(cell, minZ, maxZ) {

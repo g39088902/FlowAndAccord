@@ -83,12 +83,19 @@
         const baseCellIdx = gy * gSize + gx;
         const baseCell = cells[baseCellIdx];
         const baseKind = baseCell.surfaceKind;
+        // ★ v1.50.76 河床水格禁合并（修「河面特定角度出现水平条纹」）：
+        //   河面是半透明两遍填充（净 α≈0.715），河床格与河面段同队列排序，设计前提
+        //   「格心深度 < 覆盖它的河面段深度（段四角取最大）」依赖深度函数线性 + 格心
+        //   在段 xy 范围内。合并成最大 8×8 大 quad 后深度取 quad 中心——中心可能比
+        //   覆盖其远半幅的河面段更近，大河床 quad 后画即用不透明河床色盖掉已画水面
+        //   → 规则水平深色条带（角度相关）。水域格占比小，保持 1×1 零风险。
+        const baseIsWater = baseKind === 'DeepWater' || baseKind === 'ShallowWater';
         const baseWater = (baseCell.waterDepth || 0) > 0;
         const baseNorm = getNormal(baseCellIdx, baseCell);
 
-        // 阶段 1：沿 X 轴向右探测可扩展宽度 W
+        // 阶段 1：沿 X 轴向右探测可扩展宽度 W（★ v1.50.76 水格跳过扩展，恒 1×1）
         let maxW = 1;
-        const limitW = Math.min(N - gx, maxSpan);
+        const limitW = (!baseIsWater) ? Math.min(N - gx, maxSpan) : 1;
         for (let w = 1; w < limitW; w++) {
           const colX = gx + w;
           const neighborVIdx = rowOffset + colX;
@@ -106,9 +113,9 @@
           maxW = w + 1;
         }
 
-        // 阶段 2：沿 Y 轴向下探测可扩展高度 H
+        // 阶段 2：沿 Y 轴向下探测可扩展高度 H（★ v1.50.76 水格跳过扩展）
         let maxH = 1;
-        const limitH = Math.min(N - gy, maxSpan);
+        const limitH = (!baseIsWater) ? Math.min(N - gy, maxSpan) : 1;
         for (let h = 1; h < limitH; h++) {
           const rowY = gy + h;
           const nextRowOffset = rowY * N;

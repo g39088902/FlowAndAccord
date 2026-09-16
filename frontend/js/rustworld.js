@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.73';
+        this._appVersion = '1.50.75';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.73';
+            this._appVersion = msg.appVersion || '1.50.75';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -462,7 +462,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.73';
+        return this._appVersion || '1.50.75';
 
       }
 
@@ -700,6 +700,21 @@
               albR[idx] = alb.r; albG[idx] = alb.g; albB[idx] = alb.b;
               cell.color = computeElevationColor(cell, minZ, maxZ);
             }
+          }
+          // ★ v1.50.74 数据层反照率平滑（地表贴图插值，math.js::smoothAlbedoField）：
+          //   陆地格间硬边界变连续渐变；水格（DeepWater/ShallowWater）作屏障不混色不模糊。
+          //   平滑后重算固定光兜底 cell.color；动态光路径由 relightTerrain 经 markDirty
+          //   自动拾取平滑后场。半径走 RENDER_CONFIG.terrainAlbedoSmoothRadius（格数，
+          //   0=关；建缓存一次性消费，改值需重开世界/刷新页面生效），0~6 钳制。
+          const smoothR = Math.max(0, Math.min(6, (window.RENDER_CONFIG && window.RENDER_CONFIG.terrainAlbedoSmoothRadius) || 0));
+          if (smoothR > 0) {
+            const waterMask = new Uint8Array(cellCount);
+            for (let i = 0; i < cellCount; i++) {
+              const k = cells[i].surfaceKind;
+              waterMask[i] = (k === 'DeepWater' || k === 'ShallowWater') ? 1 : 0;
+            }
+            smoothAlbedoField(albR, albG, albB, w, h, waterMask, smoothR);
+            for (let i = 0; i < cellCount; i++) cells[i].color = computeElevationColor(cells[i], minZ, maxZ);
           }
           this.terrain = {
             gridSize: w,
