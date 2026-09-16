@@ -162,7 +162,6 @@ function updateDebugHud(now) {
     dbgSetText('dbg-light-ms', SimLighting.lastMs().toFixed(2) + ' ms');
     dbgSetText('dbg-light-phase', `u=${SimLighting.phase().toFixed(3)} · 档 ${SimLighting.stamp()}`);
   }
-  dbgSetText('dbg-render-ms', dbgRenderMs.toFixed(2) + ' ms');
   dbgSetText('dbg-frame-ms', dbgFrameMs.toFixed(2) + ' ms');
   dbgSetText('dbg-cpu', Math.min(100, (dbgFrameMs / FRAME_INTERVAL) * 100).toFixed(1) + '%');
   dbgSetText('dbg-js-heap', s.memSupported ? `${fmtMB(s.jsHeapUsed)} / ${fmtMB(s.jsHeapLimit)}` : '浏览器不支持');
