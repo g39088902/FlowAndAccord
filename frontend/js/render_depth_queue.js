@@ -624,6 +624,9 @@ function drawWorldEntities() {
   const RL = window.RiverLife;
   for (let i = 0; i < list.length; i++) {
     const it = list[i];
+    if (it.kind !== DEPTH_CELL && window.flushTerrainBatch) {
+      window.flushTerrainBatch();
+    }
     switch (it.kind) {
       case DEPTH_CELL: drawTerrainCell(it.a, it.b, it.c, it.d); break;
       case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
@@ -643,6 +646,7 @@ function drawWorldEntities() {
       default: drawAgent(it.a);
     }
   }
+  if (window.flushTerrainBatch) window.flushTerrainBatch();
 
   // ★ S4-06 交互覆盖标签：选中族人需求气泡在世界层之上强制安置（不参与地形遮挡）；
   //   挂在队列分发循环结束后——§6.3「分发循环结束点即标签层的天然挂载位」。

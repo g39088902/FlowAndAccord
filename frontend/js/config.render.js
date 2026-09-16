@@ -334,5 +334,6 @@ window.RENDER_CONFIG = {
     normalAngleDeg: 2.0,    // 法线方向近似角差容差 (度，cosθ >= cos(2°))
     planeElevTol: 0.5,      // 平面共面高程容差 (米)
     sameSurfaceKind: true,  // 严格限制同材质类型 (草地/岩壁/浅滩等不跨类合并)
+    pathBatching: true,     // 方案 A：地形同色路径合批 (连续同色单元合并至单次 fill)
   },
 };

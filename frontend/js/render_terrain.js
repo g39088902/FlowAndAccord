@@ -190,6 +190,45 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
 }
 }
 
+// ── 地形网格路径同色合批 (Terrain Path Batching，方案 A) ──
+// 单一职责：将连续、同色的地形网格面片合并到单一 Canvas 路径中，以单次 ctx.fill() 一次性光栅化。
+// 遇非地形实体或颜色变更时自动 flush，零每帧 GC 分配，100% 保持统一深度队列的遮挡关系。
+const TERRAIN_BATCH_MAX = 512;
+let _batchColor = null;
+let _batchCount = 0;
+const _batchI00 = new Int32Array(TERRAIN_BATCH_MAX);
+const _batchP00X = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP00Y = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP10X = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP10Y = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP11X = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP11Y = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP01X = new Float32Array(TERRAIN_BATCH_MAX);
+const _batchP01Y = new Float32Array(TERRAIN_BATCH_MAX);
+
+function flushTerrainBatch() {
+  if (_batchColor === null || _batchCount === 0) return;
+  ctx.fillStyle = _batchColor;
+  ctx.fill();
+  if (window.TerrainTexture) {
+    const zoom = camera.zoom;
+    for (let bi = 0; bi < _batchCount; bi++) {
+      window.TerrainTexture.drawCell(
+        ctx,
+        _batchI00[bi],
+        _batchP00X[bi], _batchP00Y[bi],
+        _batchP10X[bi], _batchP10Y[bi],
+        _batchP11X[bi], _batchP11Y[bi],
+        _batchP01X[bi], _batchP01Y[bi],
+        zoom
+      );
+    }
+  }
+  _batchColor = null;
+  _batchCount = 0;
+}
+window.flushTerrainBatch = flushTerrainBatch;
+
 // ★ v1.50.11 单个地形格四边形填充（由 render_world.js 统一深度队列调度）。
 // 原 drawTerrain 的「视口裁剪 + 逐格填充」整层循环迁出为单格入口：
 // 地形格与 POI 标记/房屋/族人/装饰同队列按相机深度远 → 近落笔，
@@ -202,7 +241,19 @@ function drawTerrainCell(i00, i10, i11, i01) {
   const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
 
   const c00 = sim.terrain.cells[i00];
-  ctx.fillStyle = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
+  const color = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
+
+  const RC = window.RENDER_CONFIG;
+  const batchingEnabled = !RC || !RC.terrainMeshMerge || RC.terrainMeshMerge.pathBatching !== false;
+
+  if (!batchingEnabled) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+  } else if (color !== _batchColor || _batchCount >= TERRAIN_BATCH_MAX) {
+    flushTerrainBatch();
+    _batchColor = color;
+    ctx.beginPath();
+  }
 
   // ★ v1.48.1 无缝拼接：相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，
   //   两者叠加后仍留约 25% 的透光率，深色天空背景便从缝隙里透出 1px 网格线
@@ -224,23 +275,27 @@ function drawTerrainCell(i00, i10, i11, i01) {
   const n1x = sgn * e1y / l1, n1y = -sgn * e1x / l1;
   const n2x = sgn * e2y / l2, n2y = -sgn * e2x / l2;
   const n3x = sgn * e3y / l3, n3y = -sgn * e3x / l3;
-  ctx.beginPath();
+
   ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
   ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
   ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
   ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
   ctx.closePath();
-  ctx.fill();
 
-  // ★ TA-12-3 世界坐标锁定地表纹理：本格纹样分片在基底之后立即绘制，与基底同属
-  //   DEPTH_CELL——不新增深度队列项、不抬 Z、不调用 projectLifted/_decalDepth（TA-12-TODO §3.3.4）。
-  //   分片几何在模型构建期已预裁剪到本格世界矩形（terrain-texture.js::buildFragments），
-  //   此处只消费分片 (u,v) 做四角双线性凸组合投影——恒在本格四边形内，无需额外视口剔除；
-  //   纹理分片不跟随防缝外扩（TERRAIN_SEAM_PX 仅作用于上方基底填充路径，§3.3.5）。
-  //   lod = camera.zoom（统一世界→CSS 像素尺度；DPR 不参与），由模块内换算特征尺度淡入。
-  if (window.TerrainTexture) {
-    window.TerrainTexture.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
+  if (!batchingEnabled) {
+    ctx.fill();
+    if (window.TerrainTexture) {
+      window.TerrainTexture.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
+    }
+    return;
   }
+
+  const idx = _batchCount++;
+  _batchI00[idx] = i00;
+  _batchP00X[idx] = p00x; _batchP00Y[idx] = p00y;
+  _batchP10X[idx] = p10x; _batchP10Y[idx] = p10y;
+  _batchP11X[idx] = p11x; _batchP11Y[idx] = p11y;
+  _batchP01X[idx] = p01x; _batchP01Y[idx] = p01y;
 }
 
 // ★ v1.50.11 地形网格线（调试叠加，'G' 键切换）：从 drawTerrain 拆出独立整层。
