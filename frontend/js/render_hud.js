@@ -136,13 +136,19 @@ function updateDebugHud(now) {
   dbgSetText('dbg-terrain-gen', (terr0.profile ? `v${terr0.generatorVersion ?? '?'} · ${terr0.gridSize ?? '?'}²` : '—'));
   const gSize0 = terr0.gridSize || 0;
   const hasTerrData = !!(terr0.cells && terr0.cells.length >= gSize0 * gSize0 && gSize0 > 1);
-  const totalTerrainFaces = hasTerrData ? (gSize0 - 1) * (gSize0 - 1) : 0;
-  if (totalTerrainFaces > 0) {
+  const totalOriginalFaces = hasTerrData ? (gSize0 - 1) * (gSize0 - 1) : 0;
+  const mergedMesh = terr0.mergedMesh || (window.TerrainMeshMerge ? window.TerrainMeshMerge.build(terr0, window.RENDER_CONFIG ? window.RENDER_CONFIG.terrainMeshMerge : null) : null);
+  const totalFaces = (mergedMesh && mergedMesh.totalMerged) ? mergedMesh.totalMerged : totalOriginalFaces;
+  if (totalFaces > 0) {
     const renderedFaces = (sim.showTerrain && !sim.headless) ? dbgTerrainRenderedCells : 0;
-    dbgSetText('dbg-terrain-faces', `${renderedFaces.toLocaleString('en-US')} / ${totalTerrainFaces.toLocaleString('en-US')}`);
+    dbgSetText('dbg-terrain-faces', `${renderedFaces.toLocaleString('en-US')} / ${totalFaces.toLocaleString('en-US')}`);
     const facesEl = dbgEl('dbg-terrain-faces');
     if (facesEl) {
-      facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 全地图网格总面数：${totalTerrainFaces.toLocaleString('en-US')} 面 (${gSize0 - 1}×${gSize0 - 1} Quads)`;
+      if (mergedMesh && mergedMesh.totalMerged && mergedMesh.totalOriginal > mergedMesh.totalMerged) {
+        facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 合并后总面数：${totalFaces.toLocaleString('en-US')} 面 (原始 ${mergedMesh.totalOriginal.toLocaleString('en-US')} 面，压减 ${mergedMesh.ratio}%)`;
+      } else {
+        facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 全地图网格总面数：${totalFaces.toLocaleString('en-US')} 面 (${gSize0 - 1}×${gSize0 - 1} Quads)`;
+      }
     }
   } else {
     dbgSetText('dbg-terrain-faces', '—');

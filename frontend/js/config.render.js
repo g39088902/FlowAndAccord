@@ -326,4 +326,13 @@ window.RENDER_CONFIG = {
   labelClusterRadiusPx: 36,       // 屏幕聚类半径（CSS px；同类普通标签在此距离内聚合）
   labelHysteresisPx: 4,           // 有限布局滞回裕量（CSS px；消除缓慢平移时的临界跳位抖动）
   labelLeaderLineEnabled: true,   // 边缘兜底引线开关（绘制从实体到边缘提示区的引线）
+
+  // —— 地形共面网格贪婪合并 (Terrain Quad Meshing) ——
+  terrainMeshMerge: {
+    enabled: true,          // 是否开启近似方向/共面四边形合并
+    maxSpan: 8,             // 合并矩形单边最大网格跨度 (建议 4~8 格，防深度穿插)
+    normalAngleDeg: 2.0,    // 法线方向近似角差容差 (度，cosθ >= cos(2°))
+    planeElevTol: 0.5,      // 平面共面高程容差 (米)
+    sameSurfaceKind: true,  // 严格限制同材质类型 (草地/岩壁/浅滩等不跨类合并)
+  },
 };

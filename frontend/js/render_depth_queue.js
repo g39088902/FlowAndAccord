@@ -224,16 +224,19 @@ function drawWorldEntities() {
     if (window.TerrainTexture) window.TerrainTexture.prepare(terrain, RC);
     const cells = terrain.cells;
     const gSize = terrain.gridSize;
-    for (let gy = 0; gy < gSize - 1; gy++) {
-      const rowOffset0 = gy * gSize;
-      const rowOffset1 = rowOffset0 + gSize;
-      for (let gx = 0; gx < gSize - 1; gx++) {
-        const i00 = rowOffset0 + gx;
-        const i10 = i00 + 1;
-        const i11 = rowOffset1 + gx + 1;
-        const i01 = rowOffset1 + gx;
+    const meshMergeCfg = RC && RC.terrainMeshMerge;
+    const mergedMesh = (window.TerrainMeshMerge && (!meshMergeCfg || meshMergeCfg.enabled !== false))
+      ? window.TerrainMeshMerge.build(terrain, meshMergeCfg)
+      : null;
 
-        // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
+    if (mergedMesh && mergedMesh.quads) {
+      const quads = mergedMesh.quads;
+      const qLen = quads.length;
+      for (let qi = 0; qi < qLen; qi++) {
+        const q = quads[qi];
+        const i00 = q.i00, i10 = q.i10, i11 = q.i11, i01 = q.i01;
+
+        // 视口边界快速剔除（20px 余量）
         const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
         const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
         const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
@@ -241,12 +244,34 @@ function drawWorldEntities() {
         if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
 
         renderedTerrainCells++;
-        const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
-        const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
-          (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
-          (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
-          (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
+        const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(q.cx, q.cy, q.cz));
         it.c = i11; it.d = i01;
+      }
+    } else {
+      for (let gy = 0; gy < gSize - 1; gy++) {
+        const rowOffset0 = gy * gSize;
+        const rowOffset1 = rowOffset0 + gSize;
+        for (let gx = 0; gx < gSize - 1; gx++) {
+          const i00 = rowOffset0 + gx;
+          const i10 = i00 + 1;
+          const i11 = rowOffset1 + gx + 1;
+          const i01 = rowOffset1 + gx;
+
+          // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
+          const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+          const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
+          const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+          const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
+          if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
+
+          renderedTerrainCells++;
+          const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
+          const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
+            (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
+            (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
+            (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
+          it.c = i11; it.d = i01;
+        }
       }
     }
     dbgTerrainRenderedCells = renderedTerrainCells;

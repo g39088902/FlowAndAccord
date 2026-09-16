@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.70';
+        this._appVersion = '1.50.71';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.70';
+            this._appVersion = msg.appVersion || '1.50.71';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -327,6 +327,8 @@
         // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
         // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
         if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
+        // 地形贪婪合并网格同一生命周期失效
+        if (window.TerrainMeshMerge) window.TerrainMeshMerge.invalidate();
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
         //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
         if (window.HormoneTrend) window.HormoneTrend.reset();
@@ -460,7 +462,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.70';
+        return this._appVersion || '1.50.71';
 
       }
 
@@ -719,6 +721,9 @@
           // 地形重建后强制下一帧整片重着色（光相未变也要重写新数组对应的 cell.color）
           if (window.SimLighting) window.SimLighting.markDirty();
           if (window.RiverLife) window.RiverLife.init(nextFeatures, this._engineSeed);
+          if (window.TerrainMeshMerge) {
+            this.terrain.mergedMesh = window.TerrainMeshMerge.build(this.terrain, window.RENDER_CONFIG ? window.RENDER_CONFIG.terrainMeshMerge : null);
+          }
         } else if (hasStaticFeatures || hasStaticAccents || hasStaticSubFeatures) {
           // ★ D-B1-7：网格缓存命中（或本帧无网格）但明确携带静态 section → 只替换静态数组，
           //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧，RiverLife 仍随网格重建
