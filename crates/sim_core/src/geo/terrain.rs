@@ -759,7 +759,12 @@ pub struct TerrainSubFeature {
 ///           放射系 + 沟带 DryGround 色差 + 粒度分带，参数默认值同步调整，
 ///           同一种子的扇面形态随之改变，其余 profile 逐位不变）
 ///           ——两次跃迁同版交付：河谷删除贡献 11，扇面改善贡献 12。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 12;
+/// v1.50.78：12 -> 13（盆地外围连通性修复：basin.rs 出口走廊扩展为「出口 + 3 条
+///           90° 等间隔径向谷地」（valley_mask，角度由 exit_theta 派生、零新增 RNG
+///           消费），盆心直通图缘的 4 条 <19° 垭口通道把外围崇山带切成窄扇区，
+///           修复噪声山脊孤岛死区（seed=56 components=2 · 20,689 格）；
+///           同一种子的盆地地形随之改变，其余 profile 逐位不变）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 13;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

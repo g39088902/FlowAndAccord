@@ -14,7 +14,7 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (369 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (370 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -105,7 +105,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 369 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 370 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
@@ -273,6 +273,7 @@ FlowAndAccord/
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       ├── 08-performance.md                # 仅保留未完成的性能优化
     │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
+    │       ├── 10-basin-mountain-encirclement.md # ★ TB-04 盆地群峰环抱与峡谷出水口地貌规划
     │       ├── 31-canvas-to-webgl-migration.md  # WebGL 渲染管线迁移总体路线规划
     │       ├── 31-webgl-phase1-complete.md      # WebGL 阶段一完成验收报告
     │       ├── 32-webgl-phase1-verify.md        # WebGL 阶段一验证清单

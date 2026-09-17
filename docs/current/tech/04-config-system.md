@@ -41,7 +41,7 @@ stateDiagram-v2
 ## 2. 核心机制
 
 ### 2.1 全量超参数抽取
-- `SimConfig` 共 **369 个字段**，按 16 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
+- `SimConfig` 共 **370 个字段**，按 16 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（2 字段）
   2. 部落民生理、代谢与生命周期（47 字段）
   3. 先天禀赋与遗传演化（9 字段）

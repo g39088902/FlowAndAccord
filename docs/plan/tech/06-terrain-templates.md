@@ -776,6 +776,7 @@ P1 不实现海水、航运、湿地、洞穴或季节水位。湖畔盆地的�
 2. **湖畔盆地取水岸点数量例外（§5.6 数量语义修订）**——湖畔盆地 `lakeside_basin_v1` 取水岸点数 = 2，由 `water_source_poi_count(profile, countWater)` 决定；**`countWater` 保留水供给预算基数语义**（池总量 = `stockMaxWater×countWater`、再生 = `regenBaseWater×countWater`，岸点不再乘入预算）。既有模板的数量与预算语义不变。`countWater=0` 走空池 → 生存门禁明确失败/降级。
 3. **静水几何契约**——`TerrainFeatureKind::WaterBody`（枚举码 4，追加不移动旧码位）；水体 #1 ↔ 特征 #1 顶点双副本逐字节一致；零流向、connections 为空；轮廓闭合（末点=首点）且非自交（`StaticWaterOutlineInvalid`）；validation 按 profile 区分「水体 #1 必须 = River（旧河流）/ WaterBody（新静水）」。
 4. **实测踩坑沉淀**——盆地不做整片平坦化（盆底曲率 F(q) 混合环会产生 33°+ 陡坡环阻断出口，改为中心平缓生活带）；冲积扇山口锚点必须在图缘线上且扇头侧缘保留 110m 最小过渡弧宽（否则扇头形成横贯扇面的 NO_WALK 墙）；固定生成期锚点不可作建房候选门禁（会落在扇侧陡缘/岸环禁建带），门禁一律按最终定稿格网扫描 `validate_footprint`。
+5. **★ TB-04 盆地群峰环抱与峡谷出水口远期重构规划**——针对当前盆地四周呈现为平坦高台平原的几何缺陷，已编制专项技术方案 [10 号文](./10-basin-mountain-encirclement.md)，基于自然山间盆地地貌原型确立闭合环脊双坡解耦、起伏峰峦天际线、向心山嘴支脊与穿山深切峡谷出水口模型，未来作为 TB-04 独立地貌里程碑实施。
 
 ### 5.6.1 random 候选池现状
 

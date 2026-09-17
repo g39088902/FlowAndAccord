@@ -62,6 +62,11 @@
     - 规划模板：湖畔盆地（`lake_basin_v1`）、冲积扇（`alluvial_fan_v1`）等。
     - 规格详见 [06 号文 R.3 / §4.4+](docs/plan/tech/06-terrain-templates.md)。
 
+- [ ] **TB-04 盆地群峰环抱与峡谷出水口地貌重构 (Basin Mountain Encirclement & Gorge Outlet)**
+    - 详见专项技术方案：[10-basin-mountain-encirclement.md](docs/plan/tech/10-basin-mountain-encirclement.md) 与 [06 号文 §5.6](docs/plan/tech/06-terrain-templates.md)。
+    - 目标：彻底解决盆地模板（`basin_oasis_v1`）“四周被一块平地环绕”的非自然几何缺陷，重构为由崇山峻岭与起伏峰脊闭合环抱、向内倾斜山嘴支脊与冲沟雕琢、单一穿山峡谷出水口与开阔盆底冲积平原构成的自然山间盆地。
+    - 核心实现：闭合环形主山脊线 $R_{\text{ridge}}(\theta)$ 与起伏天际线 $Z_{\text{crest}}(\theta)$；内外双坡解耦（内坡绝壁自然派生 `RockFace` + `NO_WALK`，外坡延伸至图缘连绵峰峦，沙盘侧壁切面呈现锯齿山体）；深切峡谷出水口与盆底蜿蜒河流；60 种子探针 100% 单连通分量（`components == 1` 无死区）与 $\ge 11,500$ 可建格。
+
 - [ ] **远期动态扩展（T4）**
     - 地图动态边界扩展与无限演化支持，待远期独立立项。
 
