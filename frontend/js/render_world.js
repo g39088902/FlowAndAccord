@@ -94,7 +94,7 @@ function houseHalfH(house, z) {
 
 // ★ S4-06 POI 标签提案（收集阶段由 render_depth_queue 调用；条件与 drawPoiMarker 消费侧一一对应）。
 // 键位 = poi.id * 16 + LabelLayout.KEY_POI_*；锚点 = projectLifted 精灵锚点（与绘制一致）。
-// 图标为 pinned（恒接受占格不移位），营地名称/舍数为 ordinary（可省略、四备选位）。
+// 图标为 pinned（恒接受占格不移位），舍数为 ordinary（可省略、四备选位）；营地名称不上地图，仅在 inspect 卡片展示。
 function proposePoiLabels(poi) {
   const LL = _llActive();
   if (!LL) return;
@@ -109,8 +109,7 @@ function proposePoiLabels(poi) {
     const campIcon = lvl >= 4 ? '🏛️' : (lvl >= 2 ? '🏘️' : '🏕️');
     LL.propose(kb + LL.KEY_POI_ICON, 0, x, y, campIcon, `${Math.floor((13 + lvl * 2) * z)}px sans-serif`, 0, 4 * z, true);
     if (z > (RC.labelPoiNameMinZoom || 0.50)) {
-      LL.propose(kb + LL.KEY_POI_NAME, 2, x, y, poi.campTitle || poi.name,
-        `bold ${Math.max(9, Math.floor(10 * z))}px sans-serif`, 0, -(11 + lvl * 2) * z, false);
+      // ★ 营地名称不再上地图绘制，仅在 inspect 卡片中展示（保留舍数标签）
       if (poi.boundHouses > 0) {
         LL.propose(kb + LL.KEY_POI_COUNT, 3, x, y, `${poi.boundHouses}舍`,
           `${Math.max(8, Math.floor(9 * z))}px sans-serif`, 0, (14 + lvl * 2) * z, false);
@@ -171,11 +170,7 @@ function drawPoiMarker(poi) {
     }
 
     if (z > (RC.labelPoiNameMinZoom || 0.50)) {
-      ctx.font = `bold ${Math.max(9, Math.floor(10 * z))}px sans-serif`;
-      ctx.fillStyle = '#fef08a';
-      if (!LL || LL.posOf(poi.id * 16 + LL.KEY_POI_NAME, _llPos)) {
-        ctx.fillText(poi.campTitle || poi.name, LL ? _llPos.x : x, LL ? _llPos.y : y - (11 + (poi.level || 0) * 2) * z);
-      }
+      // ★ 营地名称不再上地图绘制，仅在 inspect 卡片中展示（保留舍数标签）
       if (poi.boundHouses > 0) {
         ctx.font = `${Math.max(8, Math.floor(9 * z))}px sans-serif`;
         ctx.fillStyle = '#cbd5e1';
