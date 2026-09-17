@@ -38,9 +38,13 @@ stateDiagram-v2
 
 纯静态前端（无构建步骤），通过 Canvas 2D/3D 投影渲染模拟世界，提供 Inspector 观察面板、族谱可视化、账本大盘、调试监视器与全景控制台。前端是用户与模拟内核交互的唯一界面。
 
+> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，装饰/实体/道路/标签仍在 Canvas 2D 覆盖层 `sim-canvas`。**目标形态为全量 WebGL、不再使用 Canvas 2D**——装饰层与实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
+
 ## 2. 核心机制
 
 ### 2.1 Canvas 渲染管线
+
+> ★ 下文的「Canvas 渲染管线」为过渡期现状；目标形态的统一 WebGL 管线见文首方向说明与 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md).
 - **分层渲染顺序（★ v1.47.5 P0 / ★ v1.47.9 统一深度 / ★ v1.48.0 光照氛围）**：严格遵循地表物理遮挡层次调度：
   0. `SimLighting.update()`：推进年度光相（含视觉限速器），光档变化时整片重着色地形（`cell.color` 原地写回）；
   1. `drawSkyBackdrop()`：天空/地平渐变与逆光光晕（第一个氛围插入点，地表之下）；

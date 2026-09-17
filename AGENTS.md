@@ -29,9 +29,10 @@
 | **./docs/current/tech/30-workflow.md** | Agent 快速入口 + Commit 检查单 + 文档维护机制 | **提交前必读** |
 | **./docs/current/tech/22-build-and-run.md** · [24 无头诊断](./docs/current/tech/24-diagnostics.md) · [25 性能基准](./docs/current/tech/25-benchmarking.md) · [26 CI/CD](./docs/current/tech/26-cicd.md) · [27 浏览器自动化](./docs/current/tech/27-browser-automation.md) · [23 工具箱](./docs/current/tech/23-tools-guide.md) | 工程层：构建 / 诊断 / 基准 / 部署 / 自动化 / 工具速查 | 排障、优化、部署、自动化时 |
 | **./docs/current/tech/19-ui-implementation.md** · [20 制度大盘 UI](./docs/current/tech/20-society-ledger-ui.md) · [21 前端开发指南](./docs/current/tech/21-frontend-dev-guide.md) | 表现层：页面全景 + 窗口跳转 · 制度大盘 4 标签页 · 前端实施指南 | 开发新 UI 模块时 |
+| ★ **[./docs/plan/tech/31-canvas-to-webgl-migration.md](./docs/plan/tech/31-canvas-to-webgl-migration.md)** · **[TA-08-blocking-measurement.md](./TA-08-blocking-measurement.md)** | **渲染架构决策（全量 WebGL、不再使用 Canvas 2D）** + 阶段三~五迁移方案（装饰层 / 实体层 / 2D 退役）· 遮挡实测与验收矩阵 | **改渲染层代码前必读** |
 | **./docs/plan/README.md** | **计划总索引**：在办设计与未落地方案 + 依赖顺序图 | 了解未来方向时 |
 | **./docs/plan/design/01-roadmap.md** | 长期规划书（M10~M18：空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解宏观方向（多为规划态） |
-| **`docs/plan/tech/`** | 计划 · 技术方案：[01 融合契约](./docs/plan/tech/01-integration-contracts.md) · [02 记忆](./docs/plan/tech/02-memory-system.md) · [03 内部市场](./docs/plan/tech/03-internal-market.md) · [04 农田](./docs/plan/tech/04-farmland-agriculture.md) · [05 狩猎防御](./docs/plan/tech/05-hunting-defense.md) · [06 地图模板](./docs/plan/tech/06-terrain-templates.md) · [07 地形美术](./docs/plan/tech/07-terrain-art.md) · [08 性能优化](./docs/plan/tech/08-performance.md) | 设计未落地方案时 |
+| **`docs/plan/tech/`** | 计划 · 技术方案：[01 融合契约](./docs/plan/tech/01-integration-contracts.md) · [02 记忆](./docs/plan/tech/02-memory-system.md) · [03 内部市场](./docs/plan/tech/03-internal-market.md) · [04 农田](./docs/plan/tech/04-farmland-agriculture.md) · [05 狩猎防御](./docs/plan/tech/05-hunting-defense.md) · [06 地图模板](./docs/plan/tech/06-terrain-templates.md) · [07 地形美术](./docs/plan/tech/07-terrain-art.md) · [08 性能优化](./docs/plan/tech/08-performance.md) · ★ [31 Canvas→WebGL 迁移](./docs/plan/tech/31-canvas-to-webgl-migration.md) | 设计未落地方案时 |
 | **TODO.md** | 待办事项清单 | 开发新特性前 |
 
 ### 0.1 📑 嵌套 AGENTS.md（目录级操作指南）
@@ -48,7 +49,7 @@
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
-| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：54 JS 文件职责边界（含 M4 `snapshot-bin.js`、v1.50.77 `webgl/` 双 Canvas 地形渲染层、S4-02/S4-03 资源景观套件与 TA-12-2 `terrain-texture.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
+| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：54 JS 文件职责边界（含 M4 `snapshot-bin.js`、v1.50.77 `webgl/` 地形渲染层［★ 过渡形态，目标为全量 WebGL］、S4-02/S4-03 资源景观套件与 TA-12-2 `terrain-texture.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -56,7 +57,7 @@
 
 ## 1. 项目架构概述
 
-**Rust 确定性计算内核 + WebAssembly 桥接 + 混合渲染前端（WebGL 地形层 + Canvas 2D 实体覆盖层）** 三层解耦：
+**Rust 确定性计算内核 + WebAssembly 桥接 + 渲染前端（★ 过渡期：WebGL 地形层 + Canvas 2D 实体覆盖层；目标形态：全 WebGL）** 三层解耦：
 
 ```mermaid
 graph TD
@@ -64,18 +65,24 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
-    E -->|状态驱动渲染| F["frontend/js/render_canvas.js (Canvas 2D 实体覆盖层 sim-canvas)"]
+    E -->|状态驱动渲染| F["frontend/js/render_canvas.js (过渡期：Canvas 2D 实体覆盖层 sim-canvas)"]
     E -->|地形快照| F2["frontend/js/webgl/ (WebGL 地形层 sim-canvas-gl，v1.50.77 起)"]
     F --> G["浏览器 UI (版本: v1.50.82)"]
     F2 --> G
 
 ```
 
-> ★ **双 Canvas 架构（v1.50.77 迁移阶段二落地）**：地形由 `frontend/js/webgl/`（context / shader-manager / projection-utils / terrain-renderer / fallback-handler 等）绘制在底层 `sim-canvas-gl`；实体、装饰、道路、标签等仍绘制在上层 Canvas 2D `sim-canvas`。WebGL 不可用时经 `fallback-handler.js` 完整回退 2D 管线。**帧率已解限**（v1.50.80~82），不再锁定 60FPS；涉及性能预算的验收口径见各任务文档标注。
+> ★★ **渲染架构决策（2026-09-17）：全量 WebGL，不再使用 Canvas 2D**。目标形态为**全部内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲**；迁移完成后退役 `sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支，WebGL 不可用时明确提示不支持而非降级。方案见 [31 号迁移方案 §8 阶段三~五](./docs/plan/tech/31-canvas-to-webgl-migration.md)。**改渲染代码前须知**：
+>
+> - **不要再在 Canvas 2D 侧投入遮挡优化**——原 [TA-08](./TA-08-blocking-measurement.md) 的「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略已取消，遮挡由 GPU 深度缓冲解决，TA-08 收缩为实测 + 验收矩阵；
+> - **保持几何与筛选逻辑与渲染后端解耦**：`accent-model.js`（骨架/包围体）、`accent-lod.js`（判档/剔除）、`accent-season.js`（季相曲线）、`landscape-mask.js`（遮罩判定）留在 CPU 侧并被迁移直接复用，**不得**把这些逻辑写进 Canvas 绘制函数体内；
+> - **新建世界实体**在过渡期照旧挂 `drawWorldEntities()` 统一队列，但队列在迁移后仅剩批次提交/透明排序职责。
+>
+> ★ **双 Canvas 现状（v1.50.77 迁移阶段二落地，属过渡形态）**：地形由 `frontend/js/webgl/`（context / shader-manager / projection-utils / terrain-renderer / fallback-handler 等）绘制在底层 `sim-canvas-gl`；实体、装饰、道路、标签等仍绘制在上层 Canvas 2D `sim-canvas`；WebGL 不可用时经 `fallback-handler.js` 回退 2D 管线（该回退仅在迁移过渡期保留）。**帧率已解限**（v1.50.80~82），不再锁定 60FPS；涉及性能预算的验收口径见各任务文档标注。
 
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化 + ★ M4 FABS 二进制帧快照、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（54 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、★ v1.50.77 WebGL 地形渲染层 `webgl/`（7 文件，双 Canvas 架构 + 2D 回退）、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`accent-lod.js`/`render_accents.js`/`render_bush.js`/`render_grass.js`、S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js` 与 TA-12-2 地表纹样模型层 `terrain-texture.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+- **`frontend/`**：原生静态前端（54 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、★ v1.50.77 WebGL 地形渲染层 `webgl/`（7 文件；★ 目标形态为全量 WebGL，双 Canvas 与 2D 回退仅过渡期保留）、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`accent-lod.js`/`render_accents.js`/`render_bush.js`/`render_grass.js`、S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js` 与 TA-12-2 地表纹样模型层 `terrain-texture.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
 ---
 
@@ -167,6 +174,7 @@ node frontend/server.js           # http://localhost:3000（master 分支；端�
 □ 配置联动：新增超参时 config.rs(字段+doc 注释) + config.js + examples/config.json + config-check.js 通过（含第 5 条「空转参数」消费点门禁）
 □ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
 □ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/01-changelog.md + 受影响的局部 AGENTS.md
+□ 渲染改动：按「全量 WebGL」目标形态自检（§4.18）——不在 Canvas 2D 侧追加遮挡优化、几何/筛选逻辑不内联进绘制层
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
 □ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
 □ 文档链接可达：node tools/doc-link-check.js（相对链接失效即退出码 1）
@@ -346,6 +354,20 @@ FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「
 Windows 环境下 Git 建议配置 `git config core.autocrlf input`（或 `false`），代码编辑器/IDE 换行符统一设定为 LF，杜绝因 CRLF 引入虚假 diff、`git diff --check` 空白报警或配置比对漂移。
 
 → 详见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) §1.5 与 [`./docs/current/tech/28-invariants.md`](./docs/current/tech/28-invariants.md) §5（O7 约束）。
+
+### 4.18 🎨 渲染层：全量 WebGL 是目标形态，Canvas 2D 为过渡（★ 2026-09-17 决策 · 跨模块）
+
+**决策**：**所有内容上 WebGL，不再使用 Canvas 2D**。目标形态为全部渲染内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲；阶段三~五完成后退役 `sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支（[31 号 §8](./docs/plan/tech/31-canvas-to-webgl-migration.md)）。
+
+三条硬约束（改渲染/装饰/实体代码时逐条对照）：
+
+1. **不在 Canvas 2D 侧追加遮挡优化**——原 TA-08 的三策略（模型内排序 / 实体拆子项 / 屏幕空间兜底）**已取消**，遮挡由 GPU 深度缓冲逐像素解决；[TA-08](./TA-08-blocking-measurement.md) 现仅承担「旋转切片实测 + 验收矩阵」；
+2. **几何与筛选逻辑必须与渲染后端解耦**——`accent-model.js`（骨架/包围体/分级几何）、`accent-lod.js`（判档/剔除口径唯一入口）、`accent-season.js`（季相曲线）、`landscape-model.js` / `landscape-mask.js`（景观派生与遮罩判定）留在 CPU 侧并被迁移直接复用；**严禁**把这些逻辑内联进 Canvas 绘制函数，否则迁移时需重写；
+3. **不新增 Canvas 2D 专属机制**——新增的可视化元素应尽量表达为「几何 + 参数 + 可见性」，而非依赖 `ctx` 状态机；过渡期仍须挂 `drawWorldEntities()` 统一队列（§5.9），但该队列在迁移后仅剩批次提交与透明排序职责。
+
+**确定性红线不变**：渲染后端切换**不得**改变 `WorldRng` 消费顺序、几何派生规则（`accentModelStyleVersion` 契约）或快照字段；模型内排序等纯视觉计算不消费 RNG 的既有约定继续有效。
+
+→ 详见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md)（阶段三~五方案 + §9 风险与过渡期回退）与 [`frontend/AGENTS.md`](./frontend/AGENTS.md)（文件职责与加载顺序）。
 
 ## 5. 📐 文档分层放置策略
 

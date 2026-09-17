@@ -15,7 +15,7 @@
 - **阶段七（S7-01～10）**：独立地图模板（平地草原、半坡林地、河谷聚落），v1.50.39～52 交付收口。原 `STAGE-07-TODO.md` 已随收官归档清理，详见 [06 号 §4.1～§4.3](docs/plan/tech/06-terrain-templates.md#41-平地草原grassland_plain_v1设计登记2026-09-11排期2026-09-13阶段七插队位)。
 - **TB-02 台地内核（TB-02-01～10）**：台地模板（原 `plateau_settlement_v1`，v1.50.68 更名 `plateau_v1`，显示名"台地聚落"→"台地"），v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **TA-12-2 地表纹样表现层**：`terrain-texture.js` 坡度分带与 fBm 纹理采样，v1.50.54 交付收口。详见 [01-changelog.md](docs/current/01-changelog.md)。
-- **WebGL 渲染迁移阶段一/二**：双 Canvas 架构上线（v1.50.77）——地形（含沙盘侧壁）由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限。方案与阶段三~五（装饰/实体层，未实施）见 [31 号迁移方案](docs/plan/tech/31-canvas-to-webgl-migration.md)，实现现状见 `frontend/AGENTS.md`。
+- **WebGL 渲染迁移阶段一/二**：双 Canvas 架构上线（v1.50.77）——地形（含沙盘侧壁）由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限。★ 2026-09-17 架构决策已升级为**全量 WebGL、不再使用 Canvas 2D**，双 Canvas 属过渡形态；阶段三~五转为既定路线，详见 [31 号迁移方案 §8](docs/plan/tech/31-canvas-to-webgl-migration.md)，实现现状见 `frontend/AGENTS.md`。
 
 ---
 
@@ -23,11 +23,11 @@
 
 - [ ] **D-B1-8 场景样板：支脊山口 + 岩壁河谷（美术侧）**
     - **代码前置（v1.50.51）**：统一第 5c 步局部坡度试算与第 6 步全图定稿判据，移除全图定稿的高程复制；现状机制见 [14 号 §8.1](docs/current/tech/14-terrain-and-network.md#81-静态几何校验与生存成本诊断v15047--stage2-46)。此项不等于 RiverCliff 几何注入或实机验收完成。
-    - **进展（2026-09-14）**：双场景视觉目标草案已交付，用户已明确“接受构图方向”；图稿、提示词、前置源码核对与后续实机证据矩阵归档至 [07 号 §4.4.1](docs/plan/tech/07-terrain-art.md#441-ta-09-构图评审与实机交付记录)。TA-08 与阶段三 RiverCliff 尚未完成，真实种子/存档及两场景实机验收待交付，保留未勾选；TODO.md 尚不满足清空条件。
-    - 内容：两种固定场景的构图与美术打样，把地表色彩、岩层、成组植被、道路可读性、植被受光纳入同一画面（07 号任务 TA-09，旧编号 §9-1，详见 07 号 §4.4/§7）。先评审标为视觉目标的构图草案，再交付真实种子实机样板；注意前置 TB-01 / TA-08 及 06 号阶段三 RiverCliff，可按 07 号波次排期推进，不阻塞 D-B1 代码线。
+    - **进展（2026-09-14）**：双场景视觉目标草案已交付，用户已明确“接受构图方向”；图稿、提示词、前置源码核对与后续实机证据矩阵归档至 [07 号 §4.4.1](docs/plan/tech/07-terrain-art.md#441-ta-09-构图评审与实机交付记录)。TA-08 实测与阶段三 RiverCliff 尚未完成，真实种子/存档及两场景实机验收待交付，保留未勾选；TODO.md 尚不满足清空条件。
+    - 内容：两种固定场景的构图与美术打样，把地表色彩、岩层、成组植被、道路可读性、植被受光纳入同一画面（07 号任务 TA-09，旧编号 §9-1，详见 07 号 §4.4/§7）。先评审标为视觉目标的构图草案，再交付真实种子实机样板；注意前置 TB-01 / TA-08 实测及 06 号阶段三 RiverCliff，可按 07 号波次排期推进，不阻塞 D-B1 代码线。
     - 出处：06 号 R.3 阶段一（原 §5.9 第 1 条）、07-terrain-art.md §1.2 TA-09。
-    - 验收：构图草案评审 + 两场景实机验收均通过，记录种子/存档、版本、配置、窗口/DPR 及四季/旋转/俯角/景别、遮挡/接地/性能证据（07 号 §4.4/§11）；草案通过不得提前勾选。**纯视觉样板不冒充物理验收**（§5.8/§18 门禁独立于本项）。
-    - 依赖：07 号美术波次（TB-01、TA-08）及 06 号阶段三 RiverCliff；构图草案可先行，实机验收须等三项完成。
+    - 验收：构图草案评审 + 两场景实机验收均通过，记录种子/存档、版本、配置、窗口/DPR 及四季/旋转/俯角/景别、遮挡/接地/性能证据（07 号 §4.4/§11）；草案通过不得提前勾选。**纯视觉样板不冒充物理验收**（§5.8/§18 门禁独立于本项）。★ 遮挡项判据以 [TA-08 §2 验收矩阵](TA-08-blocking-measurement.md) 为准；若排在 TC-03 迁移之后，直接按 WebGL 管线口径验收。
+    - 依赖：07 号美术波次（TB-01、TA-08 实测）及 06 号阶段三 RiverCliff；构图草案可先行，实机验收须等三项完成。
 
 - [ ] **特定地貌专属景观群与房屋院地（S4-X1～X4 & TA-17-COURTYARD）**
     - 详见专项待办清单：[STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md](STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md)
@@ -40,11 +40,20 @@
 
 - [ ] **TA-05 P0 植被打样技术方案**
     - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测）。
-    - 聚焦树木与植被群落在 Canvas 2D 实体覆盖层视口下的高质量层次打样（地形底座已迁 WebGL 层，见 §0 归档索引）。
+    - 聚焦树木与植被群落在实体覆盖层视口下的高质量层次打样（地形底座已迁 WebGL 层，见 §0 归档索引）。★ 覆盖层属过渡形态（2026-09-17 决策：全量 WebGL），验收口径以几何/季相/受光数值一致性为主，不依赖覆盖层实现细节，以便迁移后复用同一批证据。
 
 - [ ] **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**
     - 详见 [TA-06 实施方案](TA-06-TODO.md) 与 [07 号文 §6.3/§11.4](docs/plan/tech/07-terrain-art.md)；TA-06 现状 ◐ v1.50.64（实现与静态/数值验证已落地：物种派生 + 三乔木轮廓 + 三灌木变体 + 花朵图元 + 冠幅单一来源联动；**待补**：Chrome 视觉·受光·四季矩阵验收与证据包、性能 A/B、景观共用通道抽查、LOAD 链路——建议与 TA-05 LOAD 补测合并为同一次 Chrome 存档会话）。
     - 由 `accent.id` 稳定哈希派生 6 物种，零新增持久化字段/FABS section/模拟参数。
+
+- [ ] **TC-03 全量 WebGL 迁移（★ 2026-09-17 定为既定路线）**
+    - 详见 [31 号迁移方案 §8 阶段三~五](docs/plan/tech/31-canvas-to-webgl-migration.md)：阶段三装饰层 → 阶段四实体层 → 阶段五 Canvas 2D 退役（删除 `#sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支）。
+    - 前置：TA-08 旋转切片实测基线（[TA-08-blocking-measurement.md](TA-08-blocking-measurement.md)）；遮挡由 GPU 深度缓冲解决，原 TA-08 三策略已取消。
+    - 约束：几何/筛选逻辑（`accent-model.js` / `accent-lod.js` / `accent-season.js` / `landscape-model.js` / `landscape-mask.js`）保持与渲染后端解耦，迁移整体复用；不得改变 `WorldRng` 消费顺序、几何派生规则与快照契约。
+
+- [ ] **TA-08 遮挡实测与验收矩阵（◐ 已重定向 2026-09-17，待实施）**
+    - 详见 [TA-08-blocking-measurement.md](TA-08-blocking-measurement.md)；原「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略随全量 WebGL 决策取消。
+    - 范围：旋转切片实测（`tools/occlusion-test.js` + 证据包）+ 承载 §2 验收矩阵；结论作为 TC-03 迁移输入与 before/after 基线。
 
 - [ ] **TA-10 台地表现层打样**
     - 详见 [07 号文 §8](docs/plan/tech/07-terrain-art.md)

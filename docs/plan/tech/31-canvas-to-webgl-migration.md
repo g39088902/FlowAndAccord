@@ -1,8 +1,8 @@
 # Flow & Accord · Canvas 2D → WebGL 迁移方案 (Phased Migration Plan)
 
-> **文档状态**: 阶段一/二已落地 (★ 2026-09-17 v1.50.77 双 Canvas 架构上线：地形由 `frontend/js/webgl/` 绘制于底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限) | **创建日期**: 2026-09-17 | **影响范围**: 前端渲染层  
-> **修订历史**: v1.0 - 初始版本，细化阶段一 (基础框架) 与阶段二 (地形层迁移)  
-> **落地口径**: 阶段一/二的实现以 [frontend/AGENTS.md](../../../frontend/AGENTS.md) 与 `docs/current/` 现状文档为准（实际文件结构较本文示例有出入）；本文保留为迁移总体路线与阶段三~五（装饰/实体层）未实施方案。
+> **文档状态**: ★ **目标形态已定**（2026-09-17）：**全量 WebGL 渲染，不再使用 Canvas 2D**——阶段三~五（装饰层 / 实体层 / Canvas 2D 退役）由「未实施」转为**既定路线**。阶段一/二已落地 (v1.50.77 双 Canvas 架构上线：地形由 `frontend/js/webgl/` 绘制于底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限)，双 Canvas 为**过渡形态**。 | **创建日期**: 2026-09-17 | **影响范围**: 前端渲染层
+> **修订历史**: v1.0 - 初始版本，细化阶段一 (基础框架) 与阶段二 (地形层迁移)；v2.0 (2026-09-17) - 架构决策落定：全量 WebGL 为目标形态，补充阶段三~五正式方案，取消 2D 回退为长期能力，TA-08 覆盖层近似策略作废（见 [TA-08](../../../TA-08-blocking-measurement.md)）
+> **落地口径**: 阶段一/二的实现以 [frontend/AGENTS.md](../../../frontend/AGENTS.md) 与 `docs/current/` 现状文档为准（实际文件结构较本文示例有出入）；阶段三~五为在办方案，实施后须同步刷新 `docs/current/`。
 
 ---
 
@@ -15,7 +15,8 @@
 - [5. 阶段一：基础框架搭建](#5-阶段一基础框架搭建)
 - [6. 阶段二：地形层迁移](#6-阶段二地形层迁移)
 - [7. 性能门禁与验收标准](#7-性能门禁与验收标准)
-- [8. 风险评估与缓解策略](#8-风险评估与缓解策略)
+- [8. 阶段三~五：全量 WebGL 迁移（装饰层 / 实体层 / Canvas 退役）](#8-阶段三五全量-webgl-迁移装饰层--实体层--canvas-退役)
+- [9. 风险评估与缓解策略](#9-风险评估与缓解策略)
 
 ---
 
@@ -106,8 +107,9 @@ let terrainProjY = new Float32Array(3600);
 
 - **零依赖**: 纯 WebGL API，不引入 Three.js/Babylon.js 等库
 - **渐进式迁移**: 每个阶段独立可回退，不影响其他部分
-- **向后兼容**: 支持降级为 Canvas 2D 模式
+- **单一渲染管线（★ v2.0 定稿）**: 迁移终点为**全部内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）纳入同一 WebGL 管线**，共享一个深度缓冲；**不再保留 Canvas 2D 作为渲染器或长期降级路径**。WebGL 不可用时给出明确不支持提示，不做 2D 降级（过渡期例外见 §9.2）
 - **确定性保持**: 不影响 WASM 内核的逐字节确定性承诺
+- **遮挡口径变更（★ v2.0 定稿）**: 跨实体遮挡由 GPU 深度缓冲逐像素解决，Canvas 2D 覆盖层的近似排序/拆分/兜底策略（原 TA-08 策略 A/B/C）**全部取消**；选中对象被遮挡时改由「关深度测试的描边 pass + 叶簇半透明」实现，验收矩阵沿用 [TA-08 §2](../../../TA-08-blocking-measurement.md)
 
 ---
 
@@ -210,7 +212,9 @@ frontend/js/webgl/
 
 ### 4.2 与现有系统集成
 
-**数据流**:
+> ★ **v2.0 口径**：下图为**过渡期**（阶段一~四）形态。目标形态（阶段五后）为单一路径：`rustworld.js::sim` → WebGL Renderer → Canvas Element，`Canvas2D Renderer` / `Fallback Handler` 两个分支整体删除（见 §8.3）。
+
+**数据流（过渡期）**:
 ```
 rustworld.js::sim
   │
@@ -232,7 +236,7 @@ rustworld.js::sim
                          Canvas Element
 ```
 
-**混合渲染模式** (过渡期):
+**混合渲染模式（过渡期，阶段五删除）**:
 ```javascript
 // frontend/js/webgl/fallback-handler.js
 class RenderFallbackManager {
@@ -266,7 +270,7 @@ class RenderFallbackManager {
 
 ### 4.3 深度队列兼容性
 
-**关键原则**: 保持现有深度排序逻辑，仅改变绘制后端
+**过渡期原则（阶段一~二）**: 保持现有深度排序逻辑，仅改变绘制后端
 
 ```javascript
 // frontend/js/render_depth_queue.js (保持不变)
@@ -283,6 +287,8 @@ function dispatchToBackend(item) {
 
 // 所有图元的 draw* 函数保持不变，由 backend 选择执行哪个实现
 ```
+
+> ★ **v2.0（2026-09-17）口径修正**：上文的「双后端分发」只是阶段一~二把地形先搬上 GPU 的过渡手段。**目标形态下 `drawWorldEntities()` 的画家算法深度队列不再是遮挡判据**——遮挡由 GPU 深度缓冲承担，深度队列退化为：① 不透明批次的前后提交顺序（性能优化，不影响正确性）；② 透明批次（叶簇、水面）的 CPU 侧排序依据。阶段三~五完成后 `canvasRenderer.submit` 分支随 2D 覆盖层一并删除，`dispatchToBackend` 收敛为单一 WebGL 提交路径（见 §8）。
 
 ---
 
@@ -1418,23 +1424,100 @@ jobs:
 
 ---
 
-## 8. 风险评估与缓解策略
+## 8. 阶段三~五：全量 WebGL 迁移（装饰层 / 实体层 / Canvas 退役）
 
-### 8.1 风险矩阵
+> **状态**: ★ **2026-09-17 定为目标形态**（原为「未实施 / TBD」）。架构决策：**所有渲染内容进入同一 WebGL 管线，不再使用 Canvas 2D**；双 Canvas 覆盖层是过渡形态，迁移完成后整体退役。
+> **总工期估算**: 5~7 周（不含阶段一/二已交付部分）| **风险**: 高 | **前置**: 阶段一/二已落地；[TA-08 遮挡实测](../../../TA-08-blocking-measurement.md) 提供基线
+> **核心收益**: ① 逐像素深度缓冲彻底解决模型内穿插与跨实体遮挡（TA-08 策略全部取消）；② 消除跨画布层序约束与三块画布叠层隐患；③ 装饰/实体实例化批绘制，draw call 数量级下降。
+
+### 8.1 阶段三：装饰层迁移（Accent → GPU）
+
+**范围**（现状全部由 Canvas 2D 绘制，经 `DEPTH_ACCENT` 入队）：
+
+| 现状模块 | 迁移对象 |
+|---|---|
+| `render_accents.js` | Tree / Boulder / RockCluster 绘制 |
+| `render_bush.js` | Bush 三变体 + 花朵图元 |
+| `render_grass.js` | GrassTuft / 芦草 |
+| `render_landscapes.js` + `landscape-model.js` | 资源景观子图元（含 GroundPatch 贴地片、detail 可采细节） |
+| `render_shadows.js` | 树/灌木贴地投影与接触阴影 |
+| `accent-model.js` / `accent-season.js` / `accent-lod.js` | **保留**为 CPU 侧几何与筛选来源，不迁 GPU |
+
+**实施要点**：
+
+1. **几何来源不变**：`accent-model.js` 的局部三维骨架（主干 / 枝条 segments / 叶簇椭球）与 `(kind,id)` 纯函数派生规则**逐值不变**，改由 vertex/index buffer 生成器消费；模型缓存 `_CACHE_MAX=2048` 与生命周期契约保留；
+2. **实例化批绘制**：同 species × segTier 的枝条/叶簇归并为 instanced draw；叶簇按 `AccentLOD` 档位选择 instance 集合（远景只提交 `farClusters` 子集，中景剔 `segTier===1`），LOD 判定仍留在 CPU 侧；
+3. **透明批次**：叶簇、花朵走预乘 alpha 混合 + CPU 侧按相机深度排序（复用现有 `_sortScratch` 次序），或 alpha-to-coverage（MSAA 可用时）；**禁用**逐簇深色 rim 描边的漫画风约定在 GPU 侧同样不得恢复；
+4. **受光与季相**：`accent-season.js` 叶色/叶量曲线、`lighting.js::shadeRgbInto` / `accentLitFill` 的受光公式迁为 shader uniform/attribute，**公式本身不变**（TA-04 系列验收逐场景复测）；
+5. **贴地投影**（`render_shadows.js`）走独立 decal 批次，随叶量调制的 alpha 入 uniform；
+6. **景观遮罩**（`landscape-mask.js`）判定逻辑保持 CPU 侧，输出子图元可见性/`_masked` 供 instance 剔除，**不搬进 shader**。
+
+**验收**：07 号 §11.1/§11.3 四季×受光×季节轮转逐场景对照（模型摘要逐值不变）；TA-08 §2 矩阵前三行 before/after；`frontend-check.js` + `config-check.js` 全绿。
+
+### 8.2 阶段四：实体层与表现层迁移（Agent / House / POI / 道路 / 特效）
+
+**范围**：`render_agents.js`（族人 + 马斯洛需求配色 + 选中态）、房屋与工地、POI 底座与图标、道路段与车辙、礼花/粒子特效、`terrain-mesh-merge.js` 产出的地形 quad（已在 GPU 侧）。
+
+**实施要点**：
+
+1. **族人**：低多边形 + 实例化；需求配色与季节色走 uniform，不逐帧重传几何；
+2. **选中遮挡补偿**（承接原 TA-08 策略 C）：选中实体在**关闭深度测试**的第二趟 pass 中补一圈描边，叶簇等前景透明体在该趟降 alpha；实现口径与验收见 [TA-08 §2](../../../TA-08-blocking-measurement.md)；
+3. **拾取**：由「按 `sim.*` 原序数组遍历 + 屏幕坐标判定」改为 **ID-buffer 颜色拾取**（离屏 FBO 渲染实体 ID，读 1×1 像素）或 CPU 侧保留现有遍历——二选一由阶段三实测性能决定，**不得**引入第二套世界事实来源；
+4. **标签层**：DOM 标签（`label-layout.js` + 标签避让）**本轮保留 DOM**，不作为 GPU 迁移对象；若后续并入，走位图文字集（texture atlas）；
+5. **道路**：曲线段三角化后合批提交，磨损 `wear` 走顶点属性；水系河面透明段排序规则（现「段四角取最大」口径）在 GPU 侧改为按段深度排序 + 深度写入关闭。
+
+**验收**：全实体类型四方位旋转一致性；拾取命中率与现状持平；高密度聚落拖动 p95 达标（§7.1 门禁）。
+
+### 8.3 阶段五：Canvas 2D 退役
+
+**删除清单**（迁移完成后执行）：
+
+| 对象 | 处置 |
+|---|---|
+| `#sim-canvas` 2D 覆盖层画布 | **删除**；`index.html`/`style.css`/`map.html` 同步 |
+| `frontend/js/webgl/fallback-handler.js` 的 2D 回退分支 | **删除**；WebGL 不可用时给出明确不支持提示（不做降级，见 §9.2） |
+| `render_terrain.js` / `render_world.js` / `render_depth_queue.js` 的 Canvas 2D 绘制路径 | **删除**；仅保留 WebGL 提交路径 |
+| `render_accents.js` / `render_bush.js` / `render_grass.js` / `render_landscapes.js` / `render_shadows.js` / `render_agents.js` 的 `ctx` 绘制实现 | **删除**，由对应 GPU 渲染模块替代 |
+| `math.js::project3D` 等 CPU 投影 | 保留（拾取/标签/AABB 剔除仍需要屏幕坐标） |
+| `frontend/AGENTS.md`、`docs/current/tech/16`/`21`/`31` | **必须同步**：文件清单、加载顺序、DOM ID 共享契约、双 Canvas 描述 |
+| `tools/frontend-check.js` / `code-map-check.js` | 门禁基线同步（DOM ID 与文件登记删除项） |
+
+**退役判据**：阶段三/四全部验收通过 + 连续两个版本无 2D 回退触发记录 + 标签层与拾取功能在纯 WebGL 下无回归。
+
+### 8.4 与原计划的差异（删除项汇总）
+
+| 原计划 | 处置 |
+|---|---|
+| TA-08 策略 A（模型内排序）/ B（实体拆子项）/ C（屏幕空间兜底） | **取消**（见 [TA-08](../../../TA-08-blocking-measurement.md)）；仅保留测量与验收矩阵 |
+| 07 号 §9.3「TC-03 条件触发」 | 改为**既定路径**：不再由性能/遮挡缺陷触发，直接按本方案阶段三~五推进 |
+| §2.2「向后兼容：支持降级 Canvas 2D 模式」 | **删除**，替换为「单一渲染管线」目标 |
+| §8.2 的 `FORCE_CANVAS2D` 紧急开关 | **仅过渡期保留**，阶段五随 2D 路径一并删除 |
+| 「禁止在 2D 覆盖层上再叠加第三块画布」 | 升级为「不再存在 2D 覆盖层」 |
+
+---
+
+## 9. 风险评估与缓解策略
+
+### 9.1 风险矩阵
 
 | 风险 | 概率 | 影响 | 缓解策略 |
 |------|------|------|---------|
-| **WebGL 驱动兼容性问题** | 中 | 高 | Fallback 机制 + 广泛硬件测试 |
+| **WebGL 驱动兼容性问题** | 中 | 高 | 启动时能力检测 + 明确不支持提示（**不再提供 2D 降级**，§9.2）；迁移前完成硬件兼容矩阵 |
 | **性能不如预期** | 低 | 中 | 渐进式优化 + A/B 对比 |
 | **画面不一致** | 中 | 中 | 自动化截图对比 + 阈值告警 |
 | **GC 开销转移至 GPU** | 低 | 低 | Buffer reuse + 对象池 |
 | **开发进度延误** | 中 | 中 | Phased approach (先 PoC 再 full) |
+| **叶簇透明批次穿插错误** | 中 | 中 | CPU 侧按深度排序透明批次；MSAA 可用时改用 alpha-to-coverage；固定种子旋转切片复测（TA-08） |
+| **拾取/标签迁移回归** | 中 | 高 | 拾取改 ID-buffer 前先做命中率对照；标签层本轮保留 DOM，不纳入迁移 |
+| **阶段五删除 2D 路径后无退路** | 低 | 高 | 阶段五以「连续两个版本无回退触发」为前置判据；删除动作独立提交，可单次 revert |
 
-### 8.2 回退策略
+### 9.2 回退策略（★ 仅过渡期有效）
 
-**紧急回退步骤**:
+> **口径变更（v2.0）**：`FORCE_CANVAS2D` 紧急开关**只在阶段三~四的过渡期**作为开发安全网存在。阶段五（Canvas 2D 退役）执行后该开关随 2D 绘制路径一并删除——**目标形态不提供 2D 降级**，WebGL 不可用时明确告知用户不支持，而非降级渲染。
+
+**过渡期紧急回退**:
 ```javascript
-// index.html中添加快速关闭开关
+// index.html中添加快速关闭开关（阶段五删除）
 window.FORCE_CANVAS2D = (() => {
   const params = new URLSearchParams(window.location.search);
   return params.get('forcemap2d') === '1';
@@ -1446,14 +1529,20 @@ if (window.FORCE_CANVAS2D) {
 }
 ```
 
-**数据库版本标记**:
+**迁移阶段标记**（阶段五完成后替换为能力检测）:
 ```javascript
 // rustworld.js::applyConfig 中添加
-window.WEBGL_MIGRATION_PHASE = 'phase2-complete'; // 或 undefined
+window.WEBGL_MIGRATION_PHASE = 'phase4-complete'; // phase3 / phase4 / phase5-complete
 
+// 过渡期：阶段标记缺失时回退 Canvas 2D（阶段五删除此分支）
 if (!window.WEBGL_MIGRATION_PHASE && window.USE_WEBGL) {
   console.warn('[Migration] Incomplete WebGL migration - falling back to Canvas 2D');
   window.USE_WEBGL = false;
+}
+
+// 阶段五之后：只做能力检测，无降级
+if (!window.USE_WEBGL) {
+  showUnsupportedNotice(); // 明确提示不支持，不做 2D 渲染
 }
 ```
 
@@ -1466,6 +1555,8 @@ if (!window.WEBGL_MIGRATION_PHASE && window.USE_WEBGL) {
 - [`docs/current/tech/17-seasonal-lighting.md`](../../current/tech/17-seasonal-lighting.md) - 动态季节光照系统
 - [`frontend/AGENTS.md`](../../../frontend/AGENTS.md) - 前端模块架构
 - [`docs/current/tech/29-impact-matrix.md`](../../current/tech/29-impact-matrix.md) - 跨模块影响关系
+- [TA-08 遮挡边界实测与验收矩阵](../../../TA-08-blocking-measurement.md) - 阶段三~四的遮挡验收标准携带者（原 Canvas 2D 近似策略已取消）
+- [`docs/plan/tech/07-terrain-art.md`](07-terrain-art.md) - 装饰层任务台账（TA-01~TA-18）与 §11 验收清单
 
 ### B. 参考资源
 
@@ -1490,4 +1581,4 @@ if (!window.WEBGL_MIGRATION_PHASE && window.USE_WEBGL) {
 
 > **修订记录**:
 > - v1.0 (2026-09-17): 初始版本，细化阶段一、二实施方案
-> - TBD: 阶段三~五 (装饰层/族人类/UI 层迁移)
+> - **v2.0 (2026-09-17)**: 架构决策落定——**全量 WebGL、不再使用 Canvas 2D**。新增 §8 阶段三~五正式方案（装饰层 / 实体层 / Canvas 退役）；§2.2 删除「向后兼容 Canvas 2D 降级」；§4.3 修正深度队列定位；§9 风险矩阵与回退策略按「无 2D 降级」口径重写；取消 TA-08 策略 A/B/C。
