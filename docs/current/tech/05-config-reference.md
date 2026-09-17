@@ -255,6 +255,7 @@
 | `terrainMaxBuildSlope` | f32 | 16 | geo/query.rs / housing_system/settlement.rs (房屋完整占地) | 房屋/设施完整占地允许的最大坡度 (度) |
 | `terrainFootprintHalfExtent` | f32 | 7 | geo/query.rs / housing_system/settlement.rs (房屋占地) | 房屋基础完整占地半径 (m) |
 | `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
+| `terrainRoadAstarHeuristic` | bool | true | geo/corridor.rs (route 距离启发开关；false = 纯 Dijkstra 旧行为) | ★ v1.50.77 路网 A* 距离启发开关（corridor.rs::route；false = 退回纯 Dijkstra 旧行为） |
 | `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
 | `terrainAccentSubFeatures` | bool | true | geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控) | ★ STAGE2-1（06号 R.5/§5.8）：创世有界重试上限（初始创世失败时阶梯降级重试的最大次数， |
 | `terrainGenerationMaxRetries` | u32 | 3 | spatial/world.rs (创世重试预算钳制；STAGE2-5 阶梯降级重试环) | ========================================================================== |

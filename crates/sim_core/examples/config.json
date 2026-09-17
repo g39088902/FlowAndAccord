@@ -162,6 +162,7 @@
   "terrainNoiseAmplitude": 6.0,
   "terrainNoiseScaleBase": 300.0,
   "terrainBranchRidgeEnabled": true,
+  "terrainRoadAstarHeuristic": true,
   "terrainBranchRidgeAmplitudeRatio": 0.48,
   "terrainBranchRidgeLength": 150.0,
   "terrainGrasslandMoundAmpMin": 6.5,

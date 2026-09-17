@@ -182,6 +182,7 @@ window.SIM_CONFIG = {
   terrainBranchRidgeEnabled: true, // 支脊生成总开关（T1 山口 profile；false 时 relief_rng 消费序缩短）
   terrainBranchRidgeAmplitudeRatio: 0.48, // 支脊/主脊振幅比中值；每条 ×[0.85,1.15] 抖动（默认 → 0.408~0.552）
   terrainBranchRidgeLength: 150.0, // 支脊基础延伸长度 (m)；每条 ×[0.8,1.2] 抖动（默认 → 120~180m）
+  terrainRoadAstarHeuristic: true, // ★ v1.50.77 路网 A* 距离启发开关（corridor.rs::route；false = 退回纯 Dijkstra 旧行为）
   // ★ v1.50.51 S7-08：阶段七 3 个静态 profile 形态参数集中化（06号 §4.1/§4.2/§4.3）。
   //   默认值 = 参数化前 terrain.rs/hydrology.rs 形态常数（世界输出逐位不变）。
   //   改任一值等于换图（同种子形态漂移），须遵循 TERRAIN_GENERATOR_VERSION 契约；

@@ -356,6 +356,11 @@ pub struct SimConfig {
     pub terrain_max_build_slope: f32,
     pub terrain_footprint_half_extent: f32,
     pub terrain_road_corridor_width: f32,
+    /// ★ v1.50.77：路网 A* 距离启发开关（geo/corridor.rs::route）。true = 弹出按 f=g+h
+    /// 排序（h=到目标直线距离×1000，factor≥1 下可采纳且一致）——开阔地貌（盆地）下
+    /// A* 探索节点数 ÷5~10；false = 退回 v1.50.76 的纯 Dijkstra（逐位旧行为）。
+    /// 启发只改「等代价路径中的选形」，最优代价不变；同种子路网选形可能与旧版不同。
+    pub terrain_road_astar_heuristic: bool,
     /// ★ v1.48.0 D-A 装饰系统：装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密）
     pub terrain_accent_density: f32,
     /// ★ D-B1（06号 §5.3）：子特征注入总开关（山脚湖/山涧飞瀑/河谷峭壁等）。

@@ -62,6 +62,7 @@ const IMPACT_OVERRIDES = {
   terrainBranchRidgeEnabled: 'geo/terrain.rs (支脊生成总开关)',
   terrainBranchRidgeAmplitudeRatio: 'geo/terrain.rs (支脊振幅比中值 ×[0.85,1.15] 抖动)',
   terrainBranchRidgeLength: 'geo/terrain.rs (支脊长度 ×[0.8,1.2] 抖动)',
+  terrainRoadAstarHeuristic: 'geo/corridor.rs (route 距离启发开关；false = 纯 Dijkstra 旧行为)',
   terrainMaxWalkSlope: 'geo/query.rs / graph.rs (道路完整曲线校验)',
   terrainMaxBuildSlope: 'geo/query.rs / housing_system/settlement.rs (房屋完整占地)',
   terrainFootprintHalfExtent: 'geo/query.rs / housing_system/settlement.rs (房屋占地)',
