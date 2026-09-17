@@ -243,4 +243,5 @@ rustworld.js::_applySnapshot()
 □ 文档更新：对应 docs/current/0X-*.md + ../01-changelog.md 已追加
 □ 局部 AGENTS.md：改了哪个目录，其局部 AGENTS.md 的类型/方法名是否需同步
 □ 影响矩阵：本文档对应行是否需要更新 (新增机制/文件/枚举时)
+□ 换行符：全仓统一使用 LF (\n)，严禁提交 CRLF（git diff --check 无空白报错）
 ```

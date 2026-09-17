@@ -100,6 +100,23 @@ rustup target add wasm32-unknown-unknown
 
 编译 / 测试 / 启动命令与 Windows 相同，仅路径分隔符为 `/`，复制用 `cp` 替代 `Copy-Item`。
 
+### 1.5 换行符规范与 Git 配置（统一 LF）
+
+本项目涉及跨平台协作、CI/CD 与确定性测试，全项目（Rust 源码、Web 前端 JS/HTML/CSS、配置文件、Markdown 文档及脚本工具）**一律严格使用 LF (`\n`) 作为换行符**，**严禁提交 CRLF (`\r\n`)**。
+
+在 Windows 环境下初次配置仓库时，建议通过 Git 配置防止签出或暂存时自动转为 CRLF：
+
+```powershell
+# 推荐配置：提交时转换为 LF，签出时不转换（保持工作区 LF）
+git config core.autocrlf input
+
+# 或完全关闭换行符自动转换（由编辑器/IDE 保证保存为 LF）
+git config core.autocrlf false
+```
+
+- **编辑器/IDE 设置**：RustRover、VS Code、WebStorm 等编辑器的换行符（End of Line / `files.eol`）必须统一指定为 `\n` (LF)。
+- **门禁检查**：提交前必须执行 `git diff --check`，若代码中混入 CRLF 或尾随空白会直接报错；`node tools/config-check.js` 等工具亦依赖一致的文本格式。
+
 ---
 
 ## 2. 编译与双副本同步

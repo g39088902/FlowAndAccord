@@ -163,6 +163,7 @@ node frontend/server.js           # http://localhost:3004
 □ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
 □ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
 □ 文档链接可达：node tools/doc-link-check.js（相对链接失效即退出码 1）
+□ 换行符规范：全仓统一 LF (\n)，严禁提交 CRLF（git diff --check 无空白报错）
 ```
 
 ### 4.0.1 ✅ Commit 前检查单（提交前必做）
@@ -299,6 +300,13 @@ FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「
 - **配套契约**：`advance_to_next_lane` 走完路线后 `route` Vec **不会清空**，「是否还在移动/重补路」判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点站死）。立宅时 `settlement.rs` 直接设 `world_pos = site_pos` 是既有设计，不计入异常。
 
 → 详见 `spatial/AGENTS.md` §4.6（运动系统契约）与 `decisions/AGENTS.md` §4.9（决策层非移动态切换规范）。回归门禁：`node tools/diagnose.js --check all` 的 Rule 5（移动停滞）。
+
+### 4.17 🟡 换行符规范（LF 单一标准 · 全局）
+
+全项目（Rust 源码、Web 前端、JSON/配置、Markdown 文档与工具脚本）**统一使用 LF (`\n`)** 作为换行符，**严禁提交 CRLF (`\r\n`)**。
+Windows 环境下 Git 建议配置 `git config core.autocrlf input`（或 `false`），代码编辑器/IDE 换行符统一设定为 LF，杜绝因 CRLF 引入虚假 diff、`git diff --check` 空白报警或配置比对漂移。
+
+→ 详见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) §1.5 与 [`./docs/current/tech/28-invariants.md`](./docs/current/tech/28-invariants.md) §5（O7 约束）。
 
 ## 5. 📐 文档分层放置策略
 

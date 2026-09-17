@@ -148,6 +148,7 @@ stateDiagram-v2
 | O4 | **新增模块时**先建 `docs/current/0X-*.md` + 对应目录 `AGENTS.md`，再在根 AGENTS.md §0 加索引，最后在 `../01-changelog.md` 追加条目 | AGENTS.md §5 | 文档缺失，后续 agent 无指南可依 |
 | O5 | **改机制时同步更新**对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新 | AGENTS.md §5 | 文档滞后于代码 |
 | O6 | **版本号自增**：每次 AI 修改代码必须同步更新 ① `index.html` 版本徽章 ② 根 AGENTS.md §1/§2 版本号 ③ changelog 条目（**仅文档变更除外**：`docs/` / `AGENTS.md` 纯内容改动不升版、不重跑测试，见 §4.0.1） | §4.9 | 版本混乱，无法追踪变更 |
+| O7 | **全仓统一使用 LF 作为换行符**，严禁提交 CRLF（Windows 开发环境配置 `core.autocrlf=input`，编辑器统一 LF） | AGENTS.md §4.17 | `git diff` 产生跨平台换行符脏变更、`git diff --check` 空白报错 |
 
 ---
 
@@ -171,6 +172,6 @@ stateDiagram-v2
 □ 数据一致：新快照字段**四处**同步（含 `snapshot_bin/encode.rs` + `snapshot-bin.js`）？wasm 双副本？agent_index 刷新？
 □ 行为语义：tick 顺序打乱？决策相位改了？系统扫描指挥复活了？
 □ 构建部署：CI 用了便携工具链？wasm MIME 对吗？门禁过了吗？
-□ 代码组织：单文件超 800 行？临时测试没删？版本号自增了？
+□ 代码组织：单文件超 800 行？临时测试没删？版本号自增了？换行符统一 LF（无 CRLF）？
 □ 前端：脚本顺序对吗？DOM ID 全量替换了吗？
 ```

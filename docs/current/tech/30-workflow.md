@@ -92,7 +92,7 @@ node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS
 ```
 
 - [ ] 工作区只有本次任务相关文件；没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本。
-- [ ] `git diff --check` 无空白错误，新增/删除/重命名文件和引用路径已核对。
+- [ ] `git diff --check` 无空白与换行符错误；换行符统一为 LF（严禁 CRLF），新增/删除/重命名文件和引用路径已核对。
 - [ ] `doc-link-check.js` 全绿（改过文档路径 / 迁移过文档目录时尤其必跑）。
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
 - [ ] 改过代码已用 `node tools/bump-version.js --patch`（或 `--minor` / 指定版本）升版，`--check` 零漂移；**未手工编辑任何版本号定义点**。
@@ -150,7 +150,7 @@ node tools/diagnose.js --check all
 
 执行 `git diff --stat` 和 `git diff --name-only`，逐文件确认：
 
-- [ ] diff 都属于本次任务，删除操作、版本号、文档链接和配置字段无误。
+- [ ] diff 都属于本次任务，删除操作、版本号、换行符（LF）、文档链接和配置字段无误。
 - [ ] 对外文案、错误提示和空态与当前机制一致。
 - [ ] 提交说明包含“改了什么 / 为什么改 / 如何验证”；未执行的门禁已说明原因。
 
