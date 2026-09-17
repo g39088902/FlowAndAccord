@@ -29,7 +29,7 @@
 | **./docs/current/tech/30-workflow.md** | Agent 快速入口 + Commit 检查单 + 文档维护机制 | **提交前必读** |
 | **./docs/current/tech/22-build-and-run.md** · [24 无头诊断](./docs/current/tech/24-diagnostics.md) · [25 性能基准](./docs/current/tech/25-benchmarking.md) · [26 CI/CD](./docs/current/tech/26-cicd.md) · [27 浏览器自动化](./docs/current/tech/27-browser-automation.md) · [23 工具箱](./docs/current/tech/23-tools-guide.md) | 工程层：构建 / 诊断 / 基准 / 部署 / 自动化 / 工具速查 | 排障、优化、部署、自动化时 |
 | **./docs/current/tech/19-ui-implementation.md** · [20 制度大盘 UI](./docs/current/tech/20-society-ledger-ui.md) · [21 前端开发指南](./docs/current/tech/21-frontend-dev-guide.md) | 表现层：页面全景 + 窗口跳转 · 制度大盘 4 标签页 · 前端实施指南 | 开发新 UI 模块时 |
-| ★ **[./docs/plan/tech/31-canvas-to-webgl-migration.md](./docs/plan/tech/31-canvas-to-webgl-migration.md)** · **[TA-08-blocking-measurement.md](./TA-08-blocking-measurement.md)** | **渲染架构决策（全量 WebGL、不再使用 Canvas 2D）** + 阶段三~五迁移方案（装饰层 / 实体层 / 2D 退役）· 遮挡实测与验收矩阵 | **改渲染层代码前必读** |
+| ★ **[./docs/plan/tech/31-canvas-to-webgl-migration.md](./docs/plan/tech/31-canvas-to-webgl-migration.md)** | **渲染架构决策（全量 WebGL、不再使用 Canvas 2D）** + 阶段三~五迁移方案（装饰层 / 实体层 / 2D 退役）· 遮挡验收矩阵（§8.5；原 TA-08 任务已删除视为完成） | **改渲染层代码前必读** |
 | **./docs/plan/README.md** | **计划总索引**：在办设计与未落地方案 + 依赖顺序图 | 了解未来方向时 |
 | **./docs/plan/design/01-roadmap.md** | 长期规划书（M10~M18：空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解宏观方向（多为规划态） |
 | **`docs/plan/tech/`** | 计划 · 技术方案：[01 融合契约](./docs/plan/tech/01-integration-contracts.md) · [02 记忆](./docs/plan/tech/02-memory-system.md) · [03 内部市场](./docs/plan/tech/03-internal-market.md) · [04 农田](./docs/plan/tech/04-farmland-agriculture.md) · [05 狩猎防御](./docs/plan/tech/05-hunting-defense.md) · [06 地图模板](./docs/plan/tech/06-terrain-templates.md) · [07 地形美术](./docs/plan/tech/07-terrain-art.md) · [08 性能优化](./docs/plan/tech/08-performance.md) · ★ [31 Canvas→WebGL 迁移](./docs/plan/tech/31-canvas-to-webgl-migration.md) | 设计未落地方案时 |
@@ -74,7 +74,7 @@ graph TD
 
 > ★★ **渲染架构决策（2026-09-17）：全量 WebGL，不再使用 Canvas 2D**。目标形态为**全部内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲**；迁移完成后退役 `sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支，WebGL 不可用时明确提示不支持而非降级。方案见 [31 号迁移方案 §8 阶段三~五](./docs/plan/tech/31-canvas-to-webgl-migration.md)。**改渲染代码前须知**：
 >
-> - **不要再在 Canvas 2D 侧投入遮挡优化**——原 [TA-08](./TA-08-blocking-measurement.md) 的「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略已取消，遮挡由 GPU 深度缓冲解决，TA-08 收缩为实测 + 验收矩阵；
+> - **不要再在 Canvas 2D 侧投入遮挡优化**——原 TA-08 的「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略已取消，遮挡由 GPU 深度缓冲解决，TA-08 任务已删除视为完成（验收矩阵并入 31 号 §8.5）；
 > - **保持几何与筛选逻辑与渲染后端解耦**：`accent-model.js`（骨架/包围体）、`accent-lod.js`（判档/剔除）、`accent-season.js`（季相曲线）、`landscape-mask.js`（遮罩判定）留在 CPU 侧并被迁移直接复用，**不得**把这些逻辑写进 Canvas 绘制函数体内；
 > - **新建世界实体**在过渡期照旧挂 `drawWorldEntities()` 统一队列，但队列在迁移后仅剩批次提交/透明排序职责。
 >
@@ -361,7 +361,7 @@ Windows 环境下 Git 建议配置 `git config core.autocrlf input`（或 `false
 
 三条硬约束（改渲染/装饰/实体代码时逐条对照）：
 
-1. **不在 Canvas 2D 侧追加遮挡优化**——原 TA-08 的三策略（模型内排序 / 实体拆子项 / 屏幕空间兜底）**已取消**，遮挡由 GPU 深度缓冲逐像素解决；[TA-08](./TA-08-blocking-measurement.md) 现仅承担「旋转切片实测 + 验收矩阵」；
+1. **不在 Canvas 2D 侧追加遮挡优化**——原 TA-08 的三策略（模型内排序 / 实体拆子项 / 屏幕空间兜底）**已取消**，遮挡由 GPU 深度缓冲逐像素解决；TA-08 任务已于 2026-09-17 删除并视为完成（重定向后无功能开发任务），验收矩阵并入 [31 号 §8.5](./docs/plan/tech/31-canvas-to-webgl-migration.md)；
 2. **几何与筛选逻辑必须与渲染后端解耦**——`accent-model.js`（骨架/包围体/分级几何）、`accent-lod.js`（判档/剔除口径唯一入口）、`accent-season.js`（季相曲线）、`landscape-model.js` / `landscape-mask.js`（景观派生与遮罩判定）留在 CPU 侧并被迁移直接复用；**严禁**把这些逻辑内联进 Canvas 绘制函数，否则迁移时需重写；
 3. **不新增 Canvas 2D 专属机制**——新增的可视化元素应尽量表达为「几何 + 参数 + 可见性」，而非依赖 `ctx` 状态机；过渡期仍须挂 `drawWorldEntities()` 统一队列（§5.9），但该队列在迁移后仅剩批次提交与透明排序职责。
 
