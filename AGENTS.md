@@ -48,7 +48,7 @@
 | `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
 | `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
 | `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
-| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：44 JS 文件职责边界（含 M4 `snapshot-bin.js`、S4-02/S4-03 资源景观套件与 TA-12-2 `terrain-texture.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
+| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：54 JS 文件职责边界（含 M4 `snapshot-bin.js`、v1.50.77 `webgl/` 双 Canvas 地形渲染层、S4-02/S4-03 资源景观套件与 TA-12-2 `terrain-texture.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
 
 **维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
 
@@ -56,7 +56,7 @@
 
 ## 1. 项目架构概述
 
-**Rust 确定性计算内核 + WebAssembly 桥接 + Canvas 前端可视化** 三层解耦：
+**Rust 确定性计算内核 + WebAssembly 桥接 + 混合渲染前端（WebGL 地形层 + Canvas 2D 实体覆盖层）** 三层解耦：
 
 ```mermaid
 graph TD
@@ -64,14 +64,18 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
-    E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
+    E -->|状态驱动渲染| F["frontend/js/render_canvas.js (Canvas 2D 实体覆盖层 sim-canvas)"]
+    E -->|地形快照| F2["frontend/js/webgl/ (WebGL 地形层 sim-canvas-gl，v1.50.77 起)"]
     F --> G["浏览器 UI (版本: v1.50.82)"]
+    F2 --> G
 
 ```
 
+> ★ **双 Canvas 架构（v1.50.77 迁移阶段二落地）**：地形由 `frontend/js/webgl/`（context / shader-manager / projection-utils / terrain-renderer / fallback-handler 等）绘制在底层 `sim-canvas-gl`；实体、装饰、道路、标签等仍绘制在上层 Canvas 2D `sim-canvas`。WebGL 不可用时经 `fallback-handler.js` 完整回退 2D 管线。**帧率已解限**（v1.50.80~82），不再锁定 60FPS；涉及性能预算的验收口径见各任务文档标注。
+
 - **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
 - **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化 + ★ M4 FABS 二进制帧快照、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（45 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`accent-lod.js`/`render_accents.js`/`render_bush.js`/`render_grass.js`、S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js` 与 TA-12-2 地表纹样模型层 `terrain-texture.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+- **`frontend/`**：原生静态前端（54 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、★ v1.50.77 WebGL 地形渲染层 `webgl/`（7 文件，双 Canvas 架构 + 2D 回退）、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`accent-lod.js`/`render_accents.js`/`render_bush.js`/`render_grass.js`、S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js` 与 TA-12-2 地表纹样模型层 `terrain-texture.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
 
 ---
 
@@ -113,17 +117,17 @@ node tools/code-map-check.js      # 代码地图与文件树登记一致性校�
 ### 步骤三：启动前端服务器
 
 ```powershell
-node frontend/server.js           # http://localhost:3004
+node frontend/server.js           # http://localhost:3000（master 分支；端口 = 3000 + 分支名末位数字，如 c3→3003；PORT 环境变量优先）
 ```
 
-> ⚠️ 若 3004 端口已被占用，说明服务已在运行，**无需再启动新实例**——直接访问即可。重复启动会触发端口递增逻辑的已知问题导致卡死。
+> ⚠️ 若默认端口已被占用，说明服务已在运行，**无需再启动新实例**——直接访问即可。重复启动会触发端口递增逻辑的已知问题导致卡死。
 
 
 ### 步骤四：浏览器访问
 
 > ⚠️ **存档依赖 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/06-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。玩家与存档链路验证请使用 Chrome/Edge；Agent 自动化在沙箱禁止外启浏览器时，可用内置预览浏览器 + `?nogate=1` 旁路做非存档链路验证（边界见 §4 铁律与 [27 号指南](./docs/current/tech/27-browser-automation.md) §7）。
 
-1. 访问 `http://localhost:3004`；
+1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
 3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.82`**。
 
