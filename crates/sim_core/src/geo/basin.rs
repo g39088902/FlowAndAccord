@@ -112,6 +112,30 @@ impl BasinGeometry {
         1.0 - smoothstep((d - self.exit_half_rad) / blend.max(1e-3))
     }
 
+    /// ★ v1.50.78 角向谷地掩码：出口 + 3 条 90° 等间隔径向谷地（共 4 条，均匀十字布设）。
+    /// 角度全部由 exit_theta 派生——**零新增 RNG 消费**，其他 profile 逐位不变；
+    /// 角向半宽与肩部过渡与出口同款。
+    ///
+    /// 修复动机：外围崇山带（q > 1.05）由高频噪声（权重 0.65）雕琢，噪声山脊会把
+    /// 外围可走区切成孤岛——v1.50.77 探针实测 seed=56 `components=2`（死区 20,689 格，
+    /// 占全图 31.6%），单条出口走廊接不到外围主块。4 条径向谷地（含穿壁段）把外围带
+    /// 切成 90° 窄扇区，每扇区都以两条「盆心直通图缘」的谷地为界，孤岛概率大幅收敛。
+    #[inline]
+    pub fn valley_mask(&self, theta: f32) -> f32 {
+        let exit_local = self.exit_theta - self.rotation_rad;
+        let mut m = 0.0f32;
+        for k in 0..4u32 {
+            let ang = exit_local + k as f32 * std::f32::consts::FRAC_PI_2;
+            let mut d = (theta - ang).abs() % std::f32::consts::TAU;
+            if d > std::f32::consts::PI {
+                d = std::f32::consts::TAU - d;
+            }
+            let blend = self.exit_half_rad * 0.8;
+            m = m.max(1.0 - smoothstep((d - self.exit_half_rad) / blend.max(1e-3)));
+        }
+        m
+    }
+
     /// 盆地下凹 + 环抱高山高程增量（米）与噪声权重。
     /// 返回 (dz, noise_weight)。
     ///
@@ -120,12 +144,14 @@ impl BasinGeometry {
     ///    边缘平缓过渡到 -0.80*depth_m（保证生活与营建面积最大化）；
     /// 2. 环抱高山山壁 (0.82 < q <= 1.05)：自盆底向外雄峻攀升至 +rim_height_m（总高差 55~65m），
     ///    峰值坡度稳定在 38°~45°，自动派生 RockFace 与 NO_WALK 环状硬屏障；
-    ///    出口走廊内（em 趋近 1）攀升幅度受控抑制（保留 saddle 垭口走廊，坡度 < 19° 保持畅通）；
+    ///    ★ v1.50.78 起谷地窗口内（vm 趋近 1，出口 + 3 条 90° 径向谷地）攀升幅度受控抑制
+    ///    （4 条 < 19° 垭口通道，盆心直通图缘，保外围连通）；
     /// 3. 外围崇山峻岭 (q > 1.05)：基底恒定于 +rim_height_m，由高频 fBm 噪声雕琢出连绵山岳，
-    ///    出口走廊方向延续为通畅山谷；
-    /// 4. 噪声权重在生活区/走廊受控阻尼，而在外围山地维持高粗糙度。
+    ///    谷地方向延续为通畅山谷（孤岛死区修复，见 valley_mask 注释）；
+    /// 4. 噪声权重在生活区/谷地受控阻尼，而在外围山地维持高粗糙度。
     pub fn basin_dz(&self, q: f32, theta: f32, _wx: f32, _wy: f32) -> (f32, f32) {
-        let em = self.exit_mask(theta);
+        // ★ v1.50.78：em（单出口）→ vm（出口 + 3 条 90° 径向谷地），damping 全线换用 vm
+        let vm = self.valley_mask(theta);
 
         let dz = if q <= 0.82 {
             let t_floor = smoothstep(q / 0.82);
@@ -134,10 +160,10 @@ impl BasinGeometry {
             let t_wall = (q - 0.82) / 0.23;
             let s = smoothstep(t_wall);
             let z_start = -self.depth_m * 0.80;
-            let z_rim = self.rim_height_m * (1.0 - 0.85 * em);
+            let z_rim = self.rim_height_m * (1.0 - 0.85 * vm);
             z_start + (z_rim - z_start) * s
         } else {
-            self.rim_height_m * (1.0 - 0.85 * em)
+            self.rim_height_m * (1.0 - 0.85 * vm)
         };
 
         // 噪声权重：山壁段保持低噪（0.18）避免单调陡坡出现死区微台阶；
@@ -154,7 +180,7 @@ impl BasinGeometry {
             wall_weight + (upland_weight - wall_weight) * smoothstep(t)
         };
 
-        let weight = base_weight * (1.0 - 0.70 * em);
+        let weight = base_weight * (1.0 - 0.70 * vm);
         (dz, weight)
     }
 }
