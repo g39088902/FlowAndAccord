@@ -32,6 +32,10 @@ let terrainProjY = new Float32Array(3600);
 // Canvas 视口尺寸（每帧在 render() 内更新；全局声明供 render_world/render_agents 等绘制函数共享）
 let w = window.innerWidth, h = window.innerHeight;
 
+// ★ Phase 1-2: WebGL 测试渲染器与地形渲染器
+let webglTestRenderer = null;
+let webglTerrainRenderer = null;
+
 // ==========================================
 // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
 // ==========================================
@@ -174,30 +178,61 @@ if (isCameraFollow && sim.selectionType === 'agent') {
 
   w = window.innerWidth;
   h = window.innerHeight;
-  ctx.clearRect(0, 0, w, h);
 
-  // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
-  //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/17-seasonal-lighting.md §3.7）
-  if (window.SimLighting) window.SimLighting.update(now, sim);
+  const shouldUseWebgl = window.fallbackManager?.shouldUseWebgl() ?? window.USE_WEBGL;
+  let webglTerrainRendered = false;
 
-  // 1. 天空与地平氛围（地表之下的第一个氛围插入点）
-  drawSkyBackdrop();
+  if (shouldUseWebgl && window.webglContext?.isReady()) {
+    if (!webglTerrainRenderer) {
+      if (!window.webglManager) {
+        window.webglManager = new ShaderManager(window.webglContext.GL);
+      }
+      webglTerrainRenderer = new TerrainWebGLRenderer(window.webglContext, window.webglManager);
+      webglTerrainRenderer.init().then(() => {
+        console.log('[WebGL] Phase 2 Terrain Renderer initialized');
+      }).catch(e => {
+        console.error('[WebGL] Terrain renderer initialization failed:', e);
+      });
+    }
 
-  // 2. 地形壳层：全网格顶点投影 + 沙盘基底/侧壁（地形格填充已迁入统一深度队列）
-  drawTerrainShell();
+    if (webglTerrainRenderer && webglTerrainRenderer.isReady() && sim.terrain && sim.terrain.cells) {
+      webglTerrainRenderer.render(camera, w, h, sim);
+      webglTerrainRendered = true;
+      dbgRenderMs = 0;
+      dbgTerrainRenderedCells = 0;
+    }
+  }
 
-  // 3. ★ v1.50.11 世界统一深度队列（修复「图标透过山体可见」）：
-  //    地形格 + 水系 + 游鱼/波光 + 道路分段 + 营地连线 + POI 底座 +
-  //    POI 标记/房屋/乔木/族人，全部按相机深度远 → 近落笔——
-  //    近处山地格、河道、乔木都能正确遮挡更远的图标（含道路悬浮检测与 Tooltip）。
-  //    大气色洗不再整屏绘制（会洗灰交错落笔的实体），已烘焙进 relightTerrain 的地形色。
-  drawWorldEntities();
+  window.webglTerrainActive = webglTerrainRendered;
 
-  // 4. 地形网格线（调试叠加，'G' 键切换，0.04 极低透明度）
-  drawTerrainGrid();
+  if (ctx) {
+    ctx.clearRect(0, 0, w, h);
 
-  // ★ M4: 登基礼花特效
-  drawCoronationEffects(now);
+    // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
+    //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/17-seasonal-lighting.md §3.7）
+    if (window.SimLighting) window.SimLighting.update(now, sim);
+
+    // 1. 天空与地平氛围：未启用 WebGL 地形时由 Canvas 2D 铺满天空；启用 WebGL 时由 WebGL 自带天幕背景
+    if (!webglTerrainRendered) {
+      drawSkyBackdrop();
+    }
+
+    // 2. 地形壳层：计算全网格顶点投影（供路网、水系、实体拾取复用）
+    drawTerrainShell();
+
+    // 3. ★ v1.50.11 世界统一深度队列：
+    //    当 WebGL 接管地形时，depth_queue 跳过地形格，高效绘制上层水系、道路、族人、房屋、POI 等；
+    //    回退模式下则全量由 2D 绘制。
+    drawWorldEntities();
+
+    // 4. 地形网格线（调试叠加，'G' 键切换）
+    if (!webglTerrainRendered) {
+      drawTerrainGrid();
+    }
+
+    // ★ M4: 登基礼花特效
+    drawCoronationEffects(now);
+  }
 
 frameCount++;
 if (now - lastFpsUpdate >= 500) {

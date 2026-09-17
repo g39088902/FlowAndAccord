@@ -150,7 +150,19 @@ FlowAndAccord/
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）；★ S4-06 proposePoiLabels/proposeHouseLabels 提案 + 绘制消费 posOf（未安置即省略；LOD 阈值收进 config.render）
 │   │   ├── render_agents.js                # 族人粒子、行囊搬运与登基礼花特效（★ S4-06 需求气泡迁 overlay 层 drawSelectedNeedBubbleOverlay；施工/流产/夺位角标 pinned + posOf 消费）
 │   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染
-│   │   └── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
+│   │   ├── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
+│   │   └── webgl/                          # ★ WebGL 硬件加速渲染管线
+│   │       ├── fallback-handler.js         # WebGL 不可用/崩溃降级守卫
+│   │       ├── render-canvas-patch.js      # Canvas 渲染主循环双管线分发补丁
+│   │       ├── core/
+│   │       │   ├── context.js              # WebGL2 上下文初始化与生命周期
+│   │       │   └── shader-manager.js       # 着色器编译与程序链接管理
+│   │       ├── layers/
+│   │       │   └── terrain/
+│   │       │       ├── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器
+│   │       │       └── test-grid.js        # 基础测试网格渲染器
+│   │       └── utils/
+│   │           └── projection-utils.js     # 轴测投影矩阵与投影换算工具
 │   ├── rust/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本
@@ -261,6 +273,9 @@ FlowAndAccord/
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       ├── 08-performance.md                # 仅保留未完成的性能优化
     │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
+    │       ├── 31-canvas-to-webgl-migration.md  # WebGL 渲染管线迁移总体路线规划
+    │       ├── 31-webgl-phase1-complete.md      # WebGL 阶段一完成验收报告
+    │       ├── 32-webgl-phase1-verify.md        # WebGL 阶段一验证清单
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
     │           ├── ta05-evidence-2026-09-14/      # TA-05 精简证据包（2026-09-14 收口归档）
     │           │   ├── manifest.json                # 证据清单

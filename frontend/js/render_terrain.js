@@ -169,14 +169,16 @@ if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.len
   const bSE_Y = terrainProjY[idxSE] + (sim.terrain.cells[idxSE].elev - skirtElev) * elevDropFactor + dropOffset;
   const bSW_Y = terrainProjY[idxSW] + (sim.terrain.cells[idxSW].elev - skirtElev) * elevDropFactor + dropOffset;
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[idxNW], bNW_Y);
-  ctx.lineTo(terrainProjX[idxNE], bNE_Y);
-  ctx.lineTo(terrainProjX[idxSE], bSE_Y);
-  ctx.lineTo(terrainProjX[idxSW], bSW_Y);
-  ctx.closePath();
-  ctx.fill();
+  if (!window.webglTerrainActive) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+    ctx.beginPath();
+    ctx.moveTo(terrainProjX[idxNW], bNW_Y);
+    ctx.lineTo(terrainProjX[idxNE], bNE_Y);
+    ctx.lineTo(terrainProjX[idxSE], bSE_Y);
+    ctx.lineTo(terrainProjX[idxSW], bSW_Y);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // ★ v1.50.14 四周边沿垂直剖面侧壁已并入 render_world.js 统一深度队列
   //    （按边界格分段 drawBoundaryWallSeg，见该文件 DEPTH_WALL 收集段）。

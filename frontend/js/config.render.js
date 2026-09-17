@@ -11,6 +11,18 @@
  * ============================================================================
  */
 window.RENDER_CONFIG = {
+  // —— WebGL 渲染（★ Phase 1-2: Canvas 2D → WebGL 迁移）——
+  useWebgl: (() => {
+    // 默认开启，可通过 URL 参数覆盖
+    const params = new URLSearchParams(window.location.search);
+    return params.get('webgl') !== '0';
+  })(),
+  
+  webglDebug: {
+    enableBatchStats: true,  // 打印 batching 统计
+    enableFrametime: true,   // GPU frametime 测量
+  },
+
   // —— 立体精灵视觉抬升（世界单位）——
   // POI 图标 / 房屋 / 族人 / 装饰的绘制锚点统一上抬量，坡面上不再「陷进」地面。
   // 贴地元素（道路/底座/水面/足迹线/目标环）不消费此值，否则坡面悬空。

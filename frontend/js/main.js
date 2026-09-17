@@ -1,6 +1,26 @@
 // === 全局初始化、相机控制与 UI 事件绑定 ===
     const canvas = document.getElementById('sim-canvas');
+    const glCanvas = document.getElementById('sim-canvas-gl');
     const ctx = canvas.getContext('2d');
+    window.ctx = ctx;
+    
+    // ★ Phase 1-2: WebGL 迁移 - 检查配置并在独立底图画布上初始化上下文
+    window.USE_WEBGL = window.RENDER_CONFIG?.useWebgl !== false;
+    if (window.USE_WEBGL && glCanvas) {
+      window.webglContext = new WebGLContext(glCanvas);
+      
+      if (!window.webglContext.isReady()) {
+        console.warn('[WebGL] Hardware acceleration not available, falling back to Canvas 2D');
+        window.USE_WEBGL = false;
+        glCanvas.style.display = 'none';
+      } else {
+        console.log('[WebGL] Initialized:', window.webglContext.version, 'on', window.webglContext.vendor);
+        window.fallbackManager = new RenderFallbackManager();
+      }
+    } else if (glCanvas) {
+      glCanvas.style.display = 'none';
+    }
+    
     const sim = new RustWorld();
     // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
     sim.isPaused = true;
@@ -18,8 +38,14 @@
 
     function resizeCanvas() {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
+      const cw = Math.floor(window.innerWidth * dpr);
+      const ch = Math.floor(window.innerHeight * dpr);
+      canvas.width = cw;
+      canvas.height = ch;
+      if (glCanvas) {
+        glCanvas.width = cw;
+        glCanvas.height = ch;
+      }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);

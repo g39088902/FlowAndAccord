@@ -217,7 +217,7 @@ function drawWorldEntities() {
   //    与立体实体同队列排序后，近处山地格后落笔即遮挡山后图标。
   let renderedTerrainCells = 0;
   dbgTerrainRenderedCells = 0;
-  if (hasTerrain) {
+  if (hasTerrain && !window.webglTerrainActive) {
     // ★ TA-12-3 世界纹样模型每帧一次分批准备（幂等；buildBudgetMs 预算内推进桶构建，
     //   未就绪帧 TerrainTexture.drawCell 自动跳过、只画原基底）。参数取 RENDER_CONFIG
     //   （纯渲染配置，不经 applyConfig 注入 WASM）；世界级失效已由 _invalidateWorldStaticCaches 钩住。
@@ -282,7 +282,7 @@ function drawWorldEntities() {
     //    （用户可见症状：「贴边 POI/房屋未被地形墙遮挡」）。分段深度取该段上沿
     //    两端顶点深度的较大值（较近端），墙面垂直下垂不改变 ry、只减 z ⇒ 段内
     //    越往下深度越小，用上沿较近端代表整段是「遮挡从严」的安全近似。
-    if (hasTerrain) {
+    if (hasTerrain && !window.webglTerrainActive) {
       const gSize = terrain.gridSize;
       const walls = BOUNDARY_WALLS;
       const cellsW = terrain.cells;

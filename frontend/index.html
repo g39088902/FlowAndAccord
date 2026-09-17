@@ -20,13 +20,14 @@
     </div>
   </div>
   <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
-  <div id="canvas-container">
-    <canvas id="sim-canvas"></canvas>
+  <div id="canvas-container" style="position:relative; width:100%; height:100%; overflow:hidden;">
+    <canvas id="sim-canvas-gl" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;"></canvas>
+    <canvas id="sim-canvas" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
   </div>
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.76</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.77</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1414,6 +1415,13 @@
   <!-- M4 二进制快照解码器 · 必须早于 rustworld.js（README: FABS 帧） -->
   <script src="js/snapshot-bin.js"></script>
   <script src="js/rustworld.js"></script>
+  <!-- ★ WebGL Phase 1-2: Canvas 2D → WebGL 迁移 (必须在 main.js 之前加载以初始化 WebGLContext) -->
+  <script src="js/webgl/core/context.js"></script>
+  <script src="js/webgl/core/shader-manager.js"></script>
+  <script src="js/webgl/utils/projection-utils.js"></script>
+  <script src="js/webgl/fallback-handler.js"></script>
+  <script src="js/webgl/layers/terrain/test-grid.js"></script>
+  <script src="js/webgl/layers/terrain/terrain-renderer.js"></script>
   <script src="js/dag-layout.js"></script>
   <script src="js/dag-view.js"></script>
   <script src="js/dag-standalone.js"></script>
