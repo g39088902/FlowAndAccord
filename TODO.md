@@ -15,6 +15,7 @@
 - **阶段七（S7-01～10）**：独立地图模板（平地草原、半坡林地、河谷聚落），v1.50.39～52 交付收口。原 `STAGE-07-TODO.md` 已随收官归档清理，详见 [06 号 §4.1～§4.3](docs/plan/tech/06-terrain-templates.md#41-平地草原grassland_plain_v1设计登记2026-09-11排期2026-09-13阶段七插队位)。
 - **TB-02 台地内核（TB-02-01～10）**：台地模板（原 `plateau_settlement_v1`，v1.50.68 更名 `plateau_v1`，显示名"台地聚落"→"台地"），v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **TA-12-2 地表纹样表现层**：`terrain-texture.js` 坡度分带与 fBm 纹理采样，v1.50.54 交付收口。详见 [01-changelog.md](docs/current/01-changelog.md)。
+- **WebGL 渲染迁移阶段一/二**：双 Canvas 架构上线（v1.50.77）——地形（含沙盘侧壁）由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限。方案与阶段三~五（装饰/实体层，未实施）见 [31 号迁移方案](docs/plan/tech/31-canvas-to-webgl-migration.md)，实现现状见 `frontend/AGENTS.md`。
 
 ---
 
@@ -39,7 +40,7 @@
 
 - [ ] **TA-05 P0 植被打样技术方案**
     - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测）。
-    - 聚焦树木与植被群落在 Canvas 视口下的高质量层次打样。
+    - 聚焦树木与植被群落在 Canvas 2D 实体覆盖层视口下的高质量层次打样（地形底座已迁 WebGL 层，见 §0 归档索引）。
 
 - [ ] **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**
     - 详见 [TA-06 实施方案](TA-06-TODO.md) 与 [07 号文 §6.3/§11.4](docs/plan/tech/07-terrain-art.md)；TA-06 现状 ◐ v1.50.64（实现与静态/数值验证已落地：物种派生 + 三乔木轮廓 + 三灌木变体 + 花朵图元 + 冠幅单一来源联动；**待补**：Chrome 视觉·受光·四季矩阵验收与证据包、性能 A/B、景观共用通道抽查、LOAD 链路——建议与 TA-05 LOAD 补测合并为同一次 Chrome 存档会话）。

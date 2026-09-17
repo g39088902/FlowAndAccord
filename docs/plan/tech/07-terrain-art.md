@@ -1,6 +1,6 @@
 # 07. 地形美术与世界景观提升规划
 
-> **状态**：短期 S1（地表光照沙盘基底）、S2/P0（渲染层级反转 + 自然道路色阶）、S2.1/P1（水系三层水光）、S2.2/P2（统一相机深度绘制）均已落地，并在 v1.50.11 / v1.50.14 / v1.50.20 演进为「地形格 / 水系 / 道路 / 沙盘侧壁 / 地表装饰全部并入 `drawWorldEntities()` 统一深度队列」；内核 T0 地表查询、T1 山口聚落、T2 两岸河谷已提供真实高程、地表类别与水系事实（`terrain_generator_version = 4`）；D-A 装饰基础（Tree/Bush/Boulder 生成 + FABS Section 21 + 绘制，v1.49.1）与连续植被季相（v1.50.24）已落地；v1.50.23 TA-01 将装饰代码拆为 `accent-season.js` / `accent-model.js` / `render_accents.js` 三件套。v1.50.24 TA-02 已提供连续季相与 Tree/Bush 叶色接入；★ v1.50.25 TA-03 已落地局部三维枝干骨架 + 椭球叶簇 + 稳定脱落次序（枝干全年保留、冬季落叶树余 0~5% 叶量、禁整冠透明度；v1.50.26 修复补位簇悬空——叶簇一律挂真实枝条）；RockCluster/GrassTuft 已完成内核生成与前端绘制（D-B1-5/6）；★ 世界光向动态受光（TA-04）已落地（v1.50.32~v1.50.46，收口验收见 §11.1/§11.3）；未实施：植被轮廓变体（TA-06）、D-B 子特征注入阶段二、资源点景观群与房屋院地、标注避让、季节地表调色、分块缓存与 LOD。
+> **状态**：短期 S1（地表光照沙盘基底）、S2/P0（渲染层级反转 + 自然道路色阶）、S2.1/P1（水系三层水光）、S2.2/P2（统一相机深度绘制）均已落地，并在 v1.50.11 / v1.50.14 / v1.50.20 演进为「地形格 / 水系 / 道路 / 沙盘侧壁 / 地表装饰全部并入 `drawWorldEntities()` 统一深度队列」；内核 T0 地表查询、T1 山口聚落、T2 两岸河谷已提供真实高程、地表类别与水系事实（`terrain_generator_version = 4`）；D-A 装饰基础（Tree/Bush/Boulder 生成 + FABS Section 21 + 绘制，v1.49.1）与连续植被季相（v1.50.24）已落地；v1.50.23 TA-01 将装饰代码拆为 `accent-season.js` / `accent-model.js` / `render_accents.js` 三件套。v1.50.24 TA-02 已提供连续季相与 Tree/Bush 叶色接入；★ v1.50.25 TA-03 已落地局部三维枝干骨架 + 椭球叶簇 + 稳定脱落次序（枝干全年保留、冬季落叶树余 0~5% 叶量、禁整冠透明度；v1.50.26 修复补位簇悬空——叶簇一律挂真实枝条）；RockCluster/GrassTuft 已完成内核生成与前端绘制（D-B1-5/6）；★ 世界光向动态受光（TA-04）已落地（v1.50.32~v1.50.46，收口验收见 §11.1/§11.3）；未实施：植被轮廓变体（TA-06）、D-B 子特征注入阶段二、资源点景观群与房屋院地、标注避让、季节地表调色、分块缓存与 LOD。★ v1.50.77~v1.50.82 渲染底座已切换为**双 Canvas 架构**（[31 号迁移方案](./31-canvas-to-webgl-migration.md)）：地形与沙盘侧壁由 `frontend/js/webgl/`（WebGL 地形渲染器）绘制在底层 `sim-canvas-gl`，装饰/实体/道路/标签仍在 Canvas 2D 覆盖层 `sim-canvas` 经统一深度队列绘制，WebGL 不可用时经 `fallback-handler.js` 完整回退 2D 管线；**帧率已解限**（v1.50.80~82，不再锁定 60FPS，§11.3 口径随之标注）。
 > **v1.48.0 方案决策**：取消独立 T3（湖泊/湿地/峡谷/瀑布 profile），改为「T1/T2 子特征注入 + 地表装饰系统」——Accent 装饰层（Tree/Boulder/Bush/RockCluster/GrassTuft）以独立加盐 RNG 生成；子特征注入器按 seed 概率注入山脚湖/瀑布/峭壁等特色地貌；湿地因视觉辨识度低明确删除。
 > **整理记录**：2026-09-12 结构重整——原先同层内容散落在旧 §3/§4/§5/§9/§10（季相写了四遍、缓存规则写了四遍、验收写了五遍、优先级写了三遍），现按「计划 → 目标边界 → 现状 → 规则 → 任务设计 → 工程约束 → 验收」归并；全部待办统一编号为 TA/TB/TC 任务并前置到 §1，旧 S/M/D-B/P 编号作为别名保留以便检索；同时按当前源码刷新管线、函数名与数字事实。
 > **评估依据**：用户实机运行反馈截图（诊断基线）＋ 当前 `frontend/js` 渲染实现逐函数核对 ＋ [地形专项方案](./06-terrain-templates.md) 落地状态。
@@ -110,7 +110,7 @@ stateDiagram-v2
 | :--- | :--- | :--- | :--- | :--- |
 | TC-01 | 动态水文 T4：枯丰水期、洪水、桥梁工程；动态通行恢复与存档契约先行 | L1、T4 | 高 | — |
 | TC-02 | 景观记录时间：道路拓宽/荒废、聚落扩展、林地采伐恢复、废宅遗址；入档或可验证重建 | L2 | 高 | — |
-| TC-03 | GPU 渲染层迁移（条件触发，不预设）：缓存与 LOD 后仍超 §11.3 预算，或真实遮挡无法在 Canvas 达成时启动原型对比 | L3、P3 | 高 | TA-08 实测结论 |
+| TC-03 | GPU 渲染层迁移（★ 阶段一/二已落地：v1.50.77 地形层由 WebGL 承载，双 Canvas 架构，见 [31 号迁移方案](./31-canvas-to-webgl-migration.md)）；剩余范围收窄为**装饰/实体层 GPU 迁移评估**（条件触发，不预设）：缓存与 LOD 后仍超 §11.3 预算，或真实遮挡无法在 Canvas 2D 覆盖层达成时启动 | L3、P3 | 高 | TA-08 实测结论 |
 
 ### 1.3 推荐实施波次
 
@@ -118,7 +118,7 @@ stateDiagram-v2
 2. **波次二**：TA-06 → TA-07 → TA-08 做普及与性能/遮挡底座；TB-01 可与之并行；随后 TA-09（支脊山口/岩壁河谷实机样板，另需 06 号阶段三 RiverCliff；构图草案可提前）、TA-10（待 TB-02）。
 3. **波次三**：TA-11~TA-18 环境补全，与 TB-02/TB-03/TB-04 并行推进；纹理、季相地表（TA-12/13）与标注避让（TA-16）无内核依赖，可随时插入。
 4. **波次四**：TB-05/TB-06、TC-01/TC-02 另立项排期。
-5. **条件触发**：TC-03 仅由 §11.3 性能数据或不可接受的遮挡缺陷触发，不作为任何前期任务的前置依赖。
+5. **条件触发**：TC-03 仅由 §11.3 性能数据或不可接受的遮挡缺陷触发，不作为任何前期任务的前置依赖（地形层已完成 WebGL 迁移，TC-03 剩余评估对象为装饰/实体层）。
 
 S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线为前提；但视觉只能表现内核已经提供的事实，不先画横穿道路的装饰河、不提前画不存在的生产/阻路/防御效果。
 
@@ -173,7 +173,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 
 **三层水系（S2.1/P1）**：`ShallowWater rgb(62,152,176)`、`DeepWater rgb(36,104,138)`、`RiverBank rgb(168,152,126)`，保留法线光照与 AO；`render_terrain.js` 对 `River` 特征分三层落笔——深底水层 `rgba(32,86,122,0.45)`、主流水层 `rgba(56,158,202,0.82)`、波光反射层 `rgba(235,248,255,0.65)` 断续高光；`ShallowFord` 为 `rgba(215,196,142,0.90)` 卵石踏道 + `rgba(255,255,255,0.65)` 浪花斑，`SpringValley` 为柔和土褐细带。水面高程、岸线、浅滩位置全部来自内核 `TerrainFeature`；`Ridge`/`Saddle`/`Terrace` 三类轮廓已随特征删除（v1.47.7），前端不再绘制。
 
-**统一深度队列（S2.2/P2，v1.47.8 建立、v1.50.11/14/20 扩展）**：`render_canvas.js::render()` 现行顺序为 `SimLighting.update()` → `drawSkyBackdrop()` → `drawTerrainShell()`（全网格顶点投影 + 沙盘基底/侧壁壳）→ **`drawWorldEntities()`（世界统一深度队列）** → `drawTerrainGrid()`（`G` 键调试网格）→ 登基礼花。队列内一切图元按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制，同深度保持收集原序（`Array.sort` 稳定）以维持渲染确定性，深度项走持久对象池 `_depthPool` 零每帧 GC；排序只作用于绘制，`sim.pois` / `sim.houses` / `sim.agents` 顺序与点击拾取、Inspector 遍历不变。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制**（已有三次历史教训，见 `frontend/AGENTS.md` §5.9）。
+**统一深度队列（S2.2/P2，v1.47.8 建立、v1.50.11/14/20 扩展；★ v1.50.77 起为双 Canvas 架构口径：WebGL 可用时地形/侧壁由 `webgl/terrain-renderer.js` 绘制在底层 `sim-canvas-gl`，下述 `render_canvas.js` 顺序为 2D 回退管线与覆盖层实体的现行顺序）**：`render_canvas.js::render()` 现行顺序为 `SimLighting.update()` → `drawSkyBackdrop()` → `drawTerrainShell()`（全网格顶点投影 + 沙盘基底/侧壁壳）→ **`drawWorldEntities()`（世界统一深度队列）** → `drawTerrainGrid()`（`G` 键调试网格）→ 登基礼花。队列内一切图元按 `depth = ry·sinX + z·cosX`（数值越大越靠近视点）**升序**绘制，同深度保持收集原序（`Array.sort` 稳定）以维持渲染确定性，深度项走持久对象池 `_depthPool` 零每帧 GC；排序只作用于绘制，`sim.pois` / `sim.houses` / `sim.agents` 顺序与点击拾取、Inspector 遍历不变。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制**（已有三次历史教训，见 `frontend/AGENTS.md` §5.9）。
 
 **D-A 装饰基础（v1.49.1）**：`geo/accents.rs` 定义 `AccentKind`（Tree/Bush/Boulder/RockCluster/GrassTuft 五变体）与 `TerrainAccent`（id/kind/pos/scale/rotation/tint）；`generate_accents()` 使用独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40 / 巨石 20 / 灌木 25 × `terrainAccentDensity`，按地表类别/坡度/肥力过滤水体与禁区、有界重试 3×；经 FABS Section 21（约 24B/个）随 `terrain_state` 入档；前端 `render_accents.js::drawAccentEntity` 分种类绘制（★ v1.50.23 自 `render_terrain.js` 迁出）。RockCluster/GrassTuft 已随 TA-11 全链路落地（v1.50.34~v1.50.38）：内核生成 60 草丛（含哈希派生水岸芦草变体）+ 12 碎石群并入 FABS Section 21，前端 `render_accents.js` 完整绘制（芦草白穗、碎石群微接触阴影与岩面分层、四季季相），渲染热路径零 GC。
 
@@ -183,7 +183,7 @@ S3/M2/M3 均可独立推进，不以农业、内部市场或记忆系统上线�
 - [地形感知路网](../../../crates/sim_core/src/spatial/terrain_network.rs)：走廊合法性、浅滩跨河授权与 `LaneTerrainProfile` 通行代价。
 - [颜色计算](../../../frontend/js/math.js)（`computeElevationColor`，唯一着色入口）/ [颜色兜底与投影](../../../frontend/js/main.js)（`getElevationColor` 只做委托 + 纯色兜底）/ [季节光照](../../../frontend/js/lighting.js)（`SimLighting`，光源真相）。
 - [地形接收与颜色缓存](../../../frontend/js/rustworld.js)（`_applySnapshot` 重建 `cells[].color`；★ v1.50.33 D-B1-7 起 `_terrainCached` 仅管地形网格，静态特征/装饰/子特征三通道独立裁决，`_invalidateWorldStaticCaches()` 随世界生命周期失效）。
-- [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存 + ★ TA-07-3 真值包围体 `bounds` 与分级几何 `farClusters`/`segTier`）/ ★ TA-07 [装饰细节分级 LOD 集中解析层](../../../frontend/js/accent-lod.js)（`window.AccentLOD`：特征尺度 / 三档滞回判档 / 解析式屏幕 AABB / `kindBounds` 一级保守常数；装饰·灌木·草丛·阴影·景观·队列六处消费点的唯一口径入口）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
+- [地形/水系绘制](../../../frontend/js/render_terrain.js)（`drawTerrainShell` / `drawTerrainCell` / `drawFeatureItem` / `drawRiverBand`，约 365 行；★ v1.50.77 起 WebGL 模式下地形/侧壁由 [WebGL 地形渲染器](../../../frontend/js/webgl/layers/terrain/terrain-renderer.js) 在底层 `sim-canvas-gl` 承担，本文件主要服务 2D 回退管线）/ [装饰季相层](../../../frontend/js/accent-season.js)（`window.SimTreeTint`）/ [装饰模型层](../../../frontend/js/accent-model.js)（`window.AccentModel` 个体形态缓存 + ★ TA-07-3 真值包围体 `bounds` 与分级几何 `farClusters`/`segTier`）/ ★ TA-07 [装饰细节分级 LOD 集中解析层](../../../frontend/js/accent-lod.js)（`window.AccentLOD`：特征尺度 / 三档滞回判档 / 解析式屏幕 AABB / `kindBounds` 一级保守常数；装饰·灌木·草丛·阴影·景观·队列六处消费点的唯一口径入口）/ [装饰绘制层](../../../frontend/js/render_accents.js)（`drawAccentEntity`）/ [世界实体深度队列与道路/POI/房屋](../../../frontend/js/render_world.js)（`drawWorldEntities` / `drawLaneSegment` / `drawPoiMarker` / `drawHouse`，约 904 行，**已超 800 行上限，新增绘制前先拆分**）/ [族人绘制](../../../frontend/js/render_agents.js)（`drawAgent`）/ [帧循环](../../../frontend/js/render_canvas.js)。
 - [渲染表现层参数](../../../frontend/js/config.render.js)（`window.RENDER_CONFIG`，不注入 WASM、不并入 SIM_CONFIG）。
 - [存读档](../../../crates/sim_core/src/spatial/world_save.rs)：`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本 5 与 `terrain_profile` 作为门禁拒绝旧档，不再依赖“按种子重建 + 静默拼接”。
 
@@ -299,15 +299,15 @@ S1 已落地部分见 §3.2；本节只保留 S1 未完成项与信息减噪任�
 
 基础目标数为树 40、石 20、灌木 25，再乘密度；实际数量取决于地表过滤与重试，不应直接当作性能实测样本数。目标风格延续写意微缩沙盘：树形有空隙，亮部柔和，冬景清瘦；叶片细节只在近景可见。优先提升季节辨识度与体积感，再增加数量。
 
-### 6.2 渲染路线：Canvas 承载局部三维植被
+### 6.2 渲染路线：Canvas 2D 覆盖层承载局部三维植被（地形层已 WebGL）
 
-建议首期使用**局部三维枝干骨架 + 椭球叶簇 + Canvas 投影绘制**。它有三维形态与世界空间受光，仍使用现有画布、相机、实体队列和拾取逻辑；不是完整 GPU 三维场景。
+建议首期使用**局部三维枝干骨架 + 椭球叶簇 + Canvas 投影绘制**。它有三维形态与世界空间受光，仍使用现有覆盖层画布、相机、实体队列和拾取逻辑；不是完整 GPU 三维场景。★ v1.50.77 起地形（含沙盘侧壁）已由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，装饰/实体继续留在 Canvas 2D 覆盖层 `sim-canvas`，两块画布经 `fallback-handler.js` 同帧合成（WebGL 不可用整体回退 2D 管线）。
 
 | 路线 | 能解决的问题 | 代价与适用范围 |
 |---|---|---|
 | 继续纯二维精灵，补季相和动态渐变 | 最快修复落叶、颜色和亮部方向 | 旋转视角仍像纸片，适合作为低画质表现 |
-| **局部三维骨架与叶簇（推荐）** | 冬季枝形、旋转体积、分簇受光 | 需缓存几何与局部排序，沿用 Canvas 的遮挡近似 |
-| 完整 GPU 三维场景 | 深度缓冲、复杂遮挡、大规模实例植被 | 需协同迁移地形、房屋、人物和拾取；单独叠加树的 WebGL 画布不能自动解决与 Canvas 地形的遮挡（TC-03） |
+| **局部三维骨架与叶簇（推荐）** | 冬季枝形、旋转体积、分簇受光 | 需缓存几何与局部排序，沿用 Canvas 2D 覆盖层的遮挡近似 |
+| 完整 GPU 三维场景 | 深度缓冲、复杂遮挡、大规模实例植被 | 地形层已迁 WebGL（v1.50.77）；装饰/实体若迁 GPU 应并入同一 WebGL 管线解决跨层遮挡，禁止在 2D 覆盖层上再叠加第三块画布（TC-03 剩余范围） |
 
 先制作一株落叶树、一株落叶灌木和一块岩石的样板，验证四季、旋转与帧耗时。缓存与细节分级后仍不满足 §11.3，或真实穿插遮挡成为验收阻碍，再启动 §9.3 的完整场景原型；届时复用局部几何、材质和季相定义，不绑定具体三维库。
 
@@ -404,7 +404,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 - 入队前两级剔除（§3.5）：一级 `kindBounds` 零模型访问 ⇒ 屏外个体不付 `AccentModel.get()`、不构建屏外骨架；二级模型真值 AABB；屏外个体还不付 `_decalDepth`（3~6 次 `_ownCellCenterDepth`）、不进排序与分发。深度项复用 `s1x~s2y` 存 AABB、新增 `ex/ey` 存锚点屏幕坐标 ⇒ **入队端与绘制端消费同一个 AABB**（旧装饰/景观「入队 + 绘制各写一遍 44/14 余量」与阴影 `crownR×1.8+|so|` 经验包络已全部删除）。
 - 两处硬编码收编进 `RENDER_CONFIG` 的 `accentLOD` 键组：芦花穗 2px → `accentLODPlumeMinPx`、贴地片 1px → `accentLODGroundPatchMinPx`；`accentLODCullEnabled` / `accentLODHysteresisEnabled` / `accentLODStoneFarSides` 为纯渲染开关，关态完整回退现状路径。几何输入（`accentLODFarMaxClusters` / `accentKindBounds`）调值须同步 bump `accentModelStyleVersion`（5→6）。
 
-**遮挡边界必须实测**：现有根部足迹排序不能保证高树与坡地/房屋的真实穿插。先测一树一屋一人的旋转切片；局部模型内按深度排枝簇，跨实体必要时拆有限子项，但不承诺 Canvas 画家算法达到逐像素深度正确。落叶和阴影仍按地表足迹处理，不能因为骨架三维化而重新引入半截入土。局部拆分与排序仍无法满足 §11.4 验收时，再评估完整 GPU 场景切片（TC-03），不单独叠加一层树木 WebGL 画布。
+**遮挡边界必须实测**：现有根部足迹排序不能保证高树与坡地/房屋的真实穿插。先测一树一屋一人的旋转切片；局部模型内按深度排枝簇，跨实体必要时拆有限子项，但不承诺 Canvas 画家算法达到逐像素深度正确。落叶和阴影仍按地表足迹处理，不能因为骨架三维化而重新引入半截入土。局部拆分与排序仍无法满足 §11.4 验收时，再评估装饰/实体层并入 WebGL 管线（TC-03 剩余范围），禁止在 2D 覆盖层上再叠加第三块画布。
 
 ## 7. 地貌与水系扩展（内核侧，中期）
 
@@ -477,9 +477,9 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 
 ### 9.3 TC-03 · 按测量结果升级渲染（L3、P3）
 
-继续以 Rust/WASM 作为唯一模拟内核，评估独立的 GPU 渲染层，逐步替换绘制实现。启动条件是：缓存与缩放分级后仍持续超出 §11.3 性能预算，或真实遮挡、水面和大规模植被效果无法在现有方案中合理实现（含 TA-08 的实测结论）。
+★ **阶段一/二已落地（v1.50.77~v1.50.82）**：地形与沙盘侧壁已由 `frontend/js/webgl/`（context / shader-manager / projection-utils / terrain-renderer / fallback-handler）绘制在底层 `sim-canvas-gl`，WebGL 不可用时经 `fallback-handler.js` 完整回退 2D 管线；帧率已解限，不再锁定 60FPS。**TC-03 剩余范围收窄为装饰/实体层（accents/房屋/族人/标签）的 GPU 迁移评估**，仍按条件触发：缓存与缩放分级后仍持续超出 §11.3 性能预算，或真实遮挡、水面和大规模植被效果无法在 Canvas 2D 覆盖层中合理实现（含 TA-08 的实测结论）。
 
-先做“一个地形块 + 一片树群 + 一座房屋 + 一名可选中人物”的原型，对比现有 Canvas 的帧耗时、内存、资源加载、镜头与命中行为，再决定技术栈。WebGL/WebGPU 的选择留给届时的平台兼容性与原型数据，不在规划阶段绑定引擎，也不单独叠加一层树木 WebGL 画布。
+评估时先做「一片装饰群 + 一座房屋 + 一名可选中人物」并入现有 WebGL 地形管线的切片原型，对比 Canvas 2D 覆盖层的帧耗时、内存、资源加载、镜头与命中行为，再决定技术栈。复用局部几何、材质和季相定义，不绑定具体三维库，禁止在 2D 覆盖层上再叠加第三块画布。
 
 **长期退出标准**：景观变化能够解释资源、迁徙或聚落历史；同一存档回放得到一致的世界事实；升级后的渲染层保留低画质降级和原有观察交互。
 
@@ -545,7 +545,7 @@ TA-01 已落地（v1.50.23）：装饰代码自 `render_terrain.js`（约 724 �
 
 | 指标 | 首轮目标 | 超标处理 |
 |---|---|---|
-| 主线程渲染与 UI 耗时 | 参考桌面设备 p95 ≤ 16 ms，争取接近 60 FPS | 先减标签、纹理层和装饰数量，低画质以稳定 30 FPS 为目标 |
+| 主线程渲染与 UI 耗时 | 参考桌面设备 p95 ≤ 16 ms（★ v1.50.80~82 帧率已解限，不再锁定 60FPS，本行保留为历史参考口径；新任务验收以各自文档标注为准） | 先减标签、纹理层和装饰数量，低画质以稳定 30 FPS 为目标 |
 | 新增地表/装饰绘制耗时 | 同条件 p95 增量 ≤ 3 ms | 调整分块、缓存、可见性剔除和缩放分级 |
 | 纯美术改动的仿真吞吐 | 同设备同负载下降不超过约 5%，重复确认测量噪声 | 核查主线程争用与快照处理，不能减少模拟 Tick 掩盖回退 |
 | 新增视觉缓存内存 | 初始上限建议 64 MiB | 缩小图块、限制 DPR/缓存档数、淘汰不可见块 |

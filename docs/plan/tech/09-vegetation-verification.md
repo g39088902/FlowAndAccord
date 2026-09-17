@@ -22,7 +22,7 @@
 | 个体绘制 | [render_accents.js](../../../frontend/js/render_accents.js)：`drawAccentEntity()` 等 | `accentClusterVisibility()` 控制逐簇收缩隐藏 |
 | 光照 | [lighting.js](../../../frontend/js/lighting.js) + [config.lighting.js](../../../frontend/js/config.lighting.js) | 修复链路固定「季相反照率 → 世界法线受光 → 光源色温」；禁恢复固定屏幕左上亮斑或烘焙季节/光向进缓存 |
 | 阴影/队列 | [render_shadows.js](../../../frontend/js/render_shadows.js)、render_depth_queue.js | 阴影独立入队，与实体一起验证，不能只截树冠 |
-| 帧循环 | [render_canvas.js](../../../frontend/js/render_canvas.js)：`render(now)` | **有帧率门控**（提前返回的回调不是绘制帧），取证须强制重绘（见 27 号 §7.4） |
+| 帧循环 | [render_canvas.js](../../../frontend/js/render_canvas.js)：`render(now)` | 帧率门控随 v1.50.82 解限默认关闭（`FRAME_INTERVAL=0` 时每个 rAF 均绘制；无头模式仍提前返回）——取证前先确认 `FRAME_INTERVAL` 取值，历史取证方法见 27 号 §7.4 |
 
 **公共模型约束**：模型缓存同时被资源景观经 `getByKey()` 复用——改公共 Tree/Bush/Boulder 模型时必须抽查资源景观，避免只顾三个 accent 样板。已有近/中/远细节阈值与模型缓存，TA-07 补的是滞回与完整投影包围体，不是从零加 LOD。
 

@@ -38,10 +38,13 @@
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；对应 design/07 的任务、接触结算、物资与存档契约 |
 | 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.3 维护 16 张模板的批次与能力前置，R.6 区分任务依赖、验收与 random 准入 |
-| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施） |
+| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 落叶、灌木季相、动态受光与局部三维升级方案（待实施）；TC-03 地形层已迁 WebGL（31 号），剩余范围为装饰/实体层 |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
 | 09 | [植被样板验证（TA-05）](tech/09-vegetation-verification.md) | ◐ 已实施：样板验证方法论与遗留事项（LOAD 补测、Chrome 性能复测、TA-04-8 预算取舍）；验收权威在 07 号 §11.4 |
 | 10 | [盆地群峰环抱（TB-04）](tech/10-basin-mountain-encirclement.md) | 规划设计（TB-04）；闭合环脊双坡解耦、向心山嘴支脊、切穿峡谷出水口与自然山间盆地地貌重构 |
+| 31 | [Canvas→WebGL 渲染迁移方案](tech/31-canvas-to-webgl-migration.md) | ★ 阶段一/二已落地（v1.50.77 双 Canvas 架构：地形 WebGL 层 + 实体 Canvas 2D 覆盖层；v1.50.80~82 帧率解限）；阶段三~五（装饰/实体层）未实施 |
+| 31 | [WebGL 阶段一完成报告](tech/31-webgl-phase1-complete.md) | 历史记录（阶段二已于 v1.50.77 落地；与上一行同号沿用现有文件名） |
+| 32 | [WebGL 阶段一验证指南](tech/32-webgl-phase1-verify.md) | 历史记录（阶段一 PoC 验证方法，临时状态已失效） |
 
 ---
 

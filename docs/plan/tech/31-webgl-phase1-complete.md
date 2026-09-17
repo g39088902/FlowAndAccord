@@ -1,6 +1,7 @@
 # WebGL 迁移阶段一完成报告
 
-**日期**: 2026-09-17 | **状态**: ✅ Phase 1 基础框架搭建完成
+**日期**: 2026-09-17 | **状态**: ✅ Phase 1 基础框架搭建完成  
+> ★ **后续进展**：Phase 2（地形层迁移）已于 v1.50.77 落地，现为双 Canvas 架构（地形 WebGL 层 `sim-canvas-gl` + 实体 Canvas 2D 覆盖层），v1.50.80~82 帧率解限。本文为阶段一历史记录，当前实现以 [frontend/AGENTS.md](../../../frontend/AGENTS.md) 为准；本文所列「待完成」项（render_canvas.js 集成、index.html 加载顺序等）均已在 Phase 2 落地时完成。
 
 ## 📦 已创建文件清单
 
