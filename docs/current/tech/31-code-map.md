@@ -261,6 +261,7 @@ FlowAndAccord/
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       ├── 08-performance.md                # 仅保留未完成的性能优化
     │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
+    │       ├── 10-basin-mountain-encirclement.md # ★ TB-04 盆地群峰环抱与峡谷出水口地貌规划
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
     │           ├── ta05-evidence-2026-09-14/      # TA-05 精简证据包（2026-09-14 收口归档）
     │           │   ├── manifest.json                # 证据清单
