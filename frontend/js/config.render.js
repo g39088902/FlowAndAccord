@@ -17,6 +17,19 @@ window.RENDER_CONFIG = {
     const params = new URLSearchParams(window.location.search);
     return params.get('webgl') !== '0';
   })(),
+
+  // —— 渲染帧率上限（★ v1.50.82 从 render_canvas.js 硬编码 TARGET_FPS=30 抽出）——
+  // 语义：绘制帧的**目标上限**；仿真推进完全由 Worker 独立线程按 speedMult 驱动，
+  //       主线程 sim.tick() 为空操作，故提高此值**不影响模拟速度、不影响确定性**。
+  // 取值：
+  //   > 0   → 按该目标 FPS 门控绘制帧（默认 60；显示器 rAF 通常为 60，更高值无收益只会放宽门控）
+  //   0 / 'uncapped' / 'none' → 完全解除门控，每个 rAF 回调都绘制（上限即显示器刷新率）
+  // 覆盖方式（优先级从高到低）：URL ?fps=<值>  →  localStorage 'fa.renderFps'  →  本默认值
+  // 例：?fps=0 不设限、?fps=30 回到旧行为、?fps=144 给高刷屏让路。
+  // ⚠️ 视觉效果提醒：Worker 快照下发仍按人口自适应节流（15~30Hz，见 sim_worker.js
+  //    SNAP_THROTTLE_TIERS），主线程无运动插值，故解除门控主要改善**镜头拖拽/缩放**
+  //    的跟手度与 UI 刷新；族人位置的更新频率仍受快照节流约束。
+  targetFps: 60,
   
   webglDebug: {
     enableBatchStats: true,  // 打印 batching 统计

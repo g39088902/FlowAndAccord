@@ -163,7 +163,13 @@ function updateDebugHud(now) {
     dbgSetText('dbg-light-phase', `u=${SimLighting.phase().toFixed(3)} · 档 ${SimLighting.stamp()}`);
   }
   dbgSetText('dbg-frame-ms', dbgFrameMs.toFixed(2) + ' ms');
-  dbgSetText('dbg-cpu', Math.min(100, (dbgFrameMs / FRAME_INTERVAL) * 100).toFixed(1) + '%');
+  // ★ v1.50.82：解除门控（FRAME_INTERVAL=0）时按当前实测 FPS 折算帧预算，避免除零显示 NaN%
+  {
+    const budgetMs = (typeof FRAME_INTERVAL === 'number' && FRAME_INTERVAL > 0)
+      ? FRAME_INTERVAL
+      : (dbgCurrentFps > 0 ? 1000 / dbgCurrentFps : 16.7);
+    dbgSetText('dbg-cpu', Math.min(100, (dbgFrameMs / budgetMs) * 100).toFixed(1) + '%');
+  }
   dbgSetText('dbg-js-heap', s.memSupported ? `${fmtMB(s.jsHeapUsed)} / ${fmtMB(s.jsHeapLimit)}` : '浏览器不支持');
   dbgSetText('dbg-wasm-mem', fmtMB(s.wasmBytes));
   const tip = dbgEl('dbg-mem-tip');

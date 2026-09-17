@@ -43,8 +43,8 @@ stateDiagram-v2
 | 任务关键词 | 首先阅读 | 最小门禁 |
 |---|---|---|
 | 快照 / Agent / House / POI 字段 | `./29-impact-matrix.md`、`crates/sim_core/src/spatial/AGENTS.md` | `node tools/snapshot-check.js`、`node tools/frontend-check.js` |
-| 决策 / NeedKind / 路由 | `crates/sim_core/src/spatial/decisions/AGENTS.md`、影响矩阵 §1.3 | `cargo test --lib`、`node tools/test-wasm.js` |
-| 账本 / 家户 / 宗族 / 王国 | `crates/sim_core/src/spatial/ledger/AGENTS.md`、`./07-ledger-and-polity.md` | `cargo test --lib`、`node tools/test-wasm.js` |
+| 决策 / NeedKind / 路由 | `crates/sim_core/src/spatial/decisions/AGENTS.md`、影响矩阵 §1.3 | `node tools/test-wasm.js` |
+| 账本 / 家户 / 宗族 / 王国 | `crates/sim_core/src/spatial/ledger/AGENTS.md`、`./07-ledger-and-polity.md` | `node tools/test-wasm.js` |
 | 配置 / 超参 | `./04-config-system.md`、影响矩阵 §1.8 | `node tools/config-check.js` |
 | 前端 / DOM / UI | `frontend/AGENTS.md`、`./21-frontend-dev-guide.md` | `node tools/frontend-check.js` |
 | WASM / 导出 / 存档 | `crates/sim_wasm/AGENTS.md`、`./06-snapshot-and-save.md` | WASM 双副本、`node tools/test-wasm.js` |
@@ -101,14 +101,29 @@ node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS
 
 ## B. Rust、WASM 或快照改动
 
+> ⚠️ **发布口径**：对外发布 / 提交前最终验证**必须**用下面的 `--release`（产物 1.49 MB，
+> 经 fat LTO + `codegen-units=1` 优化）。`--profile dev-wasm` 仅供本地迭代，**严禁发布**。
+
 ```bash
+# ── 本地迭代（可选，改 Rust 时用它快速拿反馈，省 ~15s/次）──
+cargo build --profile dev-wasm -p sim_wasm --target wasm32-unknown-unknown
+# 产物 target/wasm32-unknown-unknown/dev-wasm/sim_wasm.wasm，仅供本地验证，不进仓库
+
+# ── 发布 / 提交前最终构建（必做）──
 cargo build -p sim_wasm --target wasm32-unknown-unknown --release
 # 复制 release wasm 到 frontend/rust/sim_wasm.wasm 与 frontend/sim_wasm.wasm
-cargo test --lib
 node tools/test-wasm.js
 ```
 
+**改 Rust 的推荐顺序**（★ v1.50.82 实测）：`cargo check --lib`（约 13s）先确认语法与类型 →
+改完逻辑用 `--profile dev-wasm`（约 26s）跑 `test-wasm.js` 验证行为 → 最终提交前跑一次
+`--release`（约 41s）并同步双副本。这样能避免「编 41 秒才发现拼错变量名」，
+且 dev-wasm 产物（2.02 MB）从不进仓库、从不部署，体积代价为零。
+
 - [ ] WASM 双副本已同步。
+- [ ] ⚠️ **不跑 `cargo test --lib`**（★ v1.50.82 移除）：源码按 §4.10 禁止持久化单测，实测 `running 0 tests`，
+      花 35s 却零覆盖；其唯一实际作用「编译 lib」已被上面的 `cargo build -p sim_wasm` 完全覆盖。
+      若确需独立类型检查，用 `cargo check --lib`（约 13s）。
 - [ ] 快照字段**四处同步**（★ M4）：`snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `snapshot_bin/encode.rs` / `frontend/js/snapshot-bin.js`+`rustworld.js`，并跑 `node tools/snapshot-check.js`。
 - [ ] 若改动驻留表 / `STR_TAB` / 新增 `world_create` 调用点：跨世界缓存失效判据仍为 `start_index == 0`（根 `AGENTS.md` §4.5.1，勿改用 `epoch`）。
 - [ ] 同种子确定性、无 NaN、无越界、长程稳定性通过。

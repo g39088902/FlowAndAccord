@@ -71,7 +71,7 @@ stateDiagram-v2
 | F 卸载 | 面板关闭或折叠，跳过内部 DOM 拼接与 Diff | Esc/折叠 | 重新打开 |
 
 **不变量**（违反即出 bug）：
-- 制度大盘必须随主循环以 10FPS（每 100ms）节流更新，严禁随 30FPS Canvas 每帧操作 DOM。
+- 制度大盘必须随主循环以 10FPS（每 100ms）节流更新，严禁随 Canvas 每帧操作 DOM（★ v1.50.82 起绘制帧率上限可配置、默认 60FPS，按帧操作 DOM 的代价更高，节流不可省）。
 - `.ledger-panel` 处于 `.minimized` 折叠态时必须直接 return，跳过内部复杂 DOM 拼接。
 - 高频 `innerHTML` 重建容器须套内容快照缓存（如 `ledger-ui.js::renderHtml`），否则重建节点会吞掉 `click` 事件。
 

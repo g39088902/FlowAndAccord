@@ -3,14 +3,43 @@
 // 子模块: render_world.js (地形/路网/POI/房屋) / render_agents.js (族人/特效) / render_inspector.js (面板/拾取) / render_hud.js (HUD/大盘)
 
 // ==========================================
-// 30 FPS 渲染主循环
+// 渲染主循环（★ v1.50.82 帧率上限可配置）
 // ==========================================
 let frameCount = 0, lastFpsUpdate = performance.now();
 let lastRenderTime = performance.now();
 let lastUiUpdate = performance.now();
 let lastTopBarUpdate = performance.now(); // 📊 顶栏数据栏独立节流 (无头模式下同样刷新)
-const TARGET_FPS = 30;
-const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+// ★ v1.50.82：帧率上限从硬编码 30 改为可配置（默认 60，可解除门控）。
+//   仿真推进在 Worker 独立线程、主线程 sim.tick() 为空操作，故放宽门控不影响模拟速度与确定性。
+//   取值来源优先级：URL ?fps=<值>  →  localStorage 'fa.renderFps'  →  RENDER_CONFIG.targetFps
+(function resolveFrameBudget() {
+  const DEFAULT_FPS = 60;
+  const cfgFps = (window.RENDER_CONFIG && Number(window.RENDER_CONFIG.targetFps));
+  let raw = Number.isFinite(cfgFps) ? cfgFps : DEFAULT_FPS;
+
+  // localStorage 覆盖（面板/控制台调参后刷新保持）
+  try {
+    const ls = window.localStorage.getItem('fa.renderFps');
+    if (ls !== null && ls !== '') raw = Number(ls);
+  } catch (e) { /* 隐私模式下 localStorage 不可读，忽略 */ }
+
+  // URL 覆盖（最高优先级，便于 A/B 与取证）
+  try {
+    const q = new URLSearchParams(window.location.search).get('fps');
+    if (q !== null && q !== '') {
+      if (q === 'uncapped' || q === 'none') raw = 0;
+      else raw = Number(q);
+    }
+  } catch (e) { /* ignore */ }
+
+  if (!Number.isFinite(raw) || raw < 0) raw = DEFAULT_FPS;
+
+  window.TARGET_FPS = raw;                              // 0 = 不设限
+  window.FRAME_INTERVAL = raw > 0 ? 1000 / raw : 0;     // 0 → 每个 rAF 都绘制
+})();
+const TARGET_FPS = window.TARGET_FPS;
+const FRAME_INTERVAL = window.FRAME_INTERVAL;
 
 // ==========================================
 // 🐞 调试模式: 帧耗时 / FPS / 内存采样与 HUD 刷新
@@ -136,10 +165,15 @@ function render(now) {
   if (!now) now = performance.now();
   const elapsed = now - lastRenderTime;
 
-  if (elapsed < FRAME_INTERVAL - 1.5) {
-    return;
+  // ★ v1.50.82：FRAME_INTERVAL === 0 表示不设限，每个 rAF 回调都绘制（避免除零得 NaN）
+  if (FRAME_INTERVAL > 0) {
+    if (elapsed < FRAME_INTERVAL - 1.5) {
+      return;
+    }
+    lastRenderTime = now - (elapsed % FRAME_INTERVAL);
+  } else {
+    lastRenderTime = now;
   }
-  lastRenderTime = now - (elapsed % FRAME_INTERVAL);
 
   const frameStart = performance.now();
   sim.tick();

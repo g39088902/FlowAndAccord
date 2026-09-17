@@ -201,7 +201,7 @@ pub struct HistoryKingSnapshot {
 ## 4. 性能与渲染节流硬约束
 
 1. **DOM 更新必须降频节流**：
-   - 制度大盘（Households/Clans/Regions）与顶栏一样，必须在 `render_canvas.js` 主循环中以 **10FPS（每 100ms 一次）** 节流更新，严禁随 30FPS Canvas 每帧操作 DOM。
+   - 制度大盘（Households/Clans/Regions）与顶栏一样，必须在 `render_canvas.js` 主循环中以 **10FPS（每 100ms 一次）** 节流更新，严禁随 Canvas 每帧操作 DOM（★ v1.50.82 起绘制帧率上限可配置、默认 60FPS，按帧操作 DOM 的代价更高，节流不可省）。
 2. **面板折叠状态跳过渲染**：
    - 当 `.ledger-panel` 处于 `.minimized` 折叠态时，除了更新标题栏的简单计数徽章外，**必须直接 return**，跳过内部复杂的 DOM 拼接与 Diff。
 3. **列表虚拟化与截断保护**：

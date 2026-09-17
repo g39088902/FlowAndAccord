@@ -10,3 +10,39 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 panic = "abort"
+
+# ── 开发期快速迭代 profile（★ v1.50.82）────────────────────────────────
+# 用途：改 Rust 时的**本地反馈**用，产物只用于跑 test-wasm.js 验证逻辑，
+#       ⚠️ 严禁发布——必须走 release profile（体积与性能才是线上口径）。
+#
+# 为什么需要它：release 的 fat LTO + codegen-units=1 让每次改 sim_core 都要
+#   重编整个 crate 并重做全程序优化，实测增量 41s；关掉 LTO、放宽 cgu 后降到 26s。
+#
+# 用法：
+#   cargo build --profile dev-wasm -p sim_wasm --target wasm32-unknown-unknown
+#   ⚠️ 产物在 target/wasm32-unknown-unknown/dev-wasm/，**只用于本地跑 test-wasm.js 验证逻辑**，
+#      **严禁复制进 frontend/ 双副本、严禁提交、严禁部署**（详见根 AGENTS.md §4.10.1）。
+#      逻辑验证通过后，发布前必须再跑一次 --release 并用其产物同步双副本。
+#
+# 收益与代价：省约 15s/次；代价是产物体积 1.49MB → 2.02MB（+36%）且性能略低，
+#   但 dev-wasm 产物从不进仓库、从不部署，代价为零。
+[profile.dev-wasm]
+inherits = "release"
+lto = false
+codegen-units = 16
+
+# ── 抑制 target/ 膨胀（★ v1.50.82）──────────────────────────────────────
+# 背景：target/ 一度涨到 1.6 GB，其中 928 MB 是**宿主平台（x86 Windows）的 debug 产物**——
+#   本项目只发布 wasm32，这些产物纯属占用；主因是 dev profile 默认 `debug = 2`
+#   （完整调试信息：单个 sim_wasm.pdb 就有 33 MB，libsim_core.rlib 108 MB）。
+#
+# 处置：dev profile 关闭调试信息（本项目**不使用 dev 构建**——它还会间歇性触发 rustc ICE，
+#   见 AGENTS.md §4.10.1 说明；dev-wasm 继承的是 release，不受此设置影响）。
+#   release/dev-wasm 均未开启 debug，本段只是显式固化，防止日后默认行为变化。
+[profile.dev]
+debug = false
+
+# wasm32 侧的 debug 产物同样不需要（dev profile 在该 target 下会触发编译器 ICE，已不可用）。
+# split-debuginfo = "off"：不拆分调试信息，进一步压缩增量缓存占用。
+[profile.dev.package."*"]
+debug = false

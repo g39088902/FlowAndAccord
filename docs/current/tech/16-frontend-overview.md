@@ -31,7 +31,7 @@ stateDiagram-v2
 
 **不变量**（违反即出 bug）：
 - 排序只作用于绘制队列，不修改 `sim.pois`/`sim.houses`/`sim.agents` 顺序，点击拾取与 Inspector 遍历逻辑不受影响。
-- 同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性；高倍速下 Worker 仅按人口自适应降频，主线程始终稳定 30 FPS。
+- 同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性；高倍速下 Worker 仅按人口自适应降频，主线程绘制帧率按 `RENDER_CONFIG.targetFps`（★ v1.50.82 默认 60 FPS，可用 `?fps=` 覆盖或置 0 解除门控）运行。
 - 装饰实体（D-A）必须并入 `drawWorldEntities()` 统一深度队列，不得按种类分组原序落笔，否则远树压近树 / 乔木被道路穿透。
 
 ## 1. 模块定位

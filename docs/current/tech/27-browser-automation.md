@@ -303,3 +303,66 @@ paw browser-action '{"action":"navigate","url":"http://localhost:3004","waitUnti
 - 任务结束后 `tab_list` 检查残留 tab，`tab_close`（不带 index 关当前）逐一关闭，避免占用 4 个 tab 的会话上限。
 - 截图产物位于 CatPaw 临时目录，不进工作区、不入 git；若用户要求落盘到工作区再显式复制。
 - 判图有效性用读图工具直接打开 PNG 验证内容（分辨率/画面元素），勿凭响应 success 判定（对应 §5 坑 4 同源经验）。
+
+---
+
+## 8. 🪟 脚本化「多种子批量截图」（Windows · 2026-09-17 多种子画面临检沉淀）
+
+> 场景：用 N 个种子各跑一次页面并截图做画面临检。§3 的 shell 逐条调用在此场景下不可靠，本节给出已验证的单进程脚本管线。
+>
+> 记录人：WorkBuddy · 2026-09-17 · 项目版本 v1.50.79
+
+### 8.1 🔴 核心坑：`playwright-cli` 会话在两次工具调用之间被回收
+
+`playwright-cli -s=x open` 成功（exit 0），但下一次独立 Bash/PowerShell 调用执行 `eval` 时报 `Browser 'x' is not open`。daemon 随命令进程结束被回收，**多步命令无法跨调用接力**。
+
+**对策**：把整条链路（`open → 等待就绪 → 设种子 → 推进 → 截图 → close`）放进**同一个进程**。两种写法：
+
+1. 单条命令内 `&&` 串联（同 §7.3 坑 1）；
+2. **推荐**：写一个 Node 脚本，直接 `require` playwright-core 驱动 Chromium（见 §8.2），一次进程跑完全部种子，还能做数据采集与汇总。
+
+### 8.2 直接 require 全局 playwright-core（NODE_PATH 无效）
+
+`@playwright/cli` 全局安装时，playwright-core 嵌在其自身的 `node_modules` 下。实测在 Windows 上设置 `NODE_PATH=<npm global>\node_modules` 仍然 `Cannot find module 'playwright-core'`。
+
+**对策**：脚本里用绝对路径 require：
+
+```js
+const { chromium } = require('C:\\Users\\<用户名>\\AppData\\Roaming\\npm\\node_modules\\@playwright\\cli\\node_modules\\playwright-core');
+const browser = await chromium.launch({ channel: 'chrome' });   // 驱动系统 Chrome，支持 File System Access API
+```
+
+用项目托管 Node 运行：`"<managed-node>/node.exe" script.js`，脚本放系统临时目录，产物另存 `evidence/`。
+
+### 8.3 指定种子开局（UI 路径，已验证）
+
+主页面**不消费** URL 的 `?seed=`（仅 `mapOnly` 地图图鉴页消费），必须走 UI：填入 `#world-seed-input` 后点 `#btn-apply-world-seed`。该按钮带 `window.confirm` 确认框，headless 下会弹出无处可点，须先覆盖：
+
+```js
+await page.evaluate((s) => {
+  window.confirm = () => true;                       // 拦掉原生确认框
+  const input = document.getElementById('world-seed-input');
+  input.value = String(s);
+  document.getElementById('btn-apply-world-seed').click();
+}, seed);
+```
+
+**判据**：`window.sim._engineSeed === seed`（回读校验，勿凭点击成功判定）。
+
+### 8.4 就绪判定、加速与状态回读
+
+| 目的 | 代码 | 说明 |
+| :--- | :--- | :--- |
+| 就绪 | `page.waitForFunction(() => window.sim && window.sim.tickCount > 3)` | wasm 已在 Worker 接管 |
+| 加速 | `await page.evaluate(() => { window.sim.speedMult = 8; })` | 真实属性名是 `speedMult`（非 `_speedMult`，后者是内部字段）；`paused` 字段不存在，暂停态实为 `_isPaused` |
+| 存档门禁 | URL 加 `?nogate=1` | Chrome 下同样可用，跳过建档弹窗直接解除暂停 |
+| 回读 | `tickCount / _engineSeed / document.querySelectorAll('canvas').length` | 3 个 canvas（sim / 叠加层 / HUD） |
+
+headless Chrome 下 WebGL 2.0 正常初始化（`[WebGL] Initialized: 2.0`），控制台除 `favicon.ico 404` 外无错误，可放心用于画面临检。
+
+### 8.5 镜头推进与画面临检组合
+
+- 远景整图（默认视角，`viewport 1600×900`）看地形 / 聚落 / 标签层；近景（`viewport 1920×1080` + WheelEvent 负 `deltaY` 连发 14 次放大）看房屋 / 族人 / 植被 / 地面纹样等细节层。
+- 单种子跑 `speedMult=8` × 12~15 秒 ≈ 5000~7000 tick（约 2 模拟小时），足以出现「营地→聚落」标签与建仓日志，画面内容丰富、易暴露渲染问题。
+- 判图仍以读图工具目视核对为准：**颜色/形态与历史 review 截图一致即非 bug**。例：河谷地图的褐色谷底带、河岸锯齿纹理在 `evidence/S4-06` 基准图中同样存在，属美术风格，勿误报。
+- 收尾：`playwright-cli kill-all`（会话已回收时返回 `No daemon processes found`，属正常）；`.playwright-cli/` 已在 `.gitignore` 内，截图若要留存应显式放 `evidence/`。

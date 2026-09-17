@@ -229,7 +229,7 @@
 | 求生边界 | 临时隔离断言验证原始守卫；死亡统计仅作观察，不承诺资源枯竭时零死亡 |
 | 生殖安全 | 原条件不放宽，等待上限可达，开关完整；正式配对实验前冻结数值判据，不确定则保持默认关闭 |
 | 数值与时序 | 有限值、正除数、固定更新顺序、事件一次注入、窗口可退出；持续状态完整存档 |
-| 代码交付 | 按适用范围运行构建、`cargo test --lib`、`test-wasm.js`、`test-determinism.js`、`config-check.js`、`snapshot-check.js`、`frontend-check.js`；修改移动/行为时追加诊断 |
+| 代码交付 | 按适用范围运行构建、`test-wasm.js`、`test-determinism.js`、`config-check.js`、`snapshot-check.js`、`frontend-check.js`；修改移动/行为时追加诊断（★ v1.50.82 起不跑 `cargo test --lib`：源码无持久化单测，编译校验已由 WASM build 覆盖） |
 | 文档与版本 | `doc-maintenance-check.js`、`cross-doc-check.js`、`doc-link-check.js`、`code-map-check.js`（模块变动时）、`bump-version.js --check`、`git diff --check`；纯文档不升版、不重跑模拟测试 |
 | 最终产物 | 代码批次升版后构建 WASM 并同步双副本，验证最终版本；删除临时测试，报告保留实验口径与未完成依赖 |
 

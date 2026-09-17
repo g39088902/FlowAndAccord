@@ -42,5 +42,6 @@ pub use snapshot::{
 pub use vec3::Vec3;
 pub use world::World3DEngine;
 pub use world_save::{
-    deserialize_save, serialize_save, WorldSave, SAVE_APP_VERSION, SAVE_FORMAT_VERSION,
+    app_version_compat_line, deserialize_save, serialize_save, WorldSave, SAVE_APP_VERSION,
+    SAVE_FORMAT_VERSION,
 };

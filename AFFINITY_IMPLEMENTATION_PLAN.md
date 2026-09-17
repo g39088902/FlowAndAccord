@@ -201,6 +201,6 @@ AF-12 每个事件还必须等其领域独立就绪 + IM-XX（对应事件触发
 | 长程 | 至少沿现有多种子矩阵、至少三代；记录人口、出生／死亡、成婚、关系分布、饱和率、新关系拒入和冷却满额拒计，不断言某对人必成好友 |
 | 性能 | 同种子同 tick、同机器、相同快照频率，比较空表／满表的 tick 耗时、WASM 内存、帧大小、Worker/主线程处理；P0 建议以 tick 中位数增幅≤5%为初始目标，失败需分析而非直接放宽 |
 
-按影响范围执行：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release`、WASM 双副本同步、`cargo test --lib`、`node tools/test-wasm.js`、`node tools/test-determinism.js`、`node tools/config-check.js`、`node tools/snapshot-check.js`、`node tools/frontend-check.js`；行为变更追加 `node tools/diagnose.js --check all`。浏览器使用 Chrome 建立真实本地存档后验证推进链路。
+按影响范围执行：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release`、WASM 双副本同步、`node tools/test-wasm.js`、`node tools/test-determinism.js`、`node tools/config-check.js`、`node tools/snapshot-check.js`、`node tools/frontend-check.js`；行为变更追加 `node tools/diagnose.js --check all`。浏览器使用 Chrome 建立真实本地存档后验证推进链路。
 
 文档门禁：`node tools/doc-maintenance-check.js`、`node tools/cross-doc-check.js`、`node tools/doc-link-check.js`、`node tools/code-map-check.js`、`node tools/bump-version.js --check` 及 `git diff --check`。新 current 文档须登记维护清单；纯规划改动不伪造已实现 changelog。

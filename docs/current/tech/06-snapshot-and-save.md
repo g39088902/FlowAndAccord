@@ -8,7 +8,7 @@
 
 ## 状态机
 
-存档从「启动阻塞未建档 → 建立并授权句柄 → 已挂载」流转，运行中在自动保存与读取间切换；`SAVE_APP_VERSION` 不匹配直接拒绝读档并保持原世界不变。
+存档从「启动阻塞未建档 → 建立并授权句柄 → 已挂载」流转，运行中在自动保存与读取间切换；存档兼容线（`SAVE_APP_VERSION` 前两段）不匹配直接拒绝读档并保持原世界不变；末尾版本号差异不影响读档（★ v1.50.80，§2.4）。
 
 ```mermaid
 stateDiagram-v2
@@ -34,10 +34,10 @@ stateDiagram-v2
 | C 已挂载 | 句柄可用，门禁解除，模拟恢复 | 存档文件合法 | 自动保存/读取/失效 |
 | D 自动保存中 | `tickAutoSave` 每 30s 直写本地文件或 localStorage 三槽位 | 模拟推进 | 周期覆盖完成 |
 | E 读取中 | `world_load` 载入存档覆盖世界 | 用户读档 | 成功(0)/失败(-3) |
-| F 版本不匹配拒绝 | `app_version != SAVE_APP_VERSION` 或解析失败，保持原世界不变 | world_load 返回 -3 | 废弃旧档或重连 |
+| F 版本不匹配拒绝 | 兼容线不匹配（`app_version_compat_line(app_version) != 当前兼容线`）或解析失败，保持原世界不变 | world_load 返回 -3 | 废弃旧档或重连 |
 
 **不变量**（违反即出 bug）：
-- `save.app_version != SAVE_APP_VERSION` 直接 Err 拒绝读档，版本变更旧档自动废弃（Test 4 守卫：当前世界快照不变）。
+- 存档兼容线不匹配（前两段，★ v1.50.80 起）直接 Err 拒绝读档，**中间版本号**变更旧档自动废弃；末尾版本号差异不影响读档（§2.4）。失败时当前世界快照不变（Test 4 守卫）。
 - `format_version` 与 `SAVE_FORMAT_VERSION` 必须同改（Rust `world_save.rs` 与前端 `save-ui.js` 两处）。
 - 可重建字段（`terrain` 按 seed+profile、`agent_index` 读档重建）不入库；读档续演须与连续跑到同 tick 逐字节一致（Test 3）。
 
@@ -108,6 +108,31 @@ World3DEngine
 | `LaneGraph3D` | **手写** serde：只持久化「按插入顺序的节点/车道扁平列表 + 两个发号器」，反序列化按同序重建 `graph`/`node_map`/`edge_map`。正确性前提是路网从不删除节点/车道（`housing_system/AGENTS.md` §4.2），因此邻接表边序与原图逐条一致，A* 结果保持确定性 |
 | `PrimitivePoi` 的 `current_stock` / `max_stock` / `regen_rate` | 走 `finite_f32` 助手：非有限值用字符串哨兵（`Infinity` / `-Infinity` / `NaN`）编码。**营地储量恒为 `INFINITY`**，若按 serde_json 默认的 `null` 编码，反序列化 f32 会直接报错导致「能存不能读」 |
 
+### 2.4 版本兼容线与「末尾升版不废弃旧档」（★ v1.50.80）
+
+**问题**：v1.50.80 前，`SAVE_APP_VERSION` 存放完整三段应用版本（`1.50.79`），读档判据是**全串严格相等**——于是哪怕只改一行前端渲染代码，升一次末尾版本号也会把玩家所有旧存档判为「已废弃」。
+
+**定案**：版本号三段分工（与根 `AGENTS.md` §4.9 同源）。
+
+| 段位 | 何时自增 | 对旧存档 | 重编译 WASM |
+| :--- | :--- | :--- | :--- |
+| `patch`（末尾） | 前端渲染 / 表现层优化等不触碰存档与数值逻辑的变更 | **继续可用** | 否 |
+| `minor`（中间） | 功能变化 / 数值逻辑变化 / 存档结构不兼容 | 自动废弃 | **是** |
+| `major`（首位） | 仅人工变更 | 自动废弃 | **是** |
+
+**实现**：
+
+- `SAVE_APP_VERSION` 改存**兼容线** `major.minor`（如 `1.50`），写入存档的 `app_version` 即为该两段串；
+- 新增 `app_version_compat_line(v)`：去空白与可选 `v`/`V` 前缀后取**前两段**；`deserialize_save` 用它比对存档与当前常量 ⇒ 历史三段串档案（`1.50.79`）与当前 `1.50` 同线，**可继续加载**；
+- 前端 `save-ui.js` 六处判定改走 `compatLine()`，UI 文案改用 `getDisplayVersion()`（完整三段）展示；
+- `tools/bump-version.js` 定义点分级：存档兼容线点标 `tier: 'compat'`，**仅 minor/major 升版时同步**；patch 升版不动它，输出明示「兼容线未变 ⇒ 无需重编译、旧档可用」。
+
+⚠️ 边界：`SAVE_FORMAT_VERSION`（结构版本）与 `TERRAIN_GENERATOR_VERSION` 仍是各自的独立门禁，与本兼容线无关——两者变更照旧废弃旧档。
+
+**三条门禁必须在前端统一收敛**（★ v1.50.81 教训）：内核拒绝读档有**三个**独立判据——`format_version`、`app_version` 兼容线、`terrain_generator_version`。前端若只比其中一部分（v1.50.80 时只比兼容线），会把实质不可读的档案误判为「可兼容」：自动读档必 `-3` 失败、门禁卡在「自动读取存档失败」而按钮仍写「建立存档文件」，玩家无法脱困（实例：地形生成器 12 → 13 后旧档报「地形生成器版本不兼容」）。
+
+前端收敛实现：`save-ui.js::getSaveIncompatReason(meta)` 一次判三条，返回可读原因串（`null` = 可正常读档）；`extractMeta` 解析 `terrain_generator_version`（缺失按 0、不据此拒绝，交由内核裁决）；门禁三处接入该判据，命中即露出「🗑️ 删除旧存档并新建」按钮。删除走 `deleteStartupSave()`：`handle.remove()` → 回退写空内容 → 无论成败都断开槽位与 IndexedDB 句柄，再走正常建档流程。诊断入口：`window.saveUI.incompatReason/extractMeta/deleteSave/showStartupDelete/slotMeta`。
+
 ---
 
 ## 3. WASM 桥接层
@@ -161,7 +186,7 @@ World3DEngine
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.79**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.50.82**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。

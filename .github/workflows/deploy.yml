@@ -51,6 +51,11 @@ jobs:
       - name: WASM 回归测试门禁
         run: node tools/test-wasm.js
 
+      # 前端脚本语法 + DOM ID 完整性（★ v1.50.82 补入 CI：此前仅在本地检查单里，CI 缺失该门禁）
+      # 不跑 cargo test --lib：源码按 §4.10 禁止持久化单测，编译校验已由上面的 sim_wasm 编译覆盖
+      - name: 前端静态一致性门禁
+        run: node tools/frontend-check.js
+
       # 跨文档事实指纹一致性：文档间冲突或配置权威漂移（config.js/config.rs/tools 实际数量）即失败
       - name: 跨文档一致性门禁
         run: node tools/cross-doc-check.js

@@ -32,8 +32,30 @@ use crate::rng::WorldRng;
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 pub const SAVE_FORMAT_VERSION: u32 = 7;
-/// 写入存档时附带的应用版本（★ v1.37.1 起作为加载门禁：版本变更自动废弃旧档）
-pub const SAVE_APP_VERSION: &str = "1.50.79";
+/// 存档应用版本（加载门禁 ★ v1.37.1 起：版本变更自动废弃旧档）
+///
+/// ★★ v1.50.80 版本策略（三段的语义分工，与 `docs/current/tech/06-snapshot-and-save.md` §2.4 同源）：
+///   版本号 `major.minor.patch` = `1.50.80`，本常量只存**兼容线** `major.minor` 两段：
+///   - `patch`（末尾）：前端渲染 / 表现层优化等**不改存档与数值逻辑**的变更 —— 本常量不动，
+///     于是无需重编译 WASM，旧存档继续可加载；
+///   - `minor`（中间）：功能变化 / 数值逻辑变化 / 存档结构不兼容 —— 本常量随之推进
+///     （由 `tools/bump-version.js --minor` 同步），旧存档自动废弃，**必须**重编译 WASM；
+///   - `major`（首位）：仅人工变更。
+///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
+///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
+pub const SAVE_APP_VERSION: &str = "1.50";
+
+/// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
+///
+/// `1.50.79` / `v1.50.79` / `1.50` → `"1.50"`；不足两段或非法串按原样返回（保守：判定为不等）。
+pub fn app_version_compat_line(v: &str) -> String {
+    let t = v.trim().trim_start_matches(|c| c == 'v' || c == 'V');
+    let mut it = t.split('.');
+    match (it.next(), it.next()) {
+        (Some(a), Some(b)) if !a.is_empty() && !b.is_empty() => format!("{}.{}", a, b),
+        _ => t.to_string(),
+    }
+}
 
 
 fn default_terrain_generator_version() -> u32 {
@@ -214,9 +236,11 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
             save.format_version, SAVE_FORMAT_VERSION
         ));
     }
-    if save.app_version != SAVE_APP_VERSION {
+    // ★ v1.50.80：改按「兼容线」比对（前两段），末尾版本号差异不再判为不兼容 ——
+    //   旧存档写的是历史三段串（如 `1.50.79`），兼容线同为 `1.50` ⇒ 可继续加载。
+    if app_version_compat_line(&save.app_version) != app_version_compat_line(SAVE_APP_VERSION) {
         return Err(format!(
-            "存档应用版本不兼容：存档为 v{}，当前内核为 v{}（版本变更已自动废弃旧档）",
+            "存档应用版本不兼容：存档为 v{}，当前内核兼容线 v{}（中间版本号变更已自动废弃旧档）",
             save.app_version, SAVE_APP_VERSION
         ));
     }

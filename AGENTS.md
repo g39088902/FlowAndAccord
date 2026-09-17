@@ -65,7 +65,7 @@ graph TD
     C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动 60FPS 渲染| F["frontend/js/render_canvas.js (Canvas 视口)"]
-    F --> G["浏览器 UI (版本: v1.50.79)"]
+    F --> G["浏览器 UI (版本: v1.50.82)"]
 
 ```
 
@@ -78,6 +78,10 @@ graph TD
 ## 2. 编译与运行步骤
 
 > 详细环境配置与故障排查见 `./docs/current/tech/22-build-and-run.md`。
+
+> 💡 **改 Rust 时的快速反馈**（★ v1.50.82）：先 `cargo check --lib`（约 13s）确认语法类型；
+> 逻辑验证用 `cargo build --profile dev-wasm`（约 26s，省 ~15s，**产物严禁发布**）；
+> 提交前再跑一次下面的 `--release` 并同步双副本。详见 `./docs/current/tech/30-workflow.md` §B。
 
 ### 步骤一：编译 WASM 并双副本同步
 
@@ -95,8 +99,7 @@ Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "fr
 ### 步骤二：回归测试验证
 
 ```powershell
-cargo test --lib                  # 编译校验（源码无持久化单元测试，见 §4.10）
-node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳定
+node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳定（★ 唯一长期自动化验证，见 §4.10）
 node tools/test-determinism.js    # 增强型确定性矩阵测试 (6套件：多种子/分批独立性/快照无副作用/存读档)
 node tools/config-check.js        # 前后端数值配置一致性校验
 node tools/frontend-check.js      # 前端脚本语法与 DOM ID 完整性校验
@@ -122,7 +125,7 @@ node frontend/server.js           # http://localhost:3004
 
 1. 访问 `http://localhost:3004`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.79`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.50.82`**。
 
 
 ---
@@ -232,10 +235,20 @@ FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「
 | 资金采集纪律（`StockGold` 45s vs `GoldWealth` 180s、4 级庄园门禁） | [`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.2 原则 2 · `decisions/AGENTS.md` §4.5 |
 | 镜头跟随（关 Inspector 必须同时关跟随） | `frontend/AGENTS.md` §5.5 |
 
-### 4.9 🟢 版本号自增规范（跨模块定义点）
+### 4.9 🟢 版本号自增规范（跨模块定义点 · ★ v1.50.80 三段语义）
 
-**严禁手工改版本号**——一律 `node tools/bump-version.js --patch`（`--minor` / 指定版本 / `--check`）。唯一真相源 = `frontend/index.html` 版本徽章；升版器自动同步全部定义点（含 `world_save.rs::SAVE_APP_VERSION`）。
-升版后若 `world_save.rs` 变更（几乎每次都会）**必须重编译 WASM 并同步双副本**（§4.1）；`SAVE_APP_VERSION` 变更会**自动废弃全部旧存档**；`SAVE_FORMAT_VERSION`（结构版本）**不随应用版本自增**，仅在 `WorldSave` 不兼容变更时手工 +1 并同改 `save-ui.js`。
+**严禁手工改版本号**——一律 `node tools/bump-version.js`（默认 patch，或 `--minor` / 指定版本 / `--check`）。唯一真相源 = `frontend/index.html` 版本徽章；升版器自动同步全部定义点。
+
+★ **三段语义（升哪一段决定旧存档是否还能用）**：
+
+| 段位 | 何时自增 | 对旧存档 | 重编译 WASM |
+| :--- | :--- | :--- | :--- |
+| **patch（末尾）** | 前端渲染 / 表现层优化等**不触碰存档与数值逻辑**的变更 | **继续可用** | 否 |
+| **minor（中间）** | 功能变化 / 数值逻辑变化 / 存档结构不兼容 | 自动废弃 | **是** |
+| **major（首位）** | **仅人工变更** | 自动废弃 | **是** |
+
+落地方式：`world_save.rs::SAVE_APP_VERSION` 只存**兼容线** `major.minor`（如 `1.50`），加载判定经 `app_version_compat_line()` 取前两段比对 ⇒ 末尾升版不动该常量，**不触发重编译、旧档照常加载**；只有 minor/major 升版才推进兼容线（`bump-version.js` 会自动同步该定义点并在输出中提示「必须重编译 + 旧档废弃」）。前端 `save-ui.js` 的兼容判定一律走 `compatLine()`（前两段），**禁止**再写成全串 `===`。
+`SAVE_FORMAT_VERSION`（结构版本）**不随应用版本自增**，仅在 `WorldSave` 不兼容变更时手工 +1 并同改 `save-ui.js`。
 **版本字符串无 `v` 前缀**，前端任何比较点必须先过 `save-ui.js::normalizeVer()`。
 
 → 定义点清单与核对见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) 附篇 §5；存档门禁与废弃引导见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §4.2.2。
@@ -246,6 +259,28 @@ FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「
 - **持久化测试禁令**：不持久化保存任何单元测试脚本（`#[cfg(test)]` / `tests.rs` 一律不进入提交）。当前源码无测试用例是有意结果，非缺失。
 - **临时验证**：开发时临时编写断言跑一遍，确认不崩溃、数值合理后**提交前删除**。
 - **长期验证**：`node tools/test-wasm.js`（同种子逐字节一致性、防越界、防 NaN、长程稳定）是唯一长期保留的自动化验证。
+- **不跑 `cargo test --lib`**（★ v1.50.82）：源码无持久化单测，实测 `running 0 tests`，其唯一作用「编译 lib」已由 `cargo build -p sim_wasm` 覆盖。需要独立类型检查时用 `cargo check --lib`（约 13s）。
+
+### 4.10.1 🟢 `dev-wasm` profile 仅供本地迭代（★ v1.50.82 · 严禁发布）
+
+`Cargo.toml` 的 `[profile.dev-wasm]`（继承 release，但 `lto=false` + `codegen-units=16`）用于**改 Rust 时的本地快速反馈**：
+改 `sim_core` 后增量 **41s → 26s**，产物 1.49 MB → 2.02 MB。
+
+- ✅ **可以用**：本地跑 `test-wasm.js` 验证逻辑、排查崩溃、调数值。
+- ❌ **严禁**：把 `target/wasm32-unknown-unknown/dev-wasm/sim_wasm.wasm` 复制进 `frontend/` 双副本、提交或部署。
+- ⚠️ **发布口径唯一**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release`，产物才是 1.49 MB 的线上版本。
+- 判据：`frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm` 应恒为 **1,487,028 字节**（v1.50.82 release）；若发现约 2.0 MB，说明误用了 dev-wasm 产物，须立即重编 release 覆盖。
+
+### 4.10.2 🟢 `target/` 体积治理（★ v1.50.82）
+
+`target/` 曾膨胀到 **1.6 GB**，其中 **928 MB 是宿主平台（x86 Windows）的 debug 产物**——本项目只发布 wasm32，这些纯属占用。主因是 dev profile 默认 `debug = 2`（完整调试信息：单个 `sim_wasm.pdb` 33 MB、`libsim_core.rlib` 108 MB）。
+
+- **长期抑制**：`Cargo.toml` 已设 `[profile.dev] debug = false` 与 `[profile.dev.package."*"] debug = false`。
+  本项目不使用 dev 构建（它还会触发 rustc ICE），`dev-wasm` 继承的是 release，**不受影响**。
+- **定期清理**：`node tools/clean-target.js`（默认预览不删除，加 `--yes` 执行，`--all` 额外清 dev-wasm 缓存）。
+  默认清理 `target/debug`、`target/release`、`target/wasm32-unknown-unknown/debug`；
+  **`target/wasm32-unknown-unknown/release` 受保护永不删除**（脚本内置 `PROTECTED` 白名单，已实测 `--all --yes` 也不会误删）。
+- 实测效果：1.6 GB → **211 MB**（省 87%），release 产物与前端双副本均完好（1,487,028 字节，md5 未变）。
 
 ### 4.11 🏠 建房/升级/修缮均为 Agent 自主决策（`housing_system/` 模块）
 

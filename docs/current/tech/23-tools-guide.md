@@ -62,6 +62,7 @@ stateDiagram-v2
 | 22 | **`cross-doc-check.js`** | 契约门禁 | 跨文档事实指纹一致性：同一事实在多篇文档值不同即冲突，配置字段另与 config.js / config.rs 权威比对 | `node tools/cross-doc-check.js` | 0=全部一致, 1=冲突/漂移 |
 | 23 | **`test-dag.js`** | 族谱测试 | 直系血脉上下 5 代范围截断、闭合边拓扑、布局确定性与独立页导出自动化套件 | `node tools/test-dag.js` | 0=测试全通, 1=断言失败 |
 | 24 | **`doc-link-check.js`** | 契约门禁 | ★ Markdown 相对链接可达性门禁：文档迁移/重命名后路径深度未同步即报错） | `node tools/doc-link-check.js` | 0=全部可达, 1=存在失效链接 |
+| 25 | **`clean-target.js`** | 环境治理 | ★ v1.50.82 清理 `target/` 中本项目用不到的构建产物（宿主 x86 debug/release、wasm32 dev），**默认预览不删除**；`wasm32-…/release` 受白名单保护永不误删 | `node tools/clean-target.js`（预览）<br>`--yes`（执行）<br>`--all`（额外清 dev-wasm 缓存） | 0=完成；无失败态（缺失项跳过） |
 
 ---
 
@@ -293,9 +294,10 @@ stateDiagram-v2
 
 ### 6.1 `bump-version.js` · 版本号统一升版器
 - **目标**：消灭版本号多处定义导致的不一致（唯一真相源为 `frontend/index.html` 徽章）。
+- **★ v1.50.80 三段语义**：升**哪一段**决定旧存档是否还能用——`patch`（末尾）只用于前端渲染/表现层等不触碰存档与数值逻辑的变更（**旧档可用、无需重编译 WASM**）；`minor`（中间）用于功能/数值逻辑/存档结构变化（旧档废弃、**必须重编译**）；`major` 仅人工。存档兼容线点（`SAVE_APP_VERSION`，只存 `major.minor`）标 `tier: 'compat'`，**仅 minor/major 升版时同步**。
 - **自动同步站点**：
   1. `frontend/index.html` 徽章；
-  2. `crates/sim_core/src/spatial/world_save.rs` 内的 `SAVE_APP_VERSION`（编译进 WASM 存档门禁）；
+  2. `crates/sim_core/src/spatial/world_save.rs` 内的 `SAVE_APP_VERSION`（**存档兼容线**，编译进 WASM 存档门禁，仅 minor/major 升版同步）；
   3. `frontend/js/save-ui.js` 的 `DEFAULT_APP_VERSION`；
   4. `frontend/js/rustworld.js` 引擎版本兜底串；
   5. `frontend/js/sim_worker.js` Worker 版本兜底串；
@@ -305,10 +307,13 @@ stateDiagram-v2
 - **常用命令**：
   ```bash
   node tools/bump-version.js --check       # 门禁检查（有漂移返回 exit 1）
-  node tools/bump-version.js --patch       # 自增补丁版本（如 1.44.7 → 1.44.8）
-  node tools/bump-version.js --minor       # 自增次版本号（如 1.44.7 → 1.45.0）
-  node tools/bump-version.js 1.45.0        # 指定目标版本
+  node tools/bump-version.js               # 自增末尾版本（1.50.79 → 1.50.80，旧档可用、无需重编译）
+  node tools/bump-version.js --minor       # 自增中间版本号（1.50.80 → 1.51.0，废弃旧档、必须重编译）
+  node tools/bump-version.js 1.51.0        # 指定目标版本
+  node tools/bump-version.js --sync        # 只对齐定义点不自增
   ```
+  升版输出末尾会明示类型：`末尾版本（patch）` ⇒ `旧存档继续可用，无需重开世界`；
+  `中间版本（minor/major）` ⇒ `存档兼容线变更将自动废弃全部旧存档`（并列出重编译步骤）。
 
 ### 6.2 `rust-download.js` · 便携 Rust 工具链下载器
 - **目标**：解决部分环境（如 Windows schannel TLS 证书受限）下 `rustup` 无法拉取工具链的问题，使用 Node 原生 TLS 稳定拉取官方工具链压缩包。

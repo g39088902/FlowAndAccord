@@ -131,7 +131,7 @@ FlowAndAccord/
 │   │   ├── map-view.js                     # ★ v1.50.0 地图图鉴独立页控制器 (只读嵌入正式渲染管线，无模拟/无存档)
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
-│   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (30 FPS)
+│   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (★ v1.50.82 帧率上限可配置，默认 60 FPS，可解除门控)
 │   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (水底卵石/成群游鱼/太阳波光，纯表现层，随种子确定性重建)
 │   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出；★ TA-06-2 删除 tint() 三档兼容接口，profile 由 model.profile 单一入口送入)
 │   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道；★ TA-06 物种派生 speciesOf（三乔木轮廓 broad/sparse/conifer + 三灌木变体 multiStem/flowering/lowEvergreen + 花灌木固定花位），骨架输出 crownR/trunkH/footprintR/crownSquash 为唯一几何真相源；★ TA-07-3 真值包围体 bounds{rH,zMin,zMax,yUp,rS} + 分级几何 farClusters/segTier/stoneMain，extent 由 bounds 派生)
@@ -180,6 +180,7 @@ FlowAndAccord/
 │   ├── bump-version.js                     # 版本号统一升版器 (真相源对齐与 8+ 处定义点同步)
 │   ├── code-map-check.js                   # ★ 代码地图一致性校验 (实际文件 vs ./31-code-map.md 登记 + 描述漂移检测)
 │   ├── config-check.js                     # 前后端配置一致性校验 (含 config.house-upgrade-cost.js) + ./05-config-reference.md 自动生成
+│   ├── clean-target.js                     # ★ v1.50.82 target/ 清理器 (默认预览不删除；--yes 执行；--all 清 dev-wasm 缓存；release 受白名单保护)
 │   ├── cross-doc-check.js                  # ★ 跨文档事实指纹一致性检查 (同指纹多文档值不同即冲突，配置值另与权威比对)
 │   ├── dag-shot.js                         # 族谱多档位无头截图验证 (Node 加载 FlowDag + Chrome headless)
 │   ├── diagnose.js                         # 确定性无头内核诊断与 Bug 嗅探工具 (指定 seed/tick 极速排障)

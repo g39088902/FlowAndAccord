@@ -4,7 +4,7 @@
 > **关联文档**：[./16-frontend-overview.md](./16-frontend-overview.md)（模块总览）· [./20-society-ledger-ui.md](./20-society-ledger-ui.md)（制度大盘界面实现）· [./21-frontend-dev-guide.md](./21-frontend-dev-guide.md)（前端开发实施指南）
 > **定位**：当前 UI 页面全景解剖说明书——画布视口、顶栏、生态大盘、观察堆栈、控制台、事件日志、模态弹窗系统与存档管理面板的现状拆解。
 
-当前系统基于纯原生 HTML5 Canvas 2D + DOM 玻璃拟态（Glassmorphism）构建，无任何打包工具（无 Webpack/Vite），采用暗黑赛博生态风格（`#050a12` 背景），兼顾 30FPS 实时渲染与高密度信息透出。
+当前系统基于纯原生 HTML5 Canvas 2D + DOM 玻璃拟态（Glassmorphism）构建，无任何打包工具（无 Webpack/Vite），采用暗黑赛博生态风格（`#050a12` 背景），兼顾实时渲染（★ v1.50.82 起绘制帧率上限可配置、默认 60FPS）与高密度信息透出。
 
 ```mermaid
 graph TD
@@ -310,6 +310,7 @@ graph TD
 2. **面板层**：不阻断地图交互，负责实时指标、筛选和对象详情。
 3. **模态层**：带遮罩、阻断底层操作；通过关闭按钮、点击遮罩或 `Esc` 返回世界层。模态内部可以继续打开更深一层的详情，但应避免同时堆叠多个全屏模态。
 4. **启动门禁层（★ v1.27.0）**：页面加载后的阻塞式启动层 `#startup-save-gate`（z-index 最高），必须先建立/连接可写 `.json` 存档文件才解除（save-ui.js `releaseStartupGate`）；此层不属于模态（不可关闭），模拟在其解除前保持暂停。
+   - **★ v1.50.81 脱困通道**：层内含主按钮 `#startup-save-connect` 与**默认隐藏**的 `#startup-save-delete`（🗑️ 删除旧存档并新建）。当检测到存档实质不可读（`save-ui.js::getSaveIncompatReason` 命中 `format_version` / `app_version` 兼容线 / `terrain_generator_version` 三条内核门禁之一）时，消息区给出**具体原因**并露出删除按钮；点击后 `deleteStartupSave()` 先 `handle.remove()`、失败回退写空内容，随后断开槽位与 IndexedDB 句柄，主按钮变为「📁 建立新的存档文件」走正常建档流程。此通道确保玩家在旧档无法续演（如地形生成器换版）时始终有出路。
 
 ## 2. 主世界窗口（World Shell）
 

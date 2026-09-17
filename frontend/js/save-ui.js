@@ -16,7 +16,7 @@
   /// v1.46.12：BranchId 收敛为 16 条，活动任务枚举不兼容旧档。
   const SAVE_FORMAT_VERSION = 7;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.50.79';
+  const DEFAULT_APP_VERSION = '1.50.82';
 
   const AUTO_SAVE_INTERVAL_MS = 30000;
 
@@ -29,6 +29,29 @@
    */
   function normalizeVer(v) {
     return String(v == null ? '' : v).trim().replace(/^[vV]\s*/, '');
+  }
+
+  /**
+   * ★ v1.50.80 存档兼容线（版本号前两段 major.minor）
+   * 版本策略：末尾版本号（patch）只承载前端渲染 / 表现层优化等不触碰存档与数值逻辑的变更，
+   * 内核 `SAVE_APP_VERSION` 亦只写兼容线（`1.50`）⇒ 末尾升版**不再废弃旧存档**。
+   * 中间版本号（minor）变更（功能 / 数值逻辑 / 存档结构）才推进兼容线并自动废弃旧档。
+   * 历史档案写的是三段串（如 `1.50.79`），取前两段与本兼容线同线 ⇒ 可继续加载。
+   */
+  function compatLine(v) {
+    const t = normalizeVer(v);
+    const p = t.split('.');
+    return (p.length >= 2 && p[0] !== '' && p[1] !== '') ? `${p[0]}.${p[1]}` : t;
+  }
+
+  /** UI 展示用完整版本号（内核常量只有两段兼容线，优先取页面版本徽章的三段串） */
+  function getDisplayVersion() {
+    const tag = document.querySelector('.version-tag');
+    if (tag && tag.textContent) {
+      const m = tag.textContent.trim().match(/v?(\d+\.\d+\.\d+)/);
+      if (m) return normalizeVer(m[1]);
+    }
+    return normalizeVer(DEFAULT_APP_VERSION);
   }
 
   function getCurrentAppVersion() {
@@ -162,6 +185,105 @@
     if (el) { el.textContent = message; el.style.color = error ? '#f87171' : '#9fb3c8'; }
   }
 
+  function showStartupDeleteBtn(show) {
+    const el = document.getElementById('startup-save-delete');
+    if (el) el.style.display = show ? 'inline-block' : 'none';
+  }
+
+  /**
+   * ★ v1.50.81「删除旧存档」：清空文件内容 → 断开槽位与 IndexedDB 句柄
+   * → 重建一个全新存档文件（走正常「建立存档文件」流程，用户可另选位置）。
+   *
+   * 删除语义：File System Access API 无 `remove()`，按官方推荐 `handle.remove()`（Chrome 110+）
+   * 失败时回退「写空内容」；两者皆失败仍继续断开连接（句柄断开后旧档不再干扰启动）。
+   */
+  async function deleteStartupSave(slotId) {
+    const st = slotState[slotId];
+    if (!st || !st.handle) return { ok: false, msg: '没有已连接的存档文件' };
+    let removed = false;
+    try {
+      if (typeof st.handle.remove === 'function') {
+        await st.handle.remove();
+        removed = true;
+      }
+    } catch (e) { /* 回退到写空 */ }
+    if (!removed) {
+      try {
+        const w = await st.handle.createWritable();
+        await w.write('');
+        await w.close();
+        removed = true;
+      } catch (e) { /* 权限/占用：仍继续断开连接 */ }
+    }
+    await disconnectSlot(slotId);
+    renderList();
+    return {
+      ok: true,
+      msg: removed ? '旧存档已删除，请建立新的存档文件' : '旧存档无法删除但已断开连接，请建立新的存档文件',
+    };
+  }
+
+  /**
+   * ★ v1.50.81 判定存档是否**实质不可读**（读档必然失败）。
+   *
+   * 背景：兼容线（app_version 前两段）只覆盖「应用版本」这一个维度。存档还可能因
+   * `format_version` 或 **`terrain_generator_version`**（地形生成器换版）被内核拒绝——
+   * 后者在 `deserialize_save` 里是独立判据，旧世界无法续演，只能开新世界。
+   * 前端此前只比兼容线，于是这类档案被判为「可兼容」→ 尝试读档 → 内核 -3 拒绝 →
+   * 门禁停在「自动读取存档失败」，而唯一按钮仍写「建立存档文件」，玩家无法脱困。
+   *
+   * 返回 null = 可正常读档；否则返回原因描述串。
+   */
+  function getSaveIncompatReason(meta) {
+    if (!meta) return null;
+    if (meta.formatVersion !== SAVE_FORMAT_VERSION) {
+      return `存档格式版本 v${meta.formatVersion}（当前支持 v${SAVE_FORMAT_VERSION}）`;
+    }
+    // 应用版本兼容线（前两段）：与内核 app_version_compat_line 同判据
+    if (compatLine(meta.appVersion) !== compatLine(getCurrentAppVersion())) {
+      return `存档兼容线 v${compatLine(meta.appVersion)}（当前 v${compatLine(getCurrentAppVersion())}）`;
+    }
+    // 地形生成器版本：内核 TERRAIN_GENERATOR_VERSION，经快照 generatorVersion 下发
+    const gen = getSim() && getSim().terrain ? getSim().terrain.generatorVersion : 0;
+    if (gen && meta.terrainGeneratorVersion && meta.terrainGeneratorVersion !== gen) {
+      return `地形生成器版本 v${meta.terrainGeneratorVersion}（当前内核 v${gen}）`;
+    }
+    return null;
+  }
+
+  /** 读取存档文本失败/为空时的兜底原因（供门禁文案使用） */
+  async function probeStartupSaveIssue(slotId) {
+    const st = slotState[slotId];
+    if (!st || !st.handle) return '尚未连接存档文件';
+    try {
+      const file = await st.handle.getFile();
+      const text = await file.text();
+      if (!text || !text.trim()) return '存档文件为空';
+      let meta;
+      try { meta = extractMeta(text); }
+      catch (e) { return '存档文件不是合法 JSON'; }
+      return getSaveIncompatReason(meta) || null;
+    } catch (e) {
+      return e && e.name === 'NotAllowedError' ? '存档文件授权被拒绝' : '存档文件读取失败';
+    }
+  }
+
+  /** ★ v1.50.81 门禁「删除旧存档并新建」按钮：删档 → 重新走建立存档文件流程 */
+  async function handleStartupDelete() {
+    const btn = document.getElementById('startup-save-connect');
+    const del = document.getElementById('startup-save-delete');
+    if (del) del.disabled = true;
+    if (btn) btn.disabled = true;
+    setStartupGateMessage('正在删除旧存档…');
+    const r = await deleteStartupSave('save1');
+    if (del) { del.disabled = false; del.style.display = 'none'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '📁 建立新的存档文件';
+    }
+    setStartupGateMessage(`${r.msg}。点击下方按钮选择存档位置。`, !r.ok);
+  }
+
   // ══════════════════════════════════════════════════════════════
   // ★ v1.28.0 启动自动读档：打开游戏时若已连接默认存档文件
   // （自动槽 1 = 浏览器记住的默认目录 + 默认文件名 flowaccord-save1.json，
@@ -198,7 +320,7 @@
     try { meta = extractMeta(text); }
     catch (e) { return false; }
     const curVer = getCurrentAppVersion();
-    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION || normalizeVer(meta.appVersion) !== curVer) return false;
+    if (!meta || meta.formatVersion !== SAVE_FORMAT_VERSION || compatLine(meta.appVersion) !== compatLine(curVer)) return false;
     // 引擎就绪前不可读档（world_load 依赖 wasm）；等待加载完成
     if (!(await waitEngineReady(15000))) return false;
     const s = getSim();
@@ -240,7 +362,12 @@
         await waitEngineReady(15000);
         await refreshSlotMeta('save1');
         const curVer = getCurrentAppVersion();
-        const isCompatible = st.meta && st.meta.formatVersion === SAVE_FORMAT_VERSION && normalizeVer(st.meta.appVersion) === curVer;
+        // ★ v1.50.81：兼容判据加入「地形生成器版本」等内核独立门禁，
+        //   否则旧地形档会被误判为可读取 → 自动读档必失败（-3）且门禁无出路。
+        const isCompatible = st.meta
+          && st.meta.formatVersion === SAVE_FORMAT_VERSION
+          && compatLine(st.meta.appVersion) === compatLine(curVer)
+          && !getSaveIncompatReason(st.meta);
         if (isCompatible) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
@@ -249,13 +376,22 @@
             return;
           }
         }
+        // ★ v1.50.81：给出**具体不兼容原因**，并按需露出「删除旧存档」按钮——
+        //   覆盖保存只能改写内容，删文件才能让「选择新存档文件」流程真正重新开始。
+        const incompat = getSaveIncompatReason(st.meta) || await probeStartupSaveIssue('save1');
         if (st.isOutdated) {
           // ★ v1.37.1：检测到旧版本存档，自动废弃，引导覆盖保存新建世界
-          setStartupGateMessage(`检测到旧版本存档「${st.fileName}」（存档版本 v${st.meta ? st.meta.appVersion : '未知'}，当前版本 v${curVer}），因版本更新已自动废弃旧档。点击下方按钮覆盖写入新版本初始世界开始模拟。`, true);
-          btn.textContent = '🆕 废弃旧档并新建世界';
+          setStartupGateMessage(`检测到旧版本存档「${st.fileName}」（存档版本 v${st.meta ? st.meta.appVersion : '未知'}，当前版本 v${getDisplayVersion()}），因中间版本号变更已自动废弃旧档。点击下方按钮覆盖写入新版本初始世界开始模拟。`, true);
+          btn.textContent = '🆕 覆盖旧档并新建世界';
+          showStartupDeleteBtn(true);
+        } else if (incompat) {
+          setStartupGateMessage(`存档「${st.fileName}」无法读取：${incompat}。该存档已无法续演，请删除后建立新存档（新世界将从新种子开局）。`, true);
+          btn.textContent = '🆕 覆盖写入新存档';
+          showStartupDeleteBtn(true);
         } else {
           // 存档为空/数据异常/读取失败：保留阻断，点击按钮可覆盖保存或重新连接
           setStartupGateMessage('自动读取存档失败，点击下方按钮可覆盖保存当前世界或重新连接存档文件。', true);
+          showStartupDeleteBtn(true);
         }
       } else {
         setStartupGateMessage(`已找到上次的存档文件「${st.fileName}」，点击下方按钮授权读取后继续。`, false);
@@ -276,7 +412,7 @@
         await waitEngineReady(15000);
         await refreshSlotMeta('save1');
         const curVerNow = getCurrentAppVersion();
-        const isCompatibleNow = st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION && normalizeVer(st2.meta.appVersion) === curVerNow;
+        const isCompatibleNow = st2.meta && st2.meta.formatVersion === SAVE_FORMAT_VERSION && compatLine(st2.meta.appVersion) === compatLine(curVerNow) && !getSaveIncompatReason(st2.meta);
         if (isCompatibleNow) {
           setStartupGateMessage('正在自动读取存档…');
           const loaded = await autoLoadStartupSave('save1');
@@ -285,7 +421,9 @@
             return;
           }
           btn.disabled = false;
-          setStartupGateMessage('存档读取失败，请重试。', true);
+          const why = getSaveIncompatReason(st2.meta) || await probeStartupSaveIssue('save1');
+          setStartupGateMessage(why ? `存档无法读取：${why}。请删除旧存档后建立新存档。` : '存档读取失败，请重试。', true);
+          if (why) showStartupDeleteBtn(true);
           return;
         }
         // 文件为空或版本不兼容（含旧版本被自动废弃）：覆盖保存当前世界（相当于新建当前版本存档）
@@ -318,6 +456,10 @@
         setStartupGateMessage('未建立存档文件，游戏仍被暂停。请重试。', true);
       }
     }, { once: false });
+
+    // ★ v1.50.81：删除旧存档按钮（仅在探测到实质不兼容 / 读取失败时露出）
+    const delBtn = document.getElementById('startup-save-delete');
+    if (delBtn) delBtn.addEventListener('click', handleStartupDelete, { once: false });
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -330,6 +472,9 @@
     return {
       formatVersion: obj.format_version,
       appVersion: obj.app_version || '—',
+      // ★ v1.50.81：地形生成器版本是内核独立门禁（`deserialize_save` 第三条判据），
+      //   与 app_version 兼容线无关；缺该字段的旧档按 0 处理（不据此拒绝，交由内核裁决）。
+      terrainGeneratorVersion: obj.terrain_generator_version || 0,
       seed: obj.seed,
       tick: obj.tick_counter || 0,
       population: agents.filter(a => a.is_alive && !a.is_fetus).length,
@@ -408,7 +553,7 @@
       st.meta = meta;
       st.permError = false;
       st.lastSaved = file.lastModified;
-      st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || normalizeVer(meta.appVersion) !== curVer);
+      st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || compatLine(meta.appVersion) !== compatLine(curVer));
     } catch (e) {
       if (e.name === 'NotAllowedError') {
         // 权限未持久化：保留槽位与 IndexedDB 记录，等待用户手势内重授
@@ -518,8 +663,8 @@
       setStatus(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`, 'err');
       return;
     }
-    if (normalizeVer(meta.appVersion) !== curVer) {
-      setStatus(`存档版本 (v${meta.appVersion}) 与当前版本 (v${curVer}) 不一致，已自动废弃无法读取。请覆盖保存当前版本世界。`, 'err');
+    if (compatLine(meta.appVersion) !== compatLine(curVer)) {
+      setStatus(`存档兼容线 (v${compatLine(meta.appVersion)}) 与当前兼容线 (v${compatLine(curVer)}) 不一致，已自动废弃无法读取（中间版本号变更）。请覆盖保存当前版本世界。`, 'err');
       return;
     }
     await applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
@@ -605,7 +750,7 @@
           `<span title="存续家户">🏠 <b class="mono-num">${st.meta.households}</b> 户</span>`;
       } else if (st && st.isOutdated) {
         info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
-          `<div class="save-slot-desc" style="color:#fca5a5; margin-top:4px; line-height:1.5;">⚠️ 存档版本 (v${st.meta ? st.meta.appVersion : '—'}) 与当前版本 (v${curVer}) 不一致，已自动废弃。请点击下方「覆盖保存」重写为当前版本。</div>`;
+          `<div class="save-slot-desc" style="color:#fca5a5; margin-top:4px; line-height:1.5;">⚠️ 存档兼容线 (v${st.meta ? compatLine(st.meta.appVersion) : '—'}) 与当前兼容线 (v${compatLine(curVer)}) 不一致，已自动废弃。请点击下方「覆盖保存」重写为当前版本。</div>`;
       } else if (st) {
         info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
           `<span class="save-slot-desc">文件为空或数据异常，点击下方「保存」写入当前世界</span>`;
@@ -716,7 +861,7 @@
         const meta = extractMeta(text);
         const curVer = getCurrentAppVersion();
         if (meta.formatVersion !== SAVE_FORMAT_VERSION) throw new Error(`存档格式版本 v${meta.formatVersion}，当前支持 v${SAVE_FORMAT_VERSION}`);
-        if (normalizeVer(meta.appVersion) !== curVer) throw new Error(`存档版本 v${meta.appVersion} 与当前应用版本 v${curVer} 不一致，旧版本存档已自动废弃`);
+        if (compatLine(meta.appVersion) !== compatLine(curVer)) throw new Error(`存档兼容线 v${compatLine(meta.appVersion)} 与当前兼容线 v${compatLine(curVer)} 不一致，旧版本存档已自动废弃（中间版本号变更）`);
         await applySave(text, meta, `导入文件（${file.name}）`);
       } catch (err) { setStatus('导入失败：' + err.message, 'err'); }
       fileInput.value = '';
@@ -797,6 +942,13 @@
       loadSlot: loadFromSlot,
       autoSave: () => saveToSlot('save1'),
       refresh: renderList,
+      // ★ v1.50.81 对外暴露诊断与脱困能力：供控制台/自动化排查「存档读不了」场景
+      //   （incompatReason 返回具体不兼容原因，null = 可正常读档）
+      incompatReason: (meta) => getSaveIncompatReason(meta),
+      extractMeta: extractMeta,
+      deleteSave: (slotId) => deleteStartupSave(slotId || 'save1'),
+      showStartupDelete: showStartupDeleteBtn,
+      slotMeta: (slotId) => (slotState[slotId || 'save1'] || {}).meta || null,
     };
 
     // 监听生态重置事件，开启新档后自动更新存档
