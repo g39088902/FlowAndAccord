@@ -1432,6 +1432,8 @@ jobs:
 
 ### 8.1 阶段三：装饰层迁移（Accent → GPU）
 
+> ★ **落地进度（v1.50.83）**：石体切片已先行落地——Boulder / RockCluster（含资源景观子石）经 `drawStoneBody` sink 分发迁入 `webgl/layers/accents/stone-renderer.js`（几何/配色与 Canvas 单一同源 + 解析式边缘 AA + 深度对齐 GL 地形；唯一观感新增 = Boulder 地面投影阴影，`?stonegl=0` 完整回退）。本节其余内容为后续方案。
+
 **范围**（现状全部由 Canvas 2D 绘制，经 `DEPTH_ACCENT` 入队）：
 
 | 现状模块 | 迁移对象 |

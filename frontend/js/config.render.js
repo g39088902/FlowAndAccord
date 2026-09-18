@@ -209,6 +209,18 @@ window.RENDER_CONFIG = {
   // 棱柱轮廓随相机投影（billboard 移除），亮暗由世界光向点积决定（不固定「顶亮侧暗」）。
   accentStoneHeightK: 0.30,               // 石体高宽比：石高 = K × 石半径（侧面带高随相机 sinX 投影）
 
+  // —— 石头绘制 WebGL 迁移（★ stone-renderer.js；Canvas 2D → WebGL 阶段三石体切片）——
+  // GL 地形活动时 Boulder/RockCluster（含资源景观子石）改由 WebGLStoneRenderer 绘制：
+  // 几何/配色与 Canvas 路径单一同源（drawStoneBody sink 分发，受光公式零复制），
+  // 逐三角形解析 AA 对齐 Canvas 抗锯齿；关闭即完整回退 Canvas 现状路径（A/B 用）。
+  stoneWebglEnabled: (() => {             // 总开关（URL ?stonegl=0 优先；纯前端开关）
+    const params = new URLSearchParams(window.location.search);
+    return params.get('stonegl') !== '0';
+  })(),
+  stoneWebglShadowEnabled: true,  // ★ 唯一观感新增：Boulder 地面投影阴影（单石现状无任何阴影）
+  stoneWebglShadowAlpha: 0.10,    // 接触落底影不透明度（对齐 RockCluster 逐石接触影语言）
+  stoneWebglCastAlpha: 0.055,     // 沿世界光向投影尾不透明度（随季节/相机旋转，弱于接触影）
+
   // —— 树/灌木贴地投影（TA-04-6，render_shadows.js::drawAccentShadowGround 消费）——
   // 阴影为地面图元独立入统一深度队列（入队/分发归 render_depth_queue.js）；影长由模型实高
   // （trunkH × accent.scale，不含 zoom）经世界光向 shadowOffset 驱动，叶量调制覆盖与强度。

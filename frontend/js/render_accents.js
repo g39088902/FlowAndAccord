@@ -92,8 +92,11 @@ function _reportUnknownAccent(kind) {
 // 出 fill 色。基色/out 数组模块级复用（逐簇高频路径零分配）；SimLighting 缺席时退回基色
 // （加载顺序已保证，仅防御）。法线须经模型变换（含剪切逆转置）转到世界空间后传入，内部再归一化。
 // ★ TA-04-3 可选第 8 参 alpha：传了出 rgba()（枝干明暗带以透明度叠在体色上混圆柱侧面渐变）。
+// ★ WebGL 石体迁移：_litFinal 记录最终舍入数值色（与 fillStyle 串同源），WebGLStoneLayer
+//   sink 路径消费——GL 侧不重复受光公式，保证画风逐位一致。
 var _litBase = [0, 0, 0];
 var _litOut = [0, 0, 0];
+var _litFinal = [0, 0, 0];
 function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo, alpha) {
   const SL = window.SimLighting;
   if (SL && SL.shadeRgbInto) {
@@ -105,6 +108,7 @@ function accentLitFill(baseR, baseG, baseB, nx, ny, nz, kAo, alpha) {
   const r = Math.max(0, Math.min(255, Math.round(_litOut[0] * kAo)));
   const g = Math.max(0, Math.min(255, Math.round(_litOut[1] * kAo)));
   const b = Math.max(0, Math.min(255, Math.round(_litOut[2] * kAo)));
+  _litFinal[0] = r / 255; _litFinal[1] = g / 255; _litFinal[2] = b / 255;
   if (alpha === undefined) return 'rgb(' + r + ', ' + g + ', ' + b + ')';
   return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha.toFixed(3) + ')';
 }
@@ -595,39 +599,58 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
   for (let i = 0; i < sides; i++) _stGy[i] = cy + _stRy[i] * cosX - _stDzS[i];
   const hS = r * rockHeightK() * sinX;
   const kL = (lite - 0.5) * 20;
+  // ★ WebGL 石体迁移：sinkOn 期间图元按 Canvas 同序分发给 WebGLStoneLayer（几何/配色
+  //   单一同源，GL 侧零重复公式）；sinkOn=false 走 Canvas 现状路径（笔迹逐位不变）。
+  var sink = (window.WebGLStoneLayer && window.WebGLStoneLayer.sinkOn) ? window.WebGLStoneLayer : null;
   // ★ TA-07 远景两笔简化（§3.2/§0.3-3①）：省掉 sides 次侧面片受光（7 次 accentLitFill +
   // 7 次 path），只留顶面 + 剪影描边——轮廓与受光顶面仍在，远景不可辨的侧面明暗不画。
   // 画序（侧面 → 顶面 → 描边）与颜色公式**零改动**，只做图元增删（TA-04 受光红线）。
   for (let k = 0; !farSimplified && k < sides; k++) {
     const k2 = (k + 1) % sides;
     const aM = rot + ((k + 0.5) / sides) * Math.PI * 2;
-    ctx.fillStyle = accentLitFill(78 + kL, 74 + kL, 68 + kL, Math.cos(aM), Math.sin(aM), 0, 1);
-    ctx.beginPath();
-    ctx.moveTo(_stPx[k], _stGy[k]);
-    ctx.lineTo(_stPx[k2], _stGy[k2]);
-    ctx.lineTo(_stPx[k2], _stGy[k2] - hS);
-    ctx.lineTo(_stPx[k], _stGy[k] - hS);
-    ctx.closePath();
-    ctx.fill();
+    const fill = accentLitFill(78 + kL, 74 + kL, 68 + kL, Math.cos(aM), Math.sin(aM), 0, 1);
+    if (sink !== null) {
+      sink.quad(_stPx[k], _stGy[k], _stPx[k2], _stGy[k2],
+        _stPx[k2], _stGy[k2] - hS, _stPx[k], _stGy[k] - hS,
+        _litFinal[0], _litFinal[1], _litFinal[2], 1);
+    } else {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(_stPx[k], _stGy[k]);
+      ctx.lineTo(_stPx[k2], _stGy[k2]);
+      ctx.lineTo(_stPx[k2], _stGy[k2] - hS);
+      ctx.lineTo(_stPx[k], _stGy[k] - hS);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
   // 顶面法线 = 地表法线（平地退化为 (0,0,1)）
   var nLen = Math.hypot(sDzdx, sDzdy, 1);
-  ctx.fillStyle = accentLitFill(152 + kL, 146 + kL, 138 + kL, -sDzdx / nLen, -sDzdy / nLen, 1 / nLen, 1);
-  ctx.beginPath();
-  for (let i = 0; i < sides; i++) {
-    if (i === 0) ctx.moveTo(_stPx[i], _stGy[i] - hS); else ctx.lineTo(_stPx[i], _stGy[i] - hS);
+  const topFill = accentLitFill(152 + kL, 146 + kL, 138 + kL, -sDzdx / nLen, -sDzdy / nLen, 1 / nLen, 1);
+  if (sink !== null) {
+    sink.polyRing(_stPx, _stGy, sides, -hS, _litFinal[0], _litFinal[1], _litFinal[2], 1);
+  } else {
+    ctx.fillStyle = topFill;
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      if (i === 0) ctx.moveTo(_stPx[i], _stGy[i] - hS); else ctx.lineTo(_stPx[i], _stGy[i] - hS);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
-  ctx.lineWidth = strokeW;
-  ctx.beginPath();
-  for (let i = 0; i < sides; i++) {
-    const py = _stRy[i] < 0 ? _stGy[i] - hS : _stGy[i];
-    if (i === 0) ctx.moveTo(_stPx[i], py); else ctx.lineTo(_stPx[i], py);
+  if (sink !== null) {
+    sink.profileStroke(_stPx, _stRy, _stGy, sides, -hS, strokeW);
+  } else {
+    ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
+    ctx.lineWidth = strokeW;
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const py = _stRy[i] < 0 ? _stGy[i] - hS : _stGy[i];
+      if (i === 0) ctx.moveTo(_stPx[i], py); else ctx.lineTo(_stPx[i], py);
+    }
+    ctx.closePath();
+    ctx.stroke();
   }
-  ctx.closePath();
-  ctx.stroke();
 }
 
 // Boulder：单石，走与 RockCluster 子石同一套受光几何（drawStoneBody 共用；lite=0.5 即
@@ -637,6 +660,13 @@ function drawAccentBoulder(owner, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX)
   const AL = window.AccentLOD;
   const far = AL && AL.cfg().stoneFar && AL.tierFor(owner, 'Boulder', model, scaled) === AL.FAR;
   const sl = _terrainSlopeAt(owner.x, owner.y);
+  // ★ WebGL 石体迁移：GL 地形活动时先登记石体深度并补单石地面投影阴影（唯一观感新增），
+  //   再由 drawStoneBody 按同源几何/配色分发；否则走 Canvas 现状路径。
+  const WSL = window.WebGLStoneLayer;
+  if (WSL && WSL.sinkOn) {
+    WSL.beginStone(owner.x, owner.y, owner.z);
+    WSL.boulderGroundShadow(sx, sy, scaled);
+  }
   drawStoneBody(sx, sy, 6 * scaled, (owner && owner.rotation) || 0, 7, _BOULDER_SHAPE, 0.5,
     cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled), far, sl.dzdx, sl.dzdy);
 }
@@ -667,6 +697,10 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   // ★ v1.50.72 贴合地形：簇群锚点坡度用于全部子石（子石间距远小于地形格，同一坡度足够准确）
   const sl = _terrainSlopeAt(accent.x, accent.y);
   const clDzdx = sl.dzdx, clDzdy = sl.dzdy;
+  // ★ WebGL 石体迁移：GL 地形活动时整簇（接触阴影 + 子石）按 Canvas 同序分发给
+  //   WebGLStoneLayer；整簇登记一次深度（簇内仍按画家序叠放，深度写入关闭）。
+  var sink = (window.WebGLStoneLayer && window.WebGLStoneLayer.sinkOn) ? window.WebGLStoneLayer : null;
+  if (sink !== null) sink.beginStone(accent.x, accent.y, accent.z);
 
   // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
   function projTo(dx, dy, dz, out) {
@@ -692,19 +726,31 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
 
   // 微接触落底阴影（先画，被子石压住）：簇群整片 + 逐石接触椭圆（主石略强）
   const so = _shadowOffset(0.6, 1.2, 0.4);
-  ctx.fillStyle = 'rgba(25, 20, 15, ' + (shadowAlpha * so.alphaScale).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (sink !== null) {
+    sink.ellipseRGBA(sx + so.x * 0.5, sy + so.y * 0.35,
+      sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 25 / 255, 20 / 255, 15 / 255,
+      shadowAlpha * so.alphaScale);
+  } else {
+    ctx.fillStyle = 'rgba(25, 20, 15, ' + (shadowAlpha * so.alphaScale).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   for (let i = 0; i < nItems; i++) {
     const it = _rockScratchPool[i];
     const r = it.st.r * scaled;
     if (r < lodMinR) continue;
     if (far && it.st !== sk.stones[(model && model.stoneMain) || 0]) continue; // 远景碎石影随同略去
-    ctx.fillStyle = 'rgba(25, 20, 15, ' + ((it.st === sk.stones[0] ? stoneShadowAlpha + 0.02 : stoneShadowAlpha) * so.alphaScale).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(it.g.x + so.x * 0.4, it.g.y + so.y * 0.3, r * 1.08, r * 0.45, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const aC = (it.st === sk.stones[0] ? stoneShadowAlpha + 0.02 : stoneShadowAlpha) * so.alphaScale;
+    if (sink !== null) {
+      sink.ellipseRGBA(it.g.x + so.x * 0.4, it.g.y + so.y * 0.3, r * 1.08, r * 0.45,
+        25 / 255, 20 / 255, 15 / 255, aC);
+    } else {
+      ctx.fillStyle = 'rgba(25, 20, 15, ' + aC.toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.ellipse(it.g.x + so.x * 0.4, it.g.y + so.y * 0.3, r * 1.08, r * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   for (let i = 0; i < nItems; i++) {
