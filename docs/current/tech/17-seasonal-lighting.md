@@ -237,6 +237,18 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 
 **量化档**：`u` 量化到 `lightStepsPerYear`（默认 144 档 = 2.5°/档）。1x 下 0.6 次/秒重着色；即便 512x 且限速器打满（4 秒一圈），也只有 36 次/秒。**调色板 Map 每趟清空**：平原上大量“同反照率 + 同法线”的格子会命中同一键，实测键数远小于 14,400；趟内去重、趟间不累积，内存有界。
 
+### 4.2.1 GL Shader 化路径（★ v1.50.90 · 方案 C，31 号 §6.2 地形层落地）
+
+WebGL 地形接管后，**逐格 CPU 烘焙整条链退役**（`cell.color → parseColor → vboColor`），受光公式进顶点 shader：
+
+- **触发点闸**：`update(now, sim, glOwnsTerrain)` 第三参由 render_canvas.js 传入（= `webglTerrainRendered`）。接管时统一入口 `applyRelight(sim, glOwnsTerrain)` 只做 `S.lightRev++` + 清 dirty，**跳过 `relightTerrain` 与 `TerrainTexture.refreshPalette`**（`S.lastMs` 归零、`relightCount` 冻结）；Canvas 回退（`?webgl=0` / WebGL 不可用 / GL 初始化窗口期）第三参为 false，CPU relight 照跑零变化。GL→Canvas 运行中翻转时 render_canvas.js 调一次 `markDirty()` 保证回退首帧即重烘焙。
+- ⚠️ **`S.lightRev++` 必须在 applyRelight 触发点计数，严禁移入 relightTerrain 内**——GL 跳过分支不进该函数，移入则 GL 永不更新光照。
+- **顶点数据**：法线/AO/反照率来自 rustworld.js 世界建缓存预存数组（`terr.nx/ny/nz/ao/albR/G/B`，世界静态），terrain-renderer.js 构建为 `vboShade`（8 float/顶点：normal³ + ao + albedo³ + side），仅在几何闸（gridRev + materialRev 反照率指纹）变化时上传一次；侧壁顶点带朝外法线 + `side=1` 旗标。
+- **顶点 shader 直译 `shadeAlbedoInto`**：wrap 漫反射 → `(amb+inv·wd)·ao·inten` → kMin/kMax 钳制 → tint → `mix(lit, wash, washA)` 色洗——与 CPU 公式同源同序（光向按 `lightParams()` 原值直传，**不做归一化**，legacy 对照路径 `legacyDir` 非严格单位向量）；侧壁（side=1）输出固定平色 `u_wallColor`（现状语义，仍乘片元阴影因子）。**逐顶点受光 → 插值 v_color**，与 CPU「逐格烘焙 → 角点插值」的 GPU 语义逐位同构；shader 用 0-1 连续浮点不做 256 级 round（角点偏差 <1/255，消除量化色阶属质量提升）。
+- **uniform 节流**：terrain-renderer 每帧比对 `SimLighting.lightRev()`，仅变化时上传 5 组 uniform（u_lightDir / u_lightParams(amb,inv,kMin,kMax) / u_lightMisc(wrap,invWrap,inten,washA) / u_lightTint / u_lightWash，JS 侧已 /255）+ 常量 u_wallColor；u_matrix 与阴影组（u_shadowMap/u_lightMat/u_shadowOn/u_shadowStrength）不变。
+- **性能**：光档变化成本 60-150ms CPU 烘焙 + ~26 万次 parseColor + 4.55MB VBO 重传 → **5 组 uniform（≈60 字节）**；实测 `update(..., true)` 全程 0.1ms。128x 倍速开动态光的周期性掉帧根因消除。
+- **边界**：`shadeAlbedoInto` / `lightParams` / `relightTerrain` 函数体零修改；纹样层 GL 侧仍预留（`v_texCoord`，31 号 §6.2 阶段四）；明暗主题切换（washA）与现状同语义——下一光档生效。
+
 ### 4.3 L2 · 立体实体面光照
 
 给每个被绘制的多边形**显式指定世界法线**，再用 `shadeFace(baseColor, n, L, ambient)` 求色（结果按 `(baseColor, 量化 k)` 缓存，键数极小）：

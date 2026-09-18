@@ -258,12 +258,21 @@ if (isCameraFollow && sim.selectionType === 'agent') {
 
   window.webglTerrainActive = webglTerrainRendered;
 
+  // ★ v1.50.90 GL→Canvas 转换保险（WebGL 上下文丢失 / shouldUseWebgl 翻转）：GL 接管期间
+  //   relightTerrain 被跳过、cell.color 冻结——回退 Canvas 前强制标脏，回退首帧即重烘焙。
+  if (window._prevWebglTerrainRendered && !webglTerrainRendered && window.SimLighting) {
+    window.SimLighting.markDirty();
+  }
+  window._prevWebglTerrainRendered = webglTerrainRendered;
+
   if (ctx) {
     ctx.clearRect(0, 0, w, h);
 
     // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
     //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/17-seasonal-lighting.md §3.7）
-    if (window.SimLighting) window.SimLighting.update(now, sim);
+    //    ★ v1.50.90 第三参 = GL 地形是否接管：接管时 applyRelight 跳过 CPU 逐格烘焙与
+    //    TerrainTexture 色档（shader 顶点受光取代），lightRev 版本号照常推进供 uniform 闸消费。
+    if (window.SimLighting) window.SimLighting.update(now, sim, webglTerrainRendered);
 
     // 1. 天空与地平氛围：未启用 WebGL 地形时由 Canvas 2D 铺满天空；启用 WebGL 时由 WebGL 自带天幕背景
     if (!webglTerrainRendered) {

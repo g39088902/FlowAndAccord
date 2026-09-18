@@ -46,6 +46,7 @@ window.SimLighting = (function () {
     shadowWx: 0, shadowWy: 1, shadowLen: 1, shadowAlpha: 0.26,
     dirty: true, snapNext: true,
     lastMs: 0, relightCount: 0, lastNow: 0,
+    lightRev: 0,          // ★ v1.50.90 GL shader 光照版本号：每次「relight 语义发生」+1（GL 跳过 CPU 烘焙也要推进）
   };
 
   // ── 面光照缓存（键含光档，光档变化即整体失效） ──
@@ -94,8 +95,20 @@ window.SimLighting = (function () {
     return ambient + (1 - ambient) * wd;
   }
 
+  // ── ★ v1.50.90 relight 触发点统一入口（GL shader 光照路径的版本号闸） ──
+  // glOwnsTerrain = GL 地形已接管（terrain-renderer 顶点 shader 自算受光，不再消费 cell.color）：
+  //   跳过 CPU 逐格烘焙与 TerrainTexture 色档（128x 倍速卡顿根因），但 lightRev 仍推进——
+  //   **必须在触发点计数，严禁移入 relightTerrain 内**（GL 跳过分支不进该函数，否则 GL 永不更新）。
+  // glOwnsTerrain 缺省 false：Canvas 回退 / 无头 / 旧调用点语义零变化（CPU relight 照跑）。
+  function applyRelight(sim, glOwnsTerrain) {
+    S.lightRev++;
+    S.dirty = false;                 // GL 跳过分支也必须清 dirty，否则每帧 lightRev++ 破坏节流
+    if (glOwnsTerrain) { S.lastMs = 0; return; }
+    relightTerrain(sim);             // Canvas 回退：原路径原样执行（含末尾 refreshPalette）
+  }
+
   // ── 每帧推进光相（仅渲染路径调用；无头模式不调用，恢复渲染时按 §2.7 规则自动对齐） ──
-  function update(now, sim) {
+  function update(now, sim, glOwnsTerrain) {
     const c = cfg();
     const dtReal = S.lastNow ? clamp((now - S.lastNow) / 1000, 0, 0.25) : 0;
     S.lastNow = now;
@@ -111,7 +124,7 @@ window.SimLighting = (function () {
       S.intensity = 1.0;
       S.tint = [1, 1, 1];
       applyShadowVector(c, LEGACY_ELEV, azRad);
-      if (S.stamp !== -1 || S.dirty) { S.stamp = -1; relightTerrain(sim); }
+      if (S.stamp !== -1 || S.dirty) { S.stamp = -1; applyRelight(sim, glOwnsTerrain); }
       return;
     }
 
@@ -157,7 +170,7 @@ window.SimLighting = (function () {
     const stamp = Math.round(S.phase * c.lightStepsPerYear);
     if (S.dirty || stamp !== S.stamp) {
       S.stamp = stamp;
-      relightTerrain(sim);
+      applyRelight(sim, glOwnsTerrain);
     }
   }
 
@@ -419,6 +432,8 @@ window.SimLighting = (function () {
     shadeAlbedoInto,
     lastMs: () => S.lastMs,
     relightCount: () => S.relightCount,
+    // ★ v1.50.90 GL shader 光照版本号（terrain-renderer uniform 上传闸；applyRelight 触发点计数）
+    lightRev: () => S.lightRev,
     // 时间跳变（读档 / 重置 / 时光倒流 / 无头恢复）后立即对齐，不做平滑
     resync: () => { S.snapNext = true; S.dirty = true; },
     markDirty: () => { S.dirty = true; },

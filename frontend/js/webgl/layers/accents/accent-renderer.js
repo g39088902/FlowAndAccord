@@ -15,6 +15,9 @@
 //   4. 深度只用于与 GL 地形正确遮挡（锚点世界深度 + 1 世界单位朝相机偏置防 z-fighting，
 //      NDC z 系数与 projection-utils.js::getAxonometricMatrix 的 sz=-0.0005 逐位一致）；
 //      **深度写入关闭** ⇒ 图元之间仍按收集序（画家算法）叠放，与 Canvas 一致；
+//      ★ v1.50.89 图元级视深细化：抬高图元（叶簇/枝条/花芽/草叶）经 setViewDepth 按自身
+//      3D 视深（projTo().d 近端 + 代理半径）覆写——整株共享锚点深度在陡视角下会被
+//      「锚点下前方更近的地面」整片裁掉叶簇下部（Canvas 无深度测试无此问题）；
 //   5. 阴影归 WebGLShadowPass 阴影图（世界空间代理几何 → 光向深度 → GL 地形采样变暗），
 //      本层**不再手绘任何阴影贴片**（v1.50.84 起：贴地投影/接触影在 GL 模式下全部省略）。
 //
@@ -58,7 +61,8 @@ class WebGLAccentRenderer {
     this.vbo = null;
     this.isReadyFlag = false;
     this._sinkOn = false;   // beginFrame..endFrame 之间为 true（绘制函数 sink 分发开关）
-    this._z = 0;            // 当前图元 NDC 深度（beginAccent 刷新）
+    this._z = 0;            // 当前图元 NDC 深度（beginAccent/setViewDepth 刷新）
+    this._z0 = 0;           // 本株锚点世界视深（setViewDepth 的相对基准，beginAccent 刷新）
     this._fCount = 0;       // CPU 顶点缓冲已写浮点数（13 floats/vertex）
     this._cpu = new Float32Array(13 * 6 * 1024); // 1024 quad 起步容量，不足倍增
     // 描边 miter 偏移刮擦（n ≤ 32：树干轮廓 18 / 曲线展平 ≤ 17）
@@ -170,7 +174,16 @@ class WebGLAccentRenderer {
     const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
     const ry = wx * sinZ + wy * cosZ;
     const depth = ry * sinX + ((wz || 0) + MAP_Z_LIFT) * cosX;
+    this._z0 = depth;
     this._z = _ACCENT_DEPTH_TO_NDC * (depth + _ACCENT_DEPTH_BIAS);
+  }
+
+  // setViewDepth：图元级视深覆写（★ v1.50.89）。dRel = 图元自身 3D 视深**相对锚点**的增量
+  // （即绘制函数 projTo().d，世界单位未乘 scaled）+ 代理半径补偿（叶簇椭圆是屏幕空间
+  // billboard，rim 像素无单一 3D 对应点，取簇世界半径 = 簇模型半径 × accent.scale 作近端补偿）。
+  // 只影响与 GL 地形的深度测试（深度写入关闭，图元间仍画家序），Canvas 路径零参与。
+  setViewDepth(dRel) {
+    this._z = _ACCENT_DEPTH_TO_NDC * (this._z0 + dRel + _ACCENT_DEPTH_BIAS);
   }
 
   // endFrame：整批提交。混合 + 深度测试开、深度写入关（图元间保持画家序；

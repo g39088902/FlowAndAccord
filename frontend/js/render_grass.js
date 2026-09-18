@@ -139,6 +139,9 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     const lwBlade = Math.max(0.5, (it.b.plume > 0 ? 0.52 : 0.62) * scaled);
     if (sink !== null) {
       // 草叶：开折线描边 + 圆头（同 Canvas lineCap='round' 逐叶 stroke 语义）
+      // ★ v1.50.89 图元级视深：草叶按近端 3D 视深（叶尖/叶基取大）测试地形，
+      //   俯视时外倾叶尖不再被锚点下前方更近地面裁掉（同叶芦花穗复用同一深度）
+      sink.setViewDepth(Math.max(p0.d, p1.d));
       const np = _flattenQuad(0, p0.x, p0.y, c.x, c.y, p1.x, p1.y);
       sink.polyStroke(_flatX, _flatY, np, false, lwBlade, nr / 255, ng / 255, nb / 255, 1, true);
     } else {

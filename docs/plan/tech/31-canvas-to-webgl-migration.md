@@ -808,6 +808,8 @@ Interaction: 鼠标控制视角旋转和缩放
 
 #### Step 2.1: Shader 设计与编译 (Week 1, Day 1)
 
+> ★ **状态更新（v1.50.90 · 方案 C 已落地）**：光照进 shader 已在本节原型设想之前由 [17 号 §4.2.1](../../current/tech/17-seasonal-lighting.md) 的路径实现——terrain-renderer.js 顶点 shader 直译 `shadeAlbedoInto`（逐顶点受光 + 法线/AO/反照率静态 `vboShade` + `lightRev` uniform 节流，GL 接管时 CPU 逐格烘焙退役），与本节 instancing/batcher 原型无关（实际 Phase 2 走直接 quad 渲染，未采用 batch/instancing 设计）；纹样层（`v_texCoord`）仍为阶段四预留。以下原型保留作历史设计参考。
+
 **地形顶点着色器** (`frontend/js/webgl/layers/terrain/shaders/terrain.vert`):
 ```glsl
 // === Terrain Vertex Shader (WebGL 2) ===

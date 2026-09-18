@@ -77,6 +77,9 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       const stemFill = accentLitFill(104, 78, 54, _cylFront.x, _cylFront.y, _cylFront.z, 1);
       if (sink !== null) {
         // 茎：开折线描边 + 圆头（同 Canvas lineCap='round' 逐茎 stroke 语义）
+        // ★ v1.50.89 图元级视深：茎按近端 3D 视深（两端 projTo().d 取大）测试地形，
+        //   俯视时外倾茎不再被锚点下前方更近地面裁掉（高光带同茎复用同一深度）
+        sink.setViewDepth(Math.max(a.d, b.d));
         const np = _flattenQuad(0, a.x, a.y, c.x, c.y, b.x, b.y);
         sink.polyStroke(_flatX, _flatY, np, false, lwSeg, _litFinal[0], _litFinal[1], _litFinal[2], 1, true);
       } else {
@@ -155,6 +158,9 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     for (let i = 0; i < nItems; i++) {
       const it = _crownScratchPool[i];
       const sw = lw + it.rr * 0.16;
+      // ★ v1.50.89 图元级视深：叶簇按簇心 3D 视深 + 簇世界半径（billboard 近端补偿），
+      //   与 Tree Pass A 同口径——俯视时低矮铺展的簇丛下部不再被更近地面裁切
+      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1));
       sink.ellipseRGBA(it.px, it.py, it.rr + sw, it.rr * squash + sw, ar, ag, ab, 1);
     }
   } else {
@@ -179,6 +185,7 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const kZ = 0.80 + 0.20 * tZ;
     const clusterFill = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, c.nx, c.ny, c.nz, kZ);
     if (sink !== null) {
+      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1)); // ★ v1.50.89 同簇同深度（Pass A 口径一致）
       sink.ellipseRGBA(it.px, it.py, it.rr, it.rr * squash, _litFinal[0], _litFinal[1], _litFinal[2], 1);
     } else {
       ctx.fillStyle = clusterFill;
@@ -235,6 +242,7 @@ function drawBushFlowers(scaled, season, model, detailMid, projTo) {
     const col = (pal && pal[f.hue]) || _flowerPaletteFallback[f.hue] || _flowerPaletteFallback[0];
     const flCol = accentLitFill(col[0], col[1], col[2], c.nx, c.ny, c.nz, 1, alpha * v);
     if (sink !== null) {
+      sink.setViewDepth(p.d); // ★ v1.50.89 花点按宿主位置 3D 视深
       sink.ellipseRGBA(p.x, p.y, dr, dr * 0.92, _litFinal[0], _litFinal[1], _litFinal[2], alpha * v);
     } else {
       ctx.fillStyle = flCol;

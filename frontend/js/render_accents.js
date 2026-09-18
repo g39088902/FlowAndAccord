@@ -476,6 +476,9 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       const branchFill = accentLitFill(96, 70, 48, _cylFront.x, _cylFront.y, _cylFront.z, 1);
       if (sink !== null) {
         // 枝条：开折线描边 + 圆头（同 Canvas lineCap='round' 逐段 stroke 语义）
+        // ★ v1.50.89 图元级视深：枝条按近端 3D 视深（两端 projTo().d 取大）测试地形，
+        //   陡视角下不再被锚点下前方更近地面裁掉（高光带同段复用同一深度）
+        sink.setViewDepth(Math.max(a.d, b.d));
         const np = _flattenQuad(0, a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2 + bw * 0.35, b.x, b.y);
         sink.polyStroke(_flatX, _flatY, np, false, lwSeg, _litFinal[0], _litFinal[1], _litFinal[2], 1, true);
       } else {
@@ -559,6 +562,9 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     for (let i = 0; i < nItems; i++) {
       const it = _crownScratchPool[i];
       const sw = lw + it.rr * 0.16;
+      // ★ v1.50.89 图元级视深：叶簇椭圆按簇心 3D 视深 + 簇世界半径（billboard 近端补偿）——
+      //   俯视时叶簇下部不再被锚点下前方更近地面整片裁切（Pass B/亮部同簇同深度）
+      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1));
       sink.ellipseRGBA(it.px, it.py, it.rr + sw, it.rr * squash + sw, ar, ag, ab, 1);
     }
   } else {
@@ -587,6 +593,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const wn = window.AccentModel.shearNormalInto(c.nx, c.ny, c.nz, leanShear, _nrm);
     const clusterFill = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, wn.x, wn.y, wn.z, kZ);
     if (sink !== null) {
+      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1)); // ★ v1.50.89 同簇同深度（Pass A 口径一致）
       sink.ellipseRGBA(it.px, it.py, it.rr, it.rr * squash, _litFinal[0], _litFinal[1], _litFinal[2], 1);
     } else {
       ctx.fillStyle = clusterFill;
@@ -621,6 +628,7 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
         const t = sk.branchTips[i];
         const p = _ptD;
         projTo(t.x, t.y, t.z + 0.3, p);
+        sink.setViewDepth(p.d); // ★ v1.50.89 芽点按自身 3D 视深
         sink.ellipseRGBA(p.x, p.y, br, br * 1.3, 198 / 255, 216 / 255, 130 / 255, budA);
       }
     } else {
