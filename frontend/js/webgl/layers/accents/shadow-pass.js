@@ -259,13 +259,17 @@ class WebGLShadowPass {
   _addAccent(verts, sim, accent) {
     const kind = accent.kind;
     const model = window.AccentModel.get(accent);
-    if (!model || !model.skeleton) return;
+    if (!model) return;
     if (kind === 'Tree' || kind === 'Bush') {
+      if (!model.skeleton) return;
       this._addTreeLike(verts, sim, accent.x, accent.y, accent.z, accent.scale, model, kind, accent);
     } else if (kind === 'Boulder') {
+      const shape = window._BOULDER_SHAPE || (typeof _BOULDER_SHAPE !== 'undefined' ? _BOULDER_SHAPE : null)
+        || [0.82, 0.874, 0.982, 1.037, 1.145, 1.20, 0.82];
       this._addStones(verts, sim, accent.x, accent.y, accent.z, accent.rotation || 0, accent.scale, model,
-        window._BOULDER_SHAPE, 7, 6 * accent.scale);
+        shape, 7, 6 * accent.scale);
     } else if (kind === 'RockCluster') {
+      if (!model.skeleton) return;
       this._addStones(verts, sim, accent.x, accent.y, accent.z, accent.rotation || 0, accent.scale, model);
     }
     // GrassTuft：草叶过细，投影不可辨，不建代理
@@ -326,19 +330,23 @@ class WebGLShadowPass {
   _addStones(verts, sim, ax, ay, az, rot, scale, model, shape, sides, rW) {
     const sl = this._slopeAt(sim, ax, ay);
     const k = (window.RENDER_CONFIG && window.RENDER_CONFIG.accentStoneHeightK) || 0.3;
+    const effK = Math.max(0.45, k);
     if (shape) {
-      this._stonePrism(verts, ax, ay, az, rot, sides, shape, rW, rW * k, sl.dzdx, sl.dzdy);
+      const hW = Math.max(1.8 * (scale || 1), rW * effK);
+      this._stonePrism(verts, ax, ay, az, rot, sides, shape, rW, hW, sl.dzdx, sl.dzdy);
       return;
     }
     const sk = model && model.skeleton;
     if (!sk || !sk.stones) return;
-    const s = scale;
+    const s = scale || 1;
     const cR = Math.cos(rot), sR = Math.sin(rot);
     for (let i = 0; i < sk.stones.length; i++) {
       const st = sk.stones[i];
       const sx = ax + (st.x * cR - st.y * sR) * s;
       const sy = ay + (st.x * sR + st.y * cR) * s;
-      this._stonePrism(verts, sx, sy, az, st.rot, st.sides, st.shape, st.r * s, st.r * s * k, sl.dzdx, sl.dzdy);
+      const srW = st.r * s;
+      const shW = Math.max(0.9 * s, srW * effK);
+      this._stonePrism(verts, sx, sy, az, st.rot, st.sides, st.shape, srW, shW, sl.dzdx, sl.dzdy);
     }
   }
 
@@ -351,12 +359,14 @@ class WebGLShadowPass {
       const dx = rv * Math.cos(a), dy = rv * Math.sin(a);
       bx.push(cx + dx); by.push(cy + dy); bz.push(cz + dx * dzdx + dy * dzdy);
     }
+    const sinkD = 0.4; // 底端下沉扎入地面，消除斜坡缝隙漏光
     for (let i = 0; i < sides; i++) {
       const j = (i + 1) % sides;
+      const bzi = bz[i] - sinkD, bzj = bz[j] - sinkD;
       const tzi = bz[i] + hW, tzj = bz[j] + hW;
       // 侧面 quad（双面渲染，绕向无关）
-      verts.push(bx[i], by[i], bz[i], bx[j], by[j], bz[j], bx[j], by[j], tzj);
-      verts.push(bx[i], by[i], bz[i], bx[j], by[j], tzj, bx[i], by[i], tzi);
+      verts.push(bx[i], by[i], bzi, bx[j], by[j], bzj, bx[j], by[j], tzj);
+      verts.push(bx[i], by[i], bzi, bx[j], by[j], tzj, bx[i], by[i], tzi);
     }
     // 顶面扇形
     let tx = 0, ty = 0, tz = 0;
@@ -365,6 +375,14 @@ class WebGLShadowPass {
     for (let i = 0; i < sides; i++) {
       const j = (i + 1) % sides;
       verts.push(tx, ty, tz, bx[i], by[i], bz[i] + hW, bx[j], by[j], bz[j] + hW);
+    }
+    // 底面扇形（扎入地底封闭，防止倾斜光线穿透）
+    let bxMid = 0, byMid = 0, bzMid = 0;
+    for (let i = 0; i < sides; i++) { bxMid += bx[i]; byMid += by[i]; bzMid += bz[i] - sinkD; }
+    bxMid /= sides; byMid /= sides; bzMid /= sides;
+    for (let i = 0; i < sides; i++) {
+      const j = (i + 1) % sides;
+      verts.push(bxMid, byMid, bzMid, bx[j], by[j], bz[j] - sinkD, bx[i], by[i], bz[i] - sinkD);
     }
   }
 

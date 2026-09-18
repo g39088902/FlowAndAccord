@@ -675,12 +675,12 @@ function _terrainSlopeAt(wx, wy) {
   _slope.dzdy = cell.dzdy || 0;
   return _slope;
 }
-// Boulder 固定七边形变径（0.82~1.20），与 v1.49.3 起旧公式 r·(0.82+0.38·((i·37+13)%7)/7) 逐位一致
 var _BOULDER_SHAPE = (function () {
   const s = [];
   for (let i = 0; i < 7; i++) s.push(0.82 + 0.38 * (((i * 37 + 13) % 7) / 7));
   return s;
 })();
+if (typeof window !== 'undefined') window._BOULDER_SHAPE = _BOULDER_SHAPE;
 function rockHeightK() {
   const v = window.RENDER_CONFIG && window.RENDER_CONFIG.accentStoneHeightK;
   return Number.isFinite(v) ? v : 0.3;
@@ -770,7 +770,18 @@ function drawAccentBoulder(owner, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX)
   // ★ WebGL 装饰层：GL 模式登记石体深度（画家序不变，深度对齐地形），石体几何经
   //   drawStoneBody sink 分发；落底阴影由阴影图（WebGLShadowPass）承担，不再手绘。
   const WSL = window.WebGLAccentLayer;
-  if (WSL && WSL.sinkOn) WSL.beginAccent(owner.x, owner.y, owner.z);
+  if (WSL && WSL.sinkOn) {
+    WSL.beginAccent(owner.x, owner.y, owner.z);
+  } else if (typeof ctx !== 'undefined' && ctx) {
+    // 2D 模式手绘接地接触阴影（与 RockCluster 同向、同色板、沿世界光向）
+    const RC = window.RENDER_CONFIG || {};
+    const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
+    const so = (typeof _shadowOffset === 'function') ? _shadowOffset(0.6, 1.2, 2.0 * (owner.scale || 1)) : { x: 2, y: 1.5, alphaScale: 1 };
+    ctx.fillStyle = 'rgba(25, 20, 15, ' + ((stoneShadowAlpha + 0.04) * (so.alphaScale || 1)).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(sx + so.x * 0.4, sy + so.y * 0.3, 6 * scaled * 1.12, 6 * scaled * 0.48, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   drawStoneBody(sx, sy, 6 * scaled, (owner && owner.rotation) || 0, 7, _BOULDER_SHAPE, 0.5,
     cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled), far, sl.dzdx, sl.dzdy);
 }

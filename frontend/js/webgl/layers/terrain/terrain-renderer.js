@@ -77,9 +77,8 @@ class TerrainWebGLRenderer {
           // 世界 → 光向 NDC → 深度图 UV/深度（仿射，w=1）
           vec3 p = (u_lightMat * vec4(v_world, 1.0)).xyz * 0.5 + 0.5;
           if (p.x > 0.001 && p.x < 0.999 && p.y > 0.001 && p.y < 0.999 && p.z < 1.0) {
-            // 中心 + 4 tap PCF（1 texel）：独立比较各采样深度，对遮挡比例做均值
-            // 严禁对 depth 采样值直接做均值（背景空像素深度为 1.0，直接均值会使细小/收缩阴影瞬间灭绝）
-            float bias = 0.0012;
+            // 阴影图仅包含地表实体（树/灌木/岩石/地标子图元），无地形自交，bias 精细化至 0.0003（约 0.49m）以完备投射岩石
+            float bias = 0.0003;
             float inShadow = 0.0;
             inShadow += (p.z - bias > texture(u_shadowMap, p.xy).r) ? 1.0 : 0.0;
             inShadow += (p.z - bias > texture(u_shadowMap, p.xy + vec2(1.0 / 2048.0, 0.0)).r) ? 1.0 : 0.0;
