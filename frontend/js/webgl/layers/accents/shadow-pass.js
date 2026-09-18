@@ -19,12 +19,24 @@
 // 确定性红线：纯表现层，不消耗 WorldRng、不写模拟状态、不进快照；SimLighting 缺席或
 //   光向退化时本帧禁用阴影（地形外观不变）。
 //
-// 缓存：代理顶点按「世界 accents 数量 + 景观组版本/可见数签名」重建（房屋/车道遮蔽变化
-// 会改变可见子图元集合 → 签名漂移自动重建）；rustworld.js::_invalidateWorldStaticCaches
-// 在 READY/LOAD/REWIND/RESET 时调用 resetCache()。
+// ★ v1.50.91 代理集合与画面绘制集合同谓词（修复「有影子无树」）：① 基础装饰跳过
+//   LandscapeMask.accentHidden（被车道/房屋/POI 保护区遮蔽或被可见景观去重的个体不再投影
+//   ——绘制端 render_depth_queue.js 同谓词跳过，此前阴影端漏查留下幻影）；② 景观子图元
+//   加查 LandscapeModel.childActive（库存低于阈值的 detail 小灌木画面端不画，投影同步省略）；
+//   ③ 冠簇椭球跟随季相叶量：accentClusterVisibility(leaf, shed, 0.09) < 0.06 的簇不投影、
+//   幸存簇半径 ×v（与 drawAccentTree/drawAccentBush 同判据）——冬季落叶树不再投满冠影。
+//
+// 缓存：代理顶点按签名重建。签名 = 未遮蔽基础装饰数 + 景观组版本/「未遮蔽且达库存门槛」
+//   子图元数 + 落叶基准曲线叶量 8 档量化（档位只在春秋过渡带跨越，夏/冬平台零重建）；
+//   季相档位驱动的重建限频 250ms（高倍速下叶量档位高频跨越，防止逐帧重建代理顶点）；
+//   rustworld.js::_invalidateWorldStaticCaches 在 READY/LOAD/REWIND/RESET 时调用 resetCache()。
 // 零 GC：重建走一次性临时数组（世界生命周期级，非每帧）；每帧仅 uniform/矩阵计算。
 
 // 光向退化保护：|L| 过小或仰角过低（L.z < 0.2，对应 < ~11.5°）时本帧禁用阴影。
+
+// 季相签名基准个体：落叶乔木曲线（kind/id 稳定，仅用于签名的叶量档位采样）
+const _SEASON_CANON = { kind: 'Tree', id: 0 };
+
 class WebGLShadowPass {
   constructor(webglContext, shaderManager) {
     this.gl = webglContext.GL;
@@ -38,8 +50,11 @@ class WebGLShadowPass {
     this.strength = 0.38;             // 阴影内地形变暗比例（RENDER_CONFIG.accentWebglShadowStrength）
     this.isReadyFlag = false;
     this._dirty = true;
-    this._sig = '';
-    this._proxyCount = 0;             // 代理顶点数
+    this._sigS = '';                // 结构签名（装饰/景观集合谓词指纹）
+    this._sigT = 0;                 // 季相签名（落叶基准叶量 8 档量化）
+    this._sigOut = { s: '', t: 0 }; // 签名复用出口（零每帧分配）
+    this._seasonRebuiltAt = -1e9;   // 上次季相驱动重建时刻（限频用，performance.now() 域）
+    this._proxyCount = 0;           // 代理顶点数
     this._active = false;             // 本帧是否成功产出阴影图
     this.lightMatrix = new Float32Array(16); // 世界 → 光向 NDC（列主序）
     this._L = { x: 0, y: 0, z: 0 };
@@ -125,11 +140,20 @@ class WebGLShadowPass {
     if (!(ll > 0.5) || !(L.z > 0.2)) return; // 光向退化/仰角过低：本帧禁用
     L.x /= ll; L.y /= ll; L.z /= ll;
 
-    const sig = this._signature(sim);
-    if (this._dirty || sig !== this._sig) {
+    // 签名判定：结构变化（建房/修路/库存跨越阈值/世界生命周期）立即重建；
+    // 仅季相档位变化时限频 250ms（高倍速下叶量档位高频跨越，防逐帧重建代理顶点）。
+    const sig = this._signature(sim, this._sigOut);
+    let rebuild = this._dirty || sig.s !== this._sigS;
+    if (!rebuild && sig.t !== this._sigT) {
+      const now = performance.now();
+      if (now - this._seasonRebuiltAt >= 250) rebuild = true;
+    }
+    if (rebuild) {
       this._rebuild(sim);
-      this._sig = sig;
+      this._sigS = sig.s;
+      this._sigT = sig.t;
       this._dirty = false;
+      this._seasonRebuiltAt = performance.now();
     }
     if (this._proxyCount === 0) return;
 
@@ -156,30 +180,49 @@ class WebGLShadowPass {
   }
 
   // ── 代理几何 ──────────────────────────────────────────────────────────────
-  // 签名：accents 数量 + 景观几何版本与可见子图元数（遮蔽变化 → 重建）
-  _signature(sim) {
-    let sig = (sim.terrain.accents ? sim.terrain.accents.length : 0) | 0;
+  // 签名（与 _rebuild 同谓词的代理集合指纹，写入 out 复用对象，零每帧分配）：
+  //   s（结构）= 未遮蔽基础装饰数（accentHidden 过滤；遮蔽判定有 accent._lm 缓存）
+  //     ×31 + 景观组版本 + 「未遮蔽且达库存门槛（childActive）」子图元数；
+  //   t（季相）= 落叶乔木基准曲线叶量 8 档量化——档位只在春秋过渡带跨越，
+  //     夏/冬平台零重建；个体 jitter（±0.025 年）与画面端的微差对阴影不可辨。
+  _signature(sim, out) {
+    const accents = sim.terrain.accents;
+    const MK = window.LandscapeMask;
+    let s = 0;
+    if (accents) {
+      for (let i = 0; i < accents.length; i++) {
+        if (!(MK && MK.accentHidden(accents[i]))) s = (s + 1) | 0;
+      }
+    }
     const LM = window.LandscapeModel;
     if (LM && window.RENDER_CONFIG && window.RENDER_CONFIG.landscapeEnabled !== false) {
       LM.sync(sim);
-      sig = (sig * 31 + LM.version()) | 0;
+      s = (s * 31 + LM.version()) | 0;
       const gs = LM.groups();
       for (let i = 0; i < gs.length; i++) {
         const ch = gs[i].children;
         for (let c = 0; c < ch.length; c++) {
-          if (!window.LandscapeMask.childHidden(ch[c])) sig = (sig + 1) | 0;
+          if (!MK.childHidden(ch[c]) && LM.childActive(gs[i], ch[c])) s = (s + 1) | 0;
         }
       }
     }
-    return sig;
+    out.s = s;
+    const ST = window.SimTreeTint;
+    out.t = (ST && sim) ? Math.round(ST.sample(_SEASON_CANON, sim).leafDensity * 8) | 0 : 0;
+    return out;
   }
 
   _rebuild(sim) {
     const verts = [];
     const t = sim.terrain;
     const accents = t.accents;
+    const MK = window.LandscapeMask;
     if (accents) {
-      for (let i = 0; i < accents.length; i++) this._addAccent(verts, sim, accents[i]);
+      // ★ v1.50.91 与绘制集合同谓词：被保护区遮蔽/被可见景观去重的装饰不画也不投影
+      for (let i = 0; i < accents.length; i++) {
+        if (MK && MK.accentHidden(accents[i])) continue;
+        this._addAccent(verts, sim, accents[i]);
+      }
     }
     // 资源景观子图元（Tree/Bush/RockCluster；遮蔽子图元不投影）
     const LM = window.LandscapeModel;
@@ -190,11 +233,14 @@ class WebGLShadowPass {
         const ch = gs[gi].children;
         for (let ci = 0; ci < ch.length; ci++) {
           const child = ch[ci];
-          if (window.LandscapeMask && window.LandscapeMask.childHidden(child)) continue;
+          if (MK && MK.childHidden(child)) continue;
+          // ★ v1.50.91 库存门槛同谓词：detail 小灌木 q < qThreshold 时画面端不画，投影同步省略
+          if (!LM.childActive(gs[gi], child)) continue;
           const kind = child.modelKind;
           if (kind !== 'Tree' && kind !== 'Bush' && kind !== 'RockCluster') continue;
           const model = landscapeChildModel(child); // render_landscapes.js 全局（'L#' 键单一来源）
-          const shim = { rotation: child.rot || 0, id: child.visualSeed };
+          // kind 入 shim：SimTreeTint.sample 的 jitter 通道与 kind 回退需要（与绘制端 shim 同构）
+          const shim = { kind: kind, rotation: child.rot || 0, id: child.visualSeed };
           if (kind === 'RockCluster') this._addStones(verts, sim, child.x, child.y, child.z, child.rot || 0, child.scale, model);
           else this._addTreeLike(verts, sim, child.x, child.y, child.z, child.scale, model, kind, shim);
         }
@@ -254,12 +300,23 @@ class WebGLShadowPass {
       }
     }
     // 冠簇椭球（z 向略扁，对应画面 crownSquash 的竖直压扁读感）
+    // ★ v1.50.91 跟随季相叶量：与 drawAccentTree/drawAccentBush 同判据——
+    //   accentClusterVisibility(leaf, shed, 0.09) < 0.06 的簇不投影，幸存簇半径 ×v
+    //   （落叶树冬季只剩枝干投影，不再投满冠影）；SimTreeTint/可见度函数缺席时回退全冠。
     if (sk.clusters) {
+      const visFn = window.accentClusterVisibility;
+      const ST = window.SimTreeTint;
+      const leaf = (ST && sim) ? ST.sample(rotSrc, sim, model.profile).leafDensity : 1;
       for (let i = 0; i < sk.clusters.length; i++) {
         const c = sk.clusters[i];
+        let v = 1;
+        if (leaf < 1 && visFn) {
+          v = visFn(leaf, c.shed, 0.09);
+          if (v < 0.06) continue;
+        }
         this._ellipsoid(verts,
           ax + (c.x + lean * c.z) * s, ay + c.y * s, az + c.z * s,
-          Math.max(0.15, c.r * s), 0.85);
+          Math.max(0.15, c.r * s * v), 0.85);
       }
     }
   }
