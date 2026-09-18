@@ -47,6 +47,8 @@ window.RENDER_CONFIG = {
   // 「足迹触及的最远格心 + ε」之上，否则该格后画盖掉下半（「半截入土」）。
   agentFootprintR: 18,        // 族人：人偶/受孕环/施工环/选中环以锚点为中心，下方笔迹最大 ~9px
   laneFootprintR: 6,          // 路面：描边半宽 ~1.4px，热力图高等级外光晕 ~2.9px
+  laneCullPadPx: 16,          // ★ v1.50.88 车道屏幕 AABB 粗剔外扩余量（CSS px；覆盖描边宽与外光晕）
+  laneAdaptiveSegPx: 140,     // ★ v1.50.88 车道屏幕弧长低于此用 8 段（否则 16 段）；0 = 关闭自适应
   poiBaseCampR: 16,           // 营地底座基础半径（每等级 +poiBaseCampRPerLevel）
   poiBaseCampRPerLevel: 3,
   poiBaseResourceR: 12,       // 资源点底座半径

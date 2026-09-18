@@ -67,14 +67,21 @@ function _depthItem(kind, a, b, depth) {
 }
 
 // 道路分段持久投影缓冲（消除每帧分配）
-let _lanePX = null, _lanePY = null, _laneWX = null, _laneWY = null, _laneWZ = null, _laneCum = null;
+let _lanePX = null, _lanePY = null, _laneCum = null;
 function _ensureLaneBuf(n) {
   if (!_lanePX || _lanePX.length < n) {
     _lanePX = new Float32Array(n + 16); _lanePY = new Float32Array(n + 16);
-    _laneWX = new Float64Array(n + 16); _laneWY = new Float64Array(n + 16);
-    _laneWZ = new Float64Array(n + 16); _laneCum = new Float32Array(n + 16);
+    _laneCum = new Float32Array(n + 16);
   }
 }
+
+// ★ v1.50.88 车道静态几何缓存（lane → { wx/wy/wz:17 点世界采样, depth:16 段足迹深度,
+//   kz/kz2/kx/kx2: 深度旋转键 }）：lane.curve 与世界几何静态（增量快照只覆写 wear），
+//   WeakMap 按 lane 对象弱引用——rustworld geom_version 变更时重建 lane 对象 → 自然失效。
+//   段深度只依赖世界坐标 + 相机旋转（与 pan/zoom 无关）。消费方：本文件道路收集、
+//   render_world.js::updateLaneHover（悬浮检测复用同缓存世界采样，window.LaneGeoCache 暴露）。
+const _laneGeoCache = new WeakMap();
+window.LaneGeoCache = _laneGeoCache;
 
 // ★ v1.50.12 贴面防埋修正（「图标/道路半截被自己的地形格盖住」）：
 // 地形格深度取格心（四角均值），实体/道路锚点落在格子远半侧时格心深度 > 锚点深度，
@@ -411,51 +418,93 @@ function drawWorldEntities() {
     }
   }
 
-  // ── 3. 道路（每段一个深度项；投影 17 个采样点，虚线相位按累计弧长跨段连续）──
+  // ── 3. 道路（每段一个深度项；虚线相位按累计弧长跨段连续）──
+  // ★ v1.50.88 车道绘制性能修复（128x 倍速 10fps 根因）：踩踏路网车道数随模拟时间单调
+  //   增长（128x 下数分钟即 600+ 条），旧实现每帧对每条车道全量执行 17 次 curve.evalPos
+  //   + 80 次 _decalDepth（600 条 = 每帧 4.8 万次深度查询）→ wqe 26ms+ 且持续恶化。
+  //   三层解耦（画面笔迹逐位不变）：
+  //   ① 世界采样点缓存——lane.curve 与世界几何静态（增量快照只覆写 wear，rustworld
+  //     geom_version 变更时重建 lane 对象），17 点按 lane 对象 WeakMap 弱缓存自然失效；
+  //   ② 段深度缓存——_decalDepth 只依赖世界坐标 + 相机旋转（与 pan/zoom 无关），
+  //     每段 5 采样取大结果按旋转键缓存，平移/缩放零重算；
+  //   ③ 屏幕投影逐帧由缓存世界点廉价线性变换 + 屏幕 AABB 粗剔——屏外车道零成本；
+  //   ④ 自适应分段：屏幕弧长短的车道 8 段（偶数采样点合并，段深取双子段较大值）。
   if (sim.showLanes && sim.network && sim.network.lanes) {
-    const segs = 16;
+    const cullPad = RC.laneCullPadPx !== undefined ? RC.laneCullPadPx : 16;
+    const shortSegPx = RC.laneAdaptiveSegPx !== undefined ? RC.laneAdaptiveSegPx : 140;
     for (const lane of sim.network.lanes.values()) {
       const wear = lane.wear || 0.0;
       if (wear < 0.3) continue;
 
-      _ensureLaneBuf(segs + 1);
-      let cum = 0;
-      let prevX = 0, prevY = 0;
-      for (let i = 0; i <= segs; i++) {
-        const pt3D = lane.curve.evalPos(i / segs);
-        _laneWX[i] = pt3D.x; _laneWY[i] = pt3D.y; _laneWZ[i] = pt3D.z || 0;
-        const rx = pt3D.x * cosZ - pt3D.y * sinZ;
-        const ry = pt3D.x * sinZ + pt3D.y * cosZ;
-        const y2 = ry * cosX - (pt3D.z || 0) * sinX;
-        _lanePX[i] = cx + rx * scale;
-        _lanePY[i] = cy + y2 * scale;
-        if (i > 0) cum += Math.hypot(_lanePX[i] - prevX, _lanePY[i] - prevY);
+      // ①/② 静态几何采样 + 旋转相关段深度（WeakMap：geom_version 变更重建 lane 对象 → 自然失效）
+      let geo = _laneGeoCache.get(lane);
+      if (!geo) {
+        geo = { wx: new Float64Array(17), wy: new Float64Array(17), wz: new Float64Array(17),
+                depth: new Float64Array(16), kz: 0, kz2: 0, kx: 0, kx2: 0 };
+        for (let i = 0; i <= 16; i++) {
+          const pt3D = lane.curve.evalPos(i / 16);
+          geo.wx[i] = pt3D.x; geo.wy[i] = pt3D.y; geo.wz[i] = pt3D.z || 0;
+        }
+        _laneGeoCache.set(lane, geo);
+      }
+      if (geo.kz !== cosZ || geo.kz2 !== sinZ || geo.kx !== cosX || geo.kx2 !== sinX) {
+        for (let k = 0; k < 16; k++) {
+          let segDepth = -Infinity;
+          for (let s = 0; s <= 4; s++) {
+            const f = s * 0.25;
+            const wx = geo.wx[k] + (geo.wx[k + 1] - geo.wx[k]) * f;
+            const wy = geo.wy[k] + (geo.wy[k + 1] - geo.wy[k]) * f;
+            const wz = geo.wz[k] + (geo.wz[k + 1] - geo.wz[k]) * f;
+            const dd = _decalDepth(wx, wy, RC.laneFootprintR || 6, cosZ, sinZ, cosX, sinX);
+            const d = dd != null ? dd : _surfaceDepth(wx, wy, wz, cosZ, sinZ, cosX, sinX);
+            if (d > segDepth) segDepth = d;
+          }
+          geo.depth[k] = segDepth;
+        }
+        geo.kz = cosZ; geo.kz2 = sinZ; geo.kx = cosX; geo.kx2 = sinX;
+      }
+
+      // ③ 逐帧投影（廉价线性变换）+ 屏幕 AABB 粗剔（屏外车道跳过样式/入队，零绘制成本）
+      _ensureLaneBuf(17);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i <= 16; i++) {
+        const rx = geo.wx[i] * cosZ - geo.wy[i] * sinZ;
+        const ry = geo.wx[i] * sinZ + geo.wy[i] * cosZ;
+        const y2 = ry * cosX - geo.wz[i] * sinX;
+        const px = cx + rx * scale, py = cy + y2 * scale;
+        _lanePX[i] = px; _lanePY[i] = py;
+        if (px < minX) minX = px; if (px > maxX) maxX = px;
+        if (py < minY) minY = py; if (py > maxY) maxY = py;
+      }
+      if (maxX < -cullPad || minX > w + cullPad || maxY < -cullPad || minY > h + cullPad) continue;
+
+      // 屏幕累计弧长（虚线相位；由投影自然覆盖旋转/缩放变化）
+      let cum = 0, prevX = _lanePX[0], prevY = _lanePY[0];
+      for (let i = 1; i <= 16; i++) {
+        cum += Math.hypot(_lanePX[i] - prevX, _lanePY[i] - prevY);
         prevX = _lanePX[i]; prevY = _lanePY[i];
         _laneCum[i] = cum;
       }
 
       cacheLaneStyle(lane, wear);
 
+      // ④ 自适应分段：屏幕弧长短的车道 8 段（偶数采样点），段深取双子段缓存值较大者
+      const short = shortSegPx > 0 && cum < shortSegPx;
+      const segs = short ? 8 : 16;
+      const step = short ? 2 : 1;
       for (let k = 0; k < segs; k++) {
-        // ★ v1.50.15 足迹感知深度强化：分段 5 采样（原 3）× _decalDepth(R)——
-        //   v1.50.13 的「两端+中点三采样 _surfaceDepth」有两个缺口：① _surfaceDepth
-        //   只抬到所在格心，路拱半宽（热力图外光晕 ~2.9px）朝相机侧伸入**下一格**
-        //   的 territory 未被覆盖；② 整条赛道仅 16 分段，长路段会跨越 3+ 格，
-        //   3 采样漏掉中段跨入的更近格——两处均表现为路面被后画格「半截入土」。
-        let segDepth = -Infinity;
-        for (let s = 0; s <= 4; s++) {
-          const f = s * 0.25;
-          const wx = _laneWX[k] + (_laneWX[k + 1] - _laneWX[k]) * f;
-          const wy = _laneWY[k] + (_laneWY[k + 1] - _laneWY[k]) * f;
-          const wz = _laneWZ[k] + (_laneWZ[k + 1] - _laneWZ[k]) * f;
-          const dd = _decalDepth(wx, wy, RC.laneFootprintR || 6, cosZ, sinZ, cosX, sinX);
-          const d = dd != null ? dd : _surfaceDepth(wx, wy, wz, cosZ, sinZ, cosX, sinX);
-          if (d > segDepth) segDepth = d;
+        const i0 = k * step, i1 = i0 + step;
+        let segDepth;
+        if (short) {
+          const dA = geo.depth[i0], dB = geo.depth[i1];
+          segDepth = dA > dB ? dA : dB;
+        } else {
+          segDepth = geo.depth[k];
         }
         const it = _depthItem(DEPTH_LANE, lane, k, segDepth);
-        it.s1x = _lanePX[k]; it.s1y = _lanePY[k];
-        it.s2x = _lanePX[k + 1]; it.s2y = _lanePY[k + 1];
-        it.dash = _laneCum[k];
+        it.s1x = _lanePX[i0]; it.s1y = _lanePY[i0];
+        it.s2x = _lanePX[i1]; it.s2y = _lanePY[i1];
+        it.dash = _laneCum[i0];
       }
     }
   }

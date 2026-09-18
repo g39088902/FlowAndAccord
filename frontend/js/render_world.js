@@ -398,19 +398,46 @@ if (sim.showLanes && sim.network && sim.network.lanes) {
       const wear = lane.wear || 0.0;
       if (wear < 0.3) continue;
 
-      const segs = 12;
-      let prev2D = null;
-      for (let i = 0; i <= segs; i++) {
-        const pt3D = lane.curve.evalPos(i / segs);
-        const p2D = project3D(pt3D);
-        if (prev2D) {
-          const d = distToSegment(mousePos.x, mousePos.y, prev2D.x, prev2D.y, p2D.x, p2D.y);
-          if (d < minHoverDist) {
-            minHoverDist = d;
-            hoveredLane = lane;
+      // ★ v1.50.88 复用队列层车道静态几何缓存（window.LaneGeoCache，17 点世界采样，
+      //   render_depth_queue.js 道路收集时填充）：旧实现每帧 13 次 evalPos + project3D
+      //   （600 车道时 ~8 千次贝塞尔求值 + 6 百次临时对象分配）。缓存未命中
+      //   （geom_version 重建后首帧未入队）回退旧路径，语义不变；缓存路径采样
+      //   16 段 vs 旧 12 段只增不减，命中判定不劣化。
+      const geo = window.LaneGeoCache ? window.LaneGeoCache.get(lane) : null;
+      if (geo) {
+        const cosZh = Math.cos(camera.rotZ), sinZh = Math.sin(camera.rotZ);
+        const cosXh = Math.cos(camera.rotX), sinXh = Math.sin(camera.rotX);
+        let prevX2D = 0, prevY2D = 0;
+        for (let i = 0; i <= 16; i++) {
+          const rx = geo.wx[i] * cosZh - geo.wy[i] * sinZh;
+          const ry = geo.wx[i] * sinZh + geo.wy[i] * cosZh;
+          const y2 = ry * cosXh - geo.wz[i] * sinXh;
+          const p2Dx = w / 2 + camera.panX + rx * camera.zoom;
+          const p2Dy = h / 2 + camera.panY + y2 * camera.zoom;
+          if (i > 0) {
+            const d = distToSegment(mousePos.x, mousePos.y, prevX2D, prevY2D, p2Dx, p2Dy);
+            if (d < minHoverDist) {
+              minHoverDist = d;
+              hoveredLane = lane;
+            }
           }
+          prevX2D = p2Dx; prevY2D = p2Dy;
         }
-        prev2D = p2D;
+      } else {
+        const segs = 12;
+        let prev2D = null;
+        for (let i = 0; i <= segs; i++) {
+          const pt3D = lane.curve.evalPos(i / segs);
+          const p2D = project3D(pt3D);
+          if (prev2D) {
+            const d = distToSegment(mousePos.x, mousePos.y, prev2D.x, prev2D.y, p2D.x, p2D.y);
+            if (d < minHoverDist) {
+              minHoverDist = d;
+              hoveredLane = lane;
+            }
+          }
+          prev2D = p2D;
+        }
       }
     }
   }
