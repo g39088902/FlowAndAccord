@@ -1441,7 +1441,7 @@ jobs:
 | `render_accents.js` | Tree / Boulder / RockCluster 绘制 |
 | `render_bush.js` | Bush 三变体 + 花朵图元 |
 | `render_grass.js` | GrassTuft / 芦草 |
-| `render_landscapes.js` + `landscape-model.js` | 资源景观子图元（含 GroundPatch 贴地片、detail 可采细节） |
+| `render_landscapes.js` + `landscape-model.js` | 资源景观子图元（★ v1.50.87 GroundPatch 贴地片已删除，仅立体树石草与 foliage detail 灌木） |
 | `render_shadows.js` | 树/灌木贴地投影与接触阴影 |
 | `accent-model.js` / `accent-season.js` / `accent-lod.js` | **保留**为 CPU 侧几何与筛选来源，不迁 GPU |
 
@@ -1458,7 +1458,7 @@ jobs:
 
 ### 8.2 阶段四：实体层与表现层迁移（Agent / House / POI / 道路 / 特效）
 
-**范围**：`render_agents.js`（族人 + 马斯洛需求配色 + 选中态）、房屋与工地、POI 底座与图标、道路段与车辙、礼花/粒子特效、`terrain-mesh-merge.js` 产出的地形 quad（已在 GPU 侧）。
+**范围**：`render_agents.js`（族人 + 马斯洛需求配色 + 选中态）、房屋与工地、POI 底座与图标、道路段与车辙、`terrain-mesh-merge.js` 产出的地形 quad（已在 GPU 侧）。（★ 礼花/粒子特效已于 v1.50.85 整体删除，不在迁移范围。）
 
 **实施要点**：
 

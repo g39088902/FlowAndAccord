@@ -46,7 +46,7 @@ stateDiagram-v2
 - `render_canvas.js`：共享状态 + 主循环调度
 - `render_hud.js`：顶栏/调试/资源大盘/均值大盘/账本面板
 - `render_world.js`：地形/路网/POI/房屋绘制
-- `render_agents.js`：族人绘制 + 登基礼花
+- `render_agents.js`：族人绘制 + 夺位远征动态标牌
 - `render_inspector.js`：Inspector 面板 + 点击拾取 + 营地详情模态框
 
 ### 1.2 第三轮：地形渲染独立 + D-A 装饰系统（★ v1.48.0 / ★ v1.49.1）
@@ -56,7 +56,7 @@ stateDiagram-v2
 - **时钟与连续性**：只读快照季节及进度（缺字段回退 seasonTimer），春中心 0、初春 0.875；周期 smoothstep 跨年连续。kind/id 哈希偏移默认 ±0.025 年、硬限幅 ±0.04，盛夏满叶、隆冬落叶乔木 3% / 灌木 4%，常绿全年至少 94%；先秋色后减叶。叶色与叶量不读取平滑光相，光源仍归 `SimLighting`。
 - **配置与消费**：`config.render.js::accentSeasonProfiles` 行格式 `[u, 叶量, RGB, 芽量, 花量, 地被量, 枯荣]`，`accentFlowerCycle` 仅为显式花灌木覆写花量。当前 Tree/Bush 精灵只消费连续叶色（绘制侧派生明暗），其余输出预留 TA-03/15；裸枝、逐簇落叶与花/地被绘制尚未实现，物种分配属于 TA-06。
 - **恢复与缓存**：季相纯函数无逐帧累积和颜色缓存；几何缓存不含季相，暂停、读档、回溯与重置直接根据新快照求值，不消耗模拟 RNG、不改存档或 FABS。
-- v1.49.1 同时移除了 Pass 1 的 `RiverBank` 手绘金砂漫滩线；v1.50.3~v1.50.5 连续降噪后水系只剩「水面（Pass 2 + 2.8 波光）+ 水下游鱼（Pass 1.5）+ 浅滩涉渡（Pass 4）」，河床基底、卵石、岸线白沫与微波虚线全部移除。
+- v1.49.1 同时移除了 Pass 1 的 `RiverBank` 手绘金砂漫滩线；v1.50.3~v1.50.5 连续降噪后水系只剩「水面（Pass 2）+ 水下游鱼 + 浅滩涉渡（Pass 4）」，河床基底、卵石、岸线白沫与微波虚线全部移除；v1.50.86 删除迎光面太阳波光（Pass 2.8），游鱼经 sink 分发迁入 WebGL。
 
 ### 1.3 第四轮：制度大盘抽离 ledger-ui.js（v1.3.0）
 新建 `frontend/js/ledger-ui.js`，将社会制度与账本大盘 UI 从渲染层抽离：

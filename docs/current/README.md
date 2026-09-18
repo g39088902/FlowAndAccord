@@ -1,7 +1,7 @@
 # 现状 · 已实现功能全景
 
 > 本目录描述**当前代码中真实存在的行为**。未实现的设计一律在 [`../plan/`](../plan/)。
-> **版本**：v1.50.84（演进记录见 [./01-changelog.md](./01-changelog.md)）。
+> **版本**：v1.50.87（演进记录见 [./01-changelog.md](./01-changelog.md)）。
 
 > 修改代码前的快速入口见 [`tech/30-workflow.md`](tech/30-workflow.md)。
 
@@ -77,7 +77,7 @@
 | :---: | :--- | :--- |
 | 16 | [前端总览](tech/16-frontend-overview.md) | 渲染管线、深度队列铁律、Inspector、族谱、调试监视器 |
 | 17 | [季节光照](tech/17-seasonal-lighting.md) | 年周期光弧、地形重着色、立体面光照、世界空间阴影 |
-| 18 | [水体渲染](tech/18-water-rendering.md) | 矢量河面、平滑漫滩、岸线微沫、游鱼与波光 |
+| 18 | [水体渲染](tech/18-water-rendering.md) | 矢量河面、平滑漫滩、游鱼（WebGL sink）、涉渡踏石 |
 | 19 | [UI 实现](tech/19-ui-implementation.md) | 页面全景剖析 + 窗口结构与跳转关系 |
 | 20 | [制度大盘 UI](tech/20-society-ledger-ui.md) | 家户/婚姻/宗族/王国四标签页枢纽 |
 | 21 | [前端开发指南](tech/21-frontend-dev-guide.md) | 模块化分工、快照四处同步、CSS 设计系统、性能节流 |

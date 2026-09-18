@@ -49,16 +49,15 @@ stateDiagram-v2
   0. `SimLighting.update()`：推进年度光相（含视觉限速器），光档变化时整片重着色地形（`cell.color` 原地写回）；
   1. `drawSkyBackdrop()`：天空/地平渐变与逆光光晕（第一个氛围插入点，地表之下）；
   2. `drawTerrain()`：3D 连续坡度与法线环境光遮蔽（AO）高程沙盘网格（含随光向变化明的沙盘侧壁）；★ v1.48.1 起每格四边沿外法线外扩 `TERRAIN_SEAM_PX`(0.75px)，消除相邻格抗锯齿缝隙导致的「深色网格线透出」（详见 `frontend/AGENTS.md` §5.9）；drawTerrain 内部依次调用：
-     - `drawTerrainFeatures()`：水系地貌矢量特征——Pass 1.5 游鱼 → Pass 2 半透明碧蓝水面 → Pass 2.8 迎光面太阳波光 → Pass 4 浅滩卵石踏石（★ v1.50.3 移除 Pass 2 中心微波流线与 Pass 3 顺流碎沫段，虚线观感形似车道线；★ v1.50.4 移除 Pass 3 岸线微沫白线；★ v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充；★ v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带）；
+     - `drawTerrainFeatures()`：水系地貌矢量特征——Pass 2 半透明碧蓝水面 → Pass 4 浅滩卵石踏石（★ v1.50.3 移除 Pass 2 中心微波流线与 Pass 3 顺流碎沫段，虚线观感形似车道线；★ v1.50.4 移除 Pass 3 岸线微沫白线；★ v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充；★ v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带；★ v1.50.86 删除 Pass 2.8 迎光面太阳波光，游鱼另经 `DEPTH_FISH` 逐条入队）；
      - （★ v1.50.2 起 `drawAccents()` **已迁出** `drawTerrain()`：装饰改由 `drawAccentEntity(accent)` 单实体入口并入第 6 步 `drawWorldEntities()` 统一相机深度队列，见下）；
   3. `drawLanes()`：动态踩踏路网（贴地纹理，先于建筑绘制）；
   4. `drawSelectedCampHouseLinks()` + `drawPoiGroundBases()`：贴地图元补充层（选中营地辖区虚线、POI 底座与营地暖光，必须先于立体实体落笔）；
   5. `drawAtmosphereWash()`：大气色洗（第二个氛围插入点，在立体实体之前，建筑与文字不被洗灰）；
   6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相，贴地阴影走 `SimLighting`）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
-  7. `drawCoronationEffects()`：登基礼花与全屏动态特效。
 - **★ v1.48.0 动态季节光照（年周期光弧）**：光源绕世界一年转一圈，四季各占一个象限（春=东 / 夏=南 / 秋=西 / 冬=北），盛夏高度角 72°、隆冬 22°；地形反照率与光照解耦（`computeTerrainAlbedo` 一次性预算 + `SimLighting.relightTerrain` 按光档重算光因子），房屋墙面/屋顶与沙盘侧壁按面法线受光，阴影方向与长度由世界空间光向投影到屏幕（随相机旋转）。详见 [./17-seasonal-lighting.md](./17-seasonal-lighting.md) 与 `frontend/AGENTS.md` §5.10。
 - 动态等高线网格地形，读取内核 `GeoCell` 的地表类别、坡度和自然适宜性；v1.47.7 起不再绘制 `Ridge` 山脊线、`Saddle` 山口圆与 `Terrace` 台地轮廓（该类特征已整体删除）；T2 仍绘制真实两岸河谷、河阶、浅滩走廊与泉谷等水系特征。
-- **灵动立体水系（★ v1.47.5 P1 升级 / ★ v1.49.0 水底生态层 / ★ v1.49.1 河道净化 / ★ v1.50.3~v1.50.9 观感降噪）**：`ShallowWater`/`DeepWater` 水下格底色为**深褐色河床土色**（★ v1.50.9：`rgb(142,122,96)` 浅滩湿土 / `rgb(120,100,76)` 深床暗土，取代旧深蓝底——透过半透明水面呈现湿润泥土暖调，亮度向岸边湿砂靠拢以压低网格锯齿反差，与碧蓝水面形成「蓝水褐床」的自然对比）；`River` 渲染层级为——Pass 1.5 `river_life.js` 成群游鱼（4 群 22 条，沿河道中心线巡航、正弦摆尾）→ Pass 2 半透明碧蓝水面（0.25 深水基底 + 0.62 主流水体双层叠加）→ Pass 2.8 迎光面太阳波光（强度按河道切线与光向夹角调制）；`ShallowFord` 呈现卵石踏道与飞溅浪花，消除"干涸黑凹槽"死气；v1.49.1 移除了 Pass 1 的 `RiverBank` 双层金砂漫滩线，v1.50.3 移除 Pass 2 中心微波流线虚线，v1.50.4 移除 Pass 3 岸线微沫白线与 `river_life.js` 水底卵石层（85 颗深色扁圆石透水面观感呈"一堆深蓝色圆圈"），v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充（`rgba(30,46,56,0.92)` 整片深色底使水体发暗呆板，改由水下地表色 + Pass 2 水面叠加自然成色），v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带（沿中心线铺的深色宽水带在窄河道上观感为一条压在河心的暗色粗线）。`river_life.js` 为纯表现层：种子取自 `_engineSeed`（世界重置/读档随种子重建），走墙钟驱动（模拟暂停时水系动画继续）。
+- **灵动立体水系（★ v1.47.5 P1 升级 / ★ v1.49.0 水底生态层 / ★ v1.49.1 河道净化 / ★ v1.50.3~v1.50.9 观感降噪 / ★ v1.50.86 游鱼迁 WebGL + 删波光）**：`ShallowWater`/`DeepWater` 水下格底色为**深褐色河床土色**（★ v1.50.9：`rgb(142,122,96)` 浅滩湿土 / `rgb(120,100,76)` 深床暗土，取代旧深蓝底——透过半透明水面呈现湿润泥土暖调，亮度向岸边湿砂靠拢以压低网格锯齿反差，与碧蓝水面形成「蓝水褐床」的自然对比）；`River` 渲染层级为——游鱼（`river_life.js` 4 群 22 条，沿河道中心线巡航、正弦摆尾；★ v1.50.86 起 GL 地形活动时经 sink 分发进 `WebGLAccentLayer`，鱼身在底层 GL 画布）→ 半透明碧蓝水面（0.25 深水基底 + 0.62 主流水体双层叠加，2D 画布盖绘于游鱼之上 ⇒ 透水观感不变）；`ShallowFord` 呈现卵石踏道与飞溅浪花，消除"干涸黑凹槽"死气；v1.49.1 移除了 Pass 1 的 `RiverBank` 双层金砂漫滩线，v1.50.3 移除 Pass 2 中心微波流线虚线，v1.50.4 移除 Pass 3 岸线微沫白线与 `river_life.js` 水底卵石层（85 颗深色扁圆石透水面观感呈"一堆深蓝色圆圈"），v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充（`rgba(30,46,56,0.92)` 整片深色底使水体发暗呆板，改由水下地表色 + Pass 2 水面叠加自然成色），v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带（沿中心线铺的深色宽水带在窄河道上观感为一条压在河心的暗色粗线），v1.50.86 删除 Pass 2.8 迎光面太阳波光（用户决策）。`river_life.js` 为纯表现层：种子取自 `_engineSeed`（世界重置/读档随种子重建），走墙钟驱动（模拟暂停时水系动画继续）。详见 [./18-water-rendering.md](./18-water-rendering.md)。
 - **世界实体统一深度排序（★ v1.47.8 房屋 → ★ v1.47.9 全实体）**：Canvas 2D 无深度缓冲，同层元素按数组原序绘制会出现「远物压近物」。`drawWorldEntities()` 每帧把 POI 标记 / 房屋 / 族人按 `project3D().depth`（= `ry·sinX + z·cosX`，数值越大越靠近视点）升序排列后绘制——**远物先画、近物后画**，同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性；排序只作用于绘制队列，不修改 `sim.pois` / `sim.houses` / `sim.agents` 顺序，点击拾取与 Inspector 遍历逻辑不受影响。POI 的贴地底座/营地暖光归入第 3 层地面 pass，因此不会糊在近处建筑上。
 - 地貌特征来自 FABS/JSON 静态快照，前端不自行生成碰撞、通行或资源事实；换世界、读档和回溯时随地形缓存一起重建。
 - **双模道路呈现**：默认自然观察模式采用低饱和泥土、夯土与石板的大地材质色阶（随 wear 动态提升线宽与平整度），关闭刺眼外发光；按 `R` 键切换道路热力图分析模式，高亮展示 5 阶等级色与外圈发光，专供交通运力拓扑研判。
@@ -181,16 +180,15 @@ stateDiagram-v2
   - 数据形态：`LandscapeGroup { key: "poi:<id>", recipe, recipeVersion, anchor, geometrySignature, children[], bounds, q }` 与 `LandscapeChild { key: "poi:<id>/<role>/<slot>", modelKind, visualSeed, dx, dy, x, y, z, rot, scale, footprint, bounds, stockRole }`。
   - 确定性哈希：子图元种子通过 MurmurHash3 风格整数算法（`worldSeed ^ poi.id ^ roleSalt ^ slot`）派生，使用严格 `Math.imul` 与 `>>>0` 无符号整数运算，**禁止** `Math.random`、系统时间或消费模拟主 `WorldRng`。
   - 极坐标采样：候选位置按 $r = \sqrt{\text{lerp}(r_{\min}^2, r_{\max}^2, u)}$、$	heta = 2\pi v$ 盘分布采样，变换至世界坐标后逐点通过双线性插值采样静态高程场。
-  - 坡度与水面拒绝：贴地片落点格心与四缘任一坡度 $> \text{landscapeGroundMaxSlopeDeg}(16^\circ)$ 时整片拒绝（防止贴片悬浮穿山）；Water 配方候选四邻落入浅水/深水时拒绝，仅画陆侧岸石与低草，**严禁凭空扩张水域**。
-- **五类通用配方与单调库存丰度**：
-  - **Water**：陆侧岸石 + 小片低草 + `wet` 湿润土贴地色差片（role 级 30~42 半径带覆盖，避开 POI 操作区）。
-  - **Wood**：主树 + 林缘灌木 + `shade` 林下暗部贴地片 + `foliage` 可采枝叶细节（`stockRole: 'detail'`）。
-  - **Berry**：不规则低灌木簇 + `fruit` 深浆果红点簇（构建期预计算 10 点盘分布静态几何，绘制期可见点数随 $q$ 单调递增）。
-  - **Stone**：岩石露头 + 碎石 + `quarry` 可采面明暗灰斑（透明度随 $q$ 线性增强）。
-  - **Gold**：岩石骨架 + `vein` 哑光矿脉斑点（**严禁发光或亮晕**）。
-  - **库存丰度单调映射**：$q = \text{clamp}(\text{currentStock} / \text{maxStock}, 0, 1)$。库存变化仅驱动可采细节显隐与点簇可见度，**骨架与候选几何绝对不参与重抽**。
+  - 坡度与水面拒绝：Water 配方候选四邻落入浅水/深水时拒绝，仅画陆侧岸石与低草，**严禁凭空扩张水域**。
+- **五类通用配方与单调库存丰度**（★ v1.50.87 删除 GroundPatch 贴地色差片后全部为立体子图元）：
+  - **Water**：陆侧岸石 + 小片低草。
+  - **Wood**：主树 + 林缘灌木 + 林下草 + `foliage` 可采枝叶细节（`stockRole: 'detail'`）。
+  - **Berry**：不规则低灌木簇。
+  - **Stone**：岩石露头 + 碎石。
+  - **Gold**：岩石骨架。
+  - **库存丰度单调映射**：$q = \text{clamp}(\text{currentStock} / \text{maxStock}, 0, 1)$。库存变化仅驱动可采细节显隐（foliage 小灌木，`childActive` 按 `qThreshold` 过滤），**骨架与候选几何绝对不参与重抽**。
 - **性能与渲染接入**：
-  - 贴地色差片填充样式常量预建（`_gpStyles`），渲染热路径零字符串分配与零 GC。
   - 子图元与投影分别入统一深度队列（`DEPTH_LANDSCAPE=13`，`DEPTH_LANDSCAPE_SHADOW=14`），随相机远近统一遮挡。
   - 关态（`landscapeEnabled=false`）零入队零同步，完整回退基础 POI 标记。
 
@@ -252,11 +250,11 @@ stateDiagram-v2
 | `render_grass.js` | ★ v1.50.39 GrassTuft 丛草独立绘制层 |
 | `landscape-model.js` | ★ S4-02 资源景观模型层（五类 POI 配方、uint32 确定性哈希、极坐标盘采样、双线性高程、丰度单调映射） |
 | `landscape-mask.js` | ★ S4-03 最终世界几何遮罩层（车道贝塞尔采样胶囊带、房屋保守圆、POI 操作区空间分桶避让、字段签名脏桶失效） |
-| `render_landscapes.js` | ★ S4-02 资源景观绘制接入层（子图元与阴影入统一深度队列、GroundPatch 贴地色差片绘制） |
+| `render_landscapes.js` | ★ S4-02 资源景观绘制接入层（子图元与阴影入统一深度队列；★ v1.50.87 GroundPatch 贴地色差片删除，仅立体子图元） |
 | `label-layout.js` | ★ S4-06/07 世界标注布局与聚合引擎（网格冲突检测、同类房屋编号聚合、双目标强制保留与边缘停靠虚线引线、有限滞回与 DOM 快照缓存） |
 | `terrain-texture.js` | ★ TA-12-2 确定性地表纹样模型层（世界网格分桶草斑土纹图元，缩放旋转不重随机） |
-| `render_agents.js` | 族人渲染、妊娠光环、状态气泡、登基礼花粒子 |
-| `river_life.js` | 水系微观生态纯表现层（★ v1.49.0）：水底卵石、成群游鱼、迎光太阳波光，种子联动 `_engineSeed` |
+| `render_agents.js` | 族人渲染、妊娠光环、状态气泡 |
+| `river_life.js` | 水系微观生态纯表现层（★ v1.49.0 / ★ v1.50.86 游鱼迁 WebGL sink + 删波光）：成群游鱼（Canvas + GL 双路），种子联动 `_engineSeed` |
 | `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与智能拾取（优先命中聚合徽标与 LabelLayout 安置标签） |
 | `main.js` | 页面交互、相机控制、快捷键、无头模式 |
 | `save-ui.js` | 本地文件与槽位存档/读档系统 |

@@ -36,7 +36,6 @@ const RC = window.RENDER_CONFIG || {};
 const DEPTH_CELL = 0;      // 地形格（a/b/c/d = i00/i10/i11/i01 顶点索引）
 const DEPTH_FEATURE = 1;   // 水系特征（a = feature，River 水面 / ShallowFord / 泉谷）
 const DEPTH_FISH = 2;      // 游鱼（a = fish，水中层，深度低于水面填充）
-const DEPTH_GLINT = 3;     // 太阳波光（a = 中心线采样点，深度 = 河道最近岸 + ε，保持盖在水面之上）
 const DEPTH_LANE = 4;      // 道路分段（a = lane，b = 段序号，s1/s2 = 屏幕端点，dash = 弧长相位）
 const DEPTH_LINK = 5;      // 选中营地辖区连线（a = house）
 const DEPTH_POI_BASE = 6;  // POI 贴地底座（a = poi）
@@ -299,9 +298,9 @@ function drawWorldEntities() {
     }
   }
 
-  // ── 2. 水系特征 / 游鱼 / 波光 ──
+  // ── 2. 水系特征 / 游鱼 ──
   // ★ 修复（M4 渲染回归）：本段曾在 `!window.webglTerrainActive` 块内，导致 WebGL 地形
-  //   接管时「River / RiverBank / ShallowFord / WaterBody 水面、游鱼、太阳波光」全部不入队、
+  //   接管时「River / RiverBank / ShallowFord / WaterBody 水面、游鱼」全部不入队、
   //   整条河面不绘制 —— 用户可见症状：「河谷只剩不透明河床的褐色谷底带，没有河水」。
   //   WebGL 只接管地形本身，上层水系仍须由 2D 深度队列绘制（与 §223-225 设计注释一致）。
   if (hasTerrain) {
@@ -408,15 +407,6 @@ function drawWorldEntities() {
       for (let i = 0; i < fishList.length; i++) {
         const f = fishList[i];
         _depthItem(DEPTH_FISH, f, 0, depthOf(f.x, f.y, f.z));
-      }
-    }
-    // 波光逐段入队：深度挂所在河段最大深度 + ε ⇒ 恒在所在段水面之后、任何更近实体之前
-    const cps = window.RiverLife ? window.RiverLife.centerPoints() : null;
-    if (cps && rivers.length) {
-      for (let i = 4; i < cps.length - 6; i += 7) {
-        const cp = cps[i];
-        const bd = riverBandDepth(rivers[0], cp.y);
-        if (bd != null) _depthItem(DEPTH_GLINT, cp, i, bd + 0.06);
       }
     }
   }
@@ -638,7 +628,6 @@ function drawWorldEntities() {
       case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
       case DEPTH_FEATURE: drawFeatureItem(it.a, it.b); break;
       case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
-      case DEPTH_GLINT: RL.drawGlintAt(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
       case DEPTH_LANE: drawLaneSegment(it); break;
       case DEPTH_LINK: drawCampHouseLink(it); break;
       case DEPTH_POI_BASE: drawPoiGroundBase(it.a); break;

@@ -228,6 +228,21 @@ class WebGLAccentRenderer {
     }
   }
 
+  // 旋转椭圆填充（cx,cy = 屏幕中心；rot = 屏幕弧度，语义对齐 Canvas
+  // translate→rotate→ellipse(0..2π) 后的等效屏幕椭圆）——鱼身影子等。
+  ellipseRotRGBA(cx, cy, rx, ry, rot, r, g, b, a) {
+    if (rx <= 0 || ry <= 0 || a <= 0) return;
+    const c = Math.cos(rot), s = Math.sin(rot);
+    for (let i = 0; i < _EL_N; i++) {
+      const u0 = rx * _EL_COS[i], v0 = ry * _EL_SIN[i];
+      const u1 = rx * _EL_COS[i + 1], v1 = ry * _EL_SIN[i + 1];
+      this._tri(cx, cy,
+        cx + u0 * c - v0 * s, cy + u0 * s + v0 * c,
+        cx + u1 * c - v1 * s, cy + u1 * s + v1 * c,
+        r, g, b, a, 1, 0, 0);
+    }
+  }
+
   // 折线描边（miter join；closed=闭环无端帽；roundCap=端点外侧半圆，Canvas lineCap='round' 语义）。
   // 调用方传 Canvas 同一笔迹的点列（曲线需先展平）；横截面边内部旗标 ⇒ 与 Canvas 单 path
   // stroke 覆盖语义一致（无接缝、无双重混色）。

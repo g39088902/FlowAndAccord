@@ -166,7 +166,6 @@ window.RENDER_CONFIG = {
   accentLODFarMaxClusters: 8,        // 远景簇子集上限（模型层按簇半径降序预生成索引表；几何输入）
   accentLODStoneFarSides: true,      // 远景石体两笔简化开关（顶面 + 剪影描边，省逐侧面片受光）
   accentLODPlumeMinPx: 2.0,          // 芦花穗屏幕长度低于此省略（收编 render_grass.js 硬编码 2）
-  accentLODGroundPatchMinPx: 1.0,    // 贴地片屏幕半径低于此省略（收编 render_landscapes.js 硬编码 1）
   accentLODShadowReachK: 2.5,        // 阴影粗剔外扩系数（须 ≥ config.lighting.js::shadowLenMax 2.40 × 实高）
   // 一级粗剔保守常数表（世界单位；须 ≥ 各 kind 真值上界，宁多画不漏画；TA-07-3 以骨架实测校核）
   // yUp = 屏幕竖直额外上界（× cosX）：石体底环按 v1.50.13「底边贴落地点」契约整体落在锚点
@@ -185,7 +184,6 @@ window.RENDER_CONFIG = {
     Boulder:     { rH: 7.2,  zMin: 0,    zMax: 1.8,  yUp: 7.2, rS: 0 },
     RockCluster: { rH: 11,   zMin: 0,    zMax: 3,    yUp: 11, rS: 4.5 },
     GrassTuft:   { rH: 5.5,  zMin: 0,    zMax: 7.5,  yUp: 0,  rS: 1.5 },
-    GroundPatch: { rH: 12,   zMin: 0,    zMax: 0,    yUp: 0,  rS: 0 },
   },
 
   // —— 地表装饰 RockCluster / GrassTuft 视觉形态参数（TA-11-3，07 号 §6.6/§6.7/§10.4）——
@@ -297,11 +295,9 @@ window.RENDER_CONFIG = {
   landscapeStyleVersion: 1,     // 景观配方风格版本（组缓存/模型缓存键组成部分；调值整体重建）
   landscapeCacheMaxGroups: 256, // 景观组模型缓存上限（超限整体清空，不 LRU；§3.2 有界缓存）
   landscapeFrameChildBudget: 420, // 每帧入队子图元（含阴影）硬上限；按固定遍历序截断（§3.4 预算）
-  // —— 可采细节与贴地片（★ S4-04，STAGE-04-TODO §3.2/§3.4；landscape-model/render_landscapes 消费）——
+  // —— 可采细节（★ S4-04，STAGE-04-TODO §3.2；landscape-model/render_landscapes 消费）——
   landscapeDetailQFloor: 0.2,   // detail 子图元 q 阈值映射区间下界（q ≥ threshold_i 才显示；骨架不受影响）
   landscapeDetailQCeil: 0.85,   // detail 子图元 q 阈值映射区间上界（threshold_i = floor + (ceil-floor)·(slot+0.5)/slots）
-  landscapeGroundMaxSlopeDeg: 16, // GroundPatch 贴地片坡度拒绝阈值（度；格心+半径 0.7 四缘任一超限即拒绝，§3.4 跨陡坡不贴片）
-  landscapeGroundWinterAlphaRatio: 0.6, // 冬季贴地片 alpha 乘数（积雪覆盖湿润/阴影观感）
   // —— 景观遮罩（★ S4-03，STAGE-04-TODO §3.3；landscape-mask.js 消费）——
   // 全部距离/半径均为**世界单位**（遮罩查询在世界空间命中，不涉及显示像素；
   // 世界 → 屏幕换算只在绘制端经 camera.zoom 一次）。
@@ -313,33 +309,28 @@ window.RENDER_CONFIG = {
   landscapeMaskPoiExtraRadius: 4, // POI 操作区在 max(底座半径, 图标世界尺寸~12) 基础上的额外余量（复用 poiBase* 同源键；poiMarkerFootprintR 是深度辅助半径非视觉占地，禁用作保护半径）
   landscapeMaskMargin: 2,       // 通用留白余量（世界单位；车道采样弦差须小于该值）
   landscapeRecipes: {           // 配方表（role 顺序 = 候选生成顺序；slots = 每 role 候选上限 K）
-    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草 + 湿润土贴地片；水面候选由模型层拒绝（不画新泉池）
+    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草；水面候选由模型层拒绝（不画新泉池）
       { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
       { role: 'grass', modelKind: 'GrassTuft',   slots: 4, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-      { role: 'wet',   modelKind: 'GroundPatch', slots: 2, rMin: 30, rMax: 42, radiusMin: 6, radiusMax: 9, tone: 'wet' },
     ] },
-    Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草 + 林下暗部；foliage=可采细节（q 显隐）；避让归 S4-03 遮罩
+    Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草；foliage=可采细节（q 显隐）；避让归 S4-03 遮罩
       { role: 'tree',    modelKind: 'Tree',        slots: 3, scaleMin: 0.9,  scaleMax: 1.35, footprint: 10.5 },
       { role: 'bush',    modelKind: 'Bush',        slots: 3, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
       { role: 'grass',   modelKind: 'GrassTuft',   slots: 3, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-      { role: 'shade',   modelKind: 'GroundPatch', slots: 2, radiusMin: 8,  radiusMax: 12, tone: 'shade' },
       { role: 'foliage', modelKind: 'Bush',        slots: 3, scaleMin: 0.45, scaleMax: 0.7, footprint: 8, stockRole: 'detail' },
     ] },
-      Berry: { rMin: 22, rMax: 44, roles: [       // 不规则低灌木簇（采收中心保留原图标）+ 果实点簇（q 显隐）
-        { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
-        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-        { role: 'fruit', modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 36, radiusMin: 5, radiusMax: 8, tone: 'berry', stockRole: 'detail' },
-      ] },
-      Stone: { rMin: 22, rMax: 42, roles: [       // 岩石露头 + 少量草 + 可采面明暗（不画成阻路峭壁）
-        { role: 'rock',   modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-        { role: 'grass',  modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-        { role: 'quarry', modelKind: 'GroundPatch', slots: 1, rMin: 26, rMax: 34, radiusMin: 6, radiusMax: 9, tone: 'quarry', stockRole: 'detail' },
-      ] },
-      Gold: { rMin: 22, rMax: 42, roles: [        // 岩石骨架 + 矿脉斑点（禁止整片发光/扩矿，归 S4-05）
-        { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
-        { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
-        { role: 'vein',  modelKind: 'GroundPatch', slots: 2, rMin: 26, rMax: 34, radiusMin: 4, radiusMax: 7, tone: 'gold', stockRole: 'detail' },
-      ] },
+    Berry: { rMin: 22, rMax: 44, roles: [        // 不规则低灌木簇（采收中心保留原图标）
+      { role: 'bush',  modelKind: 'Bush',        slots: 5, scaleMin: 0.7,  scaleMax: 1.1,  footprint: 8 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Stone: { rMin: 22, rMax: 42, roles: [        // 岩石露头 + 少量草（不画成阻路峭壁）
+      { role: 'rock',   modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+      { role: 'grass',  modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
+    Gold: { rMin: 22, rMax: 42, roles: [         // 岩石骨架 + 少量草（禁止整片发光/扩矿）
+      { role: 'rock',  modelKind: 'RockCluster', slots: 2, scaleMin: 1.0,  scaleMax: 1.5,  footprint: 12 },
+      { role: 'grass', modelKind: 'GrassTuft',   slots: 2, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
+    ] },
   },
 
   // —— 标签布局（★ S4-06，STAGE-04-TODO §4.6；label-layout.js / render_world.js / render_agents.js 消费）——

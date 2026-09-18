@@ -1,6 +1,6 @@
-// === 族人与特效绘制 (从 render.js 拆分) ===
-// 部落民单实体渲染 drawAgent（由 drawWorldEntities 统一深度调度）/ 选中高亮 / 状态气泡 / 登基礼花特效
-// 依赖全局: ctx, camera, sim, project3D, MASLOW_STYLE, NEED_KIND_LABEL, parseMaslowNeed, coronationEffects, prevKingsMap, CORONATION_DURATION
+// === 族人绘制 (从 render.js 拆分) ===
+// 部落民单实体渲染 drawAgent（由 drawWorldEntities 统一深度调度）/ 选中高亮 / 状态气泡
+// 依赖全局: ctx, camera, sim, project3D, MASLOW_STYLE, NEED_KIND_LABEL, parseMaslowNeed
 
 // ★ v1.47.9 单实体绘制入口：由 render_world.js::drawWorldEntities() 按相机深度统一调度。
 // ★ S4-06：施工/流产/夺位角标为 pinned 标记（收集阶段登记占格，绘制经 posOf 确认）；
@@ -249,50 +249,4 @@ function drawAgent(agent) {
       }
     }
   }
-}
-
-function drawCoronationEffects(now) {
-if (sim.regions && sim.regions.length > 0) {
-  for (const r of sim.regions) {
-    const prevKing = prevKingsMap.get(r.campId);
-    if (r.kingId != null && prevKing !== r.kingId) {
-      const campPoi = sim.pois.find(p => p.id === r.campId && p.type === 'Camp');
-      if (campPoi) {
-        const cp = project3D(campPoi.pos);
-        const particles = [];
-        for (let i = 0; i < 24; i++) {
-          const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
-          const speed = 1.5 + Math.random() * 2.5;
-          particles.push({ dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, life: 1.0 });
-        }
-        coronationEffects.push({ x: cp.x, y: cp.y, startTime: performance.now(), particles });
-      }
-    }
-    prevKingsMap.set(r.campId, r.kingId);
-  }
-}
-
-// ★ M4: 绘制登基礼花粒子（2秒后自动清除）
-const nowCor = performance.now();
-coronationEffects = coronationEffects.filter(eff => nowCor - eff.startTime < CORONATION_DURATION);
-for (const eff of coronationEffects) {
-  const elapsed = nowCor - eff.startTime;
-  const t = elapsed / CORONATION_DURATION;
-  const alpha = Math.max(0, 1 - t);
-  ctx.save();
-  for (const p of eff.particles) {
-    const px = eff.x + p.dx * t * 40 * camera.zoom;
-    const py = eff.y + p.dy * t * 40 * camera.zoom + t * t * 15 * camera.zoom;
-    ctx.globalAlpha = alpha * p.life;
-    ctx.fillStyle = '#fbbf24';
-    ctx.shadowColor = '#fbbf24';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.arc(px, py, 2.5 * camera.zoom, 0, Math.PI * 2);
-    ctx.fill();
-    p.life = Math.max(0, p.life - 0.008);
-  }
-  ctx.restore();
-}
-
 }

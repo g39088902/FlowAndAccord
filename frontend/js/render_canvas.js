@@ -49,11 +49,6 @@ let dbgLastTick = 0, dbgLastTickSec = performance.now(); // ⚡ 每秒真实 Tic
 let dbgTerrainRenderedCells = 0; // 🐞 当前帧视口内实际渲染的地形面数 (Quad 格数)
 const dbgElCache = {};
 
-// ★ M4: 夺位远征视口动态标牌与登基礼花状态
-let coronationEffects = [];       // {x, y, startTime, particles:[{dx,dy,life}]}
-let prevKingsMap = new Map();     // campId -> kingId（上一帧，用于检测新登基）
-const CORONATION_DURATION = 2000; // 登基礼花持续 2 秒
-
 // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
 let terrainProjX = new Float32Array(3600);
 let terrainProjY = new Float32Array(3600);
@@ -292,9 +287,6 @@ if (isCameraFollow && sim.selectionType === 'agent') {
     if (!webglTerrainRendered) {
       drawTerrainGrid();
     }
-
-    // ★ M4: 登基礼花特效
-    drawCoronationEffects(now);
   }
 
 frameCount++;

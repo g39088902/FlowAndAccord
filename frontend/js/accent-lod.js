@@ -37,7 +37,7 @@ window.AccentLOD = (function () {
   // ── 配置键读取（§3.7；逐键缺省回退与 config.render.js 集中值一致；零 GC 写入复用对象）──
   var _cfg = {
     mid: 7, near: 15, hys: 0.12, hysOn: true, cullOn: true, pad: 2,
-    farMax: 8, stoneFar: true, plumeMin: 2, gpMin: 1, shadowReachK: 2.5,
+    farMax: 8, stoneFar: true, plumeMin: 2, shadowReachK: 2.5,
     grassHBase: 2.4, grassTuftMin: 1.4, rockMinR: 0.6,
   };
   function cfg() {
@@ -51,7 +51,6 @@ window.AccentLOD = (function () {
     _cfg.farMax = num(RC.accentLODFarMaxClusters, 8);
     _cfg.stoneFar = bool(RC.accentLODStoneFarSides, true);
     _cfg.plumeMin = num(RC.accentLODPlumeMinPx, 2);
-    _cfg.gpMin = num(RC.accentLODGroundPatchMinPx, 1);
     _cfg.shadowReachK = num(RC.accentLODShadowReachK, 2.5);
     _cfg.grassHBase = num(RC.accentGrassTuftHeightBase, 2.4);
     _cfg.grassTuftMin = num(RC.accentGrassTuftLODMinPx, 1.4);
@@ -69,7 +68,6 @@ window.AccentLOD = (function () {
     Boulder:     { rH: 7.2,  zMin: 0,    zMax: 1.8, yUp: 7.2, rS: 0 },
     RockCluster: { rH: 11,   zMin: 0,    zMax: 3,   yUp: 11, rS: 4.5 },
     GrassTuft:   { rH: 5.5,  zMin: 0,    zMax: 7.5, yUp: 0,  rS: 1.5 },
-    GroundPatch: { rH: 12,   zMin: 0,    zMax: 0,   yUp: 0,  rS: 0 },
   };
   var _kb = { rH: 8, zMin: 0, zMax: 8, yUp: 0, rS: 0 };
   function kindBounds(kind) {
@@ -134,14 +132,6 @@ window.AccentLOD = (function () {
     return Math.cos((owner && owner.rotation) || 0) * 0.22 * k;
   }
 
-  // 包围体刮擦：仅供无模型消费方（如 GroundPatch 直接给半径）拼装临时 bounds，零分配
-  var _bnd = { rH: 8, zMin: 0, zMax: 8, yUp: 0, rS: 0 };
-  function boundsScratch(rH, zMin, zMax, yUp, rS) {
-    _bnd.rH = rH; _bnd.zMin = zMin || 0; _bnd.zMax = zMax || 0;
-    _bnd.yUp = yUp || 0; _bnd.rS = rS || 0;
-    return _bnd;
-  }
-
   // ── 完整投影包围体：解析式屏幕 AABB（§3.4；非 8 角枚举）──
   // b.rS（「球体半径」上界）**不乘 cosX**：叶簇/子石是屏幕空间球，竖直方向按全半径外扩
   //   （水平已由 rH 计入）；漏掉它会让低俯角（cosX→0）下的冠顶被误剔。
@@ -195,7 +185,7 @@ window.AccentLOD = (function () {
     FAR: FAR, MID: MID, NEAR: NEAR,
     SHEAR_MAX: SHEAR_MAX, BOULDER_R: BOULDER_R,
     cfg: cfg,
-    kindBounds: kindBounds, modelBounds: modelBounds, boundsScratch: boundsScratch,
+    kindBounds: kindBounds, modelBounds: modelBounds,
     featureWorld: featureWorld, featurePx: featurePx,
     tierOf: tierOf, tierFor: tierFor,
     leanShear: leanShear,

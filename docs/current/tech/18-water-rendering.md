@@ -1,7 +1,7 @@
 # 18. 水系河岸平滑化与写意微缩沙盘水体改造方案 (River & Shoreline Refinement Plan)
 
 > **状态**：★ **已实现**——Rust 内核水体矢量多边形打通、前端水景渲染落地（v1.49.0），v1.50.x 演进为**统一相机深度队列 + 特征逐段绘制**（v1.50.11 / v1.50.14 / v1.50.20）。零网格细分、零 GC、确定性门禁全通。
-> **范围**：消除河岸 13 米级网格阶梯锯齿、连续矢量水面、湿砂漫滩过渡带、涉渡卵石踏道、水底游鱼与太阳波光生态层、地形格间抗锯齿缝隙补偿、边界侧壁深度排序；**不改动**宏观水库逻辑、不改动寻路阻挡判定、不增加全局网格细分，保持零 GC 与确定性。
+> **范围**：消除河岸 13 米级网格阶梯锯齿、连续矢量水面、湿砂漫滩过渡带、涉渡卵石踏道、水底游鱼生态层、地形格间抗锯齿缝隙补偿、边界侧壁深度排序；**不改动**宏观水库逻辑、不改动寻路阻挡判定、不增加全局网格细分，保持零 GC 与确定性。（★ v1.50.86 迎光面太阳波光已删除、游鱼迁 WebGL——见 §1.4。）
 > **入口**：[文档导航](../../README.md) · [地形美术规划](../../plan/tech/07-terrain-art.md) · [地形专项方案](../../plan/tech/06-terrain-templates.md) · [前端渲染现状](./16-frontend-overview.md)。
 
 ---
@@ -14,14 +14,13 @@
 | :--- | :--- | :--- | :--- |
 | 0 · `DEPTH_CELL` | 地形格（含水下底模色） | `render_terrain.js` 地形格绘制 | 四边外法线平移 `TERRAIN_SEAM_PX=0.75` 补偿缝隙 |
 | 1 · `DEPTH_FEATURE` | 水系特征：River 水面 / RiverBank 漫滩 / ShallowFord 涉渡 / 泉谷 | `render_terrain.js::drawFeatureItem` / `drawRiverBand` | River / RiverBank **按段入队**（v1.50.20）；ShallowFord 等短特征整条绘制 |
-| 2 · `DEPTH_FISH` | 游鱼（水中层） | `river_life.js::drawFishSingle` 逐条入队 | 鱼 z 在水面下（水中层），按深度先于半透明水面填充，透过水面可见 |
-| 3 · `DEPTH_GLINT` | 太阳波光 | `river_life.js::drawSunGlint` | 深度取河道最近岸 + ε，保持盖在水面之上 |
+| 2 · `DEPTH_FISH` | 游鱼（水中层） | `river_life.js::drawFishSingle` 逐条入队 | 鱼 z 在水面下（水中层），按深度先于半透明水面填充，透过水面可见；★ v1.50.86 起 GL 地形活动时经 sink 分发进 `WebGLAccentLayer`（2D 水面仍盖绘其上，透水观感不变） |
 | 11 · `DEPTH_WALL` | 边界侧壁分段 | `render_terrain.js::drawBoundaryWallSeg` | 每段深度 = 段上沿两端顶点深度的较大值（较近端），贴边实体底座会被正确盖住 |
 
 **不变量**（违反即出 bug）：
 - **严禁全局细分网格（Zero Grid Subdivisions）**：在固定物理网格上用分层矢量覆盖解决锯齿，不得提升网格分辨率（现网 `SIM_CONFIG.terrainGridRes = 256×256`，步长 ≈2.996m；v1.50.70 由 160×160 提升）。
 - **零运行时 GC 分配**：投影顶点缓冲静态预分配（`Float32Array`）+ `render_world.js` 深度项对象池，`render()` 循环内禁止对象分配，帧耗时增量 ≤ 0.08ms。
-- **观感降噪铁律**：凡「沿中心线/岸线走线、笔宽/间距与河宽成比例」的元素在窄河道退化成车道线，只有面状（水面填充/地表格色）与点状/小尺度（游鱼/波光）元素才能稳定成立。
+- **观感降噪铁律**：凡「沿中心线/岸线走线、笔宽/间距与河宽成比例」的元素在窄河道退化成车道线，只有面状（水面填充/地表格色）与点状/小尺度（游鱼）元素才能稳定成立。
 
 ## 1. 当前渲染机制
 
@@ -51,9 +50,9 @@
 ### 1.4 水底生态层（`river_life.js`，纯表现层）
 
 - **游鱼**：≤24 条（4 色盘：锦鲤赤金/金鲤明黄/青黑溪斑/白练银鱼），沿河道中心线插值巡航（基于左右岸顶点序列中点切线推进），正弦摆尾扰动，大部分顺流、少部分逆流；**走墙钟**（模拟暂停仍游动，属写意微缩沙盘环境生命感设计，与水面动画一致）。v1.50.11 起逐条入深度队列（`drawFishSingle`），深度低于水面。
-- **太阳波光**（`drawSunGlint`）：沿河道切线与太阳屏幕方向 `|dot|` 调制受光小段强度（联动 `SimLighting`），背光河段自然减弱；细碎闪烁节奏由墙钟驱动，仅当强度超过阈值时绘制细碎短线。
+- **★ v1.50.86 游鱼迁 WebGL（31 号阶段三切片）**：GL 地形活动时 `drawFishSingle` 把四笔图元（水底影子 / 鱼身梭形 / 背光高线 / 两瓣尾鳍）按 Canvas 同序同配色经 sink 分发进 `WebGLAccentLayer`——鱼身在底层 GL 画布、2D 半透明水面随后盖绘，透水观感与 Canvas 回退路径一致；配色单一数值源 `FISH_PALETTES`（Canvas rgba 串与 GL 数值通道同源派生）；`?accentgl=0` 完整回退 Canvas 现状笔迹。
 - **确定性**：世界重置/读档随 `_engineSeed` 重建（`rustworld.js` 地形重建钩子 `RiverLife.init(nextFeatures, this._engineSeed)`），不进存档、不消耗 WorldRng、不写模拟状态。
-- ⚠️ **已按观感降噪原则移除、勿复活**：水底卵石层与河床基底（v1.50.4 / v1.50.5）、中心微波虚线（v1.50.3）、深浅水色纵深带（v1.50.6）、岸线微沫与顺流碎沫段（v1.50.3 / v1.50.4）。
+- ⚠️ **已按观感降噪原则移除、勿复活**：水底卵石层与河床基底（v1.50.4 / v1.50.5）、中心微波虚线（v1.50.3）、深浅水色纵深带（v1.50.6）、岸线微沫与顺流碎沫段（v1.50.3 / v1.50.4）、**迎光面太阳波光（v1.50.86，用户决策删除）**。
 
 ### 1.5 涉渡点（`ShallowFord`，`render_terrain.js::drawFeatureItem`）
 
@@ -85,9 +84,9 @@
 | :--- | :--- | :--- | :--- |
 | Rust 内核 | [`geo/hydrology.rs`](../../../crates/sim_core/src/geo/hydrology.rs) | `generate_river` | 生成 `TerrainFeatureKind::River`（194 顶点闭合 outline）/ `RiverBank`（左右岸线，id:20+i）/ `ShallowFord`（id:10+i）/ `SpringValley`（id:30）并压入 `self.features` |
 | Rust 内核 | [`spatial/snapshot_bin/dict.rs`](../../../crates/sim_core/src/spatial/snapshot_bin/dict.rs) | `feature_kind_code` | `TerrainFeatureKind::River` 枚举码位与 FABS 表格一一对应（防漂移）；新增枚举变体须同步 `*_code()` / `*_table()` |
-| 前端 | [`js/render_world.js`](../../../frontend/js/render_world.js) | 深度队列（`DEPTH_CELL/FEATURE/FISH/GLINT/…/WALL`） | 统一按 `project3D().depth` 升序落笔；深度项对象池零 GC；收集阶段决定各元素入队深度 |
+| 前端 | [`js/render_world.js`](../../../frontend/js/render_world.js) | 深度队列（`DEPTH_CELL/FEATURE/FISH/…/WALL`，在 render_depth_queue.js） | 统一按 `project3D().depth` 升序落笔；深度项对象池零 GC；收集阶段决定各元素入队深度 |
 | 前端 | [`js/render_terrain.js`](../../../frontend/js/render_terrain.js) | `drawFeatureItem` / `drawRiverBand` / `drawBoundaryWallSeg` / `TERRAIN_SEAM_PX` | 水系特征分段绘制、地形格缝隙补偿、边界侧壁分段绘制 |
-| 前端 | [`js/river_life.js`](../../../frontend/js/river_life.js) | `RiverLife.init` / `drawFishSingle` / `drawSunGlint` | 游鱼与太阳波光（纯表现层，走墙钟，`_engineSeed` 确定性重建） |
+| 前端 | [`js/river_life.js`](../../../frontend/js/river_life.js) | `RiverLife.init` / `drawFishSingle`（Canvas + WebGL sink 双路） | 游鱼（纯表现层，走墙钟，`_engineSeed` 确定性重建） |
 | 前端 | [`js/rustworld.js`](../../../frontend/js/rustworld.js) | 地形重建钩子 | 地形重建时以 `_engineSeed` 初始化 `RiverLife`（世界重置/读档后卵石鱼群分布确定性一致） |
 | 前端 | [`js/math.js`](../../../frontend/js/math.js) | `computeTerrainAlbedo` | 水格暖棕底模色（§1.1 色值），避免缝隙渗色与亮蓝阶梯 |
 | 前端 | [`index.html`](../../../frontend/index.html) | 脚本登记 | `river_life.js` 须早于 `render_world.js` 加载 |
@@ -96,6 +95,6 @@
 
 ## 4. 性能约束
 
-- 基础地形网格（120×120）顶点投影与 Quad 绘制为基准成本；水系装饰层只增加 Canvas 2D 填充/描边（矢量水面两遍填充 + 漫滩带 + 游鱼逐条 + 波光短线），单帧耗时增量 **+0.05ms ~ +0.12ms** 量级，完全在 30~60 FPS 渲染预算内。
+- 基础地形网格（120×120）顶点投影与 Quad 绘制为基准成本；水系装饰层只增加 Canvas 2D 填充/描边（矢量水面两遍填充 + 漫滩带 + 游鱼逐条），单帧耗时增量 **+0.05ms ~ +0.12ms** 量级，完全在 30~60 FPS 渲染预算内。
 - **每帧堆内存 GC 分配 = 0 字节**：投影点全量复用模块顶层 `TypedArray`，RiverLife 静态对象零分配，深度队列走对象池，无垃圾回收。
 - 回归门禁：`node tools/test-wasm.js`（同种子确定性 + 存读档）、`node tools/frontend-check.js`（脚本语法与 DOM 完整性）、`node tools/profile-benchmark.js`（帧率无衰退）。
