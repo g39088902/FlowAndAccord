@@ -98,10 +98,10 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
 
   // 贴地接触投影（弱于灌木）——★ v1.50.84：GL 模式不再手绘，落底阴影由阴影图承担
   if (sink === null) {
-    const so = _shadowOffset(0.8, 1.6, 0.5);
-    ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.10 * so.alphaScale).toFixed(3) + ')';
+    const so = (typeof _shadowOffset === 'function') ? _shadowOffset(0.8, 1.6, 1.2 * (accent.scale || 1)) : { x: 2, y: 1.5, alphaScale: 1 };
+    ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.13 * (so.alphaScale || 1)).toFixed(3) + ')';
     ctx.beginPath();
-    ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, 2.6 * scaled, 1.1 * scaled, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx + so.x * 0.45, sy + so.y * 0.35, 3.2 * scaled, 1.4 * scaled, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 

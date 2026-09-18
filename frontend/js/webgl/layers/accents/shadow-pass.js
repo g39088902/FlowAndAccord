@@ -237,11 +237,12 @@ class WebGLShadowPass {
           // ★ v1.50.91 库存门槛同谓词：detail 小灌木 q < qThreshold 时画面端不画，投影同步省略
           if (!LM.childActive(gs[gi], child)) continue;
           const kind = child.modelKind;
-          if (kind !== 'Tree' && kind !== 'Bush' && kind !== 'RockCluster') continue;
+          if (kind !== 'Tree' && kind !== 'Bush' && kind !== 'RockCluster' && kind !== 'GrassTuft') continue;
           const model = landscapeChildModel(child); // render_landscapes.js 全局（'L#' 键单一来源）
           // kind 入 shim：SimTreeTint.sample 的 jitter 通道与 kind 回退需要（与绘制端 shim 同构）
           const shim = { kind: kind, rotation: child.rot || 0, id: child.visualSeed };
           if (kind === 'RockCluster') this._addStones(verts, sim, child.x, child.y, child.z, child.rot || 0, child.scale, model);
+          else if (kind === 'GrassTuft') this._addGrassTuft(verts, sim, child.x, child.y, child.z, child.rot || 0, child.scale, model, shim);
           else this._addTreeLike(verts, sim, child.x, child.y, child.z, child.scale, model, kind, shim);
         }
       }
@@ -271,8 +272,10 @@ class WebGLShadowPass {
     } else if (kind === 'RockCluster') {
       if (!model.skeleton) return;
       this._addStones(verts, sim, accent.x, accent.y, accent.z, accent.rotation || 0, accent.scale, model);
+    } else if (kind === 'GrassTuft') {
+      if (!model.skeleton) return;
+      this._addGrassTuft(verts, sim, accent.x, accent.y, accent.z, accent.rotation || 0, accent.scale, model, accent);
     }
-    // GrassTuft：草叶过细，投影不可辨，不建代理
   }
 
   // 树/灌木代理：冠簇椭球 + 干/枝/茎 4 棱柱（模型坐标 × scale = 世界偏移，倾干剪切同绘制层）
@@ -324,6 +327,74 @@ class WebGLShadowPass {
           cr, 0.85);
       }
     }
+
+    // 花灌木花朵点簇（Bush Flowers）：春夏季盛开时，在花位上投出饱满花球投影
+    if (kind === 'Bush' && sk.flowers && sk.flowers.length) {
+      const ST = window.SimTreeTint;
+      const season = (ST && sim) ? ST.sample(rotSrc, sim, model.profile) : null;
+      const flowerAmount = season ? (season.flowerAmount || 0) : 0;
+      if (flowerAmount > 0.05) {
+        const nVis = Math.min(sk.flowers.length, Math.round(sk.flowers.length * flowerAmount));
+        for (let i = 0; i < nVis; i++) {
+          const f = sk.flowers[i];
+          const fx = ax + f.x * s, fy = ay + f.y * s, fz = az + f.z * s;
+          const fr = Math.max(0.18, 0.28 * s * flowerAmount);
+          this._ellipsoid(verts, fx, fy, fz, fr, 0.9);
+        }
+      }
+    }
+  }
+
+  // 草丛/芦草代理（GrassTuft）：中心扎地凝聚核 + 放射状草叶两段细棱柱 + 芦花穗顶端椭球
+  _addGrassTuft(verts, sim, ax, ay, az, rot, scale, model, rotSrc) {
+    const sk = model && model.skeleton;
+    if (!sk || !sk.blades || !sk.blades.length) return;
+    const s = scale || 1;
+    const ST = window.SimTreeTint;
+    const season = (ST && sim) ? ST.sample(rotSrc, sim, model.profile) : null;
+    const leaf = season ? season.leafDensity : 1;
+    const flowerAmount = season ? (season.flowerAmount || 0) : 0;
+    const brownness = season ? (season.brownness || 0) : 0;
+    const RC = window.RENDER_CONFIG || {};
+    const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio) ? RC.accentGrassTuftWinterHeightRatio : 0.62;
+    const hK = winterK + (1 - winterK) * leaf;
+    const plumeV = Math.max(flowerAmount, Math.max(0, Math.min(1, (brownness - 0.35) / 0.45)));
+
+    const cR = Math.cos(rot), sR = Math.sin(rot);
+    const n = sk.blades.length;
+    let avgH = 0;
+
+    // 逐草叶构建两段外弯棱柱
+    for (let i = 0; i < n; i++) {
+      const b = sk.blades[i];
+      const bx = ax + (b.bx * cR - b.by * sR) * s;
+      const by = ay + (b.bx * sR + b.by * cR) * s;
+      const tx = ax + (b.tx * cR - b.ty * sR) * s;
+      const ty = ay + (b.tx * sR + b.ty * cR) * s;
+      const curH = b.h * hK * s;
+      avgH += curH;
+
+      // 折线控制点：半高、外倾 35%
+      const mx = bx + (tx - bx) * 0.35;
+      const my = by + (ty - by) * 0.35;
+      const mz = az + curH * 0.55;
+      const tz = az + curH;
+
+      // 下半段（从地表下沉 0.25m 扎入地层，防止起伏坡面悬空漏光）
+      this._prism(verts, bx, by, az - 0.25, mx, my, mz, Math.max(0.18, 0.14 * s));
+      // 上半段（向外微张）
+      this._prism(verts, mx, my, mz, tx, ty, tz, Math.max(0.15, 0.12 * s));
+
+      // 芦草花穗（Plume）：夏末至秋季成熟，在草尖形成椭球绒穗投影
+      if (b.plume > 0 && plumeV > 0.05) {
+        const pr = Math.max(0.20, 0.30 * s * (0.6 + 0.4 * plumeV));
+        this._ellipsoid(verts, tx, ty, tz, pr, 1.2);
+      }
+    }
+
+    avgH /= Math.max(1, n);
+    // 草丛中心基部凝聚核：模拟密集丛生根部，扎地 -0.25m，向上延伸至半高，提供稳固接地投影
+    this._prism(verts, ax, ay, az - 0.25, ax, ay, az + avgH * 0.45, Math.max(0.28, 0.35 * s));
   }
 
   // 石体代理：Boulder（七边形定径）或 RockCluster 子石；底环沿地形坡度（与 drawStoneBody 同构）
