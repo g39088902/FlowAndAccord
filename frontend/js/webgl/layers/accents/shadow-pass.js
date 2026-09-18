@@ -208,7 +208,7 @@ class WebGLShadowPass {
     }
     out.s = s;
     const ST = window.SimTreeTint;
-    out.t = (ST && sim) ? Math.round(ST.sample(_SEASON_CANON, sim).leafDensity * 8) | 0 : 0;
+    out.t = (ST && sim) ? Math.round(ST.sample(_SEASON_CANON, sim).leafDensity * 48) | 0 : 0;
     return out;
   }
 
@@ -281,28 +281,27 @@ class WebGLShadowPass {
     // 干（Tree）/茎（Bush）棱柱
     if (kind === 'Tree') {
       const th = sk.trunkH * s;
-      this._prism(verts, ax, ay, az, ax + lean * th, ay, az + th, Math.max(0.08, 0.17 * crownR * s));
+      // 树干底端下沉 0.5m 扎入地表，保证斜坡或起伏地形下根部无空隙贴地投影；半径保守保底 0.35m 防止光栅化漏像素
+      this._prism(verts, ax, ay, az - 0.5, ax + lean * th, ay, az + th, Math.max(0.35, 0.17 * crownR * s));
       if (sk.segments) {
         for (let i = 0; i < sk.segments.length; i++) {
           const seg = sk.segments[i];
           const x1 = ax + (seg.x1 + lean * seg.z1) * s, y1 = ay + seg.y1 * s, z1 = az + seg.z1 * s;
           const x2 = ax + (seg.x2 + lean * seg.z2) * s, y2 = ay + seg.y2 * s, z2 = az + seg.z2 * s;
-          this._prism(verts, x1, y1, z1, x2, y2, z2, Math.max(0.04, 0.17 * crownR * s * (seg.wK || 0.5) * 0.5));
+          this._prism(verts, x1, y1, z1, x2, y2, z2, Math.max(0.18, 0.17 * crownR * s * (seg.wK || 0.5) * 0.5));
         }
       }
     } else if (sk.segments) {
       for (let i = 0; i < sk.segments.length; i++) {
         const seg = sk.segments[i];
         this._prism(verts,
-          ax + seg.x1 * s, ay + seg.y1 * s, az + seg.z1 * s,
+          ax + seg.x1 * s, ay + seg.y1 * s, az + seg.z1 * s - 0.2,
           ax + seg.x2 * s, ay + seg.y2 * s, az + seg.z2 * s,
-          Math.max(0.03, 0.09 * s));
+          Math.max(0.18, 0.12 * s));
       }
     }
     // 冠簇椭球（z 向略扁，对应画面 crownSquash 的竖直压扁读感）
-    // ★ v1.50.91 跟随季相叶量：与 drawAccentTree/drawAccentBush 同判据——
-    //   accentClusterVisibility(leaf, shed, 0.09) < 0.06 的簇不投影，幸存簇半径 ×v
-    //   （落叶树冬季只剩枝干投影，不再投满冠影）；SimTreeTint/可见度函数缺席时回退全冠。
+    // ★ 跟随季相叶量：半径随 leafDensity 平滑连续收缩到 0，不设过大跳变截断，过渡期自然缩小至纯枝干投影
     if (sk.clusters) {
       const visFn = window.accentClusterVisibility;
       const ST = window.SimTreeTint;
@@ -312,11 +311,13 @@ class WebGLShadowPass {
         let v = 1;
         if (leaf < 1 && visFn) {
           v = visFn(leaf, c.shed, 0.09);
-          if (v < 0.06) continue;
+          if (v <= 0.001) continue;
         }
+        const cr = c.r * s * v;
+        if (cr < 0.05) continue;
         this._ellipsoid(verts,
           ax + (c.x + lean * c.z) * s, ay + c.y * s, az + c.z * s,
-          Math.max(0.15, c.r * s * v), 0.85);
+          cr, 0.85);
       }
     }
   }
@@ -367,7 +368,7 @@ class WebGLShadowPass {
     }
   }
 
-  // 4 棱柱（干/枝/茎）：细长几何的保守遮挡代理（双面渲染，无端盖——底贴地、顶被冠球覆盖）
+  // 4 棱柱（干/枝/茎）：细长几何的保守遮挡代理（双面渲染 + 顶底端盖——防高仰角日光射穿）
   _prism(verts, x1, y1, z1, x2, y2, z2, r) {
     if (!(r > 0.02)) return;
     const axv = x2 - x1, ayv = y2 - y1, azv = z2 - z1;
@@ -395,6 +396,24 @@ class WebGLShadowPass {
         x2 + e[0] * r, y2 + e[1] * r, z2 + e[2] * r,
         x2 + d[0] * r, y2 + d[1] * r, z2 + d[2] * r);
     }
+    // 顶端与底端端盖（各 2 个三角形），防陡直高仰角日光从空心两头射穿
+    const d0 = dirs[0], d1 = dirs[1], d2 = dirs[2], d3 = dirs[3];
+    verts.push(
+      x2 + d0[0] * r, y2 + d0[1] * r, z2 + d0[2] * r,
+      x2 + d1[0] * r, y2 + d1[1] * r, z2 + d1[2] * r,
+      x2 + d2[0] * r, y2 + d2[1] * r, z2 + d2[2] * r);
+    verts.push(
+      x2 + d0[0] * r, y2 + d0[1] * r, z2 + d0[2] * r,
+      x2 + d2[0] * r, y2 + d2[1] * r, z2 + d2[2] * r,
+      x2 + d3[0] * r, y2 + d3[1] * r, z2 + d3[2] * r);
+    verts.push(
+      x1 + d0[0] * r, y1 + d0[1] * r, z1 + d0[2] * r,
+      x1 + d1[0] * r, y1 + d1[1] * r, z1 + d1[2] * r,
+      x1 + d2[0] * r, y1 + d2[1] * r, z1 + d2[2] * r);
+    verts.push(
+      x1 + d0[0] * r, y1 + d0[1] * r, z1 + d0[2] * r,
+      x1 + d2[0] * r, y1 + d2[1] * r, z1 + d2[2] * r,
+      x1 + d3[0] * r, y1 + d3[1] * r, z1 + d3[2] * r);
   }
 
   // 椭球（冠簇）：8 经 × 4 纬，z 向按 squashK 压扁
@@ -432,8 +451,8 @@ class WebGLShadowPass {
   }
 
   // ── 光向正交矩阵（世界 → 光向 NDC；8 角紧致拟合）────────────────────────
-  // 相机位于 center − L·800，视方向 f = +L（指向光），z 轴 = −f（OpenGL 惯例，向下看 −z）。
-  // z_ndc = −(2/d)·z_v + (maxZv+minZv)/d ⇒ 最近场景点 z_ndc = −1（深度 0），
+  // 视基：s = f×up 归一，u = s×f，视向 f = -L（指向场景）。
+  // 光向距离 dist = dot(P, L)：越靠近光源 dist 越大，深度越小（z_ndc = -1，深度 0）。
   // 接收面片元深度 > 投影物深度 ⇒ 处于阴影中。
   _computeLightMatrix(sim, L) {
     const t = sim.terrain;
@@ -447,36 +466,48 @@ class WebGLShadowPass {
     if (sl < 1e-6) { sx = 1; sy = 0; sz = 0; sl = 1; }
     sx /= sl; sy /= sl; sz /= sl;
     const ux = sy * L.z - sz * L.y, uy = sz * L.x - sx * L.z, uz = sx * L.y - sy * L.x; // s × f
-    const czW = (minZ + maxZ) * 0.5;
-    const eyeX = -L.x * 800, eyeY = -L.y * 800, eyeZ = czW - L.z * 800; // 世界中心沿 −L 后撤
-    // 8 角在视空间的紧致包围
-    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minZv = 1e9, maxZv = -1e9;
+
+    // 8 角在光向视空间的紧致包围
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minDist = 1e9, maxDist = -1e9;
     const zs = [minZ, maxZ];
     for (let xi = 0; xi < 2; xi++) for (let yi = 0; yi < 2; yi++) for (let zi = 0; zi < 2; zi++) {
       const wx = xi ? m : -m, wy = yi ? m : -m, wz = zs[zi];
-      const dx = wx - eyeX, dy = wy - eyeY, dz = wz - eyeZ;
-      const xv = dx * sx + dy * sy + dz * sz;
-      const yv = dx * ux + dy * uy + dz * uz;
-      const zv = -(dx * L.x + dy * L.y + dz * L.z); // z_v = dot(c−eye, −L)
+      const xv = wx * sx + wy * sy + wz * sz;
+      const yv = wx * ux + wy * uy + wz * uz;
+      const dist = wx * L.x + wy * L.y + wz * L.z;
       if (xv < minX) minX = xv; if (xv > maxX) maxX = xv;
       if (yv < minY) minY = yv; if (yv > maxY) maxY = yv;
-      if (zv < minZv) minZv = zv; if (zv > maxZv) maxZv = zv;
+      if (dist < minDist) minDist = dist; if (dist > maxDist) maxDist = dist;
     }
-    const w = Math.max(1e-3, maxX - minX), h = Math.max(1e-3, maxY - minY), d = Math.max(1e-3, maxZv - minZv);
-    const cxv = (maxX + minX) * 0.5, cyv = (maxY + minY) * 0.5, czv = (maxZv + minZv) * 0.5;
+    const w = Math.max(1e-3, maxX - minX), h = Math.max(1e-3, maxY - minY), d = Math.max(1e-3, maxDist - minDist);
+    const cxv = (maxX + minX) * 0.5, cyv = (maxY + minY) * 0.5, cDist = (maxDist + minDist) * 0.5;
     this._depthRange = d;
-    const se = sx * eyeX + sy * eyeY + sz * eyeZ;
-    const ue = ux * eyeX + uy * eyeY + uz * eyeZ;
-    const le = L.x * eyeX + L.y * eyeY + L.z * eyeZ;
+
     const M = this.lightMatrix;
-    // 列主序：x' = 2/w·(dot(c,s) − se − cxv)；y' 同理；z' = −2/d·z_v + 2czv/d
-    M[0] = (2 / w) * sx; M[4] = (2 / h) * ux; M[8] = (2 / d) * L.x;
-    M[12] = -(2 / w) * (se + cxv);
-    M[1] = (2 / w) * sy; M[5] = (2 / h) * uy; M[9] = (2 / d) * L.y;
-    M[13] = -(2 / h) * (ue + cyv);
-    M[2] = (2 / w) * sz; M[6] = (2 / h) * uz; M[10] = -(2 / d) * L.z;
-    M[14] = (2 / d) * (czv - le);
-    M[3] = 0; M[7] = 0; M[11] = 0; M[15] = 1;
+    // WebGL 列主序（uniformMatrix4fv false）：
+    // x' = 2/w * (dot(P, s) - cxv)
+    // y' = 2/h * (dot(P, u) - cyv)
+    // z' = -2/d * (dot(P, L) - cDist)
+    // Col 0 (x)
+    M[0] = (2 / w) * sx;
+    M[1] = (2 / h) * ux;
+    M[2] = -(2 / d) * L.x;
+    M[3] = 0;
+    // Col 1 (y)
+    M[4] = (2 / w) * sy;
+    M[5] = (2 / h) * uy;
+    M[6] = -(2 / d) * L.y;
+    M[7] = 0;
+    // Col 2 (z)
+    M[8] = (2 / w) * sz;
+    M[9] = (2 / h) * uz;
+    M[10] = -(2 / d) * L.z;
+    M[11] = 0;
+    // Col 3 (平移)
+    M[12] = -(2 / w) * cxv;
+    M[13] = -(2 / h) * cyv;
+    M[14] = (2 * cDist) / d;
+    M[15] = 1;
   }
 }
 

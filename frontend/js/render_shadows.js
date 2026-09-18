@@ -99,13 +99,29 @@ function drawAccentShadowFor(accent, model, it) {
   const crowW = crownR * (0.85 + vSeed * 0.15); // 冠幅（px，含个体变径）
   const ang = Math.atan2(so.y, so.x);           // 影向 = 世界阴影方向的屏幕投影（方向无轴向偏差）
 
-  // 1) 接地弱影（贴树根，冬季仍存——「弱接地影」）
+  // 1) 树干贴地投影（树干在地面上的投影：从锚点 (sx, sy) 沿影向延伸到干顶落点，四季恒存）
+  if (kind === 'Tree') {
+    const tBaseW = Math.max(0.8, crowW * 0.16);
+    const tTopW = Math.max(0.5, crowW * 0.08);
+    const nx = -Math.sin(ang), ny = Math.cos(ang);
+    const tx = sx + so.x * 0.85, ty = sy + so.y * 0.85;
+    ctx.fillStyle = 'rgba(20, 15, 10, ' + (cfg.groundAlpha * kA * 0.95).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.moveTo(sx + nx * tBaseW, sy + ny * tBaseW);
+    ctx.lineTo(tx + nx * tTopW, ty + ny * tTopW);
+    ctx.lineTo(tx - nx * tTopW, ty - ny * tTopW);
+    ctx.lineTo(sx - nx * tBaseW, sy - ny * tBaseW);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 2) 接地弱影（贴树根，冬季仍存——「弱接地影」）
   ctx.fillStyle = 'rgba(20, 15, 10, ' + (cfg.groundAlpha * kA * (0.55 + 0.45 * leaf)).toFixed(3) + ')';
   ctx.beginPath();
   ctx.ellipse(sx, sy, crowW * 0.52 * (0.55 + 0.45 * leaf), crowW * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2) 稀疏枝影（冬季为主：两条沿影向细长椭圆，α ∝ 1−leaf；夏季被冠影覆盖无感知）
+  // 3) 稀疏枝影（冬季为主：两条沿影向细长椭圆，α ∝ 1−leaf；夏季被冠影覆盖无感知）
   if (leaf < 0.95) {
     ctx.fillStyle = 'rgba(20, 15, 10, ' + (cfg.branchAlpha * kA * (1 - leaf)).toFixed(3) + ')';
     for (let i = 0; i < 2; i++) {
@@ -116,10 +132,13 @@ function drawAccentShadowFor(accent, model, it) {
     }
   }
 
-  // 3) 冠影（夏季完整：沿影向拉长的宽椭圆，随叶量收缩淡出；中心 = 冠心世界落点 ≈ 锚点 + 85% 影向量）
-  ctx.fillStyle = 'rgba(20, 15, 10, ' + (cfg.alpha * kA * (0.30 + 0.70 * leaf)).toFixed(3) + ')';
-  ctx.beginPath();
-  ctx.ellipse(sx + so.x * 0.85, sy + so.y * 0.85,
-    crowW * shadowK * 1.12, crowW * 0.42 * shadowK, ang, 0, Math.PI * 2);
-  ctx.fill();
+  // 4) 冠影（夏季完整：沿影向拉长的宽椭圆，随叶量连续收缩淡出至 0；中心 = 冠心世界落点 ≈ 锚点 + 85% 影向量）
+  if (leaf > 0.02) {
+    const crownK = Math.max(0, (leaf - 0.02) / 0.98);
+    ctx.fillStyle = 'rgba(20, 15, 10, ' + (cfg.alpha * kA * crownK).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(sx + so.x * 0.85, sy + so.y * 0.85,
+      crowW * crownK * 1.12, crowW * 0.42 * crownK, ang, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
