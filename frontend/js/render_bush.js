@@ -41,6 +41,9 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const tier = AL.tierFor(accent, 'Bush', model, scaled);
   const detailMid = tier >= AL.MID;   // 中景：茎 + 叶簇（★ TA-06-7 花朵图元的细节门槛）
   const detailNear = tier >= AL.NEAR;
+  // ★ v1.50.84 WebGL 装饰层：GL 模式登记本丛深度，图元经 sink 分发（与 Canvas 单一同源）
+  var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
+  if (sink !== null) sink.beginAccent(accent.x, accent.y, accent.z);
 
   // 贴地微投影已随 TA-04-6 迁往 render_shadows.js::drawAccentShadowGround（同 Tree）
 
@@ -71,22 +74,38 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       const segLen = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1, seg.z2 - seg.z1) || 1;
       cylinderShade((seg.x2 - seg.x1) / segLen, (seg.y2 - seg.y1) / segLen, (seg.z2 - seg.z1) / segLen, 0,
         _ld.x, _ld.y, _ld.z, wvx, wvy, wvz, cosZ, sinZ, cosX, sinX);
-      ctx.strokeStyle = accentLitFill(104, 78, 54, _cylFront.x, _cylFront.y, _cylFront.z, 1);
-      ctx.lineWidth = lwSeg;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.quadraticCurveTo(c.x, c.y, b.x, b.y);
-      ctx.stroke();
+      const stemFill = accentLitFill(104, 78, 54, _cylFront.x, _cylFront.y, _cylFront.z, 1);
+      if (sink !== null) {
+        // 茎：开折线描边 + 圆头（同 Canvas lineCap='round' 逐茎 stroke 语义）
+        const np = _flattenQuad(0, a.x, a.y, c.x, c.y, b.x, b.y);
+        sink.polyStroke(_flatX, _flatY, np, false, lwSeg, _litFinal[0], _litFinal[1], _litFinal[2], 1, true);
+      } else {
+        ctx.strokeStyle = stemFill;
+        ctx.lineWidth = lwSeg;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.quadraticCurveTo(c.x, c.y, b.x, b.y);
+        ctx.stroke();
+      }
       // 迎光侧细高光（茎宽可辨且屏幕迎光方向非退化才画）
       if (lwSeg >= bb.minPx && _cylScr.ok) {
         const o = lwSeg * bb.offK;
-        ctx.strokeStyle = accentLitFill(104, 78, 54, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
-        ctx.lineWidth = lwSeg * bb.wK;
-        ctx.beginPath();
-        ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
-        ctx.quadraticCurveTo(c.x + _cylScr.x * o, c.y + _cylScr.y * o,
-          b.x + _cylScr.x * o, b.y + _cylScr.y * o);
-        ctx.stroke();
+        const hiFill = accentLitFill(104, 78, 54, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
+        if (sink !== null) {
+          const np = _flattenQuad(0,
+            a.x + _cylScr.x * o, a.y + _cylScr.y * o,
+            c.x + _cylScr.x * o, c.y + _cylScr.y * o,
+            b.x + _cylScr.x * o, b.y + _cylScr.y * o);
+          sink.polyStroke(_flatX, _flatY, np, false, lwSeg * bb.wK, _litFinal[0], _litFinal[1], _litFinal[2], bb.litA, true);
+        } else {
+          ctx.strokeStyle = hiFill;
+          ctx.lineWidth = lwSeg * bb.wK;
+          ctx.beginPath();
+          ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
+          ctx.quadraticCurveTo(c.x + _cylScr.x * o, c.y + _cylScr.y * o,
+            b.x + _cylScr.x * o, b.y + _cylScr.y * o);
+          ctx.stroke();
+        }
       }
     }
     ctx.lineCap = 'butt';
@@ -127,18 +146,28 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const zSpan = Math.max(0.001, zHi - zLo);
 
   // Pass A：统一冠影色剪影（重叠即并集）
-  ctx.fillStyle = 'rgb(' +
-    Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4)) + ',' +
-    Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8)) + ',' +
-    Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14)) + ')';
-  ctx.beginPath();
-  for (let i = 0; i < nItems; i++) {
-    const it = _crownScratchPool[i];
-    const sw = lw + it.rr * 0.16;
-    ctx.moveTo(it.px + it.rr + sw, it.py);
-    ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * squash + sw, 0, 0, Math.PI * 2);
+  // ★ GL 路径：逐簇发不透明椭圆——并集观感与单 path 填充一致（不透明叠涂无接缝）
+  const paR = Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4));
+  const paG = Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8));
+  const paB = Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14));
+  if (sink !== null) {
+    const ar = paR / 255, ag = paG / 255, ab = paB / 255;
+    for (let i = 0; i < nItems; i++) {
+      const it = _crownScratchPool[i];
+      const sw = lw + it.rr * 0.16;
+      sink.ellipseRGBA(it.px, it.py, it.rr + sw, it.rr * squash + sw, ar, ag, ab, 1);
+    }
+  } else {
+    ctx.fillStyle = 'rgb(' + paR + ',' + paG + ',' + paB + ')';
+    ctx.beginPath();
+    for (let i = 0; i < nItems; i++) {
+      const it = _crownScratchPool[i];
+      const sw = lw + it.rr * 0.16;
+      ctx.moveTo(it.px + it.rr + sw, it.py);
+      ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * squash + sw, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
-  ctx.fill();
 
   // Pass B：簇本体 + 冠内体积/AO 分档 × 世界光向受光（★ TA-04-2，同 Tree 管线；灌木无倾干）
   const cc = crownLitCfg();
@@ -148,17 +177,28 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const j = (c.lite - 0.5) * 2 * jitterAmp;
     const tZ = (c.z - zLo) / zSpan;
     const kZ = 0.80 + 0.20 * tZ;
-    ctx.fillStyle = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, c.nx, c.ny, c.nz, kZ);
-    ctx.beginPath();
-    ctx.ellipse(it.px, it.py, it.rr, it.rr * squash, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const clusterFill = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, c.nx, c.ny, c.nz, kZ);
+    if (sink !== null) {
+      sink.ellipseRGBA(it.px, it.py, it.rr, it.rr * squash, _litFinal[0], _litFinal[1], _litFinal[2], 1);
+    } else {
+      ctx.fillStyle = clusterFill;
+      ctx.beginPath();
+      ctx.ellipse(it.px, it.py, it.rr, it.rr * squash, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // 近景簇亮部：★ TA-04-4 世界光向投影驱动（同 Tree；灌木无倾干，簇法线即世界法线）
     if (detailNear && it.rr > cc.minPx) {
-      ctx.fillStyle = accentLitFill(255, 252, 218, c.nx, c.ny, c.nz, 1, cc.alpha * it.v);
-      ctx.beginPath();
-      ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
-        it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
-      ctx.fill();
+      const hiCol = accentLitFill(255, 252, 218, c.nx, c.ny, c.nz, 1, cc.alpha * it.v);
+      if (sink !== null) {
+        sink.ellipseRGBA(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
+          it.rr * cc.rxK, it.rr * cc.ryK, _litFinal[0], _litFinal[1], _litFinal[2], cc.alpha * it.v);
+      } else {
+        ctx.fillStyle = hiCol;
+        ctx.beginPath();
+        ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
+          it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -172,6 +212,7 @@ function drawAccentBush(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
 // 花点亦不残留，冬夏 flowerAmount 归零 → 零花点）。
 function drawBushFlowers(scaled, season, model, detailMid, projTo) {
   if (!detailMid) return; // 远景整组省略（§3.4 细节分级：仅中景及以上落笔）
+  var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
   const RC = window.RENDER_CONFIG || {};
   const rK = Number.isFinite(RC.accentFlowerDotRadiusK) ? RC.accentFlowerDotRadiusK : 0.30;
   const minPx = Number.isFinite(RC.accentFlowerMinPx) ? RC.accentFlowerMinPx : 1.2;
@@ -192,10 +233,15 @@ function drawBushFlowers(scaled, season, model, detailMid, projTo) {
     const p = _ptD;
     projTo(f.x, f.y, f.z, p);
     const col = (pal && pal[f.hue]) || _flowerPaletteFallback[f.hue] || _flowerPaletteFallback[0];
-    ctx.fillStyle = accentLitFill(col[0], col[1], col[2], c.nx, c.ny, c.nz, 1, alpha * v);
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, dr, dr * 0.92, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const flCol = accentLitFill(col[0], col[1], col[2], c.nx, c.ny, c.nz, 1, alpha * v);
+    if (sink !== null) {
+      sink.ellipseRGBA(p.x, p.y, dr, dr * 0.92, _litFinal[0], _litFinal[1], _litFinal[2], alpha * v);
+    } else {
+      ctx.fillStyle = flCol;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, dr, dr * 0.92, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 // 缺省花板回退（config.render.js::accentFlowerPalette 缺席时；白 / 淡粉 / 淡黄）

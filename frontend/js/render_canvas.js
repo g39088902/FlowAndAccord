@@ -228,19 +228,32 @@ if (isCameraFollow && sim.selectionType === 'agent') {
         console.error('[WebGL] Terrain renderer initialization failed:', e);
       });
 
-      // ★ 石头绘制 WebGL 迁移：与地形共用 GL 上下文惰性初始化；
-      //   stoneWebglEnabled=false 或 URL ?stonegl=0 完整回退 Canvas 现状路径。
-      if ((window.RENDER_CONFIG && window.RENDER_CONFIG.stoneWebglEnabled !== false) && !window.WebGLStoneLayer) {
-        window.WebGLStoneLayer = new WebGLStoneRenderer(window.webglContext, window.webglManager);
-        window.WebGLStoneLayer.init().then(() => {
-          console.log('[WebGL] Stone Renderer initialized');
+      // ★ 装饰绘制 WebGL 迁移（v1.50.83 石体 → v1.50.84 花草木）：与地形共用 GL 上下文惰性
+      //   初始化；accentWebglEnabled=false 或 URL ?accentgl=0（兼容 ?stonegl=0）完整回退 Canvas。
+      //   WebGLShadowPass 为阴影图层：世界代理几何 → 光向深度图 → 地形采样变暗（替代手绘阴影）。
+      if ((window.RENDER_CONFIG && window.RENDER_CONFIG.accentWebglEnabled !== false) && !window.WebGLAccentLayer) {
+        window.WebGLAccentLayer = new WebGLAccentRenderer(window.webglContext, window.webglManager);
+        window.WebGLAccentLayer.init().then(() => {
+          console.log('[WebGL] Accent Renderer initialized');
         }).catch(e => {
-          console.error('[WebGL] Stone renderer initialization failed:', e);
+          console.error('[WebGL] Accent renderer initialization failed:', e);
+        });
+        window.WebGLShadowPass = new WebGLShadowPass(window.webglContext, window.webglManager);
+        window.WebGLShadowPass.strength = (window.RENDER_CONFIG && Number.isFinite(window.RENDER_CONFIG.accentWebglShadowStrength))
+          ? window.RENDER_CONFIG.accentWebglShadowStrength : 0.38;
+        window.WebGLShadowPass.init().then(() => {
+          console.log('[WebGL] Shadow Pass initialized');
+        }).catch(e => {
+          console.error('[WebGL] Shadow pass initialization failed:', e);
         });
       }
     }
 
     if (webglTerrainRenderer && webglTerrainRenderer.isReady() && sim.terrain && sim.terrain.cells) {
+      // ★ 先更新阴影图（光向可能逐帧缓变），地形渲染随后采样
+      if (window.WebGLShadowPass && window.WebGLShadowPass.isReady()) {
+        window.WebGLShadowPass.render(sim);
+      }
       webglTerrainRenderer.render(camera, w, h, sim);
       webglTerrainRendered = true;
       dbgRenderMs = 0;
@@ -268,12 +281,12 @@ if (isCameraFollow && sim.selectionType === 'agent') {
     // 3. ★ v1.50.11 世界统一深度队列：
     //    当 WebGL 接管地形时，depth_queue 跳过地形格，高效绘制上层水系、道路、族人、房屋、POI 等；
     //    回退模式下则全量由 2D 绘制。
-    //    ★ 石头绘制 WebGL 迁移：GL 地形活动时，深度队列期间 drawStoneBody 把 Boulder /
-    //    RockCluster 图元按 Canvas 同序收进 WebGLStoneLayer（sink 分发），队列结束后
-    //    整批提交 GPU——同一 GL 帧、不清屏、深度对齐本帧地形。
-    if (webglTerrainRendered && window.WebGLStoneLayer) window.WebGLStoneLayer.beginFrame();
+    //    ★ 装饰绘制 WebGL 迁移：GL 地形活动时，深度队列期间各装饰绘制函数把与 Canvas 逐位
+    //    同源的屏幕空间图元收进 WebGLAccentLayer（sink 分发），队列结束后整批提交 GPU——
+    //    同一 GL 帧、不清屏、深度对齐本帧地形；落底阴影由 WebGLShadowPass 阴影图承担。
+    if (webglTerrainRendered && window.WebGLAccentLayer) window.WebGLAccentLayer.beginFrame();
     drawWorldEntities();
-    if (webglTerrainRendered && window.WebGLStoneLayer) window.WebGLStoneLayer.endFrame(w, h);
+    if (webglTerrainRendered && window.WebGLAccentLayer) window.WebGLAccentLayer.endFrame(w, h);
 
     // 4. 地形网格线（调试叠加，'G' 键切换）
     if (!webglTerrainRendered) {

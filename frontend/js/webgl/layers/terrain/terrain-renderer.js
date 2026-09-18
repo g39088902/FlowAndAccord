@@ -23,18 +23,42 @@ class TerrainWebGLRenderer {
       in vec3 a_color;
       uniform mat4 u_matrix;
       out vec3 v_color;
+      out vec3 v_world;
       void main() {
         gl_Position = u_matrix * vec4(a_position, 1.0);
         v_color = a_color;
+        v_world = a_position; // 世界坐标供阴影图采样（WebGLShadowPass）
       }
     `;
 
     const fsSource = `#version 300 es
       precision mediump float;
       in vec3 v_color;
+      in vec3 v_world;
+      uniform sampler2D u_shadowMap;
+      uniform mat4 u_lightMat;
+      uniform float u_shadowOn;
+      uniform float u_shadowStrength;
       out vec4 outColor;
       void main() {
-        outColor = vec4(v_color, 1.0);
+        float lit = 1.0;
+        if (u_shadowOn > 0.5) {
+          // 世界 → 光向 NDC → 深度图 UV/深度（仿射，w=1）
+          vec3 p = (u_lightMat * vec4(v_world, 1.0)).xyz * 0.5 + 0.5;
+          if (p.x > 0.001 && p.x < 0.999 && p.y > 0.001 && p.y < 0.999 && p.z < 1.0) {
+            // 中心 + 4 tap PCF（1 texel），深度偏移防自遮挡哨兵
+            float sh = 0.0;
+            sh += texture(u_shadowMap, p.xy).r;
+            sh += texture(u_shadowMap, p.xy + vec2(1.0 / 2048.0, 0.0)).r;
+            sh += texture(u_shadowMap, p.xy - vec2(1.0 / 2048.0, 0.0)).r;
+            sh += texture(u_shadowMap, p.xy + vec2(0.0, 1.0 / 2048.0)).r;
+            sh += texture(u_shadowMap, p.xy - vec2(0.0, 1.0 / 2048.0)).r;
+            sh /= 5.0;
+            float inShadow = (p.z - 0.0012 > sh) ? 1.0 : 0.0;
+            lit = 1.0 - u_shadowStrength * inShadow;
+          }
+        }
+        outColor = vec4(v_color * lit, 1.0);
       }
     `;
 
@@ -253,6 +277,20 @@ class TerrainWebGLRenderer {
     const matrix = ProjectionUtils.getAxonometricMatrix(camera, w, h);
     const uMatrixLoc = this.manager.getUniformLocation(this.program, 'u_matrix');
     gl.uniformMatrix4fv(uMatrixLoc, false, matrix);
+
+    // ★ v1.50.84 阴影图采样：装饰世界代理几何（WebGLShadowPass）沿光向深度 → 阴影内变暗。
+    //   阴影层缺席/光向退化时 u_shadowOn=0，地形外观与 v1.50.83 逐位一致。
+    const sp = window.WebGLShadowPass;
+    if (sp && sp.isReady() && sp.hasShadow()) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, sp.depthTexture);
+      gl.uniform1i(this.manager.getUniformLocation(this.program, 'u_shadowMap'), 0);
+      gl.uniformMatrix4fv(this.manager.getUniformLocation(this.program, 'u_lightMat'), false, sp.lightMatrix);
+      gl.uniform1f(this.manager.getUniformLocation(this.program, 'u_shadowStrength'), sp.strength);
+      gl.uniform1f(this.manager.getUniformLocation(this.program, 'u_shadowOn'), 1);
+    } else {
+      gl.uniform1f(this.manager.getUniformLocation(this.program, 'u_shadowOn'), 0);
+    }
 
     // 渲染全部地表网格与侧壁
     gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);

@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.50.83';
+        this._appVersion = '1.50.84';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.50.83';
+            this._appVersion = msg.appVersion || '1.50.84';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -327,6 +327,8 @@
         // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
         // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
         if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
+        // ★ v1.50.84：阴影图世界代理几何同一生命周期失效（换世界不残留旧投影代理）
+        if (window.WebGLShadowPass) window.WebGLShadowPass.resetCache();
         // 地形贪婪合并网格同一生命周期失效
         if (window.TerrainMeshMerge) window.TerrainMeshMerge.invalidate();
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
@@ -462,7 +464,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.50.83';
+        return this._appVersion || '1.50.84';
 
       }
 

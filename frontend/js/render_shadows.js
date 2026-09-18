@@ -48,6 +48,10 @@ function drawAccentShadowGround(accent, it) {
 // （AccentModel.getByKey，'L#' 命名空间）解析后传入，accent 与景观子图元共用同一套
 // 实高驱动影长 + 叶量调制公式（光照公式单一来源，不复制）。
 function drawAccentShadowFor(accent, model, it) {
+  // ★ v1.50.84：GL 模式贴地投影**不再手绘**——树/灌木落底阴影统一由阴影图
+  //   （WebGLShadowPass，世界空间代理几何 → 光向深度 → GL 地形采样变暗）实时承担；
+  //   Canvas 回退路径（?webgl=0 / ?accentgl=0）保持原样。
+  if (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) return;
   const kind = accent.kind;
   const skel = model.skeleton;
   if (!skel) return;

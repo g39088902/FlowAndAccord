@@ -28,7 +28,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.83</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.50.84</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1423,8 +1423,10 @@
   <script src="js/webgl/fallback-handler.js"></script>
   <script src="js/webgl/layers/terrain/test-grid.js"></script>
   <script src="js/webgl/layers/terrain/terrain-renderer.js"></script>
-  <!-- ★ 石头绘制 WebGL 迁移（阶段三石体切片）：drawStoneBody sink 分发的 GPU 石体层，须早于 render_canvas.js -->
-  <script src="js/webgl/layers/accents/stone-renderer.js"></script>
+  <!-- ★ 装饰绘制 WebGL 迁移（阶段三装饰切片）：drawStoneBody/drawAccentTree/Bush/GrassTuft sink
+       分发的 GPU 装饰层 + 阴影图层，须早于 render_canvas.js -->
+  <script src="js/webgl/layers/accents/accent-renderer.js"></script>
+  <script src="js/webgl/layers/accents/shadow-pass.js"></script>
   <script src="js/dag-layout.js"></script>
   <script src="js/dag-view.js"></script>
   <script src="js/dag-standalone.js"></script>
