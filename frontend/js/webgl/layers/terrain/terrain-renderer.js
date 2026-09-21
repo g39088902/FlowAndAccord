@@ -5,6 +5,9 @@
 //   （逐顶点受光 → 插值 v_color，与 CPU 逐格烘焙→角点插值语义逐位同构）；法线/AO/反照率来自
 //   rustworld.js 世界建缓存预存数组（terr.nx/ny/nz/ao/albR/G/B，世界静态）→ vboShade 一次上传，
 //   光档变化只剩 uniform 更新（lightRev 闸）——退役 cell.color→parseColor→vboColor 烘焙链。
+// ★ v1.50.95 阴影接收面收口：装饰阴影图只作用于地表（a_side=0）；沙盘侧壁（a_side=1）跳过采样
+//   ——侧壁自地表垂直下探至 skirtElev，沿光向深度恒大于任何装饰代理，斜投影会把贴地影的图案
+//   拉花到崖面（「影子投到地图边缘垂直墙」鬼影）。
 
 class TerrainWebGLRenderer {
   constructor(webglContext, shaderManager) {
@@ -26,6 +29,7 @@ class TerrainWebGLRenderer {
   async init() {
     // 顶点 shader：shadeAlbedoInto（lighting.js L192-210）直译。侧壁（a_side=1）保持
     // 固定平色 u_wallColor（现状语义）；地表按预存法线/AO/反照率受光。
+    // ★ v1.50.95：额外透传 v_side 给片元——片元阴影项对侧壁短路（见 fsSource 注释）。
     const vsSource = `#version 300 es
       precision highp float;
       in vec3 a_position;   // 世界坐标（含侧壁垂底顶点）
@@ -42,11 +46,13 @@ class TerrainWebGLRenderer {
       uniform vec3 u_wallColor;
       out vec3 v_color;
       out vec3 v_world;
+      out float v_side;     // ★ v1.50.95 侧壁旗标透传（片元阴影项对侧壁短路）
       void main() {
         gl_Position = u_matrix * vec4(a_position, 1.0);
         v_world = a_position; // 世界坐标供阴影图采样（WebGLShadowPass）
+        v_side = a_side;
         if (a_side > 0.5) {
-          v_color = u_wallColor; // 侧壁固定平色（现状语义，仍受片元阴影因子）
+          v_color = u_wallColor; // 侧壁固定平色（现状语义；★ v1.50.95 起不再乘阴影因子）
         } else {
           // shadeAlbedoInto 直译：wrap 漫反射 → (amb+inv·wd)·ao·inten → 钳制 → tint → 色洗
           vec3 n = normalize(a_normal);
@@ -60,12 +66,13 @@ class TerrainWebGLRenderer {
       }
     `;
 
-    // 片元 shader：与现状逐字同构（v_color × 阴影图 PCF）。
+    // 片元 shader：v_color × 阴影图 PCF（★ v1.50.95 起仅地表采样，侧壁跳过）。
     // 纹样层（TerrainTexture 对应物）预留 v_texCoord，31 号 §6.2 阶段四落地。
     const fsSource = `#version 300 es
       precision mediump float;
       in vec3 v_color;
       in vec3 v_world;
+      in float v_side;
       uniform sampler2D u_shadowMap;
       uniform mat4 u_lightMat;
       uniform float u_shadowOn;
@@ -73,7 +80,11 @@ class TerrainWebGLRenderer {
       out vec4 outColor;
       void main() {
         float lit = 1.0;
-        if (u_shadowOn > 0.5) {
+        // ★ v1.50.95 侧壁（v_side=1）短路：阴影图只含装饰代理（树/灌木/石），且侧壁顶点自地表
+        //   垂直下探至 skirtElev——沿光向的深度恒大于任何代理，「落影图案」被斜投影拉花到整个
+        //   崖面（贴地影随崖壁垂直拉伸的错位鬼影）。侧壁为固定平色边界面（u_wallColor，现状语义
+        //   本就不接收装饰影），故跳过阴影采样，恢复 v1.50.84 之前的观感。
+        if (u_shadowOn > 0.5 && v_side < 0.5) {
           // 世界 → 光向 NDC → 深度图 UV/深度（仿射，w=1）
           vec3 p = (u_lightMat * vec4(v_world, 1.0)).xyz * 0.5 + 0.5;
           if (p.x > 0.001 && p.x < 0.999 && p.y > 0.001 && p.y < 0.999 && p.z < 1.0) {
@@ -319,6 +330,7 @@ class TerrainWebGLRenderer {
 
     // ★ v1.50.84 阴影图采样：装饰世界代理几何（WebGLShadowPass）沿光向深度 → 阴影内变暗。
     //   阴影层缺席/光向退化时 u_shadowOn=0，地形外观与 v1.50.83 逐位一致。
+    //   ★ v1.50.95 接收面收口：仅地表（v_side=0）——侧壁为固定平色边界面，不参与装饰阴影。
     const sp = window.WebGLShadowPass;
     if (sp && sp.isReady() && sp.hasShadow()) {
       gl.activeTexture(gl.TEXTURE0);

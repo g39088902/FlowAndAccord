@@ -73,7 +73,10 @@ const BASE_BUSH_COUNT: usize = 25;
 /// RockCluster 由前端按 anchor 派生 2–5 颗子石，内核只下发 anchor，数量宜少于 Boulder；
 /// GrassTuft 承担草甸辨识度，允许高密度。
 const BASE_ROCK_CLUSTER_COUNT: usize = 12;
-const BASE_GRASS_TUFT_COUNT: usize = 60;
+/// ★ v1.51.0 用户需求「草的数量翻倍」（含普通草与芦花穗变体，二者由同一预算按
+///   稳定哈希 `accentGrassTuftReedChance` 派生，翻倍后比例不变）：60 → 120。
+///   装饰为纯视觉要素，改值不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构。
+const BASE_GRASS_TUFT_COUNT: usize = 120;
 
 /// 候选点最大重试次数 = 3x 目标总数（防死循环）
 const MAX_RETRY_FACTOR: usize = 3;
@@ -83,7 +86,7 @@ const MAX_RETRY_FACTOR: usize = 3;
 // 装饰是纯视觉要素，改值不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构。
 /// 孤树意象：草原 Tree 预算压至普通地图的 20%（06 号 §4.1「少量孤树」）。
 const GRASSLAND_TREE_BUDGET_RATIO: f32 = 0.2;
-/// 高密度草甸：草原 GrassTuft 预算 ×8（60 → 480 @density=1.0，受
+/// 高密度草甸：草原 GrassTuft 预算 ×8（★ v1.51.0：120 → 960 @density=1.0，受
 /// `config.terrain_accent_density` 乘子继续调制；斑块调制只改分布不改总量）。
 const GRASSLAND_GRASS_TUFT_BUDGET_RATIO: f32 = 8.0;
 /// 草甸斑块大频波长（米）：圈出「草甸群落」的宏观走向。
