@@ -119,6 +119,7 @@ FlowAndAccord/
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
 │   │   ├── decision-viz.js                 # 决策可视化窗口控制器与状态桥接
 │   │   ├── auction-ui.js                   # 房屋麦穗拍卖交易所大盘与竞价面板
+│   │   ├── ta06-acceptance.js             # ★ v1.52.1 TA-06 人工验收台 (仅 ?ta06=1 激活；季节/光向/相机/缩放快捷控制 + 7 株样板飞往 + 物种标注层 + 读数行；无参数零 DOM 零 rAF)
 │   │   ├── entity-link.js                  # 跨面板族人/房屋/POI/团体实体下钻跳转交互
 │   │   ├── sim_worker.js                   # ★ v1.38.0 仿真内核专用 Web Worker (后台独立线程加载 WASM、自主步进与快照背压推送)
 │   │   ├── snapshot-bin.js                 # ★ M4 FABS 二进制帧解码器 (strCache 驻留表缓存, start_index==0 判全新表, 四处同步第 4 处)

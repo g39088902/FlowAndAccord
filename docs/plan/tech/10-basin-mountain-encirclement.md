@@ -69,7 +69,7 @@ stateDiagram-v2
 
 根据自然地理真实山间盆地（如四川盆地、吐鲁番盆地及典型山间构造盆地）的三维地质剖面切面原型：
 
-![自然山间盆地地貌原型：四周被山峰、山脊环绕，中央平原与出水口峡谷](assets/basin/basin-reference.jpg)
+![自然山间盆地地貌原型：四周被山峰、山脊环绕，中央平原与出水口峡谷](assets/references/basin-reference.jpg)
 
 ### 2.1 五大核心地质特征
 1. **闭合环抱山系与崇山峻岭（Enclosing Mountain Range）**：
