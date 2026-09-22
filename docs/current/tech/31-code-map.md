@@ -289,6 +289,12 @@ FlowAndAccord/
     │           │   ├── visual/fixture/config-and-model-version.json  # 夹具配置与模型版本
     │           │   └── visual/fixture/identities.json                # 样板身份指纹（视觉矩阵截图 jpg 不逐张登记）
     │           ├── ta09/slope-verification.txt    # TA-09 RiverCliff 局部试算验证记录
+    │           ├── ta06-evidence-2026-09-22/      # TA-06 物种变体专项证据包（2026-09-22，默认 WebGL 路径补做验收）
+    │           │   ├── manifest.json                # 证据清单
+    │           │   ├── report.md                    # 验收报告（96 视图矩阵 / 受光 / 生命周期 / 景观通道 / 高密）
+    │           │   ├── metrics/matrix.json          # 96 视图 + 6 变体逐张像素指标与四维聚合
+    │           │   └── metrics/fixture-assertions.json  # 页内数值断言原始结果（物种分布 / 包围体 / 花位 / 景观 / 缓存）
+    │           │                                    # （visual/ 下截图为 640×360 缩图，按既有惯例不逐张登记）
     │           └── ta12/                          # TA-12 地表纹理专项归档（v1.50.53 完成后归档）
     │               ├── TA-12-TODO.md              # TA-12 实施清单与验收记录（八任务全闭环）
     │               └── TA-12-BASELINE.md          # TA-12-1 无纹理基线记录与样板清单

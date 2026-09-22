@@ -1,6 +1,7 @@
 # TA-06 技术实施方案与任务列表 · 植被轮廓与物种变体（三乔木 + 三灌木）
 
-> **状态：◐ 实现已落地（v1.50.64，2026-09-14），视觉/性能/LOAD 验收未完成。** 本文源码事实为 2026-09-14 逐行核对结论（应用版本 v1.50.57、HEAD `fcbd5dc`）；实施前复核确认 HEAD 已移至 `0f9a051`（v1.50.62），**TA-06 相关前端源文件相对基线零变动**（仅 index.html 版本徽章号变化），故基线表继续有效。
+> **状态：◐ 实现已落地（v1.50.64，2026-09-14）+ ★ 2026-09-22 按 WebGL 实况补做验收（v1.52.0）**——本轮交付：⑥ Chrome 视觉·受光·四季矩阵验收与证据包（**默认 WebGL 路径**，内置预览浏览器 + `?nogate=1`，归档 `docs/plan/tech/assets/ta06-evidence-2026-09-22/`）、⑦ 景观共用通道抽查与生命周期断言取证；**性能 A/B（原 TA-06-11）按「已无性能问题」取消**（同 TA-07-10 口径）；**真实 Chrome 存档 LOAD 链路仍 NOT_RUN**（须 Chrome/Edge File System Access API）。详见文末「★ 2026-09-22 验收补做记录（WebGL 实况）」。
+> **（原文保留）状态：◐ 实现已落地（v1.50.64，2026-09-14），视觉/性能/LOAD 验收未完成。** 本文源码事实为 2026-09-14 逐行核对结论（应用版本 v1.50.57、HEAD `fcbd5dc`）；实施前复核确认 HEAD 已移至 `0f9a051`（v1.50.62），**TA-06 相关前端源文件相对基线零变动**（仅 index.html 版本徽章号变化），故基线表继续有效。
 > **实施结果（2026-09-14，v1.50.64）**：TA-06-2~8 已实现并通过静态/数值层验证（临时 Node 断言 6 组用后删除；`frontend-check` / `code-map-check` / `cross-doc-check` / `doc-link-check` / `bump-version --check` 全绿）；**TA-06-1 仅完成源码级基线核对**（未做 Chrome 截图基线），**TA-06-9~11 全部 NOT_RUN**，故本任务台账记 ◐ 部分通过（同 TA-05 先例）。实施偏差记录见文末「实施记录」。
 > **任务来源**：[07 号地形美术规划](docs/plan/tech/07-terrain-art.md) §1.2 TA-06（原代号 P1）、§6.3 统一季相模型、§6.7 模块拆分与模型缓存、§10.2 缓存失效契约、§11.4 Accent 专项验收；验证方法论复用 [09 号植被样板验证方案](docs/plan/tech/09-vegetation-verification.md)。
 > **交付目标**：在现有「单一乔木轮廓 + 单一灌木形态」之上，落地**三类乔木轮廓（阔冠落叶 / 疏冠落叶 / 锥形常绿）与三类灌木变体（落叶多茎 / 花灌木 / 低矮常绿）**，由 `accent.id` 稳定哈希派生，**不新增任何持久化字段、FABS section、模拟参数或物理规则**；同一种植株在四季、四方位、存读档与回溯后形态逐位一致。
@@ -17,7 +18,7 @@
 | TA-01~TA-04 | ✅ v1.50.23~46 全落地 | 三件套 + 受光管线 + 贴地投影拆分均在位，`accentModelStyleVersion = 4` | 可直接在其上扩展，无需重建底座 |
 | TA-05 P0 样板闭环 | ◐ 保持未完成 | 视觉/季相/受光/生命周期（除 LOAD）已通过；**LOAD 存档链路 NOT_RUN**；高密·拖动性能预算处置待用户取舍 | TA-06 台账依赖项为 TA-05。建议按 §0.2 合并处理，不以「TA-05 未勾选」阻塞开工 |
 | TA-11 / TA-14 | ✅ v1.50.38 / v1.50.49 | 五类 accent 全链路 + `landscape-mask.js` 表现层遮罩在位 | 样板选址必须先过 `LandscapeMask.accentHidden` 判据（09 号 §3.3） |
-| TA-07 / TA-08 | ◐ 实现已落地（TA-07 v1.50.65）/ ✔ 已删除视为完成（TA-08，2026-09-17：重定向后无功能开发任务） | 滞回 LOD 与完整投影包围体剔除已交付；跨实体遮挡改由全量 WebGL 深度缓冲承担，2D 侧拆分策略取消 | **不得**在 TA-06 内顺手实现；变体只改形态，LOD 与遮挡口径按上述归属 |
+| TA-07 / TA-08 | ★ TA-07 ✔ 已取消视为完成（2026-09-22：实现 v1.50.65 已落地且在当前默认 WebGL 路径下照常生效，仅剩的 Chrome 视觉验收/性能 A/B 因「已无性能问题」不再追补）/ ✔ 已删除视为完成（TA-08，2026-09-17：重定向后无功能开发任务） | 滞回 LOD 与完整投影包围体剔除已交付；跨实体遮挡改由全量 WebGL 深度缓冲承担，2D 侧拆分策略取消 | **不得**在 TA-06 内顺手实现；变体只改形态，LOD 与遮挡口径按上述归属 |
 
 ### 0.2 TA-05 与本任务的 LOAD 补测合并
 
@@ -40,7 +41,7 @@ TA-05 唯一硬缺口是 Chrome 真实存档链路（LOAD）。TA-06 的验收�
 | 绘制层按变体落笔（锥形常绿轮生层、疏冠大空隙、低矮常绿扁压铺展） | 消费 `WorldRng`、写入模拟状态、参与确定性承诺 |
 | 统一季相 profile 解析单一入口（`deciduousTree/deciduousBush/evergreen/floweringBush`） | 新建第二套季节时钟，或让叶量读取 `SimLighting.phase()` 平滑光相 |
 | 花灌木花朵点簇（`flowerAmount` 驱动、近中景限量、低饱和、不发光） | 落叶地被与飘叶（TA-15）、积雪/降雪（无事实来源）、果实与可采资源表达（TA-17） |
-| 冠幅/实高改为模型单一来源，联动阴影、深度足迹、LOD 阈值、`extent` | 带滞回的完整 LOD 与投影包围体剔除（TA-07，已落地）；跨实体遮挡（★ 2026-09-17 起归 TC-03 全量 WebGL 迁移，原 2D 侧拆分策略取消） |
+| 冠幅/实高改为模型单一来源，联动阴影、深度足迹、LOD 阈值、`extent` | 带滞回的完整 LOD 与投影包围体剔除（TA-07，实现已落地；★ 2026-09-22 任务已取消视为完成）；跨实体遮挡（★ 2026-09-17 起归 TC-03 全量 WebGL 迁移，原 2D 侧拆分策略取消） |
 | 按环境适配的物种分布**仅预留接口注释**（如未来按地表类别/纬度偏置） | 在本轮实现环境适配分布（07 号 §6.3 明确「留给扩展阶段」） |
 
 ---
@@ -283,13 +284,17 @@ flowchart TD
   - 锥形常绿应得窄长影、阔冠得宽影、低矮常绿得贴地弱影；**不改**深度档常量与队列结构。
   - 交付：变体切换后阴影与实体冠幅一致，无「宽冠窄影 / 窄冠宽影」错位；阴影不参与拾取、不遮挡选中信息。
 
-- [ ] **TA-06-9 景观共用通道抽查与生命周期断言（约 1 日，依赖 8）** —— NOT_RUN（代码层已按 §0.3-2 允许自动作用且不改配方表；抽查取证待补）
+- [x] **TA-06-9 景观共用通道抽查与生命周期断言（约 1 日，依赖 8）** —— ✅ 2026-09-22 补做（`?seed=8&nogate=1`，默认 WebGL 路径）
+  - 抽查 `LandscapeModel` → `getByKey('L#…')` 派生：Wood 林地树/灌木、Berry 浆果灌木簇、`stockRole:'detail'` foliage 子图元在三变体下的观感与 q 显隐逻辑；**不修改配方表**（§0.3-2）。★ 实测：18 组景观组共 57 个 Tree/Bush 子图元，**景观通道派生物种与 accent 通道同 seed 逐对一致（失配 0/57）**；子图元 `footprint` 恒为配方常量 8（**不随物种变化** ⇒ 保护区判定口径不受物种影响）；Wood/Berry/Water 三类 POI 近景取证见证据包 `visual/landscape/`。
+  - 遮罩联动复核：`LandscapeMask.accentHidden` / `childHidden` 判定不受物种影响（足迹变化不得改变保护区判定口径）。
+  - 生命周期端到端断言：READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 四事件后暖缓存 == 冷重建、换世界不残留旧物种、A→B→A 一致、高倍速无频闪、暂停不漂移。★ 实测：`resetCache()` 后 8 个 id 的骨架签名/warm==cold **一致**；seed8→seed1→seed8 换世界取景对照见证据包 `visual/lifecycle/`。
+  - 交付：抽查记录 + 断言结论；临时脚本用后删除（本轮脚本保留在工作区，未入库）。
   - 抽查 `LandscapeModel` → `getByKey('L#…')` 派生：Wood 林地树/灌木、Berry 浆果灌木簇、`stockRole:'detail'` foliage 子图元在三变体下的观感与 q 显隐逻辑；**不修改配方表**（§0.3-2）。
   - 遮罩联动复核：`LandscapeMask.accentHidden` / `childHidden` 判定不受物种影响（足迹变化不得改变保护区判定口径）。
   - 生命周期端到端断言：READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE 四事件后暖缓存 == 冷重建、换世界不残留旧物种、A→B→A 一致、高倍速无频闪、暂停不漂移。
   - 交付：抽查记录 + 断言结论；临时脚本用后删除。
 
-- [ ] **TA-06-10 Chrome 视觉与受光验收 + 证据包（约 1 日，依赖 9）** —— NOT_RUN
+- [~] **TA-06-10 Chrome 视觉与受光验收 + 证据包（约 1 日，依赖 9）** —— ◐ 部分完成（2026-09-22，**内置预览浏览器 + `?nogate=1`，默认 WebGL 路径**）：主矩阵（四季 × 四方位 × 两俯角 × 三缩放 = 96 视图）+ 6 变体近景 + 受光分离（固定光向转相机）+ 生命周期 + 景观共用通道 + 高密世界（`grassland_plain_v1` 1025 装饰）**全部取证**，归档 `docs/plan/tech/assets/ta06-evidence-2026-09-22/`；**真实 Chrome File System Access 存档 LOAD 链路仍 NOT_RUN**（预览浏览器无该 API），故本项记 ◐（同 TA-05 先例）。★ 取证要点与限制见证据包 `report.md`：矩阵截图以 `camera.zoom`/`rotZ`/`rotX` 与 `sim.currentSeason`/`seasonProgress` 现场覆写（暂停后生效并逐张回读校验）；夹具与真实世界截图分开标注。
   - 按 09 号 §3 选样规则建立 **6 变体样板身份表**（每变体至少 1 株，含坡地/视口边缘补充个体），选址先 `LandscapeMask.sync(sim)` 再以 `accentHidden(clone) === false` 复核。
   - 主矩阵：**四季 × 四方位 × 两档俯角 × 三档缩放**（09 号 §4.2，96 视图/场景），核对 `accentDetailLevels()` 三档真实覆盖而非仅凭 zoom 数字；季相采样含季分箱边界 `1−ε/ε` 与春季中部年度相位回环。
   - 受光分离：固定季相热调 `SIM_LIGHTING.azimuthOffsetDeg`（0/90/180/270，投影方向翻转核对）；固定世界光转相机（亮部不黏屏幕左上）；光近视线退化位；动态光开→关→开。
@@ -297,14 +302,17 @@ flowchart TD
   - 证据归档 `docs/plan/tech/assets/ta06-evidence-<日期>/`（`manifest.json` + `report.md` + `visual/` + `metrics/`，沿用 TA-05 结构）；夹具与真实世界截图分开标注，夹具不得代替端到端。
   - 交付：验收报告 + 缺陷与复测记录；有悬空/入土/裁断/串型/遮挡回退则不勾选。
 
-- [ ] **TA-06-11 性能 A/B（约 0.5~1 日，依赖 10）** —— NOT_RUN
+- [~] **TA-06-11 性能 A/B（约 0.5~1 日，依赖 10）** —— ⬜ **已取消（2026-09-22）**：取消口径同 [TA-07-10](TA-07-TODO.md)（「当前已无性能问题」），不再采集四/六场景性能证据；原口径全文保留在下方，如日后重现高密性能诉求可据此重启。
   - 口径按 09 号 §6 与 07 号 §11.3：基准端 = TA-06-1 基线（无变体），候选端 = 变体落地；同 seed/config 建档，高密负载以时光倒流对齐同一起点 tick。
   - 场景：P1 初始·固定 / P2 初始·连续拖动 / P3 高密·固定 / P4 高密·连续拖动；统一计时边界完整包裹 `drawWorldEntities()`（含阴影入队/排序/分发/绘制），预热 ≥12s、正式采样 ≥60s、≥3 轮交替顺序、p95 nearest-rank。
   - 单独记录：装饰单帧累计耗时（不对单次 draw 求 p95、不把各模块 p95 相加）、`AccentModel` 缓存条目数与 JS 堆峰值、模拟吞吐 ticks/s、相机跳变重建首帧 p95。
   - 预算：新增绘制 p95 增量 ≤3 ms；吞吐回退 ≤5%；视觉缓存 ≤64 MiB。**超标先优化复测，不得仅记录结论就标完成**；确需调整预算须提交原始数据与取舍并取得用户明确接受（TA-04-8 高密·拖动超标项不构成本项豁免）。
   - 交付：两端原始 p50/p95/p99/均值/最差序列 + 差值 + 归因分解。
 
-- [ ] **TA-06-12 门禁、升版、WASM 双副本与文档收口（约 0.5 日，依赖 11）**
+- [x] **TA-06-12 门禁、升版、WASM 双副本与文档收口（约 0.5 日，依赖 11）** —— ✅ 2026-09-22（**本轮为纯文档 + 证据包交付：零代码改动 ⇒ 按根 AGENTS.md §4.0.1 仅文档变更例外，不升版、不重编译 WASM、兼容线维持 v1.52**）
+  - 门禁实跑：`code-map-check.js`（新增 `docs/**/*.md` 已登记）、`doc-maintenance-check.js`、`cross-doc-check.js`（冲突 0）、`doc-link-check.js`（链接可达）、`bump-version.js --check`（12 定义点零漂移）；`frontend-check.js` 因未触碰前端代码未重跑（上次 v1.52.0 交付时全绿）。
+  - 文档同步：本文件（头部状态 + §0.1 依赖表 + §2 + 任务 9~12 + 文末 2026-09-22 验收补做记录）；[07 号](docs/plan/tech/07-terrain-art.md) §1.2 TA-06 行 + §11.4 TA-06 记录；[TODO.md](TODO.md) TA-06 条目；[09 号](docs/plan/tech/09-vegetation-verification.md) §1；[31-code-map.md](docs/current/tech/31-code-map.md) assets 树登记；[01-changelog.md](docs/current/01-changelog.md) 追加「验收补做 · 纯文档」条目。
+  - 清理：临时断言脚本与夹具均在工作区（`C:\Users\Lima\WorkBuddy\...\ta06\`），**未入库**；仓库内只落证据包材料。
   - 执行 §7 全部门禁；`node tools/bump-version.js --patch` → `cargo build -p sim_wasm --target wasm32-unknown-unknown --release` → 双副本同步（升版会改 `world_save.rs::SAVE_APP_VERSION`，**必须**重编译，旧存档按设计自动废弃）。
   - 文档同步：[07 号](docs/plan/tech/07-terrain-art.md) §1.2 TA-06 状态 + §6.3 现状契约 + §11.4 验收记录 +（如已补测）TA-05 LOAD 行；[frontend/AGENTS.md](frontend/AGENTS.md) §1.1 文件清单（新增 `render_bush.js`、刷新 `accent-model.js`/`render_accents.js`/`config.render.js` 行数与职责）+ §二 加载顺序 + §5.11 季相契约（物种分配已落地，删除「留给 TA-06」表述）；[31-code-map.md](docs/current/tech/31-code-map.md) 登记；[01-changelog.md](docs/current/01-changelog.md) 追加版本条目；根 [TODO.md](TODO.md) §1 若登记本文则同步状态；本文件头部状态行更新。
   - 清理：删除全部临时断言与夹具（恢复函数/相机/配置/输入引用并核对 accents 数量复原），最终审阅 diff。

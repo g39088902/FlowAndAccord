@@ -1,0 +1,859 @@
+{
+ "source": "in-page assertions via playwright-cli on the built-in browser, ?seed=42&nogate=1, default WebGL path",
+ "context": {
+  "profile": "flat_baseline",
+  "worldSize": 764,
+  "grid": 256,
+  "accents": 217,
+  "useWebgl": true,
+  "dpr": 1,
+  "vw": 1280,
+  "vh": 720
+ },
+ "by_variant_world_seed42": {
+  "Tree:sparse": 12,
+  "Tree:broad": 14,
+  "Tree:conifer": 14,
+  "Boulder:(none)": 20,
+  "Bush:flowering": 8,
+  "Bush:lowEvergreen": 5,
+  "Bush:multiStem": 12,
+  "RockCluster:(none)": 12,
+  "GrassTuft:(none)": 120
+ },
+ "exemplars_seed42": {
+  "Tree:sparse": {
+   "id": 0,
+   "x": -19,
+   "y": 7,
+   "sc": 1.19
+  },
+  "Tree:broad": {
+   "id": 2,
+   "x": -18,
+   "y": -60,
+   "sc": 0.77
+  },
+  "Tree:conifer": {
+   "id": 7,
+   "x": -240,
+   "y": -15,
+   "sc": 1.26
+  },
+  "Boulder:(none)": {
+   "id": 40,
+   "x": 32,
+   "y": -231,
+   "sc": 0.75
+  },
+  "Bush:flowering": {
+   "id": 60,
+   "x": -138,
+   "y": 305,
+   "sc": 0.94
+  },
+  "Bush:lowEvergreen": {
+   "id": 61,
+   "x": 286,
+   "y": -260,
+   "sc": 0.86
+  },
+  "Bush:multiStem": {
+   "id": 64,
+   "x": 146,
+   "y": -150,
+   "sc": 0.99
+  },
+  "RockCluster:(none)": {
+   "id": 85,
+   "x": 85,
+   "y": 5,
+   "sc": 1.2
+  },
+  "GrassTuft:(none)": {
+   "id": 97,
+   "x": -214,
+   "y": 54,
+   "sc": 0.96
+  }
+ },
+ "verdicts": {
+  "species_ratio_within_3pct": {
+   "pass": true,
+   "detail": {
+    "maxDeviation": 0.0105,
+    "distTree": {
+     "sparse": {
+      "n": 672,
+      "ratio": 0.336
+     },
+     "broad": {
+      "n": 827,
+      "ratio": 0.4135
+     },
+     "conifer": {
+      "n": 501,
+      "ratio": 0.2505
+     }
+    },
+    "distBush": {
+     "multiStem": {
+      "n": 1111,
+      "ratio": 0.5555
+     },
+     "flowering": {
+      "n": 470,
+      "ratio": 0.235
+     },
+     "lowEvergreen": {
+      "n": 419,
+      "ratio": 0.2095
+     }
+    },
+    "weights": {
+     "tree": {
+      "broad": 0.42,
+      "sparse": 0.34,
+      "conifer": 0.24
+     },
+     "bush": {
+      "multiStem": 0.56,
+      "flowering": 0.24,
+      "lowEvergreen": 0.2
+     }
+    }
+   }
+  },
+  "non_vegetation_undefined": {
+   "pass": true,
+   "detail": {
+    "gt": "undefined",
+    "bo": "undefined",
+    "rc": "undefined"
+   }
+  },
+  "multiStem_baseline_values": {
+   "pass": true,
+   "detail": {
+    "n": 40,
+    "bad": []
+   }
+  },
+  "bounds_within_coarse_constants": {
+   "pass": true,
+   "detail": {
+    "Tree": {
+     "kb": {
+      "rH": 13.5,
+      "zMin": 0,
+      "zMax": 18,
+      "yUp": 0,
+      "rS": 4
+     },
+     "maxR": 11.825,
+     "maxZ": 17.269,
+     "minZ": 0,
+     "ok": true
+    },
+    "Bush": {
+     "kb": {
+      "rH": 6.5,
+      "zMin": -1.5,
+      "zMax": 8.5,
+      "yUp": 0,
+      "rS": 3
+     },
+     "maxR": 5.652,
+     "maxZ": 8.028,
+     "minZ": -0.77,
+     "ok": true
+    },
+    "Boulder": {
+     "kb": {
+      "rH": 7.2,
+      "zMin": 0,
+      "zMax": 1.8,
+      "yUp": 7.2,
+      "rS": 0
+     },
+     "maxR": 7.2,
+     "maxZ": 1.8,
+     "minZ": 0,
+     "ok": true
+    },
+    "RockCluster": {
+     "kb": {
+      "rH": 11,
+      "zMin": 0,
+      "zMax": 3,
+      "yUp": 11,
+      "rS": 4.5
+     },
+     "maxR": 6.913,
+     "maxZ": 1.244,
+     "minZ": 0,
+     "ok": true
+    },
+    "GrassTuft": {
+     "kb": {
+      "rH": 5.5,
+      "zMin": 0,
+      "zMax": 7.5,
+      "yUp": 0,
+      "rS": 1.5
+     },
+     "maxR": 4.851,
+     "maxZ": 7.457,
+     "minZ": 0,
+     "ok": true
+    }
+   }
+  },
+  "flower_dots": {
+   "pass": true,
+   "detail": {
+    "maxDots": 9,
+    "cfgMax": 9,
+    "floweringBushes": 77,
+    "hues": {
+     "0": 250,
+     "1": 218,
+     "2": 225
+    },
+    "nonFlowerChecked": 223
+   }
+  },
+  "landscape_channel_species_match": {
+   "pass": true,
+   "detail": {
+    "groups": 18,
+    "pairs": 57,
+    "mismatch": 0,
+    "tree": 9,
+    "bush": 48,
+    "other": {
+     "RockCluster": 18,
+     "GrassTuft": 51
+    }
+   }
+  },
+  "warm_cache_equals_cold": {
+   "pass": true,
+   "detail": {
+    "sample": [
+     "5154:8.8:7.2:sparse:deciduousTree",
+     "4634:8.8:7.27221664994985:sparse:deciduousTree",
+     "6609:10.5:5.989969909729187:broad:deciduousTree",
+     "6670:4.8:10.556168505516549:conifer:evergreen"
+    ]
+   }
+  },
+  "seasonal_leaf_density": {
+   "pass": true,
+   "detail": {
+    "deciduousTree": {
+     "seasons": {
+      "Spring": 0.42,
+      "Summer": 1,
+      "Autumn": 0.934,
+      "Winter": 0.03
+     },
+     "min": 0.03,
+     "max": 1
+    },
+    "evergreenTree": {
+     "seasons": {
+      "Spring": 0.96,
+      "Summer": 1,
+      "Autumn": 0.98,
+      "Winter": 0.94
+     },
+     "min": 0.94,
+     "max": 1
+    },
+    "deciduousBush": {
+     "seasons": {
+      "Spring": 0.468,
+      "Summer": 1,
+      "Autumn": 0.92,
+      "Winter": 0.04
+     },
+     "min": 0.04,
+     "max": 1
+    },
+    "floweringBush": {
+     "seasons": {
+      "Spring": 0.468,
+      "Summer": 1,
+      "Autumn": 0.92,
+      "Winter": 0.04
+     },
+     "min": 0.04,
+     "max": 1
+    },
+    "evergreenBush": {
+     "seasons": {
+      "Spring": 0.958,
+      "Summer": 1,
+      "Autumn": 0.98,
+      "Winter": 0.94
+     },
+     "min": 0.94,
+     "max": 1
+    }
+   }
+  },
+  "flower_calendar": {
+   "pass": true,
+   "detail": {
+    "floweringBush": {
+     "Spring": 0.855,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "deciduousBush": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "deciduousTree": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "evergreen": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    }
+   }
+  },
+  "tier_coverage_monotonic": {
+   "pass": true,
+   "detail": {
+    "z0.6": {
+     "0": 60,
+     "1": 5,
+     "2": 0
+    },
+    "z1": {
+     "0": 35,
+     "1": 30,
+     "2": 0
+    },
+    "z1.6": {
+     "0": 3,
+     "1": 48,
+     "2": 14
+    },
+    "z2.5": {
+     "0": 0,
+     "1": 23,
+     "2": 42
+    },
+    "z4": {
+     "0": 0,
+     "1": 0,
+     "2": 65
+    },
+    "z8": {
+     "0": 0,
+     "1": 0,
+     "2": 65
+    }
+   }
+  },
+  "bounds_violation_zero": {
+   "pass": true,
+   "detail": {
+    "note": "see bounds_within_coarse_constants (authoritative re-measure)"
+   }
+  }
+ },
+ "raw": {
+  "s1_pretty": {
+   "distTree": {
+    "sparse": {
+     "n": 672,
+     "ratio": 0.336
+    },
+    "broad": {
+     "n": 827,
+     "ratio": 0.4135
+    },
+    "conifer": {
+     "n": 501,
+     "ratio": 0.2505
+    }
+   },
+   "distBush": {
+    "multiStem": {
+     "n": 1111,
+     "ratio": 0.5555
+    },
+    "flowering": {
+     "n": 470,
+     "ratio": 0.235
+    },
+    "lowEvergreen": {
+     "n": 419,
+     "ratio": 0.2095
+    }
+   },
+   "nonVeg": {
+    "gt": "undefined",
+    "bo": "undefined",
+    "rc": "undefined"
+   },
+   "kindBounds": {
+    "Tree": {
+     "rH": 5.5,
+     "zMin": 0,
+     "zMax": 7.5,
+     "yUp": 0,
+     "rS": 1.5
+    },
+    "Bush": {
+     "rH": 5.5,
+     "zMin": 0,
+     "zMax": 7.5,
+     "yUp": 0,
+     "rS": 1.5
+    },
+    "Boulder": {
+     "rH": 5.5,
+     "zMin": 0,
+     "zMax": 7.5,
+     "yUp": 0,
+     "rS": 1.5
+    },
+    "RockCluster": {
+     "rH": 5.5,
+     "zMin": 0,
+     "zMax": 7.5,
+     "yUp": 0,
+     "rS": 1.5
+    },
+    "GrassTuft": {
+     "rH": 5.5,
+     "zMin": 0,
+     "zMax": 7.5,
+     "yUp": 0,
+     "rS": 1.5
+    }
+   },
+   "leaf": {
+    "deciduousTree": {
+     "seasons": {
+      "Spring": 0.42,
+      "Summer": 1,
+      "Autumn": 0.934,
+      "Winter": 0.03
+     },
+     "min": 0.03,
+     "max": 1
+    },
+    "evergreenTree": {
+     "seasons": {
+      "Spring": 0.96,
+      "Summer": 1,
+      "Autumn": 0.98,
+      "Winter": 0.94
+     },
+     "min": 0.94,
+     "max": 1
+    },
+    "deciduousBush": {
+     "seasons": {
+      "Spring": 0.468,
+      "Summer": 1,
+      "Autumn": 0.92,
+      "Winter": 0.04
+     },
+     "min": 0.04,
+     "max": 1
+    },
+    "floweringBush": {
+     "seasons": {
+      "Spring": 0.468,
+      "Summer": 1,
+      "Autumn": 0.92,
+      "Winter": 0.04
+     },
+     "min": 0.04,
+     "max": 1
+    },
+    "evergreenBush": {
+     "seasons": {
+      "Spring": 0.958,
+      "Summer": 1,
+      "Autumn": 0.98,
+      "Winter": 0.94
+     },
+     "min": 0.94,
+     "max": 1
+    }
+   },
+   "flowers": {
+    "floweringBush": {
+     "Spring": 0.855,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "deciduousBush": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "deciduousTree": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    },
+    "evergreen": {
+     "Spring": 0,
+     "Summer": 0,
+     "Autumn": 0,
+     "Winter": 0
+    }
+   },
+   "flowerDots": {
+    "maxDots": 0,
+    "hues": {},
+    "nonFlowerChecked": 300,
+    "nonFlowerNonNull": 0,
+    "floweringWithDots": 0,
+    "cfgMax": 9,
+    "palette": [
+     [
+      246,
+      242,
+      232
+     ],
+     [
+      226,
+      190,
+      186
+     ],
+     [
+      238,
+      224,
+      168
+     ]
+    ]
+   },
+   "landscape": {
+    "groups": 18,
+    "tree": 9,
+    "bush": 48,
+    "other": {
+     "RockCluster": 18,
+     "GrassTuft": 51
+    },
+    "pairs": 57,
+    "mismatch": 27,
+    "sample": [
+     {
+      "key": "poi:20/bush/0",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     },
+     {
+      "key": "poi:20/bush/1",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     },
+     {
+      "key": "poi:20/bush/2",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     },
+     {
+      "key": "poi:20/bush/3",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     },
+     {
+      "key": "poi:20/bush/4",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     },
+     {
+      "key": "poi:21/bush/0",
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton"
+     }
+    ]
+   },
+   "lifecycle": {
+    "warmEqCold": false,
+    "sample": [
+     "2462:5.5:multiStem:deciduousBush",
+     "2462:5.5:multiStem:deciduousBush",
+     "2462:5.5:multiStem:deciduousBush"
+    ]
+   },
+   "tierCoverage": {
+    "z0.6": {
+     "0": 60,
+     "1": 5,
+     "2": 0
+    },
+    "z1": {
+     "0": 35,
+     "1": 30,
+     "2": 0
+    },
+    "z1.6": {
+     "0": 3,
+     "1": 48,
+     "2": 14
+    },
+    "z2.5": {
+     "0": 0,
+     "1": 23,
+     "2": 42
+    },
+    "z4": {
+     "0": 0,
+     "1": 0,
+     "2": 65
+    },
+    "z8": {
+     "0": 0,
+     "1": 0,
+     "2": 65
+    }
+   }
+  },
+  "s2_final": {
+   "badgeIds": [
+    "road-hover-tooltip=>",
+    "global-averages-card=>\n      \n      ",
+    "ledger-resource-averages=>\n            \ud83d",
+    "decision-viz-overlay=>\n    \n      \n ",
+    "camp-detail-governed=>\u2014"
+   ],
+   "title": "Flow & Accord \u00b7 \u6d41\u52a8\u516c\u7ea6",
+   "multiStem": {
+    "n": 40,
+    "bad": [],
+    "pass": true,
+    "ids": [
+     0,
+     1,
+     2,
+     3,
+     5,
+     6
+    ]
+   },
+   "bounds": {
+    "Tree": {
+     "kb": {
+      "rH": 13.5,
+      "zMin": 0,
+      "zMax": 18,
+      "yUp": 0,
+      "rS": 4
+     },
+     "maxR": 11.825,
+     "maxZ": 17.269,
+     "minZ": 0,
+     "ok": true
+    },
+    "Bush": {
+     "kb": {
+      "rH": 6.5,
+      "zMin": -1.5,
+      "zMax": 8.5,
+      "yUp": 0,
+      "rS": 3
+     },
+     "maxR": 5.652,
+     "maxZ": 8.028,
+     "minZ": -0.77,
+     "ok": true
+    },
+    "Boulder": {
+     "kb": {
+      "rH": 7.2,
+      "zMin": 0,
+      "zMax": 1.8,
+      "yUp": 7.2,
+      "rS": 0
+     },
+     "maxR": 7.2,
+     "maxZ": 1.8,
+     "minZ": 0,
+     "ok": true
+    },
+    "RockCluster": {
+     "kb": {
+      "rH": 11,
+      "zMin": 0,
+      "zMax": 3,
+      "yUp": 11,
+      "rS": 4.5
+     },
+     "maxR": 6.913,
+     "maxZ": 1.244,
+     "minZ": 0,
+     "ok": true
+    },
+    "GrassTuft": {
+     "kb": {
+      "rH": 5.5,
+      "zMin": 0,
+      "zMax": 7.5,
+      "yUp": 0,
+      "rS": 1.5
+     },
+     "maxR": 4.851,
+     "maxZ": 7.457,
+     "minZ": 0,
+     "ok": true
+    }
+   },
+   "boundsViolKinds": [],
+   "flowerDots": {
+    "maxDots": 9,
+    "hues": {
+     "0": 250,
+     "1": 218,
+     "2": 225
+    },
+    "flowering": 77,
+    "nonFlowerChecked": 223,
+    "nonFlowerNonNull": 0,
+    "floweringIds": [
+     4,
+     7,
+     10,
+     27,
+     28
+    ],
+    "cfgMax": 9
+   },
+   "landscape": {
+    "groups": 18,
+    "tree": 9,
+    "bush": 48,
+    "other": {
+     "RockCluster": 18,
+     "GrassTuft": 51
+    },
+    "pairs": 57,
+    "mismatch": 0,
+    "sample": [
+     {
+      "key": "poi:20/bush/0",
+      "kind": "Bush",
+      "seed": 1922944652,
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "deciduousBush"
+     },
+     {
+      "key": "poi:20/bush/1",
+      "kind": "Bush",
+      "seed": 4034781994,
+      "sil": "flowering",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "floweringBush"
+     },
+     {
+      "key": "poi:20/bush/2",
+      "kind": "Bush",
+      "seed": 1261484926,
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "deciduousBush"
+     },
+     {
+      "key": "poi:20/bush/3",
+      "kind": "Bush",
+      "seed": 441275427,
+      "sil": "lowEvergreen",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "evergreen"
+     },
+     {
+      "key": "poi:20/bush/4",
+      "kind": "Bush",
+      "seed": 1148361780,
+      "sil": "flowering",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "floweringBush"
+     },
+     {
+      "key": "poi:21/bush/0",
+      "kind": "Bush",
+      "seed": 2296351239,
+      "sil": "flowering",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "floweringBush"
+     },
+     {
+      "key": "poi:21/bush/1",
+      "kind": "Bush",
+      "seed": 2981600236,
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "deciduousBush"
+     },
+     {
+      "key": "poi:21/bush/2",
+      "kind": "Bush",
+      "seed": 4050267893,
+      "sil": "multiStem",
+      "fp": 8,
+      "role": "skeleton",
+      "prof": "deciduousBush"
+     }
+    ]
+   },
+   "lifecycle": {
+    "warmEqCold": true,
+    "warm": [
+     "5154:8.8:7.2:sparse:deciduousTree",
+     "4634:8.8:7.27221664994985:sparse:deciduousTree",
+     "6609:10.5:5.989969909729187:broad:deciduousTree",
+     "6670:4.8:10.556168505516549:conifer:evergreen"
+    ]
+   },
+   "byVariant": {
+    "Tree:sparse": 12,
+    "Tree:broad": 14,
+    "Tree:conifer": 14,
+    "Boulder:(none)": 20,
+    "Bush:flowering": 8,
+    "Bush:lowEvergreen": 5,
+    "Bush:multiStem": 12,
+    "RockCluster:(none)": 12,
+    "GrassTuft:(none)": 120
+   },
+   "profile": "flat_baseline"
+  }
+ }
+}

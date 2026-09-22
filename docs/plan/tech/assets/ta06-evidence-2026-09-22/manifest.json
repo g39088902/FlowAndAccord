@@ -1,0 +1,485 @@
+{
+ "pack": "ta06-evidence-2026-09-22",
+ "files": [
+  {
+   "path": "visual/variants/T2_Tree_broad_Spring.png",
+   "desc": "6-variant closeup Tree_broad (Spring), zoom 8 near tier",
+   "sha256_16": "d736f7cc7542174a",
+   "bytes": 189244,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Tree_broad_Winter.png",
+   "desc": "6-variant closeup Tree_broad (Winter), zoom 8 near tier",
+   "sha256_16": "c83e10dee079abec",
+   "bytes": 184364,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Tree_sparse_Spring.png",
+   "desc": "6-variant closeup Tree_sparse (Spring), zoom 8 near tier",
+   "sha256_16": "daa2866ce2203914",
+   "bytes": 157104,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Tree_sparse_Winter.png",
+   "desc": "6-variant closeup Tree_sparse (Winter), zoom 8 near tier",
+   "sha256_16": "3cd95c60a3813285",
+   "bytes": 154313,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Tree_conifer_Spring.png",
+   "desc": "6-variant closeup Tree_conifer (Spring), zoom 8 near tier",
+   "sha256_16": "d3aa4e41cf74a099",
+   "bytes": 217276,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Tree_conifer_Winter.png",
+   "desc": "6-variant closeup Tree_conifer (Winter), zoom 8 near tier",
+   "sha256_16": "023b7a527e293550",
+   "bytes": 216404,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_multiStem_Spring.png",
+   "desc": "6-variant closeup Bush_multiStem (Spring), zoom 8 near tier",
+   "sha256_16": "64473db8393e3afe",
+   "bytes": 112479,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_multiStem_Winter.png",
+   "desc": "6-variant closeup Bush_multiStem (Winter), zoom 8 near tier",
+   "sha256_16": "991a64409c7feb37",
+   "bytes": 105582,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_flowering_Spring.png",
+   "desc": "6-variant closeup Bush_flowering (Spring), zoom 8 near tier",
+   "sha256_16": "cb64f1fd5e0d2510",
+   "bytes": 177425,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_flowering_Winter.png",
+   "desc": "6-variant closeup Bush_flowering (Winter), zoom 8 near tier",
+   "sha256_16": "dfd56b5df52ec260",
+   "bytes": 170499,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_lowEvergreen_Spring.png",
+   "desc": "6-variant closeup Bush_lowEvergreen (Spring), zoom 8 near tier",
+   "sha256_16": "52d7e7f91e45fd2f",
+   "bytes": 217692,
+   "dim": null
+  },
+  {
+   "path": "visual/variants/T2_Bush_lowEvergreen_Winter.png",
+   "desc": "6-variant closeup Bush_lowEvergreen (Winter), zoom 8 near tier",
+   "sha256_16": "fa2833dd31380342",
+   "bytes": 207527,
+   "dim": null
+  },
+  {
+   "path": "visual/matrix/T2_Spring_az0_t1_z1.png",
+   "desc": "spring far tier overview",
+   "sha256_16": "4a1f07eef3768895",
+   "bytes": 44618,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/matrix/T2_Spring_az0_t1_z6.png",
+   "desc": "spring near tier closeup",
+   "sha256_16": "c6d4b02192a3da8e",
+   "bytes": 62196,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/matrix/T2_Summer_az90_t2_z25.png",
+   "desc": "summer mid tier, low pitch",
+   "sha256_16": "1235b0fdaefc2d78",
+   "bytes": 61017,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/matrix/T2_Autumn_az180_t1_z25.png",
+   "desc": "autumn mid tier, opposite azimuth",
+   "sha256_16": "d7a8f12e86d44a69",
+   "bytes": 66272,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/matrix/T2_Winter_az0_t1_z1.png",
+   "desc": "winter bare branches (far tier)",
+   "sha256_16": "fcefd229b0e3e3ef",
+   "bytes": 43962,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/matrix/T2_Winter_az0_t1_z6.png",
+   "desc": "winter bare branches (near tier)",
+   "sha256_16": "25b12e3e87e5d667",
+   "bytes": 58085,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/sheets/sheet_t1_Autumn.png",
+   "desc": "contact sheet sheet_t1_Autumn",
+   "sha256_16": "09eaf10e0d22d59c",
+   "bytes": 272494,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t1_Spring.png",
+   "desc": "contact sheet sheet_t1_Spring",
+   "sha256_16": "14f6b959655a1023",
+   "bytes": 260133,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t1_Summer.png",
+   "desc": "contact sheet sheet_t1_Summer",
+   "sha256_16": "31069a93421a82c4",
+   "bytes": 279006,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t1_Winter.png",
+   "desc": "contact sheet sheet_t1_Winter",
+   "sha256_16": "506f91fe655b0f01",
+   "bytes": 245846,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t2_Autumn.png",
+   "desc": "contact sheet sheet_t2_Autumn",
+   "sha256_16": "268b1f8bc57b2bd5",
+   "bytes": 259017,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t2_Spring.png",
+   "desc": "contact sheet sheet_t2_Spring",
+   "sha256_16": "3ce28137ca298e93",
+   "bytes": 245927,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t2_Summer.png",
+   "desc": "contact sheet sheet_t2_Summer",
+   "sha256_16": "2e61f23ae746aa17",
+   "bytes": 262221,
+   "dim": null
+  },
+  {
+   "path": "visual/sheets/sheet_t2_Winter.png",
+   "desc": "contact sheet sheet_t2_Winter",
+   "sha256_16": "49ed681958470f78",
+   "bytes": 234966,
+   "dim": null
+  },
+  {
+   "path": "visual/lighting/az0.png",
+   "desc": "lighting separation shot az0",
+   "sha256_16": "a462f3abceb8a3f8",
+   "bytes": 119168,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/az180.png",
+   "desc": "lighting separation shot az180",
+   "sha256_16": "1f5ce9a5e76545d4",
+   "bytes": 117387,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/az270.png",
+   "desc": "lighting separation shot az270",
+   "sha256_16": "53bcec0f10b278de",
+   "bytes": 118716,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/az90.png",
+   "desc": "lighting separation shot az90",
+   "sha256_16": "fd22fb4b8ea852b9",
+   "bytes": 117050,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/fixedlight_rotZ000.png",
+   "desc": "lighting separation shot fixedlight_rotZ000",
+   "sha256_16": "0c616784c34e070e",
+   "bytes": 103610,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/fixedlight_rotZ090.png",
+   "desc": "lighting separation shot fixedlight_rotZ090",
+   "sha256_16": "aebeb8617878c463",
+   "bytes": 86533,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/fixedlight_rotZ180.png",
+   "desc": "lighting separation shot fixedlight_rotZ180",
+   "sha256_16": "14fb8b28ab34308c",
+   "bytes": 101999,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lighting/fixedlight_rotZ270.png",
+   "desc": "lighting separation shot fixedlight_rotZ270",
+   "sha256_16": "43fc6970cc5535a8",
+   "bytes": 96315,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lifecycle/after_resume_pause_resetcache.png",
+   "desc": "lifecycle shot after_resume_pause_resetcache",
+   "sha256_16": "c84fe661da351c82",
+   "bytes": 102046,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lifecycle/world_seed1.png",
+   "desc": "lifecycle shot world_seed1",
+   "sha256_16": "2345b0130b582281",
+   "bytes": 99597,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/lifecycle/world_seed8.png",
+   "desc": "lifecycle shot world_seed8",
+   "sha256_16": "00f910301b25e13a",
+   "bytes": 117172,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/landscape/poi_Berry.png",
+   "desc": "landscape POI closeup poi_Berry",
+   "sha256_16": "a9f16d0a264681d0",
+   "bytes": 45994,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/landscape/poi_Water.png",
+   "desc": "landscape POI closeup poi_Water",
+   "sha256_16": "eb257488d7a39d71",
+   "bytes": 102195,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/landscape/poi_Wood.png",
+   "desc": "landscape POI closeup poi_Wood",
+   "sha256_16": "62541ec620f08faa",
+   "bytes": 111822,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/density/density_zoom1.png",
+   "desc": "high-density grassland shot density_zoom1",
+   "sha256_16": "dd6430c869f944b9",
+   "bytes": 55540,
+   "dim": [
+    640,
+    360
+   ]
+  },
+  {
+   "path": "visual/density/density_zoom4.png",
+   "desc": "high-density grassland shot density_zoom4",
+   "sha256_16": "081580216867a6c7",
+   "bytes": 71552,
+   "dim": [
+    640,
+    360
+   ]
+  }
+ ],
+ "not_run": [
+  "Real Chrome File System Access save/load (LOAD) link - built-in preview browser has no such API (same gap as TA-05 LOAD).",
+  "Performance A/B (TA-06-11) - cancelled 2026-09-22 by user decision (no performance problem).",
+  "Landscape channel spot-check of stockRole:'detail' foliage q-gating visuals - numeric check done (57 pairs, 0 mismatch), per-child visual closeups only for Wood/Berry/Water POIs."
+ ],
+ "assertion_verdicts": {
+  "passed": [
+   "species_ratio_within_3pct",
+   "non_vegetation_undefined",
+   "multiStem_baseline_values",
+   "bounds_within_coarse_constants",
+   "flower_dots",
+   "landscape_channel_species_match",
+   "warm_cache_equals_cold",
+   "seasonal_leaf_density",
+   "flower_calendar",
+   "tier_coverage_monotonic",
+   "bounds_violation_zero"
+  ],
+  "failed": []
+ },
+ "matrix_readback": [
+  "[1] z1 az0 t1 Spring | inject=\"ok\" | \"z=1 rz=0 rx=1.05 pxPerM=1 season=Spring",
+  "[2] z25 az0 t1 Spring | inject=\"ok\" | \"z=2.5 rz=0 rx=1.05 pxPerM=2.5 season=Spring",
+  "[3] z6 az0 t1 Spring | inject=\"ok\" | \"z=6 rz=0 rx=1.05 pxPerM=6 season=Spring",
+  "[4] z1 az0 t2 Spring | inject=\"ok\" | \"z=1 rz=0 rx=0.55 pxPerM=1 season=Spring",
+  "[5] z25 az0 t2 Spring | inject=\"ok\" | \"z=2.5 rz=0 rx=0.55 pxPerM=2.5 season=Spring",
+  "[6] z6 az0 t2 Spring | inject=\"ok\" | \"z=6 rz=0 rx=0.55 pxPerM=6 season=Spring",
+  "[7] z1 az90 t1 Spring | inject=\"ok\" | \"z=1 rz=1.57 rx=1.05 pxPerM=0 season=Spring",
+  "[8] z25 az90 t1 Spring | inject=\"ok\" | \"z=2.5 rz=1.57 rx=1.05 pxPerM=0 season=Spring",
+  "[9] z6 az90 t1 Spring | inject=\"ok\" | \"z=6 rz=1.57 rx=1.05 pxPerM=0 season=Spring",
+  "[10] z1 az90 t2 Spring | inject=\"ok\" | \"z=1 rz=1.57 rx=0.55 pxPerM=0 season=Spring",
+  "[11] z25 az90 t2 Spring | inject=\"ok\" | \"z=2.5 rz=1.57 rx=0.55 pxPerM=0 season=Spring",
+  "[12] z6 az90 t2 Spring | inject=\"ok\" | \"z=6 rz=1.57 rx=0.55 pxPerM=0 season=Spring",
+  "[13] z1 az180 t1 Spring | inject=\"ok\" | \"z=1 rz=3.14 rx=1.05 pxPerM=1 season=Spring",
+  "[14] z25 az180 t1 Spring | inject=\"ok\" | \"z=2.5 rz=3.14 rx=1.05 pxPerM=2.5 season=Spring",
+  "[15] z6 az180 t1 Spring | inject=\"ok\" | \"z=6 rz=3.14 rx=1.05 pxPerM=6 season=Spring",
+  "[16] z1 az180 t2 Spring | inject=\"ok\" | \"z=1 rz=3.14 rx=0.55 pxPerM=1 season=Spring",
+  "[17] z25 az180 t2 Spring | inject=\"ok\" | \"z=2.5 rz=3.14 rx=0.55 pxPerM=2.5 season=Spring",
+  "[18] z6 az180 t2 Spring | inject=\"ok\" | \"z=6 rz=3.14 rx=0.55 pxPerM=6 season=Spring",
+  "[19] z1 az270 t1 Spring | inject=\"ok\" | \"z=1 rz=4.71 rx=1.05 pxPerM=0 season=Spring",
+  "[20] z25 az270 t1 Spring | inject=\"ok\" | \"z=2.5 rz=4.71 rx=1.05 pxPerM=0 season=Spring",
+  "[21] z6 az270 t1 Spring | inject=\"ok\" | \"z=6 rz=4.71 rx=1.05 pxPerM=0 season=Spring",
+  "[22] z1 az270 t2 Spring | inject=\"ok\" | \"z=1 rz=4.71 rx=0.55 pxPerM=0 season=Spring",
+  "[23] z25 az270 t2 Spring | inject=\"ok\" | \"z=2.5 rz=4.71 rx=0.55 pxPerM=0 season=Spring",
+  "[24] z6 az270 t2 Spring | inject=\"ok\" | \"z=6 rz=4.71 rx=0.55 pxPerM=0 season=Spring",
+  "[25] z1 az0 t1 Summer | inject=\"ok\" | \"z=1 rz=0 rx=1.05 pxPerM=1 season=Summer",
+  "[26] z25 az0 t1 Summer | inject=\"ok\" | \"z=2.5 rz=0 rx=1.05 pxPerM=2.5 season=Summer",
+  "[27] z6 az0 t1 Summer | inject=\"ok\" | \"z=6 rz=0 rx=1.05 pxPerM=6 season=Summer",
+  "[28] z1 az0 t2 Summer | inject=\"ok\" | \"z=1 rz=0 rx=0.55 pxPerM=1 season=Summer",
+  "[29] z25 az0 t2 Summer | inject=\"ok\" | \"z=2.5 rz=0 rx=0.55 pxPerM=2.5 season=Summer",
+  "[30] z6 az0 t2 Summer | inject=\"ok\" | \"z=6 rz=0 rx=0.55 pxPerM=6 season=Summer",
+  "[31] z1 az90 t1 Summer | inject=\"ok\" | \"z=1 rz=1.57 rx=1.05 pxPerM=0 season=Summer",
+  "[32] z25 az90 t1 Summer | inject=\"ok\" | \"z=2.5 rz=1.57 rx=1.05 pxPerM=0 season=Summer",
+  "[33] z6 az90 t1 Summer | inject=\"ok\" | \"z=6 rz=1.57 rx=1.05 pxPerM=0 season=Summer",
+  "[34] z1 az90 t2 Summer | inject=\"ok\" | \"z=1 rz=1.57 rx=0.55 pxPerM=0 season=Summer",
+  "[35] z25 az90 t2 Summer | inject=\"ok\" | \"z=2.5 rz=1.57 rx=0.55 pxPerM=0 season=Summer",
+  "[36] z6 az90 t2 Summer | inject=\"ok\" | \"z=6 rz=1.57 rx=0.55 pxPerM=0 season=Summer",
+  "[37] z1 az180 t1 Summer | inject=\"ok\" | \"z=1 rz=3.14 rx=1.05 pxPerM=1 season=Summer",
+  "[38] z25 az180 t1 Summer | inject=\"ok\" | \"z=2.5 rz=3.14 rx=1.05 pxPerM=2.5 season=Summer",
+  "[39] z6 az180 t1 Summer | inject=\"ok\" | \"z=6 rz=3.14 rx=1.05 pxPerM=6 season=Summer",
+  "[40] z1 az180 t2 Summer | inject=\"ok\" | \"z=1 rz=3.14 rx=0.55 pxPerM=1 season=Summer",
+  "[41] z25 az180 t2 Summer | inject=\"ok\" | \"z=2.5 rz=3.14 rx=0.55 pxPerM=2.5 season=Summer",
+  "[42] z6 az180 t2 Summer | inject=\"ok\" | \"z=6 rz=3.14 rx=0.55 pxPerM=6 season=Summer",
+  "[43] z1 az270 t1 Summer | inject=\"ok\" | \"z=1 rz=4.71 rx=1.05 pxPerM=0 season=Summer",
+  "[44] z25 az270 t1 Summer | inject=\"ok\" | \"z=2.5 rz=4.71 rx=1.05 pxPerM=0 season=Summer",
+  "[45] z6 az270 t1 Summer | inject=\"ok\" | \"z=6 rz=4.71 rx=1.05 pxPerM=0 season=Summer",
+  "[46] z1 az270 t2 Summer | inject=\"ok\" | \"z=1 rz=4.71 rx=0.55 pxPerM=0 season=Summer",
+  "[47] z25 az270 t2 Summer | inject=\"ok\" | \"z=2.5 rz=4.71 rx=0.55 pxPerM=0 season=Summer",
+  "[48] z6 az270 t2 Summer | inject=\"ok\" | \"z=6 rz=4.71 rx=0.55 pxPerM=0 season=Summer",
+  "[49] z1 az0 t1 Autumn | inject=\"ok\" | \"z=1 rz=0 rx=1.05 pxPerM=1 season=Autumn",
+  "[50] z25 az0 t1 Autumn | inject=\"ok\" | \"z=2.5 rz=0 rx=1.05 pxPerM=2.5 season=Autumn",
+  "[51] z6 az0 t1 Autumn | inject=\"ok\" | \"z=6 rz=0 rx=1.05 pxPerM=6 season=Autumn",
+  "[52] z1 az0 t2 Autumn | inject=\"ok\" | \"z=1 rz=0 rx=0.55 pxPerM=1 season=Autumn",
+  "[53] z25 az0 t2 Autumn | inject=\"ok\" | \"z=2.5 rz=0 rx=0.55 pxPerM=2.5 season=Autumn",
+  "[54] z6 az0 t2 Autumn | inject=\"ok\" | \"z=6 rz=0 rx=0.55 pxPerM=6 season=Autumn",
+  "[55] z1 az90 t1 Autumn | inject=\"ok\" | \"z=1 rz=1.57 rx=1.05 pxPerM=0 season=Autumn",
+  "[56] z25 az90 t1 Autumn | inject=\"ok\" | \"z=2.5 rz=1.57 rx=1.05 pxPerM=0 season=Autumn",
+  "[57] z6 az90 t1 Autumn | inject=\"ok\" | \"z=6 rz=1.57 rx=1.05 pxPerM=0 season=Autumn",
+  "[58] z1 az90 t2 Autumn | inject=\"ok\" | \"z=1 rz=1.57 rx=0.55 pxPerM=0 season=Autumn",
+  "[59] z25 az90 t2 Autumn | inject=\"ok\" | \"z=2.5 rz=1.57 rx=0.55 pxPerM=0 season=Autumn",
+  "[60] z6 az90 t2 Autumn | inject=\"ok\" | \"z=6 rz=1.57 rx=0.55 pxPerM=0 season=Autumn",
+  "[61] z1 az180 t1 Autumn | inject=\"ok\" | \"z=1 rz=3.14 rx=1.05 pxPerM=1 season=Autumn",
+  "[62] z25 az180 t1 Autumn | inject=\"ok\" | \"z=2.5 rz=3.14 rx=1.05 pxPerM=2.5 season=Autumn",
+  "[63] z6 az180 t1 Autumn | inject=\"ok\" | \"z=6 rz=3.14 rx=1.05 pxPerM=6 season=Autumn",
+  "[64] z1 az180 t2 Autumn | inject=\"ok\" | \"z=1 rz=3.14 rx=0.55 pxPerM=1 season=Autumn",
+  "[65] z25 az180 t2 Autumn | inject=\"ok\" | \"z=2.5 rz=3.14 rx=0.55 pxPerM=2.5 season=Autumn",
+  "[66] z6 az180 t2 Autumn | inject=\"ok\" | \"z=6 rz=3.14 rx=0.55 pxPerM=6 season=Autumn",
+  "[67] z1 az270 t1 Autumn | inject=\"ok\" | \"z=1 rz=4.71 rx=1.05 pxPerM=0 season=Autumn",
+  "[68] z25 az270 t1 Autumn | inject=\"ok\" | \"z=2.5 rz=4.71 rx=1.05 pxPerM=0 season=Autumn",
+  "[69] z6 az270 t1 Autumn | inject=\"ok\" | \"z=6 rz=4.71 rx=1.05 pxPerM=0 season=Autumn",
+  "[70] z1 az270 t2 Autumn | inject=\"ok\" | \"z=1 rz=4.71 rx=0.55 pxPerM=0 season=Autumn",
+  "[71] z25 az270 t2 Autumn | inject=\"ok\" | \"z=2.5 rz=4.71 rx=0.55 pxPerM=0 season=Autumn",
+  "[72] z6 az270 t2 Autumn | inject=\"ok\" | \"z=6 rz=4.71 rx=0.55 pxPerM=0 season=Autumn",
+  "[73] z1 az0 t1 Winter | inject=\"ok\" | \"z=1 rz=0 rx=1.05 pxPerM=1 season=Winter",
+  "[74] z25 az0 t1 Winter | inject=\"ok\" | \"z=2.5 rz=0 rx=1.05 pxPerM=2.5 season=Winter",
+  "[75] z6 az0 t1 Winter | inject=\"ok\" | \"z=6 rz=0 rx=1.05 pxPerM=6 season=Winter",
+  "[76] z1 az0 t2 Winter | inject=\"ok\" | \"z=1 rz=0 rx=0.55 pxPerM=1 season=Winter",
+  "[77] z25 az0 t2 Winter | inject=\"ok\" | \"z=2.5 rz=0 rx=0.55 pxPerM=2.5 season=Winter",
+  "[78] z6 az0 t2 Winter | inject=\"ok\" | \"z=6 rz=0 rx=0.55 pxPerM=6 season=Winter",
+  "[79] z1 az90 t1 Winter | inject=\"ok\" | \"z=1 rz=1.57 rx=1.05 pxPerM=0 season=Winter",
+  "[80] z25 az90 t1 Winter | inject=\"ok\" | \"z=2.5 rz=1.57 rx=1.05 pxPerM=0 season=Winter",
+  "[81] z6 az90 t1 Winter | inject=\"ok\" | \"z=6 rz=1.57 rx=1.05 pxPerM=0 season=Winter",
+  "[82] z1 az90 t2 Winter | inject=\"ok\" | \"z=1 rz=1.57 rx=0.55 pxPerM=0 season=Winter",
+  "[83] z25 az90 t2 Winter | inject=\"ok\" | \"z=2.5 rz=1.57 rx=0.55 pxPerM=0 season=Winter",
+  "[84] z6 az90 t2 Winter | inject=\"ok\" | \"z=6 rz=1.57 rx=0.55 pxPerM=0 season=Winter",
+  "[85] z1 az180 t1 Winter | inject=\"ok\" | \"z=1 rz=3.14 rx=1.05 pxPerM=1 season=Winter",
+  "[86] z25 az180 t1 Winter | inject=\"ok\" | \"z=2.5 rz=3.14 rx=1.05 pxPerM=2.5 season=Winter",
+  "[87] z6 az180 t1 Winter | inject=\"ok\" | \"z=6 rz=3.14 rx=1.05 pxPerM=6 season=Winter",
+  "[88] z1 az180 t2 Winter | inject=\"ok\" | \"z=1 rz=3.14 rx=0.55 pxPerM=1 season=Winter",
+  "[89] z25 az180 t2 Winter | inject=\"ok\" | \"z=2.5 rz=3.14 rx=0.55 pxPerM=2.5 season=Winter",
+  "[90] z6 az180 t2 Winter | inject=\"ok\" | \"z=6 rz=3.14 rx=0.55 pxPerM=6 season=Winter",
+  "[91] z1 az270 t1 Winter | inject=\"ok\" | \"z=1 rz=4.71 rx=1.05 pxPerM=0 season=Winter",
+  "[92] z25 az270 t1 Winter | inject=\"ok\" | \"z=2.5 rz=4.71 rx=1.05 pxPerM=0 season=Winter",
+  "[93] z6 az270 t1 Winter | inject=\"ok\" | \"z=6 rz=4.71 rx=1.05 pxPerM=0 season=Winter",
+  "[94] z1 az270 t2 Winter | inject=\"ok\" | \"z=1 rz=4.71 rx=0.55 pxPerM=0 season=Winter",
+  "[95] z25 az270 t2 Winter | inject=\"ok\" | \"z=2.5 rz=4.71 rx=0.55 pxPerM=0 season=Winter",
+  "[96] z6 az270 t2 Winter | inject=\"ok\" | \"z=6 rz=4.71 rx=0.55 pxPerM=0 season=Winter"
+ ],
+ "matrix_readback_count": 96
+}

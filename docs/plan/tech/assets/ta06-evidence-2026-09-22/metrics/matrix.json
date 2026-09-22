@@ -1,0 +1,2776 @@
+{
+ "matrix": {
+  "T2_Autumn_az0_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    57.2,
+    66.8,
+    53.5
+   ],
+   "greenRatio": 0.1838,
+   "brownRatio": 0.051,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    863.1,
+    449.8
+   ],
+   "brightCentroidNorm": [
+    0.674,
+    0.625
+   ]
+  },
+  "T2_Autumn_az0_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    92.7,
+    108.2,
+    68.2
+   ],
+   "greenRatio": 0.5156,
+   "brownRatio": 0.0777,
+   "brightRatio": 0.002,
+   "brightCentroid": [
+    473.9,
+    379.5
+   ],
+   "brightCentroidNorm": [
+    0.37,
+    0.527
+   ]
+  },
+  "T2_Autumn_az0_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    103.8,
+    122.9,
+    78.1
+   ],
+   "greenRatio": 0.5389,
+   "brownRatio": 0.174,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    310.9,
+    324.7
+   ],
+   "brightCentroidNorm": [
+    0.243,
+    0.451
+   ]
+  },
+  "T2_Autumn_az0_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    64.0,
+    74.4,
+    56.1
+   ],
+   "greenRatio": 0.2294,
+   "brownRatio": 0.0589,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    961.4,
+    477.9
+   ],
+   "brightCentroidNorm": [
+    0.751,
+    0.664
+   ]
+  },
+  "T2_Autumn_az0_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    102.9,
+    119.7,
+    71.6
+   ],
+   "greenRatio": 0.6108,
+   "brownRatio": 0.0817,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    592.3,
+    315.0
+   ],
+   "brightCentroidNorm": [
+    0.463,
+    0.438
+   ]
+  },
+  "T2_Autumn_az0_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    111.1,
+    131.8,
+    81.9
+   ],
+   "greenRatio": 0.6061,
+   "brownRatio": 0.1754,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    325.6,
+    297.9
+   ],
+   "brightCentroidNorm": [
+    0.254,
+    0.414
+   ]
+  },
+  "T2_Autumn_az180_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    55.8,
+    65.3,
+    53.0
+   ],
+   "greenRatio": 0.1757,
+   "brownRatio": 0.0504,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    433.7,
+    168.0
+   ],
+   "brightCentroidNorm": [
+    0.339,
+    0.233
+   ]
+  },
+  "T2_Autumn_az180_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    83.8,
+    96.6,
+    63.8
+   ],
+   "greenRatio": 0.4292,
+   "brownRatio": 0.0705,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    842.9,
+    172.7
+   ],
+   "brightCentroidNorm": [
+    0.659,
+    0.24
+   ]
+  },
+  "T2_Autumn_az180_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    99.7,
+    114.7,
+    74.9
+   ],
+   "greenRatio": 0.4651,
+   "brownRatio": 0.1507,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    977.0,
+    257.0
+   ],
+   "brightCentroidNorm": [
+    0.763,
+    0.357
+   ]
+  },
+  "T2_Autumn_az180_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    58.4,
+    68.4,
+    54.0
+   ],
+   "greenRatio": 0.2015,
+   "brownRatio": 0.0443,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    366.4,
+    187.4
+   ],
+   "brightCentroidNorm": [
+    0.286,
+    0.26
+   ]
+  },
+  "T2_Autumn_az180_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    94.0,
+    108.9,
+    67.9
+   ],
+   "greenRatio": 0.5227,
+   "brownRatio": 0.0703,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    702.8,
+    212.5
+   ],
+   "brightCentroidNorm": [
+    0.549,
+    0.295
+   ]
+  },
+  "T2_Autumn_az180_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    112.0,
+    132.9,
+    82.0
+   ],
+   "greenRatio": 0.6239,
+   "brownRatio": 0.1705,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    989.4,
+    291.9
+   ],
+   "brightCentroidNorm": [
+    0.773,
+    0.405
+   ]
+  },
+  "T2_Autumn_az270_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    55.6,
+    65.1,
+    53.0
+   ],
+   "greenRatio": 0.1724,
+   "brownRatio": 0.0495,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    924.7,
+    196.0
+   ],
+   "brightCentroidNorm": [
+    0.722,
+    0.272
+   ]
+  },
+  "T2_Autumn_az270_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    87.5,
+    100.9,
+    65.5
+   ],
+   "greenRatio": 0.4281,
+   "brownRatio": 0.0752,
+   "brightRatio": 0.0012,
+   "brightCentroid": [
+    810.2,
+    413.8
+   ],
+   "brightCentroidNorm": [
+    0.633,
+    0.575
+   ]
+  },
+  "T2_Autumn_az270_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    104.3,
+    122.9,
+    78.5
+   ],
+   "greenRatio": 0.5374,
+   "brownRatio": 0.167,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    576.8,
+    564.8
+   ],
+   "brightCentroidNorm": [
+    0.451,
+    0.784
+   ]
+  },
+  "T2_Autumn_az270_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    71.0,
+    82.4,
+    58.9
+   ],
+   "greenRatio": 0.3014,
+   "brownRatio": 0.0612,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    914.7,
+    158.8
+   ],
+   "brightCentroidNorm": [
+    0.715,
+    0.221
+   ]
+  },
+  "T2_Autumn_az270_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    87.2,
+    103.6,
+    68.0
+   ],
+   "greenRatio": 0.481,
+   "brownRatio": 0.0931,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    867.0,
+    600.7
+   ],
+   "brightCentroidNorm": [
+    0.677,
+    0.834
+   ]
+  },
+  "T2_Autumn_az270_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    99.5,
+    121.2,
+    80.2
+   ],
+   "greenRatio": 0.5189,
+   "brownRatio": 0.1517,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    677.9,
+    565.7
+   ],
+   "brightCentroidNorm": [
+    0.53,
+    0.786
+   ]
+  },
+  "T2_Autumn_az90_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    55.5,
+    64.9,
+    52.8
+   ],
+   "greenRatio": 0.1717,
+   "brownRatio": 0.0502,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    359.4,
+    398.4
+   ],
+   "brightCentroidNorm": [
+    0.281,
+    0.553
+   ]
+  },
+  "T2_Autumn_az90_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    88.9,
+    103.4,
+    66.0
+   ],
+   "greenRatio": 0.4935,
+   "brownRatio": 0.0706,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    504.3,
+    575.3
+   ],
+   "brightCentroidNorm": [
+    0.394,
+    0.799
+   ]
+  },
+  "T2_Autumn_az90_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    101.7,
+    120.9,
+    77.5
+   ],
+   "greenRatio": 0.5228,
+   "brownRatio": 0.1744,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    571.9,
+    195.8
+   ],
+   "brightCentroidNorm": [
+    0.447,
+    0.272
+   ]
+  },
+  "T2_Autumn_az90_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    77.2,
+    88.4,
+    61.0
+   ],
+   "greenRatio": 0.3016,
+   "brownRatio": 0.0806,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    389.4,
+    543.3
+   ],
+   "brightCentroidNorm": [
+    0.304,
+    0.755
+   ]
+  },
+  "T2_Autumn_az90_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    85.5,
+    102.3,
+    67.3
+   ],
+   "greenRatio": 0.475,
+   "brownRatio": 0.0945,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    434.9,
+    143.1
+   ],
+   "brightCentroidNorm": [
+    0.34,
+    0.199
+   ]
+  },
+  "T2_Autumn_az90_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    97.1,
+    118.2,
+    83.5
+   ],
+   "greenRatio": 0.4233,
+   "brownRatio": 0.1971,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    624.6,
+    276.3
+   ],
+   "brightCentroidNorm": [
+    0.488,
+    0.384
+   ]
+  },
+  "T2_Spring_az0_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    52.9,
+    67.4,
+    56.5
+   ],
+   "greenRatio": 0.2761,
+   "brownRatio": 0.0139,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    591.8,
+    457.2
+   ],
+   "brightCentroidNorm": [
+    0.462,
+    0.635
+   ]
+  },
+  "T2_Spring_az0_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    84.0,
+    110.0,
+    74.7
+   ],
+   "greenRatio": 0.5845,
+   "brownRatio": 0.047,
+   "brightRatio": 0.002,
+   "brightCentroid": [
+    191.2,
+    458.5
+   ],
+   "brightCentroidNorm": [
+    0.149,
+    0.637
+   ]
+  },
+  "T2_Spring_az0_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    93.9,
+    125.6,
+    86.1
+   ],
+   "greenRatio": 0.5948,
+   "brownRatio": 0.1038,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    267.0,
+    268.1
+   ],
+   "brightCentroidNorm": [
+    0.209,
+    0.372
+   ]
+  },
+  "T2_Spring_az0_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    58.7,
+    75.1,
+    59.8
+   ],
+   "greenRatio": 0.3405,
+   "brownRatio": 0.0159,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    572.3,
+    462.5
+   ],
+   "brightCentroidNorm": [
+    0.447,
+    0.642
+   ]
+  },
+  "T2_Spring_az0_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    92.8,
+    121.7,
+    79.1
+   ],
+   "greenRatio": 0.6769,
+   "brownRatio": 0.0496,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    170.3,
+    367.8
+   ],
+   "brightCentroidNorm": [
+    0.133,
+    0.511
+   ]
+  },
+  "T2_Spring_az0_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    100.1,
+    134.9,
+    90.8
+   ],
+   "greenRatio": 0.669,
+   "brownRatio": 0.1035,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    267.0,
+    256.3
+   ],
+   "brightCentroidNorm": [
+    0.209,
+    0.356
+   ]
+  },
+  "T2_Spring_az180_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    51.8,
+    65.9,
+    55.9
+   ],
+   "greenRatio": 0.2638,
+   "brownRatio": 0.0137,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    682.8,
+    170.1
+   ],
+   "brightCentroidNorm": [
+    0.533,
+    0.236
+   ]
+  },
+  "T2_Spring_az180_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    76.6,
+    98.1,
+    69.2
+   ],
+   "greenRatio": 0.4787,
+   "brownRatio": 0.0422,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    1079.6,
+    183.0
+   ],
+   "brightCentroidNorm": [
+    0.843,
+    0.254
+   ]
+  },
+  "T2_Spring_az180_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    91.1,
+    117.2,
+    81.9
+   ],
+   "greenRatio": 0.5172,
+   "brownRatio": 0.0886,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    1049.0,
+    238.0
+   ],
+   "brightCentroidNorm": [
+    0.819,
+    0.331
+   ]
+  },
+  "T2_Spring_az180_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    53.9,
+    69.0,
+    57.1
+   ],
+   "greenRatio": 0.2922,
+   "brownRatio": 0.0142,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    661.2,
+    180.3
+   ],
+   "brightCentroidNorm": [
+    0.517,
+    0.25
+   ]
+  },
+  "T2_Spring_az180_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    85.4,
+    110.5,
+    74.4
+   ],
+   "greenRatio": 0.582,
+   "brownRatio": 0.0442,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    1115.4,
+    262.7
+   ],
+   "brightCentroidNorm": [
+    0.871,
+    0.365
+   ]
+  },
+  "T2_Spring_az180_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    100.9,
+    136.2,
+    91.1
+   ],
+   "greenRatio": 0.6875,
+   "brownRatio": 0.1036,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    1050.8,
+    340.6
+   ],
+   "brightCentroidNorm": [
+    0.821,
+    0.473
+   ]
+  },
+  "T2_Spring_az270_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    51.4,
+    65.5,
+    55.7
+   ],
+   "greenRatio": 0.2604,
+   "brownRatio": 0.0128,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    919.9,
+    330.8
+   ],
+   "brightCentroidNorm": [
+    0.719,
+    0.459
+   ]
+  },
+  "T2_Spring_az270_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    79.3,
+    101.9,
+    71.0
+   ],
+   "greenRatio": 0.5179,
+   "brownRatio": 0.0415,
+   "brightRatio": 0.0012,
+   "brightCentroid": [
+    809.2,
+    558.2
+   ],
+   "brightCentroidNorm": [
+    0.632,
+    0.775
+   ]
+  },
+  "T2_Spring_az270_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    93.6,
+    124.8,
+    86.0
+   ],
+   "greenRatio": 0.5856,
+   "brownRatio": 0.1087,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    560.7,
+    570.8
+   ],
+   "brightCentroidNorm": [
+    0.438,
+    0.793
+   ]
+  },
+  "T2_Spring_az270_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    64.9,
+    83.2,
+    63.1
+   ],
+   "greenRatio": 0.3957,
+   "brownRatio": 0.0203,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    959.3,
+    485.7
+   ],
+   "brightCentroidNorm": [
+    0.749,
+    0.675
+   ]
+  },
+  "T2_Spring_az270_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    79.1,
+    105.0,
+    73.9
+   ],
+   "greenRatio": 0.509,
+   "brownRatio": 0.0616,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    821.1,
+    607.4
+   ],
+   "brightCentroidNorm": [
+    0.642,
+    0.844
+   ]
+  },
+  "T2_Spring_az270_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    90.5,
+    124.3,
+    88.3
+   ],
+   "greenRatio": 0.5698,
+   "brownRatio": 0.0873,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    556.8,
+    555.8
+   ],
+   "brightCentroidNorm": [
+    0.435,
+    0.772
+   ]
+  },
+  "T2_Spring_az90_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    51.6,
+    65.6,
+    55.8
+   ],
+   "greenRatio": 0.2602,
+   "brownRatio": 0.0133,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    355.5,
+    281.5
+   ],
+   "brightCentroidNorm": [
+    0.278,
+    0.391
+   ]
+  },
+  "T2_Spring_az90_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    80.9,
+    105.3,
+    72.3
+   ],
+   "greenRatio": 0.5519,
+   "brownRatio": 0.0431,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    417.5,
+    90.5
+   ],
+   "brightCentroidNorm": [
+    0.326,
+    0.126
+   ]
+  },
+  "T2_Spring_az90_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    92.6,
+    124.2,
+    85.7
+   ],
+   "greenRatio": 0.5763,
+   "brownRatio": 0.1113,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    549.6,
+    133.4
+   ],
+   "brightCentroidNorm": [
+    0.429,
+    0.185
+   ]
+  },
+  "T2_Spring_az90_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    70.4,
+    89.6,
+    66.0
+   ],
+   "greenRatio": 0.451,
+   "brownRatio": 0.0206,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    314.9,
+    148.3
+   ],
+   "brightCentroidNorm": [
+    0.246,
+    0.206
+   ]
+  },
+  "T2_Spring_az90_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    77.9,
+    104.2,
+    73.4
+   ],
+   "greenRatio": 0.5054,
+   "brownRatio": 0.0595,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    424.3,
+    101.0
+   ],
+   "brightCentroidNorm": [
+    0.331,
+    0.14
+   ]
+  },
+  "T2_Spring_az90_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    89.6,
+    122.5,
+    92.0
+   ],
+   "greenRatio": 0.4774,
+   "brownRatio": 0.1296,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    574.2,
+    130.0
+   ],
+   "brightCentroidNorm": [
+    0.449,
+    0.181
+   ]
+  },
+  "T2_Summer_az0_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    60.7,
+    74.2,
+    57.7
+   ],
+   "greenRatio": 0.26,
+   "brownRatio": 0.0195,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    730.4,
+    445.3
+   ],
+   "brightCentroidNorm": [
+    0.571,
+    0.619
+   ]
+  },
+  "T2_Summer_az0_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    99.8,
+    124.2,
+    76.9
+   ],
+   "greenRatio": 0.5845,
+   "brownRatio": 0.0538,
+   "brightRatio": 0.0021,
+   "brightCentroid": [
+    188.0,
+    411.2
+   ],
+   "brightCentroidNorm": [
+    0.147,
+    0.571
+   ]
+  },
+  "T2_Summer_az0_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    111.7,
+    141.3,
+    88.4
+   ],
+   "greenRatio": 0.5846,
+   "brownRatio": 0.1259,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    214.1,
+    329.8
+   ],
+   "brightCentroidNorm": [
+    0.167,
+    0.458
+   ]
+  },
+  "T2_Summer_az0_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    68.5,
+    83.7,
+    61.3
+   ],
+   "greenRatio": 0.3209,
+   "brownRatio": 0.0225,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    785.8,
+    447.8
+   ],
+   "brightCentroidNorm": [
+    0.614,
+    0.622
+   ]
+  },
+  "T2_Summer_az0_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    111.6,
+    138.7,
+    81.9
+   ],
+   "greenRatio": 0.6743,
+   "brownRatio": 0.0593,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    202.2,
+    327.7
+   ],
+   "brightCentroidNorm": [
+    0.158,
+    0.455
+   ]
+  },
+  "T2_Summer_az0_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    120.1,
+    152.6,
+    93.5
+   ],
+   "greenRatio": 0.6578,
+   "brownRatio": 0.1299,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    214.6,
+    345.0
+   ],
+   "brightCentroidNorm": [
+    0.168,
+    0.479
+   ]
+  },
+  "T2_Summer_az180_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    59.2,
+    72.4,
+    57.0
+   ],
+   "greenRatio": 0.2481,
+   "brownRatio": 0.0191,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    536.7,
+    156.7
+   ],
+   "brightCentroidNorm": [
+    0.419,
+    0.218
+   ]
+  },
+  "T2_Summer_az180_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    89.3,
+    109.5,
+    70.8
+   ],
+   "greenRatio": 0.4778,
+   "brownRatio": 0.0486,
+   "brightRatio": 0.0015,
+   "brightCentroid": [
+    1088.3,
+    207.4
+   ],
+   "brightCentroidNorm": [
+    0.85,
+    0.288
+   ]
+  },
+  "T2_Summer_az180_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    106.0,
+    130.3,
+    83.6
+   ],
+   "greenRatio": 0.5088,
+   "brownRatio": 0.1069,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    1065.9,
+    246.1
+   ],
+   "brightCentroidNorm": [
+    0.833,
+    0.342
+   ]
+  },
+  "T2_Summer_az180_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    62.1,
+    76.2,
+    58.3
+   ],
+   "greenRatio": 0.2792,
+   "brownRatio": 0.0178,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    493.2,
+    181.1
+   ],
+   "brightCentroidNorm": [
+    0.385,
+    0.252
+   ]
+  },
+  "T2_Summer_az180_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    101.5,
+    125.1,
+    76.8
+   ],
+   "greenRatio": 0.5797,
+   "brownRatio": 0.0533,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    1097.0,
+    230.9
+   ],
+   "brightCentroidNorm": [
+    0.857,
+    0.321
+   ]
+  },
+  "T2_Summer_az180_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    120.5,
+    153.5,
+    93.3
+   ],
+   "greenRatio": 0.6768,
+   "brownRatio": 0.1245,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    1074.3,
+    365.1
+   ],
+   "brightCentroidNorm": [
+    0.839,
+    0.507
+   ]
+  },
+  "T2_Summer_az270_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    58.8,
+    71.9,
+    56.8
+   ],
+   "greenRatio": 0.245,
+   "brownRatio": 0.0184,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    926.1,
+    233.2
+   ],
+   "brightCentroidNorm": [
+    0.723,
+    0.324
+   ]
+  },
+  "T2_Summer_az270_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    93.4,
+    114.5,
+    73.0
+   ],
+   "greenRatio": 0.5146,
+   "brownRatio": 0.0479,
+   "brightRatio": 0.0012,
+   "brightCentroid": [
+    767.3,
+    561.0
+   ],
+   "brightCentroidNorm": [
+    0.599,
+    0.779
+   ]
+  },
+  "T2_Summer_az270_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    111.4,
+    140.4,
+    88.2
+   ],
+   "greenRatio": 0.5795,
+   "brownRatio": 0.1247,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    523.1,
+    590.9
+   ],
+   "brightCentroidNorm": [
+    0.409,
+    0.821
+   ]
+  },
+  "T2_Summer_az270_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    76.1,
+    93.1,
+    64.8
+   ],
+   "greenRatio": 0.379,
+   "brownRatio": 0.0287,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    937.6,
+    296.6
+   ],
+   "brightCentroidNorm": [
+    0.732,
+    0.412
+   ]
+  },
+  "T2_Summer_az270_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    93.6,
+    118.1,
+    75.9
+   ],
+   "greenRatio": 0.5053,
+   "brownRatio": 0.0722,
+   "brightRatio": 0.0014,
+   "brightCentroid": [
+    815.2,
+    621.6
+   ],
+   "brightCentroidNorm": [
+    0.637,
+    0.863
+   ]
+  },
+  "T2_Summer_az270_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    106.6,
+    138.6,
+    89.8
+   ],
+   "greenRatio": 0.5637,
+   "brownRatio": 0.1077,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    572.6,
+    574.9
+   ],
+   "brightCentroidNorm": [
+    0.447,
+    0.798
+   ]
+  },
+  "T2_Summer_az90_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    58.8,
+    71.9,
+    56.8
+   ],
+   "greenRatio": 0.2447,
+   "brownRatio": 0.0187,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    361.3,
+    329.9
+   ],
+   "brightCentroidNorm": [
+    0.282,
+    0.458
+   ]
+  },
+  "T2_Summer_az90_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    95.5,
+    118.4,
+    74.2
+   ],
+   "greenRatio": 0.5518,
+   "brownRatio": 0.0496,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    493.7,
+    183.9
+   ],
+   "brightCentroidNorm": [
+    0.386,
+    0.255
+   ]
+  },
+  "T2_Summer_az90_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    109.4,
+    138.9,
+    87.5
+   ],
+   "greenRatio": 0.5666,
+   "brownRatio": 0.1317,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    551.1,
+    120.5
+   ],
+   "brightCentroidNorm": [
+    0.431,
+    0.167
+   ]
+  },
+  "T2_Summer_az90_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    83.3,
+    100.7,
+    67.9
+   ],
+   "greenRatio": 0.4235,
+   "brownRatio": 0.0302,
+   "brightRatio": 0.0005,
+   "brightCentroid": [
+    365.0,
+    362.3
+   ],
+   "brightCentroidNorm": [
+    0.285,
+    0.503
+   ]
+  },
+  "T2_Summer_az90_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    91.8,
+    116.8,
+    75.2
+   ],
+   "greenRatio": 0.5017,
+   "brownRatio": 0.0703,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    429.3,
+    88.8
+   ],
+   "brightCentroidNorm": [
+    0.335,
+    0.123
+   ]
+  },
+  "T2_Summer_az90_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    104.9,
+    135.3,
+    93.3
+   ],
+   "greenRatio": 0.4669,
+   "brownRatio": 0.1514,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    584.1,
+    119.2
+   ],
+   "brightCentroidNorm": [
+    0.456,
+    0.166
+   ]
+  },
+  "T2_Winter_az0_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    43.1,
+    56.1,
+    52.5
+   ],
+   "greenRatio": 0.2742,
+   "brownRatio": 0.0065,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    720.3,
+    427.3
+   ],
+   "brightCentroidNorm": [
+    0.563,
+    0.593
+   ]
+  },
+  "T2_Winter_az0_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    63.7,
+    85.9,
+    66.4
+   ],
+   "greenRatio": 0.5715,
+   "brownRatio": 0.0218,
+   "brightRatio": 0.0018,
+   "brightCentroid": [
+    531.5,
+    530.3
+   ],
+   "brightCentroidNorm": [
+    0.415,
+    0.736
+   ]
+  },
+  "T2_Winter_az0_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    70.2,
+    97.7,
+    76.3
+   ],
+   "greenRatio": 0.589,
+   "brownRatio": 0.0289,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    923.6,
+    390.6
+   ],
+   "brightCentroidNorm": [
+    0.722,
+    0.543
+   ]
+  },
+  "T2_Winter_az0_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    46.6,
+    61.2,
+    54.9
+   ],
+   "greenRatio": 0.3394,
+   "brownRatio": 0.0061,
+   "brightRatio": 0.0003,
+   "brightCentroid": [
+    687.8,
+    528.7
+   ],
+   "brightCentroidNorm": [
+    0.537,
+    0.734
+   ]
+  },
+  "T2_Winter_az0_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    69.1,
+    93.4,
+    69.3
+   ],
+   "greenRatio": 0.6679,
+   "brownRatio": 0.018,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    610.4,
+    410.8
+   ],
+   "brightCentroidNorm": [
+    0.477,
+    0.571
+   ]
+  },
+  "T2_Winter_az0_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    73.7,
+    103.8,
+    79.8
+   ],
+   "greenRatio": 0.6635,
+   "brownRatio": 0.0108,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    923.6,
+    320.7
+   ],
+   "brightCentroidNorm": [
+    0.722,
+    0.445
+   ]
+  },
+  "T2_Winter_az180_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    42.5,
+    55.3,
+    52.2
+   ],
+   "greenRatio": 0.2618,
+   "brownRatio": 0.0069,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    570.7,
+    139.1
+   ],
+   "brightCentroidNorm": [
+    0.446,
+    0.193
+   ]
+  },
+  "T2_Winter_az180_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    60.1,
+    78.4,
+    62.5
+   ],
+   "greenRatio": 0.4701,
+   "brownRatio": 0.0226,
+   "brightRatio": 0.0013,
+   "brightCentroid": [
+    808.5,
+    138.0
+   ],
+   "brightCentroidNorm": [
+    0.632,
+    0.192
+   ]
+  },
+  "T2_Winter_az180_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    71.0,
+    93.6,
+    73.7
+   ],
+   "greenRatio": 0.5116,
+   "brownRatio": 0.023,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    348.3,
+    282.0
+   ],
+   "brightCentroidNorm": [
+    0.272,
+    0.392
+   ]
+  },
+  "T2_Winter_az180_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    43.6,
+    57.2,
+    53.0
+   ],
+   "greenRatio": 0.2908,
+   "brownRatio": 0.0058,
+   "brightRatio": 0.0003,
+   "brightCentroid": [
+    546.4,
+    125.8
+   ],
+   "brightCentroidNorm": [
+    0.427,
+    0.175
+   ]
+  },
+  "T2_Winter_az180_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    64.9,
+    86.2,
+    66.0
+   ],
+   "greenRatio": 0.5751,
+   "brownRatio": 0.0159,
+   "brightRatio": 0.0008,
+   "brightCentroid": [
+    801.4,
+    168.0
+   ],
+   "brightCentroidNorm": [
+    0.626,
+    0.233
+   ]
+  },
+  "T2_Winter_az180_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    74.6,
+    105.2,
+    80.3
+   ],
+   "greenRatio": 0.6829,
+   "brownRatio": 0.0118,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    351.6,
+    302.6
+   ],
+   "brightCentroidNorm": [
+    0.275,
+    0.42
+   ]
+  },
+  "T2_Winter_az270_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    42.2,
+    54.9,
+    52.0
+   ],
+   "greenRatio": 0.2588,
+   "brownRatio": 0.0066,
+   "brightRatio": 0.0003,
+   "brightCentroid": [
+    929.8,
+    236.7
+   ],
+   "brightCentroidNorm": [
+    0.726,
+    0.329
+   ]
+  },
+  "T2_Winter_az270_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    61.2,
+    80.5,
+    63.6
+   ],
+   "greenRatio": 0.5098,
+   "brownRatio": 0.0217,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    963.9,
+    367.2
+   ],
+   "brightCentroidNorm": [
+    0.753,
+    0.51
+   ]
+  },
+  "T2_Winter_az270_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    70.2,
+    97.2,
+    76.3
+   ],
+   "greenRatio": 0.5788,
+   "brownRatio": 0.0334,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    730.6,
+    173.8
+   ],
+   "brightCentroidNorm": [
+    0.571,
+    0.241
+   ]
+  },
+  "T2_Winter_az270_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    50.8,
+    66.9,
+    57.4
+   ],
+   "greenRatio": 0.3944,
+   "brownRatio": 0.007,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    947.0,
+    322.7
+   ],
+   "brightCentroidNorm": [
+    0.74,
+    0.448
+   ]
+  },
+  "T2_Winter_az270_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    60.5,
+    82.8,
+    66.3
+   ],
+   "greenRatio": 0.5035,
+   "brownRatio": 0.0212,
+   "brightRatio": 0.0012,
+   "brightCentroid": [
+    936.5,
+    294.3
+   ],
+   "brightCentroidNorm": [
+    0.732,
+    0.409
+   ]
+  },
+  "T2_Winter_az270_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    67.6,
+    97.4,
+    78.5
+   ],
+   "greenRatio": 0.5656,
+   "brownRatio": 0.0244,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    670.8,
+    81.0
+   ],
+   "brightCentroidNorm": [
+    0.524,
+    0.112
+   ]
+  },
+  "T2_Winter_az90_t1_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    42.2,
+    54.9,
+    52.0
+   ],
+   "greenRatio": 0.2587,
+   "brownRatio": 0.0065,
+   "brightRatio": 0.0003,
+   "brightCentroid": [
+    346.2,
+    302.1
+   ],
+   "brightCentroidNorm": [
+    0.27,
+    0.42
+   ]
+  },
+  "T2_Winter_az90_t1_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    61.3,
+    82.2,
+    64.3
+   ],
+   "greenRatio": 0.5438,
+   "brownRatio": 0.0215,
+   "brightRatio": 0.0009,
+   "brightCentroid": [
+    353.3,
+    227.5
+   ],
+   "brightCentroidNorm": [
+    0.276,
+    0.316
+   ]
+  },
+  "T2_Winter_az90_t1_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    69.0,
+    96.4,
+    75.8
+   ],
+   "greenRatio": 0.5715,
+   "brownRatio": 0.0305,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    475.6,
+    490.5
+   ],
+   "brightCentroidNorm": [
+    0.372,
+    0.681
+   ]
+  },
+  "T2_Winter_az90_t2_z1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    54.2,
+    71.0,
+    59.4
+   ],
+   "greenRatio": 0.4503,
+   "brownRatio": 0.0072,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    341.6,
+    327.6
+   ],
+   "brightCentroidNorm": [
+    0.267,
+    0.455
+   ]
+  },
+  "T2_Winter_az90_t2_z25": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    59.5,
+    82.1,
+    65.8
+   ],
+   "greenRatio": 0.4986,
+   "brownRatio": 0.018,
+   "brightRatio": 0.0011,
+   "brightCentroid": [
+    369.6,
+    363.9
+   ],
+   "brightCentroidNorm": [
+    0.289,
+    0.505
+   ]
+  },
+  "T2_Winter_az90_t2_z6": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    67.2,
+    97.0,
+    82.4
+   ],
+   "greenRatio": 0.4724,
+   "brownRatio": 0.0265,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    427.6,
+    549.0
+   ],
+   "brightCentroidNorm": [
+    0.334,
+    0.762
+   ]
+  }
+ },
+ "variants": {
+  "T2_Bush_flowering_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    99.0,
+    135.0,
+    92.3
+   ],
+   "greenRatio": 0.6634,
+   "brownRatio": 0.0957,
+   "brightRatio": 0.0092,
+   "brightCentroid": [
+    829.0,
+    346.9
+   ],
+   "brightCentroidNorm": [
+    0.648,
+    0.482
+   ]
+  },
+  "T2_Bush_flowering_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    74.9,
+    106.3,
+    82.4
+   ],
+   "greenRatio": 0.6495,
+   "brownRatio": 0.0301,
+   "brightRatio": 0.0081,
+   "brightCentroid": [
+    480.8,
+    149.1
+   ],
+   "brightCentroidNorm": [
+    0.376,
+    0.207
+   ]
+  },
+  "T2_Bush_lowEvergreen_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    96.4,
+    131.2,
+    98.5
+   ],
+   "greenRatio": 0.5305,
+   "brownRatio": 0.1361,
+   "brightRatio": 0.0101,
+   "brightCentroid": [
+    711.0,
+    506.2
+   ],
+   "brightCentroidNorm": [
+    0.555,
+    0.703
+   ]
+  },
+  "T2_Bush_lowEvergreen_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    74.3,
+    106.0,
+    89.4
+   ],
+   "greenRatio": 0.5216,
+   "brownRatio": 0.0448,
+   "brightRatio": 0.0083,
+   "brightCentroid": [
+    416.0,
+    388.7
+   ],
+   "brightCentroidNorm": [
+    0.325,
+    0.54
+   ]
+  },
+  "T2_Bush_multiStem_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    104.5,
+    137.6,
+    83.0
+   ],
+   "greenRatio": 0.886,
+   "brownRatio": 0.0051,
+   "brightRatio": 0.0004,
+   "brightCentroid": [
+    896.7,
+    435.5
+   ],
+   "brightCentroidNorm": [
+    0.701,
+    0.605
+   ]
+  },
+  "T2_Bush_multiStem_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    76.4,
+    103.8,
+    71.7
+   ],
+   "greenRatio": 0.8752,
+   "brownRatio": 0.0063,
+   "brightRatio": 0.0002,
+   "brightCentroid": [
+    943.1,
+    203.3
+   ],
+   "brightCentroidNorm": [
+    0.737,
+    0.282
+   ]
+  },
+  "T2_Tree_broad_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    101.4,
+    135.8,
+    81.0
+   ],
+   "greenRatio": 0.8176,
+   "brownRatio": 0.043,
+   "brightRatio": 0.0113,
+   "brightCentroid": [
+    821.2,
+    454.2
+   ],
+   "brightCentroidNorm": [
+    0.642,
+    0.631
+   ]
+  },
+  "T2_Tree_broad_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    76.5,
+    104.4,
+    70.9
+   ],
+   "greenRatio": 0.7953,
+   "brownRatio": 0.0418,
+   "brightRatio": 0.0102,
+   "brightCentroid": [
+    683.1,
+    457.1
+   ],
+   "brightCentroidNorm": [
+    0.534,
+    0.635
+   ]
+  },
+  "T2_Tree_conifer_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    94.3,
+    129.4,
+    97.6
+   ],
+   "greenRatio": 0.5065,
+   "brownRatio": 0.1535,
+   "brightRatio": 0.001,
+   "brightCentroid": [
+    359.6,
+    94.5
+   ],
+   "brightCentroidNorm": [
+    0.281,
+    0.131
+   ]
+  },
+  "T2_Tree_conifer_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    70.8,
+    103.0,
+    87.7
+   ],
+   "greenRatio": 0.4988,
+   "brownRatio": 0.0166,
+   "brightRatio": 0.001,
+   "brightCentroid": [
+    879.5,
+    210.7
+   ],
+   "brightCentroidNorm": [
+    0.687,
+    0.293
+   ]
+  },
+  "T2_Tree_sparse_Spring": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    103.7,
+    138.5,
+    84.1
+   ],
+   "greenRatio": 0.8608,
+   "brownRatio": 0.0119,
+   "brightRatio": 0.0034,
+   "brightCentroid": [
+    396.9,
+    141.6
+   ],
+   "brightCentroidNorm": [
+    0.31,
+    0.197
+   ]
+  },
+  "T2_Tree_sparse_Winter": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    76.0,
+    104.4,
+    72.7
+   ],
+   "greenRatio": 0.849,
+   "brownRatio": 0.0156,
+   "brightRatio": 0.0034,
+   "brightCentroid": [
+    512.9,
+    194.4
+   ],
+   "brightCentroidNorm": [
+    0.401,
+    0.27
+   ]
+  }
+ },
+ "sheets": [
+  "sheet_t1_Spring.png",
+  "sheet_t1_Summer.png",
+  "sheet_t1_Autumn.png",
+  "sheet_t1_Winter.png",
+  "sheet_t2_Spring.png",
+  "sheet_t2_Summer.png",
+  "sheet_t2_Autumn.png",
+  "sheet_t2_Winter.png"
+ ],
+ "lighting": {
+  "az0": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    115.8,
+    151.5,
+    93.6
+   ],
+   "greenRatio": 0.789,
+   "brownRatio": 0.079,
+   "brightRatio": 0.0043,
+   "brightCentroid": [
+    434.8,
+    285.1
+   ],
+   "brightCentroidNorm": [
+    0.34,
+    0.396
+   ]
+  },
+  "az180": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    115.8,
+    151.6,
+    93.7
+   ],
+   "greenRatio": 0.7889,
+   "brownRatio": 0.079,
+   "brightRatio": 0.0043,
+   "brightCentroid": [
+    986.1,
+    511.3
+   ],
+   "brightCentroidNorm": [
+    0.77,
+    0.71
+   ]
+  },
+  "az270": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    115.7,
+    151.5,
+    93.6
+   ],
+   "greenRatio": 0.7889,
+   "brownRatio": 0.079,
+   "brightRatio": 0.0043,
+   "brightCentroid": [
+    1039.0,
+    541.3
+   ],
+   "brightCentroidNorm": [
+    0.812,
+    0.752
+   ]
+  },
+  "az90": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    116.0,
+    151.8,
+    93.8
+   ],
+   "greenRatio": 0.789,
+   "brownRatio": 0.079,
+   "brightRatio": 0.0043,
+   "brightCentroid": [
+    332.1,
+    255.0
+   ],
+   "brightCentroidNorm": [
+    0.259,
+    0.354
+   ]
+  },
+  "fixedlight_rotZ000": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    106.8,
+    142.4,
+    90.1
+   ],
+   "greenRatio": 0.7942,
+   "brownRatio": 0.0748,
+   "brightRatio": 0.0047,
+   "brightCentroid": [
+    243.5,
+    486.2
+   ],
+   "brightCentroidNorm": [
+    0.19,
+    0.675
+   ]
+  },
+  "fixedlight_rotZ090": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    108.0,
+    143.1,
+    89.7
+   ],
+   "greenRatio": 0.8165,
+   "brownRatio": 0.0599,
+   "brightRatio": 0.003,
+   "brightCentroid": [
+    377.8,
+    119.0
+   ],
+   "brightCentroidNorm": [
+    0.295,
+    0.165
+   ]
+  },
+  "fixedlight_rotZ180": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    106.4,
+    142.0,
+    89.6
+   ],
+   "greenRatio": 0.7951,
+   "brownRatio": 0.0734,
+   "brightRatio": 0.004,
+   "brightCentroid": [
+    1041.1,
+    186.0
+   ],
+   "brightCentroidNorm": [
+    0.813,
+    0.258
+   ]
+  },
+  "fixedlight_rotZ270": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    107.6,
+    142.2,
+    89.5
+   ],
+   "greenRatio": 0.8046,
+   "brownRatio": 0.0672,
+   "brightRatio": 0.0031,
+   "brightCentroid": [
+    924.0,
+    584.0
+   ],
+   "brightCentroidNorm": [
+    0.722,
+    0.811
+   ]
+  }
+ },
+ "lifecycle": {
+  "after_resume_pause_resetcache": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    122.5,
+    156.2,
+    92.6
+   ],
+   "greenRatio": 0.8033,
+   "brownRatio": 0.074,
+   "brightRatio": 0.0036,
+   "brightCentroid": [
+    889.0,
+    494.1
+   ],
+   "brightCentroidNorm": [
+    0.695,
+    0.686
+   ]
+  },
+  "world_seed1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    105.7,
+    135.5,
+    82.1
+   ],
+   "greenRatio": 0.8092,
+   "brownRatio": 0.0974,
+   "brightRatio": 0.0021,
+   "brightCentroid": [
+    302.6,
+    529.8
+   ],
+   "brightCentroidNorm": [
+    0.236,
+    0.736
+   ]
+  },
+  "world_seed8": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    114.1,
+    150.3,
+    93.4
+   ],
+   "greenRatio": 0.784,
+   "brownRatio": 0.081,
+   "brightRatio": 0.0042,
+   "brightCentroid": [
+    357.6,
+    267.8
+   ],
+   "brightCentroidNorm": [
+    0.279,
+    0.372
+   ]
+  }
+ },
+ "landscape": {
+  "poi_Berry": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    106.5,
+    134.3,
+    82.6
+   ],
+   "greenRatio": 0.8376,
+   "brownRatio": 0.0129,
+   "brightRatio": 0.0014,
+   "brightCentroid": [
+    1017.4,
+    318.4
+   ],
+   "brightCentroidNorm": [
+    0.795,
+    0.442
+   ]
+  },
+  "poi_Water": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    101.1,
+    136.6,
+    92.9
+   ],
+   "greenRatio": 0.6603,
+   "brownRatio": 0.1158,
+   "brightRatio": 0.0046,
+   "brightCentroid": [
+    352.4,
+    209.2
+   ],
+   "brightCentroidNorm": [
+    0.275,
+    0.291
+   ]
+  },
+  "poi_Wood": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    100.5,
+    137.3,
+    96.1
+   ],
+   "greenRatio": 0.6491,
+   "brownRatio": 0.1102,
+   "brightRatio": 0.007,
+   "brightCentroid": [
+    880.4,
+    466.5
+   ],
+   "brightCentroidNorm": [
+    0.688,
+    0.648
+   ]
+  }
+ },
+ "density": {
+  "density_zoom1": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    61.6,
+    76.2,
+    56.4
+   ],
+   "greenRatio": 0.2945,
+   "brownRatio": 0.0079,
+   "brightRatio": 0.0003,
+   "brightCentroid": [
+    814.9,
+    234.9
+   ],
+   "brightCentroidNorm": [
+    0.637,
+    0.326
+   ]
+  },
+  "density_zoom4": {
+   "w": 1280,
+   "h": 720,
+   "meanRGB": [
+    137.3,
+    170.0,
+    87.9
+   ],
+   "greenRatio": 0.95,
+   "brownRatio": 0.0115,
+   "brightRatio": 0.0012,
+   "brightCentroid": [
+    936.4,
+    89.5
+   ],
+   "brightCentroidNorm": [
+    0.732,
+    0.124
+   ]
+  }
+ },
+ "aggregates": {
+  "season_Spring": {
+   "n": 24,
+   "greenRatioMean": 0.4843,
+   "brownRatioMean": 0.0562,
+   "meanR": 77.7,
+   "meanG": 102.0,
+   "meanB": 73.3,
+   "brightCxMean": 0.487,
+   "brightCyMean": 0.442
+  },
+  "season_Summer": {
+   "n": 24,
+   "greenRatioMean": 0.4748,
+   "brownRatioMean": 0.068,
+   "meanR": 91.4,
+   "meanG": 114.2,
+   "meanB": 75.1,
+   "brightCxMean": 0.489,
+   "brightCyMean": 0.45
+  },
+  "season_Autumn": {
+   "n": 24,
+   "greenRatioMean": 0.4137,
+   "brownRatioMean": 0.1017,
+   "meanR": 85.3,
+   "meanG": 100.2,
+   "meanB": 67.4,
+   "brightCxMean": 0.504,
+   "brightCyMean": 0.473
+  },
+  "season_Winter": {
+   "n": 24,
+   "greenRatioMean": 0.4793,
+   "brownRatioMean": 0.0168,
+   "meanR": 59.5,
+   "meanG": 80.7,
+   "meanB": 65.9,
+   "brightCxMean": 0.499,
+   "brightCyMean": 0.434
+  },
+  "az_az0": {
+   "n": 24,
+   "greenRatioMean": 0.5006,
+   "brownRatioMean": 0.0606,
+   "meanR": 81.4,
+   "meanG": 103.0,
+   "meanB": 71.5,
+   "brightCxMean": 0.401,
+   "brightCyMean": 0.546
+  },
+  "az_az90": {
+   "n": 24,
+   "greenRatioMean": 0.4484,
+   "brownRatioMean": 0.067,
+   "meanR": 77.8,
+   "meanG": 99.0,
+   "meanB": 71.2,
+   "brightCxMean": 0.346,
+   "brightCyMean": 0.375
+  },
+  "az_az180": {
+   "n": 24,
+   "greenRatioMean": 0.4501,
+   "brownRatioMean": 0.055,
+   "meanR": 77.4,
+   "meanG": 96.9,
+   "meanB": 68.9,
+   "brightCxMean": 0.61,
+   "brightCyMean": 0.301
+  },
+  "az_az270": {
+   "n": 24,
+   "greenRatioMean": 0.4531,
+   "brownRatioMean": 0.0602,
+   "meanR": 77.3,
+   "meanG": 98.2,
+   "meanB": 70.2,
+   "brightCxMean": 0.622,
+   "brightCyMean": 0.577
+  },
+  "zoom_z1": {
+   "n": 32,
+   "greenRatioMean": 0.2877,
+   "brownRatioMean": 0.0249,
+   "meanR": 57.6,
+   "meanG": 71.2,
+   "meanB": 57.1,
+   "brightCxMean": 0.5,
+   "brightCyMean": 0.432
+  },
+  "zoom_z25": {
+   "n": 32,
+   "greenRatioMean": 0.5341,
+   "brownRatioMean": 0.0512,
+   "meanR": 83.0,
+   "meanG": 104.3,
+   "meanB": 70.5,
+   "brightCxMean": 0.506,
+   "brightCyMean": 0.459
+  },
+  "zoom_z6": {
+   "n": 32,
+   "greenRatioMean": 0.5673,
+   "brownRatioMean": 0.1059,
+   "meanR": 94.9,
+   "meanG": 122.3,
+   "meanB": 83.7,
+   "brightCxMean": 0.478,
+   "brightCyMean": 0.458
+  },
+  "lighting_az0": {
+   "n": 1,
+   "greenRatioMean": 0.789,
+   "brownRatioMean": 0.079,
+   "meanR": 115.8,
+   "meanG": 151.5,
+   "meanB": 93.6,
+   "brightCxMean": 0.34,
+   "brightCyMean": 0.396
+  },
+  "lighting_az180": {
+   "n": 1,
+   "greenRatioMean": 0.7889,
+   "brownRatioMean": 0.079,
+   "meanR": 115.8,
+   "meanG": 151.6,
+   "meanB": 93.7,
+   "brightCxMean": 0.77,
+   "brightCyMean": 0.71
+  },
+  "lighting_az270": {
+   "n": 1,
+   "greenRatioMean": 0.7889,
+   "brownRatioMean": 0.079,
+   "meanR": 115.7,
+   "meanG": 151.5,
+   "meanB": 93.6,
+   "brightCxMean": 0.812,
+   "brightCyMean": 0.752
+  },
+  "lighting_az90": {
+   "n": 1,
+   "greenRatioMean": 0.789,
+   "brownRatioMean": 0.079,
+   "meanR": 116.0,
+   "meanG": 151.8,
+   "meanB": 93.8,
+   "brightCxMean": 0.259,
+   "brightCyMean": 0.354
+  },
+  "lighting_fixedlight_rotZ000": {
+   "n": 1,
+   "greenRatioMean": 0.7942,
+   "brownRatioMean": 0.0748,
+   "meanR": 106.8,
+   "meanG": 142.4,
+   "meanB": 90.1,
+   "brightCxMean": 0.19,
+   "brightCyMean": 0.675
+  },
+  "lighting_fixedlight_rotZ090": {
+   "n": 1,
+   "greenRatioMean": 0.8165,
+   "brownRatioMean": 0.0599,
+   "meanR": 108.0,
+   "meanG": 143.1,
+   "meanB": 89.7,
+   "brightCxMean": 0.295,
+   "brightCyMean": 0.165
+  },
+  "lighting_fixedlight_rotZ180": {
+   "n": 1,
+   "greenRatioMean": 0.7951,
+   "brownRatioMean": 0.0734,
+   "meanR": 106.4,
+   "meanG": 142.0,
+   "meanB": 89.6,
+   "brightCxMean": 0.813,
+   "brightCyMean": 0.258
+  },
+  "lighting_fixedlight_rotZ270": {
+   "n": 1,
+   "greenRatioMean": 0.8046,
+   "brownRatioMean": 0.0672,
+   "meanR": 107.6,
+   "meanG": 142.2,
+   "meanB": 89.5,
+   "brightCxMean": 0.722,
+   "brightCyMean": 0.811
+  },
+  "lifecycle_after_resume_pause_resetcache": {
+   "n": 1,
+   "greenRatioMean": 0.8033,
+   "brownRatioMean": 0.074,
+   "meanR": 122.5,
+   "meanG": 156.2,
+   "meanB": 92.6,
+   "brightCxMean": 0.695,
+   "brightCyMean": 0.686
+  },
+  "lifecycle_world_seed1": {
+   "n": 1,
+   "greenRatioMean": 0.8092,
+   "brownRatioMean": 0.0974,
+   "meanR": 105.7,
+   "meanG": 135.5,
+   "meanB": 82.1,
+   "brightCxMean": 0.236,
+   "brightCyMean": 0.736
+  },
+  "lifecycle_world_seed8": {
+   "n": 1,
+   "greenRatioMean": 0.784,
+   "brownRatioMean": 0.081,
+   "meanR": 114.1,
+   "meanG": 150.3,
+   "meanB": 93.4,
+   "brightCxMean": 0.279,
+   "brightCyMean": 0.372
+  },
+  "landscape_poi_Berry": {
+   "n": 1,
+   "greenRatioMean": 0.8376,
+   "brownRatioMean": 0.0129,
+   "meanR": 106.5,
+   "meanG": 134.3,
+   "meanB": 82.6,
+   "brightCxMean": 0.795,
+   "brightCyMean": 0.442
+  },
+  "landscape_poi_Water": {
+   "n": 1,
+   "greenRatioMean": 0.6603,
+   "brownRatioMean": 0.1158,
+   "meanR": 101.1,
+   "meanG": 136.6,
+   "meanB": 92.9,
+   "brightCxMean": 0.275,
+   "brightCyMean": 0.291
+  },
+  "landscape_poi_Wood": {
+   "n": 1,
+   "greenRatioMean": 0.6491,
+   "brownRatioMean": 0.1102,
+   "meanR": 100.5,
+   "meanG": 137.3,
+   "meanB": 96.1,
+   "brightCxMean": 0.688,
+   "brightCyMean": 0.648
+  },
+  "density_density_zoom1": {
+   "n": 1,
+   "greenRatioMean": 0.2945,
+   "brownRatioMean": 0.0079,
+   "meanR": 61.6,
+   "meanG": 76.2,
+   "meanB": 56.4,
+   "brightCxMean": 0.637,
+   "brightCyMean": 0.326
+  },
+  "density_density_zoom4": {
+   "n": 1,
+   "greenRatioMean": 0.95,
+   "brownRatioMean": 0.0115,
+   "meanR": 137.3,
+   "meanG": 170.0,
+   "meanB": 87.9,
+   "brightCxMean": 0.732,
+   "brightCyMean": 0.124
+  }
+ }
+}
