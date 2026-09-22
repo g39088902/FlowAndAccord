@@ -16,6 +16,9 @@
 - **TB-02 台地内核（TB-02-01～10）**：台地模板（原 `plateau_settlement_v1`，v1.50.68 更名 `plateau_v1`，显示名"台地聚落"→"台地"），v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **TA-12-2 地表纹样表现层**：`terrain-texture.js` 坡度分带与 fBm 纹理采样，v1.50.54 交付收口。详见 [01-changelog.md](docs/current/01-changelog.md)。
 - **WebGL 渲染迁移阶段一/二**：双 Canvas 架构上线（v1.50.77）——地形（含沙盘侧壁）由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限。★ 2026-09-17 架构决策已升级为**全量 WebGL、不再使用 Canvas 2D**，双 Canvas 属过渡形态；阶段三~五转为既定路线，详见 [31 号迁移方案 §8](docs/plan/tech/31-canvas-to-webgl-migration.md)，实现现状见 `frontend/AGENTS.md`。
+- **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**：v1.50.64 实现落地，v1.52.3 验收通过（96 视图矩阵 + 景观共用通道 57 对零失配 + 植被观察台长期调试工具 `ta06-acceptance.js`）；原 `TA-06-TODO.md` 已随收官清理。详见 [07 号 §1.2/§11.4](docs/plan/tech/07-terrain-art.md) 与 [证据包](docs/plan/tech/assets/ta06-evidence-2026-09-22/report.md)。⚠️ Chrome 真实存档 LOAD 链路仍 NOT_RUN，并入 TA-05 补测。
+- **TA-07 装饰细节分级 LOD + 投影包围体剔除**：v1.50.65 实现落地（`accent-lod.js` 集中解析层），2026-09-22 经用户确认**取消视为完成**（性能驱动力消失，实现保留不回退、四条防回退红线见 `frontend/AGENTS.md`）；原 `TA-07-TODO.md` 已随收官清理。现状见 [07 号 §6.7](docs/plan/tech/07-terrain-art.md)。
+- **TA-08 遮挡实测与验收矩阵**：2026-09-17 删除视为完成（原「模型内排序/实体拆子项/屏幕空间兜底」三策略取消，遮挡由全量 WebGL GPU 深度缓冲承担）；§2 验收矩阵并入 [31 号 §8.5](docs/plan/tech/31-canvas-to-webgl-migration.md)。
 
 ---
 
@@ -39,25 +42,13 @@
       - `TA-17-COURTYARD` 聚落房屋院地与门前通道留白（依赖门洞矢量确认）
 
 - [ ] **TA-05 P0 植被打样技术方案**
-    - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测）。
+    - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测，含 TA-06 同口径 LOAD 补测）。
     - 聚焦树木与植被群落在实体覆盖层视口下的高质量层次打样（地形底座已迁 WebGL 层，见 §0 归档索引）。★ 覆盖层属过渡形态（2026-09-17 决策：全量 WebGL），验收口径以几何/季相/受光数值一致性为主，不依赖覆盖层实现细节，以便迁移后复用同一批证据。
-
-- [x] **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**
-    - 详见 [TA-06 实施方案](TA-06-TODO.md) 与 [07 号文 §6.3/§11.4](docs/plan/tech/07-terrain-art.md)；TA-06 现状 ✔ 验收通过（2026-09-22，v1.52.3）：实现层 v1.50.64 落地（物种派生 + 三乔木轮廓 + 三灌木变体 + 花朵图元 + 冠幅单一来源联动）；WebGL 实况 96 视图矩阵验收与证据包（`docs/plan/tech/assets/ta06-evidence-2026-09-22/`，景观共用通道物种一致 57 对零失配、暖冷缓存一致、三档真实覆盖、四季与花历数值矩阵全过）；长期调试工具植被观察台 `ta06-acceptance.js`（调试监视器内入口）+ seed42 七株身份表 + 用户逐项走查 §9 清单通过。**性能 A/B 按「已无性能问题」取消**（同 TA-07-10 口径）；**Chrome 真实存档 LOAD 链路仍 NOT_RUN**（须 Chrome/Edge File System Access API，可与 TA-05 LOAD 补测合并）。
-    - 由 `accent.id` 稳定哈希派生 6 物种，零新增持久化字段/FABS section/模拟参数。
-
-- [x] **TA-07 装饰细节分级 LOD + 投影包围体剔除（✔ 已取消视为完成 2026-09-22）**
-    - 取消理由：本任务的原生驱动力是性能，而**当前已无性能问题**；仅剩 TA-07-9（Chrome 视觉验收）与 TA-07-10（六场景性能 A/B）两项证据补采，经用户确认随任务取消不再追补。
-    - **实现保留、不回退**：TA-07-1~8 + TA-07-11 已于 v1.50.65 落地，且在今天默认的 **WebGL 路径下照常生效**（`accent-lod.js` 判档与入队两级剔除全在 CPU 侧，与渲染后端解耦）——四条防回退红线仍见 [frontend/AGENTS.md](frontend/AGENTS.md)；下游 TA-18 的前置改为「TA-07 的实现」。原方案文档 [TA-07-TODO.md](TA-07-TODO.md) 保留作历史记录（同 TA-08 先例）。
 
 - [ ] **TC-03 全量 WebGL 迁移（★ 2026-09-17 定为既定路线）**
     - 详见 [31 号迁移方案 §8 阶段三~五](docs/plan/tech/31-canvas-to-webgl-migration.md)：阶段三装饰层 → 阶段四实体层 → 阶段五 Canvas 2D 退役（删除 `#sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支）。
     - 前置：现行性能数据（07 号 §11.3）；遮挡由 GPU 深度缓冲解决，原 TA-08 三策略已取消，TA-08 任务已删除视为完成（验收矩阵并入 [31 号 §8.5](docs/plan/tech/31-canvas-to-webgl-migration.md)）。
     - 约束：几何/筛选逻辑（`accent-model.js` / `accent-lod.js` / `accent-season.js` / `landscape-model.js` / `landscape-mask.js`）保持与渲染后端解耦，迁移整体复用；不得改变 `WorldRng` 消费顺序、几何派生规则与快照契约。
-
-- [x] **TA-08 遮挡实测与验收矩阵（✔ 已删除视为完成 2026-09-17）**
-    - 原任务文档 `TA-08-blocking-measurement.md` 已从仓库根目录删除：重定向后仅剩「测量脚本 + 证据包」工作，**无任何功能开发任务**，经用户确认删除并视为完成。
-    - 原「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略随全量 WebGL 决策取消；§2 遮挡验收矩阵并入 [31 号迁移方案 §8.5](docs/plan/tech/31-canvas-to-webgl-migration.md)，遮挡技术解由 TC-03 GPU 深度缓冲承担，Canvas 2D 基线证据包不再采集。
 
 - [ ] **TA-10 台地表现层打样**
     - 详见 [07 号文 §8](docs/plan/tech/07-terrain-art.md)
