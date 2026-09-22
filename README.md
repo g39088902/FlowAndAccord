@@ -9,7 +9,7 @@
 
 <div align="center">
 
-`v1.52.6` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
+`v1.53.0` · `Rust 内核 + WebAssembly` · `浏览器打开即玩`
 
 
 </div>

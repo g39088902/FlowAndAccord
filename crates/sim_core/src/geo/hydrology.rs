@@ -3,6 +3,123 @@ use serde::{Deserialize, Serialize};
 use crate::{config::SimConfig, rng::WorldRng, spatial::vec3::Vec3};
 use super::{biome::*, terrain::*};
 
+/// Parameterised river centreline used during terrain generation.
+///
+/// The centreline is deliberately generation-only (it is not part of the
+/// save/snapshot schema).  Consumers should use the exact segment distance
+/// rather than the old horizontal `x - center(y)` approximation.
+#[derive(Debug, Clone)]
+pub struct RiverCenterline {
+    pub points: Vec<Vec3>,
+    pub cumulative: Vec<f32>,
+    pub total: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MeanderWindow {
+    pub s0: f32,
+    pub s1: f32,
+    pub arc_length: f32,
+    pub chord_length: f32,
+    pub chord_over_arc: f32,
+    pub neck_width: f32,
+    pub swing_diameter: f32,
+}
+
+impl RiverCenterline {
+    pub fn new(points: Vec<Vec3>) -> Self {
+        let mut cumulative = Vec::with_capacity(points.len());
+        cumulative.push(0.0);
+        for i in 1..points.len() {
+            let d = points[i].distance_to(&points[i - 1]);
+            cumulative.push(cumulative[i - 1] + d);
+        }
+        let total = *cumulative.last().unwrap_or(&0.0);
+        Self { points, cumulative, total }
+    }
+
+    pub fn sample(&self, s: f32) -> Vec3 {
+        if self.points.is_empty() { return Vec3::ZERO; }
+        if self.points.len() == 1 { return self.points[0]; }
+        let s = s.clamp(0.0, self.total);
+        let hi = self.cumulative.partition_point(|v| *v < s);
+        if hi == 0 { return self.points[0]; }
+        if hi >= self.points.len() { return *self.points.last().unwrap(); }
+        let lo = hi - 1;
+        let span = (self.cumulative[hi] - self.cumulative[lo]).max(f32::EPSILON);
+        Vec3::lerp(self.points[lo], self.points[hi], (s - self.cumulative[lo]) / span)
+    }
+
+    /// Exact point-to-polyline distance.  Ties are resolved by the lowest
+    /// segment index, making the result deterministic across platforms.
+    pub fn distance(&self, p: Vec3) -> (f32, f32, f32) {
+        let mut best_d2 = f32::INFINITY;
+        let mut best_s = 0.0;
+        let mut best_lateral = 0.0;
+        for i in 0..self.points.len().saturating_sub(1) {
+            let a = self.points[i];
+            let b = self.points[i + 1];
+            let dx = b.x - a.x;
+            let dy = b.y - a.y;
+            let len2 = dx * dx + dy * dy;
+            if len2 <= f32::EPSILON { continue; }
+            let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0);
+            let qx = a.x + dx * t;
+            let qy = a.y + dy * t;
+            let ex = p.x - qx;
+            let ey = p.y - qy;
+            let d2 = ex * ex + ey * ey;
+            if d2 < best_d2 {
+                best_d2 = d2;
+                best_s = self.cumulative[i] + len2.sqrt() * t;
+                // Positive = left of the direction of travel.
+                best_lateral = (dx * ey - dy * ex).signum() * d2.sqrt();
+            }
+        }
+        (best_d2.sqrt(), best_s, best_lateral)
+    }
+
+    /// Signed cross-track distance (positive on the left bank).
+    pub fn lateral(&self, p: Vec3) -> f32 { self.distance(p).2 }
+
+    /// Arc-length position where the centreline crosses a requested y.
+    /// The generated production centreline is y-monotonic; this also handles
+    /// a non-monotonic future centreline by returning the nearest crossing.
+    pub fn s_at_y(&self, y: f32) -> f32 {
+        let mut best = (f32::INFINITY, 0.0);
+        for i in 0..self.points.len().saturating_sub(1) {
+            let a = self.points[i]; let b = self.points[i + 1];
+            let dy = b.y - a.y;
+            let t = if dy.abs() < f32::EPSILON { 0.0 } else { ((y-a.y)/dy).clamp(0.0, 1.0) };
+            let err = (a.y + dy*t - y).abs();
+            if err < best.0 { best = (err, self.cumulative[i] + a.distance_to(&b)*t); }
+        }
+        best.1
+    }
+
+    /// Scan candidate windows for the R0-4 oxbow precondition.  This is a
+    /// diagnostic/local predicate only: failure means the future OxbowLake
+    /// feature is not injected, never that the base world is rejected.
+    pub fn meander_windows(&self, half_width: f32) -> Vec<MeanderWindow> {
+        let mut out = Vec::new();
+        if self.points.len() < 3 { return out; }
+        // A 20-sample window is ~60m at the production spacing and is wide
+        // enough to contain the bend while keeping the two banks close.
+        for i in 0..self.points.len().saturating_sub(20) {
+            let j = (i + 20).min(self.points.len() - 1);
+            let arc = self.cumulative[j] - self.cumulative[i];
+            let chord = self.points[i].distance_to(&self.points[j]);
+            if arc <= f32::EPSILON { continue; }
+            let neck = (chord - 2.0 * half_width).max(0.0);
+            let swing = self.points[i..=j].iter().map(|p| p.x).fold(0.0f32, |m, x| m.max(x.abs())) * 2.0;
+            if chord / arc <= 0.71 && neck >= 0.5 * half_width && neck <= 3.0 * half_width && swing >= 4.0 * half_width {
+                out.push(MeanderWindow { s0: self.cumulative[i], s1: self.cumulative[j], arc_length: arc, chord_length: chord, chord_over_arc: chord / arc, neck_width: neck, swing_diameter: swing });
+            }
+        }
+        out
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Hydrology {
     pub water_bodies: Vec<WaterBody>,
@@ -69,27 +186,46 @@ pub struct RiverGeometry {
     /// `terrace_width.max(20.0)`
     pub terrace: f32,
     pub width_amp: f32,
+    pub centerline: RiverCenterline,
 }
 
 impl RiverGeometry {
     /// 主河中心线：正弦蜿蜒，完全静态（水量由共享池维护，几何不随库存变化）。
     #[inline]
-    pub fn center(&self, y: f32, size: f32) -> f32 {
-        size * 0.055 * (y / size * 5.0 + self.phase).sin()
+    pub fn center(&self, y: f32, _size: f32) -> f32 {
+        let p = self.centerline.s_at_y(y);
+        self.centerline.sample(p).x
     }
     /// 河道半宽：基准半宽 + 波动振幅。
     #[inline]
     pub fn half_width(&self, y: f32, size: f32) -> f32 {
         self.width * 0.5 + self.width_amp * (y / size * 7.0).cos()
     }
+
+    #[inline]
+    pub fn distance(&self, p: Vec3) -> (f32, f32, f32) { self.centerline.distance(p) }
+
+    #[inline]
+    pub fn point_at_y(&self, y: f32) -> Vec3 { self.centerline.sample(self.centerline.s_at_y(y)) }
 }
 
 /// 规划 T2 主河几何（§5.3 第 3 步 `apply_profile_static_hydrology` 的参数解析前身）。
 /// `pub(super)`：★ STAGE2-3 编排器（`terrain.rs::generate_with_config`）在第 2 步前
 /// 调用并写入流水线 scratch，第 2 步铺河谷低丘与第 3 步施加水面共用同一份几何。
-pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
+pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig, size: f32) -> RiverGeometry {
     let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
     let phase = rng.gen_range(-1.0, 1.0);
+    let half = size * 0.5;
+    // Three broad loops provide a real meander train while leaving generous
+    // margin for the river terrace.  The phase remains the historical single
+    // hydro RNG draw; all derived points are pure arithmetic.
+    let mut points = Vec::with_capacity(257);
+    for i in 0..=256 {
+        let t = i as f32 / 256.0;
+        let y = -half + t * size;
+        let x = size * 0.155 * (t * std::f32::consts::TAU * 3.0 + phase * 0.35).sin();
+        points.push(Vec3::new(x, y, 0.0));
+    }
     RiverGeometry {
         phase,
         level: cfg.terrain_river_water_level,
@@ -97,6 +233,7 @@ pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig) -> RiverGeometry {
         bank: cfg.terrain_river_bank_width.max(8.0),
         terrace: cfg.terrain_river_terrace_width.max(20.0),
         width_amp: (cfg.terrain_river_width_max - cfg.terrain_river_width_min).max(0.0) * 0.22,
+        centerline: RiverCenterline::new(points),
     }
 }
 
@@ -148,13 +285,12 @@ impl TerrainMap {
             let row_y = (gy as f32/(self.grid_height-1).max(1) as f32-0.5)*size;
             // 影响带列边界（保守外扩 2 格；格内仍用原判据精确裁决，浮点边界不受影响）
             let span = half_width(row_y) + bank + terrace;
-            let row_cx = center(row_y);
-            let gx_lo = ((((row_cx-span)/size+0.5)*(self.grid_width-1).max(1) as f32).floor() as isize - 2).max(0) as usize;
-            let gx_hi = ((((row_cx+span)/size+0.5)*(self.grid_width-1).max(1) as f32).ceil() as isize + 2)
+            let gx_lo = ((((center(row_y)-span)/size+0.5)*(self.grid_width-1).max(1) as f32).floor() as isize - 3).max(0) as usize;
+            let gx_hi = ((((center(row_y)+span)/size+0.5)*(self.grid_width-1).max(1) as f32).ceil() as isize + 3)
                 .min((self.grid_width-1) as isize).max(gx_lo as isize) as usize;
             for gx in gx_lo..=gx_hi {
                 let p = self.grid_pos(gx, gy);
-                let d = (p.x-center(p.y)).abs();
+                let (d, _, _) = geom.distance(p);
                 let w = half_width(p.y);
                 let outside = (d-w).max(0.0);
                 // ★ 水系影响带之外：严格保持陆地区域基础生成结果，一格不写
@@ -184,14 +320,20 @@ impl TerrainMap {
         // 授权走廊：两端超出保守栅格岸线，普通道路只能接到陆地端点。
         let margin = size/(self.grid_width-1).max(1) as f32*2.0;
         for (i,y) in [-size*0.24,size*0.24].into_iter().enumerate() {
+            let cp = geom.point_at_y(y);
+            let (_, s, _) = geom.distance(cp);
+            let ahead = geom.centerline.sample((s + 1.0).min(geom.centerline.total));
+            let mut tx = ahead.x - cp.x; let mut ty = ahead.y - cp.y;
+            let tl = (tx*tx + ty*ty).sqrt().max(f32::EPSILON); tx /= tl; ty /= tl;
+            let nx = -ty; let ny = tx;
             let reach = half_width(y)+bank+margin;
-            let mut a = Vec3::new(center(y)-reach,y,0.0);
-            let mut b = Vec3::new(center(y)+reach,y,0.0);
+            let mut a = Vec3::new(cp.x-nx*reach, cp.y-ny*reach,0.0);
+            let mut b = Vec3::new(cp.x+nx*reach, cp.y+ny*reach,0.0);
             a.z=self.sample_elevation(a.x,a.y); b.z=self.sample_elevation(b.x,b.y);
             let crossing = TerrainConnection {id:i as u32+1,start:a,end:b,width:cfg.terrain_crossing_width.max(12.0),node_a:None,node_b:None};
             for gy in 0..self.grid_height { for gx in 0..self.grid_width {
                 let p=self.grid_pos(gx,gy);
-                if (p.y-y).abs() <= crossing.width*0.5 && self.cells[gy*self.grid_width+gx].water_body_id.is_some() {
+                if ((p.x-cp.x)*tx + (p.y-cp.y)*ty).abs() <= crossing.width*0.5 && self.cells[gy*self.grid_width+gx].water_body_id.is_some() {
                     let c=&mut self.cells[gy*self.grid_width+gx];
                     c.surface_kind=SurfaceKind::ShallowWater; c.elevation=level-0.25;
                     c.feature_flags=TERRAIN_FLAG_NO_BUILD|TERRAIN_FLAG_CROSSING_CANDIDATE;
@@ -201,10 +343,15 @@ impl TerrainMap {
             self.hydrology.connections.push(crossing);
         }
         let mut left=Vec::new(); let mut right=Vec::new();
-        for i in 0..=96 {
-            let y=(i as f32/96.0-0.5)*size;
-            left.push(Vec3::new(center(y)-half_width(y),y,level));
-            right.push(Vec3::new(center(y)+half_width(y),y,level));
+        for i in 0..=192 {
+            let s = geom.centerline.total * i as f32 / 192.0;
+            let p = geom.centerline.sample(s);
+            let q = geom.centerline.sample((s + 1.0).min(geom.centerline.total));
+            let mut tx=q.x-p.x; let mut ty=q.y-p.y;
+            let tl=(tx*tx+ty*ty).sqrt().max(f32::EPSILON); tx/=tl; ty/=tl;
+            let w=geom.half_width(p.y,size);
+            left.push(Vec3::new(p.x-ty*w,p.y+tx*w,level));
+            right.push(Vec3::new(p.x+ty*w,p.y-tx*w,level));
         }
         let mut outline=left.clone(); outline.extend(right.iter().rev().copied());
         self.hydrology.water_bodies.push(WaterBody{id:1,level,flow_direction:Vec3::new(0.0,-1.0,0.0),resource_pool_id:1,vertices:outline.clone()});
@@ -214,9 +361,14 @@ impl TerrainMap {
         }
         let n=cfg.count_water_sources;
         for i in 0..n {
-            let side=if i%2==0 {-1.0} else {1.0};
-            let y=((i/2+1) as f32/((n+1)/2+1) as f32-0.5)*size*0.85;
-            let x=center(y)+side*(half_width(y)+bank+margin);
+            let s = geom.centerline.total * (i as f32 + 1.0) / (n as f32 + 1.0);
+            let c = geom.centerline.sample(s);
+            let q = geom.centerline.sample((s + 1.0).min(geom.centerline.total));
+            let mut tx=q.x-c.x; let mut ty=q.y-c.y;
+            let tl=(tx*tx+ty*ty).sqrt().max(f32::EPSILON); tx/=tl; ty/=tl;
+            let side_sign=if i%2==0 {-1.0} else {1.0};
+            let x=c.x-ty*side_sign*(geom.half_width(c.y,size)+bank+margin);
+            let y=c.y+tx*side_sign*(geom.half_width(c.y,size)+bank+margin);
             let p=Vec3::new(x,y,self.sample_elevation(x,y));
             self.hydrology.access_points.push(WaterAccessPoint{id:i as u32+1,water_body_id:1,resource_pool_id:1,pos:p,nearest_node_id:None,interaction_radius:cfg.poi_interaction_radius});
         }
@@ -407,14 +559,16 @@ pub(super) fn apply_river_cliff(
         }
         // 崖基线距离：段内最大半宽 + bank + terrace + 6（河阶带外缘外 6m，见模块注释）
         let base_dist = max_hw + geom.bank + geom.terrace + 6.0;
-        let cx0 = geom.center(y0, size);
-        // 河流切向：d center / d y = size*0.055*(5/size)*cos(y/size*5+phase)
-        let slope_dx = size * 0.055 * (5.0 / size) * (y0 / size * 5.0 + geom.phase).cos();
-        let tlen = (slope_dx * slope_dx + 1.0).sqrt();
-        let (tx, ty) = (slope_dx / tlen, 1.0 / tlen);
-        let (nx, ny) = (side / tlen, -side * slope_dx / tlen);
-        let ax = cx0 + nx * base_dist;
-        let ay = y0 + ny * base_dist;
+        let cp = geom.point_at_y(y0);
+        let cs = geom.centerline.s_at_y(y0);
+        let prev = geom.centerline.sample((cs - 1.0).max(0.0));
+        let next = geom.centerline.sample((cs + 1.0).min(geom.centerline.total));
+        let mut tx = next.x - prev.x; let mut ty = next.y - prev.y;
+        let tlen = (tx * tx + ty * ty).sqrt().max(f32::EPSILON);
+        tx /= tlen; ty /= tlen;
+        let (nx, ny) = (side * -ty, side * tx);
+        let ax = cp.x + nx * base_dist;
+        let ay = cp.y + ny * base_dist;
         // 崖基线逐点净距 ≥ 河阶带外缘 + CLEARANCE（防河湾凸岸贴上崖脚）
         let mut min_clear = f32::INFINITY;
         let mut in_bounds = true;
@@ -426,8 +580,9 @@ pub(super) fn apply_river_cliff(
                 in_bounds = false;
                 break;
             }
-            let lateral = (px - geom.center(py, size)) * side;
-            min_clear = min_clear.min(lateral - (geom.half_width(py, size) + geom.bank + geom.terrace));
+            let (_, _, lateral) = geom.distance(Vec3::new(px, py, 0.0));
+            let signed = lateral * side;
+            min_clear = min_clear.min(signed - (geom.half_width(py, size) + geom.bank + geom.terrace));
         }
         if !in_bounds || min_clear < CLIFF_TERRACE_CLEARANCE_M {
             continue;

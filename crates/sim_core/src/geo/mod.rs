@@ -19,4 +19,5 @@ pub use basin::BasinGeometry;
 pub use lakeside::LakeGeometry;
 pub use query::{explain_failure, sample_cell, validate_footprint, FootprintQuery, LandUseKind, TerrainFailure, TerrainQueryResult};
 pub use terrain::{is_static_water_profile, water_source_poi_count, BranchRidge, GenesisOverrides, TerrainFeature, TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_FLAT_BASELINE, TERRAIN_PROFILE_GRASSLAND_PLAIN, TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU, TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY};
+pub use hydrology::{MeanderWindow, RiverCenterline};
 pub use accents::{AccentKind, TerrainAccent, ACCENT_RNG_SALT};

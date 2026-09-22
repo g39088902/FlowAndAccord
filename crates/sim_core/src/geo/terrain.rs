@@ -757,7 +757,10 @@ pub struct TerrainSubFeature {
 ///           仅 T2 中 RiverCliff 被 plan 命中且通过 §5.4.D 局部判定的种子地形变化
 ///           （结构型候选 ~20%：OxbowLake 20% 先裁、RiverCliff 25%×其未命中），
 ///           其余 profile 与未命中/被拒种子逐位不变。递增遵循「新分支入库即换版」先例）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 14;
+/// v1.53.0：14 -> 16（八a R0：T2 生成期 `RiverCenterline` 精确距离场、三回环
+///           meander train，以及沿中心线法向派生河岸/浅滩/取水点/水面轮廓；R0-4
+///           裁弯候选窗口诊断不拒绝基础世界）。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 16;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -1424,7 +1427,7 @@ impl TerrainMap {
         for gy in 0..self.grid_height {
             for gx in 0..self.grid_width {
                 let p = self.grid_pos(gx, gy);
-                let d = (p.x - geom.center(p.y, size)).abs();
+                let (d, _, _) = geom.distance(p);
                 let w = geom.half_width(p.y, size);
                 let outside = (d - w).max(0.0);
                 let c = &mut self.cells[gy * self.grid_width + gx];
@@ -1495,7 +1498,7 @@ impl TerrainMap {
         // 任何共享 RNG 消费序；第 2 步铺河谷低丘与第 3 步施加水面共用同一份。
         let mut scratch = GenesisScratch::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
-            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(seed, config));
+            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(seed, config, self.world_size));
         }
         // 2. 基础起伏（山口起伏 / 草原 / 河谷低丘）
         self.generate_base_relief(seed, config, &mut scratch);
