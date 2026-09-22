@@ -28,7 +28,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.52.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.52.3</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -854,6 +854,9 @@
       <span>🐞 调试监视器</span>
       <span style="color:#64748b; font-weight:normal; font-size:9.5px;">Tick / CPU / 内存</span>
     </div>
+    <div style="margin:4px 0 6px;">
+      <button id="btn-veg-observer" title="打开植被观察台：季节锁定/光向/机位/物种标注/6变体样板飞往" style="width:100%;padding:4px 6px;background:#0f172a;color:#5eead4;border:1px solid #1e3a3a;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;">🌿 植被观察台</button>
+    </div>
     <div class="debug-row"><span>⏱️ 模拟 Tick</span><span id="dbg-tick" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚡ 每秒 Tick</span><span id="dbg-tick-rate" class="mono-num">0</span></div>
     <div class="debug-row"><span>🗺️ 地图模板</span><span id="dbg-map-profile" class="mono-num">—</span></div>
@@ -1471,5 +1474,7 @@
   <script src="js/render_inspector.js"></script>
   <!-- 房屋连续报价中心与连续报价大盘 (v1.15.0) -->
   <script src="js/auction-ui.js"></script>
+  <!-- ★ 植被观察台（TA-06 验收通过后转为长期调试工具；左下角控制台按钮或 ?ta06=1 激活；未打开零 DOM 零帧循环） -->
+  <script src="js/ta06-acceptance.js"></script>
 </body>
 </html>

@@ -67,7 +67,7 @@ graph TD
     D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
     E -->|状态驱动渲染| F["frontend/js/render_canvas.js (过渡期：Canvas 2D 实体覆盖层 sim-canvas)"]
     E -->|地形快照| F2["frontend/js/webgl/ (WebGL 地形层 sim-canvas-gl，v1.50.77 起)"]
-    F --> G["浏览器 UI (版本: v1.52.0)"]
+    F --> G["浏览器 UI (版本: v1.52.3)"]
     F2 --> G
 
 ```
@@ -136,7 +136,7 @@ node frontend/server.js           # http://localhost:3000（master 分支；端�
 
 1. 访问 `http://localhost:3000`；
 2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.52.0`**。
+3. 页面顶部标题栏右侧显示版本徽章 **`v1.52.3`**。
 
 
 ---
