@@ -43,8 +43,6 @@
 | 09 | [植被样板验证（TA-05）](tech/09-vegetation-verification.md) | ◐ 已实施：样板验证方法论与遗留事项（LOAD 补测、Chrome 性能复测、TA-04-8 预算取舍）；验收权威在 07 号 §11.4 |
 | 10 | [盆地群峰环抱（TB-04）](tech/10-basin-mountain-encirclement.md) | 规划设计（TB-04）；闭合环脊双坡解耦、向心山嘴支脊、切穿峡谷出水口与自然山间盆地地貌重构 |
 | 31 | [Canvas→WebGL 渲染迁移方案](tech/31-canvas-to-webgl-migration.md) | ★ **v2.0（2026-09-17）目标形态已定：全量 WebGL、不再使用 Canvas 2D**。阶段一/二已落地（v1.50.77 双 Canvas 过渡架构；v1.50.80~82 帧率解限）；§8 阶段三~五（装饰层 / 实体层 / Canvas 2D 退役）为既定路线 |
-| 31 | [WebGL 阶段一完成报告](tech/31-webgl-phase1-complete.md) | 历史记录（阶段二已于 v1.50.77 落地；与上一行同号沿用现有文件名） |
-| 32 | [WebGL 阶段一验证指南](tech/32-webgl-phase1-verify.md) | 历史记录（阶段一 PoC 验证方法，临时状态已失效） |
 
 ---
 

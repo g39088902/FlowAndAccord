@@ -277,8 +277,6 @@ FlowAndAccord/
     │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
     │       ├── 10-basin-mountain-encirclement.md # ★ TB-04 盆地群峰环抱与峡谷出水口地貌规划
     │       ├── 31-canvas-to-webgl-migration.md  # WebGL 渲染管线迁移总体路线规划
-    │       ├── 31-webgl-phase1-complete.md      # WebGL 阶段一完成验收报告
-    │       ├── 32-webgl-phase1-verify.md        # WebGL 阶段一验证清单
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
     │           ├── ta05-evidence-2026-09-14/      # TA-05 精简证据包（2026-09-14 收口归档）
     │           │   ├── manifest.json                # 证据清单
