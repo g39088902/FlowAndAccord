@@ -12,7 +12,8 @@ FlowAndAccord/
 │   │   ├── examples/                       # 示例程序与探针
 │   │   │   ├── config.json                 # 示例配置（M19 / 地形探针共用）
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
-│   │   │   └── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
+│   │   │   ├── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
+│   │   │   └── accent_water_probe.rs       # 水岸装饰探针示例
 │   │   └── src/
 │   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (370 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
@@ -159,9 +160,12 @@ FlowAndAccord/
 │   │       │   ├── context.js              # WebGL2 上下文初始化与生命周期
 │   │       │   └── shader-manager.js       # 着色器编译与程序链接管理
 │   │       ├── layers/
-│   │       │   └── terrain/
-│   │       │       ├── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器
-│   │       │       └── test-grid.js        # 基础测试网格渲染器
+│   │       │   ├── terrain/
+│   │       │   │   ├── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器
+│   │       │   │   └── test-grid.js        # 基础测试网格渲染器
+│   │       │   └── accents/
+│   │       │       ├── accent-renderer.js   # 装饰图元 WebGL 三角化 + 解析式边缘 AA + 深度对齐（sink 图元）
+│   │       │       └── shadow-pass.js      # WebGL 装饰阴影 Pass（冠簇竖直压扁代理）
 │   │       └── utils/
 │   │           └── projection-utils.js     # 轴测投影矩阵与投影换算工具
 │   ├── rust/
@@ -278,25 +282,13 @@ FlowAndAccord/
     │       ├── 10-basin-mountain-encirclement.md # ★ TB-04 盆地群峰环抱与峡谷出水口地貌规划
     │       ├── 31-canvas-to-webgl-migration.md  # WebGL 渲染管线迁移总体路线规划
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
-    │           ├── ta05-evidence-2026-09-14/      # TA-05 精简证据包（2026-09-14 收口归档）
-    │           │   ├── manifest.json                # 证据清单
-    │           │   ├── report.md                    # 精简证据包报告
-    │           │   ├── metrics/baseline-ta051.json  # TA-05-1 基线指标
-    │           │   ├── metrics/lifecycle.json       # 真实生命周期采样指标
-    │           │   ├── metrics/perf-ta056.json      # 性能采样指标
-    │           │   ├── metrics/season-sampling.json # 季相采样指标
-    │           │   ├── visual/fixture/config-and-model-version.json  # 夹具配置与模型版本
-    │           │   └── visual/fixture/identities.json                # 样板身份指纹（视觉矩阵截图 jpg 不逐张登记）
     │           ├── ta09/slope-verification.txt    # TA-09 RiverCliff 局部试算验证记录
-    │           ├── ta06-evidence-2026-09-22/      # TA-06 物种变体专项证据包（2026-09-22，默认 WebGL 路径补做验收）
-    │           │   ├── manifest.json                # 证据清单
-    │           │   ├── report.md                    # 验收报告（96 视图矩阵 / 受光 / 生命周期 / 景观通道 / 高密）
-    │           │   ├── metrics/matrix.json          # 96 视图 + 6 变体逐张像素指标与四维聚合
-    │           │   └── metrics/fixture-assertions.json  # 页内数值断言原始结果（物种分布 / 包围体 / 花位 / 景观 / 缓存）
-    │           │                                    # （visual/ 下截图为 640×360 缩图，按既有惯例不逐张登记）
-    │           └── ta12/                          # TA-12 地表纹理专项归档（v1.50.53 完成后归档）
-    │               ├── TA-12-TODO.md              # TA-12 实施清单与验收记录（八任务全闭环）
-    │               └── TA-12-BASELINE.md          # TA-12-1 无纹理基线记录与样板清单
+    │           └── ta06-evidence-2026-09-22/      # TA-06 物种变体专项证据包（2026-09-22，默认 WebGL 路径补做验收）
+    │               ├── manifest.json                # 证据清单
+    │               ├── report.md                  # 验收报告（96 视图矩阵 / 受光 / 生命周期 / 景观通道 / 高密）
+    │               ├── metrics/matrix.json          # 96 视图 + 6 变体逐张像素指标与四维聚合
+    │               └── metrics/fixture-assertions.json  # 页内数值断言原始结果（物种分布 / 包围体 / 花位 / 景观 / 缓存）
+    │                                               # （visual/ 下截图为 640×360 缩图，按既有惯例不逐张登记）
 ```
 
 ## 1. 目录级 AGENTS.md
