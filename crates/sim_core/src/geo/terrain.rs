@@ -1,5 +1,5 @@
 use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
-use super::accents::TerrainAccent;
+use super::accents::{AccentKind, TerrainAccent};
 use crate::config::SimConfig;
 use crate::rng::WorldRng;
 use crate::spatial::curve::Curve3D;
@@ -603,6 +603,7 @@ pub struct GenesisOverrides {
 ///
 /// 全部为单次创世内的过程 scratch：不进快照、不进存档、不参与 tick。
 /// `pub(super)`：第 3 步实现在 `hydrology.rs`（同为 `geo` 子模块），需跨文件访问。
+#[derive(Clone)]
 pub(super) struct GenesisScratch {
     /// T2 主河静态几何：编排器在第 2 步前规划（`plan_river_geometry`，hydro_rng
     /// **独立流**单次 phase 抽取，规划时点不影响任何共享 RNG 消费序）；第 2 步铺
@@ -620,6 +621,8 @@ pub(super) struct GenesisScratch {
     pub(super) lake_geometry: Option<super::lakeside::LakeGeometry>,
     /// 草原泉溪洼地软地凹圈掩码（第 2 步标记 → 第 6 步地表派生消费）。
     pub(super) soft_ring: Vec<bool>,
+    /// 子特征地表覆盖意图，仅第 6 步物化；事务与中心线一起隔离。
+    pub(super) surface_overlays: Vec<super::geometry_transaction::SurfaceOverlay>,
 }
 
 impl Default for GenesisScratch {
@@ -631,28 +634,8 @@ impl Default for GenesisScratch {
             basin_geometry: None,
             lake_geometry: None,
             soft_ring: Vec::new(),
+            surface_overlays: Vec::new(),
         }
-    }
-}
-
-/// §5.3 第 5 步单个子特征的几何管线工作区（★ STAGE2-3 接口就位）。
-/// 5a 产出高程快照 → 5b 施加几何 → 5c 写临时坡度 → 5d 判定失败时按快照整块回滚。
-#[derive(Debug, Default)]
-struct SubFeatureWorkspace {
-    /// AABB 格索引闭区间（行主序）；空工作区以 `elevation_snapshot` 为空表达。
-    bbox_min: (usize, usize),
-    bbox_max: (usize, usize),
-    /// 5a：AABB 内**原**高程快照（回滚真相源；施加写格子前必须先有本快照，
-    /// 严禁边遍历边读回已改写的邻格）。
-    elevation_snapshot: Vec<f32>,
-    /// 5c：AABB 内临时坡度（**判定专用**，严禁提交 `cells.slope_angle_deg`——
-    /// 第 6 步才是全图唯一坡度定稿点）。
-    scratch_slopes: Vec<f32>,
-}
-
-impl SubFeatureWorkspace {
-    fn is_empty(&self) -> bool {
-        self.elevation_snapshot.is_empty()
     }
 }
 
@@ -1519,7 +1502,7 @@ impl TerrainMap {
             });
         }
         // 5. 子特征几何管线 5a–5d（阶段二空注入，接口就位）
-        self.apply_subfeature_pipeline(&mut sub_plan);
+        self.apply_subfeature_pipeline(&mut sub_plan, &mut scratch);
         // 6. 全图唯一定稿坡度 + 派生/合并 flags
         self.finalize_slope_and_surface(&scratch);
         // 7. 静态几何校验（阶段二先接线稳定 ID 校验；Err 由 STAGE2-5 有界重试环消费）
@@ -1527,7 +1510,7 @@ impl TerrainMap {
         // 8. 通用装饰（既有 accent_rng 独立流；地貌与水系定稿后散布，避免落入深水）
         self.generate_base_accents(seed, config.terrain_accent_density);
         // 9. 子特征专属装饰（阶段二空实现）
-        self.append_subfeature_accents(&sub_plan);
+        self.append_subfeature_accents(seed, &mut sub_plan);
         // 第 10/11 步不在本函数：`World3DEngine` 创世序列在 `world_create` 中先调用
         // 本函数、再调用 `seed_primitive_ecology`（第 10 步）；`validate_terrain_world`
         // （第 11 步，含 STAGE2-6 生存成本诊断）在存档/校验路径执行并冒泡给
@@ -1543,105 +1526,6 @@ impl TerrainMap {
         self.hydrology = Default::default();
     }
 
-    /// §5.3 第 5 步：按 `TerrainSubFeatureKind` 升序逐个处理已计划子特征，
-    /// 走 5a 快照 → 5b 几何施加 → 5c 临时坡度 → 5d 接受/回滚的完整管线。
-    ///
-    /// ★ 阶段二空注入：`apply_subfeature_geometry` 为空桩、不写任何格子，
-    /// 数据管线、快照结构与回滚接口完整就位，供阶段三（D-B2 首批子特征）填充。
-    fn apply_subfeature_pipeline(&mut self, plan: &mut [PlannedSubFeature]) {
-        if plan.is_empty() {
-            return;
-        }
-        // 计划产出顺序为「结构型 → 视觉型」；本步要求按 kind 编号升序处理。
-        let mut order: Vec<usize> = (0..plan.len()).collect();
-        order.sort_by_key(|&i| plan[i].kind as u32);
-        for &i in &order {
-            let mut ws = self.snapshot_subfeature_bbox(&plan[i]); // 5a
-            self.apply_subfeature_geometry(&mut plan[i], &ws); // 5b（阶段二空桩）
-            self.recompute_slopes_scratch(&mut ws); // 5c（仅局部 scratch，不提交）
-            self.accept_or_rollback(&mut plan[i], &ws); // 5d
-        }
-    }
-
-    /// §5.3 第 5a 步 `snapshot_bbox`：复制子特征 AABB 内的原高程到局部快照。
-    ///
-    /// 阶段二 `anchor_hint` 恒为 `Vec3::ZERO`（真实锚点由第 5 步接管后按 profile
-    /// 几何填充），空锚点 ⇒ 空工作区；阶段三在此按 kind 展开半径（clamp 进图）
-    /// 并填充快照与 `bbox_min/max`。
-    fn snapshot_subfeature_bbox(&self, f: &PlannedSubFeature) -> SubFeatureWorkspace {
-        let mut ws = SubFeatureWorkspace::default();
-        if f.anchor_hint == Vec3::ZERO {
-            return ws;
-        }
-        // 阶段三扩展点：world→grid 定位锚点 → 按 kind 半径展开 AABB → 行主序复制
-        // `cells[].elevation` 到 `ws.elevation_snapshot`（几何施加写格子前必须先有
-        // 本快照，严禁边遍历边读回已改写的邻格）。
-        let (gx, gy) = self.grid_index(f.anchor_hint.x, f.anchor_hint.y);
-        ws.bbox_min = (gx, gy);
-        ws.bbox_max = (gx, gy);
-        ws.elevation_snapshot
-            .push(self.cells[gy * self.grid_width + gx].elevation);
-        ws
-    }
-
-    /// §5.3 第 5b 步 `apply_subfeature_geometry`：几何施加桩。
-    ///
-    /// ★ 阶段二空注入——「只改高程与水面、不写 slope/flags」的约束由第 6 步
-    /// 唯一写点保证；阶段三（D-B2）在此按 §5.4 各 kind 规格施加几何，并回填
-    /// 关联 `TerrainFeature` 稳定 ID 与 `sub_features` 容器。
-    fn apply_subfeature_geometry(&mut self, f: &mut PlannedSubFeature, ws: &SubFeatureWorkspace) {
-        let _ = (f, ws); // 阶段二空桩：不写任何格子
-    }
-
-    /// §5.3 第 5c 步 `recompute_slopes_scratch`：仅在 AABB 内做**临时**坡度试算
-    /// （4 邻域中心差分，读含 5b 施加结果的 cells），结果只写入工作区、**严禁**
-    /// 提交 `cells.slope_angle_deg`——第 6 步才是全图唯一坡度定稿点。
-    fn recompute_slopes_scratch(&self, ws: &mut SubFeatureWorkspace) {
-        ws.scratch_slopes.clear();
-        if ws.is_empty() {
-            return;
-        }
-        let (gx0, gy0) = ws.bbox_min;
-        let (gx1, gy1) = ws.bbox_max;
-        for gy in gy0..=gy1 {
-            for gx in gx0..=gx1 {
-                ws.scratch_slopes.push(self.slope_from_elevation(gx, gy));
-            }
-        }
-    }
-
-    /// §5.3 第 5d 步 `accept_or_rollback`：几何类接受判定。
-    ///
-    /// ★ 阶段二无几何施加（5b 空桩）⇒ 无几何可拒绝，`accepted` 保持 `false`
-    /// （未注入，子特征容器不写入）。阶段三按 §5.4 拒绝条件用 `ws.scratch_slopes`
-    /// 判定；失败时调用 `rollback_subfeature_geometry` 整块回滚，并由第 6 步
-    /// 统一重算坡度与派生地表（§5.3「回滚后必须重新执行第 6 步」）。
-    fn accept_or_rollback(&mut self, f: &mut PlannedSubFeature, ws: &SubFeatureWorkspace) {
-        // 数据管线自检：临时坡度与快照必须逐格对应。
-        debug_assert_eq!(ws.scratch_slopes.len(), ws.elevation_snapshot.len());
-        let _ = f; // 阶段三：accepted 由本判定写入
-    }
-
-    /// §5.3 第 5d 步回滚路径：按 5a 快照整块恢复 AABB 内高程。
-    ///
-    /// ★ 阶段二不触发（几何施加桩为空操作）；阶段三几何类判定失败时调用。
-    /// 只恢复高程——坡度/地表/flags 由第 6 步统一重算，严禁局部手工修补。
-    #[allow(dead_code)] // 阶段三（D-B2 首批子特征）接入几何类拒绝条件后启用
-    fn rollback_subfeature_geometry(&mut self, ws: &SubFeatureWorkspace) {
-        if ws.is_empty() {
-            return;
-        }
-        let (gx0, gy0) = ws.bbox_min;
-        let (gx1, gy1) = ws.bbox_max;
-        let mut i = 0usize;
-        for gy in gy0..=gy1 {
-            for gx in gx0..=gx1 {
-                self.cells[gy * self.grid_width + gx].elevation = ws.elevation_snapshot[i];
-                i += 1;
-            }
-        }
-    }
-
     /// §5.3 第 6 步：全图唯一定稿坡度与派生/合并 flags 的位置。
     ///
     /// 6a `recompute_slopes()`：全图 4 邻域中心差分定稿 `slope_angle_deg`；
@@ -1652,9 +1536,10 @@ impl TerrainMap {
     /// （河阶带外）的地表/flags 由第 2 步陆地基底写定（历史事实：无坡度派生），
     /// 本阶段保持原样；统一陆地派生的启用属阶段三物理变更，须递增
     /// `TERRAIN_GENERATOR_VERSION` 并独立验收。
-    fn finalize_slope_and_surface(&mut self, scratch: &GenesisScratch) {
+    pub(super) fn finalize_slope_and_surface(&mut self, scratch: &GenesisScratch) {
         self.recompute_slopes();
         self.derive_surface_and_flags(scratch);
+        super::geometry_transaction::apply_surface_overlays(self, scratch);
     }
 
     /// §5.3 第 6b 步：地表派生与 flags 合并。原 `generate_base_relief`（旧
@@ -1796,8 +1681,122 @@ impl TerrainMap {
     /// 追加并回填 `accent_id_start/end`）。
     ///
     /// ★ 阶段二空实现：D-B2 注入器接管前 `plan` 不产生任何装饰。
-    fn append_subfeature_accents(&mut self, plan: &[PlannedSubFeature]) {
-        let _ = plan;
+    fn append_subfeature_accents(&mut self, seed: u64, plan: &mut [PlannedSubFeature]) {
+        // 子特征装饰使用无状态 hash，绝不触碰 generate_accents 的 accent_rng。
+        // 因此 D-B2 开关只改变新增尾段，不会重排既有装饰 ID。
+        for feature in plan.iter_mut().filter(|f| {
+            f.accepted && matches!(
+                f.kind,
+                TerrainSubFeatureKind::ForestedSlope
+                    | TerrainSubFeatureKind::RockyOutcrop
+                    | TerrainSubFeatureKind::RiversideForest
+                    | TerrainSubFeatureKind::GravelBeach
+            )
+        }) {
+            let (kind, target) = match feature.kind {
+                TerrainSubFeatureKind::ForestedSlope
+                | TerrainSubFeatureKind::RiversideForest => (AccentKind::Tree, 24usize),
+                TerrainSubFeatureKind::RockyOutcrop => (AccentKind::Boulder, 16usize),
+                TerrainSubFeatureKind::GravelBeach => (AccentKind::RockCluster, 16usize),
+                _ => continue,
+            };
+            let mut placed: Vec<Vec3> = Vec::with_capacity(target);
+            let mut first = true;
+            let mut bounds_min = Vec3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+            let mut bounds_max = Vec3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+            // 扫描顺序固定；hash 只决定候选是否入选与局部视觉参数。
+            for idx in 0..self.cells.len() {
+                if placed.len() >= target {
+                    break;
+                }
+                let hash = mix64(seed ^ feature.salt ^ idx as u64);
+                if hash % 10_000 >= 7_000 {
+                    continue;
+                }
+                let cell = &self.cells[idx];
+                let visual_ok = match feature.kind {
+                    TerrainSubFeatureKind::ForestedSlope => {
+                        matches!(cell.surface_kind, SurfaceKind::DryGround | SurfaceKind::SoftGround)
+                            && cell.slope_angle_deg >= 6.0
+                            && cell.slope_angle_deg < 28.0
+                    }
+                    TerrainSubFeatureKind::RiversideForest => {
+                        matches!(cell.surface_kind, SurfaceKind::RiverBank | SurfaceKind::RiverTerrace)
+                    }
+                    TerrainSubFeatureKind::RockyOutcrop => {
+                        matches!(cell.surface_kind, SurfaceKind::DryGround | SurfaceKind::SoftGround)
+                            && cell.slope_angle_deg > 28.0
+                            && cell.feature_flags & TERRAIN_FLAG_NO_WALK == 0
+                    }
+                    TerrainSubFeatureKind::GravelBeach => {
+                        matches!(cell.surface_kind, SurfaceKind::RiverBank | SurfaceKind::RiverTerrace)
+                            && cell.surface_kind != SurfaceKind::ShallowWater
+                    }
+                    _ => false,
+                };
+                if !visual_ok {
+                    continue;
+                }
+                let gx = idx % self.grid_width;
+                let gy = idx / self.grid_width;
+                let wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                let wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                let z = cell.elevation;
+                let pos = Vec3::new(wx, wy, z);
+                if self.hydrology.access_points.iter().any(|p| {
+                    let dx = p.pos.x - wx;
+                    let dy = p.pos.y - wy;
+                    let clearance = p.interaction_radius + 8.0;
+                    dx * dx + dy * dy < clearance * clearance
+                }) || placed.iter().any(|p| {
+                    let dx = p.x - wx;
+                    let dy = p.y - wy;
+                    dx * dx + dy * dy < 15.0 * 15.0
+                }) {
+                    continue;
+                }
+                let id = self.accents.len() as u32;
+                self.accents.push(TerrainAccent {
+                    id,
+                    kind,
+                    pos,
+                    scale: 0.75 + ((hash >> 16) % 650) as f32 / 1000.0,
+                    rotation_rad: ((hash >> 32) % 6283) as f32 / 1000.0,
+                    tint: 0,
+                });
+                placed.push(pos);
+                if first {
+                    bounds_min = pos;
+                    bounds_max = pos;
+                    first = false;
+                } else {
+                    bounds_min.x = bounds_min.x.min(pos.x);
+                    bounds_min.y = bounds_min.y.min(pos.y);
+                    bounds_min.z = bounds_min.z.min(pos.z);
+                    bounds_max.x = bounds_max.x.max(pos.x);
+                    bounds_max.y = bounds_max.y.max(pos.y);
+                    bounds_max.z = bounds_max.z.max(pos.z);
+                }
+            }
+            if placed.is_empty() {
+                feature.accepted = false;
+                continue;
+            }
+            let start = self.accents.len() as u32 - placed.len() as u32;
+            let end = self.accents.len() as u32 - 1;
+            let anchor = placed[0];
+            self.sub_features.push(TerrainSubFeature {
+                id: 1000 + feature.kind as u32,
+                kind: feature.kind,
+                anchor,
+                bounds_min,
+                bounds_max,
+                feature_ids: Vec::new(),
+                accent_id_start: Some(start),
+                accent_id_end: Some(end),
+            });
+        }
+        self.sub_features.sort_by_key(|f| f.id);
     }
 
     #[inline]

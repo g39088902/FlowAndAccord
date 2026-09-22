@@ -12,6 +12,7 @@ target/
 .playwright-cli/
 .workbuddy
 .trae
+.meituan-catpaw
 node_modules
 
 # 编辑器与备份残留（防误提交；render.js.bak 即由此漏入仓库后清理）

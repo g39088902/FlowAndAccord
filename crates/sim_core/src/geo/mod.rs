@@ -1,6 +1,7 @@
 pub mod biome;
 pub mod query;
 pub mod terrain;
+mod geometry_transaction;
 pub mod hydrology;
 pub mod corridor;
 pub mod accents;

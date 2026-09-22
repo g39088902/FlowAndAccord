@@ -16,9 +16,10 @@
 - **TB-02 台地内核（TB-02-01～10）**：台地模板（原 `plateau_settlement_v1`，v1.50.68 更名 `plateau_v1`，显示名"台地聚落"→"台地"），v1.50.54 交付收口。原 `TB-02-IMPLEMENTATION-PLAN.md` 已随收官归档清理，详见 [14 号 §8.2](docs/current/tech/14-terrain-and-network.md#82-阶段二分层验收与归档证据v15049)。
 - **TA-12-2 地表纹样表现层**：`terrain-texture.js` 坡度分带与 fBm 纹理采样，v1.50.54 交付收口。详见 [01-changelog.md](docs/current/01-changelog.md)。
 - **WebGL 渲染迁移阶段一/二**：双 Canvas 架构上线（v1.50.77）——地形（含沙盘侧壁）由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限。★ 2026-09-17 架构决策已升级为**全量 WebGL、不再使用 Canvas 2D**，双 Canvas 属过渡形态；阶段三~五转为既定路线，详见 [31 号迁移方案 §8](docs/plan/tech/31-canvas-to-webgl-migration.md)，实现现状见 `frontend/AGENTS.md`。
-- **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**：v1.50.64 实现落地，v1.52.3 验收通过（96 视图矩阵 + 景观共用通道 57 对零失配 + 植被观察台长期调试工具 `ta06-acceptance.js`）；原 `TA-06-TODO.md` 已随收官清理。详见 [07 号 §1.2/§11.4](docs/plan/tech/07-terrain-art.md) 与 [证据包](docs/plan/tech/assets/ta06-evidence-2026-09-22/report.md)。⚠️ Chrome 真实存档 LOAD 链路仍 NOT_RUN，并入 TA-05 补测。
+- **TA-06 植被轮廓与物种变体（三乔木 + 三灌木）**：v1.50.64 实现落地，v1.52.3 验收通过（96 视图矩阵 + 景观共用通道 57 对零失配 + 植被观察台长期调试工具 `ta06-acceptance.js`）；原 `TA-06-TODO.md` 已随收官清理。详见 [07 号 §1.2/§11.4](docs/plan/tech/07-terrain-art.md) 与 [证据包](docs/plan/tech/assets/ta06-evidence-2026-09-22/report.md)。Chrome 真实存档 LOAD 链路 NOT_RUN 属测试验证缺口，已随 TA-05 于 2026-09-22 按用户口径收口（见下方 TA-05 条目）。
 - **TA-07 装饰细节分级 LOD + 投影包围体剔除**：v1.50.65 实现落地（`accent-lod.js` 集中解析层），2026-09-22 经用户确认**取消视为完成**（性能驱动力消失，实现保留不回退、四条防回退红线见 `frontend/AGENTS.md`）；原 `TA-07-TODO.md` 已随收官清理。现状见 [07 号 §6.7](docs/plan/tech/07-terrain-art.md)。
 - **TA-08 遮挡实测与验收矩阵**：2026-09-17 删除视为完成（原「模型内排序/实体拆子项/屏幕空间兜底」三策略取消，遮挡由全量 WebGL GPU 深度缓冲承担）；§2 验收矩阵并入 [31 号 §8.5](docs/plan/tech/31-canvas-to-webgl-migration.md)。
+- **TA-05 P0 植被打样技术方案**：2026-09-14 实施、2026-09-22 按用户口径收口为完成（功能已齐，仅缺测试验证与取舍）——剩余仅为测试验证缺口（Chrome/Edge 真实存档 LOAD 链路 NOT_RUN，属测试验证缺口，含 TA-06 同口径）与取舍项（TA-04-8 高密·拖动超标处置由用户取舍为维持现状）；原根目录临时方案 `TA05-technical-plan.md` 已收口精简为 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)，验收权威见 [07 号 §11.4](docs/plan/tech/07-terrain-art.md)。
 
 ---
 
@@ -40,10 +41,6 @@
       - `S4-X3` 河谷峭壁专属景观（依赖阶段三 RiverCliff 注入器）
       - `S4-X4` 牛轭湖岸专属景观（依赖阶段三 OxbowLake 注入器）
       - `TA-17-COURTYARD` 聚落房屋院地与门前通道留白（依赖门洞矢量确认）
-
-- [ ] **TA-05 P0 植被打样技术方案**
-    - 详见 [09 号验证方案](docs/plan/tech/09-vegetation-verification.md)（由根目录临时方案 `TA05-technical-plan.md` 收口精简而来）与 [07 号文 §11.4](docs/plan/tech/07-terrain-art.md) 验收记录；TA-05 现状 ◐（LOAD 存档链路待 Chrome 补测，含 TA-06 同口径 LOAD 补测）。
-    - 聚焦树木与植被群落在实体覆盖层视口下的高质量层次打样（地形底座已迁 WebGL 层，见 §0 归档索引）。★ 覆盖层属过渡形态（2026-09-17 决策：全量 WebGL），验收口径以几何/季相/受光数值一致性为主，不依赖覆盖层实现细节，以便迁移后复用同一批证据。
 
 - [ ] **TC-03 全量 WebGL 迁移（★ 2026-09-17 定为既定路线）**
     - 详见 [31 号迁移方案 §8 阶段三~五](docs/plan/tech/31-canvas-to-webgl-migration.md)：阶段三装饰层 → 阶段四实体层 → 阶段五 Canvas 2D 退役（删除 `#sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支）。

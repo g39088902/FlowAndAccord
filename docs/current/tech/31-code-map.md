@@ -21,6 +21,7 @@ FlowAndAccord/
 │   │       ├── geo/                        # 🌍 地形与生物群系
 │   │       │   ├── mod.rs                  # geo 模块入口
 │   │       │   ├── terrain.rs              # 连续 3D 地形高程采样
+│   │       │   ├── geometry_transaction.rs # STAGE2-3 完整几何事务与原子回滚
 │   │       │   ├── plateau.rs              # ★ TB-02 台地几何与过渡带 (PlateauGeometry)
 │   │       │   ├── alluvial_fan.rs         # ★ TB-03 山前冲积扇几何与干浅沟 (FanGeometry)
 │   │       │   ├── basin.rs                # ★ TB-03 盆地几何与环抱高山 (BasinGeometry)

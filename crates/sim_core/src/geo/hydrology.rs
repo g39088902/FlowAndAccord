@@ -58,6 +58,7 @@ impl WaterPool {
 /// 规划：仅消费 1 次 `gen_range(-1.0, 1.0)` 相位抽取，消费顺序与旧
 /// `generate_river` 完全一致。`width_amp` 为 `(width_max - width_min).max(0.0) * 0.22`
 /// 的预乘（浮点结合次序与旧内联算式相同，逐比特同值）。
+#[derive(Clone)]
 pub struct RiverGeometry {
     pub phase: f32,
     pub level: f32,

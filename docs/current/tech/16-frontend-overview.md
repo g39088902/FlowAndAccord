@@ -1,6 +1,6 @@
 # 16. 🎨 交互式表现层与控制台 (`frontend`)
 
-> **模块索引**：[← 返回 ../README.md 全景索引](../README.md) · 主要源码：`frontend/js/render.js`、`main.js`、`rustworld.js`、`ledger-ui.js`、`dag*.js`、`frontend/index.html`  
+> **模块索引**：[← 返回 ../README.md 全景索引](../README.md) · 主要源码：`frontend/js/render_canvas.js`、`render_depth_queue.js`、`main.js`、`rustworld.js`、`ledger-ui.js`、`dag*.js`、`frontend/js/webgl/`（WebGL 地形层）、`frontend/index.html`
 > **UI 深度解剖与实现指南**：详见 [./19-ui-implementation.md](./19-ui-implementation.md)（页面全景拆解）· [./20-society-ledger-ui.md](./20-society-ledger-ui.md)（M1-M4 制度大盘 4 标签页实现说明）· [./21-frontend-dev-guide.md](./21-frontend-dev-guide.md)（前端开发指南）。
 > **窗口结构与跳转参考**：详见 [./19-ui-implementation.md](./19-ui-implementation.md)。
 
@@ -16,18 +16,20 @@ stateDiagram-v2
     [*] --> WAIT_SNAP
     WAIT_SNAP --> INGEST : Worker 下发快照（背压释放，SNAP_THROTTLE_TIERS 按人口定档）
     INGEST --> SORT : 快照映射完成（rustworld._applySnapshot）
-    SORT --> PAINT : 实体按 project3D().depth 升序排定（远→近）
-    PAINT --> PRESENT : 0 天空 → 7 特效 全部落笔完成
-    PRESENT --> WAIT_SNAP : 提交帧并回传 ACK，Worker 解锁下一帧
+    SORT --> GL : WebGL 地形层提交（sim-canvas-gl，深度缓冲逐像素遮挡）
+    GL --> PAINT : Canvas 2D 覆盖层按统一深度队列远→近落笔（sim-canvas）
+    PAINT --> PRESENT : 天空/地形/路网/贴地/实体/装饰/标签全部落笔完成
+    PRESENT --> WAIT_SNAP : 回传 ACK，Worker 解锁下一帧
 ```
 
 | 状态 | 含义 | 进入条件 | 退出条件 |
 | :--- | :--- | :--- | :--- |
 | WAIT_SNAP | 等待快照：持有 `ackReceived` 锁，Worker 未下发 | 渲染循环启动 / 上一帧已 ACK | Worker 下发新快照 |
 | INGEST | 采集与映射：主线程消费快照并映射 `sim` | `ackReceived` 释放 | 快照映射完成 |
-| SORT | 深度排序：`drawWorldEntities` 按 `depth = ry·sinX + z·cosX` 升序 | 快照映射完成 | 队列排定（远→近） |
-| PAINT | 分层绘制：0 天空 → 1 地形 → 3 路网 → 4 贴地 → 5 大气 → 6 实体 → 7 特效 | 排序完成 | 全部图层落笔完成 |
-| PRESENT | 呈现与 ACK：提交 Canvas，回传 ACK 解锁 Worker | 绘制完成 | ACK 已回传 |
+| SORT | 深度排序：`drawWorldEntities` 把地形格/水系/道路/POI/房屋/族人/装饰收进同一队列按 `depth = ry·sinX + z·cosX` 升序 | 快照映射完成 | 队列排定（远→近） |
+| GL | WebGL 地形层：地形/装饰（sink 分发）在 `sim-canvas-gl` 提交，GPU 深度缓冲解决遮挡 | 队列排定 | 地形 GL 帧完成 |
+| PAINT | Canvas 2D 覆盖层：按统一深度队列在 `sim-canvas` 落笔实体/道路/POI/标签/特效 | GL 地形提交后 | 全部图层落笔完成 |
+| PRESENT | 呈现与 ACK：回传 ACK 解锁 Worker | 绘制完成 | ACK 已回传 |
 
 **不变量**（违反即出 bug）：
 - 排序只作用于绘制队列，不修改 `sim.pois`/`sim.houses`/`sim.agents` 顺序，点击拾取与 Inspector 遍历逻辑不受影响。
@@ -53,7 +55,7 @@ stateDiagram-v2
      - （★ v1.50.2 起 `drawAccents()` **已迁出** `drawTerrain()`：装饰改由 `drawAccentEntity(accent)` 单实体入口并入第 6 步 `drawWorldEntities()` 统一相机深度队列，见下）；
   3. `drawLanes()`：动态踩踏路网（贴地纹理，先于建筑绘制）；
   4. `drawSelectedCampHouseLinks()` + `drawPoiGroundBases()`：贴地图元补充层（选中营地辖区虚线、POI 底座与营地暖光，必须先于立体实体落笔）；
-  5. `drawAtmosphereWash()`：大气色洗（第二个氛围插入点，在立体实体之前，建筑与文字不被洗灰）；
+  5. 大气色洗（★ v1.50.11 起已烘焙进 `lighting.js::relightTerrain` 写回 `cell.color`，不再是独立的整屏 pass；`drawAtmosphereWash()` 函数已删除）；
   6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相，贴地阴影走 `SimLighting`）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
 - **★ v1.48.0 动态季节光照（年周期光弧）**：光源绕世界一年转一圈，四季各占一个象限（春=东 / 夏=南 / 秋=西 / 冬=北），盛夏高度角 72°、隆冬 22°；地形反照率与光照解耦（`computeTerrainAlbedo` 一次性预算 + `SimLighting.relightTerrain` 按光档重算光因子），房屋墙面/屋顶与沙盘侧壁按面法线受光，阴影方向与长度由世界空间光向投影到屏幕（随相机旋转）。详见 [./17-seasonal-lighting.md](./17-seasonal-lighting.md) 与 `frontend/AGENTS.md` §5.10。
 - 动态等高线网格地形，读取内核 `GeoCell` 的地表类别、坡度和自然适宜性；v1.47.7 起不再绘制 `Ridge` 山脊线、`Saddle` 山口圆与 `Terrace` 台地轮廓（该类特征已整体删除）；T2 仍绘制真实两岸河谷、河阶、浅滩走廊与泉谷等水系特征。
@@ -65,7 +67,7 @@ stateDiagram-v2
 ### 2.2 ★ Web Worker 独立仿真架构（★ v1.38.0 Phase 1 解耦）
 - **内核与渲染双核分离**：将计算密集型的 Rust WASM 确定性内核与状态快照生成完全移入专属 Web Worker（`frontend/js/sim_worker.js`），运行在独立的 CPU 核心上；主线程（`rustworld.js` 作为轻量 Facade 代理）专职负责 Canvas 视口绘制与用户事件。
 - **只读地图模式（v1.50.16）**：地图图鉴以 `index.html?seed=<n>&mapOnly=1&nogate=1` 复用正式 Canvas 页面；Worker 选择 WASM `world_create_map`，与正式世界同样调用 `World3DEngine::new_seeded_with_config` 生成 TerrainMap，但不播撒生态、Agent、房屋或路网，也不启动 tick 循环。因此同种子地貌、水系、自然装饰、光照与相机画面完全同源。
-- **自适应计时循环与背压限频**：Worker 自主以 60Hz 循环步进 `world_tick_steps`（步长由 `speedMult` 驱动）。通过 `ackReceived` 握手锁实施背压控制——Worker 仅在主线程消费完上一帧快照并回传 ACK 后才下发最新快照（★ v1.44.3 起锚定 ~30Hz，与前端 30 FPS 渲染帧率对齐；★ M5-0.4 v1.46.0 起改为**按人口自适应降频**：≤200 人 30Hz / ≤320 人 25Hz / ≤450 人 20Hz / 更高 15Hz，档位由帧头 AGENT 记录数驱动，见 `sim_worker.js::SNAP_THROTTLE_TIERS`）。高倍速（5x~100x）下 Worker 在后台吃满算力全速冲刺，主线程 Canvas 彻底免于消息堆积，始终稳定在 30 FPS（`TARGET_FPS = 30`）丝滑响应。
+- **自适应计时循环与背压限频**：Worker 自主以 60Hz 循环步进 `world_tick_steps`（步长由 `speedMult` 驱动）。通过 `ackReceived` 握手锁实施背压控制——Worker 仅在主线程消费完上一帧快照并回传 ACK 后才下发最新快照（★ v1.44.3 起锚定 ~30Hz，与前端渲染帧率对齐；★ M5-0.4 v1.46.0 起改为**按人口自适应降频**：≤200 人 30Hz / ≤320 人 25Hz / ≤450 人 20Hz / 更高 15Hz，档位由帧头 AGENT 记录数驱动，见 `sim_worker.js::SNAP_THROTTLE_TIERS`）。高倍速（5x~100x）下 Worker 在后台吃满算力全速冲刺，主线程 Canvas 彻底免于消息堆积。**渲染帧率**由 `RENDER_CONFIG.targetFps` 控制（★ v1.50.82 默认 60 FPS、可 `?fps=` 覆盖或置 0 解限），与快照下发频率解耦。
 - **异步存读档桥接**：`saveWorld()` 与 `loadWorld()` 升级为 Promise 异步桥接，完全适配 `save-ui.js` 的 File System Access API 异步读写流程，存读档操作零阻塞 Canvas 绘制。
 - **多核算力跃升**：彻底打破单核单线程瓶颈，多核 CPU 利用率由原本的 25% 跃升至 40%~50%（主线程与 Worker 各自跑满独立物理核），彻底根除了高倍速下的 UI 冻结与相机卡顿。
 

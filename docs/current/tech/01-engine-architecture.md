@@ -9,7 +9,9 @@
 
 ## 1. 三层解耦架构
 
-**Rust 确定性计算内核 + WebAssembly 桥接 + Canvas 前端可视化**，三层之间只通过明确契约通信：
+**Rust 确定性计算内核 + WebAssembly 桥接 + 浏览器前端可视化**，三层之间只通过明确契约通信。
+
+> ★ **渲染形态（v1.50.77 起过渡期 / 全量 WebGL 为目标）**：地形由 `frontend/js/webgl/` 绘制在底层 `<canvas id="sim-canvas-gl">`；实体 / 装饰 / 道路 / 标签仍绘制在上层 Canvas 2D `<canvas id="sim-canvas">`。2026-09-17 架构决策为**全量 WebGL、退役 Canvas 2D**（共享同一深度缓冲），迁移期间 WebGL 不可用时经 `fallback-handler.js` 回退 2D 管线（该回退仅在过渡期保留）。详见根 AGENTS.md §4.18 与 [31 号迁移方案](../../plan/tech/31-canvas-to-webgl-migration.md)。
 
 ```mermaid
 graph TD
@@ -17,15 +19,17 @@ graph TD
     B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm<br/>+ frontend/sim_wasm.wasm 双副本"]
     C -->|加载至独立 Worker| D["frontend/js/sim_worker.js<br/>专用仿真线程"]
     D -->|跨线程快照消息| E["frontend/js/rustworld.js<br/>主线程代理 + 动态 Config 注入"]
-    E -->|状态驱动 60FPS| F["frontend/js/render_canvas.js<br/>Canvas 视口"]
-    F --> G["浏览器 UI"]
+    E -->|地形快照| GL["frontend/js/webgl/<br/>WebGL 地形层 (sim-canvas-gl)"]
+    E -->|实体/装饰/道路/标签快照| F["frontend/js/render_*.js<br/>Canvas 2D 覆盖层 (sim-canvas)"]
+    GL --> H["浏览器 UI (v1.52.3)"]
+    F --> H
 ```
 
 | 层 | 职责 | 边界 |
 | :--- | :--- | :--- |
 | `crates/sim_core` | 决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本 | 纯 Rust、无 JS 依赖、无浮点非确定性来源 |
-| `crates/sim_wasm` | 线性内存 JSON 序列化、FABS 二进制帧快照、tick 步进、JS 动态配置注入 | 不承载业务逻辑 |
-| `frontend/` | 原生静态前端（无构建步骤），Worker 仿真线程 + 主线程渲染 | 不存在独立的 JS 移植版仿真逻辑 |
+| `crates/sim_wasm` | 线性内存 FABS 二进制帧快照、tick 步进、JS 动态配置注入 | 不承载业务逻辑 |
+| `frontend/` | 原生静态前端（无构建步骤），Worker 仿真线程 + 主线程渲染（WebGL 地形层 + Canvas 2D 覆盖层） | 不存在独立的 JS 移植版仿真逻辑 |
 
 > **双副本铁律**：`sim_wasm.wasm` 必须同时复制到 `frontend/rust/` 与 `frontend/` 两处，缺一不可。
 
@@ -97,7 +101,8 @@ rustworld.js::_applySnapshot()
     ├─→ this.agents / houses / pois / households / marriages / clans / regions
     ├─→ this.network (lanes / nodes)
     └─→ this.terrain (cells)
-             ├─→ render_*.js  （Canvas 渲染）
+             ├─→ webgl/terrain-renderer.js （WebGL 地形层 sim-canvas-gl）
+             ├─→ render_*.js  （Canvas 2D 覆盖层：实体/装饰/道路/标签 sim-canvas）
              ├─→ main.js      （事件绑定）
              ├─→ ledger-ui.js （制度大盘）
              ├─→ decision-viz-view.js（决策引擎视图）
