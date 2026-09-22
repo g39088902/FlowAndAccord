@@ -253,3 +253,412 @@ impl TerrainMap {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// ★ 阶段三 D-B2 · RiverCliff 河谷峭壁注入器（06 号 §5.4.D · v1.52.6）
+//
+// 结构型子特征：改变高程 + 岩壁地表（`RockFace` 覆盖意图 → 第 6 步物化
+// `NO_WALK|NO_BUILD`）+ `Cliff` 特征（id=224）。全部判定走无状态 `mix64`
+// 哈希，**不消费任何 WorldRng**；几何施加在第 5 步整图事务域内进行
+// （`geometry_transaction.rs`），任一局部判定失败整块回滚、判为未注入、不重抽。
+//
+// 与 §5.4.D 规格的两处实现口径（以实现为准，均为规格兼容的收紧）：
+// 1. 崖基线锚定在**河阶带外缘 +6m**（规格「崖顶距河中心 > half+bank+8」的
+//    加大版）：河岸/河阶属水系优先地表（§5.3 第 6 步），`RockFace` 不得覆盖
+//    （覆盖会留下「可通行的陡峭河阶」或触发 `CellWaterFlagMismatch`），
+//    崖面整体落在河阶带外侧的 `DryGround` 陆地格上才能稳定派生硬禁行；
+// 2. 沿程两端加 6m 连续 taper（§5.4.D.6「沿程两端回落连续」）。
+// ═══════════════════════════════════════════════════════════════════════
+
+/// 崖面带宽（across 方向；§5.4.D.2 候选值 18m，离散尺度探针准入后冻结）。
+const CLIFF_WIDTH_M: f32 = 18.0;
+/// 崖面全高起点比例：across ≥ RATIO×WIDTH 后达到全高 H。0.25 = 规格候选初值
+///（抬升带 4.5m ≈ 1.5 格；离散中心差分窗口 2Δ≈6m 可完整覆盖抬升带，格点坡度最陡）。
+const CLIFF_RISE_RATIO: f32 = 0.25;
+/// 崖顶外侧回落平滑带宽度（§5.4.D.2「边缘再用 12m 平滑带衔接」）。
+const CLIFF_SMOOTH_M: f32 = 12.0;
+/// 沿程两端连续 taper（保证崖端高程连续，§5.4.D.6）。
+const CLIFF_TAPER_M: f32 = 6.0;
+/// 选址裕量：支撑域距地图边界的最小距离（与 OxbowLake 的 40m 口径一致）。
+const CLIFF_EDGE_MARGIN_M: f32 = 40.0;
+/// 崖基线在河阶带外缘之外的最小逐点净距（选址校验）。
+const CLIFF_TERRACE_CLEARANCE_M: f32 = 4.0;
+/// 浅滩授权走廊保护带：走廊半宽之外再退 20m。
+const CLIFF_FORD_MARGIN_M: f32 = 20.0;
+/// 硬禁行连续带验收下限（目标长度的 70%，§5.4.D.3/§5.4.D.7）。
+const CLIFF_BAND_MIN_RATIO: f32 = 0.7;
+/// 硬禁行阈值（与第 6 步地表派生一致：slope ≥ 34° → `SurfaceKind::RockFace`）。
+const CLIFF_ROCKFACE_SLOPE_DEG: f32 = 34.0;
+
+/// 峭壁抬升主值（纯函数，供第 5 步注入与离散尺度探针共用）。
+/// `along`：沿崖切向坐标（崖段中点为原点）；`across`：自崖基线向崖侧的法向距离。
+/// 剖面 = 沿程 taper（±len/2 之外 6m 连续回落）× 横向剖面（0→rise_w smoothstep
+/// 升至全高 H → 平台至 width → width→width+smooth 12m 平滑回落到 0）。
+pub(crate) fn river_cliff_lift(along: f32, across: f32, len: f32, h: f32) -> f32 {
+    if across <= 0.0 || h <= 0.0 {
+        return 0.0;
+    }
+    let half_len = len * 0.5;
+    let a_env = if along.abs() <= half_len {
+        1.0
+    } else if along.abs() >= half_len + CLIFF_TAPER_M {
+        0.0
+    } else {
+        let t = (half_len + CLIFF_TAPER_M - along.abs()) / CLIFF_TAPER_M;
+        t * t * (3.0 - 2.0 * t)
+    };
+    if a_env <= 0.0 {
+        return 0.0;
+    }
+    let rise_w = CLIFF_RISE_RATIO * CLIFF_WIDTH_M;
+    let outer = CLIFF_WIDTH_M + CLIFF_SMOOTH_M;
+    if across >= outer {
+        return 0.0;
+    }
+    let s = if across <= rise_w {
+        let t = across / rise_w;
+        t * t * (3.0 - 2.0 * t)
+    } else if across <= CLIFF_WIDTH_M {
+        1.0
+    } else {
+        let t = (outer - across) / CLIFF_SMOOTH_M;
+        t * t * (3.0 - 2.0 * t)
+    };
+    h * s * a_env
+}
+
+/// §5.4.D `RiverCliff`（仅 T2，不产生水体）。由第 5 步 `geometry_transaction`
+/// 调用：`baseline` 为未注入原图（只读），`candidate`/`scratch` 为事务候选。
+/// **只允许**修改 candidate 高程、追加特征/子特征、登记 scratch 覆盖意图——
+/// slope/flags 由第 6 步唯一物化（事务断言「提前写地表」会拒绝任何越界写入）。
+/// 返回 `Ok(false)` = 未注入（不重抽其他特征）；`Err` = 局部拒绝（整块回滚）。
+pub(super) fn apply_river_cliff(
+    baseline: &TerrainMap,
+    candidate: &mut TerrainMap,
+    scratch: &mut GenesisScratch,
+    plan: &mut PlannedSubFeature,
+) -> Result<bool, &'static str> {
+    if baseline.profile != TERRAIN_PROFILE_RIVER_VALLEY {
+        return Ok(false);
+    }
+    let Some(geom) = scratch.river_geometry.as_ref() else {
+        return Ok(false);
+    };
+    let size = candidate.world_size;
+    let gw = candidate.grid_width;
+    let seed = baseline.seed;
+    let step_cell = size / (candidate.grid_width - 1).max(1) as f32;
+
+    // ── 确定性参数（无状态哈希；绝不消费 WorldRng，§5.3 契约）──
+    let h_len = mix64(seed ^ plan.salt ^ 0x5243_4C46_5F4C_454E); // "RCLF_LEN"
+    let h_height = mix64(seed ^ plan.salt ^ 0x5243_4C46_5F48_4549); // "RCLF_HEI"
+    let h_side = mix64(seed ^ plan.salt ^ 0x5243_4C46_5F53_4944); // "RCLF_SID"
+    let h_scan = mix64(seed ^ plan.salt ^ 0x5243_4C46_5F53_4341); // "RCLF_SCA"
+    let len = 55.0 + (h_len % 1000) as f32 * 0.025; // 55 ~ 79.975m（§5.4.D.1）
+    let cliff_h = 6.0 + (h_height % 1000) as f32 * 0.006; // 6 ~ 11.994m（hash 固定）
+    let side = if h_side & 1 == 0 { 1.0f32 } else { -1.0f32 };
+
+    // ── 选址扫描：沿主河 y 轴等距槽位，起点由 hash 决定并环绕（同种子恒同序）──
+    let y_margin = CLIFF_EDGE_MARGIN_M + len * 0.5 + CLIFF_TAPER_M;
+    let y_lo = -size * 0.5 + y_margin;
+    let y_hi = size * 0.5 - y_margin;
+    if y_hi <= y_lo {
+        return Ok(false);
+    }
+    let slot = 8.0f32;
+    let n_slots = ((y_hi - y_lo) / slot) as usize;
+    if n_slots == 0 {
+        return Ok(false);
+    }
+    let jitter = (h_scan % 1000) as f32 * 0.001 * slot;
+    let start = ((h_scan >> 20) as usize) % (n_slots + 1);
+    // 浅滩授权走廊保护数据（读 baseline；T2 恒有 2 条，宽度取最大值口径）
+    let ford_half = baseline
+        .hydrology
+        .connections
+        .iter()
+        .map(|c| c.width)
+        .fold(0.0f32, f32::max)
+        * 0.5;
+    let ford_ys = [-size * 0.24, size * 0.24];
+
+    // 选址通过后锚点局部系：t = 河流切向（单位），n = 指向崖侧的外法向（单位），
+    // A = 崖基线中点（基线 = 河中心沿 n 平移 base_dist）。
+    let mut chosen: Option<(f32, f32, f32, f32, f32)> = None; // (ax, ay, tx, ty, nx)
+    for i in 0..=n_slots {
+        let k = (start + i) % (n_slots + 1);
+        let y0 = y_lo + jitter + k as f32 * slot;
+        if y0 > y_hi {
+            continue;
+        }
+        // 段 y 区间不与浅滩走廊重叠（走廊半宽 + 20m，16 等分逐点校验）
+        let mut ok = true;
+        let mut max_hw = 0.0f32;
+        for j in 0..=16u32 {
+            let y = y0 - len * 0.5 + len * j as f32 / 16.0;
+            max_hw = max_hw.max(geom.half_width(y, size));
+            if ford_ys.iter().any(|fy| (y - fy).abs() < ford_half + CLIFF_FORD_MARGIN_M) {
+                ok = false;
+                break;
+            }
+        }
+        if !ok {
+            continue;
+        }
+        // 崖基线距离：段内最大半宽 + bank + terrace + 6（河阶带外缘外 6m，见模块注释）
+        let base_dist = max_hw + geom.bank + geom.terrace + 6.0;
+        let cx0 = geom.center(y0, size);
+        // 河流切向：d center / d y = size*0.055*(5/size)*cos(y/size*5+phase)
+        let slope_dx = size * 0.055 * (5.0 / size) * (y0 / size * 5.0 + geom.phase).cos();
+        let tlen = (slope_dx * slope_dx + 1.0).sqrt();
+        let (tx, ty) = (slope_dx / tlen, 1.0 / tlen);
+        let (nx, ny) = (side / tlen, -side * slope_dx / tlen);
+        let ax = cx0 + nx * base_dist;
+        let ay = y0 + ny * base_dist;
+        // 崖基线逐点净距 ≥ 河阶带外缘 + CLEARANCE（防河湾凸岸贴上崖脚）
+        let mut min_clear = f32::INFINITY;
+        let mut in_bounds = true;
+        for j in 0..=16u32 {
+            let s = -len * 0.5 + len * j as f32 / 16.0;
+            let px = ax + tx * s;
+            let py = ay + ty * s;
+            if px.abs() > size * 0.5 - CLIFF_EDGE_MARGIN_M {
+                in_bounds = false;
+                break;
+            }
+            let lateral = (px - geom.center(py, size)) * side;
+            min_clear = min_clear.min(lateral - (geom.half_width(py, size) + geom.bank + geom.terrace));
+        }
+        if !in_bounds || min_clear < CLIFF_TERRACE_CLEARANCE_M {
+            continue;
+        }
+        // 支撑域 AABB（along × across 外矩形 4 角），用于取水点圆相交判定
+        let outer = CLIFF_WIDTH_M + CLIFF_SMOOTH_M;
+        let half_ext = len * 0.5 + CLIFF_TAPER_M;
+        let (mut bmin_x, mut bmax_x, mut bmin_y, mut bmax_y) =
+            (f32::INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+        for (s, a) in [
+            (-half_ext, 0.0),
+            (half_ext, 0.0),
+            (-half_ext, outer),
+            (half_ext, outer),
+        ] {
+            let px = ax + tx * s + nx * a;
+            let py = ay + ty * s + ny * a;
+            bmin_x = bmin_x.min(px);
+            bmax_x = bmax_x.max(px);
+            bmin_y = bmin_y.min(py);
+            bmax_y = bmax_y.max(py);
+        }
+        // §5.4.D.5 几何类：崖体 AABB 不得与任一 WaterAccessPoint 的
+        // interaction_radius 圆相交（违反即跳过该槽位）。
+        if baseline.hydrology.access_points.iter().any(|ap| {
+            let qx = ap.pos.x.clamp(bmin_x, bmax_x) - ap.pos.x;
+            let qy = ap.pos.y.clamp(bmin_y, bmax_y) - ap.pos.y;
+            qx * qx + qy * qy < ap.interaction_radius * ap.interaction_radius
+        }) {
+            continue;
+        }
+        chosen = Some((ax, ay, tx, ty, nx));
+        // ny 由 (tx, side) 唯一重构：n = (side·ty, −side·tx)，nx = side·ty 已存，
+        // ny = −side·tx 在 apply 段还原。
+        break;
+    }
+    let Some((ax, ay, tx, ty, nx)) = chosen else {
+        return Ok(false);
+    };
+    let ny = -side * tx;
+
+    // ── 崖面高程施加（只写 candidate 高程；支撑域 AABB 内逐格）──
+    let outer = CLIFF_WIDTH_M + CLIFF_SMOOTH_M;
+    let half_ext = len * 0.5 + CLIFF_TAPER_M;
+    let (mut bmin_x, mut bmax_x, mut bmin_y, mut bmax_y) =
+        (f32::INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+    for (s, a) in [
+        (-half_ext, 0.0),
+        (half_ext, 0.0),
+        (-half_ext, outer),
+        (half_ext, outer),
+    ] {
+        let px = ax + tx * s + nx * a;
+        let py = ay + ty * s + ny * a;
+        bmin_x = bmin_x.min(px);
+        bmax_x = bmax_x.max(px);
+        bmin_y = bmin_y.min(py);
+        bmax_y = bmax_y.max(py);
+    }
+    let gx_lo = (((bmin_x / size + 0.5) * (gw - 1).max(1) as f32).floor() as isize - 2)
+        .clamp(0, (gw - 1) as isize) as usize;
+    let gx_hi = (((bmax_x / size + 0.5) * (gw - 1).max(1) as f32).ceil() as isize + 2)
+        .clamp(0, (gw - 1) as isize) as usize;
+    let gy_lo = (((bmin_y / size + 0.5) * (candidate.grid_height - 1).max(1) as f32).floor() as isize - 2)
+        .clamp(0, (candidate.grid_height - 1) as isize) as usize;
+    let gy_hi = (((bmax_y / size + 0.5) * (candidate.grid_height - 1).max(1) as f32).ceil() as isize + 2)
+        .clamp(0, (candidate.grid_height - 1) as isize) as usize;
+    let mut modified: Vec<(usize, f32)> = Vec::new(); // (cell_index, across)
+    let (mut z_min, mut z_max) = (f32::INFINITY, f32::NEG_INFINITY);
+    for gy in gy_lo..=gy_hi {
+        for gx in gx_lo..=gx_hi {
+            let p = candidate.grid_pos(gx, gy);
+            let dx = p.x - ax;
+            let dy = p.y - ay;
+            let across = dx * nx + dy * ny;
+            if across <= 0.0 {
+                continue;
+            }
+            let along = dx * tx + dy * ty;
+            let lift = river_cliff_lift(along, across, len, cliff_h);
+            if lift <= 0.0 {
+                continue;
+            }
+            let idx = gy * gw + gx;
+            let cell = &mut candidate.cells[idx];
+            // 安全网：水系格 / 非干地格不施加（选址已保证段内全在河阶带外）。
+            if cell.water_body_id.is_some()
+                || !matches!(cell.surface_kind, SurfaceKind::DryGround | SurfaceKind::SoftGround)
+            {
+                continue;
+            }
+            cell.elevation += lift;
+            z_min = z_min.min(cell.elevation);
+            z_max = z_max.max(cell.elevation);
+            modified.push((idx, across));
+        }
+    }
+    if modified.is_empty() {
+        return Ok(false);
+    }
+
+    // ── 5c/5d 局部判定（临时坡度；判据与第 6 步全图定稿同源：slope_from_elevation）──
+    // 覆盖意图规则：**支撑域全部 modified 格整体登记 RockFace**（崖体 18m + 外侧
+    // 回落带 12m）。不能按坡度/18m 阈值离散切分：崖顶平台坡度 ≈ 基底（<34°），
+    // 只按坡度登记会产生被崖面与外侧陡带夹住的「可走口袋」（探针实测 89~129 格
+    // 孤立分量）；而只挡崖体又会让 18~30m 回落带里的离散陡格与崖体锯齿边界把
+    // 可走缝隙掐断成 1 格宽小口袋（探针实测 2~8 格 × 多个）。整域登记后崖体 +
+    // 坡脚碎石带为一条实心禁行带，与主河之间始终隔着连续河阶缓带，两翼开口，
+    // 连通分量恒不增加；崖顶/碎石带本就不可步行，语义一致。
+    let mut overlay_idx: Vec<usize> = Vec::with_capacity(modified.len());
+    for &(idx, _) in &modified {
+        overlay_idx.push(idx);
+    }
+    // 硬禁行连续带 ≥ 70% 目标长度：沿崖面中线（across = 抬升带中点）按 ≤Δ/2 采样，
+    // 记录实际格点派生坡度 ≥34° 的最长连续覆盖（§5.4.D.3/7）。
+    let rise_w = CLIFF_RISE_RATIO * CLIFF_WIDTH_M;
+    let sample_across = rise_w * 0.5;
+    let n_steps = ((len / (step_cell * 0.5)).ceil() as usize).max(2);
+    let step_len = len / n_steps as f32;
+    let (mut run, mut best_run) = (0.0f32, 0.0f32);
+    for i in 0..=n_steps {
+        let s = -len * 0.5 + len * i as f32 / n_steps as f32;
+        let px = ax + tx * s + nx * sample_across;
+        let py = ay + ty * s + ny * sample_across;
+        let (gx, gy) = candidate.grid_index(px, py);
+        if candidate.slope_from_elevation(gx, gy) >= CLIFF_ROCKFACE_SLOPE_DEG {
+            run += step_len;
+            best_run = best_run.max(run);
+        } else {
+            run = 0.0;
+        }
+    }
+    if best_run < len * CLIFF_BAND_MIN_RATIO {
+        // 几何类局部拒绝：整块回滚、判为未注入、不重抽其他特征（§5.3 两层分工）。
+        return Ok(false);
+    }
+    // 连通分量不增加（§5.3「不得切断既有生存链路」①）：未注入原图与注入候选
+    // 各自独立统计可行走连通分量（blocked = NO_WALK ∪ 本次 RockFace 意图）。
+    let mut added_block = vec![false; candidate.cells.len()];
+    for &idx in &overlay_idx {
+        added_block[idx] = true;
+    }
+    let base_comps = count_walkable_components(baseline, &[]);
+    let cand_comps = count_walkable_components(candidate, &added_block);
+    if cand_comps > base_comps {
+        return Ok(false);
+    }
+    // 登记覆盖意图：第 6 步物化 RockFace，is_hard_blocked 自动补 NO_WALK|NO_BUILD；
+    // 肥力回写原值（不改变既有肥力事实）。
+    for &idx in &overlay_idx {
+        scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+            cell_index: idx,
+            surface_kind: SurfaceKind::RockFace,
+            water_body_id: None,
+            natural_fertility: candidate.cells[idx].natural_fertility,
+            flags: 0,
+        });
+    }
+
+    // ── Cliff 特征（id=224 = 200 + kind_code(6)×4 + 0，§5.2 ID 表）与子特征登记 ──
+    // 崖顶折线 = 全高平台中线（across = rise_w + (width−rise_w)/2）9 点采样。
+    let top_across = rise_w + (CLIFF_WIDTH_M - rise_w) * 0.5;
+    let mut verts = Vec::with_capacity(9);
+    for i in 0..9u32 {
+        let s = -len * 0.5 + len * i as f32 / 8.0;
+        let px = ax + tx * s + nx * top_across;
+        let py = ay + ty * s + ny * top_across;
+        let z = candidate.sample_elevation(px, py);
+        verts.push(Vec3::new(px, py, z));
+    }
+    candidate.features.push(TerrainFeature {
+        id: 224,
+        kind: TerrainFeatureKind::Cliff,
+        elevation: verts[4].z,
+        vertices: verts.clone(),
+        width: CLIFF_WIDTH_M,
+        flags: 0,
+    });
+    candidate.sub_features.push(TerrainSubFeature {
+        id: 1000 + TerrainSubFeatureKind::RiverCliff as u32,
+        kind: TerrainSubFeatureKind::RiverCliff,
+        anchor: verts[4],
+        bounds_min: Vec3::new(bmin_x, bmin_y, z_min),
+        bounds_max: Vec3::new(bmax_x, bmax_y, z_max),
+        feature_ids: vec![224],
+        accent_id_start: None,
+        accent_id_end: None,
+    });
+    plan.anchor_hint = verts[4];
+    Ok(true)
+}
+
+/// 可行走连通分量统计（4 邻域；blocked = NO_WALK 标志 ∪ 调用方追加的意图格）。
+/// 供 RiverCliff 5d 判定「注入后连通分量数不增加」（§5.3）；纯只读。
+fn count_walkable_components(map: &TerrainMap, extra_block: &[bool]) -> u32 {
+    let gw = map.grid_width;
+    let gh = map.grid_height;
+    let n = gw * gh;
+    let mut visited = vec![false; n];
+    let mut stack: Vec<usize> = Vec::with_capacity(256);
+    let mut comps = 0u32;
+    for start in 0..n {
+        if visited[start] {
+            continue;
+        }
+        visited[start] = true;
+        let blocked = map.cells[start].feature_flags & TERRAIN_FLAG_NO_WALK != 0
+            || extra_block.get(start).copied().unwrap_or(false);
+        if blocked {
+            continue;
+        }
+        comps += 1;
+        stack.clear();
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            let x = i % gw;
+            for nidx in
+                [(x > 0).then(|| i - 1), (x + 1 < gw).then(|| i + 1),
+                 (i >= gw).then(|| i - gw), (i + gw < gh * gw).then(|| i + gw)]
+            {
+                let Some(nidx) = nidx else { continue };
+                if !visited[nidx] {
+                    visited[nidx] = true;
+                    let blocked = map.cells[nidx].feature_flags & TERRAIN_FLAG_NO_WALK != 0
+                        || extra_block.get(nidx).copied().unwrap_or(false);
+                    if !blocked {
+                        stack.push(nidx);
+                    }
+                }
+            }
+        }
+    }
+    comps
+}

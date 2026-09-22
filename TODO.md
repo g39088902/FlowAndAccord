@@ -57,8 +57,10 @@
 
 - [ ] **阶段三 · 结构型子特征注入（D-B3）**
     - 目标：将 FootLake（山脚湖）、RidgeWaterfall（山涧瀑布）、RiverCliff（河谷峭壁）、OxbowLake（牛轭湖）等物理子特征以几何事务方式注入地图流水线（第 4～5 步）。
+    - ✅ **RiverCliff 已交付（v1.52.6，生成器版本 13→14）**：注入器 + 离散尺度探针（144 组合全通过）+ 固定种子矩阵 12 例（components 恒 1）+ `Cliff` 特征/字典/前端绘制，证据见 [changelog v1.52.6](docs/current/01-changelog.md)。
+    - 剩余：FootLake（T1）、RidgeWaterfall（T1）按 06 号 §5.4.A/B；OxbowLake（T2）硬前置 R0 河道表示迁移（§6）。
     - 约束与门禁：按 [06 号 §5.4.D](docs/plan/tech/06-terrain-templates.md) 执行岩壁离散尺度探针准入，候选参数不得当作已验证默认值；注入失败必须经由阶段二的有界回退环安全降级。
-    - 联动：注入器落地后，同步解锁阶段四专属景观（S4-X1～X4）。
+    - 联动：RiverCliff 已解锁 S4-X3 河谷峭壁专属景观（S4-X1/X2/X4 待对应注入器）。
 
 - [ ] **阶段八 · 复杂地貌模板**
     - 规划模板：湖畔盆地（`lake_basin_v1`）、冲积扇（`alluvial_fan_v1`）等。

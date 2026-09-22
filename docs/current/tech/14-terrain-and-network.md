@@ -522,6 +522,8 @@ crossing_id: 1, 2
 
 T2 不实现桥梁、游泳、船舶、水位涨落和洪水事件。
 
+> ★ **RiverCliff 已落地（v1.52.6，`TERRAIN_GENERATOR_VERSION` 13→14）**：`geo/hydrology.rs::apply_river_cliff` 在第 5 步整图事务域内实施（规格见 [06 号 §5.4.D](../../plan/tech/06-terrain-templates.md)）——无状态 `mix64` 哈希决定段长 55~80m / 崖高 H∈[6,12]m / 左右侧与槽位扫描起点（零 `WorldRng` 消费）；沿河 8m 槽位确定性选址（崖基线锚定在段内最大半宽 + bank + terrace + 6m，浅滩走廊/取水点圆/图缘三重保护）；崖面 smoothstep 抬升 + 18m 崖体 + 12m 外侧回落 + 端部 6m taper，**支撑域全部 modified 格整体登记 `RockFace` 覆盖意图**（按坡度/18m 阈值离散切分会产生「可走口袋」——探针实测 2~129 格孤立分量，违反连通分量门禁）；局部判定 = 崖面中线 Δ/2 采样硬禁行连续带 ≥70% 目标长度 + 可行走连通分量数不增加（基线/候选独立洪泛），失败整块回滚判未注入、不重抽。生成 `Cliff` 特征（id=224，`TerrainFeatureKind` 枚举码尾部追加、FABS 字典码 5）+ `TerrainSubFeature` id=1005；前端 `render_terrain.js` 岩层阴影分支（仅可视化）。探针证据（144 尺度组合 + 固定种子矩阵 12 例，components 恒 1）见 [changelog v1.52.6](../01-changelog.md)。OxbowLake / FootLake / RidgeWaterfall 第 5 步仍为空注入。
+
 ### 9.6 T2 子特征注入器（v1.48.0 新增规划）
 
 > ⚠️ **本节是概念性描述，已被 §5.3 / §5.4 / §5.5 取代**（§5 在实现层面优先）。与 §9.4 同样适用：无状态哈希判定、结构型与视觉型各至多一个、百分比是候选自身概率。

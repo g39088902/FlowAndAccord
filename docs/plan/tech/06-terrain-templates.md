@@ -1,7 +1,7 @@
 # 06. 地图模板规划：模板库、地形要素与未落地蓝图
 
 > **定位**：本文是地图模板与未落地地形方案的规划权威；已实现机制以 [14 地形与路网](../../current/tech/14-terrain-and-network.md)为准，材质、光照、素材、遮挡与视觉性能见 [07 地形美术](./07-terrain-art.md)。先定义地图的空间结构与玩法，再选择实现它所需的共用基座。
-> **复核基线**：2026-09-22，应用 v1.52.3；源码 `TERRAIN_GENERATOR_VERSION=13`（v1.50.78 盆地死区修复后）、存档 `SAVE_FORMAT_VERSION=7`、FABS `FORMAT_VERSION=4`。本文交付记录截至 v1.50.70（内核地形侧最后变更 v1.50.78，此后均为前端表现层改动）；实施按变更性质判断版本递增，不照抄旧稿中的目标版本号。
+> **复核基线**：2026-09-22，应用 v1.52.3；源码 `TERRAIN_GENERATOR_VERSION=14`（v1.52.6 RiverCliff 注入器落地）、存档 `SAVE_FORMAT_VERSION=7`、FABS `FORMAT_VERSION=4`。本文交付记录截至 v1.50.70（内核地形侧最后变更 v1.50.78，此后均为前端表现层改动）；实施按变更性质判断版本递增，不照抄旧稿中的目标版本号。
 > **阅读入口**：[R.1 当前状态](#r1-现状快照)（含 [R.1.1 未完成步骤速览与必要性](#r11-未完成步骤速览与必要性)）→ [R.3 阶段计划](#terrain-roadmap) → §2.1 模板清单 → §5/§6 施工契约 → §18 验收。近期任务明细见 [TODO](../../../TODO.md)。阶段二（STAGE2-1~8）与阶段七（S7-01~10）均已收官，专项任务文档随收官归档删除，收口证据见 [14 号 §8.2](../../current/tech/14-terrain-and-network.md)；阶段七探针门禁基线与固定种子验收表收编于 §18.8，交付证据见 [changelog](../../current/01-changelog.md)。
 > **编号约定**：按 [文档导航的编号例外](../../README.md)，保留 R、§0～6、§17～21 及历史任务 ID；本文中的 **§7～16 均指 [14 号现状文档](../../current/tech/14-terrain-and-network.md)的对应章节**。阶段号表示批次，提交组表示变更类型，任务 ID 表示可验收工作项，三者不能互代；不存在必须先完成所有较小阶段号的规则。
 > **文档分工**：R.3 只维护跨批次依赖与范围；专项 TODO 维护原子任务及勾选状态；§2.1 维护模板登记；§4～6 维护设计；§18 保留验收证据。完成代码、完成样板、进入 `random` 是三个独立里程碑。
@@ -31,7 +31,7 @@
 | 步骤 | 状态 | 直接前置 | 必要性（不做会怎样） |
 | :--- | :--- | :--- | :--- |
 | STAGE2-3 完整几何事务域 | ✅ 已实施：候选隔离覆盖完整几何支撑域、覆盖意图与差分 halo，失败原子丢弃 | 阶段二其余项 | 为阶段三注入器提供安全施工地基；空注入不改变旧世界输出 |
-| 阶段三 · D-B2 注入器（RiverCliff + 四类视觉散布） | ◐ 四类视觉散布已实施；RiverCliff 仍待离散坡度/连通性验收 | 事务域 | 视觉子特征已可确定性追加 Tree/Boulder/RockCluster；RiverCliff 仍独立实施，不能用视觉结果替代物理验收 |
+| 阶段三 · D-B2 注入器（RiverCliff + 四类视觉散布） | ✅ **已交付**（v1.52.6）：四类视觉散布（v1.52.5）+ RiverCliff 河谷峭壁物理注入（§5.4.D，`TERRAIN_GENERATOR_VERSION` 14）；离散尺度探针 144 组合全通过、固定种子矩阵 12 例注入全通过（components 恒 1），证据见 changelog v1.52.6 | 事务域 | 视觉子特征确定性追加；RiverCliff 改变 T2 命中种子高程/地表/通行，其余种子逐位不变 |
 | 八c · FootLake / RidgeWaterfall | ⬜ 未开工 | 事务域（不等待 R0） | T1 侧局部地标与绕行/选址变化来源（山脚湖绕湖、飞瀑挂接水源）；S4-X1/X2 景观解锁前提 |
 | 八a · R0 T2 河道表示迁移（R0-1~4） | ⬜ 未开工 | 事务域 | 牛轭湖硬前置：现行河道 `A·k=0.275` 任意窗口弦长/弧长 ≥0.978（裁弯需 ≤0.71），单靠调参需 A≳214m=地图半宽 56%，必须参数化中心线 + 距离场 + 蜿蜒列 |
 | 八b · OxbowLake 牛轭湖 | ⬜ 未开工 | R0-4 | T2 专属结构型子特征（20%），按真实「弯道裁弯取直」生成月牙湖；S4-X4 景观解锁前提 |
@@ -40,7 +40,7 @@
 | 九a~九d 远期模板（喀斯特/海湾/半岛、沙漠绿洲、三角洲/峡湾、海岛） | ⬜ 未开工、缺规格 | 各自水陆/淡水/可达性契约 | 地图类型库的长期扩展；未过规格与有效世界验收不注册空实现、不加入 random，防止「看起来能走」的假设施 |
 | T4 动态水文与工程 | ⏳ 长期另立项 | 动态状态存档、道路失效及决策恢复 | 枯丰水期/洪水/桥梁/土地演化与航运的远期载体；静态首版明确不等待 |
 
-> **当前施工关键路径**：STAGE2-3 事务域 → 阶段三注入器（RiverCliff + 四类视觉散布）→ 八c（FootLake / RidgeWaterfall）；八a R0 → 八b OxbowLake 为独立支线（只阻塞牛轭湖）。被动解锁：S4-X1~X4 专属景观、TA-09 实机样板。
+> **当前施工关键路径**：阶段三注入器已交付（v1.52.6）→ 八c（FootLake / RidgeWaterfall）；八a R0 → 八b OxbowLake 为独立支线（只阻塞牛轭湖）。被动解锁：S4-X1/X2/X4 专属景观（S4-X3 已解锁待交付）、TA-09 实机样板。
 
 ### R.2 路线总览（依赖解锁图）
 
@@ -77,7 +77,7 @@ flowchart TD
 | ⓪ 基座 | ✅ **已交付**：T0/T1/T2/D-A 已落地；生存成本诊断、`flat_baseline`、有界降级 3 项遗留门禁已随阶段二收口销项 | — | 已交付 | R.1、§18 |
 | 一 · D-B1 | ◐ **代码交付完成**（D-B1-9 验收收口，§18.5）：装饰、模型/快照、选择器与缓存已交付；TA-09 / D-B1-8 实机场景样板待交付（依赖阶段三 RiverCliff） | D-A | 否 / 低 | §5.2、§5.5、§18.5 |
 | 二 · 共用基座 | ✅ **全部交付**：STAGE2-1～8（v1.50.39~49 收官，专项 STAGE2-TODO.md 已随收官归档删除，分层验收证据见 14 号 §8.2）；STAGE2-3 完整几何事务域随阶段三注入启用 | 一；原子任务顺序见 R.6 | 重构不改；新增拒绝/降级另拆 / 中 | §5.3、§5.8 |
-| 三 · D-B2 / 视觉散布 | ◐ **视觉散布已完成**：ForestedSlope / RockyOutcrop / RiversideForest / GravelBeach 走 hash 放点并追加装饰；RiverCliff 仍待物理验收 | 物理需二；视觉已具备事务域 | 分项 / 中 | §5.4.D、§5.5 |
+| 三 · D-B2 / 视觉散布 | ✅ **已交付**（v1.52.5 视觉散布 + v1.52.6 RiverCliff）：ForestedSlope / RockyOutcrop / RiversideForest / GravelBeach hash 放点追加装饰；RiverCliff 注入器过离散坡度/连通性验收（探针证据见 changelog v1.52.6） | 物理需二；视觉已具备事务域 | 分项 / 中 | §5.4.D、§5.5 |
 | 四 · D-C | **✅ 通用部分已收口交付（v1.50.46~53）**：通用资源景观套件、几何遮罩避让、五类配方样板、标签布局引擎、聚合与双目标停靠兜底完成（S4-01~S4-08 全部完成，详见 [16 号文](../../current/tech/16-frontend-overview.md) §2.16～§2.18；特定地貌专属景观群与院地任务见 [STAGE-04-SUBFEATURE-LANDSCAPES-TODO](../../../STAGE-04-SUBFEATURE-LANDSCAPES-TODO.md)）；特定地貌专属景观群逐项交付 | 一·D-B1 已就绪；特定地貌专属景观群另需对应注入器 | 否 / 低 | §19、阶段四 TODO |
 | 五 · P1 | ✅ **已交付**（v1.50.54 TB-02：台地 `plateau_v1`，SDF 圆角矩形台面 + 陡壁过渡带 + 双入口缓坡 + 坡脚泉溪与双接入路网；60/60 种子全通并准入 random） | 二 | 是 / 中高 | §5.6 |
 | 六 · P1 | ✅ **已交付**（v1.50.55 TB-03：盆地 `basin_oasis_v1` / 冲积扇 `alluvial_fan_v1` / 湖畔盆地 `lakeside_basin_v1`，静水全链路 + 60/60 种子矩阵；湖畔盆地独立规格已回填 §5.6；冲积扇辨识度改善第一批随 v1.50.68 落地） | 二；建议五先行，不是硬依赖 | 是 / 中高 | §1.2、§5.6 |
@@ -99,7 +99,7 @@ flowchart TD
 - **失败隔离**：D-B2/P1 任何一项失败只禁用该特征或 profile，不得在运行中修改道路、移动居民或回抽世界种子（§5.1、§5.8）。
 - **每组一改**：四类提交组禁止合并为一次大改；一次只改一件事，门禁失败才可定位（§6.5「不要顺手做的事」）。
 - **模板级前置已就绪**：GrassTuft 已随草原交付（§4.1）；半坡林地骨架已交付，其「密林山坡」视觉散布规则随阶段三注入器落地（§4.2、§5.5）。
-- **当前施工关键路径**：阶段三 RiverCliff 离散几何/连通性验收 → 八c（FootLake / RidgeWaterfall）；八a R0 → 八b OxbowLake 为独立支线（只阻塞牛轭湖）。被动解锁：S4-X1~X4 专属景观、TA-09 实机样板。
+- **当前施工关键路径**：阶段三已收口（v1.52.6 RiverCliff）→ 八c（FootLake / RidgeWaterfall）；八a R0 → 八b OxbowLake 为独立支线（只阻塞牛轭湖）。被动解锁：S4-X1/X2/X4 专属景观（S4-X3 已解锁）、TA-09 实机样板。
 - **文档节奏**：每个代码阶段独立更新现状文档与 changelog，按根 AGENTS.md 升版、同步 WASM 双副本并执行适用门禁；纯规划修订不升版，不把建议写成已落地能力。
 
 ### R.5 通用门禁与退出标准速查
@@ -729,6 +729,8 @@ fn roll_10000(seed: u64, salt: u64) -> u16 {
 5. **重生成受影响数据**：窗口 AABB 内重新派生 `River` 水面多边形（由变更后的中心线重新派生两岸）、`RiverBank` 轮廓与河阶/岸带 `surface_kind`；牛轭湖轮廓作为新的 `TerrainFeature{kind: WaterBody, id: 216}` 与其 `hydrology.water_bodies` 副本（`water_body_id = 3`）一并写入，两点集须逐字节一致（§5.2.1）。**取水点与水池完全不动**：窗口选址已保证远离所有 `WaterAccessPoint`，故 `WaterPool #1`、岸点、HUD 统计均不受影响。主河仍是 `water_body_id = 1` / 水池 1。
 6. 拒绝条件分两层（见 §5.3）：**几何类**在第 5d 步判定——新河道完整扫掠带侵入边界、浅滩或受保护取水区（使用水系几何校验，不能用拒绝深水的步行 `corridor::segment_valid` 校验河道）、裁弯后河阶可建面积低于配置下限、牛轭湖触及任一浅滩授权走廊、或月牙水域自身不连通、轮廓未闭合、两端封口仍漏水；**全局类**（岸带侵入任一初始必需 POI 的最小安全半径）要到第 10 步才有 POI，交由 §5.8 的有界重试环处理。
 
+> ✅ **已交付（v1.52.6，`TERRAIN_GENERATOR_VERSION` 13→14）**：实现与实测以 [14 号 §9.6 交付注记](../../current/tech/14-terrain-and-network.md) 与 [changelog v1.52.6](../../current/01-changelog.md) 为准。两处实现口径（均为规格兼容收紧）：① 崖基线锚定在**河阶带外缘 +6m**（河岸/河阶属水系优先地表，`RockFace` 不得覆盖，规格下限 `half+bank+8` 自动满足）；② 支撑域（崖体 18m + 外侧回落 12m）**整体**登记 `RockFace`——按坡度/18m 阈值离散切分会产生「可走口袋」（探针实测 2~129 格孤立分量）。
+
 #### D. `RiverCliff`（仅 T2，不产生水体）
 
 1. 选择主河单侧、长度 55–80m 的河段，避开浅滩、`WaterAccessPoint`、泉谷端点和地图边缘。崖顶距河中心须大于 `half_width + bank + 8m`，故不覆盖现有河面/岸带。
@@ -936,11 +938,11 @@ pub struct RiverCenterline {
 | 文件 | 修改内容 | 落地 |
 |---|---|---|
 | `crates/sim_core/src/geo/accents.rs` | RockCluster/GrassTuft 类型生成 | ✅ 已实现；装饰扩展见 §5.5 |
-| `crates/sim_core/src/geo/terrain.rs` | 子特征选择器 `plan_subfeatures()`（§5.3 第 4 步：无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**）+ T1 注入器 | ◐ 选择器已落地（D-B1-3），注入器 ⏳ |
-| `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ◐ §5.3 第 4–5、9 步钩子已接线（D-B1-3，本阶段空操作），注入器 ⏳ |
-| `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 注册 Cliff/Waterfall/WaterBody 特征表 | ⏳ 未改 |
-| `frontend/js/render_terrain.js` | Cliff/Waterfall/WaterBody 特征绘制（★ v1.50.23 装饰已迁至 `render_accents.js` / `accent-model.js` / `accent-season.js`） | ⏳ 未改 |
-| `tools/config-check.js` | 子特征相关配置映射 | ⏳ 未改 |
+| `crates/sim_core/src/geo/terrain.rs` | 子特征选择器 `plan_subfeatures()`（§5.3 第 4 步：无状态 `mix64` 哈希驱动，**不消费 `relief_rng`**）+ T1 注入器 | ◐ 选择器已落地（D-B1-3）；T1 注入器 ⏳ |
+| `crates/sim_core/src/geo/hydrology.rs` | T2 子特征注入器（无状态 `mix64` 哈希驱动，**不消费 `hydro_rng`**，见 §5.3） | ◐ RiverCliff 注入器已落地（v1.52.6，§5.4.D）；OxbowLake ⏳ |
+| `crates/sim_core/src/spatial/snapshot_bin/dict.rs` | 注册 Cliff/Waterfall/WaterBody 特征表 | ◐ Cliff 已注册（v1.52.6，字典码 5）；Waterfall 待 RidgeWaterfall |
+| `frontend/js/render_terrain.js` | Cliff/Waterfall/WaterBody 特征绘制（★ v1.50.23 装饰已迁至 `render_accents.js` / `accent-model.js` / `accent-season.js`） | ◐ Cliff 岩层阴影分支已落地（v1.52.6）；Waterfall ⏳ |
+| `tools/config-check.js` | 子特征相关配置映射 | ✅ 无需改动（RiverCliff 参数为代码内常量，未新增配置字段） |
 | `crates/sim_core/src/spatial/terrain_network.rs` | 无（子特征在路网生成前完成，路网只消费最终地表） | ✅ 无需改动 |
 
 ## 18. 分阶段验收门禁

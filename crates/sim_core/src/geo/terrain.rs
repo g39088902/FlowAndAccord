@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 /// 静态地貌特征。只描述几何，不携带资源、税收或行为语义。
 /// v1.47.7：删除 T1 的 Ridge/Saddle/Terrace 三特征（含台地压平），仅保留水系地貌特征。
 /// ★ TB-03：末尾追加 `WaterBody`（静水闭合水体，盆地泉池/湖畔大湖），不移动旧枚举码位。
+/// ★ 阶段三 D-B2（v1.52.6）：末尾追加 `Cliff`（河谷峭壁崖顶折线，RiverCliff 注入器），
+///   不移动旧枚举码位；FABS 字典码见 `dict.rs::terrain_feature_kind_code`（Cliff=5）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TerrainFeatureKind {
     River,
@@ -16,6 +18,7 @@ pub enum TerrainFeatureKind {
     ShallowFord,
     SpringValley,
     WaterBody,
+    Cliff,
 }
 
 impl TerrainFeatureKind {
@@ -26,6 +29,7 @@ impl TerrainFeatureKind {
             Self::ShallowFord => "ShallowFord",
             Self::SpringValley => "SpringValley",
             Self::WaterBody => "WaterBody",
+            Self::Cliff => "Cliff",
         }
     }
 }
@@ -747,7 +751,13 @@ pub struct TerrainSubFeature {
 ///           消费），盆心直通图缘的 4 条 <19° 垭口通道把外围崇山带切成窄扇区，
 ///           修复噪声山脊孤岛死区（seed=56 components=2 · 20,689 格）；
 ///           同一种子的盆地地形随之改变，其余 profile 逐位不变）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 13;
+/// v1.52.6：13 -> 14（阶段三 D-B2：T2 `RiverCliff` 河谷峭壁注入器落地——第 5 步
+///           几何事务域内施加崖面高程 + `RockFace` 覆盖意图 + `Cliff` 特征
+///           （id=224，`TerrainFeatureKind::Cliff` 枚举码尾部追加，FABS 字典码 5）。
+///           仅 T2 中 RiverCliff 被 plan 命中且通过 §5.4.D 局部判定的种子地形变化
+///           （结构型候选 ~20%：OxbowLake 20% 先裁、RiverCliff 25%×其未命中），
+///           其余 profile 与未命中/被拒种子逐位不变。递增遵循「新分支入库即换版」先例）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 14;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

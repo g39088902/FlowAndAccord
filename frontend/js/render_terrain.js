@@ -424,6 +424,23 @@ function drawFeatureItem(feature, idx) {
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
     ctx.setLineDash([]);
+  } else if (feature.kind === 'Cliff') {
+    // ★ 阶段三 D-B2 河谷峭壁（Cliff，id=224）：崖顶折线 → 岩体阴影带 + 崖缘暗线。
+    //   仅可视化；禁行事实在内核 cells（RockFace|NO_WALK），与 T1 台缘同语义。
+    const _strokeCliffPath = () => {
+      ctx.beginPath();
+      ctx.moveTo(_featProjX[0], _featProjY[0]);
+      for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
+      ctx.stroke();
+    };
+    // 岩体阴影带（崖顶中线向外的宽描边，色相近 RockFace）
+    ctx.strokeStyle = 'rgba(96, 88, 80, 0.38)';
+    ctx.lineWidth = Math.max(5, feature.width * scale * 0.30);
+    _strokeCliffPath();
+    // 崖缘暗线（勾勒崖顶走向）
+    ctx.strokeStyle = 'rgba(58, 52, 48, 0.55)';
+    ctx.lineWidth = Math.max(2, feature.width * scale * 0.10);
+    _strokeCliffPath();
   } else {
     // 其余特征（含 SpringValley 泉谷浅沟）：柔和土褐细带
     ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';

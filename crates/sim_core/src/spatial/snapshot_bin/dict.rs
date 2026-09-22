@@ -37,6 +37,8 @@ pub fn terrain_feature_kind_code(kind: crate::geo::TerrainFeatureKind) -> u8 {
         crate::geo::TerrainFeatureKind::ShallowFord => 2,
         crate::geo::TerrainFeatureKind::SpringValley => 3,
         crate::geo::TerrainFeatureKind::WaterBody => 4,
+        // ★ 阶段三 D-B2（v1.52.6）：Cliff 河谷峭壁（枚举码尾部追加，不移动旧码位）
+        crate::geo::TerrainFeatureKind::Cliff => 5,
     }
 }
 
@@ -47,6 +49,7 @@ pub fn terrain_feature_kind_table() -> Vec<&'static str> {
         crate::geo::TerrainFeatureKind::ShallowFord,
         crate::geo::TerrainFeatureKind::SpringValley,
         crate::geo::TerrainFeatureKind::WaterBody,
+        crate::geo::TerrainFeatureKind::Cliff,
     ]
     .iter()
     .map(|k| k.as_str())

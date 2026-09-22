@@ -1,7 +1,9 @@
 //! 第 5 步完整几何事务。整图隔离包含任意支撑域和差分 halo；不依赖锚点哨兵。
 //! 未提交的候选离开作用域即丢弃，原始地形、计划和 scratch 从未被修改。
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
-use super::terrain::{GenesisScratch, PlannedSubFeature, TerrainMap};
+use super::terrain::{
+    GenesisScratch, PlannedSubFeature, TerrainMap, TerrainSubFeatureKind,
+};
 
 /// 第 5 步登记意图，第 5c/6 步通过同一实现物化。flags 只叠加，不能取消禁行。
 #[derive(Clone)]
@@ -108,11 +110,23 @@ impl TerrainMap {
         let mut order: Vec<usize> = (0..plan.len()).collect();
         order.sort_by_key(|&i| plan[i].kind as u32);
         for i in order {
-            // 各 kind 的几何施加和专属判定在阶段三接入。空注入明确返回 false，
-            // 不把“选中”误报为“接受”；disabled_mask 已在进入此管线前过滤。
-            let structural = plan[i].kind.is_structural();
-            let _ = self.geometry_transaction(scratch, &mut plan[i],
-                move |_, _, _, _| Ok(!structural), |_, _| Ok(()));
+            match plan[i].kind {
+                // ★ 阶段三 D-B2（06 号 §5.4.D）：RiverCliff 河谷峭壁注入器。
+                //   几何施加 + 局部判定（硬禁行 70% 连续带 / 连通分量不增加 /
+                //   取水点圆保护）在事务内完成；Err 局部拒绝整块回滚、不重抽。
+                TerrainSubFeatureKind::RiverCliff => {
+                    let _ = self.geometry_transaction(scratch, &mut plan[i],
+                        super::hydrology::apply_river_cliff, |_, _| Ok(()));
+                }
+                // 其余 kind 仍为空注入：结构型（FootLake/RidgeWaterfall/OxbowLake）
+                // 待各自实施；视觉型无几何、走第 9 步装饰。Ok(false) 不把
+                // “选中”误报为“接受”；disabled_mask 已在进入此管线前过滤。
+                _ => {
+                    let structural = plan[i].kind.is_structural();
+                    let _ = self.geometry_transaction(scratch, &mut plan[i],
+                        move |_, _, _, _| Ok(!structural), |_, _| Ok(()));
+                }
+            }
         }
     }
 }
