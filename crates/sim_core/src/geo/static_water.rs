@@ -87,24 +87,30 @@ impl StaticWaterPlan {
 
     /// 点是否落在闭合轮廓多边形内（射线法，顶点数 O(n)、纯浮点确定性）。
     pub fn point_in_outline(&self, wx: f32, wy: f32) -> bool {
-        let v = &self.outline;
-        if v.len() < 4 {
-            return false;
-        }
-        let mut inside = false;
-        let mut j = v.len() - 1;
-        for i in 0..v.len() {
-            let (xi, yi) = (v[i].x, v[i].y);
-            let (xj, yj) = (v[j].x, v[j].y);
-            if ((yi > wy) != (yj > wy))
-                && (wx < (xj - xi) * (wy - yi) / (yj - yi) + xi)
-            {
-                inside = !inside;
-            }
-            j = i;
-        }
-        inside
+        point_in_polygon(&self.outline, wx, wy)
     }
+}
+
+/// 射线法点-多边形包含判定（顶点数 O(n)、纯浮点确定性、不读任何容器遍历顺序）。
+///
+/// ★ v1.52.0 提取自 `StaticWaterPlan::point_in_outline`，并由装饰落点水线判定
+/// （`accents::near_water_surface`）共用：两处必须判**同一份**几何，禁止各写一份。
+/// 判定式与提取前逐字一致（静水格涂写结果逐比特不变）。
+pub(super) fn point_in_polygon(v: &[Vec3], wx: f32, wy: f32) -> bool {
+    if v.len() < 4 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = v.len() - 1;
+    for i in 0..v.len() {
+        let (xi, yi) = (v[i].x, v[i].y);
+        let (xj, yj) = (v[j].x, v[j].y);
+        if ((yi > wy) != (yj > wy)) && (wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
 }
 
 /// 静水施加（§5.3 第 3 步静水路径）：涂写 cells + 登记 `WaterBody` 特征/水体 + 岸点。

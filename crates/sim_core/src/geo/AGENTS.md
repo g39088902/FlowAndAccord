@@ -20,7 +20,7 @@
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |
 | `corridor.rs` | 廊道/路径几何分析 |
-| `accents.rs` | ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder/RockCluster/GrassTuft，独立 salt RNG）+ ★ S7-03 `grassland_plain_v1` 草原专属分支（GrassTuft 预算 ×8 / Tree ×0.2 孤树 / Bush 泉洼 `SoftGround` 25m 邻域聚集 / 双频哈希草甸斑块场 `grass_patch_field`（固定盐值 `GRSPAT*`，复用 terrain.rs `mix64`）× 残丘坡度疏草）+ ★ S7-05 `hillside_woodland_v1` 半坡密林专属分支（Tree 预算 ×4 / 坡度梯级接受 <6° 0.06 · 6~14° 0.35 · 14~26° 0.95 · ≥26° 0.25 / 水源隔离圆 30m 禁植乔木 / Bush 林缘过渡带偏好 / 共用 `near_soft_ground`）+ ★ S7-05 `trim_trees_near_pois()`（取水点隔离圆裁剪，由 `ecology/seed.rs` 在 POI 落位后调用）——专属分支只改对应 profile，T1/T2 判定与 accent_rng 消费序逐位不变 |
+| `accents.rs` | ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder/RockCluster/GrassTuft，独立 salt RNG）+ ★ S7-03 `grassland_plain_v1` 草原专属分支（GrassTuft 预算 ×8 / Tree ×0.2 孤树 / Bush 泉洼 `SoftGround` 25m 邻域聚集 / 双频哈希草甸斑块场 `grass_patch_field`（固定盐值 `GRSPAT*`，复用 terrain.rs `mix64`）× 残丘坡度疏草）+ ★ S7-05 `hillside_woodland_v1` 半坡密林专属分支（Tree 预算 ×4 / 坡度梯级接受 <6° 0.06 · 6~14° 0.35 · 14~26° 0.95 · ≥26° 0.25 / 水源隔离圆 30m 禁植乔木 / Bush 林缘过渡带偏好 / 共用 `near_soft_ground`）+ ★ S7-05 `trim_trees_near_pois()`（取水点隔离圆裁剪，由 `ecology/seed.rs` 在 POI 落位后调用）+ ★ v1.52.0 落点禁区两道（`EDGE_PROTECTION_RATIO` 地图边缘 3% 环形保护带禁装饰；`WATER_CLEARANCE_M` 装饰中心距 `hydrology.water_bodies` 渲染水面多边形不足净空者拒——`static_water::point_in_polygon` 为静水轮廓与装饰水线判定的唯一射线法实现）——专属分支只改对应 profile，T1/T2 判定与 accent_rng 消费序逐位不变 |
 
 ## 关键易踩坑
 

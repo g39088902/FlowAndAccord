@@ -247,7 +247,7 @@ pub enum AccentKind {
 
 装饰散布规则（当前实现，`geo/accents.rs`）：
 
-- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
+- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）；★ **v1.52.0 起再加两道全局规则**（对所有五种装饰生效，见 `accents.rs::generate_accents_of_kind` 外层禁区）：① **地图边缘保护区**——距世界四边各 `3% × world_size`（764m → 22.9m ≈ 7.6 格）的环形带内不生成任何装饰（沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓）；② **水面净空**——装饰中心到**渲染水面多边形**（`hydrology.water_bodies[*].vertices`：T2 主河闭合带 + 静水闭合轮廓，与前端 `drawRiverBand` / `drawWaterBodyTile` 同源）的距离小于 `WATER_CLEARANCE_M`（3.0m ≈ 一个栅格步长）者拒绝。为什么要加②：`sample_cell` 是**格心**判定，3m 步长下岸线格与真实水线的偏差可达半格（≈1.5m），叠加装饰自身 0.5~2m 视觉体量后，中心贴线的草丛/灌木会半浸在渲染水面里（实测修前最近装饰中心距水线仅 0.36m）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
 - **偏好**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表等权随机**（xy 候选点全图均匀 roll、与面数无关；原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
 - **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25、RockCluster 12、★ v1.51.0 GrassTuft **120**（原 60，用户需求「草的数量翻倍」；乘密度倍率取整；RockCluster/GrassTuft 由 ★ D-B1-5 落地），有界重试 3× 目标数。平地草原 `grassland_plain_v1` 的 GrassTuft 预算仍 ×8（120 → 960 @density=1.0，原 480）。
 - **确定性**：`accent_rng = WorldRng::new(seed ^ ACCENT_RNG_SALT)`，盐值 `0x4143_4345_4E54_3031`（"ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG。
@@ -570,12 +570,14 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 2. 按密度配置生成目标数量：targetCount = round(baseCount * density)
 3. 逐个生成：
    a. accent_rng 生成候选 (wx, wy)
-   b. 查询对应栅格的 surface_kind / slope / fertility
-   c. 检查禁区（DeepWater/ShallowWater、NO_WALK；Boulder + RockFace 例外放行）——
+   b. ★ v1.52.0 检查地图边缘保护区（四边各 3% × world_size 环形带，带内直接拒绝）
+   c. 查询对应栅格的 surface_kind / slope / fertility
+   d. 检查禁区（DeepWater/ShallowWater、NO_WALK，v1.50.73 起**无例外**）——
       道路/房屋/POI 占地此时尚不存在，无法也不应在此检查
-   d. 按偏好加权选择 AccentKind
-   e. 生成 scale (0.7~1.4) 和 rotation (0~2π)
-   f. 命中则写入；未命中则继续（最多 3x targetCount 次重试防死循环）
+   e. ★ v1.52.0 检查水面净空（`near_water_surface`：`hydrology.water_bodies` 多边形内 + 3m 净空）
+   f. 按偏好加权选择 AccentKind
+   g. 生成 scale (0.7~1.4) 和 rotation (0~2π)
+   h. 命中则写入；未命中则继续（最多 3x targetCount 次重试防死循环）
 4. 分配稳定 ID（0, 1, 2, ...）
 5. 输出按 ID 排序
 ```

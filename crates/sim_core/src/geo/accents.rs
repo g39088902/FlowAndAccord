@@ -9,6 +9,10 @@
 //! Tree 预算 ×4、按坡度梯级接受（坡脚草原→坡麓疏林→半坡密林→山脊渐疏）、
 //! 泉源隔离圆禁植乔木；另提供 `trim_trees_near_pois()` 供生态播撒收尾在 POI
 //! 全部落位后执行「交互半径 + 8m」取水点二次隔离（纯视觉裁剪，不消费 RNG）。
+//! ★ v1.52.0：落点禁区新增两道全局规则（见 `EDGE_PROTECTION_RATIO` /
+//!   `WATER_CLEARANCE_M`）——① 地图边缘 3%（× world_size）环形保护带内不生成任何
+//!   装饰；② 装饰中心距「渲染水面多边形」不足净空者拒绝（按 `hydrology.water_bodies`
+//!   真实水线判定，不再依赖格心分类）。
 //!
 //! # 四处同步
 //! 装饰数据需要同步四处（根 AGENTS.md §4.5）：
@@ -81,6 +85,21 @@ const BASE_GRASS_TUFT_COUNT: usize = 120;
 /// 候选点最大重试次数 = 3x 目标总数（防死循环）
 const MAX_RETRY_FACTOR: usize = 3;
 
+// ── ★ v1.52.0 装饰落点禁区（地图边缘保护区 + 水面禁植）──
+// 纯视觉落点过滤：不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构，也不新增 RNG 流
+// （只改候选点的接受/拒绝；accent_rng 消费序仍是「每候选点 2 次 xy + 接受后 2 次缩放/旋转」，
+// 但拒绝会改变后续抽样序列 ⇒ 同种子装饰分布整体重排，属预期视觉变更，同 v1.50.73）。
+/// 地图边缘保护区宽度（× world_size）：四周各 3% 的环形带内不生成任何装饰。
+/// 764m 世界 → 22.9m ≈ 7.6 个栅格步长。沙盘边缘紧贴垂直护壁（`terrain-renderer.js`
+/// 侧壁段），贴边装饰会溢出沙盘轮廓、视觉上「挂」在崖壁上。
+const EDGE_PROTECTION_RATIO: f32 = 0.03;
+/// 陆地装饰离岸净空（米）：装饰中心到「渲染水面多边形」边线距离小于本值时拒绝。
+/// 为什么不能只靠格分类：`sample_cell` 是**格心**判定，3m 步长下岸线格与真实水线的
+/// 偏差可达半格（≈1.5m）；而装饰自带 0.5~2m 视觉体量（草丛/灌木/树冠），中心贴线时
+/// 半边身子会浸进水面（实测修前最近装饰中心距水线仅 0.36m）。取一个栅格步长
+/// （764/255 ≈ 3.0m）作净空，保证整只装饰落在干地。
+const WATER_CLEARANCE_M: f32 = 3.0;
+
 // ── ★ S7-03（STAGE-07-TODO S7-03）平地草原草甸预算与斑块调制常数 ──
 // 只被 `is_grassland` 分支消费，T1/T2 装饰路径零引用（输出逐位不变）；
 // 装饰是纯视觉要素，改值不递增 `TERRAIN_GENERATOR_VERSION`、不动快照结构。
@@ -134,6 +153,10 @@ const HILLSIDE_BUSH_SOFT_PROBE_M: f32 = 25.0;
 /// 按坡度梯级接受、泉源隔离圆禁植乔木、Bush 走林缘过渡带偏好
 /// （见 `HILLSIDE_*` 常数）。半坡取水点二次隔离在本函数之外，由
 /// `ecology/seed.rs` 于 POI 落位后调 `trim_trees_near_pois()` 收口。
+/// ★ v1.52.0：全局落点禁区再收两道（对所有种类生效，见 `EDGE_PROTECTION_RATIO` /
+/// `WATER_CLEARANCE_M`）——地图边缘 3% 保护带内不生成任何装饰；装饰中心距
+/// 「渲染水面多边形」不足净空者拒绝（`hydrology.water_bodies` 由第 3 步定稿，
+/// 早于本步，故可直接按真实水线几何判定，而非依赖格心分类）。
 pub fn generate_accents(
     terrain: &super::terrain::TerrainMap,
     density: f32,
@@ -171,6 +194,8 @@ pub fn generate_accents(
 
     let world_size = terrain.world_size;
     let half_size = world_size / 2.0;
+    // ★ v1.52.0 地图边缘保护区宽度（米）：四周各 3% × world_size。
+    let edge_margin = world_size * EDGE_PROTECTION_RATIO;
 
     let mut id_counter = 0u32;
 
@@ -183,6 +208,7 @@ pub fn generate_accents(
         max_retries,
         terrain,
         half_size,
+        edge_margin,
         &mut accent_rng,
         |wx, wy, cell, rng| {
             // ★ S7-05 半坡密林梯级散布：树木接受概率与坡度正相关（中陡坡高密成林，
@@ -252,6 +278,7 @@ pub fn generate_accents(
         max_retries,
         terrain,
         half_size,
+        edge_margin,
         &mut accent_rng,
         |_wx, _wy, cell, _rng| {
             // ★ v1.50.73 反转：陡坡（≥18°）禁石——巨石不再向坡面聚集；其余地表等权
@@ -272,6 +299,7 @@ pub fn generate_accents(
         max_retries,
         terrain,
         half_size,
+        edge_margin,
         &mut accent_rng,
         |wx, wy, cell, rng| {
             if is_grassland {
@@ -329,6 +357,7 @@ pub fn generate_accents(
         max_retries,
         terrain,
         half_size,
+        edge_margin,
         &mut accent_rng,
         |_wx, _wy, cell, _rng| {
             // ★ v1.50.73：与 Boulder 同规——陡坡（≥18°）禁石群，其余地表等权随机
@@ -348,6 +377,7 @@ pub fn generate_accents(
         max_retries,
         terrain,
         half_size,
+        edge_margin,
         &mut accent_rng,
         |wx, wy, cell, rng| {
             // 候选地表（§5.5 表）：DryGround/SoftGround/RiverTerrace 且坡度 < 24°；
@@ -470,6 +500,72 @@ pub fn trim_trees_near_pois(
     });
 }
 
+/// ★ v1.52.0 水面净空判定：候选点是否落在「渲染水面」内、或离水线不足
+/// `WATER_CLEARANCE_M`（返回 true = 拒绝放装饰）。
+///
+/// 「渲染水面」= `hydrology.water_bodies[*].vertices`——T2 主河闭合带（`hydrology.rs`
+/// `generate_river`）+ 静水闭合轮廓（`static_water.rs::apply_static_water`），
+/// 前端 `drawRiverBand` / `drawWaterBodyTile` 填充的正是这两族多边形，故本判据与
+/// 「玩家看到的蓝面」同源。另一类水格（`ShallowFord` 浅滩）恒落在主河轮廓内，
+/// 由本判据一并覆盖。
+///
+/// 成本：先做 AABB（含净空外扩）短路——河/湖 AABB 只占全图 6%~10% 的候选点，
+/// 其余在 O(1) 内返回；命中 AABB 的点才逐边求点线距（河 193 段 / 湖 44 段）。
+/// 纯查询：不消费 `WorldRng`、不写任何格子。
+fn near_water_surface(terrain: &super::terrain::TerrainMap, wx: f32, wy: f32) -> bool {
+    terrain
+        .hydrology
+        .water_bodies
+        .iter()
+        .any(|wb| point_in_or_near_polygon(&wb.vertices, wx, wy, WATER_CLEARANCE_M))
+}
+
+/// 点是否在多边形内、或到其边线的距离 < `clearance`（顶点数 < 4 视为退化，恒 false）。
+fn point_in_or_near_polygon(v: &[Vec3], wx: f32, wy: f32, clearance: f32) -> bool {
+    if v.len() < 4 {
+        return false;
+    }
+    // AABB 先筛（外扩净空）：绝大多数候选点在此短路，避免逐边求距。
+    let (mut min_x, mut max_x) = (f32::MAX, f32::MIN);
+    let (mut min_y, mut max_y) = (f32::MAX, f32::MIN);
+    for p in v {
+        min_x = min_x.min(p.x);
+        max_x = max_x.max(p.x);
+        min_y = min_y.min(p.y);
+        max_y = max_y.max(p.y);
+    }
+    if wx < min_x - clearance
+        || wx > max_x + clearance
+        || wy < min_y - clearance
+        || wy > max_y + clearance
+    {
+        return false;
+    }
+    if super::static_water::point_in_polygon(v, wx, wy) {
+        return true;
+    }
+    let clearance_sq = clearance * clearance;
+    let n = v.len();
+    for i in 0..n {
+        let a = v[i];
+        let b = v[(i + 1) % n];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let len_sq = dx * dx + dy * dy;
+        let t = if len_sq <= f32::EPSILON {
+            0.0
+        } else {
+            (((wx - a.x) * dx + (wy - a.y) * dy) / len_sq).clamp(0.0, 1.0)
+        };
+        let px = a.x + t * dx - wx;
+        let py = a.y + t * dy - wy;
+        if px * px + py * py < clearance_sq {
+            return true;
+        }
+    }
+    false
+}
+
 /// 生成指定种类和数量的装饰物
 fn generate_accents_of_kind<F>(
     accents: &mut Vec<TerrainAccent>,
@@ -479,6 +575,7 @@ fn generate_accents_of_kind<F>(
     max_retries: usize,
     terrain: &super::terrain::TerrainMap,
     half_size: f32,
+    edge_margin: f32,
     rng: &mut WorldRng,
     accept: F,
 ) where
@@ -496,6 +593,13 @@ fn generate_accents_of_kind<F>(
         let wx = rng.gen_range(-half_size, half_size);
         let wy = rng.gen_range(-half_size, half_size);
 
+        // ★ v1.52.0 地图边缘保护区（四边各 3% × world_size 的环形带）：整带内不落任何
+        // 装饰——沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓。判定只读坐标，不消费
+        // 额外 RNG（代价仅是拒绝后重抽，见 `MAX_RETRY_FACTOR` 余量）。
+        if wx.abs() > half_size - edge_margin || wy.abs() > half_size - edge_margin {
+            continue;
+        }
+
         // 查地表
         let cell = terrain.sample_cell(wx, wy);
 
@@ -506,6 +610,14 @@ fn generate_accents_of_kind<F>(
             || cell.surface_kind == SurfaceKind::ShallowWater
             || cell.feature_flags & super::biome::TERRAIN_FLAG_NO_WALK != 0
         {
+            continue;
+        }
+
+        // ★ v1.52.0 水面净空：格心分类只保证「不在水格里」，岸线格与真实水线的半格偏差
+        // 加上装饰自身视觉体量，仍会让草丛/灌木半浸在渲染水面里。此处按前端实际填充的
+        // 水面多边形（`hydrology.water_bodies`：主河闭合带 + 静水闭合轮廓，与
+        // `drawRiverBand` / `drawWaterBodyTile` 同源）做「内 + 净空」判定。
+        if near_water_surface(terrain, wx, wy) {
             continue;
         }
 
