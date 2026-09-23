@@ -760,7 +760,10 @@ pub struct TerrainSubFeature {
 /// v1.53.0：14 -> 16（八a R0：T2 生成期 `RiverCenterline` 精确距离场、三回环
 ///           meander train，以及沿中心线法向派生河岸/浅滩/取水点/水面轮廓；R0-4
 ///           裁弯候选窗口诊断不拒绝基础世界）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 16;
+/// v1.57.0：16 -> 17（河谷主河蜿蜒振幅在地图两端平滑收敛为垂直入/出图段，
+///           避免河道/河岸法向轮廓顶点越出地图边界并触发 FeatureVerticesInvalid；
+///           仅 T2 轮廓形态改变）。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 17;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

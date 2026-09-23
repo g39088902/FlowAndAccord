@@ -13,6 +13,79 @@ pub struct RiverCenterline {
     pub points: Vec<Vec3>,
     pub cumulative: Vec<f32>,
     pub total: f32,
+    segment_tree: Vec<RiverSegmentNode>,
+}
+
+/// Bounding-volume hierarchy node for exact nearest-segment queries.
+#[derive(Debug, Clone, Copy)]
+struct RiverSegmentNode {
+    min_x: f32,
+    min_y: f32,
+    max_x: f32,
+    max_y: f32,
+    start: usize,
+    end: usize,
+    left: usize,
+    right: usize,
+}
+
+const RIVER_BVH_NO_CHILD: usize = usize::MAX;
+const RIVER_BVH_LEAF_SEGMENTS: usize = 4;
+
+fn build_river_segment_tree(
+    points: &[Vec3],
+    start: usize,
+    end: usize,
+    nodes: &mut Vec<RiverSegmentNode>,
+) -> usize {
+    let mut min_x = f32::INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    for point in &points[start..=end] {
+        min_x = min_x.min(point.x);
+        min_y = min_y.min(point.y);
+        max_x = max_x.max(point.x);
+        max_y = max_y.max(point.y);
+    }
+    let index = nodes.len();
+    nodes.push(RiverSegmentNode {
+        min_x,
+        min_y,
+        max_x,
+        max_y,
+        start,
+        end,
+        left: RIVER_BVH_NO_CHILD,
+        right: RIVER_BVH_NO_CHILD,
+    });
+    if end - start > RIVER_BVH_LEAF_SEGMENTS {
+        let middle = start + (end - start) / 2;
+        let left = build_river_segment_tree(points, start, middle, nodes);
+        let right = build_river_segment_tree(points, middle, end, nodes);
+        nodes[index].left = left;
+        nodes[index].right = right;
+    }
+    index
+}
+
+#[inline]
+fn bounds_distance_squared(bounds: RiverSegmentNode, p: Vec3) -> f32 {
+    let dx = if p.x < bounds.min_x {
+        bounds.min_x - p.x
+    } else if p.x > bounds.max_x {
+        p.x - bounds.max_x
+    } else {
+        0.0
+    };
+    let dy = if p.y < bounds.min_y {
+        bounds.min_y - p.y
+    } else if p.y > bounds.max_y {
+        p.y - bounds.max_y
+    } else {
+        0.0
+    };
+    dx * dx + dy * dy
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,7 +108,11 @@ impl RiverCenterline {
             cumulative.push(cumulative[i - 1] + d);
         }
         let total = *cumulative.last().unwrap_or(&0.0);
-        Self { points, cumulative, total }
+        let mut segment_tree = Vec::with_capacity(points.len().saturating_mul(2));
+        if points.len() >= 2 {
+            build_river_segment_tree(&points, 0, points.len() - 1, &mut segment_tree);
+        }
+        Self { points, cumulative, total, segment_tree }
     }
 
     pub fn sample(&self, s: f32) -> Vec3 {
@@ -53,30 +130,59 @@ impl RiverCenterline {
     /// Exact point-to-polyline distance.  Ties are resolved by the lowest
     /// segment index, making the result deterministic across platforms.
     pub fn distance(&self, p: Vec3) -> (f32, f32, f32) {
-        let mut best_d2 = f32::INFINITY;
-        let mut best_s = 0.0;
-        let mut best_lateral = 0.0;
-        for i in 0..self.points.len().saturating_sub(1) {
-            let a = self.points[i];
-            let b = self.points[i + 1];
-            let dx = b.x - a.x;
-            let dy = b.y - a.y;
-            let len2 = dx * dx + dy * dy;
-            if len2 <= f32::EPSILON { continue; }
-            let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0);
-            let qx = a.x + dx * t;
-            let qy = a.y + dy * t;
-            let ex = p.x - qx;
-            let ey = p.y - qy;
-            let d2 = ex * ex + ey * ey;
-            if d2 < best_d2 {
-                best_d2 = d2;
-                best_s = self.cumulative[i] + len2.sqrt() * t;
-                // Positive = left of the direction of travel.
-                best_lateral = (dx * ey - dy * ex).signum() * d2.sqrt();
-            }
+        if self.segment_tree.is_empty() {
+            return (f32::INFINITY, 0.0, 0.0);
         }
-        (best_d2.sqrt(), best_s, best_lateral)
+        let mut best = (f32::INFINITY, 0.0, 0.0, usize::MAX);
+        self.visit_nearest_segment(0, p, &mut best);
+        (best.0.sqrt(), best.1, best.2)
+    }
+
+    fn visit_nearest_segment(
+        &self,
+        node_index: usize,
+        p: Vec3,
+        best: &mut (f32, f32, f32, usize),
+    ) {
+        let node = self.segment_tree[node_index];
+        if bounds_distance_squared(node, p) > best.0 + best.0.abs().max(1.0) * f32::EPSILON * 8.0 {
+            return;
+        }
+        if node.left == RIVER_BVH_NO_CHILD {
+            for i in node.start..node.end {
+                let a = self.points[i];
+                let b = self.points[i + 1];
+                let dx = b.x - a.x;
+                let dy = b.y - a.y;
+                let len2 = dx * dx + dy * dy;
+                if len2 <= f32::EPSILON { continue; }
+                let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0);
+                let qx = a.x + dx * t;
+                let qy = a.y + dy * t;
+                let ex = p.x - qx;
+                let ey = p.y - qy;
+                let d2 = ex * ex + ey * ey;
+                if d2 < best.0 || (d2 == best.0 && i < best.3) {
+                    best.0 = d2;
+                    best.1 = self.cumulative[i] + len2.sqrt() * t;
+                    // Positive = left of the direction of travel.
+                    best.2 = (dx * ey - dy * ex).signum() * d2.sqrt();
+                    best.3 = i;
+                }
+            }
+            return;
+        }
+        let left = self.segment_tree[node.left];
+        let right = self.segment_tree[node.right];
+        let left_distance = bounds_distance_squared(left, p);
+        let right_distance = bounds_distance_squared(right, p);
+        if left_distance <= right_distance {
+            self.visit_nearest_segment(node.left, p, best);
+            self.visit_nearest_segment(node.right, p, best);
+        } else {
+            self.visit_nearest_segment(node.right, p, best);
+            self.visit_nearest_segment(node.left, p, best);
+        }
     }
 
     /// Signed cross-track distance (positive on the left bank).
@@ -216,6 +322,19 @@ pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig, size: f32) -> Rive
     let mut rng = WorldRng::new(seed ^ 0x4859_4452_4f54_3032);
     let phase = rng.gen_range(-1.0, 1.0);
     let half = size * 0.5;
+    let width = ((cfg.terrain_river_width_min + cfg.terrain_river_width_max) * 0.5).max(12.0);
+    let width_amp = (cfg.terrain_river_width_max - cfg.terrain_river_width_min).max(0.0) * 0.22;
+    // The river/bank outlines are offset along the centerline normal. A meander
+    // tangent with any x component at y=±half pushes those outline vertices
+    // outside the map and trips FeatureVerticesInvalid. Keep the centerline
+    // straight for one maximum half-width plus a safety margin at both borders,
+    // then smoothly fade in/out the meander before it reaches the interior.
+    let edge_inset = width * 0.5 + width_amp.abs() + 4.0;
+    let edge_ramp = edge_inset.max(size / 256.0);
+    let smoothstep = |value: f32| {
+        let t = value.clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
     // Three broad loops provide a real meander train while leaving generous
     // margin for the river terrace.  The phase remains the historical single
     // hydro RNG draw; all derived points are pure arithmetic.
@@ -223,16 +342,21 @@ pub(super) fn plan_river_geometry(seed: u64, cfg: &SimConfig, size: f32) -> Rive
     for i in 0..=256 {
         let t = i as f32 / 256.0;
         let y = -half + t * size;
-        let x = size * 0.155 * (t * std::f32::consts::TAU * 3.0 + phase * 0.35).sin();
+        let edge_distance = (t * size).min((1.0 - t) * size);
+        let taper = smoothstep((edge_distance - edge_inset) / edge_ramp);
+        let x = size
+            * 0.155
+            * (t * std::f32::consts::TAU * 3.0 + phase * 0.35).sin()
+            * taper;
         points.push(Vec3::new(x, y, 0.0));
     }
     RiverGeometry {
         phase,
         level: cfg.terrain_river_water_level,
-        width: ((cfg.terrain_river_width_min + cfg.terrain_river_width_max) * 0.5).max(12.0),
+        width,
         bank: cfg.terrain_river_bank_width.max(8.0),
         terrace: cfg.terrain_river_terrace_width.max(20.0),
-        width_amp: (cfg.terrain_river_width_max - cfg.terrain_river_width_min).max(0.0) * 0.22,
+        width_amp,
         centerline: RiverCenterline::new(points),
     }
 }

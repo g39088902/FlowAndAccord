@@ -1,7 +1,7 @@
 # 06. 地图模板规划：模板库、地形要素与未落地蓝图
 
 > **定位**：本文是地图模板与未落地地形方案的规划权威；已实现机制以 [14 地形与路网](../../current/tech/14-terrain-and-network.md)为准，材质、光照、素材、遮挡与视觉性能见 [07 地形美术](./07-terrain-art.md)。先定义地图的空间结构与玩法，再选择实现它所需的共用基座。
-> **复核基线**：2026-09-23，应用 v1.53.0；源码 `TERRAIN_GENERATOR_VERSION=16`（八a R0 河道表示迁移落地）、存档 `SAVE_FORMAT_VERSION=7`、FABS `FORMAT_VERSION=4`。阶段三与八a 交付见 R.1.1 / §6，旧验收记录保留各自版本基线；实施按变更性质判断版本递增，不照抄旧稿中的目标版本号。
+> **复核基线**：2026-09-23，应用 v1.57.0；源码 `TERRAIN_GENERATOR_VERSION=17`（八a R0 河道表示 + T2 河岸轮廓边界收敛）、存档 `SAVE_FORMAT_VERSION=7`、FABS `FORMAT_VERSION=4`。阶段三与八a 交付见 R.1.1 / §6，旧验收记录保留各自版本基线；实施按变更性质判断版本递增，不照抄旧稿中的目标版本号。
 > **阅读入口**：[R.1 当前状态](#r1-现状快照)（含 [R.1.1 未完成步骤速览与必要性](#r11-未完成步骤速览与必要性)）→ [R.3 阶段计划](#terrain-roadmap) → §2.1 模板清单 → §5/§6 施工契约 → §18 验收。近期任务明细见 [TODO](../../../TODO.md)。阶段二（STAGE2-1~8）与阶段七（S7-01~10）均已收官，专项任务文档随收官归档删除，收口证据见 [14 号 §8.2](../../current/tech/14-terrain-and-network.md)；阶段七探针门禁基线与固定种子验收表收编于 §18.8，交付证据见 [changelog](../../current/01-changelog.md)。
 > **编号约定**：按 [文档导航的编号例外](../../README.md)，保留 R、§0～6、§17～21 及历史任务 ID；本文中的 **§7～16 均指 [14 号现状文档](../../current/tech/14-terrain-and-network.md)的对应章节**。阶段号表示批次，提交组表示变更类型，任务 ID 表示可验收工作项，三者不能互代；不存在必须先完成所有较小阶段号的规则。
 > **文档分工**：R.3 只维护跨批次依赖与范围；专项 TODO 维护原子任务及勾选状态；§2.1 维护模板登记；§4～6 维护设计；§18 保留验收证据。完成代码、完成样板、进入 `random` 是三个独立里程碑。
@@ -575,7 +575,7 @@ pub const NO_RESOURCE_POOL_ID: u32 = 0;
 
 `TerrainMap` 增加 `#[serde(default)] pub sub_features: Vec<TerrainSubFeature>`；每次创世先清空 `features`、`accents`、`sub_features` 和 `hydrology`，再按第 5.3 节重建。`WaterBody.resource_pool_id` 暂保留 `u32`，湖泊填写 `NO_RESOURCE_POOL_ID`；不得把 `None` 扩散为一轮全链路 `Option` 改造。只有将来需要“可采但无 POI”的第三种状态时，才另行迁移为 `Option<u32>`。
 
-结构特征 ID 不能使用 `Vec::len()`、HashMap 遍历顺序或候选失败次数。Accent 是例外：保持既有连续编号，只保证同世界同配置内稳定；跨世界/密度变化不能用其 ID 维持身份，须按生命周期清缓存。**下表中的 `kind_code` 一律指 `TerrainFeatureKind as u32`（0–6），不是 `TerrainSubFeatureKind`**——两者编号空间不同，混用会直接算错 ID。固定分区如下：
+结构特征 ID 不能使用 `Vec::len()`、HashMap 遍历顺序或候选失败次数。Accent 保留既有 ID：POI 避让过滤可造成间隙，剩余 ID 仍按数组顺序严格递增且唯一；ID 仅保证同世界同配置内稳定，跨世界/密度变化不能用其维持身份，须按生命周期清缓存。**下表中的 `kind_code` 一律指 `TerrainFeatureKind as u32`（0–6），不是 `TerrainSubFeatureKind`**——两者编号空间不同，混用会直接算错 ID。固定分区如下：
 
 | 对象 | ID 范围 | 分配规则 |
 | :--- | :--- | :--- |
@@ -599,8 +599,8 @@ pub const NO_RESOURCE_POOL_ID: u32 = 0;
 
 > **修订记录（2026-09-11 审查）**：原表 T2 规则写作 `200 + (kind_code - 4) * 4 + local_index`，且 §5.4 手写了 `104` / `105` / `220` 三个 ID。这三者在「`kind_code` = `TerrainFeatureKind`」与「= `TerrainSubFeatureKind`」两种解读下都推不出来（`Waterfall` 应为 120、`SpringValley` 应为 112、`Cliff` 应为 224）。现统一为同一条公式，§5.4 的 ID 全部改由本表推导。
 
-**待补全的集合校验（STAGE2-4；子特征容器排序校验已落地）**：结构 ID 必须唯一；新子特征集合按 `id` 升序，既有 `features` 保持生成顺序（当前 T2 为 10、11、1、20、21、30），`accents` 保持既有连续顺序。`feature_ids` 和所有几何顶点须在创建时固定顺序，不能在前端重排序。实际改变集合顺序会影响快照字节；先核对既有顺序，纯重构阶段只加兼容校验，必要的排序变更独立提交并同步 14 号描述。
-✅ **STAGE2-4（v1.50.47）已落地**：断言集实现于 `geo/validation.rs`（`validate_static_terrain_geometry` 只读不修复、不重排），第 7 步薄分发接线。覆盖：特征 ID 唯一 + 按 profile 归属/kind 期望映射（T2 核心水系 1/10/11/20/21/30、草原/半坡水源 30–31、山口/T2 子特征预留段 100–127/200–227）+ 顶点在界；子特征升序唯一 + `feature_ids` 引用存在 + accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（水体 1 额外断言 kind==`River`；其余水体在 `WaterBody` 特征枚举随 D-B2 落地前不按 kind 拒绝）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 连续（供存档路径复用）。验收：4 profile × seed 0–59 合法矩阵平凡通过 + 9 项破坏夹具稳定失败码（临时脚本用后删除）。
+**待补全的集合校验（STAGE2-4；子特征容器排序校验已落地）**：结构 ID 必须唯一；新子特征集合按 `id` 升序，既有 `features` 保持生成顺序（当前 T2 为 10、11、1、20、21、30），`accents` 保持原 ID 顺序（严格递增且唯一，允许过滤造成的间隙）。`feature_ids` 和所有几何顶点须在创建时固定顺序，不能在前端重排序。实际改变集合顺序会影响快照字节；先核对既有顺序，纯重构阶段只加兼容校验，必要的排序变更独立提交并同步 14 号描述。
+✅ **STAGE2-4（v1.50.47）已落地**：断言集实现于 `geo/validation.rs`（`validate_static_terrain_geometry` 只读不修复、不重排），第 7 步薄分发接线。覆盖：特征 ID 唯一 + 按 profile 归属/kind 期望映射（T2 核心水系 1/10/11/20/21/30、草原/半坡水源 30–31、山口/T2 子特征预留段 100–127/200–227）+ 顶点在界；子特征升序唯一 + `feature_ids` 引用存在 + accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（水体 1 额外断言 kind==`River`；其余水体在 `WaterBody` 特征枚举随 D-B2 落地前不按 kind 拒绝）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 严格递增且唯一（允许 POI 避让过滤后有间隙，供存档路径复用）。验收：4 profile × seed 0–59 合法矩阵平凡通过 + 9 项破坏夹具稳定失败码（临时脚本用后删除）。
 
 ### 5.3 无歧义的创世流水线
 

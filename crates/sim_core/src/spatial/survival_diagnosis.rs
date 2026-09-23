@@ -2,6 +2,8 @@
 //!
 //! 06 号 §5.3 第 11 步 / §5.8「生存诊断」：按**实际配置**枚举初始营地与必需资源
 //! （水 / 粮）及市场，逐营地检查路网可达性，并计算坡度/软地折算后的往返成本。
+//! 水源 / 浆果往返受代谢成本门槛约束；市场只要求路网可达，不限制往返时间，
+//! 即使作为水 / 粮补给的替代 POI 也不受该时间门槛限制。
 //! 本模块只读世界（`&self`），不修改任何状态、不触发拒绝或重试——是否据诊断
 //! 拒绝并重试由 STAGE2-5 有界回退环决定。
 //!
@@ -15,11 +17,11 @@
 //!   自饮自食满仓再出发（「无家宅者只在现场自饮自食」），现场采收与到家卸货
 //!   发生在安全点、不构成途中代谢风险——因此约束是**每一程**都不得耗尽自身
 //!   容量，即 `允许往返 = 2 × capacity / 代谢速率`；粮食代谢按名义消化效率
-//!   1.0（`digestion_efficiency=100` 的初始族人）；市场互市是以金换粮/水的
-//!   补给行程，预算口径与粮食一致。
+//!   1.0（`digestion_efficiency=100` 的初始族人）；市场互市只记录往返成本，
+//!   不设时限门槛。
 //!
 //! 失败码：`SpawnDisconnected`（营地或资源类无合法路网路径）、
-//! `SurvivalCostExceeded`（往返成本超预算）。阈值随默认配置矩阵校准
+//! `SurvivalCostExceeded`（水 / 粮往返成本超预算）。阈值随默认配置矩阵校准
 //! （记录见 06 号 §18.1 / 14 号文 §8.2），不凭地貌名推断安全。
 //!
 //! ⚠️ 诊断依赖已注入的非零配置（前端 config.js 是默认值真相源）；退化零值
@@ -43,7 +45,7 @@ const NOMINAL_DIGESTION_RATIO: f32 = 1.0;
 pub enum SurvivalDiagnosticCode {
     /// 营地本身未接入路网，或某必需资源类（水/粮/市场）无任何可达 POI。
     SpawnDisconnected,
-    /// 可达但往返成本超过代谢预算。
+    /// 可达但水源 / 浆果往返成本超过代谢预算。
     SurvivalCostExceeded,
 }
 
@@ -63,8 +65,8 @@ pub struct ResourceLinkReport {
     pub poi_id: u32,
     /// 往返成本（仿真秒，含软地/浅滩/坡度折算）。
     pub round_trip_cost_s: f32,
-    /// 允许往返预算（仿真秒 = 2 × 单程代谢预算，两端满仓出发口径）。
-    pub budget_s: f32,
+    /// 允许往返预算；选中的 POI 为市场时不设时间门槛，因此为 `None`。
+    pub budget_s: Option<f32>,
 }
 
 /// 单个营地的生存诊断报告。
@@ -118,10 +120,9 @@ impl World3DEngine {
         let food_budget = 2.0 * cfg.agent_hunger_capacity
             / (cfg.agent_base_metabolism_decay.max(1e-6) / NOMINAL_DIGESTION_RATIO);
         let classes = [
-            (CLASS_WATER, water_budget),
-            (CLASS_FOOD, food_budget),
-            // 市场互市本质是以金换粮/水的补给行程，预算口径与粮食一致。
-            (CLASS_MARKET, food_budget),
+            (CLASS_WATER, Some(water_budget)),
+            (CLASS_FOOD, Some(food_budget)),
+            (CLASS_MARKET, None),
         ];
 
         let mut camps = Vec::new();
@@ -145,7 +146,7 @@ impl World3DEngine {
             };
             // 每营地一次单源 Dijkstra（微秒整型权重，确定性无浮点并列问题）。
             let dist = self.lane_time_micros_from(camp_node);
-            for (class, allow_s) in &classes {
+            for (class, budget_s) in &classes {
                 // 候选 = 该类 POI 中已接入路网者；最优 = 单程时间最小。
                 let mut best: Option<(u64, u32)> = None;
                 for cand in self
@@ -177,20 +178,31 @@ impl World3DEngine {
                     continue;
                 };
                 let round_trip = micros as f32 / 1e6 * 2.0;
+                let selected_is_market = self
+                    .pois
+                    .iter()
+                    .any(|candidate| candidate.id == poi_id && candidate.poi_type == PoiType::Market);
+                let selected_budget_s = if selected_is_market {
+                    None
+                } else {
+                    *budget_s
+                };
                 let link = ResourceLinkReport {
                     poi_id,
                     round_trip_cost_s: round_trip,
-                    budget_s: *allow_s,
+                    budget_s: selected_budget_s,
                 };
-                if round_trip > *allow_s {
-                    report.failures.push((
-                        SurvivalDiagnosticCode::SurvivalCostExceeded,
-                        class.name,
-                        format!(
-                            "往返 {:.1}s 超预算 {:.1}s（最优 POI #{}）",
-                            round_trip, allow_s, poi_id
-                        ),
-                    ));
+                if let Some(allow_s) = selected_budget_s {
+                    if round_trip > allow_s {
+                        report.failures.push((
+                            SurvivalDiagnosticCode::SurvivalCostExceeded,
+                            class.name,
+                            format!(
+                                "往返 {:.1}s 超预算 {:.1}s（最优 POI #{}）",
+                                round_trip, allow_s, poi_id
+                            ),
+                        ));
+                    }
                 }
                 match class.name {
                     "water" => report.water = Some(link),

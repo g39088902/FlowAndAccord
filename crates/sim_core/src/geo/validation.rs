@@ -262,13 +262,15 @@ fn validate_cells(t: &TerrainMap) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// 断言 5：通用装饰 ID 连续（0..N-1）。第 7 步执行时装饰尚未散布（恒空、平凡通过）；
-/// 本断言供存档加载路径复用整套校验时兜底（06 号 §5.2「accents 保持既有连续顺序」）。
+/// 断言 5：通用装饰 ID 按数组顺序严格递增且唯一；POI 避让过滤可留下 ID 间隙。
+/// 第 7 步执行时装饰尚未散布（恒空、平凡通过）；本断言也供存档加载路径复用。
 fn validate_accents(t: &TerrainMap) -> Result<(), &'static str> {
-    for (i, a) in t.accents.iter().enumerate() {
-        if a.id != i as u32 {
-            return Err("AccentIdsNonSequential");
+    let mut previous_id = None;
+    for accent in &t.accents {
+        if previous_id.is_some_and(|id| accent.id <= id) {
+            return Err("AccentIdsNotStrictlyAscending");
         }
+        previous_id = Some(accent.id);
     }
     Ok(())
 }

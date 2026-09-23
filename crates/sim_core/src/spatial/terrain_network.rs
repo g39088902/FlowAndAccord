@@ -7,9 +7,75 @@ impl World3DEngine {
             && occupied.iter().all(|o| {let dx=o.x-q.x;let dy=o.y-q.y;(dx*dx+dy*dy).sqrt()>=self.config.poi_min_distance*self.config.poi_spawn_fallback_ratio});
         let mut p=p;p.z=self.terrain.sample_elevation(p.x,p.y);
         if valid(p){return Some(p);}
-        let mut candidates:Vec<_>=(0..self.terrain.cells.len()).map(|i|self.terrain.grid_pos(i%self.terrain.grid_width,i/self.terrain.grid_width)).filter(|q|valid(*q)).collect();
-        candidates.sort_by(|a,b|a.distance_to(&p).total_cmp(&b.distance_to(&p)).then(a.x.total_cmp(&b.x)).then(a.y.total_cmp(&b.y)));
-        candidates.first().copied()
+        // 从目标格向外扩圈。全图排序即使改成单遍最小值仍会为每个失效 POI
+        // 扫描全部 256² 个格；扩圈后找到候选，并证明未扫描区域更远时即可结束。
+        // 比较键与旧排序一致，保持距离相同时按 x/y 稳定打破平局。
+        let (center_x, center_y) = self.terrain.grid_index(p.x, p.y);
+        let max_radius = center_x
+            .max(self.terrain.grid_width - 1 - center_x)
+            .max(center_y)
+            .max(self.terrain.grid_height - 1 - center_y);
+        let mut best: Option<(Vec3, f32)> = None;
+        for radius in 0..=max_radius {
+            let x0 = center_x.saturating_sub(radius);
+            let x1 = (center_x + radius).min(self.terrain.grid_width - 1);
+            let y0 = center_y.saturating_sub(radius);
+            let y1 = (center_y + radius).min(self.terrain.grid_height - 1);
+            for gy in y0..=y1 {
+                for gx in x0..=x1 {
+                    if radius > 0
+                        && gx != x0
+                        && gx != x1
+                        && gy != y0
+                        && gy != y1
+                    {
+                        continue;
+                    }
+                    let candidate = self.terrain.grid_pos(gx, gy);
+                    if !valid(candidate) {
+                        continue;
+                    }
+                    let distance = candidate.distance_to(&p);
+                    let replace = best.map_or(true, |(current, current_distance)| {
+                        distance
+                            .total_cmp(&current_distance)
+                            .then(candidate.x.total_cmp(&current.x))
+                            .then(candidate.y.total_cmp(&current.y))
+                            .is_lt()
+                    });
+                    if replace {
+                        best = Some((candidate, distance));
+                    }
+                }
+            }
+
+            if let Some((_, best_distance)) = best {
+                // 任一未扫描格都在当前矩形外，故至少超出其某一条边；用该轴
+                // 到最近未扫描格中心的距离作保守下界。严格大于才提前结束，
+                // 让等距候选仍参与 x/y 平局判定。
+                let mut unscanned_lower_bound = f32::INFINITY;
+                if x0 > 0 {
+                    let x = self.terrain.grid_pos(x0 - 1, center_y).x;
+                    unscanned_lower_bound = unscanned_lower_bound.min((x - p.x).abs());
+                }
+                if x1 + 1 < self.terrain.grid_width {
+                    let x = self.terrain.grid_pos(x1 + 1, center_y).x;
+                    unscanned_lower_bound = unscanned_lower_bound.min((x - p.x).abs());
+                }
+                if y0 > 0 {
+                    let y = self.terrain.grid_pos(center_x, y0 - 1).y;
+                    unscanned_lower_bound = unscanned_lower_bound.min((y - p.y).abs());
+                }
+                if y1 + 1 < self.terrain.grid_height {
+                    let y = self.terrain.grid_pos(center_x, y1 + 1).y;
+                    unscanned_lower_bound = unscanned_lower_bound.min((y - p.y).abs());
+                }
+                if unscanned_lower_bound > best_distance {
+                    break;
+                }
+            }
+        }
+        best.map(|(candidate, _)| candidate)
     }
     pub(crate) fn prepare_terrain_layout(&mut self) {
         let mut occupied:Vec<Vec3>=self.terrain.hydrology.access_points.iter().map(|a|a.pos).collect();
@@ -167,7 +233,25 @@ impl World3DEngine {
         let mut degrees=std::collections::BTreeMap::<u32,usize>::new();
         for (_,a,b) in pairs {
             let connected=petgraph::algo::has_path_connecting(&self.network.graph,self.network.node_map[&a],self.network.node_map[&b],None);
-            if connected && *degrees.get(&a).unwrap_or(&0)>=3 && *degrees.get(&b).unwrap_or(&0)>=3{continue;}
+            let degree_a = *degrees.get(&a).unwrap_or(&0);
+            let degree_b = *degrees.get(&b).unwrap_or(&0);
+            if connected && degree_a >= 3 && degree_b >= 3 {continue;}
+            if connected {
+                // 已连通节点间的绕行边只增加网格密度，不承担连通性；若直线不合法，
+                // 跳过可选的全图 A* 绕行搜索，避免河流两岸节点反复搜索同一无授权跨水路线。
+                let pa = self.network.graph[self.network.node_map[&a]].pos;
+                let pb = self.network.graph[self.network.node_map[&b]].pos;
+                if !corridor::segment_valid(
+                    &self.terrain,
+                    pa,
+                    pb,
+                    self.config.terrain_road_corridor_width,
+                    self.config.terrain_max_walk_slope,
+                    None,
+                ) {
+                    continue;
+                }
+            }
             if self.connect_land_nodes(a,b){*degrees.entry(a).or_default()+=1;*degrees.entry(b).or_default()+=1;}
         }
     }

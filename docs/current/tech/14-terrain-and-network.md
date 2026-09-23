@@ -2,7 +2,7 @@
 
 ## R0 T2 河道表示迁移（v1.53.0）
 
-T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档，生成器版本推进至 16，旧 T2 地形存档按既有版本门禁拒绝。
+T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17，旧 T2 地形存档按既有版本门禁拒绝。
 
 > **层级**：下层 · 世界与物理层。
 > **本文构成**：原 `current/01-spatial-network.md` + 原 `../../plan/tech/06-terrain-templates.md` 第二部分「支撑所有地图模板的共用技术基座」（已落地契约）。模板库与未来蓝图见 [06 地图模板规划](../../plan/tech/06-terrain-templates.md)。
@@ -337,8 +337,8 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 两套只读校验服务已落地，自 STAGE2-5（v1.50.49）起由世界初始化事务消费：静态几何校验在创世第 7 步运行、失败码以 `Geometry:` 前缀进入有界降级环（§8.2）；生存诊断在候选生态播撒后运行、失败码以 `Survival:` 前缀进入同一环。诊断本身保持 `&self` 只读、不改变世界。
 
-- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 连续。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。
-- **生存成本诊断**（`spatial/survival_diagnosis.rs::World3DEngine::diagnose_survival`）：按实际配置枚举营地 POI（不硬编码数量），逐营地一次单源 Dijkstra（微秒整型权重，确定性）检查水/粮/市场三类资源的路网可达与往返成本。成本口径与生产寻路一致（`terrain_time_cost` 软地/浅滩折算 + 上坡 `Δz×grade_coef` 坡度折算，车道限速按创世态磨损 0 的 `road_level_factor`）；预算由现有配置推导、无新增超参：资源点与家宅两端可满仓自饮自食 ⇒ 往返允许 `2×capacity/代谢速率`（名义消化效率 1.0），市场口径同粮。输出 `SurvivalReport{camps, ok, worst_code}` 与每营地 `ResourceLinkReport{poi_id, round_trip_cost_s, budget_s}`；失败码 `SpawnDisconnected` / `SurvivalCostExceeded`。⚠️ `NodeId` 从 1 起、petgraph `NodeIndex` 从 0 起，查距必须经 `node_map` 映射；矩阵校准（v1.50.47）：4 profile × seed 0–59 全通过，市场往返最远 441.7s（预算 500s）。
+- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 按数组顺序严格递增且唯一，POI 避让过滤保留原 ID 时允许有间隙。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。
+- **生存成本诊断**（`spatial/survival_diagnosis.rs::World3DEngine::diagnose_survival`）：按实际配置枚举营地 POI（不硬编码数量），逐营地一次单源 Dijkstra（微秒整型权重，确定性）检查水/粮/市场三类资源的路网可达与往返成本。成本口径与生产寻路一致（`terrain_time_cost` 软地/浅滩折算 + 上坡 `Δz×grade_coef` 坡度折算，车道限速按创世态磨损 0 的 `road_level_factor`）；水源 / 浆果预算由现有配置推导、无新增超参：资源点与家宅两端可满仓自饮自食 ⇒ 往返允许 `2×capacity/代谢速率`（名义消化效率 1.0）。市场仍要求路网可达并记录往返成本，但无 500s 往返时间门槛；市场被选作水 / 粮补给 POI 时也不受该门槛约束。输出 `SurvivalReport{camps, ok, worst_code}` 与每营地 `ResourceLinkReport{poi_id, round_trip_cost_s, budget_s}`（选中市场时 `budget_s=None`）；失败码 `SpawnDisconnected` / `SurvivalCostExceeded`，后者仅用于清泉 / 浆果超预算。⚠️ `NodeId` 从 1 起、petgraph `NodeIndex` 从 0 起，查距必须经 `node_map` 映射；历史校准矩阵（v1.50.47）：4 profile × seed 0–59 全通过，市场往返最远 441.7s。
 
 ### 8.2 世界初始化事务、有界降级与阶段二收口记录（v1.50.49 · STAGE2-5/8）
 
@@ -508,6 +508,8 @@ T2 包含“一条蜿蜒主河 + 两处静态浅滩通道 + 两岸河阶 + 泉�
 2. ✅ 河床高程统一凹陷（`level - 1.4`），地表标记为 `DeepWater`，写入 `NO_BUILD|NO_WALK`，关联 `water_body_id = Some(1)`。
 3. ✅ 河道外缘向外生成宽度为 `bank` 的 `RiverBank`（标记 `NO_BUILD|SHORE_ACCESS`），再向外生成宽度为 `terrace` 的 `RiverTerrace`（天然高肥力 0.95，平缓河阶地表）。
 4. ✅ 在南侧（`-size*0.24`）与北侧（`size*0.24`）生成两处 `TerrainConnection` 浅滩跨水走廊，河床局部抬高为浅水（`ShallowWater`），写入 `NO_BUILD|CROSSING_CANDIDATE`，并生成 `ShallowFord` 地貌特征折线。
+
+跨水授权必须按 `TerrainConnection.start → end` 的局部纵向/法向坐标验证；不得假定渡口轴线恒沿世界 x 轴或横向恒为世界 y。主河 meander 的法线方向随种子变化，且端点顺序可能使 x 递减；轴对齐校验会拒绝合法浅滩、造成河谷两岸路网断开。
 5. ✅ 生成水面双侧轮廓与河岸轮廓（`River` 与 `RiverBank` 特征）。
 6. ✅ 在河流两岸交替布置水源取水点（`WaterAccessPoint`），统一绑定至共享水池 `WaterPool #1`。
 7. ✅ 生成从河岸高地汇入主河的浅沟特征 `SpringValley`（不产生独立水库存）。
@@ -649,9 +651,10 @@ T0 基础契约、T1 山地、T2 水系骨干与 D-A 装饰层已全链路打通
   - `segment_valid(t, a, b, width, slope, crossing)` 检查线段覆盖的网格单元，硬禁行 `DeepWater`、`RockFace`、越界与无授权水域；有 `crossing_id` 时允许横向穿越 `ShallowWater`。
   - `validate_curve(t, curve, width, slope, crossing)` 递归自适应二分贝塞尔曲线，对每一段进行走廊宽度栅格化覆盖校验。
   - `route(t, a, b, cfg)` 基于网格的确定性 A* 寻路，在避开深水与陡坡的同时，沿软地和河岸搜索最优通行走廊，并执行视线贪心合并（Raycast Shortcutting）。
+- **河谷中心线距离场**（`geo/hydrology.rs::RiverCenterline::distance`）：河谷基底与水系覆盖需对大量网格采样精确折线距离。线段包围盒树按点到盒子的距离下界剪除不可能成为最近线段的子树；线段投影公式与等距时最低线段编号规则不变。
 - **地形感知路网生成**（`spatial/terrain_network.rs`）：
   - `prepare_terrain_layout`：将 POI 与路网节点移动到合法陆地位置，水源 POI 绑定河岸取水点，非水 POI 避开深水与水系。
-  - `connect_terrain_world`：优先为浅滩连接（`TerrainConnection`）在两岸建立交叉节点并授权跨水车道；其余地表节点通过 `corridor::route` 连接为稳定的近邻骨架与连通分量补边。
+  - `connect_terrain_world`：优先为浅滩连接（`TerrainConnection`）在两岸建立交叉节点并授权跨水车道；其余地表节点通过 `corridor::route` 连接为稳定的近邻骨架与连通分量补边。图已连通后，额外密度边仅尝试直线合法连接，跳过不必要的全图绕行 A*；节点位置回退从原落点按网格环向外搜索，找到合法候选并证明未扫描区域更远后提前停止，等价保留原最近距离及 x/y 平局规则。
   - `validate_terrain_world`：**读档时**校验全图车道均符合地表通行规则，且全体 POI 均在连通图内。创世侧不调用它，而是由 `commit_terrain_path` 在提交前用同一判据（`corridor::validate_curve`）前置复核——v1.50.17 前创世不自检，曾产出「存档即读不回」的车道，详见 §9.3.1。
 
 ### 11.2 LaneEdge3D 扩展与地形通行代价

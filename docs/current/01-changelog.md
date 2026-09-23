@@ -1,7 +1,19 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.53.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.57.0**。
+
+| **v1.57.0** | **修复河谷地图触发 `Geometry:FeatureVerticesInvalid` 并降级**：根因是三回环河道中心线延伸到地图上下边界时仍有横向切线，河道与河岸沿法线构造的轮廓顶点会越出地图，导致静态几何门禁拒绝 T2。现使中心线在边界内侧保持直线、在有足够河宽余量后平滑渐入渐出蜿蜒，保持轮廓在界内且保留地图内部的蜿蜒形态；不增加 RNG 消耗。河谷生成器版本 16→17，存档兼容线升至 v1.57。release 编译并同步 WASM 双副本；遵照用户要求未运行浏览器、种子、探针或自动化测试。 | crates(sim_core/geo/hydrology.rs, terrain.rs, spatial/world_save.rs), docs(geo/AGENTS, 14, changelog), version |
+
+| **v1.56.0** | **修正河谷浅滩授权的方向判定并缩短创世耗时**：`corridor::segment_valid` 原先用世界 x/y 轴范围验证 `TerrainConnection`，隐含要求渡口水平且 x 递增；v1.53 三回环中心线让渡口随河道法线旋转，局部坐标判定现按渡口轴线投影和法向偏距验证。另为河道中心线距离场加入确定性线段 BVH，并将非法落点改为网格环扩展早停。用户随后报告河谷地图仍会降级，具体首个失败码 `Geometry:FeatureVerticesInvalid` 已于 v1.57.0 修复。release 编译并同步 WASM 双副本；当时按用户要求未运行浏览器、种子探针或其他测试。兼容线升至 v1.56，旧存档按规则失效。 | crates(sim_core/geo/{corridor.rs, hydrology.rs}, spatial/terrain_network.rs, world_save.rs), docs(geo/AGENTS, spatial/AGENTS, 14, changelog), version |
+
+| **v1.55.1** | **压缩河谷型地图创世耗时**：河谷基底与河道覆盖会对网格反复查询河道中心线；旧 `RiverCenterline::distance` 每格线性检查全部 256 段，河谷型独有的两轮全图工作约触发数千万段投影。现构建确定性线段包围盒树，按点到包围盒的保守下界剪枝，保留精确线段投影、最低段号平局规则和地形输出语义。另将非法 POI 落位从全网格扫描改为带距离下界的网格环扩展。未运行浏览器或种子探针。 | crates(sim_core/geo/hydrology.rs, spatial/terrain_network.rs), docs(geo/AGENTS, spatial/AGENTS, 14, changelog), version |
+
+| **v1.55.0** | **缩短地形 POI 落位与路网创世的极端耗时路径**：`legal_land_position` 找最近合法格由「全网格分配候选并排序」改为保持原距离/x/y 平局规则的单遍最小值扫描；路网已连通后，额外密度边若直线走廊不合法则跳过可选的全图 A* 绕行，仍保留组件连通所需的寻路和浅滩授权连接。按用户要求未启动浏览器、未运行种子或自动化测试；release 编译通过并同步 WASM 双副本。**兼容线升至 v1.55，旧存档按规则失效。** | crates(sim_core/spatial/terrain_network.rs, world_save.rs), docs(spatial/AGENTS, 14, changelog), version |
+
+| **v1.54.1** | **取消市场往返时间拒绝门槛**：恢复市场原有随机落位，不按营地群中心调整位置；生存诊断仍检查营地到市场的路网可达性并记录往返时间，但市场行程不再因超过 500 秒拒绝世界。市场被选作水 / 粮补给 POI 时也不受该时间门槛约束；专用水源 / 浆果仍按各自代谢预算校验。`ResourceLinkReport.budget_s` 对选中的市场返回 `None`。存档兼容线维持 v1.54。 | crates(sim_core/spatial/survival_diagnosis.rs), docs(spatial/AGENTS, 14, changelog), version |
+
+| **v1.53.1** | **修复 seed=2 半坡林地创世被错误降级为 `flat_baseline`**：半坡树木 POI 避让按设计过滤装饰但保留原始 ID，形成间隙；静态地形校验原先要求 ID 与数组下标连续，误报 `AccentIdsNonSequential` 并触发降级。校验现要求装饰 ID 按数组顺序严格递增且唯一，允许过滤留下间隙；不重编号，保持 `accent.id` 派生外观身份稳定。存档结构与兼容线不变。 | crates(sim_core/geo/validation.rs), docs(geo/AGENTS, ecology/AGENTS, 06, 14, changelog), version |
 
 | **v1.53.0** | **八a R0 · T2 河道表示迁移**：新增生成期 `RiverCenterline`（累计弧长、精确点到折线距离、符号横距、弧长采样与 R0-4 候选窗口诊断）；T2 河道带改用精确距离场，河岸/河阶、水面轮廓、两处浅滩端点、取水点全部按中心线法向/弧长派生；中心线为三回环 meander train，保持独立 `hydro_rng` 相位且不进入存档。R0-4 几何量仅作候选局部谓词，无合格窗口时不拒绝基础世界；`TERRAIN_GENERATOR_VERSION` 14→16。`terrain_probe world 20`：random/river_valley 20/20 创世校验通过、可行走连通分量恒 1，T2 最少车道 144。**存档兼容线推进 v1.52→v1.53，旧档按设计废弃。** | crates/sim_core/src/geo/{hydrology.rs,terrain.rs,mod.rs}, docs(plan/tech/06,current/tech/14), version |
 

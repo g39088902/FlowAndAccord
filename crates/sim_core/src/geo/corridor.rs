@@ -38,6 +38,27 @@ pub fn segment_valid(t:&TerrainMap,a:Vec3,b:Vec3,width:f32,slope:f32,crossing:Op
     let (x0,y0)=t.grid_index(a.x.min(b.x)-r,a.y.min(b.y)-r);
     let (x1,y1)=t.grid_index(a.x.max(b.x)+r,a.y.max(b.y)+r);
     let auth=crossing.and_then(|id|t.hydrology.connections.iter().find(|c|c.id==id));
+    // 授权走廊方向由实际河道法线决定，不能假设跨水方向恒为 x、横向偏移恒为 y。
+    // T2 meander 在不同种子/河段角度不同；轴对齐判定会误拒绝旋转的合法渡口，
+    // 随后路网创世会对两岸节点反复运行不可能穿水的无授权 A*。
+    let auth_segment_valid = auth.map(|f| {
+        let fx = f.end.x - f.start.x;
+        let fy = f.end.y - f.start.y;
+        let length_squared = fx * fx + fy * fy;
+        if length_squared <= f32::EPSILON {
+            return false;
+        }
+        let length = length_squared.sqrt();
+        [a, b].into_iter().all(|p| {
+            let px = p.x - f.start.x;
+            let py = p.y - f.start.y;
+            let along = (px * fx + py * fy) / length;
+            let lateral = (fx * py - fy * px).abs() / length;
+            along >= -radius
+                && along <= length + radius
+                && lateral + radius <= f.width * 0.5
+        })
+    });
     let dx=b.x-a.x;let dy=b.y-a.y;
     let dx_ok=dx.abs()>=1e-7;let dy_ok=dy.abs()>=1e-7;
     let invdx=if dx_ok {1.0/dx}else{0.0};
@@ -57,10 +78,8 @@ pub fn segment_valid(t:&TerrainMap,a:Vec3,b:Vec3,width:f32,slope:f32,crossing:Op
             if !seg_box_hit(a.x,a.y,b.x,b.y,p.x-r,p.y-r,p.x+r,p.y+r,invdx,invdy,dx_ok,dy_ok){continue;}
             if c.slope_angle_deg>slope{return false;}
             if water {
-                let Some(f)=auth else {return false;};
-                // 授权只覆盖该连接的横向走廊；禁止普通路线借浅滩沿河行进。
-                if (a.y-f.start.y).abs()+radius>f.width*0.5 || (b.y-f.start.y).abs()+radius>f.width*0.5 {return false;}
-                if a.x.min(b.x)<f.start.x-radius || a.x.max(b.x)>f.end.x+radius{return false;}
+                // 授权只覆盖该连接轴线的有限走廊；禁止普通路线借浅滩沿河行进。
+                if auth_segment_valid != Some(true) {return false;}
             } else {return false;}
         }
     }}

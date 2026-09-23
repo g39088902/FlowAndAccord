@@ -47,6 +47,8 @@ tick.rs::tick_poi_interactions(dt)             ← world_tick.rs 管线步骤 3�
 
 ## 四、局部易踩坑
 
+- **半坡树木 POI 避让保留稳定 ID**：`trim_trees_near_pois()` 过滤树木时不重排剩余 accent ID，因此数组中的 ID 可有间隙，但必须保持严格递增且唯一；不要为消除间隙而重新编号，否则会改变由 `accent.id` 派生的外观身份。
+
 ### 4.1 世界重置必须全量清空
 
 `seed.rs::reset_world_state()` 是唯一清空入口，清单见 `spatial/AGENTS.md` §4.5。遗漏任一项 → 重置后残留旧状态（"重置后族人仍显示旧家户"）。
