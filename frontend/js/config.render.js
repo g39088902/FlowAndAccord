@@ -311,8 +311,8 @@ window.RENDER_CONFIG = {
   landscapeMaskPoiExtraRadius: 4, // POI 操作区在 max(底座半径, 图标世界尺寸~12) 基础上的额外余量（复用 poiBase* 同源键；poiMarkerFootprintR 是深度辅助半径非视觉占地，禁用作保护半径）
   landscapeMaskMargin: 2,       // 通用留白余量（世界单位；车道采样弦差须小于该值）
   landscapeRecipes: {           // 配方表（role 顺序 = 候选生成顺序；slots = 每 role 候选上限 K）
-    Water: { rMin: 24, rMax: 46, roles: [       // 陆侧岸石 + 低草；水面候选由模型层拒绝（不画新泉池）
-      { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
+    Water: { rMin: 24, rMax: 46, roles: [       // 稀疏陆侧岸石 + 低草；所有模型按足迹避开水面
+      { role: 'stone', modelKind: 'RockCluster', slots: 1, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
       { role: 'grass', modelKind: 'GrassTuft',   slots: 4, scaleMin: 0.8,  scaleMax: 1.2,  footprint: 6 },
     ] },
     Wood: { rMin: 30, rMax: 60, roles: [        // 少量主树 + 林缘灌木 + 林下草；foliage=可采细节（q 显隐）；避让归 S4-03 遮罩

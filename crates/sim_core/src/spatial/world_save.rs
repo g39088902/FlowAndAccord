@@ -43,7 +43,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.57";
+pub const SAVE_APP_VERSION: &str = "1.59";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///

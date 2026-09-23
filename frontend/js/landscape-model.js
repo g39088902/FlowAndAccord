@@ -36,8 +36,8 @@ window.LandscapeModel = window.LandscapeModel || (function () {
   // qThreshold 由 q 映射）；v3（★ S4-05）：Berry/Stone/Gold 增 detail 贴地片。
   // v4（★ v1.50.87）：GroundPatch 贴地色差片整体删除（wet/shade/fruit/quarry/vein 五 role
   // 连同坡度拒绝与点簇预计算）——可采细节仅保留 Wood foliage 小灌木（stockRole 'detail'，
-  // q 显隐机制不变）。
-  const RECIPE_VERSION = 4;
+  // q 显隐机制不变）；v5：水岸配方石群减半，所有 POI 景观按模型足迹避开水面。
+  const RECIPE_VERSION = 5;
 
   // —— 固定 uint32 哈希（MurmurHash3 风格 finalizer，明确无符号整数运算）——
   function hash32() {
@@ -74,7 +74,7 @@ window.LandscapeModel = window.LandscapeModel || (function () {
   function defaultRecipes() {
     return {
       Water: { rMin: 24, rMax: 46, roles: [
-        { role: 'stone', modelKind: 'RockCluster', slots: 2, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
+        { role: 'stone', modelKind: 'RockCluster', slots: 1, scaleMin: 0.55, scaleMax: 0.85, footprint: 10 },
         { role: 'grass', modelKind: 'GrassTuft', slots: 4, scaleMin: 0.8, scaleMax: 1.2, footprint: 6 },
       ] },
       Wood: { rMin: 30, rMax: 60, roles: [
@@ -145,10 +145,11 @@ window.LandscapeModel = window.LandscapeModel || (function () {
     const e01 = cells[i00 + gSize].elev, e11 = cells[i00 + gSize + 1].elev;
     return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
   }
-  // 候选落点是否为水面（四角顶点任一为 ShallowWater/DeepWater 即拒；RiverBank 为岸带陆地放行）。
-  // Water 配方放置约束（§3.2 表：不画新泉池、不凭名称扩张水域）。
+  // 候选模型的水平足迹是否会碰到水面。格心代表一个地形格，因此将格子半对角线
+  // 加进净空半径，保守覆盖格心到真实水线的偏移；RiverBank 仍是可放置的陆地。
+  // 对所有 POI 类型生效，木林/浆果景观也不能把灌木或树冠放进河湖。
   const WATER_KINDS = { ShallowWater: 1, DeepWater: 1 };
-  function isWaterSurface(x, y) {
+  function isWaterSurface(x, y, footprint = 0) {
     const t = _terr;
     if (!t) return true; // 地形不可用 → 保守拒绝
     const gSize = t.gridSize, cells = t.cells;
@@ -156,12 +157,19 @@ window.LandscapeModel = window.LandscapeModel || (function () {
     if (half == null) return true;
     const gx = Math.max(0, Math.min(gSize - 1, Math.round(((x + half) / (2 * half)) * (gSize - 1))));
     const gy = Math.max(0, Math.min(gSize - 1, Math.round(((y + half) / (2 * half)) * (gSize - 1))));
-    const idx = gy * gSize + gx;
-    return !!(WATER_KINDS[cells[idx].surfaceKind] ||
-      (gx > 0 && WATER_KINDS[cells[idx - 1].surfaceKind]) ||
-      (gx < gSize - 1 && WATER_KINDS[cells[idx + 1].surfaceKind]) ||
-      (gy > 0 && WATER_KINDS[cells[idx - gSize].surfaceKind]) ||
-      (gy < gSize - 1 && WATER_KINDS[cells[idx + gSize].surfaceKind]));
+    const spacing = (2 * half) / Math.max(1, gSize - 1);
+    const searchR = Math.max(0, footprint) + spacing * Math.SQRT1_2;
+    const reach = Math.ceil(searchR / spacing);
+    for (let oy = -reach; oy <= reach; oy++) {
+      const cy = gy + oy;
+      if (cy < 0 || cy >= gSize) continue;
+      for (let ox = -reach; ox <= reach; ox++) {
+        const cx = gx + ox;
+        if (cx < 0 || cx >= gSize || ox * ox + oy * oy > (searchR / spacing) ** 2) continue;
+        if (WATER_KINDS[cells[cy * gSize + cx].surfaceKind]) return true;
+      }
+    }
+    return false;
   }
   // 可采细节 slot 阈值映射区间（§3.2：稳定 slot 阈值映射少量细节的连续强度；
   // 缺省 0.2/0.85 与 config.render.js 集中值一致）
@@ -228,12 +236,13 @@ window.LandscapeModel = window.LandscapeModel || (function () {
         const dy = Math.sin(theta) * r;
         const x = poi.pos.x + dx, y = poi.pos.y + dy;
         if (!EXTENT_BY_KIND[modelKind]) continue; // 未知模型类型：跳过该子图元
-        if (poi.type === 'Water' && isWaterSurface(x, y)) continue; // 水面候选拒绝（跳过不重编号）
-        const z = sampleElevation(x, y);
-        if (z == null) continue; // 越界/地形缺失：跳过
         const footprint = cfgNum(roleDef.footprint, 8);
         const scale = cfgNum(roleDef.scaleMin, 0.7) +
           (cfgNum(roleDef.scaleMax, 1.2) - cfgNum(roleDef.scaleMin, 0.7)) * chan(seed, 12);
+        const waterClearance = Math.max(footprint, EXTENT_BY_KIND[modelKind] * scale);
+        if (isWaterSurface(x, y, waterClearance)) continue; // 任意配方均须留模型水岸净空
+        const z = sampleElevation(x, y);
+        if (z == null) continue; // 越界/地形缺失：跳过
         const child = {
           key: 'poi:' + poi.id + '/' + roleDef.role + '/' + slot,
           modelKind: modelKind,

@@ -763,7 +763,10 @@ pub struct TerrainSubFeature {
 /// v1.57.0：16 -> 17（河谷主河蜿蜒振幅在地图两端平滑收敛为垂直入/出图段，
 ///           避免河道/河岸法向轮廓顶点越出地图边界并触发 FeatureVerticesInvalid；
 ///           仅 T2 轮廓形态改变）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 17;
+/// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
+///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
+///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 20;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -1716,15 +1719,13 @@ impl TerrainMap {
                 TerrainSubFeatureKind::GravelBeach => (AccentKind::RockCluster, 16usize),
                 _ => continue,
             };
-            let mut placed: Vec<Vec3> = Vec::with_capacity(target);
+            let mut candidates: Vec<(u64, Vec3)> = Vec::with_capacity(self.cells.len() / 8);
             let mut first = true;
             let mut bounds_min = Vec3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
             let mut bounds_max = Vec3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
-            // 扫描顺序固定；hash 只决定候选是否入选与局部视觉参数。
+            // 全格收集后做确定性最远点采样。旧版按网格行序取满 target，河岸碎石
+            // 会固定挤在扫描起点一侧；hash 只做候选稀疏化与稳定平局裁决。
             for idx in 0..self.cells.len() {
-                if placed.len() >= target {
-                    break;
-                }
                 let hash = mix64(seed ^ feature.salt ^ idx as u64);
                 if hash % 10_000 >= 7_000 {
                     continue;
@@ -1753,24 +1754,63 @@ impl TerrainMap {
                 if !visual_ok {
                     continue;
                 }
-                let gx = idx % self.grid_width;
-                let gy = idx / self.grid_width;
-                let wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
-                let wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
-                let z = cell.elevation;
-                let pos = Vec3::new(wx, wy, z);
+                let pos = self.grid_pos(idx % self.grid_width, idx / self.grid_width);
+                let water_clearance = match feature.kind {
+                    TerrainSubFeatureKind::RiversideForest => 18.0,
+                    TerrainSubFeatureKind::GravelBeach => 13.0,
+                    _ => 0.0,
+                };
+                if water_clearance > 0.0
+                    && super::accents::near_water_surface_with_clearance(
+                        self, pos.x, pos.y, water_clearance,
+                    )
+                {
+                    continue;
+                }
                 if self.hydrology.access_points.iter().any(|p| {
-                    let dx = p.pos.x - wx;
-                    let dy = p.pos.y - wy;
+                    let dx = p.pos.x - pos.x;
+                    let dy = p.pos.y - pos.y;
                     let clearance = p.interaction_radius + 8.0;
                     dx * dx + dy * dy < clearance * clearance
-                }) || placed.iter().any(|p| {
-                    let dx = p.x - wx;
-                    let dy = p.y - wy;
-                    dx * dx + dy * dy < 15.0 * 15.0
                 }) {
                     continue;
                 }
+                candidates.push((hash, pos));
+            }
+
+            let min_spacing = match feature.kind {
+                TerrainSubFeatureKind::GravelBeach => 48.0,
+                TerrainSubFeatureKind::RiversideForest => 30.0,
+                _ => 15.0,
+            };
+            let min_spacing_sq = min_spacing * min_spacing;
+            let mut placed: Vec<Vec3> = Vec::with_capacity(target);
+            while placed.len() < target && !candidates.is_empty() {
+                let selected = if placed.is_empty() {
+                    candidates.iter().enumerate().min_by_key(|(_, c)| c.0).map(|(i, _)| i)
+                } else {
+                    // 每次选距既有落点最近距离最大的候选，铺开覆盖范围；完全相等时
+                    // 取 hash 较小者，确保 wasm/native 与重复创世稳定一致。
+                    let mut best: Option<(usize, f32, u64)> = None;
+                    for (i, (hash, pos)) in candidates.iter().enumerate() {
+                        let nearest_sq = placed.iter().map(|p| {
+                            let dx = p.x - pos.x;
+                            let dy = p.y - pos.y;
+                            dx * dx + dy * dy
+                        }).fold(f32::INFINITY, f32::min);
+                        if nearest_sq < min_spacing_sq {
+                            continue;
+                        }
+                        if best.map_or(true, |(_, dist_sq, best_hash)| {
+                            nearest_sq > dist_sq || (nearest_sq == dist_sq && *hash < best_hash)
+                        }) {
+                            best = Some((i, nearest_sq, *hash));
+                        }
+                    }
+                    best.map(|(i, _, _)| i)
+                };
+                let Some(selected) = selected else { break };
+                let (hash, pos) = candidates.swap_remove(selected);
                 let id = self.accents.len() as u32;
                 self.accents.push(TerrainAccent {
                     id,

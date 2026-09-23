@@ -221,7 +221,7 @@ impl FanGeometry {
         if r > self.length {
             return (0.0, false);
         }
-        let mut total = 0.0f32;
+        let mut depth_total = 0.0f32;
         let mut in_gully = false;
         for g in &self.gullies {
             let (d, env) = self.gully_cross_distance(r, theta, g);
@@ -232,11 +232,15 @@ impl FanGeometry {
             if d < half {
                 // 紧支撑浅凹横截面：(1−u²)²，边缘导数为零、与扇面 C1 衔接
                 let u = d / half;
-                total += g.depth * env * (1.0 - u * u) * (1.0 - u * u);
+                let depth = g.depth * env * (1.0 - u * u) * (1.0 - u * u);
+                // 放射沟在扇头自然汇合。重叠区取较深的一条，而不是把各沟深度
+                // 相加；求和会在沟距小于沟宽的扇头形成非设计的复合深槽，叠出
+                // 超过单沟规格的坡面并可能切断扇轴干地通道。
+                depth_total = depth_total.max(depth);
                 in_gully = true;
             }
         }
-        (total, in_gully)
+        (depth_total, in_gully)
     }
 
     /// 高程贡献：返回 (z_fan, noise_weight)——扇体高程增量与该点噪声阻尼权重

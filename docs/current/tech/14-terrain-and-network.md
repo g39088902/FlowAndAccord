@@ -2,7 +2,7 @@
 
 ## R0 T2 河道表示迁移（v1.53.0）
 
-T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17，旧 T2 地形存档按既有版本门禁拒绝。
+T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。浅滩端点从解析岸线起沿法向按栅格步长向外检查，直到其映射到非水格，避免急弯的邻近河段或栅格取整使端点落水。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17；v1.58 冲积扇沟槽合并与浅滩端点陆格寻址使版本再推进至 19；v1.59 河谷子特征改为水线净空 + 最远点散布，版本推进至 20，旧地形存档按既有版本门禁拒绝。
 
 > **层级**：下层 · 世界与物理层。
 > **本文构成**：原 `current/01-spatial-network.md` + 原 `../../plan/tech/06-terrain-templates.md` 第二部分「支撑所有地图模板的共用技术基座」（已落地契约）。模板库与未来蓝图见 [06 地图模板规划](../../plan/tech/06-terrain-templates.md)。
@@ -251,8 +251,8 @@ pub enum AccentKind {
 
 装饰散布规则（当前实现，`geo/accents.rs`）：
 
-- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）；★ **v1.52.0 起再加两道全局规则**（对所有五种装饰生效，见 `accents.rs::generate_accents_of_kind` 外层禁区）：① **地图边缘保护区**——距世界四边各 `3% × world_size`（764m → 22.9m ≈ 7.6 格）的环形带内不生成任何装饰（沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓）；② **水面净空**——装饰中心到**渲染水面多边形**（`hydrology.water_bodies[*].vertices`：T2 主河闭合带 + 静水闭合轮廓，与前端 `drawRiverBand` / `drawWaterBodyTile` 同源）的距离小于 `WATER_CLEARANCE_M`（3.0m ≈ 一个栅格步长）者拒绝。为什么要加②：`sample_cell` 是**格心**判定，3m 步长下岸线格与真实水线的偏差可达半格（≈1.5m），叠加装饰自身 0.5~2m 视觉体量后，中心贴线的草丛/灌木会半浸在渲染水面里（实测修前最近装饰中心距水线仅 0.36m）。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
-- **偏好**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表等权随机**（xy 候选点全图均匀 roll、与面数无关；原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
+- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）；★ **v1.52.0 起再加两道全局规则**（对所有五种装饰生效，见 `accents.rs::generate_accents_of_kind` 外层禁区）：① **地图边缘保护区**——距世界四边各 `3% × world_size`（764m → 22.9m ≈ 7.6 格）的环形带内不生成任何装饰（沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓）；② **水面净空**——装饰中心到**渲染水面多边形**（`hydrology.water_bodies[*].vertices`：T2 主河闭合带 + 静水闭合轮廓，与前端 `drawRiverBand` / `drawWaterBodyTile` 同源）的距离小于 `WATER_CLEARANCE_M`（v1.58.1 起 13m，覆盖最大模型水平包围体约 8.5m × 最大缩放 1.4 后的约 11.9m，并留余量）者拒绝，避免灌木/树冠跨入水面。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
+- **偏好与空间分布**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权、RiverBank 0.85 / RiverTerrace 按 `fertility×0.5+0.5` 高概率（河流两岸有树）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表随机接受**（原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；v1.58.1 起石块按四象限分别封顶至各自目标量的 1/4 向上取整，避免单一种子偶然集中到局部；v1.59.0 起河谷碎石子特征再按 48m 最小间距铺开。Bush 偏好林缘过渡带 + RiverBank 0.6 / RiverTerrace 0.5 喜湿灌丛。
 - **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25、RockCluster 12、★ v1.51.0 GrassTuft **120**（原 60，用户需求「草的数量翻倍」；乘密度倍率取整；RockCluster/GrassTuft 由 ★ D-B1-5 落地），有界重试 3× 目标数。平地草原 `grassland_plain_v1` 的 GrassTuft 预算仍 ×8（120 → 960 @density=1.0，原 480）。
 - **确定性**：`accent_rng = WorldRng::new(seed ^ ACCENT_RNG_SALT)`，盐值 `0x4143_4345_4E54_3031`（"ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG。
 - **持久化**：`TerrainMap.accents: Vec<TerrainAccent>`（`#[serde(default)]`）随 `terrain_state` 一并入档，读档后逐字节恢复。
@@ -992,7 +992,7 @@ render_agents.js        族人绘制                                            
 ✅ terrainFanHalfAngleDeg     38.0                ★ TB-03 冲积扇扇半角（度，角向窗口 ±α）；v1.50.68 扩角
 ✅ terrainFanAmplitude        52.0                ★ TB-03 山口到扇缘总高差 (m)；v1.50.68 提升——双段凸形径向剖面（扇头 0~0.2L 陡段 ≈10° 山口堆 + 其后缓段 ≤6°），扇头侧缘配合 150m 最小过渡弧宽 ≤tan(19°)
 ✅ terrainFanGullyCountMax    4                   ★ TB-03 干浅沟数量上限（v1.50.68 起 3~4 均匀掷，放射沟系）
-✅ terrainFanGullyDepthM      4.5                 ★ TB-03 干浅沟最大深度 (m)；v1.50.68 提升 ≥0.6 格目视可辨；沟内 DryGround+NO_BUILD 色差带可慢行
+✅ terrainFanGullyDepthM      4.5                 ★ TB-03 单条干浅沟最大深度 (m)；沟带重叠按最大单沟深度合并，不累加挖深；沟内 DryGround+NO_BUILD 色差带可慢行
 ✅ terrainFanGullyWidthM      22.0                ★ TB-03 干浅沟横截面全宽 (m)；v1.50.68 提升；须跨越多个格子
 ✅ terrainFanGullyMeanderAmpRad 0.12               ★ TB-03 干浅沟中心线角向蜿蜒幅度（弧度）
 ✅ terrainFanTopBandRatio     0.32                ★ TB-03 粒度分带——扇顶砾石带外缘（t=r/L）；v1.50.68 新增，带内 DryGround + 肥力折减

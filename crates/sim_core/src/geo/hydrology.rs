@@ -443,6 +443,7 @@ impl TerrainMap {
         }
         // 授权走廊：两端超出保守栅格岸线，普通道路只能接到陆地端点。
         let margin = size/(self.grid_width-1).max(1) as f32*2.0;
+        let grid_step = size/(self.grid_width-1).max(1) as f32;
         for (i,y) in [-size*0.24,size*0.24].into_iter().enumerate() {
             let cp = geom.point_at_y(y);
             let (_, s, _) = geom.distance(cp);
@@ -451,9 +452,37 @@ impl TerrainMap {
             let tl = (tx*tx + ty*ty).sqrt().max(f32::EPSILON); tx /= tl; ty /= tl;
             let nx = -ty; let ny = tx;
             let reach = half_width(y)+bank+margin;
-            let mut a = Vec3::new(cp.x-nx*reach, cp.y-ny*reach,0.0);
-            let mut b = Vec3::new(cp.x+nx*reach, cp.y+ny*reach,0.0);
-            a.z=self.sample_elevation(a.x,a.y); b.z=self.sample_elevation(b.x,b.y);
+            // 解析半宽只描述当前横截面；急弯处最近中心线可能来自邻近河段，且
+            // 最终岸侧判定会把坐标取整到栅格。故从理论岸线向外逐格检查实际水格，
+            // 找到首个陆格才落端点，保证特征端点与授权走廊端点共享同一陆侧事实。
+            let land_endpoint = |side: f32| {
+                // 上限足以沿任意方向扫描穿过整张方形地图；通常在岸外几格即结束。
+                let max_extra_steps = ((size * 2.0) / grid_step).ceil() as usize;
+                for step in 0..=max_extra_steps {
+                    let distance = reach + step as f32 * grid_step;
+                    let x = cp.x + side * nx * distance;
+                    let y = cp.y + side * ny * distance;
+                    if x.abs() > size * 0.5 || y.abs() > size * 0.5 {
+                        break;
+                    }
+                    let (gx, gy) = self.grid_index(x, y);
+                    let cell = &self.cells[gy * self.grid_width + gx];
+                    let is_water = cell.water_body_id.is_some()
+                        || matches!(cell.surface_kind, SurfaceKind::DeepWater | SurfaceKind::ShallowWater);
+                    if !is_water {
+                        return Some(Vec3::new(x, y, self.sample_elevation(x, y)));
+                    }
+                }
+                None
+            };
+            let fallback_a = Vec3::new(cp.x-nx*reach, cp.y-ny*reach,0.0);
+            let fallback_b = Vec3::new(cp.x+nx*reach, cp.y+ny*reach,0.0);
+            let a = land_endpoint(-1.0).unwrap_or_else(|| {
+                Vec3::new(fallback_a.x, fallback_a.y, self.sample_elevation(fallback_a.x, fallback_a.y))
+            });
+            let b = land_endpoint(1.0).unwrap_or_else(|| {
+                Vec3::new(fallback_b.x, fallback_b.y, self.sample_elevation(fallback_b.x, fallback_b.y))
+            });
             let crossing = TerrainConnection {id:i as u32+1,start:a,end:b,width:cfg.terrain_crossing_width.max(12.0),node_a:None,node_b:None};
             for gy in 0..self.grid_height { for gx in 0..self.grid_width {
                 let p=self.grid_pos(gx,gy);

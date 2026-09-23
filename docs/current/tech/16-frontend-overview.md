@@ -182,9 +182,9 @@ stateDiagram-v2
   - 数据形态：`LandscapeGroup { key: "poi:<id>", recipe, recipeVersion, anchor, geometrySignature, children[], bounds, q }` 与 `LandscapeChild { key: "poi:<id>/<role>/<slot>", modelKind, visualSeed, dx, dy, x, y, z, rot, scale, footprint, bounds, stockRole }`。
   - 确定性哈希：子图元种子通过 MurmurHash3 风格整数算法（`worldSeed ^ poi.id ^ roleSalt ^ slot`）派生，使用严格 `Math.imul` 与 `>>>0` 无符号整数运算，**禁止** `Math.random`、系统时间或消费模拟主 `WorldRng`。
   - 极坐标采样：候选位置按 $r = \sqrt{\text{lerp}(r_{\min}^2, r_{\max}^2, u)}$、$	heta = 2\pi v$ 盘分布采样，变换至世界坐标后逐点通过双线性插值采样静态高程场。
-  - 坡度与水面拒绝：Water 配方候选四邻落入浅水/深水时拒绝，仅画陆侧岸石与低草，**严禁凭空扩张水域**。
+  - 坡度与水面拒绝：所有 POI 配方按模型水平足迹 + 地形格半对角净空拒绝贴近浅水/深水的候选；Water 配方每个清泉至多 1 处陆侧岸石并配低草，**严禁凭空扩张水域**或让林缘灌木/树冠伸入水面。
 - **五类通用配方与单调库存丰度**（★ v1.50.87 删除 GroundPatch 贴地色差片后全部为立体子图元）：
-  - **Water**：陆侧岸石 + 小片低草。
+  - **Water**：稀疏陆侧岸石（每个清泉至多 1 处）+ 小片低草。
   - **Wood**：主树 + 林缘灌木 + 林下草 + `foliage` 可采枝叶细节（`stockRole: 'detail'`）。
   - **Berry**：不规则低灌木簇。
   - **Stone**：岩石露头 + 碎石。

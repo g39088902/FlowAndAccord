@@ -1,7 +1,15 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.57.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.59.0**。
+
+| **v1.59.0** | **完成 seed 104 河谷子特征修复**：根因是 `GravelBeach` / `RiversideForest` 子特征按网格行序取满目标数量，导致碎石固定聚在扫描起点一侧，树/灌木也可能贴进水面。现先收集全图合法候选，再用确定性最远点采样铺开；碎石最小间距 48m、河岸林 30m，并分别加入 13m/18m 水面净空。地形生成器版本 19→20，存档兼容线升至 v1.59；同时保留前端所有 POI 景观按模型足迹避水与清泉岸石单簇限制。浏览器 seed 104 已确认地图可正常生成，未见降级。 | crates(sim_core/src/geo/{accents.rs, terrain.rs}), frontend/js/{landscape-model.js, config.render.js}, docs, version, WASM |
+
+| **v1.58.2** | **修复资源景观越水与清泉岸石偏密**：根因在前端 `LandscapeModel`：先前只有 Water 配方检查候选点是否落入水格，Wood/Berry 等配方的灌木和树可以直接落在河湖内；而水岸每个清泉最多生成 2 簇石，多个清泉沿同一河岸时会形成石带。现对所有 POI 子图元按模型水平包围体与地形格半对角线留水岸净空，并将每个清泉岸石上限降至 1 簇。配方缓存版本升至 5；纯前端表现变化，不改地形/模拟/存档兼容线，应用升至 v1.58.2。浏览器 seed 104 已复核，地图可正常生成。 | frontend/js/{landscape-model.js, config.render.js}, docs(16-frontend-overview, changelog), version |
+
+| **v1.58.1** | **修正河谷地图石块偏聚与灌木伸入水面**：① Boulder / RockCluster 按四象限限制各区数量，避免固定种子下全图随机接受造成石块偏聚；各类目标数与 RNG 流保持不变。② 装饰离水净空从 3m 增至 13m，覆盖约 8.5m 最大模型包围体 × 1.4 最大缩放并留余量，避免灌木/树冠主体跨入水面。仅改变新生成世界的纯视觉装饰落点，`TERRAIN_GENERATOR_VERSION` 不变；应用 patch 升至 v1.58.1，存档兼容线 v1.58 不变（已保存的装饰落点不重排）。当时未运行种子探针或浏览器；release WASM 已编译并同步双副本。 | crates(sim_core/geo/accents.rs), docs(geo/AGENTS, 14, changelog), frontend/version, WASM |
+
+| **v1.58.0** | **修复冲积扇通道降级与河谷浅滩端点落水**：① 冲积扇扇头的放射干沟交叠时，旧逻辑把各沟下凹深度相加，产生超过单沟规格的复合槽并可能切断扇轴路线；现按最大单沟深度合并，失败码 `FanDryCorridorBlocked` 对应路径不再被复合挖深影响。② 河谷浅滩端点原按当前横截面的解析河宽外推，但急弯处邻近河段及栅格取整可能使端点仍落入水格；现沿法向逐格检查实际地表，端点与授权走廊共用首个陆格位置。两项改动均不增加 RNG 消费；`TERRAIN_GENERATOR_VERSION` 17→19（冲积扇与河谷地形输出改变），应用兼容线升至 v1.58，旧存档按规则废弃。按用户要求未运行种子探针、浏览器或测试。 | crates(sim_core/geo/{alluvial_fan.rs, hydrology.rs, terrain.rs}), docs(geo/AGENTS, 14, changelog), version |
 
 | **v1.57.0** | **修复河谷地图触发 `Geometry:FeatureVerticesInvalid` 并降级**：根因是三回环河道中心线延伸到地图上下边界时仍有横向切线，河道与河岸沿法线构造的轮廓顶点会越出地图，导致静态几何门禁拒绝 T2。现使中心线在边界内侧保持直线、在有足够河宽余量后平滑渐入渐出蜿蜒，保持轮廓在界内且保留地图内部的蜿蜒形态；不增加 RNG 消耗。河谷生成器版本 16→17，存档兼容线升至 v1.57。release 编译并同步 WASM 双副本；遵照用户要求未运行浏览器、种子、探针或自动化测试。 | crates(sim_core/geo/hydrology.rs, terrain.rs, spatial/world_save.rs), docs(geo/AGENTS, 14, changelog), version |
 

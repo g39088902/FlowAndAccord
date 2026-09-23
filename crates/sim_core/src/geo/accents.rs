@@ -94,11 +94,13 @@ const MAX_RETRY_FACTOR: usize = 3;
 /// 侧壁段），贴边装饰会溢出沙盘轮廓、视觉上「挂」在崖壁上。
 const EDGE_PROTECTION_RATIO: f32 = 0.03;
 /// 陆地装饰离岸净空（米）：装饰中心到「渲染水面多边形」边线距离小于本值时拒绝。
-/// 为什么不能只靠格分类：`sample_cell` 是**格心**判定，3m 步长下岸线格与真实水线的
-/// 偏差可达半格（≈1.5m）；而装饰自带 0.5~2m 视觉体量（草丛/灌木/树冠），中心贴线时
-/// 半边身子会浸进水面（实测修前最近装饰中心距水线仅 0.36m）。取一个栅格步长
-/// （764/255 ≈ 3.0m）作净空，保证整只装饰落在干地。
-const WATER_CLEARANCE_M: f32 = 3.0;
+/// 需覆盖最大装饰水平包围体（约 8.5m）× 最大缩放 1.4，再留少量余量；原 3m 只够
+/// 抵消格心误差，灌木/树冠仍会伸入水面。13m 保证可见模型主体完整落在干地。
+const WATER_CLEARANCE_M: f32 = 13.0;
+
+/// Boulder / RockCluster 的均衡散布分区：四象限各自最多承载目标数的 1/4（向上取整），
+/// 避免独立均匀抽样在固定种子下偶然把石块集中到地图一侧。
+const STONE_BALANCE_BINS_PER_AXIS: usize = 2;
 
 // ── ★ S7-03（STAGE-07-TODO S7-03）平地草原草甸预算与斑块调制常数 ──
 // 只被 `is_grassland` 分支消费，T1/T2 装饰路径零引用（输出逐位不变）；
@@ -513,11 +515,21 @@ pub fn trim_trees_near_pois(
 /// 其余在 O(1) 内返回；命中 AABB 的点才逐边求点线距（河 193 段 / 湖 44 段）。
 /// 纯查询：不消费 `WorldRng`、不写任何格子。
 fn near_water_surface(terrain: &super::terrain::TerrainMap, wx: f32, wy: f32) -> bool {
+    near_water_surface_with_clearance(terrain, wx, wy, WATER_CLEARANCE_M)
+}
+
+/// 子特征装饰按自身水平包围体使用的可变水面净空查询。
+pub(crate) fn near_water_surface_with_clearance(
+    terrain: &super::terrain::TerrainMap,
+    wx: f32,
+    wy: f32,
+    clearance_m: f32,
+) -> bool {
     terrain
         .hydrology
         .water_bodies
         .iter()
-        .any(|wb| point_in_or_near_polygon(&wb.vertices, wx, wy, WATER_CLEARANCE_M))
+        .any(|wb| point_in_or_near_polygon(&wb.vertices, wx, wy, clearance_m))
 }
 
 /// 点是否在多边形内、或到其边线的距离 < `clearance`（顶点数 < 4 视为退化，恒 false）。
@@ -598,6 +610,29 @@ fn generate_accents_of_kind<F>(
         // 额外 RNG（代价仅是拒绝后重抽，见 `MAX_RETRY_FACTOR` 余量）。
         if wx.abs() > half_size - edge_margin || wy.abs() > half_size - edge_margin {
             continue;
+        }
+
+        // 石块数量按四象限封顶；避免确定性随机抽样的偶然聚集破坏全图分布。
+        // 两类石块分别均衡，且保持既有 RNG 流和各类目标总数不变。
+        if matches!(kind, AccentKind::Boulder | AccentKind::RockCluster) {
+            let bx = usize::from(wx >= 0.0);
+            let by = usize::from(wy >= 0.0);
+            let bin = by * STONE_BALANCE_BINS_PER_AXIS + bx;
+            let bin_limit = target.div_ceil(STONE_BALANCE_BINS_PER_AXIS.pow(2));
+            let in_bin = accents
+                .iter()
+                .filter(|a| {
+                    if a.kind != kind {
+                        return false;
+                    }
+                    let accent_bx = usize::from(a.pos.x >= 0.0);
+                    let accent_by = usize::from(a.pos.y >= 0.0);
+                    accent_by * STONE_BALANCE_BINS_PER_AXIS + accent_bx == bin
+                })
+                .count();
+            if in_bin >= bin_limit {
+                continue;
+            }
         }
 
         // 查地表

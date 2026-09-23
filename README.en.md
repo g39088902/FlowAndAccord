@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.57.0` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.59.0` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 
 </div>
