@@ -1,7 +1,9 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.53.0**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.54.0**。
+
+| **v1.54.0** | **八b D-B2 · OxbowLake 牛轭湖注入器落地（T2 结构型子特征物理注入，`TERRAIN_GENERATOR_VERSION` 16→17）**：① **裁弯选址**——复用 R0-4 `meander_windows()` 曲折率/弯颈/摆幅诊断，额外过滤浅滩走廊（`terrainCrossingWidth+30m`）、取水点 `interaction_radius+8m`、图缘 40m、弯顶在窗口内（max |x| 非端点）及弦内部陆地可开挖（新河道扫掠带净距校验）；无窗口判未注入、不重抽。② **裁弯取直**——旧中心线 i..j 替换为弦（端点严格保留 C0 连续），新中心线重算累计弧长；新几何写入 `GenesisScratch.river_geometry`。③ **弃弯成湖**——旧河道带内且不在新直道带内的格子成为牛轭湖：上游 25% 回填 `RiverTerrace`（淤积端，`level+1.2`），剩余 75% 为月牙湖 `DeepWater`#3（`water_body_id=Some(3)`，`resource_pool_id=0`，`NO_BUILD|NO_WALK`，湖床 `level-1.2`）；两端封口 `RiverBank|NO_BUILD`。④ **主河重派生**——窗口 AABB 内重写 `DeepWater#1`/`RiverBank`/`RiverTerrace`，并更新 `River#1`/`RiverBank#20/21` 水面轮廓；牛轭湖轮廓作为 `WaterBody` 特征 id=216（`TerrainFeatureKind::WaterBody`）与其 `hydrology.water_bodies` 副本 id=3 双副本逐字节一致（`validate_static_terrain_geometry` 校验 2↔116/3↔216 映射）。⑤ **局部判定**——可行走连通分量数不增加（4 邻域洪泛预检）；失败整块回滚判未注入、不重抽。⑥ **不变性**——未命中种子开关两态高程逐字节一致、T1 等其余 profile 逐位不变；仅 T2 命中 OxbowLake 的种子地形变化。⑦ **前端**——`WaterBody` 已有绘制分支 `drawWaterBodyTile` 直接复用，牛轭湖为静水无流向。门禁：`frontend-check` 全绿（WASM 编译受限环境未执行，待补）。**存档兼容线推进 v1.53→v1.54，旧档按设计废弃；生成器版本门禁按 16/17 拒绝错版地形档。** | crates/sim_core/src/geo/{terrain.rs, hydrology.rs, geometry_transaction.rs, validation.rs}, frontend/js/render_terrain.js, docs(plan/current), version |
 
 | **v1.53.0** | **八a R0 · T2 河道表示迁移**：新增生成期 `RiverCenterline`（累计弧长、精确点到折线距离、符号横距、弧长采样与 R0-4 候选窗口诊断）；T2 河道带改用精确距离场，河岸/河阶、水面轮廓、两处浅滩端点、取水点全部按中心线法向/弧长派生；中心线为三回环 meander train，保持独立 `hydro_rng` 相位且不进入存档。R0-4 几何量仅作候选局部谓词，无合格窗口时不拒绝基础世界；`TERRAIN_GENERATOR_VERSION` 14→16。`terrain_probe world 20`：random/river_valley 20/20 创世校验通过、可行走连通分量恒 1，T2 最少车道 144。**存档兼容线推进 v1.52→v1.53，旧档按设计废弃。** | crates/sim_core/src/geo/{hydrology.rs,terrain.rs,mod.rs}, docs(plan/tech/06,current/tech/14), version |
 

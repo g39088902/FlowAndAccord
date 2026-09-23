@@ -137,7 +137,16 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
         // ★ TB-03 起按 profile 与真实种类检查：旧河流水体 #1 必须匹配 `River`；
         //   静水新模板（盆地/湖畔）水体 #1 必须匹配 `WaterBody`——不得把静水
         //   误标成河流以绕过校验。不删除种类校验。
-        let Some(feat) = t.features.iter().find(|f| f.id == wb.id) else {
+        // ★ 八b：OxbowLake 水体 #3 ↔ 特征 #216，FootLake 水体 #2 ↔ #116，双副本
+        //   逐字节一致（06 号 §5.2.1 顶点副本有意冗余）。
+        let feat_opt = if wb.id == 2 {
+            t.features.iter().find(|f| f.id == 116)
+        } else if wb.id == 3 {
+            t.features.iter().find(|f| f.id == 216)
+        } else {
+            t.features.iter().find(|f| f.id == wb.id)
+        };
+        let Some(feat) = feat_opt else {
             return Err("WaterBodyFeatureMissing");
         };
         if wb.id == 1 {
@@ -147,6 +156,10 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
                 TerrainFeatureKind::River
             };
             if feat.kind != expect {
+                return Err("WaterBodyFeatureMissing");
+            }
+        } else if wb.id == 2 || wb.id == 3 {
+            if feat.kind != TerrainFeatureKind::WaterBody {
                 return Err("WaterBodyFeatureMissing");
             }
         }

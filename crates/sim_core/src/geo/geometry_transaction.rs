@@ -118,7 +118,13 @@ impl TerrainMap {
                     let _ = self.geometry_transaction(scratch, &mut plan[i],
                         super::hydrology::apply_river_cliff, |_, _| Ok(()));
                 }
-                // 其余 kind 仍为空注入：结构型（FootLake/RidgeWaterfall/OxbowLake）
+                // ★ 八b D-B2（06 号 §5.4.C）：OxbowLake 牛轭湖注入器。
+                //   裁弯取直 + 月牙湖 + 上游回填，事务内完成；失败回滚判未注入。
+                TerrainSubFeatureKind::OxbowLake => {
+                    let _ = self.geometry_transaction(scratch, &mut plan[i],
+                        super::hydrology::apply_oxbow_lake, |_, _| Ok(()));
+                }
+                // 其余 kind 仍为空注入：结构型（FootLake/RidgeWaterfall）
                 // 待各自实施；视觉型无几何、走第 9 步装饰。Ok(false) 不把
                 // “选中”误报为“接受”；disabled_mask 已在进入此管线前过滤。
                 _ => {

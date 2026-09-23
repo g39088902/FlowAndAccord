@@ -760,7 +760,11 @@ pub struct TerrainSubFeature {
 /// v1.53.0：14 -> 16（八a R0：T2 生成期 `RiverCenterline` 精确距离场、三回环
 ///           meander train，以及沿中心线法向派生河岸/浅滩/取水点/水面轮廓；R0-4
 ///           裁弯候选窗口诊断不拒绝基础世界）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 16;
+/// v1.53.x：16 -> 17（八b D-B2：T2 `OxbowLake` 牛轭湖注入器落地——第 5 步
+///           几何事务域内裁弯取直 + 月牙湖 WaterBody#3/特征#216 + 上游 25% 回填
+///           RiverTerrace + 主河轮廓重派生；仅 T2 中 OxbowLake 被 plan 命中且
+///           通过 §5.4.C 局部判定的种子地形变化，其余 profile 与未命中/被拒种子逐位不变）。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 17;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

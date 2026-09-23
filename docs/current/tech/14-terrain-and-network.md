@@ -491,7 +491,7 @@ T1 骨架生成完成后，用无状态哈希判定是否注入子特征：
 - 注入必须在生态播撒、营地/POI 落位与路网拓扑生成前完成；它不在运行中移动已存在的实体。最终落点以注入后的完整地表查询结果为准，不能承诺与关闭注入时坐标相同。
 
 > ✅ **D-B1-3（v1.50.30）**：**选择器**已在 `geo/terrain.rs::plan_subfeatures()` 落地——`mix64` / `roll_10000` / 每种 kind 一个固定盐值 / 按 `TerrainSubFeatureKind` 编号升序的「首个命中即停」互斥裁决，产出 `Vec<PlannedSubFeature>`（≤2，结构型在前）。它**不消费任何 `WorldRng`**、不读不写 `terrain`，由创世流水线第 4 步（`geo/terrain.rs::generate_with_config` 门控，★ STAGE2-3 起编排器迁至 terrain.rs）的 `terrainAccentSubFeatures` 开关门控调用。
-> ⚠️ **选中 ≠ 注入**：第 5 步（几何施加 5a~5d）与第 9 步（专属装饰）**结构型注入器仍为空实现**；四类视觉子特征已在第 9 步通过固定 hash 追加装饰与 `TerrainSubFeature` 元数据，不消费 `accent_rng`。RiverCliff 等改变物理事实的注入器仍属独立阶段三/八提交。
+> ⚠️ **选中 ≠ 注入（部分实现）**：第 5 步（几何施加 5a~5d）中 **RiverCliff（v1.52.6）与 OxbowLake（v1.54.0）已实现物理注入**，四类视觉子特征已在第 9 步通过固定 hash 追加装饰与 `TerrainSubFeature` 元数据，不消费 `accent_rng`。FootLake / RidgeWaterfall 结构型注入器仍为空注入，属独立阶段八提交。
 > 实现踩坑：候选池是 profile 作用域的，按 kind 编号扫描时「不在本 profile 池内」必须 `continue`，不能用 `?` 提前返回——否则排在 T1 候选（编号 0/1）之后的 T2 候选（4/5）永远判不到，T2 恒为空。
 
 ### 9.5 T2 主河与浅滩模板
@@ -526,7 +526,8 @@ crossing_id: 1, 2
 
 T2 不实现桥梁、游泳、船舶、水位涨落和洪水事件。
 
-> ★ **RiverCliff 已落地（v1.52.6，`TERRAIN_GENERATOR_VERSION` 13→14）**：`geo/hydrology.rs::apply_river_cliff` 在第 5 步整图事务域内实施（规格见 [06 号 §5.4.D](../../plan/tech/06-terrain-templates.md)）——无状态 `mix64` 哈希决定段长 55~80m / 崖高 H∈[6,12]m / 左右侧与槽位扫描起点（零 `WorldRng` 消费）；沿河 8m 槽位确定性选址（崖基线锚定在段内最大半宽 + bank + terrace + 6m，浅滩走廊/取水点圆/图缘三重保护）；崖面 smoothstep 抬升 + 18m 崖体 + 12m 外侧回落 + 端部 6m taper，**支撑域全部 modified 格整体登记 `RockFace` 覆盖意图**（按坡度/18m 阈值离散切分会产生「可走口袋」——探针实测 2~129 格孤立分量，违反连通分量门禁）；局部判定 = 崖面中线 Δ/2 采样硬禁行连续带 ≥70% 目标长度 + 可行走连通分量数不增加（基线/候选独立洪泛），失败整块回滚判未注入、不重抽。生成 `Cliff` 特征（id=224，`TerrainFeatureKind` 枚举码尾部追加、FABS 字典码 5）+ `TerrainSubFeature` id=1005；前端 `render_terrain.js` 岩层阴影分支（仅可视化）。探针证据（144 尺度组合 + 固定种子矩阵 12 例，components 恒 1）见 [changelog v1.52.6](../01-changelog.md)。OxbowLake / FootLake / RidgeWaterfall 第 5 步仍为空注入。
+> ★ **RiverCliff 已落地（v1.52.6，`TERRAIN_GENERATOR_VERSION` 13→14）**：`geo/hydrology.rs::apply_river_cliff` 在第 5 步整图事务域内实施（规格见 [06 号 §5.4.D](../../plan/tech/06-terrain-templates.md)）——无状态 `mix64` 哈希决定段长 55~80m / 崖高 H∈[6,12]m / 左右侧与槽位扫描起点（零 `WorldRng` 消费）；沿河 8m 槽位确定性选址（崖基线锚定在段内最大半宽 + bank + terrace + 6m，浅滩走廊/取水点圆/图缘三重保护）；崖面 smoothstep 抬升 + 18m 崖体 + 12m 外侧回落 + 端部 6m taper，**支撑域全部 modified 格整体登记 `RockFace` 覆盖意图**（按坡度/18m 阈值离散切分会产生「可走口袋」——探针实测 2~129 格孤立分量，违反连通分量门禁）；局部判定 = 崖面中线 Δ/2 采样硬禁行连续带 ≥70% 目标长度 + 可行走连通分量数不增加（基线/候选独立洪泛），失败整块回滚判未注入、不重抽。生成 `Cliff` 特征（id=224，`TerrainFeatureKind` 枚举码尾部追加、FABS 字典码 5）+ `TerrainSubFeature` id=1005；前端 `render_terrain.js` 岩层阴影分支（仅可视化）。探针证据（144 尺度组合 + 固定种子矩阵 12 例，components 恒 1）见 [changelog v1.52.6](../01-changelog.md)。
+> ★ **OxbowLake 已落地（v1.54.0，`TERRAIN_GENERATOR_VERSION` 16→17）**：`geo/hydrology.rs::apply_oxbow_lake` 在第 5 步整图事务域内实施（规格见 [06 号 §5.4.C](../../plan/tech/06-terrain-templates.md)）——复用 `meander_windows()` 曲折率/弯颈/摆幅诊断，额外过滤浅滩走廊、取水点圆、图缘 40m、弯顶在窗内及弦可开挖；确定性选窗后裁弯取直（旧中心线 i..j 替换为弦，C0 连续），新中心线重算弧长；旧河道带内且不在新直道带内的格子：上游 25% 回填 `RiverTerrace`（`level+1.2`），剩余 75% 为月牙湖 `DeepWater#3`（`water_body_id=3`，`resource_pool_id=0`，`NO_BUILD|NO_WALK`，湖床 `level-1.2`），两端封口 `RiverBank|NO_BUILD`；窗口 AABB 内重写主河 `DeepWater#1`/`RiverBank`/`RiverTerrace` 并更新 `River#1`/`RiverBank#20/21` 轮廓；牛轭湖轮廓作为 `WaterBody` 特征 id=216 与水体 #3 双副本逐字节一致（校验 3↔216 映射）；局部判定 = 可行走连通分量不增加，失败回滚判未注入。仅 T2 命中种子地形变化。前端 `WaterBody` 绘制分支复用。FootLake / RidgeWaterfall 第 5 步仍为空注入。
 
 ### 9.6 T2 子特征注入器（v1.48.0 新增规划）
 

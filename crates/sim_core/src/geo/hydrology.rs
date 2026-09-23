@@ -17,6 +17,8 @@ pub struct RiverCenterline {
 
 #[derive(Debug, Clone, Copy)]
 pub struct MeanderWindow {
+    pub i: usize,
+    pub j: usize,
     pub s0: f32,
     pub s1: f32,
     pub arc_length: f32,
@@ -113,7 +115,7 @@ impl RiverCenterline {
             let neck = (chord - 2.0 * half_width).max(0.0);
             let swing = self.points[i..=j].iter().map(|p| p.x).fold(0.0f32, |m, x| m.max(x.abs())) * 2.0;
             if chord / arc <= 0.71 && neck >= 0.5 * half_width && neck <= 3.0 * half_width && swing >= 4.0 * half_width {
-                out.push(MeanderWindow { s0: self.cumulative[i], s1: self.cumulative[j], arc_length: arc, chord_length: chord, chord_over_arc: chord / arc, neck_width: neck, swing_diameter: swing });
+                out.push(MeanderWindow { i, j, s0: self.cumulative[i], s1: self.cumulative[j], arc_length: arc, chord_length: chord, chord_over_arc: chord / arc, neck_width: neck, swing_diameter: swing });
             }
         }
         out
@@ -772,6 +774,550 @@ pub(super) fn apply_river_cliff(
         accent_id_end: None,
     });
     plan.anchor_hint = verts[4];
+    Ok(true)
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ★ 八b D-B2 · OxbowLake 牛轭湖注入器（06 号 §5.4.C · v1.53.x）
+//
+// 结构型子特征：裁弯取直 + 闭合月牙湖。改变高程/水体/通行 + WaterBody
+// 特征（id=216）+ 水体 #3。全部判定走无状态 mix64 哈希，不消费 WorldRng；
+// 几何施加在第 5 步整图事务域内进行，任一局部判定失败整块回滚、判未注入、不重抽。
+//
+// 实现口径（以实现为准，均为规格兼容收紧）：
+// 1. 选址：复用 RiverCenterline::meander_windows() 的曲折率/弯颈/摆幅诊断，
+//    额外过滤浅滩走廊、取水点圆、图缘 40m、弯顶在窗口内（max |x| 非端点）
+//    以及弦内部陆地可开挖（新河道扫掠带净距校验）。
+// 2. 裁弯：旧中心线 i..j 替换为弦（i 与 j 顶点严格保留，C0 连续）；新中心线
+//    重新计算累计弧长。
+// 3. 弃弯成湖：旧河道带内且不在新直道带内的格子成为牛轭湖；上游 25% 回填
+//    RiverTerrace（淤积端），剩余 75% 为月牙湖 DeepWater#3；两端封口 RiverBank。
+// 4. 主河重派生：窗口 AABB 内重写 DeepWater#1 / RiverBank / RiverTerrace，
+//    并更新 River#1 / RiverBank#20/21 水面轮廓。
+// 5. 连通性：施加后可行走连通分量数不增加；任一 WaterAccessPoint 仍可达营地
+//    （全局类检查由 §5.8 重试环承担，此处仅做几何类连通预检）。
+// ═══════════════════════════════════════════════════════════════════════
+
+const OXBOW_EDGE_MARGIN_M: f32 = 40.0;
+const OXBOW_FORD_MARGIN_M: f32 = 20.0;
+const OXBOW_WATER_CLEARANCE_M: f32 = 8.0;
+const OXBOW_FILL_RATIO: f32 = 0.25;
+const OXBOW_MIN_LAKE_CELLS: usize = 6;
+
+/// §5.4.C `OxbowLake`（仅 T2，WaterBody #3，无资源池）。由第 5 步调用。
+pub(super) fn apply_oxbow_lake(
+    baseline: &TerrainMap,
+    candidate: &mut TerrainMap,
+    scratch: &mut GenesisScratch,
+    plan: &mut PlannedSubFeature,
+) -> Result<bool, &'static str> {
+    if baseline.profile != TERRAIN_PROFILE_RIVER_VALLEY {
+        return Ok(false);
+    }
+    let Some(geom) = scratch.river_geometry.as_ref() else {
+        return Ok(false);
+    };
+    let size = candidate.world_size;
+    let gw = candidate.grid_width;
+    let gh = candidate.grid_height;
+    let seed = baseline.seed;
+
+    // ── 候选窗口：复用 R0-4 诊断 + 额外过滤 ──
+    let half_avg = geom.width * 0.5;
+    let mut windows = geom.centerline.meander_windows(half_avg);
+    if windows.is_empty() {
+        return Ok(false);
+    }
+
+    // 浅滩保护：取 baseline 已生成的 connections 最大半宽 + 30 + bank+terrace
+    let ford_max_half = baseline
+        .hydrology
+        .connections
+        .iter()
+        .map(|c| c.width)
+        .fold(0.0f32, f32::max)
+        * 0.5;
+    let ford_ys = [-size * 0.24, size * 0.24];
+    let ford_protect = ford_max_half + 30.0 + geom.bank + geom.terrace;
+
+    // 过滤：边界 40m、浅滩、取水点、弯顶在内、弦可开挖
+    let half_world = size * 0.5;
+    let mut valid: Vec<MeanderWindow> = Vec::new();
+    for w in windows.drain(..) {
+        if w.i >= geom.centerline.points.len() || w.j >= geom.centerline.points.len() || w.j <= w.i {
+            continue;
+        }
+        // 边界：窗口内任一点距图缘 <40m 则拒
+        let mut out_of_bounds = false;
+        let mut y_min = f32::INFINITY;
+        let mut y_max = f32::NEG_INFINITY;
+        let mut max_abs_x = 0.0f32;
+        let mut max_x_idx = w.i;
+        for k in w.i..=w.j {
+            let p = geom.centerline.points[k];
+            if p.x.abs() > half_world - OXBOW_EDGE_MARGIN_M || p.y.abs() > half_world - OXBOW_EDGE_MARGIN_M {
+                out_of_bounds = true;
+                break;
+            }
+            y_min = y_min.min(p.y);
+            y_max = y_max.max(p.y);
+            let ax = p.x.abs();
+            if ax > max_abs_x {
+                max_abs_x = ax;
+                max_x_idx = k;
+            }
+        }
+        if out_of_bounds {
+            continue;
+        }
+        // 弯顶在窗口内（max |x| 非端点）
+        if max_x_idx == w.i || max_x_idx == w.j {
+            continue;
+        }
+        // 浅滩：窗口 y 区间距任一 ford_y < protect 则拒
+        let mut near_ford = false;
+        for fy in ford_ys {
+            if y_max < fy - ford_protect || y_min > fy + ford_protect {
+                continue;
+            }
+            // 更精细：窗口中心 y 距 ford_y
+            let yc = (y_min + y_max) * 0.5;
+            if (yc - fy).abs() < ford_protect {
+                near_ford = true;
+                break;
+            }
+        }
+        if near_ford {
+            continue;
+        }
+        // 取水点圆保护：窗口 AABB 扩展后不得与任一 access_point 的 interaction_radius+8 相交
+        let (mut bmin_x, mut bmax_x, mut bmin_y, mut bmax_y) = (f32::INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+        for k in w.i..=w.j {
+            let p = geom.centerline.points[k];
+            bmin_x = bmin_x.min(p.x);
+            bmax_x = bmax_x.max(p.x);
+            bmin_y = bmin_y.min(p.y);
+            bmax_y = bmax_y.max(p.y);
+        }
+        // 扩展：半宽+bank+terrace+8
+        let expand = half_avg + geom.bank + geom.terrace + OXBOW_WATER_CLEARANCE_M;
+        bmin_x -= expand;
+        bmax_x += expand;
+        bmin_y -= expand;
+        bmax_y += expand;
+        if baseline.hydrology.access_points.iter().any(|ap| {
+            let r = ap.interaction_radius + OXBOW_WATER_CLEARANCE_M;
+            let qx = ap.pos.x.clamp(bmin_x, bmax_x) - ap.pos.x;
+            let qy = ap.pos.y.clamp(bmin_y, bmax_y) - ap.pos.y;
+            qx * qx + qy * qy < r * r
+        }) {
+            continue;
+        }
+        // SpringValley id=30 若存在：其折线 AABB 不得与窗口重叠（当前无此特征，保留检查）
+        if candidate.features.iter().any(|f| f.id == 30) {
+            // 若有 SpringValley，简单拒掉靠近图心 0.34*size 的窗口（旧规格锚点）
+            let spring_y = 0.34 * size;
+            if y_min <= spring_y && spring_y <= y_max {
+                continue;
+            }
+        }
+        // 弦内部陆地可开挖：新河道扫掠带（弦 AABB 扩展）不得侵入边界/取水点/浅滩
+        // 弦 AABB
+        let pi = geom.centerline.points[w.i];
+        let pj = geom.centerline.points[w.j];
+        let (mut cmin_x, mut cmax_x, mut cmin_y, mut cmax_y) = (
+            pi.x.min(pj.x),
+            pi.x.max(pj.x),
+            pi.y.min(pj.y),
+            pi.y.max(pj.y),
+        );
+        cmin_x -= expand;
+        cmax_x += expand;
+        cmin_y -= expand;
+        cmax_y += expand;
+        if cmin_x < -half_world + OXBOW_EDGE_MARGIN_M
+            || cmax_x > half_world - OXBOW_EDGE_MARGIN_M
+            || cmin_y < -half_world + OXBOW_EDGE_MARGIN_M
+            || cmax_y > half_world - OXBOW_EDGE_MARGIN_M
+        {
+            continue;
+        }
+        if baseline.hydrology.access_points.iter().any(|ap| {
+            let r = ap.interaction_radius + OXBOW_WATER_CLEARANCE_M;
+            let qx = ap.pos.x.clamp(cmin_x, cmax_x) - ap.pos.x;
+            let qy = ap.pos.y.clamp(cmin_y, cmax_y) - ap.pos.y;
+            qx * qx + qy * qy < r * r
+        }) {
+            continue;
+        }
+        // 浅滩走廊保护：弦 AABB 不得与 ford_y 保护带重叠
+        let mut chord_near_ford = false;
+        for fy in ford_ys {
+            if cmax_y < fy - ford_protect || cmin_y > fy + ford_protect {
+                continue;
+            }
+            chord_near_ford = true;
+            break;
+        }
+        if chord_near_ford {
+            continue;
+        }
+        valid.push(w);
+    }
+
+    if valid.is_empty() {
+        return Ok(false);
+    }
+
+    // ── 确定性选窗：hash 决定起始并环绕 ──
+    let h_pick = mix64(seed ^ plan.salt ^ 0x4F58_424C_4C41_4B45);
+    let start = (h_pick as usize) % valid.len();
+    let chosen = valid[start];
+
+    // ── 新中心线：i..j 替换为弦 ──
+    let mut new_pts = Vec::with_capacity(geom.centerline.points.len() - (chosen.j - chosen.i - 1));
+    new_pts.extend_from_slice(&geom.centerline.points[0..=chosen.i]);
+    new_pts.push(geom.centerline.points[chosen.j]);
+    new_pts.extend_from_slice(&geom.centerline.points[chosen.j + 1..]);
+    let new_centerline = RiverCenterline::new(new_pts);
+    let new_geom = RiverGeometry {
+        phase: geom.phase,
+        level: geom.level,
+        width: geom.width,
+        bank: geom.bank,
+        terrace: geom.terrace,
+        width_amp: geom.width_amp,
+        centerline: new_centerline.clone(),
+    };
+
+    // ── 地形改写：窗口 AABB 内逐格 ──
+    // 旧窗口与新弦的并集 AABB，扩展 half+bank+terrace+2格
+    let pi = geom.centerline.points[chosen.i];
+    let pj = geom.centerline.points[chosen.j];
+    let mut bmin_x = pi.x.min(pj.x);
+    let mut bmax_x = pi.x.max(pj.x);
+    let mut bmin_y = pi.y.min(pj.y);
+    let mut bmax_y = pi.y.max(pj.y);
+    for k in chosen.i..=chosen.j {
+        let p = geom.centerline.points[k];
+        bmin_x = bmin_x.min(p.x);
+        bmax_x = bmax_x.max(p.x);
+        bmin_y = bmin_y.min(p.y);
+        bmax_y = bmax_y.max(p.y);
+    }
+    let expand = half_avg + geom.bank + geom.terrace + 10.0;
+    bmin_x -= expand;
+    bmax_x += expand;
+    bmin_y -= expand;
+    bmax_y += expand;
+
+    let gx_lo = (((bmin_x / size + 0.5) * (gw - 1).max(1) as f32).floor() as isize - 2)
+        .clamp(0, (gw - 1) as isize) as usize;
+    let gx_hi = (((bmax_x / size + 0.5) * (gw - 1).max(1) as f32).ceil() as isize + 2)
+        .clamp(0, (gw - 1) as isize) as usize;
+    let gy_lo = (((bmin_y / size + 0.5) * (gh - 1).max(1) as f32).floor() as isize - 2)
+        .clamp(0, (gh - 1) as isize) as usize;
+    let gy_hi = (((bmax_y / size + 0.5) * (gh - 1).max(1) as f32).ceil() as isize + 2)
+        .clamp(0, (gh - 1) as isize) as usize;
+
+    let level = geom.level;
+    let s0 = chosen.s0;
+    let s1 = chosen.s1;
+    let arc = chosen.arc_length;
+    let s_lake_start = s0 + arc * OXBOW_FILL_RATIO;
+    // 新中心线中弦的 s 区间
+    let new_s0 = new_centerline.cumulative[chosen.i];
+    let new_s1 = new_s0 + chosen.chord_length;
+
+    let mut modified_idx: Vec<usize> = Vec::new();
+    let mut lake_cells: Vec<usize> = Vec::new();
+    let mut lake_positions: Vec<Vec3> = Vec::new();
+    let (mut z_min, mut z_max) = (f32::INFINITY, f32::NEG_INFINITY);
+
+    for gy in gy_lo..=gy_hi {
+        for gx in gx_lo..=gx_hi {
+            let idx = gy * gw + gx;
+            let p = candidate.grid_pos(gx, gy);
+            let (d_old, s_old, _) = geom.centerline.distance(p);
+            let (d_new, s_new, _) = new_centerline.distance(p);
+            let hw_old = geom.half_width(p.y, size);
+            let hw_new = new_geom.half_width(p.y, size);
+
+            // 是否在新直道影响带内（优先）
+            let in_new_span = s_new >= new_s0 - 1.0 && s_new <= new_s1 + 1.0;
+            if in_new_span {
+                if d_new < hw_new {
+                    // 新主河 DeepWater#1
+                    let elev = level - 1.4 + p.y / size * 0.3;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::DeepWater,
+                        water_body_id: Some(1),
+                        natural_fertility: 0.95,
+                        flags: 0,
+                    });
+                    modified_idx.push(idx);
+                    continue;
+                } else if d_new < hw_new + geom.bank {
+                    let outside = (d_new - hw_new).max(0.0);
+                    let elev = level + 0.4 + outside / geom.bank * 1.6;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::RiverBank,
+                        water_body_id: None,
+                        natural_fertility: 0.95,
+                        flags: TERRAIN_FLAG_NO_BUILD | TERRAIN_FLAG_SHORE_ACCESS,
+                    });
+                    modified_idx.push(idx);
+                    continue;
+                } else if d_new < hw_new + geom.bank + geom.terrace {
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::RiverTerrace,
+                        water_body_id: None,
+                        natural_fertility: 0.95,
+                        flags: 0,
+                    });
+                    modified_idx.push(idx);
+                    continue;
+                }
+            }
+
+            // 旧弯道区域：仅当 s_old 在窗口内
+            if s_old < s0 - 0.5 || s_old > s1 + 0.5 {
+                continue;
+            }
+            // 已被新河道覆盖的格子不再作为湖
+            if d_new < hw_new + geom.bank + 0.5 {
+                continue;
+            }
+            let t = ((s_old - s0) / arc).clamp(0.0, 1.0);
+            if t < OXBOW_FILL_RATIO {
+                // 上游回填：RiverTerrace
+                if d_old < hw_old + geom.bank + geom.terrace {
+                    // 抬高到阶地
+                    let elev = level + 1.2 + (1.0 - t) * 0.8;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::RiverTerrace,
+                        water_body_id: None,
+                        natural_fertility: 0.95,
+                        flags: 0,
+                    });
+                    modified_idx.push(idx);
+                }
+            } else {
+                // 月牙湖本体及岸带
+                if d_old < hw_old {
+                    // 湖床
+                    let elev = level - 1.2;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::DeepWater,
+                        water_body_id: Some(3),
+                        natural_fertility: 0.95,
+                        flags: 0,
+                    });
+                    modified_idx.push(idx);
+                    lake_cells.push(idx);
+                    lake_positions.push(p);
+                } else if d_old < hw_old + geom.bank {
+                    // 湖岸 RiverBank
+                    let outside = (d_old - hw_old).max(0.0);
+                    let elev = level + 0.35 + outside / geom.bank * 0.8;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::RiverBank,
+                        water_body_id: None,
+                        natural_fertility: 0.95,
+                        flags: TERRAIN_FLAG_NO_BUILD,
+                    });
+                    modified_idx.push(idx);
+                } else if d_old < hw_old + geom.bank + geom.terrace + 2.0 && t < OXBOW_FILL_RATIO + 0.08 {
+                    // 封口过渡带：上游回填与湖交界写 RiverBank
+                    let elev = level + 0.6;
+                    candidate.cells[idx].elevation = elev;
+                    z_min = z_min.min(elev);
+                    z_max = z_max.max(elev);
+                    scratch.surface_overlays.push(super::geometry_transaction::SurfaceOverlay {
+                        cell_index: idx,
+                        surface_kind: SurfaceKind::RiverBank,
+                        water_body_id: None,
+                        natural_fertility: 0.95,
+                        flags: TERRAIN_FLAG_NO_BUILD,
+                    });
+                    modified_idx.push(idx);
+                }
+            }
+        }
+    }
+
+    if lake_cells.len() < OXBOW_MIN_LAKE_CELLS {
+        return Ok(false);
+    }
+
+    // ── 局部判定：连通分量不增加 ──
+    let mut extra_block = vec![false; candidate.cells.len()];
+    for &idx in &modified_idx {
+        // DeepWater 与 RockFace 会导致 NO_WALK，事务预览会物化
+        // 这里预检：所有 DeepWater id 1/3 都视为阻断
+        if let Some(ov) = scratch.surface_overlays.iter().find(|o| o.cell_index == idx) {
+            if matches!(ov.surface_kind, SurfaceKind::DeepWater) {
+                extra_block[idx] = true;
+            }
+        }
+    }
+    let base_comps = count_walkable_components(baseline, &[]);
+    let cand_comps = count_walkable_components(candidate, &extra_block);
+    if cand_comps > base_comps {
+        return Ok(false);
+    }
+
+    // ── 主河轮廓重派生（新中心线）──
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    for i in 0..=192 {
+        let s = new_centerline.total * i as f32 / 192.0;
+        let p = new_centerline.sample(s);
+        let q = new_centerline.sample((s + 1.0).min(new_centerline.total));
+        let mut tx = q.x - p.x;
+        let mut ty = q.y - p.y;
+        let tl = (tx * tx + ty * ty).sqrt().max(f32::EPSILON);
+        tx /= tl;
+        ty /= tl;
+        let w = new_geom.half_width(p.y, size);
+        left.push(Vec3::new(p.x - ty * w, p.y + tx * w, level));
+        right.push(Vec3::new(p.x + ty * w, p.y - tx * w, level));
+    }
+    let mut new_outline = left.clone();
+    new_outline.extend(right.iter().rev().copied());
+
+    // 更新主河水体与特征（id 1,20,21）
+    if let Some(wb) = candidate.hydrology.water_bodies.iter_mut().find(|wb| wb.id == 1) {
+        wb.vertices = new_outline.clone();
+    }
+    if let Some(feat) = candidate.features.iter_mut().find(|f| f.id == 1) {
+        feat.vertices = new_outline.clone();
+    } else {
+        candidate.features.push(TerrainFeature {
+            id: 1,
+            kind: TerrainFeatureKind::River,
+            vertices: new_outline.clone(),
+            elevation: level,
+            width: new_geom.width,
+            flags: 0,
+        });
+    }
+    // RiverBank 20/21
+    for (fid, verts) in [(20u32, left.clone()), (21u32, right.clone())] {
+        if let Some(feat) = candidate.features.iter_mut().find(|f| f.id == fid) {
+            feat.vertices = verts;
+        } else {
+            candidate.features.push(TerrainFeature {
+                id: fid,
+                kind: TerrainFeatureKind::RiverBank,
+                vertices: verts,
+                elevation: level,
+                width: new_geom.bank,
+                flags: 0,
+            });
+        }
+    }
+
+    // ── 牛轭湖轮廓：旧弯道采样 ──
+    // 采样旧中心线从 s_lake_start 到 s1，24 点
+    let mut lake_left = Vec::new();
+    let mut lake_right = Vec::new();
+    let n_lake = 24usize;
+    for i in 0..=n_lake {
+        let s = s_lake_start + (s1 - s_lake_start) * i as f32 / n_lake as f32;
+        let p = geom.centerline.sample(s);
+        let q = geom.centerline.sample((s + 1.0).min(geom.centerline.total));
+        let mut tx = q.x - p.x;
+        let mut ty = q.y - p.y;
+        let tl = (tx * tx + ty * ty).sqrt().max(f32::EPSILON);
+        tx /= tl;
+        ty /= tl;
+        let w = geom.half_width(p.y, size);
+        lake_left.push(Vec3::new(p.x - ty * w, p.y + tx * w, level - 0.2));
+        lake_right.push(Vec3::new(p.x + ty * w, p.y - tx * w, level - 0.2));
+    }
+    let mut lake_outline = lake_left.clone();
+    lake_outline.extend(lake_right.iter().rev().copied());
+    // 闭合：首尾相等（验证器对静水才强制，但保持闭合习惯）
+    if let Some(first) = lake_outline.first().copied() {
+        lake_outline.push(first);
+    }
+
+    // 水体 #3 与特征 #216 双副本逐字节一致
+    candidate.hydrology.water_bodies.push(WaterBody {
+        id: 3,
+        level: level - 0.2,
+        flow_direction: Vec3::ZERO,
+        resource_pool_id: 0,
+        vertices: lake_outline.clone(),
+    });
+    candidate.features.push(TerrainFeature {
+        id: 216,
+        kind: TerrainFeatureKind::WaterBody,
+        vertices: lake_outline.clone(),
+        elevation: level - 0.2,
+        width: geom.width * 0.5,
+        flags: 0,
+    });
+
+    // ── 子特征登记 ──
+    let anchor = if !lake_positions.is_empty() {
+        let mut ax = 0.0f32;
+        let mut ay = 0.0f32;
+        let mut az = 0.0f32;
+        for p in &lake_positions {
+            ax += p.x;
+            ay += p.y;
+            az += p.z;
+        }
+        let n = lake_positions.len() as f32;
+        Vec3::new(ax / n, ay / n, az / n)
+    } else {
+        geom.centerline.sample((s_lake_start + s1) * 0.5)
+    };
+    let (mut bmin_x, mut bmax_x, mut bmin_y, mut bmax_y) = (f32::INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+    for v in &lake_outline {
+        bmin_x = bmin_x.min(v.x);
+        bmax_x = bmax_x.max(v.x);
+        bmin_y = bmin_y.min(v.y);
+        bmax_y = bmax_y.max(v.y);
+    }
+    bmin_x = bmin_x.min(bmin_x).min(bmin_x); // keep
+    candidate.sub_features.push(TerrainSubFeature {
+        id: 1000 + TerrainSubFeatureKind::OxbowLake as u32,
+        kind: TerrainSubFeatureKind::OxbowLake,
+        anchor,
+        bounds_min: Vec3::new(bmin_x, bmin_y, z_min),
+        bounds_max: Vec3::new(bmax_x, bmax_y, z_max),
+        feature_ids: vec![216],
+        accent_id_start: None,
+        accent_id_end: None,
+    });
+
+    // 更新 scratch 中的中心线为新几何，供后续流程使用
+    scratch.river_geometry = Some(new_geom);
+    plan.anchor_hint = anchor;
     Ok(true)
 }
 

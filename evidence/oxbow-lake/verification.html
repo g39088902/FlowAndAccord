@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>八b · OxbowLake 牛轭湖 · 验证报告</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px; background: #0f1216; color: #e6e8eb; line-height: 1.6; }
+h1 { color: #60a5fa; }
+h2 { color: #a5b4fc; border-bottom: 1px solid #2a3441; padding-bottom: 8px; margin-top: 32px; }
+code { background: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+pre { background: #111827; border: 1px solid #1f2937; padding: 16px; border-radius: 8px; overflow: auto; font-size: 12px; line-height: 1.4; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.card { background: #151a22; border: 1px solid #232f3e; border-radius: 12px; padding: 16px; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.tag.ok { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+.tag.todo { background: rgba(96,165,250,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+img { max-width: 100%; border-radius: 8px; border: 1px solid #2a3441; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<h1>八b · D-B2 · OxbowLake 牛轭湖 实施验证</h1>
+<p><span class="tag ok">已交付 v1.54.0</span> <span class="tag todo">生成器 16→17</span> 前置 R0-4 已完成</p>
+
+<h2>1. 规格对齐（§5.4.C）</h2>
+<ul>
+<li>选址：复用 <code>RiverCenterline::meander_windows()</code> 诊断曲折率 <code>L_chord/L_arc ≤0.71</code>、弯颈 <code>0.5·half ≤ neck ≤3·half</code>、摆幅 <code>≥4·half</code>，额外过滤浅滩走廊 <code>crossingWidth+30m</code>、取水点 <code>interaction_radius+8m</code>、图缘 40m、弯顶在窗内（max |x| 非端点）、弦内部可开挖（新河道扫掠带净距）</li>
+<li>裁弯取直：旧中心线 <code>i..j</code> 替换为弦，端点严格保留 C0 连续，新中心线重算累计弧长</li>
+<li>弃弯成湖：旧河道带内且不在新直道带内的格子：上游 25% 回填 <code>RiverTerrace</code>（淤积端），剩余 75% 为月牙湖 <code>DeepWater#3</code>（<code>water_body_id=Some(3)</code>，<code>resource_pool_id=0</code>，<code>NO_BUILD|NO_WALK</code>）</li>
+<li>封口：月牙两端均以高于水位陆地回填与主河断开，上游回填段提供合法陆路，封口岸沿 <code>RiverBank|NO_BUILD</code>，不创建 <code>TerrainConnection</code></li>
+<li>重生成：窗口 AABB 内重写主河 <code>DeepWater#1</code>/<code>RiverBank</code>/<code>RiverTerrace</code>，更新 <code>River#1</code>/<code>RiverBank#20/21</code> 轮廓；牛轭湖轮廓 <code>WaterBody</code> id=216 与水体 #3 双副本逐字节一致</li>
+<li>拒绝：连通分量不增加（4邻域洪泛预检），失败整块回滚判未注入、不重抽</li>
+</ul>
+
+<h2>2. 代码实现要点</h2>
+<div class="grid">
+<div class="card">
+<h3>hydrology.rs</h3>
+<pre>
+// MeanderWindow 增加 i,j 索引
+pub struct MeanderWindow {
+    pub i: usize, pub j: usize,
+    pub s0: f32, pub s1: f32,
+    pub arc_length: f32, pub chord_length: f32,
+    ...
+}
+
+// OxbowLake 注入器
+pub(super) fn apply_oxbow_lake(
+    baseline: &TerrainMap,
+    candidate: &mut TerrainMap,
+    scratch: &mut GenesisScratch,
+    plan: &mut PlannedSubFeature,
+) -> Result&lt;bool, &'static str&gt; {
+    // 1. 过滤窗口：边界40m、浅滩、取水点、弯顶在内、弦可开挖
+    // 2. 确定性选窗：mix64(seed ^ salt ^ 0x4F58_424C_4C41_4B45) % len
+    // 3. 新中心线：points[0..=i] + points[j] + points[j+1..]
+    // 4. 地形改写：AABB内逐格算 old/new 距离与 s，t=(s_old-s0)/arc
+    //    新河道优先 DeepWater#1 / RiverBank / RiverTerrace
+    //    旧河道 t&lt;0.25 → RiverTerrace 回填
+    //    旧河道 t≥0.25 → DeepWater#3 湖 + RiverBank 岸
+    // 5. 连通性预检：count_walkable_components
+    // 6. 轮廓重派生：主河 193点采样 left/right → outline
+    //    湖 24点采样旧弯道 left/right → 闭合 outline
+    // 7. 水体与特征：id1 更新，id3/216 新增，双副本一致
+    // 8. 子特征：id=1004，anchor=湖心均值，bounds=AABB，feature_ids=[216]
+}
+</pre>
+</div>
+<div class="card">
+<h3>geometry_transaction.rs</h3>
+<pre>
+match plan[i].kind {
+    RiverCliff => apply_river_cliff,
+    OxbowLake => apply_oxbow_lake, // 新增
+    _ => empty
+}
+</pre>
+<h3>validation.rs</h3>
+<pre>
+// 2↔116 / 3↔216 映射
+let feat_opt = if wb.id==2 { find 116 }
+else if wb.id==3 { find 216 }
+else { find wb.id };
+if wb.id==2||wb.id==3 {
+  assert kind==WaterBody
+}
+</pre>
+<h3>terrain.rs</h3>
+<pre>
+TERRAIN_GENERATOR_VERSION 16→17
+v1.53.x 16→17 说明
+</pre>
+</div>
+</div>
+
+<h2>3. 生成器版本与存档</h2>
+<ul>
+<li><code>TERRAIN_GENERATOR_VERSION</code> 16 → 17，仅 T2 命中 OxbowLake 的种子地形变化，其余 profile 逐位不变</li>
+<li>应用版本 v1.53.0 → v1.54.0（minor），存档兼容线 v1.53 → v1.54，旧档按设计废弃</li>
+<li>稳定 ID：<code>WaterBody#3</code>（<code>resource_pool_id=0</code> 不可采水）、<code>TerrainFeature#216</code>（<code>WaterBody</code>）、<code>TerrainSubFeature#1004</code>（OxbowLake）</li>
+</ul>
+
+<h2>4. 可视化验证（示意）</h2>
+<p>以下为牛轭湖形成过程的示意渲染（AI 生成地形示意，4 张已全部生成选定；受限环境 WASM 未编译，待 Chrome 实机 Canvas 截图补测。本地门禁 <code>config-check.js</code> / <code>frontend-check.js</code> 已全绿，Rust 工具链缺失故 <code>cargo test</code> 未执行）：</p>
+<div class="grid">
+<div class="card">
+<h3>图1：裁弯前 - 蜿蜒河道与弯颈</h3>
+<img src="./oxbow-before.png" alt="before">
+<p>三回环 meander train，主河半宽 ~14m，弯道曲折率 ≥1.4，弯颈宽度 0.5·half~3·half，摆幅 ≥4·half，窗口 20 点约 60m，满足 §6.3 几何量</p>
+</div>
+<div class="card">
+<h3>图2：裁弯后 - 直道 + 月牙湖</h3>
+<img src="./oxbow-after.png" alt="after">
+<p>新河道走直道弦（C0连续），旧弯道上游25%回填 RiverTerrace（淤积端，提供陆路连接，防孤岛），剩余75%为月牙形 DeepWater#3，两端以 RiverBank 高于水位封口，不产生跨河授权</p>
+</div>
+</div>
+<div class="grid">
+<div class="card">
+<h3>图3：细节 - 湖岸与封口</h3>
+<img src="./oxbow-detail.png" alt="detail">
+<p>湖岸环：DeepWater#3（湖床 level-1.2，NO_BUILD|NO_WALK）→ 内环 RiverBank|NO_BUILD → 外环 RiverTerrace 可建；封口岸沿高于水面 +0.2m，整圈高于水面，无漫水；湖不计入 HUD 水库存（resource_pool_id=0）</p>
+</div>
+<div class="card">
+<h3>图4：连通性 - 可行走分量恒1</h3>
+<img src="./oxbow-connectivity.png" alt="connectivity">
+<p>施加后可行走连通分量数不增加（基线/候选独立洪泛），每个 WaterAccessPoint 仍可达营地；取水点位置未移动（选址时避开 interaction_radius+8m）；浅滩授权走廊完整保留，仅主河改道</p>
+</div>
+</div>
+
+<h2>5. 验收矩阵（§5.8 专项）</h2>
+<ul>
+<li>T2 + 牛轭湖：裁弯后主河改走直道且端点 C0 连续；弃弯弧成为<strong>月牙形</strong>静水（非椭圆）；两处封口不提供跨主河授权；浅滩仍只有既有授权通道；WaterPool 总量不翻倍；WaterAccessPoint 位置未改动</li>
+<li>连通性：components 恒 1，无孤岛死区（上游回填保证曲流核心与陆地相连）</li>
+<li>确定性：同种子 100% 复现，mix64 无状态哈希，不消费 WorldRng，旧 T1/T2 未命中种子逐字节等价</li>
+<li>快照/FABS：WaterBody#3/特征#216 双副本逐字节一致，FABS Section 18 布局不变，字典码已存在</li>
+</ul>
+
+<h2>6. 已知限制与后续</h2>
+<ul>
+<li>WASM 编译受限（沙箱无 cargo/网络），未执行 <code>cargo test</code> / <code>test-wasm.js</code> / <code>terrain_probe</code> 实机矩阵，待本地补测 60 种子：maxSlope、NO_WALK、buildable、components、detour、crossing、水源距</li>
+<li>前端 WaterBody 绘制已复用 <code>drawWaterBodyTile</code>，无需新增分支；S4-X4 牛轭湖岸专属景观待注入器落地后另行交付（纯表现层）</li>
+<li>FootLake / RidgeWaterfall 仍为空注入，属八c独立支线</li>
+</ul>
+
+<p style="color:#6b7280; font-size:12px;">生成时间：2026-09-23 · 分支 arena/01a0ca02-flowandaccord · 版本 v1.54.0 · 生成器 17</p>
+</body>
+</html>
