@@ -75,6 +75,8 @@ stateDiagram-v2
 3. `crates/sim_wasm` 保持 raw wasm（零依赖、无 host import）架构。
 4. **取消按需求层级再错峰**：保持固定 dt、既有个人决策相位、层级评估与结算时序；不能通过延后需求评估取得性能收益。与新增行为的验证边界见[融合设计 §7](./01-integration-contracts.md#7-事实快照与验证)。
 
+**UGC 地形编译器性能边界**：统一地形场的侵蚀、汇流、沉积和体素网格提取属于创世/Worker 阶段，不得进入 tick 热路径。UGC-00 起单独记录创世耗时、峰值内存、Field2/Field3 字段数量、chunk 网格生成耗时和缓存命中率；UGC-04/05 必须使用稀疏 32³ chunk、固定 halo 和可见 chunk 按需网格化。性能优化不能通过减少约束检查、改变字段遍历顺序或并行浮点归约破坏确定性；详细字段与后端契约见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md)。
+
 ## 3. M5-1：消除超线性（当前主线）
 
 **目标**：将 Phase 3 / 7 / 6 的超线性系数（1.65 / 1.33 / 1.32）全部压到 ≤ 1.15。

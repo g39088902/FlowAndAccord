@@ -2,7 +2,7 @@
 
 > **当前架构**：双 Canvas 过渡形态——地形与沙盘侧壁由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，装饰/实体/道路/标签仍在 Canvas 2D 覆盖层 `sim-canvas` 经统一深度队列绘制。★ **2026-09-17 架构决策：全量 WebGL、不再使用 Canvas 2D**，双 Canvas 仅为过渡，装饰层与实体层将整体迁入同一 WebGL 管线后退役 2D 覆盖层（[31 号 §8](./31-canvas-to-webgl-migration.md) 阶段三~五），遮挡由 GPU 深度缓冲逐像素解决。
 > **本文定位**：世界景观提升的**任务台账 + 设计契约**。已完成任务的实现细节与验收流水账权威在 [changelog](../../current/01-changelog.md) 与证据包（`assets/ta*-evidence-*/`），本文只保留"当前是什么规则、还剩什么没做、为什么做"。
-> **入口**：[文档导航](../../README.md) · [长期路线图](../design/01-roadmap.md) · [空间与路网现状](../../current/tech/14-terrain-and-network.md) · [前端现状](../../current/tech/16-frontend-overview.md) · [地形专项方案](./06-terrain-templates.md)。
+> **入口**：[文档导航](../../README.md) · [长期路线图](../design/01-roadmap.md) · [空间与路网现状](../../current/tech/14-terrain-and-network.md) · [前端现状](../../current/tech/16-frontend-overview.md) · [地形专项方案](./06-terrain-templates.md) · [统一地形场编译器设计](../../../TERRAIN_FIELD_COMPILER_DESIGN.md)。
 
 ## 状态机
 
@@ -264,7 +264,7 @@ seed=0 因 `sim_worker.js` 入口缺陷（`msg.seed || Date.now()` 替换 0）�
 
 ### 7.1 生成顺序与已落地骨架
 
-生成顺序：内核先完成高程、水系、通行与选址约束，再生成合法路网并通过校验，最后添加材质与装饰。✅ T1 山口与 T2 河谷已落地；地形感知路网保证路线绕山、经浅滩跨河。❌ **不再规划独立 T3 profile**（v1.48.0 决策）：湖泊/峡谷/瀑布通过 TB-04 子特征注入实现；湿地因视觉辨识度低明确删除。
+生成顺序：内核先完成字段编译、高程/水系/通行与选址约束，再生成合法路网并通过校验，最后由前端消费材质字段和装饰事实。现有 T1 山口与 T2 河谷继续按高度场运行；统一生成器 UGC-01~03 通过后，台地、盆地、冲积扇和湖泊也由同一套 Field Graph/水文过程生成。视觉层不得根据模板名称自行补画地貌；材质、LOD 和网格细节只消费 Rust 输出的字段与 `TerrainFeature`。
 
 ### 7.2 TB-04 · D-B 子特征注入（难度：高）
 
@@ -285,6 +285,23 @@ seed=0 因 `sim_worker.js` 入口缺陷（`msg.seed || Date.now()` 替换 0）�
 
 - ⏳ 未来桥面作为独立高程的连接设施预留（随 TC-01/T4），不把桥当作道路纹理。
 - ⏳ **TB-05**：`ecology/spawn.rs` 尚未消费地表查询，需接入地表类别做生态落位的生存距离诊断，保证族人始祖落位与地表事实一致。
+
+### 7.5 统一场编译器与体素网格对接（UGC-04/05）
+
+统一编译器的视觉输入分成两层：
+
+1. **语义层**：`SurfaceKind`、坡度、湿度、硬度、水体、岸带、可建/可行走 flags。它们决定材质选择、装饰禁区、路网和拾取，不由网格反推。
+2. **几何层**：HeightfieldBackend 或稀疏 VoxelBackend 输出的高度、密度、材质和网格。它决定轮廓、岩壁、悬挑、洞穴和 LOD。
+
+体素迁移的表现约束：
+
+- 初期 VoxelBackend 用 32³ chunk + 一格 halo；chunk 边界不得出现裂缝或法线跳变。
+- 网格提取可先用 Surface Nets，确认锐利岩壁需求后采用 Dual Contouring；算法选择不能改变语义字段。
+- `HeightfieldView` 在多层导航完成前只提供顶部可居住层，洞穴和地下层不能自动成为 Agent 路径。
+- 静态 chunk 网格按 `recipe_hash + chunk_coord + generator_version` 缓存；换世界、读档或生成器版本变化时统一失效。
+- 全量 WebGL 迁移沿用 [31 号方案](./31-canvas-to-webgl-migration.md)；地形、实体、装饰和水体共享深度缓冲，LOD 只改变几何细节。
+
+实现细节、字段量化、chunk 存档和验收命令见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md) §7、§8、§10。
 
 ## 8. 资源区与聚落地景（TA-17）
 
@@ -323,6 +340,7 @@ seed=0 因 `sim_worker.js` 入口缺陷（`msg.seed || Date.now()` 替换 0）�
 | 数据类别 | 权威来源与约束 |
 |---|---|
 | 高程、坡度、地表类别 | ✅ Rust T0/T1/T2 生成，经 FABS 地形 section 传递；不由前端另造物理地形 |
+| 统一场/体素几何（UGC） | ⬜ UGC-01~03 由 Field Graph 生成语义；UGC-04~05 由 VoxelBackend/HeightfieldView 提供网格与顶部查询；未落地前不写入现状快照 |
 | 河湖几何、水位、岸带、浅滩 | ✅ 内核 `TerrainFeature`/`WaterPool`/`TerrainConnection`；水面高程独立于河床；桥梁待 TC-01 |
 | 道路、房屋、资源储量 | 现有世界快照；材质映射不得改变真实坐标、路线、容量与消耗 |
 | 草斑、装饰石、素材变体 | ✅ 五类全量承载；独立 `accent_rng`，不消费共享模拟 RNG；FABS Section 21 持久化 |
@@ -338,7 +356,7 @@ seed=0 因 `sim_worker.js` 入口缺陷（`msg.seed || Date.now()` 替换 0）�
 
 ### 10.3 版本门禁与存档契约
 
-`terrain_generator_version` + `terrain_profile` 与 `SAVE_FORMAT_VERSION`（当前 7）共同拒绝旧档，地形与水池直接从存档恢复。后续若新增持久化字段再评估存档结构版本，不能把每次材质改色都变成格式升级。改变 accent 生成规则时同样按此处理。
+当前 `terrain_generator_version` + `terrain_profile` 与 `SAVE_FORMAT_VERSION`（当前 7）共同拒绝旧档，地形与水池直接从存档恢复。UGC-05 后将增加 `terrain_recipe_hash` 与 `voxel_backend_version` 的门禁；静态 chunk 由 seed/recipe 重建，动态修改只保存 chunk delta。后续若新增持久化字段再评估存档结构版本，不能把每次材质改色都变成格式升级。改变 accent 生成规则时同样按此处理。
 
 ### 10.4 工程纪律
 

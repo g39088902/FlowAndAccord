@@ -37,8 +37,8 @@
 | 03 | [内部市场](tech/03-internal-market.md) | 产品设计已复核，未排期；自主兼职售货员 + 实物托管 + 有限订单簿；[实施任务序列](../../INTERNAL_MARKET_IMPLEMENTATION_PLAN.md) |
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；对应 design/07 的任务、接触结算、物资与存档契约 |
-| 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.3 维护 16 张模板的批次与能力前置，R.6 区分任务依赖、验收与 random 准入 |
-| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 季相、动态受光、LOD 与遮挡边界方案；★ 2026-09-17 渲染架构决策：**全量 WebGL、不再使用 Canvas 2D**（TC-03 改为既定路线，原 2D 遮挡近似策略取消；TA-08 任务已删除视为完成，验收矩阵并入 31 号 §8.5）；★ 2026-09-22 渲染架构决策：**TA-07 任务已取消视为完成**（实现 v1.50.65 保留且在默认 WebGL 路径下照常生效，仅剩的 Chrome 视觉验收与性能 A/B 随「已无性能问题」不再追补） |
+| 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.0 新增统一 Field Graph/水文过程/体素后端路线，R.3 维护 UGC-00~05 与模板批次；可执行设计见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
+| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 季相、动态受光、LOD 与遮挡边界方案；新增 UGC-04/05 的 voxel chunk/语义字段视觉边界；★ 2026-09-17 渲染架构决策：**全量 WebGL、不再使用 Canvas 2D**（TC-03 改为既定路线，原 2D 遮挡近似策略取消；TA-08 任务已删除视为完成，验收矩阵并入 31 号 §8.5）；★ 2026-09-22 渲染架构决策：**TA-07 任务已取消视为完成**（实现 v1.50.65 保留且在默认 WebGL 路径下照常生效，仅剩的 Chrome 视觉验收与性能 A/B 随「已无性能问题」不再追补） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
 | 09 | [植被样板验证（TA-05）](tech/09-vegetation-verification.md) | ✔ 已收口（2026-09-22 按用户口径：功能已齐，仅缺测试验证与取舍；LOAD 补测不再作为完成门槛）；验收权威在 07 号 §11.4 |
 | 10 | [盆地群峰环抱（TB-04）](tech/10-basin-mountain-encirclement.md) | 规划设计（TB-04）；闭合环脊双坡解耦、向心山嘴支脊、切穿峡谷出水口与自然山间盆地地貌重构 |
