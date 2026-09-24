@@ -128,6 +128,8 @@ function updateDebugHud(now) {
   dbgLastTickSec = realNow;
   const tickRate = (typeof s.tickRate === 'number') ? s.tickRate : fallbackTickRate;
 
+  const currentSeed = sim._engineSeed;
+  dbgSetText('dbg-seed', Number.isSafeInteger(currentSeed) ? String(currentSeed) : '—');
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
   // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格）

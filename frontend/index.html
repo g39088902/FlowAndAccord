@@ -13,11 +13,14 @@
 </head>
 <body>
   <div id="startup-save-gate" class="save-modal-backdrop" style="display:flex; z-index:9999;">
-    <div style="width:min(460px, calc(100vw - 32px)); padding:24px; border:1px solid rgba(56,189,248,.35); border-radius:12px; background:#0b1220; color:#e5eef7; text-align:center; box-shadow:0 20px 80px rgba(0,0,0,.55);">
-      <div style="font-size:22px; margin-bottom:8px;">💾 先建立本地存档文件</div>
-      <div id="startup-save-message" style="font-size:12px; color:#9fb3c8; line-height:1.6; margin-bottom:16px;">游戏开始前必须连接一个 .json 存档文件。请使用 Chrome 或 Edge。</div>
-      <button id="startup-save-connect" class="save-bar-btn" style="padding:9px 18px;">建立存档文件</button>
-      <button id="startup-save-delete" class="save-bar-btn" style="padding:9px 18px; display:none; background:rgba(239,68,68,.16); border-color:rgba(248,113,113,.55); color:#fca5a5;">🗑️ 删除旧存档并新建</button>
+    <div class="startup-save-card">
+      <div id="startup-save-title" class="startup-save-title">💾 先建立本地存档文件</div>
+      <div id="startup-save-message" class="startup-save-message">游戏开始前必须连接一个 .json 存档文件。请使用 Chrome 或 Edge。</div>
+      <div class="startup-save-actions">
+        <button id="startup-save-connect" class="save-bar-btn">建立存档文件</button>
+        <button id="startup-save-load" class="save-bar-btn" style="display:none;">📂 读取旧存档</button>
+        <button id="startup-save-delete" class="save-bar-btn startup-save-delete" style="display:none;">🗑️ 删除旧存档并新建</button>
+      </div>
     </div>
   </div>
   <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
@@ -857,6 +860,7 @@
     <div style="margin:4px 0 6px;">
       <button id="btn-veg-observer" title="打开植被观察台：季节锁定/光向/机位/物种标注/6变体样板飞往" style="width:100%;padding:4px 6px;background:#0f172a;color:#5eead4;border:1px solid #1e3a3a;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;">🌿 植被观察台</button>
     </div>
+    <div class="debug-row"><span>🌱 当前 Seed</span><span id="dbg-seed" class="mono-num">—</span></div>
     <div class="debug-row"><span>⏱️ 模拟 Tick</span><span id="dbg-tick" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚡ 每秒 Tick</span><span id="dbg-tick-rate" class="mono-num">0</span></div>
     <div class="debug-row"><span>🗺️ 地图模板</span><span id="dbg-map-profile" class="mono-num">—</span></div>

@@ -269,9 +269,15 @@ impl World3DEngine {
         for lane in self.network.graph.edge_weights(){
             if !corridor::validate_curve(&self.terrain,&lane.curve,self.config.terrain_road_corridor_width,self.config.terrain_max_walk_slope,lane.terrain_profile.crossing_id){return Err(format!("车道 {} 不符合地表通行规则",lane.id));}
         }
-        let Some(start)=self.network.graph.node_indices().next()else{return Err("没有合法路网".into());};
-        for poi in &self.pois {let Some(id)=poi.nearest_node_id else{return Err("POI 缺少道路接入".into());};
-            if !petgraph::algo::has_path_connecting(&self.network.graph,start,self.network.node_map[&id],None){return Err(format!("POI {} 不可达",poi.id));}}
+        // POI 不要求全部落在同一个路网连通分量内。孤立 POI 允许作为地图上的
+        // 独立资源点保留；仍要求它拥有对应的路网节点，且所有已提交车道通过
+        // 上面的几何/地表校验。
+        for poi in &self.pois {
+            let Some(id)=poi.nearest_node_id else{return Err("POI 缺少道路接入".into());};
+            if !self.network.node_map.contains_key(&id) {
+                return Err(format!("POI {} 的道路节点不存在", poi.id));
+            }
+        }
         Ok(())
     }
     pub(crate) fn sync_water_pois(&mut self){

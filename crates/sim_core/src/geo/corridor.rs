@@ -73,11 +73,15 @@ pub fn segment_valid(t:&TerrainMap,a:Vec3,b:Vec3,width:f32,slope:f32,crossing:Op
         // ★ v1.50.77 判定重排（语义等价）：先做便宜的格属性分类，仅对「将被拒绝/走水」
         // 的格再确认与走廊相交（原逻辑每格都先算 intersects）。false ⇔ 存在相交且不合格的格，不变。
         let water=c.water_body_id.is_some() || matches!(c.surface_kind,SurfaceKind::ShallowWater|SurfaceKind::DeepWater);
+        // 河谷模板按用户规则允许道路直接经过河道；其他模板仍要求水体只能
+        // 通过显式授权的浅滩连接。保留坡度与 NO_WALK/RockFace 校验。
+        let river_valley_open_water = t.profile == crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY;
+        let water_blocked = water && !river_valley_open_water;
         let hard=c.feature_flags&TERRAIN_FLAG_NO_WALK!=0 || c.surface_kind==SurfaceKind::RockFace;
-        if c.slope_angle_deg>slope || water || hard {
+        if c.slope_angle_deg>slope || water_blocked || hard {
             if !seg_box_hit(a.x,a.y,b.x,b.y,p.x-r,p.y-r,p.x+r,p.y+r,invdx,invdy,dx_ok,dy_ok){continue;}
             if c.slope_angle_deg>slope{return false;}
-            if water {
+            if water_blocked {
                 // 授权只覆盖该连接轴线的有限走廊；禁止普通路线借浅滩沿河行进。
                 if auth_segment_valid != Some(true) {return false;}
             } else {return false;}

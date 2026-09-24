@@ -180,6 +180,112 @@
     }
   }
 
+  /** 与 RustWorld 的 seed 解析保持一致；地图预览不进入存档选择流程。 */
+  function requestedStartupSeed() {
+    const query = new URLSearchParams(window.location.search);
+    if (query.has('mapOnly')) return null;
+    const value = Number.parseInt(query.get('seed') || '', 10);
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+
+  async function hasReadableStartupSave() {
+    const st = slotState.save1;
+    if (!st || !st.handle) return false;
+    try {
+      await st.handle.getFile();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** 显式 seed 开局：旧槽位在用户选择前绝不能被自动读取或覆盖。 */
+  async function bootstrapSeedChoice(seed) {
+    const title = document.getElementById('startup-save-title');
+    const createBtn = document.getElementById('startup-save-connect');
+    const loadBtn = document.getElementById('startup-save-load');
+    if (!createBtn || !loadBtn) return;
+    if (title) title.textContent = '🧬 选择世界启动方式';
+    setStartupGateMessage(`URL 指定种子 ${seed}。请选择用该种子建立新档，或读取已有存档；读取旧档将使用存档自身的种子。`);
+    createBtn.textContent = '🆕 用此种子建立新档';
+    loadBtn.style.display = (await hasReadableStartupSave()) ? 'inline-block' : 'none';
+    if (loadBtn.style.display === 'none') {
+      setStartupGateMessage(`URL 指定种子 ${seed}，当前没有可读取的本地存档文件。请创建一个新档后开始游戏。`);
+    }
+    if (!supportsFileAPI()) {
+      createBtn.disabled = true;
+      loadBtn.disabled = true;
+      setStartupGateMessage('当前浏览器不兼容本地存档文件，请使用最新版 Chrome 或 Edge。', true);
+      return;
+    }
+
+    createBtn.addEventListener('click', async () => {
+      createBtn.disabled = true;
+      loadBtn.disabled = true;
+      try {
+        // 不复用槽位 1：用户必须明确选择空文件，旧档及其 IDB 连接才不会被误覆盖。
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `flowaccord-seed-${seed}.json`,
+          types: [{ description: 'Flow & Accord 存档文件', accept: { 'application/json': ['.json'] } }],
+        });
+        const file = await handle.getFile();
+        if (file.size !== 0) {
+          setStartupGateMessage(`「${handle.name}」已有内容。请选择空文件建立新档，旧存档不会被覆盖。`, true);
+          return;
+        }
+        if (!(await waitEngineReady(15000))) throw new Error('引擎尚未就绪');
+        const previous = slotState.save1;
+        slotState.save1 = { handle, fileName: handle.name, meta: null, lastSaved: 0, permError: false };
+        const saved = await saveToSlot('save1');
+        if (!saved) {
+          if (previous) slotState.save1 = previous;
+          else delete slotState.save1;
+          setStartupGateMessage('新档写入失败，请重新选择空文件。', true);
+          return;
+        }
+        await idbPut('save1', handle, handle.name);
+        releaseStartupGate(`已用种子 ${seed} 建立新档，模拟开始`);
+      } catch (e) {
+        if (e.name !== 'AbortError') setStartupGateMessage(`建立新档失败：${e.message}`, true);
+      } finally {
+        createBtn.disabled = false;
+        loadBtn.disabled = false;
+      }
+    });
+
+    let chooseAnotherSave = false;
+    loadBtn.addEventListener('click', async () => {
+      createBtn.disabled = true;
+      loadBtn.disabled = true;
+      const previous = slotState.save1;
+      try {
+        let st = slotState.save1;
+        if (chooseAnotherSave || !st || !st.handle) {
+          const [handle] = await window.showOpenFilePicker({
+            types: [{ description: 'Flow & Accord 存档文件', accept: { 'application/json': ['.json'] } }],
+          });
+          st = { handle, fileName: handle.name, meta: null, lastSaved: 0, permError: false };
+          slotState.save1 = st;
+        }
+        if (!(await requestHandlePermission(st.handle))) throw new Error('存档文件授权被拒绝');
+        setStartupGateMessage('正在读取旧存档…');
+        if (!(await autoLoadStartupSave('save1'))) {
+          chooseAnotherSave = true;
+          throw new Error('存档无法读取或版本不兼容');
+        }
+        await idbPut('save1', st.handle, st.fileName);
+        releaseStartupGate('已读取旧存档，模拟继续');
+      } catch (e) {
+        if (previous) slotState.save1 = previous;
+        else delete slotState.save1;
+        if (e.name !== 'AbortError') setStartupGateMessage(`读取旧存档失败：${e.message}。可选择用 URL 种子建立新档。`, true);
+      } finally {
+        createBtn.disabled = false;
+        loadBtn.disabled = false;
+      }
+    });
+  }
+
   function setStartupGateMessage(message, error) {
     const el = document.getElementById('startup-save-message');
     if (el) { el.textContent = message; el.style.color = error ? '#f87171' : '#9fb3c8'; }
@@ -345,6 +451,11 @@
     // ★ v1.50.8：?nogate=1 旁路——隐藏门禁弹窗并直接解除暂停，不连接任何存档文件
     if (isSaveGateBypassed()) {
       releaseStartupGate('已跳过存档门禁（?nogate=1）：无存档文件，仅内存演算');
+      return;
+    }
+    const seed = requestedStartupSeed();
+    if (seed !== null) {
+      await bootstrapSeedChoice(seed);
       return;
     }
     if (!supportsFileAPI()) {
@@ -830,6 +941,8 @@
   // 自动保存（每 60 秒写入槽位 1）
   // ══════════════════════════════════════════════════════════════
   function tickAutoSave() {
+    const gate = document.getElementById('startup-save-gate');
+    if (gate && gate.style.display !== 'none') return;
     const s = getSim();
     if (!s || !s._ready) return;
     if (typeof s.tickCount === 'number' && s.tickCount === lastAutoTick) return;
@@ -951,8 +1064,8 @@
       slotMeta: (slotId) => (slotState[slotId || 'save1'] || {}).meta || null,
     };
 
-    // 监听生态重置事件，开启新档后自动更新存档
-    window.addEventListener('ecology-reset', async () => {
+    // 监听重置完成事件：必须等 Worker 应用新世界快照后再自动保存，避免旧世界竞态写回。
+    window.addEventListener('ecology-reset-complete', async () => {
       const st = slotState['save1'];
       if (st && st.handle && !st.permError) {
         await saveToSlot('save1');

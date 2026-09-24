@@ -598,8 +598,8 @@
       const url = new URL(window.location.href);
       url.searchParams.set('seed', String(sim._engineSeed));
       window.history.replaceState({}, '', url);
+      // 存档由 Worker 完成 RESET 后的 RESET_DONE 事件触发，避免把旧世界写回文件。
       window.dispatchEvent(new CustomEvent('ecology-reset'));
-      if (window.saveUI && typeof window.saveUI.autoSave === 'function') window.saveUI.autoSave();
       return true;
     }
 

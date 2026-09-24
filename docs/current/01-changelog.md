@@ -3,7 +3,21 @@
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.1**。
 
+| **（代码修复 · 河谷通行 · 不升版）2026-09-24** | **河谷道路允许直接经过水体**：`river_valley_v1` 不再把河水格视为道路障碍，河道可直接通行；其他模板仍保留水体/浅滩授权规则，河谷的坡度、`NO_WALK` 与岩壁校验不变。该 seed 的 native release 创世耗时由约 11 秒降至约 0.14 秒。**已重编译并同步 WASM 双副本，存档兼容线维持 v1.60。** | crates/sim_core/src/geo/corridor.rs, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} / docs(01-changelog) |
+
+| **（代码修复 · 创世门禁 · 不升版）2026-09-24** | **解除 `SpawnDisconnected` 创世拒绝**：生存诊断仍记录营地/资源不可达，但不再因此回退或拒绝世界；`SurvivalCostExceeded` 仍保持门禁。**不升版，已重编译并同步 WASM 双副本，存档兼容线维持 v1.60。** | crates/sim_core/src/spatial/creation_fallback.rs, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} / docs(01-changelog) |
+
+| **（代码修复 · 创世门禁 · 不升版）2026-09-24** | **允许孤立 POI 保留**：关闭“所有 POI 必须从首个路网节点可达”的创世门禁；仍校验 POI 已绑定的道路节点存在，以及已提交车道通过地表/几何校验。孤立资源点不再触发随机种子回退（含 seed `1790252417756` 的 POI 40）。**不升版、不重编译 WASM，存档兼容线维持 v1.60。** | crates/sim_core/src/spatial/terrain_network.rs / docs(01-changelog) |
+
+| **（代码修复 · 纯前端 · 不升版）2026-09-24** | **修复随机重置后旧存档覆盖新 Seed 的竞态**：自动保存改为等待 Worker `RESET_DONE` 并应用新快照后执行，移除重置入口的重复保存调用，避免旧世界的 `1790252417756` 等 seed 最后写回存档。**不升版、不重编译 WASM，存档兼容线维持 v1.60。** | frontend(js/main.js, js/rustworld.js, js/save-ui.js) / docs(01-changelog) |
+
+| **（代码修复 · 纯前端 · 不升版）2026-09-24** | **修复随机重置后 Seed 展示不一致**：`null` 不再被 `Number(null)` 误转为显式种子 `0`；Worker 与主线程统一接收 `0` 这个合法 seed，并在 `RESET_DONE` 以 Worker 返回值同步当前 seed。**不升版、不重编译 WASM，存档兼容线维持 v1.60。** | frontend(js/rustworld.js, js/sim_worker.js) / docs(01-changelog) |
+
+| **（代码变更 · 纯前端 · 不升版）2026-09-24** | **调试监视器新增当前世界 Seed 展示**：新增 `dbg-seed` 读数，每 200ms 从 `RustWorld._engineSeed` 刷新，便于记录和复现当前世界；不改变模拟、渲染或存档行为。**不升版、不重编译 WASM，存档兼容线维持 v1.60。** | frontend(index.html, js/render_hud.js) / docs(tech/16-frontend-overview, 01-changelog) |
+
 | **（文档重构 · 纯文档，无版本变更）2026-09-24** | **把 `WORKBOARD.md` 的定义提升为根 `AGENTS.md` §4.19 权威条款**：根 `AGENTS.md` §4.19 由一句话引用扩展为完整定义（用途 + 四条规则：开工前登记 / 收工清理 / 过期兜底 / 提交前核对，保留 `30-workflow.md` 附篇一 §F 链接）；按「同一事实只有一个权威位置」分层守则，`WORKBOARD.md` 头部与 `docs/current/tech/30-workflow.md` §5 改为只指向根 `AGENTS.md` §4.19，不再复制规则文本。**纯文档变更：不升版、不重编译 WASM、不触碰任何运行时行为，存档兼容线维持 v1.60。** | docs(AGENTS, WORKBOARD, tech/30-workflow, 01-changelog) |
+| **（代码变更 · 纯前端 · 不升版）2026-09-24** | **URL 指定 `?seed=` 时改为显式选择启动方式**：启动门禁不再自动读取已连接的槽位 1，而是提供「用此种子建立新档」与「读取旧存档」两个按钮；新档流程要求选择空文件并成功写入后才替换槽位 1 句柄，避免覆盖旧存档；读档流程优先使用已连接句柄，失败后允许另选文件，并以存档自身种子继续。`mapOnly` 与 `nogate` 行为保持不变。**纯前端交互变更：不升版、不重编译 WASM，存档兼容线维持 v1.60。** | frontend(index.html, js/save-ui.js), docs(tech/19-ui-implementation, 01-changelog) |
+| **（代码变更 · 纯前端 · 不升版）2026-09-24** | **优化 seed 启动门禁与存档错误提示布局**：启动弹窗统一为卡片样式，创建、读档、删除操作在同一操作行排列，窄屏才换行；当 URL 带 seed 且本地没有可读取文件时，只显示创建新档并直接提示原因；已有存档损坏或不兼容时保留读档/重新选择入口。**不升版、不重编译 WASM，存档兼容线维持 v1.60。** | frontend(index.html, style.css, js/save-ui.js), docs(tech/19-ui-implementation, 01-changelog) |
 | **（代码重构 · 纯前端 · 不升版）2026-09-24** | **拆分 `render_inspector.js`（1860 行，超 §4.6 800 行红线）为 8 个职责单一文件**：`inspector-shared.js`（共享计量/产速帮助层）、`inspector-hormone.js`（H-06 激素面板与趋势采样器，`window.HormoneTrend` 导出不变）、`inspector-agent.js`（族人面板）、`inspector-house.js`（房屋面板）、`inspector-poi.js`（POI 面板）、`inspector-lineage.js`（血脉与族谱模态子层）、`render_inspector.js`（调度层 + 智能点击拾取，160 行）、`camp-detail.js`（营地辖区详情模态，`window._campDetailTick` 等导出不变）。纯代码逐段搬迁，不改任何文案/DOM ID/交互逻辑；`updateInspector` 调度签名与全部 window 导出保持不变。**纯前端表现层重构：不升版、不重编译 WASM、存档兼容线维持 v1.60。** 已过 frontend-check / doc 三查 / code-map 门禁与浏览器 Inspector 三视图实测。 | frontend/js/{inspector-shared.js, inspector-hormone.js, inspector-agent.js, inspector-house.js, inspector-poi.js, inspector-lineage.js, render_inspector.js, camp-detail.js}, index.html, docs(frontend/AGENTS, tech/31-code-map, 01-changelog) |
 
 | **（文档新增 · 纯文档，无版本变更）2026-09-24** | **新增 32 号文《地形生成门禁》**：把散落在 `geo/validation.rs`、`spatial/`（creation_fallback / terrain_network / survival_diagnosis / world_save）、探针（terrain_probe / accent_water_probe）与 `tools/` 的地形生成相关校验集中为门禁地图——五道防线（生成期静态校验 / 创世事务门禁链 / 存档读入门禁 / 探针验收 / 回归一致性门禁）+ 生成器版本契约（`TERRAIN_GENERATOR_VERSION=21`）+「改 X 跑什么」决策表 + 一页速查。登记于 [current/README](../current/README.md) 附录组 32 号。**纯文档变更：不升版、不重编译 WASM、不触碰任何运行时行为，存档兼容线维持 v1.60。** | docs(32-terrain-generation-gates, current/README, 01-changelog) |

@@ -376,7 +376,7 @@ self.onmessage = async function(e) {
   switch (msg.type) {
     case 'INIT': {
       try {
-        _engineSeed = msg.seed || Date.now();
+        _engineSeed = Number.isSafeInteger(msg.seed) && msg.seed >= 0 ? msg.seed : Date.now();
         const resp = await fetch(msg.wasmUrl, { cache: 'no-store' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const bytes = await resp.arrayBuffer();
@@ -503,7 +503,7 @@ self.onmessage = async function(e) {
 
     case 'RESET': {
       if (_ready) {
-        _engineSeed = msg.seed || Date.now();
+        _engineSeed = Number.isSafeInteger(msg.seed) && msg.seed >= 0 ? msg.seed : Date.now();
         if (msg.config) {
           applyConfigInternal(msg.config);
         }

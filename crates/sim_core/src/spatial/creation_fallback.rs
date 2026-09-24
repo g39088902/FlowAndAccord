@@ -321,13 +321,17 @@ impl World3DEngine {
         }
         let report = self.diagnose_survival();
         if !report.ok {
-            let code = report
-                .worst_code
-                .map(|c| c.as_str())
-                .unwrap_or("SurvivalFailed");
-            return Err(format!("Survival:{}", code));
+            // SpawnDisconnected 只作为诊断结果保留，不再阻断创世；允许营地或
+            // 资源点处于独立连通分量。仍拒绝可达但往返成本超预算的世界。
+            if report.worst_code != Some(crate::spatial::survival_diagnosis::SurvivalDiagnosticCode::SpawnDisconnected)
+            {
+                let code = report
+                    .worst_code
+                    .map(|c| c.as_str())
+                    .unwrap_or("SurvivalFailed");
+                return Err(format!("Survival:{}", code));
+            }
         }
         Ok(())
     }
 }
-

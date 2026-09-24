@@ -273,6 +273,8 @@
             break;
           }
           case 'RESET_DONE': {
+            // Worker 返回的 seed 是本次重置实际采用的权威值（随机重置不能停留在旧值）。
+            if (Number.isSafeInteger(msg.seed) && msg.seed >= 0) this._engineSeed = msg.seed;
             this._applyRewindMeta(msg.rewind);
             if (msg.snapshot) {
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
@@ -283,6 +285,10 @@
               if (window.SimLighting) window.SimLighting.resync();
               this._applySnapshot(msg.snapshot, true);
             }
+            // 仅在新世界快照已应用后通知存档层，避免竞态写回旧世界。
+            window.dispatchEvent(new CustomEvent('ecology-reset-complete', {
+              detail: { seed: this._engineSeed },
+            }));
             this._worker.postMessage({ type: 'ACK' });
             break;
           }
@@ -420,7 +426,8 @@
 
       initEcology(agentCount, seed) {
         // 允许地图图鉴或主界面显式传入种子；随机重置则生成新的安全整数种子。
-        const requestedSeed = Number(seed);
+        // null/undefined 表示随机重置；Number(null) 会变成 0，不能把它误当成显式 seed 0。
+        const requestedSeed = seed == null ? NaN : Number(seed);
         this._engineSeed = Number.isSafeInteger(requestedSeed) && requestedSeed >= 0
           ? requestedSeed
           : Date.now();
