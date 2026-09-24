@@ -150,7 +150,7 @@ impl World3DEngine {
             let cand_pos = Vec3::new(
                 chosen.x,
                 chosen.y,
-                self.terrain.sample_elevation(chosen.x, chosen.y),
+                self.terrain_runtime().sample_elevation(chosen.x, chosen.y),
             );
             if !self.is_house_site_valid(cand_pos) {
                 continue;

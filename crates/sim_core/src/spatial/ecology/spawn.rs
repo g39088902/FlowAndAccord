@@ -41,7 +41,7 @@ impl World3DEngine {
         for _ in 0..100 {
             let x = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
             let y = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
-            let elev = self.terrain.sample_elevation(x, y);
+            let elev = self.terrain_runtime().sample_elevation(x, y);
             let cand = Vec3::new(x, y, elev);
             if poi_positions
                 .iter()
@@ -55,7 +55,7 @@ impl World3DEngine {
         for _ in 0..50 {
             let x = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
             let y = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
-            let elev = self.terrain.sample_elevation(x, y);
+            let elev = self.terrain_runtime().sample_elevation(x, y);
             let cand = Vec3::new(x, y, elev);
             if poi_positions.iter().all(|p| {
                 p.distance_to(&cand) >= min_poi_distance * poi_spawn_fallback_ratio
@@ -66,7 +66,7 @@ impl World3DEngine {
         }
         let x = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
         let y = self.rng.gen_range(-half_size * radius_ratio, half_size * radius_ratio);
-        let cand = Vec3::new(x, y, self.terrain.sample_elevation(x, y));
+        let cand = Vec3::new(x, y, self.terrain_runtime().sample_elevation(x, y));
         poi_positions.push(cand);
         cand
     }
@@ -246,7 +246,7 @@ impl World3DEngine {
         for _ in 0..self.config.count_terrain_transition_nodes {
             let x = self.rng.gen_range(-half_size * spread, half_size * spread);
             let y = self.rng.gen_range(-half_size * spread, half_size * spread);
-            let elev = self.terrain.sample_elevation(x, y);
+            let elev = self.terrain_runtime().sample_elevation(x, y);
             let node_id = self
                 .network
                 .add_node(Vec3::new(x, y, elev), NodeType::GroundIntersection);
@@ -264,7 +264,7 @@ impl World3DEngine {
         for _ in 0..100 {
             let x = self.rng.gen_range(-half_size * spread, half_size * spread);
             let y = self.rng.gen_range(-half_size * spread, half_size * spread);
-            let cand = Vec3::new(x, y, self.terrain.sample_elevation(x, y));
+            let cand = Vec3::new(x, y, self.terrain_runtime().sample_elevation(x, y));
             let min_dist = camp_positions
                 .iter()
                 .map(|c| c.distance_to(&cand))

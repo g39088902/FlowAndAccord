@@ -5,7 +5,7 @@ impl World3DEngine {
     pub(crate) fn legal_land_position(&self, p:Vec3, occupied:&[Vec3])->Option<Vec3> {
         let valid=|q:Vec3| corridor::segment_valid(&self.terrain,q,q,self.config.terrain_road_corridor_width,self.config.terrain_max_walk_slope,None)
             && occupied.iter().all(|o| {let dx=o.x-q.x;let dy=o.y-q.y;(dx*dx+dy*dy).sqrt()>=self.config.poi_min_distance*self.config.poi_spawn_fallback_ratio});
-        let mut p=p;p.z=self.terrain.sample_elevation(p.x,p.y);
+        let mut p=p;p.z=self.terrain_runtime().sample_elevation(p.x,p.y);
         if valid(p){return Some(p);}
         // 从目标格向外扩圈。全图排序即使改成单遍最小值仍会为每个失效 POI
         // 扫描全部 256² 个格；扩圈后找到候选，并证明未扫描区域更远时即可结束。
@@ -82,11 +82,16 @@ impl World3DEngine {
         let is_plateau = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU;
         let plateau_geom = if is_plateau { self.get_plateau_geometry() } else { None };
         if let Some(pg) = plateau_geom.as_ref() {
+            let anchor_elevations: Vec<f32> = pg
+                .spring_anchors
+                .iter()
+                .map(|&(sx, sy)| self.terrain_runtime().sample_elevation(sx, sy))
+                .collect();
             let mut w_idx = 0;
             for p in &mut self.pois {
                 if p.poi_type == super::poi::PoiType::WaterSource && w_idx < pg.spring_anchors.len() {
                     let (sx, sy) = pg.spring_anchors[w_idx];
-                    let sz = self.terrain.sample_elevation(sx, sy);
+                    let sz = anchor_elevations[w_idx];
                     let pos = Vec3::new(sx, sy, sz);
                     p.pos = pos;
                     if let Some(n) = p.nearest_node_id {
@@ -101,11 +106,16 @@ impl World3DEngine {
         let is_fan = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN;
         let fan_geom = if is_fan { self.get_fan_geometry() } else { None };
         if let Some(fg) = fan_geom.as_ref() {
+            let anchor_elevations: Vec<f32> = fg
+                .spring_anchors
+                .iter()
+                .map(|&(sx, sy)| self.terrain_runtime().sample_elevation(sx, sy))
+                .collect();
             let mut w_idx = 0;
             for p in &mut self.pois {
                 if p.poi_type == super::poi::PoiType::WaterSource && w_idx < fg.spring_anchors.len() {
                     let (sx, sy) = fg.spring_anchors[w_idx];
-                    let pos = Vec3::new(sx, sy, self.terrain.sample_elevation(sx, sy));
+                    let pos = Vec3::new(sx, sy, anchor_elevations[w_idx]);
                     p.pos = pos;
                     if let Some(n) = p.nearest_node_id {
                         self.network.graph[*self.network.node_map.get(&n).unwrap()].pos = pos;
@@ -184,8 +194,8 @@ impl World3DEngine {
         let mut curves=Vec::with_capacity(segs);
         for pair in path.windows(2) {
             let mut forward=Curve3D::new_straight(pair[0],pair[1]);
-            forward.p1.z=self.terrain.sample_elevation(forward.p1.x,forward.p1.y);
-            forward.p2.z=self.terrain.sample_elevation(forward.p2.x,forward.p2.y);
+            forward.p1.z=self.terrain_runtime().sample_elevation(forward.p1.x,forward.p1.y);
+            forward.p2.z=self.terrain_runtime().sample_elevation(forward.p2.x,forward.p2.y);
             forward.length=forward.calculate_arc_length(32);
             // 反向车道是同一 x/y 轨迹的逆参数化，几何等价，验证正向即可覆盖两者。
             if !corridor::validate_curve(&self.terrain,&forward,w,slope,crossing){return false;}
@@ -196,7 +206,7 @@ impl World3DEngine {
             let to=if i+1==segs{b}else{self.network.add_node(path[i+1],NodeType::GroundIntersection)};
             let reverse=Curve3D::new_bezier(forward.p3,forward.p2,forward.p1,forward.p0);
             let mut profile=LaneTerrainProfile {max_slope_deg:0.0,terrain_time_cost:1.0,surface_mask:0,crossing_id:crossing};
-            for k in 0..=32{let p=forward.evaluate_pos(k as f32/32.0);let c=self.terrain.sample_cell(p.x,p.y);
+            for k in 0..=32{let p=forward.evaluate_pos(k as f32/32.0);let c=self.terrain_runtime().sample_cell(p.x,p.y);
                 profile.max_slope_deg=profile.max_slope_deg.max(c.slope_angle_deg);profile.surface_mask|=1u16<<(c.surface_kind as u8);
                 if matches!(c.surface_kind,SurfaceKind::RiverBank|SurfaceKind::SoftGround){profile.terrain_time_cost=profile.terrain_time_cost.max(self.config.terrain_soft_ground_cost.max(1.0));}}
             if crossing.is_some(){profile.terrain_time_cost=self.config.terrain_shallow_water_cost.max(1.0);}
@@ -288,11 +298,11 @@ impl World3DEngine {
     }
 
     fn setup_plateau_network(&mut self, pg: &crate::geo::PlateauGeometry) {
-        let p_center = Vec3::new(pg.center_anchor.0, pg.center_anchor.1, self.terrain.sample_elevation(pg.center_anchor.0, pg.center_anchor.1));
-        let p_a_top = Vec3::new(pg.ramp_a_top.0, pg.ramp_a_top.1, self.terrain.sample_elevation(pg.ramp_a_top.0, pg.ramp_a_top.1));
-        let p_a_bot = Vec3::new(pg.ramp_a_bottom.0, pg.ramp_a_bottom.1, self.terrain.sample_elevation(pg.ramp_a_bottom.0, pg.ramp_a_bottom.1));
-        let p_b_top = Vec3::new(pg.ramp_b_top.0, pg.ramp_b_top.1, self.terrain.sample_elevation(pg.ramp_b_top.0, pg.ramp_b_top.1));
-        let p_b_bot = Vec3::new(pg.ramp_b_bottom.0, pg.ramp_b_bottom.1, self.terrain.sample_elevation(pg.ramp_b_bottom.0, pg.ramp_b_bottom.1));
+        let p_center = Vec3::new(pg.center_anchor.0, pg.center_anchor.1, self.terrain_runtime().sample_elevation(pg.center_anchor.0, pg.center_anchor.1));
+        let p_a_top = Vec3::new(pg.ramp_a_top.0, pg.ramp_a_top.1, self.terrain_runtime().sample_elevation(pg.ramp_a_top.0, pg.ramp_a_top.1));
+        let p_a_bot = Vec3::new(pg.ramp_a_bottom.0, pg.ramp_a_bottom.1, self.terrain_runtime().sample_elevation(pg.ramp_a_bottom.0, pg.ramp_a_bottom.1));
+        let p_b_top = Vec3::new(pg.ramp_b_top.0, pg.ramp_b_top.1, self.terrain_runtime().sample_elevation(pg.ramp_b_top.0, pg.ramp_b_top.1));
+        let p_b_bot = Vec3::new(pg.ramp_b_bottom.0, pg.ramp_b_bottom.1, self.terrain_runtime().sample_elevation(pg.ramp_b_bottom.0, pg.ramp_b_bottom.1));
 
         let n_center = self.network.add_node(p_center, NodeType::GroundIntersection);
         let n_a_top = self.network.add_node(p_a_top, NodeType::GroundIntersection);
@@ -341,7 +351,7 @@ impl World3DEngine {
             let res = crate::geo::validate_footprint(
                 &self.terrain,
                 crate::geo::FootprintQuery {
-                    center: Vec3::new(pos.0, pos.1, self.terrain.sample_elevation(pos.0, pos.1)),
+                    center: Vec3::new(pos.0, pos.1, self.terrain_runtime().sample_elevation(pos.0, pos.1)),
                     half_extents: (
                         self.config.terrain_footprint_half_extent,
                         self.config.terrain_footprint_half_extent,
@@ -484,7 +494,7 @@ impl World3DEngine {
                 let res = crate::geo::validate_footprint(
                     &self.terrain,
                     crate::geo::FootprintQuery {
-                        center: Vec3::new(p.x, p.y, self.terrain.sample_elevation(p.x, p.y)),
+                        center: Vec3::new(p.x, p.y, self.terrain_runtime().sample_elevation(p.x, p.y)),
                         half_extents: (
                             self.config.terrain_footprint_half_extent,
                             self.config.terrain_footprint_half_extent,
@@ -541,9 +551,9 @@ impl World3DEngine {
         );
         let b = Vec3::new(fg.edge_anchor.0, fg.edge_anchor.1, 0.0);
         let mut a = a;
-        a.z = self.terrain.sample_elevation(a.x, a.y);
+        a.z = self.terrain_runtime().sample_elevation(a.x, a.y);
         let mut b = b;
-        b.z = self.terrain.sample_elevation(b.x, b.y);
+        b.z = self.terrain_runtime().sample_elevation(b.x, b.y);
         if corridor::route(&self.terrain, a, b, &self.config).is_none() {
             return Err("FanDryCorridorBlocked".into());
         }
@@ -566,11 +576,11 @@ impl World3DEngine {
         // 出口走廊：盆心 (center_x, center_y) → 沿出口方向越过高山 (1.3×semi_b) 的路由必须存在。
         let (dir_x, dir_y) = (bg.exit_theta.cos(), bg.exit_theta.sin());
         let mut a = Vec3::new(bg.center_x, bg.center_y, 0.0);
-        a.z = self.terrain.sample_elevation(a.x, a.y);
+        a.z = self.terrain_runtime().sample_elevation(a.x, a.y);
         let bx = bg.center_x + dir_x * bg.semi_b * 1.3;
         let by = bg.center_y + dir_y * bg.semi_b * 1.3;
         let mut b = Vec3::new(bx, by, 0.0);
-        b.z = self.terrain.sample_elevation(b.x, b.y);
+        b.z = self.terrain_runtime().sample_elevation(b.x, b.y);
         if corridor::route(&self.terrain, a, b, &self.config).is_none() {
             return Err("BasinExitBlocked".into());
         }
@@ -603,9 +613,9 @@ impl World3DEngine {
                 let (ax, ay) = plan.access_points[0];
                 let (bx, by) = plan.access_points[1];
                 let mut a = Vec3::new(ax, ay, 0.0);
-                a.z = self.terrain.sample_elevation(ax, ay);
+                a.z = self.terrain_runtime().sample_elevation(ax, ay);
                 let mut b = Vec3::new(bx, by, 0.0);
-                b.z = self.terrain.sample_elevation(bx, by);
+                b.z = self.terrain_runtime().sample_elevation(bx, by);
                 if corridor::route(&self.terrain, a, b, &self.config).is_none() {
                     return Err("LakeShoreDisconnected".into());
                 }
@@ -619,9 +629,9 @@ impl World3DEngine {
             let d1 = r_out_e + lg.shore_setback_m + 8.0;
             let d2 = r_out_e * 2.55;
             let mut a = Vec3::new(lg.center_x + e.cos() * d1, lg.center_y + e.sin() * d1, 0.0);
-            a.z = self.terrain.sample_elevation(a.x, a.y);
+            a.z = self.terrain_runtime().sample_elevation(a.x, a.y);
             let mut b = Vec3::new(lg.center_x + e.cos() * d2, lg.center_y + e.sin() * d2, 0.0);
-            b.z = self.terrain.sample_elevation(b.x, b.y);
+            b.z = self.terrain_runtime().sample_elevation(b.x, b.y);
             if corridor::route(&self.terrain, a, b, &self.config).is_none() {
                 return Err("LakeShoreDisconnected".into());
             }
