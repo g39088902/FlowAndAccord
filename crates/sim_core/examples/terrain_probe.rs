@@ -42,7 +42,7 @@ use sim_core::geo::terrain::{
     TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU,
     TERRAIN_PROFILE_RIVER_VALLEY,
 };
-use sim_core::geo::{BranchRidge, SurfaceKind, TerrainFeatureKind, TerrainMap};
+use sim_core::geo::{BranchRidge, SurfaceKind, TerrainFeatureKind, TerrainGenerator, TerrainMap};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 
@@ -946,8 +946,7 @@ fn run_profile(cfg: &mut SimConfig, profile: &str, seeds: Vec<u64>) {
     let mut hard_ratio_min = f32::MAX;
     let mut hard_ratio_max = 0.0f32;
     for &seed in &seeds {
-        let mut t = TerrainMap::new(256, 256, 764.0);
-        t.generate_with_config(seed, cfg);
+        let t = TerrainGenerator::compile(256, 764.0, seed, cfg);
         let (br_n, flank_max) = branch_flank_stats(&t);
         let zone = branch_zone_mask(&t);
         let r = analyse(&t, 12, &zone);

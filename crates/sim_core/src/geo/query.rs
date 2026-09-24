@@ -1,4 +1,5 @@
 use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
+use super::runtime::TerrainRuntime;
 use super::terrain::TerrainMap;
 use crate::spatial::vec3::Vec3;
 
@@ -69,7 +70,7 @@ impl TerrainQueryResult {
 }
 
 pub fn sample_cell(terrain: &TerrainMap, wx: f32, wy: f32) -> &GeoCell {
-    terrain.sample_cell(wx, wy)
+    TerrainRuntime::new(terrain).sample_cell(wx, wy)
 }
 
 pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope_deg: f32) -> TerrainQueryResult {

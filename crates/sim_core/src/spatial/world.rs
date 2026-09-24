@@ -9,7 +9,7 @@ use super::poi::{PoiType, PrimitivePoi};
 use super::snapshot::{RecentDeathSnapshot, Season};
 use super::vec3::Vec3;
 use crate::config::SimConfig;
-use crate::geo::terrain::TerrainMap;
+use crate::geo::{TerrainGenerator, TerrainMap, TerrainRuntime};
 use crate::rng::WorldRng;
 use std::collections::{HashMap, VecDeque};
 
@@ -156,8 +156,13 @@ impl World3DEngine {
         mut config: SimConfig,
         overrides: &crate::geo::terrain::GenesisOverrides,
     ) -> Self {
-        let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_with_config_overrides(seed, &config, overrides);
+        let terrain = TerrainGenerator::compile_with_overrides(
+            grid_res,
+            world_size,
+            seed,
+            &config,
+            overrides,
+        );
         config.terrain_profile = terrain.profile.clone();
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
@@ -218,6 +223,13 @@ impl World3DEngine {
             last_geom_sig: std::cell::Cell::new(u64::MAX),
             creation_diagnostic: None,
         }
+    }
+
+    /// 为游戏系统提供只读地形查询门面。
+    ///
+    /// 生成器、recipe 和后端细节不应从决策、生态或房屋系统直接访问。
+    pub fn terrain_runtime(&self) -> TerrainRuntime<'_> {
+        TerrainRuntime::new(&self.terrain)
     }
 
     /// 强制下一帧二进制快照重发**全部**静态几何（地形 + 路网拓扑）。

@@ -24,8 +24,10 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 | `src/lib.rs` | crate 根，声明 `config`/`rng`/`geo`/`spatial` 并集中 re-export 对外类型 |
 | `src/config.rs` | **全部超参的单一归档点**：模块级 `pub const` + `SimConfig` 结构体 + `Default` 映射 |
 | `src/rng.rs` | `WorldRng`：xorshift64* 确定性 PRNG（无 rand 依赖，wasm32 安全） |
-| `src/geo/mod.rs` | geo 模块声明，`GeoCell`（高程+坡度栅格单元） |
-| `src/geo/terrain.rs` | `TerrainMap`：自然地形生成 + 世界坐标高程采样 |
+| `src/geo/mod.rs` | geo 模块声明与地形 API re-export |
+| `src/geo/generator.rs` | `TerrainGenerator`：创世生成唯一入口，输出静态 `TerrainMap` |
+| `src/geo/runtime.rs` | `TerrainRuntime`：游戏逻辑使用的只读地形查询门面 |
+| `src/geo/terrain.rs` | `TerrainMap` 数据容器与现有生成流水线；旧 `generate_*` 方法仅保留兼容壳 |
 | `src/geo/biome.rs` | 生物群系判定（基于高程/坡度/温度的生态分区） |
 | `src/spatial/` | 世界主体（详见 §3） |
 

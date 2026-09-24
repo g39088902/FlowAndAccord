@@ -1,6 +1,6 @@
 # geo 模块 · 局部操作指南
 
-> 本目录负责确定性地形生成：高程场 + 生物群系 + 水系 + 装饰散布。
+> 本目录负责确定性地形生成与只读地形查询：高程场 + 生物群系 + 水系 + 装饰散布。
 > 改本目录代码前：先读根 AGENTS.md §4，再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -8,7 +8,9 @@
 
 | 文件 | 职责 |
 | :--- | :--- |
-| `mod.rs` | 模块入口 + 公开重导出 |
+| `mod.rs` | 模块入口 + 公开重导出；生成与运行时查询边界 |
+| `generator.rs` | `TerrainGenerator` 创世入口；只接收 seed/config/overrides，不读取 World3DEngine 或游戏实体 |
+| `runtime.rs` | `TerrainRuntime` 只读查询门面；游戏逻辑通过它读取已生成地形事实 |
 | `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ §5.3 创世流水线编排器 `generate_with_config()`（0–9 步私有阶段，STAGE2-3 迁入）+ 第 2 步 `generate_base_relief`（山口起伏/草原/河谷低丘/★ STAGE2-7 `flat_baseline` 倾斜-only 诊断基线，原 `generate_with_profile`）+ 第 5 步子特征几何管线（5a 快照/5b 施加桩/5c 临时坡度/5d 接受回滚；视觉型子特征已接入，第 9 步 hash 装饰已接入，结构型仍空）+ 第 6 步 `finalize_slope_and_surface`（全图唯一定稿坡度与派生 flags；★ S7-07 水系写定地表 `DeepWater/RiverBank/RiverTerrace/ShallowWater` 优先保留）+ 第 7 步 `validate_static_terrain_geometry`（★ STAGE2-4 起薄分发至 `validation.rs`）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入）+ ★ S7-08 阶段七形态参数集中化（`terrain_grassland_*`/`terrain_hillside_*`/`terrain_spring_depression_*`，默认值=原常数、输出逐位不变，前端 config.js 为真相源；原 `terrain_valley_*` 20 字段随 v1.50.68 河谷聚落模板删除一并下线，原 S7-06 深切河谷三分带分支同步移除） |
 | `plateau.rs` | ★ TB-02（v1.50.54；v1.50.68 起模板更名“台地”，profile `plateau_v1`）台地几何与过渡带：`PlateauGeometry` 实现圆角矩形 SDF、台缘陡壁（$B=0.6H$ 派生 $\ge 34^\circ$ 硬禁行崖壁）与双入口缓坡（$B=4.0H$ 约束 $\le 30^\circ$）解耦带、专属噪声强阻尼与坡脚泉溪锚点提取 |
 | `alluvial_fan.rs` | ★ TB-03（v1.50.55）山前冲积扇几何：`FanGeometry` 扇面高程（★ v1.50.68 双段凸形径向剖面 + 山口高程帽，扇头 150m 最小过渡弧宽防侧壁成墙）+ 3~4 条确定性干浅沟放射系（重叠处取最大单沟下凹，避免沟深相加造成非设计复合陡槽；`DryGround\|NO_BUILD`、头尾归零、禁水面）+ 粒度分带（扇顶砾石带肥力折减/扇缘沃土带，第 6 步消费）+ 扇缘水源锚点 |
@@ -26,7 +28,7 @@
 
 - **局部坡度与定稿同源**：第 5c 步试算和第 6 步全图定稿均调用 `hydrology.rs::slope_from_elevation`；不要再复制中心差分公式或仅在局部钳制步长。试算只读高程、只写 scratch；全图定稿只写 `slope_angle_deg`，不需要复制高程数组。方形生产网格步长与既有定稿运算次序保持不变。
 
-1. **生成顺序（★ STAGE2-3 阶段化流水线）**：外部调用点只调用 `terrain.rs::generate_with_config(seed, config)`，内部按 06 号 §5.3 执行 0–9 步私有阶段：`0 resolve_profile`（不消费 WorldRng）→ `1 reset_static_terrain_state` → `2 generate_base_relief`（原 `generate_with_profile`：T0/T1 山口起伏、草原、T2 先铺倾斜+fBm 高程再由 `generate_river_valley_base_relief` 铺满全图写陆地基底——★ STAGE2-2 公式解耦：河阶外低丘公式唯一权威位置）→ `3 apply_profile_static_hydrology`（`hydrology.rs`：`generate_river` **仅覆盖水系影响带** `d < half_width + bank + terrace`，带外一格不碰）→ `4 plan_subfeatures`（纯 hash）→ `5 子特征几何管线 5a–5d`（★ 阶段二空注入）→ `6 finalize_slope_and_surface`（**全图唯一写 slope/派生 flags 的位置**；T2 只重算坡度、不改陆地分类）→ `7 validate_static_terrain_geometry`（STAGE2-4 扩充）→ `8 generate_base_accents` → `9 append_subfeature_accents`（空实现）。第 10/11 步（ecology 布局与路网、`validate_terrain_world`+生存诊断）由 `World3DEngine` 创世序列执行。阶段间临时数据走 `GenesisScratch`（T2 河几何 + 草原软地掩码），不进快照/存档。装饰在第 8 步（地貌与水系定稿后）散布，不能提前调用（会落入深水区）。
+1. **生成顺序（★ STAGE2-3 阶段化流水线）**：外部创世调用点优先调用 `geo::TerrainGenerator::compile(seed, config)` 或 `compile_with_overrides`；其内部委托 `TerrainMap` 的兼容流水线执行 0–9 步私有阶段：`0 resolve_profile`（不消费 WorldRng）→ `1 reset_static_terrain_state` → `2 generate_base_relief`（原 `generate_with_profile`：T0/T1 山口起伏、草原、T2 先铺倾斜+fBm 高程再由 `generate_river_valley_base_relief` 铺满全图写陆地基底——★ STAGE2-2 公式解耦：河阶外低丘公式唯一权威位置）→ `3 apply_profile_static_hydrology`（`hydrology.rs`：`generate_river` **仅覆盖水系影响带** `d < half_width + bank + terrace`，带外一格不碰）→ `4 plan_subfeatures`（纯 hash）→ `5 子特征几何管线 5a–5d`（★ 阶段二空注入）→ `6 finalize_slope_and_surface`（**全图唯一写 slope/派生 flags 的位置**；T2 只重算坡度、不改陆地分类）→ `7 validate_static_terrain_geometry`（STAGE2-4 扩充）→ `8 generate_base_accents` → `9 append_subfeature_accents`（空实现）。第 10/11 步（ecology 布局与路网、`validate_terrain_world`+生存诊断）由 `World3DEngine` 创世序列执行。阶段间临时数据走 `GenesisScratch`（T2 河几何 + 草原软地掩码），不进快照/存档。装饰在第 8 步（地貌与水系定稿后）散布，不能提前调用（会落入深水区）。
 2. **RNG 隔离**：`generate_accents` 使用 `WorldRng::new(seed ^ ACCENT_RNG_SALT)` —— `ACCENT_RNG_SALT = 0x4143_4345_4E54_3031`。此流与地形播撒、生态 POI、水系生成完全独立，保证装饰确定性可单独籽验。★ S7-05 半坡专属判定（泉源隔离圆 / 梯级概率 / `near_soft_ground` / `trim_trees_near_pois`）均为纯地形·特征查询，**不消费 accent_rng**；偏好闭包内改判定时严禁增减 `gen_range` 次数（会换掉同种子装饰分布）。
 3. **装饰早于 POI（★ S7-05 两道防线口径）**：装饰散布在流水线第 8 步，POI 由生态播撒落位——accents 层拿不到 `SimConfig`，泉源隔离圆半径以常量 `HILLSIDE_SPRING_CLEARANCE_M`（30m = 默认交互半径 22 + 8）固化；「所有 POI 周围 r+8m」由 `ecology/seed.rs` 在 POI 落位后调 `trim_trees_near_pois(config.poi_interaction_radius + 8.0)` 收口。两处口径必须一致；裁剪只作用于 `hillside_woodland_v1`（T1/T2/草原 accents 逐位不变是 S7-10 门禁）。
 4. **`TerrainMap` 字段增删** = 影响存档序列化 + 快照四处同步（见根 AGENTS.md §4.5）。新增字段须加 `#[serde(default)]` 以保持向后兼容。

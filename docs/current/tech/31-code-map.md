@@ -20,6 +20,8 @@ FlowAndAccord/
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
 │   │       │   ├── mod.rs                  # geo 模块入口
+│   │       │   ├── generator.rs            # ★ TerrainGenerator 创世唯一入口（seed/config/overrides → 静态 TerrainMap，不读游戏实体）
+│   │       │   ├── runtime.rs              # ★ TerrainRuntime 只读查询门面（游戏逻辑经它读取已生成地形事实）
 │   │       │   ├── terrain.rs              # 连续 3D 地形高程采样
 │   │       │   ├── geometry_transaction.rs # STAGE2-3 完整几何事务与原子回滚
 │   │       │   ├── plateau.rs              # ★ TB-02 台地几何与过渡带 (PlateauGeometry)
@@ -259,7 +261,8 @@ FlowAndAccord/
     │       ├── 28-invariants.md                 # 工程：六类硬约束集中清单
     │       ├── 29-impact-matrix.md              # 工程：改 X 牵动哪些文件 + tick 顺序
     │       ├── 30-workflow.md                   # 工程：Agent 入口 + 提交检查单 + 文档维护
-    │       └── 31-code-map.md                   # 附录：本文件
+    │       ├── 31-code-map.md                   # 附录：本文件
+    │       └── 32-terrain-generation-gates.md   # ★ 地形生成门禁地图（五道防线 + 生成器版本契约 + 改 X 跑什么决策表）
     └── plan/                                 # 计划：在办设计与未落地方案
     │   ├── README.md                          # 计划总索引（含依赖顺序图）
     │   ├── design/                            # 产品设计（玩法方向）

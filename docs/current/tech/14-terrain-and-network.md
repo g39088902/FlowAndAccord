@@ -8,7 +8,7 @@ T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计�
 > **本文构成**：原 `current/01-spatial-network.md` + 原 `../../plan/tech/06-terrain-templates.md` 第二部分「支撑所有地图模板的共用技术基座」（已落地契约）。模板库与未来蓝图见 [06 地图模板规划](../../plan/tech/06-terrain-templates.md)。
 
 
-> **模块索引**：[← 返回 ../README.md 全景索引](../README.md) · 主要源码：`crates/sim_core/src/geo/terrain.rs`、`geo/biome.rs`、`geo/query.rs`、`crates/sim_core/src/spatial/graph.rs`、`curve.rs`、`vec3.rs`
+> **模块索引**：[← 返回 ../README.md 全景索引](../README.md) · 主要源码：`crates/sim_core/src/geo/generator.rs`（创世入口）、`geo/runtime.rs`（只读查询门面）、`geo/terrain.rs`（兼容数据容器与流水线）、`geo/biome.rs`、`geo/query.rs`、`crates/sim_core/src/spatial/graph.rs`、`curve.rs`、`vec3.rs`
 
 ---
 
@@ -46,6 +46,12 @@ stateDiagram-v2
 连续 3D 地形上的贝塞尔曲线拓扑路网系统，为部落民提供 A\* 寻路导航，并通过踩踏-衰减机制涌现出自发道路网络。地形与路网是所有空间行为的物理基底。
 
 ## 核心机制
+
+### 生成器与游戏逻辑边界
+
+- `geo::TerrainGenerator` 负责 seed/config/创世覆盖到静态 `TerrainMap` 的确定性生成；它不读取 Agent、房屋、路网、账本或 tick 状态。
+- `geo::TerrainRuntime` 为路网、房屋、生态和决策提供只读地形查询门面；`World3DEngine::terrain_runtime()` 返回该视图。
+- `TerrainMap::generate_*` 仍保留为旧探针和兼容调用点，新增创世调用必须走 `TerrainGenerator`；未来 VoxelBackend 替换时优先保持 `TerrainRuntime` 接口不变。
 
 ### 连续 3D 地形与 T0/T1 静态地貌
 - `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 火山湖）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。

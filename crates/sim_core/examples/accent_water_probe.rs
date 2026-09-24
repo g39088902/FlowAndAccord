@@ -17,7 +17,6 @@
 
 use sim_core::config::SimConfig;
 use sim_core::geo::biome::SurfaceKind;
-use sim_core::geo::terrain::TerrainMap;
 use sim_core::geo::accents::AccentKind;
 
 fn point_in_poly(v: &[sim_core::spatial::vec3::Vec3], x: f32, y: f32) -> bool {
@@ -93,8 +92,7 @@ fn main() {
         let mut c = cfg.clone();
         c.terrain_profile = p.to_string();
         for seed in 1..=8u64 {
-            let mut t = TerrainMap::new(256, 256, 764.0);
-            t.generate_with_config(seed, &c);
+            let t = sim_core::geo::TerrainGenerator::compile(256, 764.0, seed, &c);
             let polys: Vec<&Vec<sim_core::spatial::vec3::Vec3>> =
                 t.hydrology.water_bodies.iter().map(|w| &w.vertices).collect();
             let half = t.world_size * 0.5;
