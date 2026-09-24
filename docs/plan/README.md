@@ -37,11 +37,10 @@
 | 03 | [内部市场](tech/03-internal-market.md) | 产品设计已复核，未排期；自主兼职售货员 + 实物托管 + 有限订单簿；[实施任务序列](../../INTERNAL_MARKET_IMPLEMENTATION_PLAN.md) |
 | 04 | [农田与农业税](tech/04-farmland-agriculture.md) | 规划设计；真实劳动与搬运、产出税与库存税并存 |
 | 05 | [狩猎、流寇与防御](tech/05-hunting-defense.md) | 规划设计（M18）；对应 design/07 的任务、接触结算、物资与存档契约 |
-| 06 | [地图模板规划](tech/06-terrain-templates.md) | T0/T1/T2/D-A/D-B1 代码与 TB-01 支脊已落地，草原骨架已交付；R.0 新增统一 Field Graph/水文过程/体素后端路线，R.3 维护 UGC-00~05 与模板批次；可执行设计见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
-| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§1 为任务总台账（TA/TB/TC 编号+难度+依赖），§6 为 Accent 季相、动态受光、LOD 与遮挡边界方案；新增 UGC-04/05 的 voxel chunk/语义字段视觉边界；★ 2026-09-17 渲染架构决策：**全量 WebGL、不再使用 Canvas 2D**（TC-03 改为既定路线，原 2D 遮挡近似策略取消；TA-08 任务已删除视为完成，验收矩阵并入 31 号 §8.5）；★ 2026-09-22 渲染架构决策：**TA-07 任务已取消视为完成**（实现 v1.50.65 保留且在默认 WebGL 路径下照常生效，仅剩的 Chrome 视觉验收与性能 A/B 随「已无性能问题」不再追补） |
+| 06 | [地图类型与统一生成](tech/06-terrain-templates.md) | 已删除逐模板地形生成开发计划；后续只排 UGC 统一场编译器、通用水文过程与体素后端，地图类型仅作为配方和验收目标；可执行设计见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
+| 07 | [地形美术与世界景观](tech/07-terrain-art.md) | 部分落地；§6 为 Accent 季相、动态受光、LOD 与遮挡边界方案（已落地契约），§7.5 为 UGC-04/05 的 voxel chunk/语义字段视觉边界；★ 2026-09-17 渲染架构决策：**全量 WebGL、不再使用 Canvas 2D**（TC-03 既定路线，TA-08 已删除视为完成，验收矩阵并入 31 号 §8.5）；★ 2026-09-24 决策：**UGC 基本功能优先**——TA-09/D-B1-8、TA-10 已删除，TA-13/15/17/18、TB-05/06、TC-01/02 与专属景观/院地细节全部撤销排期，待统一生成器调通后完全重新设计（装饰景观布局同样由生成器按 recipe 输出字段，前端只渲染） |
 | 08 | [性能优化](tech/08-performance.md) | 仅保留未完成项：M5-1 消除超线性（P2）、M5-2 多线程 Fork-Join |
 | 09 | [植被样板验证（TA-05）](tech/09-vegetation-verification.md) | ✔ 已收口（2026-09-22 按用户口径：功能已齐，仅缺测试验证与取舍；LOAD 补测不再作为完成门槛）；验收权威在 07 号 §11.4 |
-| 10 | [盆地群峰环抱（TB-04）](tech/10-basin-mountain-encirclement.md) | 规划设计（TB-04）；闭合环脊双坡解耦、向心山嘴支脊、切穿峡谷出水口与自然山间盆地地貌重构 |
 | 31 | [Canvas→WebGL 渲染迁移方案](tech/31-canvas-to-webgl-migration.md) | ★ **v2.0（2026-09-17）目标形态已定：全量 WebGL、不再使用 Canvas 2D**。阶段一/二已落地（v1.50.77 双 Canvas 过渡架构；v1.50.80~82 帧率解限）；§8 阶段三~五（装饰层 / 实体层 / Canvas 2D 退役）为既定路线 |
 
 ---
@@ -54,9 +53,7 @@ graph LR
     I --> MK["03 内部市场"]
     I --> F["04 农田"]
     I --> H["05 狩猎防御"]
-    T["06 地图模板"] --> A["07 地形美术"]
-    T --> BM["10 盆地群峰环抱"]
-    BM --> A
+    T["06 地图类型与统一生成"] --> A["07 地形美术"]
     T --> F
     L["02 日常生活"] --> M
     L --> H
