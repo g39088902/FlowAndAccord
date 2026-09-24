@@ -177,12 +177,42 @@ moisture        地表湿度
 flow            汇流量
 sediment        沉积物浓度
 water_level     静态水位
+water_access    可在合理距离和坡度内取得水的程度
+soil_moisture   土壤湿润度
+vegetation_ok   是否满足植被生长条件
+surface_material 地表材料类别
+surface_palette  地表调色类别
 roughness       表面粗糙度
 build_mask      可建造候选权重
 walk_mask       可行走候选权重
 ```
 
 字段值在过程之间传递；`SurfaceKind`、`NO_BUILD`、`NO_WALK` 等闭集事实在最后的语义投影阶段一次性产生。
+
+### 4.3 地表颜色、材质和植被必须由同一条因果链产生
+
+地形引擎同时负责“地面是什么”和“地面应该呈现什么颜色”。前端只把调色类别叠加季节、光照和纹理细节，不自行猜测草地或沙地。
+
+固定关系如下：
+
+```text
+降水 / 汇流 / 静态水体
+        ↓
+水的可达性与土壤湿润度
+        ↓
+植被资格、土壤类别、地表材料
+        ↓
+地表调色类别、草地/灌木候选和体素材质
+```
+
+首版规则可以配置阈值，但必须由引擎统一计算：
+
+- `water_access < dry_threshold` 时，不得生成草地事实；地表进入沙、裸土或砾石候选。
+- `water_access >= grass_water_threshold` 且坡度、土壤厚度和温度满足条件时，才允许 `vegetation_ok = true`。
+- 视觉上的绿色、黄色或棕色只能来自 `surface_palette` 与季节/光照叠加，不能反过来改变水、通行或建造规则。
+- 体素后端读取同一套 `surface_material` 和 `surface_palette`；洞穴内部可以得到岩壁、湿岩或地下水材质，不另写模板专用着色器。
+
+这使“干旱地图是沙地、靠水区域才长草”成为通用字段关系，而不是每个模板的一段绘图代码。干旱地区仍可通过 recipe 参数调整阈值、沙地颜色和少量耐旱植物，但不能绕过水分条件直接把整片地面标成草地。
 
 ### 4.3 通用算子
 
@@ -266,10 +296,11 @@ pub fn compile_terrain(
 | 3 | `erosion_and_deposition` | 只写高程、沉积物 | 侵蚀后的地形字段 |
 | 4 | `drainage_and_water` | 读高程/降水，写流量/水位 | 河道、湖盆、水体候选 |
 | 5 | `landmark_detection` | 只读字段 | 脊、谷、扇、湖、崖、浅滩候选 |
-| 6 | `semantic_projection` | 写 `GeoCell`/features/hydrology | 最终地理事实 |
-| 7 | `constraint_evaluation` | 只读最终事实 | 报告和失败原因 |
-| 8 | `backend_finalize` | 写高度场或 voxel chunks | 可查询后端、网格计划 |
-| 9 | `accent_generation` | 独立 accent RNG | 纯视觉装饰 |
+| 6 | `soil_and_surface` | 读水的可达性、湿润度、坡度、硬度和温度 | 土壤、草地资格、沙地/裸土/岩石材料与调色类别 |
+| 7 | `semantic_projection` | 读取全部稳定字段 | `GeoCell`、通行/建造标记、植被候选和水体事实 |
+| 8 | `voxel_material_projection` | 读取密度表面与语义字段 | 体素材料、洞穴内壁材质和可渲染调色输入 |
+| 9 | `constraint_and_diagnostics` | 读取最终结果 | 约束报告、字段 hash、失败原因 |
+| 10 | `backend_finalize_and_accents` | 写高度场/voxel chunks，独立 accent RNG | 可查询后端、网格计划和纯视觉装饰 |
 
 伪代码：
 
@@ -282,14 +313,16 @@ macro_relief(&mut fields, &recipe, &domains.macro_relief)?;
 erosion_and_deposition(&mut fields, &recipe, &domains.processes)?;
 let hydro = drainage_and_water(&fields, &recipe, &domains.hydrology)?;
 let landmarks = detect_landmarks(&fields, &hydro, &recipe)?;
-let semantics = project_semantics(&fields, &hydro, &landmarks, &recipe)?;
-let report = evaluate_constraints(&semantics, &recipe.constraints)?;
+let surface = soil_and_surface(&fields, &hydro, &landmarks, &recipe)?;
+let semantics = project_semantics(&fields, &hydro, &landmarks, &surface, &recipe)?;
+let material = project_voxel_material(&fields, &semantics, &recipe)?;
+let report = evaluate_constraints(&semantics, &surface, &recipe.constraints)?;
 
 if !report.passed {
     return Err(TerrainCompileError::Constraint(report));
 }
 
-let backend = finalize_backend(fields, semantics, backend)?;
+let backend = finalize_backend(fields, semantics, material, backend)?;
 let accents = generate_accents(seed, &backend, config.terrain_accent_density);
 Ok(CompiledTerrain { backend, semantics, accents })
 ```
@@ -519,6 +552,8 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 - 同版本同 seed 的 native/WASM 结果逐字节一致，或明确记录量化后的允许误差。
 - 所有输出为有限值；没有越界 cell、负面积水体、重复 feature ID 或不连续 chunk。
 - 可行走连通分量、可建面积、取水点、浅滩和路线绕行比符合 recipe 约束。
+- `water_access` 低于干旱阈值的区域不得出现 `vegetation_ok=true` 或草地调色；满足水分、坡度和土壤条件的区域才可出现草地。
+- 相同 seed、recipe、配置和生成器版本必须得到相同的水分、材料、调色和体素结果；改变颜色映射不能改变通行、建造或水体事实。
 - 地形视觉网格与内核语义一致；LOD 和 mesh 不改变 `SurfaceKind`、flags 或查询结果。
 - 编译成本、内存和首屏 mesh 生成时间有基线；生成器不进入 tick 热路径。
 
