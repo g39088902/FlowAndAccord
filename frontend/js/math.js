@@ -135,8 +135,7 @@
     //   对反照率场做水平→垂直两趟半径 r 均值（盒式近似高斯），陆地格间硬边界变连续
     //   渐变；waterMask 非 0 的水格视为屏障——水格输出保持原值、陆格只平均陆格邻居，
     //   水陆边界不产生混色晕圈（RiverBank 算陆格，允许与干地互混柔化岸线）。
-    //   就地写回传入数组（调用方在世界建缓存时一次性消费，之后 relightTerrain 与
-    //   TerrainTexture 色档自动拾取平滑后场，绘制层/深度队列零改动）。
+    //   就地写回传入数组（调用方在世界建缓存时一次性消费，平滑后场由 GL 地形渲染器消费）。
     //   复杂度 O(N·(2r+1))·2 趟 · 3 通道：N=65,536、r=2 时约 400 万次加法，~几 ms。
     function smoothAlbedoField(albR, albG, albB, w, h, waterMask, radius) {
       const n = w * h;
@@ -179,22 +178,6 @@
       }
     }
 
-    // 静态光照组合入口（v1.47.11 行为，作为动态光照关闭时的对照路径与兜底）
-    // 光源来自左上方俯视: L = normalize(-0.45, -0.60, 0.66)
-    function computeElevationColor(cell, minZ, maxZ) {
-      const { dzdx = 0, dzdy = 0 } = cell;
-      const alb = computeTerrainAlbedo(cell, minZ, maxZ);
-
-      // 单位法线: N = normalize(-dzdx, -dzdy, 1.0)
-      const normLen = Math.hypot(-dzdx, -dzdy, 1.0) || 1.0;
-      const dot = (0.45 * dzdx + 0.60 * dzdy + 0.66) / normLen;
-      const diffuse = Math.max(0, dot);
-      const ao = terrainAmbientOcclusion(dzdx, dzdy);
-      const lightFactor = Math.max(0.52, Math.min(1.22, (0.54 + 0.46 * diffuse) * ao));
-
-      const finalR = Math.min(255, Math.max(0, Math.floor(alb.r * lightFactor)));
-      const finalG = Math.min(255, Math.max(0, Math.floor(alb.g * lightFactor)));
-      const finalB = Math.min(255, Math.max(0, Math.floor(alb.b * lightFactor)));
-
-      return `rgb(${finalR}, ${finalG}, ${finalB})`;
-    }
+    // ★ 全量 WebGL：computeElevationColor（Canvas 地形格固定光兜底色）已随 Canvas 备用
+    //   通道删除——地形受光由 webgl/layers/terrain/terrain-renderer.js 顶点 shader 直译。
+    // 静态反照率与 AO 基座仍由 computeTerrainAlbedo / terrainAmbientOcclusion 提供。

@@ -85,7 +85,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.60.0';
+        this._appVersion = '1.60.1';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -156,7 +156,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.60.0';
+            this._appVersion = msg.appVersion || '1.60.1';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -324,13 +324,8 @@
         if (window.LandscapeMask) window.LandscapeMask.resetCache();
         // ★ S4-06/S4-07：标签布局与交互缓存同一生命周期失效（清空测量、滞回、停靠与聚合弹窗）
         if (window.LabelLayout) window.LabelLayout.resetCache();
-        // ★ TA-12-2：世界纹样模型同一生命周期失效——失效只管理缓存不进图元哈希，
-        // 新世界重建后同坐标图元身份不变（TA-12-TODO §3.1/§5.2）
-        if (window.TerrainTexture) window.TerrainTexture.invalidate('world');
         // ★ v1.50.84：阴影图世界代理几何同一生命周期失效（换世界不残留旧投影代理）
         if (window.WebGLShadowPass) window.WebGLShadowPass.resetCache();
-        // 地形贪婪合并网格同一生命周期失效
-        if (window.TerrainMeshMerge) window.TerrainMeshMerge.invalidate();
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
         //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
         if (window.HormoneTrend) window.HormoneTrend.reset();
@@ -464,7 +459,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.60.0';
+        return this._appVersion || '1.60.1';
 
       }
 
@@ -677,8 +672,8 @@
           }
           const step = worldSize / (w - 1);
           // ★ 动态季节光照（docs/current/tech/17-seasonal-lighting.md §5）：
-          //   一次性预存单位法线 / 无光反照率 / 坡度 AO；光档变化时由 SimLighting.relightTerrain()
-          //   只重算光因子并原地写回 cell.color，避免每次整片重建颜色与字符串。
+          //   一次性预存单位法线 / 无光反照率 / 坡度 AO，供 GL 地形渲染器顶点受光消费。
+          //   ★ 全量 WebGL：cell.color CPU 烘焙已删除（terrain-renderer shader 直译受光公式）。
           const cellCount = w * h;
           const nxArr = new Float32Array(cellCount), nyArr = new Float32Array(cellCount), nzArr = new Float32Array(cellCount);
           const aoArr = new Float32Array(cellCount);
@@ -700,14 +695,12 @@
               aoArr[idx] = terrainAmbientOcclusion(cell.dzdx, cell.dzdy);
               const alb = computeTerrainAlbedo(cell, minZ, maxZ);
               albR[idx] = alb.r; albG[idx] = alb.g; albB[idx] = alb.b;
-              cell.color = computeElevationColor(cell, minZ, maxZ);
             }
           }
-          // ★ v1.50.74 数据层反照率平滑（地表贴图插值，math.js::smoothAlbedoField）：
+          // ★ v1.50.74 数据层反照率平滑（math.js::smoothAlbedoField）：
           //   陆地格间硬边界变连续渐变；水格（DeepWater/ShallowWater）作屏障不混色不模糊。
-          //   平滑后重算固定光兜底 cell.color；动态光路径由 relightTerrain 经 markDirty
-          //   自动拾取平滑后场。半径走 RENDER_CONFIG.terrainAlbedoSmoothRadius（格数，
-          //   0=关；建缓存一次性消费，改值需重开世界/刷新页面生效），0~6 钳制。
+          //   半径走 RENDER_CONFIG.terrainAlbedoSmoothRadius（格数，0=关；
+          //   建缓存一次性消费，改值需重开世界/刷新页面生效），0~6 钳制。
           const smoothR = Math.max(0, Math.min(6, (window.RENDER_CONFIG && window.RENDER_CONFIG.terrainAlbedoSmoothRadius) || 0));
           if (smoothR > 0) {
             const waterMask = new Uint8Array(cellCount);
@@ -716,7 +709,6 @@
               waterMask[i] = (k === 'DeepWater' || k === 'ShallowWater') ? 1 : 0;
             }
             smoothAlbedoField(albR, albG, albB, w, h, waterMask, smoothR);
-            for (let i = 0; i < cellCount; i++) cells[i].color = computeElevationColor(cells[i], minZ, maxZ);
           }
           this.terrain = {
             gridSize: w,
@@ -735,12 +727,9 @@
             profile: snap.terrain_profile || '',
           };
           this._terrainCached = true;
-          // 地形重建后强制下一帧整片重着色（光相未变也要重写新数组对应的 cell.color）
+          // 地形重建后强制光档重推进（lightRev 闸节流 GL uniform 上传）
           if (window.SimLighting) window.SimLighting.markDirty();
           if (window.RiverLife) window.RiverLife.init(nextFeatures, this._engineSeed);
-          if (window.TerrainMeshMerge) {
-            this.terrain.mergedMesh = window.TerrainMeshMerge.build(this.terrain, window.RENDER_CONFIG ? window.RENDER_CONFIG.terrainMeshMerge : null);
-          }
         } else if (hasStaticFeatures || hasStaticAccents || hasStaticSubFeatures) {
           // ★ D-B1-7：网格缓存命中（或本帧无网格）但明确携带静态 section → 只替换静态数组，
           //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧，RiverLife 仍随网格重建

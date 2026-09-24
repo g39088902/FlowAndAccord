@@ -11,7 +11,7 @@
 
 **Rust 确定性计算内核 + WebAssembly 桥接 + 浏览器前端可视化**，三层之间只通过明确契约通信。
 
-> ★ **渲染形态（v1.50.77 起过渡期 / 全量 WebGL 为目标）**：地形由 `frontend/js/webgl/` 绘制在底层 `<canvas id="sim-canvas-gl">`；实体 / 装饰 / 道路 / 标签仍绘制在上层 Canvas 2D `<canvas id="sim-canvas">`。2026-09-17 架构决策为**全量 WebGL、退役 Canvas 2D**（共享同一深度缓冲），迁移期间 WebGL 不可用时经 `fallback-handler.js` 回退 2D 管线（该回退仅在过渡期保留）。详见根 AGENTS.md §4.18 与 [31 号迁移方案](../../plan/tech/31-canvas-to-webgl-migration.md)。
+> ★ **渲染形态（v1.50.77 起过渡期 / 全量 WebGL 为目标）**：地形由 `frontend/js/webgl/` 绘制在底层 `<canvas id="sim-canvas-gl">`；道路 / POI / 房屋 / 族人 / 标签 / 水系面仍绘制在上层 Canvas 2D `<canvas id="sim-canvas">`。2026-09-17 架构决策为**全量 WebGL、退役 Canvas 2D**（共享同一深度缓冲）。★ **v1.60.1 部分提前落地**：**WebGL 为硬门槛**——不可用时 `main.js` 显示错误覆盖层并阻断启动（`fallback-handler.js` 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影的 Canvas 备用通道已删除（见 31 号迁移方案 §1.3）。详见根 AGENTS.md §4.18 与 [31 号迁移方案](../../plan/tech/31-canvas-to-webgl-migration.md)。
 
 ```mermaid
 graph TD

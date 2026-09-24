@@ -1,6 +1,6 @@
 // === 水系微观生态纯表现层 (RiverLife) ===
-// 提供成群游鱼（★ v1.50.86 起 GL 地形活动时经 sink 分发进 WebGLAccentLayer；
-// Canvas 回退路径笔迹逐位不变）
+// 提供成群游鱼（★ 全量 WebGL：图元经 sink 分发进 WebGLAccentLayer；GL 未就绪帧跳过绘制，
+// 无 Canvas 兜底）
 // （★ v1.50.4 移除水底卵石层：深色扁圆石透水面观感呈"一堆深蓝色圆圈"，见 01-changelog.md；
 //   ★ v1.50.86 移除迎光面太阳波光：用户决策删除水面闪光特效）
 // 依赖全局: window.SimLighting (可选)、camera、w/h（视口剔除，render_canvas 共享）
@@ -13,7 +13,7 @@
 
   // 游鱼数据
   const _fishList = [];
-  // ★ v1.50.86 鱼群配色单一数值源：Canvas rgba 串与 GL sink 数值通道都从这里派生
+  // ★ 鱼群配色单一数值源：GL sink 数值通道从这里派生（rgba 串出口仅供调试）
   // （四群：锦鲤赤金 / 金鲤明黄 / 青黑溪斑 / 白练银鱼；[体R,G,B,A, 鳍R,G,B,A]）
   const FISH_PALETTES = [
     { bodyN: [235, 115, 55, 0.88], finN: [255, 165, 105, 0.75] },   // 锦鲤赤金
@@ -193,10 +193,9 @@
 
     /**
      * ★ v1.50.11 单条游鱼绘制（由统一深度队列调度）。
-     * ★ v1.50.86 GL 装饰层：GL 地形活动时四笔图元（水底影子 / 鱼身 / 背光高线 / 尾鳍）
-     *   按 Canvas 同序同配色经 sink 分发给 WebGLAccentLayer（鱼身在底层 GL 画布，
-     *   2D 半透明水面随后盖绘 ⇒ 透水观感与 Canvas 路径一致）；sinkOn=false 走 Canvas
-     *   现状路径（笔迹逐位不变）。
+     * ★ 全量 WebGL：四笔图元（水底影子 / 鱼身 / 背光高线 / 尾鳍）按同一画序同配色
+     *   经 sink 分发给 WebGLAccentLayer（鱼身在底层 GL 画布，2D 半透明水面随后盖绘
+     *   ⇒ 透水观感不变）；GL 未就绪帧整条跳过，无 Canvas 兜底。
      */
     drawFishSingle: function (ctx, f, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
       // 3D 投影
@@ -215,54 +214,13 @@
       const wid = len * 0.35;
       const tailWag = Math.sin(f.wigglePhase) * (len * 0.32);
 
-      // ★ WebGL 装饰层：sinkOn 期间按 Canvas 同序分发给 WebGLAccentLayer
-      // （几何/配色单一同源，GL 侧零重复公式）。
+      // ★ 全量 WebGL：GL 未就绪帧整条跳过（硬门槛架构下无 Canvas 兜底）；四笔图元按
+      //   同一画序同配色分发给 WebGLAccentLayer（几何/配色单一同源，GL 侧零重复公式）。
       const sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
-      if (sink !== null) {
-        sink.beginAccent(f.x, f.y, f.z);
-        this._dispatchFishSingle(sink, px, py, screenRot, len, wid, tailWag, f, scale);
-        return;
-      }
-
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(screenRot);
-
-      // 1. 鱼身影子 (水底微弱投影)
-      ctx.fillStyle = 'rgba(15, 30, 42, 0.28)';
-      ctx.beginPath();
-      ctx.ellipse(-len * 0.1, wid * 0.4, len * 0.45, wid * 0.3, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 2. 鱼身主体 (流线型梭形)
-      ctx.fillStyle = f.palette.body;
-      ctx.beginPath();
-      ctx.moveTo(len * 0.55, 0); // 鱼头
-      ctx.quadraticCurveTo(len * 0.1, wid * 0.55, -len * 0.45, tailWag * 0.4); // 腹部
-      ctx.lineTo(-len * 0.55, tailWag); // 鱼尾基底
-      ctx.quadraticCurveTo(len * 0.1, -wid * 0.55, len * 0.55, 0); // 背部
-      ctx.closePath();
-      ctx.fill();
-
-      // 3. 鱼背部高光线 (呈现水面透光下的鱼背流线反光)
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-      ctx.lineWidth = Math.max(0.6, 0.8 * scale);
-      ctx.beginPath();
-      ctx.moveTo(len * 0.35, 0);
-      ctx.quadraticCurveTo(0, -wid * 0.18, -len * 0.30, tailWag * 0.3);
-      ctx.stroke();
-
-      // 4. 灵动半透明摆尾 (两瓣尾鳍)
-      ctx.fillStyle = f.palette.fin;
-      ctx.beginPath();
-      ctx.moveTo(-len * 0.45, tailWag * 0.4);
-      ctx.lineTo(-len * 0.90, tailWag - wid * 0.45);
-      ctx.lineTo(-len * 0.72, tailWag);
-      ctx.lineTo(-len * 0.90, tailWag + wid * 0.45);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
+      if (sink === null) return;
+      sink.beginAccent(f.x, f.y, f.z);
+      this._dispatchFishSingle(sink, px, py, screenRot, len, wid, tailWag, f, scale);
+      return;
     },
 
     // ★ v1.50.86 sink 分发（drawFishSingle 消费）：把 Canvas translate(px,py)+rotate(screenRot)

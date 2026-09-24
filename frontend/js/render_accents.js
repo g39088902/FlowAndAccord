@@ -60,7 +60,10 @@
 // drawAccentEntity 只做分发），颜色由前端按当前季节派生（同 Tree，不读存档 tint，14 号 §7.4）。
 // 未知 kind 直接跳过并计数，开发模式（🐞 调试开关）下限频报警，**严禁错画成 Bush**。
 //
-// 依赖全局: ctx, camera, sim, w, h, MAP_Z_LIFT（render_world.js 定义，渲染期可用）、
+// ★ 全量 WebGL：装饰图元全部经 WebGLAccentLayer sink 分发（几何/配色与旧 Canvas 逐位
+// 同源）；GL 层未就绪的帧整只实体跳过绘制，无 Canvas 兜底分支。
+//
+// 依赖全局: camera, sim, w, h, MAP_Z_LIFT（render_world.js 定义，渲染期可用）、
 //   lightShadowOffset（render_world.js）、window.SimTreeTint（accent-season.js）、
 //   window.AccentModel（accent-model.js，须先于本文件加载）、
 //   window.AccentLOD（accent-lod.js，★ TA-07 判档/包围体唯一入口，24b 位须早于本文件）、
@@ -92,8 +95,9 @@ function _reportUnknownAccent(kind) {
 // 出 fill 色。基色/out 数组模块级复用（逐簇高频路径零分配）；SimLighting 缺席时退回基色
 // （加载顺序已保证，仅防御）。法线须经模型变换（含剪切逆转置）转到世界空间后传入，内部再归一化。
 // ★ TA-04-3 可选第 8 参 alpha：传了出 rgba()（枝干明暗带以透明度叠在体色上混圆柱侧面渐变）。
-// ★ WebGL 石体迁移：_litFinal 记录最终舍入数值色（与 fillStyle 串同源），WebGLStoneLayer
-//   sink 路径消费——GL 侧不重复受光公式，保证画风逐位一致。
+// ★ WebGL 石体迁移：_litFinal 记录最终舍入数值色（与 fillStyle 串同源），WebGLAccentLayer
+//   sink 路径消费——GL 侧不重复受光公式，保证画风逐位一致；全量 WebGL 下返回的颜色
+//   字符串已无绘制消费方，仅供调试。
 var _litBase = [0, 0, 0];
 var _litOut = [0, 0, 0];
 var _litFinal = [0, 0, 0];
@@ -178,7 +182,7 @@ function crownLitCfg() {
 
 // ★ TA-11-6 渲染热路径零 GC（07 号 §6.7/§10.2）：模块级持久刮擦缓冲，跨帧复用，
 // 稳态零逐帧堆分配。纪律：① 池条目只在容量不足时创建，字段每帧整体覆写；
-// ② 投影/法线/阴影偏移写入复用点对象（projTo / shearNormalInto / _shadowOffset），
+// ② 投影/法线写入复用点对象（projTo / shearNormalInto），
 // 严禁返回字面量对象；③ 排序用稳定性插入排序 _sortScratch（n ≤ 16，无 sort() 闭包
 // 与临时包装分配，等深度次序与 Array.prototype.sort 一致）；④ 刮擦对象严禁跨绘制
 // 调用持有（同帧顺序复用，无重入）。
@@ -187,7 +191,6 @@ var _ptB = { x: 0, y: 0, d: 0 };
 var _ptC = { x: 0, y: 0, d: 0 };
 var _ptD = { x: 0, y: 0, d: 0 };
 var _nrm = { x: 0, y: 0, z: 0 };         // 倾干剪切法线刮擦（shearNormalInto 消费）
-var _so = { x: 0, y: 0, alphaScale: 1 }; // 贴地阴影偏移刮擦（lightShadowOffset out 参数消费）
 
 // 碎石池条目 { st, g:{x,y,d} }；冠簇池条目（Tree/Bush 共用）{ c, px, py, pd, rr, v }；
 // （草叶池 { b, bx, by, tx, ty, h, d } 已随 GrassTuft 绘制迁往 render_grass.js）。
@@ -230,20 +233,14 @@ function _flattenQuad(off, x0, y0, cx, cy, x1, y1) {
   return off + n + 1;
 }
 
-// 贴地阴影偏移零分配包装（render_world.js::lightShadowOffset 的 out 参数消费）
-function _shadowOffset(legacyX, legacyY, height) {
-  if (typeof lightShadowOffset === 'function') return lightShadowOffset(legacyX, legacyY, height, _so);
-  _so.x = legacyX * camera.zoom;
-  _so.y = legacyY * camera.zoom;
-  _so.alphaScale = 1;
-  return _so;
-}
-
 // ★ TA-07-6：第二参 it = 统一深度队列项（可选）。入队端已完成两级剔除并把屏幕 AABB
 //   （s1x/s1y = 左下、s2x/s2y = 右上）与锚点屏幕坐标（ex/ey）写入深度项，绘制端直接消费
 //   ——**入队端与绘制端共用同一个 AABB**（§3.5 口径唯一红线，杜绝「入队却被绘制端剔掉」
 //   或「没入队但本会画」的漏画）。缺省（独立调用/剔除关态）时内部按 AccentLOD 自算。
 function drawAccentEntity(accent, it) {
+  // ★ 全量 WebGL：GL 层未就绪的帧整只实体跳过（硬门槛架构下无 Canvas 兜底）
+  var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
+  if (sink === null) return;
   const kind = accent.kind;
   // ★ D-B1-6：只放行已实现分支；未知 kind（含未来新增未绘制类型）跳过 + 计数报警
   if (kind !== 'Tree' && kind !== 'Boulder' && kind !== 'Bush' &&
@@ -340,10 +337,11 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const tier = window.AccentLOD.tierFor(accent, 'Tree', model, scaled);
   const detailMid = tier >= window.AccentLOD.MID;
   const detailNear = tier >= window.AccentLOD.NEAR;
-  // ★ v1.50.84 WebGL 装饰层：GL 模式登记本株深度（画家序不变，深度对齐地形），后续图元
-  //   经 sink 分发（几何/配色与 Canvas 单一同源）；sinkOn=false 走 Canvas 现状路径。
+  // ★ 全量 WebGL：GL 未就绪帧整株跳过（硬门槛架构下无 Canvas 兜底）；登记本株深度
+  //   （画家序不变，深度对齐地形），后续图元经 sink 分发（几何/配色单一同源）。
   var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
-  if (sink !== null) sink.beginAccent(accent.x, accent.y, accent.z);
+  if (sink === null) return;
+  sink.beginAccent(accent.x, accent.y, accent.z);
 
   // 贴地投影已迁出为地面图元（★ TA-04-6：入队/分发归 render_depth_queue.js，绘制归
   // render_shadows.js::drawAccentShadowGround——实高驱动影长 + 叶量调制，**严禁**在实体内恢复旧阴影）
@@ -381,28 +379,14 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
 
   const bodyFill = accentLitFill(barkR, barkG, barkB, _cylFront.x, _cylFront.y, _cylFront.z, 1);
   const outlineW = Math.max(0.4, 0.45 * scaled);
-  if (sink !== null) {
-    // 主体：左右两条二次曲线边之间的条带（与 Canvas 同一 path 闭合多边形精确三角化）
-    sink.ribbonQuad(sx - bw, sy, sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y,
-      sx + bw, sy, sx + bw * 0.45, sy - trunkH * 0.55, top.x + tw, top.y,
-      _litFinal[0], _litFinal[1], _litFinal[2], 1);
-    // 轮廓描边（闭环 18 点：左曲线 L0..L8 → 右曲线 R8..R0，闭合边即底边；miter join 同 Canvas）
-    let np = _flattenQuad(0, sx - bw, sy, sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y);
-    np = _flattenQuad(np, top.x + tw, top.y, sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
-    sink.polyStroke(_flatX, _flatY, np, true, outlineW, 40 / 255, 28 / 255, 18 / 255, 0.38, false);
-  } else {
-    ctx.fillStyle = bodyFill;
-    ctx.strokeStyle = 'rgba(40, 28, 18, 0.38)';
-    ctx.lineWidth = outlineW;
-    ctx.beginPath();
-    ctx.moveTo(sx - bw, sy);
-    ctx.quadraticCurveTo(sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y);
-    ctx.lineTo(top.x + tw, top.y);
-    ctx.quadraticCurveTo(sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
+  // 主体：左右两条二次曲线边之间的条带（与 Canvas 同一 path 闭合多边形精确三角化）
+  sink.ribbonQuad(sx - bw, sy, sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y,
+    sx + bw, sy, sx + bw * 0.45, sy - trunkH * 0.55, top.x + tw, top.y,
+    _litFinal[0], _litFinal[1], _litFinal[2], 1);
+  // 轮廓描边（闭环 18 点：左曲线 L0..L8 → 右曲线 R8..R0，闭合边即底边；miter join 同 Canvas）
+  let np = _flattenQuad(0, sx - bw, sy, sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y);
+  np = _flattenQuad(np, top.x + tw, top.y, sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
+  sink.polyStroke(_flatX, _flatY, np, true, outlineW, 40 / 255, 28 / 255, 18 / 255, 0.38, false);
 
   // ★ TA-04-3 侧面明暗带（替代旧「固定屏幕左上」树皮亮线 v1.49.3 遗留）：带位由世界光向
   //   的屏幕投影决定，clip 进干轮廓防溢出；远景干宽不足 minWidthPx 时省略（亚像素噪声）。
@@ -412,52 +396,26 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     const bandW = Math.max(0.4, bw * bb.wK);
     const litBand = accentLitFill(barkR, barkG, barkB, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
     const darkBand = accentLitFill(barkR, barkG, barkB, _cylDark.x, _cylDark.y, _cylDark.z, 1, bb.darkA);
-    if (sink !== null) {
-      // 明暗带：两条开折线描边（平头，同 Canvas 默认 lineCap）。
-      // Canvas 的 clip 防溢出在 GL 侧省略——带外缘与干轮廓间隙恒 ≥ 0（带偏移系数推导，
-      // 残余溢出 ≤ 0.04×干宽，亚像素级），详见 changelog v1.50.84。
-      let np = _flattenQuad(0,
-        sx + _cylScr.x * ob, sy + _cylScr.y * ob,
-        sx + _cylScr.x * om, sy - trunkH * 0.55 + _cylScr.y * om,
-        top.x + _cylScr.x * ot, top.y + _cylScr.y * ot);
-      sink.polyStroke(_flatX, _flatY, np, false, bandW, _litFinal[0], _litFinal[1], _litFinal[2], bb.litA, false);
-      // 暗带（_litFinal 已被 darkBand 调用覆写为暗带色）
-      np = _flattenQuad(0,
-        sx - _cylScr.x * ob, sy - _cylScr.y * ob,
-        sx - _cylScr.x * om, sy - trunkH * 0.55 - _cylScr.y * om,
-        top.x - _cylScr.x * ot, top.y - _cylScr.y * ot);
-      sink.polyStroke(_flatX, _flatY, np, false, bandW, _litFinal[0], _litFinal[1], _litFinal[2], bb.darkA, false);
-    } else {
-      ctx.save();
-      ctx.beginPath(); // 重建干轮廓作 clip（明暗带严格留在圆柱投影内）
-      ctx.moveTo(sx - bw, sy);
-      ctx.quadraticCurveTo(sx - bw * 0.45, sy - trunkH * 0.55, top.x - tw, top.y);
-      ctx.lineTo(top.x + tw, top.y);
-      ctx.quadraticCurveTo(sx + bw * 0.45, sy - trunkH * 0.55, sx + bw, sy);
-      ctx.closePath();
-      ctx.clip();
-      ctx.lineWidth = bandW;
-      ctx.strokeStyle = litBand;
-      ctx.beginPath();
-      ctx.moveTo(sx + _cylScr.x * ob, sy + _cylScr.y * ob);
-      ctx.quadraticCurveTo(sx + _cylScr.x * om, sy - trunkH * 0.55 + _cylScr.y * om,
-        top.x + _cylScr.x * ot, top.y + _cylScr.y * ot);
-      ctx.stroke();
-      ctx.strokeStyle = darkBand;
-      ctx.beginPath();
-      ctx.moveTo(sx - _cylScr.x * ob, sy - _cylScr.y * ob);
-      ctx.quadraticCurveTo(sx - _cylScr.x * om, sy - trunkH * 0.55 - _cylScr.y * om,
-        top.x - _cylScr.x * ot, top.y - _cylScr.y * ot);
-      ctx.stroke();
-      ctx.restore();
-    }
+    // 明暗带：两条开折线描边（平头，同 Canvas 默认 lineCap）。
+    // Canvas 的 clip 防溢出在 GL 侧省略——带外缘与干轮廓间隙恒 ≥ 0（带偏移系数推导，
+    // 残余溢出 ≤ 0.04×干宽，亚像素级），详见 changelog v1.50.84。
+    let np = _flattenQuad(0,
+      sx + _cylScr.x * ob, sy + _cylScr.y * ob,
+      sx + _cylScr.x * om, sy - trunkH * 0.55 + _cylScr.y * om,
+      top.x + _cylScr.x * ot, top.y + _cylScr.y * ot);
+    sink.polyStroke(_flatX, _flatY, np, false, bandW, _litFinal[0], _litFinal[1], _litFinal[2], bb.litA, false);
+    // 暗带（_litFinal 已被 darkBand 调用覆写为暗带色）
+    np = _flattenQuad(0,
+      sx - _cylScr.x * ob, sy - _cylScr.y * ob,
+      sx - _cylScr.x * om, sy - trunkH * 0.55 - _cylScr.y * om,
+      top.x - _cylScr.x * ot, top.y - _cylScr.y * ot);
+    sink.polyStroke(_flatX, _flatY, np, false, bandW, _litFinal[0], _litFinal[1], _litFinal[2], bb.darkA, false);
   }
 
   // 枝条骨架（全年保留——冬季裸枝的主体，§6.4）
   // ★ TA-04-3：枝条走同一受光管线——基色按「朝屏法线」（视向垂直段轴向分量）受光，
   //   转相机/光向明暗随动；段宽可辨时沿迎光侧补一条细高光（少量侧面明暗，不逐段贴图）。
   if (detailMid) {
-    ctx.lineCap = 'round';
     // ★ TA-07 分级：中景只画主枝（segTier 0），二级枝（segTier 1）移入近景——与 07 号
     //   §6.7「中景绘制主要枝簇、近景增加细枝」口径一致（旧实现把两者混在同一数组全画）。
     const segTier = sk.segTier;
@@ -474,44 +432,23 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
       cylinderShade(dxs / segLen, dys / segLen, dzs / segLen, leanShear,
         lmx, lmy, lmz, vmx, vmy, vmz, cosZ, sinZ, cosX, sinX);
       const branchFill = accentLitFill(96, 70, 48, _cylFront.x, _cylFront.y, _cylFront.z, 1);
-      if (sink !== null) {
-        // 枝条：开折线描边 + 圆头（同 Canvas lineCap='round' 逐段 stroke 语义）
-        // ★ v1.50.89 图元级视深：枝条按近端 3D 视深（两端 projTo().d 取大）测试地形，
-        //   陡视角下不再被锚点下前方更近地面裁掉（高光带同段复用同一深度）
-        sink.setViewDepth(Math.max(a.d, b.d));
-        const np = _flattenQuad(0, a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2 + bw * 0.35, b.x, b.y);
-        sink.polyStroke(_flatX, _flatY, np, false, lwSeg, _litFinal[0], _litFinal[1], _litFinal[2], 1, true);
-      } else {
-        ctx.strokeStyle = branchFill;
-        ctx.lineWidth = lwSeg;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        // 控制点取中点略下垂，枝条微弯不僵硬
-        ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + bw * 0.35, b.x, b.y);
-        ctx.stroke();
-      }
+      // 枝条：开折线描边 + 圆头（同 Canvas lineCap='round' 逐段 stroke 语义）
+      // ★ v1.50.89 图元级视深：枝条按近端 3D 视深（两端 projTo().d 取大）测试地形，
+      //   陡视角下不再被锚点下前方更近地面裁掉（高光带同段复用同一深度）
+      sink.setViewDepth(Math.max(a.d, b.d));
+      const np = _flattenQuad(0, a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2 + bw * 0.35, b.x, b.y);
+      sink.polyStroke(_flatX, _flatY, np, false, lwSeg, _litFinal[0], _litFinal[1], _litFinal[2], 1, true);
       // 迎光侧细高光（段宽可辨且屏幕迎光方向非退化才画）
       if (lwSeg >= bb.minPx && _cylScr.ok) {
         const o = lwSeg * bb.offK;
         const hiFill = accentLitFill(96, 70, 48, _cylLit.x, _cylLit.y, _cylLit.z, 1, bb.litA);
-        if (sink !== null) {
-          const np = _flattenQuad(0,
-            a.x + _cylScr.x * o, a.y + _cylScr.y * o,
-            (a.x + b.x) / 2 + _cylScr.x * o, (a.y + b.y) / 2 + bw * 0.35 + _cylScr.y * o,
-            b.x + _cylScr.x * o, b.y + _cylScr.y * o);
-          sink.polyStroke(_flatX, _flatY, np, false, lwSeg * bb.wK, _litFinal[0], _litFinal[1], _litFinal[2], bb.litA, true);
-        } else {
-          ctx.strokeStyle = hiFill;
-          ctx.lineWidth = lwSeg * bb.wK;
-          ctx.beginPath();
-          ctx.moveTo(a.x + _cylScr.x * o, a.y + _cylScr.y * o);
-          ctx.quadraticCurveTo((a.x + b.x) / 2 + _cylScr.x * o,
-            (a.y + b.y) / 2 + bw * 0.35 + _cylScr.y * o, b.x + _cylScr.x * o, b.y + _cylScr.y * o);
-          ctx.stroke();
-        }
+        const np = _flattenQuad(0,
+          a.x + _cylScr.x * o, a.y + _cylScr.y * o,
+          (a.x + b.x) / 2 + _cylScr.x * o, (a.y + b.y) / 2 + bw * 0.35 + _cylScr.y * o,
+          b.x + _cylScr.x * o, b.y + _cylScr.y * o);
+        sink.polyStroke(_flatX, _flatY, np, false, lwSeg * bb.wK, _litFinal[0], _litFinal[1], _litFinal[2], bb.litA, true);
       }
     }
-    ctx.lineCap = 'butt';
   }
 
   // 叶簇：按 leafDensity × shed 次序收缩隐藏（§6.4）；色差随 brownness 加深（秋色簇间先后）
@@ -557,26 +494,14 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   const paR = Math.min(255, Math.round(season.leafColor[0] * 0.50 + 4));
   const paG = Math.min(255, Math.round(season.leafColor[1] * 0.58 + 8));
   const paB = Math.min(255, Math.round(season.leafColor[2] * 0.62 + 14));
-  if (sink !== null) {
-    const ar = paR / 255, ag = paG / 255, ab = paB / 255;
-    for (let i = 0; i < nItems; i++) {
-      const it = _crownScratchPool[i];
-      const sw = lw + it.rr * 0.16;
-      // ★ v1.50.89 图元级视深：叶簇椭圆按簇心 3D 视深 + 簇世界半径（billboard 近端补偿）——
-      //   俯视时叶簇下部不再被锚点下前方更近地面整片裁切（Pass B/亮部同簇同深度）
-      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1));
-      sink.ellipseRGBA(it.px, it.py, it.rr + sw, it.rr * squash + sw, ar, ag, ab, 1);
-    }
-  } else {
-    ctx.fillStyle = 'rgb(' + paR + ',' + paG + ',' + paB + ')';
-    ctx.beginPath();
-    for (let i = 0; i < nItems; i++) {
-      const it = _crownScratchPool[i];
-      const sw = lw + it.rr * 0.16;
-      ctx.moveTo(it.px + it.rr + sw, it.py);
-      ctx.ellipse(it.px, it.py, it.rr + sw, it.rr * squash + sw, 0, 0, Math.PI * 2);
-    }
-    ctx.fill();
+  const ar = paR / 255, ag = paG / 255, ab = paB / 255;
+  for (let i = 0; i < nItems; i++) {
+    const it = _crownScratchPool[i];
+    const sw = lw + it.rr * 0.16;
+    // ★ v1.50.89 图元级视深：叶簇椭圆按簇心 3D 视深 + 簇世界半径（billboard 近端补偿）——
+    //   俯视时叶簇下部不再被锚点下前方更近地面整片裁切（Pass B/亮部同簇同深度）
+    sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1));
+    sink.ellipseRGBA(it.px, it.py, it.rr + sw, it.rr * squash + sw, ar, ag, ab, 1);
   }
 
   // Pass B：簇本体（基色 + lite 色差，再乘冠内体积/AO 分档 × 世界光向受光）
@@ -592,30 +517,15 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
     // 簇法线（模型层冠包络外向法线）经倾干剪切逆转置补偿转到世界空间（★ 零 GC Into 变体）
     const wn = window.AccentModel.shearNormalInto(c.nx, c.ny, c.nz, leanShear, _nrm);
     const clusterFill = accentLitFill(season.leafColor[0] + j, season.leafColor[1] + j, season.leafColor[2] + j, wn.x, wn.y, wn.z, kZ);
-    if (sink !== null) {
-      sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1)); // ★ v1.50.89 同簇同深度（Pass A 口径一致）
-      sink.ellipseRGBA(it.px, it.py, it.rr, it.rr * squash, _litFinal[0], _litFinal[1], _litFinal[2], 1);
-    } else {
-      ctx.fillStyle = clusterFill;
-      ctx.beginPath();
-      ctx.ellipse(it.px, it.py, it.rr, it.rr * squash, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    sink.setViewDepth(it.pd + it.c.r * (accent.scale || 1)); // ★ v1.50.89 同簇同深度（Pass A 口径一致）
+    sink.ellipseRGBA(it.px, it.py, it.rr, it.rr * squash, _litFinal[0], _litFinal[1], _litFinal[2], 1);
     // 近景簇亮部：★ TA-04-4 世界光向投影驱动（v1.50.27 屏幕固定白斑移除）——亮部中心沿
     // 屏幕光向偏移（光近视线经 sunScreenDirFull 平滑回冠心），亮色走受光管线随簇法线
     // 迎光程度自然衰减（取代旧「只给上半冠」tZ 启发式）；宽而弱，避免塑料反光
     if (detailNear && it.rr > cc.minPx) {
       const hiCol = accentLitFill(255, 252, 218, wn.x, wn.y, wn.z, 1, cc.alpha * it.v);
-      if (sink !== null) {
-        sink.ellipseRGBA(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
-          it.rr * cc.rxK, it.rr * cc.ryK, _litFinal[0], _litFinal[1], _litFinal[2], cc.alpha * it.v);
-      } else {
-        ctx.fillStyle = hiCol;
-        ctx.beginPath();
-        ctx.ellipse(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
-          it.rr * cc.rxK, it.rr * cc.ryK, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      sink.ellipseRGBA(it.px + _sunScr.x * it.rr * cc.offK, it.py + _sunScr.y * it.rr * cc.offK,
+        it.rr * cc.rxK, it.rr * cc.ryK, _litFinal[0], _litFinal[1], _litFinal[2], cc.alpha * it.v);
     }
   }
 
@@ -623,24 +533,12 @@ function drawAccentTree(accent, sx, sy, scaled, season, model, cosZ, sinZ, cosX,
   if (detailMid && season.budAmount > 0.12) {
     const budA = 0.55 * season.budAmount;
     const br = Math.max(0.7, crownR * 0.055);
-    if (sink !== null) {
-      for (let i = 0; i < sk.branchTips.length; i++) {
-        const t = sk.branchTips[i];
-        const p = _ptD;
-        projTo(t.x, t.y, t.z + 0.3, p);
-        sink.setViewDepth(p.d); // ★ v1.50.89 芽点按自身 3D 视深
-        sink.ellipseRGBA(p.x, p.y, br, br * 1.3, 198 / 255, 216 / 255, 130 / 255, budA);
-      }
-    } else {
-      ctx.fillStyle = 'rgba(198, 216, 130, ' + budA.toFixed(3) + ')';
-      for (let i = 0; i < sk.branchTips.length; i++) {
-        const t = sk.branchTips[i];
-        const p = _ptD;
-        projTo(t.x, t.y, t.z + 0.3, p);
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y, br, br * 1.3, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    for (let i = 0; i < sk.branchTips.length; i++) {
+      const t = sk.branchTips[i];
+      const p = _ptD;
+      projTo(t.x, t.y, t.z + 0.3, p);
+      sink.setViewDepth(p.d); // ★ v1.50.89 芽点按自身 3D 视深
+      sink.ellipseRGBA(p.x, p.y, br, br * 1.3, 198 / 255, 216 / 255, 130 / 255, budA);
     }
   }
 }
@@ -706,9 +604,10 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
   for (let i = 0; i < sides; i++) _stGy[i] = cy + _stRy[i] * cosX - _stDzS[i];
   const hS = r * rockHeightK() * sinX;
   const kL = (lite - 0.5) * 20;
-  // ★ WebGL 装饰层：sinkOn 期间图元按 Canvas 同序分发给 WebGLAccentLayer（几何/配色
-  //   单一同源，GL 侧零重复公式）；sinkOn=false 走 Canvas 现状路径（笔迹逐位不变）。
+  // ★ 全量 WebGL：图元按画家序分发给 WebGLAccentLayer（几何/配色单一同源，GL 侧零重复
+  //   公式）；GL 未就绪帧跳过（调用方已作硬门槛，此处防御性兜底）。
   var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
+  if (sink === null) return;
   // ★ TA-07 远景两笔简化（§3.2/§0.3-3①）：省掉 sides 次侧面片受光（7 次 accentLitFill +
   // 7 次 path），只留顶面 + 剪影描边——轮廓与受光顶面仍在，远景不可辨的侧面明暗不画。
   // 画序（侧面 → 顶面 → 描边）与颜色公式**零改动**，只做图元增删（TA-04 受光红线）。
@@ -716,48 +615,15 @@ function drawStoneBody(gx, gy, r, rot, sides, shape, lite, cosZ, sinZ, cosX, sin
     const k2 = (k + 1) % sides;
     const aM = rot + ((k + 0.5) / sides) * Math.PI * 2;
     const fill = accentLitFill(78 + kL, 74 + kL, 68 + kL, Math.cos(aM), Math.sin(aM), 0, 1);
-    if (sink !== null) {
-      sink.quad(_stPx[k], _stGy[k], _stPx[k2], _stGy[k2],
-        _stPx[k2], _stGy[k2] - hS, _stPx[k], _stGy[k] - hS,
-        _litFinal[0], _litFinal[1], _litFinal[2], 1);
-    } else {
-      ctx.fillStyle = fill;
-      ctx.beginPath();
-      ctx.moveTo(_stPx[k], _stGy[k]);
-      ctx.lineTo(_stPx[k2], _stGy[k2]);
-      ctx.lineTo(_stPx[k2], _stGy[k2] - hS);
-      ctx.lineTo(_stPx[k], _stGy[k] - hS);
-      ctx.closePath();
-      ctx.fill();
-    }
+    sink.quad(_stPx[k], _stGy[k], _stPx[k2], _stGy[k2],
+      _stPx[k2], _stGy[k2] - hS, _stPx[k], _stGy[k] - hS,
+      _litFinal[0], _litFinal[1], _litFinal[2], 1);
   }
   // 顶面法线 = 地表法线（平地退化为 (0,0,1)）
   var nLen = Math.hypot(sDzdx, sDzdy, 1);
   const topFill = accentLitFill(152 + kL, 146 + kL, 138 + kL, -sDzdx / nLen, -sDzdy / nLen, 1 / nLen, 1);
-  if (sink !== null) {
-    sink.polyRing(_stPx, _stGy, sides, -hS, _litFinal[0], _litFinal[1], _litFinal[2], 1);
-  } else {
-    ctx.fillStyle = topFill;
-    ctx.beginPath();
-    for (let i = 0; i < sides; i++) {
-      if (i === 0) ctx.moveTo(_stPx[i], _stGy[i] - hS); else ctx.lineTo(_stPx[i], _stGy[i] - hS);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-  if (sink !== null) {
-    sink.profileStroke(_stPx, _stRy, _stGy, sides, -hS, strokeW);
-  } else {
-    ctx.strokeStyle = 'rgba(40, 36, 30, 0.75)';
-    ctx.lineWidth = strokeW;
-    ctx.beginPath();
-    for (let i = 0; i < sides; i++) {
-      const py = _stRy[i] < 0 ? _stGy[i] - hS : _stGy[i];
-      if (i === 0) ctx.moveTo(_stPx[i], py); else ctx.lineTo(_stPx[i], py);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  }
+  sink.polyRing(_stPx, _stGy, sides, -hS, _litFinal[0], _litFinal[1], _litFinal[2], 1);
+  sink.profileStroke(_stPx, _stRy, _stGy, sides, -hS, strokeW);
 }
 
 // Boulder：单石，走与 RockCluster 子石同一套受光几何（drawStoneBody 共用；lite=0.5 即
@@ -767,21 +633,12 @@ function drawAccentBoulder(owner, sx, sy, scaled, model, cosZ, sinZ, cosX, sinX)
   const AL = window.AccentLOD;
   const far = AL && AL.cfg().stoneFar && AL.tierFor(owner, 'Boulder', model, scaled) === AL.FAR;
   const sl = _terrainSlopeAt(owner.x, owner.y);
-  // ★ WebGL 装饰层：GL 模式登记石体深度（画家序不变，深度对齐地形），石体几何经
-  //   drawStoneBody sink 分发；落底阴影由阴影图（WebGLShadowPass）承担，不再手绘。
-  const WSL = window.WebGLAccentLayer;
-  if (WSL && WSL.sinkOn) {
-    WSL.beginAccent(owner.x, owner.y, owner.z);
-  } else if (typeof ctx !== 'undefined' && ctx) {
-    // 2D 模式手绘接地接触阴影（与 RockCluster 同向、同色板、沿世界光向）
-    const RC = window.RENDER_CONFIG || {};
-    const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
-    const so = (typeof _shadowOffset === 'function') ? _shadowOffset(0.6, 1.2, 2.0 * (owner.scale || 1)) : { x: 2, y: 1.5, alphaScale: 1 };
-    ctx.fillStyle = 'rgba(25, 20, 15, ' + ((stoneShadowAlpha + 0.04) * (so.alphaScale || 1)).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(sx + so.x * 0.4, sy + so.y * 0.3, 6 * scaled * 1.12, 6 * scaled * 0.48, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // ★ 全量 WebGL：GL 未就绪帧整只跳过（硬门槛架构下无 Canvas 兜底）；登记石体深度
+  //   （画家序不变，深度对齐地形），石体几何经 drawStoneBody sink 分发；落底阴影由
+  //   阴影图（WebGLShadowPass）承担，不手绘接触影。
+  var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
+  if (sink === null) return;
+  sink.beginAccent(owner.x, owner.y, owner.z);
   drawStoneBody(sx, sy, 6 * scaled, (owner && owner.rotation) || 0, 7, _BOULDER_SHAPE, 0.5,
     cosZ, sinZ, cosX, sinX, Math.max(0.6, 0.9 * scaled), far, sl.dzdx, sl.dzdy);
 }
@@ -806,16 +663,14 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   const AL = window.AccentLOD;
   const far = AL && AL.tierFor(accent, 'RockCluster', model, scaled) === AL.FAR;
   const farSimplified = !!(far && AL.cfg().stoneFar);
-  // 微接触阴影透明度（config.render.js，TA-11-5；缺省回退与集中值一致）
-  const shadowAlpha = Number.isFinite(RC.accentRockClusterShadowAlpha) ? RC.accentRockClusterShadowAlpha : 0.14;
-  const stoneShadowAlpha = Number.isFinite(RC.accentRockClusterStoneShadowAlpha) ? RC.accentRockClusterStoneShadowAlpha : 0.10;
   // ★ v1.50.72 贴合地形：簇群锚点坡度用于全部子石（子石间距远小于地形格，同一坡度足够准确）
   const sl = _terrainSlopeAt(accent.x, accent.y);
   const clDzdx = sl.dzdx, clDzdy = sl.dzdy;
-  // ★ WebGL 装饰层：GL 地形活动时整簇子石按 Canvas 同序分发给 WebGLAccentLayer；
-  //   整簇登记一次深度（簇内仍按画家序叠放，深度写入关闭）。
+  // ★ 全量 WebGL：GL 未就绪帧整簇跳过（硬门槛架构下无 Canvas 兜底）；整簇子石按画家序
+  //   分发给 WebGLAccentLayer，整簇登记一次深度（簇内仍按画家序叠放，深度写入关闭）。
   var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
-  if (sink !== null) sink.beginAccent(accent.x, accent.y, accent.z);
+  if (sink === null) return;
+  sink.beginAccent(accent.x, accent.y, accent.z);
 
   // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
   function projTo(dx, dy, dz, out) {
@@ -839,25 +694,8 @@ function drawAccentRockCluster(accent, sx, sy, scaled, model, cosZ, sinZ, cosX, 
   }
   _sortScratch(_rockScratchPool, nItems, 'd');
 
-  // 微接触落底阴影（先画，被子石压住）：簇群整片 + 逐石接触椭圆（主石略强）
-  // ★ v1.50.84：GL 模式不再手绘接触影——落底阴影统一由阴影图（WebGLShadowPass）承担
-  const so = _shadowOffset(0.6, 1.2, 0.4);
-  if (sink === null) {
-    ctx.fillStyle = 'rgba(25, 20, 15, ' + (shadowAlpha * so.alphaScale).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(sx + so.x * 0.5, sy + so.y * 0.35, sk.spread * scaled * 1.05, sk.spread * scaled * 0.42, 0, 0, Math.PI * 2);
-    ctx.fill();
-    for (let i = 0; i < nItems; i++) {
-      const it = _rockScratchPool[i];
-      const r = it.st.r * scaled;
-      if (r < lodMinR) continue;
-      if (far && it.st !== sk.stones[(model && model.stoneMain) || 0]) continue; // 远景碎石影随同略去
-      ctx.fillStyle = 'rgba(25, 20, 15, ' + ((it.st === sk.stones[0] ? stoneShadowAlpha + 0.02 : stoneShadowAlpha) * so.alphaScale).toFixed(3) + ')';
-      ctx.beginPath();
-      ctx.ellipse(it.g.x + so.x * 0.4, it.g.y + so.y * 0.3, r * 1.08, r * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+  // 微接触落底阴影：全量 WebGL 下由阴影图（WebGLShadowPass）统一承担，不手绘接触影
+  // （★ v1.50.84 起 GL 分发模式即移除手绘，Canvas 分支随全量 WebGL 迁移删除）。
 
   for (let i = 0; i < nItems; i++) {
     const it = _rockScratchPool[i];

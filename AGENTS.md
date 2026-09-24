@@ -39,10 +39,10 @@ crates/sim_core  →  crates/sim_wasm  →  frontend/rust/sim_wasm.wasm
 
 - `sim_core`：确定性模拟内核、决策、生态、房屋、账本、地形与路网。
 - `sim_wasm`：无依赖 WASM 桥接、tick、配置注入、FABS 二进制快照和存档导出。
-- `frontend`：Worker 代理、快照解码、配置 UI、WebGL 地形层和过渡期 Canvas 2D 实体层。浏览器 UI (版本: v1.60.0)。
+- `frontend`：Worker 代理、快照解码、配置 UI、WebGL 地形层和过渡期 Canvas 2D 实体层。浏览器 UI (版本: v1.60.1)。
 - 改动必须保持内核与表现层解耦；前端渲染不得改变模拟状态或 `WorldRng` 消费顺序。
 
-渲染目标是全量 WebGL。迁移期间保留双 Canvas 和 2D 回退；改渲染代码前必须阅读 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 与 `frontend/AGENTS.md`。
+渲染目标是全量 WebGL。★ v1.60.1 起地形/光照/装饰/阴影的 Canvas 备用通道已删除（WebGL 不可用为启动硬门槛）；水系/实体/标签仍在 2D 覆盖层，阶段三~五迁移完成前不得删除该覆盖层。改渲染代码前必须阅读 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 与 `frontend/AGENTS.md`。
 
 ## 2. 编译、验证与运行
 
@@ -83,7 +83,7 @@ node tools/bump-version.js --check
 node frontend/server.js
 ```
 
-默认地址为 `http://localhost:3000`。端口已有服务时直接复用，不要重复启动。存档链路使用 Chrome 或 Edge；受限环境只能用内置浏览器加 `?nogate=1` 验证非存档链路，不能据此证明真实存档读写。每次重编译 WASM 后强制刷新；页面顶部标题栏右侧显示版本徽章 **`v1.60.0`**。
+默认地址为 `http://localhost:3000`。端口已有服务时直接复用，不要重复启动。存档链路使用 Chrome 或 Edge；受限环境只能用内置浏览器加 `?nogate=1` 验证非存档链路，不能据此证明真实存档读写。每次重编译 WASM 后强制刷新；页面顶部标题栏右侧显示版本徽章 **`v1.60.1`**。
 
 ## 3. 玩家交互速查
 

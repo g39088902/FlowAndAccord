@@ -15,10 +15,10 @@ stateDiagram-v2
     direction LR
     [*] --> WAIT_SNAP
     WAIT_SNAP --> INGEST : Worker 下发快照（背压释放，SNAP_THROTTLE_TIERS 按人口定档）
-    INGEST --> SORT : 快照映射完成（rustworld._applySnapshot）
-    SORT --> GL : WebGL 地形层提交（sim-canvas-gl，深度缓冲逐像素遮挡）
-    GL --> PAINT : Canvas 2D 覆盖层按统一深度队列远→近落笔（sim-canvas）
-    PAINT --> PRESENT : 天空/地形/路网/贴地/实体/装饰/标签全部落笔完成
+    INGEST --> GL : 快照映射完成（rustworld._applySnapshot）
+    GL --> SORT : WebGL 地形层提交（sim-canvas-gl，地形/侧壁 shader 直译受光 + 深度缓冲逐像素遮挡）
+    SORT --> PAINT : 2D 深度队列排定（水系/游鱼/道路/POI/房屋/装饰/族人按 depth 升序）
+    PAINT --> PRESENT : 实体/标签落笔完成（'G' 键调试网格叠层最后绘制）
     PRESENT --> WAIT_SNAP : 回传 ACK，Worker 解锁下一帧
 ```
 
@@ -26,9 +26,9 @@ stateDiagram-v2
 | :--- | :--- | :--- | :--- |
 | WAIT_SNAP | 等待快照：持有 `ackReceived` 锁，Worker 未下发 | 渲染循环启动 / 上一帧已 ACK | Worker 下发新快照 |
 | INGEST | 采集与映射：主线程消费快照并映射 `sim` | `ackReceived` 释放 | 快照映射完成 |
-| SORT | 深度排序：`drawWorldEntities` 把地形格/水系/道路/POI/房屋/族人/装饰收进同一队列按 `depth = ry·sinX + z·cosX` 升序 | 快照映射完成 | 队列排定（远→近） |
-| GL | WebGL 地形层：地形/装饰（sink 分发）在 `sim-canvas-gl` 提交，GPU 深度缓冲解决遮挡 | 队列排定 | 地形 GL 帧完成 |
-| PAINT | Canvas 2D 覆盖层：按统一深度队列在 `sim-canvas` 落笔实体/道路/POI/标签/特效 | GL 地形提交后 | 全部图层落笔完成 |
+| GL | WebGL 地形层：地形/侧壁在 `sim-canvas-gl` 提交，GPU 深度缓冲解决遮挡 | 快照映射完成 | 地形 GL 帧完成 |
+| SORT | 深度排序：`drawWorldEntities` 把水系/游鱼/道路/POI/房屋/装饰/族人收进同一队列按 `depth = ry·sinX + z·cosX` 升序（★ v1.60.1 起地形格不入队） | GL 帧完成 | 队列排定（远→近） |
+| PAINT | Canvas 2D 覆盖层：按统一深度队列在 `sim-canvas` 落笔实体/道路/POI/标签 | 队列排定 | 全部图层落笔完成 |
 | PRESENT | 呈现与 ACK：回传 ACK 解锁 Worker | 绘制完成 | ACK 已回传 |
 
 **不变量**（违反即出 bug）：
@@ -40,24 +40,22 @@ stateDiagram-v2
 
 纯静态前端（无构建步骤），通过 Canvas 2D/3D 投影渲染模拟世界，提供 Inspector 观察面板、族谱可视化、账本大盘、调试监视器与全景控制台。前端是用户与模拟内核交互的唯一界面。
 
-> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，装饰/实体/道路/标签仍在 Canvas 2D 覆盖层 `sim-canvas`。**目标形态为全量 WebGL、不再使用 Canvas 2D**——装饰层与实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
+> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，道路/POI/房屋/族人/标签/水系面仍在 Canvas 2D 覆盖层 `sim-canvas`。**目标形态为全量 WebGL、不再使用 Canvas 2D**——实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层。★ **v1.60.1 部分提前落地**：WebGL 成为**硬门槛**（不可用时 `main.js` 显示错误覆盖层并阻断启动，`fallback-handler.js` 2D 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除（详见 [31 号 §1.3](../../plan/tech/31-canvas-to-webgl-migration.md)）。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
 
 ## 2. 核心机制
 
 ### 2.1 Canvas 渲染管线
 
-> ★ 下文的「Canvas 渲染管线」为过渡期现状；目标形态的统一 WebGL 管线见文首方向说明与 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md).
-- **分层渲染顺序（★ v1.47.5 P0 / ★ v1.47.9 统一深度 / ★ v1.48.0 光照氛围）**：严格遵循地表物理遮挡层次调度：
-  0. `SimLighting.update()`：推进年度光相（含视觉限速器），光档变化时整片重着色地形（`cell.color` 原地写回）；
-  1. `drawSkyBackdrop()`：天空/地平渐变与逆光光晕（第一个氛围插入点，地表之下）；
-  2. `drawTerrain()`：3D 连续坡度与法线环境光遮蔽（AO）高程沙盘网格（含随光向变化明的沙盘侧壁）；★ v1.48.1 起每格四边沿外法线外扩 `TERRAIN_SEAM_PX`(0.75px)，消除相邻格抗锯齿缝隙导致的「深色网格线透出」（详见 `frontend/AGENTS.md` §5.9）；drawTerrain 内部依次调用：
-     - `drawTerrainFeatures()`：水系地貌矢量特征——Pass 2 半透明碧蓝水面 → Pass 4 浅滩卵石踏石（★ v1.50.3 移除 Pass 2 中心微波流线与 Pass 3 顺流碎沫段，虚线观感形似车道线；★ v1.50.4 移除 Pass 3 岸线微沫白线；★ v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充；★ v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带；★ v1.50.86 删除 Pass 2.8 迎光面太阳波光，游鱼另经 `DEPTH_FISH` 逐条入队）；
-     - （★ v1.50.2 起 `drawAccents()` **已迁出** `drawTerrain()`：装饰改由 `drawAccentEntity(accent)` 单实体入口并入第 6 步 `drawWorldEntities()` 统一相机深度队列，见下）；
+> ★ 下文的「Canvas 渲染管线」为过渡期现状；目标形态的统一 WebGL 管线见文首方向说明与 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md). ★ **v1.60.1 起**：地形 / 光照 / 装饰 / 阴影的 Canvas 备用通道已删除——地形由 WebGL 地形层直绘（含受光与阴影），装饰经 sink 硬门槛进 GL 层，2D 覆盖层只画水系/道路/POI/房屋/族人/标签。
+- **分层渲染顺序（★ v1.47.5 P0 / ★ v1.47.9 统一深度 / ★ v1.60.1 地形层直绘）**：严格遵循地表物理遮挡层次调度：
+  0. `SimLighting.update()`：推进年度光相（含视觉限速器），光档变化时推进 `lightRev`——受光由 GL 地形 shader 直译（★ v1.60.1 CPU 逐格烘焙与 `cell.color` 写回已删除）；
+  1. **WebGL 地形层**（terrain-renderer.js，`sim-canvas-gl`）：真实地形网格 + Diorama 沙盘侧壁，顶点 shader 直译 `shadeAlbedoInto` 受光 + 片元采样 GL 阴影图；★ v1.60.1 起 Canvas 侧 `drawSkyBackdrop()` / `drawTerrain()` / `drawTerrainCell` 已删除（天空清屏由 GL 层承担）；
+  2. `drawWorldEntities()`：世界统一深度队列（见第 6 步）；★ v1.60.1 起地形格/侧壁不再入队（遮挡由 GPU 深度缓冲承担），'G' 键调试网格线 `drawTerrainGrid` 仍以 2D 叠层画在 GL 地形上；
   3. `drawLanes()`：动态踩踏路网（贴地纹理，先于建筑绘制）；
   4. `drawSelectedCampHouseLinks()` + `drawPoiGroundBases()`：贴地图元补充层（选中营地辖区虚线、POI 底座与营地暖光，必须先于立体实体落笔）；
-  5. 大气色洗（★ v1.50.11 起已烘焙进 `lighting.js::relightTerrain` 写回 `cell.color`，不再是独立的整屏 pass；`drawAtmosphereWash()` 函数已删除）；
-  6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相，贴地阴影走 `SimLighting`）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
-- **★ v1.48.0 动态季节光照（年周期光弧）**：光源绕世界一年转一圈，四季各占一个象限（春=东 / 夏=南 / 秋=西 / 冬=北），盛夏高度角 72°、隆冬 22°；地形反照率与光照解耦（`computeTerrainAlbedo` 一次性预算 + `SimLighting.relightTerrain` 按光档重算光因子），房屋墙面/屋顶与沙盘侧壁按面法线受光，阴影方向与长度由世界空间光向投影到屏幕（随相机旋转）。详见 [./17-seasonal-lighting.md](./17-seasonal-lighting.md) 与 `frontend/AGENTS.md` §5.10。
+  5. 大气色洗（★ v1.50.11 起烘焙进地形色、★ v1.60.1 起由 GL 顶点 shader 的 wash mix 承担——`relightTerrain` / `cell.color` 已删除，`drawAtmosphereWash()` 函数已删除）；
+  6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入 / ★ v1.60.1 水系面仍经队列**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相；★ v1.60.1 起绘制经 sink 分发进 GL 装饰层、GL 未就绪帧整只跳过）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
+- **★ v1.48.0 动态季节光照（年周期光弧）**：光源绕世界一年转一圈，四季各占一个象限（春=东 / 夏=南 / 秋=西 / 冬=北），盛夏高度角 72°、隆冬 22°；地形反照率与光照解耦（`computeTerrainAlbedo` 一次性预算 + GL 顶点 shader 直译 `shadeAlbedoInto` 受光，光档变化经 `lightRev` 闸节流上传 uniform），房屋墙面/屋顶按面法线受光，阴影方向与长度由世界空间光向投影到屏幕（随相机旋转）。详见 [./17-seasonal-lighting.md](./17-seasonal-lighting.md) 与 `frontend/AGENTS.md` §5.10。
 - 动态等高线网格地形，读取内核 `GeoCell` 的地表类别、坡度和自然适宜性；v1.47.7 起不再绘制 `Ridge` 山脊线、`Saddle` 山口圆与 `Terrace` 台地轮廓（该类特征已整体删除）；T2 仍绘制真实两岸河谷、河阶、浅滩走廊与泉谷等水系特征。
 - **灵动立体水系（★ v1.47.5 P1 升级 / ★ v1.49.0 水底生态层 / ★ v1.49.1 河道净化 / ★ v1.50.3~v1.50.9 观感降噪 / ★ v1.50.86 游鱼迁 WebGL + 删波光）**：`ShallowWater`/`DeepWater` 水下格底色为**深褐色河床土色**（★ v1.50.9：`rgb(142,122,96)` 浅滩湿土 / `rgb(120,100,76)` 深床暗土，取代旧深蓝底——透过半透明水面呈现湿润泥土暖调，亮度向岸边湿砂靠拢以压低网格锯齿反差，与碧蓝水面形成「蓝水褐床」的自然对比）；`River` 渲染层级为——游鱼（`river_life.js` 4 群 22 条，沿河道中心线巡航、正弦摆尾；★ v1.50.86 起 GL 地形活动时经 sink 分发进 `WebGLAccentLayer`，鱼身在底层 GL 画布）→ 半透明碧蓝水面（0.25 深水基底 + 0.62 主流水体双层叠加，2D 画布盖绘于游鱼之上 ⇒ 透水观感不变）；`ShallowFord` 呈现卵石踏道与飞溅浪花，消除"干涸黑凹槽"死气；v1.49.1 移除了 Pass 1 的 `RiverBank` 双层金砂漫滩线，v1.50.3 移除 Pass 2 中心微波流线虚线，v1.50.4 移除 Pass 3 岸线微沫白线与 `river_life.js` 水底卵石层（85 颗深色扁圆石透水面观感呈"一堆深蓝色圆圈"），v1.50.5 移除 Pass 1.5 均匀深沉河床基底填充（`rgba(30,46,56,0.92)` 整片深色底使水体发暗呆板，改由水下地表色 + Pass 2 水面叠加自然成色），v1.50.6 移除 Pass 2 的 B1 深浅水色纵深带（沿中心线铺的深色宽水带在窄河道上观感为一条压在河心的暗色粗线），v1.50.86 删除 Pass 2.8 迎光面太阳波光（用户决策）。`river_life.js` 为纯表现层：种子取自 `_engineSeed`（世界重置/读档随种子重建），走墙钟驱动（模拟暂停时水系动画继续）。详见 [./18-water-rendering.md](./18-water-rendering.md)。
 - **世界实体统一深度排序（★ v1.47.8 房屋 → ★ v1.47.9 全实体）**：Canvas 2D 无深度缓冲，同层元素按数组原序绘制会出现「远物压近物」。`drawWorldEntities()` 每帧把 POI 标记 / 房屋 / 族人按 `project3D().depth`（= `ry·sinX + z·cosX`，数值越大越靠近视点）升序排列后绘制——**远物先画、近物后画**，同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性；排序只作用于绘制队列，不修改 `sim.pois` / `sim.houses` / `sim.agents` 顺序，点击拾取与 Inspector 遍历逻辑不受影响。POI 的贴地底座/营地暖光归入第 3 层地面 pass，因此不会糊在近处建筑上。
@@ -170,7 +168,7 @@ stateDiagram-v2
 - 全局族人均值大盘显示按金币排序、ID 作为并列裁决的最富家户；家户制度大盘不重复展示该指标。
 
 ### 2.15 轻量化渲染优化
-- 地形网格批处理：单次顶点投影 + 静态高度颜色预缓存 + 视口边界裁剪 + 批处理线框渲染。
+- 地形网格批处理：★ v1.60.1 起由 WebGL 地形层批量绘制取代（Canvas 逐格填充与批处理已删除）。
 - 零 Shader 开销光晕：移除 Canvas shadowBlur 与 CSS backdrop-filter，改用双层矢量描边与深色半透明底色。
 - 高分屏 DPR 自动钳制：`Math.min(devicePixelRatio, 1.25)`。
 - DOM 统计节流：顶栏与大盘以 10 FPS 降频更新。
@@ -243,22 +241,21 @@ stateDiagram-v2
 | `rustworld.js` | WASM 桥接层、快照映射、Config 注入、存档桥接、生命周期缓存失效 |
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |
 | `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘 |
-| `render_world.js` | 3D 地形、水系地貌特征、POI 指示环、房屋模型及拍卖标牌、踩踏道路 |
-| `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 统一调度与实体悬浮检测 |
-| `render_shadows.js` | ★ v1.50.46 TA-04-6 装饰贴地投影绘制层：drawAccentShadowGround / drawAccentShadowFor 树/灌木地面图元阴影 |
+| `render_world.js` | 水系地貌特征绘制帮助、POI 指示环、房屋模型及拍卖标牌、踩踏道路（地形已迁 GL 层；保留 lightShadowOffset/shadeHex） |
+| `render_terrain.js` | 'G' 键调试网格线 + 水系特征绘制（drawFeatureItem/drawRiverBand/drawWaterBodyTile；★ v1.60.1 Canvas 地形格/天空/侧壁绘制已删） |
+| `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 统一调度与实体悬浮检测（★ v1.60.1 地形格/侧壁/贴地投影入队已删） |
 | `accent-model.js` | ★ v1.50.23 装饰模型派生与缓存（Tree/Bush/Boulder/RockCluster/GrassTuft + ★ S4-02 景观子图元 'L#' 命名空间通道） |
 | `accent-season.js` | ★ v1.50.23 动态季相颜色派生系统（树叶色彩相位调制与季节过渡） |
-| `render_accents.js` | ★ v1.50.23 装饰立体图元绘制（树木/灌木/岩石/碎石群） |
-| `render_grass.js` | ★ v1.50.39 GrassTuft 丛草独立绘制层 |
+| `render_accents.js` | ★ v1.50.23 装饰立体图元绘制（树木/灌木/岩石/碎石群；★ v1.60.1 sink 硬门槛，零 ctx 引用） |
+| `render_grass.js` | ★ v1.50.39 GrassTuft 丛草独立绘制层（★ v1.60.1 sink 硬门槛） |
 | `landscape-model.js` | ★ S4-02 资源景观模型层（五类 POI 配方、uint32 确定性哈希、极坐标盘采样、双线性高程、丰度单调映射） |
 | `landscape-mask.js` | ★ S4-03 最终世界几何遮罩层（车道贝塞尔采样胶囊带、房屋保守圆、POI 操作区空间分桶避让、字段签名脏桶失效） |
-| `render_landscapes.js` | ★ S4-02 资源景观绘制接入层（子图元与阴影入统一深度队列；★ v1.50.87 GroundPatch 贴地色差片删除，仅立体子图元） |
+| `render_landscapes.js` | ★ S4-02 资源景观绘制接入层（子图元入统一深度队列，阴影由 GL 阴影图承担；★ v1.50.87 GroundPatch 删除） |
 | `label-layout.js` | ★ S4-06/07 世界标注布局与聚合引擎（网格冲突检测、同类房屋编号聚合、双目标强制保留与边缘停靠虚线引线、有限滞回与 DOM 快照缓存） |
-| `terrain-texture.js` | ★ TA-12-2 确定性地表纹样模型层（世界网格分桶草斑土纹图元，缩放旋转不重随机） |
 | `render_agents.js` | 族人渲染、妊娠光环、状态气泡 |
-| `river_life.js` | 水系微观生态纯表现层（★ v1.49.0 / ★ v1.50.86 游鱼迁 WebGL sink + 删波光）：成群游鱼（Canvas + GL 双路），种子联动 `_engineSeed` |
+| `river_life.js` | 水系微观生态纯表现层（★ v1.49.0 / ★ v1.50.86 游鱼迁 WebGL sink + 删波光 / ★ v1.60.1 sink 硬门槛）：成群游鱼，种子联动 `_engineSeed` |
 | `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与智能拾取（优先命中聚合徽标与 LabelLayout 安置标签） |
-| `main.js` | 页面交互、相机控制、快捷键、无头模式 |
+| `main.js` | 页面交互、相机控制、快捷键、无头模式（★ v1.60.1 WebGL 硬门槛：不可用即错误覆盖层阻断启动） |
 | `save-ui.js` | 本地文件与槽位存档/读档系统 |
 | `dag.js` / `dag-*.js` | 直系血脉时间轴族谱四件套（布局/渲染/新标签页/编排） |
 | `ledger-ui.js` | 社会与经济制度大盘 4 标签页（家户/婚姻/宗族/王国），家户页含五类资源均值 |

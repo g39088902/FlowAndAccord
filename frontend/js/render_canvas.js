@@ -46,7 +46,6 @@ const FRAME_INTERVAL = window.FRAME_INTERVAL;
 // ==========================================
 let dbgRenderMs = 0, dbgFrameMs = 0, dbgCurrentFps = 0, dbgHudUpdate = performance.now();
 let dbgLastTick = 0, dbgLastTickSec = performance.now(); // ⚡ 每秒真实 Tick 速率采样基准
-let dbgTerrainRenderedCells = 0; // 🐞 当前帧视口内实际渲染的地形面数 (Quad 格数)
 const dbgElCache = {};
 
 // 预分配地形顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
@@ -56,8 +55,7 @@ let terrainProjY = new Float32Array(3600);
 // Canvas 视口尺寸（每帧在 render() 内更新；全局声明供 render_world/render_agents 等绘制函数共享）
 let w = window.innerWidth, h = window.innerHeight;
 
-// ★ Phase 1-2: WebGL 测试渲染器与地形渲染器
-let webglTestRenderer = null;
+// ★ 全量 WebGL：地形渲染器（装饰层与阴影层随地形同点惰性创建）
 let webglTerrainRenderer = null;
 
 // ==========================================
@@ -183,7 +181,6 @@ function render(now) {
   // 🧠 无头模式: 只推进模拟，跳过全部画布渲染与 DOM 刷新
   if (sim.headless) {
     dbgRenderMs = 0;
-    dbgTerrainRenderedCells = 0;
     if (sim.debugMode) dbgFrameMs += ((performance.now() - frameStart) - dbgFrameMs) * 0.15;
     return;
   }
@@ -208,10 +205,12 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   w = window.innerWidth;
   h = window.innerHeight;
 
-  const shouldUseWebgl = window.fallbackManager?.shouldUseWebgl() ?? window.USE_WEBGL;
+  // ★ 全量 WebGL：唯一渲染路径。WebGL 不可用已由 main.js 硬门槛阻断；GL 层未就绪的帧
+  //   跳过对应绘制（不回退 Canvas），初始化失败同样升级为硬报错覆盖层。
+  const shouldUseWebgl = window.webglContext?.isReady() === true;
   let webglTerrainRendered = false;
 
-  if (shouldUseWebgl && window.webglContext?.isReady()) {
+  if (shouldUseWebgl) {
     if (!webglTerrainRenderer) {
       if (!window.webglManager) {
         window.webglManager = new ShaderManager(window.webglContext.GL);
@@ -220,18 +219,17 @@ if (isCameraFollow && sim.selectionType === 'agent') {
       webglTerrainRenderer.init().then(() => {
         console.log('[WebGL] Phase 2 Terrain Renderer initialized');
       }).catch(e => {
-        console.error('[WebGL] Terrain renderer initialization failed:', e);
+        showWebglGateError('WebGL 地形渲染器初始化失败：' + (e && e.message ? e.message : e));
       });
 
-      // ★ 装饰绘制 WebGL 迁移（v1.50.83 石体 → v1.50.84 花草木）：与地形共用 GL 上下文惰性
-      //   初始化；accentWebglEnabled=false 或 URL ?accentgl=0（兼容 ?stonegl=0）完整回退 Canvas。
+      // ★ 装饰绘制 WebGL 迁移（v1.50.83 石体 → v1.50.84 花草木）：与地形共用 GL 上下文惰性初始化。
       //   WebGLShadowPass 为阴影图层：世界代理几何 → 光向深度图 → 地形采样变暗（替代手绘阴影）。
-      if ((window.RENDER_CONFIG && window.RENDER_CONFIG.accentWebglEnabled !== false) && !window.WebGLAccentLayer) {
+      if (!window.WebGLAccentLayer) {
         window.WebGLAccentLayer = new WebGLAccentRenderer(window.webglContext, window.webglManager);
         window.WebGLAccentLayer.init().then(() => {
           console.log('[WebGL] Accent Renderer initialized');
         }).catch(e => {
-          console.error('[WebGL] Accent renderer initialization failed:', e);
+          showWebglGateError('WebGL 装饰渲染器初始化失败：' + (e && e.message ? e.message : e));
         });
         window.WebGLShadowPass = new WebGLShadowPass(window.webglContext, window.webglManager);
         window.WebGLShadowPass.strength = (window.RENDER_CONFIG && Number.isFinite(window.RENDER_CONFIG.accentWebglShadowStrength))
@@ -239,7 +237,7 @@ if (isCameraFollow && sim.selectionType === 'agent') {
         window.WebGLShadowPass.init().then(() => {
           console.log('[WebGL] Shadow Pass initialized');
         }).catch(e => {
-          console.error('[WebGL] Shadow pass initialization failed:', e);
+          showWebglGateError('WebGL 阴影图层初始化失败：' + (e && e.message ? e.message : e));
         });
       }
     }
@@ -252,50 +250,31 @@ if (isCameraFollow && sim.selectionType === 'agent') {
       webglTerrainRenderer.render(camera, w, h, sim);
       webglTerrainRendered = true;
       dbgRenderMs = 0;
-      dbgTerrainRenderedCells = 0;
     }
   }
 
   window.webglTerrainActive = webglTerrainRendered;
 
-  // ★ v1.50.90 GL→Canvas 转换保险（WebGL 上下文丢失 / shouldUseWebgl 翻转）：GL 接管期间
-  //   relightTerrain 被跳过、cell.color 冻结——回退 Canvas 前强制标脏，回退首帧即重烘焙。
-  if (window._prevWebglTerrainRendered && !webglTerrainRendered && window.SimLighting) {
-    window.SimLighting.markDirty();
-  }
-  window._prevWebglTerrainRendered = webglTerrainRendered;
-
   if (ctx) {
     ctx.clearRect(0, 0, w, h);
 
-    // 0. ★ 动态季节光照：推进光相（含视觉限速器），光档变化时整片重着色地形
-    //    （无头模式已在上方 return，恢复渲染时由 resync 规则立即对齐，见 docs/current/tech/17-seasonal-lighting.md §3.7）
-    //    ★ v1.50.90 第三参 = GL 地形是否接管：接管时 applyRelight 跳过 CPU 逐格烘焙与
-    //    TerrainTexture 色档（shader 顶点受光取代），lightRev 版本号照常推进供 uniform 闸消费。
-    if (window.SimLighting) window.SimLighting.update(now, sim, webglTerrainRendered);
+    // 0. ★ 动态季节光照：推进光相（含视觉限速器）。地形受光由 GL shader 承担，
+    //    lightRev 版本号照常推进供 uniform 闸消费（见 lighting.js applyRelight）。
+    if (window.SimLighting) window.SimLighting.update(now, sim);
 
-    // 1. 天空与地平氛围：未启用 WebGL 地形时由 Canvas 2D 铺满天空；启用 WebGL 时由 WebGL 自带天幕背景
-    if (!webglTerrainRendered) {
-      drawSkyBackdrop();
-    }
-
-    // 2. 地形壳层：计算全网格顶点投影（供路网、水系、实体拾取复用）
+    // 1. 地形壳层：计算全网格顶点投影（供路网、水系、实体拾取复用）
     drawTerrainShell();
 
-    // 3. ★ v1.50.11 世界统一深度队列：
-    //    当 WebGL 接管地形时，depth_queue 跳过地形格，高效绘制上层水系、道路、族人、房屋、POI 等；
-    //    回退模式下则全量由 2D 绘制。
-    //    ★ 装饰绘制 WebGL 迁移：GL 地形活动时，深度队列期间各装饰绘制函数把与 Canvas 逐位
-    //    同源的屏幕空间图元收进 WebGLAccentLayer（sink 分发），队列结束后整批提交 GPU——
+    // 2. ★ 世界统一深度队列：绘制上层水系、道路、族人、房屋、POI 等（地形由 GL 层承担）。
+    //    ★ 装饰绘制：GL 地形活动时，深度队列期间各装饰绘制函数把与 Canvas 逐位同源的
+    //    屏幕空间图元收进 WebGLAccentLayer（sink 分发），队列结束后整批提交 GPU——
     //    同一 GL 帧、不清屏、深度对齐本帧地形；落底阴影由 WebGLShadowPass 阴影图承担。
     if (webglTerrainRendered && window.WebGLAccentLayer) window.WebGLAccentLayer.beginFrame();
     drawWorldEntities();
     if (webglTerrainRendered && window.WebGLAccentLayer) window.WebGLAccentLayer.endFrame(w, h);
 
-    // 4. 地形网格线（调试叠加，'G' 键切换）
-    if (!webglTerrainRendered) {
-      drawTerrainGrid();
-    }
+    // 3. 地形网格线（调试叠加，'G' 键切换；GL 模式下作为 2D 叠层继续可用）
+    drawTerrainGrid();
   }
 
 frameCount++;

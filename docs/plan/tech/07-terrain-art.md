@@ -120,16 +120,16 @@ graph TD
 
 ### 3.2 已落地渲染机制摘要
 
-- **地表着色**：`math.js::computeElevationColor` 唯一实现，快照重建时由 `rustworld.js` 一次算好 `cell.color` 缓存；草/土/岩按坡度 12°/28°/45° 与肥力 smoothstep 连续遮罩。
+- **地表着色**：★ v1.60.1 起受光由 WebGL 地形层顶点 shader 直译（`computeTerrainAlbedo` 反照率 + `nx/ny/nz/ao/albR/G/B` 静态缓存进 `vboShade`）；草/土/岩按坡度 12°/28°/45° 与肥力 smoothstep 连续遮罩（原 `cell.color` CPU 烘焙已删）。
 - **自然道路谱**：线宽随踩踏度 1.2→2.8px，五级色阶（泥径/夯土/石道/石板/通衢），`R` 键热力图模式保留明艳色阶。
 - **三层水系**：深底 `rgba(32,86,122,0.45)` / 主流 `rgba(56,158,202,0.82)` / 波光 `rgba(235,248,255,0.65)`；浅滩卵石踏道 + 浪花斑。
-- **统一深度队列**：`render_canvas.js::render()` 顺序为 `SimLighting.update()` → `drawSkyBackdrop()` → `drawTerrainShell()` → **`drawWorldEntities()`** → 调试网格。队列内图元按 `depth = ry·sinX + z·cosX` 升序绘制，同深度保持收集原序（`Array.sort` 稳定）保确定性；深度项走持久对象池 `_depthPool` 零每帧 GC。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制。**
+- **统一深度队列**：★ v1.60.1 起 `render_canvas.js::render()` 顺序为 `SimLighting.update()` → **WebGL 地形层直绘**（地形/侧壁，shader 受光 + 阴影图）→ **`drawWorldEntities()`**（水系/道路/实体/装饰）→ 调试网格（'G' 键）。2D 队列内图元按 `depth = ry·sinX + z·cosX` 升序绘制，同深度保持收集原序（`Array.sort` 稳定）保确定性；深度项走持久对象池 `_depthPool` 零每帧 GC。**新增世界实体/贴地图元必须挂进同一队列，严禁在 `render()` 里另开整层绘制。**
 - **装饰基础**：`geo/accents.rs::generate_accents()` 独立 RNG 流（`seed ^ 0x4143_4345_4E54_3031`），基数树 40/石 20/灌木 25 × 密度，FABS Section 21 约 24B/个；前端 `render_accents.js::drawAccentEntity` 分种类绘制。
 
 ### 3.3 关键实现入口
 
 - **内核**：[terrain.rs](../../../crates/sim_core/src/geo/terrain.rs) / [hydrology.rs](../../../crates/sim_core/src/geo/hydrology.rs) / [accents.rs](../../../crates/sim_core/src/geo/accents.rs) / [query.rs](../../../crates/sim_core/src/geo/query.rs)（地理事实唯一真相源，`sample_elevation` 仍为最近邻采样）；[terrain_network.rs](../../../crates/sim_core/src/spatial/terrain_network.rs)（走廊合法性与通行代价）。
-- **前端绘制**：[math.js](../../../frontend/js/math.js)（`computeElevationColor`）/ [lighting.js](../../../frontend/js/lighting.js)（`SimLighting` 光源真相）/ [rustworld.js](../../../frontend/js/rustworld.js)（快照接收与 `cell.color` 缓存）/ [render_terrain.js](../../../frontend/js/render_terrain.js)（2D 回退管线，WebGL 模式下地形由 [terrain-renderer.js](../../../frontend/js/webgl/layers/terrain/terrain-renderer.js) 承担）/ [accent-season.js](../../../frontend/js/accent-season.js) / [accent-model.js](../../../frontend/js/accent-model.js) / [accent-lod.js](../../../frontend/js/accent-lod.js)（LOD 唯一口径）/ [render_accents.js](../../../frontend/js/render_accents.js) / [render_world.js](../../../frontend/js/render_world.js)（深度队列）/ [render_canvas.js](../../../frontend/js/render_canvas.js)（帧循环）。
+- **前端绘制**：[math.js](../../../frontend/js/math.js)（`computeTerrainAlbedo`）/ [lighting.js](../../../frontend/js/lighting.js)（`SimLighting` 光源真相）/ [rustworld.js](../../../frontend/js/rustworld.js)（快照接收与反照率静态缓存）/ [render_terrain.js](../../../frontend/js/render_terrain.js)（调试网格与水系绘制；地形由 [terrain-renderer.js](../../../frontend/js/webgl/layers/terrain/terrain-renderer.js) 承担）/ [accent-season.js](../../../frontend/js/accent-season.js) / [accent-model.js](../../../frontend/js/accent-model.js) / [accent-lod.js](../../../frontend/js/accent-lod.js)（LOD 唯一口径）/ [render_accents.js](../../../frontend/js/render_accents.js)（sink 硬门槛进 GL 层）/ [render_world.js](../../../frontend/js/render_world.js)（深度队列）/ [render_canvas.js](../../../frontend/js/render_canvas.js)（帧循环）。
 - **存读档**：[world_save.rs](../../../crates/sim_core/src/spatial/world_save.rs)，`terrain_state` + `water_pools` 直接入档（`SAVE_FORMAT_VERSION = 7`），生成器版本与 `terrain_profile` 作为门禁拒绝旧档。
 
 ## 4. 统一美术规则

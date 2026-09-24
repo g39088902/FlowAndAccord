@@ -901,19 +901,18 @@ render_agents.js        族人绘制                                            
 
 ### 15.2 绘制顺序
 
-当前实际顺序（v1.50.11 起为统一相机深度队列）：
+当前实际顺序（★ v1.60.1 起地形/侧壁由 WebGL 地形层直绘，2D 队列仅存水系/道路/实体/装饰）：
 
 ```text
-1. 背景底色（环境氛围天空/地平线）           drawSkyBackdrop()
-2. 地形壳层（沙盘基底 + 边界侧壁）           drawTerrainShell()
-3. ★ 世界统一深度队列 drawWorldEntities()  按 depth = ry·sinX + z·cosX 升序（远 → 近）
-   ├─ 地形格（drawTerrainCell，深度 = 四角 world 坐标均值）
+0. WebGL 地形层（terrain-renderer.js，sim-canvas-gl）  地形网格 + 沙盘侧壁直绘
+   （shader 直译受光 + GL 阴影图采样；天空清屏由本层承担）
+1. ★ 世界统一深度队列 drawWorldEntities()  按 depth = ry·sinX + z·cosX 升序（远 → 近）
    ├─ 水系特征（drawFeatureItem：River 水面 / ShallowFord）
    ├─ 道路分段（lineDashOffset 按累计弧长保持虚线相位连续）
    ├─ 营地辖区连线、POI 底座（−0.01 ε 垫在自己标记下）
    ├─ POI 标记 / 私产宅舍 / 部落民（立体实体）
-   └─ ★ 装饰实体（WORLD_ENTITY_ACCENT：Bush / Boulder / Tree，v1.50.2 起并入）
-4. 调试网格线（普通视图隐藏，G 键切换）      drawTerrainGrid()
+   └─ ★ 装饰实体（WORLD_ENTITY_ACCENT：Bush / Boulder / Tree，v1.50.2 起并入；sink 硬门槛进 GL 装饰层）
+2. 调试网格线（普通视图隐藏，G 键切换）      drawTerrainGrid()
 ```
 
 > **Tree 绘制位置（★ v1.50.2 已修订，历史设计见下）**：原设计把 Tree 当作「仅 2D 精灵、不参与 `drawWorldEntities()` 深度队列（避免与房屋/族人交互）」，装饰整层在道路之前按 `pos.ry` 排序绘制。该设计在实地观感上暴露两个缺陷：① 装饰层内部按「种类分组 → 数组原序」落笔，远树会压住近树；② 乔木永远被后画的道路与族人覆盖，近景大树被远处小人「穿透」。**v1.50.2 起装饰整体并入 `drawWorldEntities()` 统一深度队列**（`WORLD_ENTITY_ACCENT`），与 POI 标记 / 房屋 / 族人同队列按 `ry·sinX + z·cosX` 升序绘制，近处乔木可正确遮挡远景道路、POI 底座与族人，也仍会被更近的实体正确遮挡。

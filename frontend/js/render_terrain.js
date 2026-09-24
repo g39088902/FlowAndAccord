@@ -1,42 +1,12 @@
-// === 地形与天空氛围绘制（v1.48.0 从 render_world.js 拆出；★ v1.50.11 深度队列化改造） ===
-// 地形壳层（投影 + 沙盘基底/侧壁）/ 单格填充 / 单水系特征 / 天空背景 / 地形网格线
-// 依赖全局: ctx, camera, sim, project3D, getElevationColor, w, h, terrainProjX, terrainProjY, SimLighting
+// === 地形壳层投影 / 地形网格线（调试）/ 水系特征绘制（v1.48.0 从 render_world.js 拆出） ===
+// ★ 全量 WebGL（Canvas 备用通道删除）：地形格/沙盘基底/侧壁/天空全部由
+//   webgl/layers/terrain/terrain-renderer.js 承担；本文件只保留——
+//   ① drawTerrainShell 全网格顶点投影（水系、路网、实体拾取复用）；
+//   ② drawTerrainGrid 'G' 键调试网格线（2D 叠层）；
+//   ③ 水系特征绘制（drawFeatureItem/drawRiverBand/drawWaterBodyTile——水面在 GL 模式
+//     下仍由 2D 统一深度队列绘制，见 render_depth_queue.js DEPTH_FEATURE 段）。
+// 依赖全局: ctx, camera, sim, w, h, terrainProjX, terrainProjY
 // 另消费 window.RENDER_CONFIG（config.render.js，须先加载）。
-//
-// ★ TA-01（v1.50.23）装饰代码已迁出为三文件（docs/plan/tech/07-terrain-art.md §6.7）：
-//   - accent-season.js：window.SimTreeTint（装饰树木季节叶色唯一生产者，2026-09-12 落地的
-//     死分支修复代码原位迁移，此处不再定义）；
-//   - accent-model.js：稳定形态派生 + 个体模型缓存（_accentHash / window.AccentModel）；
-//   - render_accents.js：drawAccentEntity / drawAccentTree / drawAccentBoulder / drawAccentBush
-//     （仍由 render_world.js::drawWorldEntities() 深度队列以 DEPTH_ACCENT 调度）。
-//
-// ★ 动态季节光照（docs/current/tech/17-seasonal-lighting.md）：
-//   地形颜色本身由 SimLighting.relightTerrain() 每光档写回 cell.color（大气色洗亦烘焙于此），本文件只负责绘制。
-//
-// ★ v1.50.11 图层契约变更：drawTerrainCell / drawFeatureItem 是**单实体绘制入口**，
-//   由 render_world.js::drawWorldEntities() 的统一相机深度队列调度（远 → 近），
-//   使近处山地格与河道能正确遮挡远处图标。**严禁**在 render() 里恢复「整层先画地形」的调用，
-//   那会退回「图标透过山体可见」的旧 bug（与 v1.47.8 房屋、v1.50.2 装饰两次历史教训同类）。
-
-// ★ v1.48.1 地形格间抗锯齿缝隙补偿量（屏幕像素）：相邻格共享边各只覆盖约半像素，
-//   不补偿会露出背景色 1px 网格线。0.75px 经像素采样验证可把缝隙残差压到 1/255 以内。
-const TERRAIN_SEAM_PX = 0.75;
-
-// ★ v1.48.2 边界墙（沙盘侧壁）深度排序 → ★ v1.50.14 并入统一深度队列：
-//   v1.48.2 曾按整墙中点 ry 在壳层排序绘制；但 v1.50.11 地形格并入深度队列后，
-//   侧壁仍整墙先行栅格化 → 侧壁永远画在所有队列元素之前，盖不住任何贴边实体
-//   （用户可见症状：「贴边 POI/房屋的底座与图标盖在南侧壁之上，未被遮挡」）。
-//   v1.50.14 起侧壁按**边界格分段**入队（drawBoundaryWallSeg），每段深度 = 该段
-//   上沿两端顶点深度的较大值（较近端）——侧壁是地图边界上最靠近相机的几何，
-//   贴边实体的底座/圆环伸过边界线的部分会被正确盖住；远离边界的实体与侧壁
-//   屏幕区域不相交，不受影响。
-const BOUNDARY_WALL_BASE = '#5A5043'; // 基准色 = v1.47.11 北侧壁色（关闭动态光照时的观感基准）
-const BOUNDARY_WALLS = [
-  { nx: 0, ny: -1, nz: 0, first: 0, step: 1, ry: 0 }, // 北（世界 -y，受光面）
-  { nx: -1, ny: 0, nz: 0, first: 0, step: 1, ry: 0 }, // 西（世界 -x）
-  { nx: 0, ny: 1, nz: 0, first: 0, step: 1, ry: 0 },  // 南（世界 +y，背阴）
-  { nx: 1, ny: 0, nz: 0, first: 0, step: 1, ry: 0 },  // 东（世界 +x）
-];
 
 // 预分配水系与特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
 let _featProjX = new Float32Array(512);
@@ -59,283 +29,37 @@ function _projectFeatureVertices(vertices, count, cx, cy, cosZ, sinZ, cosX, sinX
   }
 }
 
-// ★ v1.50.14 单段边界墙（由 render_world.js 统一深度队列调度）：
-// 画出第 k 段——上沿顶点 k → k+1，折返下垂底沿后闭合填充。下垂参数由
-// drawTerrainShell 每帧暂存（模块级），外法线参与季节光照。
-let _wallSkirtElev = 0;
-let _wallElevDrop = 0;
-function drawBoundaryWallSeg(wd, k) {
-  const cells = sim.terrain.cells;
-  const i0 = wd.first + k * wd.step;
-  const i1 = i0 + wd.step;
-  const drop0 = (cells[i0].elev - _wallSkirtElev) * _wallElevDrop;
-  const drop1 = (cells[i1].elev - _wallSkirtElev) * _wallElevDrop;
-  const L = window.SimLighting;
-  ctx.fillStyle = (L && L.enabled()) ? L.shadeFace(BOUNDARY_WALL_BASE, wd.nx, wd.ny, wd.nz) : BOUNDARY_WALL_BASE;
-  ctx.beginPath();
-  ctx.moveTo(terrainProjX[i0], terrainProjY[i0]);
-  ctx.lineTo(terrainProjX[i1], terrainProjY[i1]);
-  ctx.lineTo(terrainProjX[i1], terrainProjY[i1] + drop1);
-  ctx.lineTo(terrainProjX[i0], terrainProjY[i0] + drop0);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// 天空/地平渐变 + 逆光光晕（光源对侧偏亮，光晕随四季方位绕地平线移动）
-function drawSkyBackdrop() {
-  const L = window.SimLighting;
-  if (!L || !L.enabled()) return;
-  const c = L.cfg();
-  const tint = L.tint();
-  const lightTheme = !!(c.respectLightTheme && document.body && document.body.classList.contains('theme-light'));
-  const mix = lightTheme ? 0.42 : 0;
-
-  const mixCh = (r, g, b) => [
-    Math.round(r * (1 - mix) + 226 * mix),
-    Math.round(g * (1 - mix) + 232 * mix),
-    Math.round(b * (1 - mix) + 240 * mix),
-  ];
-  const [tr, tg, tb] = mixCh(5 * tint[0], 10 * tint[1], 18 * tint[2]);
-  const [hr, hg, hb] = mixCh(30 * tint[0], 37 * tint[1], 50 * tint[2]);
-
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, `rgb(${Math.round(tr)}, ${Math.round(tg)}, ${Math.round(tb)})`);
-  grad.addColorStop(1, `rgb(${Math.round(hr)}, ${Math.round(hg)}, ${Math.round(hb)})`);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
-
-  // 逆光光晕：低日头（隆冬/晨昏）更浓，盛夏更淡
-  const dir = L.sunScreenDir();
-  const gx = w * 0.5 + dir.x * w * 0.55;
-  const gy = h * 0.5 + dir.y * h * 0.55;
-  const rad = Math.max(w, h) * 0.55;
-  const glow = (0.09 + 0.11 * (1 - Math.sin(L.elevationDeg() * Math.PI / 180))) * (1 - mix * 0.6);
-  const gr = Math.round(Math.min(255, 255 * Math.min(1.12, tint[0])));
-  const gg = Math.round(Math.min(255, 214 * Math.min(1.12, tint[1])));
-  const gb = Math.round(Math.min(255, 168 * Math.min(1.12, tint[2])));
-  const glowGrad = ctx.createRadialGradient(gx, gy, 0, gx, gy, rad);
-  glowGrad.addColorStop(0, `rgba(${gr}, ${gg}, ${gb}, ${glow.toFixed(3)})`);
-  glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = glowGrad;
-  ctx.fillRect(0, 0, w, h);
-}
-
-// ★ v1.50.11 大气色洗已烘焙进 lighting.js::relightTerrain() 的地形色：
-//   色洗原本是「贴地图元之后、立体实体之前」的整屏 fillRect，但地形格并入统一深度队列后
-//   实体与地形格交错落笔，整屏矩形会把实体一起洗灰（渲染顺序见 render_world.js::drawWorldEntities）。
-//   烘焙进 cell.color 后观感不变，且省去每帧一次全屏合成。
-
+// 地形壳层：全网格顶点投影（供水系/路网/实体绘制与拾取复用）。
+// 地形面片/侧壁/天空已由 WebGL 地形渲染器承担，此处不再落笔。
 function drawTerrainShell() {
-// ★ v1.50.11 拆分：本函数只保留「全网格顶点投影 + 沙盘基底/侧壁」壳层；
-//   地形格四边形填充迁入 render_world.js 统一深度队列（drawTerrainCell），
-//   使近处山地格能正确遮挡站在山后的远处图标/道路/水系。
-if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
-  const gSize = sim.terrain.gridSize;
-  const totalVertices = gSize * gSize;
-  if (terrainProjX.length !== totalVertices) {
-    terrainProjX = new Float32Array(totalVertices);
-    terrainProjY = new Float32Array(totalVertices);
-  }
+  if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
+    const gSize = sim.terrain.gridSize;
+    const totalVertices = gSize * gSize;
+    if (terrainProjX.length !== totalVertices) {
+      terrainProjX = new Float32Array(totalVertices);
+      terrainProjY = new Float32Array(totalVertices);
+    }
 
-  const cx = w / 2 + camera.panX;
-  const cy = h / 2 + camera.panY;
-  const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
-  const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-  const scale = camera.zoom;
+    const cx = w / 2 + camera.panX;
+    const cy = h / 2 + camera.panY;
+    const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
+    const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
+    const scale = camera.zoom;
 
-  // 单次全网格顶点投影 (3600 次 vs 原 13924 次)
-  for (let i = 0; i < totalVertices; i++) {
-    const c = sim.terrain.cells[i];
-    const rx = c.wx * cosZ - c.wy * sinZ;
-    const ry = c.wx * sinZ + c.wy * cosZ;
-    const y2 = ry * cosX - c.elev * sinX;
-    terrainProjX[i] = cx + rx * scale;
-    terrainProjY[i] = cy + y2 * scale;
-  }
-
-  // 1. 微缩沙盘地景投影与四周厚度剖面 (Diorama Skirt)
-  const minZ = sim.terrain.minZ != null ? sim.terrain.minZ : 0;
-  const skirtElev = minZ - 16;
-  const dropOffset = 8 * scale;
-  const elevDropFactor = sinX * scale;
-
-  // 1.1 沙盘基底下方的柔和地底投影
-  const idxNW = 0;
-  const idxNE = gSize - 1;
-  const idxSE = totalVertices - 1;
-  const idxSW = (gSize - 1) * gSize;
-  const bNW_Y = terrainProjY[idxNW] + (sim.terrain.cells[idxNW].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bNE_Y = terrainProjY[idxNE] + (sim.terrain.cells[idxNE].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bSE_Y = terrainProjY[idxSE] + (sim.terrain.cells[idxSE].elev - skirtElev) * elevDropFactor + dropOffset;
-  const bSW_Y = terrainProjY[idxSW] + (sim.terrain.cells[idxSW].elev - skirtElev) * elevDropFactor + dropOffset;
-
-  if (!window.webglTerrainActive) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
-    ctx.beginPath();
-    ctx.moveTo(terrainProjX[idxNW], bNW_Y);
-    ctx.lineTo(terrainProjX[idxNE], bNE_Y);
-    ctx.lineTo(terrainProjX[idxSE], bSE_Y);
-    ctx.lineTo(terrainProjX[idxSW], bSW_Y);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // ★ v1.50.14 四周边沿垂直剖面侧壁已并入 render_world.js 统一深度队列
-  //    （按边界格分段 drawBoundaryWallSeg，见该文件 DEPTH_WALL 收集段）。
-  //    此处只暂存下垂参数供单段绘制消费。
-  _wallSkirtElev = skirtElev;
-  _wallElevDrop = elevDropFactor;
-  BOUNDARY_WALLS[0].first = 0;          BOUNDARY_WALLS[0].step = 1;     // 北
-  BOUNDARY_WALLS[1].first = 0;          BOUNDARY_WALLS[1].step = gSize; // 西
-  BOUNDARY_WALLS[2].first = (gSize - 1) * gSize; BOUNDARY_WALLS[2].step = 1;     // 南
-  BOUNDARY_WALLS[3].first = gSize - 1;  BOUNDARY_WALLS[3].step = gSize; // 东
-}
-}
-
-// ── 地形网格路径同色合批 (Terrain Path Batching，方案 A) ──
-// 单一职责：将连续、同色的地形网格面片合并到单一 Canvas 路径中，以单次 ctx.fill() 一次性光栅化。
-// 遇非地形实体或颜色变更时自动 flush，零每帧 GC 分配，100% 保持统一深度队列的遮挡关系。
-const TERRAIN_BATCH_MAX = 512;
-let _batchColor = null;
-let _batchCount = 0;
-const _batchI00 = new Int32Array(TERRAIN_BATCH_MAX);
-const _batchI10 = new Int32Array(TERRAIN_BATCH_MAX);
-const _batchI11 = new Int32Array(TERRAIN_BATCH_MAX);
-const _batchI01 = new Int32Array(TERRAIN_BATCH_MAX);
-const _batchP00X = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP00Y = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP10X = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP10Y = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP11X = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP11Y = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP01X = new Float32Array(TERRAIN_BATCH_MAX);
-const _batchP01Y = new Float32Array(TERRAIN_BATCH_MAX);
-
-function flushTerrainBatch() {
-  if (_batchColor === null || _batchCount === 0) return;
-  ctx.fillStyle = _batchColor;
-  ctx.fill();
-  const zoom = camera.zoom;
-  for (let bi = 0; bi < _batchCount; bi++) {
-    drawTerrainTextureForQuad(
-      _batchI00[bi], _batchI10[bi], _batchI11[bi], _batchI01[bi],
-      _batchP00X[bi], _batchP00Y[bi],
-      _batchP10X[bi], _batchP10Y[bi],
-      _batchP11X[bi], _batchP11Y[bi],
-      _batchP01X[bi], _batchP01Y[bi],
-      zoom
-    );
-  }
-  _batchColor = null;
-  _batchCount = 0;
-}
-window.flushTerrainBatch = flushTerrainBatch;
-
-// ★ v1.50.75 地表纹样按格展开（修复 v1.50.71 贪婪合并后「地面纹理脏兮兮」）：
-//   TerrainTexture.drawCell 把 i00 格内 uv∈[0,1]² 的纹样片段双线性映射到传入四角——
-//   合并 quad 只传 i00 一格 → 该格 2~6m 草斑/土纹被拉伸 8×成大黑印、其余格纹样缺失。
-//   修复：1×1 quad 走原单格快路径；合并 quad 展开为逐格 drawCell（每格用自己的四角
-//   投影坐标），纹样位置/密度与未合并时逐位一致；基底 fill 仍按合并 quad 合批
-//   （面数压减收益保留，仅纹样落笔次数回到合并前水平，受 detailFadePx LOD 调制）。
-function drawTerrainTextureForQuad(i00, i10, i11, i01, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom) {
-  const TT = window.TerrainTexture;
-  if (!TT) return;
-  const gSize = sim.terrain.gridSize;
-  const colSpan = i10 - i00;
-  const rowSpan = (i01 - i00) / gSize;
-  if (colSpan === 1 && rowSpan === 1) {
-    TT.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom);
-    return;
-  }
-  // 非轴对齐/退化兜底（不应发生）：按单格画，宁可少画不画错位
-  if (colSpan < 1 || rowSpan < 1 || !Number.isInteger(rowSpan) || (i01 - i00) % gSize !== 0) {
-    TT.drawCell(ctx, i00, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, zoom);
-    return;
-  }
-  const gy0 = Math.floor(i00 / gSize), gx0 = i00 - gy0 * gSize;
-  const TPX = terrainProjX, TPY = terrainProjY;
-  for (let r = 0; r < rowSpan; r++) {
-    const rowBase = (gy0 + r) * gSize;
-    for (let c = 0; c < colSpan; c++) {
-      const j00 = rowBase + gx0 + c;
-      const j10 = j00 + 1, j11 = j00 + gSize + 1, j01 = j00 + gSize;
-      TT.drawCell(ctx, j00, TPX[j00], TPY[j00], TPX[j10], TPY[j10], TPX[j11], TPY[j11], TPX[j01], TPY[j01], zoom);
+    // 单次全网格顶点投影 (3600 次 vs 原 13924 次)
+    for (let i = 0; i < totalVertices; i++) {
+      const c = sim.terrain.cells[i];
+      const rx = c.wx * cosZ - c.wy * sinZ;
+      const ry = c.wx * sinZ + c.wy * cosZ;
+      const y2 = ry * cosX - c.elev * sinX;
+      terrainProjX[i] = cx + rx * scale;
+      terrainProjY[i] = cy + y2 * scale;
     }
   }
 }
 
-// ★ v1.50.11 单个地形格四边形填充（由 render_world.js 统一深度队列调度）。
-// 原 drawTerrain 的「视口裁剪 + 逐格填充」整层循环迁出为单格入口：
-// 地形格与 POI 标记/房屋/族人/装饰同队列按相机深度远 → 近落笔，
-// 近处山地格后落笔即可遮挡站在山后的远处图标（旧整层先画导致图标透山可见）。
-// 视口粗剔除在队列收集阶段完成（同一 20px 余量）。
-function drawTerrainCell(i00, i10, i11, i01) {
-  const p00x = terrainProjX[i00], p00y = terrainProjY[i00];
-  const p10x = terrainProjX[i10], p10y = terrainProjY[i10];
-  const p11x = terrainProjX[i11], p11y = terrainProjY[i11];
-  const p01x = terrainProjX[i01], p01y = terrainProjY[i01];
-
-  const c00 = sim.terrain.cells[i00];
-  const color = c00.color || getElevationColor(c00, sim.terrain.minZ, sim.terrain.maxZ);
-
-  const RC = window.RENDER_CONFIG;
-  const batchingEnabled = !RC || !RC.terrainMeshMerge || RC.terrainMeshMerge.pathBatching !== false;
-
-  if (!batchingEnabled) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-  } else if (color !== _batchColor || _batchCount >= TERRAIN_BATCH_MAX) {
-    flushTerrainBatch();
-    _batchColor = color;
-    ctx.beginPath();
-  }
-
-  // ★ v1.48.1 无缝拼接：相邻格共享边在 Canvas2D 抗锯齿下各自只覆盖约一半像素，
-  //   两者叠加后仍留约 25% 的透光率，深色天空背景便从缝隙里透出 1px 网格线
-  //   （表现为「地形漏出后面的边界线条」）。把四条边各自沿外法线平移 TERRAIN_SEAM_PX，
-  //   使相邻格互相重叠盖住缝隙；沿边方向的分量只让边滑动，不改变覆盖宽度。
-  const mx = (p00x + p10x + p11x + p01x) * 0.25;
-  const my = (p00y + p10y + p11y + p01y) * 0.25;
-  const e0x = p10x - p00x, e0y = p10y - p00y;
-  const e1x = p11x - p10x, e1y = p11y - p10y;
-  const e2x = p01x - p11x, e2y = p01y - p11y;
-  const e3x = p00x - p01x, e3y = p00y - p01y;
-  const l0 = Math.sqrt(e0x * e0x + e0y * e0y) || 1;
-  const l1 = Math.sqrt(e1x * e1x + e1y * e1y) || 1;
-  const l2 = Math.sqrt(e2x * e2x + e2y * e2y) || 1;
-  const l3 = Math.sqrt(e3x * e3x + e3y * e3y) || 1;
-  // 固定旋向法线 (ey, -ex)/l，再用质心方向确定指向"外"侧
-  const sgn = (e0y * ((p00x + p10x) * 0.5 - mx) - e0x * ((p00y + p10y) * 0.5 - my)) > 0 ? 1 : -1;
-  const n0x = sgn * e0y / l0, n0y = -sgn * e0x / l0;
-  const n1x = sgn * e1y / l1, n1y = -sgn * e1x / l1;
-  const n2x = sgn * e2y / l2, n2y = -sgn * e2x / l2;
-  const n3x = sgn * e3y / l3, n3y = -sgn * e3x / l3;
-
-  ctx.moveTo(p00x + (n3x + n0x) * TERRAIN_SEAM_PX, p00y + (n3y + n0y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p10x + (n0x + n1x) * TERRAIN_SEAM_PX, p10y + (n0y + n1y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p11x + (n1x + n2x) * TERRAIN_SEAM_PX, p11y + (n1y + n2y) * TERRAIN_SEAM_PX);
-  ctx.lineTo(p01x + (n2x + n3x) * TERRAIN_SEAM_PX, p01y + (n2y + n3y) * TERRAIN_SEAM_PX);
-  ctx.closePath();
-
-  if (!batchingEnabled) {
-    ctx.fill();
-    drawTerrainTextureForQuad(i00, i10, i11, i01, p00x, p00y, p10x, p10y, p11x, p11y, p01x, p01y, camera.zoom);
-    return;
-  }
-
-  const idx = _batchCount++;
-  _batchI00[idx] = i00;
-  _batchI10[idx] = i10;
-  _batchI11[idx] = i11;
-  _batchI01[idx] = i01;
-  _batchP00X[idx] = p00x; _batchP00Y[idx] = p00y;
-  _batchP10X[idx] = p10x; _batchP10Y[idx] = p10y;
-  _batchP11X[idx] = p11x; _batchP11Y[idx] = p11y;
-  _batchP01X[idx] = p01x; _batchP01Y[idx] = p01y;
-}
-
-// ★ v1.50.11 地形网格线（调试叠加，'G' 键切换）：从 drawTerrain 拆出独立整层。
-//   0.04 极低透明度的调试线条，置于统一深度队列之后绘制，叠加在实体上不可感知。
+// 地形网格线（调试叠加，'G' 键切换）：0.04 极低透明度的调试线条，
+// 置于统一深度队列之后绘制，叠加在实体上不可感知。GL 模式下作为 2D 叠层继续可用。
 function drawTerrainGrid() {
   if (!sim.showTerrain || !sim.showGrid || !sim.terrain || !sim.terrain.cells) return;
   const gSize = sim.terrain.gridSize;
@@ -358,9 +82,9 @@ function drawTerrainGrid() {
   ctx.stroke();
 }
 
-// ★ v1.50.11 单个水系地貌特征绘制（由 render_world.js 统一深度队列调度）。
+// 单个水系地貌特征绘制（由 render_depth_queue.js 统一深度队列调度）。
 // ★ v1.50.20 河流分段绘制：River / RiverBank 的 idx 为段号（整条以「全顶点最大深度」入队
-// 会盖住所有更远的实体，见 render_world.js 收集段注释）；ShallowFord / 其余短特征仍整条绘制。
+// 会盖住所有更远的实体，见 render_depth_queue.js 收集段注释）；ShallowFord / 其余短特征仍整条绘制。
 function drawFeatureItem(feature, idx) {
   if (!feature.vertices || feature.vertices.length < 2) return;
 

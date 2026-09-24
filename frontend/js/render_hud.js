@@ -130,36 +130,18 @@ function updateDebugHud(now) {
 
   dbgSetText('dbg-tick', s.tick.toLocaleString('en-US'));
   dbgSetText('dbg-tick-rate', Math.round(tickRate).toLocaleString('en-US') + ' tick/s');
-  // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格 / 渲染总面数）
+  // ★ S7-09：地形参数（resolved profile / 生成器版本 / 网格规格）
   const terr0 = sim.terrain || {};
   dbgSetText('dbg-map-profile', terr0.profile || '—');
   dbgSetText('dbg-terrain-gen', (terr0.profile ? `v${terr0.generatorVersion ?? '?'} · ${terr0.gridSize ?? '?'}²` : '—'));
-  const gSize0 = terr0.gridSize || 0;
-  const hasTerrData = !!(terr0.cells && terr0.cells.length >= gSize0 * gSize0 && gSize0 > 1);
-  const totalOriginalFaces = hasTerrData ? (gSize0 - 1) * (gSize0 - 1) : 0;
-  const mergedMesh = terr0.mergedMesh || (window.TerrainMeshMerge ? window.TerrainMeshMerge.build(terr0, window.RENDER_CONFIG ? window.RENDER_CONFIG.terrainMeshMerge : null) : null);
-  const totalFaces = (mergedMesh && mergedMesh.totalMerged) ? mergedMesh.totalMerged : totalOriginalFaces;
-  if (totalFaces > 0) {
-    const renderedFaces = (sim.showTerrain && !sim.headless) ? dbgTerrainRenderedCells : 0;
-    dbgSetText('dbg-terrain-faces', `${renderedFaces.toLocaleString('en-US')} / ${totalFaces.toLocaleString('en-US')}`);
-    const facesEl = dbgEl('dbg-terrain-faces');
-    if (facesEl) {
-      if (mergedMesh && mergedMesh.totalMerged && mergedMesh.totalOriginal > mergedMesh.totalMerged) {
-        facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 合并后总面数：${totalFaces.toLocaleString('en-US')} 面 (原始 ${mergedMesh.totalOriginal.toLocaleString('en-US')} 面，压减 ${mergedMesh.ratio}%)`;
-      } else {
-        facesEl.title = `当前视口渲染：${renderedFaces.toLocaleString('en-US')} 面 · 全地图网格总面数：${totalFaces.toLocaleString('en-US')} 面 (${gSize0 - 1}×${gSize0 - 1} Quads)`;
-      }
-    }
-  } else {
-    dbgSetText('dbg-terrain-faces', '—');
-  }
+  // ★ 全量 WebGL：dbg-terrain-faces 读数已删除——地形格由 GL 层渲染，
+  //   原 greedy-merge 面数统计与 dbgTerrainRenderedCells 计数通道一并移除。
   dbgSetText('dbg-royal-privy', ((sim.totalRoyalPrivy || 0).toFixed(1)) + ' 单位');
   dbgSetText('dbg-fps', String(Math.round(dbgCurrentFps)));
   dbgSetText('dbg-tick-ms', s.tickMs.toFixed(2) + ' ms');
   dbgSetText('dbg-snap-ms', s.snapMs.toFixed(2) + ' ms');
-  // ★ 动态季节光照：整片重着色耗时 + 光相/光档（验收取证用）
+  // ★ 动态季节光照：光相/光档（验收取证用；重着色耗时读数随 CPU relight 通道删除）
   if (window.SimLighting) {
-    dbgSetText('dbg-light-ms', SimLighting.lastMs().toFixed(2) + ' ms');
     dbgSetText('dbg-light-phase', `u=${SimLighting.phase().toFixed(3)} · 档 ${SimLighting.stamp()}`);
   }
   dbgSetText('dbg-frame-ms', dbgFrameMs.toFixed(2) + ' ms');

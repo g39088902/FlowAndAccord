@@ -1,7 +1,7 @@
 # Flow & Accord · Canvas 2D → WebGL 迁移方案 (Phased Migration Plan)
 
-> **文档状态**: ★ **目标形态已定**（2026-09-17）：**全量 WebGL 渲染，不再使用 Canvas 2D**——阶段三~五（装饰层 / 实体层 / Canvas 2D 退役）由「未实施」转为**既定路线**。阶段一/二已落地 (v1.50.77 双 Canvas 架构上线：地形由 `frontend/js/webgl/` 绘制于底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限)，双 Canvas 为**过渡形态**。 | **创建日期**: 2026-09-17 | **影响范围**: 前端渲染层
-> **修订历史**: v1.0 - 初始版本，细化阶段一 (基础框架) 与阶段二 (地形层迁移)；v2.0 (2026-09-17) - 架构决策落定：全量 WebGL 为目标形态，补充阶段三~五正式方案，取消 2D 回退为长期能力，TA-08 覆盖层近似策略作废；v2.1 (2026-09-17) TA-08 任务删除并视为完成，其 §2 验收矩阵并入本文 §8.5
+> **文档状态**: ★ **目标形态已定**（2026-09-17）：**全量 WebGL 渲染，不再使用 Canvas 2D**——阶段三~五（装饰层 / 实体层 / Canvas 2D 退役）由「未实施」转为**既定路线**。阶段一/二已落地 (v1.50.77 双 Canvas 架构上线：地形由 `frontend/js/webgl/` 绘制于底层 `sim-canvas-gl`，实体/装饰仍在 Canvas 2D 覆盖层 `sim-canvas`；v1.50.80~82 帧率解限)，双 Canvas 为**过渡形态**。★ **v1.60.1（2026-09-24）部分提前落地**：地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除，WebGL 成为**硬门槛**（不可用即错误覆盖层阻断启动），详见 [§1.3](#13--2026-09-24-部分提前落地v1601地形光照装饰阴影-canvas-备用通道删除)。 | **创建日期**: 2026-09-17 | **影响范围**: 前端渲染层
+> **修订历史**: v1.0 - 初始版本，细化阶段一 (基础框架) 与阶段二 (地形层迁移)；v2.0 (2026-09-17) - 架构决策落定：全量 WebGL 为目标形态，补充阶段三~五正式方案，取消 2D 回退为长期能力，TA-08 覆盖层近似策略作废；v2.1 (2026-09-17) TA-08 任务删除并视为完成，其 §2 验收矩阵并入本文 §8.5；v2.2 (2026-09-24) - **v1.60.1 部分提前落地**：删 6 文件 + WebGL 硬门槛 + 装饰 sink 无 Canvas 分支，记录于 §1.3
 > **落地口径**: 阶段一/二的实现以 [frontend/AGENTS.md](../../../frontend/AGENTS.md) 与 `docs/current/` 现状文档为准（实际文件结构较本文示例有出入）；阶段三~五为在办方案，实施后须同步刷新 `docs/current/`。统一地形场和体素后端的生产契约见根目录 [TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md)，本文件只规定 WebGL 消费 chunk mesh、语义字段和深度缓冲的方式。
 
 ---
@@ -88,6 +88,36 @@ function project3D({x, y, z}) {
 let terrainProjX = new Float32Array(3600);
 let terrainProjY = new Float32Array(3600);
 ```
+
+### 1.3 ★ 2026-09-24 部分提前落地（v1.60.1）：地形/光照/装饰/阴影 Canvas 备用通道删除
+
+> 本节为**现状记录**（v1.60.1，refactor · 表现层，不改生成结果与存档格式，存档兼容线 v1.60 未变、旧档可用）。阶段三~五的总体方案（§8）仍为路线依据，以下内容已提前成为事实。
+
+**① WebGL 成为硬门槛**：WebGL 不可用时 `main.js` 显示错误覆盖层并**阻断启动**；`?webgl=0` / `RENDER_CONFIG.useWebgl` / `?accentgl=0` / `?stonegl=0` 等 Canvas 回退开关全部删除。
+
+**② 已删除的文件（6 个）**：
+
+| 文件 | 原职责 | 删除理由 |
+|---|---|---|
+| `frontend/js/terrain-texture.js` | TA-12 地表纹样模型层（`window.TerrainTexture`） | 仅 Canvas 地形格消费 |
+| `frontend/js/terrain-mesh-merge.js` | 地形共面网格贪婪合并 | 仅 Canvas 地形格 / HUD 面数读数消费 |
+| `frontend/js/render_shadows.js` | Canvas 手绘贴地投影（`drawAccentShadowGround`） | GL 阴影图（shadow-pass.js）已全覆盖 |
+| `frontend/js/webgl/fallback-handler.js` | WebGL → Canvas 2D 回退管理器 | 回退通道随硬门槛删除（§8.3 该项提前完成） |
+| `frontend/js/webgl/render-canvas-patch.js` | Phase 1 PoC 双管线分发补丁 | 本就未加载 |
+| `frontend/js/webgl/layers/terrain/test-grid.js` | Phase 1 测试网格渲染器 | PoC 遗留 |
+
+**③ 随通道删除的行为/函数**：
+
+- `render_terrain.js`：`drawTerrainCell` / `flushTerrainBatch` / `drawTerrainTextureForQuad` / `drawSkyBackdrop` / `drawBoundaryWallSeg` 删除；仅保留 `drawTerrainShell`（纯顶点投影，无落笔）、`drawTerrainGrid`（'G' 键调试网格线，GL 模式下仍可用）与**水系绘制**（`drawFeatureItem` / `drawRiverBand` / `drawWaterBodyTile`——水系仍走 2D 深度队列）。
+- `render_depth_queue.js`：地形格/侧壁/贴地投影的入队与分发删除（`DEPTH_CELL` / `DEPTH_WALL` / `DEPTH_ACCENT_SHADOW` / `DEPTH_LANDSCAPE_SHADOW` 常量删除）；水系/游鱼/道路/POI/房屋/装饰/族人照旧。
+- `lighting.js`：`relightTerrain` / `shadeAlbedoInto` / `lastMs` / `relightCount` 删除；`applyRelight` 只推进 `lightRev`；`update(now, sim)` 恢复两参；`lightParams` / `shadeFace` / `shadeRgbInto` / `markDirty` / `resync` 保留（`lightParams` 被 terrain-renderer.js GL uniform 上传消费）。
+- `rustworld.js`：`cell.color` 写入与 TerrainTexture/TerrainMeshMerge 失效钩子删除；`nx/ny/nz/ao/albR/G/B` 反照率缓存保留（GL 消费）。
+- `render_accents.js` / `render_bush.js` / `render_grass.js` / `river_life.js`：**sink 硬门槛**——GL 层未就绪的帧整只跳过绘制，Canvas else 分支与接触影全删，文件内零 `ctx` 引用。
+- `render_landscapes.js`：景观贴地投影入队与 `drawLandscapeShadowGround` 删除。
+- `config.render.js`：`useWebgl` / `accentWebglEnabled` / terrainTexture 组 / terrainMeshMerge 组 / `accentShadow*` 4 键 / `accentRockClusterShadowAlpha` / `accentRockClusterStoneShadowAlpha` 删除；保留 `webglDebug` / `accentWebglShadowStrength`。
+- `index.html`：上述 5 个 script 标签（terrain-texture / terrain-mesh-merge / render_shadows / fallback-handler / test-grid）与 `dbg-terrain-faces` / `dbg-light-ms` 调试行删除；'G' 键调试网格保留。
+
+**④ 遗留 2D 覆盖层边界（阶段四~五仍未迁移）**：道路 / POI / 房屋 / 族人 / 标签 / 水系面仍在 `#sim-canvas` 2D 覆盖层（统一深度队列）；GL 阴影接收面仅 GL 地形（2D 实体自身不接收阴影）；`#sim-canvas` 画布与 2D 深度队列（批次提交 + 透明排序职责）继续存在，退役判据见 §8.3。
 
 ---
 
@@ -1480,9 +1510,9 @@ jobs:
 | 对象 | 处置 |
 |---|---|
 | `#sim-canvas` 2D 覆盖层画布 | **删除**；`index.html`/`style.css`/`map.html` 同步 |
-| `frontend/js/webgl/fallback-handler.js` 的 2D 回退分支 | **删除**；WebGL 不可用时给出明确不支持提示（不做降级，见 §9.2） |
-| `render_terrain.js` / `render_world.js` / `render_depth_queue.js` 的 Canvas 2D 绘制路径 | **删除**；仅保留 WebGL 提交路径 |
-| `render_accents.js` / `render_bush.js` / `render_grass.js` / `render_landscapes.js` / `render_shadows.js` / `render_agents.js` 的 `ctx` 绘制实现 | **删除**，由对应 GPU 渲染模块替代 |
+| `frontend/js/webgl/fallback-handler.js` 的 2D 回退分支 | **删除**；WebGL 不可用时给出明确不支持提示（不做降级，见 §9.2）——★ v1.60.1 已提前执行：整文件删除 + `main.js` 错误覆盖层硬门槛 |
+| `render_terrain.js` / `render_world.js` / `render_depth_queue.js` 的 Canvas 2D 绘制路径 | **删除**；仅保留 WebGL 提交路径——★ v1.60.1 部分提前执行：地形格/侧壁/贴地投影与 `drawSkyBackdrop`/`drawBoundaryWallSeg` 已删（道路/实体 Canvas 路径仍在） |
+| `render_accents.js` / `render_bush.js` / `render_grass.js` / `render_landscapes.js` / `render_shadows.js` / `render_agents.js` 的 `ctx` 绘制实现 | **删除**，由对应 GPU 渲染模块替代——★ v1.60.1 部分提前执行：前四个文件已零 `ctx` 引用（sink 硬门槛）且 `render_shadows.js` 整文件删除（阴影由 shadow-pass.js 承担），`render_agents.js` 仍 2D |
 | `math.js::project3D` 等 CPU 投影 | 保留（拾取/标签/AABB 剔除仍需要屏幕坐标） |
 | `frontend/AGENTS.md`、`docs/current/tech/16`/`21`/`31` | **必须同步**：文件清单、加载顺序、DOM ID 共享契约、双 Canvas 描述 |
 | `tools/frontend-check.js` / `code-map-check.js` | 门禁基线同步（DOM ID 与文件登记删除项） |

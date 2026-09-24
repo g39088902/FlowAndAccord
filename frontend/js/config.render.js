@@ -11,12 +11,7 @@
  * ============================================================================
  */
 window.RENDER_CONFIG = {
-  // —— WebGL 渲染（★ Phase 1-2: Canvas 2D → WebGL 迁移）——
-  useWebgl: (() => {
-    // 默认开启，可通过 URL 参数覆盖
-    const params = new URLSearchParams(window.location.search);
-    return params.get('webgl') !== '0';
-  })(),
+  // —— WebGL 渲染（★ 全量 WebGL：Canvas 备用通道已删除，WebGL 不可用由 main.js 硬门槛报错）——
 
   // —— 渲染帧率上限（★ v1.50.82 从 render_canvas.js 硬编码 TARGET_FPS=30 抽出）——
   // 语义：绘制帧的**目标上限**；仿真推进完全由 Worker 独立线程按 speedMult 驱动，
@@ -202,32 +197,17 @@ window.RENDER_CONFIG = {
   accentRockClusterDebrisRadiusVar: 1.3,  // 伴生碎石半径随机幅度（1.1~2.4m）
   accentRockClusterLODMinRadius: 0.6,     // 远景微碎石省略阈值（屏幕半径 px）
   accentGrassTuftLODMinPx: 1.4,           // ★ S7-03 远景草丛整丛省略阈值（草叶屏幕长度 px；高密草甸批量绘制耗时平稳）
-  accentRockClusterShadowAlpha: 0.14,     // 簇群整片微接触落底阴影透明度（TA-11-5，rgba(25,20,15,α)）
-  accentRockClusterStoneShadowAlpha: 0.10,// 逐石接触椭圆阴影透明度（TA-11-5，主石自动 +0.02）
 
   // —— 岩石立体受光几何（TA-04-5，render_accents.js::drawStoneBody 消费；Boulder 与 RockCluster 子石共用）——
   // 棱柱轮廓随相机投影（billboard 移除），亮暗由世界光向点积决定（不固定「顶亮侧暗」）。
   accentStoneHeightK: 0.30,               // 石体高宽比：石高 = K × 石半径（侧面带高随相机 sinX 投影）
 
-  // —— 装饰绘制 WebGL 迁移（★ accent-renderer.js + shadow-pass.js；Canvas 2D → WebGL 阶段三装饰切片）——
-  // GL 地形活动时 Boulder/RockCluster/Tree/Bush/GrassTuft（含资源景观子图元与花朵/春芽）
-  // 改由 WebGLAccentRenderer 绘制：几何/配色与 Canvas 路径单一同源（sink 分发，受光公式零复制），
-  // 逐三角形解析 AA 对齐 Canvas 抗锯齿；落底阴影不再手绘（v1.50.83 Boulder 落底影与
-  // Canvas 手绘贴地影在 GL 模式下一律省略），统一由 WebGLShadowPass 阴影图（世界空间代理
-  // 几何 → 光向深度 → 地形采样变暗）承担。关闭即完整回退 Canvas 现状路径（A/B 用）。
-  accentWebglEnabled: (() => {            // 总开关（URL ?accentgl=0 优先，?stonegl=0 兼容别名；纯前端开关）
-    const params = new URLSearchParams(window.location.search);
-    return params.get('accentgl') !== '0' && params.get('stonegl') !== '0';
-  })(),
+  // —— 装饰绘制 WebGL 迁移（★ accent-renderer.js + shadow-pass.js；全量 WebGL 唯一路径）——
+  // Boulder/RockCluster/Tree/Bush/GrassTuft（含资源景观子图元与花朵/春芽）由
+  // WebGLAccentRenderer 绘制：几何/配色与原 Canvas 单一同源（sink 分发，受光公式零复制），
+  // 逐三角形解析 AA；落底阴影统一由 WebGLShadowPass 阴影图（世界空间代理几何 →
+  // 光向深度 → 地形采样变暗）承担。Canvas 备用通道已删除（GL 未就绪帧跳过绘制）。
   accentWebglShadowStrength: 0.38,        // 阴影内地形变暗比例（0 = 关阴影；约 0.3~0.5 观感自然）
-
-  // —— 树/灌木贴地投影（TA-04-6，render_shadows.js::drawAccentShadowGround 消费）——
-  // 阴影为地面图元独立入统一深度队列（入队/分发归 render_depth_queue.js）；影长由模型实高
-  // （trunkH × accent.scale，不含 zoom）经世界光向 shadowOffset 驱动，叶量调制覆盖与强度。
-  accentShadowAlpha: 0.17,                // 冠影峰值不透明度（夏季完整冠影；随叶量 0.30+0.70×leaf 衰减）
-  accentShadowGroundAlpha: 0.12,          // 接地弱影不透明度（贴树根，冬季仍存）
-  accentShadowBranchAlpha: 0.10,          // 稀疏枝影峰值不透明度（α ∝ 1−leaf，冬季为主）
-  accentShadowMinPx: 2.5,                 // 冠屏半径低于此整组省略阴影（远景亚像素噪声）
 
   accentGrassTuftMinBlades: 3,            // 草叶最少叶数
   accentGrassTuftMaxBlades: 6,            // 草叶最多叶数
@@ -265,29 +245,6 @@ window.RENDER_CONFIG = {
   accentCrownLitRyK: 0.42,    // 亮部椭圆纵半径相对簇半径的比例
   accentCrownLitAlpha: 0.16,  // 亮部峰值不透明度（弱于旧 0.20 小白斑，宽而弱）
   accentCrownLitMinPx: 2.2,   // 簇屏幕半径低于此省略亮部（远景亚像素噪声）
-
-  // —— 世界坐标锁定地表纹理（★ TA-12-2，TA-12-TODO §3/§5；terrain-texture.js 消费）——
-  // CPU 确定性派生小型世界空间图元（草斑/土纹）：固定整数哈希 + 独立属性通道 + 世界桶候选，
-  // 位置/形状/方向固定在世界空间，缩放/旋转/暂停/刷新/存读档不重新抽样（首期不依赖 _engineSeed）。
-  // 纯渲染配置，不进 SIM_CONFIG、不经 applyConfig 注入 WASM；所有数字须有真实消费点（§5.3）。
-  terrainTexture: {
-    enabled: true,             // 总开关（false = 不构建模型、不绘制；纯前端开关）
-    styleVersion: 1,           // 纹样派生算法版本（哈希输入之一；调值整体换纹样并重建）
-    bucketSizeWorld: 12,       // 世界桶边长（世界单位）
-    grassCandidates: 3,        // 每桶草斑候选上限（非保证密度，经低频密度场 × 材质权重筛选）
-    soilCandidates: 2,         // 每桶土纹候选上限
-    grassSizeRange: [2, 6],    // 草斑直径区间（世界单位）
-    soilLengthRange: [1, 3],   // 土纹长度区间（世界单位）
-    soilWidthRange: [0.2, 0.5],// 土纹宽度区间（世界单位；禁止屏幕固定宽度）
-    contrast: 0.04,            // 明度扰动基准幅度（相对原反照率等比例，§4.1 建议 3%~5%）
-    contrastMax: 0.08,         // 明度扰动上限（§4.1 上限 8%）
-    cacheMaxBytes: 8388608,    // 模型缓存上限 8 MiB（超出按候选数等比例确定性截断）
-    buildBudgetMs: 2,          // 分批构建每帧预算（未就绪格 TA-12-3 只画原基底）
-    // ★ TA-12-3 LOD：特征尺度 = 图元特征尺寸(世界单位) × camera.zoom(世界→CSS 像素)，
-    //   在 [2,5] CSS px 区间 smoothstep 淡入（远景隐去细土纹、草斑平滑减弱，§4.2）；
-    //   只作用于绘制透明度，不改变纹样身份 → 不触发模型重建。
-    detailFadePx: [2, 5],
-  },
 
   // —— 资源景观（★ S4-02，STAGE-04-TODO §3.2；landscape-model.js / render_landscapes.js 消费）——
   // 围绕资源 POI 的前端确定性派生景观：模型只由世界 seed / POI 类型与坐标 / 静态地形 /
@@ -357,20 +314,10 @@ window.RENDER_CONFIG = {
   labelHysteresisPx: 4,           // 有限布局滞回裕量（CSS px；消除缓慢平移时的临界跳位抖动）
   labelLeaderLineEnabled: true,   // 边缘兜底引线开关（绘制从实体到边缘提示区的引线）
 
-  // —— 地形共面网格贪婪合并 (Terrain Quad Meshing) ——
-  terrainMeshMerge: {
-    enabled: true,          // 是否开启近似方向/共面四边形合并
-    maxSpan: 8,             // 合并矩形单边最大网格跨度 (建议 4~8 格，防深度穿插)
-    normalAngleDeg: 2.0,    // 法线方向近似角差容差 (度，cosθ >= cos(2°))
-    planeElevTol: 0.5,      // 平面共面高程容差 (米)
-    sameSurfaceKind: true,  // 严格限制同材质类型 (草地/岩壁/浅滩等不跨类合并)
-    pathBatching: true,     // 方案 A：地形同色路径合批 (连续同色单元合并至单次 fill)
-  },
-
-  // —— 地表反照率数据层平滑（★ v1.50.74 地表贴图插值；math.js::smoothAlbedoField 消费）——
+  // —— 地表反照率数据层平滑（★ v1.50.74；math.js::smoothAlbedoField 消费）——
   // 世界建缓存时对 albR/G/B 做边缘感知盒式模糊（半径 r 格）：陆地格间硬色阶变连续
   // 渐变；水格（DeepWater/ShallowWater）作屏障不混色，水陆边界无晕圈。
-  // 建缓存一次性消费（~几 ms），每帧零成本；relightTerrain 与 TerrainTexture 色档自动拾取。
+  // 建缓存一次性消费（~几 ms），每帧零成本；平滑后场由 GL 地形渲染器消费。
   // ⚠️ 改值需重开世界/刷新页面生效（不随帧重建）；0 = 关（回退原始逐格色场）。
   terrainAlbedoSmoothRadius: 2,
 };

@@ -4,21 +4,17 @@
     const ctx = canvas.getContext('2d');
     window.ctx = ctx;
     
-    // ★ Phase 1-2: WebGL 迁移 - 检查配置并在独立底图画布上初始化上下文
-    window.USE_WEBGL = window.RENDER_CONFIG?.useWebgl !== false;
-    if (window.USE_WEBGL && glCanvas) {
+    // ★ 全量 WebGL（渲染架构决策 2026-09-17 + Canvas 备用通道删除）：地形/光照/装饰/阴影
+    //   只存在 GL 路径。WebGL 不可用属硬门槛——阻断启动并显示错误覆盖层，不再回退 Canvas 2D。
+    if (!glCanvas) {
+      showWebglGateError('缺少 #sim-canvas-gl 画布，无法初始化 WebGL 渲染管线。');
+    } else {
       window.webglContext = new WebGLContext(glCanvas);
-      
       if (!window.webglContext.isReady()) {
-        console.warn('[WebGL] Hardware acceleration not available, falling back to Canvas 2D');
-        window.USE_WEBGL = false;
-        glCanvas.style.display = 'none';
+        showWebglGateError('当前浏览器不支持 WebGL 硬件加速，无法渲染世界。请改用支持 WebGL 的现代浏览器（Chrome / Edge / Firefox / Safari）。');
       } else {
         console.log('[WebGL] Initialized:', window.webglContext.version, 'on', window.webglContext.vendor);
-        window.fallbackManager = new RenderFallbackManager();
       }
-    } else if (glCanvas) {
-      glCanvas.style.display = 'none';
     }
     
     const sim = new RustWorld();
@@ -124,11 +120,25 @@
       return { x: cx + rx * scale, y: cy + y2 * scale, depth: z2 };
     }
 
-    function getElevationColor(cell, minZ, maxZ) {
-      if (typeof computeElevationColor === 'function') {
-        return computeElevationColor(cell, minZ, maxZ);
-      }
-      return 'rgb(110, 132, 86)';
+    // WebGL 硬门槛错误覆盖层：阻断启动，提示更换浏览器（全量 WebGL 架构下无 Canvas 回退）
+    function showWebglGateError(message) {
+      const overlay = document.createElement('div');
+      overlay.id = 'webgl-gate-error';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;gap:12px;background:#0b0f14;color:#e2e8f0;' +
+        'font:15px/1.6 system-ui,sans-serif;text-align:center;padding:24px;';
+      const title = document.createElement('div');
+      title.textContent = '⚠ 无法初始化 WebGL 渲染管线';
+      title.style.cssText = 'font-size:20px;font-weight:600;';
+      const desc = document.createElement('div');
+      desc.textContent = message;
+      desc.style.cssText = 'max-width:520px;opacity:0.85;';
+      overlay.appendChild(title);
+      overlay.appendChild(desc);
+      document.body.appendChild(overlay);
+      // 后续初始化继续进行会因缺少渲染而白屏，这里中止脚本进一步执行无意义——
+      // 保留 DOM 覆盖层即可，渲染循环照常空转但画面被覆盖层遮挡。
+      throw new Error('[WebGL] ' + message);
     }
 
 

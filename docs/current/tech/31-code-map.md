@@ -114,11 +114,10 @@ FlowAndAccord/
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── config.poi-rates.js             # POI 产速本地偏好 (localStorage 倍率，world_create 前读取，可复现演化)
-│   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG；★ TA-12 terrainTexture 配置组 12 键含 detailFadePx LOD 淡入区间)
+│   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG；★ v1.60.1 删 useWebgl/accentWebglEnabled/terrainTexture 组/terrainMeshMerge 组/accentShadow* 4 键/接触阴影 2 键，保留 webglDebug/accentWebglShadowStrength)
 │   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
-│   │   ├── terrain-texture.js              # ★ TA-12 世界坐标锁定地表纹理模型层 (window.TerrainTexture：固定整数哈希/独立属性通道/世界桶候选/草斑土纹图元/材质筛选/有界缓存与分批构建；★ TA-12-3 clipToRect/buildFragments 跨格预裁剪 + drawCell 四角双线性贴面投影；★ TA-12-4 refreshPalette 共用受光色档；★ TA-12-5 invalidate 生命周期；★ TA-12-7 _lodFade live LOD 热调修复)
 │   │   ├── terrain-style.js                # ★ TB-03-11 景观风格样式表 (window.TerrainStyle：profile→基调白名单/世界 seed 固定盐选型/逐 SurfaceKind 反照率乘色；纯表现层)
-│   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/地形重着色/面光照/世界空间阴影；★ TA-12-4 lightParams/shadeAlbedoInto 共用受光步骤 + 批次末尾通知 TerrainTexture.refreshPalette)
+│   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/面光照/世界空间阴影；★ v1.50.90 GL shader 直译受光 + lightRev uniform 节流；★ v1.60.1 relightTerrain/shadeAlbedoInto CPU 烘焙删除，applyRelight 只推进 lightRev)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
 │   │   ├── decision-viz.js                 # 决策可视化窗口控制器与状态桥接
@@ -132,40 +131,42 @@ FlowAndAccord/
 │   │   ├── dag-view.js                     # 族谱虚拟化渲染 + LOD + pan/zoom + 刻度尺
 │   │   ├── dag-standalone.js               # 族谱独立新标签页 HTML 模板
 │   │   ├── dag.js                          # 族谱数据构建 + 模态编排 + Inspector
-│   │   ├── main.js                         # 页面交互、控制台、事件绑定、相机控制
+│   │   ├── main.js                         # 页面交互、控制台、事件绑定、相机控制（★ v1.60.1 WebGL 硬门槛：不可用即错误覆盖层阻断启动）
 │   │   ├── map-view.js                     # ★ v1.50.0 地图图鉴独立页控制器 (只读嵌入正式渲染管线，无模拟/无存档)
 │   │   ├── ledger-ui.js                    # ★ 社会与经济制度大盘 4 标签页 (家户/婚姻/宗族/王国)
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (★ v1.50.82 帧率上限可配置，默认 60 FPS，可解除门控)
-│   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (成群游鱼，★ v1.50.86 Canvas + WebGL sink 双路并删除太阳波光，纯表现层，随种子确定性重建)
+│   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (成群游鱼，★ v1.50.86 GL sink 分发、★ v1.60.1 sink 硬门槛未就绪帧整只跳过，纯表现层，随种子确定性重建)
 │   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出；★ TA-06-2 删除 tint() 三档兼容接口，profile 由 model.profile 单一入口送入)
 │   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道；★ TA-06 物种派生 speciesOf（三乔木轮廓 broad/sparse/conifer + 三灌木变体 multiStem/flowering/lowEvergreen + 花灌木固定花位），骨架输出 crownR/trunkH/footprintR/crownSquash 为唯一几何真相源；★ TA-07-3 真值包围体 bounds{rH,zMin,zMax,yUp,rS} + 分级几何 farClusters/segTier/stoneMain，extent 由 bounds 派生)
 │   │   ├── accent-lod.js                  # ★ TA-07-2 装饰细节分级 LOD 集中解析层 (window.AccentLOD：特征尺度 CSS px / 三档判档 + 阈值带滞回 tierOf·tierFor(_lodT) / kindBounds 一级保守常数 / aabbOf 解析式屏幕 AABB（yUp 石体贴地 + rS 球体不乘 cosX）/ shadowAabb 冠影+影梢并集 / leanShear 单一来源 / stats dev 计数器；六处消费点唯一口径入口)
 │   │   ├── landscape-model.js              # ★ S4-02 资源景观模型层 (window.LandscapeModel：配方/slot/固定 uint32 哈希/极坐标候选/双线性高程/组缓存，静态输入派生，世界事件 resetCache；★ S4-03 version() 组几何版本号；stockRole detail/qThreshold + childActive（foliage 可采细节 q 显隐）；★ v1.50.87 GroundPatch 贴地色差片/坡度拒绝/点簇预计算整体删除，配方 v4)
 │   │   ├── landscape-mask.js               # ★ S4-03 景观遮罩层 (window.LandscapeMask：道路胶囊带/房屋/POI 保护区 + 世界网格分桶 + 字段签名脏桶失效 + 装饰去重；源数组只隐藏不移除，世界事件 resetCache；★ S4-04 detail 子图元只预判 _masked 不入占据桶)
-│   │   ├── terrain-mesh-merge.js           # 地形共面网格贪婪合并 (Greedy Quad Meshing：法线近似/高程共面/同材质合并为大四边形，大幅降低渲染面数与深度排序开销)
-│   │   ├── render_terrain.js               # ★ v1.49.1 地形网格/水系特征 + 天空/大气氛围 (从 render_world.js 拆出；已移除 RiverBank 金砂漫滩线；★ v1.50.23 装饰绘制已迁出 render_accents.js；★ TA-12-3 drawTerrainCell 基底后调用 TerrainTexture.drawCell 同深度落笔)
-│   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity 分发 + Tree/Boulder/RockCluster；★ v1.50.39 TA-04-3 cylinderShade 枝干圆柱侧面明暗；★ TA-06-5 灌木绘制迁出 render_bush.js、★ TA-06-6 三乔木轮廓接入（冠幅/干高/扁压/倾干读模型）；★ TA-07 判档走 AccentLOD、segTier 分档枝条 / farClusters 远景簇子集 / 远景石体两笔简化 / 消费深度项 AABB 与锚点 ex·ey，由 render_world.js 深度队列调度)
+│   │   ├── render_terrain.js               # ★ v1.49.1 自 render_world.js 拆出 (★ v1.60.1 仅剩：drawTerrainShell 纯顶点投影 / drawTerrainGrid 'G' 键调试网格 / drawFeatureItem·drawRiverBand·drawWaterBodyTile 水系绘制；drawTerrainCell/flushTerrainBatch/drawSkyBackdrop/drawBoundaryWallSeg 已删，地形改由 webgl 地形层绘制)
+│   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity 分发 + Tree/Boulder/RockCluster；★ v1.50.39 TA-04-3 cylinderShade 枝干圆柱侧面明暗；★ TA-06-5 灌木绘制迁出 render_bush.js、★ TA-06-6 三乔木轮廓接入（冠幅/干高/扁压/倾干读模型）；★ TA-07 判档走 AccentLOD、segTier 分档枝条 / farClusters 远景簇子集 / 远景石体两笔简化 / 消费深度项 AABB 与锚点 ex·ey，由 render_world.js 深度队列调度；★ v1.60.1 sink 硬门槛：GL 层未就绪帧整只跳过，零 ctx 引用)
 │   │   ├── render_bush.js                  # ★ TA-06-5 灌木绘制层 (自 render_accents.js 迁出守 800 行上限：drawAccentBush 三变体 + ★ TA-06-7 花朵图元 flowerAmount 首次消费，低饱和三色板/簇法线受光/中近景限量，复用 accent 族共享刮擦工具；★ TA-07 判档走 AccentLOD + 远景簇子集 + 补簇级 x/y 剔除)
 │   │   ├── render_grass.js                 # ★ v1.50.39 GrassTuft 草丛绘制 (自 render_accents.js 迁出守 800 行上限；grassSeasonColor 季相色 + 芦草穗，复用 accent 族共享刮擦工具；★ TA-07 整丛省略判据走 AccentLOD.featurePx，芦花穗阈值收编 accentLODPlumeMinPx)
-│   │   ├── render_shadows.js               # ★ v1.50.46 TA-04-6 装饰贴地投影绘制层 (drawAccentShadowGround 树/灌木地面图元阴影：实高驱动影长 + 叶量调制夏冠影/冬枝影，复用 accent 族共享刮擦工具；★ S4-02 drawAccentShadowFor 模型参数化主体；★ TA-06-8 冠幅读模型 skel.crownR；★ TA-07 剔除改 AccentLOD.shadowAabb，签名加 it 消费深度项锚点)
-│   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild/drawLandscapeShadowGround 分发；复用装饰图元/光照/季相，配置关态零开销回退；★ S4-03 被遮蔽子图元连同投影不入队；detail 子图元 childActive q 过滤；★ TA-07 入队与绘制共用 AccentLOD AABB，签名加 it；★ v1.50.87 GroundPatch 贴地色差片绘制删除)
+│   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild 分发；复用装饰图元/光照/季相，配置关态零开销回退；★ S4-03 被遮蔽子图元不入队；detail 子图元 childActive q 过滤；★ TA-07 入队与绘制共用 AccentLOD AABB，签名加 it；★ v1.50.87 GroundPatch 删除；★ v1.60.1 drawLandscapeShadowGround 与 DEPTH_LANDSCAPE_SHADOW 已删，阴影由 GL 阴影图承担)
 │   │   ├── label-layout.js                # ★ S4-06 标签候选层与屏幕布局 (window.LabelLayout：提案池/字体测量缓存/固定备选位[首选/镜像/同排左右]/屏幕网格冲突检测/UI 禁入矩形/overlay 通道；pinned 恒接受占格 + ordinary 可省略；候选 ≤4 有界；关态回退旧直接绘制)
-│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发 + 树灌木阴影入队；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰及其投影跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels；★ TA-07-6 装饰/阴影入队前两级剔除（kindBounds 粗剔 → 模型 bounds 精剔）+ 深度项新增 ex/ey 锚点与 AABB 复用 s1x~s2y 提案 + drawSelectedNeedBubbleOverlay 交互覆盖；★ TA-12-3 帧首 TerrainTexture.prepare 分批准备)
+│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels；★ TA-07-6 装饰入队前两级剔除（kindBounds 粗剔 → 模型 bounds 精剔）+ 深度项新增 ex/ey 锚点与 AABB 复用 s1x~s2y 提案 + drawSelectedNeedBubbleOverlay 交互覆盖；★ v1.60.1 地形格/侧壁/贴地投影入队与分发删除（DEPTH_CELL/DEPTH_WALL/DEPTH_ACCENT_SHADOW/DEPTH_LANDSCAPE_SHADOW 常量删除），遮挡由 GL 深度缓冲承担；水系/游鱼/道路/POI/房屋/装饰/族人照旧)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）；★ S4-06 proposePoiLabels/proposeHouseLabels 提案 + 绘制消费 posOf（未安置即省略；LOD 阈值收进 config.render）
 │   │   ├── render_agents.js                # 族人粒子、行囊搬运与夺位远征动态标牌（★ S4-06 需求气泡迁 overlay 层 drawSelectedNeedBubbleOverlay；施工/流产/夺位角标 pinned + posOf 消费）
-│   │   ├── render_inspector.js             # 拾取光标、族人/房屋/地标检查器面板渲染
+│   │   ├── inspector-shared.js             # ★ v1.60.1 Inspector 共享计量/产速帮助层 (速率追踪/倍率换算)
+│   │   ├── inspector-hormone.js            # ★ H-06 激素观察面板与趋势采样器 (window.HormoneTrend)
+│   │   ├── inspector-agent.js              # 族人 Inspector 面板 (状态机/M19 任务卡/生存指标/行囊)
+│   │   ├── inspector-house.js              # 房屋 Inspector 面板 (耐久/储备/拍卖档案)
+│   │   ├── inspector-poi.js                # POI Inspector 面板 (储量/榷场/营地晋升/国库)
+│   │   ├── inspector-lineage.js            # 血脉与世系族谱子层 (血缘 chips + 族谱模态 self 卡片)
+│   │   ├── render_inspector.js             # Inspector 调度层 + 智能点击拾取 (★ v1.60.1 自 1860 行拆出 7 文件)
+│   │   ├── camp-detail.js                  # ★ v1.12.0 营地辖区详情模态 (window._campDetailTick)
 │   │   ├── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
-│   │   └── webgl/                          # ★ WebGL 硬件加速渲染管线
-│   │       ├── fallback-handler.js         # WebGL 不可用/崩溃降级守卫
-│   │       ├── render-canvas-patch.js      # Canvas 渲染主循环双管线分发补丁
+│   │   └── webgl/                          # ★ WebGL 硬件加速渲染管线（★ v1.60.1 硬门槛：不可用即阻断启动；fallback-handler.js / render-canvas-patch.js / layers/terrain/test-grid.js 已删除）
 │   │       ├── core/
 │   │       │   ├── context.js              # WebGL2 上下文初始化与生命周期
 │   │       │   └── shader-manager.js       # 着色器编译与程序链接管理
 │   │       ├── layers/
 │   │       │   ├── terrain/
-│   │       │   │   ├── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器
-│   │       │   │   └── test-grid.js        # 基础测试网格渲染器
+│   │       │   │   └── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器（shader 直译 shadeAlbedoInto 受光 + 阴影图采样）
 │   │       │   └── accents/
 │   │       │       ├── accent-renderer.js   # 装饰图元 WebGL 三角化 + 解析式边缘 AA + 深度对齐（sink 图元）
 │   │       │       └── shadow-pass.js      # WebGL 装饰阴影 Pass（冠簇竖直压扁代理）
@@ -175,7 +176,7 @@ FlowAndAccord/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本
 │   ├── server.js                           # 静态文件开发服务器 (内置 .wasm MIME + POST /save-decision-order, 默认 3004 端口)
-│   ├── index.html                          # 完整单页可视化仿真系统 (14 script 按序加载)
+│   ├── index.html                          # 完整单页可视化仿真系统 (48 script 按序加载)
 │   ├── map.html                            # ★ v1.50.0 地图图鉴独立页 (加载 index.html?mapOnly=1&nogate=1 只读画布，无存档门禁)
 │   ├── map.css                             # ★ v1.50.0 地图图鉴页样式 (map-only 模式，仅保留画布)
 │   └── style.css                           # 全局样式

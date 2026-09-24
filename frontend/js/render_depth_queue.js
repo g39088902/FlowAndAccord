@@ -1,21 +1,20 @@
 // === 世界统一深度队列层（★ TA-04-6 前置自 render_world.js 拆分，单一职责模块）===
 // 职责（07 号 §6.5 末段「入队和分发归队列层」）：深度项对象池、贴面/足迹感知深度帮助函数、
-// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（地形格 / 侧壁 / 水系 /
-// 游鱼 / 波光 / 道路 / 辖区连线 / POI 底座与标记 / 房屋 / 地表装饰 / ★ 树灌木贴地投影 / 族人）
-// 与按相机深度远 → 近的分发落笔。**各图元的绘制逻辑不在本文件**（地形壳层 render_terrain.js、
-// 装饰 render_accents.js / render_grass.js / render_shadows.js、★ S4-02 景观 render_landscapes.js、
-// 房屋与 POI render_world.js、族人 render_agents.js）——本文件只做入队、排序与分发，扩展队列项时勿把绘制搬进来。
+// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（水系 / 游鱼 / 道路 /
+// 辖区连线 / POI 底座与标记 / 房屋 / 地表装饰 / 族人）与按相机深度远 → 近的分发落笔。
+// ★ 全量 WebGL（Canvas 备用通道删除）：地形格 / 侧壁 / 贴地投影已删除——地形与侧壁由
+//   webgl/layers/terrain/terrain-renderer.js 承担，落底阴影由 webgl/layers/accents/shadow-pass.js
+//   光向深度图承担。**各图元的绘制逻辑不在本文件**（水系 render_terrain.js、
+//   装饰 render_accents.js / render_grass.js、★ S4-02 景观 render_landscapes.js、
+//   房屋与 POI render_world.js、族人 render_agents.js）——本文件只做入队、排序与分发。
 //
 // ★ v1.50.11 世界统一深度队列：Canvas 2D 无深度缓冲，全部图元按 project3D().depth =
 //   ry·sinX + z·cosX 升序（远 → 近）落笔，同深度保持收集原序（Array.sort 稳定）——
-//   近处山地格、近处河道、近处乔木都会正确遮挡更远的图标；渲染确定性不变。
-//   大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），已烘焙进 relightTerrain 的地形色。
+//   近处河道、近处乔木都会正确遮挡更远的图标；渲染确定性不变。
 // 依赖全局: ctx, camera, sim, w, h, project3D, mousePos, isDragging, hoveredLane, SimLighting,
-//   terrainProjX, terrainProjY, BOUNDARY_WALLS（render_terrain.js）、drawTerrainCell / drawFeatureItem /
-//   drawBoundaryWallSeg（render_terrain.js）、drawPoiGroundBase / drawPoiMarker / drawHouse /
+//   drawFeatureItem（render_terrain.js）、drawPoiGroundBase / drawPoiMarker / drawHouse /
 //   drawLaneSegment / drawCampHouseLink（render_world.js）、drawAccentEntity（render_accents.js）、
-//   drawAccentShadowGround（render_shadows.js）、collectLandscapes / drawLandscapeChild /
-//   drawLandscapeShadowGround（render_landscapes.js，S4-02）、drawAgent（render_agents.js）、RiverLife / window.RiverLife
+//   collectLandscapes / drawLandscapeChild（render_landscapes.js，S4-02）、drawAgent（render_agents.js）、RiverLife / window.RiverLife
 
 // ★ v1.50.15 渲染表现层参数（视觉抬升 / 足迹深度半径），来源 config.render.js
 //   （前端独立配置，不进 SIM_CONFIG——config.js 与 Rust SimConfig 严格互检）。
@@ -32,8 +31,7 @@ const RC = window.RENDER_CONFIG || {};
 // 按 project3D().depth = ry·sinX + z·cosX 升序（远 → 近）落笔：
 // 近处山地格、近处河道、近处乔木都会正确遮挡更远的图标。
 // 同深度保持收集原序（Array.sort 稳定），渲染确定性不变。
-// 大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），已烘焙进 relightTerrain 的地形色。
-const DEPTH_CELL = 0;      // 地形格（a/b/c/d = i00/i10/i11/i01 顶点索引）
+// 大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），地形受光由 GL shader 承担。
 const DEPTH_FEATURE = 1;   // 水系特征（a = feature，River 水面 / ShallowFord / 泉谷）
 const DEPTH_FISH = 2;      // 游鱼（a = fish，水中层，深度低于水面填充）
 const DEPTH_LANE = 4;      // 道路分段（a = lane，b = 段序号，s1/s2 = 屏幕端点，dash = 弧长相位）
@@ -43,10 +41,7 @@ const DEPTH_POI = 7;       // POI 标记（a = poi）
 const DEPTH_HOUSE = 8;     // 房屋（a = house）
 const DEPTH_ACCENT = 9;    // 地表装饰（a = accent）
 const DEPTH_AGENT = 10;    // 族人（a = agent）
-const DEPTH_WALL = 11;     // ★ v1.50.14 边界侧壁分段（a = 墙定义，b = 段序号；深度 = 段上沿较近端顶点）
-const DEPTH_ACCENT_SHADOW = 12; // ★ TA-04-6 树/灌木贴地投影（地面图元，a = accent；深度 = 基点/影梢足迹深度取大）
 const DEPTH_LANDSCAPE = 13;        // ★ S4-02 资源景观立体子图元（a = LandscapeChild，landscape-model.js 派生）
-const DEPTH_LANDSCAPE_SHADOW = 14; // ★ S4-02 景观树/灌木子图元贴地投影（a = LandscapeChild；深度口径同 ACCENT_SHADOW）
 
 const _depthPool = [];     // 持久深度项对象池（零每帧 GC）
 const _depthList = [];     // 每帧重建的引用列表（仅含本帧使用的项）
@@ -139,9 +134,6 @@ function _decalDepth(px, py, rWorld, cosZ, sinZ, cosX, sinX) {
   return dMax == null ? null : dMax + SURFACE_EPS;
 }
 
-// ★ TA-04-6 世界阴影方向刮擦（SimLighting.shadowDirInto 消费，收集阶段逐树刷新）
-var _qShDir = { x: 0, y: 0, len: 1 };
-
 // 选中营地辖区连线暂存（收集阶段定位，绘制阶段消费）
 let _selLinkCamp = null;
 
@@ -218,98 +210,11 @@ function drawWorldEntities() {
   const hasTerrain = !!(sim.showTerrain && terrain && terrain.cells &&
     terrain.cells.length >= terrain.gridSize * terrain.gridSize);
 
-  // ── 1. 地形格入队（★ 本修复核心）──
-  //    深度取四角 world 坐标均值（深度公式对 wx/wy/elev 线性，均值即格心深度）；
-  //    与立体实体同队列排序后，近处山地格后落笔即遮挡山后图标。
-  let renderedTerrainCells = 0;
-  dbgTerrainRenderedCells = 0;
-  if (hasTerrain && !window.webglTerrainActive) {
-    // ★ TA-12-3 世界纹样模型每帧一次分批准备（幂等；buildBudgetMs 预算内推进桶构建，
-    //   未就绪帧 TerrainTexture.drawCell 自动跳过、只画原基底）。参数取 RENDER_CONFIG
-    //   （纯渲染配置，不经 applyConfig 注入 WASM）；世界级失效已由 _invalidateWorldStaticCaches 钩住。
-    if (window.TerrainTexture) window.TerrainTexture.prepare(terrain, RC);
-    const cells = terrain.cells;
-    const gSize = terrain.gridSize;
-    const meshMergeCfg = RC && RC.terrainMeshMerge;
-    const mergedMesh = (window.TerrainMeshMerge && (!meshMergeCfg || meshMergeCfg.enabled !== false))
-      ? window.TerrainMeshMerge.build(terrain, meshMergeCfg)
-      : null;
-
-    if (mergedMesh && mergedMesh.quads) {
-      const quads = mergedMesh.quads;
-      const qLen = quads.length;
-      for (let qi = 0; qi < qLen; qi++) {
-        const q = quads[qi];
-        const i00 = q.i00, i10 = q.i10, i11 = q.i11, i01 = q.i01;
-
-        // 视口边界快速剔除（20px 余量）
-        const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-        const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-        const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-        const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-        if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
-
-        renderedTerrainCells++;
-        const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(q.cx, q.cy, q.cz));
-        it.c = i11; it.d = i01;
-      }
-    } else {
-      for (let gy = 0; gy < gSize - 1; gy++) {
-        const rowOffset0 = gy * gSize;
-        const rowOffset1 = rowOffset0 + gSize;
-        for (let gx = 0; gx < gSize - 1; gx++) {
-          const i00 = rowOffset0 + gx;
-          const i10 = i00 + 1;
-          const i11 = rowOffset1 + gx + 1;
-          const i01 = rowOffset1 + gx;
-
-          // 视口边界快速剔除（与旧 drawTerrain 相同的 20px 余量）
-          const minX = Math.min(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-          const maxX = Math.max(terrainProjX[i00], terrainProjX[i10], terrainProjX[i11], terrainProjX[i01]);
-          const minY = Math.min(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-          const maxY = Math.max(terrainProjY[i00], terrainProjY[i10], terrainProjY[i11], terrainProjY[i01]);
-          if (maxX < -20 || minX > w + 20 || maxY < -20 || minY > h + 20) continue;
-
-          renderedTerrainCells++;
-          const c00 = cells[i00], c10 = cells[i10], c11 = cells[i11], c01 = cells[i01];
-          const it = _depthItem(DEPTH_CELL, i00, i10, depthOf(
-            (c00.wx + c10.wx + c11.wx + c01.wx) * 0.25,
-            (c00.wy + c10.wy + c11.wy + c01.wy) * 0.25,
-            (c00.elev + c10.elev + c11.elev + c01.elev) * 0.25));
-          it.c = i11; it.d = i01;
-        }
-      }
-    }
-    dbgTerrainRenderedCells = renderedTerrainCells;
-
-    // ── 1.5 边界侧壁分段入队（★ v1.50.14）──
-    //    侧壁是地图边界处最靠近相机的几何：贴边实体的底座/圆环伸过边界线的部分
-    //    必须被侧壁盖住。旧实现整墙在壳层先行栅格化，永远盖不住队列元素
-    //    （用户可见症状：「贴边 POI/房屋未被地形墙遮挡」）。分段深度取该段上沿
-    //    两端顶点深度的较大值（较近端），墙面垂直下垂不改变 ry、只减 z ⇒ 段内
-    //    越往下深度越小，用上沿较近端代表整段是「遮挡从严」的安全近似。
-    if (hasTerrain && !window.webglTerrainActive) {
-      const gSize = terrain.gridSize;
-      const walls = BOUNDARY_WALLS;
-      const cellsW = terrain.cells;
-      for (let wi = 0; wi < 4; wi++) {
-        const wd = walls[wi];
-        for (let k = 0; k < gSize - 1; k++) {
-          const c0 = cellsW[wd.first + k * wd.step];
-          const c1 = cellsW[wd.first + (k + 1) * wd.step];
-          const d0 = depthOf(c0.wx, c0.wy, c0.elev);
-          const d1 = depthOf(c1.wx, c1.wy, c1.elev);
-          _depthItem(DEPTH_WALL, wd, k, d0 > d1 ? d0 : d1);
-        }
-      }
-    }
-  }
+  // ★ 全量 WebGL：地形格与边界侧壁不再入队（terrain-renderer.js GL 层承担，
+  //   含沙盘侧壁 skirt 与天幕 clear 背景）。地形壳层投影由 drawTerrainShell 提供。
 
   // ── 2. 水系特征 / 游鱼 ──
-  // ★ 修复（M4 渲染回归）：本段曾在 `!window.webglTerrainActive` 块内，导致 WebGL 地形
-  //   接管时「River / RiverBank / ShallowFord / WaterBody 水面、游鱼」全部不入队、
-  //   整条河面不绘制 —— 用户可见症状：「河谷只剩不透明河床的褐色谷底带，没有河水」。
-  //   WebGL 只接管地形本身，上层水系仍须由 2D 深度队列绘制（与 §223-225 设计注释一致）。
+  //   WebGL 只接管地形本身，上层水系仍由 2D 深度队列绘制。
   if (hasTerrain) {
     // ★ v1.50.20 河流分段入队：整条河多边形若以「全顶点最大深度」入队（v1.50.11 做法），
     //   只要任一岸段靠近相机，整条河就后画、盖住所有更远的树/房/POI/族人（用户可见症状：
@@ -579,67 +484,9 @@ function drawWorldEntities() {
       AL.stats().enqueued++;
     }
   }
-  // ── 6.5 树/灌木贴地投影（★ TA-04-6 地面图元独立入队，绘制归 render_shadows.js 装饰层）──
-  //   深度由世界落点（基点 + 影梢）的足迹深度取大——不沿用树根/树冠深度；
-  //   影梢 = 锚点 + 世界阴影方向 × 影长 × 模型实高（hWorld = trunkH × accent.scale，不含 camera.zoom，
-  //   zoom 只在 lightShadowOffset → SimLighting.shadowOffset 内乘一次，杜绝重复缩放）。
-  //   影梢取大深度：影覆盖范围内（含朝相机侧）的地表格恒先画，阴影不被近格后画盖掉；
-  //   站进影内的实体被半透明影色罩到属「处于影中」的正常读感，比影更近的实体深度更大、
-  //   仍后画不受影响（07 号 §6.5 末段「不承诺逐像素投影正确」的样板口径）。
-  {
-    const SL = window.SimLighting;
-    for (const accent of terrainAccents) {
-      const kind = accent.kind;
-      if (kind !== 'Tree' && kind !== 'Bush') continue;
-      if (_mask && _mask.accentHidden(accent)) continue; // ★ S4-03：被遮蔽装饰的投影随同隐藏
-      const rxS = accent.x * cosZ - accent.y * sinZ;
-      const ryS = accent.x * sinZ + accent.y * cosZ;
-      const azS = (accent.z || 0) + MAP_Z_LIFT;
-      const sxS = cx + rxS * scale;
-      const syS = cy + (ryS * cosX - azS * sinX) * scale;
-      // ★ TA-07 一级粗剔：影长可达「实高 × shadowReachK」（shadowLenMax 2.40，见
-      //   config.lighting.js），须按该上界外扩后再判，否则会剔掉「树在屏外、影在屏内」的个体。
-      if (cullOn) {
-        const scS = (accent.scale || 1) * scale;
-        const kbS = AL.kindBounds(kind);
-        const aS = AL.aabbOf(sxS, syS, kbS, AL.SHEAR_MAX, scS, cosX, sinX, AL.aabb);
-        const reach = kbS.zMax * AL.cfg().shadowReachK * scS; // 影长上界（任意方向）：AABB 各向同扩
-        aS.x0 -= reach; aS.x1 += reach; aS.y0 -= reach; aS.y1 += reach;
-        if (!AL.visible(aS)) { AL.stats().cullCoarse++; continue; }
-      }
-      const skel = window.AccentModel.get(accent).skeleton;
-      if (!skel) continue;
-      const hWorld = skel.trunkH * accent.scale;
-      let sxw = 0.6, syw = 0.8, slen = 1.146; // SimLighting 缺席防御：旧固定光（西北 41°）的阴影方向
-      if (SL && SL.shadowDirInto) {
-        SL.shadowDirInto(_qShDir);
-        sxw = _qShDir.x; syw = _qShDir.y; slen = _qShDir.len;
-      }
-      const tipX = accent.x + sxw * slen * hWorld;
-      const tipY = accent.y + syw * slen * hWorld;
-      const soX = ((tipX - accent.x) * cosZ - (tipY - accent.y) * sinZ) * scale;
-      const soY = ((tipX - accent.x) * sinZ + (tipY - accent.y) * cosZ) * cosX * scale;
-      // ★ TA-07 二级精剔：冠影 + 影梢两圆并集（保守：冠幅取模型 crownR 全幅、shadowK 取 1）
-      if (cullOn) {
-        const crownRS = (skel.crownR || (kind === 'Tree' ? 8.5 : 6.5)) * (accent.scale || 1) * scale;
-        if (!AL.visible(AL.shadowAabb(sxS, syS, crownRS, 1, soX, soY, AL.aabb))) {
-          AL.stats().cullFine++; continue;
-        }
-      }
-      const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * accent.scale; // ★ TA-06-8 冠幅足迹读模型（世界单位）
-      const dBase = _decalDepth(accent.x, accent.y, fp, cosZ, sinZ, cosX, sinX);
-      const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
-      let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;
-      if (d == null) d = _surfaceDepth(accent.x, accent.y, accent.z, cosZ, sinZ, cosX, sinX);
-      const itS = _depthItem(DEPTH_ACCENT_SHADOW, accent, 0, d);
-      itS.ex = sxS; itS.ey = syS; // ★ TA-07 锚点屏幕坐标随深度项传递（阴影绘制端零重投影）
-      if (cullOn) {
-        itS.lod = 1; // 绘制端不再重剔（关态时绘制端按现状自算自剔，见 render_shadows.js）
-        itS.s1x = AL.aabb.x0; itS.s1y = AL.aabb.y0; itS.s2x = AL.aabb.x1; itS.s2y = AL.aabb.y1;
-        AL.stats().enqueued++;
-      }
-    }
-  }
+  // ── 6.5 树/灌木贴地投影：已删除（★ 全量 WebGL）──
+  //   落底阴影由 webgl/layers/accents/shadow-pass.js 世界空间代理几何 + 光向深度图承担，
+  //   terrain-renderer.js 片元采样变暗；2D 手绘阴影通道（原 render_shadows.js）已移除。
 
   // ── 6.6 资源景观（★ S4-02：LandscapeModel 派生组 → render_landscapes.js 入队）──
   //   配方/缓存归 landscape-model.js、子图元绘制复用装饰图元归 render_landscapes.js；
@@ -669,12 +516,7 @@ function drawWorldEntities() {
   const RL = window.RiverLife;
   for (let i = 0; i < list.length; i++) {
     const it = list[i];
-    if (it.kind !== DEPTH_CELL && window.flushTerrainBatch) {
-      window.flushTerrainBatch();
-    }
     switch (it.kind) {
-      case DEPTH_CELL: drawTerrainCell(it.a, it.b, it.c, it.d); break;
-      case DEPTH_WALL: drawBoundaryWallSeg(it.a, it.b); break;
       case DEPTH_FEATURE: drawFeatureItem(it.a, it.b); break;
       case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
       case DEPTH_LANE: drawLaneSegment(it); break;
@@ -682,15 +524,12 @@ function drawWorldEntities() {
       case DEPTH_POI_BASE: drawPoiGroundBase(it.a); break;
       case DEPTH_POI: drawPoiMarker(it.a); break;
       case DEPTH_HOUSE: drawHouse(it.a); break;
-      // ★ TA-07-6：装饰/阴影/景观四项把深度项整体传给绘制端（消费入队端 AABB 与锚点屏幕坐标）
+      // ★ TA-07-6：装饰/景观把深度项整体传给绘制端（消费入队端 AABB 与锚点屏幕坐标）
       case DEPTH_ACCENT: drawAccentEntity(it.a, it); break;
-      case DEPTH_ACCENT_SHADOW: drawAccentShadowGround(it.a, it); break;
       case DEPTH_LANDSCAPE: drawLandscapeChild(it.a, it); break;
-      case DEPTH_LANDSCAPE_SHADOW: drawLandscapeShadowGround(it.a, it); break;
       default: drawAgent(it.a);
     }
   }
-  if (window.flushTerrainBatch) window.flushTerrainBatch();
 
   // ★ S4-06 交互覆盖标签：选中族人需求气泡在世界层之上强制安置（不参与地形遮挡）；
   //   挂在队列分发循环结束后——§6.3「分发循环结束点即标签层的天然挂载位」。

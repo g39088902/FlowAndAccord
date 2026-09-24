@@ -1,6 +1,6 @@
 # 17. 动态季节光照（年周期光弧）设计方案
 
-> **状态**：★ **P0–P3 已实现（v1.48.0）**——光相引擎、地形重着色、立体面光照、世界空间阴影、天空氛围、开关与调试读数全部落地；P4（水面镜面高光 / 浅色主题联动微调）仍未实施。★ **立体装饰受光已随 TA-04 落地（v1.50.32~v1.50.46）**，接口见 §4.7。口径 4 项决策已确认：年周期光弧 / 四季正方向（春东·夏南·秋西·冬北）/ 冬夏亮度拉开（0.90 / 1.08）/ 默认开启。
+> **状态**：★ **P0–P3 已实现（v1.48.0）**——光相引擎、地形重着色、立体面光照、世界空间阴影、天空氛围、开关与调试读数全部落地；P4（水面镜面高光 / 浅色主题联动微调）仍未实施。★ **立体装饰受光已随 TA-04 落地（v1.50.32~v1.50.46）**，接口见 §4.7。★ **v1.60.1**：地形受光全面走 GL shader 直译（§4.2.1），CPU 逐格烘焙 `relightTerrain` / `shadeAlbedoInto` / `cell.color` 写回与 `dbg-light-ms` 读数已删除，`applyRelight` 只推进 `lightRev` 闸。口径 4 项决策已确认：年周期光弧 / 四季正方向（春东·夏南·秋西·冬北）/ 冬夏亮度拉开（0.90 / 1.08）/ 默认开启。
 > **整理日期**：2026-09-09（按 v1.47.11 代码现状逐函数核对）；2026-09-09 落地为 v1.48.0，实现细节以代码与 `frontend/AGENTS.md` §5.10 为准。
 > **范围**：太阳方位/高度角、光照强度与环境项、光色温、阴影方向与长度、天空氛围；**不含**地表反照率（草色/枯黄/积雪）与素材。
 > **入口**：[文档导航](../../README.md) · [四季与热力学现状](./15-seasons-climate.md) · [地形美术规划](../../plan/tech/07-terrain-art.md) · [前端现状](./16-frontend-overview.md)。
@@ -9,26 +9,26 @@
 
 ## 状态机
 
-动态季节光照的单帧生效状态迁移：光相推进（含限速器）→ 光档变化触发整片重着色 → 地形读取 `cell.color` 生效，并在开关/读档/重置时失效重算。
+动态季节光照的单帧生效状态迁移：光相推进（含限速器）→ 光档变化推进 `lightRev` 闸 → GL 地形 shader 按 uniform 重新受光，并在开关/读档/重置时失效重算。
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> PHASE
     PHASE --> RELIGHT : u_vis 量化档变化 (|Δu| >= 1/lightStepsPerYear, 144 档)
-    RELIGHT --> RENDER : 整片 cell.color 重算写回完成
-    RENDER --> PHASE : 进入下一帧 update()
+    RELIGHT --> RENDER : applyRelight 推进 S.lightRev + 清 dirty（GL uniform 节流上传）
+    RENDER --> PHASE : GL 地形 shader 直译 shadeAlbedoInto 受光呈现
     PHASE --> STALE : enabled=false / 地形重建(_terrainCached=false) / READY·LOAD_RESULT·REWIND_RESULT·RESET_DONE
     STALE --> PHASE : SimLighting.resync() 立即对齐当前季节
-    STALE --> RELIGHT : enabled=true 切回动态光，立即整片重算
+    STALE --> RELIGHT : enabled=true 切回动态光（markDirty 触发 lightRev 推进）
 ```
 
 | 状态 | 含义 | 进入条件 | 退出条件 |
 | :--- | :--- | :--- | :--- |
 | PHASE | 光相推进：`update()` 按限速器推进 `u_vis`，`phaseFromSnapshot` 派生 β/e/L/tint | 渲染循环启动（`enabled=true`） | 量化档变化 / 失效事件 |
-| RELIGHT | 地形重着色：`relightTerrain` 原地写回 `cell.color`（每趟清空调色板 Map） | `u` 量化档变化 | `cell.color` 整片写回完成 |
-| RENDER | 生效呈现：`drawTerrain`/`shadeFace` 读取 `cell.color` 与面光照 | 重着色完成 | 下一帧 `update()` |
-| STALE | 失效待重算：开关/地形重建/读档重置触发 | 上述失效事件 | `resync()` 对齐 / 切回动态光 |
+| RELIGHT | 光档推进：`applyRelight` 只做 `S.lightRev++` + 清 dirty（★ v1.60.1 CPU 逐格烘焙与 `cell.color` 写回已删除） | `u` 量化档变化 | `lightRev` 推进完成、GL uniform 上传 |
+| RENDER | 生效呈现：GL 地形顶点 shader 直译 `shadeAlbedoInto`（法线/AO/反照率静态 vboShade），`shadeFace` 消费面光照 | uniform 上传完成 | 下一帧 `update()` |
+| STALE | 失效待重算：开关/地形重建/读档重置触发 | 上述失效事件 | `resync()` 对齐 / `markDirty()` 触发重算 |
 
 **不变量**（违反即出 bug）：
 - 零内核改动：光照为纯表现层，不消耗 `WorldRng`、不写模拟状态、不进存档；限速器依赖真实帧时间，不参与逐字节确定性承诺。
@@ -214,6 +214,8 @@ if |du| > 0.5 圈 → u_vis = u_target            // 半年以上跳变直接对
 
 ### 4.2 L1 · 地形重着色（可见性最高、性价比最高）
 
+> ★ **v1.60.1 历史注记**：本节 L1 的 CPU 逐格烘焙设计（`relightTerrain` 按档重算并原地写回 `cell.color`）已随 §4.2.1 的 GL shader 直译路径**退役删除**，以下保留作原始设计记录；现状契约见 §4.2.1 与 `frontend/AGENTS.md` §5.10。
+
 **改造 `math.js`**：把 `computeElevationColor` 拆成两半，保持单一着色入口：
 
 1. `computeTerrainAlbedo(cell, minZ, maxZ) → {r,g,b}`：现有 L70–119 的**不含光**部分（水体色 / 高程插值 / 坡度平滑过渡），语义不变；
@@ -241,13 +243,12 @@ cell.color = palette.get(pack(alb_i · k_i · tint))   // 每趟清空的调色�
 
 WebGL 地形接管后，**逐格 CPU 烘焙整条链退役**（`cell.color → parseColor → vboColor`），受光公式进顶点 shader：
 
-- **触发点闸**：`update(now, sim, glOwnsTerrain)` 第三参由 render_canvas.js 传入（= `webglTerrainRendered`）。接管时统一入口 `applyRelight(sim, glOwnsTerrain)` 只做 `S.lightRev++` + 清 dirty，**跳过 `relightTerrain` 与 `TerrainTexture.refreshPalette`**（`S.lastMs` 归零、`relightCount` 冻结）；Canvas 回退（`?webgl=0` / WebGL 不可用 / GL 初始化窗口期）第三参为 false，CPU relight 照跑零变化。GL→Canvas 运行中翻转时 render_canvas.js 调一次 `markDirty()` 保证回退首帧即重烘焙。
-- ⚠️ **`S.lightRev++` 必须在 applyRelight 触发点计数，严禁移入 relightTerrain 内**——GL 跳过分支不进该函数，移入则 GL 永不更新光照。
+- **触发点闸（★ v1.60.1 硬门槛化）**：`update(now, sim)` 恢复两参（原第三参 `glOwnsTerrain` 随 Canvas 回退通道删除）。统一入口 `applyRelight(sim)` 只做 `S.lightRev++` + 清 dirty；**`relightTerrain` / `shadeAlbedoInto` CPU 路径 / `S.lastMs` / `relightCount` 与 `TerrainTexture.refreshPalette` 通知已整体删除**，地形受光唯一通道为 GL shader 直译（实测单次光档推进全程 0.1ms）。⚠️ **`S.lightRev++` 必须在 applyRelight 触发点计数**——它是 terrain-renderer.js 每帧比对并节流上传 uniform 的唯一信号，移入其他函数则 GL 永不更新光照。
 - **顶点数据**：法线/AO/反照率来自 rustworld.js 世界建缓存预存数组（`terr.nx/ny/nz/ao/albR/G/B`，世界静态），terrain-renderer.js 构建为 `vboShade`（8 float/顶点：normal³ + ao + albedo³ + side），仅在几何闸（gridRev + materialRev 反照率指纹）变化时上传一次；侧壁顶点带朝外法线 + `side=1` 旗标。
 - **顶点 shader 直译 `shadeAlbedoInto`**：wrap 漫反射 → `(amb+inv·wd)·ao·inten` → kMin/kMax 钳制 → tint → `mix(lit, wash, washA)` 色洗——与 CPU 公式同源同序（光向按 `lightParams()` 原值直传，**不做归一化**，legacy 对照路径 `legacyDir` 非严格单位向量）；侧壁（side=1）输出固定平色 `u_wallColor`（现状语义；★ v1.50.95 起片元阴影项对侧壁短路，不再乘阴影因子）。**逐顶点受光 → 插值 v_color**，与 CPU「逐格烘焙 → 角点插值」的 GPU 语义逐位同构；shader 用 0-1 连续浮点不做 256 级 round（角点偏差 <1/255，消除量化色阶属质量提升）。
 - **uniform 节流**：terrain-renderer 每帧比对 `SimLighting.lightRev()`，仅变化时上传 5 组 uniform（u_lightDir / u_lightParams(amb,inv,kMin,kMax) / u_lightMisc(wrap,invWrap,inten,washA) / u_lightTint / u_lightWash，JS 侧已 /255）+ 常量 u_wallColor；u_matrix 与阴影组（u_shadowMap/u_lightMat/u_shadowOn/u_shadowStrength）不变。
-- **性能**：光档变化成本 60-150ms CPU 烘焙 + ~26 万次 parseColor + 4.55MB VBO 重传 → **5 组 uniform（≈60 字节）**；实测 `update(..., true)` 全程 0.1ms。128x 倍速开动态光的周期性掉帧根因消除。
-- **边界**：`shadeAlbedoInto` / `lightParams` / `relightTerrain` 函数体零修改；纹样层 GL 侧仍预留（`v_texCoord`，31 号 §6.2 阶段四）；明暗主题切换（washA）与现状同语义——下一光档生效。
+- **性能**：光档变化成本 60-150ms CPU 烘焙 + ~26 万次 parseColor + 4.55MB VBO 重传 → **5 组 uniform（≈60 字节）**；实测单次光档推进全程 0.1ms。128x 倍速开动态光的周期性掉帧根因消除。
+- **边界**：`lightParams` / `shadeFace` 保留（★ v1.60.1 起 `shadeAlbedoInto` / `relightTerrain` CPU 路径已删除，公式以 shader 形式直译；明暗主题切换（washA）与现状同语义——下一光档生效）。
 
 ### 4.3 L2 · 立体实体面光照
 
@@ -296,8 +297,8 @@ WebGL 地形接管后，**逐格 CPU 烘焙整条链退役**（`cell.color → p
 - **每实体零分配读取**：`lightDirInto(out)` / `shadowDirInto(out)`（世界阴影方向 + 影长系数）。
 - **法线几何归模型层** `accent-model.js`：`attachCrownNormals()` 在 Tree/Bush 骨架构建时写入冠包络椭球外向梯度法线（随骨架缓存，id 纯函数）；`shearNormal()` 为倾干剪切（`x += s·z`）的逆转置变换 `n' = (nx, ny, nz − s·nx)`，依赖 `accent.rotation` 不入缓存、绘制层每帧施加。
 - **石体**：`drawStoneBody()`（Boulder 与 RockCluster 子石共用）棱柱轮廓随相机投影，顶面法线 (0,0,1)、侧面 = 面片中点世界水平方向——低角度阳光下迎光侧面可亮过顶面。
-- **贴地投影**：`render_shadows.js::drawAccentShadowGround` 三段影（接地弱影/稀疏枝影 α∝1−leaf/冠影随叶量 0.30+0.70×leaf），影长 = `trunkH × accent.scale` 实高经 `shadowOffset` 驱动，以世界落点独立入深度队列（§4.4 修订）。
-- **配置**：16 个可调参数集中在 `config.render.js`（`sunScreenEps` / `accentBarkBand*` 5 / `accentCrownLit*` 5 / `accentStoneHeightK` / `accentShadow*` 4），缺省回退与集中值逐键一致，不进 SIM_CONFIG/WASM 链路（TA-04-7 审计）。
+- **贴地投影（★ v1.60.1 改 GL 阴影图统一承担）**：`render_shadows.js` 自绘三段影通道（接地弱影/稀疏枝影/冠影）已随文件删除——装饰阴影由 WebGL 阴影图（`shadow-pass.js`：世界空间代理几何 → 沿世界光向 2048² 深度图 → GL 地形片元 PCF 采样按 `accentWebglShadowStrength` 变暗）统一承担，随季节光向旋转、随地形起伏贴坡；**接收面仅 GL 地形**（2D 实体与装饰自身不接收，阶段四统一解决）。
+- **配置**：可调参数集中在 `config.render.js`（`sunScreenEps` / `accentBarkBand*` 5 / `accentCrownLit*` 5 / `accentStoneHeightK`；★ v1.60.1 起 `accentShadow*` 4 键随自绘贴地投影删除），缺省回退与集中值逐键一致，不进 SIM_CONFIG/WASM 链路（TA-04-7 审计）。
 - **生命周期**：模型缓存随 D-B1-7 `_invalidateWorldStaticCaches()` 在 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 四事件清理；`STR_TAB.start_index==0` 仅管字符串驻留表，不替代模型清理。
 
 ---
@@ -308,8 +309,8 @@ WebGL 地形接管后，**逐格 CPU 烘焙整条链退役**（`cell.color → p
 
 | 项 | 频率 | 单次成本（估算） | 说明 |
 |---|---|---|---|
-| 地形整片重着色 | 光档变化时（1x：0.6 次/秒） | 14,400 格 ×（3 乘 + 2 加 + 1 查表）≈ 0.3–1.0 ms | 预存法线/反照率后无 `hypot`/`sqrt` |
-| 调色板 Map | 每趟清空 | 键数 ≪ 14,400 | 平原同色去重 |
+| 地形整片重着色 | 光档变化时（1x：0.6 次/秒） | 14,400 格 ×（3 乘 + 2 加 + 1 查表）≈ 0.3–1.0 ms | ★ v1.60.1 起为 GL uniform 上传（实测 0.1ms，§4.2.1）；本行为 CPU 烘焙时代估算 |
+| 调色板 Map | 每趟清空 | 键数 ≪ 14,400 | ★ v1.60.1 随 CPU 烘焙删除 |
 | 立体实体面光照 | 每帧 | 百级实体 × 4 面，≪ 0.1 ms | 结果按 (色, k 档) 缓存 |
 | 天空/大气层 | 每帧 | 2 次全屏渐变 + 1 次全屏填充 | 固定 2 个插入点 |
 | 限速器 | 每帧 | O(1) | — |
@@ -320,9 +321,9 @@ WebGL 地形接管后，**逐格 CPU 烘焙整条链退役**（`cell.color → p
 
 | 触发 | 必须失效/重算 |
 |---|---|
-| 光档变化 | 地形 `cell.color` 整片重算 |
-| `enabled` 切换 | 立即整片重算（切到固定光 = 一次性重算） |
-| 地形重建（`_terrainCached = false`） | 既有路径已重建法线/反照率/`cell.color` |
+| 光档变化 | `applyRelight` 推进 `lightRev` → GL uniform 上传，shader 重受光（★ v1.60.1 起不再有 `cell.color` 整片重算） |
+| `enabled` 切换 | `markDirty()` → 下一趟 `applyRelight` 推进 `lightRev`（切到固定光走 legacy 对照路径） |
+| 地形重建（`_terrainCached = false`） | 既有路径重建法线/反照率静态缓存（`nx/ny/nz/ao/albR/G/B`，供 GL `vboShade`） |
 | `READY / LOAD_RESULT / REWIND_RESULT / RESET_DONE` | 既有清缓存点 + `SimLighting.resync()` |
 | 相机旋转/缩放 | **不重算**（阴影按 §3.6 每帧投影，颜色与相机无关） |
 | 主题切换 | 只影响 UI 与可选氛围亮度 |
@@ -426,7 +427,7 @@ node tools/test-wasm.js             # ALL_TESTS_DONE
 
 ### 9.2 性能
 
-- 同机器同负载，记录 `#dbg-light-ms` 与渲染 FPS：新增 p95 ≤ 3 ms，帧率不降档；
+- 同机器同负载，记录渲染 FPS：新增 p95 ≤ 3 ms，帧率不降档（★ `#dbg-light-ms` 重着色耗时读数已随 CPU 烘焙于 v1.60.1 删除）；
 - 14,400 格整片重着色 p95 ≤ 1.5 ms（预存法线后）；
 - 内存增量 ≤ 1 MiB（typed array + 每趟清空的调色板）。
 
@@ -454,7 +455,7 @@ node tools/test-wasm.js             # ALL_TESTS_DONE
 
 | 方案 | 边界 |
 |---|---|
-| [../../plan/tech/07-terrain-art.md](../../plan/tech/07-terrain-art.md) S1-4 / M3 | 该方案负责**地表反照率**（草绿→枯黄→积雪、纹理、素材）；本方案负责**光**（方向/强度/色温/阴影/氛围）。两侧**共用** `SimLighting.phase()` 与同一套 `cell.color` 失效机制，**严禁各自维护一套季节相位**。本方案先落地可让 S1-4 直接消费光相。 |
+| [../../plan/tech/07-terrain-art.md](../../plan/tech/07-terrain-art.md) S1-4 / M3 | 该方案负责**地表反照率**（草绿→枯黄→积雪、纹理、素材）；本方案负责**光**（方向/强度/色温/阴影/氛围）。两侧**共用** `SimLighting.phase()` 与同一套光档失效机制（★ v1.60.1 起 `cell.color` CPU 写回已删除，地形反照率静态缓存经 `lightRev` 闸进 GL shader），**严禁各自维护一套季节相位**。本方案先落地可让 S1-4 直接消费光相。 |
 | [./15-seasons-climate.md](./15-seasons-climate.md) | 只提供季节/气温事实；本方案不新增时间基准、不修改 `tick_season`。 |
 | [../../plan/tech/06-terrain-templates.md](../../plan/tech/06-terrain-templates.md) | 地表类别与法线来源不变；本方案只消费既有 `dzdx/dzdy`。 |
 | [../../plan/tech/08-performance.md](../../plan/tech/08-performance.md) | 本方案的重着色成本需纳入其渲染侧基准；若未来网格分辨率提升，须重估 §4.1。 |

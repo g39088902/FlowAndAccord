@@ -178,7 +178,7 @@ $$\Delta Z_{\text{detail}}(r, \theta) = \sum_{j=1}^{N_{\text{spur}}} H_j \cdot \
 
 ### 5.1 沙盘侧壁（`BOUNDARY_WALLS`）地质剖面呈现
 由于外坡高程保持在 $35 \sim 65\text{m}$ 且具起伏变化：
-- 渲染管线（`render_terrain.js::drawBoundaryWallSeg`）在地图边缘切出的不再是一条平淡的水平天际线；
+- 渲染管线（★ v1.60.1 前经 `render_terrain.js::drawBoundaryWallSeg`，此后侧壁由 WebGL 地形层顶点绘制并参与 GPU 深度测试）在地图边缘切出的不再是一条平淡的水平天际线；
 - 侧壁垂直下垂面将真实展现出自然切断的山峰山谷波浪形断层剖面（与参考图的泥土/岩石三维截面完全一致）。
 
 ### 5.2 垂直自然带视觉呈现（结合 TA-12）

@@ -1,15 +1,15 @@
 // === 资源景观绘制接入层（★ S4-02，STAGE-04-TODO §3.1/§3.4）===
 // LandscapeModel 派生组（landscape-model.js）→ 统一深度队列的接入层：
-// - collectLandscapes(...)：由 render_depth_queue.js::drawWorldEntities() 在装饰阴影段之后
-//   调用——先 LandscapeModel.sync(sim)（静态签名变化才重建几何；遮罩层已在装饰段前同步过，
-//   此处幂等兜底），再把每个子图元与树/灌木贴地投影分别入队（DEPTH_LANDSCAPE /
-//   DEPTH_LANDSCAPE_SHADOW，深度口径与装饰一致走 _decalDepth 足迹感知深度）。
-//   **本层不做绘制逻辑，也严禁把配方/索引/遮罩搬进队列层**；保护区遮蔽判定委托
-//   landscape-mask.js::childHidden（S4-03），被遮蔽子图元连同投影不入队。
-// - drawLandscapeChild / drawLandscapeShadowGround：深度队列分发入口——立体树石草复用
+// - collectLandscapes(...)：由 render_depth_queue.js::drawWorldEntities() 调用——
+//   先 LandscapeModel.sync(sim)（静态签名变化才重建几何；遮罩层已在装饰段前同步过，
+//   此处幂等兜底），再把每个子图元入队（DEPTH_LANDSCAPE，深度口径与装饰一致走
+//   _decalDepth 足迹感知深度）。**本层不做绘制逻辑，也严禁把配方/索引/遮罩搬进队列层**；
+//   保护区遮蔽判定委托 landscape-mask.js::childHidden（S4-03），被遮蔽子图元不入队。
+//   ★ 全量 WebGL：贴地投影入队已删除——落底阴影由 webgl/layers/accents/shadow-pass.js
+//   世界空间代理几何 + 光向深度图承担。
+// - drawLandscapeChild：深度队列分发入口——立体树石草复用
 //   render_accents.js / render_grass.js 既有图元（drawAccentTree/Boulder/Bush/RockCluster/
-//   GrassTuft），阴影复用 render_shadows.js::drawAccentShadowFor（模型参数化主体），
-//   季相复用 window.SimTreeTint，光照经图元内部 accentLitFill 单一入口——**不复制光照公式**。
+//   GrassTuft），季相复用 window.SimTreeTint，光照经图元内部 accentLitFill 单一入口——**不复制光照公式**。
 //   ★ S4-04/S4-05：GroundPatch 贴地色差片已于 v1.50.87 整体删除（wet/shade/fruit/quarry/vein
 //   五 role 连同两遍式椭圆图元与点簇绘制）；可采细节机制保留——Wood foliage 小灌木
 //   （stockRole 'detail'，Bush 模型）由 LandscapeModel.childActive 按 q ≥ qThreshold 过滤
@@ -21,14 +21,14 @@
 // - 失败处理（STAGE-04-TODO §4.2）：未知 modelKind 跳过该子图元并计数（开发模式限频报警）；
 //   单组无子图元即自然回落基础 POI 标记，不阻断其他组。
 //
-// 零 GC：子图元视图对象（_view，供 SimTreeTint/阴影层读取的 accent 同构视图）在 child 上
+// 零 GC：子图元视图对象（_view，供 SimTreeTint 读取的 accent 同构视图）在 child 上
 // 惰性缓存一次；无逐帧堆分配。加载顺序：accent-model.js → landscape-model.js →
-// render_shadows.js → 本文件 → render_depth_queue.js（index.html 已按序注册）。
+// 本文件 → render_depth_queue.js（index.html 已按序注册）。
 //
 // 复用深度队列层共享工具（全局函数，同装饰族共享先例）：_depthItem / _decalDepth /
 // _surfaceDepth / MAP_Z_LIFT（render_depth_queue.js）。
 // 依赖全局: ctx, camera, sim, w, h（render_canvas.js/main.js）、window.LandscapeModel、
-//   window.AccentModel、window.SimTreeTint、window.RENDER_CONFIG、DEPTH_LANDSCAPE(_SHADOW)。
+//   window.AccentModel、window.SimTreeTint、window.RENDER_CONFIG、DEPTH_LANDSCAPE。
 
 var _unknownLandscapeKinds = Object.create(null);
 var _unknownLandscapeWarnAt = 0;
@@ -65,9 +65,8 @@ function landscapeChildView(child) {
 }
 
 // ── 入队：每帧由 drawWorldEntities 调用（关态零开销）──
-// 预算：RENDER_CONFIG.landscapeFrameChildBudget 为每帧入队子图元（含阴影）硬上限，
+// 预算：RENDER_CONFIG.landscapeFrameChildBudget 为每帧入队子图元硬上限，
 // 超限按固定遍历序（组 key → role/slot 序）截断——确定性不依赖集合遍历顺序。
-var _lsShDir = { x: 0, y: 0, len: 1 }; // 世界阴影方向刮擦（每帧刷新 1 次）
 function collectLandscapes(cosZ, sinZ, cosX, sinX) {
   const RC = window.RENDER_CONFIG || {};
   if (RC.landscapeEnabled === false) return; // 配置关态：零开销回退原画面路径
@@ -83,10 +82,6 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
   const scale = camera.zoom;
   const cx = w / 2 + camera.panX, cy = h / 2 + camera.panY;
   let used = 0;
-  // 世界阴影方向每帧刷新一次（SimLighting 缺席防御：旧固定光（西北 41°）方向）
-  const SL = window.SimLighting;
-  if (SL && SL.shadowDirInto) SL.shadowDirInto(_lsShDir);
-  else { _lsShDir.x = 0.6; _lsShDir.y = 0.8; _lsShDir.len = 1.146; }
 
   for (let gi = 0; gi < groups.length; gi++) {
     const children = groups[gi].children;
@@ -126,26 +121,6 @@ function collectLandscapes(cosZ, sinZ, cosX, sinX) {
         lit.lod = 1;
         lit.s1x = AL.aabb.x0; lit.s1y = AL.aabb.y0; lit.s2x = AL.aabb.x1; lit.s2y = AL.aabb.y1;
       }
-      used++;
-
-      // 树/灌木子图元的贴地投影独立入队（同装饰 TA-04-6 口径：基点/影梢足迹深度取大，
-      // 影梢 = 锚点 + 世界阴影方向 × 影长 × 模型实高，实高不含 zoom）
-      const kind = child.modelKind;
-      if (kind !== 'Tree' && kind !== 'Bush') continue;
-      if (used >= budget) return;
-      const skel = landscapeChildModel(child).skeleton;
-      if (!skel) continue;
-      const hWorld = skel.trunkH * child.scale;
-      const tipX = child.x + _lsShDir.x * _lsShDir.len * hWorld;
-      const tipY = child.y + _lsShDir.y * _lsShDir.len * hWorld;
-      const fp = (skel.footprintR || (kind === 'Tree' ? 10.5 : 8)) * child.scale; // ★ TA-06-8 冠幅足迹读模型
-      const dBase = _decalDepth(child.x, child.y, fp, cosZ, sinZ, cosX, sinX);
-      const dTip = _decalDepth(tipX, tipY, fp, cosZ, sinZ, cosX, sinX);
-      let d = dBase != null && (dTip == null || dBase > dTip) ? dBase : dTip;
-      if (d == null) d = _surfaceDepth(child.x, child.y, child.z, cosZ, sinZ, cosX, sinX);
-      const sit = _depthItem(DEPTH_LANDSCAPE_SHADOW, child, 0, d);
-      // 锚点屏幕坐标随深度项传递（阴影绘制端零重投影）
-      if (window.AccentLOD) { sit.ex = sx; sit.ey = sy; }
       used++;
     }
   }
@@ -204,11 +179,4 @@ function drawLandscapeChild(child, it) {
     const season = window.SimTreeTint.sample(view, sim, model.profile);
     drawAccentGrassTuft(view, sx, sy, scaled, season, model, cosZ, sinZ, cosX, sinX); // render_grass.js
   }
-}
-
-// ── 分发：树/灌木子图元贴地投影（复用 render_shadows.js 模型参数化主体）──
-function drawLandscapeShadowGround(child, it) {
-  const kind = child.modelKind;
-  if (kind !== 'Tree' && kind !== 'Bush') return; // 入队已过滤，防御再判
-  drawAccentShadowFor(landscapeChildView(child), landscapeChildModel(child), it);
 }

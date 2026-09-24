@@ -3,12 +3,14 @@
 //   原样迁出（ GrassTuft 本期不在动态受光范围——§6.5「保留季相短草线，不新增立体法线」，
 //   世界光向受光接入留给后续任务；TA-04-3 的枝干圆柱明暗仍归 render_accents.js）。
 //
-// 职责：GrassTuft 短草线 / 芦草变体的季相色派生与绘制。依赖全局（经典脚本顶层声明
-// 即全局，加载顺序 render_accents.js → 本文件，均在渲染期可用）：
-// - render_accents.js：_shadowOffset（贴地阴影零分配包装）/ _sortScratch（稳定性插入排序）/
+// 职责：GrassTuft 短草线 / 芦草变体的季相色派生与绘制。
+// ★ 全量 WebGL：草叶/穗图元全部经 WebGLAccentLayer sink 分发（几何/配色与旧 Canvas 逐位
+// 同源）；GL 未就绪帧整丛跳过绘制，无 Canvas 兜底分支。
+// 依赖全局（经典脚本顶层声明即全局，加载顺序 render_accents.js → 本文件，均在渲染期可用）：
+// - render_accents.js：_sortScratch（稳定性插入排序）/ _flattenQuad / _flatX/_flatY /
 //   _ptA~_ptD（投影刮擦点）——装饰族共享工具；
 // - window.AccentModel（accent-model.js 骨架）/ window.RENDER_CONFIG（config.render.js）/
-//   window.SimTreeTint（accent-season.js 季相样本）/ ctx、sim（render_world.js）。
+//   window.SimTreeTint（accent-season.js 季相样本）、sim（render_world.js）。
 
 // ★ TA-11-6 渲染热路径零 GC：草叶池（条目 { b, bx, by, tx, ty, h, d }），条目只在容量
 // 不足时创建，字段每帧整体覆写；刮擦对象严禁跨绘制调用持有。
@@ -78,9 +80,11 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
   const winterK = Number.isFinite(RC.accentGrassTuftWinterHeightRatio)
     ? RC.accentGrassTuftWinterHeightRatio : 0.62;
   const hK = winterK + (1 - winterK) * season.leafDensity;
-  // ★ v1.50.84 WebGL 装饰层：GL 模式登记本丛深度，草叶/穗经 sink 分发（与 Canvas 单一同源）
+  // ★ 全量 WebGL：GL 未就绪帧整丛跳过（硬门槛架构下无 Canvas 兜底）；登记本丛深度，
+  //   草叶/穗经 sink 分发（几何/配色单一同源）。
   var sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn) ? window.WebGLAccentLayer : null;
-  if (sink !== null) sink.beginAccent(accent.x, accent.y, accent.z);
+  if (sink === null) return;
+  sink.beginAccent(accent.x, accent.y, accent.z);
 
   // 局部三维 → 屏幕（★ TA-11-6 写入复用点对象，零分配）
   function projTo(dx, dy, dz, out) {
@@ -96,14 +100,8 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
   // ★ TA-07 芦花穗省略阈值（accentLODPlumeMinPx；走 AccentLOD 单一读取入口）
   const plumeMinPx = AL ? AL.cfg().plumeMin : 2;
 
-  // 贴地接触投影（弱于灌木）——★ v1.50.84：GL 模式不再手绘，落底阴影由阴影图承担
-  if (sink === null) {
-    const so = (typeof _shadowOffset === 'function') ? _shadowOffset(0.8, 1.6, 1.2 * (accent.scale || 1)) : { x: 2, y: 1.5, alphaScale: 1 };
-    ctx.fillStyle = 'rgba(20, 15, 10, ' + (0.13 * (so.alphaScale || 1)).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.ellipse(sx + so.x * 0.45, sy + so.y * 0.35, 3.2 * scaled, 1.4 * scaled, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // 贴地接触投影：全量 WebGL 下由阴影图（WebGLShadowPass）统一承担，不手绘接触影
+  // （★ v1.50.84 起 GL 分发模式即移除手绘，Canvas 分支随全量 WebGL 迁移删除）。
 
   // 草叶收集 + 深度画家排序（叶尖投影深度，远 → 近；★ TA-11-6 草叶池 + 稳定性插入排序，零分配）
   let nItems = 0;
@@ -121,7 +119,6 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
   }
   _sortScratch(_grassScratchPool, nItems, 'd');
 
-  ctx.lineCap = 'round';
   for (let i = 0; i < nItems; i++) {
     const it = _grassScratchPool[i];
     const p0 = _ptB;
@@ -137,21 +134,12 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
     const nb = Math.round(Math.max(0, Math.min(255, sc.b * k)));
     // 芦秆略细挺（0.52 vs 0.62），与普通短草区分茎秆质感
     const lwBlade = Math.max(0.5, (it.b.plume > 0 ? 0.52 : 0.62) * scaled);
-    if (sink !== null) {
-      // 草叶：开折线描边 + 圆头（同 Canvas lineCap='round' 逐叶 stroke 语义）
-      // ★ v1.50.89 图元级视深：草叶按近端 3D 视深（叶尖/叶基取大）测试地形，
-      //   俯视时外倾叶尖不再被锚点下前方更近地面裁掉（同叶芦花穗复用同一深度）
-      sink.setViewDepth(Math.max(p0.d, p1.d));
-      const np = _flattenQuad(0, p0.x, p0.y, c.x, c.y, p1.x, p1.y);
-      sink.polyStroke(_flatX, _flatY, np, false, lwBlade, nr / 255, ng / 255, nb / 255, 1, true);
-    } else {
-      ctx.strokeStyle = 'rgb(' + nr + ',' + ng + ',' + nb + ')';
-      ctx.lineWidth = lwBlade;
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.quadraticCurveTo(c.x, c.y, p1.x, p1.y);
-      ctx.stroke();
-    }
+    // 草叶：开折线描边 + 圆头（同 Canvas lineCap='round' 逐叶 stroke 语义）
+    // ★ v1.50.89 图元级视深：草叶按近端 3D 视深（叶尖/叶基取大）测试地形，
+    //   俯视时外倾叶尖不再被锚点下前方更近地面裁掉（同叶芦花穗复用同一深度）
+    sink.setViewDepth(Math.max(p0.d, p1.d));
+    const np = _flattenQuad(0, p0.x, p0.y, c.x, c.y, p1.x, p1.y);
+    sink.polyStroke(_flatX, _flatY, np, false, lwBlade, nr / 255, ng / 255, nb / 255, 1, true);
     // ★ TA-11-4 穗状芦花：沿叶曲线末端方向的三笔花序线段（主穗顺叶弯挺出 + 两侧短穗）。
     //   穗量 plumeV 秋枯升起、隆冬存留（干灰色），几何随隆冬 hK 收缩；
     //   远景穗屏长 < 2px 不可辨直接省略；画家排序与所在草叶一致（叶压穗/穗压叶自然）。
@@ -167,30 +155,16 @@ function drawAccentGrassTuft(accent, sx, sy, scaled, season, model, cosZ, sinZ, 
         const pb = Math.round(Math.max(0, Math.min(255, sc.plumeB)));
         const plumeA = 0.8 * sc.plumeV;
         const lwPlume = Math.max(0.5, 0.9 * scaled);
-        if (sink !== null) {
-          // 三笔穗线（主穗顺叶弯挺出 + 两侧短穗）：Canvas 单 path 三段，段间互不重叠，
-          // GL 逐段发开折线（圆头、同一半透明色）与 Canvas compositing 一致
-          _flatX[0] = p1.x; _flatY[0] = p1.y;
-          _flatX[1] = p1.x + Math.cos(pa) * pl; _flatY[1] = p1.y + Math.sin(pa) * pl;
-          sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
-          _flatX[1] = p1.x + Math.cos(pa + 0.45) * pl * 0.6; _flatY[1] = p1.y + Math.sin(pa + 0.45) * pl * 0.6;
-          sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
-          _flatX[1] = p1.x + Math.cos(pa - 0.5) * pl * 0.5; _flatY[1] = p1.y + Math.sin(pa - 0.5) * pl * 0.5;
-          sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
-        } else {
-          ctx.strokeStyle = 'rgba(' + pr + ',' + pg + ',' + pb + ',' + plumeA.toFixed(3) + ')';
-          ctx.lineWidth = lwPlume;
-          ctx.beginPath();
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p1.x + Math.cos(pa) * pl, p1.y + Math.sin(pa) * pl);
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p1.x + Math.cos(pa + 0.45) * pl * 0.6, p1.y + Math.sin(pa + 0.45) * pl * 0.6);
-          ctx.moveTo(p1.x, p1.y);
-          ctx.lineTo(p1.x + Math.cos(pa - 0.5) * pl * 0.5, p1.y + Math.sin(pa - 0.5) * pl * 0.5);
-          ctx.stroke();
-        }
+        // 三笔穗线（主穗顺叶弯挺出 + 两侧短穗）：段间互不重叠，逐段发开折线（圆头、
+        // 同一半透明色），观感与原 Canvas 单 path 三段一致
+        _flatX[0] = p1.x; _flatY[0] = p1.y;
+        _flatX[1] = p1.x + Math.cos(pa) * pl; _flatY[1] = p1.y + Math.sin(pa) * pl;
+        sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
+        _flatX[1] = p1.x + Math.cos(pa + 0.45) * pl * 0.6; _flatY[1] = p1.y + Math.sin(pa + 0.45) * pl * 0.6;
+        sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
+        _flatX[1] = p1.x + Math.cos(pa - 0.5) * pl * 0.5; _flatY[1] = p1.y + Math.sin(pa - 0.5) * pl * 0.5;
+        sink.polyStroke(_flatX, _flatY, 2, false, lwPlume, pr / 255, pg / 255, pb / 255, plumeA, true);
       }
     }
   }
-  ctx.lineCap = 'butt';
 }

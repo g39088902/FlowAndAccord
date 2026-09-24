@@ -28,7 +28,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.60.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.60.1</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -861,12 +861,10 @@
     <div class="debug-row"><span>⚡ 每秒 Tick</span><span id="dbg-tick-rate" class="mono-num">0</span></div>
     <div class="debug-row"><span>🗺️ 地图模板</span><span id="dbg-map-profile" class="mono-num">—</span></div>
     <div class="debug-row"><span>🌍 地形生成器</span><span id="dbg-terrain-gen" class="mono-num">—</span></div>
-    <div class="debug-row"><span>📐 地形渲染总面数</span><span id="dbg-terrain-faces" class="mono-num">—</span></div>
     <div class="debug-row"><span>👑 国王内帑总额</span><span id="dbg-royal-privy" class="mono-num">0.00 🪙</span></div>
     <div class="debug-row"><span>🖼️ 渲染 FPS</span><span id="dbg-fps" class="mono-num">0</span></div>
     <div class="debug-row"><span>⚙️ 内核步进</span><span id="dbg-tick-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>📦 快照解析</span><span id="dbg-snap-ms" class="mono-num">0.00 ms</span></div>
-    <div class="debug-row"><span>☀️ 光照重着色</span><span id="dbg-light-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>🧭 光相 / 光档</span><span id="dbg-light-phase" class="mono-num">—</span></div>
     <div class="debug-row"><span>🧮 整帧耗时</span><span id="dbg-frame-ms" class="mono-num">0.00 ms</span></div>
     <div class="debug-row"><span>🔥 CPU 占用</span><span id="dbg-cpu" class="mono-num">0%</span></div>
@@ -1410,8 +1408,6 @@
   <script src="js/config.render.js"></script>
   <!-- ★ TB-03-11 景观风格样式表（window.TerrainStyle，profile→基调白名单 + 反照率乘色；纯表现层，须早于 math.js 首帧消费） -->
   <script src="js/terrain-style.js"></script>
-  <!-- ★ TA-12-2 世界纹样模型层（window.TerrainTexture，确定性草斑/土纹图元；须早于 rustworld.js 与渲染入口，加载时不读 Canvas 全局） -->
-  <script src="js/terrain-texture.js"></script>
   <script src="js/lighting.js"></script>
   <script src="js/decision-viz-data.js"></script>
   <script src="js/decision-viz-view.js"></script>
@@ -1419,15 +1415,14 @@
   <!-- M4 二进制快照解码器 · 必须早于 rustworld.js（README: FABS 帧） -->
   <script src="js/snapshot-bin.js"></script>
   <script src="js/rustworld.js"></script>
-  <!-- ★ WebGL Phase 1-2: Canvas 2D → WebGL 迁移 (必须在 main.js 之前加载以初始化 WebGLContext) -->
+  <!-- ★ 全量 WebGL 渲染管线 (必须在 main.js 之前加载以初始化 WebGLContext；
+       Canvas 备用通道已删除，WebGL 不可用由 main.js 硬门槛报错) -->
   <script src="js/webgl/core/context.js"></script>
   <script src="js/webgl/core/shader-manager.js"></script>
   <script src="js/webgl/utils/projection-utils.js"></script>
-  <script src="js/webgl/fallback-handler.js"></script>
-  <script src="js/webgl/layers/terrain/test-grid.js"></script>
   <script src="js/webgl/layers/terrain/terrain-renderer.js"></script>
-  <!-- ★ 装饰绘制 WebGL 迁移（阶段三装饰切片）：drawStoneBody/drawAccentTree/Bush/GrassTuft sink
-       分发的 GPU 装饰层 + 阴影图层，须早于 render_canvas.js -->
+  <!-- ★ 装饰绘制与阴影图层：drawStoneBody/drawAccentTree/Bush/GrassTuft sink
+       分发的 GPU 装饰层 + 光向深度图阴影层，须早于 render_canvas.js -->
   <script src="js/webgl/layers/accents/accent-renderer.js"></script>
   <script src="js/webgl/layers/accents/shadow-pass.js"></script>
   <script src="js/dag-layout.js"></script>
@@ -1452,17 +1447,13 @@
   <script src="js/landscape-model.js"></script>
   <!-- ★ S4-03 景观遮罩层（道路/房屋/POI 保护区 + 空间分桶 + 脏桶失效 + 装饰去重；依赖 LandscapeModel） -->
   <script src="js/landscape-mask.js"></script>
-  <!-- 地形共面网格贪婪合并（Greedy Quad Meshing；依赖 RENDER_CONFIG，早于 render_terrain.js） -->
-  <script src="js/terrain-mesh-merge.js"></script>
   <script src="js/render_terrain.js"></script>
   <script src="js/render_accents.js"></script>
   <!-- ★ TA-06-5 灌木绘制层（drawAccentBush + 花朵图元；复用 render_accents 共享刮擦/受光工具，
        必须晚于 render_accents.js、早于 render_landscapes.js（其分派 drawAccentBush）） -->
   <script src="js/render_bush.js"></script>
   <script src="js/render_grass.js"></script>
-  <!-- ★ TA-04-6 装饰贴地投影绘制层（树/灌木地面图元阴影；复用 render_accents 共享工具） -->
-  <script src="js/render_shadows.js"></script>
-  <!-- ★ S4-02 资源景观绘制接入层（子图元/阴影入统一深度队列；复用装饰图元与阴影参数化主体） -->
+  <!-- ★ S4-02 资源景观绘制接入层（子图元入统一深度队列；复用装饰图元） -->
   <script src="js/render_landscapes.js"></script>
   <!-- ★ S4-06 标签候选层与屏幕布局（提案池/字体测量/固定备选位/网格冲突/UI 禁入；早于深度队列与图元层） -->
   <script src="js/label-layout.js"></script>
@@ -1471,7 +1462,18 @@
   <script src="js/render_depth_queue.js"></script>
   <script src="js/render_world.js"></script>
   <script src="js/render_agents.js"></script>
+  <!-- ★ Inspector 共享计量/产速帮助层（须早于 inspector 各面板与生态大盘） -->
+  <script src="js/inspector-shared.js"></script>
+  <!-- ★ H-06 激素观察面板与趋势采样器（window.HormoneTrend，rustworld 世界生命周期 reset） -->
+  <script src="js/inspector-hormone.js"></script>
+  <!-- ★ Inspector 三视图面板（族人/房屋/POI）与血脉族谱子层（由 render_inspector.js 调度） -->
+  <script src="js/inspector-agent.js"></script>
+  <script src="js/inspector-house.js"></script>
+  <script src="js/inspector-poi.js"></script>
+  <script src="js/inspector-lineage.js"></script>
   <script src="js/render_inspector.js"></script>
+  <!-- ★ v1.12.0 营地辖区详情模态（window._campDetailTick/closeCampDetail/isCampDetailOpen） -->
+  <script src="js/camp-detail.js"></script>
   <!-- 房屋连续报价中心与连续报价大盘 (v1.15.0) -->
   <script src="js/auction-ui.js"></script>
   <!-- ★ 植被观察台（TA-06 验收通过后转为长期调试工具；左下角控制台按钮或 ?ta06=1 激活；未打开零 DOM 零帧循环） -->
