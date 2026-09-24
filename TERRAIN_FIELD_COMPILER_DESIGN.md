@@ -674,6 +674,101 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 小模型执行这些任务时，完成一个任务即停，先运行任务的局部门禁，再进入下一个任务；不要一次性重写 `terrain.rs`、`hydrology.rs` 和前端。
 
+### 9.1 逐任务技术实施方案
+
+下面的方案把每个波次拆成可直接开工的实现单元。所有新增公开类型先放在 `procedural` 或 `backend` 内部；只有标记为“兼容出口”的类型才在 `geo/mod.rs` 重导出。示例接口使用 Rust 伪代码，实际实现应保持 `serde`、WASM 和现有错误码风格。
+
+#### UGC-00：基线、探针和版本冻结
+
+- **接口**：`TerrainBaseline { seed, profile, generator_version, elevation_hash, surface_hash, water_hash, metrics }`；`fn capture_baseline(map: &TerrainMap) -> TerrainBaseline`；`fn compare_baseline(a: &TerrainBaseline, b: &TerrainBaseline) -> BaselineDiff`。
+- **算法**：使用现有生成入口逐个遍历固定 profile×seed 矩阵；hash 输入按 `y` 外层、`x` 内层的行优先顺序写入量化后的 `i32 elevation_mm`、闭集 `SurfaceKind`、水体 ID。指标复用现有查询：BFS 计算 walkable components，扫描 `NO_BUILD` 计算 buildable cells，Dijkstra 计算 detour p95。
+- **实现顺序**：先增加 `terrain_probe --baseline <path>`，再冻结 `TERRAIN_GENERATOR_VERSION` 和探针输出 schema；基线只放 `target/terrain-baseline/`，不进运行时和存档。
+- **失败/验收**：hash 不一致返回 `BASELINE_MISMATCH`；运行 `cargo run --release -p sim_core --example terrain_probe -- --baseline 60`，并对 native/WASM 输出做逐字节比较。
+
+#### UGC-01：Field IR、算子和 HeightfieldBackend
+
+- **UGC-01.1 IR**：实现 `validate_recipe(recipe) -> Result<ResolvedRecipe, RecipeError>`。用 `BTreeMap<NodeId, usize>` 建索引，Kahn 拓扑排序；DFS 只用于生成 `Cycle { path }` 诊断。错误码固定为 `DuplicateNode`、`UnknownInput`、`Cycle`、`NonFiniteParameter`、`UnsupportedOp`。
+- **UGC-01.2 字段**：`Field2::new(width,height,fill)`、`Field2::hash_quantized(scale)`；所有写入通过 `FieldWriter::set(x,y,v)` 做有限值和边界检查。`Plane` 直接计算 `dot(p, direction)*slope+base`；`NoiseFbm` 使用现有无状态 `mix64` 梯度哈希、五次插值和固定倍频循环。
+- **UGC-01.3 形状算子**：`Ridge`/`Valley` 先把点投影到轴线，使用 `exp(-(d/width)^2)`；`SmoothUnion`/`SmoothSubtract` 使用 polynomial smooth-min，`k<=0` 直接返回 `InvalidSmoothing`。每个算子只读 `FieldView`，不访问 profile、世界或 `WorldRng`。
+- **UGC-01.4 兼容后端**：`HeightfieldBackend::from_fields(fields, semantics)` 将高程按现有网格写入 `TerrainMap`；`project_geocell(x,y)` 复用 `hydrology::slope_from_elevation` 和现有 `SurfaceKind` 规则，保证旧查询最近邻语义不变。
+- **UGC-01.5 recipe**：先实现草原，再实现山口。recipe 注册表返回静态数据，禁止 `match profile` 几何分支。验收为两个 recipe 的约束报告通过、`TerrainMap` 基线差异可解释、无 `NaN`。
+
+#### UGC-02：水文过程
+
+- **汇流**：`compute_flow_direction(elevation) -> FlowField` 对每格检查 8 邻域；按 `(drop, neighbor_index)` 最大值选下游，平地按固定 `y,x` 顺序 tie-break。按 `elevation` 降序稳定排序后累加 `flow[cell] += rainfall[cell]`。
+- **侵蚀/沉积**：`hydraulic_erosion(state, iterations, dt)` 固定扫描顺序；每格搬运量为 `min(capacity(flow,slope,hardness), sediment)`，从上游扣除并向下游加；`thermal_relaxation` 对超过角度阈值的相邻差值按固定比例搬运。每轮后 clamp 高程和沉积物到 recipe 范围。
+- **水位**：用优先队列从边界执行 priority-flood，得到封闭洼地 spill elevation；`WaterLevelSolve` 将低于 spill 的连通格归入同一 `WaterBodyId`，以最小格索引作为稳定 ID。
+- **语义**：河道由 `flow >= channel_threshold` 连通分量生成，岸带按法向距离扩张，浅滩候选从两侧陆格向法向扫描并验证。所有水体写入先进入 `GeometryTransaction`，验证通过后一次性提交。
+- **验收**：`cargo run --release -p sim_core --example terrain_probe -- --hydrology 60`；门禁包括水体不越界、深水不可走/不可建、浅滩端点在陆侧、无负面积和无孤立 walkable component。
+
+#### UGC-03：静态模板迁移
+
+- **迁移协议**：每个 profile 建立 `recipes/<id>.ron`（或等价 Rust 常量）和 `RecipeGate`；旧生成器只作为 `LegacyReference`，由 `compare_recipe_to_legacy` 输出差异，不被新编译器调用。
+- **顺序**：河谷→台地→盆地→冲积扇→火山湖→半坡；一次只启用一个 recipe。每个 recipe 只能组合既有 `FieldOp`、`ProcessOp` 和约束，不能新增 profile 专用函数。
+- **门禁**：复用 `run_creation_gates` 的 Geometry/RoadNetwork/Survival 前缀；失败时按 recipe 的 `fallback_candidates` 固定排序降级，并将 `requested/effective` 写入 `WorldCreationDiagnostic`。
+
+#### UGC-04：VoxelBackend 和网格提取
+
+- **数据接口**：`trait TerrainGeometry { fn sample_density(&self,p:Vec3)->i16; fn sample_material(&self,p:Vec3)->u8; fn load_chunk(&mut self,c:ChunkCoord)->Result<&VoxelChunk,VoxelError>; }`；chunk 尺寸固定 32³，halo 固定 1。
+- **密度算法**：高度场初始密度为 `surface_height-z`；结构节点以 `SmoothUnion/Subtract` 组合。量化使用固定 `DENSITY_SCALE` 和 round-to-nearest，写入前 clamp 到 `i16`。
+- **兼容视图**：`HeightfieldView::surface_at(x,y)` 从最高 z 向下采样并二分定位零面；随后调用同一 slope/material 投影。顶部表面与旧高度场允许的误差写成常量 `HEIGHTFIELD_QUANTUM_M`。
+- **网格**：首版 Surface Nets：每格 8 角符号变化则按边交点平均求顶点，按固定轴顺序生成面；chunk 边界读取 halo。Worker 只在可见或请求 chunk 生成 mesh，缓存键为 `(recipe_hash, generator_version, coord, lod)`。
+- **验收**：随机抽样比较 VoxelBackend/HeightfieldBackend 的高程和 flags；邻接 chunk 法线连续、无裂缝；性能探针确认 mesh 不在 tick 调用栈。
+
+#### UGC-05：快照、存档和前端接入
+
+- **存档接口**：`TerrainStaticKey { recipe_id, recipe_hash, seed, generator_version, voxel_backend_version }`；`ChunkDelta { coord, base_hash, runs: Vec<DeltaRun> }`。读取顺序为“重建基线→校验 base_hash→应用 delta”。
+- **WASM 接口**：新增 `terrain_chunk_request(coord,lod)` 和 `terrain_chunk_read()`，返回压缩后的 density/material buffer；不把完整 chunk 放入 FABS cell section。
+- **兼容**：只有需要持久化的语义字段才同步 `snapshot.rs`、`world_snapshot.rs`、`encode.rs`、`snapshot-bin.js`、`rustworld.js`；静态网格属于请求结果，不进 tick 快照。
+- **验收**：旧存档在版本不匹配时稳定拒绝；新存档重建后 `base_hash` 一致；Chrome/Edge File System Access 流程和 `node tools/snapshot-check.js` 通过。
+
+#### UGC-06：地层柱和材料属性
+
+- **接口**：`StratigraphicColumn::validate()` 检查 ID 唯一、厚度正、单位范围；`sample_stratum(column, depth) -> StratumSample`；`MaterialTable::get(id) -> MaterialProps`。
+- **算法**：从地表向下累计厚度定位地层；侵蚀后的地表覆盖层以沉积物厚度优先，未覆盖处沿地层柱采样。`hardness`、`soil_storage`、`permeability` 作为字段，不从颜色反推。
+- **体素投影**：每个体素先按深度选 `stratum_id`，再写 material；洞穴壁读取零面附近最近实体体素的材料。颜色改变只替换 `palette` 映射。
+- **验收**：固定剖面逐层比较 ID/厚度/材料；改变 palette 后 terrain hash（物理字段）不变；`terrain_probe --section x,y` 输出剖面 JSON。
+
+#### UGC-07：断层、褶皱和不整合
+
+- **接口**：`apply_structures(fields, events, seed) -> StructureField`；`Fault`、`Fold`、`Unconformity` 各自返回位移/截断场和 affected node IDs。
+- **算法**：断层用有符号平面距离 `s` 和平滑阶跃位移 `displacement * smoothstep(-w,w,s)`；褶皱用到轴线距离的正弦位移 `amplitude*sin(2πd/wavelength)`；不整合把低于指定 surface 的年轻层截断。事件按 recipe 顺序应用，先结构后侵蚀。
+- **局部事务**：结构候选写入 scratch chunk，检查实体连通、最高/最低界和水系连续性；失败返回 `StructureInvalid`，不重抽事件。
+- **验收**：断层两侧位移符号、褶皱峰谷和剖面 hash 稳定；固定 seed 不出现 NaN、浮空实体或无出口水体。
+
+#### UGC-08：静态地下水和植被因果
+
+- **接口**：`solve_groundwater(fields, hydro, materials) -> GroundwaterFields`；输出 `recharge/water_table/aquifer_mask/discharge/water_access/soil_moisture`。
+- **算法**：补给 `recharge = rainfall * infiltration(permeability, soil_storage)`；按下游/邻域固定 Gauss-Seidel 次序传播储水，迭代次数由 recipe 固定；遇低渗透层截断，遇地形出口生成 discharge。`water_access` 为地表到最近水体/泉点的坡度加权距离的指数衰减。
+- **植被投影**：`vegetation_ok = water_access>=grass_threshold && slope<=max_grass_slope && soil_storage>=min_soil`；失败时按 moisture/hardness 选择沙、裸土或砾石。palette/material 由同一函数返回。
+- **验收**：干旱阈值以下 `vegetation_ok=false`；泉点、湿地和草地均可由字段切片解释；模板名不出现在分类函数中。
+
+#### UGC-09：剖面诊断和有限不确定性
+
+- **接口**：`generate_candidates(base, spec) -> Vec<CandidateResult>`；`CandidateResult { hash, score, report, fields_hashes }`；`DiagnosticsBundle::write(path)`。
+- **算法**：第 `i` 个候选参数由 `mix64(seed ^ candidate_salt ^ i)` 映射到声明的 range；候选按 `(passed desc, score desc, candidate_hash asc)` 稳定排序，超过 `keep_top_n` 丢弃。confidence 为局部候选字段方差的反函数，并量化到 `u8`。
+- **诊断**：字段切片统一带 header（宽、高、stride、单位、seed、recipe hash、generator version、quantization）；剖面沿任意两点 Bresenham/定步长采样，输出地层、水位、材料和节点证据。
+- **验收**：同输入候选顺序和 hash 恒定；失败报告能回溯到 constraint code、affected nodes 和阶段 hash；诊断文件不进入 snapshot。
+
+#### UGC-10：多层查询和地下寻路
+
+- **接口**：`NavigationLayerId`、`LayerConnector { from, to, kind, cost }`；`LayeredTerrainQuery::connectors(layer)`；`build_layer_graph()`。
+- **算法**：从洞口/竖井/坡道候选生成连接点，检查两端实体间隙、坡度和最小净空；每层先做局部 walkability flood fill，再以 connector 边连接层图。A* 状态为 `(node, layer)`，跨层边增加固定 cost。
+- **启用策略**：UGC-10 前只暴露顶部 `NavigationLayerId=0`；地下层必须同时满足合法 connector 和局部连通，不能因 mesh 存在自动可走。
+- **验收**：Agent 无 connector 不可跨层；碰撞 raycast、网格和 walk flags 一致；旧 profile 未启用地下层时路网 hash 不变。
+
+#### UGC-11：外部数据适配器
+
+- **接口**：`ObservationSource` 只读返回带 `units, crs, source, timestamp, content_hash` 的记录；`to_recipe(source, policy) -> Result<RecipePatch, ImportError>`。
+- **算法**：DEM 重采样到固定网格并记录插值方法；接触点/钻孔按坐标投影到地层柱约束；断层线拟合为有限 `PlaneSpec` 候选。适配器只产生 recipe patch、结构事件和约束，不直接写 Field2。
+- **验收**：输入 metadata 和 hash 可追踪；单位/坐标系缺失返回 `MissingMetadata`；无外部输入时 recipe 序列化和生成结果逐字节不变。
+
+#### UGC-12：专业物理独立后端
+
+- **边界接口**：`trait PhysicsBackend { fn initialize(&mut self, snapshot:&StaticTerrain) -> Result<(),PhysicsError>; fn step(&mut self, dt:f32); fn export_delta(&self)->PhysicsDelta; }`，与 `TerrainCompiler`、tick、FABS 分离。
+- **实现策略**：多相流、反应输运、热、力学和反演各自独立 crate/feature；默认 feature 不编译、不链接。后端只通过显式 delta 更新允许的地下字段，不能直接改 Agent、道路或地表事实。
+- **立项门槛**：先有明确玩法需求、基准数据、稳定存档契约和性能预算；没有这些输入时保持禁用，不阻塞 UGC-06～10。
+
 ## 10. 验收与调试
 
 ### 10.1 必跑门禁
