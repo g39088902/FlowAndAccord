@@ -27,7 +27,7 @@
 - `crates/sim_wasm/AGENTS.md`：导出函数、线性内存、错误码和 WASM 约定。
 - `frontend/AGENTS.md`：脚本加载、快照映射、渲染管线、DOM 契约和浏览器约束。
 
-`docs/README.md` 是文档总入口；`docs/current/README.md` 是现状模块索引；`docs/plan/README.md` 是未落地方案索引；`TODO.md` 是待办清单。
+`docs/README.md` 是文档总入口；`docs/current/README.md` 是现状模块索引；`docs/plan/README.md` 是未落地方案索引。
 
 ## 1. 架构边界
 
@@ -42,7 +42,7 @@ crates/sim_core  →  crates/sim_wasm  →  frontend/rust/sim_wasm.wasm
 - `frontend`：Worker 代理、快照解码、配置 UI、WebGL 地形层和过渡期 Canvas 2D 实体层。浏览器 UI (版本: v1.60.1)。
 - 改动必须保持内核与表现层解耦；前端渲染不得改变模拟状态或 `WorldRng` 消费顺序。
 
-渲染目标是全量 WebGL。★ v1.60.1 起地形/光照/装饰/阴影的 Canvas 备用通道已删除（WebGL 不可用为启动硬门槛）；水系/实体/标签仍在 2D 覆盖层，阶段三~五迁移完成前不得删除该覆盖层。改渲染代码前必须阅读 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 与 `frontend/AGENTS.md`。
+渲染目标是全量 WebGL（当前迁移状态见 `frontend/AGENTS.md` 头部）；改渲染代码前必须阅读 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 与 `frontend/AGENTS.md`。
 
 ## 2. 编译、验证与运行
 
@@ -83,11 +83,11 @@ node tools/bump-version.js --check
 node frontend/server.js
 ```
 
-默认地址为 `http://localhost:3000`。端口已有服务时直接复用，不要重复启动。存档链路使用 Chrome 或 Edge；受限环境只能用内置浏览器加 `?nogate=1` 验证非存档链路，不能据此证明真实存档读写。每次重编译 WASM 后强制刷新；页面顶部标题栏右侧显示版本徽章 **`v1.60.1`**。
+默认地址为 `http://localhost:3000`。端口已有服务时直接复用，不要重复启动；存档链路使用 Chrome 或 Edge（受限环境只能用内置浏览器加 `?nogate=1` 验证非存档链路，详见 `docs/current/tech/22-build-and-run.md`）。每次重编译 WASM 后强制刷新；页面顶部标题栏右侧显示版本徽章 **`v1.60.1`**。
 
 ## 3. 玩家交互速查
 
-`Space` 暂停/继续；左键点击族人、房屋或地标查看 Inspector；滚轮缩放、右键拖拽平移；顶部重置重新播撒初始族人。详细 UI 规则见 `frontend/AGENTS.md` 和 `docs/current/tech/05-observation-ux.md`。
+`Space` 暂停/继续；左键点击族人、房屋或地标查看 Inspector；滚轮缩放、右键拖拽平移；顶部重置重新播撒初始族人。详细 UI 规则见 `frontend/AGENTS.md` 和 `docs/current/design/05-observation-ux.md`。
 
 ## 4. 全局硬约束与易踩坑索引
 
@@ -118,30 +118,23 @@ Rust 变更必须重编译并复制到 `frontend/rust/sim_wasm.wasm` 和 `fronte
 
 ### 4.2 决策与寻路
 
-POI 施密特触发器、连续采收、中途原地重路由和榷场兜底都属于 `decisions/` 的决策语义；系统层不得旁路派发任务。详见 `decisions/AGENTS.md` 与 `docs/current/tech/11-decision-engine.md`。
+POI 施密特触发器、连续采收、中途原地重路由和榷场兜底等决策语义的机制细节见 `decisions/AGENTS.md` 与 `docs/current/tech/11-decision-engine.md`；系统层不得旁路派发任务（见 §4.11.1）。
 
 ### 4.3 Tick 顺序与确定性
 
-必须保持“季节/再生 → 代谢繁衍 → POI 交互与卸货 → 房屋 → 道路衰减 → 运动与决策 → 账本制度 → 清理”的顺序；卸货在决策前，道路衰减在运动前。每 tick 使用 `simulationDt = 1/60`，倍速只能用多步 tick。详见 `spatial/AGENTS.md` §二。
+tick 全序（季节/再生 → 代谢繁衍 → POI 交互与卸货 → 房屋 → 道路衰减 → 运动与决策 → 账本制度 → 清理）与「卸货在决策前、道路衰减在运动前」的权威描述见 `spatial/AGENTS.md` §二。每 tick 使用 `simulationDt = 1/60`，倍速只能用多步 tick。
 
 ### 4.4 随身搬运
 
-水、粮、木、石各自独立容量，资源点只装入行囊，回家按速率卸入家户账本；无家宅者不装袋，只现场进食饮水；金容量无限。改容量或装卸速率必须沿 `agent → ecology → decisions → snapshot → frontend` 全链路同步。
+水、粮、木、石各自独立容量、资源点只装入行囊、回家按速率卸入家户账本、无家宅者不装袋只现场进食饮水、金容量无限等契约的权威描述见 `spatial/AGENTS.md` §3.1。改容量或装卸速率必须沿 `agent → ecology → decisions → snapshot → frontend` 全链路同步。
 
 ### 4.5 FABS 快照四处同步
 
-新增 `agent`、`house`、`poi` 快照字段时必须同步：
-
-1. `snapshot.rs` 定义；
-2. `world_snapshot.rs::generate_snapshot()` 赋值；
-3. `snapshot_bin/encode.rs` 编码及 `dict.rs` 枚举码表；
-4. `frontend/js/snapshot-bin.js` 解码与 `rustworld.js::_applySnapshot()` 映射。
-
-同步核对使用 `tools/snapshot-check.js`、`test-wasm.js` 和 `test-determinism.js`。
+新增 `agent`、`house`、`poi` 快照字段时必须同步：`snapshot.rs` 定义 → `world_snapshot.rs::generate_snapshot()` 赋值 → `snapshot_bin/encode.rs` 编码及 `dict.rs` 枚举码表 → `frontend/js/snapshot-bin.js` 解码与 `rustworld.js::_applySnapshot()` 映射。同步核对使用 `tools/snapshot-check.js`、`test-wasm.js` 和 `test-determinism.js`；完整清单见 `spatial/AGENTS.md` §3.3 与 `docs/current/tech/06-snapshot-and-save.md` §7.1。
 
 ### 4.5.1 跨世界驻留表缓存
 
-FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `epoch` 或全局单调计数。 `world_load` / `world_create` 后必须清理工具侧缓存。详见 `docs/current/tech/06-snapshot-and-save.md` §7.2 和 `frontend/AGENTS.md` §5.2。
+FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `epoch` 或全局单调计数。`world_load` / `world_create` 后必须清理工具侧缓存。详见 `docs/current/tech/06-snapshot-and-save.md` §7.2 和 `frontend/AGENTS.md` §5.2。
 
 ### 4.6 文件粒度
 
@@ -149,7 +142,7 @@ FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `ep
 
 ### 4.7 POI 与 ID
 
-全图默认 23 处 POI，ID 段位、资源类型和营地行政区升级门槛由 `docs/current/tech/08-ecology-and-poi.md` 维护；不要在调用方复制数量或段位常量。
+全图 POI 数量、ID 段位、资源类型和营地行政区升级门槛的权威位置是 `docs/current/tech/08-ecology-and-poi.md`（与 `spatial/AGENTS.md` 的 poi.rs）；不要在调用方复制数量或段位常量。
 
 ### 4.8 行为与生理规则归属
 
@@ -168,13 +161,9 @@ FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `ep
 
 项目是确定性内核驱动的长期涌现系统。临时断言验证后删除；长期门禁是 `test-wasm.js` 和 `test-determinism.js`。不把 `cargo test --lib` 当作行为测试。
 
-### 4.10.1 `dev-wasm` 仅供本地迭代
-
-`--profile dev-wasm` 只用于快速反馈；严禁复制到前端、提交或部署。发布必须重新执行 `--release` 并同步双副本。
-
 ### 4.10.2 `target/` 治理
 
-使用 `node tools/clean-target.js` 清理宿主 debug 产物；脚本保护 `target/wasm32-unknown-unknown/release`，不要手工删除发布缓存。
+`target/` 体积治理使用 `node tools/clean-target.js`（默认预览、`--yes` 执行），脚本白名单保护 `target/wasm32-unknown-unknown/release`；不要手工删除发布缓存。详见 `docs/current/tech/23-tools-guide.md`。
 
 ### 4.11 房屋系统只结算，不指挥
 
@@ -198,11 +187,11 @@ CI 使用标准 rustup，依次完成 WASM 编译、双副本同步、确定性/
 
 ### 4.15 高频 DOM 重建
 
-高频更新容器必须使用内容快照缓存；HTML 未变化时不得重新赋值 `innerHTML`，否则会在一次点击期间替换节点并丢失交互。详见 `docs/current/tech/21-frontend-dev-guide.md` §4.5。
+高频更新容器必须使用内容快照缓存；HTML 未变化时不得重新赋值 `innerHTML`，否则会在一次点击期间替换节点并丢失交互。机制细节见 `docs/current/tech/21-frontend-dev-guide.md` §4.5。
 
 ### 4.16 运动状态
 
-是否移动只由 `current_lane_id.is_some()` 决定。移动态转非移动态必须调用 `enter_stationary_state()`，不得直接写 `agent.state`；到达判定使用 `current_lane_id.is_none()`，不要使用永不清空的 `route.is_empty()`。详见 `spatial/AGENTS.md` §4.6 和 `decisions/AGENTS.md` §4.9。
+是否移动只由 `current_lane_id.is_some()` 决定。移动态转非移动态必须调用 `enter_stationary_state()`，不得直接写 `agent.state`；到达判定使用 `current_lane_id.is_none()`，不要使用永不清空的 `route.is_empty()`。机制细节见 `spatial/AGENTS.md` §4.6 和 `decisions/AGENTS.md` §4.9。
 
 ### 4.17 换行符
 
@@ -210,11 +199,16 @@ CI 使用标准 rustup，依次完成 WASM 编译、双副本同步、确定性/
 
 ### 4.18 渲染迁移
 
-目标是全量 WebGL 和共享深度缓冲：不要在 Canvas 2D 侧新增遮挡优化；几何、LOD、季相和遮罩逻辑留在 CPU 模型层；过渡期实体仍进入 `drawWorldEntities()` 统一队列。详见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 和 `frontend/AGENTS.md`。
+目标是全量 WebGL 和共享深度缓冲：不要在 Canvas 2D 侧新增遮挡优化，几何、LOD、季相和遮罩逻辑留在 CPU 模型层。细节见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 和 `frontend/AGENTS.md`。
 
-### 4.19 多 Agent 并行与写字板
+### 4.19 多 Agent 并行与写字板（`WORKBOARD.md`）
 
-本仓库有时会有多个 Agent 同时工作。开工前在根目录写字板 `WORKBOARD.md` 登记影响范围与预计起止时间，收工后删除自己的条目（文件保留复用）；提交前结合写字板只提交自己登记的改动。详见 `docs/current/tech/30-workflow.md` §5。
+本仓库有时会有多个 Agent 同时工作（多人或多会话并行）。根目录 `WORKBOARD.md` 是唯一的多 Agent 并行协调板，其定义为：**存放并行工作的临时登记条目，只写必要信息，不写实现细节**。本节为权威定义，其他文档只保留链接：
+
+- **开工前登记**：动手前在 `WORKBOARD.md` 追加一行登记：Agent 标识、影响范围（目录 / 文件 / 模块）、预计起止时间。
+- **收工清理**：任务完成（提交或明确交接）后删除自己的登记条目；`WORKBOARD.md` 文件本身保留，供后续 Agent 复用。
+- **过期兜底**：登记明显过期（长时间无提交、任务已中断）时，其他 Agent 可代为删除过期条目，避免写字板失真。
+- **提交前核对**：结合写字板区分自己与他人的改动，只提交自己登记的改动（见 `docs/current/tech/30-workflow.md` 附篇一 §F）。
 
 ## 5. 文档分层
 
