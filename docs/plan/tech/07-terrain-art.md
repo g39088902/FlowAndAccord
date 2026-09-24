@@ -364,7 +364,7 @@ seed=0 因 `sim_worker.js` 入口缺陷（`msg.seed || Date.now()` 替换 0）�
 - **快照同步**：新增 accent 字段/枚举时，`world_snapshot.rs`/`snapshot.rs`/`snapshot_bin/encode.rs`/`snapshot-bin.js`/`rustworld.js` 五处同步；枚举还要同步 `snapshot_bin/dict.rs`。
 - **配置集中**：影响模拟的参数走 `SimConfig` 全链路；纯视觉参数集中在 `config.render.js`（`RENDER_CONFIG`，不注入 WASM）；共用光源参数沿用 `config.lighting.js`。
 - **文件行数**：单文件严控 800 行以内。
-- **持久化测试禁令**：不提交临时单元测试；临时验证跑通后删除，长期验证以 `test-wasm.js` 等既有门禁为准。
+- **测试策略**：临时验证跑通后删除，长期验证以 `test-wasm.js` 等既有门禁为准。
 
 ## 11. 验收与性能预算
 

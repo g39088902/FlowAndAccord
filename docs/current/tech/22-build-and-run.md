@@ -162,10 +162,10 @@ node tools/config-check.js
 ### 3.3 Rust 原生编译检查
 
 ```powershell
-cargo test --lib
+cargo check --lib
 ```
 
-当前源码无持久化单元测试（见 AGENTS.md §4.10 混沌系统定位），命令通过即代表编译无误。
+编译通过即代表语法与类型无误；行为与确定性验证以 `node tools/test-wasm.js` / `test-determinism.js` 门禁为准（根 AGENTS.md §4.10）。
 
 ---
 
@@ -264,7 +264,7 @@ node tools/config-check.js
 ```bash
 cargo build -p sim_core
 ```
-> 项目定位为混沌系统，不持久化保存单元测试脚本（详见根 AGENTS.md §4.10）。`cargo test --lib` 仅验证编译通过，无测试用例。
+> 测试策略见根 AGENTS.md §4.10；行为与确定性验证以 `test-wasm.js` / `test-determinism.js` 门禁为准，临时验证脚本使用后清理。
 
 ## 5. 版本号统一升版与一致性校验
 ```bash

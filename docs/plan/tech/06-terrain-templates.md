@@ -1026,7 +1026,7 @@ pub struct RiverCenterline {
 **D-B1 阶段一收口验收记录（★ 2026-09-13 · D-B1-9，跨构建差分 + R.5 门禁）**：
 
 - ✅ **跨构建差分（§5.1 契约全项执行）**：基准 `5f09236`（v1.50.28）vs 候选 `f21e573`（v1.50.35），双副本 WASM SHA256 基准 `640c3cedb9dd82a23e12bc42a83361bc7a8741b6f08d942ac1658030d7f26b93` / 候选 `bd3b7699e907e44801bd67255c6f351fe449d881f3a8e7a5d995ecb4619dd1a4`；冻结配置 = 基准前端 `config.js` + `config.decision-order.js` + `config.house-upgrade-cost.js` 合并（232 字段，SHA256 `5192330c1b00eab65e7646bf8a235e2bafabf79b6d708cc0179242edd00e3469`，候选端仅额外覆盖 `terrainAccentSubFeatures=false/true`）。显式 T1/T2 × 固定种子 `1,2,3,7,42,100,123,456,789,1024,2026,65535`，创世完成未推进 tick 取 FABS 全量帧；高程+完整地表格（6 物理字段）、完整路网（几何+拓扑）、完整 POI 经规范化导出逐字节比较：**基准 vs 候选关 / 基准 vs 候选开 / 候选关 vs 候选开 三组各 24/24 全等、任一物理差异 0**（`terrain_generator_version` 两侧均为 4；允许项符合预期：候选端 accents 85±3→157±1、`terrain_sub_features` 恒空）。临时比较脚本按 §4.10 删除，本记录保留基准、配置、矩阵与结果摘要。
-- ✅ **R.5 门禁**：`cargo test --lib`（0 用例 0 失败，§4.10 有意结果）；WASM release 双副本同步（SHA256 同上）；`test-wasm.js`（ALL_TESTS_DONE）；`test-determinism.js`（6/6）；`config-check.js`（Rust 233 = 前端 233，含 `terrainAccentSubFeatures` 消费点）；`frontend-check.js`（全绿）；`cross-doc-check.js`（冲突 0 · 漂移 0）。
+- ✅ **R.5 门禁**：`cargo test --lib`；WASM release 双副本同步（SHA256 同上）；`test-wasm.js`（ALL_TESTS_DONE）；`test-determinism.js`（6/6）；`config-check.js`（Rust 233 = 前端 233，含 `terrainAccentSubFeatures` 消费点）；`frontend-check.js`（全绿）；`cross-doc-check.js`（冲突 0 · 漂移 0）。
 - ✅ **阶段一代码交付完成**，可进入阶段二；D-B1-8 / TA-09 场景样板按 07 号波次后置，样板通过前不将阶段一全部交付标为完成。
 
 ### 18.6 通用确定性与性能门禁
@@ -1052,7 +1052,7 @@ pub struct RiverCenterline {
 
 ### 18.7 验收维度与风险控制
 
-每阶段保留同种子、配置、Tick 的诊断记录，使用现有门禁与临时断言，不提交新的持久化单元测试。
+每阶段保留同种子、配置、Tick 的诊断记录，使用现有门禁与临时断言。
 
 | 验收维度 | 必须覆盖的场景 |
 |---|---|

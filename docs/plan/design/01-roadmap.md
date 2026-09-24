@@ -116,7 +116,7 @@
 | **渐进复杂度** | 首局展示生存/房屋/关系，中期展示家户/道路/市场，长期运行后再展开政治/经济分析 |
 | **快照完整同步** | 新增字段遵循[根指南 §4.5](../../../AGENTS.md#45--快照与前端字段四处同步-m4-起v1453)与[影响矩阵](../../current/tech/29-impact-matrix.md)，覆盖结构、生产者、FABS 编解码及前端映射 |
 | **配置集中化** | 新增规则参数同时进入 `config.rs`、前端配置和 `config-check.js`；不散落行为字面量 |
-| **持久化测试禁令** | 不提交临时单元测试；长期验证使用 `test-wasm.js`、`test-determinism.js`、`frontend-check.js` 等门禁 |
+| **测试策略** | 临时验证脚本/断言用后即删；长期验证使用 `test-wasm.js`、`test-determinism.js`、`frontend-check.js` 等门禁 |
 
 ---
 
@@ -199,7 +199,7 @@ Flow & Accord 不需要成为 RimWorld 的战斗版，也不需要成为城市�
 | 配置集中化 | 新超参进入 `config.rs`（命名 const + 字段 + Default 三处）+ 前端配置 + `config-check.js` | 全部 |
 | 存档纪律 | `SAVE_FORMAT_VERSION` 仅在结构不兼容时升级并同步前端；新增行为状态必须持久化，读档不得重规划/重掷点/重发资本；旧应用版本存档拒绝加载 | 记忆 · 市场 · M19 |
 | 版本与 WASM 双副本 | 改动后统一升版器升版、重编译并同步 `frontend/rust/` 与 `frontend/` 双副本 | 全部 |
-| 持久化测试禁令 | 临时验证脚本/断言用后即删；长期验证走 `test-wasm.js` / `test-determinism.js` / `config-check.js` / `frontend-check.js` | 全部 |
+| 测试策略 | 临时验证脚本/断言用后即删；长期验证走 `test-wasm.js` / `test-determinism.js` / `config-check.js` / `frontend-check.js` | 全部 |
 | 性能配对基线 | 同机器/同配置配对相对基线，决策与内核耗时增长 ≤5%；报价只在决策/交易发生时计算，不逐 tick 全人口扫描 | 记忆 · 市场 · 性能 |
 | 文档纪律 | 规划不写入现状文档；机制落地后迁入 `docs/current/`，并同步局部 AGENTS、changelog 与版本 | 全部 |
 

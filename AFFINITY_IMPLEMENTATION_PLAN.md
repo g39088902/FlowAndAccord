@@ -35,7 +35,7 @@
 | [layout.rs](crates/sim_core/src/spatial/snapshot_bin/layout.rs) | FABS 为带目录的顺序流；结构变化须升级 FORMAT_VERSION | 追加独立关系 section，按非空条目编码 |
 | [内部市场规划](docs/plan/tech/03-internal-market.md) | 真人撮合、订单簿仍是规划 | 不把现有外部榷场当作真人交易对象 |
 
-实施前按变更目录再读根与局部 AGENTS.md，尤其 sim_core、spatial、decisions、sim_wasm、frontend。新模块单文件不超过 800 行；不新增持久化单元测试文件。
+实施前按变更目录再读根与局部 AGENTS.md，尤其 sim_core、spatial、decisions、sim_wasm、frontend。新模块单文件不超过 800 行。
 
 ## 3. 数据模型、接口与配置
 

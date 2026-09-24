@@ -71,6 +71,14 @@ stateDiagram-v2
 
 遇到“无动作”或 `undefined` 时，优先检查这条链，而不是先修改调用方的兜底逻辑。
 
+## 5. 多 Agent 并行工作约定（写字板）
+
+本仓库有时会有多个 Agent 同时工作（多人或多会话并行），为避免提交相互覆盖、diff 归属不清，所有 Agent 在动手前和收工后遵循以下约定：
+
+- **开工前登记**：在根目录写字板 `WORKBOARD.md` 追加一条登记：Agent 标识、影响范围（目录 / 文件 / 模块）、预计起止时间。只写必要信息，不写实现细节。
+- **收工清理**：任务完成（提交或明确交接）后删除自己的登记条目；`WORKBOARD.md` 文件本身保留，供后续 Agent 复用。
+- **过期兜底**：登记明显过期（长时间无提交、任务已中断）时，其他 Agent 可代为删除过期条目，避免写字板失真。
+- **提交前核对**：结合写字板区分自己与他人的改动，只提交自己登记的改动（见附篇一 §F）。
 
 ---
 
@@ -91,7 +99,7 @@ node tools/cross-doc-check.js          # 跨文档事实指纹：文档间冲突
 node tools/bump-version.js --check        # 版本号定义点零漂移（AGENTS.md §4.9）
 ```
 
-- [ ] 工作区只有本次任务相关文件；没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本。
+- [ ] 工作区没有构建产物、临时截图、调试输出、`.playwright-cli/` 或临时测试脚本；结合 `WORKBOARD.md` 核对并行 Agent 的影响范围。
 - [ ] `git diff --check` 无空白与换行符错误；换行符统一为 LF（严禁 CRLF），新增/删除/重命名文件和引用路径已核对。
 - [ ] `doc-link-check.js` 全绿（改过文档路径 / 迁移过文档目录时尤其必跑）。
 - [ ] 文档维护检查没有未处理的 `MISSING_DOC`、`MISSING_SOURCE` 或 `UNTRACKED_DOC`；源码产生的 `NEEDS_REVIEW` 已复核。
@@ -121,9 +129,7 @@ node tools/test-wasm.js
 且 dev-wasm 产物（2.02 MB）从不进仓库、从不部署，体积代价为零。
 
 - [ ] WASM 双副本已同步。
-- [ ] ⚠️ **不跑 `cargo test --lib`**（★ v1.50.82 移除）：源码按 §4.10 禁止持久化单测，实测 `running 0 tests`，
-      花 35s 却零覆盖；其唯一实际作用「编译 lib」已被上面的 `cargo build -p sim_wasm` 完全覆盖。
-      若确需独立类型检查，用 `cargo check --lib`（约 13s）。
+- [ ] 独立类型检查用 `cargo check --lib`（约 13s）；发布构建以 `cargo build -p sim_wasm --release` 为准。
 - [ ] 快照字段**四处同步**（★ M4）：`snapshot.rs` / `world.rs`（或 `world_snapshot.rs`）/ `snapshot_bin/encode.rs` / `frontend/js/snapshot-bin.js`+`rustworld.js`，并跑 `node tools/snapshot-check.js`。
 - [ ] 若改动驻留表 / `STR_TAB` / 新增 `world_create` 调用点：跨世界缓存失效判据仍为 `start_index == 0`（根 `AGENTS.md` §4.5.1，勿改用 `epoch`）。
 - [ ] 同种子确定性、无 NaN、无越界、长程稳定性通过。
@@ -159,13 +165,13 @@ node tools/diagnose.js --check all
 ```
 
 - [ ] 使用固定 Seed/Tick 复现并记录结果，相关规则（尤其 Rule 5）无新增异常。
-- [ ] 临时 `#[cfg(test)]`、`tests.rs`、调试断言和实验脚本已删除。
+- [ ] 临时调试断言和实验脚本已删除。
 
 ## F. 最终 diff 审阅
 
-执行 `git diff --stat` 和 `git diff --name-only`，逐文件确认：
+执行 `git diff --stat` 和 `git diff --name-only`（多 Agent 并行时 diff 可能混入他人改动，结合 `WORKBOARD.md` 区分归属）：
 
-- [ ] diff 都属于本次任务，删除操作、版本号、换行符（LF）、文档链接和配置字段无误。
+- [ ] 本次提交只包含自己登记的改动；删除操作、版本号、换行符（LF）、文档链接和配置字段无误。
 - [ ] 对外文案、错误提示和空态与当前机制一致。
 - [ ] 提交说明包含“改了什么 / 为什么改 / 如何验证”；未执行的门禁已说明原因。
 

@@ -211,7 +211,7 @@ WorldSave 保存市场实体、托管与手续费余数、订单、接收预留�
 
 记录每 tick/每阶段耗时、峰值订单与托管主体数、报价比较次数和内存；按相同人口/世界规模配对基线。所有活跃簿扫描有上限，普通订单大量占用时危机不能无解释饿死。平衡数值须有实验记录后再启用默认开关，不把“有交易”当作“改善生存”。
 
-实现时按变更范围运行现有 WASM release 编译及双副本同步、`test-wasm.js`、`test-determinism.js`、`snapshot-check.js`、`config-check.js`、`frontend-check.js`、`diagnose.js --check all`，性能复用 profile-benchmark。只使用临时断言验证专项场景，不提交新增持久化单元测试。
+实现时按变更范围运行现有 WASM release 编译及双副本同步、`test-wasm.js`、`test-determinism.js`、`snapshot-check.js`、`config-check.js`、`frontend-check.js`、`diagnose.js --check all`，性能复用 profile-benchmark。只使用临时断言验证专项场景，验证后删除。
 
 每批实现同步对应 current 模块文档、局部 AGENTS、代码地图及 changelog；通过 `doc-maintenance-check.js`、`cross-doc-check.js`、`doc-link-check.js`、`code-map-check.js`、`bump-version.js --check`。统一 bump 工具升版，若变更 world_save.rs，必须重新编译并同步两个 WASM 文件。
 

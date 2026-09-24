@@ -19,7 +19,7 @@ stateDiagram-v2
     A --> B : 对照快速自检清单, 启动六类逐项核对
     B --> C : D(WorldRng共享/遍历Vec序/相位120/不改simulationDt) + C(快照四处同步/双副本/agent_index) 全过
     C --> D : B(tick顺序/决策相位/无系统扫描指挥) 全过
-    D --> E : P(CI标准rustup/MIME/门禁不过不部署) + O(单文件800行/不持久化测试/版本自增) + F(脚本顺序/DOM ID全量替换) 全过
+    D --> E : P(CI标准rustup/MIME/门禁不过不部署) + O(单文件800行/版本自增) + F(脚本顺序/DOM ID全量替换) 全过
     E --> [*] : bump-version + changelog 后提交
     B --> F : 确定性 / 数据一致性任一红线违反
     C --> F : 行为语义任一红线违反
@@ -39,7 +39,7 @@ stateDiagram-v2
 **不变量**（违反即出 bug）：
 - 门禁不过不部署（P3）：`test-wasm.js` 失败时版本不上线，确定性/越界/NaN 红线不可绕过。
 - 快照字段必须四处同步（C2）：`snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/encode.rs` / `snapshot-bin.js`+`rustworld.js` 缺一则前端读到 `undefined`。
-- 版本号自增（O6）：仅纯文档变更可跳过；其余每次 AI 改代码必须同步徽章、`AGENTS.md` 版本号与 `changelog` 条目。
+- 版本号自增（O5）：仅纯文档变更可跳过；其余每次 AI 改代码必须同步徽章、`AGENTS.md` 版本号与 `changelog` 条目。
 
 ## 1. 确定性约束 (Determinism)
 
@@ -143,12 +143,11 @@ stateDiagram-v2
 | # | 不变量 | 来源 | 违反后果 |
 |---|---|---|---|
 | O1 | **单文件严控在 800 行以内**，功能膨胀时及时子目录模块化拆分 | §4.6 | 可维护性下降，agent 定位困难 |
-| O2 | **不持久化保存任何单元测试脚本**（`#[cfg(test)]` / `tests.rs` 一律不进入提交）；临时验证通过后删除 | §4.10 | 固定断言锁死演化多样性，与混沌系统定位冲突 |
-| O3 | **同一事实只在一个权威位置出现**，其余用交叉引用，禁止多处复制粘贴导致漂移 | AGENTS.md §5 | 文档与代码不一致 |
-| O4 | **新增模块时**先建 `docs/current/0X-*.md` + 对应目录 `AGENTS.md`，再在根 AGENTS.md §0 加索引，最后在 `../01-changelog.md` 追加条目 | AGENTS.md §5 | 文档缺失，后续 agent 无指南可依 |
-| O5 | **改机制时同步更新**对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新 | AGENTS.md §5 | 文档滞后于代码 |
-| O6 | **版本号自增**：每次 AI 修改代码必须同步更新 ① `index.html` 版本徽章 ② 根 AGENTS.md §1/§2 版本号 ③ changelog 条目（**仅文档变更除外**：`docs/` / `AGENTS.md` 纯内容改动不升版、不重跑测试，见 §4.0.1） | §4.9 | 版本混乱，无法追踪变更 |
-| O7 | **全仓统一使用 LF 作为换行符**，严禁提交 CRLF（Windows 开发环境配置 `core.autocrlf=input`，编辑器统一 LF） | AGENTS.md §4.17 | `git diff` 产生跨平台换行符脏变更、`git diff --check` 空白报错 |
+| O2 | **同一事实只在一个权威位置出现**，其余用交叉引用，禁止多处复制粘贴导致漂移 | AGENTS.md §5 | 文档与代码不一致 |
+| O3 | **新增模块时**先建 `docs/current/0X-*.md` + 对应目录 `AGENTS.md`，再在根 AGENTS.md §0 加索引，最后在 `../01-changelog.md` 追加条目 | AGENTS.md §5 | 文档缺失，后续 agent 无指南可依 |
+| O4 | **改机制时同步更新**对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新 | AGENTS.md §5 | 文档滞后于代码 |
+| O5 | **版本号自增**：每次 AI 修改代码必须同步更新 ① `index.html` 版本徽章 ② 根 AGENTS.md §1/§2 版本号 ③ changelog 条目（**仅文档变更除外**：`docs/` / `AGENTS.md` 纯内容改动不升版、不重跑测试，见 §4.0.1） | §4.9 | 版本混乱，无法追踪变更 |
+| O6 | **全仓统一使用 LF 作为换行符**，严禁提交 CRLF（Windows 开发环境配置 `core.autocrlf=input`，编辑器统一 LF） | AGENTS.md §4.17 | `git diff` 产生跨平台换行符脏变更、`git diff --check` 空白报错 |
 
 ---
 

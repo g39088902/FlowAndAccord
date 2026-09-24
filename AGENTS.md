@@ -166,7 +166,7 @@ FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `ep
 
 ### 4.10 测试策略
 
-项目是确定性内核驱动的长期涌现系统，不提交持久化 `#[cfg(test)]` 或 `tests.rs`。临时断言验证后删除；长期门禁是 `test-wasm.js` 和 `test-determinism.js`。不把 `cargo test --lib` 当作行为测试。
+项目是确定性内核驱动的长期涌现系统。临时断言验证后删除；长期门禁是 `test-wasm.js` 和 `test-determinism.js`。不把 `cargo test --lib` 当作行为测试。
 
 ### 4.10.1 `dev-wasm` 仅供本地迭代
 
@@ -211,6 +211,10 @@ CI 使用标准 rustup，依次完成 WASM 编译、双副本同步、确定性/
 ### 4.18 渲染迁移
 
 目标是全量 WebGL 和共享深度缓冲：不要在 Canvas 2D 侧新增遮挡优化；几何、LOD、季相和遮罩逻辑留在 CPU 模型层；过渡期实体仍进入 `drawWorldEntities()` 统一队列。详见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 和 `frontend/AGENTS.md`。
+
+### 4.19 多 Agent 并行与写字板
+
+本仓库有时会有多个 Agent 同时工作。开工前在根目录写字板 `WORKBOARD.md` 登记影响范围与预计起止时间，收工后删除自己的条目（文件保留复用）；提交前结合写字板只提交自己登记的改动。详见 `docs/current/tech/30-workflow.md` §5。
 
 ## 5. 文档分层
 

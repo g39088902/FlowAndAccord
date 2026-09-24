@@ -133,7 +133,7 @@ rustworld.js::_applySnapshot()
 | :--- | :--- |
 | 单文件 ≤ 800 行 | 前端与 Rust 均遵守；超出按职责拆分并为新目录补局部 `AGENTS.md` |
 | 目录级 `AGENTS.md` | 每个复杂目录维护一份，聚焦职责边界、文件清单与局部易踩坑 |
-| 持久化测试禁令 | 不提交临时单元测试；长期验证走 `test-wasm.js` / `test-determinism.js` / `config-check.js` / `frontend-check.js` |
+| 测试策略 | 长期验证走 `test-wasm.js` / `test-determinism.js` / `config-check.js` / `frontend-check.js`；临时验证脚本/断言用后即删 |
 | 文档纪律 | 规划不写入现状文档；机制落地后才更新 `docs/current/`、局部 AGENTS、changelog 与版本 |
 
 完整约定见 [`66 不变量`](./28-invariants.md) 与 [`68 工作流`](./30-workflow.md)。
