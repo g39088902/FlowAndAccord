@@ -18,6 +18,7 @@
 6. 再实现 `backend::voxel`：稀疏 chunk、密度场、材质场、网格提取和 `HeightfieldView` 兼容层。
 7. 体素静态数据由 `seed + recipe + generator_version` 重建；存档只保存版本、配方和动态 chunk delta，不把完整体素数组写入每个快照。
 8. 每个阶段都运行固定 seed 矩阵、WASM/native 对拍、无 NaN/越界检查和性能探针。失败时回退到旧生成器或显式降级 recipe，不在运行中修改 Agent、道路或居民位置。
+9. UGC-06~10 依次补齐地层材料、断层褶皱、静态地下水、剖面诊断/有限不确定性和多层寻路；UGC-11 外部数据、UGC-12 专业物理后端保持独立。
 
 实现模型不应自行改变下列事项：`WorldRng` 消费顺序、tick 顺序、`TerrainMap` 的现有查询语义、FABS 字段顺序、`STR_TAB.start_index == 0` 缓存失效判据、版本门禁和 `random` 准入规则。
 
@@ -38,6 +39,21 @@
 - 不要求一次性把路网、房屋、生态和前端全部改成三维体素查询。
 - 不把景观材质、装饰或前端视觉推断当成地理事实。
 - 不用机器学习模型替代确定性的地理过程；输入、迭代次数和结果必须可复现。
+- 不把多相流、反应输运、热传导、地质力学、地震反演或大规模并行求解器混入创世主线；这些属于 UGC-12 独立后端。
+- 不把专业建模器的“输入真实观测并反演地下结构”误写成程序化 recipe 已具备的能力；外部数据适配属于 UGC-11。
+
+本方案把“接近专业系统”拆成可交付层级：
+
+| 能力层 | 本项目路线 | 处理方式 |
+|---|---|---|
+| 程序化三维结构 | 地层柱、断层、褶皱、不整合、洞穴和悬挑 | UGC-06/07，进入统一 Field Graph |
+| 地表—地下水—生态关系 | 水位、储水、渗透、湿度、草地/沙地 | UGC-08，先做静态创世状态 |
+| 不确定性和可解释性 | 有限候选、confidence、字段切片、剖面 | UGC-09，不引入黑箱模型 |
+| 多层游戏语义 | 地下碰撞、洞口、跨层寻路 | UGC-10，逐步接入 Agent |
+| 真实地质数据 | DEM、接触点、钻孔、断层线 | UGC-11，只读适配器 |
+| 专业物理求解 | 多相流、反应、热、力学、地震反演 | UGC-12 独立后端，默认不阻塞游戏路线 |
+
+专业系统通常同时处理地层接触点、地层方向、层序、厚度和断层属性；本方案先用 recipe 生成同样的结构字段，再为真实观测保留输入适配口。专业地下物理系统还会求解流动、传输、化学和地质力学；这些过程不属于当前创世编译器的默认职责。
 
 ### 1.3 不可变契约
 
@@ -89,8 +105,13 @@ crates/sim_core/src/geo/
     operators.rs        # Ridge/Valley/Noise/Blend 等通用算子
     processes.rs        # Uplift/Erosion/Flow/Deposition 通用过程
     hydrology.rs        # 汇流、河道、岸带和浅滩候选
+    strata.rs           # 地层柱、材料属性和地下储水参数
+    structures.rs       # 断层、褶皱、不整合位移场
+    groundwater.rs      # 静态地下水位、补给、排泄和水的可达性
+    uncertainty.rs      # 有限候选、排序、confidence 和候选 hash
     semantics.rs        # SurfaceKind、WaterBody、TerrainFeature 投影
     constraints.rs      # 通用玩法约束与诊断结果
+    diagnostics.rs      # 字段切片、剖面、候选对比和证据包
     compiler.rs         # 固定顺序、RNG 域、事务和编译入口
     recipes.rs          # 内置配方；只放数据，不放生成分支
   backend/
@@ -98,6 +119,10 @@ crates/sim_core/src/geo/
     heightfield.rs      # 当前 TerrainMap/GeoCell 兼容后端
     voxel.rs            # 稀疏体素 chunk 与密度采样
     meshing.rs          # Surface Nets/Dual Contouring 网格提取
+    layers.rs           # 多层区间查询、洞口和跨层连接
+  adapters/
+    mod.rs              # 外部数据适配边界
+    observations.rs     # DEM、接触点、钻孔和断层线输入
 ```
 
 迁移后的职责：
@@ -127,6 +152,9 @@ pub struct TerrainRecipe {
     pub id: RecipeId,
     pub schema_version: u16,
     pub nodes: Vec<TerrainNode>,
+    pub stratigraphy: StratigraphicColumn,
+    pub structures: Vec<StructuralEvent>,
+    pub uncertainty: UncertaintySpec,
     pub constraints: Vec<TerrainConstraint>,
     pub output: OutputSpec,
 }
@@ -177,11 +205,17 @@ moisture        地表湿度
 flow            汇流量
 sediment        沉积物浓度
 water_level     静态水位
+water_table     地下水位
+aquifer_mask    地下储水层候选
+recharge        地下水补给量
+discharge       地下水排泄量
 water_access    可在合理距离和坡度内取得水的程度
 soil_moisture   土壤湿润度
 vegetation_ok   是否满足植被生长条件
+stratum_id      地层单元 ID
 surface_material 地表材料类别
 surface_palette  地表调色类别
+confidence      候选生成稳定度
 roughness       表面粗糙度
 build_mask      可建造候选权重
 walk_mask       可行走候选权重
@@ -248,7 +282,67 @@ walk_mask       可行走候选权重
 
 第一版不追求物理精确，追求稳定、可调、可诊断。过程必须使用固定遍历顺序和固定迭代次数；不得依赖线程调度或不稳定的浮点归约。
 
-### 4.5 约束与诊断
+### 4.5 地层、结构变形和地下属性
+
+体素后端不能只存“实心/空气”。每个 recipe 还应声明可复用的地下结构数据。它们是生成输入，不是模板专用代码。
+
+```rust
+pub struct StratigraphicColumn {
+    pub units: Vec<StratumSpec>, // 从年轻到古老，顺序固定
+}
+
+pub struct StratumSpec {
+    pub id: u16,
+    pub thickness_m: f32,
+    pub material: u8,
+    pub hardness: f32,
+    pub soil_storage: f32,
+    pub permeability: f32,
+    pub palette: u8,
+}
+
+pub enum StructuralEvent {
+    Fault { plane: PlaneSpec, displacement_m: f32 },
+    Fold { axis: AxisSpec, amplitude_m: f32, wavelength_m: f32 },
+    Unconformity { surface: NodeId },
+}
+```
+
+实现顺序固定为：地层柱 → 抬升与断层/褶皱 → 侵蚀和沉积 → 水文 → 土壤与植被 → 体素材料。断层先用可重复的位移场实现，不引入通用偏微分方程求解器；褶皱先用轴线、振幅和波长控制。这样可以生成地层错动、峡谷、断陷盆地和洞穴岩壁，同时保留统一算子边界。
+
+地下属性使用“类别加数值”的轻量表示：
+
+- `material`：岩石、砂、黏土、表土、砾石等稳定类别；
+- `hardness`：侵蚀和开挖阻力；
+- `soil_storage`：可保存的水量；
+- `permeability`：水向下渗透的相对速度；
+- `porosity_class`：可选的孔隙类别，首版只影响储水和生态，不做真实多相流。
+
+### 4.6 静态地下水和生态因果
+
+首版地下水只求稳定的创世状态，不在每个 tick 解完整地下流体方程。编译器从降水、汇流、土壤储水、渗透性和出水口推导：
+
+```text
+recharge → water_table → aquifer_mask → water_access → soil_moisture
+```
+
+输出增加 `water_table`、`aquifer_mask`、`recharge` 和 `discharge` 诊断字段。地下水可以提供泉水、湿地、洞穴湿岩和草地资格；它不能凭空改变地表高度，也不能绕过水源数量和通行约束。
+
+### 4.7 多候选生成和不确定性
+
+同一个 recipe 可以声明一组有限参数候选。每个候选使用独立的确定性哈希，不重抽共享 RNG：
+
+```rust
+pub struct UncertaintySpec {
+    pub candidate_count: u8,
+    pub parameter_jitter: Vec<ParameterRange>,
+    pub keep_top_n: u8,
+}
+```
+
+编译器记录每个候选的 `candidate_hash`、约束得分和字段 hash，输出 `confidence` 场。运行时只选择通过约束且排名最高的候选；诊断工具可以显示候选之间最不稳定的区域。这样提供可解释的不确定性，不引入机器学习或黑箱采样。
+
+### 4.8 约束与诊断
 
 ```rust
 pub enum TerrainConstraint {
@@ -293,14 +387,16 @@ pub fn compile_terrain(
 | 0 | `resolve_recipe` | 只读 seed/config/recipe | 已校验 recipe、拓扑顺序 |
 | 1 | `allocate_fields` | 新建字段，不读世界状态 | 初始 Field2 或 chunk 计划 |
 | 2 | `macro_relief` | 只写高程、硬度、降水 | 宏观地形字段 |
-| 3 | `erosion_and_deposition` | 只写高程、沉积物 | 侵蚀后的地形字段 |
-| 4 | `drainage_and_water` | 读高程/降水，写流量/水位 | 河道、湖盆、水体候选 |
-| 5 | `landmark_detection` | 只读字段 | 脊、谷、扇、湖、崖、浅滩候选 |
-| 6 | `soil_and_surface` | 读水的可达性、湿润度、坡度、硬度和温度 | 土壤、草地资格、沙地/裸土/岩石材料与调色类别 |
-| 7 | `semantic_projection` | 读取全部稳定字段 | `GeoCell`、通行/建造标记、植被候选和水体事实 |
-| 8 | `voxel_material_projection` | 读取密度表面与语义字段 | 体素材料、洞穴内壁材质和可渲染调色输入 |
-| 9 | `constraint_and_diagnostics` | 读取最终结果 | 约束报告、字段 hash、失败原因 |
-| 10 | `backend_finalize_and_accents` | 写高度场/voxel chunks，独立 accent RNG | 可查询后端、网格计划和纯视觉装饰 |
+| 3 | `strata_and_structure` | 读 recipe 地层柱和结构事件，写地层/位移场 | 地层、断层、褶皱和不整合候选 |
+| 4 | `erosion_and_deposition` | 只写高程、沉积物 | 侵蚀后的地形字段 |
+| 5 | `drainage_and_water` | 读高程/降水，写流量/水位 | 河道、湖盆、水体候选 |
+| 6 | `groundwater_and_storage` | 读土壤储水、渗透性、补给和出水口 | 地下水位、储水层、排泄点 |
+| 7 | `landmark_detection` | 只读字段 | 脊、谷、扇、湖、崖、浅滩候选 |
+| 8 | `soil_and_surface` | 读水的可达性、湿润度、坡度、硬度和温度 | 土壤、草地资格、沙地/裸土/岩石材料与调色类别 |
+| 9 | `semantic_projection` | 读取全部稳定字段 | `GeoCell`、通行/建造标记、植被候选和水体事实 |
+| 10 | `voxel_material_projection` | 读取密度表面与语义字段 | 体素材料、洞穴内壁材质和可渲染调色输入 |
+| 11 | `constraint_and_diagnostics` | 读取最终结果和候选集 | 约束报告、字段 hash、置信度和失败原因 |
+| 12 | `backend_finalize_and_accents` | 写高度场/voxel chunks，独立 accent RNG | 可查询后端、网格计划和纯视觉装饰 |
 
 伪代码：
 
@@ -310,13 +406,16 @@ let domains = RngDomains::from_seed(seed);
 let mut fields = allocate_fields(&recipe, config)?;
 
 macro_relief(&mut fields, &recipe, &domains.macro_relief)?;
+strata_and_structure(&mut fields, &recipe, &domains.structure)?;
 erosion_and_deposition(&mut fields, &recipe, &domains.processes)?;
 let hydro = drainage_and_water(&fields, &recipe, &domains.hydrology)?;
+let groundwater = groundwater_and_storage(&fields, &hydro, &recipe)?;
 let landmarks = detect_landmarks(&fields, &hydro, &recipe)?;
-let surface = soil_and_surface(&fields, &hydro, &landmarks, &recipe)?;
-let semantics = project_semantics(&fields, &hydro, &landmarks, &surface, &recipe)?;
+let surface = soil_and_surface(&fields, &hydro, &groundwater, &landmarks, &recipe)?;
+let semantics = project_semantics(&fields, &hydro, &groundwater, &landmarks, &surface, &recipe)?;
 let material = project_voxel_material(&fields, &semantics, &recipe)?;
-let report = evaluate_constraints(&semantics, &surface, &recipe.constraints)?;
+let candidates = evaluate_candidates(&fields, &semantics, &recipe.uncertainty)?;
+let report = evaluate_constraints(&semantics, &surface, &candidates, &recipe.constraints)?;
 
 if !report.passed {
     return Err(TerrainCompileError::Constraint(report));
@@ -331,9 +430,11 @@ Ok(CompiledTerrain { backend, semantics, accents })
 
 ```text
 macro_relief = mix64(seed ^ 0x5445525241494E01)
-processes     = mix64(seed ^ 0x5445525241494E02)
-hydrology    = mix64(seed ^ 0x5445525241494E03)
-semantics    = mix64(seed ^ 0x5445525241494E04)
+structure    = mix64(seed ^ 0x5445525241494E02)
+processes     = mix64(seed ^ 0x5445525241494E03)
+hydrology    = mix64(seed ^ 0x5445525241494E04)
+uncertainty  = mix64(seed ^ 0x5445525241494E05)
+semantics    = mix64(seed ^ 0x5445525241494E06)
 accents      = 现有 ACCENT_RNG_SALT
 ```
 
@@ -416,6 +517,30 @@ pub struct HeightfieldView<'a> {
 - chunk 边界必须使用 halo 或邻块采样，避免裂缝和法线跳变；
 - 静态 mesh 以 `recipe_hash + chunk_coord + generator_version` 缓存。
 
+### 7.3.1 多层查询和地下通行
+
+`HeightfieldView` 只保留顶部兼容投影；VoxelBackend 同时提供真正的分层查询：
+
+```rust
+pub struct SolidInterval {
+    pub z_min: f32,
+    pub z_max: f32,
+    pub material: u8,
+    pub walkable: bool,
+}
+
+pub trait LayeredTerrainQuery {
+    fn solid_intervals(&self, x: f32, y: f32) -> Vec<SolidInterval>;
+    fn surface_at(&self, x: f32, y: f32, layer: u16) -> Option<SurfaceHit>;
+}
+```
+
+第一版只把顶部层接入现有路网和 Agent。地下层先支持碰撞、体素材质和剖面查看；多层寻路需要独立的 `NavigationLayerId`、竖井/洞口连接点和跨层成本，完成后才能让 Agent 真正进入洞穴。
+
+### 7.3.2 外部数据适配边界
+
+为了接近专业建模器，未来可以增加只读输入适配器：数字高程、地层接触点、地层方向、钻孔柱状记录和断层线。适配器只转换成 `TerrainRecipe` 的地层柱、结构事件和约束，不直接修改编译器内部字段。首版不做地震反演和自动解释；输入数据必须带单位、坐标系、来源和时间戳。
+
 ### 7.4 存档和快照
 
 静态体素不作为每 tick 的完整快照字段。存档保存：
@@ -478,6 +603,46 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 只在 UGC-04 稳定后接入 FABS 和 WebGL。先传 chunk/mesh 请求结果，再考虑体素 delta。不要把完整体素数组塞进现有 cell section。
 
+### UGC-06：地层柱和材料属性
+
+为 recipe 增加 `StratigraphicColumn`、`StratumSpec` 和材料属性表。先让高度场输出地层 ID、硬度、储水量、渗透性和调色类别，再让 VoxelBackend 把这些字段写入体素材料。
+
+**退出条件**：固定剖面上的地层顺序、厚度、材料和颜色稳定；洞穴剖面不丢失层间关系；改变颜色映射不会改变物理字段。
+
+### UGC-07：断层、褶皱和不整合
+
+实现 `StructuralEvent` 的确定性位移场。第一版只支持有限断层和褶皱参数，不做反演，不读取 profile 分支。结构变形必须在侵蚀前完成，并在诊断图中显示位移前后地层。
+
+**退出条件**：断层两侧地层错动方向正确，褶皱峰谷连续，结构事件不产生 NaN、孤立浮空体或不可解释的水系断裂。
+
+### UGC-08：静态地下水与植被因果
+
+实现补给、储水、渗透、地下水位和排泄点的创世计算，把 `water_access`、`soil_moisture`、`vegetation_ok`、`surface_material` 和 `surface_palette` 接入统一字段图。
+
+**退出条件**：干旱阈值以下没有草地事实；泉水、湿地和地下水位可由字段诊断解释；颜色、装饰和资源落位不再根据模板名称猜测。
+
+### UGC-09：剖面诊断与有限不确定性
+
+增加开发者剖面查看器、字段切片、候选对比、`confidence` 场和候选 hash。每个候选都记录约束得分、失败原因和字段 hash，只选择固定排序中的最佳通过候选。
+
+**退出条件**：同一输入的候选顺序稳定；任意失败区域能定位到字段或节点；诊断工具不进入运行时快照。
+
+### UGC-10：多层查询和地下寻路
+
+在 `LayeredTerrainQuery` 上增加洞口、竖井、坡道和跨层连接点。先让碰撞和查询支持多层，再把地下层接入局部寻路；顶部 `HeightfieldView` 继续作为兼容接口。
+
+**退出条件**：Agent 只有通过合法连接点才能进入地下层；洞穴、地表和悬挑的碰撞与网格一致；旧路网结果不因未启用地下层而改变。
+
+### UGC-11：外部数据适配器
+
+增加数字高程、地层接触点、地层方向、钻孔柱状记录和断层线的只读导入。输入先转换成 recipe、地层柱、结构事件和约束；不在这一阶段实现地震反演、自动地质解释或专业 GIS 编辑器。
+
+**退出条件**：单位、坐标系、来源、时间戳和输入 hash 可追踪；没有输入时，程序化 recipe 的结果完全不变。
+
+### UGC-12：专业物理扩展（长期候选）
+
+多相流、反应输运、热传导、地质力学、地震反演和大规模并行求解器不进入游戏创世主线。只有当玩法明确需要地下水流动、矿物反应、滑坡或地热时，才以独立后端和独立存档契约立项；它们不能阻塞 UGC-06~10。
+
 ## 9. 小任务执行卡
 
 每个实现任务必须用以下格式写在 TODO 或提交说明中：
@@ -539,10 +704,14 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 03_erosion_sediment.bin/png
 04_flow_accumulation.bin/png
 05_water_level.bin/png
-06_surface_kind.bin/png
-07_walk_build_masks.bin/png
-08_constraint_report.json
-09_chunk_hashes.json
+06_water_table_aquifer.bin/png
+07_soil_moisture_vegetation.bin/png
+08_strata_material.bin/png
+09_surface_kind_palette.bin/png
+10_walk_build_masks.bin/png
+11_uncertainty_confidence.bin/png
+12_constraint_report.json
+13_chunk_hashes.json
 ```
 
 诊断文件只用于本地和证据包，不进入存档。所有数组必须记录宽、高、步长、seed、recipe hash、generator version 和字段量化方式。
@@ -579,4 +748,6 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 4. 现有房屋、路网、生态和存档接口可继续工作。
 5. 固定 seed 矩阵、WASM/native 对拍、约束门禁、无 NaN/越界和性能基线全部通过。
 6. VoxelBackend 可以重建静态世界，HeightfieldView 能在迁移期提供现有 `GeoCell` 查询。
-7. 文档、版本门禁、FABS 结构和前端 WebGL 接口已分别记录；未实现能力不得写入 `docs/current/` 的现状章节。
+7. 地层、材料、湿度、地下水位、地表颜色和植被资格来自同一字段链；干旱阈值以下没有草地事实。
+8. 断层/褶皱、不确定性、剖面诊断和多层查询都有稳定输入、字段 hash、失败原因和局部门禁。
+9. 文档、版本门禁、FABS 结构和前端 WebGL 接口已分别记录；未实现能力不得写入 `docs/current/` 的现状章节。
