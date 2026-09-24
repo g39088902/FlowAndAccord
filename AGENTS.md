@@ -1,390 +1,223 @@
-# Flow & Accord · 智能体与模拟系统开发操作指南 (AGENTS.md)
+# Flow & Accord · 全局智能体开发指南
 
-> ⚠️ **改代码前必读**：第 4 节「重要易踩坑清单」汇总了本项目最容易踩的坑（WASM 双向同步、决策节拍、随身搬运、POI 储量门槛、快照四处同步[M4]、确定性约束等），由历次开发踩坑沉淀而来。
+> **改代码前必读。** 本文件只保留全局不变量、跨模块契约、任务路由和门禁；模块实现细节、文件清单与局部易踩坑放在对应目录的 `AGENTS.md` 和 `docs/current/` 中。规则冲突时，本文件优先。
 
----
+## 0. 任务路由与文档入口
 
-## 0. 📚 项目文档地图
+先按改动范围选择最小上下文：
 
-开发任务从 [Agent 快速入口](./docs/current/tech/30-workflow.md) 按改动类型选择局部指南和门禁；本文件仍为全局规则入口。
+| 改动范围 | 先读的局部指南 | 权威技术文档 |
+|---|---|---|
+| `crates/sim_core/` | `crates/sim_core/AGENTS.md` | `docs/current/tech/01-engine-architecture.md` |
+| `crates/sim_core/src/spatial/` | `spatial/AGENTS.md`，再读目标子目录指南 | `docs/current/tech/11-decision-engine.md`、`13-housing-system.md`、`08-ecology-and-poi.md` |
+| `crates/sim_core/src/geo/` | `geo/AGENTS.md` | `docs/current/tech/14-terrain-and-network.md` |
+| `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | `docs/current/tech/06-snapshot-and-save.md` |
+| `frontend/` | `frontend/AGENTS.md` | `docs/current/tech/19-ui-implementation.md`、`21-frontend-dev-guide.md` |
+| 跨模块 / 发布 / 存档 | 本文件 + `docs/current/tech/30-workflow.md` | `docs/current/tech/28-invariants.md`、`29-impact-matrix.md` |
 
-除根目录 **README.md**（对外营销宣传）、**AGENTS.md** 和 **TODO.md** 外，其余文档全部在 `docs/` 下，按
-**当前 / 计划** 划分，每层再按 **产品设计 / 技术方案** 划分；**每个目录内文档按顺序从 `01` 起连续编号**
-（各目录各自成序，编号本身不含层级语义）。`tech/` 内按
-总体与基座 → 上层社会与经济 → 中层个体与行为 → 下层世界与物理 → 表现层 → 工程层 → 附录 分层排列。
+### 0.1 局部 `AGENTS.md` 清单
 
-| 文件 | 定位 | 何时阅读 |
-| :--- | :--- | :--- |
-| **README.md** | 面向玩家的营销宣传文档：项目定位、八大核心看点、第一局观察指引、三分钟上手、路线图 | 对外宣传 / 新玩家入门时 |
-| **AGENTS.md**（本文档） | 架构概述、编译步骤、快捷键 + §4 易踩坑清单 + §5 文档分层策略 | **改任何代码前必读** |
-| **`docs/README.md`** | 文档总导航（唯一入口） | 找文档时 |
-| **./docs/current/README.md** | **现状总索引**：完整模块导航表 | 快速了解现状 |
-| **`docs/current/design/`** | 现状 · 产品设计（玩家视角）：[01 产品总览](./docs/current/design/01-product-overview.md) · [02 世界与地图规则](./docs/current/design/02-world-rules.md) · [03 族人家庭与社会规则](./docs/current/design/03-life-and-society.md) · [04 经济与资源规则](./docs/current/design/04-economy.md) · [05 观察与交互设计](./docs/current/design/05-observation-ux.md) · [06 AI 行为设计](./docs/current/design/06-agent-behavior-design.md) | 讨论玩法、规则与体验时 |
-| **./docs/current/tech/01-engine-architecture.md** | 现状 · 技术总体：三层解耦、文档地图、tick 内部顺序、数据流、配置注入 | 入门架构 / 定位模块归属 |
-| **./docs/current/tech/02-core-systems-fsm.md** | 三大核心系统状态机全景：马斯洛需求与动作、私产房屋与归宿拓扑、王国与帝国政体演化 | 查阅核心 FSM 与状态转移契约时 |
-| **./docs/current/tech/11-decision-engine.md** | 决策引擎：马斯洛六层、16 条分支、私有触发器、错峰节拍（附「为什么这么设计」篇） | 理解决策状态机与寻路逻辑时 |
-| **./docs/current/tech/12-m19-architecture.md** | M19 决策架构规格：意图/策略/原语三层解耦、ActiveTask 单一真相源 | 使用意图/策略/原语类型及观察 API 时 |
-| **./docs/current/tech/07-ledger-and-polity.md** | 账本与政体（M1~M5 已落地） | 改动 ledger/ 代码时查阅 |
-| **./docs/current/tech/28-invariants.md** · [29 影响矩阵](./docs/current/tech/29-impact-matrix.md) | 六类硬约束集中清单 · 改 X 牵动哪些文件 | 改动前对照 |
-| **./docs/current/tech/30-workflow.md** | Agent 快速入口 + Commit 检查单 + 文档维护机制 | **提交前必读** |
-| **./docs/current/tech/22-build-and-run.md** · [24 无头诊断](./docs/current/tech/24-diagnostics.md) · [25 性能基准](./docs/current/tech/25-benchmarking.md) · [26 CI/CD](./docs/current/tech/26-cicd.md) · [27 浏览器自动化](./docs/current/tech/27-browser-automation.md) · [23 工具箱](./docs/current/tech/23-tools-guide.md) | 工程层：构建 / 诊断 / 基准 / 部署 / 自动化 / 工具速查 | 排障、优化、部署、自动化时 |
-| **./docs/current/tech/19-ui-implementation.md** · [20 制度大盘 UI](./docs/current/tech/20-society-ledger-ui.md) · [21 前端开发指南](./docs/current/tech/21-frontend-dev-guide.md) | 表现层：页面全景 + 窗口跳转 · 制度大盘 4 标签页 · 前端实施指南 | 开发新 UI 模块时 |
-| ★ **[./docs/plan/tech/31-canvas-to-webgl-migration.md](./docs/plan/tech/31-canvas-to-webgl-migration.md)** | **渲染架构决策（全量 WebGL、不再使用 Canvas 2D）** + 阶段三~五迁移方案（装饰层 / 实体层 / 2D 退役）· 遮挡验收矩阵（§8.5；原 TA-08 任务已删除视为完成） | **改渲染层代码前必读** |
-| **./docs/plan/README.md** | **计划总索引**：在办设计与未落地方案 + 依赖顺序图 | 了解未来方向时 |
-| **./docs/plan/design/01-roadmap.md** | 长期规划书（M10~M18：空间演化 / 专利经济 / 混合政体 / LLM 认知层） | 了解宏观方向（多为规划态） |
-| **`docs/plan/tech/`** | 计划 · 技术方案：[01 融合契约](./docs/plan/tech/01-integration-contracts.md) · [02 记忆](./docs/plan/tech/02-memory-system.md) · [03 内部市场](./docs/plan/tech/03-internal-market.md) · [04 农田](./docs/plan/tech/04-farmland-agriculture.md) · [05 狩猎防御](./docs/plan/tech/05-hunting-defense.md) · [06 地图模板](./docs/plan/tech/06-terrain-templates.md) · [07 地形美术](./docs/plan/tech/07-terrain-art.md) · [08 性能优化](./docs/plan/tech/08-performance.md) · ★ [31 Canvas→WebGL 迁移](./docs/plan/tech/31-canvas-to-webgl-migration.md) | 设计未落地方案时 |
-| **TODO.md** | 待办事项清单 | 开发新特性前 |
+- `crates/sim_core/AGENTS.md`：内核 crate、`SimConfig`、`WorldRng`、验证方式。
+- `crates/sim_core/src/geo/AGENTS.md`：地形生成、RNG 隔离、地形存档约束。
+- `crates/sim_core/src/spatial/AGENTS.md`：tick 顺序、实体接口、快照映射、运动契约。
+- `crates/sim_core/src/spatial/decisions/AGENTS.md`：马斯洛决策、节拍、路由、立宅和 M19。
+- `crates/sim_core/src/spatial/ecology/AGENTS.md`：播撒、采收、装卸、榷场结算和 RNG 顺序。
+- `crates/sim_core/src/spatial/housing_system/AGENTS.md`：房屋结算、升级、修缮、空置房和拍卖。
+- `crates/sim_core/src/spatial/ledger/AGENTS.md`：账本、家户、宗族、地区和帝国制度。
+- `crates/sim_wasm/AGENTS.md`：导出函数、线性内存、错误码和 WASM 约定。
+- `frontend/AGENTS.md`：脚本加载、快照映射、渲染管线、DOM 契约和浏览器约束。
 
-### 0.1 📑 嵌套 AGENTS.md（目录级操作指南）
+`docs/README.md` 是文档总入口；`docs/current/README.md` 是现状模块索引；`docs/plan/README.md` 是未落地方案索引；`TODO.md` 是待办清单。
 
-每个复杂代码目录维护一份局部 AGENTS.md，聚焦职责边界、文件清单与局部易踩坑。**改哪个目录的代码，先读对应局部 AGENTS.md**；全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
+## 1. 架构边界
 
-| 目录 | 局部 AGENTS.md | 覆盖范围 |
-| :--- | :--- | :--- |
-| `crates/sim_core/` | `crates/sim_core/AGENTS.md` | sim_core 内核：crate 布局、SimConfig、WorldRng 确定性、geo/spatial 模块地图 |
-| `crates/sim_wasm/` | `crates/sim_wasm/AGENTS.md` | WASM 导出层：导出函数清单、静态缓冲区、错误码、指针约定 |
-| `crates/sim_core/src/spatial/` | `crates/sim_core/src/spatial/AGENTS.md` | spatial 核心层：13 散文件 + 4 子目录职责边界、world.rs tick 调用顺序、agent↔ecology 装载卸货契约、bookkeeping 与 ledger 分工、快照映射责任 |
-| `crates/sim_core/src/geo/` | `crates/sim_core/src/geo/AGENTS.md` | geo 地形生成：terrain/hydrology/biome/query/corridor/accents 6 文件职责、generate_with_profile vs generate_with_config 调用链、RNG 隔离 |
-| `crates/sim_core/src/spatial/ecology/` | `crates/sim_core/src/spatial/ecology/AGENTS.md` | 生态子模块：7 个单一职责子模块（播撒/落位/始祖/调度/采收/卸货）、RNG 消费顺序契约、榷场支付顺序 |
-| `crates/sim_core/src/spatial/decisions/` | `crates/sim_core/src/spatial/decisions/AGENTS.md` | 决策状态机：马斯洛评估、节拍语义、私有施密特触发器、途中重路由、立宅选址 |
-| `crates/sim_core/src/spatial/housing_system/` | `crates/sim_core/src/spatial/housing_system/AGENTS.md` | 房屋系统：6 个单一职责子模块、升级门槛、三条自主决策链路 |
-| `crates/sim_core/src/spatial/ledger/` | `crates/sim_core/src/spatial/ledger/AGENTS.md` | 独立经济账本子系统：账本内核、团体基类、婚姻登记簿、家户体系（家庭跟着男人走）、宗族（M3）、地区王国（M4） |
-| `frontend/` | `frontend/AGENTS.md` | 原生静态前端：54 JS 文件职责边界（含 M4 `snapshot-bin.js`、v1.50.77 `webgl/` 地形渲染层［★ 过渡形态，目标为全量 WebGL］、S4-02/S4-03 资源景观套件与 TA-12-2 `terrain-texture.js`）、脚本加载顺序、渲染管线数据流、DOM ID 共享契约、决策三件套/族谱四件套/制度大盘分工、wasm 接口对照 |
-
-**维护规则**：新增或重构出复杂目录时应同步补充局部 AGENTS.md 并登记到本表；局部文档引用的类型/方法改名后必须同步修订。
-
----
-
-## 1. 项目架构概述
-
-**Rust 确定性计算内核 + WebAssembly 桥接 + 渲染前端（★ 过渡期：WebGL 地形层 + Canvas 2D 实体覆盖层；目标形态：全 WebGL）** 三层解耦：
-
-```mermaid
-graph TD
-    A["crates/sim_core (Rust 确定性内核)"] -->|编译| B["crates/sim_wasm (wasm32)"]
-    B -->|二进制 .wasm| C["frontend/rust/sim_wasm.wasm"]
-    C -->|加载至独立 Worker 线程| D["frontend/js/sim_worker.js (专用仿真 Worker)"]
-    D -->|跨线程快照消息| E["frontend/js/rustworld.js (主线程代理 & 动态 Config 注入)"]
-    E -->|状态驱动渲染| F["frontend/js/render_canvas.js (过渡期：Canvas 2D 实体覆盖层 sim-canvas)"]
-    E -->|地形快照| F2["frontend/js/webgl/ (WebGL 地形层 sim-canvas-gl，v1.50.77 起)"]
-    F --> G["浏览器 UI (版本: v1.60.0)"]
-    F2 --> G
-
+```text
+crates/sim_core  →  crates/sim_wasm  →  frontend/rust/sim_wasm.wasm
+                                      →  frontend/sim_wasm.wasm
+                                      →  sim_worker.js → rustworld.js → WebGL/Canvas 过渡渲染
 ```
 
-> ★★ **渲染架构决策（2026-09-17）：全量 WebGL，不再使用 Canvas 2D**。目标形态为**全部内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲**；迁移完成后退役 `sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支，WebGL 不可用时明确提示不支持而非降级。方案见 [31 号迁移方案 §8 阶段三~五](./docs/plan/tech/31-canvas-to-webgl-migration.md)。**改渲染代码前须知**：
->
-> - **不要再在 Canvas 2D 侧投入遮挡优化**——原 TA-08 的「模型内排序 / 实体拆子项 / 屏幕空间兜底」三策略已取消，遮挡由 GPU 深度缓冲解决，TA-08 任务已删除视为完成（验收矩阵并入 31 号 §8.5）；
-> - **保持几何与筛选逻辑与渲染后端解耦**：`accent-model.js`（骨架/包围体）、`accent-lod.js`（判档/剔除）、`accent-season.js`（季相曲线）、`landscape-mask.js`（遮罩判定）留在 CPU 侧并被迁移直接复用，**不得**把这些逻辑写进 Canvas 绘制函数体内；
-> - **新建世界实体**在过渡期照旧挂 `drawWorldEntities()` 统一队列，但队列在迁移后仅剩批次提交/透明排序职责。
->
-> ★ **双 Canvas 现状（v1.50.77 迁移阶段二落地，属过渡形态）**：地形由 `frontend/js/webgl/`（context / shader-manager / projection-utils / terrain-renderer / fallback-handler 等）绘制在底层 `sim-canvas-gl`；实体、装饰、道路、标签等仍绘制在上层 Canvas 2D `sim-canvas`；WebGL 不可用时经 `fallback-handler.js` 回退 2D 管线（该回退仅在迁移过渡期保留）。**帧率已解限**（v1.50.80~82），不再锁定 60FPS；涉及性能预算的验收口径见各任务文档标注。
+- `sim_core`：确定性模拟内核、决策、生态、房屋、账本、地形与路网。
+- `sim_wasm`：无依赖 WASM 桥接、tick、配置注入、FABS 二进制快照和存档导出。
+- `frontend`：Worker 代理、快照解码、配置 UI、WebGL 地形层和过渡期 Canvas 2D 实体层。浏览器 UI (版本: v1.60.0)。
+- 改动必须保持内核与表现层解耦；前端渲染不得改变模拟状态或 `WorldRng` 消费顺序。
 
-- **`crates/sim_core`**：决策状态机、生态采收与随身搬运、路网寻路、私宅营建与空置房登记、经济账本；
-- **`crates/sim_wasm`**：零依赖 WASM 导出层，线性内存 JSON 序列化 + ★ M4 FABS 二进制帧快照、tick 步进、JS 动态配置注入；
-- **`frontend/`**：原生静态前端（54 个 JS 文件，含 Web Worker 仿真线程 `sim_worker.js`、M4 二进制解码器 `snapshot-bin.js`、★ v1.50.77 WebGL 地形渲染层 `webgl/`（7 文件；★ 目标形态为全量 WebGL，双 Canvas 与 2D 回退仅过渡期保留）、v1.50.23 装饰套件 `accent-season.js`/`accent-model.js`/`accent-lod.js`/`render_accents.js`/`render_bush.js`/`render_grass.js`、S4-02/S4-03 资源景观套件 `landscape-model.js`/`landscape-mask.js`/`render_landscapes.js` 与 TA-12-2 地表纹样模型层 `terrain-texture.js`），内置 `server.js` 开发服务器。数字配置抽离在 `config.js`，无需重编译即可调参。
+渲染目标是全量 WebGL。迁移期间保留双 Canvas 和 2D 回退；改渲染代码前必须阅读 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 与 `frontend/AGENTS.md`。
 
----
+## 2. 编译、验证与运行
 
-## 2. 编译与运行步骤
+详细环境说明见 [`docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) 和 [`docs/current/tech/30-workflow.md`](./docs/current/tech/30-workflow.md)。
 
-> 详细环境配置与故障排查见 `./docs/current/tech/22-build-and-run.md`。
-
-> 💡 **改 Rust 时的快速反馈**（★ v1.50.82）：先 `cargo check --lib`（约 13s）确认语法类型；
-> 逻辑验证用 `cargo build --profile dev-wasm`（约 26s，省 ~15s，**产物严禁发布**）；
-> 提交前再跑一次下面的 `--release` 并同步双副本。详见 `./docs/current/tech/30-workflow.md` §B。
-
-### 步骤一：编译 WASM 并双副本同步
+### 步骤一：发布 WASM
 
 ```powershell
-# 注入便携工具链
 $env:PATH = "$PWD\.toolchain\cargo\bin;$PWD\.toolchain\rustc\bin;$env:PATH"
 $env:CARGO_HOME = "$PWD\.cargo-home"
 cargo build -p sim_wasm --target wasm32-unknown-unknown --release
-
-# 双副本复制（缺一不可，见 §4.1）
 Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "frontend\rust\sim_wasm.wasm" -Force
 Copy-Item "target\wasm32-unknown-unknown\release\sim_wasm.wasm" -Destination "frontend\sim_wasm.wasm" -Force
 ```
 
-### 步骤二：回归测试验证
+改 Rust 时可先用 `cargo check --lib` 或 `--profile dev-wasm` 做本地反馈；`dev-wasm` 产物严禁复制、提交或部署。发布口径只能是 `--release`，并且两个前端副本必须同时更新。
 
-```powershell
-node tools/test-wasm.js           # WASM 确定性/防越界/防 NaN/长程稳定（★ 唯一长期自动化验证，见 §4.10）
-node tools/test-determinism.js    # 增强型确定性矩阵测试 (6套件：多种子/分批独立性/快照无副作用/存读档)
-node tools/config-check.js        # 前后端数值配置一致性校验
-node tools/frontend-check.js      # 前端脚本语法与 DOM ID 完整性校验
-node tools/doc-link-check.js      # Markdown 相对链接可达性（文档迁移后路径深度未同步即报错）
-node tools/cross-doc-check.js     # 跨文档事实指纹一致性校验
-node tools/code-map-check.js      # 代码地图与文件树登记一致性校验
+### 步骤二：长期门禁
+
+```text
+node tools/test-wasm.js
+node tools/test-determinism.js
+node tools/config-check.js
+node tools/frontend-check.js
+node tools/snapshot-check.js
+node tools/doc-link-check.js
+node tools/cross-doc-check.js
+node tools/code-map-check.js
+node tools/doc-maintenance-check.js
+node tools/bump-version.js --check
 ```
 
-输出 `ALL_TESTS_DONE` 与 `确定性矩阵测试全通` 即全部通过。性能分析可运行 `node tools/profile-benchmark.js`。
+按改动类型选择 `docs/current/tech/30-workflow.md` 的专项门禁；不要为了文档小改动运行无关的 Rust 发布构建。
 
-### 步骤三：启动前端服务器
+### 步骤三：前端运行
 
-```powershell
-node frontend/server.js           # http://localhost:3000（master 分支；端口 = 3000 + 分支名末位数字，如 c3→3003；PORT 环境变量优先）
+```text
+node frontend/server.js
 ```
 
-> ⚠️ 若默认端口已被占用，说明服务已在运行，**无需再启动新实例**——直接访问即可。重复启动会触发端口递增逻辑的已知问题导致卡死。
+默认地址为 `http://localhost:3000`。端口已有服务时直接复用，不要重复启动。存档链路使用 Chrome 或 Edge；受限环境只能用内置浏览器加 `?nogate=1` 验证非存档链路，不能据此证明真实存档读写。每次重编译 WASM 后强制刷新；页面顶部标题栏右侧显示版本徽章 **`v1.60.0`**。
 
+## 3. 玩家交互速查
 
-### 步骤四：浏览器访问
+`Space` 暂停/继续；左键点击族人、房屋或地标查看 Inspector；滚轮缩放、右键拖拽平移；顶部重置重新播撒初始族人。详细 UI 规则见 `frontend/AGENTS.md` 和 `docs/current/tech/05-observation-ux.md`。
 
-> ⚠️ **存档依赖 Chrome 或 Edge**：本地文件存档依赖 **File System Access API**（`showSaveFilePicker` / `showOpenFilePicker`，详见 `./docs/current/tech/06-snapshot-and-save.md` §4.2.1）。Firefox / Safari / CatPaw 内置预览浏览器均不支持——**启动存档门禁会一直阻断模拟（“先建立本地存档文件”弹窗无法关闭）**。玩家与存档链路验证请使用 Chrome/Edge；Agent 自动化在沙箱禁止外启浏览器时，可用内置预览浏览器 + `?nogate=1` 旁路做非存档链路验证（边界见 §4 铁律与 [27 号指南](./docs/current/tech/27-browser-automation.md) §7）。
+## 4. 全局硬约束与易踩坑索引
 
-1. 访问 `http://localhost:3000`；
-2. 每次重编译 WASM 后按 **`Ctrl + F5`** 强制刷新清缓存；
-3. 页面顶部标题栏右侧显示版本徽章 **`v1.60.0`**。
+本节只保留跨模块结论。机制细节和调用链必须写在局部指南或现状技术文档中，避免多处复制。
 
+浏览器验证：真实存档依赖 Chrome/Edge 的 File System Access API；`?nogate=1` 只用于内存演算和视觉、性能、镜头等非存档验证。
 
----
+### 4.0 改动前快速自检
 
-## 3. 核心快捷键与交互
-
-| 操作 | 功能 |
-| :--- | :--- |
-| **`Space`** | 全局暂停 / 继续模拟 |
-| **鼠标左键点击小人** | 选中族人，右侧 Inspector 展示马斯洛主导需求、决策原因、饱食/水分/体力/行囊 |
-| **鼠标左键点击房屋** | 查看私宅等级、耐久度、仓储及家庭成员 |
-| **鼠标左键点击地标** | 查看清泉/果丛/森林/采石场/金矿/榷场互市的储量与产速/单价 |
-| **鼠标滚轮 / 右键拖拽** | 缩放与平移视口 |
-| **重置模拟（顶部按钮）** | 重新播撒 20 名初始族人（10 男 10 女，±10 随机离散） |
-
----
-
-## 4. ⚠️ 重要易踩坑清单（速查索引）
-
-> **本章定位**：只做**「一句话要点 + 权威文档指向」的索引**与**跨模块硬约束**。
-> 模块内的机制细节、数值口径与调用链一律在**对应模块文档**中维护（同一事实只在一个权威位置，见 §5）。
-> 条目按「最常踩 → 最隐蔽」排序，**编号长期稳定**，可安全交叉引用；找细节请顺「详见 →」跳转。
-
-> 🔴 **浏览器验证环境选择**：本项目存档依赖 **Chrome 的 File System Access API**（直写磁盘 `.json`，启动存档门禁未建立存档前模拟一直暂停）。环境允许启动 Chrome 时**优先用 Chrome**（存档链路验证只能用它）；**沙箱/环境禁止外启浏览器进程时（如 CatPaw 会话），允许用内置预览浏览器 + `?nogate=1` 旁路**（v1.50.8 起隐藏门禁弹窗并直接解除暂停，仅内存演算）完成视觉、性能、季相、镜头与生命周期等非存档链路验证。两条硬边界：① `?nogate=1` 不连接任何存档文件，**不得用于证明建档/读档链路**，受限环境中的存档验证项必须如实标注 NOT_RUN/待补测；② 内置预览浏览器与 Firefox / Safari 均无法走通真实存档读写。
-
-### 4.0 ✅ 改动前快速自检（10 秒扫完）
-
-> 详细版（含影响面说明）见 [`./docs/current/tech/29-impact-matrix.md`](./docs/current/tech/29-impact-matrix.md) §五。
-
-```
-□ 版本号：node tools/bump-version.js --patch（自动同步全部定义点，见 §4.9；仅文档变更可跳过，见 §4.0.1）
-□ 双副本：Rust 变更后 sim_wasm.wasm 已复制到 frontend/rust/ + frontend/
-□ 四处同步（M4）：快照字段变更时 snapshot.rs / world_snapshot.rs / snapshot_bin/encode.rs / snapshot-bin.js+rustworld.js 一致（JSON 对拍门禁已随 JSON 快照通道移除，跑 node tools/snapshot-check.js + test-wasm.js 回归）
-□ 跨世界缓存：改动驻留表/STR_TAB 或新增 world_create 调用点时，缓存失效判据仍为 start_index==0（见 §4.5.1，勿改用 epoch）
-□ 配置联动：新增超参时 config.rs(字段+doc 注释) + config.js + examples/config.json + config-check.js 通过（含第 5 条「空转参数」消费点门禁）
-□ 测试门禁：cargo build + test-wasm.js + config-check.js + frontend-check.js 全绿
-□ 文档更新：对应 docs/current/ 下对应模块文档 + ./docs/current/01-changelog.md + 受影响的局部 AGENTS.md
-□ 渲染改动：按「全量 WebGL」目标形态自检（§4.18）——不在 Canvas 2D 侧追加遮挡优化、几何/筛选逻辑不内联进绘制层
-□ 文档维护体检：node tools/doc-maintenance-check.js（发布前追加 --strict）
-□ 跨文档一致性：node tools/cross-doc-check.js（文档间冲突 / 配置权威漂移）
-□ 文档链接可达：node tools/doc-link-check.js（相对链接失效即退出码 1）
-□ 换行符规范：全仓统一 LF (\n)，严禁提交 CRLF（git diff --check 无空白报错）
+```text
+□ 版本号是否应由 node tools/bump-version.js 提升？
+□ Rust WASM 是否 release 编译并同步 frontend/rust/ 与 frontend/ 两个副本？
+□ 快照字段是否同步 snapshot.rs → world_snapshot.rs → snapshot_bin/encode.rs → snapshot-bin.js/rustworld.js？
+□ 是否保持 STR_TAB.start_index == 0 的跨世界缓存失效判据？
+□ 新配置是否同步 config.rs、frontend/js/config.js、examples/config.json、config-check.js？
+□ 是否阅读受影响目录的局部 AGENTS.md 并更新对应技术文档？
+□ 是否按 30-workflow.md 选择了必要门禁？
+□ 文档、代码和脚本是否统一 LF？
 ```
 
-### 4.0.1 ✅ Commit 前检查单（提交前必做）
+### 4.0.1 Commit 前检查单
 
-**完整清单已下沉至 [`./docs/current/tech/30-workflow.md`](./docs/current/tech/30-workflow.md) 附篇一（A~G）**，按改动类型选择专项门禁执行。
-**⚡ 仅文档变更例外**：diff 只涉及 `docs/`、根/局部 `AGENTS.md` 等纯文档内容（**不含** Rust / 前端 / 配置 / 版本号定义点）时不升版、不重跑测试，只需 ① 工作区/diff 检查；② `doc-maintenance-check.js` 通过；③ `cross-doc-check.js` 无冲突；④ `bump-version.js --check` 零漂移（纯一致性校验，非升版）。详见 `./docs/current/tech/30-workflow.md` §G。
+完整清单在 [`docs/current/tech/30-workflow.md`](./docs/current/tech/30-workflow.md) 附篇一。纯文档变更只需工作区检查、`doc-maintenance-check.js`、`cross-doc-check.js` 和 `bump-version.js --check`；Rust、前端、配置或存档变更按专项清单执行。
 
-### 4.1 🔴 WASM 编译与双副本同步（跨模块 · 最常踩）
+### 4.1 WASM 双副本
 
-- 改 Rust 内核后必须重编译并复制到**两个位置**：`frontend/rust/sim_wasm.wasm`（主路径）+ `frontend/sim_wasm.wasm`（备用），缺一浏览器仍加载旧逻辑；
-- **不要用 wasm 字节数判断是否更新**，以 `node tools/test-wasm.js` 实际输出为准。
+Rust 变更必须重编译并复制到 `frontend/rust/sim_wasm.wasm` 和 `frontend/sim_wasm.wasm`。不要用文件大小判断是否更新，以 `test-wasm.js` 结果为准。详见 `docs/current/tech/22-build-and-run.md` §2。
 
-→ 详见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) §2 与 `frontend/AGENTS.md` §5.7。
+### 4.2 决策与寻路
 
-### 4.2 🟠 寻路决策门槛、连续采收与中途重路由（`decisions/` 模块）
+POI 施密特触发器、连续采收、中途原地重路由和榷场兜底都属于 `decisions/` 的决策语义；系统层不得旁路派发任务。详见 `decisions/AGENTS.md` 与 `docs/current/tech/11-decision-engine.md`。
 
-**要点**：Agent 私有 POI 施密特触发器（开启 ≥ `decisionPoiSeekMinStockRatio` / 关闭 < `decisionPoiAbandonStockRatio`，路由只读取结论）→ 连续采收与单趟多品类 → 途中断流**原地平滑掉头重路由，严禁瞬移** → 水/粮/木断流时户主可远程结算直达榷场。
+### 4.3 Tick 顺序与确定性
 
-→ 详见 [`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.2 原则 3、`decisions/AGENTS.md` §4.1/§4.3；榷场兜底见 [`./docs/current/tech/09-market-pricing.md`](./docs/current/tech/09-market-pricing.md)；A\* 局部失效与 APSP 见 [`./docs/current/tech/14-terrain-and-network.md`](./docs/current/tech/14-terrain-and-network.md)。
+必须保持“季节/再生 → 代谢繁衍 → POI 交互与卸货 → 房屋 → 道路衰减 → 运动与决策 → 账本制度 → 清理”的顺序；卸货在决策前，道路衰减在运动前。每 tick 使用 `simulationDt = 1/60`，倍速只能用多步 tick。详见 `spatial/AGENTS.md` §二。
 
-### 4.3 🟠 决策节拍与 tick 内部顺序（跨模块时序）
+### 4.4 随身搬运
 
-- 每 tick = `simulationDt`(1/60) 游戏小时；错峰相位 `(tick_counter + agent.id) % agentDecisionIntervalTicks(120)`；**严禁修改 `simulationDt`**，倍速靠 `world_tick_steps(N, dt)` 同帧多步；
-- tick 顺序（POI 再生 → 代谢/繁衍 → POI 交互/卸货 → 房屋 → 道路衰减 → 运动 → 决策及提交结算 → 账本 → 清理）**勿打乱**；**卸货在决策之前**，决策读到的是卸货后的家户账本余额；
-- `WorldRng` 全局共享、按 agents 顺序消费，新增随机消耗必须保持确定性。
+水、粮、木、石各自独立容量，资源点只装入行囊，回家按速率卸入家户账本；无家宅者不装袋，只现场进食饮水；金容量无限。改容量或装卸速率必须沿 `agent → ecology → decisions → snapshot → frontend` 全链路同步。
 
-→ 详见 `crates/sim_core/src/spatial/AGENTS.md` §二、[`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.4、[`./docs/current/tech/03-determinism.md`](./docs/current/tech/03-determinism.md)。
+### 4.5 FABS 快照四处同步
 
-### 4.4 🟠 随身搬运机制（`ecology/` 模块 · 真实背包，非瞬移）
+新增 `agent`、`house`、`poi` 快照字段时必须同步：
 
-水/粮/木/石每类**独立容量**、在资源点只装入随身行囊，回家按卸货速率入**家户账本**；金容量无限；**无家宅者不装袋**，只在现场自饮自食。改容量/装卸速率须全链条联动。
+1. `snapshot.rs` 定义；
+2. `world_snapshot.rs::generate_snapshot()` 赋值；
+3. `snapshot_bin/encode.rs` 编码及 `dict.rs` 枚举码表；
+4. `frontend/js/snapshot-bin.js` 解码与 `rustworld.js::_applySnapshot()` 映射。
 
-→ 详见 [`./docs/current/tech/08-ecology-and-poi.md`](./docs/current/tech/08-ecology-and-poi.md) §2.6、`spatial/AGENTS.md` §3.1、`ecology/AGENTS.md` §4.3、[`./docs/current/tech/29-impact-matrix.md`](./docs/current/tech/29-impact-matrix.md) §1.1（全链条清单）。
+同步核对使用 `tools/snapshot-check.js`、`test-wasm.js` 和 `test-determinism.js`。
 
-### 4.5 🟠 快照四处同步（★ M4 · 跨模块硬约束）
+### 4.5.1 跨世界驻留表缓存
 
-给 agent/house/poi 新增快照字段时必须**四处**同步：① `snapshot.rs`（定义）② `world_snapshot.rs::generate_snapshot()`（赋值）③ `snapshot_bin/encode.rs`（FABS 二进制编码，字段顺序/枚举码位与 ①② 等价）④ `snapshot-bin.js`（解码）+ `rustworld.js::_applySnapshot()`（映射）。
-JSON 对拍门禁（test-snapshot-bin.js）已于 v1.50.35 随 JSON 快照通道移除，同步核对走 `node tools/snapshot-check.js` + `test-wasm.js` / `test-determinism.js` 回归兜底；新增枚举变体必须同步 `snapshot_bin/dict.rs` 的 `*_code()` / `*_table()`。
+FABS `STR_TAB` 的新世界判据唯一是 `start_index == 0`；禁止改用 `epoch` 或全局单调计数。 `world_load` / `world_create` 后必须清理工具侧缓存。详见 `docs/current/tech/06-snapshot-and-save.md` §7.2 和 `frontend/AGENTS.md` §5.2。
 
-→ 详见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §7、`spatial/AGENTS.md` §3.3、`frontend/AGENTS.md` §5.2。
+### 4.6 文件粒度
 
-### 4.5.1 🔴 跨世界必须让驻留表缓存失效（★ T1 缺陷修复，v1.46.0）
+单文件控制在 800 行以内；功能增长时拆成职责单一的子模块，并补充局部 `AGENTS.md` 和代码地图。
 
-FABS 字符串驻留表（`STR_TAB`）在前端解码器永久缓存。判定「这是不是一张全新的驻留表」的**唯一正确判据是 `STR_TAB.start_index == 0`**——**不能**用 `epoch`（任何新世界恒为 0，会串味），也**不能**改成全局单调递增 epoch（会击穿确定性）。工具侧（`snapshot-reader.js`）在 `world_load` / `world_create` 后必须显式 `resetCaches()`。
+### 4.7 POI 与 ID
 
-→ 详见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §7.2、`frontend/AGENTS.md` §5.2。回归验证 = `node tools/test-determinism.js` 存读档套件（换世界后地名/人名无串味）。
+全图默认 23 处 POI，ID 段位、资源类型和营地行政区升级门槛由 `docs/current/tech/08-ecology-and-poi.md` 维护；不要在调用方复制数量或段位常量。
 
-### 4.6 🟡 模块粒度与单文件行数规范（全局）
+### 4.8 行为与生理规则归属
 
-单文件严控在 **800 行以内**，功能膨胀时及时子目录模块化拆分（先例：`decisions/` / `ecology/` / `housing_system/` 已各自拆为多个单一职责文件，详见对应目录局部 AGENTS.md）。
+| 主题 | 权威位置 |
+|---|---|
+| 冬季供暖、木材禁孕、家庭储备、升级成本 | `docs/current/tech/13-housing-system.md`、`housing_system/AGENTS.md` |
+| 生育住宅门槛、流产和产后冷却 | `docs/current/tech/10-agent-life-cycle.md` |
+| 金币采集冷却、庄园门禁、POI 触发器 | `docs/current/tech/11-decision-engine.md`、`decisions/AGENTS.md` |
+| Inspector 与镜头跟随 | `frontend/AGENTS.md` |
 
-### 4.7 🟡 POI 数量、ID 段位与营地行政区升级（`ecology/` 模块）
+### 4.9 版本号与存档兼容线
 
-全图 **共 23 处 POI**：营地 4 / 清泉 6 / 浆果 6 / 林木 3 / 石矿 2 / 金矿 1 / 榷场互市 1，由 `config.countCamps` 等字段控制，空间排斥间距 `poiMinDistance`(70m)。ID 段位与营地五级行政区（营地→村→乡→镇→县）升级门槛见模块文档。
+版本号一律由 `node tools/bump-version.js` 修改。patch 只影响表现层并保留旧档；minor/major 影响兼容线并废弃旧档；`SAVE_APP_VERSION` 只存 `major.minor`，`SAVE_FORMAT_VERSION` 只在存档结构不兼容时手工递增。版本字符串比较前先规范化，详见 `docs/current/tech/22-build-and-run.md` 附篇 §5。
 
-→ 详见 [`./docs/current/tech/08-ecology-and-poi.md`](./docs/current/tech/08-ecology-and-poi.md) §2.1 / §2.5，玩家视角见 [`./docs/current/design/02-world-rules.md`](./docs/current/design/02-world-rules.md) §4。
+### 4.10 测试策略
 
-### 4.8 🟡 行为与生理硬约束（按主题下沉到各模块）
+项目是确定性内核驱动的长期涌现系统，不提交持久化 `#[cfg(test)]` 或 `tests.rs`。临时断言验证后删除；长期门禁是 `test-wasm.js` 和 `test-determinism.js`。不把 `cargo test --lib` 当作行为测试。
 
-本章只登记**去向**，不复制规则：
+### 4.10.1 `dev-wasm` 仅供本地迭代
 
-| 约束 | 权威文档 |
-| :--- | :--- |
-| 冬季供暖（低温阈值烧柴）、家宅木材不足禁孕、家庭储备 = 家户账本唯一真相源、去采货施密特触发器、升级成本 4×5 固定矩阵 | [`./docs/current/tech/13-housing-system.md`](./docs/current/tech/13-housing-system.md) §2.1 / §2.4、[`./docs/current/tech/08-ecology-and-poi.md`](./docs/current/tech/08-ecology-and-poi.md) §2.4 |
-| 生育住宅门槛（男方须有 ≥1 级私宅、流产/产后冷却） | [`./docs/current/tech/10-agent-life-cycle.md`](./docs/current/tech/10-agent-life-cycle.md) |
-| 资金采集纪律（`StockGold` 45s vs `GoldWealth` 180s、4 级庄园门禁） | [`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.2 原则 2 · `decisions/AGENTS.md` §4.5 |
-| 镜头跟随（关 Inspector 必须同时关跟随） | `frontend/AGENTS.md` §5.5 |
+`--profile dev-wasm` 只用于快速反馈；严禁复制到前端、提交或部署。发布必须重新执行 `--release` 并同步双副本。
 
-### 4.9 🟢 版本号自增规范（跨模块定义点 · ★ v1.50.80 三段语义）
+### 4.10.2 `target/` 治理
 
-**严禁手工改版本号**——一律 `node tools/bump-version.js`（默认 patch，或 `--minor` / 指定版本 / `--check`）。唯一真相源 = `frontend/index.html` 版本徽章；升版器自动同步全部定义点。
+使用 `node tools/clean-target.js` 清理宿主 debug 产物；脚本保护 `target/wasm32-unknown-unknown/release`，不要手工删除发布缓存。
 
-★ **三段语义（升哪一段决定旧存档是否还能用）**：
+### 4.11 房屋系统只结算，不指挥
 
-| 段位 | 何时自增 | 对旧存档 | 重编译 WASM |
-| :--- | :--- | :--- | :--- |
-| **patch（末尾）** | 前端渲染 / 表现层优化等**不触碰存档与数值逻辑**的变更 | **继续可用** | 否 |
-| **minor（中间）** | 功能变化 / 数值逻辑变化 / 存档结构不兼容 | 自动废弃 | **是** |
-| **major（首位）** | **仅人工变更** | 自动废弃 | **是** |
+立宅、升级和修缮必须来自 Agent 决策；房屋系统只执行放置、施工、耐久、空置登记和拍卖等物理结算。禁止恢复旧的全图扫描派工逻辑。详见 `housing_system/AGENTS.md`。
 
-落地方式：`world_save.rs::SAVE_APP_VERSION` 只存**兼容线** `major.minor`（如 `1.50`），加载判定经 `app_version_compat_line()` 取前两段比对 ⇒ 末尾升版不动该常量，**不触发重编译、旧档照常加载**；只有 minor/major 升版才推进兼容线（`bump-version.js` 会自动同步该定义点并在输出中提示「必须重编译 + 旧档废弃」）。前端 `save-ui.js` 的兼容判定一律走 `compatLine()`（前两段），**禁止**再写成全串 `===`。
-`SAVE_FORMAT_VERSION`（结构版本）**不随应用版本自增**，仅在 `WorldSave` 不兼容变更时手工 +1 并同改 `save-ui.js`。
-**版本字符串无 `v` 前缀**，前端任何比较点必须先过 `save-ui.js::normalizeVer()`。
+### 4.11.1 马斯洛引擎是唯一任务入口
 
-→ 定义点清单与核对见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) 附篇 §5；存档门禁与废弃引导见 [`./docs/current/tech/06-snapshot-and-save.md`](./docs/current/tech/06-snapshot-and-save.md) §4.2.2。
+任何“去哪里 / 做什么”必须由 `Decisioner::arbitrate_sustained_task → dispatch_task` 产生；系统 tick、生态、房屋和账本层不得直接改写 `Seeking*`、`ReturningToCamp`、`ConstructingHouse` 等行动状态。物理层只结算已经写下的 pending 意图。
 
-### 4.10 🟢 混沌系统定位与测试策略（持久化测试禁令 · 全局）
+### 4.12 配置集中化
 
-- **项目定位**：确定性内核驱动多智能体在代际、社会、经济维度涌现不可预测的长期演化；短期固定断言测不出涌现，还可能锁死演化多样性。
-- **持久化测试禁令**：不持久化保存任何单元测试脚本（`#[cfg(test)]` / `tests.rs` 一律不进入提交）。当前源码无测试用例是有意结果，非缺失。
-- **临时验证**：开发时临时编写断言跑一遍，确认不崩溃、数值合理后**提交前删除**。
-- **长期验证**：`node tools/test-wasm.js`（同种子逐字节一致性、防越界、防 NaN、长程稳定）是唯一长期保留的自动化验证。
-- **不跑 `cargo test --lib`**（★ v1.50.82）：源码无持久化单测，实测 `running 0 tests`，其唯一作用「编译 lib」已由 `cargo build -p sim_wasm` 覆盖。需要独立类型检查时用 `cargo check --lib`（约 13s）。
+数值配置的默认真相源是前端配置，经 `rustworld.js::applyConfig` 注入 Rust。新增字段必须同步 Rust、前端、示例配置和 `config-check.js`，并且必须有真实读取点；`decisionEvalOrder` / `decisionEvalLevels` 由前端维护，Rust 不写死顺序。详见 `docs/current/tech/04-config-system.md`。
 
-### 4.10.1 🟢 `dev-wasm` profile 仅供本地迭代（★ v1.50.82 · 严禁发布）
+### 4.13 CI/CD
 
-`Cargo.toml` 的 `[profile.dev-wasm]`（继承 release，但 `lto=false` + `codegen-units=16`）用于**改 Rust 时的本地快速反馈**：
-改 `sim_core` 后增量 **41s → 26s**，产物 1.49 MB → 2.02 MB。
+CI 使用标准 rustup，依次完成 WASM 编译、双副本同步、确定性/文档门禁后才部署；密钥只来自 GitHub Secrets，WASM MIME 必须为 `application/wasm`。详见 `docs/current/tech/26-cicd.md`。
 
-- ✅ **可以用**：本地跑 `test-wasm.js` 验证逻辑、排查崩溃、调数值。
-- ❌ **严禁**：把 `target/wasm32-unknown-unknown/dev-wasm/sim_wasm.wasm` 复制进 `frontend/` 双副本、提交或部署。
-- ⚠️ **发布口径唯一**：`cargo build -p sim_wasm --target wasm32-unknown-unknown --release`，产物才是 1.49 MB 的线上版本。
-- 判据：`frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm` 应恒为 **1,487,028 字节**（v1.50.82 release）；若发现约 2.0 MB，说明误用了 dev-wasm 产物，须立即重编 release 覆盖。
+### 4.14 决策顺序可编排
 
-### 4.10.2 🟢 `target/` 体积治理（★ v1.50.82）
+决策分支条件必须自包含；顺序由前端配置拖动、热注入并写入 localStorage，Rust 不保存一份相互竞争的固定顺序。详见 `decisions/AGENTS.md` §4.7 和 `frontend/AGENTS.md` §5.6。
 
-`target/` 曾膨胀到 **1.6 GB**，其中 **928 MB 是宿主平台（x86 Windows）的 debug 产物**——本项目只发布 wasm32，这些纯属占用。主因是 dev profile 默认 `debug = 2`（完整调试信息：单个 `sim_wasm.pdb` 33 MB、`libsim_core.rlib` 108 MB）。
+### 4.15 高频 DOM 重建
 
-- **长期抑制**：`Cargo.toml` 已设 `[profile.dev] debug = false` 与 `[profile.dev.package."*"] debug = false`。
-  本项目不使用 dev 构建（它还会触发 rustc ICE），`dev-wasm` 继承的是 release，**不受影响**。
-- **定期清理**：`node tools/clean-target.js`（默认预览不删除，加 `--yes` 执行，`--all` 额外清 dev-wasm 缓存）。
-  默认清理 `target/debug`、`target/release`、`target/wasm32-unknown-unknown/debug`；
-  **`target/wasm32-unknown-unknown/release` 受保护永不删除**（脚本内置 `PROTECTED` 白名单，已实测 `--all --yes` 也不会误删）。
-- 实测效果：1.6 GB → **211 MB**（省 87%），release 产物与前端双副本均完好（1,487,028 字节，md5 未变）。
+高频更新容器必须使用内容快照缓存；HTML 未变化时不得重新赋值 `innerHTML`，否则会在一次点击期间替换节点并丢失交互。详见 `docs/current/tech/21-frontend-dev-guide.md` §4.5。
 
-### 4.11 🏠 建房/升级/修缮均为 Agent 自主决策（`housing_system/` 模块）
+### 4.16 运动状态
 
-设计原则：系统只当「物理规则执行者」（放置校验 / 路网接入 / 施工计时 / 竣工扩容），一切「盖不盖、何时盖、在哪盖」必须来自 agent 自己的 `arbitrate_sustained_task` 输出。**严禁**引入扫描全图并强制改写 `agent.state` 的指挥式逻辑；已删除的旧扫描器（`tick_warehouse_founding`、`check_start_house_upgrades`、修缮强制切换块）勿复活。
-三条自主链路：**立宅**（`FoundHome`，生理层最后一档）/**升级**（`BuildHouse`，M6 瞬时化，一次性扣账 + 威望 +1）/**修缮**（`RepairHouse`，耐久 <50%）。
+是否移动只由 `current_lane_id.is_some()` 决定。移动态转非移动态必须调用 `enter_stationary_state()`，不得直接写 `agent.state`；到达判定使用 `current_lane_id.is_none()`，不要使用永不清空的 `route.is_empty()`。详见 `spatial/AGENTS.md` §4.6 和 `decisions/AGENTS.md` §4.9。
 
-→ 详见 `crates/sim_core/src/spatial/housing_system/AGENTS.md` §1 / §4.1、[`./docs/current/tech/13-housing-system.md`](./docs/current/tech/13-housing-system.md) §2.2。
+### 4.17 换行符
 
-### 4.11.1 🧠 马斯洛引擎是唯一任务分派入口（跨模块硬约束 · 严禁旁路指挥）
+全仓统一 LF (`\n`)；提交前执行 `git diff --check`。Windows Git 建议 `core.autocrlf input` 或 `false`。
 
-- **唯一入口**：任何「去哪里 / 做什么」的 Agent 任务，必须来自 `Decisioner::arbitrate_sustained_task` → `dispatch_task`；系统 tick、生态层、房屋层和账本层**不得**扫描 Agent 并直接摊派 `Seeking*` / `ReturningToCamp` / `ConstructingHouse` 等行动状态。
-- **状态执行边界**：决策器的途中熔断只能执行当前马斯洛层级允许的降级；临界口渴/饥饿等更高优先级生理需求不得被普通疲劳阈值强制改写。
-- **物理结算例外**：系统只结算 Agent 已写下的 pending 意图（立宅、升级、成婚、受孕、登基），**不得**借结算流程生成新任务或覆盖当前需求优先级。
-- **新增分支/熔断审计**：必须证明任意决策顺序下语义仍由分支自包含条件决定；禁止在分支外新增「看到某状态就强制切换」的旁路指挥逻辑。
+### 4.18 渲染迁移
 
-→ 详见 `decisions/AGENTS.md` §4.7、[`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.5。
+目标是全量 WebGL 和共享深度缓冲：不要在 Canvas 2D 侧新增遮挡优化；几何、LOD、季相和遮罩逻辑留在 CPU 模型层；过渡期实体仍进入 `drawWorldEntities()` 统一队列。详见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md) 和 `frontend/AGENTS.md`。
 
-### 4.12 🔧 超参集中化、配置校验与速查表（跨模块契约）
+## 5. 文档分层
 
-- 全部 `SimConfig` 字段由 `frontend/js/config.js` **及拆分配置**（`config.house-upgrade-cost.js` / `config.decision-order.js`）驱动，经 `rustworld.js::applyConfig` 注入内核；Rust 逻辑层一律通过 `self.config.<字段>` 引用，**禁止**散落字面量。
-- 新增超参须**四处**同步：`config.rs` 增加 `SimConfig` 字段（含 doc 注释；v1.44.9 起 Rust 无 const/手写 Default，`#[derive(Default)]` 零值兑底，**默认值唯一真相源 = 前端 config.js**）+ `frontend/js/config.js` + `crates/sim_core/examples/config.json`（探针用）+ `tools/config-check.js` IMPACT_OVERRIDES 映射；内核必须有真实读取点——`config-check.js` 第 5 条「空转参数」规则拒绝零读取字段。
-- **文档化例外**：`decisionEvalOrder` / `decisionEvalLevels` 是「Rust 无顺序」字段——Rust 默认为空 Vec，权威值只存在于前端 `config.decision-order.js`；**严禁**在 Rust 侧写死策展优先级序列。
-- 防回归：`config-check.js` 与 `test-wasm.js` 双绿方为可发布状态；`./docs/current/tech/05-config-reference.md` **自动生成，勿手工维护**。
+| 层级 | 载体 | 内容 |
+|---|---|---|
+| 全局 | 根 `AGENTS.md` | 不变量、跨模块契约、任务路由、门禁 |
+| 模块 | 局部 `AGENTS.md`、`docs/current/` | 文件职责、数据结构、调用链、算法和模块易踩坑 |
+| 局部实现 | 代码注释 | 函数级实现原因和短期技巧 |
 
-→ 详见 [`./docs/current/tech/04-config-system.md`](./docs/current/tech/04-config-system.md) §3.1~§3.3。
-
-### 4.13 🚀 CI/CD 流水线（GitHub Actions → 腾讯云 COS）
-
-触发（push `master` / `workflow_dispatch`）→ 编译 WASM → 双副本同步 → 三类门禁（test-wasm / cross-doc-check / doc-link-check）→ `coscmd` 增量上传 `frontend/`。
-铁律：**CI 用标准 rustup**（严禁 `CARGO_HOME` 指向 `.cargo-home` 或把 `.toolchain/` 加入 PATH）；**wasm MIME 必须 `application/wasm`**；**门禁不过不部署**；桶地址/密钥一律走 GitHub Secrets。
-
-→ 详见 [`./docs/current/tech/26-cicd.md`](./docs/current/tech/26-cicd.md)。
-
-### 4.14 🧠 决策顺序可编排（`decisions/` + 前端）
-
-**内核无序**（按 `branch_order` 迭代 16 条自包含条件分支）+ **前端拖动热注入**（覆层拖卡 → 改 `SIM_CONFIG` → `applyConfig()`）+ **localStorage 持久化**（键 `flowaccord.decision-order.v3`）。
-分支自包含铁律：无家守卫、`b13` 的 4 级庄园门禁、`b5/b6/b7` 的 `family_level` 动态默认**必须写在分支条件内部**；层级覆盖编码 `0`=⓪瞬间行为 / `1-5`=①..⑤马斯洛层级 / `6`=保留代码动态默认。
-
-→ 详见 [`./docs/current/tech/11-decision-engine.md`](./docs/current/tech/11-decision-engine.md) §3.5、`decisions/AGENTS.md` §4.7（含层级覆盖与瞬发钳制）、`frontend/AGENTS.md` §5.6（保存与迁移）。
-
-### 4.15 🟠 高频 DOM 重建禁止破坏交互（`frontend/` 模块 · 内容快照缓存）
-
-被高频（每帧 / 10FPS）`innerHTML = ...` 全量重建的容器，其内部可交互元素会在 mousedown 与 mouseup 之间被替换成新节点，`click` 落到共同祖先、`e.target.closest(...)` 落空——表现为「点击无反应」，且**控制台零报错**。
-唯一正确姿势：高频刷新容器一律套**内容快照缓存**（生成 HTML 与上次一致即跳过重建）。凡计划在高频重建容器内放可点击元素（chip / 按钮 / 卡片），必须先确认该容器走缓存。
-
-→ 详见 [`./docs/current/tech/21-frontend-dev-guide.md`](./docs/current/tech/21-frontend-dev-guide.md) §4.5（含在红线内的容器清单）、`frontend/AGENTS.md` §0。
-
-### 4.16 🟠 移动由 `current_lane_id` 唯一驱动 · 非移动态切换必须走 `enter_stationary_state()`（v1.25.0 起）
-
-- 不再维护 `is_moving` 白名单：有车道则沿路线积分位移，无车道则清零速度静止；`dispatch()` / `turn_around_and_route_to()` 自动写入 `current_lane_id`，新增移动态零额外成本。
-- **硬约束**：所有从移动态切到非移动态的场景**必须**调用 `agent.enter_stationary_state(state)`（统一清空 `current_lane_id` / `current_velocity` / `route_index` 的唯一写入入口），禁止直接 `agent.state = X`，否则会出现「人在家休息但坐标在跑」。
-- **配套契约**：`advance_to_next_lane` 走完路线后 `route` Vec **不会清空**，「是否还在移动/重补路」判定必须用 `current_lane_id.is_none()`，**严禁**用 `route.is_empty()`（永不成立 → 到点站死）。立宅时 `settlement.rs` 直接设 `world_pos = site_pos` 是既有设计，不计入异常。
-
-→ 详见 `spatial/AGENTS.md` §4.6（运动系统契约）与 `decisions/AGENTS.md` §4.9（决策层非移动态切换规范）。回归门禁：`node tools/diagnose.js --check all` 的 Rule 5（移动停滞）。
-
-### 4.17 🟡 换行符规范（LF 单一标准 · 全局）
-
-全项目（Rust 源码、Web 前端、JSON/配置、Markdown 文档与工具脚本）**统一使用 LF (`\n`)** 作为换行符，**严禁提交 CRLF (`\r\n`)**。
-Windows 环境下 Git 建议配置 `git config core.autocrlf input`（或 `false`），代码编辑器/IDE 换行符统一设定为 LF，杜绝因 CRLF 引入虚假 diff、`git diff --check` 空白报警或配置比对漂移。
-
-→ 详见 [`./docs/current/tech/22-build-and-run.md`](./docs/current/tech/22-build-and-run.md) §1.5 与 [`./docs/current/tech/28-invariants.md`](./docs/current/tech/28-invariants.md) §5（O7 约束）。
-
-### 4.18 🎨 渲染层：全量 WebGL 是目标形态，Canvas 2D 为过渡（★ 2026-09-17 决策 · 跨模块）
-
-**决策**：**所有内容上 WebGL，不再使用 Canvas 2D**。目标形态为全部渲染内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲；阶段三~五完成后退役 `sim-canvas` 2D 覆盖层与 `fallback-handler.js` 的 2D 回退分支（[31 号 §8](./docs/plan/tech/31-canvas-to-webgl-migration.md)）。
-
-三条硬约束（改渲染/装饰/实体代码时逐条对照）：
-
-1. **不在 Canvas 2D 侧追加遮挡优化**——原 TA-08 的三策略（模型内排序 / 实体拆子项 / 屏幕空间兜底）**已取消**，遮挡由 GPU 深度缓冲逐像素解决；TA-08 任务已于 2026-09-17 删除并视为完成（重定向后无功能开发任务），验收矩阵并入 [31 号 §8.5](./docs/plan/tech/31-canvas-to-webgl-migration.md)；
-2. **几何与筛选逻辑必须与渲染后端解耦**——`accent-model.js`（骨架/包围体/分级几何）、`accent-lod.js`（判档/剔除口径唯一入口）、`accent-season.js`（季相曲线）、`landscape-model.js` / `landscape-mask.js`（景观派生与遮罩判定）留在 CPU 侧并被迁移直接复用；**严禁**把这些逻辑内联进 Canvas 绘制函数，否则迁移时需重写；
-3. **不新增 Canvas 2D 专属机制**——新增的可视化元素应尽量表达为「几何 + 参数 + 可见性」，而非依赖 `ctx` 状态机；过渡期仍须挂 `drawWorldEntities()` 统一队列（§5.9），但该队列在迁移后仅剩批次提交与透明排序职责。
-
-**确定性红线不变**：渲染后端切换**不得**改变 `WorldRng` 消费顺序、几何派生规则（`accentModelStyleVersion` 契约）或快照字段；模型内排序等纯视觉计算不消费 RNG 的既有约定继续有效。
-
-→ 详见 [31 号迁移方案](./docs/plan/tech/31-canvas-to-webgl-migration.md)（阶段三~五方案 + §9 风险与过渡期回退）与 [`frontend/AGENTS.md`](./frontend/AGENTS.md)（文件职责与加载顺序）。
-
-## 5. 📐 文档分层放置策略
-
-> 防文档膨胀的核心守则。新增文档内容前先判断属于哪一层。
-
-### 分层原则
-
-| 层级 | 载体 | 写什么 | 不写什么 |
-| :--- | :--- | :--- | :--- |
-| **高层** | 根 AGENTS.md / ./docs/current/README.md | 原则、不变量、索引、跨模块硬约束、易踩坑 | 实现细节、函数级逻辑、逐行解释 |
-| **中层** | docs/current/ 下对应模块文档 / 嵌套 AGENTS.md | 模块机制、数据结构、模块间接口、关键算法 | 逐行代码解释、临时调试过程 |
-| **底层** | 代码内注释 | 函数级实现、局部 trick、为什么这么写 | 上升到文档的机制描述 |
-
-### 操作守则
-
-1. **同一事实只在一个权威位置出现**，其余用交叉引用（如"详见 decisions/AGENTS.md"），禁止多处复制粘贴导致漂移。
-2. **禁止往高层文档塞**：会话级临时决策、单次调试过程、已完成的中间步骤、具体函数名清单（除非是跨模块硬约束的一部分）。
-3. **历史性 churn 只进 changelog** 的里程碑条目，不进机制文档。机制文档只描述"当前是什么"，不描述"从什么改过来"。
-4. **新增模块时**：先在 `docs/current/tech/`（实现视角）与 `docs/current/design/`（玩家视角，若影响可观察规则）建模块文档 + 在对应目录建嵌套 AGENTS.md，再在 `docs/current/README.md` 模块导航表登记，最后在 `./docs/current/01-changelog.md` 追加版本条目。文档编号为**目录内顺序号**（从 `01` 起连续，各目录各自成序），新增文档取该目录下一个可用编号；文档内标题编号约定见 [`docs/README.md`](./docs/README.md)（H1 写文件名前缀、分部内 `##` 从 1 起连续、`## 状态机` 不编号）。
-5. **改机制时**：同步更新对应中层文档的机制描述 + changelog 条目；根 AGENTS.md 仅在跨模块硬约束变化时更新。
+同一事实只有一个权威位置，其他地方只保留链接。新增复杂目录时必须补局部指南；修改机制时同步更新对应现状文档和 `docs/current/01-changelog.md`。提交前运行文档维护、跨文档一致性和链接检查。
