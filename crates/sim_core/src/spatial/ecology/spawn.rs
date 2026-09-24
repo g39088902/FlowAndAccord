@@ -95,7 +95,7 @@ impl World3DEngine {
 
     /// 2. 生成清泉水源（ID 段位 10-15）
     ///
-    /// ★ TB-03：数量按 profile 决定（`water_source_poi_count`）——湖畔盆地 2 个
+    /// ★ TB-03：数量按 profile 决定（`water_source_poi_count`）——火山湖 2 个
     /// （双湖岸取水点），其余 profile 恒为 `count_water_sources`（既有数量语义不变）。不先创建
     /// 多余水源再删除以绕开 RNG 与 ID 规则。
     pub(super) fn spawn_water_pois(&mut self, layout: &mut SeedLayout) {

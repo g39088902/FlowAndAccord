@@ -21,7 +21,7 @@
   const STYLE_WHITELIST = {
     alluvial_fan_v1: ['warm_layered'],
     basin_oasis_v1: ['oasis_dry'],
-    lakeside_basin_v1: ['lakeside_green'],
+    volcanic_lake_v1: ['volcanic_blue'],
   };
 
   // 基调定义：逐 SurfaceKind 的反照率乘色（1.0 = 不改）。只列需要调色的键，
@@ -41,14 +41,15 @@
       RiverTerrace: [1.05, 1.00, 0.90],
       RockFace: [1.12, 1.02, 0.92],
     },
-    // 湖畔盆地：润泽绿岸——环岸草地偏冷绿，水床色压深托出湖面层次。
-    lakeside_green: {
-      DryGround: [0.97, 1.02, 0.97],
-      SoftGround: [0.96, 1.02, 0.97],
-      RiverTerrace: [0.97, 1.02, 0.97],
-      ShallowWater: [0.92, 0.97, 1.05],
-      DeepWater: [0.92, 0.97, 1.05],
-      RiverBank: [0.95, 1.00, 1.00],
+    // 火山湖：天池蓝——深蓝湖心、冷灰火山岩与高海拔草坡。
+    volcanic_blue: {
+      DryGround: [0.94, 1.00, 0.96],
+      SoftGround: [0.91, 0.98, 0.94],
+      RiverTerrace: [0.94, 1.00, 0.96],
+      RockFace: [0.82, 0.87, 0.92],
+      ShallowWater: [0.58, 0.82, 1.12],
+      DeepWater: [0.42, 0.72, 1.18],
+      RiverBank: [0.80, 0.90, 0.96],
     },
   };
 
@@ -60,7 +61,7 @@
   const RANDOM_CANDIDATES = [
     'mountain_pass_v1', 'river_valley_v1', 'grassland_plain_v1',
     'hillside_woodland_v1', 'plateau_v1',
-    'alluvial_fan_v1', 'basin_oasis_v1', 'lakeside_basin_v1',
+    'alluvial_fan_v1', 'basin_oasis_v1', 'volcanic_lake_v1',
   ];
   // 内核常量 0x5052_4F46_494C_4531 拆半（JS 无 u64）：2^32 % 8 = 0，
   // value % 8 = (hi % 8) × 0 + (lo % 8) = lo % 8（模乘同余，高半部不参与）。

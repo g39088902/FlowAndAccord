@@ -19,7 +19,7 @@
       "id": "engine-architecture",
       "path": "docs/current/tech/01-engine-architecture.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "AGENTS.md",
         "crates/sim_core/src/spatial/world.rs",
@@ -54,7 +54,7 @@
       "id": "config-system",
       "path": "docs/current/tech/04-config-system.md",
       "owner": "frontend/sim-core",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/config.rs",
         "frontend/js/config*.js",
@@ -89,7 +89,7 @@
       "id": "ecology-and-poi",
       "path": "docs/current/tech/08-ecology-and-poi.md",
       "owner": "sim-core/ecology",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/spatial/ecology/**/*.rs",
         "crates/sim_core/src/spatial/poi.rs",
@@ -153,7 +153,7 @@
       "id": "terrain-and-network",
       "path": "docs/current/tech/14-terrain-and-network.md",
       "owner": "sim-core/geo",
-      "lastReviewed": "2026-09-14",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/spatial/graph.rs",
@@ -175,7 +175,7 @@
       "id": "frontend-overview",
       "path": "docs/current/tech/16-frontend-overview.md",
       "owner": "frontend",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "frontend/index.html",
         "frontend/style.css",
@@ -209,7 +209,7 @@
       "id": "ui-implementation",
       "path": "docs/current/tech/19-ui-implementation.md",
       "owner": "frontend",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "frontend/index.html",
         "frontend/js/**/*.js",
@@ -231,7 +231,7 @@
       "id": "frontend-dev-guide",
       "path": "docs/current/tech/21-frontend-dev-guide.md",
       "owner": "frontend",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "frontend/js/**/*.js",
         "frontend/style.css",
@@ -243,7 +243,7 @@
       "id": "build-and-run",
       "path": "docs/current/tech/22-build-and-run.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "AGENTS.md",
         "docs/current/tech/22-build-and-run.md"
@@ -303,7 +303,7 @@
       "id": "invariants",
       "path": "docs/current/tech/28-invariants.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "AGENTS.md",
         "frontend/AGENTS.md",
@@ -316,7 +316,7 @@
       "id": "impact-matrix",
       "path": "docs/current/tech/29-impact-matrix.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "AGENTS.md",
         "frontend/AGENTS.md",
@@ -328,7 +328,7 @@
       "id": "workflow",
       "path": "docs/current/tech/30-workflow.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "AGENTS.md",
         "crates/sim_core/AGENTS.md",
@@ -343,7 +343,7 @@
       "id": "code-map",
       "path": "docs/current/tech/31-code-map.md",
       "owner": "engineering",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/**/*.rs",
         "crates/sim_wasm/src/**/*.rs",
@@ -352,10 +352,27 @@
       ]
     },
     {
+      "id": "terrain-generation-gates",
+      "path": "docs/current/tech/32-terrain-generation-gates.md",
+      "owner": "sim-core/geo",
+      "lastReviewed": "2026-09-24",
+      "sources": [
+        "crates/sim_core/src/geo/validation.rs",
+        "crates/sim_core/src/geo/terrain.rs",
+        "crates/sim_core/src/spatial/creation_fallback.rs",
+        "crates/sim_core/src/spatial/terrain_network.rs",
+        "crates/sim_core/src/spatial/survival_diagnosis.rs",
+        "crates/sim_core/src/spatial/world_save.rs",
+        "crates/sim_core/examples/terrain_probe.rs",
+        "crates/sim_core/examples/accent_water_probe.rs",
+        "docs/current/tech/32-terrain-generation-gates.md"
+      ]
+    },
+    {
       "id": "design-product-overview",
       "path": "docs/current/design/01-product-overview.md",
       "owner": "product",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "README.md",
         "docs/current/design/01-product-overview.md"
@@ -365,7 +382,7 @@
       "id": "design-world-rules",
       "path": "docs/current/design/02-world-rules.md",
       "owner": "product",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/config.rs",
@@ -388,7 +405,7 @@
       "id": "design-economy",
       "path": "docs/current/design/04-economy.md",
       "owner": "product",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/spatial/ecology/**/*.rs",
         "crates/sim_core/src/spatial/decisions/market.rs",
@@ -400,7 +417,7 @@
       "id": "design-observation-ux",
       "path": "docs/current/design/05-observation-ux.md",
       "owner": "product/frontend",
-      "lastReviewed": "2026-09-12",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "frontend/index.html",
         "frontend/js/**/*.js",
@@ -421,7 +438,7 @@
       "id": "design-terrain-implementation",
       "path": "docs/current/design/07-terrain-implementation.md",
       "owner": "product",
-      "lastReviewed": "2026-09-13",
+      "lastReviewed": "2026-09-24",
       "sources": [
         "crates/sim_core/src/geo/**/*.rs",
         "crates/sim_core/src/config.rs",

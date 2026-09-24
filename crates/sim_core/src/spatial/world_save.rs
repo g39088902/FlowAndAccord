@@ -43,7 +43,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.59";
+pub const SAVE_APP_VERSION: &str = "1.60";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///
@@ -267,7 +267,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         // ★ TB-03：静水/干沟三新模板入列白名单（同次交付 §7.4 快照/存档同步清单）
         && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN
         && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS
-        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN
+        && save.terrain_profile != crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE
     {
         return Err(format!("地形 profile 不受支持：{}", save.terrain_profile));
     }

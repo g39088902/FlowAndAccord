@@ -19,7 +19,7 @@
     plateau_v1: '🏕️ 台地',
     alluvial_fan_v1: '🏜️ 山前冲积扇',
     basin_oasis_v1: '⛰️ 盆地',
-    lakeside_basin_v1: '🌊 湖畔盆地',
+    volcanic_lake_v1: '🌋 火山湖',
     flat_baseline: '📐 诊断基线',
   };
 
@@ -34,7 +34,7 @@
     'plateau_v1',
     'alluvial_fan_v1',
     'basin_oasis_v1',
-    'lakeside_basin_v1',
+    'volcanic_lake_v1',
   ];
 
   const PROFILE_SALT = 0x50524F46494C4531n;

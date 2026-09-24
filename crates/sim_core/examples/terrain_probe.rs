@@ -38,7 +38,7 @@ use sim_core::config::SimConfig;
 use sim_core::geo::biome::TERRAIN_FLAG_NO_WALK;
 use sim_core::geo::terrain::{
     TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS, TERRAIN_PROFILE_GRASSLAND_PLAIN,
-    TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_LAKESIDE_BASIN,
+    TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_VOLCANIC_LAKE,
     TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU,
     TERRAIN_PROFILE_RIVER_VALLEY,
 };
@@ -1152,7 +1152,7 @@ fn main() {
         // 诊断模式：创世后立刻跑读档用的同一套校验（`validate_terrain_world`），确认
         // 「非法车道」不会在创世被产出——否则世界一旦存档就再也读不回来。
         let n: u64 = raw.get(2).and_then(|s| s.parse().ok()).unwrap_or(20);
-        for profile in ["random", "river_valley_v1"] {
+        for profile in ["random", "river_valley_v1", "volcanic_lake_v1"] {
             let mut fails = 0usize;
             let mut lanes_min = usize::MAX;
             let mut sample_max = 0.0f32;
@@ -1213,7 +1213,7 @@ fn main() {
             || name == TERRAIN_PROFILE_PLATEAU
             || name == TERRAIN_PROFILE_ALLUVIAL_FAN
             || name == TERRAIN_PROFILE_BASIN_OASIS
-            || name == TERRAIN_PROFILE_LAKESIDE_BASIN
+            || name == TERRAIN_PROFILE_VOLCANIC_LAKE
         {
             let n = seeds_arg.unwrap_or(60);
             run_profile(&mut cfg, &name, (0..n).collect());
@@ -1228,7 +1228,7 @@ fn main() {
                 TERRAIN_PROFILE_PLATEAU,
                 TERRAIN_PROFILE_ALLUVIAL_FAN,
                 TERRAIN_PROFILE_BASIN_OASIS,
-                TERRAIN_PROFILE_LAKESIDE_BASIN
+                TERRAIN_PROFILE_VOLCANIC_LAKE
             );
             std::process::exit(2);
         }

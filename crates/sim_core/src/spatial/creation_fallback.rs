@@ -316,8 +316,8 @@ impl World3DEngine {
         if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
             self.validate_basin_gates()?;
         }
-        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
-            self.validate_lakeside_gates()?;
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE {
+            self.validate_volcanic_lake_gates()?;
         }
         let report = self.diagnose_survival();
         if !report.ok {

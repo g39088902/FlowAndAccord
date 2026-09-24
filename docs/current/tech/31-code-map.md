@@ -25,7 +25,7 @@ FlowAndAccord/
 │   │       │   ├── plateau.rs              # ★ TB-02 台地几何与过渡带 (PlateauGeometry)
 │   │       │   ├── alluvial_fan.rs         # ★ TB-03 山前冲积扇几何与干浅沟 (FanGeometry)
 │   │       │   ├── basin.rs                # ★ TB-03 盆地几何与环抱高山 (BasinGeometry)
-│   │       │   ├── lakeside.rs             # ★ TB-03 湖畔盆地几何与环湖干岸 (LakeGeometry)
+│   │       │   ├── volcanic_lake.rs             # ★ TB-03 火山湖几何与环湖干岸 (VolcanicLakeGeometry)
 │   │       │   ├── static_water.rs         # ★ TB-03 静水共用规划：闭合扰动椭圆轮廓/cells 涂写/WaterBody 特征与岸点登记 (StaticWaterPlan)
 │   │       │   ├── hydrology.rs            # 水系生成（含 River/RiverBank 特征闭合轮廓）
 │   │       │   ├── accents.rs              # ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder 5 类，salt RNG）

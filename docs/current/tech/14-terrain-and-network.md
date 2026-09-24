@@ -48,7 +48,7 @@ stateDiagram-v2
 ## 核心机制
 
 ### 连续 3D 地形与 T0/T1 静态地貌
-- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 湖畔盆地）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。
+- `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 火山湖）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。
 - `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面，水体相关枚举为 T2 预留。
 - T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；水系特征（河岸/浅滩/泉谷）仍由 T2 profile 输出，前端只消费这些内核事实进行绘制；草原 profile 包含泉溪低洼地形（见 §9.7）。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
@@ -383,9 +383,9 @@ accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值
 
 ★ **T1/T2 随机轮换机制**：
 
-- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'`、`'plateau_v1'`、`'alluvial_fan_v1'`、`'basin_oasis_v1'`、`'lakeside_basin_v1'` 或 `'flat_baseline'`）。
+- 前端与内核配置中 `terrainProfile` 默认为 `'random'`（亦支持显式锁定 `'mountain_pass_v1'`、`'river_valley_v1'`、`'grassland_plain_v1'`、`'hillside_woodland_v1'`、`'plateau_v1'`、`'alluvial_fan_v1'`、`'basin_oasis_v1'`、`'volcanic_lake_v1'` 或 `'flat_baseline'`）。
 - 当配置为 `'random'` 时，内核在生成前按世界种子确定性分支（★ S7-10 候选池 2→5）：
-  `(seed ^ 0x5052_4F46_494C_4531) % 8` 依序实例化为 `mountain_pass_v1`（T1 山口）/ `river_valley_v1`（T2 两岸河谷）/ `grassland_plain_v1`（平地草原）/ `hillside_woodland_v1`（半坡林地）/ `plateau_v1`（台地）/ `alluvial_fan_v1`（山前冲积扇）/ `basin_oasis_v1`（盆地）/ `lakeside_basin_v1`（湖畔盆地），各 ~12.5%（★ v1.50.68 砍需求后 8 路；原 9 路中的 `river_valley_settlement_v1` 已删除，同一种子的 random 映射随之改变）。
+  `(seed ^ 0x5052_4F46_494C_4531) % 8` 依序实例化为 `mountain_pass_v1`（T1 山口）/ `river_valley_v1`（T2 两岸河谷）/ `grassland_plain_v1`（平地草原）/ `hillside_woodland_v1`（半坡林地）/ `plateau_v1`（台地）/ `alluvial_fan_v1`（山前冲积扇）/ `basin_oasis_v1`（盆地）/ `volcanic_lake_v1`（火山湖），各 ~12.5%（★ v1.50.68 砍需求后 8 路；原 9 路中的 `river_valley_settlement_v1` 已删除，同一种子的 random 映射随之改变）。
   ★ `flat_baseline`（STAGE2-7 显式诊断/降级基线，倾斜-only 平地）**永不参与 random 分派**，只能显式指定；它是 STAGE2-5 有界回退环的显式降级目标，支持存读档续演（存档 profile 白名单已放行）。
 - ⚠️ **取模作用于原始异或值而非 mix64 哈希**：连续种子的落点按 `% 5` 同余循环分布，非哈希均匀分散。S7-10 扩池改变了既有种子在 random 下的落点（旧 T1/T2 奇偶交替 → 5 路取模），属 §20 收口设计——显式 profile 的输出不受影响，旧存档记录的是已实例化模板名，读档不受影响。
 - 创世完成后，`terrain.profile` 记录具体实例化模板名，存档 `WorldSave` 记录真实模板名，完全保持同种子 100% 逐字节确定性与读档一致性，同时确保普通玩家开局/重置时五套地貌各 ~20% 均衡轮换。
@@ -705,7 +705,7 @@ A\* 寻路通过 `LaneEdge3D::wear_tier_bucket` 量化道路踩踏加成（0.50x
 
 ## 12. 取水与生态预算
 
-> **服务对象**：带水地图模板（两岸河谷、湖畔盆地、盆地……）的共享取水语义。
+> **服务对象**：带水地图模板（两岸河谷、火山湖、盆地……）的共享取水语义。
 
 
 建议区分“水体几何”“可采水资源池”“岸边交互点”。水面可见范围不等于处处可采，多个岸点可引用同一资源池。
@@ -862,7 +862,7 @@ pub terrain_generator_version: u32,     // 当前为 11（v1.50.68 砍需求：�
 pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1"
 ```
 
-`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验白名单：`mountain_pass_v1`、`river_valley_v1`、`grassland_plain_v1`、`hillside_woodland_v1`、`plateau_v1`、`alluvial_fan_v1`、`basin_oasis_v1`、`lakeside_basin_v1`、`flat_baseline` 九者被接受，其余报错拒绝（禁止静默回退；原 `river_valley_settlement_v1` 已随 v1.50.68 删除，旧档同时因生成器版本门禁被拒）。
+`terrain_profile` 用于记录已实例化的具体地貌模板（创世时若配置为 `"random"`，内核会按种子哈希实例化为具体名称入档）。当前严格校验白名单：`mountain_pass_v1`、`river_valley_v1`、`grassland_plain_v1`、`hillside_woodland_v1`、`plateau_v1`、`alluvial_fan_v1`、`basin_oasis_v1`、`volcanic_lake_v1`、`flat_baseline` 九者被接受，其余报错拒绝（禁止静默回退；原 `river_valley_settlement_v1` 已随 v1.50.68 删除，旧档同时因生成器版本门禁被拒）。
 
 读档规则：
 
@@ -949,7 +949,7 @@ render_agents.js        族人绘制                                            
 ✅ 已落地 76 个仿真字段（分区 7「地形生成、地表查询与山口/河谷/草原/台地 profile」，全系统配置字段总计 370；★ v1.50.51 S7-08 集中化 3 profile 的 37 形态参数；★ v1.50.54 TB-02 台地 12 形态参数；★ v1.50.55 TB-03 盆地/冲积扇/湖畔 22 形态参数并纳入 profile；★ v1.50.68 砍需求删河谷聚落 20 形态参数、冲积扇辨识度改善增 3 形态参数并调扇系默认值）：
 
 ```text
-✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "plateau_v1"（台地，原 plateau_settlement_v1）| "alluvial_fan_v1"（★ TB-03 冲积扇）| "basin_oasis_v1"（★ TB-03 盆地）| "lakeside_basin_v1"（★ TB-03 湖畔盆地）| "flat_baseline"（诊断基线，永不入 random）；★ v1.50.68 起 8 profile 参与 random 轮换（原 9 路中的河谷聚落已删除）
+✅ terrainProfile             "random"            地貌模板："random"（种子轮换）| "mountain_pass_v1" | "river_valley_v1" | "grassland_plain_v1" | "hillside_woodland_v1" | "plateau_v1"（台地，原 plateau_settlement_v1）| "alluvial_fan_v1"（★ TB-03 冲积扇）| "basin_oasis_v1"（★ TB-03 盆地）| "volcanic_lake_v1"（★ TB-03 火山湖）| "flat_baseline"（诊断基线，永不入 random）；★ v1.50.68 起 8 profile 参与 random 轮换（原 9 路中的河谷聚落已删除）
 ✅ terrainGridRes             256                 地形栅格分辨率（每边格数；世界尺寸 764m ⇒ 步长 764/255 ≈ 2.996m；v1.50.70 由 160 提升）
 ✅ terrainRidgeAmplitude      28.0                山脊/河谷起伏幅度 (m)
 ✅ terrainPassRidgeWidth      62.0                ★ T1 山口主脊高斯半宽 (m)；通行力约束见 §9.3.1
@@ -1030,7 +1030,7 @@ render_agents.js        族人绘制                                            
 实现约束：
 
 - ✅ 每个字段同时出现在 Rust `SimConfig`、前端 `config.js` 与探针示例 `examples/config.json`，并由 `config-check.js` 严格契约校验（全系统配置字段总计 369）。
-- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 8` 确定性八路分支到 T1/T2/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地（★ v1.50.68 砍需求：候选池 9→8，删除河谷聚落、台地聚落更名台地）。
+- ✅ `terrainProfile` 影响地形创世与存档门禁；当设为 `"random"` 时，内核通过 `(seed ^ 0x5052_4F46_494C_4531) % 8` 确定性八路分支到 T1/T2/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖（★ v1.50.68 砍需求：候选池 9→8，删除河谷聚落、台地聚落更名台地）。
 - ✅ 新增配置不改变现有 `simulationDt`、Agent 决策相位、全局 RNG 消费顺序和 tick 顺序。
 - ⚠️ **已删除/待加回的地形字段**（v1.50.18 死代码审计）：`terrainRidgeWidth`（山脊/河谷影响宽度，
   T1 主脊已改走 `terrainPassRidgeWidth`）与 `terrainTreeSeasonTint`（树木季节变色开关）已**永久删除**，勿再引用；

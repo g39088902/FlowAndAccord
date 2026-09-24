@@ -179,7 +179,7 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 256 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（v1.50.70 由 160 提升；256 → 步长 764/255 ≈ 2.996m） |
-| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/湖畔盆地，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'lakeside_basin_v1'（★ TB-03 湖畔盆地：中心大湖+环湖干岸+双出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
+| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
@@ -237,12 +237,12 @@
 | `terrainBasinRimHeightM` | f32 | 42 | geo/basin.rs (TB-03 外缘低脊高度) | 外缘高耸山体基底高度 (m)；雄峻环抱高山，出口处受控归低 |
 | `terrainBasinExitWidthDeg` | f32 | 38 | geo/basin.rs (TB-03 陆路出口角宽) | 陆路出口角宽（度）；首版至少一个明确出口 |
 | `terrainBasinNoiseGain` | f32 | 0.3 | geo/basin.rs (TB-03 盆底噪声阻尼增益) | 盆底/盆壁噪声阻尼增益；出口与生活带噪声额外抑制 |
-| `terrainLakeSemiAxisRatioMin` | f32 | 0.1 | geo/lakeside.rs (TB-03 湖半轴比例抽样下限) | 湖半轴比例抽样下限（×worldSize） |
-| `terrainLakeSemiAxisRatioMax` | f32 | 0.16 | geo/lakeside.rs (TB-03 湖半轴比例抽样上限) | 湖半轴比例抽样上限；椭圆两轴各自独立抽样 |
-| `terrainLakeDepthM` | f32 | 3.5 | geo/lakeside.rs (TB-03 湖床最大深度) | 湖床最大深度 (m)；静水湖水位恒定 |
-| `terrainLakeShoreSetbackM` | f32 | 10 | geo/lakeside.rs (TB-03 水岸安全退距) | 水岸安全退距 (m)；岸线外 NO_BUILD 缓冲，其外为可建干岸 |
-| `terrainLakeOutlineWarpM` | f32 | 14 | geo/lakeside.rs (TB-03 湖岸低频径向扰动幅度) | 湖岸低频径向扰动幅度 (m)；限制凹度、不生成岛屿 |
-| `terrainLakeNoiseGain` | f32 | 0.3 | geo/lakeside.rs (TB-03 环岸噪声阻尼增益) | 环岸噪声阻尼增益；环岸干岸带平缓可建 |
+| `terrainLakeSemiAxisRatioMin` | f32 | 0.1 | geo/volcanic_lake.rs (TB-03 湖半轴比例抽样下限) | 湖半轴比例抽样下限（×worldSize） |
+| `terrainLakeSemiAxisRatioMax` | f32 | 0.16 | geo/volcanic_lake.rs (TB-03 湖半轴比例抽样上限) | 湖半轴比例抽样上限；椭圆两轴各自独立抽样 |
+| `terrainLakeDepthM` | f32 | 3.5 | geo/volcanic_lake.rs (TB-03 湖床最大深度) | 湖床最大深度 (m)；静水湖水位恒定 |
+| `terrainLakeShoreSetbackM` | f32 | 10 | geo/volcanic_lake.rs (TB-03 水岸安全退距) | 水岸安全退距 (m)；岸线外 NO_BUILD 缓冲，其外为可建干岸 |
+| `terrainLakeOutlineWarpM` | f32 | 14 | geo/volcanic_lake.rs (TB-03 湖岸低频径向扰动幅度) | 湖岸低频径向扰动幅度 (m)；限制凹度、不生成岛屿 |
+| `terrainLakeNoiseGain` | f32 | 0.3 | geo/volcanic_lake.rs (TB-03 环岸噪声阻尼增益) | 环岸噪声阻尼增益；环岸干岸带平缓可建 |
 | `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
 | `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |

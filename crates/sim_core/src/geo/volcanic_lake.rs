@@ -1,12 +1,12 @@
-//! lakeside.rs · TB-03 湖畔盆地静态几何与高程规划。
+//! volcanic_lake.rs · TB-03 火山湖静态几何与高程规划。
 //!
-//! 负责独立静态模板 `lakeside_basin_v1` 的物理高程骨架（TB-03-IMPLEMENTATION-PLAN §6）：
+//! 负责独立静态模板 `volcanic_lake_v1` 的物理高程骨架（TB-03-IMPLEMENTATION-PLAN §6）：
 //! 1. 中心静水湖：椭圆边界 + 有限低频径向扰动（限制半径正值与凹度，无岛屿），
-//!    半轴 0.10~0.16×world 独立抽样；湖面为整图主要障碍，迫使路线沿岸绕行；
+//!    半轴按配置随机抽样后收缩至约 0.08~0.13×world；湖心随机偏移在平原中形成天池式火山口湖；
 //! 2. 分带高程（q = 归一化椭圆半径）：
-//!    q<1 湖床（水下格由静水涂写强制下凹）→ 1≤q<1.35 干岸平台（平坦、可建、
-//!    岸线安全退距 NO_BUILD）→ 1.35≤q<2.3 外坡（soft 障碍，出口走廊归零）→
-//!    q≥2.3 外缘平地。湖心近域使用平坦基准（局部倾斜会破坏水平水面与环岸平台），
+//!    q<1 湖床（水下格由静水涂写强制下凹）→ 1≤q<1.42 干岸平台（平坦、可建、
+//!    岸线安全退距 NO_BUILD）→ 1.42≤q<3.25 环形火山锥体（出口走廊压低为双缓坡）→
+//!    q≥3.25 平原或轻微起伏外缘。湖心近域使用平坦基准（局部倾斜会破坏水平水面与环岸平台），
 //!    过渡带平滑回归局部倾斜；
 //! 3. 两个分离陆路出口：外坡角向窗口归零（间隔 ≥126°，不共用咽喉），
 //!    连接环湖生活带与外缘资源区；至少一条完整环湖陆路（干岸平台连续）；
@@ -23,9 +23,9 @@ use crate::config::SimConfig;
 use crate::rng::WorldRng;
 use super::static_water::{build_closed_ellipse_outline, StaticWaterPlan};
 
-/// 湖畔盆地静态几何（创世 scratch 专用，不进快照/存档）。
+/// 火山湖静态几何（创世 scratch 专用，不进快照/存档）。
 #[derive(Debug, Clone)]
-pub struct LakeGeometry {
+pub struct VolcanicLakeGeometry {
     /// 湖心世界坐标
     pub center_x: f32,
     pub center_y: f32,
@@ -33,16 +33,16 @@ pub struct LakeGeometry {
     pub rotation_rad: f32,
     pub cos_rot: f32,
     pub sin_rot: f32,
-    /// 湖半轴（米）：a 沿局部 u 轴、b 沿局部 v 轴（各自独立抽样 0.10~0.16×world）
+    /// 湖半轴（米）：a 沿局部 u 轴、b 沿局部 v 轴（配置随机抽样后缩放至约 0.08~0.13×world）
     pub semi_a: f32,
     pub semi_b: f32,
     /// 湖床最大深度（米）
     pub depth_m: f32,
     /// 水岸安全退距（米，岸线外 NO_BUILD 缓冲）
     pub shore_setback_m: f32,
-    /// 环岸噪声阻尼增益
+    /// 火山坡面噪声阻尼增益
     pub noise_gain: f32,
-    /// 外坡总抬升（米）
+    /// 火山锥体环壁总抬升（米）
     pub outer_rise_m: f32,
     /// 轮廓低频扰动：相对幅度与相位（2 谐波；|w1|+|w2| ≤ 0.12 保证半径恒正）
     pub warp1: f32,
@@ -64,8 +64,8 @@ fn smoothstep(t: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-impl LakeGeometry {
-    /// 从 `relief_rng` 专属流抽取参数构建湖畔静态几何。
+impl VolcanicLakeGeometry {
+    /// 从 `relief_rng` 专属流抽取参数构建平原中的火山口湖与环形火山体。
     ///
     /// `tilt_at`：基础倾斜平面（世界坐标 → 高程米），供干岸平台平坦基准解析计算。
     pub fn plan<T: Fn(f32, f32) -> f32>(
@@ -80,8 +80,11 @@ impl LakeGeometry {
         let (sin_rot, cos_rot) = rotation_rad.sin_cos();
         let a_min = config.terrain_lake_semi_axis_ratio_min.clamp(0.06, 0.24);
         let a_max = config.terrain_lake_semi_axis_ratio_max.clamp(a_min + 0.01, 0.26);
-        let semi_a = relief_rng.gen_range(a_min, a_max) * world_size;
-        let semi_b = relief_rng.gen_range(a_min, a_max) * world_size;
+        // 天池的湖面只占火山体的一小部分：保留配置的随机性，但把湖面收进
+        // 更宽的环形山口，避免画面退化成一块孤立的蓝色椭圆。
+        let lake_scale = 0.80;
+        let semi_a = relief_rng.gen_range(a_min, a_max) * world_size * lake_scale;
+        let semi_b = relief_rng.gen_range(a_min, a_max) * world_size * lake_scale;
         let depth_m = config.terrain_lake_depth_m.max(1.0);
         let shore_setback_m = config.terrain_lake_shore_setback_m.max(2.0);
         let noise_gain = config.terrain_lake_noise_gain.clamp(0.0, 1.0);
@@ -94,8 +97,10 @@ impl LakeGeometry {
         // 两个分离出口：θ1 均匀抽样、θ2 = θ1 + [2.2, 4.0] rad（间隔 ≥126°）
         let exit1 = relief_rng.gen_range(0.0, std::f32::consts::TAU);
         let exit2 = exit1 + relief_rng.gen_range(2.2, 4.0);
-        let exit_half_rad = 0.24; // 出口角向半宽 ~13.7°（肩部另加 80% 过渡）
-        let outer_rise_m = 12.0;
+        let exit_half_rad = 0.46; // 两条窄缓坡出山口，保留完整环形火山口轮廓
+        // 天池式火山体：湖面位于平原中部，外圈形成宽缓但明显的火山锥体。
+        // 高度随地图尺度缩放，使不同世界尺寸仍保持远景可辨。
+        let outer_rise_m = (world_size * 0.060).clamp(40.0, 72.0);
 
         let mut geom = Self {
             center_x: cx,
@@ -193,11 +198,11 @@ impl LakeGeometry {
 
     /// 分带高程增量（米）与噪声权重。返回 (dz, noise_weight, datum_blend)。
     ///
-    /// * q<1：湖床下凹（与第 3 步水下格涂写同源：`level − bed_offset`，
+    /// * q<1：火山口湖湖床下凹（与第 3 步水下格涂写同源：`level − bed_offset`，
     ///   level = shore_datum − 1.2）；
-    /// * 1≤q<1.35：干岸平台（dz=0、平坦基准 datum_blend=1、噪声强阻尼）；
-    /// * 1.35≤q<2.3：外坡抬升（出口走廊归零 85%），基准平滑回归局部倾斜；
-    /// * q≥2.3：外缘平地（dz=0、正常倾斜与噪声）。
+    /// * 1≤q<1.42：火山口内的干岸平台（dz=0、平坦基准 datum_blend=1、噪声强阻尼）；
+    /// * 1.42≤q<3.25：环形火山锥体（出口走廊保留为低坡谷地），基准平滑回归局部倾斜；
+    /// * q≥3.25：平原或轻微起伏的外部地表（dz=0、正常倾斜与噪声）。
     pub fn elevation_offset(&self, wx: f32, wy: f32) -> (f32, f32, f32) {
         let (u, v) = self.local_uv(wx, wy);
         let theta = v.atan2(u);
@@ -210,22 +215,19 @@ impl LakeGeometry {
             // 湖床：与静水 bed 剖面同源（水位 = datum − 1.2，边缘床深 0.4m）
             let bed = 0.4 + (self.depth_m - 0.4) * (1.0 - u_n * u_n);
             (-1.2 - bed, 0.08, 1.0)
-        } else if u_n < 1.45 {
+        } else if u_n < 1.42 {
             // 干岸平台：平坦可建（安全退距 NO_BUILD 由第 6 步覆盖意图施加；
             // 带宽 0.45×r_out ≈ 40~55m，扣除岸线扰动与退距后仍容一排完整房屋）
             (0.0, 0.15, 1.0)
-        } else if u_n < 2.4 {
-            // 环湖盆岭（bump）：自平台外缘升 12m 再回落到外缘平地（sin² 剖面，
-            // 两端导数为零——⚠️ 不可用只升不降的单调外坡：u_n=2.4 边界会留下
-            // 12m 高差断崖形成环湖 NO_WALK 墙，TB-03-08 实测踩坑）。峰值梯度
-            // π×12/(0.95×r_out) ≈ tan(22°)（soft 障碍+NO_BUILD）；出口走廊归
-            // 零 85%（垭口缓通道）。基准回归同步跨岭带平滑过渡。
-            let t = (u_n - 1.45) / 0.95;
+        } else if u_n < 3.25 {
+            // 火山锥体：湖岸外先抬到连续的环形火山口，再向平原宽缓回落。
+            // 非对称 sin² 让内侧肩部更醒目，出口只切出窄谷，不再留下两座孤立土丘。
+            let t = (u_n - 1.42) / 1.83;
             let s = (std::f32::consts::PI * t.clamp(0.0, 1.0)).sin();
-            let rise = self.outer_rise_m * s * s * (1.0 - 0.85 * em);
-            // 基准回归：返回 datum_blend，由调用方把 base_tilt 与 shore_datum
+            let rise = self.outer_rise_m * s * s * (1.0 - 0.30 * t) * (1.0 - 0.55 * em);
+            // 火山坡脚平滑回归平原基准，返回 datum_blend 供调用方混合。
             // 按 (1−blend)/blend 混合（跨岭带平滑回归局部倾斜，回归梯度 ≤5°）
-            let datum_blend = 1.0 - smoothstep((u_n - 1.45) / 0.5);
+            let datum_blend = 1.0 - smoothstep((u_n - 1.42) / 0.48);
             (rise, self.noise_gain, datum_blend)
         } else {
             // 外缘平地：中等噪声（接近通用平原权重，避免满幅噪声推高坡度方差）

@@ -289,7 +289,7 @@ pub struct SimConfig {
     pub terrain_plateau_ramp_noise_gain: f32,
     /// ★ TB-02 台地：台缘轮廓低频扰动幅度 (m)。默认 6.0。
     pub terrain_plateau_outline_warp: f32,
-    // ── ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地模板参数（仅对应 profile 消费；
+    // ── ★ TB-03 盆地 / 山前冲积扇 / 火山湖模板参数（仅对应 profile 消费；
     //    默认值唯一真相源 = 前端 config.js；改任一值等于换图，遵循
     //    TERRAIN_GENERATOR_VERSION 契约）──
     /// ★ TB-03 山前冲积扇：扇体长度比例（× world_size，山口→扇缘）。默认 0.58
@@ -331,17 +331,17 @@ pub struct SimConfig {
     pub terrain_basin_exit_width_deg: f32,
     /// ★ TB-03 盆地：盆底/盆壁噪声阻尼增益。默认 0.30（出口与盆底生活带噪声受额外抑制）。
     pub terrain_basin_noise_gain: f32,
-    /// ★ TB-03 湖畔盆地：湖半轴比例抽样下限（× world_size）。默认 0.10。
+    /// ★ TB-03 火山湖：湖半轴比例抽样下限（× world_size）。默认 0.10。
     pub terrain_lake_semi_axis_ratio_min: f32,
-    /// ★ TB-03 湖畔盆地：湖半轴比例抽样上限。默认 0.16（椭圆两轴各自独立抽样）。
+    /// ★ TB-03 火山湖：湖半轴比例抽样上限。默认 0.16（椭圆两轴各自独立抽样）。
     pub terrain_lake_semi_axis_ratio_max: f32,
-    /// ★ TB-03 湖畔盆地：湖床最大深度 (m)。默认 3.5（静水湖，水位恒定）。
+    /// ★ TB-03 火山湖：湖床最大深度 (m)。默认 3.5（静水湖，水位恒定）。
     pub terrain_lake_depth_m: f32,
-    /// ★ TB-03 湖畔盆地：水岸安全退距 (m)。默认 10.0（岸线外 NO_BUILD 缓冲，其外才是可建干岸）。
+    /// ★ TB-03 火山湖：水岸安全退距 (m)。默认 10.0（岸线外 NO_BUILD 缓冲，其外才是可建干岸）。
     pub terrain_lake_shore_setback_m: f32,
-    /// ★ TB-03 湖畔盆地：湖岸低频径向扰动幅度 (m)。默认 14.0（限制凹度、不生成岛屿）。
+    /// ★ TB-03 火山湖：湖岸低频径向扰动幅度 (m)。默认 14.0（限制凹度、不生成岛屿）。
     pub terrain_lake_outline_warp_m: f32,
-    /// ★ TB-03 湖畔盆地：环岸噪声阻尼增益。默认 0.30（环岸干岸带平缓可建）。
+    /// ★ TB-03 火山湖：环岸噪声阻尼增益。默认 0.30（环岸干岸带平缓可建）。
     pub terrain_lake_noise_gain: f32,
     pub terrain_river_width_min: f32,
     pub terrain_river_width_max: f32,

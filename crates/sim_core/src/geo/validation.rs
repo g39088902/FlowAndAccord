@@ -20,7 +20,7 @@
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
     is_static_water_profile, TerrainFeatureKind, TerrainMap,
-    TERRAIN_PROFILE_LAKESIDE_BASIN, TERRAIN_PROFILE_MOUNTAIN_PASS,
+    TERRAIN_PROFILE_VOLCANIC_LAKE, TERRAIN_PROFILE_MOUNTAIN_PASS,
     TERRAIN_PROFILE_RIVER_VALLEY,
 };
 
@@ -40,8 +40,8 @@ fn expected_feature_kind(profile: &str, id: u32) -> Option<TerrainFeatureKind> {
             20 | 21 => Some(TerrainFeatureKind::RiverBank),
             _ => None,
         },
-        // ★ TB-03 湖畔盆地：水体特征 #1（静水 `WaterBody`）
-        TERRAIN_PROFILE_LAKESIDE_BASIN => match id {
+        // ★ TB-03 火山湖：水体特征 #1（静水 `WaterBody`）
+        TERRAIN_PROFILE_VOLCANIC_LAKE => match id {
             1 => Some(TerrainFeatureKind::WaterBody),
             _ => None,
         },

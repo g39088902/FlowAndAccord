@@ -115,7 +115,7 @@ impl World3DEngine {
             }
         }
         // ★ TB-03 静水新模板取水点命名（湖岸；旧模板保持「河岸」语义）
-        let water_poi_label = if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+        let water_poi_label = if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE {
             "湖岸取水点"
         } else {
             "河岸取水点"
@@ -387,7 +387,7 @@ impl World3DEngine {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地：几何重放与模板专属门禁。
+    // ★ TB-03 盆地 / 山前冲积扇 / 火山湖：几何重放与模板专属门禁。
     // ═══════════════════════════════════════════════════════════════════
 
     /// 重放 `relief_rng` 头部公共消费（4 次），供 TB-03 几何重放入口复用。
@@ -443,9 +443,9 @@ impl World3DEngine {
         ))
     }
 
-    /// 重新派生湖畔盆地几何（含静水计划与干岸平坦基准）。
-    pub fn get_lake_geometry(&self) -> Option<crate::geo::LakeGeometry> {
-        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_LAKESIDE_BASIN {
+    /// 重新派生火山湖几何（含静水计划与干岸平坦基准）。
+    pub fn get_volcanic_lake_geometry(&self) -> Option<crate::geo::VolcanicLakeGeometry> {
+        if self.terrain.profile != crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE {
             return None;
         }
         let mut relief_rng = self.replay_relief_rng();
@@ -457,7 +457,7 @@ impl World3DEngine {
         let tilt_at = |wx: f32, wy: f32| -> f32 {
             ((wx * tilt_cos + wy * tilt_sin) / half.max(1.0)) * (tilt_magnitude * 0.5)
         };
-        Some(crate::geo::LakeGeometry::plan(
+        Some(crate::geo::VolcanicLakeGeometry::plan(
             &mut relief_rng,
             self.terrain.world_size,
             &self.config,
@@ -577,18 +577,20 @@ impl World3DEngine {
         Ok(())
     }
 
-    /// TB-03 湖畔盆地专有门禁：环岸生活带房屋候选完整占地 + 环岸通路 +
+    /// TB-03 火山湖专有门禁：环岸生活带房屋候选完整占地 + 环岸通路 +
     /// 双出口可达 + 岸点干地合法。
-    pub fn validate_lakeside_gates(&self) -> Result<(), String> {
-        let Some(lg) = self.get_lake_geometry() else {
+    pub fn validate_volcanic_lake_gates(&self) -> Result<(), String> {
+        let Some(lg) = self.get_volcanic_lake_geometry() else {
             return Ok(());
         };
-        // 环岸生活带：水线外退距+占地余量 → 平台外缘（0.42×均半轴）
+        // 环岸生活带：水线外退距+占地余量 → 低坡环岸外缘。
+        // 火山湖湖面收缩后，固定 0.42×均半轴会把最小湖型的可建带压到不足一栋房屋；
+        // 扩到 0.75×均半轴仍由最终 footprint 坡度/禁建标志筛选，只放宽候选扫描范围。
         let r_mean = (lg.semi_a + lg.semi_b) * 0.5;
         let setback = lg.shore_setback_m + self.config.terrain_footprint_half_extent * 2.0;
         let buildable = self.count_spaced_buildable(|wx, wy| {
             let d = lg.shore_distance(wx, wy);
-            d > setback && d < 0.42 * r_mean
+            d > setback && d < 0.75 * r_mean
         });
         if buildable < 3 {
             return Err("LakeBuildAreaInsufficient".into());

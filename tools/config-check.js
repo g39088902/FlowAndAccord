@@ -105,7 +105,7 @@ const IMPACT_OVERRIDES = {
   terrainPlateauTopNoiseGain: 'geo/plateau.rs (TB-02 台面区域噪声阻尼增益)',
   terrainPlateauRampNoiseGain: 'geo/plateau.rs (TB-02 缓坡入口噪声阻尼增益)',
   terrainPlateauOutlineWarp: 'geo/plateau.rs (TB-02 台缘轮廓低频扰动幅度)',
-  // ★ TB-03 盆地 / 山前冲积扇 / 湖畔盆地形态参数
+  // ★ TB-03 盆地 / 山前冲积扇 / 火山湖形态参数
   terrainFanLengthRatio: 'geo/alluvial_fan.rs (TB-03 扇体长度比例；v1.50.68 提升)',
   terrainFanHalfAngleDeg: 'geo/alluvial_fan.rs (TB-03 扇半角；v1.50.68 扩角)',
   terrainFanAmplitude: 'geo/alluvial_fan.rs (TB-03 山口到扇缘总高差；v1.50.68 提升)',
@@ -125,12 +125,12 @@ const IMPACT_OVERRIDES = {
   terrainBasinPoolDepthM: 'geo/basin.rs (TB-03 泉池床最大深度)',
   terrainBasinBankRingM: 'geo/basin.rs (TB-03 泉池外干燥岸环宽)',
   terrainBasinNoiseGain: 'geo/basin.rs (TB-03 盆底噪声阻尼增益)',
-  terrainLakeSemiAxisRatioMin: 'geo/lakeside.rs (TB-03 湖半轴比例抽样下限)',
-  terrainLakeSemiAxisRatioMax: 'geo/lakeside.rs (TB-03 湖半轴比例抽样上限)',
-  terrainLakeDepthM: 'geo/lakeside.rs (TB-03 湖床最大深度)',
-  terrainLakeShoreSetbackM: 'geo/lakeside.rs (TB-03 水岸安全退距)',
-  terrainLakeOutlineWarpM: 'geo/lakeside.rs (TB-03 湖岸低频径向扰动幅度)',
-  terrainLakeNoiseGain: 'geo/lakeside.rs (TB-03 环岸噪声阻尼增益)',
+  terrainLakeSemiAxisRatioMin: 'geo/volcanic_lake.rs (TB-03 湖半轴比例抽样下限)',
+  terrainLakeSemiAxisRatioMax: 'geo/volcanic_lake.rs (TB-03 湖半轴比例抽样上限)',
+  terrainLakeDepthM: 'geo/volcanic_lake.rs (TB-03 湖床最大深度)',
+  terrainLakeShoreSetbackM: 'geo/volcanic_lake.rs (TB-03 水岸安全退距)',
+  terrainLakeOutlineWarpM: 'geo/volcanic_lake.rs (TB-03 湖岸低频径向扰动幅度)',
+  terrainLakeNoiseGain: 'geo/volcanic_lake.rs (TB-03 环岸噪声阻尼增益)',
   // ★ H-08/H-09 行为意愿通道（hormone 前缀规则只指向 hormones.rs，行为接线点需显式覆盖）
   hormoneEffectsEnabled: 'spatial/hormones.rs + decisions/branches.rs (行为意愿通道总开关)',
   hormoneDaWillDeferMult: 'decisions/branches.rs (b8 高阶升级/b13 意愿等待放行阈值)',

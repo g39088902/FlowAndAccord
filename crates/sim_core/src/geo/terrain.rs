@@ -620,9 +620,9 @@ pub(super) struct GenesisScratch {
     pub(super) fan_geometry: Option<super::alluvial_fan::FanGeometry>,
     /// ★ TB-03 盆地静态几何：第 2 步构建（盆体高程 + 出口），第 6 步地表派生消费。
     pub(super) basin_geometry: Option<super::basin::BasinGeometry>,
-    /// ★ TB-03 湖畔盆地静态几何：第 2 步构建（湖盆高程 + 环岸），第 3 步静水
+    /// ★ TB-03 火山湖静态几何：第 2 步构建（湖盆高程 + 环岸），第 3 步静水
     /// （大湖 `StaticWaterPlan`）与第 6 步安全退距覆盖意图消费。
-    pub(super) lake_geometry: Option<super::lakeside::LakeGeometry>,
+    pub(super) lake_geometry: Option<super::volcanic_lake::VolcanicLakeGeometry>,
     /// 草原泉溪洼地软地凹圈掩码（第 2 步标记 → 第 6 步地表派生消费）。
     pub(super) soft_ring: Vec<bool>,
     /// 子特征地表覆盖意图，仅第 6 步物化；事务与中心线一起隔离。
@@ -659,7 +659,7 @@ fn resolve_profile(seed: u64, profile: &str) -> String {
             TERRAIN_PROFILE_PLATEAU,
             TERRAIN_PROFILE_ALLUVIAL_FAN,
             TERRAIN_PROFILE_BASIN_OASIS,
-            TERRAIN_PROFILE_LAKESIDE_BASIN,
+            TERRAIN_PROFILE_VOLCANIC_LAKE,
         ];
         RANDOM_CANDIDATES[((seed ^ 0x5052_4F46_494C_4531) % 8) as usize].to_string()
     } else {
@@ -715,6 +715,7 @@ pub struct TerrainSubFeature {
 }
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
+/// v1.60.0：20 -> 21（湖畔盆地更名并重构为 volcanic_lake_v1：平原中的随机火山锥体、天池式火山口湖与双缓坡出口）。
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
 ///           同时移除 `generate_with_profile` 无配置的兼容入口，旧存档按版本门禁拒绝）
@@ -736,7 +737,7 @@ pub struct TerrainSubFeature {
 ///           可建的台面 + 连续陡峭台缘 RockFace 硬禁行 + 两个可通过道路走廊的
 ///           缓坡入口 + 坡脚取水点生活水源；既有 5 profile 路径逐位不变）
 /// v1.50.55：9 -> 10（TB-03 新增 `alluvial_fan_v1` 冲积扇 / `basin_oasis_v1` 盆地
-///           / `lakeside_basin_v1` 湖畔盆地三个分支 + `TerrainFeatureKind::WaterBody`
+///           / `volcanic_lake_v1` 火山湖三个分支 + `TerrainFeatureKind::WaterBody`
 ///           静水水体特征；三个新 profile 各自自包含、互不影响，既有 6 profile
 ///           路径逐位不变。递增遵循「新分支入库即换版」先例）
 /// v1.50.68：10 -> 12（砍需求：删除 `river_valley_settlement_v1` 深切河谷模板、
@@ -766,7 +767,7 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 20;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 21;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -795,15 +796,15 @@ pub const TERRAIN_PROFILE_ALLUVIAL_FAN: &str = "alluvial_fan_v1";
 /// 大尺度连续椭圆盆地围绕中心平缓生活带组织——超宽盆底可建生活带 + 环抱高山
 /// 山壁天然屏障 + 至少一个明确陆路出口垭口走廊。
 pub const TERRAIN_PROFILE_BASIN_OASIS: &str = "basin_oasis_v1";
-/// ★ TB-03 模板：湖畔盆地（TB-03-IMPLEMENTATION-PLAN §6 独立规格）。
+/// ★ TB-03 模板：火山湖（TB-03-IMPLEMENTATION-PLAN §6 独立规格）。
 /// 中心静水湖占据显著面积（半轴 0.10~0.16×world）迫使路线沿岸绕行——连续环湖
 /// 干岸（安全退距外可建）+ 两个分离陆路出口 + 两个分离湖岸取水点共享同一淡水池。
-pub const TERRAIN_PROFILE_LAKESIDE_BASIN: &str = "lakeside_basin_v1";
+pub const TERRAIN_PROFILE_VOLCANIC_LAKE: &str = "volcanic_lake_v1";
 
-/// ★ TB-03 静水新模板判定：湖畔盆地的水体 #1 是 `WaterBody` 特征
+/// ★ TB-03 静水新模板判定：火山湖的水体 #1 是 `WaterBody` 特征
 /// （非 River），其水资源预算走「配置一次建立总池」路径（不按岸点数乘算）。
 pub fn is_static_water_profile(profile: &str) -> bool {
-    profile == TERRAIN_PROFILE_LAKESIDE_BASIN
+    profile == TERRAIN_PROFILE_VOLCANIC_LAKE
 }
 
 /// ★ TB-03：各 profile 的实际取水 POI（清泉）数量。
@@ -811,7 +812,7 @@ pub fn is_static_water_profile(profile: &str) -> bool {
 /// 湖畔首版明确双岸点，静水水资源预算走「配置一次建立总池」路径；
 /// 其余模板（含盆地）清泉 POI 数 = `countWater`。
 pub fn water_source_poi_count(profile: &str, count_water_sources: usize) -> usize {
-    if profile == TERRAIN_PROFILE_LAKESIDE_BASIN {
+    if profile == TERRAIN_PROFILE_VOLCANIC_LAKE {
         2
     } else {
         count_water_sources
@@ -932,13 +933,13 @@ impl TerrainMap {
         // ★ TB-03 三个新模板：低幅基础倾斜（主地貌由专属特征承担，与草原/半坡同口径）
         let is_fan = self.profile == TERRAIN_PROFILE_ALLUVIAL_FAN;
         let is_basin = self.profile == TERRAIN_PROFILE_BASIN_OASIS;
-        let is_lakeside = self.profile == TERRAIN_PROFILE_LAKESIDE_BASIN;
+        let is_volcanic_lake = self.profile == TERRAIN_PROFILE_VOLCANIC_LAKE;
         let low_relief = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN
             || self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND
             || is_plateau
             || is_fan
             || is_basin
-            || is_lakeside
+            || is_volcanic_lake
             || is_flat_baseline;
         self.tilt_magnitude = if low_relief {
             rng.gen_range(16.0, 24.0)
@@ -1085,8 +1086,8 @@ impl TerrainMap {
         } else {
             None
         };
-        let lake = if is_lakeside {
-            Some(super::lakeside::LakeGeometry::plan(
+        let lake = if is_volcanic_lake {
+            Some(super::volcanic_lake::VolcanicLakeGeometry::plan(
                 &mut relief_rng,
                 self.world_size,
                 config,
@@ -1209,7 +1210,7 @@ impl TerrainMap {
                     continue;
                 }
 
-                // ★ TB-03 湖畔盆地：湖床/干岸平台/外坡分带；湖心近域平坦基准
+                // ★ TB-03 火山湖：湖床/干岸平台/外坡分带；湖心近域平坦基准
                 //   （局部倾斜破坏水平水面与环岸平台，跨外坡带平滑回归）。
                 if let Some(lg) = lake.as_ref() {
                     let fbm_v = terrain_noise::fbm_terrain_3octaves(

@@ -72,7 +72,7 @@ fn main() {
         "plateau_v1",
         "basin_oasis_v1",
         "alluvial_fan_v1",
-        "lakeside_basin_v1",
+        "volcanic_lake_v1",
     ];
     println!(
         "{:>20} {:>4} {:>6} {:>8} {:>8} {:>8} {:>8} {:>7} {:>7} {:>7} {:>9} {:>7}",
