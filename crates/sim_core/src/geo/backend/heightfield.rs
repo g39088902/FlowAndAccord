@@ -88,6 +88,7 @@ impl HeightfieldBackend {
             crate::geo::terrain::TerrainMap::new(self.width, self.height, self.world_size);
         map.seed = seed;
         map.profile = recipe_id.to_string();
+        map.field_compiled = true;
         map.cells = self.cells.clone();
         map
     }

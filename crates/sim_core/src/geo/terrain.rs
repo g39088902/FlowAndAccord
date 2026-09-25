@@ -804,7 +804,7 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 24;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 25;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -879,6 +879,10 @@ pub struct TerrainMap {
     pub generator_version: u32,
     #[serde(default)]
     pub profile: String,
+    /// Creation backend used for profile-specific network and geometry gates.
+    /// Saved with the terrain so loading retains the same gate semantics.
+    #[serde(default)]
+    pub field_compiled: bool,
     #[serde(default)]
     pub features: Vec<TerrainFeature>,
     #[serde(default)]
@@ -922,6 +926,7 @@ impl TerrainMap {
             seed: 0,
             generator_version: TERRAIN_GENERATOR_VERSION,
             profile: TERRAIN_PROFILE_MOUNTAIN_PASS.to_string(),
+            field_compiled: false,
             features: Vec::new(),
             accents: Vec::new(),
             sub_features: Vec::new(),

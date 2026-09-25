@@ -306,7 +306,9 @@ impl World3DEngine {
         }
         self.validate_terrain_world()
             .map_err(|e| format!("RoadNetwork:{}", e))?;
-        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU {
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU
+            && !self.terrain.field_compiled
+        {
             self.validate_plateau_gates()?;
         }
         // ★ TB-03 模板专属门禁（房屋候选/走廊/岸点；失败码计入 Geometry 前缀语义）
@@ -316,7 +318,9 @@ impl World3DEngine {
         if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
             self.validate_basin_gates()?;
         }
-        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE {
+        if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE
+            && !self.terrain.field_compiled
+        {
             self.validate_volcanic_lake_gates()?;
         }
         let report = self.diagnose_survival();

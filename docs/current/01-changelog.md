@@ -1,9 +1,11 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.2**。
 
 | **（代码新增 · UGC-04 VoxelBackend 与 Surface Nets · 不升版）2026-09-25** | **补齐静态体素后端**：新增固定 32³ + halo=1 的稀疏 chunk 构建、`surface_height-z` 密度量化、材质投影、世界坐标采样、顶部零面二分查询和 `HeightfieldView::surface_at` 兼容入口；实现按固定顺序的 Surface Nets 网格提取与 chunk 世界原点定位。体素与 mesh 只在显式后端请求时生成，不进入 tick、FABS 快照或前端 cell section，UGC-05 再接入缓存和存档 delta。 | crates/sim_core/src/geo/backend/{voxel.rs,meshing.rs,heightfield.rs,mod.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · Field Compiler 迁移门禁与装饰）2026-09-25** | **修复迁移后的台地/火山湖创世失败**：Field Compiler 结果标记其生成后端，台地和火山湖不再被要求通过只适用于旧专用几何的门禁，也不再按旧台地锚点重排水源；保留 FanGeometry/BasinGeometry 专用路径。迁移结果补回 TerrainAccent 生成，约束诊断对尚未具备路线/特征上下文的约束返回失败而不是虚假的 `DEFERRED` 通过；`TERRAIN_GENERATOR_VERSION` 24→25。 | crates/sim_core/src/geo/{generator.rs,terrain.rs,backend/heightfield.rs,procedural/constraints.rs}, crates/sim_core/src/spatial/{creation_fallback.rs,terrain_network.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
 
 | **（代码修复 · 冲积扇迁移回退与生成器升版）2026-09-25** | **修复 `alluvial_fan_v1` 的平板化外观**：UGC-03 的通用 Cone recipe 没有表达旧 FanGeometry 的扇形角向衰减、3~4 条干沟、山口帽和泉点锚定，且路网仍按 FanGeometry 规划，导致地图与路网几何来源不一致。冲积扇现在暂时退出 Field Compiler 投影路径，地图和网络共同使用专用 FanGeometry；其余七个 profile 保持 UGC-03 迁移路径。`TERRAIN_GENERATOR_VERSION` 22→23，旧版本存档按门禁拒绝。 | crates/sim_core/src/geo/{generator.rs,terrain.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
 

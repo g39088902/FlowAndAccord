@@ -78,7 +78,12 @@ impl TerrainGenerator {
                 config,
                 BackendKind::Heightfield,
             )
-            .map(|compiled| super::adapters::terrain_map_from_compiled(&compiled, seed)),
+            .map(|compiled| {
+                let mut map = super::adapters::terrain_map_from_compiled(&compiled, seed);
+                map.accents =
+                    super::accents::generate_accents(&map, config.terrain_accent_density, seed);
+                map
+            }),
         )
     }
 

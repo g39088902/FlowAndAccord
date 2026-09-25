@@ -79,7 +79,8 @@ impl World3DEngine {
     }
     pub(crate) fn prepare_terrain_layout(&mut self) {
         let mut occupied:Vec<Vec3>=self.terrain.hydrology.access_points.iter().map(|a|a.pos).collect();
-        let is_plateau = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU;
+        let is_plateau = self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_PLATEAU
+            && !self.terrain.field_compiled;
         let plateau_geom = if is_plateau { self.get_plateau_geometry() } else { None };
         if let Some(pg) = plateau_geom.as_ref() {
             let anchor_elevations: Vec<f32> = pg

@@ -65,7 +65,12 @@ pub fn evaluate(
                     format!("{min}..={max}"),
                 )
             }
-            _ => report(true, "DEFERRED", 0.0, "deferred".into()),
+            _ => report(
+                false,
+                "UNSUPPORTED_CONSTRAINT",
+                0.0,
+                "constraint requires a compiled route/feature context".into(),
+            ),
         })
         .collect()
 }
