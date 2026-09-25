@@ -214,12 +214,34 @@ impl World3DEngine {
             seed,
             &migration_config,
         );
+        let mut terrain_compile_failure: Option<String> = None;
         let (terrain, terrain_voxel_backend) = match compiled_world {
             Some(Ok(pair)) => pair,
             // A recipe constraint failure is a candidate failure, not a reason
             // to revive the old generator. The bounded creation ladder's
             // explicit flat recipe is the deterministic voxel-only fallback.
-            Some(Err(_)) | None => {
+            Some(Err(error)) => {
+                terrain_compile_failure = Some(format!(
+                    "⚠️ 地形配方 {} 编译失败，已回退 flat_baseline：{}",
+                    migration_config.terrain_profile,
+                    error.code()
+                ));
+                migration_config.terrain_profile =
+                    crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+                TerrainGenerator::compile_voxel_world(
+                    grid_res,
+                    world_size,
+                    seed,
+                    &migration_config,
+                )
+                .and_then(Result::ok)
+                    .expect("flat_baseline voxel recipe must compile")
+            }
+            None => {
+                terrain_compile_failure = Some(format!(
+                    "⚠️ 地形配方 {} 不存在，已回退 flat_baseline",
+                    migration_config.terrain_profile
+                ));
                 migration_config.terrain_profile =
                     crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
                 TerrainGenerator::compile_voxel_world(
@@ -271,7 +293,7 @@ impl World3DEngine {
             stone_regen_multiplier: 1.0,
             gold_regen_multiplier: 1.0,
             tick_counter: 0,
-            last_event: None,
+            last_event: terrain_compile_failure,
             recent_deaths: Vec::new(),
             config,
             agent_index: HashMap::new(),

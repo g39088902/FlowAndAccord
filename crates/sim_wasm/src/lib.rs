@@ -132,9 +132,18 @@ pub extern "C" fn world_create(
         );
         match result {
             Ok(w) => {
+                let creation_warning = w
+                    .creation_diagnostic
+                    .as_ref()
+                    .filter(|diag| diag.degraded)
+                    .map(|diag| diag.summary());
                 WORLD = Some(w);
                 clear_terrain_backend_cache();
-                clear_error();
+                if let Some(warning) = creation_warning {
+                    set_error(&warning);
+                } else {
+                    clear_error();
+                }
                 0
             }
             Err(diag) => {

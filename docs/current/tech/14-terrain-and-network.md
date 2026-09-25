@@ -4,7 +4,7 @@
 
 > **UGC-02 实施状态（2026-09-25）**：`geo::procedural::processes` 已提供固定 D8 汇流（含平地稳定 tie-break）、热松弛、液压侵蚀/沉积和 priority-flood 水位求解；`procedural::hydrology` 将河道连通分量、岸带、静态水体 ID 和深水/河岸语义投影到 `SemanticGrid`。这些过程现在作为统一 voxel 创世链的固定阶段。
 
-> **UGC-03 / UGC-05 体素主路径（2026-09-26）**：所有注册 profile（含冲积扇、盆地、平坦降级基线以及断层/褶皱演示）统一由 Field Compiler 编译，并以同一份 `CompiledTerrain` 构建懒加载 `VoxelBackend`。旧 `TerrainMap::generate_*` 不再参与生产创世；`TerrainMap` 只保留语义/快照兼容投影。`World3DEngine::terrain_runtime()` 的高程来自 voxel 顶面，WASM chunk 请求复用世界创建时的 voxel 源，LOD 换尺度只重建懒 chunk 索引；读档先按 seed/profile/config 重建 voxel 基线，再校验并重放 `ChunkDelta`。`TERRAIN_GENERATOR_VERSION` 26→27，旧版本存档按既有门禁拒绝。
+> **UGC-03 / UGC-05 体素主路径（2026-09-26）**：所有注册 profile（含冲积扇、盆地、平坦降级基线以及断层/褶皱演示）统一由 Field Compiler 编译，并以同一份 `CompiledTerrain` 构建懒加载 `VoxelBackend`。旧 `TerrainMap::generate_*` 不再参与生产创世；`TerrainMap` 只保留语义/快照兼容投影。`World3DEngine::terrain_runtime()` 的高程来自 voxel 顶面，WASM chunk 请求复用世界创建时的 voxel 源，LOD 换尺度只重建懒 chunk 索引；读档先按 seed/profile/config 重建 voxel 基线，再校验并重放 `ChunkDelta`。`TERRAIN_GENERATOR_VERSION` 27→32，旧版本存档按既有门禁拒绝。
 
 > **UGC-04 实施状态（2026-09-25）**：`VoxelBackend` 已按固定 32³ chunk + 一格 halo 从 `CompiledTerrain` 构建量化密度与材质场；密度使用 `DENSITY_SCALE=256`、四舍五入和 `i16` clamp。`TerrainGeometry` 提供世界坐标密度/材质采样和 chunk 读取，`LayeredTerrainQuery` 对编译后端保留精确顶部兼容面，对手工 chunk 使用零面二分查询；`HeightfieldView` 仅作为内部字段投影，不再是创世后端。`meshing::extract_surface_nets_at` 按固定角点/轴顺序平均符号变化边交点并生成确定性三角面，halo 负责相邻 chunk 的边界采样。
 
@@ -13,6 +13,10 @@
 > **UGC-06 实施状态（2026-09-25）**：Field Compiler recipe 现在携带 `StratigraphicColumn` 与 `MaterialTable`。地层柱校验 ID 唯一、厚度为正、硬度/储水/渗透率均在 `[0,1]`；`sample_stratum(column, depth)` 按地表向下累计厚度稳定定位地层，边界深度进入下一层。`CompiledTerrain`、`HeightfieldBackend` 和 `VoxelBackend` 传递这组静态字段，chunk 生成时以 `surface_height - z` 为深度采样地层并写入材料 ID；没有 recipe 的旧/手工 chunk 继续使用既有 `SurfaceKind` 映射。palette 只用于材料外观元数据，不改变高程、密度、通行或 tick；UGC-08 使表层材质读取统一的湿度/植被投影，voxel backend 版本推进到 3。
 
 > **UGC-07 实施状态（2026-09-25）**：`StructuralEvent` 已进入 Field Compiler 的固定阶段顺序。`apply_structures` 先在 scratch 高程上按声明顺序执行 Fault 的归一化平面 smoothstep 位移、Fold 的轴向周期位移和 Unconformity 的地层深度偏移，再交给热松弛、侵蚀和水文过程；结构参数、零长度几何、未知 surface node、NaN/无穷结果均在编译前或事务提交前拒绝。`StructureField` 将 authored 位移事件和不整合深度偏移传递到 Heightfield/Voxel 后端；默认 production recipe 没有结构事件，因此现有随机 profile 输出不变。地图图鉴新增 `fault_scarp_demo_v1` 与 `folded_basin_demo_v1` 两个显式演示 recipe，通过 `terrainProfile` 查询参数走同一 WASM/WebGL 地形链路，分别可见断层陡坎和连续褶皱；演示配方不加入 `random`，且只读地图模式绕过可玩世界降级门禁。
+
+> **UGC-07 FoldNetwork 增强（2026-09-26）**：`folded_basin_demo_v1` 现在以约 36 个紧密拼接的 Voronoi 多边形为山体基底。单元中心来自行错位、宏观漂移和较大种子抖动的非规则点集；28% 的锚点是长度 48~142m、方向独立的线段，其余为点，归属距离统一取到点/线段的最近距离。每个位置再按距所有单元平分边界的距离抬升成独立锥体，共享边界保持同一谷底高程；连续低频地表噪音把谷底和底板从平面扰动为起伏地表。原褶皱带只用 value noise 沿其方向轻微扭曲单元采样域，不再产生任何周期正弦山脊；低幅 ridged fBm 和热松弛/液压侵蚀只修饰坡面。该结构只进入只读图鉴演示，不加入 `random` 候选池；`TERRAIN_GENERATOR_VERSION` 30→31。
+
+> **盆地地形修正（2026-09-26）**：`basin_oasis_v1` 复用同一套点/线段 Voronoi 锥体，通过 `FoldAnnulusSpec` 只在半径 230m 之外布置山体，并在 230~350m 之间平滑抬升；盆地中心保留低幅 1.2m 地表噪音和原有浅凹平原。中心生活带保持连续平原，四周形成不规则褶皱山带；`TERRAIN_GENERATOR_VERSION` 31→32。
 
 > **UGC-08 实施状态（2026-09-25）**：Field Compiler 在水文阶段之后新增固定顺序的静态地下水求解：从 `StratigraphicColumn` 的 `permeability`/`soil_storage` 生成补给场，按高程降序执行有限 Gauss-Seidel 松弛，得到 `water_table`、`aquifer_mask` 和具有局部高程出口证据的 `discharge`；再以地表水、河道和排泄点为源，用坡度加权 Dijkstra 计算 `water_access`，并合成 `soil_moisture`。`semantics` 只允许在取水可达性、土壤湿度、储水和坡度同时满足时写入 `vegetation_ok`/Grass；干旱格进入 Sand、Gravel 或 BareSoil 候选。相同字段同时进入 `HeightfieldBackend` 的肥力兼容值和 `VoxelBackend` 的表层材料投影，诊断包新增补给/水位/含水层/排泄/可达性/湿度/植被字段 hash；`groundwater_probe` 提供固定 seed 验收输出。生成器版本推进到 26，VoxelBackend 版本推进到 3。
 

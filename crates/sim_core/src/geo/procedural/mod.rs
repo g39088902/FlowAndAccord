@@ -23,9 +23,9 @@ pub use fields::{
     ScalarField,
 };
 pub use ir::{
-    validate_recipe, FieldOp, HydrologySpec, NodeId, OutputSpec, ParameterRange, ProcessOp,
-    RecipeError, RecipeId, ResolvedRecipe, StratigraphicColumn, StratumSpec, TerrainNode,
-    TerrainRecipe, UncertaintySpec,
+    validate_recipe, AxisSpec, ConeCellSpec, FieldOp, FoldAnnulusSpec, FoldBandSpec, FoldNetworkSpec,
+    HydrologySpec, NodeId, OutputSpec, ParameterRange, ProcessOp, RecipeError, RecipeId, ResolvedRecipe,
+    StratigraphicColumn, StratumSpec, StructuralEvent, TerrainNode, TerrainRecipe, UncertaintySpec,
 };
 pub use recipes::{
     alluvial_fan_v1, basin_oasis_v1, builtin, builtins, fault_scarp_demo_v1, folded_basin_demo_v1,

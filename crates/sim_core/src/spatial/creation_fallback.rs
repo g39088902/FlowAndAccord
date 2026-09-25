@@ -243,18 +243,24 @@ impl World3DEngine {
                 world.creation_diagnostic = Some(diag);
                 if degraded {
                     // 成功降级不冒充原模板成功：事件流明确记录 requested → effective。
+                    let compile_note = world
+                        .last_event
+                        .as_ref()
+                        .filter(|event| event.contains("编译失败") || event.contains("不存在"))
+                        .cloned();
                     let first_failure = world
                         .creation_diagnostic
                         .as_ref()
                         .and_then(|d| d.attempts.iter().find_map(|a| a.failure_code.as_ref().map(|c| (a.attempt, c.clone()))));
                     world.last_event = Some(format!(
-                        "⚠️ 地形生成降级：请求 {} → 实际 {}（{} 次尝试{}）",
+                        "⚠️ 地形生成降级：请求 {} → 实际 {}（{} 次尝试{}）{}",
                         requested_profile,
                         effective,
                         attempts.len(),
                         first_failure
                             .map(|(i, c)| format!("，首次失败：尝试 #{} {}", i, c))
-                            .unwrap_or_default()
+                            .unwrap_or_default(),
+                        compile_note.map(|note| format!("；{}", note)).unwrap_or_default()
                     ));
                 }
                 return Ok(world);

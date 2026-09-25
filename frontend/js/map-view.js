@@ -20,7 +20,7 @@
     hillside_woodland_v1: '🌲 半坡林地',
     plateau_v1: '🏕️ 台地',
     alluvial_fan_v1: '🏜️ 山前冲积扇',
-    basin_oasis_v1: '⛰️ 盆地',
+    basin_oasis_v1: '⛰️ 盆地：起伏平原+外围点线混合褶皱山带',
     volcanic_lake_v1: '🌋 火山湖',
     fault_scarp_demo_v1: '🪨 断层抬升演示',
     folded_basin_demo_v1: '〰️ 褶皱盆地演示',
@@ -30,7 +30,7 @@
   const STRUCTURE_NOTES = {
     random: '当前为正式地貌预览。',
     fault_scarp_demo_v1: 'UGC-07 Fault：沿斜向断层面平滑抬升约 58m，中央形成清晰高差。',
-    folded_basin_demo_v1: 'UGC-07 Fold：沿斜向轴线叠加周期起伏，形成连续褶皱脊谷。',
+    folded_basin_demo_v1: 'UGC-07 多边形锥体：点/线段混合单元从起伏谷底向中心抬升，形成不规则峰群。',
   };
 
   // 与 sim_core geo/terrain.rs::resolve_profile 完全一致的 8 路 random 候选池

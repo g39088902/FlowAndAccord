@@ -52,8 +52,10 @@ pub use backend::{
 pub use procedural::{
     apply_structures, candidate_hash, candidate_parameters, candidate_results, candidates,
     confidence_field, field_slice, profile_slice, sample_stratum, validate_column, BackendKind,
-    Candidate, CandidateFieldHash, CandidateResult, CompiledTerrain, DiagnosticsBundle, Field2,
-    FieldDiagnostic, FieldOp, FieldSlice, FieldSliceHeader, GroundwaterFields, GroundwaterSettings,
-    MaterialProps, MaterialTable, ProfileSample, StratigraphicColumn, StratumSample, StratumSpec,
+    AxisSpec, Candidate, CandidateFieldHash, CandidateResult, CompiledTerrain, DiagnosticsBundle,
+    Field2, FieldDiagnostic, FieldOp, FieldSlice, FieldSliceHeader, FoldBandSpec,
+    ConeCellSpec, FoldAnnulusSpec, FoldNetworkSpec, GroundwaterFields, GroundwaterSettings, MaterialProps,
+    MaterialTable,
+    ProfileSample, StratigraphicColumn, StratumSample, StratumSpec, StructuralEvent,
     StructureError, StructureField, TerrainCompileError, TerrainRecipe, UncertaintySpec,
 };

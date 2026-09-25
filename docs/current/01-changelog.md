@@ -3,6 +3,18 @@
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.4**。
 
+| **（代码修复 · 盆地种子回退与错误可见性 · 不升应用版本）2026-09-26** | **修复种子 `1790359076439` 的盆地回退**：降低外围锥体高度以保持盆地生活带连通，保留外围山带与中心平原；同时保留地形编译错误并通过 `creationWarning` 发送到 Worker，成功降级时控制台和引擎状态显示实际失败原因，不再静默回退。 | sim_core/spatial/world.rs, sim_wasm/src/lib.rs, frontend/js/{sim_worker.js,rustworld.js}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · 点线混合锚点与地表噪音 · 不升应用版本）2026-09-26** | **扩展 Voronoi 锥体单元**：约 28% 锚点改为长度 48~142m、方向独立的线段，其余保持点锚点；Voronoi 距离统一支持点/线段。共享谷底增加连续低频 value noise，使地表不再是平板；`TERRAIN_GENERATOR_VERSION` 30→31。 | sim_core/geo/procedural/{ir.rs,structures.rs,recipes.rs}, frontend/js/map-view.js, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · 非规则锥体布局 · 不升应用版本）2026-09-26** | **减少并打散褶皱演示的锥体点**：Voronoi 单元从 81 个降至约 36 个，加入行错位、宏观漂移和更大种子抖动，避免均匀方格与尖塔阵列观感；多边形边界到中心的锥体构造保持不变；`TERRAIN_GENERATOR_VERSION` 29→30。 | sim_core/geo/procedural/{ir.rs,structures.rs,recipes.rs}, frontend/js/map-view.js, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · 盆地外围褶皱山带 · 不升应用版本）2026-09-26** | **修正 `basin_oasis_v1`**：复用点/线段 Voronoi 锥体，仅在盆地外围环带布置山体，230~350m 之间平滑抬升；盆地中心保留低幅起伏平原，噪音幅度降至 1.2m，避免生活带被山体切碎；`TERRAIN_GENERATOR_VERSION` 31→32。 | sim_core/geo/procedural/{recipes.rs,structures.rs,ir.rs}, frontend/js/map-view.js, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · Voronoi 多边形锥体 · 不升应用版本）2026-09-26** | **重构褶皱演示的山体拓扑**：以紧密排列的种子抖动格点生成 Voronoi 多边形单元，每个单元按距精确多边形边界的距离从共享谷底抬升成独立锥体。原褶皱带仅用 value noise 扭曲采样域，不再用周期三角函数生成山脊；`TERRAIN_GENERATOR_VERSION` 28→29。 | sim_core/geo/procedural/{ir.rs,structures.rs,recipes.rs}, frontend/js/map-view.js, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · FoldNetwork 褶皱地貌增强 · 不升应用版本）2026-09-26** | **重做 `folded_basin_demo_v1` 的褶皱场**：删除单轴一维正弦位移作为演示形态，新增 `FoldNetwork` 结构事件，使用多组交错方向/波长/振幅的褶皱带、共享域扭曲、谐波脊形、种子驱动 ridged fBm 细节，以及固定热松弛与液压侵蚀，生成弯折、分叉、多尺度的二维山脊谷地。配方继续排除 `random`，仅供地图图鉴只读预览；`TERRAIN_GENERATOR_VERSION` 27→28。 | sim_core/geo/procedural/{ir.rs,structures.rs,recipes.rs,compiler.rs}, frontend/js/map-view.js, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
 | **v1.60.4**（代码修复 · 移除盆地出口硬门禁） | **取消 `BasinExitBlocked` 创世拒绝**：盆地不再使用与 Field Compiler 地形不同源的旧出口几何做硬门禁；保留盆底可建面积检查，实际车道和 POI 继续由路网校验与生存诊断负责。种子 `1790353316431` 不再因该门禁降级或失败。 | crates/sim_core/src/spatial/{terrain_network.rs,creation_fallback.rs}, docs/current/tech/32-terrain-generation-gates.md |
 
 | **v1.60.3**（代码新增 · 旧地形生成器下线 · 全量体素创世） | **统一静态地形来源**：所有注册 profile（含冲积扇、盆地、flat baseline、断层/褶皱演示）改由 Field Compiler 编译，世界创建同时保存同一份懒 `VoxelBackend`；旧 `TerrainMap::generate_*` 从生产路径移除。`TerrainRuntime` 顶面高程、WASM chunk 请求和读档重建均直接复用 voxel 源，LOD 换尺度只重建懒 chunk 索引；`TerrainMap` 仅作为快照/生态语义投影保留。修复地下水边界邻居在 debug 构建下的 `usize` 溢出，新增 `flat_baseline_v1` 配方；`TERRAIN_GENERATOR_VERSION` 26→27。 | sim_core(geo/generator, geo/backend/voxel, geo/runtime, spatial/world, spatial/world_save, procedural/recipes, procedural/groundwater) / sim_wasm / docs |

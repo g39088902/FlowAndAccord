@@ -752,6 +752,15 @@ pub struct TerrainSubFeature {
 /// 专用高程/干沟/锚点实现，避免地图与路网几何来源不一致）。
 /// v1.60.4：23 -> 24（盆地暂时退出通用 Depression 迁移路径，恢复 BasinGeometry
 /// 与出口门禁共用的专用盆地高程/谷地实现，避免 BasinExitBlocked 误判）。
+/// v1.60.4：27 -> 28（UGC-07 褶皱演示改用多带域扭曲 FoldNetwork，增加
+/// 交错脊谷、分形细节和侵蚀过程；仅影响只读演示配方）。
+/// v1.60.4：28 -> 29（UGC-07 演示改为紧密 Voronoi 多边形单元，按距边界的
+/// 几何距离抬升锥体，移除褶皱主体中的周期三角函数）。
+/// v1.60.4：29 -> 30（UGC-07 减少锥体单元数量并加入行错位、宏观漂移和更大
+/// 的种子抖动，消除规则尖塔阵列观感）。
+/// v1.60.4：30 -> 31（UGC-07 支持点/线段混合锚点，并为共享谷底加入连续
+/// 低频地表噪音起伏）。
+/// v1.60.4：31 -> 32（盆地外围接入点/线段混合褶皱山带，中心保留轻微起伏平原）。
 /// v1.60.0：20 -> 21（湖畔盆地更名并重构为 volcanic_lake_v1：平原中的随机火山锥体、天池式火山口湖与双缓坡出口）。
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
@@ -804,7 +813,7 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 27;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 32;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

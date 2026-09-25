@@ -7,7 +7,7 @@ use super::materials::MaterialTable;
 use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, ErosionSettings};
 use super::semantics::{self, SemanticGrid, SurfaceThresholds};
 use super::strata::sample_stratum;
-use super::structures::{apply_structures, StructureError, StructureField};
+use super::structures::{StructureError, StructureField};
 use super::{constraints, diagnostics, operators, uncertainty};
 use crate::config::SimConfig;
 use serde::{Deserialize, Serialize};
@@ -196,11 +196,12 @@ pub fn compile_terrain_with_dimensions(
         .and_then(|id| fields.get(&id).cloned())
         .unwrap_or(Field2::new(width, height, 0.5)?);
     let cell_size = world_size / width.saturating_sub(1).max(1) as f32;
-    let structures = apply_structures(
+    let structures = super::structures::apply_structures_seeded(
         &mut elevation,
         &resolved.recipe.structures,
         &fields,
         world_size,
+        seed,
     )
     .map_err(TerrainCompileError::Structure)?;
     let hydro_spec = &resolved.recipe.hydrology;

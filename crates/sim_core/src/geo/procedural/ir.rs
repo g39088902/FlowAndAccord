@@ -106,6 +106,13 @@ pub enum StructuralEvent {
         amplitude_m: f32,
         wavelength_m: f32,
     },
+    /// A warped, multi-band fold train used by structural showcase recipes.
+    /// Each band contributes a different directional fold family; the compiler
+    /// applies a shared domain warp and fine relief field so the result reads
+    /// as a connected mountain system instead of parallel 1-D stripes.
+    FoldNetwork {
+        spec: FoldNetworkSpec,
+    },
     Unconformity {
         surface: NodeId,
     },
@@ -119,6 +126,51 @@ pub struct PlaneSpec {
 pub struct AxisSpec {
     pub start: [f32; 2],
     pub end: [f32; 2],
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldBandSpec {
+    pub axis: AxisSpec,
+    pub amplitude_m: f32,
+    pub wavelength_m: f32,
+    pub phase: f32,
+    pub weight: f32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldNetworkSpec {
+    pub bands: Vec<FoldBandSpec>,
+    /// A tightly packed Voronoi cell field. Each cell is lifted from its
+    /// polygon boundary into one stable cone.
+    pub cone_cells: ConeCellSpec,
+    /// Limits cone sites and their uplift to an outer mountain belt. None
+    /// applies the same point/segment cell geometry to the whole map.
+    pub annulus: Option<FoldAnnulusSpec>,
+    pub warp_m: f32,
+    pub warp_wavelength_m: f32,
+    pub micro_relief_m: f32,
+    pub micro_wavelength_m: f32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FoldAnnulusSpec {
+    pub center: [f32; 2],
+    pub site_inner_radius_m: f32,
+    pub rise_start_m: f32,
+    pub rise_full_m: f32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ConeCellSpec {
+    pub columns: u16,
+    pub rows: u16,
+    pub spacing_m: f32,
+    pub jitter_m: f32,
+    pub stagger_m: f32,
+    pub line_probability: f32,
+    pub line_length_min_m: f32,
+    pub line_length_max_m: f32,
+    pub min_height_m: f32,
+    pub max_height_m: f32,
+    pub floor_m: f32,
+    pub ground_noise_m: f32,
+    pub ground_noise_wavelength_m: f32,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct UncertaintySpec {
@@ -483,6 +535,72 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
                     || *wavelength_m <= 0.0
                     || !length_sq.is_finite()
                     || length_sq <= 1e-12
+            }
+            StructuralEvent::FoldNetwork { spec } => {
+                spec.bands.is_empty()
+                    || spec.bands.len() > 32
+                    || spec.annulus.as_ref().is_some_and(|ring| {
+                        ring.center.iter().any(|v| !v.is_finite())
+                            || !ring.site_inner_radius_m.is_finite()
+                            || ring.site_inner_radius_m < 0.0
+                            || !ring.rise_start_m.is_finite()
+                            || ring.rise_start_m < 0.0
+                            || !ring.rise_full_m.is_finite()
+                            || ring.rise_full_m <= ring.rise_start_m
+                            || ring.site_inner_radius_m > ring.rise_full_m
+                    })
+                    || spec.cone_cells.columns < 2
+                    || spec.cone_cells.columns > 32
+                    || spec.cone_cells.rows < 2
+                    || spec.cone_cells.rows > 32
+                    || !spec.cone_cells.spacing_m.is_finite()
+                    || spec.cone_cells.spacing_m <= 0.0
+                    || !spec.cone_cells.jitter_m.is_finite()
+                    || spec.cone_cells.jitter_m < 0.0
+                    || spec.cone_cells.jitter_m > spec.cone_cells.spacing_m * 0.45
+                    || !spec.cone_cells.stagger_m.is_finite()
+                    || spec.cone_cells.stagger_m < 0.0
+                    || spec.cone_cells.stagger_m > spec.cone_cells.spacing_m * 0.45
+                    || !spec.cone_cells.line_probability.is_finite()
+                    || spec.cone_cells.line_probability < 0.0
+                    || spec.cone_cells.line_probability > 1.0
+                    || !spec.cone_cells.line_length_min_m.is_finite()
+                    || !spec.cone_cells.line_length_max_m.is_finite()
+                    || spec.cone_cells.line_length_min_m <= 0.0
+                    || spec.cone_cells.line_length_max_m < spec.cone_cells.line_length_min_m
+                    || !spec.cone_cells.min_height_m.is_finite()
+                    || !spec.cone_cells.max_height_m.is_finite()
+                    || spec.cone_cells.min_height_m <= 0.0
+                    || spec.cone_cells.max_height_m < spec.cone_cells.min_height_m
+                    || !spec.cone_cells.floor_m.is_finite()
+                    || spec.cone_cells.floor_m < 0.0
+                    || !spec.cone_cells.ground_noise_m.is_finite()
+                    || spec.cone_cells.ground_noise_m < 0.0
+                    || !spec.cone_cells.ground_noise_wavelength_m.is_finite()
+                    || spec.cone_cells.ground_noise_wavelength_m <= 0.0
+                    || !spec.warp_m.is_finite()
+                    || !spec.warp_wavelength_m.is_finite()
+                    || spec.warp_wavelength_m <= 0.0
+                    || !spec.micro_relief_m.is_finite()
+                    || !spec.micro_wavelength_m.is_finite()
+                    || spec.micro_wavelength_m <= 0.0
+                    || spec.bands.iter().any(|band| {
+                        let dx = band.axis.end[0] - band.axis.start[0];
+                        let dy = band.axis.end[1] - band.axis.start[1];
+                        let length_sq = dx * dx + dy * dy;
+                        band.axis
+                            .start
+                            .iter()
+                            .chain(band.axis.end.iter())
+                            .any(|v| !v.is_finite())
+                            || !band.amplitude_m.is_finite()
+                            || !band.wavelength_m.is_finite()
+                            || band.wavelength_m <= 0.0
+                            || !band.phase.is_finite()
+                            || !band.weight.is_finite()
+                            || length_sq <= 1e-12
+                            || !length_sq.is_finite()
+                    })
             }
             StructuralEvent::Unconformity { surface } => {
                 if !known.contains(surface) {

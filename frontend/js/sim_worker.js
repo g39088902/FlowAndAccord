@@ -457,6 +457,7 @@ self.onmessage = async function(e) {
         }
         // 图鉴世界只读取首帧地形快照，不创建检查点也不启动模拟节拍，确保它始终是无游戏数据的静态地图。
         if (!msg.mapOnly) startLoop();
+        const creationWarning = (!msg.mapOnly) ? readLastErrorRaw() : '';
         const initMsg = {
           type: 'READY',
           seed: _engineSeed,
@@ -465,6 +466,7 @@ self.onmessage = async function(e) {
           snapshot: initialSnap,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
           rewind: rewindMeta(),
+          creationWarning,
         };
         if (initialRes && initialRes.bin) {
           self.postMessage(initMsg, [initialRes.bin.buffer]);
