@@ -6,7 +6,10 @@
 use super::heightfield::HeightfieldBackend;
 use super::layers::{LayeredTerrainQuery, SolidInterval, SurfaceHit};
 use crate::geo::biome::SurfaceKind;
-use crate::geo::procedural::{ChunkCoord, CompiledTerrain, Field3Chunk, FieldError};
+use crate::geo::procedural::{
+    sample_stratum, ChunkCoord, CompiledTerrain, Field3Chunk, FieldError, MaterialTable,
+    StratigraphicColumn,
+};
 use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -15,7 +18,7 @@ pub const VOXEL_CHUNK_SIZE: u8 = 32;
 pub const VOXEL_HALO: u8 = 1;
 pub const DENSITY_SCALE: f32 = 256.0;
 pub const HEIGHTFIELD_QUANTUM_M: f32 = 1.0 / DENSITY_SCALE;
-pub const VOXEL_BACKEND_VERSION: u32 = 1;
+pub const VOXEL_BACKEND_VERSION: u32 = 2;
 pub const TERRAIN_CHUNK_PACKET_VERSION: u16 = 1;
 pub const TERRAIN_CHUNK_PACKET_HEADER_LEN: usize = 52;
 
@@ -115,6 +118,8 @@ pub struct VoxelBackend {
     /// top-surface compatibility queries. Hand-authored chunks use density
     /// ray queries instead.
     source_heightfield: Option<HeightfieldBackend>,
+    source_stratigraphy: Option<StratigraphicColumn>,
+    material_table: MaterialTable,
 }
 
 impl Default for VoxelBackend {
@@ -129,6 +134,8 @@ impl Default for VoxelBackend {
             min_z: 0.0,
             max_z: 0.0,
             source_heightfield: None,
+            source_stratigraphy: None,
+            material_table: MaterialTable::default(),
         }
     }
 }
@@ -159,6 +166,8 @@ impl VoxelBackend {
             min_z,
             max_z,
             source_heightfield: Some(heightfield.clone()),
+            source_stratigraphy: heightfield.stratigraphy.clone(),
+            material_table: heightfield.materials.clone(),
             ..Self::default()
         };
         let horizontal = (heightfield.world_size / voxel_scale).ceil() as i32;
@@ -412,12 +421,36 @@ impl VoxelBackend {
                         as i16;
                     let i = z * side * side + y * side + x;
                     chunk.density_q16[i] = density;
-                    chunk.material[i] =
-                        material_for(heightfield.sample_cell(p.x, p.y).surface_kind);
+                    chunk.material[i] = self.material_at_depth(
+                        heightfield,
+                        p.x,
+                        p.y,
+                        p.z,
+                        surface,
+                    );
                 }
             }
         }
         Ok(chunk)
+    }
+
+    fn material_at_depth(
+        &self,
+        heightfield: &HeightfieldBackend,
+        x: f32,
+        y: f32,
+        z: f32,
+        surface: f32,
+    ) -> u8 {
+        if let Some(column) = &self.source_stratigraphy {
+            let depth = (surface - z).max(0.0);
+            if let Some(sample) = sample_stratum(column, depth) {
+                if self.material_table.get(sample.material).is_some() {
+                    return sample.material;
+                }
+            }
+        }
+        material_for(heightfield.sample_cell(x, y).surface_kind)
     }
 
     pub fn chunk_origin(&self, coord: ChunkCoord) -> Vec3 {

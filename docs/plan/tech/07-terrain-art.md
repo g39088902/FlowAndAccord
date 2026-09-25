@@ -49,7 +49,7 @@ stateDiagram-v2
 
 | 编号 | 任务 | 状态 | 权威 |
 | :--- | :--- | :--- | :--- |
-| UGC-00～12 | 统一地形场编译器与体素迁移（含地形事实与景观布局字段） | UGC-01～04 已落地；UGC-05 已接入静态地形键、WASM chunk 请求、Worker 转发与 `ChunkDelta` 基线校验/重放，前端网格缓存和完整 WebGL 消费仍待完成；其余波次未实施 | [06 号 R.2](./06-terrain-templates.md)、[TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
+| UGC-00～12 | 统一地形场编译器与体素迁移（含地形事实与景观布局字段） | UGC-01～05 已落地；UGC-06 已接入地层柱校验、材料属性表和按深度 voxel 材料投影；UGC-05 的前端网格缓存和完整 WebGL 消费、UGC-06 的剖面诊断仍待完成；其余波次未实施 | [06 号 R.2](./06-terrain-templates.md)、[TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
 | TC-03 ◐ | 全量 WebGL 迁移阶段三~五（装饰层→实体层→Canvas 2D 退役） | 既定路线 | [31 号 §8](./31-canvas-to-webgl-migration.md) |
 
 ### 1.3 排期原则

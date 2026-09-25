@@ -1,6 +1,6 @@
 //! Heightfield compatibility backend for existing GeoCell consumers.
 use crate::geo::biome::GeoCell;
-use crate::geo::procedural::{CompiledTerrain, Field2};
+use crate::geo::procedural::{CompiledTerrain, Field2, MaterialTable, StratigraphicColumn};
 
 #[derive(Debug, Clone)]
 pub struct HeightfieldBackend {
@@ -9,6 +9,8 @@ pub struct HeightfieldBackend {
     pub world_size: f32,
     pub elevation: Field2,
     pub cells: Vec<GeoCell>,
+    pub stratigraphy: Option<StratigraphicColumn>,
+    pub materials: MaterialTable,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct HeightfieldView<'a> {
@@ -45,6 +47,7 @@ impl HeightfieldBackend {
         {
             return None;
         }
+        let recipe = crate::geo::procedural::builtin(&map.profile);
         Some(Self {
             width: map.grid_width,
             height: map.grid_height,
@@ -55,6 +58,11 @@ impl HeightfieldBackend {
                 values: map.cells.iter().map(|cell| cell.elevation).collect(),
             },
             cells: map.cells.clone(),
+            stratigraphy: recipe.as_ref().map(|recipe| recipe.stratigraphy.clone()),
+            materials: recipe
+                .as_ref()
+                .map(|recipe| recipe.materials.clone())
+                .unwrap_or_default(),
         })
     }
 
@@ -79,6 +87,8 @@ impl HeightfieldBackend {
             world_size,
             elevation: e.clone(),
             cells,
+            stratigraphy: Some(compiled.stratigraphy.clone()),
+            materials: compiled.materials.clone(),
         }
     }
     pub fn from_compiled_default(compiled: &CompiledTerrain) -> Self {

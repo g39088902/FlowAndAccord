@@ -2,6 +2,7 @@
 use super::fields::{Field2, FieldError};
 use super::hydrology::{project_semantics, solve_hydrology, HydrologyFields, HydrologySettings};
 use super::ir::{validate_recipe, RecipeError, ResolvedRecipe, TerrainRecipe};
+use super::materials::MaterialTable;
 use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, ErosionSettings};
 use super::semantics::{self, SemanticGrid, SurfaceThresholds};
 use super::{constraints, diagnostics, operators};
@@ -33,6 +34,8 @@ pub struct CompiledTerrain {
     pub diagnostics: diagnostics::DiagnosticsBundle,
     pub backend: BackendKind,
     pub recipe_id: String,
+    pub stratigraphy: super::ir::StratigraphicColumn,
+    pub materials: MaterialTable,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -218,6 +221,8 @@ pub fn compile_terrain_with_dimensions(
         diagnostics: diagnostic,
         backend,
         recipe_id: recipe.id.clone(),
+        stratigraphy: recipe.stratigraphy.clone(),
+        materials: recipe.materials.clone(),
     })
 }
 

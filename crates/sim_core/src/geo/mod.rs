@@ -49,5 +49,7 @@ pub use backend::{
     VOXEL_BACKEND_VERSION, VOXEL_CHUNK_SIZE, VOXEL_HALO,
 };
 pub use procedural::{
-    BackendKind, CompiledTerrain, Field2, FieldOp, TerrainCompileError, TerrainRecipe,
+    sample_stratum, validate_column, BackendKind, CompiledTerrain, Field2, FieldOp, MaterialProps,
+    MaterialTable, StratigraphicColumn, StratumSample, StratumSpec,
+    TerrainCompileError, TerrainRecipe,
 };

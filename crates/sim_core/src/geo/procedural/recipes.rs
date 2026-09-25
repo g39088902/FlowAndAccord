@@ -1,5 +1,6 @@
 //! Built-in data-only recipes. Geometry lives in the generic compiler.
 use super::ir::*;
+use super::materials::MaterialTable;
 
 pub const GRASSLAND_PLAIN_V1: &str = "grassland_plain_v1";
 pub const MOUNTAIN_PASS_V1: &str = "mountain_pass_v1";
@@ -21,6 +22,7 @@ fn recipe_from_nodes(
         schema_version: 1,
         nodes,
         stratigraphy: default_strata(),
+        materials: default_materials(),
         structures: vec![],
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
@@ -135,6 +137,7 @@ pub fn grassland_plain_v1() -> TerrainRecipe {
             },
         ],
         stratigraphy: default_strata(),
+        materials: default_materials(),
         structures: vec![],
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
@@ -213,6 +216,7 @@ pub fn mountain_pass_v1() -> TerrainRecipe {
             },
         ],
         stratigraphy: default_strata(),
+        materials: default_materials(),
         structures: vec![],
         uncertainty: UncertaintySpec::default(),
         constraints: vec![
@@ -412,14 +416,38 @@ pub fn builtins() -> Vec<TerrainRecipe> {
 }
 fn default_strata() -> StratigraphicColumn {
     StratigraphicColumn {
-        units: vec![StratumSpec {
-            id: 0,
-            thickness_m: 100.0,
-            material: 0,
-            hardness: 0.5,
-            soil_storage: 0.7,
-            permeability: 0.5,
-            palette: 0,
-        }],
+        units: vec![
+            StratumSpec {
+                id: 0,
+                thickness_m: 2.0,
+                material: 1,
+                hardness: 0.2,
+                soil_storage: 0.9,
+                permeability: 0.8,
+                palette: 1,
+            },
+            StratumSpec {
+                id: 1,
+                thickness_m: 18.0,
+                material: 0,
+                hardness: 0.5,
+                soil_storage: 0.7,
+                permeability: 0.5,
+                palette: 0,
+            },
+            StratumSpec {
+                id: 2,
+                thickness_m: 1000.0,
+                material: 4,
+                hardness: 0.95,
+                soil_storage: 0.05,
+                permeability: 0.05,
+                palette: 3,
+            },
+        ],
     }
+}
+
+fn default_materials() -> MaterialTable {
+    MaterialTable::default()
 }

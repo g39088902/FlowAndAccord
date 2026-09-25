@@ -9,13 +9,21 @@ pub struct StratumSample {
     pub permeability: f32,
     pub palette: u8,
 }
+
+impl StratigraphicColumn {
+    pub fn validate(&self) -> bool {
+        validate_column(self)
+    }
+}
+
 pub fn sample_stratum(column: &StratigraphicColumn, depth: f32) -> Option<StratumSample> {
-    if depth < 0.0 {
+    if !depth.is_finite() || depth < 0.0 {
         return None;
     }
     let mut d = depth;
-    for u in &column.units {
-        if d <= u.thickness_m {
+    for (index, u) in column.units.iter().enumerate() {
+        let is_last = index + 1 == column.units.len();
+        if d < u.thickness_m || (is_last && d <= u.thickness_m) {
             return Some(StratumSample {
                 id: u.id,
                 material: u.material,
@@ -36,8 +44,11 @@ pub fn validate_column(column: &StratigraphicColumn) -> bool {
             u.thickness_m.is_finite()
                 && u.thickness_m > 0.0
                 && u.hardness.is_finite()
+                && (0.0..=1.0).contains(&u.hardness)
                 && u.soil_storage.is_finite()
+                && (0.0..=1.0).contains(&u.soil_storage)
                 && u.permeability.is_finite()
+                && (0.0..=1.0).contains(&u.permeability)
                 && ids.insert(u.id)
         })
 }

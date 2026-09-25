@@ -2,6 +2,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::materials::MaterialTable;
+
 pub type NodeId = u16;
 pub type RecipeId = String;
 
@@ -230,6 +232,8 @@ pub struct TerrainRecipe {
     pub schema_version: u16,
     pub nodes: Vec<TerrainNode>,
     pub stratigraphy: StratigraphicColumn,
+    #[serde(default)]
+    pub materials: MaterialTable,
     pub structures: Vec<StructuralEvent>,
     pub uncertainty: UncertaintySpec,
     pub constraints: Vec<TerrainConstraint>,
@@ -244,6 +248,7 @@ impl Default for TerrainRecipe {
             schema_version: 1,
             nodes: Vec::new(),
             stratigraphy: StratigraphicColumn { units: Vec::new() },
+            materials: MaterialTable::default(),
             structures: Vec::new(),
             uncertainty: UncertaintySpec::default(),
             constraints: Vec::new(),
@@ -263,6 +268,8 @@ pub enum RecipeError {
     InvalidDimensions,
     InvalidWorldSize,
     UnsupportedOp,
+    InvalidStratigraphy,
+    InvalidMaterialTable,
 }
 impl RecipeError {
     pub const fn code(&self) -> &'static str {
@@ -275,6 +282,8 @@ impl RecipeError {
             Self::InvalidDimensions => "INVALID_DIMENSIONS",
             Self::InvalidWorldSize => "INVALID_WORLD_SIZE",
             Self::UnsupportedOp => "UNSUPPORTED_OP",
+            Self::InvalidStratigraphy => "INVALID_STRATIGRAPHY",
+            Self::InvalidMaterialTable => "INVALID_MATERIAL_TABLE",
         }
     }
 }
@@ -295,6 +304,18 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
     }
     if !recipe.output.world_size.is_finite() || recipe.output.world_size <= 0.0 {
         return Err(RecipeError::InvalidWorldSize);
+    }
+    if !recipe.stratigraphy.validate() {
+        return Err(RecipeError::InvalidStratigraphy);
+    }
+    if !recipe.materials.validate()
+        || recipe
+            .stratigraphy
+            .units
+            .iter()
+            .any(|unit| recipe.materials.get(unit.material).is_none())
+    {
+        return Err(RecipeError::InvalidMaterialTable);
     }
     let h = &recipe.hydrology;
     let hydrology_values = [

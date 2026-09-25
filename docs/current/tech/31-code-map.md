@@ -41,6 +41,7 @@ FlowAndAccord/
 │   │       │   │   ├── processes.rs        # 固定顺序汇流与热松弛过程
 │   │       │   │   ├── hydrology.rs        # 汇流/河道/水位字段投影
 │   │       │   │   ├── strata.rs           # 地层柱采样
+│   │       │   │   ├── materials.rs        # 材料属性表与范围校验
 │   │       │   │   ├── groundwater.rs      # 静态地下水字段
 │   │       │   │   ├── uncertainty.rs      # 有限候选排序
 │   │       │   │   ├── semantics.rs        # SurfaceKind/材质/调色投影

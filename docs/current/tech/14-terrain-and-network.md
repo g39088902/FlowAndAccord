@@ -10,6 +10,8 @@
 
 > **UGC-05 实施状态（2026-09-25）**：静态地形现在有稳定 `TerrainStaticKey`（recipe id/hash、seed、`TERRAIN_GENERATOR_VERSION`、`VOXEL_BACKEND_VERSION`），存档写入该键并对旧档缺省字段按当前 `TerrainMap` 推导校验。WASM 提供 `world_terrain_key_ptr/len` 与 `world_terrain_chunk_request(x,y,z,voxel_scale)` / `world_terrain_chunk_ptr/len`；chunk 包采用版本化 `FAVX` little-endian 格式（header 52 字节，密度 `i16` + 材质 `u8`）。`ChunkDelta`/`DeltaRun` 以 chunk 基线 hash 和有序运行区间保存 authored 修改，lazy voxel 后端构建后按 hash 校验并重放；基线漂移或越界 delta 拒绝请求。Worker 与 `RustWorld.terrainStaticKey()` / `requestTerrainChunk()` 只在显式调用时请求，静态 voxel 后端按尺度缓存，换世界或读档时失效；FABS、tick 和现有地形格快照不变。前端网格缓存和完整 WebGL 消费仍待后续 UGC-05 子任务。
 
+> **UGC-06 实施状态（2026-09-25）**：Field Compiler recipe 现在携带 `StratigraphicColumn` 与 `MaterialTable`。地层柱校验 ID 唯一、厚度为正、硬度/储水/渗透率均在 `[0,1]`；`sample_stratum(column, depth)` 按地表向下累计厚度稳定定位地层，边界深度进入下一层。`CompiledTerrain`、`HeightfieldBackend` 和 `VoxelBackend` 传递这组静态字段，chunk 生成时以 `surface_height - z` 为深度采样地层并写入材料 ID；没有 recipe 的旧/手工 chunk 继续使用既有 `SurfaceKind` 映射。palette 只用于材料外观元数据，不改变高程、密度、通行或 tick；voxel backend 版本推进到 2。
+
 ## R0 T2 河道表示迁移（v1.53.0）
 
 T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。浅滩端点从解析岸线起沿法向按栅格步长向外检查，直到其映射到非水格，避免急弯的邻近河段或栅格取整使端点落水。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17；v1.58 冲积扇沟槽合并与浅滩端点陆格寻址使版本再推进至 19；v1.59 河谷子特征改为水线净空 + 最远点散布，版本推进至 20，旧地形存档按既有版本门禁拒绝。
