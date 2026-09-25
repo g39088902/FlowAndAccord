@@ -30,7 +30,7 @@
 | 2 | 路网读档校验 | `spatial/terrain_network.rs::validate_terrain_world` | `车道 X 不符合地表通行规则` / `POI 不可达` / `没有合法路网` | 创世门禁链（`RoadNetwork:` 前缀）、`world_save.rs` 读档后 |
 | 3 | 台地模板门禁 | `validate_plateau_gates` | `PlateauBuildAreaInsufficient` / `PlateauRampABlocked` / `PlateauWaterUnreachable` | 创世门禁链 |
 | 4 | 冲积扇模板门禁 | `validate_fan_gates` | `FanBuildAreaInsufficient` / `FanDryCorridorBlocked` | 创世门禁链 |
-| 5 | 盆地模板门禁 | `validate_basin_gates` | `BasinBuildAreaInsufficient` / `BasinExitBlocked` | 创世门禁链 |
+| 5 | 盆地生活带门禁 | `validate_basin_build_area_gate` | `BasinBuildAreaInsufficient` | 创世门禁链 |
 | 6 | 火山湖模板门禁 | `validate_volcanic_lake_gates` | `LakeBuildAreaInsufficient` / `WaterAccessInvalid` / `LakeShoreDisconnected` | 创世门禁链 |
 | 7 | 生存诊断 | `spatial/survival_diagnosis.rs::diagnose_survival` | `SpawnDisconnected` / `SurvivalCostExceeded` | 创世门禁链（`Survival:` 前缀） |
 | 8 | 有界降级环 | `spatial/creation_fallback.rs` | `budget_exhausted` / `no_new_strategy` | 生产创建入口 |
@@ -92,7 +92,7 @@
 | :--- | :--- | :--- | :--- |
 | 台地 | 台面房屋候选 ≥ 3 | 台心 → 双坡脚水源 POI(10/11) 双入口通路 | `PlateauBuildAreaInsufficient` / `PlateauRampBlocked` / `PlateauWaterUnreachable` / `PlateauRampABlocked` / `PlateauRampBBlocked` |
 | 冲积扇 | `r<0.9L` 且 `|θ|<0.85α` 内 ≥ 3 | 山口内 20m → 扇缘全宽**干地**走廊（干沟可慢行横跨） | `FanBuildAreaInsufficient` / `FanDryCorridorBlocked` |
-| 盆地 | `q<0.82` 盆底 ≥ 3 | 盆心 → 沿出口方向越过高山（1.3×semi_b） | `BasinBuildAreaInsufficient` / `BasinExitBlocked` |
+| 盆地 | `q<0.82` 盆底 ≥ 3 | 不再以旧出口几何作为创世硬门禁；实际车道与 POI 仍经路网/生存诊断校验 | `BasinBuildAreaInsufficient` |
 | 火山湖 | 环岸 `d>setback` 且 `d<0.75×r_mean` ≥ 3 | 双岸点环岸通路 + 双出口自水线外平台 → 岭外（`r_out×2.55`）可达；岸点全部干地合法 | `LakeBuildAreaInsufficient` / `WaterAccessInvalid` / `LakeShoreDisconnected` |
 
 > ⚠️ 火山湖出口起终点**禁止以水体格为起点**（池心是 DeepWater），且**不可用固定比例半径**（湖半轴独立抽样可达 1.6:1，窄轴方向固定点会落进湖里，TB-03-08 踩坑）。

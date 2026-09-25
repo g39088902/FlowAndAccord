@@ -593,8 +593,11 @@ impl World3DEngine {
         Ok(())
     }
 
-    /// TB-03 盆地专有门禁：盆底平坦生活带房屋候选完整占地 + 出口走廊。
-    pub fn validate_basin_gates(&self) -> Result<(), String> {
+    /// TB-03 盆地生活带门禁：盆底平坦生活带房屋候选完整占地。
+    ///
+    /// 出口路径不再作为创世硬门禁。实际路网和生存诊断仍会校验已生成的
+    /// 车道与 POI，避免用与 Field Compiler 不同源的旧出口几何拒绝盆地。
+    pub fn validate_basin_build_area_gate(&self) -> Result<(), String> {
         let Some(bg) = self.get_basin_geometry() else {
             return Ok(());
         };
@@ -605,17 +608,6 @@ impl World3DEngine {
         });
         if buildable < 3 {
             return Err("BasinBuildAreaInsufficient".into());
-        }
-        // 出口走廊：盆心 (center_x, center_y) → 沿出口方向越过高山 (1.3×semi_b) 的路由必须存在。
-        let (dir_x, dir_y) = (bg.exit_theta.cos(), bg.exit_theta.sin());
-        let mut a = Vec3::new(bg.center_x, bg.center_y, 0.0);
-        a.z = self.terrain_runtime().sample_elevation(a.x, a.y);
-        let bx = bg.center_x + dir_x * bg.semi_b * 1.3;
-        let by = bg.center_y + dir_y * bg.semi_b * 1.3;
-        let mut b = Vec3::new(bx, by, 0.0);
-        b.z = self.terrain_runtime().sample_elevation(b.x, b.y);
-        if corridor::route(&self.terrain, a, b, &self.config).is_none() {
-            return Err("BasinExitBlocked".into());
         }
         Ok(())
     }

@@ -1,7 +1,9 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.3**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.4**。
+
+| **v1.60.4**（代码修复 · 移除盆地出口硬门禁） | **取消 `BasinExitBlocked` 创世拒绝**：盆地不再使用与 Field Compiler 地形不同源的旧出口几何做硬门禁；保留盆底可建面积检查，实际车道和 POI 继续由路网校验与生存诊断负责。种子 `1790353316431` 不再因该门禁降级或失败。 | crates/sim_core/src/spatial/{terrain_network.rs,creation_fallback.rs}, docs/current/tech/32-terrain-generation-gates.md |
 
 | **v1.60.3**（代码新增 · 旧地形生成器下线 · 全量体素创世） | **统一静态地形来源**：所有注册 profile（含冲积扇、盆地、flat baseline、断层/褶皱演示）改由 Field Compiler 编译，世界创建同时保存同一份懒 `VoxelBackend`；旧 `TerrainMap::generate_*` 从生产路径移除。`TerrainRuntime` 顶面高程、WASM chunk 请求和读档重建均直接复用 voxel 源，LOD 换尺度只重建懒 chunk 索引；`TerrainMap` 仅作为快照/生态语义投影保留。修复地下水边界邻居在 debug 构建下的 `usize` 溢出，新增 `flat_baseline_v1` 配方；`TERRAIN_GENERATOR_VERSION` 26→27。 | sim_core(geo/generator, geo/backend/voxel, geo/runtime, spatial/world, spatial/world_save, procedural/recipes, procedural/groundwater) / sim_wasm / docs |
 

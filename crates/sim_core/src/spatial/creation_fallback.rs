@@ -316,7 +316,7 @@ impl World3DEngine {
             self.validate_fan_gates()?;
         }
         if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS {
-            self.validate_basin_gates()?;
+            self.validate_basin_build_area_gate()?;
         }
         if self.terrain.profile == crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE
             && !self.terrain.field_compiled

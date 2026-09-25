@@ -24,7 +24,7 @@ sim_core → sim_wasm → frontend/rust/sim_wasm.wasm
                     → frontend/sim_wasm.wasm → sim_worker.js → rustworld.js → WebGL/Canvas 过渡层
 ```
 
-- `sim_core` 是确定性模拟内核；`sim_wasm` 只做桥接、tick、配置注入、快照和存档；`frontend` 负责 Worker、快照解码、配置 UI 与渲染（浏览器 UI (版本: v1.60.3)）。
+- `sim_core` 是确定性模拟内核；`sim_wasm` 只做桥接、tick、配置注入、快照和存档；`frontend` 负责 Worker、快照解码、配置 UI 与渲染（浏览器 UI (版本: v1.60.4)）。
 - 内核状态与表现层解耦：前端渲染不得改模拟状态或改变 `WorldRng` 消费顺序。
 - 修改渲染前必须读 `frontend/AGENTS.md` 与 [`31-canvas-to-webgl-migration.md`](docs/plan/tech/31-canvas-to-webgl-migration.md)。
 
@@ -50,7 +50,7 @@ cargo build -p sim_wasm --target wasm32-unknown-unknown --release
 # 将 target/wasm32-unknown-unknown/release/sim_wasm.wasm 复制到上述两个 frontend 路径
 ```
 
-常用运行命令：`node frontend/server.js`（默认 `http://localhost:3000`）。每次重编译 WASM 后强制刷新；页面顶部标题栏显示版本徽章 **`v1.60.3`**，版本升版统一使用 `node tools/bump-version.js`。
+常用运行命令：`node frontend/server.js`（默认 `http://localhost:3000`）。每次重编译 WASM 后强制刷新；页面顶部标题栏显示版本徽章 **`v1.60.4`**，版本升版统一使用 `node tools/bump-version.js`。
 
 长期门禁按改动类型选择 [`30-workflow.md`](docs/current/tech/30-workflow.md)：`test-wasm.js`、`test-determinism.js`、`config-check.js`、`frontend-check.js`、`snapshot-check.js`、`doc-link-check.js`、`cross-doc-check.js`、`code-map-check.js`、`doc-maintenance-check.js`、`bump-version.js --check`。纯文档改动至少运行工作区检查、文档维护、跨文档一致性和版本检查；不要为文档改动运行无关的 Rust 发布构建。
 
