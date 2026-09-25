@@ -603,6 +603,8 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 只在 UGC-04 稳定后接入 FABS 和 WebGL。先传 chunk/mesh 请求结果，再考虑体素 delta。不要把完整体素数组塞进现有 cell section。
 
+**当前实现注记（2026-09-26）**：UGC-05 的创世主路径已完成统一：所有注册 recipe 先编译为 `CompiledTerrain`，再由同一结果构建懒 `VoxelBackend`；`TerrainMap` 只作为快照/生态语义投影。`TerrainRuntime`、WASM chunk 请求和读档重建不再从旧 `TerrainMap` 反向生成 voxel。`ChunkDelta` 仍按基线 hash 校验并在请求时重放，完整网格缓存和 WebGL 消费继续由前端阶段接入。
+
 ### UGC-06：地层柱和材料属性
 
 为 recipe 增加 `StratigraphicColumn`、`StratumSpec` 和材料属性表。先让高度场输出地层 ID、硬度、储水量、渗透性和调色类别，再让 VoxelBackend 把这些字段写入体素材料。

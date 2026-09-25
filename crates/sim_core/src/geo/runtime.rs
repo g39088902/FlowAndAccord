@@ -5,23 +5,28 @@
 //! 顶层查询，并在内部切换高度场或体素实现。
 
 use super::biome::GeoCell;
+use super::backend::{LayeredTerrainQuery, VoxelBackend};
 use super::terrain::TerrainMap;
 
 /// 静态地形的只读运行时视图。
 #[derive(Debug, Clone, Copy)]
 pub struct TerrainRuntime<'a> {
     terrain: &'a TerrainMap,
+    voxel: &'a VoxelBackend,
 }
 
 impl<'a> TerrainRuntime<'a> {
-    pub fn new(terrain: &'a TerrainMap) -> Self {
-        Self { terrain }
+    pub fn new(terrain: &'a TerrainMap, voxel: &'a VoxelBackend) -> Self {
+        Self { terrain, voxel }
     }
 
     /// 读取世界坐标处的顶部高程。
     #[inline]
     pub fn sample_elevation(&self, wx: f32, wy: f32) -> f32 {
-        self.terrain.sample_elevation(wx, wy)
+        self.voxel
+            .surface_at(wx, wy, 0)
+            .map(|hit| hit.z)
+            .unwrap_or(0.0)
     }
 
     /// 读取世界坐标处的顶部地表事实。
@@ -34,5 +39,12 @@ impl<'a> TerrainRuntime<'a> {
     #[inline]
     pub fn as_heightfield(&self) -> &'a TerrainMap {
         self.terrain
+    }
+
+    /// Access the authoritative voxel source for geometry consumers that need
+    /// layered material or density queries.
+    #[inline]
+    pub fn as_voxel(&self) -> &'a VoxelBackend {
+        self.voxel
     }
 }

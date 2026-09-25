@@ -10,6 +10,8 @@ pub const BASIN_OASIS_V1: &str = "basin_oasis_v1";
 pub const ALLUVIAL_FAN_V1: &str = "alluvial_fan_v1";
 pub const VOLCANIC_LAKE_V1: &str = "volcanic_lake_v1";
 pub const HILLSIDE_WOODLAND_V1: &str = "hillside_woodland_v1";
+/// Explicit flat fallback used by the bounded world creation ladder.
+pub const FLAT_BASELINE_V1: &str = "flat_baseline";
 /// Read-only map gallery recipe used to make the UGC-07 structural compiler visible.
 pub const FAULT_SCARP_DEMO_V1: &str = "fault_scarp_demo_v1";
 /// Read-only map gallery recipe used to make the UGC-07 structural compiler visible.
@@ -89,6 +91,38 @@ fn common_nodes(base: FieldOp, relief: FieldOp, noise_amplitude: f32) -> Vec<Ter
             mask: None,
         },
     ]
+}
+
+/// A deterministic, deliberately boring fallback field.  The legacy terrain
+/// generator used to own this branch; keeping it as a recipe means even
+/// degraded worlds are compiled into the same voxel source as every other
+/// profile.
+pub fn flat_baseline_v1() -> TerrainRecipe {
+    TerrainRecipe {
+        id: FLAT_BASELINE_V1.into(),
+        schema_version: 1,
+        nodes: vec![TerrainNode {
+            id: 0,
+            op: FieldOp::Plane {
+                direction: [0.0, 1.0],
+                slope: 0.001,
+                base: 0.0,
+            },
+            inputs: vec![],
+            strength: 1.0,
+            mask: None,
+        }],
+        stratigraphy: default_strata(),
+        materials: default_materials(),
+        structures: vec![],
+        uncertainty: UncertaintySpec::default(),
+        constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
+        hydrology: HydrologySpec::default(),
+        output: OutputSpec {
+            elevation_node: 0,
+            ..OutputSpec::default()
+        },
+    }
 }
 
 pub fn grassland_plain_v1() -> TerrainRecipe {
@@ -481,6 +515,7 @@ pub fn builtin(id: &str) -> Option<TerrainRecipe> {
         ALLUVIAL_FAN_V1 => Some(alluvial_fan_v1()),
         VOLCANIC_LAKE_V1 => Some(volcanic_lake_v1()),
         HILLSIDE_WOODLAND_V1 => Some(hillside_woodland_v1()),
+        FLAT_BASELINE_V1 => Some(flat_baseline_v1()),
         FAULT_SCARP_DEMO_V1 => Some(fault_scarp_demo_v1()),
         FOLDED_BASIN_DEMO_V1 => Some(folded_basin_demo_v1()),
         _ => None,

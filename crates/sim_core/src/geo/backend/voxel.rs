@@ -205,39 +205,38 @@ impl VoxelBackend {
         Self::from_heightfield(&heightfield, min - margin, max + margin, voxel_scale)
     }
 
-    /// Build the static voxel volume from the current compatibility map.
-    /// This is the UGC-05 request path: it never touches `WorldRng`.
-    pub fn from_terrain_map(
-        map: &crate::geo::terrain::TerrainMap,
+    /// Build a lazy voxel volume directly from compiled fields. Chunks are
+    /// materialized only when a renderer requests them.
+    pub fn from_compiled_lazy(
+        compiled: &CompiledTerrain,
         voxel_scale: f32,
     ) -> Result<Self, VoxelError> {
-        let heightfield = HeightfieldBackend::from_terrain_map(map).ok_or(VoxelError::InvalidBounds)?;
-        let (min, max) = map
-            .cells
-            .iter()
-            .map(|cell| cell.elevation)
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), value| {
-                (lo.min(value), hi.max(value))
-            });
-        let margin = voxel_scale.max(1.0) * 2.0;
-        Self::from_heightfield(&heightfield, min - margin, max + margin, voxel_scale)
+        let heightfield = HeightfieldBackend::from_compiled_default(compiled);
+        Self::from_heightfield_lazy(&heightfield, voxel_scale)
     }
 
-    /// Same static source as `from_terrain_map`, but leave chunks unallocated
-    /// until `ensure_chunk`/`encode_chunk` requests them. This is the WASM
-    /// request path and keeps untouched chunks out of the cache.
-    pub fn from_terrain_map_lazy(
-        map: &crate::geo::terrain::TerrainMap,
+    /// Recreate the lazy chunk index at a different voxel scale while keeping
+    /// the same compiled heightfield source.
+    pub fn with_voxel_scale(&self, voxel_scale: f32) -> Result<Self, VoxelError> {
+        let heightfield = self
+            .source_heightfield
+            .as_ref()
+            .ok_or(VoxelError::MissingChunk)?;
+        Self::from_heightfield_lazy(heightfield, voxel_scale)
+    }
+
+    fn from_heightfield_lazy(
+        heightfield: &HeightfieldBackend,
         voxel_scale: f32,
     ) -> Result<Self, VoxelError> {
         if !voxel_scale.is_finite() || voxel_scale <= 0.0 {
             return Err(VoxelError::InvalidScale);
         }
-        let heightfield = HeightfieldBackend::from_terrain_map(map).ok_or(VoxelError::InvalidBounds)?;
-        let (min, max) = map
-            .cells
+        let (min, max) = heightfield
+            .elevation
+            .values
             .iter()
-            .map(|cell| cell.elevation)
+            .copied()
             .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), value| {
                 (lo.min(value), hi.max(value))
             });
@@ -253,7 +252,9 @@ impl VoxelBackend {
             origin: Vec3::new(-half, -half, min_z),
             min_z,
             max_z,
-            source_heightfield: Some(heightfield),
+            source_heightfield: Some(heightfield.clone()),
+            source_stratigraphy: heightfield.stratigraphy.clone(),
+            material_table: heightfield.materials.clone(),
             ..Self::default()
         })
     }

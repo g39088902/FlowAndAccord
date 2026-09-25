@@ -9,7 +9,7 @@ use super::poi::{PoiType, PrimitivePoi};
 use super::snapshot::{RecentDeathSnapshot, Season};
 use super::vec3::Vec3;
 use crate::config::SimConfig;
-use crate::geo::{ChunkDelta, TerrainGenerator, TerrainMap, TerrainRuntime};
+use crate::geo::{ChunkDelta, TerrainGenerator, TerrainMap, TerrainRuntime, VoxelBackend};
 use crate::rng::WorldRng;
 use std::collections::{HashMap, VecDeque};
 
@@ -23,6 +23,9 @@ use std::collections::{HashMap, VecDeque};
 /// - `world_season.rs`：四季温度计算
 pub struct World3DEngine {
     pub terrain: TerrainMap,
+    /// Authoritative static geometry source. `terrain` remains a serialized
+    /// semantic projection for snapshot/ecology compatibility only.
+    pub terrain_voxel_backend: VoxelBackend,
     /// Authored voxel edits reapplied on top of the generated terrain baseline.
     /// The static compiler remains the source of truth for untouched chunks.
     pub terrain_chunk_deltas: Vec<ChunkDelta>,
@@ -176,10 +179,10 @@ impl World3DEngine {
         mut config: SimConfig,
         overrides: &crate::geo::terrain::GenesisOverrides,
     ) -> Self {
-        // UGC-03 migration resolves `random` through the legacy seed partition,
-        // then compiles the selected registered recipe into the compatibility
-        // map. Flat baseline, unknown recipes and explicit degradation
-        // overrides retain the legacy generator as the reference/fallback path.
+        // Resolve random through the stable profile partition, then compile a
+        // single Field Graph result into both the semantic projection and the
+        // authoritative voxel source. The old TerrainMap generator is not a
+        // production path anymore.
         let mut migration_config = config.clone();
         if migration_config.terrain_profile.is_empty()
             || migration_config.terrain_profile == crate::geo::terrain::TERRAIN_PROFILE_RANDOM
@@ -189,21 +192,47 @@ impl World3DEngine {
                 migration_config.terrain_profile.as_str(),
             );
         }
-        let terrain = match TerrainGenerator::compile_procedural_map(
+        if !matches!(
+            migration_config.terrain_profile.as_str(),
+            crate::geo::terrain::TERRAIN_PROFILE_MOUNTAIN_PASS
+                | crate::geo::terrain::TERRAIN_PROFILE_RIVER_VALLEY
+                | crate::geo::terrain::TERRAIN_PROFILE_GRASSLAND_PLAIN
+                | crate::geo::terrain::TERRAIN_PROFILE_HILLSIDE_WOODLAND
+                | crate::geo::terrain::TERRAIN_PROFILE_PLATEAU
+                | crate::geo::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN
+                | crate::geo::terrain::TERRAIN_PROFILE_BASIN_OASIS
+                | crate::geo::terrain::TERRAIN_PROFILE_VOLCANIC_LAKE
+                | crate::geo::terrain::TERRAIN_PROFILE_FAULT_SCARP_DEMO
+                | crate::geo::terrain::TERRAIN_PROFILE_FOLDED_BASIN_DEMO
+                | crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE
+        ) {
+            migration_config.terrain_profile = crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+        }
+        let compiled_world = TerrainGenerator::compile_voxel_world(
             grid_res,
             world_size,
             seed,
             &migration_config,
-        ) {
-            Some(Ok(map)) if overrides.disabled_subfeature_mask == 0 => map,
-            _ => TerrainGenerator::compile_with_overrides(
-                grid_res,
-                world_size,
-                seed,
-                &config,
-                overrides,
-            ),
+        );
+        let (terrain, terrain_voxel_backend) = match compiled_world {
+            Some(Ok(pair)) => pair,
+            // A recipe constraint failure is a candidate failure, not a reason
+            // to revive the old generator. The bounded creation ladder's
+            // explicit flat recipe is the deterministic voxel-only fallback.
+            Some(Err(_)) | None => {
+                migration_config.terrain_profile =
+                    crate::geo::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+                TerrainGenerator::compile_voxel_world(
+                    grid_res,
+                    world_size,
+                    seed,
+                    &migration_config,
+                )
+                .and_then(Result::ok)
+                .expect("flat_baseline voxel recipe must compile")
+            }
         };
+        let _ = overrides;
         config.terrain_profile = terrain.profile.clone();
 
         let journal_cap = if config.ledger_journal_capacity > 0 {
@@ -214,6 +243,7 @@ impl World3DEngine {
 
         Self {
             terrain,
+            terrain_voxel_backend,
             terrain_chunk_deltas: Vec::new(),
             water_pools: Vec::new(),
             network: LaneGraph3D::new(),
@@ -271,7 +301,7 @@ impl World3DEngine {
     ///
     /// 生成器、recipe 和后端细节不应从决策、生态或房屋系统直接访问。
     pub fn terrain_runtime(&self) -> TerrainRuntime<'_> {
-        TerrainRuntime::new(&self.terrain)
+        TerrainRuntime::new(&self.terrain, &self.terrain_voxel_backend)
     }
 
     /// 强制下一帧二进制快照重发**全部**静态几何（地形 + 路网拓扑）。

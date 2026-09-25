@@ -1,12 +1,14 @@
 //! 地形创世入口。
 //!
-//! `TerrainGenerator` 负责把 seed、配置和创世覆盖编译成静态 `TerrainMap`。
+//! `TerrainGenerator` 负责把 seed、配置和创世覆盖编译成静态 voxel 源及其
+//! `TerrainMap` 语义投影。
 //! 生成过程不读取 World3DEngine、Agent、房屋、路网或 tick 状态；游戏运行时
 //! 只应通过 `TerrainRuntime` 查询生成结果。`TerrainMap::generate_*` 保留为
-//! 旧调用点的兼容壳，新代码不得绕过本模块直接编排创世流程。
+//! 历史兼容壳，新代码不得绕过本模块直接编排创世流程。
 
+use super::backend::VoxelBackend;
 use super::procedural::{
-    builtin, BackendKind, CompiledTerrain, TerrainCompileError, TerrainRecipe,
+    builtin, flat_baseline_v1, BackendKind, CompiledTerrain, TerrainCompileError, TerrainRecipe,
 };
 use super::terrain::{GenesisOverrides, TerrainMap};
 use crate::config::SimConfig;
@@ -43,31 +45,16 @@ impl TerrainGenerator {
         super::procedural::compile_terrain(seed, recipe, config, backend)
     }
 
-    /// Compile one of the UGC-03 migrated static profiles into the legacy
-    /// `TerrainMap` compatibility view. Unsupported profiles, and profiles
-    /// whose Field Graph migration is not yet semantically equivalent, return
-    /// `None` so callers can keep the old generator as an explicit reference
-    /// path.
+    /// Compile one registered profile into the compatibility map projection.
+    /// The projection is fed by a voxel-targeted field compile; the legacy
+    /// terrain generator is no longer a production fallback.
     pub fn compile_procedural_map(
         grid_res: usize,
         world_size: f32,
         seed: u64,
         config: &SimConfig,
     ) -> Option<Result<TerrainMap, TerrainCompileError>> {
-        // The first UGC-03 fan/basin recipes only described generic radial
-        // fields. They did not carry the directional geometry, anchors, exit
-        // corridors, or config-driven parameters used by terrain/network
-        // gates. Keep each map and its gate on the same specialized
-        // implementation until those semantics are represented in the Field
-        // Graph.
-        if matches!(
-            config.terrain_profile.as_str(),
-            super::terrain::TERRAIN_PROFILE_ALLUVIAL_FAN
-                | super::terrain::TERRAIN_PROFILE_BASIN_OASIS
-        ) {
-            return None;
-        }
-        let recipe = builtin(config.terrain_profile.as_str())?;
+        let recipe = recipe_for_profile(config.terrain_profile.as_str())?;
         Some(
             super::procedural::compile_terrain_with_dimensions(
                 seed,
@@ -76,13 +63,48 @@ impl TerrainGenerator {
                 grid_res.max(2),
                 world_size,
                 config,
-                BackendKind::Heightfield,
+                BackendKind::Voxel,
             )
             .map(|compiled| {
                 let mut map = super::adapters::terrain_map_from_compiled(&compiled, seed);
                 map.accents =
                     super::accents::generate_accents(&map, config.terrain_accent_density, seed);
                 map
+            }),
+        )
+    }
+
+    /// Compile a profile once and return both the compatibility projection and
+    /// the lazy voxel source built from the same `CompiledTerrain`. Keeping the
+    /// pair together prevents the world runtime and the chunk API from quietly
+    /// rebuilding different terrain representations.
+    pub fn compile_voxel_world(
+        grid_res: usize,
+        world_size: f32,
+        seed: u64,
+        config: &SimConfig,
+    ) -> Option<Result<(TerrainMap, VoxelBackend), TerrainCompileError>> {
+        let recipe = recipe_for_profile(config.terrain_profile.as_str())?;
+        Some(
+            super::procedural::compile_terrain_with_dimensions(
+                seed,
+                &recipe,
+                grid_res.max(2),
+                grid_res.max(2),
+                world_size,
+                config,
+                BackendKind::Voxel,
+            )
+            .and_then(|compiled| {
+                let mut map = super::adapters::terrain_map_from_compiled(&compiled, seed);
+                map.accents = super::accents::generate_accents(
+                    &map,
+                    config.terrain_accent_density,
+                    seed,
+                );
+                let backend = VoxelBackend::from_compiled_lazy(&compiled, 4.0)
+                    .map_err(|error| TerrainCompileError::Semantic(format!("voxel backend: {error:?}")))?;
+                Ok((map, backend))
             }),
         )
     }
@@ -97,8 +119,36 @@ impl TerrainGenerator {
         config: &SimConfig,
         overrides: &GenesisOverrides,
     ) -> TerrainMap {
-        let mut terrain = TerrainMap::new(grid_res, grid_res, world_size);
-        terrain.generate_with_config_overrides(seed, config, overrides);
-        terrain
+        let mut voxel_config = config.clone();
+        if voxel_config.terrain_profile.is_empty()
+            || voxel_config.terrain_profile == super::terrain::TERRAIN_PROFILE_RANDOM
+        {
+            voxel_config.terrain_profile = Self::resolve_profile(seed, &voxel_config.terrain_profile);
+        }
+        if recipe_for_profile(voxel_config.terrain_profile.as_str()).is_none() {
+            voxel_config.terrain_profile = super::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+        }
+        // Overrides currently affect only legacy structural subfeature planning.
+        // Field recipes do not inject those compatibility-only structures, so
+        // the same compiled voxel result is valid for every bounded attempt.
+        let _ = overrides;
+        match Self::compile_voxel_world(grid_res, world_size, seed, &voxel_config) {
+            Some(Ok((map, _backend))) => map,
+            Some(Err(_)) | None => {
+                voxel_config.terrain_profile = super::terrain::TERRAIN_PROFILE_FLAT_BASELINE.to_string();
+                Self::compile_voxel_world(grid_res, world_size, seed, &voxel_config)
+                    .and_then(Result::ok)
+                    .map(|(map, _backend)| map)
+                    .expect("flat_baseline voxel recipe must compile")
+            }
+        }
+    }
+}
+
+fn recipe_for_profile(profile: &str) -> Option<TerrainRecipe> {
+    if profile == super::terrain::TERRAIN_PROFILE_FLAT_BASELINE {
+        Some(flat_baseline_v1())
+    } else {
+        builtin(profile)
     }
 }

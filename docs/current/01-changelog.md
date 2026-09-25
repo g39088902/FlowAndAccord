@@ -1,7 +1,9 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.3**。
+
+| **v1.60.3**（代码新增 · 旧地形生成器下线 · 全量体素创世） | **统一静态地形来源**：所有注册 profile（含冲积扇、盆地、flat baseline、断层/褶皱演示）改由 Field Compiler 编译，世界创建同时保存同一份懒 `VoxelBackend`；旧 `TerrainMap::generate_*` 从生产路径移除。`TerrainRuntime` 顶面高程、WASM chunk 请求和读档重建均直接复用 voxel 源，LOD 换尺度只重建懒 chunk 索引；`TerrainMap` 仅作为快照/生态语义投影保留。修复地下水边界邻居在 debug 构建下的 `usize` 溢出，新增 `flat_baseline_v1` 配方；`TERRAIN_GENERATOR_VERSION` 26→27。 | sim_core(geo/generator, geo/backend/voxel, geo/runtime, spatial/world, spatial/world_save, procedural/recipes, procedural/groundwater) / sim_wasm / docs |
 
 | **（代码新增 · UGC-07 断层/褶皱可视演示 · 不升应用版本）2026-09-25** | **让结构事件可直接预览**：新增 `fault_scarp_demo_v1` 和 `folded_basin_demo_v1` 诊断 recipe，并在地图图鉴添加结构下拉选择。演示地图复用正式 Field Compiler→TerrainMap→WASM→WebGL 路径；明确从 `random` 池排除，且图鉴只读建图绕过可玩世界的地形回退阶梯，保证断层和褶皱形态实际显示。 | crates/sim_core/src/geo/procedural/recipes.rs, crates/sim_core/src/spatial/world.rs, frontend/{map.html,map.css,js/map-view.js,js/rustworld.js,js/render_hud.js}, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} |
 

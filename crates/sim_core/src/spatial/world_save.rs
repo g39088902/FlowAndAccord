@@ -25,6 +25,7 @@ use super::snapshot::Season;
 use super::world::World3DEngine;
 use crate::config::SimConfig;
 use crate::geo::backend::{ChunkDelta, TerrainStaticKey};
+use crate::geo::TerrainGenerator;
 use crate::geo::terrain::{TerrainMap, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS};
 use crate::rng::WorldRng;
 
@@ -305,11 +306,24 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
             return Err("存档地形 chunk delta 坐标非法".into());
         }
     }
+    let mut voxel_config = save.config.clone();
+    voxel_config.terrain_profile = terrain.profile.clone();
+    let terrain_voxel_backend = match TerrainGenerator::compile_voxel_world(
+        terrain.grid_width,
+        terrain.world_size,
+        terrain.seed,
+        &voxel_config,
+    ) {
+        Some(Ok((_compiled_map, backend))) => backend,
+        Some(Err(error)) => return Err(format!("存档地形 voxel 重建失败：{}", error.code())),
+        None => return Err(format!("存档地形 profile 不支持 voxel 重建：{}", terrain.profile)),
+    };
     // §5.2 稳定 ID 契约：加载时校验 sub_features 升序且唯一（D-B1-2）
     terrain.validate_sub_features_sorted_unique()?;
 
     let mut world = World3DEngine {
         terrain,
+        terrain_voxel_backend,
         terrain_chunk_deltas: save.terrain_chunk_deltas,
         water_pools: save.water_pools,
         network: save.network,

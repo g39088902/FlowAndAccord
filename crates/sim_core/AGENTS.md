@@ -25,9 +25,9 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 | `src/config.rs` | **全部超参的单一归档点**：模块级 `pub const` + `SimConfig` 结构体 + `Default` 映射 |
 | `src/rng.rs` | `WorldRng`：xorshift64* 确定性 PRNG（无 rand 依赖，wasm32 安全） |
 | `src/geo/mod.rs` | geo 模块声明与地形 API re-export |
-| `src/geo/generator.rs` | `TerrainGenerator`：创世生成唯一入口，输出静态 `TerrainMap` |
+| `src/geo/generator.rs` | `TerrainGenerator`：创世生成唯一入口，编译 `CompiledTerrain` 并输出 voxel 源与 `TerrainMap` 语义投影 |
 | `src/geo/runtime.rs` | `TerrainRuntime`：游戏逻辑使用的只读地形查询门面 |
-| `src/geo/terrain.rs` | `TerrainMap` 数据容器与现有生成流水线；旧 `generate_*` 方法仅保留兼容壳 |
+| `src/geo/terrain.rs` | `TerrainMap` 数据容器与历史生成流水线；生产创世不再调用旧 `generate_*`，仅保留兼容 API |
 | `src/geo/biome.rs` | 生物群系判定（基于高程/坡度/温度的生态分区） |
 | `src/spatial/` | 世界主体（详见 §3） |
 
@@ -54,7 +54,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 
 - **`WorldRng`**：xorshift64*，状态仅一个 u64。seed 0 被静默替换为黄金比例常数；`gen_normal`（Box-Muller）恰好消耗 2 个均匀数；`gen_range_usize` 在 `high <= low` 时返回 `low`（不 panic）。
 - **`SimConfig`**：370 个字段（含拆分配置），前端按 camelCase 键注入，缺省回落默认值；数值权威在前端配置文件（见根 AGENTS.md §4.12）。
-- **`TerrainMap`**：`sample_elevation` 为最近邻采样（无插值），归一化坐标 clamp 到 [0.0, 0.999]。
+- **`TerrainMap`**：快照/生态兼容投影；游戏逻辑通过 `TerrainRuntime` 从 `VoxelBackend` 查询顶面，直接采样仅供兼容调用，归一化坐标 clamp 到 [0.0, 0.999]。
 - **`World3DEngine`**：世界总管理器，一切世界级系统方法以 `impl World3DEngine` 分散挂载。
 - **`Agent3D`**：部落民实体（生理/行囊/血缘/禀赋/`poi_seekability` 私有触发器表）。
 - **`LaneGraph3D`**：`DiGraph<NodeData, LaneEdge3D>` 有向路网，加权 A* 寻路。**从不删除节点/车道**（无 `remove_node`），空置节点靠复用来遏制膨胀。

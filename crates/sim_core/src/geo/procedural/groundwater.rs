@@ -310,7 +310,13 @@ fn cardinal_neighbors(
         (x, y + 1),
     ]
     .into_iter()
-    .filter_map(move |(nx, ny)| (nx < width && ny < height).then_some(ny * width + nx))
+    .filter_map(move |(nx, ny)| {
+        if nx < width && ny < height {
+            Some(ny * width + nx)
+        } else {
+            None
+        }
+    })
 }
 
 #[cfg(test)]

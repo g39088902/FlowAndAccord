@@ -57,16 +57,21 @@ fn ensure_terrain_backend(voxel_scale: f32) -> Result<(), String> {
         {
             return Ok(());
         }
-        let terrain = WORLD
-            .as_ref()
-            .map(|world| world.terrain.clone())
-            .ok_or_else(|| "世界尚未初始化，无法读取地形 chunk".to_string())?;
         let deltas = WORLD
             .as_ref()
             .map(|world| world.terrain_chunk_deltas.clone())
             .unwrap_or_default();
-        let mut backend = VoxelBackend::from_terrain_map_lazy(&terrain, voxel_scale)
-            .map_err(|error| format!("地形 voxel 后端构建失败：{:?}", error))?;
+        let base_backend = WORLD
+            .as_ref()
+            .map(|world| world.terrain_voxel_backend.clone())
+            .ok_or_else(|| "世界尚未初始化，无法读取地形 chunk".to_string())?;
+        let mut backend = if base_backend.voxel_scale.to_bits() == voxel_scale.to_bits() {
+            base_backend
+        } else {
+            base_backend
+                .with_voxel_scale(voxel_scale)
+                .map_err(|error| format!("地形 voxel 后端重采样失败：{:?}", error))?
+        };
         for delta in &deltas {
             backend
                 .apply_delta(delta)
