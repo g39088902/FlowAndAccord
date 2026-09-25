@@ -443,7 +443,7 @@ impl VoxelBackend {
         surface: f32,
     ) -> u8 {
         if let Some(column) = &self.source_stratigraphy {
-            let depth = (surface - z).max(0.0);
+            let depth = (surface - z + heightfield.sample_strata_depth_offset(x, y)).max(0.0);
             if let Some(sample) = sample_stratum(column, depth) {
                 if self.material_table.get(sample.material).is_some() {
                     return sample.material;

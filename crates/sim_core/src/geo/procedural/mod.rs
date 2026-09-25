@@ -12,6 +12,7 @@ pub mod processes;
 pub mod recipes;
 pub mod semantics;
 pub mod strata;
+pub mod structures;
 pub mod uncertainty;
 pub use compiler::{
     compile_terrain, compile_terrain_with_dimensions, BackendKind, CompiledTerrain,
@@ -35,4 +36,5 @@ pub use recipes::{
 pub use hydrology::{ChannelField, HydrologyFields, HydrologySettings};
 pub use materials::{MaterialProps, MaterialTable};
 pub use strata::{sample_stratum, validate_column, StratumSample};
+pub use structures::{apply_structures, StructureError, StructureField};
 pub use processes::{ErosionResult, ErosionSettings, FlowField, WaterBodyField};

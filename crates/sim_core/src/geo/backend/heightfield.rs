@@ -11,6 +11,7 @@ pub struct HeightfieldBackend {
     pub cells: Vec<GeoCell>,
     pub stratigraphy: Option<StratigraphicColumn>,
     pub materials: MaterialTable,
+    pub strata_depth_offset: Option<Field2>,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct HeightfieldView<'a> {
@@ -63,6 +64,7 @@ impl HeightfieldBackend {
                 .as_ref()
                 .map(|recipe| recipe.materials.clone())
                 .unwrap_or_default(),
+            strata_depth_offset: None,
         })
     }
 
@@ -89,6 +91,7 @@ impl HeightfieldBackend {
             cells,
             stratigraphy: Some(compiled.stratigraphy.clone()),
             materials: compiled.materials.clone(),
+            strata_depth_offset: Some(compiled.structures.strata_depth_offset.clone()),
         }
     }
     pub fn from_compiled_default(compiled: &CompiledTerrain) -> Self {
@@ -104,6 +107,15 @@ impl HeightfieldBackend {
     pub fn sample_cell(&self, x: f32, y: f32) -> &GeoCell {
         let (gx, gy) = self.index_pair(x, y);
         &self.cells[gy * self.width + gx]
+    }
+    pub fn sample_strata_depth_offset(&self, x: f32, y: f32) -> f32 {
+        self.strata_depth_offset
+            .as_ref()
+            .map(|field| {
+                let (gx, gy) = self.index_pair(x, y);
+                field.get_unchecked(gx, gy)
+            })
+            .unwrap_or(0.0)
     }
     pub fn index(&self, v: f32) -> usize {
         let half = self.world_size * 0.5;

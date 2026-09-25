@@ -270,6 +270,8 @@ pub enum RecipeError {
     UnsupportedOp,
     InvalidStratigraphy,
     InvalidMaterialTable,
+    InvalidStructure { event_index: usize },
+    UnknownStructureSurface { event_index: usize, surface: NodeId },
 }
 impl RecipeError {
     pub const fn code(&self) -> &'static str {
@@ -284,6 +286,8 @@ impl RecipeError {
             Self::UnsupportedOp => "UNSUPPORTED_OP",
             Self::InvalidStratigraphy => "INVALID_STRATIGRAPHY",
             Self::InvalidMaterialTable => "INVALID_MATERIAL_TABLE",
+            Self::InvalidStructure { .. } => "INVALID_STRUCTURE",
+            Self::UnknownStructureSurface { .. } => "UNKNOWN_STRUCTURE_SURFACE",
         }
     }
 }
@@ -352,6 +356,47 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
         }
     }
     let known: BTreeSet<NodeId> = indices.keys().copied().collect();
+    for (event_index, event) in recipe.structures.iter().enumerate() {
+        let invalid = match event {
+            StructuralEvent::Fault {
+                plane,
+                displacement_m,
+            } => {
+                let norm_sq = plane.normal[0] * plane.normal[0] + plane.normal[1] * plane.normal[1];
+                plane.origin.iter().chain(plane.normal.iter()).any(|v| !v.is_finite())
+                    || !displacement_m.is_finite()
+                    || !norm_sq.is_finite()
+                    || norm_sq <= 1e-12
+            }
+            StructuralEvent::Fold {
+                axis,
+                amplitude_m,
+                wavelength_m,
+            } => {
+                let dx = axis.end[0] - axis.start[0];
+                let dy = axis.end[1] - axis.start[1];
+                let length_sq = dx * dx + dy * dy;
+                axis.start.iter().chain(axis.end.iter()).any(|v| !v.is_finite())
+                    || !amplitude_m.is_finite()
+                    || !wavelength_m.is_finite()
+                    || *wavelength_m <= 0.0
+                    || !length_sq.is_finite()
+                    || length_sq <= 1e-12
+            }
+            StructuralEvent::Unconformity { surface } => {
+                if !known.contains(surface) {
+                    return Err(RecipeError::UnknownStructureSurface {
+                        event_index,
+                        surface: *surface,
+                    });
+                }
+                false
+            }
+        };
+        if invalid {
+            return Err(RecipeError::InvalidStructure { event_index });
+        }
+    }
     let mut indegree = BTreeMap::new();
     let mut outgoing: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     for node in &recipe.nodes {

@@ -10,7 +10,7 @@
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出；生成与运行时查询边界 |
 | `generator.rs` | `TerrainGenerator` 创世入口；只接收 seed/config/overrides，不读取 World3DEngine 或游戏实体 |
-| `procedural/` | UGC-01 字段 IR、确定性算子、recipe、约束报告与固定顺序编译器；UGC-02 增加 D8 汇流、热松弛、液压侵蚀/沉积、priority-flood 水位和水系语义投影；UGC-03 注册八个静态模板 recipe；不读取 profile、Agent 或路网 |
+| `procedural/` | UGC-01 字段 IR、确定性算子、recipe、约束报告与固定顺序编译器；UGC-02 增加 D8 汇流、热松弛、液压侵蚀/沉积、priority-flood 水位和水系语义投影；UGC-03 注册八个静态模板 recipe；UGC-06 地层柱/材料属性；UGC-07 断层、褶皱和不整合 scratch 结构场；不读取 profile、Agent 或路网 |
 | `backend/` | Heightfield 兼容视图、固定 32³ + halo=1 的稀疏 Voxel、Surface Nets 网格与分层查询接口；静态几何不进入 tick 热路径（UGC-04） |
 | `adapters/` | UGC-03 编译结果到 `TerrainMap` 的兼容适配与旧生成器差异报告；外部地形观测只读元数据边界（UGC-11） |
 | `runtime.rs` | `TerrainRuntime` 只读查询门面；游戏逻辑通过它读取已生成地形事实 |
