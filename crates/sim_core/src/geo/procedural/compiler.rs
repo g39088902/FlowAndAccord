@@ -8,7 +8,7 @@ use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, Erosion
 use super::semantics::{self, SemanticGrid, SurfaceThresholds};
 use super::strata::sample_stratum;
 use super::structures::{apply_structures, StructureError, StructureField};
-use super::{constraints, diagnostics, operators};
+use super::{constraints, diagnostics, operators, uncertainty};
 use crate::config::SimConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -31,11 +31,15 @@ pub struct TerrainFields {
 #[derive(Debug, Clone)]
 pub struct CompiledTerrain {
     pub world_size: f32,
+    pub output_node: u16,
     pub fields: TerrainFields,
     pub sediment: Field2,
     pub hydrology: HydrologyFields,
     pub semantics: SemanticGrid,
     pub groundwater: GroundwaterFields,
+    /// Quantized only when exported through diagnostics; not part of runtime
+    /// snapshots or gameplay state.
+    pub confidence: Field2,
     pub reports: Vec<constraints::ConstraintReport>,
     pub diagnostics: diagnostics::DiagnosticsBundle,
     pub backend: BackendKind,
@@ -43,6 +47,42 @@ pub struct CompiledTerrain {
     pub stratigraphy: super::ir::StratigraphicColumn,
     pub materials: MaterialTable,
     pub structures: StructureField,
+}
+
+impl CompiledTerrain {
+    /// Return a deterministic developer profile through the compiled fields.
+    pub fn profile_slice(
+        &self,
+        start_world: [f32; 2],
+        end_world: [f32; 2],
+    ) -> Vec<diagnostics::ProfileSample> {
+        let mut source_nodes = vec![self.output_node];
+        for node in self
+            .diagnostics
+            .constraints
+            .iter()
+            .flat_map(|report| report.affected_nodes.iter().copied())
+        {
+            if !source_nodes.contains(&node) {
+                source_nodes.push(node);
+            }
+        }
+        diagnostics::profile_slice(
+            &self.fields.elevation,
+            &self.groundwater,
+            &self.semantics,
+            &self.stratigraphy,
+            &self.structures.strata_depth_offset,
+            self.world_size,
+            start_world,
+            end_world,
+            &source_nodes,
+        )
+    }
+
+    pub fn write_diagnostics(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
+        self.diagnostics.write(path)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -206,7 +246,12 @@ pub fn compile_terrain_with_dimensions(
         &rainfall,
         &permeability,
         &soil_storage,
-        &hydrology.water.body_id.iter().map(Option::is_some).collect::<Vec<_>>(),
+        &hydrology
+            .water
+            .body_id
+            .iter()
+            .map(Option::is_some)
+            .collect::<Vec<_>>(),
         &hydrology.channels.channel,
         world_size,
         GroundwaterSettings {
@@ -233,58 +278,81 @@ pub fn compile_terrain_with_dimensions(
     )
     .map_err(TerrainCompileError::Semantic)?;
     project_semantics(&mut projected, &hydrology.channels, &hydrology.water);
-    let reports = constraints::evaluate(&resolved.recipe.constraints, &projected);
+    let mut reports = constraints::evaluate(&resolved.recipe.constraints, &projected);
+    for report in &mut reports {
+        if report.affected_nodes.is_empty() {
+            report.affected_nodes.push(output.elevation_node);
+        }
+    }
     if reports.iter().any(|report| !report.passed) {
         return Err(TerrainCompileError::ConstraintFailure(reports));
     }
     let recipe_hash = diagnostics::recipe_hash(&serde_json::to_vec(recipe).unwrap_or_default());
+    let confidence = diagnostics::confidence_field(&[&elevation])?;
+    let mut field_diagnostics = vec![
+        diagnostics::field_diagnostic("elevation", &elevation),
+        diagnostics::field_diagnostic("hardness", &hardness),
+        diagnostics::field_diagnostic("rainfall", &rainfall),
+        diagnostics::field_diagnostic("permeability", &permeability),
+        diagnostics::field_diagnostic("soil_storage", &soil_storage),
+        diagnostics::field_diagnostic("flow", &hydrology.flow.accumulation),
+        diagnostics::field_diagnostic("sediment", &sediment),
+        diagnostics::field_diagnostic("water_depth", &hydrology.water.depth),
+        diagnostics::field_diagnostic("recharge", &groundwater.recharge),
+        diagnostics::field_diagnostic("water_table", &groundwater.water_table),
+        diagnostics::field_diagnostic("discharge", &groundwater.discharge),
+        diagnostics::field_diagnostic("water_access", &groundwater.water_access),
+        diagnostics::field_diagnostic("soil_moisture", &groundwater.soil_moisture),
+        diagnostics::field_diagnostic(
+            "aquifer_mask",
+            &Field2::from_values(
+                width,
+                height,
+                groundwater
+                    .aquifer_mask
+                    .iter()
+                    .map(|value| if *value { 1.0 } else { 0.0 })
+                    .collect(),
+            )?,
+        ),
+        diagnostics::field_diagnostic(
+            "vegetation_ok",
+            &Field2::from_values(
+                width,
+                height,
+                projected
+                    .vegetation_ok
+                    .iter()
+                    .map(|value| if *value { 1.0 } else { 0.0 })
+                    .collect(),
+            )?,
+        ),
+    ];
+    let confidence_diagnostic = diagnostics::field_diagnostic("confidence", &confidence);
+    field_diagnostics.push(confidence_diagnostic.clone());
+    let candidates = uncertainty::candidate_results(
+        seed,
+        &resolved.recipe.uncertainty,
+        &reports,
+        &diagnostics::candidate_field_hashes(&field_diagnostics),
+    );
+    let selected_candidate_hash = candidates
+        .first()
+        .map(|candidate| candidate.hash)
+        .unwrap_or(0);
     let diagnostic = diagnostics::DiagnosticsBundle {
         seed,
         recipe_hash,
         generator_version: crate::geo::terrain::TERRAIN_GENERATOR_VERSION,
-        fields: vec![
-            diagnostics::field_diagnostic("elevation", &elevation),
-            diagnostics::field_diagnostic("hardness", &hardness),
-            diagnostics::field_diagnostic("rainfall", &rainfall),
-            diagnostics::field_diagnostic("permeability", &permeability),
-            diagnostics::field_diagnostic("soil_storage", &soil_storage),
-            diagnostics::field_diagnostic("flow", &hydrology.flow.accumulation),
-            diagnostics::field_diagnostic("sediment", &sediment),
-            diagnostics::field_diagnostic("water_depth", &hydrology.water.depth),
-            diagnostics::field_diagnostic("recharge", &groundwater.recharge),
-            diagnostics::field_diagnostic("water_table", &groundwater.water_table),
-            diagnostics::field_diagnostic("discharge", &groundwater.discharge),
-            diagnostics::field_diagnostic("water_access", &groundwater.water_access),
-            diagnostics::field_diagnostic("soil_moisture", &groundwater.soil_moisture),
-            diagnostics::field_diagnostic(
-                "aquifer_mask",
-                &Field2::from_values(
-                    width,
-                    height,
-                    groundwater
-                        .aquifer_mask
-                        .iter()
-                        .map(|value| if *value { 1.0 } else { 0.0 })
-                        .collect(),
-                )?,
-            ),
-            diagnostics::field_diagnostic(
-                "vegetation_ok",
-                &Field2::from_values(
-                    width,
-                    height,
-                    projected
-                        .vegetation_ok
-                        .iter()
-                        .map(|value| if *value { 1.0 } else { 0.0 })
-                        .collect(),
-                )?,
-            ),
-        ],
+        fields: field_diagnostics,
+        confidence: confidence_diagnostic,
         constraints: reports.clone(),
+        candidates,
+        selected_candidate_hash,
     };
     Ok(CompiledTerrain {
         world_size,
+        output_node: output.elevation_node,
         fields: TerrainFields {
             elevation,
             hardness,
@@ -296,6 +364,7 @@ pub fn compile_terrain_with_dimensions(
         hydrology,
         semantics: projected,
         groundwater,
+        confidence,
         reports,
         diagnostics: diagnostic,
         backend,
@@ -319,10 +388,7 @@ fn surface_material_fields(
     if strata_depth_offset.width != width || strata_depth_offset.height != height {
         return Err(FieldError::SizeMismatch);
     }
-    let fallback = stratigraphy
-        .units
-        .last()
-        .ok_or(FieldError::SizeMismatch)?;
+    let fallback = stratigraphy.units.last().ok_or(FieldError::SizeMismatch)?;
     let mut permeability = Vec::with_capacity(width * height);
     let mut soil_storage = Vec::with_capacity(width * height);
     for depth in &strata_depth_offset.values {

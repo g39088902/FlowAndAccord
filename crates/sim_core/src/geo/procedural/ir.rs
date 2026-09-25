@@ -328,6 +328,7 @@ pub enum RecipeError {
     UnsupportedOp,
     InvalidStratigraphy,
     InvalidMaterialTable,
+    InvalidUncertainty,
     InvalidStructure { event_index: usize },
     UnknownStructureSurface { event_index: usize, surface: NodeId },
 }
@@ -344,6 +345,7 @@ impl RecipeError {
             Self::UnsupportedOp => "UNSUPPORTED_OP",
             Self::InvalidStratigraphy => "INVALID_STRATIGRAPHY",
             Self::InvalidMaterialTable => "INVALID_MATERIAL_TABLE",
+            Self::InvalidUncertainty => "INVALID_UNCERTAINTY",
             Self::InvalidStructure { .. } => "INVALID_STRUCTURE",
             Self::UnknownStructureSurface { .. } => "UNKNOWN_STRUCTURE_SURFACE",
         }
@@ -378,6 +380,17 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
             .any(|unit| recipe.materials.get(unit.material).is_none())
     {
         return Err(RecipeError::InvalidMaterialTable);
+    }
+    let uncertainty = &recipe.uncertainty;
+    if uncertainty.candidate_count > 64
+        || uncertainty.keep_top_n > 64
+        || (uncertainty.candidate_count > 0 && uncertainty.keep_top_n > uncertainty.candidate_count)
+        || uncertainty
+            .parameter_jitter
+            .iter()
+            .any(|range| !range.min.is_finite() || !range.max.is_finite() || range.min > range.max)
+    {
+        return Err(RecipeError::InvalidUncertainty);
     }
     let h = &recipe.hydrology;
     let hydrology_values = [
@@ -444,7 +457,11 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
                 displacement_m,
             } => {
                 let norm_sq = plane.normal[0] * plane.normal[0] + plane.normal[1] * plane.normal[1];
-                plane.origin.iter().chain(plane.normal.iter()).any(|v| !v.is_finite())
+                plane
+                    .origin
+                    .iter()
+                    .chain(plane.normal.iter())
+                    .any(|v| !v.is_finite())
                     || !displacement_m.is_finite()
                     || !norm_sq.is_finite()
                     || norm_sq <= 1e-12
@@ -457,7 +474,10 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
                 let dx = axis.end[0] - axis.start[0];
                 let dy = axis.end[1] - axis.start[1];
                 let length_sq = dx * dx + dy * dy;
-                axis.start.iter().chain(axis.end.iter()).any(|v| !v.is_finite())
+                axis.start
+                    .iter()
+                    .chain(axis.end.iter())
+                    .any(|v| !v.is_finite())
                     || !amplitude_m.is_finite()
                     || !wavelength_m.is_finite()
                     || *wavelength_m <= 0.0

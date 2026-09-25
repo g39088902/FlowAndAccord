@@ -14,6 +14,7 @@ FlowAndAccord/
 │   │   │   ├── m19_probe.rs                # M19 行为探针示例
 │   │   │   ├── terrain_probe.rs            # 地形通行力探针（实测主脊是否挡路，plan/tech/25 §9.3.1）
 │   │   │   ├── groundwater_probe.rs         # UGC-08 地下水/植被因果字段探针
+│   │   │   ├── terrain_diagnostics_probe.rs # UGC-09 候选、置信度与剖面诊断探针
 │   │   │   └── accent_water_probe.rs       # 水岸装饰探针示例
 │   │   └── src/
 │   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (370 字段，纯净 derive(Default)，JS 唯一真相源)
@@ -45,10 +46,10 @@ FlowAndAccord/
 │   │       │   │   ├── materials.rs        # 材料属性表与范围校验
 │   │       │   │   ├── structures.rs       # 断层/褶皱/不整合 scratch 结构场
 │   │       │   │   ├── groundwater.rs      # 补给/水位/含水层/排泄/取水可达性字段
-│   │       │   │   ├── uncertainty.rs      # 有限候选排序
+│   │       │   │   ├── uncertainty.rs      # 有限候选参数、排序与候选报告
 │   │       │   │   ├── semantics.rs        # SurfaceKind/材质/调色/植被资格与湿度投影
 │   │       │   │   ├── constraints.rs      # 可建/可行走约束报告
-│   │       │   │   ├── diagnostics.rs      # 字段 hash 与诊断包
+│   │       │   │   ├── diagnostics.rs      # 字段切片、剖面、confidence 与 JSON 诊断包
 │   │       │   │   ├── compiler.rs         # 固定顺序 Field Graph 编译入口
 │   │       │   │   └── recipes.rs          # 八个静态模板 + 断层/褶皱图鉴演示 recipe
 │   │       │   ├── backend/                # UGC-04 Heightfield/Voxel/Surface Nets/分层查询后端

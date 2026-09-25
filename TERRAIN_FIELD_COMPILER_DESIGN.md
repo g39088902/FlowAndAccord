@@ -631,6 +631,8 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 **退出条件**：同一输入的候选顺序稳定；任意失败区域能定位到字段或节点；诊断工具不进入运行时快照。
 
+**当前实现注记（2026-09-25）**：`uncertainty.rs` 使用独立 candidate salt 将声明的 `ParameterRange` 映射为有限参数，并按 `(passed desc, score desc, candidate_hash asc)` 排序、截断 `keep_top_n`；`CandidateResult` 保存参数、约束报告和字段 hash，`DiagnosticsBundle` 记录排序首项的 `selected_candidate_hash`。`DiagnosticsBundle::write` 输出稳定 JSON，`field_slice` 统一写入宽、高、stride、单位、seed、recipe hash、生成器版本和量化系数；`CompiledTerrain::profile_slice` 使用世界坐标 Bresenham 采样地层、水位、排泄、湿度、材料、植被和节点证据。`confidence_field` 按候选字段的局部方差量化为 `u8`；当前内置 recipe 的字段候选保持相同，因此置信度为 255，后续 recipe 可通过显式参数绑定产生真实差异。固定探针为 `cargo run --release -p sim_core --example terrain_diagnostics_probe -- grassland_plain_v1 42 32`，诊断数据只保留在编译结果和开发者文件，不进入 FABS 快照。
+
 ### UGC-10：多层查询和地下寻路
 
 在 `LayeredTerrainQuery` 上增加洞口、竖井、坡道和跨层连接点。先让碰撞和查询支持多层，再把地下层接入局部寻路；顶部 `HeightfieldView` 继续作为兼容接口。

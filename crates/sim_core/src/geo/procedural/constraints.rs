@@ -2,8 +2,10 @@
 use super::fields::Field2;
 use super::ir::TerrainConstraint;
 use super::semantics::SemanticGrid;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-#[derive(Debug, Clone, PartialEq)]
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConstraintReport {
     pub passed: bool,
     pub code: String,

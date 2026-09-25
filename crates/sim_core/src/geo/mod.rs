@@ -33,8 +33,8 @@ pub use terrain::{
     is_static_water_profile, water_source_poi_count, BranchRidge, GenesisOverrides, TerrainFeature,
     TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind,
     TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS,
-    TERRAIN_PROFILE_FLAT_BASELINE, TERRAIN_PROFILE_GRASSLAND_PLAIN,
-    TERRAIN_PROFILE_FAULT_SCARP_DEMO, TERRAIN_PROFILE_FOLDED_BASIN_DEMO,
+    TERRAIN_PROFILE_FAULT_SCARP_DEMO, TERRAIN_PROFILE_FLAT_BASELINE,
+    TERRAIN_PROFILE_FOLDED_BASIN_DEMO, TERRAIN_PROFILE_GRASSLAND_PLAIN,
     TERRAIN_PROFILE_HILLSIDE_WOODLAND, TERRAIN_PROFILE_MOUNTAIN_PASS, TERRAIN_PROFILE_PLATEAU,
     TERRAIN_PROFILE_RANDOM, TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_VOLCANIC_LAKE,
 };
@@ -43,15 +43,17 @@ pub use volcanic_lake::VolcanicLakeGeometry;
 // Field compiler and geometry backends are additive during migration.
 pub use adapters::{compare_recipe_to_legacy, terrain_map_from_compiled, TerrainMigrationDiff};
 pub use backend::{
-    extract_surface_nets, extract_surface_nets_at, ChunkDelta, DeltaRun, HeightfieldBackend, HeightfieldView,
-    LayeredTerrainQuery, MeshTriangle, MeshVertex, SolidInterval, SurfaceHit, SurfaceMesh,
-    TerrainGeometry, TerrainStaticKey, VoxelBackend, VoxelError, DENSITY_SCALE,
+    extract_surface_nets, extract_surface_nets_at, ChunkDelta, DeltaRun, HeightfieldBackend,
+    HeightfieldView, LayeredTerrainQuery, MeshTriangle, MeshVertex, SolidInterval, SurfaceHit,
+    SurfaceMesh, TerrainGeometry, TerrainStaticKey, VoxelBackend, VoxelError, DENSITY_SCALE,
     HEIGHTFIELD_QUANTUM_M, TERRAIN_CHUNK_PACKET_HEADER_LEN, TERRAIN_CHUNK_PACKET_VERSION,
     VOXEL_BACKEND_VERSION, VOXEL_CHUNK_SIZE, VOXEL_HALO,
 };
 pub use procedural::{
-    sample_stratum, validate_column, BackendKind, CompiledTerrain, Field2, FieldOp, MaterialProps,
-    apply_structures, MaterialTable, StratigraphicColumn, StratumSample, StratumSpec,
-    GroundwaterFields, GroundwaterSettings, StructureError, StructureField,
-    TerrainCompileError, TerrainRecipe,
+    apply_structures, candidate_hash, candidate_parameters, candidate_results, candidates,
+    confidence_field, field_slice, profile_slice, sample_stratum, validate_column, BackendKind,
+    Candidate, CandidateFieldHash, CandidateResult, CompiledTerrain, DiagnosticsBundle, Field2,
+    FieldDiagnostic, FieldOp, FieldSlice, FieldSliceHeader, GroundwaterFields, GroundwaterSettings,
+    MaterialProps, MaterialTable, ProfileSample, StratigraphicColumn, StratumSample, StratumSpec,
+    StructureError, StructureField, TerrainCompileError, TerrainRecipe, UncertaintySpec,
 };

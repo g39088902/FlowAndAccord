@@ -16,6 +16,8 @@
 
 > **UGC-08 实施状态（2026-09-25）**：Field Compiler 在水文阶段之后新增固定顺序的静态地下水求解：从 `StratigraphicColumn` 的 `permeability`/`soil_storage` 生成补给场，按高程降序执行有限 Gauss-Seidel 松弛，得到 `water_table`、`aquifer_mask` 和具有局部高程出口证据的 `discharge`；再以地表水、河道和排泄点为源，用坡度加权 Dijkstra 计算 `water_access`，并合成 `soil_moisture`。`semantics` 只允许在取水可达性、土壤湿度、储水和坡度同时满足时写入 `vegetation_ok`/Grass；干旱格进入 Sand、Gravel 或 BareSoil 候选。相同字段同时进入 `HeightfieldBackend` 的肥力兼容值和 `VoxelBackend` 的表层材料投影，诊断包新增补给/水位/含水层/排泄/可达性/湿度/植被字段 hash；`groundwater_probe` 提供固定 seed 验收输出。生成器版本推进到 26，VoxelBackend 版本推进到 3。
 
+> **UGC-09 实施状态（2026-09-25）**：`procedural::uncertainty` 已提供独立 salt 的候选参数映射、`CandidateResult` 和 `(passed desc, score desc, hash asc)` 固定排序；约束报告补齐 `affected_nodes`，候选记录失败原因、约束得分和字段 hash。`DiagnosticsBundle` 现在可写出稳定 JSON，字段切片带宽高/stride/单位/seed/recipe hash/generator version/量化信息，`CompiledTerrain::profile_slice` 沿世界坐标 Bresenham 线返回地层、地下水位、排泄、湿度、材料、植被和节点证据；`confidence` 由候选字段局部方差量化为 `u8`（当前内置 recipe 为单一确定字段，置信度为 255）。`terrain_diagnostics_probe` 用 5 个有限候选验收顺序、参数和剖面样本；这些记录只存在编译结果/诊断文件，不进入 FABS 快照。
+
 ## R0 T2 河道表示迁移（v1.53.0）
 
 T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。浅滩端点从解析岸线起沿法向按栅格步长向外检查，直到其映射到非水格，避免急弯的邻近河段或栅格取整使端点落水。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17；v1.58 冲积扇沟槽合并与浅滩端点陆格寻址使版本再推进至 19；v1.59 河谷子特征改为水线净空 + 最远点散布，版本推进至 20，旧地形存档按既有版本门禁拒绝。
