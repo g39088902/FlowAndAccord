@@ -20,7 +20,7 @@
 | 文件 | 职责 |
 | :--- | :--- |
 | `Cargo.toml` | `crate-type = ["cdylib"]`（wasm 二进制），依赖 `sim_core` + `serde_json` |
-| `src/lib.rs` | 全部导出函数与 5 个静态缓冲区（`WORLD`/`SNAPSHOT_BIN_BUF`(★ M4 FABS)/`ENUM_TABLE_BUF`(M4)/`CONFIG_BUF`/`SAVE_BUF`/`ERROR_BUF`） |
+| `src/lib.rs` | 全部导出函数与静态缓冲区（`WORLD`/`SNAPSHOT_BIN_BUF`(★ M4 FABS)/`ENUM_TABLE_BUF`(M4)/`CONFIG_BUF`/`SAVE_BUF`/`ERROR_BUF`，以及 UGC-05 `TERRAIN_KEY_BUF`/`TERRAIN_CHUNK_BUF`/`TERRAIN_VOXEL_BACKEND`）；构建后端时重放 `World3DEngine.terrain_chunk_deltas` |
 
 ## 3. 🧭 导出函数清单
 
@@ -39,6 +39,12 @@
 | `world_snapshot_bin_len` | `() -> u32` | ★ M4 二进制帧字节长度 |
 | `world_enum_table_ptr` | `() -> u32` | ★ M4 枚举名称表 JSON 起始指针（懒生成缓存；前端 INIT 取一次，杜绝前后端枚举漂移） |
 | `world_enum_table_len` | `() -> u32` | ★ M4 枚举名称表 JSON 字节长度 |
+| `world_terrain_key_ptr` / `world_terrain_key_len` | `() -> u32` | ★ UGC-05 静态地形键 JSON 指针/长度（recipe/hash/seed/生成器与 voxel 后端版本） |
+| `world_terrain_chunk_request` | `(chunk_x: i32, chunk_y: i32, chunk_z: i32, voxel_scale: f32) -> i32` | ★ UGC-05 显式构建并缓存静态 voxel 后端，编码一个 FAVX chunk；0 成功，负数为参数/后端/chunk 错误 |
+| `world_terrain_chunk_ptr` / `world_terrain_chunk_len` | `() -> u32` | ★ UGC-05 最近一次成功 chunk 请求的数据包指针/长度 |
+| `terrain_static_key_ptr` / `terrain_static_key_len` | `() -> u32` | ★ UGC-05 设计文档兼容别名 |
+| `terrain_chunk_request` | `(chunk_x: i32, chunk_y: i32, chunk_z: i32, lod: u32) -> i32` | ★ UGC-05 设计文档兼容入口（LOD 0 = 4m/voxel） |
+| `terrain_chunk_read` / `terrain_chunk_read_len` | `() -> u32` | ★ UGC-05 设计文档兼容读取入口 |
 | `world_app_version_ptr` | `() -> u32` | 内核应用版本号字符串指针（UTF-8，见 SAVE_APP_VERSION） |
 | `world_app_version_len` | `() -> u32` | 内核应用版本号字符串字节长度 |
 

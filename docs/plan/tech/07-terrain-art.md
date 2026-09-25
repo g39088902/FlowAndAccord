@@ -49,7 +49,7 @@ stateDiagram-v2
 
 | 编号 | 任务 | 状态 | 权威 |
 | :--- | :--- | :--- | :--- |
-| UGC-00～12 | 统一地形场编译器与体素迁移（含地形事实与景观布局字段） | 未实施，当前唯一主线 | [06 号 R.2](./06-terrain-templates.md)、[TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
+| UGC-00～12 | 统一地形场编译器与体素迁移（含地形事实与景观布局字段） | UGC-01～04 已落地；UGC-05 已接入静态地形键、WASM chunk 请求、Worker 转发与 `ChunkDelta` 基线校验/重放，前端网格缓存和完整 WebGL 消费仍待完成；其余波次未实施 | [06 号 R.2](./06-terrain-templates.md)、[TERRAIN_FIELD_COMPILER_DESIGN.md](../../../TERRAIN_FIELD_COMPILER_DESIGN.md) |
 | TC-03 ◐ | 全量 WebGL 迁移阶段三~五（装饰层→实体层→Canvas 2D 退役） | 既定路线 | [31 号 §8](./31-canvas-to-webgl-migration.md) |
 
 ### 1.3 排期原则
@@ -298,7 +298,7 @@ TA-09/D-B1-8（支脊山口+岩壁河谷样板）、TA-10（台地表现层）�
 
 ### 10.3 版本门禁与存档契约
 
-当前 `terrain_generator_version` + `terrain_profile` 与 `SAVE_FORMAT_VERSION`（当前 7）共同拒绝旧档，地形与水池直接从存档恢复。UGC-05 后将增加 `terrain_recipe_hash` 与 `voxel_backend_version` 的门禁；静态 chunk 由 seed/recipe 重建，动态修改只保存 chunk delta。后续若新增持久化字段再评估存档结构版本，不能把每次材质改色都变成格式升级。改变 accent 生成规则时同样按此处理。
+当前 `terrain_generator_version` + `terrain_profile` 与 `SAVE_FORMAT_VERSION`（当前 7）共同拒绝旧档，地形与水池直接从存档恢复。UGC-05 已增加 `terrain_static_key`（含 recipe hash 与 `voxel_backend_version`）门禁；静态 chunk 由 seed/recipe 重建，动态修改只保存带基线 hash 的 `ChunkDelta`。后续若新增持久化字段再评估存档结构版本，不能把每次材质改色都变成格式升级。改变 accent 生成规则时同样按此处理。
 
 ### 10.4 工程纪律
 

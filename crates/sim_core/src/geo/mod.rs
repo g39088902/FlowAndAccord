@@ -42,10 +42,11 @@ pub use volcanic_lake::VolcanicLakeGeometry;
 // Field compiler and geometry backends are additive during migration.
 pub use adapters::{compare_recipe_to_legacy, terrain_map_from_compiled, TerrainMigrationDiff};
 pub use backend::{
-    extract_surface_nets, extract_surface_nets_at, HeightfieldBackend, HeightfieldView,
+    extract_surface_nets, extract_surface_nets_at, ChunkDelta, DeltaRun, HeightfieldBackend, HeightfieldView,
     LayeredTerrainQuery, MeshTriangle, MeshVertex, SolidInterval, SurfaceHit, SurfaceMesh,
-    TerrainGeometry, VoxelBackend, VoxelError, DENSITY_SCALE, HEIGHTFIELD_QUANTUM_M,
-    VOXEL_CHUNK_SIZE, VOXEL_HALO,
+    TerrainGeometry, TerrainStaticKey, VoxelBackend, VoxelError, DENSITY_SCALE,
+    HEIGHTFIELD_QUANTUM_M, TERRAIN_CHUNK_PACKET_HEADER_LEN, TERRAIN_CHUNK_PACKET_VERSION,
+    VOXEL_BACKEND_VERSION, VOXEL_CHUNK_SIZE, VOXEL_HALO,
 };
 pub use procedural::{
     BackendKind, CompiledTerrain, Field2, FieldOp, TerrainCompileError, TerrainRecipe,

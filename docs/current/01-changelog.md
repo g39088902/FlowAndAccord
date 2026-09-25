@@ -3,6 +3,10 @@
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.2**。
 
+| **（代码新增 · UGC-05 静态体素请求契约 · 不升版）2026-09-25** | **接入静态地形键与按需 chunk 通道**：新增 `TerrainStaticKey`（recipe/hash/seed/generator/voxel backend 版本）并写入存档元数据；WASM 暴露 `world_terrain_key_*` 与 `world_terrain_chunk_*`，按显式坐标请求返回带 FAVX 头、坐标、体素尺度、密度和材质的 little-endian chunk 包；Worker/RustWorld 提供异步转发。请求路径只构建并缓存静态 voxel 后端，不进入 tick 或 FABS 快照；读档和换世界自动失效缓存。 | crates/sim_core/src/geo/backend/{heightfield.rs,voxel.rs}, crates/sim_core/src/spatial/world_save.rs, crates/sim_wasm/src/lib.rs, frontend/js/{sim_worker.js,rustworld.js} |
+
+| **（代码新增 · UGC-05 chunk delta 持久化 · 不升版）2026-09-25** | **补齐静态 chunk 修改的保存契约**：新增 `ChunkDelta`/`DeltaRun`，对 chunk 坐标、运行区间和基线 hash 做确定性校验；`World3DEngine`/`WorldSave` 保存 authored delta，WASM 重建 lazy voxel 后端时按基线 hash 重放修改，基线变化或越界时拒绝请求。静态地形、tick、FABS 字段保持不变。 | crates/sim_core/src/geo/backend/{voxel.rs,mod.rs}, crates/sim_core/src/spatial/{world.rs,world_save.rs}, crates/sim_wasm/src/lib.rs |
+
 | **（代码新增 · UGC-04 VoxelBackend 与 Surface Nets · 不升版）2026-09-25** | **补齐静态体素后端**：新增固定 32³ + halo=1 的稀疏 chunk 构建、`surface_height-z` 密度量化、材质投影、世界坐标采样、顶部零面二分查询和 `HeightfieldView::surface_at` 兼容入口；实现按固定顺序的 Surface Nets 网格提取与 chunk 世界原点定位。体素与 mesh 只在显式后端请求时生成，不进入 tick、FABS 快照或前端 cell section，UGC-05 再接入缓存和存档 delta。 | crates/sim_core/src/geo/backend/{voxel.rs,meshing.rs,heightfield.rs,mod.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
 
 | **（代码修复 · Field Compiler 迁移门禁与装饰）2026-09-25** | **修复迁移后的台地/火山湖创世失败**：Field Compiler 结果标记其生成后端，台地和火山湖不再被要求通过只适用于旧专用几何的门禁，也不再按旧台地锚点重排水源；保留 FanGeometry/BasinGeometry 专用路径。迁移结果补回 TerrainAccent 生成，约束诊断对尚未具备路线/特征上下文的约束返回失败而不是虚假的 `DEFERRED` 通过；`TERRAIN_GENERATOR_VERSION` 24→25。 | crates/sim_core/src/geo/{generator.rs,terrain.rs,backend/heightfield.rs,procedural/constraints.rs}, crates/sim_core/src/spatial/{creation_fallback.rs,terrain_network.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |

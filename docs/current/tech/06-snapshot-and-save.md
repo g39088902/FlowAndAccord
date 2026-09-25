@@ -79,7 +79,8 @@ World3DEngine
 | 分组 | 字段 |
 | :--- | :--- |
 | 元信息 | `format_version` / `app_version` |
-| 重建参数 | `seed` / `grid_res` / `world_size` / `terrain_generator_version` / `terrain_profile` |
+| 重建参数 | `seed` / `grid_res` / `world_size` / `terrain_generator_version` / `terrain_profile` / `terrain_static_key`（UGC-05） |
+| UGC 地形修改 | `terrain_chunk_deltas`（`ChunkDelta` 基线 hash 与有序 `DeltaRun`，UGC-05） |
 | 基础实体 | `network` / `pois` / `houses` / `agents` |
 | 发号器 | `next_agent_id` / `next_house_id`（各登记簿的 `next_id` 内嵌在自身结构里） |
 | 计数器 | `total_births` / `total_deaths` / `total_deaths_natural` / `total_deaths_unnatural` / `total_miscarriages` / `auction_started` / `auction_sold` / `auction_flopped` |
@@ -92,6 +93,8 @@ World3DEngine
 | 冷却表 | `mutual_aid_cooldown` / `relief_cooldown`（均 BTreeMap 保序） |
 
 每名 agent 的私有状态（`poi_seekability` 施密特触发器 / `family_stock_active` / `gold_mining_cooldown` / `miscarriage_cooldown_timer` / `postpartum_cooldown_timer` / `route` 等）随 `Agent3D` 整体序列化，**无需单独处理**。夺位远征目标（`expedition_target_camp` / `coronation_pending`）为瞬态不落档，读档后重置为空，下一决策相位重新评估（v1.9.0）。
+
+★ **UGC-05 静态体素键与修改**：`terrain_static_key` 记录 `recipe_id`、recipe 序列化 hash、seed、地形生成器版本和 `VOXEL_BACKEND_VERSION`。静态 voxel chunk 不进入 FABS 或每 tick 存档；调用方按该键请求 `FAVX` chunk 包，`terrain_chunk_deltas` 只保存 `ChunkDelta` 的基线 hash 与有序运行区间。读档或请求 chunk 时先重建静态基线，再校验 hash 并重放 delta；旧档缺少键或 delta 字段时按空集合兼容，键存在但不匹配则拒绝加载。
 
 ### 2.2 显式排除的字段
 

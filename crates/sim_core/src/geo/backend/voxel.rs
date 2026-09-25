@@ -8,12 +8,87 @@ use super::layers::{LayeredTerrainQuery, SolidInterval, SurfaceHit};
 use crate::geo::biome::SurfaceKind;
 use crate::geo::procedural::{ChunkCoord, CompiledTerrain, Field3Chunk, FieldError};
 use crate::spatial::vec3::Vec3;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const VOXEL_CHUNK_SIZE: u8 = 32;
 pub const VOXEL_HALO: u8 = 1;
 pub const DENSITY_SCALE: f32 = 256.0;
 pub const HEIGHTFIELD_QUANTUM_M: f32 = 1.0 / DENSITY_SCALE;
+pub const VOXEL_BACKEND_VERSION: u32 = 1;
+pub const TERRAIN_CHUNK_PACKET_VERSION: u16 = 1;
+pub const TERRAIN_CHUNK_PACKET_HEADER_LEN: usize = 52;
+
+/// Stable identity for static terrain data and voxel cache entries.
+///
+/// This key is intentionally independent from the simulation tick and is safe
+/// to persist alongside a save without putting static chunk arrays in FABS.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TerrainStaticKey {
+    pub recipe_id: String,
+    pub recipe_hash: u64,
+    pub seed: u64,
+    pub generator_version: u32,
+    pub voxel_backend_version: u32,
+}
+
+/// A run-length encoded edit against one generated voxel chunk.
+///
+/// Runs replace both density and material samples in row-major order. Keeping
+/// the run payload independent from the static terrain key lets saves carry
+/// only authored edits while the compiler rebuilds the baseline on demand.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeltaRun {
+    pub start: u32,
+    pub density_q16: Vec<i16>,
+    pub material: Vec<u8>,
+}
+
+/// Persisted authored changes for one voxel chunk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChunkDelta {
+    pub coord: ChunkCoord,
+    pub base_hash: u64,
+    #[serde(default)]
+    pub runs: Vec<DeltaRun>,
+}
+
+impl ChunkDelta {
+    /// Validate run ordering and bounds against a generated chunk.
+    pub fn validate(&self, sample_count: usize) -> Result<(), VoxelError> {
+        let mut previous_end = 0usize;
+        for run in &self.runs {
+            if run.density_q16.is_empty() || run.density_q16.len() != run.material.len() {
+                return Err(VoxelError::InvalidDelta);
+            }
+            let start = run.start as usize;
+            let end = start
+                .checked_add(run.density_q16.len())
+                .ok_or(VoxelError::InvalidDelta)?;
+            if start < previous_end || end > sample_count {
+                return Err(VoxelError::InvalidDelta);
+            }
+            previous_end = end;
+        }
+        Ok(())
+    }
+}
+
+impl TerrainStaticKey {
+    pub fn from_terrain_map(map: &crate::geo::terrain::TerrainMap) -> Self {
+        let recipe_hash = crate::geo::procedural::builtin(&map.profile)
+            .and_then(|recipe| serde_json::to_vec(&recipe).ok())
+            .map(|bytes| crate::geo::procedural::diagnostics::recipe_hash(&bytes))
+            .unwrap_or_else(|| crate::geo::procedural::diagnostics::recipe_hash(map.profile.as_bytes()));
+        Self {
+            recipe_id: map.profile.clone(),
+            recipe_hash,
+            seed: map.seed,
+            generator_version: map.generator_version,
+            voxel_backend_version: VOXEL_BACKEND_VERSION,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VoxelError {
@@ -21,6 +96,8 @@ pub enum VoxelError {
     MissingChunk,
     InvalidBounds,
     InvalidScale,
+    InvalidDelta,
+    DeltaBaseMismatch,
     Field(FieldError),
 }
 
@@ -88,7 +165,7 @@ impl VoxelBackend {
         let vertical = ((max_z - min_z) / voxel_scale).ceil() as i32;
         let x_chunks = div_ceil(horizontal, backend.chunk_size as i32);
         let y_chunks = x_chunks;
-        let z_chunks = div_ceil(vertical, backend.chunk_size as i32);
+        let z_chunks = div_ceil(vertical.max(1), backend.chunk_size as i32).max(1);
         for cz in 0..z_chunks {
             for cy in 0..y_chunks {
                 for cx in 0..x_chunks {
@@ -119,8 +196,90 @@ impl VoxelBackend {
         Self::from_heightfield(&heightfield, min - margin, max + margin, voxel_scale)
     }
 
+    /// Build the static voxel volume from the current compatibility map.
+    /// This is the UGC-05 request path: it never touches `WorldRng`.
+    pub fn from_terrain_map(
+        map: &crate::geo::terrain::TerrainMap,
+        voxel_scale: f32,
+    ) -> Result<Self, VoxelError> {
+        let heightfield = HeightfieldBackend::from_terrain_map(map).ok_or(VoxelError::InvalidBounds)?;
+        let (min, max) = map
+            .cells
+            .iter()
+            .map(|cell| cell.elevation)
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), value| {
+                (lo.min(value), hi.max(value))
+            });
+        let margin = voxel_scale.max(1.0) * 2.0;
+        Self::from_heightfield(&heightfield, min - margin, max + margin, voxel_scale)
+    }
+
+    /// Same static source as `from_terrain_map`, but leave chunks unallocated
+    /// until `ensure_chunk`/`encode_chunk` requests them. This is the WASM
+    /// request path and keeps untouched chunks out of the cache.
+    pub fn from_terrain_map_lazy(
+        map: &crate::geo::terrain::TerrainMap,
+        voxel_scale: f32,
+    ) -> Result<Self, VoxelError> {
+        if !voxel_scale.is_finite() || voxel_scale <= 0.0 {
+            return Err(VoxelError::InvalidScale);
+        }
+        let heightfield = HeightfieldBackend::from_terrain_map(map).ok_or(VoxelError::InvalidBounds)?;
+        let (min, max) = map
+            .cells
+            .iter()
+            .map(|cell| cell.elevation)
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), value| {
+                (lo.min(value), hi.max(value))
+            });
+        if !min.is_finite() || !max.is_finite() || min > max {
+            return Err(VoxelError::InvalidBounds);
+        }
+        let margin = voxel_scale.max(1.0) * 2.0;
+        let min_z = min - margin;
+        let max_z = max + margin;
+        let half = heightfield.world_size * 0.5;
+        Ok(Self {
+            voxel_scale,
+            origin: Vec3::new(-half, -half, min_z),
+            min_z,
+            max_z,
+            source_heightfield: Some(heightfield),
+            ..Self::default()
+        })
+    }
+
     pub fn insert_chunk(&mut self, chunk: Field3Chunk) {
         self.chunks.insert(chunk.coord, chunk);
+    }
+
+    pub fn ensure_chunk(&mut self, coord: ChunkCoord) -> Result<(), VoxelError> {
+        if coord.x < 0 || coord.y < 0 || coord.z < 0 {
+            return Err(VoxelError::MissingChunk);
+        }
+        let horizontal = (self.world_size() / self.voxel_scale).ceil() as i32;
+        let vertical = ((self.max_z - self.min_z) / self.voxel_scale).ceil() as i32;
+        let x_chunks = div_ceil(horizontal, self.chunk_size as i32).max(1);
+        let z_chunks = div_ceil(vertical.max(1), self.chunk_size as i32).max(1);
+        if coord.x >= x_chunks || coord.y >= x_chunks || coord.z >= z_chunks {
+            return Err(VoxelError::MissingChunk);
+        }
+        if self.chunks.contains_key(&coord) {
+            return Ok(());
+        }
+        let chunk = {
+            let heightfield = self
+                .source_heightfield
+                .as_ref()
+                .ok_or(VoxelError::MissingChunk)?;
+            self.build_chunk(heightfield, coord)?
+        };
+        self.chunks.insert(coord, chunk);
+        Ok(())
+    }
+
+    fn world_size(&self) -> f32 {
+        self.origin.x.abs() * 2.0
     }
     pub fn chunk(&self, c: ChunkCoord) -> Option<&Field3Chunk> {
         self.chunks.get(&c)
@@ -130,6 +289,46 @@ impl VoxelBackend {
             .get(&c)
             .and_then(|ch| ch.density_q16.get(index))
             .copied()
+    }
+
+    /// Return a stable hash of the generated chunk before authored edits.
+    pub fn chunk_hash(&mut self, coord: ChunkCoord) -> Result<u64, VoxelError> {
+        self.ensure_chunk(coord)?;
+        self.chunks
+            .get(&coord)
+            .map(hash_chunk)
+            .ok_or(VoxelError::MissingChunk)
+    }
+
+    /// Verify and apply an authored chunk delta to the generated baseline.
+    pub fn apply_delta(&mut self, delta: &ChunkDelta) -> Result<(), VoxelError> {
+        self.ensure_chunk(delta.coord)?;
+        let sample_count = self
+            .chunks
+            .get(&delta.coord)
+            .ok_or(VoxelError::MissingChunk)?
+            .density_q16
+            .len();
+        delta.validate(sample_count)?;
+        let base_hash = self
+            .chunks
+            .get(&delta.coord)
+            .map(hash_chunk)
+            .ok_or(VoxelError::MissingChunk)?;
+        if base_hash != delta.base_hash {
+            return Err(VoxelError::DeltaBaseMismatch);
+        }
+        let chunk = self
+            .chunks
+            .get_mut(&delta.coord)
+            .ok_or(VoxelError::MissingChunk)?;
+        for run in &delta.runs {
+            let start = run.start as usize;
+            let end = start + run.density_q16.len();
+            chunk.density_q16[start..end].copy_from_slice(&run.density_q16);
+            chunk.material[start..end].copy_from_slice(&run.material);
+        }
+        Ok(())
     }
 
     pub fn mesh_chunk(&self, coord: ChunkCoord) -> Result<super::meshing::SurfaceMesh, VoxelError> {
@@ -142,6 +341,51 @@ impl VoxelBackend {
                 [p.x, p.y, p.z]
             },
         ))
+    }
+
+    /// Encode one chunk into the stable UGC-05 little-endian packet format.
+    ///
+    /// Header fields: magic `FAVX`, packet version, chunk coordinate, size,
+    /// halo, voxel scale, world origin, sample count, density byte length and
+    /// material byte length. Payload order is density `i16` values followed by
+    /// material `u8` values in z/y/x row-major order.
+    pub fn encode_chunk(&mut self, coord: ChunkCoord, out: &mut Vec<u8>) -> Result<(), VoxelError> {
+        self.ensure_chunk(coord)?;
+        let chunk = self.chunks.get(&coord).ok_or(VoxelError::MissingChunk)?;
+        if chunk.density_q16.len() != chunk.material.len() {
+            return Err(VoxelError::InvalidChunk);
+        }
+        let origin = self.chunk_origin(coord);
+        let sample_count = chunk.density_q16.len();
+        let density_bytes = sample_count.checked_mul(2).ok_or(VoxelError::InvalidChunk)?;
+        let total = TERRAIN_CHUNK_PACKET_HEADER_LEN
+            .checked_add(density_bytes)
+            .and_then(|value| value.checked_add(sample_count))
+            .ok_or(VoxelError::InvalidChunk)?;
+        out.clear();
+        out.reserve(total);
+        out.extend_from_slice(b"FAVX");
+        push_u16(out, TERRAIN_CHUNK_PACKET_VERSION);
+        push_u16(out, 0);
+        push_i32(out, coord.x);
+        push_i32(out, coord.y);
+        push_i32(out, coord.z);
+        out.push(chunk.size);
+        out.push(chunk.halo);
+        push_u16(out, 0);
+        push_f32(out, self.voxel_scale);
+        push_f32(out, origin.x);
+        push_f32(out, origin.y);
+        push_f32(out, origin.z);
+        push_u32(out, sample_count as u32);
+        push_u32(out, density_bytes as u32);
+        push_u32(out, sample_count as u32);
+        for &value in &chunk.density_q16 {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        out.extend_from_slice(&chunk.material);
+        debug_assert_eq!(out.len(), total);
+        Ok(())
     }
 
     fn build_chunk(
@@ -176,7 +420,7 @@ impl VoxelBackend {
         Ok(chunk)
     }
 
-    fn chunk_origin(&self, coord: ChunkCoord) -> Vec3 {
+    pub fn chunk_origin(&self, coord: ChunkCoord) -> Vec3 {
         Vec3::new(
             self.origin.x + coord.x as f32 * self.chunk_size as f32 * self.voxel_scale,
             self.origin.y + coord.y as f32 * self.chunk_size as f32 * self.voxel_scale,
@@ -254,6 +498,53 @@ impl VoxelBackend {
             .get(iz * side * side + iy * side + ix)
             .copied()
     }
+}
+
+#[inline]
+fn push_u16(out: &mut Vec<u8>, value: u16) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+#[inline]
+fn push_u32(out: &mut Vec<u8>, value: u32) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+#[inline]
+fn push_i32(out: &mut Vec<u8>, value: i32) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+#[inline]
+fn push_f32(out: &mut Vec<u8>, value: f32) {
+    out.extend_from_slice(&value.to_le_bytes());
+}
+
+fn hash_chunk(chunk: &Field3Chunk) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for bytes in [
+        chunk.coord.x.to_le_bytes().as_slice(),
+        chunk.coord.y.to_le_bytes().as_slice(),
+        chunk.coord.z.to_le_bytes().as_slice(),
+        &[chunk.size],
+        &[chunk.halo],
+    ] {
+        for &byte in bytes {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    }
+    for value in &chunk.density_q16 {
+        for byte in value.to_le_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+    }
+    for &byte in &chunk.material {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 pub trait TerrainGeometry {

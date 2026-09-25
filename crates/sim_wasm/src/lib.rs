@@ -5,6 +5,8 @@
 //! 所有导出均为 extern "C"，AOT 可解析；world_create 的 seed 参数保证可复现。
 
 use sim_core::config::SimConfig;
+use sim_core::geo::{TerrainStaticKey, VoxelBackend};
+use sim_core::geo::procedural::ChunkCoord;
 use sim_core::spatial::{deserialize_save, serialize_save, World3DEngine};
 
 static mut WORLD: Option<World3DEngine> = None;
@@ -18,6 +20,13 @@ static mut CONFIG_BUF: Vec<u8> = Vec::new();
 static mut SAVE_BUF: Vec<u8> = Vec::new();
 /// 最近一次存档/读档失败原因（UTF-8 文本，供前端提示，成功时清空）
 static mut ERROR_BUF: Vec<u8> = Vec::new();
+/// UGC-05 static terrain identity JSON buffer.
+static mut TERRAIN_KEY_BUF: Vec<u8> = Vec::new();
+/// UGC-05 explicitly requested voxel chunk packet.
+static mut TERRAIN_CHUNK_BUF: Vec<u8> = Vec::new();
+/// Lazily built voxel backend. It is invalidated whenever WORLD is replaced.
+static mut TERRAIN_VOXEL_BACKEND: Option<VoxelBackend> = None;
+static mut TERRAIN_VOXEL_SCALE: f32 = 0.0;
 
 /// 记录最近一次错误文本（成功路径调用 clear_error）
 fn set_error(msg: &str) {
@@ -29,6 +38,43 @@ fn set_error(msg: &str) {
 fn clear_error() {
     unsafe {
         ERROR_BUF.clear();
+    }
+}
+
+fn clear_terrain_backend_cache() {
+    unsafe {
+        TERRAIN_KEY_BUF.clear();
+        TERRAIN_CHUNK_BUF.clear();
+        TERRAIN_VOXEL_BACKEND = None;
+        TERRAIN_VOXEL_SCALE = 0.0;
+    }
+}
+
+fn ensure_terrain_backend(voxel_scale: f32) -> Result<(), String> {
+    unsafe {
+        if TERRAIN_VOXEL_BACKEND.is_some()
+            && TERRAIN_VOXEL_SCALE.to_bits() == voxel_scale.to_bits()
+        {
+            return Ok(());
+        }
+        let terrain = WORLD
+            .as_ref()
+            .map(|world| world.terrain.clone())
+            .ok_or_else(|| "世界尚未初始化，无法读取地形 chunk".to_string())?;
+        let deltas = WORLD
+            .as_ref()
+            .map(|world| world.terrain_chunk_deltas.clone())
+            .unwrap_or_default();
+        let mut backend = VoxelBackend::from_terrain_map_lazy(&terrain, voxel_scale)
+            .map_err(|error| format!("地形 voxel 后端构建失败：{:?}", error))?;
+        for delta in &deltas {
+            backend
+                .apply_delta(delta)
+                .map_err(|error| format!("地形 chunk delta 校验失败：{:?}", error))?;
+        }
+        TERRAIN_VOXEL_BACKEND = Some(backend);
+        TERRAIN_VOXEL_SCALE = voxel_scale;
+        Ok(())
     }
 }
 
@@ -82,6 +128,7 @@ pub extern "C" fn world_create(
         match result {
             Ok(w) => {
                 WORLD = Some(w);
+                clear_terrain_backend_cache();
                 clear_error();
                 0
             }
@@ -105,6 +152,7 @@ pub extern "C" fn world_create_map(grid_res: u32, world_size: f32, seed: f64) ->
             seed as u64,
             config,
         ));
+        clear_terrain_backend_cache();
     }
     0
 }
@@ -241,6 +289,144 @@ pub extern "C" fn world_require_terrain() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// UGC-05 静态地形键与 voxel chunk 请求
+//
+// 这些接口只在调用方明确请求时执行；不进入 tick，也不写入 FABS 帧。
+// `world_terrain_chunk_request` 的结果是拥有独立线性内存的 FAVX 数据包，
+// 前端可以直接转移给 Worker/渲染缓存。
+// ═══════════════════════════════════════════════════════════════
+
+/// 将当前静态地形键编码为 JSON，返回起始指针。
+#[no_mangle]
+pub extern "C" fn world_terrain_key_ptr() -> u32 {
+    unsafe {
+        TERRAIN_KEY_BUF = match WORLD.as_ref() {
+            Some(world) => {
+                clear_error();
+                serde_json::to_vec(&TerrainStaticKey::from_terrain_map(&world.terrain))
+                    .unwrap_or_default()
+            }
+            None => {
+                set_error("世界尚未初始化，无法读取静态地形键");
+                Vec::new()
+            }
+        };
+        TERRAIN_KEY_BUF.as_ptr() as u32
+    }
+}
+
+/// 返回静态地形键 JSON 长度。
+#[no_mangle]
+pub extern "C" fn world_terrain_key_len() -> u32 {
+    unsafe { TERRAIN_KEY_BUF.len() as u32 }
+}
+
+/// Design-document spelling kept as a thin alias for non-World consumers.
+#[no_mangle]
+pub extern "C" fn terrain_static_key_ptr() -> u32 {
+    world_terrain_key_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn terrain_static_key_len() -> u32 {
+    world_terrain_key_len()
+}
+
+/// 请求一个静态 voxel chunk。坐标是非负 chunk 坐标，scale 为米/体素。
+/// 返回值：0 成功，-1 未初始化，-2 参数非法，-3 后端构建失败，-4 chunk 不存在。
+#[no_mangle]
+pub extern "C" fn world_terrain_chunk_request(
+    chunk_x: i32,
+    chunk_y: i32,
+    chunk_z: i32,
+    voxel_scale: f32,
+) -> i32 {
+    unsafe {
+        TERRAIN_CHUNK_BUF.clear();
+        if WORLD.is_none() {
+            set_error("世界尚未初始化，无法读取地形 chunk");
+            return -1;
+        }
+        if chunk_x < 0
+            || chunk_y < 0
+            || chunk_z < 0
+            || !voxel_scale.is_finite()
+            || voxel_scale <= 0.0
+        {
+            set_error("地形 chunk 请求参数非法");
+            return -2;
+        }
+        if let Err(error) = ensure_terrain_backend(voxel_scale) {
+            set_error(&error);
+            return -3;
+        }
+        let coord = ChunkCoord {
+            x: chunk_x,
+            y: chunk_y,
+            z: chunk_z,
+        };
+        let result = TERRAIN_VOXEL_BACKEND
+            .as_mut()
+            .ok_or_else(|| "地形 voxel 后端未就绪".to_string())
+            .and_then(|backend| {
+                backend
+                    .encode_chunk(coord, &mut TERRAIN_CHUNK_BUF)
+                    .map_err(|error| format!("地形 chunk 不存在：{:?}", error))
+            });
+        match result {
+            Ok(()) => {
+                clear_error();
+                0
+            }
+            Err(error) => {
+                TERRAIN_CHUNK_BUF.clear();
+                set_error(&error);
+                -4
+            }
+        }
+    }
+}
+
+/// 返回最近一次成功 chunk 请求的数据包指针。
+#[no_mangle]
+pub extern "C" fn world_terrain_chunk_ptr() -> u32 {
+    unsafe { TERRAIN_CHUNK_BUF.as_ptr() as u32 }
+}
+
+/// 返回最近一次成功 chunk 请求的数据包长度。
+#[no_mangle]
+pub extern "C" fn world_terrain_chunk_len() -> u32 {
+    unsafe { TERRAIN_CHUNK_BUF.len() as u32 }
+}
+
+/// Design-document spelling: request a chunk by integer LOD. LOD 0 uses the
+/// default 4 m voxel scale and each subsequent level doubles that scale.
+#[no_mangle]
+pub extern "C" fn terrain_chunk_request(
+    chunk_x: i32,
+    chunk_y: i32,
+    chunk_z: i32,
+    lod: u32,
+) -> i32 {
+    if lod > 8 {
+        set_error("地形 chunk LOD 超出范围");
+        return -2;
+    }
+    let voxel_scale = 4.0 * (1u32 << lod) as f32;
+    world_terrain_chunk_request(chunk_x, chunk_y, chunk_z, voxel_scale)
+}
+
+#[no_mangle]
+pub extern "C" fn terrain_chunk_read() -> u32 {
+    world_terrain_chunk_ptr()
+}
+
+#[no_mangle]
+pub extern "C" fn terrain_chunk_read_len() -> u32 {
+    world_terrain_chunk_len()
+}
+
+// ═══════════════════════════════════════════════════════════════
 // 读档 / 存档导出（v1.7.0）
 //
 // 沿用现有「线性内存 JSON 缓冲区」约定：
@@ -310,6 +496,7 @@ pub extern "C" fn world_load(len: u32) -> i32 {
         match deserialize_save(json_str) {
             Ok(world) => {
                 WORLD = Some(world);
+                clear_terrain_backend_cache();
                 clear_error();
                 0
             }

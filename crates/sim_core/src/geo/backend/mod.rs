@@ -9,6 +9,7 @@ pub use meshing::{
     extract_surface_nets, extract_surface_nets_at, MeshTriangle, MeshVertex, SurfaceMesh,
 };
 pub use voxel::{
-    TerrainGeometry, VoxelBackend, VoxelError, DENSITY_SCALE, HEIGHTFIELD_QUANTUM_M,
-    VOXEL_CHUNK_SIZE, VOXEL_HALO,
+    ChunkDelta, DeltaRun, TerrainGeometry, TerrainStaticKey, VoxelBackend, VoxelError, DENSITY_SCALE,
+    HEIGHTFIELD_QUANTUM_M, TERRAIN_CHUNK_PACKET_HEADER_LEN, TERRAIN_CHUNK_PACKET_VERSION,
+    VOXEL_BACKEND_VERSION, VOXEL_CHUNK_SIZE, VOXEL_HALO,
 };

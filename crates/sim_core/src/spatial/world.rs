@@ -9,7 +9,7 @@ use super::poi::{PoiType, PrimitivePoi};
 use super::snapshot::{RecentDeathSnapshot, Season};
 use super::vec3::Vec3;
 use crate::config::SimConfig;
-use crate::geo::{TerrainGenerator, TerrainMap, TerrainRuntime};
+use crate::geo::{ChunkDelta, TerrainGenerator, TerrainMap, TerrainRuntime};
 use crate::rng::WorldRng;
 use std::collections::{HashMap, VecDeque};
 
@@ -23,6 +23,9 @@ use std::collections::{HashMap, VecDeque};
 /// - `world_season.rs`：四季温度计算
 pub struct World3DEngine {
     pub terrain: TerrainMap,
+    /// Authored voxel edits reapplied on top of the generated terrain baseline.
+    /// The static compiler remains the source of truth for untouched chunks.
+    pub terrain_chunk_deltas: Vec<ChunkDelta>,
     pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
     pub network: LaneGraph3D,
     pub pois: Vec<PrimitivePoi>,
@@ -194,6 +197,7 @@ impl World3DEngine {
 
         Self {
             terrain,
+            terrain_chunk_deltas: Vec::new(),
             water_pools: Vec::new(),
             network: LaneGraph3D::new(),
             pois: Vec::new(),

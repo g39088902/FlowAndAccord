@@ -225,6 +225,22 @@
             }
             break;
           }
+          case 'TERRAIN_KEY_RESULT': {
+            const resolver = this._pendingRequests.get(msg.reqId);
+            if (resolver) {
+              this._pendingRequests.delete(msg.reqId);
+              resolver({ ok: !!msg.ok, json: msg.json || '', error: msg.error || '' });
+            }
+            break;
+          }
+          case 'TERRAIN_CHUNK_RESULT': {
+            const resolver = this._pendingRequests.get(msg.reqId);
+            if (resolver) {
+              this._pendingRequests.delete(msg.reqId);
+              resolver({ ok: !!msg.ok, chunk: msg.chunk || null, error: msg.error || '' });
+            }
+            break;
+          }
           case 'LOAD_RESULT': {
             this._lastSaveError = msg.error || '';
             this._applyRewindMeta(msg.rewind);
@@ -480,6 +496,43 @@
         return new Promise((resolve) => {
           this._pendingRequests.set(reqId, resolve);
           this._worker.postMessage({ type: 'SAVE', reqId });
+        });
+      }
+
+      /**
+       * Read the static terrain cache key used by UGC-05 chunk consumers.
+       * @returns {Promise<{ok:boolean,json:string,error?:string}>}
+       */
+      terrainStaticKey() {
+        if (!this._ready || !this._worker) {
+          return Promise.resolve({ ok: false, json: '', error: 'WASM 引擎尚未就绪' });
+        }
+        const reqId = ++this._reqSeq;
+        return new Promise((resolve) => {
+          this._pendingRequests.set(reqId, resolve);
+          this._worker.postMessage({ type: 'TERRAIN_KEY', reqId });
+        });
+      }
+
+      /**
+       * Request one static voxel chunk. The returned Uint8Array uses the FAVX
+       * packet format and is safe to transfer to a renderer/cache.
+       * @param {number} chunkX
+       * @param {number} chunkY
+       * @param {number} chunkZ
+       * @param {number} voxelScale meters per voxel
+       * @returns {Promise<{ok:boolean,chunk:Uint8Array|null,error?:string}>}
+       */
+      requestTerrainChunk(chunkX, chunkY, chunkZ, voxelScale = 4.0) {
+        if (!this._ready || !this._worker) {
+          return Promise.resolve({ ok: false, chunk: null, error: 'WASM 引擎尚未就绪' });
+        }
+        const reqId = ++this._reqSeq;
+        return new Promise((resolve) => {
+          this._pendingRequests.set(reqId, resolve);
+          this._worker.postMessage({
+            type: 'TERRAIN_CHUNK', reqId, chunkX, chunkY, chunkZ, voxelScale,
+          });
         });
       }
 

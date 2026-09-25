@@ -135,6 +135,39 @@ function loadWorldInternal(jsonStr) {
   return { ok: true };
 }
 
+// UGC-05 static terrain requests. These calls are explicit and never run from
+// the tick loop or the FABS snapshot path.
+function readTerrainKeyInternal() {
+  if (!_ready || typeof _wasm.world_terrain_key_ptr !== 'function') return null;
+  const ptr = _wasm.world_terrain_key_ptr();
+  const len = _wasm.world_terrain_key_len();
+  if (!len) return null;
+  return _textDecoder.decode(new Uint8Array(_memory.buffer, ptr, len));
+}
+
+function requestTerrainChunkInternal(chunkX, chunkY, chunkZ, voxelScale) {
+  if (!_ready || typeof _wasm.world_terrain_chunk_request !== 'function') {
+    return { ok: false, error: '当前 WASM 不支持静态地形 chunk 请求' };
+  }
+  const scale = Number(voxelScale);
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return { ok: false, error: 'voxelScale 必须为正数' };
+  }
+  const rc = _wasm.world_terrain_chunk_request(
+    Number(chunkX) | 0,
+    Number(chunkY) | 0,
+    Number(chunkZ) | 0,
+    scale
+  );
+  if (rc !== 0) {
+    return { ok: false, error: readLastError() || ('地形 chunk 请求失败（' + rc + '）') };
+  }
+  const ptr = _wasm.world_terrain_chunk_ptr();
+  const len = _wasm.world_terrain_chunk_len();
+  if (!len) return { ok: false, error: '地形 chunk 为空' };
+  return { ok: true, bytes: new Uint8Array(_memory.buffer, ptr, len).slice() };
+}
+
 function recordHistoryCheckpoint(tick) {
   if (!_ready) return;
   if (tick - lastCheckpointTick < 30 && lastCheckpointTick >= 0) return;
@@ -550,6 +583,32 @@ self.onmessage = async function(e) {
         json: json || '',
         error: json ? '' : readLastError(),
       });
+      break;
+    }
+
+    case 'TERRAIN_KEY': {
+      const json = readTerrainKeyInternal();
+      self.postMessage({
+        type: 'TERRAIN_KEY_RESULT',
+        reqId: msg.reqId,
+        ok: !!json,
+        json: json || '',
+        error: json ? '' : (readLastError() || '静态地形键不可用'),
+      });
+      break;
+    }
+
+    case 'TERRAIN_CHUNK': {
+      const result = requestTerrainChunkInternal(msg.chunkX, msg.chunkY, msg.chunkZ, msg.voxelScale);
+      const response = {
+        type: 'TERRAIN_CHUNK_RESULT',
+        reqId: msg.reqId,
+        ok: result.ok,
+        error: result.error || '',
+        chunk: result.bytes || null,
+      };
+      if (result.bytes) self.postMessage(response, [result.bytes.buffer]);
+      else self.postMessage(response);
       break;
     }
 

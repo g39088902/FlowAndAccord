@@ -31,6 +31,33 @@ impl<'a> HeightfieldView<'a> {
 }
 
 impl HeightfieldBackend {
+    /// Build a compatibility backend from an already generated `TerrainMap`.
+    ///
+    /// UGC-05 uses this path when a caller requests a static voxel chunk after
+    /// world creation. It deliberately does not re-run the field compiler or
+    /// consume any simulation RNG.
+    pub fn from_terrain_map(map: &crate::geo::terrain::TerrainMap) -> Option<Self> {
+        if map.grid_width == 0
+            || map.grid_height == 0
+            || map.cells.len() != map.grid_width * map.grid_height
+            || !map.world_size.is_finite()
+            || map.world_size <= 0.0
+        {
+            return None;
+        }
+        Some(Self {
+            width: map.grid_width,
+            height: map.grid_height,
+            world_size: map.world_size,
+            elevation: Field2 {
+                width: map.grid_width,
+                height: map.grid_height,
+                values: map.cells.iter().map(|cell| cell.elevation).collect(),
+            },
+            cells: map.cells.clone(),
+        })
+    }
+
     pub fn from_compiled(compiled: &CompiledTerrain, world_size: f32) -> Self {
         let e = &compiled.fields.elevation;
         let cells = e

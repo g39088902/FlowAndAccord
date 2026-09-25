@@ -24,6 +24,7 @@ use super::poi::PrimitivePoi;
 use super::snapshot::Season;
 use super::world::World3DEngine;
 use crate::config::SimConfig;
+use crate::geo::backend::{ChunkDelta, TerrainStaticKey};
 use crate::geo::terrain::{TerrainMap, TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_MOUNTAIN_PASS};
 use crate::rng::WorldRng;
 
@@ -91,6 +92,14 @@ pub struct WorldSave {
     /// 地形 profile，例如 mountain_pass_v1。
     #[serde(default = "default_terrain_profile")]
     pub terrain_profile: String,
+    /// UGC-05 static terrain identity. Older saves omit this field and derive
+    /// it from `terrain_state` during load.
+    #[serde(default)]
+    pub terrain_static_key: Option<TerrainStaticKey>,
+    /// UGC-05 authored voxel edits. The generated terrain is rebuilt first;
+    /// each delta is then checked against its chunk baseline when requested.
+    #[serde(default)]
+    pub terrain_chunk_deltas: Vec<ChunkDelta>,
     pub terrain_state: TerrainMap,
     pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
 
@@ -174,6 +183,8 @@ impl World3DEngine {
             world_size: self.terrain.world_size,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
+            terrain_static_key: Some(TerrainStaticKey::from_terrain_map(&self.terrain)),
+            terrain_chunk_deltas: self.terrain_chunk_deltas.clone(),
             terrain_state: self.terrain.clone(),
             water_pools: self.water_pools.clone(),
             network: self.network.clone(),
@@ -283,11 +294,23 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     // 地形按种子确定性重建（不消耗世界 RNG）
     let terrain = save.terrain_state;
     if terrain.profile != save.terrain_profile || terrain.generator_version != save.terrain_generator_version || terrain.cells.len()!=terrain.grid_width*terrain.grid_height { return Err("存档地形不一致".into()); }
+    let expected_static_key = TerrainStaticKey::from_terrain_map(&terrain);
+    if let Some(static_key) = save.terrain_static_key {
+        if static_key != expected_static_key {
+            return Err("存档静态地形键不一致".into());
+        }
+    }
+    for delta in &save.terrain_chunk_deltas {
+        if delta.coord.x < 0 || delta.coord.y < 0 || delta.coord.z < 0 {
+            return Err("存档地形 chunk delta 坐标非法".into());
+        }
+    }
     // §5.2 稳定 ID 契约：加载时校验 sub_features 升序且唯一（D-B1-2）
     terrain.validate_sub_features_sorted_unique()?;
 
     let mut world = World3DEngine {
         terrain,
+        terrain_chunk_deltas: save.terrain_chunk_deltas,
         water_pools: save.water_pools,
         network: save.network,
         pois: save.pois,
