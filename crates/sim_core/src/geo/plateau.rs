@@ -62,11 +62,7 @@ pub struct PlateauGeometry {
 
 impl PlateauGeometry {
     /// 从 `relief_rng` 专属流抽取参数构建台地静态几何。
-    pub fn plan(
-        relief_rng: &mut WorldRng,
-        world_size: f32,
-        config: &SimConfig,
-    ) -> Self {
+    pub fn plan(relief_rng: &mut WorldRng, world_size: f32, config: &SimConfig) -> Self {
         let h_min = config.terrain_plateau_height_min.max(10.0);
         let h_max = config.terrain_plateau_height_max.max(h_min + 0.1);
         let height = relief_rng.gen_range(h_min, h_max);

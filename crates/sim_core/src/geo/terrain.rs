@@ -1,5 +1,5 @@
-use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::accents::{AccentKind, TerrainAccent};
+use super::biome::{GeoCell, SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use crate::config::SimConfig;
 use crate::rng::WorldRng;
 use crate::spatial::curve::Curve3D;
@@ -124,29 +124,53 @@ fn sub_feature_candidate(
     match (profile, kind) {
         // —— T1 山口聚落 ——
         (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::FootLake) => {
-            Some(SubFeatureCandidate { salt: SALT_FOOT_LAKE, prob_bp: 3000 }) // 30%
+            Some(SubFeatureCandidate {
+                salt: SALT_FOOT_LAKE,
+                prob_bp: 3000,
+            }) // 30%
         }
         (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::RidgeWaterfall) => {
-            Some(SubFeatureCandidate { salt: SALT_RIDGE_WATERFALL, prob_bp: 2500 }) // 25%
+            Some(SubFeatureCandidate {
+                salt: SALT_RIDGE_WATERFALL,
+                prob_bp: 2500,
+            }) // 25%
         }
         (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::ForestedSlope) => {
-            Some(SubFeatureCandidate { salt: SALT_FORESTED_SLOPE, prob_bp: 4000 }) // 40%
+            Some(SubFeatureCandidate {
+                salt: SALT_FORESTED_SLOPE,
+                prob_bp: 4000,
+            }) // 40%
         }
         (TERRAIN_PROFILE_MOUNTAIN_PASS, TerrainSubFeatureKind::RockyOutcrop) => {
-            Some(SubFeatureCandidate { salt: SALT_ROCKY_OUTCROP, prob_bp: 3500 }) // 35%
+            Some(SubFeatureCandidate {
+                salt: SALT_ROCKY_OUTCROP,
+                prob_bp: 3500,
+            }) // 35%
         }
         // —— T2 两岸河谷 ——
         (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::OxbowLake) => {
-            Some(SubFeatureCandidate { salt: SALT_OXBOW_LAKE, prob_bp: 2000 }) // 20%
+            Some(SubFeatureCandidate {
+                salt: SALT_OXBOW_LAKE,
+                prob_bp: 2000,
+            }) // 20%
         }
         (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::RiverCliff) => {
-            Some(SubFeatureCandidate { salt: SALT_RIVER_CLIFF, prob_bp: 2500 }) // 25%
+            Some(SubFeatureCandidate {
+                salt: SALT_RIVER_CLIFF,
+                prob_bp: 2500,
+            }) // 25%
         }
         (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::RiversideForest) => {
-            Some(SubFeatureCandidate { salt: SALT_RIVERSIDE_FOREST, prob_bp: 5000 }) // 50%
+            Some(SubFeatureCandidate {
+                salt: SALT_RIVERSIDE_FOREST,
+                prob_bp: 5000,
+            }) // 50%
         }
         (TERRAIN_PROFILE_RIVER_VALLEY, TerrainSubFeatureKind::GravelBeach) => {
-            Some(SubFeatureCandidate { salt: SALT_GRAVEL_BEACH, prob_bp: 4000 }) // 40%
+            Some(SubFeatureCandidate {
+                salt: SALT_GRAVEL_BEACH,
+                prob_bp: 4000,
+            }) // 40%
         }
         _ => None,
     }
@@ -211,10 +235,22 @@ mod terrain_noise {
         [-1.0, 0.0],
         [0.0, 1.0],
         [0.0, -1.0],
-        [std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
-        [-std::f32::consts::FRAC_1_SQRT_2, std::f32::consts::FRAC_1_SQRT_2],
-        [std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
-        [-std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2],
+        [
+            std::f32::consts::FRAC_1_SQRT_2,
+            std::f32::consts::FRAC_1_SQRT_2,
+        ],
+        [
+            -std::f32::consts::FRAC_1_SQRT_2,
+            std::f32::consts::FRAC_1_SQRT_2,
+        ],
+        [
+            std::f32::consts::FRAC_1_SQRT_2,
+            -std::f32::consts::FRAC_1_SQRT_2,
+        ],
+        [
+            -std::f32::consts::FRAC_1_SQRT_2,
+            -std::f32::consts::FRAC_1_SQRT_2,
+        ],
     ];
 
     /// 梯度选择哈希：格网整数坐标 + 世界种子 + 特征盐值 → [0, 8) 梯度索引。
@@ -426,11 +462,7 @@ impl BranchRidge {
         let t = d_par / self.length;
         let u = (t / BRANCH_ROOT_RAMP).min(1.0);
         let ramp = u * u * (3.0 - 2.0 * u);
-        self.amplitude
-            * (-(d_perp / self.width).powi(2)).exp()
-            * (1.0 - t)
-            * (1.0 - t)
-            * ramp
+        self.amplitude * (-(d_perp / self.width).powi(2)).exp() * (1.0 - t) * (1.0 - t) * ramp
     }
 }
 
@@ -463,7 +495,11 @@ fn sample_branch_anchor(
     let total = left_len + (a_bound - right_start);
     if total <= 1.0 {
         // 禁区吞没全轴（理论不可达：saddle_width ≤ 0.19×world），防御性兜底取远端。
-        return if saddle_along >= 0.0 { -a_bound } else { a_bound };
+        return if saddle_along >= 0.0 {
+            -a_bound
+        } else {
+            a_bound
+        };
     }
     let p = rng.gen_range(0.0, 1.0) * total;
     if p < left_len {
@@ -506,8 +542,7 @@ fn sample_branch_ridges(
         let side = if i == 0 { first_side } else { -first_side };
         let anchor = sample_branch_anchor(rng, a_bound, saddle_along, saddle_width);
         let phi = rng.gen_range(BRANCH_PHI_MIN_RAD, BRANCH_PHI_MAX_RAD);
-        let length =
-            branch_len_base * rng.gen_range(BRANCH_LEN_JITTER_MIN, BRANCH_LEN_JITTER_MAX);
+        let length = branch_len_base * rng.gen_range(BRANCH_LEN_JITTER_MIN, BRANCH_LEN_JITTER_MAX);
         let width = rng.gen_range(BRANCH_WIDTH_RATIO_MIN, BRANCH_WIDTH_RATIO_MAX) * ridge_width;
         let amplitude = amp_ratio
             * rng.gen_range(BRANCH_AMP_JITTER_MIN, BRANCH_AMP_JITTER_MAX)
@@ -577,11 +612,7 @@ fn pick_sub_feature_in_class(
 ///
 /// 产出顺序恒为「结构型 → 视觉型」，每类至多一个，故长度 ≤ 2。
 /// `enabled=false`（`terrainAccentSubFeatures`）或 profile 不在候选池内时返回空。
-pub(crate) fn plan_subfeatures(
-    seed: u64,
-    profile: &str,
-    enabled: bool,
-) -> Vec<PlannedSubFeature> {
+pub(crate) fn plan_subfeatures(seed: u64, profile: &str, enabled: bool) -> Vec<PlannedSubFeature> {
     if !enabled {
         return Vec::new();
     }
@@ -646,7 +677,7 @@ impl Default for GenesisScratch {
 /// §5.3 第 0 步 `resolve_profile`：解析 profile。空串 / `random` 按种子整数判别
 /// 分派候选池。纯整数运算，**不消费任何 `WorldRng`**（逻辑自原 `generate_with_profile`
 /// 头部逐字抽出）。
-fn resolve_profile(seed: u64, profile: &str) -> String {
+pub(crate) fn resolve_profile(seed: u64, profile: &str) -> String {
     if profile.is_empty() || profile == TERRAIN_PROFILE_RANDOM {
         // ★ v1.50.68：random 候选池 9→8（砍需求：删除河谷聚落模板，台地聚落
         //   更名台地）。各 ~12.5% 均衡入列；`flat_baseline` 永不入列。8 路判别；
@@ -715,6 +746,12 @@ pub struct TerrainSubFeature {
 }
 
 /// 地形生成器版本。改变高程/地表/特征生成算法时必须递增。
+/// v1.60.2：21 -> 22（UGC-03：六个静态 profile 与 random 候选切换到 Field Compiler
+/// Heightfield 兼容适配；冲积扇/盆地保留专用几何，旧 TerrainMap 仅作为失败回退/LegacyReference）。
+/// v1.60.3：22 -> 23（冲积扇暂时退出通用 Cone 迁移路径，恢复 FanGeometry 与网络共用的
+/// 专用高程/干沟/锚点实现，避免地图与路网几何来源不一致）。
+/// v1.60.4：23 -> 24（盆地暂时退出通用 Depression 迁移路径，恢复 BasinGeometry
+/// 与出口门禁共用的专用盆地高程/谷地实现，避免 BasinExitBlocked 误判）。
 /// v1.60.0：20 -> 21（湖畔盆地更名并重构为 volcanic_lake_v1：平原中的随机火山锥体、天池式火山口湖与双缓坡出口）。
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
@@ -767,7 +804,7 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 21;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 24;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -969,13 +1006,19 @@ impl TerrainMap {
         let is_grassland = self.profile == TERRAIN_PROFILE_GRASSLAND_PLAIN;
         let is_hillside = self.profile == TERRAIN_PROFILE_HILLSIDE_WOODLAND;
         let grass_mounds: Vec<(f32, f32, f32, f32)> = if is_grassland {
-            let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 { 1 } else { 2 };
+            let mound_count = if relief_rng.gen_range(0.0, 1.0) < 0.5 {
+                1
+            } else {
+                2
+            };
             // ★ S7-08：幅度/幅径比走 SimConfig（默认 6.5~9.5 / 0.19~0.31 与原
             //   字面量逐位相同）。防御性钳制防止零值 Default 产生空抽样区间。
             let amp_lo = config.terrain_grassland_mound_amp_min.max(0.0);
             let amp_hi = config.terrain_grassland_mound_amp_max.max(amp_lo + 0.01);
             let ratio_lo = config.terrain_grassland_mound_ratio_min.max(0.01);
-            let ratio_hi = config.terrain_grassland_mound_ratio_max.max(ratio_lo + 0.001);
+            let ratio_hi = config
+                .terrain_grassland_mound_ratio_max
+                .max(ratio_lo + 0.001);
             let mut placed: Vec<(f32, f32, f32, f32)> = Vec::with_capacity(mound_count);
             for i in 0..mound_count {
                 let mut ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
@@ -1014,11 +1057,17 @@ impl TerrainMap {
             let wind_lo = config.terrain_hillside_wind_slope_min.max(0.1);
             let wind_hi = config.terrain_hillside_wind_slope_max.max(wind_lo + 0.01);
             let shift_lo = config.terrain_hillside_crest_shift_min.max(0.0);
-            let shift_hi = config.terrain_hillside_crest_shift_max.max(shift_lo + 0.001);
+            let shift_hi = config
+                .terrain_hillside_crest_shift_max
+                .max(shift_lo + 0.001);
             let amp = relief_rng.gen_range(amp_lo, amp_hi);
             let lee_target = relief_rng.gen_range(lee_lo, lee_hi).to_radians().tan();
             let wind_target = relief_rng.gen_range(wind_lo, wind_hi).to_radians().tan();
-            let sgn = if relief_rng.gen_range(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+            let sgn = if relief_rng.gen_range(0.0, 1.0) < 0.5 {
+                -1.0
+            } else {
+                1.0
+            };
             let crest_shift = sgn * relief_rng.gen_range(shift_lo, shift_hi) * self.world_size;
             Some((
                 amp,
@@ -1038,9 +1087,13 @@ impl TerrainMap {
             // ★ S7-08：深度/凹圈半径走 SimConfig（默认 1.4~2.2 / 24~34 与原字面量
             //   逐位相同；草原/半坡共用同一组）。
             let depth_lo = config.terrain_spring_depression_depth_min.max(0.0);
-            let depth_hi = config.terrain_spring_depression_depth_max.max(depth_lo + 0.01);
+            let depth_hi = config
+                .terrain_spring_depression_depth_max
+                .max(depth_lo + 0.01);
             let drad_lo = config.terrain_spring_depression_radius_min.max(1.0);
-            let drad_hi = config.terrain_spring_depression_radius_max.max(drad_lo + 0.1);
+            let drad_hi = config
+                .terrain_spring_depression_radius_max
+                .max(drad_lo + 0.1);
             (0..2)
                 .map(|_| {
                     let ang = relief_rng.gen_range(0.0, std::f32::consts::TAU);
@@ -1072,7 +1125,11 @@ impl TerrainMap {
             ((wx * tilt_cos + wy * tilt_sin) / half_size.max(1.0)) * (self.tilt_magnitude * 0.5)
         };
         let fan = if is_fan {
-            Some(super::alluvial_fan::FanGeometry::plan(&mut relief_rng, self.world_size, config))
+            Some(super::alluvial_fan::FanGeometry::plan(
+                &mut relief_rng,
+                self.world_size,
+                config,
+            ))
         } else {
             None
         };
@@ -1178,7 +1235,8 @@ impl TerrainMap {
                         seed,
                     ) * noise_amp_k;
                     let warp_v = ridge_warp_raw(wy, self.world_size, seed);
-                    raw[gy * self.grid_width + gx] = pg.elevation_at(wx, wy, base_tilt, fbm_v, warp_v);
+                    raw[gy * self.grid_width + gx] =
+                        pg.elevation_at(wx, wy, base_tilt, fbm_v, warp_v);
                     continue;
                 }
 
@@ -1262,8 +1320,7 @@ impl TerrainMap {
                 //   脊线走向沿用既有 theta，横向偏移 = ridge_offset + crest_shift
                 //   （crest_shift 把陡峭带推离图心，营地落在迎风坡脚平缓带）。
                 if let Some((h_amp, w_wind, w_lee, crest_shift)) = hill_params {
-                    let across =
-                        -wx * theta_sin + wy * theta_cos - ridge_offset - crest_shift;
+                    let across = -wx * theta_sin + wy * theta_cos - ridge_offset - crest_shift;
                     let w = if across <= 0.0 { w_wind } else { w_lee };
                     elev += h_amp * (-(across * across) / (2.0 * w * w)).exp();
                 }
@@ -1272,7 +1329,8 @@ impl TerrainMap {
                 //   严禁全图均匀加噪（根 AGENTS.md §4 坑 #3：平原 ±2m 噪声即产生
                 //   大面积 NO_BUILD 红格）。
                 let h_norm = ((elev + 45.0) / 100.0).clamp(0.0, 1.0);
-                let w_t = ((h_norm - NOISE_WEIGHT_HNORM_LOW) / NOISE_WEIGHT_HNORM_SPAN).clamp(0.0, 1.0);
+                let w_t =
+                    ((h_norm - NOISE_WEIGHT_HNORM_LOW) / NOISE_WEIGHT_HNORM_SPAN).clamp(0.0, 1.0);
                 let weight = NOISE_WEIGHT_PLAIN
                     + (NOISE_WEIGHT_MOUNTAIN - NOISE_WEIGHT_PLAIN)
                         * (w_t * w_t * w_t * (w_t * (w_t * 6.0 - 15.0) + 10.0));
@@ -1308,7 +1366,10 @@ impl TerrainMap {
                     .clamp(10.0, (n - 11) as f32) as usize
             };
             for (di, &(cwx, cwy, depth, drad)) in foot_depressions.iter().enumerate() {
-                let (cgx, cgy) = (to_grid(cwx, self.grid_width), to_grid(cwy, self.grid_height));
+                let (cgx, cgy) = (
+                    to_grid(cwx, self.grid_width),
+                    to_grid(cwy, self.grid_height),
+                );
                 let mut best = (cgx, cgy);
                 let mut best_e = f32::MAX;
                 for wy in cgy.saturating_sub(8)..=(cgy + 8).min(self.grid_height - 1) {
@@ -1321,13 +1382,17 @@ impl TerrainMap {
                     }
                 }
                 let (mut sx, mut sy) = best;
-                let mut swx = (sx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
-                let mut swy = (sy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                let mut swx =
+                    (sx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
+                let mut swy =
+                    (sy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
                 // 与已接受洼地过近时沿连线外推到 0.22×world_size（确定性修正，不消费 RNG）
                 if di > 0 {
                     if let Some(&(pgx, pgy, _, _, _, _)) = springs.first() {
-                        let pwx = (pgx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
-                        let pwy = (pgy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let pwx = (pgx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5)
+                            * self.world_size;
+                        let pwy = (pgy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5)
+                            * self.world_size;
                         let min_dist = 0.22 * self.world_size;
                         let d = (swx - pwx).hypot(swy - pwy);
                         if d < min_dist && d > 1e-3 {
@@ -1355,11 +1420,17 @@ impl TerrainMap {
                     for dx in -reach..=reach {
                         let gx = sx as i32 + dx;
                         let gy = sy as i32 + dy;
-                        if gx < 0 || gy < 0 || gx >= self.grid_width as i32 || gy >= self.grid_height as i32 {
+                        if gx < 0
+                            || gy < 0
+                            || gx >= self.grid_width as i32
+                            || gy >= self.grid_height as i32
+                        {
                             continue;
                         }
-                        let cell_wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size;
-                        let cell_wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size;
+                        let cell_wx = (gx as f32 / (self.grid_width - 1).max(1) as f32 - 0.5)
+                            * self.world_size;
+                        let cell_wy = (gy as f32 / (self.grid_height - 1).max(1) as f32 - 0.5)
+                            * self.world_size;
                         let ddx = cell_wx - swx;
                         let ddy = cell_wy - swy;
                         let d2 = ddx * ddx + ddy * ddy;
@@ -1409,7 +1480,7 @@ impl TerrainMap {
         if let Some(geom) = scratch.river_geometry.as_ref() {
             self.generate_river_valley_base_relief(geom, config);
         }
-        }
+    }
 
     /// T2 `river_valley_v1` 陆地区域基础生成（★ STAGE2-2 公式解耦，06 号 §5.3 兼容性拆分）。
     ///
@@ -1440,7 +1511,9 @@ impl TerrainMap {
                 let c = &mut self.cells[gy * self.grid_width + gx];
                 // 旧 T2 河阶外低丘公式（原 else 分支逐字保留）
                 let u = ((outside - bank) / terrace).clamp(0.0, 1.0);
-                c.elevation = level + 2.0 + u * 2.0
+                c.elevation = level
+                    + 2.0
+                    + u * 2.0
                     + ((outside - bank - terrace).max(0.0) / size
                         * config.terrain_ridge_amplitude.max(1.0))
                         * (0.8 + 0.2 * (p.y / 90.0).sin());
@@ -1505,7 +1578,11 @@ impl TerrainMap {
         // 任何共享 RNG 消费序；第 2 步铺河谷低丘与第 3 步施加水面共用同一份。
         let mut scratch = GenesisScratch::default();
         if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
-            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(seed, config, self.world_size));
+            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(
+                seed,
+                config,
+                self.world_size,
+            ));
         }
         // 2. 基础起伏（山口起伏 / 草原 / 河谷低丘）
         self.generate_base_relief(seed, config, &mut scratch);
@@ -1597,7 +1674,8 @@ impl TerrainMap {
                     continue;
                 }
                 let slope = self.cells[idx].slope_angle_deg;
-                let normalized_height = ((self.cells[idx].elevation + 45.0) / 100.0).clamp(0.0, 1.0);
+                let normalized_height =
+                    ((self.cells[idx].elevation + 45.0) / 100.0).clamp(0.0, 1.0);
                 // ★ TB-03 覆盖判据（仅新模板进入，旧 profile 恒 false、逐位无影响）
                 let (wx, wy) = if needs_world_pos {
                     (
@@ -1705,17 +1783,19 @@ impl TerrainMap {
         // 子特征装饰使用无状态 hash，绝不触碰 generate_accents 的 accent_rng。
         // 因此 D-B2 开关只改变新增尾段，不会重排既有装饰 ID。
         for feature in plan.iter_mut().filter(|f| {
-            f.accepted && matches!(
-                f.kind,
-                TerrainSubFeatureKind::ForestedSlope
-                    | TerrainSubFeatureKind::RockyOutcrop
-                    | TerrainSubFeatureKind::RiversideForest
-                    | TerrainSubFeatureKind::GravelBeach
-            )
+            f.accepted
+                && matches!(
+                    f.kind,
+                    TerrainSubFeatureKind::ForestedSlope
+                        | TerrainSubFeatureKind::RockyOutcrop
+                        | TerrainSubFeatureKind::RiversideForest
+                        | TerrainSubFeatureKind::GravelBeach
+                )
         }) {
             let (kind, target) = match feature.kind {
-                TerrainSubFeatureKind::ForestedSlope
-                | TerrainSubFeatureKind::RiversideForest => (AccentKind::Tree, 24usize),
+                TerrainSubFeatureKind::ForestedSlope | TerrainSubFeatureKind::RiversideForest => {
+                    (AccentKind::Tree, 24usize)
+                }
                 TerrainSubFeatureKind::RockyOutcrop => (AccentKind::Boulder, 16usize),
                 TerrainSubFeatureKind::GravelBeach => (AccentKind::RockCluster, 16usize),
                 _ => continue,
@@ -1734,21 +1814,30 @@ impl TerrainMap {
                 let cell = &self.cells[idx];
                 let visual_ok = match feature.kind {
                     TerrainSubFeatureKind::ForestedSlope => {
-                        matches!(cell.surface_kind, SurfaceKind::DryGround | SurfaceKind::SoftGround)
-                            && cell.slope_angle_deg >= 6.0
+                        matches!(
+                            cell.surface_kind,
+                            SurfaceKind::DryGround | SurfaceKind::SoftGround
+                        ) && cell.slope_angle_deg >= 6.0
                             && cell.slope_angle_deg < 28.0
                     }
                     TerrainSubFeatureKind::RiversideForest => {
-                        matches!(cell.surface_kind, SurfaceKind::RiverBank | SurfaceKind::RiverTerrace)
+                        matches!(
+                            cell.surface_kind,
+                            SurfaceKind::RiverBank | SurfaceKind::RiverTerrace
+                        )
                     }
                     TerrainSubFeatureKind::RockyOutcrop => {
-                        matches!(cell.surface_kind, SurfaceKind::DryGround | SurfaceKind::SoftGround)
-                            && cell.slope_angle_deg > 28.0
+                        matches!(
+                            cell.surface_kind,
+                            SurfaceKind::DryGround | SurfaceKind::SoftGround
+                        ) && cell.slope_angle_deg > 28.0
                             && cell.feature_flags & TERRAIN_FLAG_NO_WALK == 0
                     }
                     TerrainSubFeatureKind::GravelBeach => {
-                        matches!(cell.surface_kind, SurfaceKind::RiverBank | SurfaceKind::RiverTerrace)
-                            && cell.surface_kind != SurfaceKind::ShallowWater
+                        matches!(
+                            cell.surface_kind,
+                            SurfaceKind::RiverBank | SurfaceKind::RiverTerrace
+                        ) && cell.surface_kind != SurfaceKind::ShallowWater
                     }
                     _ => false,
                 };
@@ -1763,7 +1852,10 @@ impl TerrainMap {
                 };
                 if water_clearance > 0.0
                     && super::accents::near_water_surface_with_clearance(
-                        self, pos.x, pos.y, water_clearance,
+                        self,
+                        pos.x,
+                        pos.y,
+                        water_clearance,
                     )
                 {
                     continue;
@@ -1788,17 +1880,24 @@ impl TerrainMap {
             let mut placed: Vec<Vec3> = Vec::with_capacity(target);
             while placed.len() < target && !candidates.is_empty() {
                 let selected = if placed.is_empty() {
-                    candidates.iter().enumerate().min_by_key(|(_, c)| c.0).map(|(i, _)| i)
+                    candidates
+                        .iter()
+                        .enumerate()
+                        .min_by_key(|(_, c)| c.0)
+                        .map(|(i, _)| i)
                 } else {
                     // 每次选距既有落点最近距离最大的候选，铺开覆盖范围；完全相等时
                     // 取 hash 较小者，确保 wasm/native 与重复创世稳定一致。
                     let mut best: Option<(usize, f32, u64)> = None;
                     for (i, (hash, pos)) in candidates.iter().enumerate() {
-                        let nearest_sq = placed.iter().map(|p| {
-                            let dx = p.x - pos.x;
-                            let dy = p.y - pos.y;
-                            dx * dx + dy * dy
-                        }).fold(f32::INFINITY, f32::min);
+                        let nearest_sq = placed
+                            .iter()
+                            .map(|p| {
+                                let dx = p.x - pos.x;
+                                let dy = p.y - pos.y;
+                                dx * dx + dy * dy
+                            })
+                            .fold(f32::INFINITY, f32::min);
                         if nearest_sq < min_spacing_sq {
                             continue;
                         }
@@ -1860,11 +1959,16 @@ impl TerrainMap {
     pub fn sample_elevation(&self, wx: f32, wy: f32) -> f32 {
         let (x, y) = self.grid_coords(wx, wy);
         let (ix, iy) = (x.floor() as usize, y.floor() as usize);
-        let (jx, jy) = ((ix + 1).min(self.grid_width - 1), (iy + 1).min(self.grid_height - 1));
+        let (jx, jy) = (
+            (ix + 1).min(self.grid_width - 1),
+            (iy + 1).min(self.grid_height - 1),
+        );
         let (u, v) = (x - ix as f32, y - iy as f32);
-        let a = self.cells[iy * self.grid_width + ix].elevation * (1.0-u) + self.cells[iy * self.grid_width+jx].elevation*u;
-        let b = self.cells[jy * self.grid_width + ix].elevation * (1.0-u) + self.cells[jy * self.grid_width+jx].elevation*u;
-        a*(1.0-v)+b*v
+        let a = self.cells[iy * self.grid_width + ix].elevation * (1.0 - u)
+            + self.cells[iy * self.grid_width + jx].elevation * u;
+        let b = self.cells[jy * self.grid_width + ix].elevation * (1.0 - u)
+            + self.cells[jy * self.grid_width + jx].elevation * u;
+        a * (1.0 - v) + b * v
     }
 
     #[inline]
@@ -1875,22 +1979,33 @@ impl TerrainMap {
 
     #[inline]
     pub fn grid_index(&self, wx: f32, wy: f32) -> (usize, usize) {
-        let (x,y) = self.grid_coords(wx, wy);
+        let (x, y) = self.grid_coords(wx, wy);
         (x.round() as usize, y.round() as usize)
     }
 
     pub fn grid_coords(&self, x: f32, y: f32) -> (f32, f32) {
-        (((x/self.world_size+0.5)*(self.grid_width-1) as f32).clamp(0.0,(self.grid_width-1) as f32),
-         ((y/self.world_size+0.5)*(self.grid_height-1) as f32).clamp(0.0,(self.grid_height-1) as f32))
+        (
+            ((x / self.world_size + 0.5) * (self.grid_width - 1) as f32)
+                .clamp(0.0, (self.grid_width - 1) as f32),
+            ((y / self.world_size + 0.5) * (self.grid_height - 1) as f32)
+                .clamp(0.0, (self.grid_height - 1) as f32),
+        )
     }
     pub fn grid_pos(&self, x: usize, y: usize) -> Vec3 {
-        Vec3::new((x as f32/(self.grid_width-1).max(1) as f32-0.5)*self.world_size,
-                  (y as f32/(self.grid_height-1).max(1) as f32-0.5)*self.world_size,
-                  self.cells[y*self.grid_width+x].elevation)
+        Vec3::new(
+            (x as f32 / (self.grid_width - 1).max(1) as f32 - 0.5) * self.world_size,
+            (y as f32 / (self.grid_height - 1).max(1) as f32 - 0.5) * self.world_size,
+            self.cells[y * self.grid_width + x].elevation,
+        )
     }
 
     /// 对整条三次贝塞尔曲线做自适应密度采样；用于 T0 路网合法性门禁。
-    pub fn validate_curve(&self, curve: &Curve3D, corridor_width: f32, max_walk_slope: f32) -> bool {
+    pub fn validate_curve(
+        &self,
+        curve: &Curve3D,
+        corridor_width: f32,
+        max_walk_slope: f32,
+    ) -> bool {
         super::corridor::validate_curve(self, curve, corridor_width, max_walk_slope, None)
     }
 

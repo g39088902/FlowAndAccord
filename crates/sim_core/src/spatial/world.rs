@@ -156,13 +156,34 @@ impl World3DEngine {
         mut config: SimConfig,
         overrides: &crate::geo::terrain::GenesisOverrides,
     ) -> Self {
-        let terrain = TerrainGenerator::compile_with_overrides(
+        // UGC-03 migration resolves `random` through the legacy seed partition,
+        // then compiles the selected registered recipe into the compatibility
+        // map. Flat baseline, unknown recipes and explicit degradation
+        // overrides retain the legacy generator as the reference/fallback path.
+        let mut migration_config = config.clone();
+        if migration_config.terrain_profile.is_empty()
+            || migration_config.terrain_profile == crate::geo::terrain::TERRAIN_PROFILE_RANDOM
+        {
+            migration_config.terrain_profile = TerrainGenerator::resolve_profile(
+                seed,
+                migration_config.terrain_profile.as_str(),
+            );
+        }
+        let terrain = match TerrainGenerator::compile_procedural_map(
             grid_res,
             world_size,
             seed,
-            &config,
-            overrides,
-        );
+            &migration_config,
+        ) {
+            Some(Ok(map)) if overrides.disabled_subfeature_mask == 0 => map,
+            _ => TerrainGenerator::compile_with_overrides(
+                grid_res,
+                world_size,
+                seed,
+                &config,
+                overrides,
+            ),
+        };
         config.terrain_profile = terrain.profile.clone();
 
         let journal_cap = if config.ledger_journal_capacity > 0 {

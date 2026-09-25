@@ -183,15 +183,19 @@ pub fn generate_accents(
     } else {
         1.0
     };
-    let grass_tuft_ratio =
-        if is_grassland { GRASSLAND_GRASS_TUFT_BUDGET_RATIO } else { 1.0 };
+    let grass_tuft_ratio = if is_grassland {
+        GRASSLAND_GRASS_TUFT_BUDGET_RATIO
+    } else {
+        1.0
+    };
     let tree_count = ((BASE_TREE_COUNT as f32) * tree_ratio * density).round() as usize;
     let boulder_count = ((BASE_BOULDER_COUNT as f32) * density).round() as usize;
     let bush_count = ((BASE_BUSH_COUNT as f32) * density).round() as usize;
     let rock_cluster_count = ((BASE_ROCK_CLUSTER_COUNT as f32) * density).round() as usize;
     let grass_tuft_count =
         ((BASE_GRASS_TUFT_COUNT as f32) * grass_tuft_ratio * density).round() as usize;
-    let total_target = tree_count + boulder_count + bush_count + rock_cluster_count + grass_tuft_count;
+    let total_target =
+        tree_count + boulder_count + bush_count + rock_cluster_count + grass_tuft_count;
     let max_retries = total_target * MAX_RETRY_FACTOR;
 
     let world_size = terrain.world_size;
@@ -227,7 +231,9 @@ pub fn generate_accents(
                     if let Some(c) = f.vertices.last() {
                         let dx = wx - c.x;
                         let dy = wy - c.y;
-                        if dx * dx + dy * dy < HILLSIDE_SPRING_CLEARANCE_M * HILLSIDE_SPRING_CLEARANCE_M {
+                        if dx * dx + dy * dy
+                            < HILLSIDE_SPRING_CLEARANCE_M * HILLSIDE_SPRING_CLEARANCE_M
+                        {
                             return false;
                         }
                     }
@@ -309,11 +315,12 @@ pub fn generate_accents(
                 //   灌木，形成水源的视觉提示——候选点本格或 25m 六向邻点命中软地即视为
                 //   「洼地邻域」高概率接受，开阔干地只零星点缀（预算不变、聚集靠偏好；
                 //   邻域探测是纯地形查询，不消费 accent_rng、不写任何格子）。
-                return rng.gen_range(0.0, 1.0) < if near_soft_ground(terrain, wx, wy) {
-                    0.85
-                } else {
-                    0.12
-                };
+                return rng.gen_range(0.0, 1.0)
+                    < if near_soft_ground(terrain, wx, wy) {
+                        0.85
+                    } else {
+                        0.12
+                    };
             }
             if is_hillside {
                 // ★ S7-05 半坡林缘过渡带：泉洼软地邻域（低地软地，25m 探测语义与草原
@@ -393,9 +400,12 @@ pub fn generate_accents(
                 //   深浅斑块）调制接受概率（0.25~1.15，均值 ≈0.7），形成深浅交错的
                 //   草甸群落而非均匀撒点；残丘坡面（坡度 6°→14°）线性疏草露土，
                 //   泉洼软地（SoftGround）略密。纯函数调制不消费 accent_rng 额外流。
-                let base = if cell.surface_kind == SurfaceKind::SoftGround { 0.95 } else { 0.90 };
-                let slope_k =
-                    1.0 - 0.85 * ((cell.slope_angle_deg - 6.0) / 8.0).clamp(0.0, 1.0);
+                let base = if cell.surface_kind == SurfaceKind::SoftGround {
+                    0.95
+                } else {
+                    0.90
+                };
+                let slope_k = 1.0 - 0.85 * ((cell.slope_angle_deg - 6.0) / 8.0).clamp(0.0, 1.0);
                 let patch_k = 0.25 + 0.90 * grass_patch_field(wx, wy, seed);
                 return rng.gen_range(0.0, 1.0) < base * slope_k * patch_k;
             }
@@ -418,8 +428,7 @@ pub fn generate_accents(
 /// 只依赖整数运算，跨平台逐位确定。
 fn grass_patch_value(ix: i64, iy: i64, seed: u64, salt: u64) -> f32 {
     let m = super::terrain::mix64(
-        seed
-            ^ salt
+        seed ^ salt
             ^ (ix as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
             ^ (iy as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F),
     );
@@ -453,8 +462,20 @@ fn smooth_patch_field(wx: f32, wy: f32, lambda_m: f32, seed: u64, salt: u64) -> 
 /// 纯函数：只依赖世界种子 + 固定盐值（`SALT_GRASS_PATCH_*`）与坐标，
 /// 不消费任何 `WorldRng` 流、不写任何格子，同入参跨平台逐位一致。
 fn grass_patch_field(wx: f32, wy: f32, seed: u64) -> f32 {
-    0.62 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_LARGE_M, seed, SALT_GRASS_PATCH_LARGE)
-        + 0.38 * smooth_patch_field(wx, wy, GRASS_PATCH_LAMBDA_SMALL_M, seed, SALT_GRASS_PATCH_SMALL)
+    0.62 * smooth_patch_field(
+        wx,
+        wy,
+        GRASS_PATCH_LAMBDA_LARGE_M,
+        seed,
+        SALT_GRASS_PATCH_LARGE,
+    ) + 0.38
+        * smooth_patch_field(
+            wx,
+            wy,
+            GRASS_PATCH_LAMBDA_SMALL_M,
+            seed,
+            SALT_GRASS_PATCH_SMALL,
+        )
 }
 
 /// 候选点本格或 `HILLSIDE_BUSH_SOFT_PROBE_M` 六向邻点命中 `SoftGround`（泉洼软地

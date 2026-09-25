@@ -10,6 +10,9 @@
 | :--- | :--- |
 | `mod.rs` | 模块入口 + 公开重导出；生成与运行时查询边界 |
 | `generator.rs` | `TerrainGenerator` 创世入口；只接收 seed/config/overrides，不读取 World3DEngine 或游戏实体 |
+| `procedural/` | UGC-01 字段 IR、确定性算子、recipe、约束报告与固定顺序编译器；UGC-02 增加 D8 汇流、热松弛、液压侵蚀/沉积、priority-flood 水位和水系语义投影；UGC-03 注册八个静态模板 recipe；不读取 profile、Agent 或路网 |
+| `backend/` | Heightfield 兼容视图、固定 32³ + halo=1 的稀疏 Voxel、Surface Nets 网格与分层查询接口；静态几何不进入 tick 热路径（UGC-04） |
+| `adapters/` | UGC-03 编译结果到 `TerrainMap` 的兼容适配与旧生成器差异报告；外部地形观测只读元数据边界（UGC-11） |
 | `runtime.rs` | `TerrainRuntime` 只读查询门面；游戏逻辑通过它读取已生成地形事实 |
 | `terrain.rs` | 高程场采样与 `TerrainMap` 结构体（含 `cells`/`features`/`accents`/`sub_features` + `branch_ridges` 诊断字段）+ ★ §5.3 创世流水线编排器 `generate_with_config()`（0–9 步私有阶段，STAGE2-3 迁入）+ 第 2 步 `generate_base_relief`（山口起伏/草原/河谷低丘/★ STAGE2-7 `flat_baseline` 倾斜-only 诊断基线，原 `generate_with_profile`）+ 第 5 步子特征几何管线（5a 快照/5b 施加桩/5c 临时坡度/5d 接受回滚；视觉型子特征已接入，第 9 步 hash 装饰已接入，结构型仍空）+ 第 6 步 `finalize_slope_and_surface`（全图唯一定稿坡度与派生 flags；★ S7-07 水系写定地表 `DeepWater/RiverBank/RiverTerrace/ShallowWater` 优先保留）+ 第 7 步 `validate_static_terrain_geometry`（★ STAGE2-4 起薄分发至 `validation.rs`）+ ★ D-B1-3 子特征选择器 `plan_subfeatures()` + ★ TB-01 多尺度噪声内核 `terrain_noise`（确定性 2D 梯度噪声 + 3 倍频 fBm + 主脊域扭曲）+ ★ TB-01-3 支脊系统 `BranchRidge`/`sample_branch_ridges`（pub，供探针消费）+ ★ S7-02 阶段七 `grassland_plain_v1` 草原分支（低幅高程场/孤立残丘/泉溪洼地雕入）+ ★ S7-08 阶段七形态参数集中化（`terrain_grassland_*`/`terrain_hillside_*`/`terrain_spring_depression_*`，默认值=原常数、输出逐位不变，前端 config.js 为真相源；原 `terrain_valley_*` 20 字段随 v1.50.68 河谷聚落模板删除一并下线，原 S7-06 深切河谷三分带分支同步移除） |
 | `plateau.rs` | ★ TB-02（v1.50.54；v1.50.68 起模板更名“台地”，profile `plateau_v1`）台地几何与过渡带：`PlateauGeometry` 实现圆角矩形 SDF、台缘陡壁（$B=0.6H$ 派生 $\ge 34^\circ$ 硬禁行崖壁）与双入口缓坡（$B=4.0H$ 约束 $\le 30^\circ$）解耦带、专属噪声强阻尼与坡脚泉溪锚点提取 |

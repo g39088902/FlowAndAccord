@@ -173,6 +173,32 @@ impl World3DEngine {
             let max=self.config.stock_max_water*n_budget as f32;
             self.water_pools.push(crate::geo::hydrology::WaterPool{id:1,current_stock:max*0.75,max_stock:max,regen_rate:self.config.regen_base_water*n_budget as f32,source_poi_ids:ids});
             self.sync_water_pois();
+        } else if self.terrain.cells.iter().any(|cell| {
+            matches!(cell.surface_kind, crate::geo::biome::SurfaceKind::DeepWater)
+        }) {
+            // UGC-03 heightfield maps intentionally do not invent legacy
+            // River/WaterBody polygons. Preserve the gameplay contract by
+            // deriving one shared water pool from the new cell semantics;
+            // rendering still consumes the cells directly.
+            let water_sources: Vec<u32> = self
+                .pois
+                .iter_mut()
+                .filter(|poi| poi.poi_type == super::poi::PoiType::WaterSource)
+                .map(|poi| {
+                    poi.water_pool_id = Some(1);
+                    poi.id
+                })
+                .collect();
+            let n_budget = self.config.count_water_sources as usize;
+            let max = self.config.stock_max_water * n_budget as f32;
+            self.water_pools.push(crate::geo::hydrology::WaterPool {
+                id: 1,
+                current_stock: max * 0.75,
+                max_stock: max,
+                regen_rate: self.config.regen_base_water * n_budget as f32,
+                source_poi_ids: water_sources,
+            });
+            self.sync_water_pois();
         }
     }
     pub(crate) fn connect_land_nodes(&mut self,a:u32,b:u32)->bool {

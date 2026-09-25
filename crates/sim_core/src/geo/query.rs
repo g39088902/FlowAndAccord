@@ -73,16 +73,29 @@ pub fn sample_cell(terrain: &TerrainMap, wx: f32, wy: f32) -> &GeoCell {
     TerrainRuntime::new(terrain).sample_cell(wx, wy)
 }
 
-pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope_deg: f32) -> TerrainQueryResult {
+pub fn validate_footprint(
+    terrain: &TerrainMap,
+    query: FootprintQuery,
+    max_slope_deg: f32,
+) -> TerrainQueryResult {
     let (hx, hy) = query.half_extents;
-    let step = terrain.world_size / (terrain.grid_width-1).max(1) as f32;
+    let step = terrain.world_size / (terrain.grid_width - 1).max(1) as f32;
     let (sin_r, cos_r) = query.rotation_rad.sin_cos();
-    let ex=hx*cos_r.abs()+hy*sin_r.abs(); let ey=hx*sin_r.abs()+hy*cos_r.abs();
-    if query.center.x.abs()+ex>terrain.world_size*0.5 || query.center.y.abs()+ey>terrain.world_size*0.5 {
+    let ex = hx * cos_r.abs() + hy * sin_r.abs();
+    let ey = hx * sin_r.abs() + hy * cos_r.abs();
+    if query.center.x.abs() + ex > terrain.world_size * 0.5
+        || query.center.y.abs() + ey > terrain.world_size * 0.5
+    {
         return TerrainQueryResult::invalid(TerrainFailure::OutOfBounds);
     }
-    let (x0,y0)=terrain.grid_index(query.center.x-ex-step*0.5,query.center.y-ey-step*0.5);
-    let (x1,y1)=terrain.grid_index(query.center.x+ex+step*0.5,query.center.y+ey+step*0.5);
+    let (x0, y0) = terrain.grid_index(
+        query.center.x - ex - step * 0.5,
+        query.center.y - ey - step * 0.5,
+    );
+    let (x1, y1) = terrain.grid_index(
+        query.center.x + ex + step * 0.5,
+        query.center.y + ey + step * 0.5,
+    );
     let mut result = TerrainQueryResult {
         valid: true,
         failure: TerrainFailure::None,
@@ -94,8 +107,10 @@ pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope
     };
     for iy in y0..=y1 {
         for ix in x0..=x1 {
-            let cell = &terrain.cells[iy*terrain.grid_width+ix];
-            if cell.surface_kind == SurfaceKind::ShallowWater {return TerrainQueryResult::invalid(TerrainFailure::WaterCovered);}
+            let cell = &terrain.cells[iy * terrain.grid_width + ix];
+            if cell.surface_kind == SurfaceKind::ShallowWater {
+                return TerrainQueryResult::invalid(TerrainFailure::WaterCovered);
+            }
             result.min_elevation = result.min_elevation.min(cell.elevation);
             result.max_elevation = result.max_elevation.max(cell.elevation);
             result.max_slope_deg = result.max_slope_deg.max(cell.slope_angle_deg);
@@ -107,10 +122,13 @@ pub fn validate_footprint(terrain: &TerrainMap, query: FootprintQuery, max_slope
             if cell.surface_kind == SurfaceKind::RockFace {
                 return TerrainQueryResult::invalid(TerrainFailure::CliffTooSteep);
             }
-            if query.use_kind != LandUseKind::Road && cell.feature_flags & TERRAIN_FLAG_NO_BUILD != 0 {
+            if query.use_kind != LandUseKind::Road
+                && cell.feature_flags & TERRAIN_FLAG_NO_BUILD != 0
+            {
                 return TerrainQueryResult::invalid(TerrainFailure::SurfaceForbidden);
             }
-            if query.use_kind == LandUseKind::Road && cell.feature_flags & TERRAIN_FLAG_NO_WALK != 0 {
+            if query.use_kind == LandUseKind::Road && cell.feature_flags & TERRAIN_FLAG_NO_WALK != 0
+            {
                 return TerrainQueryResult::invalid(TerrainFailure::SurfaceForbidden);
             }
         }

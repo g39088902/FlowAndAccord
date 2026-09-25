@@ -3,6 +3,20 @@
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.1**。
 
+| **（代码新增 · UGC-04 VoxelBackend 与 Surface Nets · 不升版）2026-09-25** | **补齐静态体素后端**：新增固定 32³ + halo=1 的稀疏 chunk 构建、`surface_height-z` 密度量化、材质投影、世界坐标采样、顶部零面二分查询和 `HeightfieldView::surface_at` 兼容入口；实现按固定顺序的 Surface Nets 网格提取与 chunk 世界原点定位。体素与 mesh 只在显式后端请求时生成，不进入 tick、FABS 快照或前端 cell section，UGC-05 再接入缓存和存档 delta。 | crates/sim_core/src/geo/backend/{voxel.rs,meshing.rs,heightfield.rs,mod.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · 冲积扇迁移回退与生成器升版）2026-09-25** | **修复 `alluvial_fan_v1` 的平板化外观**：UGC-03 的通用 Cone recipe 没有表达旧 FanGeometry 的扇形角向衰减、3~4 条干沟、山口帽和泉点锚定，且路网仍按 FanGeometry 规划，导致地图与路网几何来源不一致。冲积扇现在暂时退出 Field Compiler 投影路径，地图和网络共同使用专用 FanGeometry；其余七个 profile 保持 UGC-03 迁移路径。`TERRAIN_GENERATOR_VERSION` 22→23，旧版本存档按门禁拒绝。 | crates/sim_core/src/geo/{generator.rs,terrain.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码修复 · 盆地迁移回退与生成器升版）2026-09-25** | **修复 `BasinExitBlocked`**：盆地通用 Depression recipe 与出口门禁使用的 `BasinGeometry` 不同源，出口路径会在另一张高程图上被判定阻断。`basin_oasis_v1` 现在暂时退出 Field Compiler 投影路径，地图、出口谷地和门禁共同使用专用 BasinGeometry；`TERRAIN_GENERATOR_VERSION` 23→24，旧版本存档按门禁拒绝。 | crates/sim_core/src/geo/{generator.rs,terrain.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码新增 · UGC-02 通用水文过程 · 不升版）2026-09-25** | **补齐字段编译器水文阶段**：加入稳定 D8 汇流与平地 tie-break、固定迭代热松弛、液压侵蚀/沉积、priority-flood 静态水位、河道/岸带连通分量与稳定水体 ID，并把深水/河岸、通行和建造标记统一投影到 `SemanticGrid`。水文参数进入 recipe；旧 TerrainMap 生成、快照和存档默认路径不变。 | crates/sim_core/src/geo/procedural/{processes.rs,hydrology.rs,compiler.rs,semantics.rs,ir.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（代码新增 · UGC-03 静态模板迁移适配 · 生成器升版）2026-09-25** | **接入八个静态模板 recipe 的兼容迁移路径**：新增河谷、台地、盆地、冲积扇、火山湖和半坡 recipe；新增编译结果到 `TerrainMap` 的单向适配器与旧生成器差异报告；已注册 profile 在世界创建时优先走 Field Compiler，失败或降级覆盖仍回退 LegacyReference。新路径让高程、坡度、地表水文语义和 `GeoCell` flags 进入现有查询、快照和 WebGL 地形格渲染；无旧水文多边形时按新深水格建立共享水池并绑定水源 POI，不伪造旧特征 ID；修复 priority-flood 边界邻居在 debug 构建下的整数溢出。 | crates/sim_core/src/geo/{procedural/recipes.rs,adapters/terrain_map.rs,backend/heightfield.rs,generator.rs}, crates/sim_core/src/spatial/{world.rs,terrain_network.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
+| **（版本契约 · UGC-03 生成器版本推进）2026-09-25** | **`TERRAIN_GENERATOR_VERSION` 21→22**：random 与八个静态 profile 的高程/地表来源已切换到 Field Compiler，旧 TerrainMap 只保留为失败回退和 LegacyReference；新旧静态地形不再共用版本号，旧生成器版本存档按既有门禁拒绝。 | crates/sim_core/src/geo/terrain.rs, docs(current/01-changelog) |
+
+| **（代码新增 · UGC-01 地形场编译器 · 不升版）2026-09-24** | **落地统一地形场编译器第一波**：新增稳定 NodeId/recipe IR 与拓扑校验、Field2/Field3Chunk、确定性 Plane/Noise/Ridge/Valley/平滑组合算子、草原与山口数据配方、可建/可行走约束报告、字段诊断哈希，以及 Heightfield 兼容视图、稀疏 Voxel chunk 和分层查询边界。旧 TerrainMap 生成入口保持默认，新增 `TerrainGenerator::compile_procedural` 供迁移对拍使用；不改变旧地图、快照或存档。 | crates/sim_core/src/geo/{procedural,backend,adapters,generator.rs,mod.rs}, docs(current/tech/14-terrain-and-network, 01-changelog) |
+
 | **（代码修复 · 河谷通行 · 不升版）2026-09-24** | **河谷道路允许直接经过水体**：`river_valley_v1` 不再把河水格视为道路障碍，河道可直接通行；其他模板仍保留水体/浅滩授权规则，河谷的坡度、`NO_WALK` 与岩壁校验不变。该 seed 的 native release 创世耗时由约 11 秒降至约 0.14 秒。**已重编译并同步 WASM 双副本，存档兼容线维持 v1.60。** | crates/sim_core/src/geo/corridor.rs, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} / docs(01-changelog) |
 
 | **（代码修复 · 创世门禁 · 不升版）2026-09-24** | **解除 `SpawnDisconnected` 创世拒绝**：生存诊断仍记录营地/资源不可达，但不再因此回退或拒绝世界；`SurvivalCostExceeded` 仍保持门禁。**不升版，已重编译并同步 WASM 双副本，存档兼容线维持 v1.60。** | crates/sim_core/src/spatial/creation_fallback.rs, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} / docs(01-changelog) |

@@ -19,9 +19,8 @@
 
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use super::terrain::{
-    is_static_water_profile, TerrainFeatureKind, TerrainMap,
-    TERRAIN_PROFILE_VOLCANIC_LAKE, TERRAIN_PROFILE_MOUNTAIN_PASS,
-    TERRAIN_PROFILE_RIVER_VALLEY,
+    is_static_water_profile, TerrainFeatureKind, TerrainMap, TERRAIN_PROFILE_MOUNTAIN_PASS,
+    TERRAIN_PROFILE_RIVER_VALLEY, TERRAIN_PROFILE_VOLCANIC_LAKE,
 };
 
 use crate::spatial::vec3::Vec3;
@@ -156,7 +155,10 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
         // ★ TB-03 静水语义：零流向、无授权走廊（不沿用浅滩跨水授权）；静水
         //   闭合轮廓额外校验闭合性与自交（不套河流条带协议）。
         if is_static_water_profile(&t.profile) {
-            if wb.flow_direction.x != 0.0 || wb.flow_direction.y != 0.0 || wb.flow_direction.z != 0.0 {
+            if wb.flow_direction.x != 0.0
+                || wb.flow_direction.y != 0.0
+                || wb.flow_direction.z != 0.0
+            {
                 return Err("StaticWaterOutlineInvalid");
             }
             if !t.hydrology.connections.is_empty() {
@@ -204,7 +206,9 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
             return Err("ConnectionIdDuplicated");
         }
         conn_ids.push(c.id);
-        if !pos_bounded(&c.start, half) || !pos_bounded(&c.end, half) || !(c.width.is_finite() && c.width > 0.0)
+        if !pos_bounded(&c.start, half)
+            || !pos_bounded(&c.end, half)
+            || !(c.width.is_finite() && c.width > 0.0)
         {
             return Err("ConnectionInvalid");
         }
@@ -221,7 +225,10 @@ fn validate_hydrology(t: &TerrainMap) -> Result<(), &'static str> {
             let (gx, gy) = t.grid_index(v.x, v.y);
             let c = &t.cells[gy * t.grid_width + gx];
             if c.water_body_id.is_some()
-                || matches!(c.surface_kind, SurfaceKind::DeepWater | SurfaceKind::ShallowWater)
+                || matches!(
+                    c.surface_kind,
+                    SurfaceKind::DeepWater | SurfaceKind::ShallowWater
+                )
             {
                 return Err("FordEndpointNotOnLand");
             }
@@ -249,9 +256,7 @@ fn validate_cells(t: &TerrainMap) -> Result<(), &'static str> {
         let no_build = c.feature_flags & TERRAIN_FLAG_NO_BUILD != 0;
         let mismatch = match c.surface_kind {
             SurfaceKind::DeepWater => c.water_body_id.is_none() || !no_walk || !no_build,
-            SurfaceKind::ShallowWater => {
-                c.water_body_id.is_none() || !no_build || no_walk
-            }
+            SurfaceKind::ShallowWater => c.water_body_id.is_none() || !no_build || no_walk,
             SurfaceKind::RockFace => c.water_body_id.is_some() || !no_walk,
             _ => c.water_body_id.is_some() || no_walk,
         };

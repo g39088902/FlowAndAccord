@@ -34,6 +34,28 @@ FlowAndAccord/
 │   │       │   ├── query.rs                # 地表通行与建造查询
 │   │       │   ├── biome.rs                # 生物群系定义
 │   │       │   ├── validation.rs          # ★ STAGE2-4 静态几何只读校验（创世与读档共用门禁）
+│   │       │   ├── procedural/             # UGC-01/02 字段 IR、算子、水文过程与编译器；UGC-03 静态模板 recipe；Field3Chunk
+│   │       │   │   ├── ir.rs               # 稳定 NodeId、TerrainRecipe 与拓扑校验
+│   │       │   │   ├── fields.rs           # Field2/Field3Chunk 与有限值写入
+│   │       │   │   ├── operators.rs        # Plane/Noise/Ridge/Valley/平滑组合算子
+│   │       │   │   ├── processes.rs        # 固定顺序汇流与热松弛过程
+│   │       │   │   ├── hydrology.rs        # 汇流/河道/水位字段投影
+│   │       │   │   ├── strata.rs           # 地层柱采样
+│   │       │   │   ├── groundwater.rs      # 静态地下水字段
+│   │       │   │   ├── uncertainty.rs      # 有限候选排序
+│   │       │   │   ├── semantics.rs        # SurfaceKind/材质/调色投影
+│   │       │   │   ├── constraints.rs      # 可建/可行走约束报告
+│   │       │   │   ├── diagnostics.rs      # 字段 hash 与诊断包
+│   │       │   │   ├── compiler.rs         # 固定顺序 Field Graph 编译入口
+│   │       │   │   └── recipes.rs          # 八个静态模板数据 recipe
+│   │       │   ├── backend/                # UGC-04 Heightfield/Voxel/Surface Nets/分层查询后端
+│   │       │   │   ├── heightfield.rs     # GeoCell 兼容视图
+│   │       │   │   ├── voxel.rs           # 稀疏 chunk 与 TerrainGeometry
+│   │       │   │   ├── layers.rs          # 分层查询接口
+│   │       │   │   └── meshing.rs         # Surface Nets 网格提取
+│   │       │   ├── adapters/               # UGC-03 TerrainMap 兼容适配 + UGC-11 外部观测边界
+│   │       │   │   ├── terrain_map.rs     # 编译结果投影与 LegacyReference 差异报告
+│   │       │   │   └── observations.rs    # 只读输入元数据
 │   │       │   └── corridor.rs             # 廊道分析
 │   │       └── spatial/                    # 🗺️ 空间模拟核心
 │   │           ├── mod.rs                  # spatial 模块集成入口
@@ -215,7 +237,6 @@ FlowAndAccord/
 │   └── workflows/
 │       └── deploy.yml                      # CI/CD 自动部署 (GitHub Actions → 腾讯云 COS)
 ├── AGENTS.md                                # 📖 智能体操作指南 (唯一保留在根目录的文档)
-├── TODO.md                                  # 待办事项清单
 └── docs/                                    # 📚 全部项目文档（当前/计划 → 产品设计/技术方案 → 目录内顺序编号）
     ├── README.md                              # 文档总导航
     ├── doc-maintenance.json                   # 文档维护清单契约配置
@@ -284,7 +305,6 @@ FlowAndAccord/
     │       ├── 07-terrain-art.md                # 地形美术与世界景观
     │       ├── 08-performance.md                # 仅保留未完成的性能优化
     │       ├── 09-vegetation-verification.md    # 植被样板验证方案与遗留事项（TA-05，自根目录临时方案收口精简）
-    │       ├── 10-basin-mountain-encirclement.md # ★ TB-04 盆地群峰环抱与峡谷出水口地貌规划
     │       ├── 31-canvas-to-webgl-migration.md  # WebGL 渲染管线迁移总体路线规划
     │       └── assets/                          # 专项归档（实施/验收/验证记录）
     │           ├── ta09/slope-verification.txt    # TA-09 RiverCliff 局部试算验证记录
@@ -312,4 +332,3 @@ FlowAndAccord/
 ## 3. M19.1 类型与只读观察入口
 
 `decisions/intent.rs` 定义意图并转换已知来源的 Need；`strategy.rs` / `primitive.rs` 定义计划词汇；`observation.rs` 为 Agent 提供借用式执行事实与旧状态无损视图。旧 evaluate/routing/scheduler 继续执行，不存在第二个调度器。API 与存储边界见 [./12-m19-architecture.md](./12-m19-architecture.md)。
-

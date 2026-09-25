@@ -132,15 +132,25 @@ pub(super) fn apply_static_water<F>(
     let half = map.world_size * 0.5;
     let xs: Vec<f32> = plan.outline.iter().map(|v| v.x).collect();
     let ys: Vec<f32> = plan.outline.iter().map(|v| v.y).collect();
-    let (min_x, max_x) = (xs.iter().cloned().fold(f32::MAX, f32::min), xs.iter().cloned().fold(f32::MIN, f32::max));
-    let (min_y, max_y) = (ys.iter().cloned().fold(f32::MAX, f32::min), ys.iter().cloned().fold(f32::MIN, f32::max));
-    let gx_lo = ((((min_x - 1.0) / map.world_size + 0.5) * (map.grid_width - 1).max(1) as f32).floor() as isize)
+    let (min_x, max_x) = (
+        xs.iter().cloned().fold(f32::MAX, f32::min),
+        xs.iter().cloned().fold(f32::MIN, f32::max),
+    );
+    let (min_y, max_y) = (
+        ys.iter().cloned().fold(f32::MAX, f32::min),
+        ys.iter().cloned().fold(f32::MIN, f32::max),
+    );
+    let gx_lo = ((((min_x - 1.0) / map.world_size + 0.5) * (map.grid_width - 1).max(1) as f32)
+        .floor() as isize)
         .clamp(0, (map.grid_width - 1) as isize) as usize;
-    let gx_hi = ((((max_x + 1.0) / map.world_size + 0.5) * (map.grid_width - 1).max(1) as f32).ceil() as isize)
+    let gx_hi = ((((max_x + 1.0) / map.world_size + 0.5) * (map.grid_width - 1).max(1) as f32)
+        .ceil() as isize)
         .clamp(0, (map.grid_width - 1) as isize) as usize;
-    let gy_lo = ((((min_y - 1.0) / map.world_size + 0.5) * (map.grid_height - 1).max(1) as f32).floor() as isize)
+    let gy_lo = ((((min_y - 1.0) / map.world_size + 0.5) * (map.grid_height - 1).max(1) as f32)
+        .floor() as isize)
         .clamp(0, (map.grid_height - 1) as isize) as usize;
-    let gy_hi = ((((max_y + 1.0) / map.world_size + 0.5) * (map.grid_height - 1).max(1) as f32).ceil() as isize)
+    let gy_hi = ((((max_y + 1.0) / map.world_size + 0.5) * (map.grid_height - 1).max(1) as f32)
+        .ceil() as isize)
         .clamp(0, (map.grid_height - 1) as isize) as usize;
     let _ = half;
     for gy in gy_lo..=gy_hi {

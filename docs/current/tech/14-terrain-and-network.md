@@ -1,5 +1,13 @@
 # 14. 地形、空间拓扑与路网（`geo` + `spatial`）
 
+> **UGC-01 实施状态（2026-09-24）**：新增 `geo::procedural` Field IR、确定性二维字段算子、`grassland_plain_v1`/`mountain_pass_v1` 数据配方、约束报告和 `geo::backend::HeightfieldBackend`/稀疏 Voxel 接口。旧 `TerrainMap` 生成器仍是默认兼容路径；新编译器通过 `TerrainGenerator::compile_procedural` 使用，后续波次再迁移水文和体素静态重建。
+
+> **UGC-02 实施状态（2026-09-25）**：`geo::procedural::processes` 已提供固定 D8 汇流（含平地稳定 tie-break）、热松弛、液压侵蚀/沉积和 priority-flood 水位求解；`procedural::hydrology` 将河道连通分量、岸带、静态水体 ID 和深水/河岸语义投影到 `SemanticGrid`。这些过程只由 recipe 水文参数驱动，旧 `TerrainMap` 默认生成路径保持不变。
+
+> **UGC-03 实施状态（2026-09-25）**：已注册河谷、台地、盆地、冲积扇、火山湖、半坡以及前两波的草原/山口共八个静态 recipe。迁移校正后，六个 profile 进入 Field Compiler；冲积扇和盆地暂时保留旧 `FanGeometry`/`BasinGeometry` 专用生成路径，因为通用 Cone/Depression recipe 尚未表达扇形干沟、盆地出口谷地和模板锚点。`random` 仍使用原有 seed→profile 分区，选中这两个 profile 时同样走专用路径；其余 profile 通过 `HeightfieldBackend` 投影到 `TerrainMap`。编译失败、flat baseline、未知配方或降级覆盖开启时回退旧生成器。冲积扇与盆地修复使 `TERRAIN_GENERATOR_VERSION` 从 22 推进到 24；旧版本存档按既有门禁拒绝。适配器复制新高程、坡度、地表、水体 ID 和 flags，保留旧特征 ID/水文多边形协议不伪造；生态布局在没有旧水文多边形但检测到新深水格时，仍建立共享水池并绑定水源 POI；`compare_recipe_to_legacy` 提供高程最大误差、地表差异和水体 ID 差异报告。
+
+> **UGC-04 实施状态（2026-09-25）**：`VoxelBackend` 已按固定 32³ chunk + 一格 halo 从 `HeightfieldBackend`/`CompiledTerrain` 构建量化密度与材质场；密度使用 `DENSITY_SCALE=256`、四舍五入和 `i16` clamp。`TerrainGeometry` 提供世界坐标密度/材质采样和 chunk 读取，`LayeredTerrainQuery` 对编译后端保留精确顶部兼容面，对手工 chunk 使用零面二分查询；`HeightfieldView::surface_at` 保留高度场兼容入口。`meshing::extract_surface_nets_at` 按固定角点/轴顺序平均符号变化边交点并生成确定性三角面，halo 负责相邻 chunk 的边界采样。体素构建和 mesh 请求均为静态显式调用，不进入 tick、快照或前端 cell section；UGC-05 再接入 chunk 缓存和存档 delta。
+
 ## R0 T2 河道表示迁移（v1.53.0）
 
 T2 主河现由生成期 `RiverCenterline` 参数化折线表示（弧长累计、线性弧长采样、精确点到线段距离与符号横距），河道影响带不再使用 `|x-center(y)|`。三回环中心线由独立 `hydro_rng` 相位确定性派生；河岸/河阶、水面轮廓、浅滩授权端点及取水点均沿中心线法向或弧长落位。中心线在地图边缘保留直线入/出图段，并在至少覆盖最大河半宽的内侧余量后平滑渐入渐出蜿蜒，避免法向轮廓顶点越界。浅滩端点从解析岸线起沿法向按栅格步长向外检查，直到其映射到非水格，避免急弯的邻近河段或栅格取整使端点落水。`RiverCenterline::meander_windows()` 提供 R0-4 牛轭湖前置的曲折率、弯颈宽度与摆幅候选窗口诊断；没有合格窗口只表示未来子特征不注入，不拒绝基础世界。该中心线不进入存档；边缘形态修复使生成器版本从 16 推进至 17；v1.58 冲积扇沟槽合并与浅滩端点陆格寻址使版本再推进至 19；v1.59 河谷子特征改为水线净空 + 最远点散布，版本推进至 20，旧地形存档按既有版本门禁拒绝。

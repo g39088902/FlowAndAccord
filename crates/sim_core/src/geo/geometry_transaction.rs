@@ -1,9 +1,7 @@
 //! 第 5 步完整几何事务。整图隔离包含任意支撑域和差分 halo；不依赖锚点哨兵。
 //! 未提交的候选离开作用域即丢弃，原始地形、计划和 scratch 从未被修改。
 use super::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
-use super::terrain::{
-    GenesisScratch, PlannedSubFeature, TerrainMap, TerrainSubFeatureKind,
-};
+use super::terrain::{GenesisScratch, PlannedSubFeature, TerrainMap, TerrainSubFeatureKind};
 
 /// 第 5 步登记意图，第 5c/6 步通过同一实现物化。flags 只叠加，不能取消禁行。
 #[derive(Clone)]
@@ -19,17 +17,30 @@ pub(super) fn apply_surface_overlays(terrain: &mut TerrainMap, scratch: &Genesis
     for overlay in &scratch.surface_overlays {
         let cell = &mut terrain.cells[overlay.cell_index];
         // 既有水系地表优先，不允许陆地意图抹掉主河/浅滩。
-        let existing_water = matches!(cell.surface_kind, SurfaceKind::DeepWater
-            | SurfaceKind::ShallowWater | SurfaceKind::RiverBank | SurfaceKind::RiverTerrace);
-        let incoming_water = matches!(overlay.surface_kind, SurfaceKind::DeepWater
-            | SurfaceKind::ShallowWater | SurfaceKind::RiverBank | SurfaceKind::RiverTerrace);
+        let existing_water = matches!(
+            cell.surface_kind,
+            SurfaceKind::DeepWater
+                | SurfaceKind::ShallowWater
+                | SurfaceKind::RiverBank
+                | SurfaceKind::RiverTerrace
+        );
+        let incoming_water = matches!(
+            overlay.surface_kind,
+            SurfaceKind::DeepWater
+                | SurfaceKind::ShallowWater
+                | SurfaceKind::RiverBank
+                | SurfaceKind::RiverTerrace
+        );
         if !existing_water || incoming_water {
             cell.surface_kind = overlay.surface_kind;
             cell.water_body_id = overlay.water_body_id;
             cell.natural_fertility = overlay.natural_fertility;
         }
         cell.feature_flags |= overlay.flags;
-        if matches!(cell.surface_kind, SurfaceKind::DeepWater | SurfaceKind::ShallowWater) {
+        if matches!(
+            cell.surface_kind,
+            SurfaceKind::DeepWater | SurfaceKind::ShallowWater
+        ) {
             cell.feature_flags |= TERRAIN_FLAG_NO_BUILD;
         }
         if cell.surface_kind.is_hard_blocked() {
@@ -46,8 +57,12 @@ impl TerrainMap {
         &mut self,
         scratch: &mut GenesisScratch,
         plan: &mut PlannedSubFeature,
-        apply: impl FnOnce(&TerrainMap, &mut TerrainMap, &mut GenesisScratch,
-            &mut PlannedSubFeature) -> Result<bool, &'static str>,
+        apply: impl FnOnce(
+            &TerrainMap,
+            &mut TerrainMap,
+            &mut GenesisScratch,
+            &mut PlannedSubFeature,
+        ) -> Result<bool, &'static str>,
         validate: impl FnOnce(&TerrainMap, &PlannedSubFeature) -> Result<(), &'static str>,
     ) -> Result<bool, &'static str> {
         // Clone 整个值而非手列字段：features/hydrology/中心线/ID 绑定与将来新增字段
@@ -58,7 +73,8 @@ impl TerrainMap {
         if !apply(self, &mut candidate, &mut pending, &mut planned)? {
             return Ok(false);
         }
-        if candidate.grid_width != self.grid_width || candidate.grid_height != self.grid_height
+        if candidate.grid_width != self.grid_width
+            || candidate.grid_height != self.grid_height
             || candidate.cells.len() != self.cells.len()
             || candidate.world_size.to_bits() != self.world_size.to_bits()
             || candidate.seed != self.seed
@@ -87,8 +103,11 @@ impl TerrainMap {
             }
         }
         if (!pending.soft_ring.is_empty() && pending.soft_ring.len() != candidate.cells.len())
-            || pending.surface_overlays.iter().any(|o| o.cell_index >= candidate.cells.len()
-                || !o.natural_fertility.is_finite() || !(0.0..=1.0).contains(&o.natural_fertility))
+            || pending.surface_overlays.iter().any(|o| {
+                o.cell_index >= candidate.cells.len()
+                    || !o.natural_fertility.is_finite()
+                    || !(0.0..=1.0).contains(&o.natural_fertility)
+            })
         {
             return Err("SubFeatureSurfaceIntentInvalid");
         }
@@ -105,7 +124,9 @@ impl TerrainMap {
     }
 
     pub(super) fn apply_subfeature_pipeline(
-        &mut self, plan: &mut [PlannedSubFeature], scratch: &mut GenesisScratch,
+        &mut self,
+        plan: &mut [PlannedSubFeature],
+        scratch: &mut GenesisScratch,
     ) {
         let mut order: Vec<usize> = (0..plan.len()).collect();
         order.sort_by_key(|&i| plan[i].kind as u32);
@@ -115,16 +136,24 @@ impl TerrainMap {
                 //   几何施加 + 局部判定（硬禁行 70% 连续带 / 连通分量不增加 /
                 //   取水点圆保护）在事务内完成；Err 局部拒绝整块回滚、不重抽。
                 TerrainSubFeatureKind::RiverCliff => {
-                    let _ = self.geometry_transaction(scratch, &mut plan[i],
-                        super::hydrology::apply_river_cliff, |_, _| Ok(()));
+                    let _ = self.geometry_transaction(
+                        scratch,
+                        &mut plan[i],
+                        super::hydrology::apply_river_cliff,
+                        |_, _| Ok(()),
+                    );
                 }
                 // 其余 kind 仍为空注入：结构型（FootLake/RidgeWaterfall/OxbowLake）
                 // 待各自实施；视觉型无几何、走第 9 步装饰。Ok(false) 不把
                 // “选中”误报为“接受”；disabled_mask 已在进入此管线前过滤。
                 _ => {
                     let structural = plan[i].kind.is_structural();
-                    let _ = self.geometry_transaction(scratch, &mut plan[i],
-                        move |_, _, _, _| Ok(!structural), |_, _| Ok(()));
+                    let _ = self.geometry_transaction(
+                        scratch,
+                        &mut plan[i],
+                        move |_, _, _, _| Ok(!structural),
+                        |_, _| Ok(()),
+                    );
                 }
             }
         }

@@ -19,9 +19,9 @@
 //! `relief_rng` 专属局部流（消费序固定：湖心横移 ×2 → 旋转 → 长轴比 → 短轴比 →
 //! 轮廓谐波相位 ×2 → 出口 1 方向 → 出口 2 间隔 → 取水点角偏移）。
 
+use super::static_water::{build_closed_ellipse_outline, StaticWaterPlan};
 use crate::config::SimConfig;
 use crate::rng::WorldRng;
-use super::static_water::{build_closed_ellipse_outline, StaticWaterPlan};
 
 /// 火山湖静态几何（创世 scratch 专用，不进快照/存档）。
 #[derive(Debug, Clone)]
@@ -79,7 +79,9 @@ impl VolcanicLakeGeometry {
         let rotation_rad = relief_rng.gen_range(0.0, std::f32::consts::TAU);
         let (sin_rot, cos_rot) = rotation_rad.sin_cos();
         let a_min = config.terrain_lake_semi_axis_ratio_min.clamp(0.06, 0.24);
-        let a_max = config.terrain_lake_semi_axis_ratio_max.clamp(a_min + 0.01, 0.26);
+        let a_max = config
+            .terrain_lake_semi_axis_ratio_max
+            .clamp(a_min + 0.01, 0.26);
         // 天池的湖面只占火山体的一小部分：保留配置的随机性，但把湖面收进
         // 更宽的环形山口，避免画面退化成一块孤立的蓝色椭圆。
         let lake_scale = 0.80;
@@ -98,8 +100,8 @@ impl VolcanicLakeGeometry {
         let exit1 = relief_rng.gen_range(0.0, std::f32::consts::TAU);
         let exit2 = exit1 + relief_rng.gen_range(2.2, 4.0);
         let exit_half_rad = 0.46; // 两条窄缓坡出山口，保留完整环形火山口轮廓
-        // 天池式火山体：湖面位于平原中部，外圈形成宽缓但明显的火山锥体。
-        // 高度随地图尺度缩放，使不同世界尺寸仍保持远景可辨。
+                                  // 天池式火山体：湖面位于平原中部，外圈形成宽缓但明显的火山锥体。
+                                  // 高度随地图尺度缩放，使不同世界尺寸仍保持远景可辨。
         let outer_rise_m = (world_size * 0.060).clamp(40.0, 72.0);
 
         let mut geom = Self {
@@ -131,8 +133,10 @@ impl VolcanicLakeGeometry {
         //（岸线外 6m 真实干地；分居两出口邻域，间距 ≥2×semi_b×sin(Δθ/2) ≫ 70m）。
         let level = geom.shore_datum - 1.2;
         let outline = build_closed_ellipse_outline(
-            cx, cy,
-            semi_a, semi_b,
+            cx,
+            cy,
+            semi_a,
+            semi_b,
             rotation_rad,
             geom.warp1,
             geom.warp2,
@@ -148,7 +152,10 @@ impl VolcanicLakeGeometry {
             let (r_out_a, _) = geom.outline_radius_at(a_world - rotation_rad);
             // 岸线外 12m（退距外缘）：既保证道路走廊半径（~5.7m）不扫到紧贴
             // 水线的深水格，又落在可建干岸带内；距水线 12m < 交互半径 22m。
-            access_points.push((cx + a_world.cos() * (r_out_a + 12.0), cy + a_world.sin() * (r_out_a + 12.0)));
+            access_points.push((
+                cx + a_world.cos() * (r_out_a + 12.0),
+                cy + a_world.sin() * (r_out_a + 12.0),
+            ));
         }
         geom.water = Some(StaticWaterPlan {
             water_body_id: 1,
@@ -167,7 +174,10 @@ impl VolcanicLakeGeometry {
     fn local_uv(&self, wx: f32, wy: f32) -> (f32, f32) {
         let dx = wx - self.center_x;
         let dy = wy - self.center_y;
-        (dx * self.cos_rot + dy * self.sin_rot, -dx * self.sin_rot + dy * self.cos_rot)
+        (
+            dx * self.cos_rot + dy * self.sin_rot,
+            -dx * self.sin_rot + dy * self.cos_rot,
+        )
     }
     /// 局部角 θ 处的扰动轮廓半径（米）与标称椭圆半径（米）。
     /// 轮廓半径 = 椭圆半径(θ) × (1 + warp(θ))。
@@ -176,7 +186,8 @@ impl VolcanicLakeGeometry {
             / ((theta.cos() / self.semi_a).powi(2) + (theta.sin() / self.semi_b).powi(2))
                 .sqrt()
                 .max(1e-6);
-        let warp = 1.0 + self.warp1 * (2.0 * theta + self.phase1).sin()
+        let warp = 1.0
+            + self.warp1 * (2.0 * theta + self.phase1).sin()
             + self.warp2 * (3.0 * theta + self.phase2).sin();
         (ell * warp, ell)
     }

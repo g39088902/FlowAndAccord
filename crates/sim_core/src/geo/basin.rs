@@ -93,7 +93,8 @@ impl BasinGeometry {
         let v = -dx * self.sin_rot + dy * self.cos_rot;
         let q_base = ((u / self.semi_a).powi(2) + (v / self.semi_b).powi(2)).sqrt();
         let theta = v.atan2(u);
-        let warp = 1.0 + 0.12 * (3.0 * theta + self.warp_phase1).sin()
+        let warp = 1.0
+            + 0.12 * (3.0 * theta + self.warp_phase1).sin()
             + 0.07 * (5.0 * theta + self.warp_phase2).cos();
         let q = q_base / warp.max(0.6);
         (q, theta)
