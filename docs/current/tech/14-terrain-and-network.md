@@ -12,7 +12,7 @@
 
 > **UGC-06 实施状态（2026-09-25）**：Field Compiler recipe 现在携带 `StratigraphicColumn` 与 `MaterialTable`。地层柱校验 ID 唯一、厚度为正、硬度/储水/渗透率均在 `[0,1]`；`sample_stratum(column, depth)` 按地表向下累计厚度稳定定位地层，边界深度进入下一层。`CompiledTerrain`、`HeightfieldBackend` 和 `VoxelBackend` 传递这组静态字段，chunk 生成时以 `surface_height - z` 为深度采样地层并写入材料 ID；没有 recipe 的旧/手工 chunk 继续使用既有 `SurfaceKind` 映射。palette 只用于材料外观元数据，不改变高程、密度、通行或 tick；voxel backend 版本推进到 2。
 
-> **UGC-07 实施状态（2026-09-25）**：`StructuralEvent` 已进入 Field Compiler 的固定阶段顺序。`apply_structures` 先在 scratch 高程上按声明顺序执行 Fault 的归一化平面 smoothstep 位移、Fold 的轴向周期位移和 Unconformity 的地层深度偏移，再交给热松弛、侵蚀和水文过程；结构参数、零长度几何、未知 surface node、NaN/无穷结果均在编译前或事务提交前拒绝。`StructureField` 将 authored 位移事件和不整合深度偏移传递到 Heightfield/Voxel 后端；默认 recipe 没有结构事件，因此现有 profile 输出不变。
+> **UGC-07 实施状态（2026-09-25）**：`StructuralEvent` 已进入 Field Compiler 的固定阶段顺序。`apply_structures` 先在 scratch 高程上按声明顺序执行 Fault 的归一化平面 smoothstep 位移、Fold 的轴向周期位移和 Unconformity 的地层深度偏移，再交给热松弛、侵蚀和水文过程；结构参数、零长度几何、未知 surface node、NaN/无穷结果均在编译前或事务提交前拒绝。`StructureField` 将 authored 位移事件和不整合深度偏移传递到 Heightfield/Voxel 后端；默认 production recipe 没有结构事件，因此现有随机 profile 输出不变。地图图鉴新增 `fault_scarp_demo_v1` 与 `folded_basin_demo_v1` 两个显式演示 recipe，通过 `terrainProfile` 查询参数走同一 WASM/WebGL 地形链路，分别可见断层陡坎和连续褶皱；演示配方不加入 `random`，且只读地图模式绕过可玩世界降级门禁。
 
 ## R0 T2 河道表示迁移（v1.53.0）
 

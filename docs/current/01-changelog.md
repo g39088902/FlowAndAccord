@@ -3,6 +3,8 @@
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
 > 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.2**。
 
+| **（代码新增 · UGC-07 断层/褶皱可视演示 · 不升应用版本）2026-09-25** | **让结构事件可直接预览**：新增 `fault_scarp_demo_v1` 和 `folded_basin_demo_v1` 诊断 recipe，并在地图图鉴添加结构下拉选择。演示地图复用正式 Field Compiler→TerrainMap→WASM→WebGL 路径；明确从 `random` 池排除，且图鉴只读建图绕过可玩世界的地形回退阶梯，保证断层和褶皱形态实际显示。 | crates/sim_core/src/geo/procedural/recipes.rs, crates/sim_core/src/spatial/world.rs, frontend/{map.html,map.css,js/map-view.js,js/rustworld.js,js/render_hud.js}, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} |
+
 | **（代码新增 · UGC-05 静态体素请求契约 · 不升版）2026-09-25** | **接入静态地形键与按需 chunk 通道**：新增 `TerrainStaticKey`（recipe/hash/seed/generator/voxel backend 版本）并写入存档元数据；WASM 暴露 `world_terrain_key_*` 与 `world_terrain_chunk_*`，按显式坐标请求返回带 FAVX 头、坐标、体素尺度、密度和材质的 little-endian chunk 包；Worker/RustWorld 提供异步转发。请求路径只构建并缓存静态 voxel 后端，不进入 tick 或 FABS 快照；读档和换世界自动失效缓存。 | crates/sim_core/src/geo/backend/{heightfield.rs,voxel.rs}, crates/sim_core/src/spatial/world_save.rs, crates/sim_wasm/src/lib.rs, frontend/js/{sim_worker.js,rustworld.js} |
 
 | **（代码新增 · UGC-05 chunk delta 持久化 · 不升版）2026-09-25** | **补齐静态 chunk 修改的保存契约**：新增 `ChunkDelta`/`DeltaRun`，对 chunk 坐标、运行区间和基线 hash 做确定性校验；`World3DEngine`/`WorldSave` 保存 authored delta，WASM 重建 lazy voxel 后端时按基线 hash 重放修改，基线变化或越界时拒绝请求。静态地形、tick、FABS 字段保持不变。 | crates/sim_core/src/geo/backend/{voxel.rs,mod.rs}, crates/sim_core/src/spatial/{world.rs,world_save.rs}, crates/sim_wasm/src/lib.rs |

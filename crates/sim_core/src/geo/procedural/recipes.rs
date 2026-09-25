@@ -10,6 +10,10 @@ pub const BASIN_OASIS_V1: &str = "basin_oasis_v1";
 pub const ALLUVIAL_FAN_V1: &str = "alluvial_fan_v1";
 pub const VOLCANIC_LAKE_V1: &str = "volcanic_lake_v1";
 pub const HILLSIDE_WOODLAND_V1: &str = "hillside_woodland_v1";
+/// Read-only map gallery recipe used to make the UGC-07 structural compiler visible.
+pub const FAULT_SCARP_DEMO_V1: &str = "fault_scarp_demo_v1";
+/// Read-only map gallery recipe used to make the UGC-07 structural compiler visible.
+pub const FOLDED_BASIN_DEMO_V1: &str = "folded_basin_demo_v1";
 
 fn recipe_from_nodes(
     id: &str,
@@ -389,6 +393,84 @@ pub fn hillside_woodland_v1() -> TerrainRecipe {
     )
 }
 
+/// A deliberately legible UGC-07 demo: a smooth uplift across a diagonal plane.
+/// It is kept out of the random production profile pool and is intended for the
+/// map gallery/diagnostic view only.
+pub fn fault_scarp_demo_v1() -> TerrainRecipe {
+    let mut recipe = recipe_from_nodes(
+        FAULT_SCARP_DEMO_V1,
+        common_nodes(
+            FieldOp::Plane {
+                direction: [0.0, 1.0],
+                slope: 0.004,
+                base: 0.0,
+            },
+            FieldOp::Ridge {
+                start: [-360.0, 260.0],
+                end: [360.0, -260.0],
+                width: 240.0,
+                amplitude: 24.0,
+            },
+            3.0,
+        ),
+        3,
+        HydrologySpec {
+            channel_threshold: 900.0,
+            bank_width_m: 18.0,
+            ..HydrologySpec::default()
+        },
+    );
+    recipe.structures = vec![StructuralEvent::Fault {
+        plane: PlaneSpec {
+            origin: [0.0, 0.0],
+            normal: [0.70710677, -0.70710677],
+        },
+        displacement_m: 58.0,
+    }];
+    // This gallery sample intentionally shows the discontinuity; it is not a
+    // production settlement candidate and therefore does not apply the
+    // single-walkable-component gate used by playable recipes.
+    recipe.constraints.clear();
+    recipe
+}
+
+/// A deliberately legible UGC-07 demo: repeated folds perpendicular to a
+/// diagonal axis. It is kept out of the random production profile pool.
+pub fn folded_basin_demo_v1() -> TerrainRecipe {
+    let mut recipe = recipe_from_nodes(
+        FOLDED_BASIN_DEMO_V1,
+        common_nodes(
+            FieldOp::Plane {
+                direction: [0.0, 1.0],
+                slope: 0.002,
+                base: 6.0,
+            },
+            FieldOp::Depression {
+                center: [0.0, 0.0],
+                radius: 330.0,
+                depth: 18.0,
+            },
+            2.5,
+        ),
+        3,
+        HydrologySpec {
+            channel_threshold: 900.0,
+            bank_width_m: 16.0,
+            ..HydrologySpec::default()
+        },
+    );
+    recipe.structures = vec![StructuralEvent::Fold {
+        axis: AxisSpec {
+            start: [-380.0, -180.0],
+            end: [380.0, 180.0],
+        },
+        amplitude_m: 34.0,
+        wavelength_m: 190.0,
+    }];
+    recipe.constraints.clear();
+    recipe
+}
+
 pub fn builtin(id: &str) -> Option<TerrainRecipe> {
     match id {
         GRASSLAND_PLAIN_V1 => Some(grassland_plain_v1()),
@@ -399,6 +481,8 @@ pub fn builtin(id: &str) -> Option<TerrainRecipe> {
         ALLUVIAL_FAN_V1 => Some(alluvial_fan_v1()),
         VOLCANIC_LAKE_V1 => Some(volcanic_lake_v1()),
         HILLSIDE_WOODLAND_V1 => Some(hillside_woodland_v1()),
+        FAULT_SCARP_DEMO_V1 => Some(fault_scarp_demo_v1()),
+        FOLDED_BASIN_DEMO_V1 => Some(folded_basin_demo_v1()),
         _ => None,
     }
 }
@@ -412,6 +496,8 @@ pub fn builtins() -> Vec<TerrainRecipe> {
         alluvial_fan_v1(),
         volcanic_lake_v1(),
         hillside_woodland_v1(),
+        fault_scarp_demo_v1(),
+        folded_basin_demo_v1(),
     ]
 }
 fn default_strata() -> StratigraphicColumn {

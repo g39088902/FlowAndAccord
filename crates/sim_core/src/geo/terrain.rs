@@ -837,6 +837,10 @@ pub const TERRAIN_PROFILE_BASIN_OASIS: &str = "basin_oasis_v1";
 /// 中心静水湖占据显著面积（半轴 0.10~0.16×world）迫使路线沿岸绕行——连续环湖
 /// 干岸（安全退距外可建）+ 两个分离陆路出口 + 两个分离湖岸取水点共享同一淡水池。
 pub const TERRAIN_PROFILE_VOLCANIC_LAKE: &str = "volcanic_lake_v1";
+/// UGC-07 map-gallery demo: a compiled fault scarp, excluded from `random`.
+pub const TERRAIN_PROFILE_FAULT_SCARP_DEMO: &str = "fault_scarp_demo_v1";
+/// UGC-07 map-gallery demo: a compiled fold train, excluded from `random`.
+pub const TERRAIN_PROFILE_FOLDED_BASIN_DEMO: &str = "folded_basin_demo_v1";
 
 /// ★ TB-03 静水新模板判定：火山湖的水体 #1 是 `WaterBody` 特征
 /// （非 River），其水资源预算走「配置一次建立总池」路径（不按岸点数乘算）。

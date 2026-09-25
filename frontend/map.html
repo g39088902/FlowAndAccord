@@ -25,6 +25,14 @@
         <button id="btn-reroll" class="map-button" type="button">刷新地图</button>
       </div>
 
+      <label class="map-control-label" for="terrain-profile">地质结构演示</label>
+      <select id="terrain-profile" class="map-input map-select">
+        <option value="random">按种子选择正式地貌</option>
+        <option value="fault_scarp_demo_v1">断层抬升演示</option>
+        <option value="folded_basin_demo_v1">褶皱盆地演示</option>
+      </select>
+      <div id="terrain-structure-note" class="map-structure-note" aria-live="polite">当前为正式地貌预览。</div>
+
       <div class="map-type-row">
         <span class="map-control-label">当前地形类型</span>
         <div id="terrain-type-badge" class="terrain-type-badge">

@@ -49,7 +49,7 @@ FlowAndAccord/
 │   │       │   │   ├── constraints.rs      # 可建/可行走约束报告
 │   │       │   │   ├── diagnostics.rs      # 字段 hash 与诊断包
 │   │       │   │   ├── compiler.rs         # 固定顺序 Field Graph 编译入口
-│   │       │   │   └── recipes.rs          # 八个静态模板数据 recipe
+│   │       │   │   └── recipes.rs          # 八个静态模板 + 断层/褶皱图鉴演示 recipe
 │   │       │   ├── backend/                # UGC-04 Heightfield/Voxel/Surface Nets/分层查询后端
 │   │       │   │   ├── heightfield.rs     # GeoCell 兼容视图
 │   │       │   │   ├── voxel.rs           # 稀疏 chunk 与 TerrainGeometry

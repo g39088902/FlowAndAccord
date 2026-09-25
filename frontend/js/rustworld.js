@@ -67,6 +67,14 @@
         const query = new URLSearchParams(window.location.search);
         const requestedSeed = Number.parseInt(query.get('seed') || '', 10);
         this._engineSeed = Number.isSafeInteger(requestedSeed) && requestedSeed >= 0 ? requestedSeed : Date.now();
+        // UGC-07 map-gallery demos are explicit, read-only recipe overrides. Keep
+        // them out of the normal random pool so ordinary worlds remain byte-stable.
+        const requestedTerrainProfile = query.get('terrainProfile');
+        const demoProfiles = new Set(['fault_scarp_demo_v1', 'folded_basin_demo_v1']);
+        if (requestedTerrainProfile && demoProfiles.has(requestedTerrainProfile)
+            && typeof window.SIM_CONFIG !== 'undefined') {
+          window.SIM_CONFIG.terrainProfile = requestedTerrainProfile;
+        }
         // 地图图鉴以相同 seed 创建仅含 TerrainMap 的 WASM 世界；不播撒任何游戏实体或路网。
         this._mapOnly = query.has('mapOnly');
         this._terrainCached = false;

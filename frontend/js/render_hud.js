@@ -106,6 +106,8 @@ const MAP_TEMPLATE_LABELS = {
   alluvial_fan_v1: '🏜️ 山前冲积扇',
   basin_oasis_v1: '⛰️ 盆地',
   volcanic_lake_v1: '🌋 火山湖',
+  fault_scarp_demo_v1: '🪨 断层抬升演示',
+  folded_basin_demo_v1: '〰️ 褶皱盆地演示',
   flat_baseline: '📐 诊断基线',
 };
 

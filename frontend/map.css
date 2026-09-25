@@ -31,12 +31,15 @@ body { background: #d9e5e0; }
 .map-control-label { display: block; color: #587067; font-size: 11px; font-weight: 750; letter-spacing: .06em; margin: 14px 0 6px; }
 .map-select, .map-input, .map-button { border: 1px solid #c8d7d0; border-radius: 9px; font: inherit; }
 .map-select, .map-input { width: 100%; height: 36px; padding: 0 10px; color: #294239; background: rgba(255,255,255,.92); }
+.map-structure-note { margin-top: 7px; padding: 7px 9px; border-radius: 8px; color: #6b5a37; background: #fff7df; border: 1px solid #ead9a7; font-size: 11px; line-height: 1.4; }
 .seed-row { display: flex; gap: 8px; }
 .seed-row .map-input { min-width: 0; }
 .map-button { flex: 0 0 auto; padding: 0 12px; color: white; background: #4b7560; cursor: pointer; font-weight: 700; }
 .map-button:hover { background: #375e4d; }
 .map-use-button { display:block; margin-top:9px; padding:9px 10px; border-radius:9px; text-align:center; text-decoration:none; color:#255c6e; background:#d9eef0; border:1px solid #9ecdd3; font-size:12px; font-weight:800; }
 .map-use-button:hover { color:#fff; background:#347789; border-color:#347789; }
+.map-use-button[aria-disabled="true"] { color:#7a6a47; background:#f7efd9; border-color:#e4d6b5; cursor:default; }
+.map-use-button[aria-disabled="true"]:hover { color:#7a6a47; background:#f7efd9; border-color:#e4d6b5; }
 .map-seed-note { margin-top:7px; color:#6d8179; font-size:10px; line-height:1.45; }
 .terrain-type-badge { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; padding: 0 10px; background: rgba(255, 255, 255, .92); border: 1px solid #c8d7d0; border-radius: 9px; }
 .terrain-type-name { font-size: 13px; font-weight: 750; color: #234233; }

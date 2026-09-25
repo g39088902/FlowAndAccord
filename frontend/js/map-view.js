@@ -4,10 +4,12 @@
   const frame = document.getElementById("map-frame");
   const seedInput = document.getElementById("terrain-seed");
   const rerollButton = document.getElementById("btn-reroll");
+  const profileSelect = document.getElementById("terrain-profile");
   const useInGameLink = document.getElementById("btn-use-in-game");
   const typeNameEl = document.getElementById("terrain-type-name");
   const typeIdEl = document.getElementById("terrain-type-id");
   const typeTagEl = document.getElementById("terrain-type-tag");
+  const structureNoteEl = document.getElementById("terrain-structure-note");
   const maxSeed = Number.MAX_SAFE_INTEGER;
 
   // 地图模板名称对照（与 render_hud.js::MAP_TEMPLATE_LABELS 一致）
@@ -20,7 +22,15 @@
     alluvial_fan_v1: '🏜️ 山前冲积扇',
     basin_oasis_v1: '⛰️ 盆地',
     volcanic_lake_v1: '🌋 火山湖',
+    fault_scarp_demo_v1: '🪨 断层抬升演示',
+    folded_basin_demo_v1: '〰️ 褶皱盆地演示',
     flat_baseline: '📐 诊断基线',
+  };
+
+  const STRUCTURE_NOTES = {
+    random: '当前为正式地貌预览。',
+    fault_scarp_demo_v1: 'UGC-07 Fault：沿斜向断层面平滑抬升约 58m，中央形成清晰高差。',
+    folded_basin_demo_v1: 'UGC-07 Fold：沿斜向轴线叠加周期起伏，形成连续褶皱脊谷。',
   };
 
   // 与 sim_core geo/terrain.rs::resolve_profile 完全一致的 8 路 random 候选池
@@ -39,7 +49,8 @@
 
   const PROFILE_SALT = 0x50524F46494C4531n;
 
-  function resolveProfile(seed) {
+  function resolveProfile(seed, selectedProfile) {
+    if (selectedProfile && selectedProfile !== 'random') return selectedProfile;
     const cfgProfile = (typeof window.SIM_CONFIG !== 'undefined' && window.SIM_CONFIG.terrainProfile)
       ? window.SIM_CONFIG.terrainProfile
       : 'random';
@@ -66,8 +77,11 @@
     return Number.isSafeInteger(parsed) && parsed >= 0 ? Math.min(parsed, maxSeed) : 0;
   }
 
-  function mapUrl(seed) {
-    return `index.html?seed=${encodeURIComponent(String(seed))}&mapOnly=1&nogate=1`;
+  function mapUrl(seed, profile) {
+    const profileParam = profile && profile !== 'random'
+      ? `&terrainProfile=${encodeURIComponent(profile)}`
+      : '';
+    return `index.html?seed=${encodeURIComponent(String(seed))}&mapOnly=1&nogate=1${profileParam}`;
   }
 
   let pollTimer = null;
@@ -98,11 +112,28 @@
 
   function renderMap() {
     const seed = currentSeed();
+    const selectedProfile = profileSelect ? profileSelect.value : 'random';
     seedInput.value = String(seed);
-    const predicted = resolveProfile(seed);
+    const predicted = resolveProfile(seed, selectedProfile);
     updateTerrainDisplay(predicted);
-    frame.src = mapUrl(seed);
-    useInGameLink.href = `index.html?seed=${encodeURIComponent(String(seed))}`;
+    if (structureNoteEl) structureNoteEl.textContent = STRUCTURE_NOTES[selectedProfile] || STRUCTURE_NOTES.random;
+    frame.src = mapUrl(seed, selectedProfile);
+    const isStructureDemo = selectedProfile === 'fault_scarp_demo_v1'
+      || selectedProfile === 'folded_basin_demo_v1';
+    if (isStructureDemo) {
+      useInGameLink.href = '#';
+      useInGameLink.textContent = '结构演示仅供只读预览';
+      useInGameLink.setAttribute('aria-disabled', 'true');
+      useInGameLink.tabIndex = -1;
+    } else {
+      const profileParam = selectedProfile !== 'random'
+        ? `&terrainProfile=${encodeURIComponent(selectedProfile)}`
+        : '';
+      useInGameLink.href = `index.html?seed=${encodeURIComponent(String(seed))}${profileParam}`;
+      useInGameLink.textContent = '在正式游戏中使用此种子';
+      useInGameLink.removeAttribute('aria-disabled');
+      useInGameLink.tabIndex = 0;
+    }
     syncEngineProfile();
   }
 
@@ -113,6 +144,10 @@
   seedInput.addEventListener("change", renderMap);
   seedInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") renderMap();
+  });
+  if (profileSelect) profileSelect.addEventListener("change", renderMap);
+  useInGameLink.addEventListener("click", (event) => {
+    if (useInGameLink.getAttribute('aria-disabled') === 'true') event.preventDefault();
   });
   window.addEventListener("keydown", (event) => {
     if (event.key.toLowerCase() === "r" && event.target.tagName !== "INPUT") rerollButton.click();

@@ -27,10 +27,11 @@ pub use ir::{
     ResolvedRecipe, StratigraphicColumn, StratumSpec, TerrainNode, TerrainRecipe,
 };
 pub use recipes::{
-    alluvial_fan_v1, basin_oasis_v1, builtin, builtins, grassland_plain_v1, hillside_woodland_v1,
-    mountain_pass_v1, plateau_v1, river_valley_v1, volcanic_lake_v1, ALLUVIAL_FAN_V1,
-    BASIN_OASIS_V1, GRASSLAND_PLAIN_V1, HILLSIDE_WOODLAND_V1, MOUNTAIN_PASS_V1, PLATEAU_V1,
-    RIVER_VALLEY_V1, VOLCANIC_LAKE_V1,
+    alluvial_fan_v1, basin_oasis_v1, builtin, builtins, fault_scarp_demo_v1,
+    folded_basin_demo_v1, grassland_plain_v1, hillside_woodland_v1, mountain_pass_v1, plateau_v1,
+    river_valley_v1, volcanic_lake_v1, ALLUVIAL_FAN_V1, BASIN_OASIS_V1, FAULT_SCARP_DEMO_V1,
+    FOLDED_BASIN_DEMO_V1, GRASSLAND_PLAIN_V1, HILLSIDE_WOODLAND_V1, MOUNTAIN_PASS_V1,
+    PLATEAU_V1, RIVER_VALLEY_V1, VOLCANIC_LAKE_V1,
 };
 
 pub use hydrology::{ChannelField, HydrologyFields, HydrologySettings};

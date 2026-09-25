@@ -129,6 +129,23 @@ impl World3DEngine {
         seed: u64,
         config: SimConfig,
     ) -> Self {
+        // The map gallery intentionally includes structural demo recipes whose
+        // sharp scarp/fold geometry is not a playable settlement candidate.
+        // Build those read-only previews directly so the creation fallback
+        // ladder does not replace the requested shape with flat_baseline.
+        if matches!(
+            config.terrain_profile.as_str(),
+            crate::geo::terrain::TERRAIN_PROFILE_FAULT_SCARP_DEMO
+                | crate::geo::terrain::TERRAIN_PROFILE_FOLDED_BASIN_DEMO
+        ) {
+            return Self::build_candidate(
+                grid_res,
+                world_size,
+                seed,
+                config,
+                &crate::geo::terrain::GenesisOverrides::default(),
+            );
+        }
         let fallback_cfg = config.clone();
         match Self::new_seeded_with_config_bounded(grid_res, world_size, seed, config, &mut |_| {}) {
             Ok(w) => w,

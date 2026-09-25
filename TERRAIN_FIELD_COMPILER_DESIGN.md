@@ -615,6 +615,8 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 **退出条件**：断层两侧地层错动方向正确，褶皱峰谷连续，结构事件不产生 NaN、孤立浮空体或不可解释的水系断裂。
 
+**当前实现注记（2026-09-25）**：UGC-07 已落地 Fault/Fold/Unconformity 的 scratch 事务字段与 Heightfield/Voxel 传递。地图图鉴提供 `fault_scarp_demo_v1`、`folded_basin_demo_v1` 两个只读 recipe，用同一 WASM/WebGL 链路直接显示断层陡坎和褶皱脊谷；它们不进入 `random` 候选池，也不作为正式游戏存档 profile。
+
 ### UGC-08：静态地下水与植被因果
 
 实现补给、储水、渗透、地下水位和排泄点的创世计算，把 `water_access`、`soil_moisture`、`vegetation_ok`、`surface_material` 和 `surface_palette` 接入统一字段图。
