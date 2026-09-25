@@ -1,10 +1,12 @@
 //! Fixed-order deterministic terrain field compiler.
 use super::fields::{Field2, FieldError};
+use super::groundwater::{solve_groundwater, GroundwaterFields, GroundwaterSettings};
 use super::hydrology::{project_semantics, solve_hydrology, HydrologyFields, HydrologySettings};
 use super::ir::{validate_recipe, RecipeError, ResolvedRecipe, TerrainRecipe};
 use super::materials::MaterialTable;
 use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, ErosionSettings};
 use super::semantics::{self, SemanticGrid, SurfaceThresholds};
+use super::strata::sample_stratum;
 use super::structures::{apply_structures, StructureError, StructureField};
 use super::{constraints, diagnostics, operators};
 use crate::config::SimConfig;
@@ -22,6 +24,8 @@ pub struct TerrainFields {
     pub elevation: Field2,
     pub hardness: Field2,
     pub rainfall: Field2,
+    pub permeability: Field2,
+    pub soil_storage: Field2,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +35,7 @@ pub struct CompiledTerrain {
     pub sediment: Field2,
     pub hydrology: HydrologyFields,
     pub semantics: SemanticGrid,
+    pub groundwater: GroundwaterFields,
     pub reports: Vec<constraints::ConstraintReport>,
     pub diagnostics: diagnostics::DiagnosticsBundle,
     pub backend: BackendKind,
@@ -190,11 +195,40 @@ pub fn compile_terrain_with_dimensions(
         min_lake_depth_m: hydro_spec.min_lake_depth_m,
     };
     let hydrology = solve_hydrology(&elevation, &rainfall, cell_size, hydro_settings)?;
-    let mut projected = semantics::project_with_world_size(
+    let (permeability, soil_storage) = surface_material_fields(
+        &recipe.stratigraphy,
+        &structures.strata_depth_offset,
+        width,
+        height,
+    )?;
+    let groundwater = solve_groundwater(
+        &elevation,
+        &rainfall,
+        &permeability,
+        &soil_storage,
+        &hydrology.water.body_id.iter().map(Option::is_some).collect::<Vec<_>>(),
+        &hydrology.channels.channel,
+        world_size,
+        GroundwaterSettings {
+            iterations: hydro_spec.groundwater_iterations,
+            aquifer_threshold: hydro_spec.groundwater_aquifer_threshold,
+            discharge_threshold: hydro_spec.groundwater_discharge_threshold,
+            access_radius_m: hydro_spec.groundwater_access_radius_m,
+        },
+    )?;
+    let mut projected = semantics::project_with_groundwater(
         &elevation,
         &rainfall,
         &hardness,
-        SurfaceThresholds::default(),
+        &groundwater,
+        SurfaceThresholds {
+            dry: hydro_spec.groundwater_dry_threshold,
+            grass_water: hydro_spec.groundwater_grass_threshold,
+            min_soil_moisture: hydro_spec.groundwater_min_soil_moisture,
+            min_soil_storage: hydro_spec.groundwater_min_soil_storage,
+            wetland_moisture: hydro_spec.groundwater_wetland_threshold,
+            ..SurfaceThresholds::default()
+        },
         world_size,
     )
     .map_err(TerrainCompileError::Semantic)?;
@@ -207,14 +241,45 @@ pub fn compile_terrain_with_dimensions(
     let diagnostic = diagnostics::DiagnosticsBundle {
         seed,
         recipe_hash,
-        generator_version: 1,
+        generator_version: crate::geo::terrain::TERRAIN_GENERATOR_VERSION,
         fields: vec![
             diagnostics::field_diagnostic("elevation", &elevation),
             diagnostics::field_diagnostic("hardness", &hardness),
             diagnostics::field_diagnostic("rainfall", &rainfall),
+            diagnostics::field_diagnostic("permeability", &permeability),
+            diagnostics::field_diagnostic("soil_storage", &soil_storage),
             diagnostics::field_diagnostic("flow", &hydrology.flow.accumulation),
             diagnostics::field_diagnostic("sediment", &sediment),
             diagnostics::field_diagnostic("water_depth", &hydrology.water.depth),
+            diagnostics::field_diagnostic("recharge", &groundwater.recharge),
+            diagnostics::field_diagnostic("water_table", &groundwater.water_table),
+            diagnostics::field_diagnostic("discharge", &groundwater.discharge),
+            diagnostics::field_diagnostic("water_access", &groundwater.water_access),
+            diagnostics::field_diagnostic("soil_moisture", &groundwater.soil_moisture),
+            diagnostics::field_diagnostic(
+                "aquifer_mask",
+                &Field2::from_values(
+                    width,
+                    height,
+                    groundwater
+                        .aquifer_mask
+                        .iter()
+                        .map(|value| if *value { 1.0 } else { 0.0 })
+                        .collect(),
+                )?,
+            ),
+            diagnostics::field_diagnostic(
+                "vegetation_ok",
+                &Field2::from_values(
+                    width,
+                    height,
+                    projected
+                        .vegetation_ok
+                        .iter()
+                        .map(|value| if *value { 1.0 } else { 0.0 })
+                        .collect(),
+                )?,
+            ),
         ],
         constraints: reports.clone(),
     };
@@ -224,10 +289,13 @@ pub fn compile_terrain_with_dimensions(
             elevation,
             hardness,
             rainfall,
+            permeability,
+            soil_storage,
         },
         sediment,
         hydrology,
         semantics: projected,
+        groundwater,
         reports,
         diagnostics: diagnostic,
         backend,
@@ -240,4 +308,39 @@ pub fn compile_terrain_with_dimensions(
 
 pub fn resolve_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeError> {
     validate_recipe(recipe)
+}
+
+fn surface_material_fields(
+    stratigraphy: &super::ir::StratigraphicColumn,
+    strata_depth_offset: &Field2,
+    width: usize,
+    height: usize,
+) -> Result<(Field2, Field2), FieldError> {
+    if strata_depth_offset.width != width || strata_depth_offset.height != height {
+        return Err(FieldError::SizeMismatch);
+    }
+    let fallback = stratigraphy
+        .units
+        .last()
+        .ok_or(FieldError::SizeMismatch)?;
+    let mut permeability = Vec::with_capacity(width * height);
+    let mut soil_storage = Vec::with_capacity(width * height);
+    for depth in &strata_depth_offset.values {
+        let sample = sample_stratum(stratigraphy, (*depth).max(0.0)).unwrap_or_else(|| {
+            super::strata::StratumSample {
+                id: fallback.id,
+                material: fallback.material,
+                hardness: fallback.hardness,
+                soil_storage: fallback.soil_storage,
+                permeability: fallback.permeability,
+                palette: fallback.palette,
+            }
+        });
+        permeability.push(sample.permeability.clamp(0.0, 1.0));
+        soil_storage.push(sample.soil_storage.clamp(0.0, 1.0));
+    }
+    Ok((
+        Field2::from_values(width, height, permeability)?,
+        Field2::from_values(width, height, soil_storage)?,
+    ))
 }

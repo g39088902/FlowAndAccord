@@ -149,10 +149,12 @@ pub fn project_semantics(
     for i in 0..n {
         if let Some(id) = water.body_id[i] {
             semantics.surface_kind[i] = SurfaceKind::DeepWater;
+            semantics.vegetation_ok[i] = false;
             semantics.flags[i] |= TERRAIN_FLAG_NO_WALK | TERRAIN_FLAG_NO_BUILD;
             semantics.water_body_id[i] = Some(lake_offset.saturating_add(id));
         } else if channels.channel[i] {
             semantics.surface_kind[i] = SurfaceKind::DeepWater;
+            semantics.vegetation_ok[i] = false;
             semantics.flags[i] |= TERRAIN_FLAG_NO_WALK | TERRAIN_FLAG_NO_BUILD;
             semantics.water_body_id[i] = channels.channel_id[i];
         } else if channels.bank[i] {

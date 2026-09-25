@@ -8,7 +8,7 @@ use super::layers::{LayeredTerrainQuery, SolidInterval, SurfaceHit};
 use crate::geo::biome::SurfaceKind;
 use crate::geo::procedural::{
     sample_stratum, ChunkCoord, CompiledTerrain, Field3Chunk, FieldError, MaterialTable,
-    StratigraphicColumn,
+    StratigraphicColumn, SurfaceMaterial, SurfacePalette,
 };
 use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub const VOXEL_CHUNK_SIZE: u8 = 32;
 pub const VOXEL_HALO: u8 = 1;
 pub const DENSITY_SCALE: f32 = 256.0;
 pub const HEIGHTFIELD_QUANTUM_M: f32 = 1.0 / DENSITY_SCALE;
-pub const VOXEL_BACKEND_VERSION: u32 = 2;
+pub const VOXEL_BACKEND_VERSION: u32 = 3;
 pub const TERRAIN_CHUNK_PACKET_VERSION: u16 = 1;
 pub const TERRAIN_CHUNK_PACKET_HEADER_LEN: usize = 52;
 
@@ -442,15 +442,34 @@ impl VoxelBackend {
         z: f32,
         surface: f32,
     ) -> u8 {
+        let cell = heightfield.sample_cell(x, y);
+        if cell.surface_kind.is_hard_blocked() {
+            return material_for(cell.surface_kind);
+        }
         if let Some(column) = &self.source_stratigraphy {
             let depth = (surface - z + heightfield.sample_strata_depth_offset(x, y)).max(0.0);
+            if depth <= self.voxel_scale * 1.5 {
+                if let Some(surface_materials) = &heightfield.surface_material {
+                    let gx = heightfield.index(x).min(heightfield.width - 1);
+                    let gy = heightfield.index(y).min(heightfield.height - 1);
+                    let index = gy * heightfield.width + gx;
+                    if let Some(material) = surface_materials.get(index).copied() {
+                        return surface_material_to_id(material);
+                    }
+                    if let Some(palettes) = &heightfield.surface_palette {
+                        if let Some(palette) = palettes.get(index).copied() {
+                            return surface_palette_to_id(palette);
+                        }
+                    }
+                }
+            }
             if let Some(sample) = sample_stratum(column, depth) {
                 if self.material_table.get(sample.material).is_some() {
                     return sample.material;
                 }
             }
         }
-        material_for(heightfield.sample_cell(x, y).surface_kind)
+        material_for(cell.surface_kind)
     }
 
     pub fn chunk_origin(&self, coord: ChunkCoord) -> Vec3 {
@@ -662,5 +681,24 @@ fn material_for(kind: SurfaceKind) -> u8 {
         SurfaceKind::ShallowWater | SurfaceKind::DeepWater => 2,
         SurfaceKind::RiverBank | SurfaceKind::RiverTerrace => 3,
         SurfaceKind::RockFace => 4,
+    }
+}
+
+fn surface_material_to_id(material: SurfaceMaterial) -> u8 {
+    match material {
+        SurfaceMaterial::Grass => 1,
+        SurfaceMaterial::Sand => 2,
+        SurfaceMaterial::BareSoil => 0,
+        SurfaceMaterial::Gravel => 3,
+        SurfaceMaterial::Rock => 4,
+    }
+}
+
+fn surface_palette_to_id(palette: SurfacePalette) -> u8 {
+    match palette {
+        SurfacePalette::Green => 1,
+        SurfacePalette::Yellow => 2,
+        SurfacePalette::Brown => 0,
+        SurfacePalette::Grey => 3,
     }
 }

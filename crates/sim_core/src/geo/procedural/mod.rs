@@ -35,7 +35,9 @@ pub use recipes::{
 };
 
 pub use hydrology::{ChannelField, HydrologyFields, HydrologySettings};
+pub use groundwater::{solve_groundwater, GroundwaterFields, GroundwaterSettings};
 pub use materials::{MaterialProps, MaterialTable};
+pub use semantics::{SemanticGrid, SurfaceMaterial, SurfacePalette, SurfaceThresholds};
 pub use strata::{sample_stratum, validate_column, StratumSample};
 pub use structures::{apply_structures, StructureError, StructureField};
 pub use processes::{ErosionResult, ErosionSettings, FlowField, WaterBodyField};

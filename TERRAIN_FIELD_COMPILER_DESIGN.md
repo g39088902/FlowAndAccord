@@ -623,6 +623,8 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 **退出条件**：干旱阈值以下没有草地事实；泉水、湿地和地下水位可由字段诊断解释；颜色、装饰和资源落位不再根据模板名称猜测。
 
+**当前实现注记（2026-09-25）**：UGC-08 已接入 Field Compiler 的固定阶段。`groundwater.rs` 从地层柱的渗透性/储水量生成补给，按高程降序执行有限 Gauss-Seidel 松弛，输出 `recharge`、`water_table`、`aquifer_mask`、`discharge`、`water_access`、`soil_moisture`；取水可达性使用地表水、河道和排泄点作为源，并以坡度加权 Dijkstra 保持稳定距离。`semantics` 同时消费可达性、湿度、储水和坡度，写入 `vegetation_ok`、`surface_material` 与 `surface_palette`；Heightfield 的 `natural_fertility` 和 Voxel 表层材质沿用同一字段。固定 seed 探针为 `cargo run --release -p sim_core --example groundwater_probe -- grassland_plain_v1 42 64`，诊断包记录上述字段 hash；生成器版本为 26，VoxelBackend 版本为 3。
+
 ### UGC-09：剖面诊断与有限不确定性
 
 增加开发者剖面查看器、字段切片、候选对比、`confidence` 场和候选 hash。每个候选都记录约束得分、失败原因和字段 hash，只选择固定排序中的最佳通过候选。

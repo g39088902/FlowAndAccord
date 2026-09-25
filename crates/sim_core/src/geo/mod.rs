@@ -52,6 +52,6 @@ pub use backend::{
 pub use procedural::{
     sample_stratum, validate_column, BackendKind, CompiledTerrain, Field2, FieldOp, MaterialProps,
     apply_structures, MaterialTable, StratigraphicColumn, StratumSample, StratumSpec,
-    StructureError, StructureField,
+    GroundwaterFields, GroundwaterSettings, StructureError, StructureField,
     TerrainCompileError, TerrainRecipe,
 };

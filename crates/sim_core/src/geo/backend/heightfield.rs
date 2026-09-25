@@ -1,6 +1,8 @@
 //! Heightfield compatibility backend for existing GeoCell consumers.
 use crate::geo::biome::GeoCell;
-use crate::geo::procedural::{CompiledTerrain, Field2, MaterialTable, StratigraphicColumn};
+use crate::geo::procedural::{
+    CompiledTerrain, Field2, MaterialTable, StratigraphicColumn, SurfaceMaterial, SurfacePalette,
+};
 
 #[derive(Debug, Clone)]
 pub struct HeightfieldBackend {
@@ -12,6 +14,8 @@ pub struct HeightfieldBackend {
     pub stratigraphy: Option<StratigraphicColumn>,
     pub materials: MaterialTable,
     pub strata_depth_offset: Option<Field2>,
+    pub surface_material: Option<Vec<SurfaceMaterial>>,
+    pub surface_palette: Option<Vec<SurfacePalette>>,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct HeightfieldView<'a> {
@@ -65,6 +69,8 @@ impl HeightfieldBackend {
                 .map(|recipe| recipe.materials.clone())
                 .unwrap_or_default(),
             strata_depth_offset: None,
+            surface_material: None,
+            surface_palette: None,
         })
     }
 
@@ -78,7 +84,10 @@ impl HeightfieldBackend {
                 elevation: *v,
                 slope_angle_deg: compiled.semantics.slope_deg.values[i],
                 surface_kind: compiled.semantics.surface_kind[i],
-                natural_fertility: compiled.fields.rainfall.values[i],
+                // Legacy fertility is the compatibility projection of the
+                // causal soil-moisture field; rainfall alone must not create
+                // grass in a dry or impermeable cell.
+                natural_fertility: compiled.semantics.soil_moisture.values[i],
                 water_body_id: compiled.semantics.water_body_id[i],
                 feature_flags: compiled.semantics.flags[i],
             })
@@ -92,6 +101,8 @@ impl HeightfieldBackend {
             stratigraphy: Some(compiled.stratigraphy.clone()),
             materials: compiled.materials.clone(),
             strata_depth_offset: Some(compiled.structures.strata_depth_offset.clone()),
+            surface_material: Some(compiled.semantics.surface_material.clone()),
+            surface_palette: Some(compiled.semantics.surface_palette.clone()),
         }
     }
     pub fn from_compiled_default(compiled: &CompiledTerrain) -> Self {

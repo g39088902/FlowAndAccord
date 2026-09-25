@@ -204,7 +204,56 @@ pub struct HydrologySpec {
     pub channel_threshold: f32,
     pub bank_width_m: f32,
     pub min_lake_depth_m: f32,
+    /// Fixed creation-time groundwater relaxation passes. This is deliberately
+    /// part of the recipe so the static field result is reproducible.
+    #[serde(default = "default_groundwater_iterations")]
+    pub groundwater_iterations: u16,
+    #[serde(default = "default_groundwater_aquifer_threshold")]
+    pub groundwater_aquifer_threshold: f32,
+    #[serde(default = "default_groundwater_discharge_threshold")]
+    pub groundwater_discharge_threshold: f32,
+    #[serde(default = "default_groundwater_access_radius_m")]
+    pub groundwater_access_radius_m: f32,
+    #[serde(default = "default_groundwater_dry_threshold")]
+    pub groundwater_dry_threshold: f32,
+    #[serde(default = "default_groundwater_grass_threshold")]
+    pub groundwater_grass_threshold: f32,
+    #[serde(default = "default_groundwater_min_soil_moisture")]
+    pub groundwater_min_soil_moisture: f32,
+    #[serde(default = "default_groundwater_min_soil_storage")]
+    pub groundwater_min_soil_storage: f32,
+    #[serde(default = "default_groundwater_wetland_threshold")]
+    pub groundwater_wetland_threshold: f32,
 }
+
+const fn default_groundwater_iterations() -> u16 {
+    4
+}
+const fn default_groundwater_aquifer_threshold() -> f32 {
+    0.45
+}
+const fn default_groundwater_discharge_threshold() -> f32 {
+    0.42
+}
+const fn default_groundwater_access_radius_m() -> f32 {
+    180.0
+}
+const fn default_groundwater_dry_threshold() -> f32 {
+    0.2
+}
+const fn default_groundwater_grass_threshold() -> f32 {
+    0.45
+}
+const fn default_groundwater_min_soil_moisture() -> f32 {
+    0.3
+}
+const fn default_groundwater_min_soil_storage() -> f32 {
+    0.25
+}
+const fn default_groundwater_wetland_threshold() -> f32 {
+    0.65
+}
+
 impl Default for HydrologySpec {
     fn default() -> Self {
         Self {
@@ -222,6 +271,15 @@ impl Default for HydrologySpec {
             channel_threshold: f32::MAX,
             bank_width_m: 12.0,
             min_lake_depth_m: 0.5,
+            groundwater_iterations: default_groundwater_iterations(),
+            groundwater_aquifer_threshold: default_groundwater_aquifer_threshold(),
+            groundwater_discharge_threshold: default_groundwater_discharge_threshold(),
+            groundwater_access_radius_m: default_groundwater_access_radius_m(),
+            groundwater_dry_threshold: default_groundwater_dry_threshold(),
+            groundwater_grass_threshold: default_groundwater_grass_threshold(),
+            groundwater_min_soil_moisture: default_groundwater_min_soil_moisture(),
+            groundwater_min_soil_storage: default_groundwater_min_soil_storage(),
+            groundwater_wetland_threshold: default_groundwater_wetland_threshold(),
         }
     }
 }
@@ -335,12 +393,35 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
         h.channel_threshold,
         h.bank_width_m,
         h.min_lake_depth_m,
+        h.groundwater_aquifer_threshold,
+        h.groundwater_discharge_threshold,
+        h.groundwater_access_radius_m,
+        h.groundwater_dry_threshold,
+        h.groundwater_grass_threshold,
+        h.groundwater_min_soil_moisture,
+        h.groundwater_min_soil_storage,
+        h.groundwater_wetland_threshold,
     ];
     if hydrology_values.iter().any(|v| !v.is_finite())
         || h.min_elevation > h.max_elevation
         || h.max_sediment < 0.0
         || h.bank_width_m < 0.0
         || h.min_lake_depth_m < 0.0
+        || h.groundwater_iterations == 0
+        || h.groundwater_iterations > 256
+        || h.groundwater_access_radius_m <= 0.0
+        || h.groundwater_grass_threshold < h.groundwater_dry_threshold
+        || [
+            h.groundwater_aquifer_threshold,
+            h.groundwater_discharge_threshold,
+            h.groundwater_dry_threshold,
+            h.groundwater_grass_threshold,
+            h.groundwater_min_soil_moisture,
+            h.groundwater_min_soil_storage,
+            h.groundwater_wetland_threshold,
+        ]
+        .iter()
+        .any(|v| !(0.0..=1.0).contains(v))
     {
         return Err(RecipeError::NonFiniteParameter {
             node: recipe.output.elevation_node,
