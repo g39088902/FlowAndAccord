@@ -222,7 +222,9 @@ function drawWorldEntities() {
     const features = terrain.features || [];
     const nowMs = performance.now();
     if (features.length && window.RiverLife) window.RiverLife.update(nowMs);
-    if (features.length && window.WaterParticles) window.WaterParticles.update(nowMs);
+    // ★ v1.63.0：水粒子层**不随水系特征启停**——内核是开放水循环，降雨/泉眼会在
+    //   无任何水系特征的地形上造出水体（Fluid section 存在即绘制，缺席即清空视图）。
+    if (window.WaterParticles) window.WaterParticles.update(nowMs);
     const rivers = [];
     for (let fi = 0; fi < features.length; fi++) {
       const f = features[fi];

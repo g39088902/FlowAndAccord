@@ -90,6 +90,7 @@ stateDiagram-v2
 4. tick_housing(dt)                     房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)         道路自然衰减
 6. tick_phase_fluid(dt)                ★ v1.62.0 运行时水体求解（PBF，每 6 拍；只读地形、不消耗 RNG）
+                                        ★ v1.63.0 补源（降雨/泉涌）+ 边界出流 + 坡面下渗（粒子数动态）
 7. 运动 (胎儿跳过)                      agent.tick_movement
    tick_decisions()                     错峰决策 ((tick + id) % 120 == 0)
 8. tick_bookkeeping()                   M2 继承清算 + 分家抽资
@@ -103,6 +104,7 @@ stateDiagram-v2
 - **决策在运动之后**：决策基于本 tick 运动后的位置和状态
 - **bookkeeping/clan/region 在决策之后**（8/9/10）：制度结算使用决策后的最终状态
 - ★ **水体求解不改其他子阶段语义**（步骤 6，v1.62.0）：只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；见 [33 号文](./33-runtime-fluid.md)
+- ★ **水体粒子数动态但不外溢**（步骤 6，v1.63.0）：降雨/泉涌补源与边界出流/坡面下渗使 `count` 逐帧可变，但粒子只由 `FluidSim` 私有缓冲承载、上限 1600；泉眼坐标只**读** `WaterSource` POI 的 `pos`（`refresh_springs`），不回写 POI 库存 ⇒ 取水玩法语义不变
 
 ### 3.2 决策与行为约束
 

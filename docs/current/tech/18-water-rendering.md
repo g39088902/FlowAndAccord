@@ -53,6 +53,14 @@
 - **数据来源**：`snap.fluid_particles`（`Float32Array`，扁平 `[x,y,z,…]`）+ `fluid_fill_radius`
   / `fluid_tone_radius`；由 `rustworld.js::_applySnapshot` 映射到 `rustWorldSim.fluidParticles`。
   section 缺席 = 本帧无水体 ⇒ 前端清空粒子视图。
+  ★ **粒子数逐帧可变**（内核补源/出流/下渗，见 33 号文 §2.3/§2.4）：前端按 `count` 伸缩绘制视图，
+  内核用 `swap_remove` 保证每次删减只扰动一个粒子的抖动身份；粒径由内核按静态 `spacing_eff` 下发，
+  不随粒子数漂移（目标间距已由 2.6m 提升 70% ⇒ 单粒子粒径 ×1.7、投影面积 ×2.89 的颗粒读感）。
+- ★ **本层不再以「静态水系特征非空」为启用门槛**（v1.63.0）：`WaterParticles.init` 恒启用、
+  `render_depth_queue.js` 无条件调用 `WaterParticles.update`——水是**开放循环**，全图降雨/泉眼会在
+  完全没有水系特征的地形（山口 / 冲积扇 / 半坡 / `flat_baseline`）上造出水体；
+  「有没有水」唯一由内核快照的 `Fluid` section 决定（缺席即清空视图）。`RiverLife`（游鱼）仍按
+  `features.length` 启停——它只服务河道。
 - **`water_particles.js`（渲染层，约 190 行）**：内核粒子 → 绘制视图一一映射。逐粒子**视觉抖动**
   （尺寸 `sizeK`、旋转 `rotC/rotS`、透明度 `aK`、相位 `phase/phase2`）由**粒子下标 + 世界种子的稳定哈希**
   派生，只在粒子下标首次出现时计算一次 ⇒ 稳态不闪、零堆分配；亮点抽样 `i % 5 === 0`；
@@ -115,7 +123,7 @@
 | Rust 内核 | [`spatial/snapshot_bin/dict.rs`](../../../crates/sim_core/src/spatial/snapshot_bin/dict.rs) | `feature_kind_code` | `TerrainFeatureKind::River` 枚举码位与 FABS 表格一一对应（防漂移）；新增枚举变体须同步 `*_code()` / `*_table()` |
 | 前端 | [`js/render_world.js`](../../../frontend/js/render_world.js) | 深度队列（`DEPTH_FEATURE/FISH/…`，在 render_depth_queue.js；★ v1.60.1 起 DEPTH_CELL/DEPTH_WALL 已删；★ v1.61.4 起 River/WaterBody 水面不入队） | 统一按 `project3D().depth` 升序落笔；深度项对象池零 GC；收集阶段决定各元素入队深度 |
 | 前端 | [`js/render_terrain.js`](../../../frontend/js/render_terrain.js) | `drawTerrainShell` / `drawTerrainGrid` / `drawFeatureItem`（★ v1.61.4 起 `drawRiverBand`/`drawWaterBodyTile`/`_wbTileGrid` 已删） | 非水面水系特征绘制（RiverBank 逐段 / ShallowFord / Cliff / 泉谷）；水面 = 粒子层 |
-| Rust 内核 | [`spatial/fluid/mod.rs`](../../../crates/sim_core/src/spatial/fluid/mod.rs) | `FluidSim::{seed_from_terrain, step, substep, export_state, restore_state}` | ★ v1.62.0 水体求解器：播种、每步河床剖面、子步受力与 PBF 约束投影、位精确存档状态。详见 [33 号文](./33-runtime-fluid.md) |
+| Rust 内核 | [`spatial/fluid/mod.rs`](../../../crates/sim_core/src/spatial/fluid/mod.rs) | `FluidSim::{seed_from_terrain, refresh_springs, step, spawn, despawn, substep, export_state, restore_state}` | ★ v1.62.0 水体求解器：播种、每步河床剖面、子步受力与 PBF 约束投影、位精确存档状态；★ v1.63.0 增补源（降雨/泉涌）、开放边界出流与坡面下渗寿命。详见 [33 号文](./33-runtime-fluid.md) |
 | Rust 内核 | [`spatial/fluid/pbf.rs`](../../../crates/sim_core/src/spatial/fluid/pbf.rs) · [`grid.rs`](../../../crates/sim_core/src/spatial/fluid/grid.rs) | 二维核 / 密度 / λ / Δp / XSPH；平面桶索引 | PBF 求解核函数与邻域索引（⚠️ `s_corr` 禁止 `powf`） |
 | 前端 | [`js/water_particles.js`](../../../frontend/js/water_particles.js) | `WaterParticles.init` / `update` / `particles` / `drawParticle` / `stats` | ★ v1.62.0 **渲染层**（不再自带求解）：内核粒子 → 绘制视图映射（下标哈希视觉抖动）、sink 分发压扁菱形 |
 | 前端 | [`js/river_life.js`](../../../frontend/js/river_life.js) | `RiverLife.init` / `drawFishSingle`（GL sink 硬门槛） | 游鱼（纯表现层，走墙钟，`_engineSeed` 确定性重建） |
@@ -127,7 +135,7 @@
 
 ## 4. 性能约束
 
-- 基础地形网格（120×120）顶点投影与 Quad 绘制为基准成本；水系装饰层为粒子逐条 sink 绘制 + 漫滩带 + 游鱼逐条，**全图粒子预算 3000**（内核求解器上限，见 [33 号文](./33-runtime-fluid.md) §2），入队端先剔屏外粒子（排序与绘制规模只与可见粒子相关）。
-- **求解成本（内核侧，★ v1.62.0）**：3000 粒子摊薄 **0.372 ms/tick**（含每 6 拍一次的 PBF 求解），折算 1× 实时 ≈22 ms / 秒模拟时间。⚠️ 高倍速（≥128×）下求解器是模拟吞吐主要瓶颈；成本旋钮 = `FLUID_STEP_TICKS` / `SUBSTEPS` / `FLUID_MAX_PARTICLES`。
+- 基础地形网格（120×120）顶点投影与 Quad 绘制为基准成本；水系装饰层为粒子逐条 sink 绘制 + 漫滩带 + 游鱼逐条，**全图粒子上限 1600**（内核求解器上限，含降雨/泉涌补源；常态稳态 ≈1100，见 [33 号文](./33-runtime-fluid.md) §2/§6），入队端先剔屏外粒子（排序与绘制规模只与可见粒子相关）。
+- **求解成本（内核侧，★ v1.62.0）**：`river_valley_v1` 稳态 ≈1090 粒子时 Phase 5 摊薄 **≈0.18 ms/tick**（整拍 ≈0.20 ms/tick，含每 6 拍一次的 PBF 求解 + 每 10 步一次的侵蚀），折算 1× 实时 ≈12 ms / 秒模拟时间。⚠️ 高倍速（≥128×）下求解器是模拟吞吐主要瓶颈（该世界约 84× 实时到顶）；成本旋钮 = `FLUID_STEP_TICKS` / `SUBSTEPS` / 粒子数（≈0.17 µs/tick / 粒子）。
 - **每帧堆内存 GC 分配 = 0 字节**：内核求解器全部 SoA 缓冲放置期预分配、运行时只写数值字段；前端粒子视图按需扩展后原地复用、视觉抖动由下标哈希派生（只算一次），深度队列走对象池，无垃圾回收。
 - 回归门禁：`node tools/test-wasm.js`（同种子确定性 + 存读档逐字节一致）、`node tools/test-determinism.js`（六套件矩阵）、`node tools/frontend-check.js`（脚本语法与 DOM 完整性）、`node tools/profile-benchmark.js`（吞吐与子阶段拆解）。

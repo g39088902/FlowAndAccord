@@ -118,7 +118,7 @@ stateDiagram-v2
 - 房屋候选和最终实体化均使用 `validate_footprint`，完整占地由 `terrainFootprintHalfExtent`、`terrainMaxBuildSlope` 控制；不再只凭中心点高度判断地块合法。
 - 查询失败使用稳定原因：越界、深水、陡壁、地表禁用或完整占地坡度过大。没有合法地块时交由 Agent 正常重选，不由地形系统强制搬迁。
 - T1 山口 profile 只提供连续起伏地貌与选址/路网约束，不生成河流/浅滩特征（属 T2 河谷）；动态通行仍待后续扩展。
-- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；当前 Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形，河谷主槽使用连续不规则浅水面，前端由水体粒子运动模拟引擎经统一深度队列逐条绘制（见 [18 号文 §1.3](./18-water-rendering.md)）。
+- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；当前 Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形，河谷主槽使用连续不规则浅水面，水面由**内核 PBF 水体求解器**（[33 号文](./33-runtime-fluid.md)）下发的粒子经统一深度队列逐条绘制（前端只渲染、不自带求解，见 [18 号文 §1.3](./18-water-rendering.md)）。
 
 ## 关键不变量
 - 路网节点从不删除；房屋坍塌后，其大门节点可被新立宅复用（`house_node_reuse_radius`）。

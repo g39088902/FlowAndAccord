@@ -79,8 +79,8 @@ FlowAndAccord/
 │   │           │   ├── tick.rs             # tick_poi_interactions 调度壳 (遍历/胎儿跳过/分娩委托/尸骸清理)
 │   │           │   ├── harvest.rs          # 现场采收 (水/粮/木/石/金) 与榷场采购结算
 │   │           │   └── home.rs             # 回家卸货入账 (Deposit) 与在家吃喝 (Consume)
-│   │           ├── fluid/                  # ★ v1.62.0 运行时水体求解器 (PBF 深度平均域)：mod.rs 播种/受力积分/深度刷新/存档状态；pbf.rs 二维核与约束求解；grid.rs 平面桶索引；erosion.rs 水力侵蚀/沉积（剪应力→高程写回+坡度限幅）。详见 tech/33-runtime-fluid.md
-│   │           │   ├── mod.rs              # FluidSim：播种 / 每步河床剖面 / 子步受力与约束投影 / 位精确存档状态
+│   │           ├── fluid/                  # ★ v1.62.0 运行时水体求解器 (PBF 深度平均域)：mod.rs 播种/受力积分/补源出流/存档状态；pbf.rs 二维核与约束求解；grid.rs 平面桶索引；erosion.rs 水力侵蚀/沉积（剪应力→高程写回+坡度限幅）。详见 tech/33-runtime-fluid.md
+│   │           │   ├── mod.rs              # FluidSim：播种 / 降雨与泉涌补源 / 每步河床剖面与深度派生 / 子步受力与约束投影 / 开放边界出流与坡面下渗淘汰 / 位精确存档状态
 │   │           │   ├── pbf.rs              # 2D poly6·spiky 核、密度、λ、Δp（⚠️ s_corr 禁用 powf）、XSPH 粘性
 │   │           │   ├── grid.rs             # 平面均匀桶索引（桶边长 = 支撑域半径，3×3 邻域，下标升序插入保确定性）
 │   │           │   └── erosion.rs          # ★ v1.62.0 水力侵蚀/沉积：粒子场→逐格水深/流速→Manning 剪应力→侵蚀/沉积→高程写回（只改水体格）+坡度上限保护+脏格待发列表
@@ -168,7 +168,7 @@ FlowAndAccord/
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (★ v1.50.82 帧率上限可配置，默认 60 FPS，可解除门控)
 │   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (成群游鱼，★ v1.50.86 GL sink 分发、★ v1.60.1 sink 硬门槛未就绪帧整只跳过，纯表现层，随种子确定性重建)
-│   │   ├── water_particles.js              # ★ v1.62.0 水体粒子**渲染层** (window.WaterParticles：消费内核快照 Fluid section 的粒子位置，逐粒子视觉抖动由「粒子下标 + 世界种子」稳定哈希派生（只算一次、稳态不闪）；复用 v1.61.4 观感常量与 sink 落笔路径；**不再自带求解器**——流场构建/积分/覆盖率折叠选活已上移内核，详见 tech/33-runtime-fluid.md)
+│   │   ├── water_particles.js              # ★ v1.62.0 水体粒子**渲染层** (window.WaterParticles：消费内核快照 Fluid section 的粒子位置，逐粒子视觉抖动由「粒子下标 + 世界种子」稳定哈希派生（只算一次、稳态不闪）；复用 v1.61.4 观感常量与 sink 落笔路径；**不再自带求解器**——流场构建/积分/覆盖率折叠选活已上移内核；★ v1.63.0 粒子数逐帧可变 + 启用门槛取消（不再要求静态水系特征非空），详见 tech/33-runtime-fluid.md)
 │   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出；★ TA-06-2 删除 tint() 三档兼容接口，profile 由 model.profile 单一入口送入)
 │   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道；★ TA-06 物种派生 speciesOf（三乔木轮廓 broad/sparse/conifer + 三灌木变体 multiStem/flowering/lowEvergreen + 花灌木固定花位），骨架输出 crownR/trunkH/footprintR/crownSquash 为唯一几何真相源；★ TA-07-3 真值包围体 bounds{rH,zMin,zMax,yUp,rS} + 分级几何 farClusters/segTier/stoneMain，extent 由 bounds 派生)
 │   │   ├── accent-lod.js                  # ★ TA-07-2 装饰细节分级 LOD 集中解析层 (window.AccentLOD：特征尺度 CSS px / 三档判档 + 阈值带滞回 tierOf·tierFor(_lodT) / kindBounds 一级保守常数 / aabbOf 解析式屏幕 AABB（yUp 石体贴地 + rS 球体不乘 cosX）/ shadowAabb 冠影+影梢并集 / leanShear 单一来源 / stats dev 计数器；六处消费点唯一口径入口)
@@ -295,7 +295,7 @@ FlowAndAccord/
     │       ├── 30-workflow.md                   # 工程：Agent 入口 + 提交检查单 + 文档维护
     │       ├── 31-code-map.md                   # 附录：本文件
     │       ├── 32-terrain-generation-gates.md   # ★ 地形生成门禁地图（五道防线 + 生成器版本契约 + 改 X 跑什么决策表）
-    │       └── 33-runtime-fluid.md              # ★ v1.62.0 运行时水体求解器（内核 PBF 深度平均域：播种/受力/约束/FABS Fluid 协议/位精确存档/性能）+ §7 水力侵蚀沉积（剪应力模型、只改水体格、TerrainDelta 增量、深度反馈）
+    │       └── 33-runtime-fluid.md              # ★ v1.62.0 运行时水体求解器（内核 PBF 深度平均域：播种/受力/约束/FABS Fluid 协议/位精确存档/性能）+ §2.3 降雨与泉涌补源、§2.4 开放边界出流与坡面下渗 + §7 水力侵蚀沉积（剪应力模型、只改水体格、TerrainDelta 增量、深度反馈）
     └── plan/                                 # 计划：在办设计与未落地方案
     │   ├── README.md                          # 计划总索引（含依赖顺序图）
     │   ├── design/                            # 产品设计（玩法方向）

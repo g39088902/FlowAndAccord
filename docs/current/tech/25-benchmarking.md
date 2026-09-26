@@ -101,14 +101,14 @@ node tools/profile-benchmark.js --ticks 3000 --compare baseline.json
 3. **Phase 2: POI 交互卸货 (Poi Interactions)**：约 $7\%\sim 9\%$
 4. **Phase 3: 房屋维护与折旧 (Housing & Auction)**：约 $3\%\sim 4\%$
 5. **Phase 4: 道路自然衰减 (Road Wear Decay)**：约 $25\%\sim 32\%$（遍历全图边权重衰减并更新磨损分桶）
-6. **Phase 5: 水体求解 PBF (Fluid Solve)**：★ v1.62.0 新增，仅在每 `FLUID_STEP_TICKS`（默认 6）个 tick 之一上实际求解（有水世界 ≈0.37 ms/tick 摊薄；无水世界恒 0）
+6. **Phase 5: 水体求解 PBF (Fluid Solve)**（拆解表标签写死「每 6 拍」，与内核 `FLUID_STEP_TICKS` 同值，改常量需同步该标签）：★ v1.62.0 新增，仅在每 `FLUID_STEP_TICKS`（默认 6）个 tick 之一上实际求解（★ v1.63.0 起含降雨/泉涌补源、边界出流与坡面下渗 ⇒ 粒子数动态）。成本 ≈0.17 µs/tick / 粒子：`river_valley_v1` 常态 ≈1090 粒子 ⇒ ≈0.18 ms/tick（占整拍 ≈91%）；纯泉眼地图 ≈90 粒子 ⇒ ≈10 µs/tick；既无水格也无泉眼的地图恒 0。详见 [33 号文](./33-runtime-fluid.md) §6
 7. **Phase 6: 动力位移踩踏 (Movement & Trample)**：约 $6\%\sim 8\%$
 8. **Phase 7: 马斯洛决策寻路 (Decisions & A\*)**：约 $25\%\sim 35\%$（马斯洛状态机评估 + 加权 A* 寻路）
 9. **Phase 8: 账本宗族公仓 (Ledger, Clan, Region)**：约 $10\%\sim 15\%$
 10. **Phase 9: 墓碑窗口清理 (Cleanup)**：$< 1\%$
 
 > 💡 **性能优化热点指南**：
-> 从实测数据可知，**道路磨损衰减（Phase 4）** 与 **马斯洛决策与 A\* 寻路（Phase 7）** 合计占据了整个仿真周期的 **近 60% 算力**。优化重点应始终聚焦在这两个模块；★ 有水世界需额外关注 **Phase 5 水体求解**（高倍速下成为吞吐瓶颈，旋钮见 [33 号文](./33-runtime-fluid.md) §6）。
+> 从实测数据可知，**道路磨损衰减（Phase 4）** 与 **马斯洛决策与 A\* 寻路（Phase 7）** 合计占据了整个仿真周期的 **近 60% 算力**。优化重点应始终聚焦在这两个模块；★ 但在**有水体的世界**（`river_valley_v1` ≈1090 粒子）Phase 5 **水体求解**会反超至整拍 ≈91%（≈0.18 ms/tick），成为高倍速下的吞吐瓶颈（旋钮见 [33 号文](./33-runtime-fluid.md) §6）。
 
 #### C. 快照编码与通信开销（Snapshot Overhead）
 

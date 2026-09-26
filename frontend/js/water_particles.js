@@ -34,8 +34,9 @@
   let _bodyView = { alphaK: 1 }; // 共享"水体"引用（兼容 drawParticle 的 p.body.alphaK）
   let _initialized = false;
   let _seed = 1;
-  let _fillRadius = 2.6 * 1.30;
-  let _toneRadius = 2.6 * 0.52;
+  // 兜底粒径（正常帧恒由内核 Fluid section 下发；★ 内核目标间距已由 2.6m 提升 70%）
+  let _fillRadius = 4.42 * 1.30;
+  let _toneRadius = 4.42 * 0.52;
   let _lastRevision = 0;
   let _srcRef = null;           // 上一次消费的内核数组（换帧数组时重建视图）
 
@@ -78,14 +79,16 @@
   const WaterParticles = {
     // 世界重建钩子（rustworld.js 在地形重建时调用）：只重置视觉状态与视图缓存。
     // 参数保持旧签名以兼容调用点；`features` / `seed` 现在只用于标记世界身份。
+    // ★ v1.63.0：**不再以「静态水系特征非空」作为启用门槛**——水是开放循环，
+    //   全图降雨 / 泉眼会在没有任何水系特征的地形（山口 / 冲积扇 / 半坡）上造出水体，
+    //   故本层恒启用，有无水完全由内核快照的 Fluid section 决定（缺席即清空视图）。
     init: function (features, seed) {
       _particles.length = 0;
-      _initialized = false;
       _srcRef = null;
       _lastRevision = 0;
       _seed = (Number.isFinite(seed) && seed > 0) ? (seed >>> 0) : 1;
       // 世界身份参与抖动盐，换世界后颗粒纹理不残留（同种子仍逐位一致）
-      _initialized = !!(features && features.length);
+      _initialized = true;
       return _initialized;
     },
 

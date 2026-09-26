@@ -90,6 +90,7 @@
 - **bookkeeping/clan/region 在决策之后**：制度结算使用决策后的最终状态
 - **胎儿跳过**：代谢（步骤 2）、运动（步骤 7）、决策均跳过 `is_fetus` 的 agent
 - ★ **水体求解不改变任何其他子阶段语义**（步骤 6）：推进只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；其推进节拍由 `tick_counter % FLUID_STEP_TICKS` 决定（读档恢复 tick 后自动对齐）。详见 [`fluid/mod.rs`](fluid/mod.rs) 与 `docs/current/tech/33-runtime-fluid.md`。
+- ★ **水体是开放水循环（步骤 6，v1.63.0）**：粒子数**动态**——降雨（落点全图，速率 ∝ `rainfall_intensity()`）与泉眼（只读 `WaterSource` POI 的 `pos`，恒速）补源，越出世界 AABB 即出流、非水体格上 `age > SHEET_FLOW_LIFETIME(30s)` 即下渗；补源落点走 `seed ^ SPAWN_SALT ^ tick_counter` 的局部 PRNG（不消耗 `WorldRng`）。因此 `tick_phase_fluid` 不再以 `fluid.enabled` 单条件早退（无静态水体的泉眼地图也要推进），`fluid.enabled` 在有粒子后自动置真。存档必须携带 `age` 与两个补源信用，否则读档续演与不中断运行分叉（`test-wasm.js` 硬门禁）。
 - ★ **侵蚀只写水体格**（步骤 6 内，见 [`fluid/erosion.rs`](fluid/erosion.rs)）：高程/坡度只对 `water_body_id.is_some()` 的格生效，陆地格的 `elevation`/`slope_angle_deg`/`feature_flags` 一律不动 ⇒ `corridor::validate_curve` 与读档 `validate_terrain_world` 不受侵蚀影响；写入后的坡度受 `terrain_max_walk_slope` 上限保护。★ **深水保护**：`level − bed ≥ MAX_DEPTH` 的格整体跳过——渲染水面是 `bed + clamp(level − bed, MIN, MAX_DEPTH)`，水柱深度封顶后床面变化只会平移水面（下切＝湖面下沉露滩），故深湖床保持稳定。侵蚀结果同步 `VoxelBackend` 权威高度场（`surface_heights_mut`），并随 FABS `TerrainDelta` section 增量下发；逐格累计量不入档，读档由高程差还原。
 
 ---

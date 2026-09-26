@@ -228,7 +228,7 @@ async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup =
     '2. POI交互卸货 (Poi Interactions)',
     '3. 房屋维护与折旧 (Housing & Auction)',
     '4. 道路自然衰减 (Road Wear Decay)',
-    '5. 水体求解 PBF (Fluid Solve, 每4拍)',
+    '5. 水体求解 PBF (Fluid Solve, 每6拍)',
     '6. 动力位移踩踏 (Movement & Trample)',
     '7. 马斯洛决策寻路 (Decisions & A*)',
     '8. 账本宗族公仓 (Ledger, Clan, Region)',

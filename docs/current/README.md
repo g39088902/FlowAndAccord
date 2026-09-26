@@ -1,7 +1,7 @@
 # 现状 · 已实现功能全景
 
 > 本目录描述**当前代码中真实存在的行为**。未实现的设计一律在 [`../plan/`](../plan/)。
-> **版本**：v1.62.0（演进记录见 [./01-changelog.md](./01-changelog.md)）。
+> **版本**：v1.63.0（演进记录见 [./01-changelog.md](./01-changelog.md)）。
 
 > 修改代码前的快速入口见 [`tech/30-workflow.md`](tech/30-workflow.md)。
 
@@ -102,7 +102,7 @@
 | :---: | :--- | :--- |
 | 31 | [代码地图](tech/31-code-map.md) | `crates/` 与 `frontend/` 源码树（由 `code-map-check.js` 校验） |
 | 32 | [地形生成门禁](tech/32-terrain-generation-gates.md) | 地形生成五道防线：创世门禁链、存档门禁、探针验收、回归门禁与生成器版本契约（14 号文的门禁地图视图） |
-| 33 | [运行时水体求解器](tech/33-runtime-fluid.md) | 内核 PBF（深度平均域）粒子流体：播种、受力与约束、地形坡度重力与 Manning 摩阻、FABS `Fluid` 快照协议、位精确存档、性能与后续侵蚀设计 |
+| 33 | [运行时水体求解器](tech/33-runtime-fluid.md) | 内核 PBF（深度平均域）粒子流体：播种、受力与约束、地形坡度重力与 Manning 摩阻、**降雨/泉涌补源与开放边界出流（开放水循环）**、FABS `Fluid` 快照协议、位精确存档、性能与水力侵蚀沉积 |
 
 ---
 
