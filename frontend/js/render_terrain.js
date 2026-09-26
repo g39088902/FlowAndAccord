@@ -3,8 +3,8 @@
 //   webgl/layers/terrain/terrain-renderer.js 承担；本文件只保留——
 //   ① drawTerrainShell 全网格顶点投影（水系、路网、实体拾取复用）；
 //   ② drawTerrainGrid 'G' 键调试网格线（2D 叠层）；
-//   ③ 水系特征绘制（drawFeatureItem/drawRiverBand/drawWaterBodyTile——水面在 GL 模式
-//     下仍由 2D 统一深度队列绘制，见 render_depth_queue.js DEPTH_FEATURE 段）。
+//   ③ 水系特征绘制（drawFeatureItem/drawWaterBodyTile——静湖水面在 GL 模式
+//      下仍由 2D 统一深度队列绘制，见 render_depth_queue.js DEPTH_FEATURE 段）。
 // 依赖全局: ctx, camera, sim, w, h, terrainProjX, terrainProjY
 // 另消费 window.RENDER_CONFIG（config.render.js，须先加载）。
 
@@ -113,13 +113,8 @@ function drawTerrainGrid() {
 }
 
 // 单个水系地貌特征绘制（由 render_depth_queue.js 统一深度队列调度）。
-// ★ v1.50.20 河流分段绘制：River / RiverBank 的 idx 为段号（整条以「全顶点最大深度」入队
-// 会盖住所有更远的实体，见 render_depth_queue.js 收集段注释）；ShallowFord / 其余短特征仍整条绘制。
 function drawFeatureItem(feature, idx) {
   if (!feature.vertices || feature.vertices.length < 2) return;
-  // 粒子水面已接管 River/WaterBody；静态轮廓只作为粒子初始化边界，不再填充固定模型。
-  if ((feature.kind === 'River' || feature.kind === 'WaterBody') &&
-      window.WaterParticles && window.WaterParticles.isInitialized()) return;
 
   const cx = w / 2 + camera.panX;
   const cy = h / 2 + camera.panY;
@@ -127,13 +122,7 @@ function drawFeatureItem(feature, idx) {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  if (feature.kind === 'River') {
-    drawRiverBand(feature, idx | 0, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-    return;
-  }
-
-  // ★ TB-03 静水闭合水体（盆地泉池 / 湖畔大湖）：分块绘制（idx = 块号 + 1），
-  //   不套 River 的成对岸线条带协议；水色与河面共用，不启用 RiverLife 流纹。
+  // ★ TB-03 静水闭合水体（盆地泉池 / 湖畔大湖）：分块绘制（idx = 块号 + 1）。
   if (feature.kind === 'WaterBody') {
     drawWaterBodyTile(feature, idx | 0, cx, cy, cosZ, sinZ, cosX, sinX, scale);
     return;
@@ -141,23 +130,6 @@ function drawFeatureItem(feature, idx) {
 
   const vLen = feature.vertices.length;
   _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-
-  if (feature.kind === 'RiverBank') {
-    // 岸线带单段描边（idx = 段号）
-    const s = idx | 0;
-    if (s < 0 || s >= vLen - 1) return;
-    ctx.save();
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(174, 137, 78, 0.24)';
-    ctx.lineWidth = Math.max(2, feature.width * scale * 0.06);
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[s], _featProjY[s]);
-    ctx.lineTo(_featProjX[s + 1], _featProjY[s + 1]);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
 
   // ── 浅滩涉渡（ShallowFord）与其余地貌特征 ──
   ctx.save();
@@ -207,44 +179,6 @@ function drawFeatureItem(feature, idx) {
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
   }
-  ctx.restore();
-}
-
-// ★ v1.50.20 河面单段绘制（idx = 剖分区间号）：
-//   河道 outline 是「左岸 N 点顺去 + 右岸 N 点逆回」的闭合带（hydrology.rs），
-//   顶点 i 与顶点 vLen-1-i 同为第 i 剖分断面的左右岸点。段 b 的四边形 =
-//   (v[b], v[b+1], v[vLen-2-b], v[vLen-1-b])。
-//   绘制时 **clip 到该段四边形内、再整多边形两遍填充**（深水基底 + 主水体）：
-//   硬 clip 逐像素归属唯一一段 ⇒ 相邻段无接缝、无半透明叠 blend，
-//   观感与整河单次填充完全一致；段外的更近地形/实体照常遮挡该段。
-function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
-  const v = feature.vertices, vLen = v.length, half = vLen >> 1;
-  if (band < 0 || band >= half - 1) return;
-  const j = vLen - 1 - band;
-  if (!_projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale)) return;
-  const state = _waterState(feature);
-  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
-  const alphaScale = 0.35 + coverage * 0.65;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(_featProjX[band], _featProjY[band]);
-  ctx.lineTo(_featProjX[band + 1], _featProjY[band + 1]);
-  ctx.lineTo(_featProjX[j - 1], _featProjY[j - 1]);
-  ctx.lineTo(_featProjX[j], _featProjY[j]);
-  ctx.closePath();
-  ctx.clip();
-
-  // 整多边形填充（clip 限定只落本段）：底层深水基底 + 主流水体，与旧整河填充同色同透明度
-  ctx.beginPath();
-  ctx.moveTo(_featProjX[0], _featProjY[0]);
-  for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-  ctx.closePath();
-  ctx.globalAlpha = alphaScale;
-  ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
-  ctx.fill();
-  ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
-  ctx.fill();
   ctx.restore();
 }
 
@@ -304,7 +238,7 @@ function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) 
   ctx.closePath();
   ctx.clip();
 
-  // 整多边形填充（clip 限定只落本块）：与 drawRiverBand 同色的双层水面
+  // 整多边形填充（clip 限定只落本块）：深水基底 + 主水体的双层水面
   ctx.beginPath();
   ctx.moveTo(_featProjX[0], _featProjY[0]);
   for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);

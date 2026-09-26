@@ -22,7 +22,6 @@ pub use alluvial_fan::FanGeometry;
 pub use basin::BasinGeometry;
 pub use biome::{GeoCell, SurfaceKind};
 pub use generator::TerrainGenerator;
-pub use hydrology::{MeanderWindow, RiverCenterline};
 pub use plateau::PlateauGeometry;
 pub use query::{
     explain_failure, sample_cell, validate_footprint, FootprintQuery, LandUseKind, TerrainFailure,
@@ -54,7 +53,7 @@ pub use procedural::{
     confidence_field, field_slice, profile_slice, sample_stratum, validate_column, BackendKind,
     AxisSpec, Candidate, CandidateFieldHash, CandidateResult, CompiledTerrain, DiagnosticsBundle,
     Field2, FieldDiagnostic, FieldOp, FieldSlice, FieldSliceHeader, FoldBandSpec,
-    ConeCellSpec, FoldAnnulusSpec, FoldNetworkSpec, GroundwaterFields, GroundwaterSettings, MaterialProps,
+    ConeCellSpec, FoldAnnulusSpec, FoldNetworkSpec, MaterialProps,
     MaterialTable,
     ProfileSample, StratigraphicColumn, StratumSample, StratumSpec, StructuralEvent,
     StructureError, StructureField, TerrainCompileError, TerrainRecipe, UncertaintySpec,

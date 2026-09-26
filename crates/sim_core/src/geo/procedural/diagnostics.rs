@@ -4,7 +4,6 @@
 //! snapshots or affect the field compiler's RNG streams.
 use super::constraints::ConstraintReport;
 use super::fields::{Field2, FieldError};
-use super::groundwater::GroundwaterFields;
 use super::ir::StratigraphicColumn;
 use super::semantics::{SemanticGrid, SurfaceMaterial, SurfacePalette};
 use super::strata::sample_stratum;
@@ -50,9 +49,6 @@ pub struct ProfileSample {
     pub stratum_id: u16,
     pub stratum_material: u8,
     pub stratum_palette: u8,
-    pub water_table: f32,
-    pub discharge: f32,
-    pub soil_moisture: f32,
     pub material: u8,
     pub palette: u8,
     pub vegetation_ok: bool,
@@ -162,7 +158,6 @@ pub fn confidence_field(fields: &[&Field2]) -> Result<Field2, FieldError> {
 /// stable for native and WASM.
 pub fn profile_slice(
     elevation: &Field2,
-    groundwater: &GroundwaterFields,
     semantics: &SemanticGrid,
     stratigraphy: &StratigraphicColumn,
     strata_depth_offset: &Field2,
@@ -175,8 +170,6 @@ pub fn profile_slice(
         || elevation.height == 0
         || world_size <= 0.0
         || !world_size.is_finite()
-        || groundwater.water_table.width != elevation.width
-        || groundwater.water_table.height != elevation.height
         || semantics.width != elevation.width
         || semantics.height != elevation.height
         || strata_depth_offset.width != elevation.width
@@ -209,9 +202,6 @@ pub fn profile_slice(
                 stratum_id: stratum.map(|value| value.id).unwrap_or_default(),
                 stratum_material: stratum.map(|value| value.material).unwrap_or_default(),
                 stratum_palette: stratum.map(|value| value.palette).unwrap_or_default(),
-                water_table: groundwater.water_table.values[index],
-                discharge: groundwater.discharge.values[index],
-                soil_moisture: groundwater.soil_moisture.values[index],
                 material,
                 palette,
                 vegetation_ok: semantics.vegetation_ok[index],

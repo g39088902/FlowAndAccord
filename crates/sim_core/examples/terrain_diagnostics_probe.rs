@@ -95,12 +95,11 @@ fn main() {
     }
     for sample in profile_samples.iter().take(3) {
         println!(
-            "profile x={} y={} elevation={:.3} stratum={} water_table={:.3} material={} nodes={:?}",
+            "profile x={} y={} elevation={:.3} stratum={} material={} nodes={:?}",
             sample.x,
             sample.y,
             sample.elevation,
             sample.stratum_id,
-            sample.water_table,
             sample.material,
             sample.source_nodes,
         );

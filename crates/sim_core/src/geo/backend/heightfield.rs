@@ -48,10 +48,9 @@ impl HeightfieldBackend {
                 elevation: *v,
                 slope_angle_deg: compiled.semantics.slope_deg.values[i],
                 surface_kind: compiled.semantics.surface_kind[i],
-                // Legacy fertility is the compatibility projection of the
-                // causal soil-moisture field; rainfall alone must not create
-                // grass in a dry or impermeable cell.
-                natural_fertility: compiled.semantics.soil_moisture.values[i],
+                // Legacy fertility is now a fixed constant: the causal
+                // soil-moisture field was removed with the groundwater chain.
+                natural_fertility: 0.75,
                 water_body_id: compiled.semantics.water_body_id[i],
                 feature_flags: compiled.semantics.flags[i],
             })

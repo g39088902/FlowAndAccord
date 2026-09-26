@@ -4,138 +4,6 @@ use super::semantics::slope_field_with_world_size;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 
-#[derive(Debug, Clone)]
-pub struct FlowField {
-    /// Downstream cell index. Every edge is strictly descending or advances a
-    /// deterministic flat rank, so accumulation is acyclic.
-    pub direction: Vec<Option<usize>>,
-    pub accumulation: Field2,
-}
-
-pub fn flow_accumulation(elevation: &Field2, rainfall: &Field2) -> Result<FlowField, FieldError> {
-    flow_accumulation_with_cell_size(elevation, rainfall, 1.0)
-}
-
-pub fn flow_accumulation_with_cell_size(
-    elevation: &Field2,
-    rainfall: &Field2,
-    cell_size: f32,
-) -> Result<FlowField, FieldError> {
-    if elevation.width != rainfall.width || elevation.height != rainfall.height {
-        return Err(FieldError::SizeMismatch);
-    }
-    if !cell_size.is_finite() || cell_size <= 0.0 {
-        return Err(FieldError::InvalidDimensions);
-    }
-    let width = elevation.width;
-    let height = elevation.height;
-    let count = elevation.values.len();
-    let mut flat_rank = vec![u32::MAX; count];
-    let mut queue = VecDeque::new();
-
-    // Start flat routing at the map edge and every cell with a lower neighbor.
-    // Seeds are inserted in row-major order; 8-neighbors are scanned in a fixed
-    // order, which makes equal-elevation drainage reproducible across targets.
-    for index in 0..count {
-        let x = index % width;
-        let y = index / width;
-        let height_here = elevation.values[index];
-        let has_lower = neighbors(x, y, width, height)
-            .any(|(nx, ny, _)| elevation.values[ny * width + nx] < height_here);
-        let is_edge = x == 0 || y == 0 || x + 1 == width || y + 1 == height;
-        if has_lower || is_edge {
-            flat_rank[index] = 0;
-            queue.push_back(index);
-        }
-    }
-    while let Some(index) = queue.pop_front() {
-        let x = index % width;
-        let y = index / width;
-        for (nx, ny, _) in neighbors(x, y, width, height) {
-            let next = ny * width + nx;
-            if flat_rank[next] == u32::MAX
-                && elevation.values[next].to_bits() == elevation.values[index].to_bits()
-            {
-                flat_rank[next] = flat_rank[index].saturating_add(1);
-                queue.push_back(next);
-            }
-        }
-    }
-    // Isolated enclosed flats with no lower neighbor are seeded at their
-    // smallest row-major cell, then drained outward by increasing rank.
-    for index in 0..count {
-        if flat_rank[index] == u32::MAX {
-            flat_rank[index] = 0;
-            queue.push_back(index);
-            while let Some(current) = queue.pop_front() {
-                let x = current % width;
-                let y = current / width;
-                for (nx, ny, _) in neighbors(x, y, width, height) {
-                    let next = ny * width + nx;
-                    if flat_rank[next] == u32::MAX
-                        && elevation.values[next].to_bits() == elevation.values[current].to_bits()
-                    {
-                        flat_rank[next] = flat_rank[current].saturating_add(1);
-                        queue.push_back(next);
-                    }
-                }
-            }
-        }
-    }
-
-    let mut direction = vec![None; count];
-    for index in 0..count {
-        let x = index % width;
-        let y = index / width;
-        let here = elevation.values[index];
-        let mut downhill: Option<(f32, usize)> = None;
-        let mut flat: Option<(u32, usize)> = None;
-        for (nx, ny, distance) in neighbors(x, y, width, height) {
-            let next = ny * width + nx;
-            let raw_drop = here - elevation.values[next];
-            if raw_drop > 0.0 {
-                let drop = raw_drop / (distance * cell_size);
-                if downhill.is_none_or(|(best_drop, best_index)| {
-                    drop > best_drop || (drop.to_bits() == best_drop.to_bits() && next < best_index)
-                }) {
-                    downhill = Some((drop, next));
-                }
-            } else if elevation.values[next].to_bits() == here.to_bits()
-                && flat_rank[next] < flat_rank[index]
-            {
-                let candidate = (flat_rank[next], next);
-                if flat.is_none_or(|best| candidate < best) {
-                    flat = Some(candidate);
-                }
-            }
-        }
-        direction[index] = downhill.map(|(_, i)| i).or_else(|| flat.map(|(_, i)| i));
-    }
-
-    // Descending elevation, then row-major index. Equal-height flat edges are
-    // ordered by descending flat rank to preserve upstream-before-downstream.
-    let mut order: Vec<usize> = (0..count).collect();
-    order.sort_by(|a, b| {
-        elevation.values[*b]
-            .total_cmp(&elevation.values[*a])
-            .then(flat_rank[*b].cmp(&flat_rank[*a]))
-            .then(a.cmp(b))
-    });
-    let mut accumulation = rainfall.clone();
-    for index in order {
-        if let Some(next) = direction[index] {
-            accumulation.values[next] += accumulation.values[index];
-            if !accumulation.values[next].is_finite() {
-                return Err(FieldError::NonFinite);
-            }
-        }
-    }
-    Ok(FlowField {
-        direction,
-        accumulation,
-    })
-}
-
 fn neighbors(
     x: usize,
     y: usize,
@@ -161,6 +29,30 @@ fn neighbors(
             distance,
         ))
     })
+}
+
+/// Steepest-descent neighbour used by hydraulic transport. Ties are broken by
+/// the smallest row-major index so downstream routing stays deterministic.
+fn steepest_downstream(elevation: &Field2, index: usize) -> Option<usize> {
+    let width = elevation.width;
+    let height = elevation.height;
+    let x = index % width;
+    let y = index / width;
+    let here = elevation.values[index];
+    let mut best: Option<(f32, usize)> = None;
+    for (nx, ny, distance) in neighbors(x, y, width, height) {
+        let next = ny * width + nx;
+        let drop = here - elevation.values[next];
+        if drop > 0.0 {
+            let rate = drop / distance;
+            if best.is_none_or(|(best_rate, best_index)| {
+                rate > best_rate || (rate.to_bits() == best_rate.to_bits() && next < best_index)
+            }) {
+                best = Some((rate, next));
+            }
+        }
+    }
+    best.map(|(_, i)| i)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -191,12 +83,12 @@ impl Default for ErosionSettings {
 
 #[derive(Debug, Clone)]
 pub struct ErosionResult {
-    pub flow: FlowField,
     pub sediment: Field2,
 }
 
 /// Fixed iteration hydraulic transport. Material moved off a cell is carried to
-/// its downstream cell; deposition returns sediment to the elevation field.
+/// its steepest-descent neighbour; deposition returns sediment to the elevation
+/// field. Capacity is driven by local rainfall rather than a flow field.
 pub fn hydraulic_erosion(
     elevation: &mut Field2,
     rainfall: &Field2,
@@ -220,7 +112,6 @@ pub fn hydraulic_erosion(
         return Err(FieldError::NonFinite);
     }
     let dt = settings.dt.clamp(0.0, 1.0);
-    let mut flow = flow_accumulation_with_cell_size(elevation, rainfall, cell_size)?;
     for _ in 0..settings.iterations {
         let slope =
             slope_field_with_world_size(elevation, cell_size * (elevation.width - 1) as f32)
@@ -235,7 +126,7 @@ pub fn hydraulic_erosion(
         });
         for index in order {
             let hard = hardness.values[index].clamp(0.0, 1.0);
-            let capacity = (flow.accumulation.values[index].max(0.0)
+            let capacity = (rainfall.values[index].max(0.0)
                 * slope.values[index].to_radians().tan().max(0.0)
                 * settings.capacity_factor)
                 .clamp(0.0, settings.max_sediment);
@@ -248,7 +139,7 @@ pub fn hydraulic_erosion(
             next_sediment[index] = (next_sediment[index] + erode).min(settings.max_sediment);
 
             let transport = (next_sediment[index].min(capacity) * dt).min(next_sediment[index]);
-            if let Some(downstream) = flow.direction[index] {
+            if let Some(downstream) = steepest_downstream(elevation, index) {
                 next_sediment[index] -= transport;
                 next_sediment[downstream] =
                     (next_sediment[downstream] + transport).min(settings.max_sediment);
@@ -267,10 +158,8 @@ pub fn hydraulic_erosion(
                 return Err(FieldError::NonFinite);
             }
         }
-        flow = flow_accumulation_with_cell_size(elevation, rainfall, cell_size)?;
     }
     Ok(ErosionResult {
-        flow,
         sediment: sediment.clone(),
     })
 }

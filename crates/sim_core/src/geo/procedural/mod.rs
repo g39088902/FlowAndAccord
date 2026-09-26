@@ -3,7 +3,6 @@ pub mod compiler;
 pub mod constraints;
 pub mod diagnostics;
 pub mod fields;
-pub mod groundwater;
 pub mod hydrology;
 pub mod ir;
 pub mod materials;
@@ -39,10 +38,9 @@ pub use diagnostics::{
     candidate_field_hashes, confidence_field, field_diagnostic, field_slice, profile_slice,
     DiagnosticsBundle, FieldDiagnostic, FieldSlice, FieldSliceHeader, ProfileSample,
 };
-pub use groundwater::{solve_groundwater, GroundwaterFields, GroundwaterSettings};
-pub use hydrology::{ChannelField, HydrologyFields, HydrologySettings};
+pub use hydrology::{HydrologyFields, HydrologySettings};
 pub use materials::{MaterialProps, MaterialTable};
-pub use processes::{ErosionResult, ErosionSettings, FlowField, WaterBodyField};
+pub use processes::{ErosionResult, ErosionSettings, WaterBodyField};
 pub use semantics::{SemanticGrid, SurfaceMaterial, SurfacePalette, SurfaceThresholds};
 pub use strata::{sample_stratum, validate_column, StratumSample};
 pub use structures::{apply_structures, StructureError, StructureField};

@@ -194,7 +194,6 @@ pub struct SimConfig {
     /// 并使旧存档因 `SAVE_APP_VERSION` 变更而废弃——调整后必须重跑全量门禁与性能基准。
     pub terrain_grid_res: usize,
     pub terrain_profile: String,
-    pub terrain_ridge_amplitude: f32,
     /// ★ v1.50.17 T1-R：T1 山口聚落主脊高斯半宽 (m)。
     /// 通行力约束：主脊最大梯度 ≈ 0.858 × `terrain_pass_ridge_amplitude` / 本值，
     /// 必须显著大于 tan(`terrain_max_walk_slope`)，否则主脊不产生绕行代价（docs/22 §9.3.1）。
@@ -343,12 +342,6 @@ pub struct SimConfig {
     pub terrain_lake_outline_warp_m: f32,
     /// ★ TB-03 火山湖：环岸噪声阻尼增益。默认 0.30（环岸干岸带平缓可建）。
     pub terrain_lake_noise_gain: f32,
-    pub terrain_river_width_min: f32,
-    pub terrain_river_width_max: f32,
-    pub terrain_river_water_level: f32,
-    pub terrain_river_bank_width: f32,
-    pub terrain_river_terrace_width: f32,
-    pub terrain_crossing_width: f32,
     pub terrain_soft_ground_cost: f32,
     pub terrain_shallow_water_cost: f32,
 

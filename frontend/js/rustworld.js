@@ -96,7 +96,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.61.2';
+        this._appVersion = '1.62.0';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -168,7 +168,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.61.2';
+            this._appVersion = msg.appVersion || '1.62.0';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -503,7 +503,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.61.2';
+        return this._appVersion || '1.62.0';
 
       }
 
@@ -848,11 +848,9 @@
           this._terrainCached = true;
           // 地形重建后强制光档重推进（lightRev 闸节流 GL uniform 上传）
           if (window.SimLighting) window.SimLighting.markDirty();
-          if (window.RiverLife) window.RiverLife.init(nextFeatures, this._engineSeed);
-          if (window.WaterParticles) window.WaterParticles.init(nextFeatures, this._engineSeed);
         } else if (hasStaticFeatures || hasStaticAccents || hasStaticSubFeatures) {
           // ★ D-B1-7：网格缓存命中（或本帧无网格）但明确携带静态 section → 只替换静态数组，
-          //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧，RiverLife 仍随网格重建
+          //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧
           this.terrain.features = nextFeatures;
           this.terrain.accents = nextAccents;
           this.terrain.subFeatures = nextSubFeatures;

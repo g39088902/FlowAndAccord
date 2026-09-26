@@ -180,7 +180,6 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 256 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（v1.50.70 由 160 提升；256 → 步长 764/255 ≈ 2.996m） |
 | `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断基线：倾斜-only 平地，永不加入 random；v1.XX 起不再是降级回退目标）；影响地形重建与存档门禁 |
-| `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
 | `terrainNoiseAmplitude` | f32 | 6 | geo/terrain.rs (fBm 振幅增益，默认 6.0 零漂移) | fBm 基础振幅 (m)；Octave 0 基准，Octave 1/2 按 0.43/0.145 比例跟随 |
@@ -243,12 +242,6 @@
 | `terrainLakeShoreSetbackM` | f32 | 10 | geo/volcanic_lake.rs (TB-03 水岸安全退距) | 水岸安全退距 (m)；岸线外 NO_BUILD 缓冲，其外为可建干岸 |
 | `terrainLakeOutlineWarpM` | f32 | 14 | geo/volcanic_lake.rs (TB-03 湖岸低频径向扰动幅度) | 湖岸低频径向扰动幅度 (m)；限制凹度、不生成岛屿 |
 | `terrainLakeNoiseGain` | f32 | 0.3 | geo/volcanic_lake.rs (TB-03 环岸噪声阻尼增益) | 环岸噪声阻尼增益；环岸干岸带平缓可建 |
-| `terrainRiverWidthMin` | f32 | 28 | — | T2 地貌 / 通行参数 |
-| `terrainRiverWidthMax` | f32 | 42 | — | T2 地貌 / 通行参数 |
-| `terrainRiverWaterLevel` | f32 | 0 | — | T2 地貌 / 通行参数 |
-| `terrainRiverBankWidth` | f32 | 18 | — | T2 地貌 / 通行参数 |
-| `terrainRiverTerraceWidth` | f32 | 65 | — | T2 地貌 / 通行参数 |
-| `terrainCrossingWidth` | f32 | 26 | — | T2 地貌 / 通行参数 |
 | `terrainSoftGroundCost` | f32 | 1.25 | — | T2 地貌 / 通行参数 |
 | `terrainShallowWaterCost` | f32 | 2 | — | T2 地貌 / 通行参数 |
 | `terrainMaxWalkSlope` | f32 | 30 | geo/query.rs / graph.rs (道路完整曲线校验) | 普通道路允许的最大坡度 (度) |

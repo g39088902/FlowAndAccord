@@ -33,7 +33,8 @@ use crate::rng::WorldRng;
 /// v1.12.0: history_kings 从 Vec<AgentId> 改为 Vec<HistoryKing>（含在位时长与死因），不兼容旧档
 /// v1.44.7: 新增帝国登记簿与帝国公帑结算状态，不兼容旧档
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
-pub const SAVE_FORMAT_VERSION: u32 = 7;
+/// v1.62.0：删除地图河流水系与土壤湿润，地形生成语义变化，不兼容旧档。
+pub const SAVE_FORMAT_VERSION: u32 = 8;
 /// 存档应用版本（加载门禁 ★ v1.37.1 起：版本变更自动废弃旧档）
 ///
 /// ★★ v1.50.80 版本策略（三段的语义分工，与 `docs/current/tech/06-snapshot-and-save.md` §2.4 同源）：
@@ -45,7 +46,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.61";
+pub const SAVE_APP_VERSION: &str = "1.62";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///

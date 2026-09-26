@@ -640,10 +640,6 @@ pub struct GenesisOverrides {
 /// `pub(super)`：第 3 步实现在 `hydrology.rs`（同为 `geo` 子模块），需跨文件访问。
 #[derive(Clone)]
 pub(super) struct GenesisScratch {
-    /// T2 主河静态几何：编排器在第 2 步前规划（`plan_river_geometry`，hydro_rng
-    /// **独立流**单次 phase 抽取，规划时点不影响任何共享 RNG 消费序）；第 2 步铺
-    /// 河谷低丘、第 3 步施加水面共用同一份，保证两段几何逐比特一致（STAGE2-2 契约）。
-    pub(super) river_geometry: Option<super::hydrology::RiverGeometry>,
     /// ★ TB-02 台地静态几何：第 2 步 plateau 分支构建，第 10 步路网接入消费。
     pub(super) plateau_geometry: Option<super::plateau::PlateauGeometry>,
     /// ★ TB-03 冲积扇静态几何：第 2 步构建（扇面高程 + 干沟 + 锚点），第 6 步
@@ -663,7 +659,6 @@ pub(super) struct GenesisScratch {
 impl Default for GenesisScratch {
     fn default() -> Self {
         Self {
-            river_geometry: None,
             plateau_geometry: None,
             fan_geometry: None,
             basin_geometry: None,
@@ -821,7 +816,10 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 35;
+/// v1.62.0：35 -> 36（删除地图河流水系统与土壤湿润：移除汇流河道/支流/河谷主干河
+///           与整条地下水链，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度的
+///           固定规则。河谷模板不再生成河流，同种子地形随之改变；旧存档按版本门禁拒绝。）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 36;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -1501,53 +1499,25 @@ impl TerrainMap {
         //   导致探针 fan_coverage/gully/relief 恒 0、G1/G2/G3 门禁全假阳。
         self.fan_geometry = scratch.fan_geometry.clone();
 
-        // ★ T2 河谷低丘陆地基底（STAGE2-2 提取公式，铺满全图）＝第 2 步的
-        //   river_valley 分支；几何由编排器第 2 步前规划的共享 `RiverGeometry` 提供。
-        if let Some(geom) = scratch.river_geometry.as_ref() {
-            self.generate_river_valley_base_relief(geom, config);
+        // ★ T2 河谷：河流已被删除，第 2 步的 river_valley 分支只把全图归一为
+        //   河谷陆地基底（地表/归属/flags/肥力），高程沿用通用基础起伏。
+        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
+            self.generate_river_valley_base_relief();
         }
     }
 
-    /// T2 `river_valley_v1` 陆地区域基础生成（★ STAGE2-2 公式解耦，06 号 §5.3 兼容性拆分）。
+    /// T2 `river_valley_v1` 陆地区域归一（★ 删除河流后保留河谷陆地基底）。
     ///
-    /// 旧实现中「河阶外低丘」公式内联在 `hydrology.rs::generate_river` 的全图覆写里，
-    /// 水系阶段把前置地貌全部冲刷，统一地表派生无法局部生效。现将该公式**逐字**提取为
-    /// 本函数：铺满全图写陆地基底——高程用旧 else 分支原式（`u` 夹取、山脊项、浮点次序
-    /// 不改），地表 `DryGround`、肥力 `0.75`、flags `0`、无水体归属；随后
-    /// `hydrology.rs::generate_river` 只覆盖水系影响带。拆分前后最终网格逐比特等价：
-    /// 带内河阶格的山脊项恒为 +0.0，本函数写出的高程即旧实现的最终值。
-    ///
-    /// 流水线定位：06 号 §5.3 第 2 步 `generate_base_relief` 的 river_valley 分支前身
-    ///（阶段化管线重构属 STAGE2-3）。
-    pub fn generate_river_valley_base_relief(
-        &mut self,
-        geom: &super::hydrology::RiverGeometry,
-        config: &SimConfig,
-    ) {
-        let size = self.world_size;
-        let level = geom.level;
-        let bank = geom.bank;
-        let terrace = geom.terrace;
-        for gy in 0..self.grid_height {
-            for gx in 0..self.grid_width {
-                let p = self.grid_pos(gx, gy);
-                let (d, _, _) = geom.distance(p);
-                let w = geom.half_width(p.y, size);
-                let outside = (d - w).max(0.0);
-                let c = &mut self.cells[gy * self.grid_width + gx];
-                // 旧 T2 河阶外低丘公式（原 else 分支逐字保留）
-                let u = ((outside - bank) / terrace).clamp(0.0, 1.0);
-                c.elevation = level
-                    + 2.0
-                    + u * 2.0
-                    + ((outside - bank - terrace).max(0.0) / size
-                        * config.terrain_ridge_amplitude.max(1.0))
-                        * (0.8 + 0.2 * (p.y / 90.0).sin());
-                c.surface_kind = SurfaceKind::DryGround;
-                c.water_body_id = None;
-                c.feature_flags = 0;
-                c.natural_fertility = 0.75;
-            }
+    /// 旧实现里本函数用水系几何距离场写河阶外低丘高程；河流管线删除后不再有
+    /// 几何输入，故只把全图 cell 归一为陆地事实：`DryGround`、无水体归属、
+    /// flags `0`、肥力 `0.75`，高程沿用 `generate_base_relief` 写出的通用起伏。
+    /// 第 6 步 `derive_surface_and_flags` 对本 profile 仍直接返回（地表由此定稿）。
+    pub fn generate_river_valley_base_relief(&mut self) {
+        for cell in self.cells.iter_mut() {
+            cell.surface_kind = SurfaceKind::DryGround;
+            cell.water_body_id = None;
+            cell.feature_flags = 0;
+            cell.natural_fertility = 0.75;
         }
     }
 
@@ -1600,19 +1570,10 @@ impl TerrainMap {
         self.generator_version = TERRAIN_GENERATOR_VERSION;
         // 1. 清空静态地形状态（§5.2：每次创世先清空，再按流水线重建）
         self.reset_static_terrain_state();
-        // T2 主河几何规划：hydro_rng 独立流（单次 phase 抽取），规划时点不影响
-        // 任何共享 RNG 消费序；第 2 步铺河谷低丘与第 3 步施加水面共用同一份。
         let mut scratch = GenesisScratch::default();
-        if self.profile == TERRAIN_PROFILE_RIVER_VALLEY {
-            scratch.river_geometry = Some(super::hydrology::plan_river_geometry(
-                seed,
-                config,
-                self.world_size,
-            ));
-        }
-        // 2. 基础起伏（山口起伏 / 草原 / 河谷低丘）
+        // 2. 基础起伏（山口起伏 / 草原 / 河谷陆地基底）
         self.generate_base_relief(seed, config, &mut scratch);
-        // 3. 静态水系（T2 主河；P1 预留）
+        // 3. 静态水系（模板专有静态湖泊；河流已删除）
         self.apply_profile_static_hydrology(config, &scratch);
         // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）；
         //    创世覆盖掩码在规划产出后过滤结构子特征（不触碰 RNG；v1.XX 起恒 0）。

@@ -1,7 +1,9 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.61.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.62.0**。
+
+| **v1.62.0**（不兼容变更 · 删除地图河流水系统与土壤湿润） | **移除地图河流/土壤湿润链与粒子流体**：删除地图级河流水系统（主干河、支流、漫滩、浅滩渡口、河岸/河阶带、`RiverCliff` 注入与全部河道几何）与整条土壤湿润/地下水链（`GroundwaterFields`/`solve_groundwater`/`project_with_groundwater`/`ChannelField`/`classify_channels`/`FlowField`），并删除前端粒子流体（`water_particles.js`）与游鱼层（`river_life.js`）。**保留**模板专有静态湖泊（`volcanic_lake` / `mountain_pass` / `basin_oasis` / `plateau` 静湖）与生存水链（清泉 `WaterSource` POI、共享 `WaterPool`、饮用）。无湖泊模板的全部清泉 POI 统一绑定共享 `WaterPool #1`（低洼清泉 #id）。地表材质/调色/植被资格改为仅按坡度+硬度的固定规则（`slope≤28°` → Grass/Green；`hard>0.85 && slope>34°` → RockFace/NO_WALK\|NO_BUILD；`hard>0.7 && slope>18°` → Gravel；否则 BareSoil/Brown），`natural_fertility` 固定 `0.75`。配置删除 `terrainRiverWidthMin/Max`、`terrainRiverWaterLevel`、`terrainRiverBankWidth`、`terrainRiverTerraceWidth`、`terrainCrossingWidth`、`terrainRidgeAmplitude` 与全部 `groundwater_*` 键，字段总数 369 → **362**。`TERRAIN_GENERATOR_VERSION` **35 → 36**，`SAVE_FORMAT_VERSION` **7 → 8**（FABS `FORMAT_VERSION` 保持 6）。旧存档因生成器/结构版本门禁直接拒绝。 | crates/sim_core/src/{config.rs,geo/{terrain.rs,hydrology.rs,validation.rs,procedural/{compiler,recipes,semantics,processes,hydrology,ir,diagnostics,mod}.rs}}, crates/sim_core/src/spatial/{terrain_network.rs,world_save.rs}, crates/sim_core/examples/{config.json,terrain_diagnostics_probe.rs}, frontend/{js/{config.js,render_terrain.js,render_depth_queue.js,rustworld.js}}, docs/current/tech/{14-terrain-and-network,18-water-rendering,16-frontend-overview,32-terrain-generation-gates,06-snapshot-and-save,04-config-system,29-impact-matrix,31-code-map}.md |
 
 | **v1.61.2**（代码新增 · 粒子水面） | **移除固定水面填充模型**：新增确定性水体粒子模拟，河流粒子沿中心线流动，湖泊粒子在水体边界内漂移；降雨驱动的覆盖率、水位和流动强度控制粒子数量、扩散和速度，粒子经统一深度队列与 WebGL 图元层绘制。 | frontend/{index.html,js/{water_particles,rustworld,render_terrain,render_depth_queue}}, docs/current/tech/{14-terrain-and-network,18-water-rendering}.md |
 

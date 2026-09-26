@@ -1,6 +1,6 @@
 // === 世界统一深度队列层（★ TA-04-6 前置自 render_world.js 拆分，单一职责模块）===
 // 职责（07 号 §6.5 末段「入队和分发归队列层」）：深度项对象池、贴面/足迹感知深度帮助函数、
-// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（水系 / 游鱼 / 道路 /
+// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（水系静湖 / 道路 /
 // 辖区连线 / POI 底座与标记 / 房屋 / 地表装饰 / 族人）与按相机深度远 → 近的分发落笔。
 // ★ 全量 WebGL（Canvas 备用通道删除）：地形格 / 侧壁 / 贴地投影已删除——地形与侧壁由
 //   webgl/layers/terrain/terrain-renderer.js 承担，落底阴影由 webgl/layers/accents/shadow-pass.js
@@ -10,11 +10,11 @@
 //
 // ★ v1.50.11 世界统一深度队列：Canvas 2D 无深度缓冲，全部图元按 project3D().depth =
 //   ry·sinX + z·cosX 升序（远 → 近）落笔，同深度保持收集原序（Array.sort 稳定）——
-//   近处河道、近处乔木都会正确遮挡更远的图标；渲染确定性不变。
+//   近处湖水、近处乔木都会正确遮挡更远的图标；渲染确定性不变。
 // 依赖全局: ctx, camera, sim, w, h, project3D, mousePos, isDragging, hoveredLane, SimLighting,
 //   drawFeatureItem（render_terrain.js）、drawPoiGroundBase / drawPoiMarker / drawHouse /
 //   drawLaneSegment / drawCampHouseLink（render_world.js）、drawAccentEntity（render_accents.js）、
-//   collectLandscapes / drawLandscapeChild（render_landscapes.js，S4-02）、drawAgent（render_agents.js）、RiverLife / window.RiverLife
+//   collectLandscapes / drawLandscapeChild（render_landscapes.js，S4-02）、drawAgent（render_agents.js）
 
 // ★ v1.50.15 渲染表现层参数（视觉抬升 / 足迹深度半径），来源 config.render.js
 //   （前端独立配置，不进 SIM_CONFIG——config.js 与 Rust SimConfig 严格互检）。
@@ -26,15 +26,13 @@ const RC = window.RENDER_CONFIG || {};
 // ==========================================
 // Canvas 2D 无深度缓冲。v1.47.9 只把立体实体收进深度队列，地形格仍整层先画——
 // 结果实体之间的遮挡正确了，但**近处山地无法遮挡远处图标**（图标永远后画、透山可见）。
-// 现将地形格 / 水系特征 / 游鱼 / 波光 / 道路分段 / 营地连线 / POI 底座 /
+// 现将地形格 / 水系特征 / 道路分段 / 营地连线 / POI 底座 /
 // POI 标记 / 房屋 / 地表装饰 / 族人全部收进**同一个相机深度队列**，
 // 按 project3D().depth = ry·sinX + z·cosX 升序（远 → 近）落笔：
-// 近处山地格、近处河道、近处乔木都会正确遮挡更远的图标。
+// 近处山地格、近处湖水、近处乔木都会正确遮挡更远的图标。
 // 同深度保持收集原序（Array.sort 稳定），渲染确定性不变。
 // 大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），地形受光由 GL shader 承担。
-const DEPTH_FEATURE = 1;   // 水系特征（a = feature，River 水面 / ShallowFord / 泉谷）
-const DEPTH_FISH = 2;      // 游鱼（a = fish，水中层，深度低于水面填充）
-const DEPTH_WATER_PARTICLE = 3; // 动态水粒子（a = particle）
+const DEPTH_FEATURE = 1;   // 水系特征（a = feature，静湖水面 / 泉谷）
 const DEPTH_LANE = 4;      // 道路分段（a = lane，b = 段序号，s1/s2 = 屏幕端点，dash = 弧长相位）
 const DEPTH_LINK = 5;      // 选中营地辖区连线（a = house）
 const DEPTH_POI_BASE = 6;  // POI 贴地底座（a = poi）
@@ -214,77 +212,16 @@ function drawWorldEntities() {
   // ★ 全量 WebGL：地形格与边界侧壁不再入队（terrain-renderer.js GL 层承担，
   //   含沙盘侧壁 skirt 与天幕 clear 背景）。地形壳层投影由 drawTerrainShell 提供。
 
-  // ── 2. 水系特征 / 游鱼 ──
+  // ── 2. 水系特征（静湖）──
   //   WebGL 只接管地形本身，上层水系仍由 2D 深度队列绘制。
   if (hasTerrain) {
-    // ★ v1.50.20 河流分段入队：整条河多边形若以「全顶点最大深度」入队（v1.50.11 做法），
-    //   只要任一岸段靠近相机，整条河就后画、盖住所有更远的树/房/POI/族人（用户可见症状：
-    //   「河流叠加在树和房子、POI、NPC 上」）。现在：
-    //   River 水面按剖分区间逐段入队（b = 段号，深度 = 段四角最大相机深度）；
-    //   RiverBank 逐段描边；ShallowFord / 波光挂所在段深度 + ε（恒在所在段水面之后）。
     const features = terrain.features || [];
-    const nowMs = performance.now();
-    if (features.length && window.RiverLife) window.RiverLife.update(nowMs);
-    if (features.length && window.WaterParticles) window.WaterParticles.update(nowMs);
-    const rivers = [];
-    for (let fi = 0; fi < features.length; fi++) {
-      const f = features[fi];
-      if (f.kind === 'River' && f.vertices && f.vertices.length >= 4) rivers.push(f);
-    }
-    // 河轴剖分 y → 所在段的最大深度（左右岸顶点 y 单调；段深度 = 4 角相机深度最大值）
-    const riverBandDepth = (river, y) => {
-      const v = river.vertices, half = v.length >> 1;
-      const asc = v[0].y <= v[half - 1].y;
-      if (asc ? (y < v[0].y || y > v[half - 1].y) : (y > v[0].y || y < v[half - 1].y)) return null;
-      let lo = 0, hi = half - 2;
-      while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1;
-        if (asc ? v[mid].y <= y : v[mid].y >= y) lo = mid; else hi = mid - 1;
-      }
-      const j = v.length - 1 - lo;
-      return Math.max(
-        depthOf(v[lo].x, v[lo].y, v[lo].z),
-        depthOf(v[lo + 1].x, v[lo + 1].y, v[lo + 1].z),
-        depthOf(v[j].x, v[j].y, v[j].z),
-        depthOf(v[j - 1].x, v[j - 1].y, v[j - 1].z));
-    };
     for (let fi = 0; fi < features.length; fi++) {
       const f = features[fi];
       if (!f.vertices || f.vertices.length < 2) continue;
       const vs = f.vertices;
       const waterState = sim.waterBodyDynamics && sim.waterBodyDynamics.get(f.id);
-      const levelDelta = waterState ? waterState.level - (f.elevation || 0) : 0;
-      if ((f.kind === 'River' || f.kind === 'WaterBody') &&
-          window.WaterParticles && window.WaterParticles.isInitialized()) continue;
-      if (f.kind === 'River') {
-        const half = vs.length >> 1;
-        for (let b = 0; b < half - 1; b++) {
-          const j = vs.length - 1 - b;
-          _depthItem(DEPTH_FEATURE, f, b, Math.max(
-            depthOf(vs[b].x, vs[b].y, vs[b].z + levelDelta),
-            depthOf(vs[b + 1].x, vs[b + 1].y, vs[b + 1].z + levelDelta),
-            depthOf(vs[j].x, vs[j].y, vs[j].z + levelDelta),
-            depthOf(vs[j - 1].x, vs[j - 1].y, vs[j - 1].z + levelDelta)));
-        }
-      } else if (f.kind === 'RiverBank') {
-        // 岸线带逐段入队（整条以最大顶点深度入队会同样盖住更远实体）
-        for (let s = 0; s < vs.length - 1; s++) {
-          const d0 = depthOf(vs[s].x, vs[s].y, vs[s].z);
-          const d1 = depthOf(vs[s + 1].x, vs[s + 1].y, vs[s + 1].z);
-          _depthItem(DEPTH_FEATURE, f, s, d0 > d1 ? d0 : d1);
-        }
-      } else if (f.kind === 'ShallowFord') {
-        // 涉渡横跨河道（两端 y 相同）：挂所在段深度 + ε ⇒ 恒在该段水面之后
-        let d = null;
-        const yMid = (vs[0].y + vs[1].y) * 0.5;
-        for (let ri = 0; ri < rivers.length && d == null; ri++) d = riverBandDepth(rivers[ri], yMid);
-        if (d == null) {
-          const d0 = depthOf(vs[0].x, vs[0].y, vs[0].z);
-          const d1 = depthOf(vs[1].x, vs[1].y, vs[1].z);
-          d = d0 > d1 ? d0 : d1;
-        }
-        _depthItem(DEPTH_FEATURE, f, 0, d + 0.05);
-      } else if (f.kind === 'WaterBody') {
+      if (f.kind === 'WaterBody') {
         // ★ TB-03 静水闭合水体：按 32m 世界块分块入队（整湖以最大顶点深度入队
         // 会盖住近岸人物与房屋，TB-03-IMPLEMENTATION-PLAN §7.3）。块网格与
         // render_terrain.js::_wbTileGrid 同式；块深度 = 块四角在水面高程下的
@@ -318,24 +255,6 @@ function drawWorldEntities() {
           if (d > dmax) dmax = d;
         }
         _depthItem(DEPTH_FEATURE, f, 0, dmax);
-      }
-    }
-    // 动态水粒子逐条入队：使用粒子自身的水位深度，保持近岸实体的遮挡关系。
-    if (window.WaterParticles) {
-      const particles = window.WaterParticles.particles();
-      if (particles) {
-        for (let pi = 0; pi < particles.length; pi++) {
-          const p = particles[pi];
-          if (p.active) _depthItem(DEPTH_WATER_PARTICLE, p, 0, depthOf(p.x, p.y, p.z));
-        }
-      }
-    }
-    // 游鱼逐条入队：深度 = 鱼体世界坐标（所在段水面的段内位置深度 < 段 4 角最大 ⇒ 落在水面填充之前）
-    const fishList = window.RiverLife ? window.RiverLife.fishList() : null;
-    if (fishList) {
-      for (let i = 0; i < fishList.length; i++) {
-        const f = fishList[i];
-        _depthItem(DEPTH_FISH, f, 0, depthOf(f.x, f.y, f.z));
       }
     }
   }
@@ -530,15 +449,10 @@ function drawWorldEntities() {
 
   list.sort((a, b) => a.depth - b.depth);
 
-  const RL = window.RiverLife;
   for (let i = 0; i < list.length; i++) {
     const it = list[i];
     switch (it.kind) {
       case DEPTH_FEATURE: drawFeatureItem(it.a, it.b); break;
-      case DEPTH_WATER_PARTICLE:
-        window.WaterParticles.drawParticle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-        break;
-      case DEPTH_FISH: RL.drawFishSingle(ctx, it.a, cx, cy, cosZ, sinZ, cosX, sinX, scale); break;
       case DEPTH_LANE: drawLaneSegment(it); break;
       case DEPTH_LINK: drawCampHouseLink(it); break;
       case DEPTH_POI_BASE: drawPoiGroundBase(it.a); break;

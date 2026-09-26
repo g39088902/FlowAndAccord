@@ -51,11 +51,11 @@
 
 五组只读断言，全部通过才 `Ok(())`：
 
-**断言 1 · `features`**：ID 唯一；按 profile 归属且 kind 与稳定 ID 表一致（T2：1=`River`、10/11=`ShallowFord`、20/21=`RiverBank`；火山湖：1=`WaterBody`）；子特征 ID 段（T1 100–127 / T2 200–227）放行；顶点非空、在界（`BOUND_EPSILON_M=0.5m`）、高程有限。失败码：`FeatureIdsDuplicated` / `FeatureIdKindMismatch` / `FeatureIdOwnershipInvalid` / `FeatureVerticesInvalid`。
+**断言 1 · `features`**：ID 唯一；按 profile 归属且 kind 与稳定 ID 表一致（火山湖：1=`WaterBody`；★ v1.62.0 起地图河流水系统删除，其余 profile 零核心特征）；子特征 ID 段（T1 100–127 / T2 200–227）放行；顶点非空、在界（`BOUND_EPSILON_M=0.5m`）、高程有限。失败码：`FeatureIdsDuplicated` / `FeatureIdKindMismatch` / `FeatureIdOwnershipInvalid` / `FeatureVerticesInvalid`。
 
 **断言 2 · `sub_features`**：ID 严格升序唯一；`feature_ids` 引用存在且升序；accent 区间配对（`[start,end]` 均 Some 且 start ≤ end）。失败码：`SubFeatureIdsUnsortedOrDuplicated` / `SubFeatureReferenceMissing` / `SubFeatureAccentRangeInvalid`。
 
-**断言 3 · 水系**：水体 ID 唯一、轮廓非空且在界、水位有限；**水体轮廓与同 id 特征顶点双副本逐字节相等**（主河水体 1 ↔ `River` 特征 1；静水水体 1 ↔ `WaterBody`，不得误标成河流绕过校验）；静水（火山湖）零流向、零授权走廊、轮廓闭合（末点=首点）且非自交（O(n²) 段相交普查）；取水点引用水体且落位在界；授权走廊 ID 唯一、端点在界、宽度正有限；浅滩特征恰好 2 顶点且**端点必须落在陆侧**（读档校验与 corridor 授权都依赖此事实）。失败码：`WaterBodyIdDuplicated` / `WaterBodyOutlineInvalid` / `WaterBodyFeatureMissing` / `WaterBodyOutlineMismatch` / `StaticWaterOutlineInvalid` / `AccessPointInvalid` / `ConnectionIdDuplicated` / `ConnectionInvalid` / `FordEndpointInvalid` / `FordEndpointNotOnLand`。
+**断言 3 · 水系**：水体 ID 唯一、轮廓非空且在界、水位有限；**水体轮廓与同 id 特征顶点双副本逐字节相等**（静水水体 1 ↔ `WaterBody` 特征 1；legacy `River` 路径已随地图河流水系统删除）；静水（火山湖）零流向、零授权走廊、轮廓闭合（末点=首点）且非自交（O(n²) 段相交普查）；取水点引用水体且落位在界；授权走廊 ID 唯一、端点在界、宽度正有限；浅滩特征恰好 2 顶点且**端点必须落在陆侧**（读档校验与 corridor 授权都依赖此事实）。失败码：`WaterBodyIdDuplicated` / `WaterBodyOutlineInvalid` / `WaterBodyFeatureMissing` / `WaterBodyOutlineMismatch` / `StaticWaterOutlineInvalid` / `AccessPointInvalid` / `ConnectionIdDuplicated` / `ConnectionInvalid` / `FordEndpointInvalid` / `FordEndpointNotOnLand`。
 
 **断言 4 · cells 水域归属与通行标志一致**（阈值即物理契约，与第 6 步派生及水系写入同源）：
 
@@ -124,7 +124,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | 结构版本 | `SAVE_FORMAT_VERSION` 精确相等（不随应用版本自增） | `存档格式版本不兼容` |
 | 应用兼容线 | `app_version_compat_line` 前两段 `major.minor` 比对（**禁止**全串 `===`） | `存档应用版本不兼容` |
 | 世界参数 | `grid_res != 0`、`world_size` 正有限 | `存档世界参数非法` |
-| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **21**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v21` |
+| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **36**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v36` |
 | **profile 白名单** | 九个：`mountain_pass_v1` / `river_valley_v1` / `flat_baseline` / `grassland_plain_v1` / `hillside_woodland_v1` / `plateau_v1` / `alluvial_fan_v1` / `basin_oasis_v1` / `volcanic_lake_v1` | `地形 profile 不受支持` |
 | 读档路网复核 | 加载后 `validate_terrain_world()` | `车道 X 不符合地表通行规则` |
 
@@ -185,7 +185,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 生成器侧常量（`accents.rs`）：
 - `EDGE_PROTECTION_RATIO = 0.03`（× world_size，764m → 22.9m ≈ 7.6 格步长）；
 - `WATER_CLEARANCE_M = 13.0`（v1.52.0 定为 3.0m；**v1.58.1 上调至 13m**，覆盖 ~8.5m 最大模型包围体 × 1.4 最大缩放并留余量；探针判读仍按保守下限 3.0）；
-- 水面判定与前端 `drawRiverBand` / `drawWaterBodyTile` **同源**（`point_in_polygon` 唯一实现，静水涂写逐比特不变）。
+- 水面判定与前端 `drawWaterBodyTile` **同源**（`point_in_polygon` 唯一实现，静水涂写逐比特不变；★ v1.62.0 起 `drawRiverBand` 随河流水系统删除）。
 
 > 装饰为纯视觉要素：改落点规则**不递增** `TERRAIN_GENERATOR_VERSION`、不动快照结构；但 `accent_rng` 拒绝会改变抽样序列 ⇒ 同种子装饰分布整体重排。
 
@@ -207,14 +207,14 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 ## 8. 生成器版本契约（`TERRAIN_GENERATOR_VERSION`）
 
-**当前版本 21**（v1.60.0：湖畔盆地 → 火山湖重构）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
+**当前版本 36**（★ v1.62.0：删除地图河流水系统与土壤湿润，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度固定规则）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
 
 | 情形 | 是否递增 | 备注 |
 | :--- | :--- | :--- |
 | 改变高程 / 地表 / 特征生成算法 | ✅ | 旧存档按版本门禁拒绝 |
 | **新 profile 分支入库**（「新分支入库即换版」先例） | ✅ | 同种子输出改变，即使旧路径逐位不变 |
 | 掩码 / 扭曲 / 支脊常数（`RIDGE_WARP_*` / `NOISE_WEIGHT_*` / `SADDLE_NOISE_*` / `BRANCH_*` 等） | ✅ | 改值等于换图 |
-| 结构型子特征注入（RiverCliff 等） | ✅ | 必然改变命中种子输出 |
+| 结构型子特征注入（RiverCliff 等，★ v1.62.0 随河流水系统删除） | ✅ | 必然改变命中种子输出 |
 | 装饰纯视觉落点（草量、净空、裁树、四象限配额） | ❌ | 不动快照结构、不同步存档兼容线 |
 | 仅前端渲染表现 | ❌ | patch 升版即可 |
 

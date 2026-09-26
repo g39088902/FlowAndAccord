@@ -200,6 +200,33 @@ impl World3DEngine {
                 source_poi_ids: water_sources,
             });
             self.sync_water_pois();
+        } else {
+            // ★ 无湖模板兜底（河流已删除）：`water_bodies` 与 DeepWater 语义格
+            //   均为空，不再有岸边存取水点，生存水源改由清泉 POI 直接承载——
+            //   把全部 `WaterSource` 绑定到共享池 #1。落点已在上方循环经
+            //   `legal_land_position` 保证合法（本分支不额外重锚）。预算按
+            //   `countWater` 一次建立，与语义水格路径一致；`countWater=0` ⇒
+            //   空池走生存门禁明确失败/降级。
+            let water_sources: Vec<u32> = self
+                .pois
+                .iter_mut()
+                .filter(|poi| poi.poi_type == super::poi::PoiType::WaterSource)
+                .map(|poi| {
+                    poi.water_pool_id = Some(1);
+                    poi.name = format!("低洼清泉 #{}", poi.id);
+                    poi.id
+                })
+                .collect();
+            let n_budget = self.config.count_water_sources as usize;
+            let max = self.config.stock_max_water * n_budget as f32;
+            self.water_pools.push(crate::geo::hydrology::WaterPool {
+                id: 1,
+                current_stock: max * 0.75,
+                max_stock: max,
+                regen_rate: self.config.regen_base_water * n_budget as f32,
+                source_poi_ids: water_sources,
+            });
+            self.sync_water_pois();
         }
     }
     pub(crate) fn connect_land_nodes(&mut self,a:u32,b:u32)->bool {

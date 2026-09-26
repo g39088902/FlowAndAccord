@@ -180,8 +180,6 @@ pub fn grassland_plain_v1() -> TerrainRecipe {
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
         hydrology: HydrologySpec {
-            channel_threshold: 900.0,
-            bank_width_m: 18.0,
             ..HydrologySpec::default()
         },
         output: OutputSpec {
@@ -262,8 +260,6 @@ pub fn mountain_pass_v1() -> TerrainRecipe {
             TerrainConstraint::BuildableArea { min_cells: 64 },
         ],
         hydrology: HydrologySpec {
-            channel_threshold: 900.0,
-            bank_width_m: 18.0,
             ..HydrologySpec::default()
         },
         output: OutputSpec {
@@ -298,11 +294,6 @@ pub fn river_valley_v1() -> TerrainRecipe {
         nodes,
         3,
         HydrologySpec {
-            // A wetter valley keeps tributary flow alive; the compiler adds a
-            // connected irregular trunk so these channels do not appear as
-            // isolated blue dashes after polygonal relief is applied.
-            channel_threshold: 800.0,
-            bank_width_m: 18.0,
             min_lake_depth_m: 1.0,
             ..HydrologySpec::default()
         },
@@ -428,8 +419,6 @@ pub fn alluvial_fan_v1() -> TerrainRecipe {
         ),
         3,
         HydrologySpec {
-            channel_threshold: 700.0,
-            bank_width_m: 12.0,
             min_lake_depth_m: 20.0,
             ..HydrologySpec::default()
         },
@@ -454,8 +443,6 @@ pub fn volcanic_lake_v1() -> TerrainRecipe {
         ),
         3,
         HydrologySpec {
-            channel_threshold: f32::MAX,
-            bank_width_m: 0.0,
             min_lake_depth_m: 1.0,
             ..HydrologySpec::default()
         },
@@ -509,8 +496,6 @@ pub fn fault_scarp_demo_v1() -> TerrainRecipe {
         ),
         3,
         HydrologySpec {
-            channel_threshold: 900.0,
-            bank_width_m: 18.0,
             ..HydrologySpec::default()
         },
     );
@@ -551,8 +536,6 @@ pub fn folded_basin_demo_v1() -> TerrainRecipe {
         ),
         3,
         HydrologySpec {
-            channel_threshold: 900.0,
-            bank_width_m: 16.0,
             thermal_iterations: 1,
             erosion_iterations: 18,
             erosion_dt: 0.08,

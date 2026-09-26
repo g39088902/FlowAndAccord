@@ -1,6 +1,5 @@
 //! Fixed-order deterministic terrain field compiler.
 use super::fields::{Field2, FieldError};
-use super::groundwater::{solve_groundwater, GroundwaterFields, GroundwaterSettings};
 use super::hydrology::{project_semantics, solve_hydrology, HydrologyFields, HydrologySettings};
 use super::ir::{validate_recipe, RecipeError, ResolvedRecipe, TerrainRecipe};
 use super::materials::MaterialTable;
@@ -10,84 +9,8 @@ use super::strata::sample_stratum;
 use super::structures::{StructureError, StructureField};
 use super::{constraints, diagnostics, operators, uncertainty};
 use crate::config::SimConfig;
-use crate::geo::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-/// A single connected water corridor used by the river-valley recipe.  The
-/// field compiler's D8 accumulation is intentionally local and can leave
-/// short high-flow islands when polygonal relief creates shallow sills.  The
-/// trunk keeps the authored valley hydrologically legible without turning
-/// every low-flow tributary into a blocked cell.  It is shallow water so the
-/// walkability constraint still has a deterministic crossing surface.
-const RIVER_VALLEY_TRUNK_ID: u32 = 0xF10D_0001;
-
-fn project_river_valley_trunk(
-    semantics: &mut SemanticGrid,
-    world_size: f32,
-    seed: u64,
-) {
-    let width = semantics.width;
-    let height = semantics.height;
-    if width < 2 || height < 2 || semantics.surface_kind.len() != width * height {
-        return;
-    }
-    let half = world_size * 0.5;
-    let cell_x = world_size / (width - 1) as f32;
-    let cell_y = world_size / (height - 1) as f32;
-    // Direction of the authored [-500,-420] → [500,420] valley axis.
-    const DX: f32 = 0.766261;
-    const DY: f32 = 0.642513;
-    const NX: f32 = -0.642513;
-    const NY: f32 = 0.766261;
-    for y in 0..height {
-        for x in 0..width {
-            let wx = x as f32 * cell_x - half;
-            let wy = y as f32 * cell_y - half;
-            let index = y * width + x;
-            // River-valley crossings are shallow even where the raw solver
-            // found a tiny closed depression.  Keeping those cells in the
-            // same blue, crossable water class prevents polygonal sills from
-            // splitting the walkable valley into isolated islands.
-            if semantics.water_body_id[index].is_some() {
-                semantics.surface_kind[index] = SurfaceKind::ShallowWater;
-                semantics.flags[index] &= !TERRAIN_FLAG_NO_WALK;
-                semantics.walk_mask.values[index] = 1.0;
-            }
-            let along = wx * DX + wy * DY;
-            if along.abs() > world_size * 0.59 {
-                continue;
-            }
-            let center_warp = operators::polygonal_surface(
-                seed ^ 0x5249_5645_5254_5255,
-                wx,
-                wy,
-                180.0,
-                18.0,
-            );
-            let half_width = 13.0
-                + operators::polygonal_surface(
-                    seed ^ 0x5249_5645_5252_4944,
-                    wx,
-                    wy,
-                    150.0,
-                    4.0,
-                );
-            let cross = wx * NX + wy * NY - center_warp;
-            if cross.abs() > half_width.max(7.0) {
-                continue;
-            }
-            semantics.surface_kind[index] = SurfaceKind::ShallowWater;
-            semantics.water_body_id[index] = Some(RIVER_VALLEY_TRUNK_ID);
-            semantics.water_depth.values[index] = semantics.water_depth.values[index].max(0.6);
-            semantics.flags[index] |= TERRAIN_FLAG_NO_BUILD;
-            // Keep the broad river crossable; the central water colour is
-            // still blue in both canvas and WebGL paths.
-            semantics.walk_mask.values[index] = 1.0;
-            semantics.build_mask.values[index] = 0.0;
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BackendKind {
@@ -112,7 +35,6 @@ pub struct CompiledTerrain {
     pub sediment: Field2,
     pub hydrology: HydrologyFields,
     pub semantics: SemanticGrid,
-    pub groundwater: GroundwaterFields,
     /// Quantized only when exported through diagnostics; not part of runtime
     /// snapshots or gameplay state.
     pub confidence: Field2,
@@ -145,7 +67,6 @@ impl CompiledTerrain {
         }
         diagnostics::profile_slice(
             &self.fields.elevation,
-            &self.groundwater,
             &self.semantics,
             &self.stratigraphy,
             &self.structures.strata_depth_offset,
@@ -328,57 +249,24 @@ pub fn compile_terrain_with_dimensions(
         },
     )?;
     let hydro_settings = HydrologySettings {
-        channel_threshold: hydro_spec.channel_threshold,
-        bank_width_m: hydro_spec.bank_width_m,
         min_lake_depth_m: hydro_spec.min_lake_depth_m,
     };
-    let hydrology = solve_hydrology(&elevation, &rainfall, cell_size, hydro_settings)?;
+    let hydrology = solve_hydrology(&elevation, hydro_settings)?;
     let (permeability, soil_storage) = surface_material_fields(
         &recipe.stratigraphy,
         &structures.strata_depth_offset,
         width,
         height,
     )?;
-    let groundwater = solve_groundwater(
-        &elevation,
-        &rainfall,
-        &permeability,
-        &soil_storage,
-        &hydrology
-            .water
-            .body_id
-            .iter()
-            .map(Option::is_some)
-            .collect::<Vec<_>>(),
-        &hydrology.channels.channel,
-        world_size,
-        GroundwaterSettings {
-            iterations: hydro_spec.groundwater_iterations,
-            aquifer_threshold: hydro_spec.groundwater_aquifer_threshold,
-            discharge_threshold: hydro_spec.groundwater_discharge_threshold,
-            access_radius_m: hydro_spec.groundwater_access_radius_m,
-        },
-    )?;
-    let mut projected = semantics::project_with_groundwater(
+    let mut projected = semantics::project_with_world_size(
         &elevation,
         &rainfall,
         &hardness,
-        &groundwater,
-        SurfaceThresholds {
-            dry: hydro_spec.groundwater_dry_threshold,
-            grass_water: hydro_spec.groundwater_grass_threshold,
-            min_soil_moisture: hydro_spec.groundwater_min_soil_moisture,
-            min_soil_storage: hydro_spec.groundwater_min_soil_storage,
-            wetland_moisture: hydro_spec.groundwater_wetland_threshold,
-            ..SurfaceThresholds::default()
-        },
+        SurfaceThresholds::default(),
         world_size,
     )
     .map_err(TerrainCompileError::Semantic)?;
-    project_semantics(&mut projected, &hydrology.channels, &hydrology.water);
-    if recipe.id == super::recipes::RIVER_VALLEY_V1 {
-        project_river_valley_trunk(&mut projected, world_size, seed);
-    }
+    project_semantics(&mut projected, &hydrology.water);
     let mut reports = constraints::evaluate(&resolved.recipe.constraints, &projected);
     for report in &mut reports {
         if report.affected_nodes.is_empty() {
@@ -396,26 +284,8 @@ pub fn compile_terrain_with_dimensions(
         diagnostics::field_diagnostic("rainfall", &rainfall),
         diagnostics::field_diagnostic("permeability", &permeability),
         diagnostics::field_diagnostic("soil_storage", &soil_storage),
-        diagnostics::field_diagnostic("flow", &hydrology.flow.accumulation),
         diagnostics::field_diagnostic("sediment", &sediment),
         diagnostics::field_diagnostic("water_depth", &hydrology.water.depth),
-        diagnostics::field_diagnostic("recharge", &groundwater.recharge),
-        diagnostics::field_diagnostic("water_table", &groundwater.water_table),
-        diagnostics::field_diagnostic("discharge", &groundwater.discharge),
-        diagnostics::field_diagnostic("water_access", &groundwater.water_access),
-        diagnostics::field_diagnostic("soil_moisture", &groundwater.soil_moisture),
-        diagnostics::field_diagnostic(
-            "aquifer_mask",
-            &Field2::from_values(
-                width,
-                height,
-                groundwater
-                    .aquifer_mask
-                    .iter()
-                    .map(|value| if *value { 1.0 } else { 0.0 })
-                    .collect(),
-            )?,
-        ),
         diagnostics::field_diagnostic(
             "vegetation_ok",
             &Field2::from_values(
@@ -464,7 +334,6 @@ pub fn compile_terrain_with_dimensions(
         sediment,
         hydrology,
         semantics: projected,
-        groundwater,
         confidence,
         reports,
         diagnostics: diagnostic,

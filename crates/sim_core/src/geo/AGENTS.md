@@ -21,10 +21,10 @@
 | `volcanic_lake.rs` | ★ TB-03（v1.50.55）火山湖几何：`VolcanicLakeGeometry` 湖床/干岸平台/环形火山锥体（sin² bump，宽缓抬升并在外缘归零）/外缘分带 + 双出口垭口 + 双取水岸点（岸线外 12m，⚠️ `outline_radius_at` 消费局部角，世界角须减 rotation）+ 湖心平坦基准 |
 | `static_water.rs` | ★ TB-03（v1.50.55）静水共用规划：`StaticWaterPlan` 闭合扰动椭圆轮廓（末点=首点）+ `apply_static_water`（cells 涂写 DeepWater+水体归属+禁行禁建、`WaterBody` 特征/水体 #1 双副本登记、取水岸点按槽位定 id）；水位 = 干岸基准 − 1.2m，水量由 World 共享池维护、几何不随库存变化 |
 | `validation.rs` | ★ STAGE2-4（v1.50.47）§5.3 第 7 步静态几何与稳定 ID 校验断言集：特征 ID 唯一/按 profile 归属与 kind 期望映射/顶点在界、子特征升序唯一+`feature_ids` 引用存在+accent 区间配对、水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）、取水点/授权走廊引用与边界、浅滩端点在陆侧、cells 水域归属与 NO_WALK/NO_BUILD 一致、装饰 ID 按数组顺序严格递增且唯一（POI 避让过滤允许 ID 间隙）。**只读不修复、不重排既有生成顺序**；稳定失败码只作诊断（v1.XX 起创世不再消费，不触发重试/降级） |
-| `hydrology.rs` | 深度图 → 水面/浅滩/河岸 → 河道闭合轮廓（`River`/`RiverBank` 特征）+ ★ §5.3 第 3 步 `apply_profile_static_hydrology`（T2 主河水系覆盖 + ★ TB-03 湖畔静水 `apply_static_water`；`plan_river_geometry` 共享几何；`RiverCenterline::distance` 对河谷基底全图扫描使用确定性线段 BVH 加速，保持精确线段投影与最低段号平局规则；中心线蜿蜒在图缘内侧平滑收敛为直线段，确保法向河道/河岸轮廓不越界；浅滩端点从解析岸线起沿法向逐格校验至陆格，避免急弯或栅格取整后落入水域；原 S7-07 settlement 主河随 v1.50.68 河谷聚落删除下线） |
+| `hydrology.rs` | ★ v1.62.0 起仅保留模板专有静态湖泊的水面/湖岸几何（`apply_profile_static_hydrology` → TB-03 湖畔 `apply_static_water`：闭合轮廓 + `WaterBody` 特征/水体 #1 双副本 + 取水岸点）。**地图河流水系统已删除**：主河中心线（`RiverCenterline`/`plan_river_geometry`/`RiverGeometry`）、河岸/河阶带、浅滩渡口、`RiverCliff` 注入与 `project_river_valley_trunk`、`ChannelField`/`classify_channels`/`FlowField` 全部移除 |
 | `biome.rs` | 生物群系分类与色表 |
 | `query.rs` | 通行性、坡度、建造条件等地表查询 |
-| `corridor.rs` | 廊道/路径几何分析；`segment_valid` 对浅滩授权按 `TerrainConnection.start → end` 局部坐标检查纵向范围与法向宽度，不假定 x/y 轴对齐（河道 meander 渡口会旋转或反向） |
+| `corridor.rs` | 廊道/路径几何分析；`segment_valid` 对浅滩授权按 `TerrainConnection.start → end` 局部坐标检查纵向范围与法向宽度，不假定 x/y 轴对齐（★ v1.62.0 起地图河流水系统删除，浅滩渡口不再生成，该豁免分支实际不触发） |
 | `accents.rs` | ★ v1.49.1 D-A 装饰散布（Tree/Bush/Boulder/RockCluster/GrassTuft，独立 salt RNG）+ ★ S7-03 `grassland_plain_v1` 草原专属分支（GrassTuft 预算 ×8 / Tree ×0.2 孤树 / Bush 泉洼 `SoftGround` 25m 邻域聚集 / 双频哈希草甸斑块场 `grass_patch_field`（固定盐值 `GRSPAT*`，复用 terrain.rs `mix64`）× 残丘坡度疏草）+ ★ S7-05 `hillside_woodland_v1` 半坡密林梯级分支（Tree 预算 ×4 / 坡度概率梯级 / 30m 水源隔离 / Bush 林缘过渡）+ ★ S7-05 `trim_trees_near_pois()` 取水点裁树 + ★ v1.52.0 地图边缘 3% 保护和渲染水面多边形净空过滤（净空 13m，覆盖装饰最大缩放后的水平包围体）+ ★ v1.58.1 Boulder/RockCluster 四象限目标配额，避免固定种子石块集中；★ v1.59.0 河谷 GravelBeach/RiversideForest 水线净空 + 最远点散布，避免子特征装饰聚边；规则只改纯视觉装饰落点与生成器版本 |
 
 ## 关键易踩坑
