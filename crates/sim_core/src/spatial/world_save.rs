@@ -45,7 +45,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.60";
+pub const SAVE_APP_VERSION: &str = "1.61";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///
@@ -66,6 +66,10 @@ fn default_terrain_generator_version() -> u32 {
 
 fn default_terrain_profile() -> String {
     TERRAIN_PROFILE_MOUNTAIN_PASS.to_string()
+}
+
+fn default_regen_multiplier() -> f32 {
+    1.0
 }
 
 /// 存档契约：世界全量可持久化状态
@@ -135,6 +139,8 @@ pub struct WorldSave {
 
     // ── 生态再生倍率 ──
     pub water_regen_multiplier: f32,
+    #[serde(default = "default_regen_multiplier")]
+    pub rainfall_multiplier: f32,
     pub berry_regen_multiplier: f32,
     pub wood_regen_multiplier: f32,
     pub stone_regen_multiplier: f32,
@@ -206,6 +212,7 @@ impl World3DEngine {
             climate_epoch_phase: self.climate_epoch_phase,
             rng: self.rng,
             water_regen_multiplier: self.water_regen_multiplier,
+            rainfall_multiplier: self.rainfall_multiplier,
             berry_regen_multiplier: self.berry_regen_multiplier,
             wood_regen_multiplier: self.wood_regen_multiplier,
             stone_regen_multiplier: self.stone_regen_multiplier,
@@ -344,6 +351,7 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         climate_epoch_phase: save.climate_epoch_phase,
         rng: save.rng,
         water_regen_multiplier: save.water_regen_multiplier,
+        rainfall_multiplier: save.rainfall_multiplier,
         berry_regen_multiplier: save.berry_regen_multiplier,
         wood_regen_multiplier: save.wood_regen_multiplier,
         stone_regen_multiplier: save.stone_regen_multiplier,

@@ -7,6 +7,30 @@ use super::world::World3DEngine;
 /// 对 `season_year_length` 取模后按四分之一年分箱；温度为 mid ± amplitude
 /// 的正弦曲线，与季节相位对齐。
 impl World3DEngine {
+    /// 玩家降雨倍率、季节和气候相位共同决定的有效降雨强度。
+    /// 只读既有时钟与相位，不消费 WorldRng。
+    pub fn rainfall_intensity(&self) -> f32 {
+        let year = self.config.season_year_length.max(1.0);
+        let season_factor = match self.current_season {
+            Season::Spring => 1.25,
+            Season::Summer => 0.85,
+            Season::Autumn => 1.05,
+            Season::Winter => 0.55,
+        };
+        let seasonal_wave = (self.season_timer / year * std::f32::consts::TAU).sin();
+        let enso_wave = (self.el_nino_phase
+            + self.season_timer / (self.config.temp_el_nino_cycle_years.max(0.1) * year)
+                * std::f32::consts::TAU)
+            .sin();
+        let epoch_wave = (self.climate_epoch_phase
+            + self.season_timer / (self.config.temp_climate_epoch_cycle_years.max(0.1) * year)
+                * std::f32::consts::TAU)
+            .sin();
+        let climate_factor = (1.0 + 0.08 * seasonal_wave + 0.12 * enso_wave + 0.05 * epoch_wave)
+            .clamp(0.55, 1.45);
+        self.rainfall_multiplier.clamp(0.0, 5.0) * season_factor * climate_factor
+    }
+
     pub fn tick_season(&mut self, dt: f32) {
         self.season_timer += dt;
         let year_length = self.config.season_year_length;

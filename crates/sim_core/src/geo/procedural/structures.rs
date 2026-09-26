@@ -102,9 +102,30 @@ pub fn apply_structures_seeded(
                         let wx = x as f32 * cell_x - half - axis.start[0];
                         let wy = y as f32 * cell_y - half - axis.start[1];
                         let signed_distance = (dx * wy - dy * wx) / length;
-                        let phase = std::f32::consts::TAU * signed_distance / wavelength_m;
+                        let along = (dx * (wx + axis.start[0]) + dy * (wy + axis.start[1])) / length;
+                        // Fold axes use the same irregular polygonal domain as
+                        // the terrain base.  The authored wavelength remains a
+                        // broad structural guide, while local value noise
+                        // breaks the unnaturally perfect parallel bands.
+                        let domain_warp = deterministic_value_noise(
+                            0x464f_4c44_5741_5250,
+                            along / wavelength_m,
+                            signed_distance / wavelength_m,
+                        ) * wavelength_m * 0.22;
+                        let phase = std::f32::consts::TAU
+                            * (signed_distance + domain_warp)
+                            / wavelength_m;
                         let i = y * scratch.width + x;
-                        scratch.values[i] += deterministic_sin(phase) * amplitude_m;
+                        let polygon_factor = 1.0
+                            + 0.24
+                                * super::operators::polygonal_surface(
+                                    seed ^ 0x464f_4c44_504f_4c59,
+                                    wx + axis.start[0],
+                                    wy + axis.start[1],
+                                    wavelength_m.max(40.0),
+                                    1.0,
+                                );
+                        scratch.values[i] += deterministic_sin(phase) * amplitude_m * polygon_factor;
                     }
                 }
                 displaced_event_indices.push(event_index);

@@ -31,7 +31,9 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 /// v1.50.30：2 -> 3（D-B1-4 新增 `TerrainSubFeatures=22` section，见下方枚举）。
 /// v1.50.56（H-05）：3 -> 4（AGENT 顺序流尾部追加激素观察块：12 水平 + 12 有效基线
 /// + 慢性压力 + 营养不足 + 3 余韵计时器 + NE 焦虑标签；新旧解码器双向拒绝错版帧）。
-pub const FORMAT_VERSION: u16 = 4;
+/// v1.61.0：4 -> 5（GLOBAL 追加降雨倍率与强度）。
+/// v1.61.1：5 -> 6（新增每帧 `WaterDynamics=23` section）。
+pub const FORMAT_VERSION: u16 = 6;
 
 /// Header 定长（字节）
 ///
@@ -91,6 +93,8 @@ pub enum SectionKind {
     ///   各 3×f32 + feature_count u8 + feature_ids… + accent_start/end opt_u32 + align4，
     ///   静态地形脏帧输出；本阶段恒空）
     TerrainSubFeatures = 22,
+    /// 降雨驱动的水面动态（每帧输出；静态地形几何仍在 TerrainFeatures）
+    WaterDynamics = 23,
 }
 
 impl SectionKind {

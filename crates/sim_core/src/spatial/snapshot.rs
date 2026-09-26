@@ -42,6 +42,9 @@ pub struct WorldSnapshot3D {
     /// ★ D-B1-7：Option 语义同上（None = 未发送，Some(空) = 明确空集合）
     #[serde(default)]
     pub terrain_sub_features: Option<Vec<TerrainSubFeatureSnapshot>>,
+    /// 降雨驱动的水面动态状态（每帧输出，静态地形几何仍由 terrain_features 提供）。
+    #[serde(default)]
+    pub water_bodies: Vec<WaterBodySnapshot>,
     #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
@@ -106,6 +109,12 @@ pub struct WorldSnapshot3D {
     /// ⚠ 榷场特例：粮食再生复用**浆果槽位**（见 `world_tick.rs`），内核无独立粮食倍率。
     #[serde(default = "default_regen_multiplier")]
     pub water_regen_multiplier: f32,
+    /// 玩家手动降雨倍率（0~5）。
+    #[serde(default = "default_regen_multiplier")]
+    pub rainfall_multiplier: f32,
+    /// 当前季节基准降雨强度（用于 HUD 展示）。
+    #[serde(default)]
+    pub rainfall_intensity: f32,
     #[serde(default = "default_regen_multiplier")]
     pub berry_regen_multiplier: f32,
     #[serde(default = "default_regen_multiplier")]
@@ -176,6 +185,17 @@ pub struct TerrainFeatureSnapshot {
     pub elevation: f32,
     pub width: f32,
     pub flags: u16,
+}
+
+/// 水体动态投影：库存决定覆盖率，降雨与库存共同决定水位和流动强度。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WaterBodySnapshot {
+    pub id: u32,
+    pub resource_pool_id: u32,
+    pub stock_ratio: f32,
+    pub coverage: f32,
+    pub level: f32,
+    pub flow_strength: f32,
 }
 
 /// ★ v1.48.0 D-A：地表装饰快照（纯视觉要素，约 24B/个）
@@ -314,7 +334,7 @@ pub struct LaneSnapshot {
 /// `[6]`肾上腺素 ADR、`[7]`去甲肾上腺素 NE、`[8]`雄激素 AND、`[9]`雌激素 EST、
 /// `[10]`孕激素 PROG、`[11]`甲状腺素 THY。
 /// `baselines` 为本拍有效基线（已含慢性压力 5-HT/AND 与营养不足 THY 的耦合下调）。
-/// FABS 帧编码顺序与此处字段声明顺序一致（v1.50.x FORMAT_VERSION 4）。
+/// FABS 帧编码顺序与此处字段声明顺序一致（v1.61.1 FORMAT_VERSION 6）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HormoneSnapshot {
     /// 11 激素水平 + DA 奖赏阈值（顺序见结构体文档）

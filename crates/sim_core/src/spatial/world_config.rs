@@ -86,4 +86,14 @@ impl World3DEngine {
             _ => {}
         }
     }
+
+    /// 设置玩家控制的降雨倍率（0=无雨，1=季节基准，5=暴雨）。
+    /// 这是运行期世界状态，不写入 SimConfig，因而不会触发地形重建。
+    pub fn set_rainfall_multiplier(&mut self, mult: f32) {
+        self.rainfall_multiplier = if mult.is_finite() {
+            mult.clamp(0.0, 5.0)
+        } else {
+            1.0
+        };
+    }
 }

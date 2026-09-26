@@ -9,8 +9,9 @@ use super::snapshot::{
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
     TerrainAccentSnapshot, TerrainFeatureSnapshot, TerrainSubFeatureSnapshot,
-    TransferRecordSnapshot, VacantHouseSnapshot, WorldSnapshot3D,
-};use super::world::World3DEngine;
+    TransferRecordSnapshot, VacantHouseSnapshot, WaterBodySnapshot, WorldSnapshot3D,
+};
+use super::world::World3DEngine;
 
 /// 快照生成
 ///
@@ -22,6 +23,46 @@ use super::snapshot::{
 /// 2. 本文件 `generate_snapshot()`（赋值）
 /// 3. `frontend/js/rustworld.js::_applySnapshot()`（前端映射）
 impl World3DEngine {
+    /// 把共享水池库存投影成地图水面的动态状态。
+    /// 覆盖率在无雨时逐步归零，库存恢复后平滑扩张；几何始终保持确定性。
+    pub(crate) fn water_body_snapshots(&self) -> Vec<WaterBodySnapshot> {
+        self.terrain
+            .hydrology
+            .water_bodies
+            .iter()
+            .map(|body| {
+                let pool = self
+                    .water_pools
+                    .iter()
+                    .find(|pool| pool.id == body.resource_pool_id);
+                let (stock_ratio, coverage) = if let Some(pool) = pool {
+                    let ratio = if pool.max_stock.is_finite() && pool.max_stock > f32::EPSILON {
+                        (pool.current_stock / pool.max_stock).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let t = ((ratio - 0.02) / 0.73).clamp(0.0, 1.0);
+                    let smooth = t * t * (3.0 - 2.0 * t);
+                    (ratio, smooth)
+                } else {
+                    // 地图预览世界没有生态水池时保留静态水面。
+                    (1.0, 1.0)
+                };
+                let rainfall = self.rainfall_intensity().max(0.0);
+                let level = body.level + (stock_ratio - 0.75) * 1.5;
+                let flow_strength = (stock_ratio * 0.25 + rainfall * 0.08).clamp(0.0, 1.0);
+                WaterBodySnapshot {
+                    id: body.id,
+                    resource_pool_id: body.resource_pool_id,
+                    stock_ratio,
+                    coverage,
+                    level,
+                    flow_strength,
+                }
+            })
+            .collect()
+    }
+
     /// 导出快照
     pub fn generate_snapshot(&self) -> WorldSnapshot3D {
         let need_terrain = self.terrain_dirty.replace(false);
@@ -741,6 +782,7 @@ impl World3DEngine {
         } else {
             None
         };
+        let water_bodies = self.water_body_snapshots();
 
         WorldSnapshot3D {
             tick: self.tick_counter,
@@ -748,6 +790,7 @@ impl World3DEngine {
             terrain_features,
             terrain_accents,
             terrain_sub_features,
+            water_bodies,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,
@@ -817,6 +860,8 @@ impl World3DEngine {
             recent_deaths: self.recent_deaths.clone(),
             // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源，读档后由存档值回填）
             water_regen_multiplier: self.water_regen_multiplier,
+            rainfall_multiplier: self.rainfall_multiplier,
+            rainfall_intensity: self.rainfall_intensity(),
             berry_regen_multiplier: self.berry_regen_multiplier,
             wood_regen_multiplier: self.wood_regen_multiplier,
             stone_regen_multiplier: self.stone_regen_multiplier,

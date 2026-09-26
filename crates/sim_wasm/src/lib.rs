@@ -228,6 +228,16 @@ pub extern "C" fn world_set_regen_multiplier(which: i32, mult: f32) {
     }
 }
 
+/// 设置玩家手动降雨倍率（0=无雨，1=季节基准，5=暴雨）。
+#[no_mangle]
+pub extern "C" fn world_set_rainfall_multiplier(mult: f32) {
+    unsafe {
+        if let Some(w) = WORLD.as_mut() {
+            w.set_rainfall_multiplier(mult);
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // ★ M4 快照零拷贝扁平二进制缓冲（FABS 帧，v1.45.0）
 //

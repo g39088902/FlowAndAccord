@@ -41,5 +41,18 @@
       return this.get();
     },
     reset: function () { return this.save(DEFAULTS); },
+    getRainfall: function () {
+      try {
+        var value = Number(localStorage.getItem('flowaccord.rainfall-multiplier.v1'));
+        return Number.isFinite(value) && value >= 0 && value <= 5 ? value : 1.0;
+      } catch (_) { return 1.0; }
+    },
+    saveRainfall: function (value) {
+      var normalized = Number(value);
+      normalized = Number.isFinite(normalized) && normalized >= 0 && normalized <= 5 ? normalized : 1.0;
+      try { localStorage.setItem('flowaccord.rainfall-multiplier.v1', String(normalized)); } catch (_) { /* ignore */ }
+      return normalized;
+    },
+    resetRainfall: function () { return this.saveRainfall(1.0); },
   };
 })(window);

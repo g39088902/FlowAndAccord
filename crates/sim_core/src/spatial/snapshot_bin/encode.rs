@@ -87,6 +87,8 @@ impl World3DEngine {
                     .sum::<f32>(),
             );
             w.f32(self.water_regen_multiplier);
+            w.f32(self.rainfall_multiplier);
+            w.f32(self.rainfall_intensity());
             w.f32(self.berry_regen_multiplier);
             w.f32(self.wood_regen_multiplier);
             w.f32(self.stone_regen_multiplier);
@@ -561,6 +563,26 @@ impl World3DEngine {
                 SectionKind::TerrainSubFeatures,
                 self.terrain.sub_features.len() as u32,
                 sf.into_inner(),
+            ));
+        }
+
+        // ══════════════ WATER DYNAMICS（降雨驱动，每帧） ══════════════
+        {
+            let dynamics = self.water_body_snapshots();
+            let mut w = BinWriter::with_capacity(dynamics.len() * 24 + 16);
+            for body in &dynamics {
+                w.u32(body.id);
+                w.u32(body.resource_pool_id);
+                w.f32(body.stock_ratio);
+                w.f32(body.coverage);
+                w.f32(body.level);
+                w.f32(body.flow_strength);
+            }
+            w.align4();
+            secs.push(Sec::new(
+                SectionKind::WaterDynamics,
+                dynamics.len() as u32,
+                w.into_inner(),
             ));
         }
 

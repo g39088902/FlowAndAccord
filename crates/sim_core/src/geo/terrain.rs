@@ -761,6 +761,14 @@ pub struct TerrainSubFeature {
 /// v1.60.4：30 -> 31（UGC-07 支持点/线段混合锚点，并为共享谷底加入连续
 /// 低频地表噪音起伏）。
 /// v1.60.4：31 -> 32（盆地外围接入点/线段混合褶皱山带，中心保留轻微起伏平原）。
+/// v1.60.4：32 -> 33（统一多边形地表基底：所有模板的高程场叠加连续 Voronoi
+/// 单元起伏，Ridge/Valley/Depression/Cone/Plateau 与 Fold 算子改用多边形域扰动，
+/// 消除绝对规则的曲线边界）。
+/// v1.60.4：33 -> 34（Field Compiler 水体语义投影为闭合 WaterBody 轮廓，补齐
+/// 水体快照、深度队列绘制和岸边取水点；WebGL 水格恢复蓝色底色）。
+/// v1.60.4：34 -> 35（河谷增加 0.75 降雨输入与连续不规则浅水主槽；原始
+/// D8 小水体统一为可涉浅水，避免多边形起伏把主河切成孤岛，同时保留统一水体 ID、
+/// 水量和取水点投影）。
 /// v1.60.0：20 -> 21（湖畔盆地更名并重构为 volcanic_lake_v1：平原中的随机火山锥体、天池式火山口湖与双缓坡出口）。
 /// v1.47.7：2 -> 3（删除 T1 台地压平与 Ridge/Saddle/Terrace 特征生成）
 /// v1.50.17：3 -> 4（T1-R 主脊通行力修复：主脊宽度/幅度改走配置并加陡，鞍部加宽；
@@ -813,7 +821,7 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 32;
+pub const TERRAIN_GENERATOR_VERSION: u32 = 35;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

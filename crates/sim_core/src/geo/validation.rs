@@ -24,6 +24,7 @@ use super::terrain::{
 };
 
 use crate::spatial::vec3::Vec3;
+use std::collections::BTreeSet;
 
 /// 顶点越界判定的宽容余量（米）：只拦截明显出界的几何，不卡良性浮点抖动。
 const BOUND_EPSILON_M: f32 = 0.5;
@@ -60,12 +61,50 @@ fn sub_feature_id_range(profile: &str) -> Option<(u32, u32)> {
 
 /// §5.3 第 7 步入口：依次执行特征 / 子特征 / 水系与 cells 四组断言。
 pub(crate) fn validate_static_terrain_geometry(t: &TerrainMap) -> Result<(), &'static str> {
+    if t.field_compiled {
+        return validate_compiled_static_terrain(t);
+    }
     validate_features(t)?;
     validate_sub_features(t)?;
     validate_hydrology(t)?;
     validate_cells(t)?;
     validate_accents(t)?;
     Ok(())
+}
+
+/// Field Compiler water contours are generated from semantic grid cells and
+/// do not use the legacy profile ID table or paired River bank convention.
+fn validate_compiled_static_terrain(t: &TerrainMap) -> Result<(), &'static str> {
+    let half = t.world_size * 0.5;
+    let mut feature_ids = BTreeSet::new();
+    for feature in &t.features {
+        if !feature_ids.insert(feature.id)
+            || feature.kind != TerrainFeatureKind::WaterBody
+            || feature.vertices.len() < 4
+            || feature.vertices.first() != feature.vertices.last()
+            || !vertices_bounded(&feature.vertices, half)
+            || !feature.elevation.is_finite()
+        {
+            return Err("CompiledWaterFeatureInvalid");
+        }
+    }
+    for body in &t.hydrology.water_bodies {
+        let Some(feature) = t.features.iter().find(|feature| feature.id == body.id) else {
+            return Err("CompiledWaterFeatureMissing");
+        };
+        if feature.vertices != body.vertices || !body.level.is_finite() {
+            return Err("CompiledWaterFeatureMismatch");
+        }
+    }
+    for access in &t.hydrology.access_points {
+        if !t.hydrology.water_bodies.iter().any(|body| body.id == access.water_body_id)
+            || !pos_bounded(&access.pos, half)
+        {
+            return Err("CompiledWaterAccessInvalid");
+        }
+    }
+    validate_cells(t)?;
+    validate_accents(t)
 }
 
 /// 断言 1：`features` ID 唯一、按 profile 归属且 kind 与 ID 表一致、顶点在界。

@@ -19,12 +19,13 @@
 //      terrain_sub_features —— 仅静态地形脏帧携带（数组，**可为空** = 明确空集合）；
 //      否则为 null（= 本帧未发送，消费方必须保留旧值）。「未发送」≠「空集合」，
 //      与 lanes/nodes 的 null 约定一致，严禁用数组长度猜测是否发送。
+//   8. snap.water_bodies —— 每帧携带降雨驱动的覆盖率/水位/流动强度。
 
 (function (global) {
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 4; // v1.50.56 H-05：AGENT 顺序流尾部追加激素观察块（新旧混搭双向拒绝解码）
+  var FORMAT_VERSION = 6; // 动态水：新增 WATER_DYNAMICS section
   // ★ H-05 激素水平/基线数组固定顺序（与 snapshot.rs::HormoneSnapshot 文档一致）
   var HORMONE_LEVEL_LEN = 12;
   var NONE_U32 = 0xffffffff;
@@ -49,6 +50,8 @@
     TERRAIN_ACCENTS: 21,
     // ★ v1.50.30 D-B1-4：地图模板子特征（静态地形脏帧输出；本阶段恒空）
     TERRAIN_SUB_FEATURES: 22,
+    // 降雨驱动的水面动态（每帧）
+    WATER_DYNAMICS: 23,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -160,6 +163,7 @@
     var snap = {
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
       terrain_cells: [], terrain_features: null, terrain_accents: null, terrain_sub_features: null,
+      water_bodies: [],
       terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
@@ -167,6 +171,7 @@
       total_miscarriages: 0, total_households: 0, auction_started: 0, auction_sold: 0, auction_flopped: 0,
       total_royal_privy: 0, total_imperial_privy: 0, auction_history: [], season: 'Spring', temperature: 0,
       season_progress: 0, last_mutation_event: null, recent_deaths: [], water_regen_multiplier: 1,
+      rainfall_multiplier: 1, rainfall_intensity: 1,
       berry_regen_multiplier: 1, wood_regen_multiplier: 1, stone_regen_multiplier: 1, gold_regen_multiplier: 1,
       season_timer: 0, el_nino_phase: 0, climate_epoch_phase: 0,
       lane_wear: null,
@@ -198,6 +203,8 @@
       snap.total_royal_privy = gr.f32();
       snap.total_imperial_privy = gr.f32();
       snap.water_regen_multiplier = gr.f32();
+      snap.rainfall_multiplier = gr.f32();
+      snap.rainfall_intensity = gr.f32();
       snap.berry_regen_multiplier = gr.f32();
       snap.wood_regen_multiplier = gr.f32();
       snap.stone_regen_multiplier = gr.f32();
@@ -473,6 +480,20 @@
         }
         fr.align4();
         snap.terrain_features.push(feature);
+      }
+    }
+    if (dir[K.WATER_DYNAMICS]) {
+      var wr = readerAt(uint8, dir[K.WATER_DYNAMICS].o, dir[K.WATER_DYNAMICS].bl);
+      snap.water_bodies = new Array(dir[K.WATER_DYNAMICS].c);
+      for (var wi = 0; wi < dir[K.WATER_DYNAMICS].c; wi++) {
+        snap.water_bodies[wi] = {
+          id: wr.u32(),
+          resource_pool_id: wr.u32(),
+          stock_ratio: wr.f32(),
+          coverage: wr.f32(),
+          level: wr.f32(),
+          flow_strength: wr.f32(),
+        };
       }
     }
     // ★ v1.48.0 D-A：解码地表装饰 Section 21（★ D-B1-7：section 缺席时保持默认 null = 未发送）

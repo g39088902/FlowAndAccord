@@ -38,7 +38,8 @@
         this.expeditionTargets = new Map();// ★ M4: 远征目标反查表 agent_id -> camp_id
         this.auctionHistory = [];          // ★ 房屋报价中心历史受理记录 (256 环形缓冲区)
         // ★ D-B1-7：静态地形三通道容器恒在（features/accents/subFeatures），装饰缓存独立于网格缓存
-        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [] };
+        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [], dynamicWaterRevision: 0 };
+        this.waterBodyDynamics = new Map();
         this.network = { lanes: new Map(), nodes: new Map() };
         this.totalBirths = 0;
         this.totalDeaths = 0;
@@ -59,6 +60,8 @@
         // ★ 创世配置：config.poi-rates.js 已在本脚本前读取 localStorage。
         // 该值随 INIT/RESET 在 world_create 前发送给 Worker，并在第 0 帧快照前写入内核。
         this.regenMultipliers = this._poiRegenMultipliersFromStorage();
+        this.rainfallMultiplier = this._rainfallMultiplierFromStorage();
+        this.rainfallIntensity = 1.0;
 
         // 引擎状态与 Web Worker 架构
         this._worker = null;
@@ -93,7 +96,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.60.4';
+        this._appVersion = '1.61.2';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -151,6 +154,7 @@
             mapOnly: this._mapOnly,
             config: configObj,
             regenMultipliers: this._poiRegenMultipliersFromStorage(),
+            rainfallMultiplier: this._rainfallMultiplierFromStorage(),
           });
         } catch (e) {
           this._setEngineStatus('无法创建 Web Worker (请确保通过 HTTP 服务访问): ' + e.message, 'error');
@@ -164,7 +168,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.60.4';
+            this._appVersion = msg.appVersion || '1.61.2';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -346,7 +350,8 @@
       // 字符串驻留表仍由 SnapshotBin 侧 `STR_TAB.start_index==0` 既有契约单独清理，两者互不替代。
       _invalidateWorldStaticCaches() {
         this._terrainCached = false;
-        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [] };
+        this.terrain = { gridSize: 60, minZ: 0, maxZ: 1, cells: [], features: [], accents: [], subFeatures: [], dynamicWaterRevision: 0 };
+        this.waterBodyDynamics = new Map();
         if (window.AccentModel) window.AccentModel.resetCache();
         // ★ S4-02：资源景观组缓存与装饰模型缓存同一消息生命周期失效（换世界不残留旧景观组）
         if (window.LandscapeModel) window.LandscapeModel.resetCache();
@@ -373,6 +378,13 @@
           return window.FlowAccordPoiRates.get();
         }
         return { water: 1.0, berry: 1.0, wood: 1.0, stone: 1.0, gold: 1.0 };
+      }
+
+      _rainfallMultiplierFromStorage() {
+        if (window.FlowAccordPoiRates && typeof window.FlowAccordPoiRates.getRainfall === 'function') {
+          return window.FlowAccordPoiRates.getRainfall();
+        }
+        return 1.0;
       }
 
       // 应用动态配置到 WASM 仿真引擎 (支持热更新，免重新编译)
@@ -475,6 +487,7 @@
             campCount: this._campCountFromConfig(),
             config: cfg,
             regenMultipliers: this._poiRegenMultipliersFromStorage(),
+            rainfallMultiplier: this._rainfallMultiplierFromStorage(),
           });
         }
       }
@@ -490,7 +503,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.60.4';
+        return this._appVersion || '1.61.2';
 
       }
 
@@ -630,6 +643,33 @@
       setStoneRegenMultiplier(m) { this._setRegenMultiplier('stone', 3, m); }
       setGoldRegenMultiplier(m)  { this._setRegenMultiplier('gold', 4, m); }
 
+      setRainfallMultiplier(value) {
+        const mult = Math.min(5.0, Math.max(0.0, Number(value) || 0.0));
+        this.rainfallMultiplier = mult;
+        if (window.FlowAccordPoiRates && typeof window.FlowAccordPoiRates.saveRainfall === 'function') {
+          window.FlowAccordPoiRates.saveRainfall(mult);
+        }
+        if (this._worker) this._worker.postMessage({ type: 'SET_RAINFALL', mult });
+      }
+
+      _applyDynamicWaterCoverage() {
+        const cells = this.terrain && this.terrain.cells;
+        if (!cells || cells.length === 0) return;
+        let changed = false;
+        for (const cell of cells) {
+          if (cell.waterBodyId == null) continue;
+          const state = this.waterBodyDynamics.get(cell.waterBodyId);
+          const coverage = state ? state.coverage : 1.0;
+          const level = state ? state.level : cell.elev;
+          if (cell.dynamicWaterCoverage !== coverage || cell.dynamicWaterLevel !== level) {
+            cell.dynamicWaterCoverage = coverage;
+            cell.dynamicWaterLevel = level;
+            changed = true;
+          }
+        }
+        if (changed) this.terrain.dynamicWaterRevision = (this.terrain.dynamicWaterRevision || 0) + 1;
+      }
+
       logEvent(msg, type = '') {
         const list = document.getElementById('log-list');
         if (!list) return;
@@ -682,6 +722,16 @@
           ? snap.season_progress : null;
         this.elNinoPhase = snap.el_nino_phase != null ? snap.el_nino_phase : 0.0;
         this.climateEpochPhase = snap.climate_epoch_phase != null ? snap.climate_epoch_phase : 0.0;
+        this.rainfallMultiplier = snap.rainfall_multiplier != null ? snap.rainfall_multiplier : 1.0;
+        this.rainfallIntensity = snap.rainfall_intensity != null ? snap.rainfall_intensity : this.rainfallMultiplier;
+        this.waterBodyDynamics = new Map((snap.water_bodies || []).map(w => [w.id, {
+          id: w.id,
+          resourcePoolId: w.resource_pool_id,
+          stockRatio: Number.isFinite(w.stock_ratio) ? w.stock_ratio : 1,
+          coverage: Number.isFinite(w.coverage) ? Math.max(0, Math.min(1, w.coverage)) : 1,
+          level: Number.isFinite(w.level) ? w.level : 0,
+          flowStrength: Number.isFinite(w.flow_strength) ? w.flow_strength : 0,
+        }]));
 
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
         // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致
@@ -793,11 +843,13 @@
             subFeatures: nextSubFeatures,
             generatorVersion: snap.terrain_generator_version || 0,
             profile: snap.terrain_profile || '',
+            dynamicWaterRevision: 0,
           };
           this._terrainCached = true;
           // 地形重建后强制光档重推进（lightRev 闸节流 GL uniform 上传）
           if (window.SimLighting) window.SimLighting.markDirty();
           if (window.RiverLife) window.RiverLife.init(nextFeatures, this._engineSeed);
+          if (window.WaterParticles) window.WaterParticles.init(nextFeatures, this._engineSeed);
         } else if (hasStaticFeatures || hasStaticAccents || hasStaticSubFeatures) {
           // ★ D-B1-7：网格缓存命中（或本帧无网格）但明确携带静态 section → 只替换静态数组，
           //   不动网格/光照缓存；生产链路静态 section 恒与 cells 同帧，RiverLife 仍随网格重建
@@ -805,6 +857,7 @@
           this.terrain.accents = nextAccents;
           this.terrain.subFeatures = nextSubFeatures;
         }
+        this._applyDynamicWaterCoverage();
 
         // --- POI ---
         const poiTypeMap = { Camp: 'Camp', WaterSource: 'Water', BerryBush: 'Berry', WoodForest: 'Wood', StoneQuarry: 'Stone', GoldMine: 'Gold', Market: 'Market' };

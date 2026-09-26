@@ -28,6 +28,36 @@ function _projectFeatureVertices(vertices, count, cx, cy, cosZ, sinZ, cosX, sinX
     _featProjY[i] = cy + y2 * scale;
   }
 }
+function _waterState(feature) {
+  return sim.waterBodyDynamics && sim.waterBodyDynamics.get(feature.id);
+}
+function _projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
+  const state = _waterState(feature);
+  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
+  if (coverage <= 0.005) return false;
+  const vertices = feature.vertices;
+  let centerX = 0, centerY = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    centerX += vertices[i].x;
+    centerY += vertices[i].y;
+  }
+  centerX /= vertices.length; centerY /= vertices.length;
+  const xyScale = Math.sqrt(coverage);
+  const levelDelta = state ? state.level - (feature.elevation || 0) : 0;
+  _ensureFeatProjCapacity(vertices.length);
+  for (let i = 0; i < vertices.length; i++) {
+    const v = vertices[i];
+    const wx = centerX + (v.x - centerX) * xyScale;
+    const wy = centerY + (v.y - centerY) * xyScale;
+    const wz = (v.z || 0) + levelDelta;
+    const rx = wx * cosZ - wy * sinZ;
+    const ry = wx * sinZ + wy * cosZ;
+    const y2 = ry * cosX - wz * sinX;
+    _featProjX[i] = cx + rx * scale;
+    _featProjY[i] = cy + y2 * scale;
+  }
+  return true;
+}
 
 // 地形壳层：全网格顶点投影（供水系/路网/实体绘制与拾取复用）。
 // 地形面片/侧壁/天空已由 WebGL 地形渲染器承担，此处不再落笔。
@@ -87,6 +117,9 @@ function drawTerrainGrid() {
 // 会盖住所有更远的实体，见 render_depth_queue.js 收集段注释）；ShallowFord / 其余短特征仍整条绘制。
 function drawFeatureItem(feature, idx) {
   if (!feature.vertices || feature.vertices.length < 2) return;
+  // 粒子水面已接管 River/WaterBody；静态轮廓只作为粒子初始化边界，不再填充固定模型。
+  if ((feature.kind === 'River' || feature.kind === 'WaterBody') &&
+      window.WaterParticles && window.WaterParticles.isInitialized()) return;
 
   const cx = w / 2 + camera.panX;
   const cy = h / 2 + camera.panY;
@@ -188,7 +221,10 @@ function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
   const v = feature.vertices, vLen = v.length, half = vLen >> 1;
   if (band < 0 || band >= half - 1) return;
   const j = vLen - 1 - band;
-  _projectFeatureVertices(v, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+  if (!_projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale)) return;
+  const state = _waterState(feature);
+  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
+  const alphaScale = 0.35 + coverage * 0.65;
 
   ctx.save();
   ctx.beginPath();
@@ -204,6 +240,7 @@ function drawRiverBand(feature, band, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
   ctx.moveTo(_featProjX[0], _featProjY[0]);
   for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
   ctx.closePath();
+  ctx.globalAlpha = alphaScale;
   ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
   ctx.fill();
   ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
@@ -253,7 +290,10 @@ function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) 
   const c0 = proj(x0, y0), c1 = proj(x1, y0), c2 = proj(x1, y1), c3 = proj(x0, y1);
 
   const v = feature.vertices, vLen = v.length;
-  _projectFeatureVertices(v, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
+  if (!_projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale)) return;
+  const state = _waterState(feature);
+  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
+  const alphaScale = 0.35 + coverage * 0.65;
 
   ctx.save();
   ctx.beginPath();
@@ -269,6 +309,7 @@ function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) 
   ctx.moveTo(_featProjX[0], _featProjY[0]);
   for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
   ctx.closePath();
+  ctx.globalAlpha = alphaScale;
   ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
   ctx.fill();
   ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';

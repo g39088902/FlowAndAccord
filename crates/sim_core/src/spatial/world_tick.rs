@@ -10,6 +10,12 @@ use std::collections::{BTreeSet, HashMap};
 /// 死亡/流产墓碑滑动窗口（tick）：覆盖前端最高倍速(1024x)单帧推进与任意渲染间隙
 const RECENT_DEATH_RETAIN_TICKS: u64 = 4096;
 
+/// 降雨对每个水源的基础补给（库存单位/游戏小时）。降雨与泉源产能分离，
+/// 乘以水池的水源数量后进入共享池，因此同一河流/湖泊的多个取水点不会重复加水。
+const RAINFALL_BASE_RECHARGE_PER_SOURCE: f32 = 0.70;
+/// 高温蒸发的最大比例（库存满时每游戏小时的损失比例）。
+const EVAPORATION_MAX_RATIO_PER_HOUR: f32 = 0.035;
+
 /// ★ v1.47.0 逝者随身遗物归集的固定品类顺序（保证遍历与流水写入确定性）
 const DEATH_CARGO_ORDER: [ResourceKind; 5] = [
     ResourceKind::Water,
@@ -90,11 +96,14 @@ impl World3DEngine {
     pub fn tick_phase_season_and_poi_regen(&mut self, dt: f32) {
         // 0. 四季更迭与宏观环境温度演化 (正弦周期拟合)
         self.tick_season(dt);
+        let rainfall_intensity = self.rainfall_intensity();
+        let evaporation_temp = ((self.temperature - 8.0) / 32.0).clamp(0.0, 1.0);
 
         // 1. POI 自然恢复 (按类型应用前端可调的产速倍率)
         for pool in &mut self.water_pools {
             pool.current_stock=(pool.current_stock+pool.regen_rate*dt*self.water_regen_multiplier).min(pool.max_stock);
         }
+        self.tick_dynamic_rainfall(dt, rainfall_intensity, evaporation_temp);
         for poi in &mut self.pois {
             if poi.water_pool_id.is_some(){continue;}
             if poi.poi_type == PoiType::Market {
@@ -152,9 +161,49 @@ impl World3DEngine {
                     _ => 1.0,
                 };
                 poi.tick_regenerate(dt * mult);
+                // 没有共享水池的山口泉眼同样响应降雨与蒸发。
+                if poi.poi_type == PoiType::WaterSource {
+                    let rain_input = RAINFALL_BASE_RECHARGE_PER_SOURCE * rainfall_intensity * dt;
+                    let evap = poi.max_stock.max(0.0) * EVAPORATION_MAX_RATIO_PER_HOUR
+                        * evaporation_temp * dt;
+                    poi.current_stock = (poi.current_stock + rain_input - evap)
+                        .clamp(0.0, poi.max_stock.max(0.0));
+                }
             }
         }
         self.sync_water_pois();
+    }
+
+    /// 确定性水循环：季节降雨 → 水池补给 → 高温蒸发。
+    /// 降雨相位只读取既有季节时钟与气候相位，不消耗 WorldRng；因此同种子、
+    /// 同一组玩家输入仍然逐 tick 可复现。水池是共享资源，多个岸点只镜像同一库存。
+    fn tick_dynamic_rainfall(&mut self, dt: f32, rainfall_intensity: f32, evaporation_temp: f32) {
+        if !dt.is_finite() || dt <= 0.0 {
+            return;
+        }
+        let mut overflow = 0.0;
+        for pool in &mut self.water_pools {
+            let source_count = pool.source_poi_ids.len().max(1) as f32;
+            let rain_input = RAINFALL_BASE_RECHARGE_PER_SOURCE * source_count * rainfall_intensity * dt;
+            let evap = pool.max_stock.max(0.0)
+                * EVAPORATION_MAX_RATIO_PER_HOUR
+                * evaporation_temp
+                * dt;
+            let before = pool.current_stock.max(0.0);
+            let after = before + rain_input - evap;
+            overflow += (after - pool.max_stock.max(0.0)).max(0.0);
+            pool.current_stock = after.clamp(0.0, pool.max_stock.max(0.0));
+        }
+        if overflow > 0.01 {
+            let event = format!("🌧️ 降雨补给形成溢流（{:.1} 单位）", overflow);
+            let already_reported = self
+                .last_event
+                .as_deref()
+                .is_some_and(|message| message.starts_with("🌧️ 降雨补给形成溢流"));
+            if !already_reported {
+                self.last_event = Some(event);
+            }
+        }
     }
 
     /// 子阶段 1: 生理代谢、养育受孕、胎儿位置跟随与金币遗产继承

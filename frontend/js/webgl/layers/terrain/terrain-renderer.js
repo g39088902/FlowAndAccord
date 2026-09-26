@@ -153,7 +153,7 @@ class TerrainWebGLRenderer {
 
     // 检查几何结构是否需要更新（★ v1.50.90 追加 materialRev：反照率指纹，防换世界同尺寸时
     //   shade VBO 不重建的 rewind 边角——反照率为世界静态，仅建缓存时变化）
-    const gridRev = `${gSize}_${cells.length}_${terrain.minZ}_${terrain.maxZ}`;
+    const gridRev = `${gSize}_${cells.length}_${terrain.minZ}_${terrain.maxZ}_${terrain.dynamicWaterRevision || 0}`;
     const albR = terrain.albR;
     const materialRev = albR ? `${albR[0]}_${albR[cells.length >> 1]}` : 'none';
     const needsGeometryRebuild = (gridRev !== this.lastGridRev) || (materialRev !== this.lastMaterialRev);
@@ -172,19 +172,26 @@ class TerrainWebGLRenderer {
 
       // 角点受光材料写入：[nx, ny, nz, ao, albR, albG, albB, side]
       const writeShade = (i, side) => {
+        const cell = cells[i];
+        const coverage = cell && cell.waterBodyId != null && Number.isFinite(cell.dynamicWaterCoverage)
+          ? Math.max(0, Math.min(1, cell.dynamicWaterCoverage)) : 1;
+        const dryR = 148, dryG = 138, dryB = 114;
         if (hasPre) {
           shadeData[sIdx++] = nx[i]; shadeData[sIdx++] = ny[i]; shadeData[sIdx++] = nz[i];
           shadeData[sIdx++] = aoA[i];
-          shadeData[sIdx++] = albR[i]; shadeData[sIdx++] = ag[i]; shadeData[sIdx++] = ab[i];
+          shadeData[sIdx++] = dryR + (albR[i] - dryR) * coverage;
+          shadeData[sIdx++] = dryG + (ag[i] - dryG) * coverage;
+          shadeData[sIdx++] = dryB + (ab[i] - dryB) * coverage;
         } else {
-          const cell = cells[i];
           const dzdx = (cell && cell.dzdx) || 0, dzdy = (cell && cell.dzdy) || 0;
           const len = Math.hypot(-dzdx, -dzdy, 1) || 1;
           const slopeDeg = Math.atan(Math.hypot(dzdx, dzdy)) * (180 / Math.PI);
           const alb = computeTerrainAlbedo(cell, terrain.minZ, terrain.maxZ);
           shadeData[sIdx++] = -dzdx / len; shadeData[sIdx++] = -dzdy / len; shadeData[sIdx++] = 1 / len;
           shadeData[sIdx++] = Math.max(0.70, 1 - (slopeDeg / 65) * 0.30);
-          shadeData[sIdx++] = alb.r; shadeData[sIdx++] = alb.g; shadeData[sIdx++] = alb.b;
+          shadeData[sIdx++] = dryR + (alb.r - dryR) * coverage;
+          shadeData[sIdx++] = dryG + (alb.g - dryG) * coverage;
+          shadeData[sIdx++] = dryB + (alb.b - dryB) * coverage;
         }
         shadeData[sIdx++] = side;
       };

@@ -69,7 +69,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.60.4';
+  return '1.61.2';
 
 }
 
@@ -100,6 +100,14 @@ function applyInitialRegenMultipliers(multipliers) {
     if (Number.isFinite(value) && value >= 0 && value <= 5) {
       _wasm.world_set_regen_multiplier(which, value);
     }
+  }
+}
+
+function applyInitialRainfallMultiplier(mult) {
+  if (typeof _wasm.world_set_rainfall_multiplier !== 'function') return;
+  const value = Number(mult);
+  if (Number.isFinite(value) && value >= 0 && value <= 5) {
+    _wasm.world_set_rainfall_multiplier(value);
   }
 }
 
@@ -215,6 +223,9 @@ async function rewindToTickInternal(targetTick, reqId) {
       if (command.type === 'CONFIG') applyConfigInternal(command.config);
       if (command.type === 'SET_REGEN' && typeof _wasm.world_set_regen_multiplier === 'function') {
         _wasm.world_set_regen_multiplier(command.which, command.mult);
+      }
+      if (command.type === 'SET_RAINFALL' && typeof _wasm.world_set_rainfall_multiplier === 'function') {
+        _wasm.world_set_rainfall_multiplier(command.mult);
       }
     }
   };
@@ -445,6 +456,7 @@ self.onmessage = async function(e) {
             throw new Error('世界初始化失败：' + readLastErrorRaw());
           }
           applyInitialRegenMultipliers(msg.regenMultipliers);
+          applyInitialRainfallMultiplier(msg.rainfallMultiplier);
         }
         _ready = true;
         historyCheckpoints = [];
@@ -525,6 +537,16 @@ self.onmessage = async function(e) {
       break;
     }
 
+    case 'SET_RAINFALL': {
+      if (_ready && typeof _wasm.world_set_rainfall_multiplier === 'function') {
+        const mult = Math.min(5, Math.max(0, Number(msg.mult) || 0));
+        _wasm.world_set_rainfall_multiplier(mult);
+        historyCommands.push({ tick: currentTick, type: 'SET_RAINFALL', mult });
+        pullAndPost('SNAPSHOT', { tickMs: 0 }, false);
+      }
+      break;
+    }
+
     case 'REQUIRE_TERRAIN': {
       forceTerrain = true;
       break;
@@ -548,6 +570,7 @@ self.onmessage = async function(e) {
           throw new Error('世界重置失败：' + readLastErrorRaw());
         }
         applyInitialRegenMultipliers(msg.regenMultipliers);
+        applyInitialRainfallMultiplier(msg.rainfallMultiplier);
         historyCheckpoints = [];
         historyCommands = [];
         lastCheckpointTick = -1;

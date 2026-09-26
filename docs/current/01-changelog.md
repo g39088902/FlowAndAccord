@@ -1,7 +1,19 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.60.4**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.61.2**。
+
+| **v1.61.2**（代码新增 · 粒子水面） | **移除固定水面填充模型**：新增确定性水体粒子模拟，河流粒子沿中心线流动，湖泊粒子在水体边界内漂移；降雨驱动的覆盖率、水位和流动强度控制粒子数量、扩散和速度，粒子经统一深度队列与 WebGL 图元层绘制。 | frontend/{index.html,js/{water_particles,rustworld,render_terrain,render_depth_queue}}, docs/current/tech/{14-terrain-and-network,18-water-rendering}.md |
+
+| **v1.61.1**（代码新增 · 降雨驱动地图水面） | **地图水面接入动态水状态**：FABS 新增 `WATER_DYNAMICS` section，下发共享水池库存比例、覆盖率、水位和流动强度；前端按覆盖率缩放河湖水面、调节水色透明度并让水格渐变为干涸河床，玩家调整降雨量后地图表面会随库存涨落。 | crates/sim_core/src/spatial/{snapshot,world_snapshot,snapshot_bin/{layout,encode}}, frontend/js/{snapshot-bin,rustworld,render_terrain,render_depth_queue,webgl/layers/terrain/terrain-renderer}, docs/current/tech/14-terrain-and-network.md |
+
+| **v1.61.0**（代码新增 · 动态水循环与手动降雨） | **加入确定性动态水循环**：共享水池与独立泉眼按季节和气候相位接受降雨补给，并按温度蒸发；满池会记录溢流事件。新增独立的 0~5 倍降雨滑块，状态经 WASM、FABS、存档和时光倒流链路同步，避免与水源 POI 再生倍率混用。 | crates/sim_core/src/spatial/{world,world_tick,world_config,world_snapshot,snapshot,world_save,snapshot_bin}, crates/sim_wasm/src/lib.rs, frontend/{index.html,js/{main,rustworld,sim_worker,config.poi-rates,snapshot-bin}} |
+
+| **（代码变更 · 河谷水量与主河连通）2026-09-26** | **增加河谷降雨与连续水槽**：`river_valley_v1` 的降雨输入 0.55→0.75、汇流阈值调整为 800、浅湖深度阈值提高到 1m；Field Compiler 增加带多边形摆动的连续浅水主槽，统一 `water_body_id`，并把河谷内细碎深水转为可涉浅水，避免多边形起伏把河切成孤岛；`TERRAIN_GENERATOR_VERSION` 34→35。 | crates/sim_core/src/geo/procedural/{compiler.rs,recipes.rs}, crates/sim_core/src/geo/terrain.rs, docs/current/{01-changelog.md,tech/14-terrain-and-network.md}, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} |
+
+| **（代码变更 · Field Compiler 水体多边形与蓝色水面恢复）2026-09-26** | **补齐编译地形水体渲染链**：按 `water_body_id` 从语义水格追踪闭合 `WaterBody` 多边形，写入 `TerrainMap.features`、`Hydrology.water_bodies` 和岸边取水点；WebGL `DeepWater/ShallowWater` 改用蓝色底色，覆盖轮廓缺失或细小水面的情况；Field Compiler 静态几何校验增加专用分支；`TERRAIN_GENERATOR_VERSION` 33→34。 | crates/sim_core/src/geo/{adapters/terrain_map.rs,validation.rs,terrain.rs}, crates/sim_core/src/spatial/terrain_network.rs, frontend/js/math.js, frontend/{sim_wasm.wasm,rust/sim_wasm.wasm} |
+
+| **（代码变更 · 统一多边形地表基底）2026-09-26** | **所有模板与地形算子统一迁移到不规则多边形地表基础**：Field Compiler 在每个模板高程场上叠加连续 Voronoi 单元起伏；Ridge、Valley、Depression、Cone、Plateau 和 Fold 的距离/域采样加入确定性多边形扰动，保留宏观地貌意图并消除绝对规则曲线；`TERRAIN_GENERATOR_VERSION` 32→33。 | crates/sim_core/src/geo/procedural/{operators.rs,compiler.rs,structures.rs}, crates/sim_core/src/geo/terrain.rs, docs/current/tech/14-terrain-and-network.md |
 
 | **（代码修复 · 删除全部创世门禁与降级回退 · 不升应用版本）2026-09-26** | **创世无门禁、无降级**：`creation_fallback.rs` 删除 `run_creation_gates` 门禁链、`GenesisStrategy`/`StrategyFacts` 阶梯与 `STRUCTURAL_SUBFEATURE_MASK` 位掩码，`new_seeded_with_config_bounded` 改为按请求 profile 构建**单个候选**并直接发布（返回 `World3DEngine`，不再返回 `Result`）；删除 `terrainGenerationMaxRetries` 重试预算，以及 `terrain_network.rs` 模板专属门禁族（`validate_plateau_gates`/`validate_fan_gates`/`validate_basin_build_area_gate`/`validate_volcanic_lake_gates`/`count_spaced_buildable`/`validate_access_points_dry`/`replay_tilt`）；WASM `world_create` 无失败/降级路径（成功恒 0），前端移除 `creationWarning` 降级警告通道；`WorldCreationDiagnostic` 保留为只读诊断（恒 `first_try`、`degraded=false`）。**任何地形模板恒按请求原样构建，永不回退 `flat_baseline`**；静态几何/路网读档/生存诊断校验保留但不阻断创世。⚠️ **本环境无 cargo/rustup 工具链，WASM 双副本未重编译——前端实际加载的 wasm 仍含旧门禁，须在工具链可用后重编译并同步 `frontend/rust/sim_wasm.wasm` 与 `frontend/sim_wasm.wasm`。** | crates/sim_core/src/{config.rs,geo/terrain.rs,spatial/{creation_fallback.rs,terrain_network.rs,world.rs}}, crates/sim_wasm/src/lib.rs, frontend/js/{config.js,sim_worker.js,rustworld.js}, crates/sim_core/examples/config.json, tools/config-check.js, docs(current/tech/{04-config-system,14-terrain-and-network,29-impact-matrix,31-code-map,32-terrain-generation-gates}, current/01-changelog), 各层 AGENTS.md |
 

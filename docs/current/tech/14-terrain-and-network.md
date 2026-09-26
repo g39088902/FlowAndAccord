@@ -4,7 +4,7 @@
 
 > **UGC-02 实施状态（2026-09-25）**：`geo::procedural::processes` 已提供固定 D8 汇流（含平地稳定 tie-break）、热松弛、液压侵蚀/沉积和 priority-flood 水位求解；`procedural::hydrology` 将河道连通分量、岸带、静态水体 ID 和深水/河岸语义投影到 `SemanticGrid`。这些过程现在作为统一 voxel 创世链的固定阶段。
 
-> **UGC-03 / UGC-05 体素主路径（2026-09-26）**：所有注册 profile（含冲积扇、盆地、平坦降级基线以及断层/褶皱演示）统一由 Field Compiler 编译，并以同一份 `CompiledTerrain` 构建懒加载 `VoxelBackend`。旧 `TerrainMap::generate_*` 不再参与生产创世；`TerrainMap` 只保留语义/快照兼容投影。`World3DEngine::terrain_runtime()` 的高程来自 voxel 顶面，WASM chunk 请求复用世界创建时的 voxel 源，LOD 换尺度只重建懒 chunk 索引；读档先按 seed/profile/config 重建 voxel 基线，再校验并重放 `ChunkDelta`。`TERRAIN_GENERATOR_VERSION` 27→32，旧版本存档按既有门禁拒绝。
+> **UGC-03 / UGC-05 体素主路径（2026-09-26）**：所有注册 profile（含冲积扇、盆地、平坦降级基线以及断层/褶皱演示）统一由 Field Compiler 编译，并以同一份 `CompiledTerrain` 构建懒加载 `VoxelBackend`。旧 `TerrainMap::generate_*` 不再参与生产创世；`TerrainMap` 只保留语义/快照兼容投影。`World3DEngine::terrain_runtime()` 的高程来自 voxel 顶面，WASM chunk 请求复用世界创建时的 voxel 源，LOD 换尺度只重建懒 chunk 索引；读档先按 seed/profile/config 重建 voxel 基线，再校验并重放 `ChunkDelta`。`TERRAIN_GENERATOR_VERSION` 27→35，旧版本存档按既有门禁拒绝。
 
 > **UGC-04 实施状态（2026-09-25）**：`VoxelBackend` 已按固定 32³ chunk + 一格 halo 从 `CompiledTerrain` 构建量化密度与材质场；密度使用 `DENSITY_SCALE=256`、四舍五入和 `i16` clamp。`TerrainGeometry` 提供世界坐标密度/材质采样和 chunk 读取，`LayeredTerrainQuery` 对编译后端保留精确顶部兼容面，对手工 chunk 使用零面二分查询；`HeightfieldView` 仅作为内部字段投影，不再是创世后端。`meshing::extract_surface_nets_at` 按固定角点/轴顺序平均符号变化边交点并生成确定性三角面，halo 负责相邻 chunk 的边界采样。
 
@@ -13,6 +13,12 @@
 > **UGC-06 实施状态（2026-09-25）**：Field Compiler recipe 现在携带 `StratigraphicColumn` 与 `MaterialTable`。地层柱校验 ID 唯一、厚度为正、硬度/储水/渗透率均在 `[0,1]`；`sample_stratum(column, depth)` 按地表向下累计厚度稳定定位地层，边界深度进入下一层。`CompiledTerrain`、`HeightfieldBackend` 和 `VoxelBackend` 传递这组静态字段，chunk 生成时以 `surface_height - z` 为深度采样地层并写入材料 ID；没有 recipe 的旧/手工 chunk 继续使用既有 `SurfaceKind` 映射。palette 只用于材料外观元数据，不改变高程、密度、通行或 tick；UGC-08 使表层材质读取统一的湿度/植被投影，voxel backend 版本推进到 3。
 
 > **UGC-07 实施状态（2026-09-25）**：`StructuralEvent` 已进入 Field Compiler 的固定阶段顺序。`apply_structures` 先在 scratch 高程上按声明顺序执行 Fault 的归一化平面 smoothstep 位移、Fold 的轴向周期位移和 Unconformity 的地层深度偏移，再交给热松弛、侵蚀和水文过程；结构参数、零长度几何、未知 surface node、NaN/无穷结果均在编译前或事务提交前拒绝。`StructureField` 将 authored 位移事件和不整合深度偏移传递到 Heightfield/Voxel 后端；默认 production recipe 没有结构事件，因此现有随机 profile 输出不变。地图图鉴新增 `fault_scarp_demo_v1` 与 `folded_basin_demo_v1` 两个显式演示 recipe，通过 `terrainProfile` 查询参数走同一 WASM/WebGL 地形链路，分别可见断层陡坎和连续褶皱；演示配方不加入 `random`，且只读地图模式绕过可玩世界降级门禁。
+
+> **Field Compiler 水体渲染链修复（2026-09-26）**：编译语义中的 `water_body_id` 现在按水格边界追踪为闭合 `WaterBody` 轮廓，并同步到 `TerrainMap.features` 与 `Hydrology.water_bodies`；前端沿用现有水体深度队列分块绘制，WebGL 水格反照率改为蓝色，保证没有旧版特征多边形时水面仍可见。字段校验增加 `field_compiled` 专用水体规则；生成器版本 33→34。
+
+> **河谷水量与主河连通（2026-09-26）**：`river_valley_v1` 的降雨常量从 0.55 提升至 0.75，汇流阈值调整为 800、最小湖深提高至 1m 以抑制细碎洼地。编译器在水文投影后加入沿河谷轴线的连续不规则浅水主槽（多边形域摆动、固定水体 ID `0xF10D0001`），并把河谷内碎片深水统一归入可涉浅水，避免多边形起伏将河道切成多个孤岛；该主槽由同一套水体轮廓/水池/取水点适配器输出。
+
+> **统一多边形地表基底（2026-09-26）**：所有注册模板在 Field Compiler 输出的高程场上叠加同源、连续的确定性 Voronoi 多边形起伏；`Ridge`、`Valley`、`Depression`、`Cone`、`Plateau` 与 `Fold` 算子的距离场和采样域同步加入多边形扰动。模板的宏观意图与水文语义保持不变，但不再输出绝对规则的曲线边界。生成器版本 32→33。
 
 > **UGC-07 FoldNetwork 增强（2026-09-26）**：`folded_basin_demo_v1` 现在以约 36 个紧密拼接的 Voronoi 多边形为山体基底。单元中心来自行错位、宏观漂移和较大种子抖动的非规则点集；28% 的锚点是长度 48~142m、方向独立的线段，其余为点，归属距离统一取到点/线段的最近距离。每个位置再按距所有单元平分边界的距离抬升成独立锥体，共享边界保持同一谷底高程；连续低频地表噪音把谷底和底板从平面扰动为起伏地表。原褶皱带只用 value noise 沿其方向轻微扭曲单元采样域，不再产生任何周期正弦山脊；低幅 ridged fBm 和热松弛/液压侵蚀只修饰坡面。该结构只进入只读图鉴演示，不加入 `random` 候选池；`TERRAIN_GENERATOR_VERSION` 30→31。
 
@@ -111,7 +117,7 @@ stateDiagram-v2
 - 房屋候选和最终实体化均使用 `validate_footprint`，完整占地由 `terrainFootprintHalfExtent`、`terrainMaxBuildSlope` 控制；不再只凭中心点高度判断地块合法。
 - 查询失败使用稳定原因：越界、深水、陡壁、地表禁用或完整占地坡度过大。没有合法地块时交由 Agent 正常重选，不由地形系统强制搬迁。
 - T1 山口 profile 只提供连续起伏地貌与选址/路网约束，不生成河流/浅滩特征（属 T2 河谷）；动态通行仍待后续扩展。
-- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：T2 河谷（`river_valley_v1`）生成确定性闭合水体多边形（`River`）与双岸平滑几何（`RiverBank`）；前端通过四层微缩沙盘管线（河床底模消隐、平滑湿砂漫滩带、连续碧蓝矢量水面闭合填充、水陆交界表面张力微沫高光；★ v1.50.3 起中心微波虚线已移除）彻底消灭 13 米离散网格阶梯锯齿，零网格细分、零 GC 堆分配，耗时增量 $\le 0.08\text{ms}$。
+- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；当前 Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形，河谷主槽使用连续不规则浅水面，前端仍通过水体深度队列绘制连续碧蓝矢量水面。
 
 ## 关键不变量
 - 路网节点从不删除；房屋坍塌后，其大门节点可被新立宅复用（`house_node_reuse_radius`）。
@@ -169,13 +175,13 @@ RockFace        陡壁/裸岩面，超过通行坡度时硬禁行
 说明：
 
 - `natural_fertility` 只描述自然土地条件，不能直接写入家户粮食或农业资产 `fertility`。
-- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。T2 `river_valley_v1` 将深水单元关联至 `Some(1)`，其他地表为 `None`。
+- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。旧版 T2 深水曾使用 `Some(1)`；当前 Field Compiler 的 `river_valley_v1` 以固定 ID `0xF10D0001` 表示连续主槽，河谷水格统一保留为可涉 `ShallowWater`。
 - `feature_flags` 只放稳定、可组合的查询事实。已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志；T2 中深水写入 `NO_BUILD|NO_WALK`，河岸写入 `NO_BUILD|SHORE_ACCESS`，浅滩写入 `NO_BUILD|CROSSING_CANDIDATE`。
 - ⚠️ `SHORE_ACCESS` 目前是**只写不读**的标志：全仓只有定义（`biome.rs`）与写入点（`hydrology.rs`），没有任何读取方。因此它**不产生任何交互语义**——取水可行性只由 `WaterAccessPoint` + `WaterPool` 决定（§12）。任何依赖它的新设计必须先实现读取方。
 
 ### 7.2 地貌特征
 
-✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。**注意当前是「生成顺序」而非「ID 升序」**——T2 实际顺序为 `ShallowFord(10,11)` → `River(1)` → `RiverBank(20,21)` → `SpringValley(30)`（见 §14.1），ID 升序是 §5.2 对 D-B1 提出的要求，尚未实现。
+✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。旧版 T2 特征顺序为 `ShallowFord(10,11)` → `River(1)` → `RiverBank(20,21)` → `SpringValley(30)`；Field Compiler 水体统一输出 `WaterBody`，其顺序按 `water_body_id` 的确定性边界追踪产生。
 
 ```rust
 pub struct TerrainFeature {
@@ -223,6 +229,20 @@ pub struct WaterPool {
     pub regen_rate: f32,
     pub source_poi_ids: Vec<u32>,
 }
+```
+
+### 7.3.1 动态水循环与玩家降雨控制
+
+共享水池在 tick 的环境阶段按固定顺序更新：
+
+1. 水源 POI 以 `water_regen_multiplier` 再生；
+2. 降雨按 `rainfall_multiplier`（0~5）× 季节系数（春 1.25、夏 0.85、秋 1.05、冬 0.55）× 厄尔尼诺/纪元相位补给，每个水池按绑定水源数计一次，避免共享池重复加水；
+3. 温度高于 8°C 时按库存上限比例蒸发；
+4. 超过上限的部分被截断并生成一次溢流事件。
+
+降雨倍率属于世界运行状态，随 `WorldSave` 保存，并通过 FABS `GLOBAL` 字段下发前端。前端“天空降雨量”滑块通过 `SET_RAINFALL` 命令写入 WASM，同时记录到 Worker 的历史命令流，时光倒流会按原 tick 重放。该控制只改变天空补给，不改变泉源 POI 的基础产能。
+
+地图水面也消费同一份水池状态：每帧 FABS `WATER_DYNAMICS` section 输出 `stock_ratio`、`coverage`、`level` 和 `flow_strength`。覆盖率由库存比例经过平滑阈值映射得到，前端据此调整粒子数量、漂移速度和水位；静态轮廓只作为粒子初始边界，不再作为水面模型绘制。带 `water_body_id` 的地表格从蓝色渐变到干涸河床色。没有共享水池的地图预览使用完整粒子水面。该表现层变化不改写地形格的通行、建造或取水规则。
 
 pub struct WaterAccessPoint {
     pub id: u32,
@@ -232,15 +252,14 @@ pub struct WaterAccessPoint {
     pub nearest_node_id: Option<u32>,
     pub interaction_radius: f32,
 }
-```
 
 落地细节：
 
 - T2 保留现有 `PoiType::WaterSource`，但将同一河流两岸的多个岸点（`WaterAccessPoint`）的储量读取和扣减委托给同一个 `WaterPool`（池 ID 1）。
 - 既有 Agent 装载、回家卸货、家户账本和施密特触发器保持原有语义；在 `spatial/ecology/harvest.rs` 中，多名 Agent 采水先收集需求并按 `agent.id` 升序稳定排序，再串行扣减共享水池，保证不同执行批次下的绝对确定性。
 - 自然再生在 `spatial/ecology/tick.rs` 中按池统一执行，每个水源 POI 的动态储量通过 `sync_water_pois()` 与所属水池实时同步。
-- 水面存在但 `current_stock == 0` 时，前端仍绘制水面，HUD 大盘按池 ID 去重统计（`render_hud.js`），避免同一水池被多点统计导致总量虚高。
-- T2 水位保持静态几何事实（`terrainRiverWaterLevel = 0.0`），枯水/丰水动态涨落预留给 T4。
+- 水面库存为零时，动态覆盖率会收敛到零并显示干涸河床；HUD 大盘仍按池 ID 去重统计（`render_hud.js`），避免同一水池被多点统计导致总量虚高。
+- T2 水体的原始轮廓仍是静态地貌事实；运行时只在其上应用确定性的覆盖率缩放和水位偏移，不改写静态地形栅格或寻路禁行事实。
 
 ### 7.4 地表装饰（Accents）
 
@@ -750,7 +769,7 @@ Agent 到达河岸取水点 (WaterAccessPoint)
 - 在 `spatial/poi.rs` 中，`PrimitivePoi` 增加 `water_pool_id` 与 `access_point_id`；在 `spatial/ecology/tick.rs` 中，`self.water_pools` 按池统一进行自然再生，之后调用 `sync_water_pois()` 同步各取水 POI 的储量展示。
 - 同一资源池的岸点共享库存事实；采收入行囊、回宅卸货和家户账本规则保持原契约。Agent 私有 POI 施密特触发器应读取对应资源池比例，切换岸点不能绕过 `decision_poi_seek_min_stock_ratio`、`decision_poi_abandon_stock_ratio` 和断流后的市场兜底。
 - 首期静态水位与可采水储量分开：库存环表示当前可采额度，不表示整条河的体积。未来增加枯水/水量模拟时再建立二者关系，不让每次取水立即把整条河的岸线抽动。
-- 水面存在但 `current_stock == 0` 时，前端仍绘制水面，HUD 大盘按池 ID 去重统计。
+- 水面库存为零时，前端按 `WATER_DYNAMICS.coverage` 显示干涸河床；HUD 大盘仍按池 ID 去重统计。
 
 ## 13. 房屋、农业、设施与 POI 接入
 

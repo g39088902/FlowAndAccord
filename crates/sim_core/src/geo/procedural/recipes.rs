@@ -276,26 +276,34 @@ pub fn mountain_pass_v1() -> TerrainRecipe {
 }
 
 pub fn river_valley_v1() -> TerrainRecipe {
+    let mut nodes = common_nodes(
+        FieldOp::Plane {
+            direction: [0.0, 1.0],
+            slope: 0.008,
+            base: 8.0,
+        },
+        FieldOp::Valley {
+            start: [-500.0, -420.0],
+            end: [500.0, 420.0],
+            width: 105.0,
+            depth: 42.0,
+        },
+        6.0,
+    );
+    if let Some(rainfall) = nodes.iter_mut().find(|node| node.id == 101) {
+        rainfall.op = FieldOp::Constant { value: 0.75 };
+    }
     recipe_from_nodes(
         RIVER_VALLEY_V1,
-        common_nodes(
-            FieldOp::Plane {
-                direction: [0.0, 1.0],
-                slope: 0.008,
-                base: 8.0,
-            },
-            FieldOp::Valley {
-                start: [-500.0, -420.0],
-                end: [500.0, 420.0],
-                width: 105.0,
-                depth: 42.0,
-            },
-            6.0,
-        ),
+        nodes,
         3,
         HydrologySpec {
-            channel_threshold: 420.0,
+            // A wetter valley keeps tributary flow alive; the compiler adds a
+            // connected irregular trunk so these channels do not appear as
+            // isolated blue dashes after polygonal relief is applied.
+            channel_threshold: 800.0,
             bank_width_m: 18.0,
+            min_lake_depth_m: 1.0,
             ..HydrologySpec::default()
         },
     )

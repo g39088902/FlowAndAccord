@@ -177,10 +177,10 @@ impl World3DEngine {
         } else if self.terrain.cells.iter().any(|cell| {
             matches!(cell.surface_kind, crate::geo::biome::SurfaceKind::DeepWater)
         }) {
-            // UGC-03 heightfield maps intentionally do not invent legacy
-            // River/WaterBody polygons. Preserve the gameplay contract by
-            // deriving one shared water pool from the new cell semantics;
-            // rendering still consumes the cells directly.
+            // UGC-03 heightfield maps derive a shared pool from semantic water
+            // cells. The adapter also projects those cells into generic closed
+            // WaterBody contours for the renderer, so gameplay and visuals use
+            // the same water-body IDs.
             let water_sources: Vec<u32> = self
                 .pois
                 .iter_mut()

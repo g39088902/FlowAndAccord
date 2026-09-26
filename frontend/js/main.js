@@ -352,6 +352,22 @@
     // 用户拖拽期间禁止内核回写滑块，否则会与拖动打架
     let ecoSliderDragging = false;
 
+    const rainfallSlider = document.getElementById('slider-rainfall-rate');
+    const rainfallLabel = document.getElementById('lbl-rainfall-rate');
+    let rainfallSliderDragging = false;
+    const rainfallSliderLabel = mult => `${(isFinite(mult) ? mult : 1.0).toFixed(1)}x（季节基准）`;
+    if (rainfallSlider && rainfallLabel) {
+      rainfallSlider.addEventListener('input', e => {
+        const mult = parseFloat(e.target.value);
+        if (typeof sim.setRainfallMultiplier === 'function') sim.setRainfallMultiplier(mult);
+        rainfallLabel.textContent = rainfallSliderLabel(mult);
+      });
+      rainfallSlider.addEventListener('pointerdown', () => { rainfallSliderDragging = true; });
+      rainfallSlider.addEventListener('pointerup', () => { rainfallSliderDragging = false; });
+      rainfallSlider.addEventListener('pointercancel', () => { rainfallSliderDragging = false; });
+      rainfallSlider.addEventListener('blur', () => { rainfallSliderDragging = false; });
+    }
+
     for (const def of ECO_SLIDERS) {
       def.sliderEl = document.getElementById(def.sliderId);
       def.lblEl = document.getElementById(def.lblId);
@@ -379,6 +395,13 @@
         const txt = ecoSliderLabel(def, mult);
         if (def.lblEl.textContent !== txt) def.lblEl.textContent = txt;
       }
+      if (!rainfallSliderDragging && rainfallSlider && rainfallLabel && typeof sim.rainfallMultiplier === 'number') {
+        if (Math.abs(parseFloat(rainfallSlider.value) - sim.rainfallMultiplier) > 1e-4) {
+          rainfallSlider.value = String(sim.rainfallMultiplier);
+        }
+        const txt = rainfallSliderLabel(sim.rainfallMultiplier);
+        if (rainfallLabel.textContent !== txt) rainfallLabel.textContent = txt;
+      }
     };
 
     document.getElementById('btn-reset-rate').addEventListener('click', () => {
@@ -387,6 +410,11 @@
         def.sliderEl.value = '1.0';
         if (typeof sim[def.setter] === 'function') sim[def.setter](1.0);
         def.lblEl.textContent = ecoSliderLabel(def, 1.0);
+      }
+      if (rainfallSlider && rainfallLabel) {
+        rainfallSlider.value = '1.0';
+        if (typeof sim.setRainfallMultiplier === 'function') sim.setRainfallMultiplier(1.0);
+        rainfallLabel.textContent = rainfallSliderLabel(1.0);
       }
       sim.logEvent(`🔄 产速重置: 全局资源已恢复默认基准产率！`, 'water');
     });

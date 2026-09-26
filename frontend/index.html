@@ -31,7 +31,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.60.4</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.61.2</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -176,6 +176,13 @@
 
     <!-- 玩家手动控制资源生成速率滑块 -->
     <div class="slider-control-group">
+      <div class="slider-item">
+        <div class="slider-header">
+          <span style="font-weight:600; color:#60a5fa;">🌧️ 天空降雨量:</span>
+          <span id="lbl-rainfall-rate" class="mono-num" style="color:#60a5fa; font-weight:700;">1.0x（季节基准）</span>
+        </div>
+        <input type="range" id="slider-rainfall-rate" min="0" max="5.0" step="0.1" value="1.0" aria-label="手动控制降雨量">
+      </div>
       <div class="slider-item">
         <div class="slider-header">
           <span style="font-weight:600; color:#38bdf8;">💧 清泉涌出:</span>
@@ -1442,6 +1449,7 @@
   <script src="js/render_canvas.js"></script>
   <!-- 水系写意微观生态（水底卵石、游鱼、动态波光） -->
   <script src="js/river_life.js"></script>
+  <script src="js/water_particles.js"></script>
   <script src="js/accent-season.js"></script>
   <script src="js/accent-model.js"></script>
   <!-- ★ TA-07-2 装饰细节分级 LOD 集中解析层（特征尺度 / 三档滞回判档 / 解析式屏幕 AABB；
