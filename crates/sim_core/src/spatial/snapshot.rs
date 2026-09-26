@@ -45,6 +45,25 @@ pub struct WorldSnapshot3D {
     /// 降雨驱动的水面动态状态（每帧输出，静态地形几何仍由 terrain_features 提供）。
     #[serde(default)]
     pub water_bodies: Vec<WaterBodySnapshot>,
+    /// ★ v1.62.0 运行时水体粒子（水面唯一来源）：扁平 `[x, y, z, …]`。
+    /// `None` = 本帧无水体（无水体格的地形 / 地图页）；FABS 走独立 `Fluid` section
+    /// （量化 u16 编码），本字段是四处同步契约的结构定义与 test-only 真值通道。
+    #[serde(default)]
+    pub fluid_particles: Option<Vec<f32>>,
+    /// 求解器步数（调试读数，非逐帧语义）
+    #[serde(default)]
+    pub fluid_revision: u32,
+    /// 水面粒径 / 亮点粒径（世界单位；前端据此还原 v1.61.4 的颗粒读感）
+    #[serde(default)]
+    pub fluid_fill_radius: f32,
+    #[serde(default)]
+    pub fluid_tone_radius: f32,
+    /// ★ v1.62.0 侵蚀地形增量（`spatial/fluid/erosion.rs` 产生的脏格）。
+    /// `None` = 本帧未发送（无侵蚀改动，或本帧走全量地形帧——全量 cells 已含最新高程）；
+    /// FABS 走独立 `TerrainDelta` section（稀疏 u32 下标 + 高程/坡度/flags）。
+    /// 与 `terrain_cells` 的「全量帧」互斥，消费方就地打补丁即可。
+    #[serde(default)]
+    pub terrain_delta: Option<Vec<TerrainDeltaSnapshot>>,
     #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
@@ -174,6 +193,18 @@ pub struct GeoCellSnapshot {
     #[serde(default)]
     pub water_body_id: Option<u32>,
     #[serde(default)]
+    pub feature_flags: u16,
+}
+
+/// ★ v1.62.0 侵蚀地形增量的单格记录（`WorldSnapshot3D::terrain_delta`）。
+///
+/// `index` 为 `TerrainMap` 行主序格下标；只携带被侵蚀/沉积改写的字段
+/// （高程、坡度角、flags），`surface_kind` 与 `water_body_id` 不随侵蚀变化。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerrainDeltaSnapshot {
+    pub index: u32,
+    pub elevation: f32,
+    pub slope_angle: f32,
     pub feature_flags: u16,
 }
 

@@ -4,6 +4,7 @@ pub mod bookkeeping;
 pub mod curve;
 pub mod decisions;
 pub mod ecology;
+pub mod fluid;
 pub mod graph;
 pub mod hormones;
 pub mod house;

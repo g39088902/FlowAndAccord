@@ -212,7 +212,7 @@ async function runThroughputBench(ticks, seed, agents, camps, config) {
   };
 }
 
-// 模块 B: 内核 8 大子阶段细粒度拆解
+// 模块 B: 内核 10 大子阶段细粒度拆解
 async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup = 60) {
   const { ex } = await createEngine(seed, agents, camps, config);
   const dt = 1.0 / 60.0;
@@ -228,16 +228,17 @@ async function runSubphaseBreakdown(ticks, seed, agents, camps, config, warmup =
     '2. POI交互卸货 (Poi Interactions)',
     '3. 房屋维护与折旧 (Housing & Auction)',
     '4. 道路自然衰减 (Road Wear Decay)',
-    '5. 动力位移踩踏 (Movement & Trample)',
-    '6. 马斯洛决策寻路 (Decisions & A*)',
-    '7. 账本宗族公仓 (Ledger, Clan, Region)',
-    '8. 墓碑窗口清理 (Cleanup)',
+    '5. 水体求解 PBF (Fluid Solve, 每4拍)',
+    '6. 动力位移踩踏 (Movement & Trample)',
+    '7. 马斯洛决策寻路 (Decisions & A*)',
+    '8. 账本宗族公仓 (Ledger, Clan, Region)',
+    '9. 墓碑窗口清理 (Cleanup)',
   ];
 
-  const phaseTotalsNs = new Array(9).fill(0n);
+  const phaseTotalsNs = new Array(10).fill(0n);
 
   for (let t = 0; t < ticks; t++) {
-    for (let p = 0; p <= 8; p++) {
+    for (let p = 0; p <= 9; p++) {
       const t0 = process.hrtime.bigint();
       ex.world_tick_subphase(p, dt);
       const t1 = process.hrtime.bigint();

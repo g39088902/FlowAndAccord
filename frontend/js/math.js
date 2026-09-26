@@ -59,13 +59,13 @@
 
       let r, g, b;
 
-      // 水体底色必须自身可见。传统河流路径会再叠加半透明多边形水面，
-      // 但 Field Compiler 也会产生只有 DeepWater 语义格的湖泊/河道；
-      // 两条路径都使用蓝色底色，避免水体因缺少旧特征多边形而退化成棕色土格。
+      // ★ v1.61.4：水面完全由粒子运动模拟引擎表现（water_particles.js），地表水格
+      // 不再拟合平面水色——只作为**河床 / 水底底色**：浅水与深水均为湿润河床土色，
+      // terrain-renderer 的覆盖度插值只在「湿河床（本值）」与「干河床（砂色）」间过渡。
       if (surfaceKind === 'ShallowWater') {
-        r = 70; g = 145; b = 178;
+        r = 142; g = 122; b = 96;
       } else if (surfaceKind === 'DeepWater') {
-        r = 34; g = 102; b = 146;
+        r = 120; g = 100; b = 76;
       } else if (surfaceKind === 'RiverBank') {
         r = 148; g = 138; b = 114;
       } else {

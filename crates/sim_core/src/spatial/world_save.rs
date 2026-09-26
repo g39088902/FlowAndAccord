@@ -45,7 +45,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.61";
+pub const SAVE_APP_VERSION: &str = "1.62";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///
@@ -107,6 +107,11 @@ pub struct WorldSave {
     pub terrain_chunk_deltas: Vec<ChunkDelta>,
     pub terrain_state: TerrainMap,
     pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
+    /// ★ 运行时水体求解器状态（f32 位精确的十六进制打包）。
+    /// 旧档缺字段时为 `None` ⇒ 读档按地形水体格重新播种（不破坏加载）。
+    /// 必须持久化：`test-wasm.js` 要求「存档续演 == 不中断连续运行」逐字节一致。
+    #[serde(default)]
+    pub fluid_state: Option<crate::spatial::fluid::FluidSaveState>,
 
     // ── 基础实体 ──
     pub network: LaneGraph3D,
@@ -192,6 +197,7 @@ impl World3DEngine {
             terrain_profile: self.terrain.profile.clone(),
             terrain_static_key: Some(TerrainStaticKey::from_terrain_map(&self.terrain)),
             terrain_chunk_deltas: self.terrain_chunk_deltas.clone(),
+            fluid_state: Some(self.fluid.export_state()),
             terrain_state: self.terrain.clone(),
             water_pools: self.water_pools.clone(),
             network: self.network.clone(),
@@ -328,11 +334,30 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     // §5.2 稳定 ID 契约：加载时校验 sub_features 升序且唯一（D-B1-2）
     terrain.validate_sub_features_sorted_unique()?;
 
+    // 水体求解器：存档带状态则位精确恢复，否则（旧档 / 状态不自洽）按地形重新播种
+    let mut fluid =
+        crate::spatial::fluid::FluidSim::new(terrain.world_size, terrain.grid_width);
+    let fluid_restored = save
+        .fluid_state
+        .as_ref()
+        .is_some_and(|state| fluid.restore_state(&terrain, state));
+    if !fluid_restored {
+        fluid.seed_from_terrain(&terrain);
+    }
+    // 侵蚀累计量由 `sync_voxel_surface_from_terrain` 在 voxel 后端重建后回填
+    //（`terrain_state` 已携带侵蚀后的高程，属于「可由地形精确还原」的派生量）。
+    let erosion = crate::spatial::fluid::erosion::Erosion::new(
+        terrain.grid_width,
+        terrain.grid_height,
+    );
+
     let mut world = World3DEngine {
         terrain,
         terrain_voxel_backend,
         terrain_chunk_deltas: save.terrain_chunk_deltas,
         water_pools: save.water_pools,
+        fluid,
+        erosion,
         network: save.network,
         pois: save.pois,
         houses: save.houses,
@@ -385,6 +410,9 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
 
     // 派生索引必须重建，否则 agent_by_id() 返回错误下标或 panic
     world.rebuild_agent_index();
+    // ★ 权威高程对齐：voxel 后端按种子重建为原始高度场，`terrain_state` 携带侵蚀结果
+    //   ⇒ 必须回灌，否则 `sample_elevation`（寻路/建造/生态真值）与渲染/流体分裂。
+    world.sync_voxel_surface_from_terrain();
     if world.household_registry.active_households.is_empty()
         && !world.household_registry.households.is_empty()
     {

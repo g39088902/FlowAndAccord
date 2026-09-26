@@ -8,8 +8,9 @@ use super::snapshot::{
     ActiveTaskSnapshot, AgentSnapshot, ClanSnapshot, EmpireSnapshot, GeoCellSnapshot,
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
-    TerrainAccentSnapshot, TerrainFeatureSnapshot, TerrainSubFeatureSnapshot,
-    TransferRecordSnapshot, VacantHouseSnapshot, WaterBodySnapshot, WorldSnapshot3D,
+    TerrainAccentSnapshot, TerrainDeltaSnapshot, TerrainFeatureSnapshot,
+    TerrainSubFeatureSnapshot, TransferRecordSnapshot, VacantHouseSnapshot, WaterBodySnapshot,
+    WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -784,6 +785,54 @@ impl World3DEngine {
         };
         let water_bodies = self.water_body_snapshots();
 
+        // ★ v1.62.0 运行时水体粒子：test-only 真值通道（生产走 FABS `Fluid` section 的
+        // u16 量化编码，见 `snapshot_bin/encode.rs`）。此处按世界坐标逐粒子展开。
+        let (fluid_particles, fluid_revision, fluid_fill_radius, fluid_tone_radius) =
+            if self.fluid.enabled && self.fluid.particle_count() > 0 {
+                let (px, py, pz) = self.fluid.positions();
+                let n = self.fluid.particle_count();
+                let (fr, tr) = self.fluid.render_radii();
+                let mut flat = Vec::with_capacity(n * 3);
+                for i in 0..n {
+                    flat.push(px[i]);
+                    flat.push(py[i]);
+                    flat.push(pz[i]);
+                }
+                (
+                    Some(flat),
+                    (self.fluid.revision & 0xFFFF_FFFF) as u32,
+                    fr,
+                    tr,
+                )
+            } else {
+                (None, 0, 0.0, 0.0)
+            };
+
+        // ★ v1.62.0 侵蚀地形增量：与全量地形帧互斥（全量 cells 已含最新高程）。
+        //   本通道只读待发列表，不清空（清空/取走由 FABS 编码器统一负责，避免两条
+        //   通道互相偷走增量）。
+        let terrain_delta: Option<Vec<TerrainDeltaSnapshot>> = if need_terrain
+            || self.erosion.pending_is_empty()
+        {
+            None
+        } else {
+            Some(
+                self.erosion
+                    .pending_indices()
+                    .into_iter()
+                    .map(|index| {
+                        let cell = &self.terrain.cells[index as usize];
+                        TerrainDeltaSnapshot {
+                            index,
+                            elevation: cell.elevation,
+                            slope_angle: cell.slope_angle_deg,
+                            feature_flags: cell.feature_flags,
+                        }
+                    })
+                    .collect(),
+            )
+        };
+
         WorldSnapshot3D {
             tick: self.tick_counter,
             terrain_cells,
@@ -791,6 +840,11 @@ impl World3DEngine {
             terrain_accents,
             terrain_sub_features,
             water_bodies,
+            fluid_particles,
+            fluid_revision,
+            fluid_fill_radius,
+            fluid_tone_radius,
+            terrain_delta,
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,

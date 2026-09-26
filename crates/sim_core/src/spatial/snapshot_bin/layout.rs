@@ -33,7 +33,9 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 /// + 慢性压力 + 营养不足 + 3 余韵计时器 + NE 焦虑标签；新旧解码器双向拒绝错版帧）。
 /// v1.61.0：4 -> 5（GLOBAL 追加降雨倍率与强度）。
 /// v1.61.1：5 -> 6（新增每帧 `WaterDynamics=23` section）。
-pub const FORMAT_VERSION: u16 = 6;
+/// v1.62.0：6 -> 7（新增每帧 `Fluid=24` section：运行时水体粒子）。
+/// v1.62.0：7 -> 8（新增 `TerrainDelta=25` section：侵蚀产生的地形增量脏格）。
+pub const FORMAT_VERSION: u16 = 8;
 
 /// Header 定长（字节）
 ///
@@ -95,6 +97,14 @@ pub enum SectionKind {
     TerrainSubFeatures = 22,
     /// 降雨驱动的水面动态（每帧输出；静态地形几何仍在 TerrainFeatures）
     WaterDynamics = 23,
+    /// ★ v1.62.0 运行时水体粒子（每帧输出；水面唯一来源）。
+    ///   `u32 count + u32 revision + 3×f32 量化原点 + 3×f32 量化步长`
+    ///   `+ count × (u16 qx, u16 qy, u16 qz)`，约 6B/粒子。
+    Fluid = 24,
+    /// ★ v1.62.0 侵蚀地形增量（脏格才输出，非每帧）。
+    ///   `u32 count + count × (u32 格下标, f32 高程, f32 坡度角, u16 flags) + align4`。
+    ///   格下标为 `TerrainMap` 行主序；前端就地打补丁（不触发全量 65536 格重发）。
+    TerrainDelta = 25,
 }
 
 impl SectionKind {

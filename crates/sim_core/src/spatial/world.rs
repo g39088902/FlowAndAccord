@@ -30,6 +30,12 @@ pub struct World3DEngine {
     /// The static compiler remains the source of truth for untouched chunks.
     pub terrain_chunk_deltas: Vec<ChunkDelta>,
     pub water_pools: Vec<crate::geo::hydrology::WaterPool>,
+    /// ★ 运行时水体求解器（PBF 深度平均域）。纯物理层：推进只读地形、不消耗
+    /// `WorldRng`；状态随存档持久化（`FluidSaveState`），否则读档续演无法逐字节一致。
+    pub fluid: crate::spatial::fluid::FluidSim,
+    /// ★ 水力侵蚀 / 沉积（流体求解器的地形反馈）。只改水体格高程；
+    /// 逐格累计量不入存档，读档时由「当前高程 − 重建高度场」还原。
+    pub erosion: crate::spatial::fluid::erosion::Erosion,
     pub network: LaneGraph3D,
     pub pois: Vec<PrimitivePoi>,
     pub houses: Vec<House>,
@@ -231,11 +237,22 @@ impl World3DEngine {
             64
         };
 
+        // 水体求解器按地形水体格播种（确定性，不消耗 WorldRng）
+        let mut fluid =
+            crate::spatial::fluid::FluidSim::new(terrain.world_size, terrain.grid_width);
+        fluid.seed_from_terrain(&terrain);
+        let erosion = crate::spatial::fluid::erosion::Erosion::new(
+            terrain.grid_width,
+            terrain.grid_height,
+        );
+
         Self {
             terrain,
             terrain_voxel_backend,
             terrain_chunk_deltas: Vec::new(),
             water_pools: Vec::new(),
+            fluid,
+            erosion,
             network: LaneGraph3D::new(),
             pois: Vec::new(),
             houses: Vec::new(),
@@ -293,6 +310,25 @@ impl World3DEngine {
     /// 生成器、recipe 和后端细节不应从决策、生态或房屋系统直接访问。
     pub fn terrain_runtime(&self) -> TerrainRuntime<'_> {
         TerrainRuntime::new(&self.terrain, &self.terrain_voxel_backend)
+    }
+
+    /// 把语义投影（`terrain.cells[].elevation`）的高程回灌到权威 voxel 高度场，
+    /// 并把「当前高程 − 原始高度场」回填为侵蚀累计量。
+    ///
+    /// 读档时 voxel 后端按种子重建为**原始**高度场，而 `terrain_state` 携带侵蚀结果；
+    /// 不对齐会让 `sample_elevation`（寻路 / 建造 / 生态真值）与渲染 / 流体读到的
+    /// 地形分裂。创世期两侧本就一致，本函数为恒等写入（累计量归零）。
+    pub fn sync_voxel_surface_from_terrain(&mut self) {
+        let Some(heights) = self.terrain_voxel_backend.surface_heights_mut() else {
+            return;
+        };
+        let count = heights.len().min(self.terrain.cells.len());
+        for index in 0..count {
+            let target = self.terrain.cells[index].elevation;
+            self.erosion.set_cumulative(index, target - heights[index]);
+            heights[index] = target;
+        }
+        self.terrain_voxel_backend.invalidate_materialized_chunks();
     }
 
     /// 强制下一帧二进制快照重发**全部**静态几何（地形 + 路网拓扑）。

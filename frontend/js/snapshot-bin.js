@@ -25,7 +25,7 @@
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 6; // 动态水：新增 WATER_DYNAMICS section
+  var FORMAT_VERSION = 8; // ★ v1.62.0 侵蚀地形：新增 TERRAIN_DELTA section
   // ★ H-05 激素水平/基线数组固定顺序（与 snapshot.rs::HormoneSnapshot 文档一致）
   var HORMONE_LEVEL_LEN = 12;
   var NONE_U32 = 0xffffffff;
@@ -52,6 +52,10 @@
     TERRAIN_SUB_FEATURES: 22,
     // 降雨驱动的水面动态（每帧）
     WATER_DYNAMICS: 23,
+    // ★ v1.62.0 运行时水体粒子（每帧；水面唯一来源）
+    FLUID: 24,
+    // ★ v1.62.0 侵蚀地形增量（脏格才携带；前端就地打补丁并入 cells）
+    TERRAIN_DELTA: 25,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -164,6 +168,10 @@
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
       terrain_cells: [], terrain_features: null, terrain_accents: null, terrain_sub_features: null,
       water_bodies: [],
+      // ★ v1.62.0 内核水体粒子：[x,y,z, x,y,z, …]（Float32Array）；缺席 = 本帧无水体
+      fluid_particles: null, fluid_revision: 0, fluid_fill_radius: 0, fluid_tone_radius: 0,
+      // ★ v1.62.0 侵蚀地形增量（脏格才携带）；缺席 = 本帧无侵蚀改动
+      terrain_delta: null,
       terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
@@ -495,6 +503,45 @@
           flow_strength: wr.f32(),
         };
       }
+    }
+    // ★ v1.62.0：解码运行时水体粒子 Section 24（每帧；内核 PBF 求解结果）。
+    //   布局 = u32 count + u32 revision + 3×f32 量化原点 + 3×f32 量化步长
+    //          + f32 水面粒径 + f32 亮点粒径 + count × (u16 qx, u16 qy, u16 qz)
+    //   还原：world = origin + q × scale。缺席 = 本帧无水体（地图页/无水体 profile）。
+    if (dir[K.FLUID]) {
+      var flr = readerAt(uint8, dir[K.FLUID].o, dir[K.FLUID].bl);
+      var fcount = flr.u32();
+      snap.fluid_revision = flr.u32();
+      var fox = flr.f32(), foy = flr.f32(), foz = flr.f32();
+      var fsx = flr.f32(), fsy = flr.f32(), fsz = flr.f32();
+      snap.fluid_fill_radius = flr.f32();
+      snap.fluid_tone_radius = flr.f32();
+      var fxyz = new Float32Array(fcount * 3);
+      for (var fpi = 0; fpi < fcount; fpi++) {
+        var qx = flr.u16(), qy = flr.u16(), qz = flr.u16();
+        var o3 = fpi * 3;
+        fxyz[o3] = fox + qx * fsx;
+        fxyz[o3 + 1] = foy + qy * fsy;
+        fxyz[o3 + 2] = foz + qz * fsz;
+      }
+      snap.fluid_particles = fxyz;
+    }
+    // ★ v1.62.0：解码侵蚀地形增量 Section 25（仅侵蚀脏格携带）。
+    //   布局 = u32 count + count × (u32 格下标, f32 高程, f32 坡度角, u16 flags) + align4。
+    //   格下标为 TerrainMap 行主序；缺席 = 本帧无侵蚀改动（严禁用长度猜测是否发送）。
+    if (dir[K.TERRAIN_DELTA]) {
+      var tdr = readerAt(uint8, dir[K.TERRAIN_DELTA].o, dir[K.TERRAIN_DELTA].bl);
+      var tdCount = tdr.u32();
+      var delta = new Array(tdCount);
+      for (var tdi = 0; tdi < tdCount; tdi++) {
+        delta[tdi] = {
+          index: tdr.u32(),
+          elevation: tdr.f32(),
+          slope_angle: tdr.f32(),
+          feature_flags: tdr.u16(),
+        };
+      }
+      snap.terrain_delta = delta;
     }
     // ★ v1.48.0 D-A：解码地表装饰 Section 21（★ D-B1-7：section 缺席时保持默认 null = 未发送）
     if (dir[K.TERRAIN_ACCENTS]) {

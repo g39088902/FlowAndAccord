@@ -189,7 +189,7 @@ World3DEngine
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.61.2**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.62.0**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
@@ -240,6 +240,7 @@ World3DEngine
 - **枚举口径**：二进制帧的闭集枚举（state / poiType / roadClass / houseTier / resourceKind / season / householdRole / gender / transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 - **★ v1.50.30 D-B1-4**：`FORMAT_VERSION` 2 → 3，新增 `SectionKind::TerrainSubFeatures = 22`（地图模板子特征，JSON 字段 `terrain_sub_features`；静态地形脏帧才输出，本阶段恒空数组，注入自阶段二起）；`dict.rs` 同步注册 `terrainSubFeatureKind` 名称表（`TerrainSubFeatureKind` 8 变体与 `TerrainFeatureKind` 是两套编号空间）。
 - **★ v1.61.1 动态水面**：FABS `FORMAT_VERSION` 升至 6，新增 `SectionKind::WaterDynamics = 23`。该 section 每帧输出水体库存比例、覆盖率、水位和流动强度；静态 `TerrainFeatures` 仍只在地形脏帧输出。
+- **★ v1.62.0 运行时水体 + 侵蚀地形**：`FORMAT_VERSION` 6 → 7（新增每帧 `SectionKind::Fluid = 24`，JSON 字段 `fluid_particles` / `fluid_revision` / `fluid_fill_radius` / `fluid_tone_radius`；u16 量化 6B/粒子）→ **8**（新增 `SectionKind::TerrainDelta = 25`，JSON 字段 `terrain_delta`；稀疏脏格 = `u32 格下标 + f32 高程 + f32 坡度角 + u16 flags`）。⚠️ `TerrainDelta` 与全量 `TERRAIN` 帧**互斥**：编码器在 `terrain_dirty` 为真时丢弃待发增量（全量 cells 已含最新高程），因此「不推进仿真连取两帧」得到相同帧——`test-wasm.js` 的 `WORLD_MUTATED_BY_FAILED_LOAD` 断言依赖此口径。侵蚀结果本身随 `terrain_state` 持久化，`Erosion` 累计量不入档（读档由「当前高程 − 重建高度场」还原）。
 - **★ v1.50.35 通道收敛完成**：JSON 快照通道彻底移除——T1（v1.46.0）曾将其收敛为 test-only 真值源（`world_snapshot_json_debug_ptr/len`）供 `test-snapshot-bin.js` 对拍；现该导出与门禁脚本均已删除，生产与工具链路只剩 FABS 一条通道（`tools/` 统一走 `tools/snapshot-reader.js`）。
 - 前端 DOM ID 必须与 `render_inspector.js` / `main.js` 中的 `getElementById` 完全匹配（见 `frontend/AGENTS.md` §四）。
 

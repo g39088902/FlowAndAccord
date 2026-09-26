@@ -55,9 +55,10 @@ fn clear_death_cargo(agent: &mut Agent3D) {
 /// - 步骤 2.3/2.5: 本文件 `tick_fetus_reconcile` / `settle_death_cargo`
 /// - 步骤 3: `ecology/tick.rs::tick_poi_interactions`
 /// - 步骤 4: `housing_system/mod.rs::tick_housing`
-/// - 步骤 6 决策: `decisions/scheduler.rs::tick_decisions`
-/// - 步骤 7: `bookkeeping.rs::tick_bookkeeping`
-/// - 步骤 8/9: `ledger/clan.rs::tick_clan` / `ledger/region.rs::tick_region`
+/// - 步骤 5: 本文件 `tick_phase_fluid`（★ 运行时水体求解，每 `FLUID_STEP_TICKS` 拍一步）
+/// - 步骤 7 决策: `decisions/scheduler.rs::tick_decisions`
+/// - 步骤 8: `bookkeeping.rs::tick_bookkeeping`
+/// - 步骤 9/10: `ledger/clan.rs::tick_clan` / `ledger/region.rs::tick_region`
 impl World3DEngine {
     /// 确定性仿真 Tick (按 AGENTS.md §4.3 严格顺次执行子阶段)
     pub fn tick(&mut self, dt: f32) {
@@ -67,13 +68,14 @@ impl World3DEngine {
         self.tick_phase_poi_interactions(dt);
         self.tick_phase_housing(dt);
         self.tick_phase_road_decay(dt);
+        self.tick_phase_fluid(dt);
         self.tick_phase_movement(dt);
         self.tick_phase_decisions();
         self.tick_phase_ledger(dt);
         self.tick_phase_cleanup();
     }
 
-    /// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~8）
+    /// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~9）
     pub fn tick_subphase(&mut self, phase_idx: u32, dt: f32) {
         match phase_idx {
             0 => {
@@ -84,10 +86,11 @@ impl World3DEngine {
             2 => self.tick_phase_poi_interactions(dt),
             3 => self.tick_phase_housing(dt),
             4 => self.tick_phase_road_decay(dt),
-            5 => self.tick_phase_movement(dt),
-            6 => self.tick_phase_decisions(),
-            7 => self.tick_phase_ledger(dt),
-            8 => self.tick_phase_cleanup(),
+            5 => self.tick_phase_fluid(dt),
+            6 => self.tick_phase_movement(dt),
+            7 => self.tick_phase_decisions(),
+            8 => self.tick_phase_ledger(dt),
+            9 => self.tick_phase_cleanup(),
             _ => {}
         }
     }
@@ -320,7 +323,46 @@ impl World3DEngine {
         self.network.tick_wear_decay(dt, &self.config);
     }
 
-    /// 子阶段 5: 动力学运动与踩踏拓路
+    /// 子阶段 5: 运行时水体求解（PBF 粒子流体，深度平均域）+ 水力侵蚀。
+    ///
+    /// 推进节拍**由 tick 计数驱动**（`tick_counter % FLUID_STEP_TICKS == 0`），
+    /// 不用墙钟也不累加浮点：读档恢复 `tick_counter` 后节拍自动对齐，续演逐位一致。
+    /// 每步 `dt = 每拍 dt × FLUID_STEP_TICKS`，保证倍速下水流速度与模拟时间一致。
+    /// 求解器只读地形、不消耗 `WorldRng`，因此本阶段对既有确定性与行为语义零影响。
+    ///
+    /// 侵蚀（`erosion::Erosion`）挂在**流体步计数**上（每 `EROSION_EVERY_FLUID_STEPS`
+    /// 个流体步 ≈ 1 秒模拟时间一次），写回水体格高程 + 重算深度，同样不消耗 `WorldRng`。
+    pub fn tick_phase_fluid(&mut self, dt: f32) {
+        use crate::spatial::fluid::{erosion::EROSION_EVERY_FLUID_STEPS, FLUID_STEP_TICKS};
+        if !self.fluid.enabled {
+            return;
+        }
+        if self.tick_counter % FLUID_STEP_TICKS != 0 {
+            return;
+        }
+        let step_dt = dt * FLUID_STEP_TICKS as f32;
+        self.fluid.step(&self.terrain, step_dt);
+
+        if (self.tick_counter / FLUID_STEP_TICKS) % EROSION_EVERY_FLUID_STEPS != 0 {
+            return;
+        }
+        let erode_dt = step_dt * EROSION_EVERY_FLUID_STEPS as f32;
+        let walk_slope = self.config.terrain_max_walk_slope;
+        let changed = {
+            let Some(heights) = self.terrain_voxel_backend.surface_heights_mut() else {
+                return;
+            };
+            self.erosion
+                .step(&mut self.terrain, heights, &self.fluid, erode_dt, walk_slope)
+        };
+        if changed > 0 {
+            self.terrain_voxel_backend.invalidate_materialized_chunks();
+            // 河床变了 ⇒ 水柱深度与摩阻按新地形重算（与读档口径一致，见 FluidSim::refresh_depths）
+            self.fluid.refresh_depths(&self.terrain);
+        }
+    }
+
+    /// 子阶段 6: 动力学运动与踩踏拓路
     pub fn tick_phase_movement(&mut self, dt: f32) {
         for agent in &mut self.agents {
             if agent.is_fetus {

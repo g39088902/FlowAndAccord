@@ -80,6 +80,7 @@ stateDiagram-v2
 - `geo::TerrainGenerator` 负责 seed/config/创世覆盖到静态 `TerrainMap` 的确定性生成；它不读取 Agent、房屋、路网、账本或 tick 状态。
 - `geo::TerrainRuntime` 为路网、房屋、生态和决策提供只读地形查询门面；`World3DEngine::terrain_runtime()` 返回该视图。
 - `TerrainMap::generate_*` 仅作为历史探针/兼容 API 保留，生产创世必须走 `TerrainGenerator` 的 voxel 编译路径；`TerrainRuntime` 对游戏逻辑保持稳定接口，内部顶面查询来自 `VoxelBackend`。
+- ★ **运行时改地形的唯一写点 = 水体格高程（v1.62.0 水力侵蚀）**：`spatial/fluid/erosion.rs` 只对 `water_body_id.is_some()` 的格写 `TerrainMap.cells[].elevation` / `slope_angle_deg`，并同步 `VoxelBackend::surface_heights_mut()`（`surface_at` 在懒构建后端下直读该高度场）。写完后 `invalidate_materialized_chunks()` 丢弃物化 chunk；读档时 `World3DEngine::sync_voxel_surface_from_terrain()` 把 `terrain_state` 的侵蚀高程回灌权威高度场，否则 `sample_elevation`（寻路/建造/生态真值）与渲染/流体读到的地形会分裂。陆地格的高程/坡度/flags 与水体格的 `surface_kind`/`water_body_id` 一律不变 ⇒ 车道几何与地表分类语义不受侵蚀影响。详见 [33 号文](./33-runtime-fluid.md) §7。
 
 ### 连续 3D 地形与 T0/T1 静态地貌
 - `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 火山湖）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。
@@ -117,7 +118,7 @@ stateDiagram-v2
 - 房屋候选和最终实体化均使用 `validate_footprint`，完整占地由 `terrainFootprintHalfExtent`、`terrainMaxBuildSlope` 控制；不再只凭中心点高度判断地块合法。
 - 查询失败使用稳定原因：越界、深水、陡壁、地表禁用或完整占地坡度过大。没有合法地块时交由 Agent 正常重选，不由地形系统强制搬迁。
 - T1 山口 profile 只提供连续起伏地貌与选址/路网约束，不生成河流/浅滩特征（属 T2 河谷）；动态通行仍待后续扩展。
-- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；当前 Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形，河谷主槽使用连续不规则浅水面，前端仍通过水体深度队列绘制连续碧蓝矢量水面。
+- **水系河谷与写意沙盘平滑管线（★ v1.48.2）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；当前 Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形，河谷主槽使用连续不规则浅水面，前端由水体粒子运动模拟引擎经统一深度队列逐条绘制（见 [18 号文 §1.3](./18-water-rendering.md)）。
 
 ## 关键不变量
 - 路网节点从不删除；房屋坍塌后，其大门节点可被新立宅复用（`house_node_reuse_radius`）。

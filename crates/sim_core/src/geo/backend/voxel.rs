@@ -1,8 +1,14 @@
 //! Deterministic sparse voxel storage and top-surface compatibility queries.
 //!
-//! Chunks are static creation data. They are never sampled from the simulation
+//! Chunks are lazy creation data. They are never sampled from the simulation
 //! tick; callers explicitly build/load them and then use `TerrainGeometry` or
 //! `LayeredTerrainQuery` for geometry work.
+//!
+//! The retained `source_heightfield` is the authoritative top-surface source for
+//! `surface_at`; runtime terrain edits (hydraulic erosion, `spatial/fluid/erosion.rs`)
+//! write it through [`VoxelBackend::surface_heights_mut`] and must call
+//! [`VoxelBackend::invalidate_materialized_chunks`] so lazily built chunks are
+//! regenerated from the new heights.
 use super::heightfield::HeightfieldBackend;
 use super::layers::{LayeredTerrainQuery, SolidInterval, SurfaceHit};
 use crate::geo::biome::SurfaceKind;
@@ -291,6 +297,23 @@ impl VoxelBackend {
     fn world_size(&self) -> f32 {
         self.origin.x.abs() * 2.0
     }
+
+    /// 权威顶部高程数组的可变视图（编译器构建的懒后端才有）。
+    ///
+    /// `surface_at` 在懒构建后端下直接读 `source_heightfield`，因此这是
+    /// **运行时改地形（侵蚀）的唯一权威写点**；语义投影 `TerrainMap.cells[].elevation`
+    /// 必须同步写入，否则查询路径与渲染/流体路径分裂。
+    pub fn surface_heights_mut(&mut self) -> Option<&mut [f32]> {
+        self.source_heightfield
+            .as_mut()
+            .map(|heightfield| heightfield.elevation.values.as_mut_slice())
+    }
+
+    /// 高程被外部改写后丢弃已物化的 chunk（下次请求按新高度场重建）。
+    pub fn invalidate_materialized_chunks(&mut self) {
+        self.chunks.clear();
+    }
+
     pub fn chunk(&self, c: ChunkCoord) -> Option<&Field3Chunk> {
         self.chunks.get(&c)
     }

@@ -46,7 +46,7 @@ stateDiagram-v2
 | 6 | **`snapshot-reader.js`** | 工具公共模块 | ★ T1 的唯一快照访问入口：读取 FABS 并复用前端解码器（快照仅此一条通道） | 被多个快照工具 `require()` | 非独立 CLI |
 | 7 | **`test-wasm.js`** | 内核测试 | Node 无头运行 WASM，验证确定性、长程稳定（防越界/防NaN）、存读档状态一致 | `node tools/test-wasm.js` | 0=通过, 1=失败抛出 |
 | 8 | **`test-determinism.js`** | 内核测试 | **最高级确定性门禁**：验证 6 大数学定理（多种子/分批独立/快照只读/重放一致等） | `node tools/test-determinism.js` | 0=矩阵全通, 1=确定性分叉 |
-| 9 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 8 大子阶段耗时占比与 FABS 编码/解码；支持优化前后加速比对比、`--preset max-yield` 压力场景、`--set` 覆写与 `--pops` 自定义规模档位 | `node tools/profile-benchmark.js` | 0=完成采样 |
+| 9 | **`profile-benchmark.js`** | 性能分析 | 测算仿真吞吐量（TPS）、内核 10 大子阶段耗时占比与 FABS 编码/解码；支持优化前后加速比对比、`--preset max-yield` 压力场景、`--set` 覆写与 `--pops` 自定义规模档位 | `node tools/profile-benchmark.js` | 0=完成采样 |
 | 10 | **`diagnose.js`** | 诊断排障 | 确定性无头诊断，指定种子与 Tick 极速复现并嗅探死因、贫困、行为卡死 | `node tools/diagnose.js -s 42 -t 3000` | 0=完成诊断 |
 | 11 | **`gold_mining_analysis.js`** | 专项分析 | 专门用于深入排查和追踪族人“为何不淘金/采金”的家户物资与马斯洛行为链路 | `node tools/gold_mining_analysis.js` | 0=完成分析 |
 | 12 | **`gen-dag-testdata.js`** | 族谱工具 | 驱动内核跑满数十万 Tick 累积族人档案库，裁剪直系血脉生成 DAG 测试集 | `node tools/gen-dag-testdata.js` | 0=生成完成 |
@@ -190,7 +190,7 @@ stateDiagram-v2
 - **目标**：微秒级精度度量内核性能，为优化提供量化基准。
 - **核心功能**：
   - 测算总体 TPS 与单 Tick 耗时（µs）；
-  - 输出 8 大子阶段（Phase 0~8）的单拍物理耗时与百分比条形图；
+  - 输出 10 大子阶段（Phase 0~9，含 ★ v1.62.0 新增「5. 水体求解 PBF」）的单拍物理耗时与百分比条形图；
   - 测试 1x ~ 1024x 步长推进与人口规模扩展性（档位可用 `--pops` 自定义）；
   - 支持导出基准 JSON，并通过 `--compare` 生成优化前后的加速比对比表；
   - ★ **产速预设与逐字段覆写**：无需修改 `frontend/js/config.js` 即可构造极端场景，覆写清单会写入报告 JSON 的 `configOverrides` 字段保证可复现。

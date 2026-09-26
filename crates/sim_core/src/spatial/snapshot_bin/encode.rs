@@ -40,7 +40,7 @@ impl World3DEngine {
         out.clear();
 
         let mut tab = self.strtab.borrow_mut();
-        let mut secs: Vec<Sec> = Vec::with_capacity(18);
+        let mut secs: Vec<Sec> = Vec::with_capacity(20);
         let mut flags: u16 = 0;
 
         // ── 增量判定：地形脏位（Cell，&self 可消费）与路网几何签名 ──
@@ -586,6 +586,98 @@ impl World3DEngine {
             ));
         }
 
+        // ══════════════ FLUID（运行时水体粒子，每帧） ══════════════
+        //
+        // 水面唯一来源：内核 PBF 求解器的粒子位置，按世界 AABB 量化到 u16
+        // （x/y 用世界边长，z 用逐帧粒子 z 范围的紧凑区间），约 6B/粒子。
+        // 前端用 origin + q × scale 还原世界坐标后按既有画风绘制。
+        if self.fluid.enabled {
+            let n = self.fluid.particle_count();
+            if n > 0 {
+                let (px, py, pz) = self.fluid.positions();
+                let half = self.terrain.world_size * 0.5;
+                let mut z_min = f32::INFINITY;
+                let mut z_max = f32::NEG_INFINITY;
+                for i in 0..n {
+                    let z = pz[i];
+                    if z < z_min {
+                        z_min = z;
+                    }
+                    if z > z_max {
+                        z_max = z;
+                    }
+                }
+                if !z_min.is_finite() {
+                    z_min = 0.0;
+                }
+                if !z_max.is_finite() || z_max <= z_min {
+                    z_max = z_min + 1.0;
+                }
+                let span = self.terrain.world_size.max(1.0);
+                let z_span = (z_max - z_min + 1.0).max(1e-4);
+                let ox = -half;
+                let oy = -half;
+                let oz = z_min - 0.5;
+                let sx = span / 65535.0;
+                let sy = span / 65535.0;
+                let sz = z_span / 65535.0;
+                // 量化入参是**归一化到 [0,1]** 的比例（quantize_u16 内部再乘 65535）
+                let inv_span = 1.0 / span;
+                let inv_z_span = 1.0 / z_span;
+                let mut w = BinWriter::with_capacity(n * 6 + 40);
+                w.u32(n as u32);
+                w.u32((self.fluid.revision & 0xFFFF_FFFF) as u32);
+                w.f32(ox);
+                w.f32(oy);
+                w.f32(oz);
+                w.f32(sx);
+                w.f32(sy);
+                w.f32(sz);
+                let (fill_r, tone_r) = self.fluid.render_radii();
+                w.f32(fill_r);
+                w.f32(tone_r);
+                for i in 0..n {
+                    w.u16(quantize_u16((px[i] - ox) * inv_span));
+                    w.u16(quantize_u16((py[i] - oy) * inv_span));
+                    w.u16(quantize_u16((pz[i] - oz) * inv_z_span));
+                }
+                w.align4();
+                secs.push(Sec::new(SectionKind::Fluid, n as u32, w.into_inner()));
+            }
+        }
+
+        // ══════════════ TERRAIN DELTA（侵蚀脏格，按需） ══════════════
+        //
+        // 水力侵蚀只改水体格高程（`spatial/fluid/erosion.rs`），全量 65536 格重发
+        // 代价过高 ⇒ 只下发自上次取帧以来改动的格（下标 + 高程 + 坡度 + flags），
+        // 前端就地打补丁。取走即清空（`&self` ⇒ RefCell 内部可变性，同 strtab 先例）。
+        //
+        // ⚠️ 与全量 TERRAIN 互斥：全量帧的 cells 已含最新高程，增量必须作废
+        //    （否则同一改动重复下发，且「不推进仿真时连续取两帧」会得到不同帧——
+        //    `test-wasm.js` 的「读档失败不得改动世界」断言正是此口径）。
+        if need_terrain {
+            self.erosion.clear_pending();
+        } else {
+            let pending = self.erosion.take_pending();
+            if !pending.is_empty() {
+                let mut w = BinWriter::with_capacity(pending.len() * 14 + 16);
+                w.u32(pending.len() as u32);
+                for index in &pending {
+                    let cell = &self.terrain.cells[*index as usize];
+                    w.u32(*index);
+                    w.f32(cell.elevation);
+                    w.f32(cell.slope_angle_deg);
+                    w.u16(cell.feature_flags);
+                }
+                w.align4();
+                secs.push(Sec::new(
+                    SectionKind::TerrainDelta,
+                    pending.len() as u32,
+                    w.into_inner(),
+                ));
+            }
+        }
+
         // ══════════════ HOUSEHOLD ══════════════
         {
             let mut w = BinWriter::with_capacity(
@@ -963,4 +1055,16 @@ impl World3DEngine {
     pub fn enum_table_json(&self) -> String {
         enum_table_json()
     }
+}
+
+/// 把归一化到 `[0, 1]` 的量化值收进 `u16` 值域（越界夹紧，NaN 归零）。
+///
+/// 供运行时水体粒子的位置量化使用：`origin + q × scale` 即还原世界坐标，
+/// 精度 = `scale`（世界边长 / 65535 ≈ 0.012m）。
+#[inline]
+fn quantize_u16(t: f32) -> u16 {
+    if !t.is_finite() {
+        return 0;
+    }
+    (t * 65535.0).round().clamp(0.0, 65535.0) as u16
 }

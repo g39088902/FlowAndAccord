@@ -11,7 +11,7 @@
 | `mod.rs` | 模块入口 + 公开重导出；生成与运行时查询边界 |
 | `generator.rs` | `TerrainGenerator` 创世入口；只接收 seed/config/overrides，不读取 World3DEngine 或游戏实体 |
 | `procedural/` | UGC-01 字段 IR、确定性算子、recipe、约束报告与固定顺序编译器；UGC-02 增加 D8 汇流、热松弛、液压侵蚀/沉积、priority-flood 水位和水系语义投影；UGC-03 注册八个静态模板 recipe；UGC-06 地层柱/材料属性；UGC-07 断层、褶皱和不整合 scratch 结构场，并提供两个只读地图图鉴演示 recipe（不加入 random、不能存档）；UGC-08 接入地层渗透/储水、静态地下水、取水可达性和植被/地表材料因果投影；UGC-09 提供有限候选、字段切片、Bresenham 剖面、confidence 和 JSON 诊断（不进入快照）；不读取 profile、Agent 或路网 |
-| `backend/` | CompiledTerrain 的固定 32³ + halo=1 稀疏 Voxel、Surface Nets 网格与分层查询接口；Heightfield 仅是内部字段投影，静态几何不进入 tick 热路径（UGC-04） |
+| `backend/` | CompiledTerrain 的固定 32³ + halo=1 稀疏 Voxel、Surface Nets 网格与分层查询接口；Heightfield 仅是内部字段投影，chunk 几何不进入 tick 热路径（UGC-04）。★ v1.62.0：`source_heightfield` 高程是**权威顶面**（`surface_at` 直读），也是运行时侵蚀的唯一写点（`surface_heights_mut` + `invalidate_materialized_chunks`）；写后必须由 `World3DEngine::sync_voxel_surface_from_terrain` 与 `TerrainMap` 对齐 |
 | `adapters/` | UGC-03 编译结果到 `TerrainMap` 的兼容适配与旧生成器差异报告；外部地形观测只读元数据边界（UGC-11） |
 | `runtime.rs` | `TerrainRuntime` 只读查询门面；游戏逻辑通过它读取已生成地形事实 |
 | `terrain.rs` | `TerrainMap` 语义/快照兼容结构（含 `cells`/`features`/`accents`/`sub_features` + 诊断字段）；历史 `generate_*` 流水线仍供兼容探针，但生产创世由 `generator.rs` 的 Field Compiler → VoxelBackend 路径负责 |

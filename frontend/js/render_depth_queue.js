@@ -214,14 +214,11 @@ function drawWorldEntities() {
   // ★ 全量 WebGL：地形格与边界侧壁不再入队（terrain-renderer.js GL 层承担，
   //   含沙盘侧壁 skirt 与天幕 clear 背景）。地形壳层投影由 drawTerrainShell 提供。
 
-  // ── 2. 水系特征 / 游鱼 ──
-  //   WebGL 只接管地形本身，上层水系仍由 2D 深度队列绘制。
+  // ── 2. 水系特征 / 水粒子 / 游鱼 ──
+  //   ★ v1.61.4：River / WaterBody 水面**不入队、不绘制**——水面唯一来源是
+  //   water_particles.js 的粒子层（紧随下方逐条入队）；本段只收集非水面特征：
+  //   RiverBank 岸线逐段描边、ShallowFord 涉渡挂所在河段深度 + ε、泉谷等整条入队。
   if (hasTerrain) {
-    // ★ v1.50.20 河流分段入队：整条河多边形若以「全顶点最大深度」入队（v1.50.11 做法），
-    //   只要任一岸段靠近相机，整条河就后画、盖住所有更远的树/房/POI/族人（用户可见症状：
-    //   「河流叠加在树和房子、POI、NPC 上」）。现在：
-    //   River 水面按剖分区间逐段入队（b = 段号，深度 = 段四角最大相机深度）；
-    //   RiverBank 逐段描边；ShallowFord / 波光挂所在段深度 + ε（恒在所在段水面之后）。
     const features = terrain.features || [];
     const nowMs = performance.now();
     if (features.length && window.RiverLife) window.RiverLife.update(nowMs);
@@ -252,21 +249,9 @@ function drawWorldEntities() {
       const f = features[fi];
       if (!f.vertices || f.vertices.length < 2) continue;
       const vs = f.vertices;
-      const waterState = sim.waterBodyDynamics && sim.waterBodyDynamics.get(f.id);
-      const levelDelta = waterState ? waterState.level - (f.elevation || 0) : 0;
-      if ((f.kind === 'River' || f.kind === 'WaterBody') &&
-          window.WaterParticles && window.WaterParticles.isInitialized()) continue;
-      if (f.kind === 'River') {
-        const half = vs.length >> 1;
-        for (let b = 0; b < half - 1; b++) {
-          const j = vs.length - 1 - b;
-          _depthItem(DEPTH_FEATURE, f, b, Math.max(
-            depthOf(vs[b].x, vs[b].y, vs[b].z + levelDelta),
-            depthOf(vs[b + 1].x, vs[b + 1].y, vs[b + 1].z + levelDelta),
-            depthOf(vs[j].x, vs[j].y, vs[j].z + levelDelta),
-            depthOf(vs[j - 1].x, vs[j - 1].y, vs[j - 1].z + levelDelta)));
-        }
-      } else if (f.kind === 'RiverBank') {
+      // ★ v1.61.4：River / WaterBody 无任何多边形水面 ⇒ 恒不入队（水面 = 粒子层）
+      if (f.kind === 'River' || f.kind === 'WaterBody') continue;
+      if (f.kind === 'RiverBank') {
         // 岸线带逐段入队（整条以最大顶点深度入队会同样盖住更远实体）
         for (let s = 0; s < vs.length - 1; s++) {
           const d0 = depthOf(vs[s].x, vs[s].y, vs[s].z);
@@ -284,33 +269,6 @@ function drawWorldEntities() {
           d = d0 > d1 ? d0 : d1;
         }
         _depthItem(DEPTH_FEATURE, f, 0, d + 0.05);
-      } else if (f.kind === 'WaterBody') {
-        // ★ TB-03 静水闭合水体：按 32m 世界块分块入队（整湖以最大顶点深度入队
-        // 会盖住近岸人物与房屋，TB-03-IMPLEMENTATION-PLAN §7.3）。块网格与
-        // render_terrain.js::_wbTileGrid 同式；块深度 = 块四角在水面高程下的
-        // 最大深度。idx = 块号 + 1（0 保留给整条绘制项）。
-        const STEP = 32;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (let vi = 0; vi < vs.length; vi++) {
-          if (vs[vi].x < minX) minX = vs[vi].x;
-          if (vs[vi].x > maxX) maxX = vs[vi].x;
-          if (vs[vi].y < minY) minY = vs[vi].y;
-          if (vs[vi].y > maxY) maxY = vs[vi].y;
-        }
-        const nx = Math.max(1, Math.ceil((maxX - minX) / STEP));
-        const ny = Math.max(1, Math.ceil((maxY - minY) / STEP));
-        const lvl = waterState ? waterState.level : (f.elevation || 0);
-        for (let ty = 0; ty < ny; ty++) {
-          for (let tx = 0; tx < nx; tx++) {
-            const x0 = minX + tx * STEP, y0 = minY + ty * STEP;
-            const x1 = x0 + STEP, y1 = y0 + STEP;
-            // 块四角任一在水面高程下的深度取最大（空块照常入队，绘制端 clip 兜底）
-            const d = Math.max(
-              depthOf(x0, y0, lvl), depthOf(x1, y0, lvl),
-              depthOf(x1, y1, lvl), depthOf(x0, y1, lvl));
-            _depthItem(DEPTH_FEATURE, f, ty * nx + tx + 1, d);
-          }
-        }
       } else {
         let dmax = -Infinity;
         for (let vi = 0; vi < vs.length; vi++) {
@@ -321,12 +279,21 @@ function drawWorldEntities() {
       }
     }
     // 动态水粒子逐条入队：使用粒子自身的水位深度，保持近岸实体的遮挡关系。
+    // ★ v1.62.0：粒子位置来自**内核 PBF 求解器**（快照 Fluid section），前端只渲染；
+    //   入队端按屏幕 AABB（粒径外扩）先剔屏外粒子——排序与绘制的规模只与可见粒子相关。
     if (window.WaterParticles) {
       const particles = window.WaterParticles.particles();
       if (particles) {
         for (let pi = 0; pi < particles.length; pi++) {
           const p = particles[pi];
-          if (p.active) _depthItem(DEPTH_WATER_PARTICLE, p, 0, depthOf(p.x, p.y, p.z));
+          if (!p.active) continue;
+          const prx = p.x * cosZ - p.y * sinZ;
+          const pry = (p.x * sinZ + p.y * cosZ) * cosX - p.z * sinX;
+          const spx = cx + prx * scale;
+          const spy = cy + pry * scale;
+          const rpx = (p.rWorld || 3) * scale + 24;
+          if (spx < -rpx || spx > w + rpx || spy < -rpx || spy > h + rpx) continue;
+          _depthItem(DEPTH_WATER_PARTICLE, p, 0, depthOf(p.x, p.y, p.z));
         }
       }
     }

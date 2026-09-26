@@ -75,19 +75,22 @@
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
-6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
+6. tick_phase_fluid(dt)                      ★ v1.62.0 运行时水体求解（PBF，每 6 拍推进一次；不消耗 RNG）+ 水力侵蚀（每 10 个流体步一次，只改水体格高程）
+7. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
    tick_decisions()                           错峰决策 ((tick + id) % 120 == 0)
-7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
-8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
-9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济
+8. tick_bookkeeping()                         M2 继承清算 + 分家抽资
+9. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
+10. tick_region(dt)                           M4 初王顺位 → 长子继承 → 公仓税 → 救济
 ```
 
 **关键不变量**：
 - **卸货入账在决策之前**（步骤 3 → 决策）：决策读到的是卸货后的家户账本余额（M6 起）
-- **道路衰减在运动之前**（步骤 5 → 6）：运动踩踏的是衰减后的路网
+- **道路衰减在运动之前**（步骤 5 → 7）：运动踩踏的是衰减后的路网
 - **决策在运动之后**：决策基于本 tick 运动后的位置和状态
 - **bookkeeping/clan/region 在决策之后**：制度结算使用决策后的最终状态
-- **胎儿跳过**：代谢（步骤 2）、运动（步骤 6）、决策均跳过 `is_fetus` 的 agent
+- **胎儿跳过**：代谢（步骤 2）、运动（步骤 7）、决策均跳过 `is_fetus` 的 agent
+- ★ **水体求解不改变任何其他子阶段语义**（步骤 6）：推进只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；其推进节拍由 `tick_counter % FLUID_STEP_TICKS` 决定（读档恢复 tick 后自动对齐）。详见 [`fluid/mod.rs`](fluid/mod.rs) 与 `docs/current/tech/33-runtime-fluid.md`。
+- ★ **侵蚀只写水体格**（步骤 6 内，见 [`fluid/erosion.rs`](fluid/erosion.rs)）：高程/坡度只对 `water_body_id.is_some()` 的格生效，陆地格的 `elevation`/`slope_angle_deg`/`feature_flags` 一律不动 ⇒ `corridor::validate_curve` 与读档 `validate_terrain_world` 不受侵蚀影响；写入后的坡度受 `terrain_max_walk_slope` 上限保护。★ **深水保护**：`level − bed ≥ MAX_DEPTH` 的格整体跳过——渲染水面是 `bed + clamp(level − bed, MIN, MAX_DEPTH)`，水柱深度封顶后床面变化只会平移水面（下切＝湖面下沉露滩），故深湖床保持稳定。侵蚀结果同步 `VoxelBackend` 权威高度场（`surface_heights_mut`），并随 FABS `TerrainDelta` section 增量下发；逐格累计量不入档，读档由高程差还原。
 
 ---
 
@@ -117,7 +120,7 @@ ecology/tick.rs::tick_poi_interactions(dt)
 |---|---|---|
 | 定位 | 家庭生命周期**结算触发器** | 账本与社会制度**数据结构 + 规则** |
 | 内容 | 继承清算 (Inheritance) + 分家抽资 (Split) | 账本内核 / 家户 / 婚姻 / 宗族 / 地区王国 |
-| 调用方 | world.rs::tick() 步骤 7 | 被 bookkeeping.rs / ecology/ / housing_system / birth.rs / decisions 调用 |
+| 调用方 | world.rs::tick() 步骤 8 | 被 bookkeeping.rs / ecology/ / housing_system / birth.rs / decisions 调用 |
 | 日常收付 | **不负责**（M6 起已删除 Deposit/Consume/Heating 旁路观测） | 提供 Ledger::transfer() 接口，由生态/维护层直接调用 |
 | 确定性 | 不消耗 WorldRng，按 id 保序遍历 | 内核操作确定性，不消耗 RNG |
 
@@ -153,7 +156,7 @@ snapshot.rs 只定义**数据结构**，不做任何赋值或转换。**M4 (v1.4
 
 `Agent3D.is_fetus = true` 的 agent 在以下环节**必须跳过**：
 - `world.rs::tick()` 代谢（步骤 2）
-- `world.rs::tick()` 运动（步骤 6）
+- `world.rs::tick()` 运动（步骤 7）
 - `decisions/scheduler.rs::tick_decisions()` 决策
 - `ecology/` POI 交互和渲染
 - `render.js` Canvas 绘制和点击拾取

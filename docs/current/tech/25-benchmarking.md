@@ -78,7 +78,7 @@ node tools/profile-benchmark.js --ticks 3000 --compare baseline.json
 | `--seed` | `42` | 确定性随机数种子（用于保证跨机器测试可比性） |
 | `--agents`| `20` | 初始部落民人口数量 |
 | `--camps` | `4` | 行政区营地数量 |
-| `--breakdown` | `true` | 是否运行 8 大子阶段细粒度耗时拆解 |
+| `--breakdown` | `true` | 是否运行 10 大子阶段细粒度耗时拆解（★ v1.62.0 起含「5. 水体求解 PBF」） |
 | `--scale` | `false`| 是否运行 20 / 50 / 100 人口规模横向压测 |
 | `--batch` | `false`| 是否运行不同 `world_tick_steps` 批次大小的单步效率对比 |
 | `--json` | `null` | 导出基准数据为 JSON 文件的路径 |
@@ -94,20 +94,21 @@ node tools/profile-benchmark.js --ticks 3000 --compare baseline.json
 - **游戏时钟速率**：$1\text{ TPS} = 1/60\text{ 游戏小时/秒}$。在 60,000 TPS 下，现实 1 秒相当于推演 $1,000$ 个游戏小时。
 - **延迟分位数 (P50/P95/P99/Max)**：反映计算平稳度。若 P99 与 P50 相差超过 3 倍，说明路网缓存失效或错峰决策相位存在微观负载抖动。
 
-#### B. 8 大子阶段耗时占比（Subphase Breakdown）
-内核已通过 `world_tick_subphase` 导出 8 个原子级阶段探针：
+#### B. 10 大子阶段耗时占比（Subphase Breakdown）
+内核已通过 `world_tick_subphase` 导出 10 个原子级阶段探针：
 1. **Phase 0: 四季与 POI 恢复 (Season & Poi Regen)**：约 $4\%\sim 6\%$
 2. **Phase 1: 代谢繁衍与继承 (Metabolism & Child)**：约 $3\%\sim 5\%$
 3. **Phase 2: POI 交互卸货 (Poi Interactions)**：约 $7\%\sim 9\%$
 4. **Phase 3: 房屋维护与折旧 (Housing & Auction)**：约 $3\%\sim 4\%$
 5. **Phase 4: 道路自然衰减 (Road Wear Decay)**：约 $25\%\sim 32\%$（遍历全图边权重衰减并更新磨损分桶）
-6. **Phase 5: 动力位移踩踏 (Movement & Trample)**：约 $6\%\sim 8\%$
-7. **Phase 6: 马斯洛决策寻路 (Decisions & A\*)**：约 $25\%\sim 35\%$（马斯洛状态机评估 + 加权 A* 寻路）
-8. **Phase 7: 账本宗族公仓 (Ledger, Clan, Region)**：约 $10\%\sim 15\%$
-9. **Phase 8: 墓碑窗口清理 (Cleanup)**：$< 1\%$
+6. **Phase 5: 水体求解 PBF (Fluid Solve)**：★ v1.62.0 新增，仅在每 `FLUID_STEP_TICKS`（默认 6）个 tick 之一上实际求解（有水世界 ≈0.37 ms/tick 摊薄；无水世界恒 0）
+7. **Phase 6: 动力位移踩踏 (Movement & Trample)**：约 $6\%\sim 8\%$
+8. **Phase 7: 马斯洛决策寻路 (Decisions & A\*)**：约 $25\%\sim 35\%$（马斯洛状态机评估 + 加权 A* 寻路）
+9. **Phase 8: 账本宗族公仓 (Ledger, Clan, Region)**：约 $10\%\sim 15\%$
+10. **Phase 9: 墓碑窗口清理 (Cleanup)**：$< 1\%$
 
 > 💡 **性能优化热点指南**：
-> 从实测数据可知，**Phase 4（道路磨损衰减）** 与 **Phase 6（马斯洛决策与 A\* 寻路）** 合计占据了整个仿真周期的 **近 60% 算力**。优化重点应始终聚焦在这两个模块。
+> 从实测数据可知，**道路磨损衰减（Phase 4）** 与 **马斯洛决策与 A\* 寻路（Phase 7）** 合计占据了整个仿真周期的 **近 60% 算力**。优化重点应始终聚焦在这两个模块；★ 有水世界需额外关注 **Phase 5 水体求解**（高倍速下成为吞吐瓶颈，旋钮见 [33 号文](./33-runtime-fluid.md) §6）。
 
 #### C. 快照编码与通信开销（Snapshot Overhead）
 

@@ -162,16 +162,19 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 3. tick_poi_interactions(dt)                 POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                           房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)               道路自然衰减
-6. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
+6. tick_phase_fluid(dt)                      ★ v1.62.0 运行时水体求解（PBF，每 6 拍推进一次；只读地形、不消耗 RNG）+ 水力侵蚀（每 10 个流体步一次，只改水体格高程）
+7. 运动 (for agent in agents)                 agent.tick_movement (胎儿跳过)
    tick_decisions()                           错峰决策 ((tick + id) % 120 == 0)
-7. tick_bookkeeping()                         M2 继承清算 + 分家抽资
-8. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
-9. tick_region(dt)                            M4 初王顺位 → 长子继承 → 公仓税 → 救济 → ★国王内帑（v1.27.0）
+8. tick_bookkeeping()                         M2 继承清算 + 分家抽资
+9. tick_clan(dt)                              M3 族长顺位 → 族税 → 族内互助
+10. tick_region(dt)                           M4 初王顺位 → 长子继承 → 公仓税 → 救济 → ★国王内帑（v1.27.0）
 ```
 
 **关键不变量**：
 - **卸货入账在决策之前**（步骤 3 在决策之前）：决策读到的是卸货后的家户账本余额
-- **道路衰减在运动之前**（步骤 5 在 6 之前）：运动踩踏的是衰减后的路网
+- **道路衰减在运动之前**（步骤 5 在 7 之前）：运动踩踏的是衰减后的路网
+- ★ **水体求解不改其他子阶段语义**（步骤 6）：见 [33 号文](./33-runtime-fluid.md)
+- ★ **侵蚀只写水体格**（步骤 6 内）：陆地格高程/坡度/flags 全不动 ⇒ 车道几何校验与读档 `validate_terrain_world` 不受影响；深水（`level − bed ≥ MAX_DEPTH`）整体跳过以免湖面被下切拉低；见 [33 号文](./33-runtime-fluid.md) §7
 - **决策在运动之后**：决策基于本 tick 运动后的位置和状态
 - **bookkeeping/clan/region 在决策之后**：制度结算使用决策后的最终状态
 - **胎儿跳过**：代谢、运动、决策均跳过 `is_fetus` 的 agent

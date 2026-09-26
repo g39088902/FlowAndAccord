@@ -369,6 +369,21 @@
       ]
     },
     {
+      "id": "runtime-fluid",
+      "path": "docs/current/tech/33-runtime-fluid.md",
+      "owner": "sim-core/spatial",
+      "lastReviewed": "2026-09-26",
+      "sources": [
+        "crates/sim_core/src/spatial/fluid/**/*.rs",
+        "crates/sim_core/src/spatial/world_tick.rs",
+        "crates/sim_core/src/spatial/world_save.rs",
+        "crates/sim_core/src/spatial/snapshot_bin/encode.rs",
+        "crates/sim_core/src/geo/backend/voxel.rs",
+        "frontend/js/water_particles.js",
+        "docs/current/tech/33-runtime-fluid.md"
+      ]
+    },
+    {
       "id": "design-product-overview",
       "path": "docs/current/design/01-product-overview.md",
       "owner": "product",

@@ -96,7 +96,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.61.2';
+        this._appVersion = '1.62.0';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -168,7 +168,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.61.2';
+            this._appVersion = msg.appVersion || '1.62.0';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -503,7 +503,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.61.2';
+        return this._appVersion || '1.62.0';
 
       }
 
@@ -670,6 +670,65 @@
         if (changed) this.terrain.dynamicWaterRevision = (this.terrain.dynamicWaterRevision || 0) + 1;
       }
 
+      // ★ v1.62.0 侵蚀地形增量（FABS Section 25）：就地更新被侵蚀改动的格。
+      //   高程直接决定顶点位置 ⇒ 必须 bump dynamicWaterRevision 让 GL 重传几何；
+      //   法线/AO/反照率是建缓存时预算的数组 ⇒ 受影响格（自身 + 4 邻域，因中心差分
+      //   窗口重叠）就地重算，不重建整图。minZ/maxZ 故意不动：反照率归一化基准
+      //   必须与全图其余格保持一致，否则只剩补丁格换了配色。
+      _applyTerrainDelta(delta) {
+        const terrain = this.terrain;
+        if (!terrain) return;
+        const w = terrain.gridSize;
+        const cells = terrain.cells;
+        if (!w || w < 2 || !cells || cells.length !== w * w) return;
+        const step = terrain.worldSize / (w - 1);
+        const touched = new Set();
+        for (let i = 0; i < delta.length; i++) {
+          const entry = delta[i];
+          const idx = entry.index | 0;
+          if (idx < 0 || idx >= cells.length) continue;
+          const cell = cells[idx];
+          cell.elev = entry.elevation;
+          cell.slopeAngle = entry.slope_angle;
+          cell.featureFlags = entry.feature_flags;
+          touched.add(idx);
+        }
+        if (touched.size === 0) return;
+        // 4 邻域法线依赖被改格高程 ⇒ 一并重算（中心差分窗口宽 2 格）
+        const marks = Array.from(touched);
+        for (const idx of marks) {
+          if (idx + 1 < cells.length) touched.add(idx + 1);
+          if (idx - 1 >= 0) touched.add(idx - 1);
+          if (idx + w < cells.length) touched.add(idx + w);
+          if (idx - w >= 0) touched.add(idx - w);
+        }
+        const nx = terrain.nx, ny = terrain.ny, nz = terrain.nz, aoA = terrain.ao;
+        const albR = terrain.albR, albG = terrain.albG, albB = terrain.albB;
+        const minZ = terrain.minZ, maxZ = terrain.maxZ;
+        touched.forEach((idx) => {
+          const gx = idx % w;
+          const gy = (idx / w) | 0;
+          const cell = cells[idx];
+          const eR = gx < w - 1 ? cells[idx + 1].elev : cell.elev;
+          const eL = gx > 0 ? cells[idx - 1].elev : cell.elev;
+          const eD = gy < w - 1 ? cells[idx + w].elev : cell.elev;
+          const eU = gy > 0 ? cells[idx - w].elev : cell.elev;
+          cell.dzdx = (eR - eL) / (2 * step);
+          cell.dzdy = (eD - eU) / (2 * step);
+          const invLen = 1 / (Math.hypot(-cell.dzdx, -cell.dzdy, 1.0) || 1.0);
+          if (nx) nx[idx] = -cell.dzdx * invLen;
+          if (ny) ny[idx] = -cell.dzdy * invLen;
+          if (nz) nz[idx] = invLen;
+          if (aoA) aoA[idx] = terrainAmbientOcclusion(cell.dzdx, cell.dzdy);
+          if (albR && typeof computeTerrainAlbedo === 'function') {
+            const alb = computeTerrainAlbedo(cell, minZ, maxZ);
+            albR[idx] = alb.r; albG[idx] = alb.g; albB[idx] = alb.b;
+          }
+        });
+        terrain.dynamicWaterRevision = (terrain.dynamicWaterRevision || 0) + 1;
+        if (window.SimLighting) window.SimLighting.markDirty();
+      }
+
       logEvent(msg, type = '') {
         const list = document.getElementById('log-list');
         if (!list) return;
@@ -733,6 +792,13 @@
           flowStrength: Number.isFinite(w.flow_strength) ? w.flow_strength : 0,
         }]));
 
+        // ★ v1.62.0 内核水体粒子（水面唯一来源）：[x,y,z, …] 扁平 Float32Array。
+        //   内核 PBF 求解器每 4 拍推进一次，快照每帧携带当前位置；缺席 = 本帧无水体。
+        this.fluidParticles = snap.fluid_particles || null;
+        this.fluidRevision = snap.fluid_revision || 0;
+        this.fluidFillRadius = snap.fluid_fill_radius || 0;
+        this.fluidToneRadius = snap.fluid_tone_radius || 0;
+
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
         // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致
         this.regenMultipliers = {
@@ -763,7 +829,9 @@
         const nextSubFeatures = hasStaticSubFeatures ? snap.terrain_sub_features : this.terrain.subFeatures;
 
         // 地形网格（仅首次/重开时整组重建，静态网格空数组时跳过）
-        if ((!this._terrainCached || forceTerrain) && snap.terrain_cells && snap.terrain_cells.length > 0) {
+        const terrainRebuilt = (!this._terrainCached || forceTerrain)
+          && snap.terrain_cells && snap.terrain_cells.length > 0;
+        if (terrainRebuilt) {
           const w = snap.grid_w, h = snap.grid_h;
           const worldSize = snap.world_size || 764.0;
           const half = worldSize / 2;
@@ -856,6 +924,12 @@
           this.terrain.features = nextFeatures;
           this.terrain.accents = nextAccents;
           this.terrain.subFeatures = nextSubFeatures;
+        }
+        // ★ v1.62.0 侵蚀地形增量：全量重建帧的高程已是最新 ⇒ 仅增量帧打补丁。
+        //   补丁就地改高程/坡度/flags 并重算受影响格及其 4 邻域的法线/AO/反照率，
+        //   bump 修订号触发 GL 几何重传（避免 65536 格全量重发与全图缓存重建）。
+        if (!terrainRebuilt && Array.isArray(snap.terrain_delta) && snap.terrain_delta.length > 0) {
+          this._applyTerrainDelta(snap.terrain_delta);
         }
         this._applyDynamicWaterCoverage();
 

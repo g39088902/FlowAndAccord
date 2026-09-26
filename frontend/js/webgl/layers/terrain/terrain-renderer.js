@@ -173,6 +173,8 @@ class TerrainWebGLRenderer {
       // 角点受光材料写入：[nx, ny, nz, ao, albR, albG, albB, side]
       const writeShade = (i, side) => {
         const cell = cells[i];
+        // ★ v1.61.4 水格 = 河床湿润度（非水色）：coverage 只在「湿河床（反照率）」与
+        //   「干河床（dry 砂色）」之间过渡；水面本身完全由粒子层绘制，地表不拟合平面水。
         const coverage = cell && cell.waterBodyId != null && Number.isFinite(cell.dynamicWaterCoverage)
           ? Math.max(0, Math.min(1, cell.dynamicWaterCoverage)) : 1;
         const dryR = 148, dryG = 138, dryB = 114;

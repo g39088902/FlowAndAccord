@@ -1,216 +1,182 @@
-// === 降水驱动水体粒子表现层 ===
-// 水面不再由固定多边形填充：静态 WaterBody/River 只作为粒子初始边界和流向采样源，
-// 粒子的位置、速度、覆盖率和水位由当前水体动态状态驱动。该层只负责表现，不修改
-// Rust 模拟状态，也不消费 WorldRng。
+// === 水体粒子渲染层（内核粒子 = 水面唯一来源）===
+// 定位变更（★ v1.62.0）：本文件**不再自带求解器**。水面的运动学由 Rust 内核的
+// PBF（Position Based Fluids，深度平均域）求解器负责，粒子位置随每帧 FABS 快照的
+// `Fluid` section 下发（`rustworld.js::fluidParticles`，扁平 [x,y,z,…] Float32Array +
+// 粒径/亮点粒径）。
+//
+// 本层只做三件事：
+//   ① 把内核粒子映射为绘制视图（逐粒子视觉抖动由**粒子下标**哈希派生，稳定不闪）；
+//   ② 复用 v1.61.4 的观感常量与落笔路径（压扁菱形、同源配色、每 5 粒一位亮点）；
+//   ③ 向统一深度队列暴露与旧接口同名的 `particles()` / `drawParticle()`。
+//
+// 不变量（违反即出 bug）：
+//   ① 不写模拟状态、不消耗 WorldRng、不进存档——粒子位置只读自快照；
+//   ② 稳态零堆分配：粒子对象数组按需扩展后原地复用，`update` 只写数值字段；
+//   ③ 观感常量与 v1.61.4 逐位一致（配色 / 透明度 / 亮点抽样 / 抖动区间）；
+//   ④ sink 硬门槛：GL 图元层未就绪的帧整帧跳过（Canvas 备用通道已删除）。
 
 (function (window) {
   'use strict';
 
-  const MAX_RIVER_PARTICLES = 360;
-  const MAX_BODY_PARTICLES = 180;
-  const MAX_TOTAL_PARTICLES = 1800;
-  const FIXED_DT = 1 / 60;
-  const _particles = [];
-  const _bodies = [];
-  const _bodyById = new Map();
+  // ── 观感常量（单点真相源；与 v1.61.4 前端同源）──
+  const TONE_EVERY = 5;                 // 每 N 个粒子选一个亮点（写意波光）
+  const ALPHA_FILL = 0.26;              // 水面粒子基准透明度
+  const ALPHA_TONE = 0.34;              // 亮点粒子基准透明度
+  const COVER_ALPHA_MIN = 0.30;         // 低降雨时透明度下限系数
+  const WAVE_AMP = 0.16;                // 竖向起伏振幅（m，纯表现层）
+  const WAVE_RATE = 2.1;                // 竖向起伏角速度（rad/s）
+  const TAU = Math.PI * 2;
+  // 与 v1.61.2 同源配色（rgba(46,145,198) / rgba(122,214,235)）——保持写意低饱和
+  const FILL_R = 46 / 255, FILL_G = 145 / 255, FILL_B = 198 / 255;
+  const TONE_R = 122 / 255, TONE_G = 214 / 255, TONE_B = 235 / 255;
+
+  const _particles = [];        // 绘制视图（按内核下标一一对应）
+  let _bodyView = { alphaK: 1 }; // 共享"水体"引用（兼容 drawParticle 的 p.body.alphaK）
   let _initialized = false;
-  let _lastTime = 0;
+  let _seed = 1;
+  let _fillRadius = 2.6 * 1.30;
+  let _toneRadius = 2.6 * 0.52;
+  let _lastRevision = 0;
+  let _srcRef = null;           // 上一次消费的内核数组（换帧数组时重建视图）
 
-  function makePrng(seed) {
-    let s = (seed ^ 0x6d2b79f5) >>> 0;
-    return function () {
-      s = (s + 0x6d2b79f5) >>> 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+  // 粒子下标 → [0,1) 稳定哈希（通道 salt 区分用途；保证同下标永远同一抖动）
+  function hash01(i, salt) {
+    let h = (i * 0x9e3779b1 + salt * 0x85ebca6b + _seed * 0x27d4eb2f) >>> 0;
+    h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d) >>> 0;
+    h ^= h >>> 12; h = Math.imul(h, 0x297a2d39) >>> 0;
+    h ^= h >>> 15;
+    return (h >>> 0) / 4294967296;
+  }
+
+  // 视图条目：视觉属性只在下标首次出现时派生一次（稳态不再写）
+  function ensureParticle(i) {
+    let p = _particles[i];
+    if (p) return p;
+    const tone = (i % TONE_EVERY) === 0;
+    const rot = hash01(i, 4) * TAU;
+    p = {
+      index: i,
+      tone: tone,
+      sizeK: 0.82 + 0.36 * hash01(i, 1),
+      phase: hash01(i, 2) * TAU,
+      phase2: hash01(i, 3) * TAU,
+      rotC: Math.cos(rot),
+      rotS: Math.sin(rot),
+      aK: 0.78 + 0.22 * hash01(i, 5),
+      flick: 1,
+      body: _bodyView,
+      active: true,
+      x: 0, y: 0, z: 0, zBase: 0,
+      rWorld: 0,
     };
-  }
-
-  function pointInPolygon(vertices, x, y) {
-    let inside = false;
-    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-      const a = vertices[i], b = vertices[j];
-      const crosses = ((a.y > y) !== (b.y > y)) &&
-        (x < (b.x - a.x) * (y - a.y) / ((b.y - a.y) || 1e-6) + a.x);
-      if (crosses) inside = !inside;
-    }
-    return inside;
-  }
-
-  function polygonBounds(vertices) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    let cx = 0, cy = 0;
-    for (let i = 0; i < vertices.length; i++) {
-      const v = vertices[i];
-      minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
-      minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
-      cx += v.x; cy += v.y;
-    }
-    const n = Math.max(1, vertices.length);
-    return { minX, maxX, minY, maxY, cx: cx / n, cy: cy / n };
-  }
-
-  function samplePolygon(body, rng) {
-    for (let attempt = 0; attempt < 32; attempt++) {
-      const x = body.bounds.minX + rng() * (body.bounds.maxX - body.bounds.minX);
-      const y = body.bounds.minY + rng() * (body.bounds.maxY - body.bounds.minY);
-      if (pointInPolygon(body.vertices, x, y)) return { x, y };
-    }
-    return { x: body.bounds.cx, y: body.bounds.cy };
-  }
-
-  function riverSample(body, t, lateral, coverage, out) {
-    const half = body.half;
-    const f = Math.max(0, Math.min(half - 1, t * (half - 1)));
-    const i0 = Math.floor(f), i1 = Math.min(half - 1, i0 + 1);
-    const frac = f - i0;
-    const left0 = body.vertices[i0], left1 = body.vertices[i1];
-    const right0 = body.vertices[body.vertices.length - 1 - i0];
-    const right1 = body.vertices[body.vertices.length - 1 - i1];
-    const lx = left0.x + (left1.x - left0.x) * frac;
-    const ly = left0.y + (left1.y - left0.y) * frac;
-    const rx = right0.x + (right1.x - right0.x) * frac;
-    const ry = right0.y + (right1.y - right0.y) * frac;
-    const centerX = (lx + rx) * 0.5;
-    const centerY = (ly + ry) * 0.5;
-    const nextT = Math.min(1, t + 1 / Math.max(2, half - 1));
-    const nf = nextT * (half - 1), ni = Math.min(half - 1, Math.floor(nf));
-    const nextLeft = body.vertices[ni], nextRight = body.vertices[body.vertices.length - 1 - ni];
-    let tx = (nextLeft.x + nextRight.x) * 0.5 - centerX;
-    let ty = (nextLeft.y + nextRight.y) * 0.5 - centerY;
-    const len = Math.hypot(tx, ty) || 1;
-    tx /= len; ty /= len;
-    const width = Math.hypot(rx - lx, ry - ly) * 0.5 * Math.sqrt(coverage);
-    const normalX = -ty, normalY = tx;
-    out.x = centerX + normalX * lateral * width;
-    out.y = centerY + normalY * lateral * width;
-    out.z = ((left0.z || body.feature.elevation || 0) + (right0.z || body.feature.elevation || 0)) * 0.5;
-    out.dirX = tx; out.dirY = ty;
+    _particles[i] = p;
+    return p;
   }
 
   const WaterParticles = {
+    // 世界重建钩子（rustworld.js 在地形重建时调用）：只重置视觉状态与视图缓存。
+    // 参数保持旧签名以兼容调用点；`features` / `seed` 现在只用于标记世界身份。
     init: function (features, seed) {
       _particles.length = 0;
-      _bodies.length = 0;
-      _bodyById.clear();
       _initialized = false;
-      if (!features || !features.length) return;
-      const rng = makePrng((seed || 0) ^ 0x57415452);
-      for (let fi = 0; fi < features.length; fi++) {
-        const feature = features[fi];
-        if ((feature.kind !== 'River' && feature.kind !== 'WaterBody') ||
-            !feature.vertices || feature.vertices.length < 4) continue;
-        if (_particles.length >= MAX_TOTAL_PARTICLES) break;
-        const bounds = polygonBounds(feature.vertices);
-        const body = {
-          id: feature.id,
-          feature,
-          kind: feature.kind,
-          vertices: feature.vertices,
-          bounds,
-          half: feature.kind === 'River' ? feature.vertices.length >> 1 : 0,
-          count: feature.kind === 'River' ? MAX_RIVER_PARTICLES : MAX_BODY_PARTICLES,
-        };
-        _bodies.push(body);
-        _bodyById.set(body.id, body);
-        const count = Math.min(body.count, MAX_TOTAL_PARTICLES - _particles.length);
-        for (let i = 0; i < count; i++) {
-          const p = {
-            bodyId: body.id,
-            ordinal: i,
-            pathT: rng(),
-            lateral: rng() * 1.8 - 0.9,
-            localX: 0,
-            localY: 0,
-            vx: (rng() * 2 - 1) * 5,
-            vy: (rng() * 2 - 1) * 5,
-            phase: rng() * Math.PI * 2,
-            size: 0.7 + rng() * 1.25,
-            tone: i % 7 === 0,
-            x: bounds.cx, y: bounds.cy, z: feature.elevation || 0,
-            dirX: 0, dirY: 1, active: true,
-          };
-          if (body.kind === 'WaterBody') {
-            const sample = samplePolygon(body, rng);
-            p.localX = sample.x - bounds.cx;
-            p.localY = sample.y - bounds.cy;
-          }
-          _particles.push(p);
-        }
-      }
-      _initialized = _particles.length > 0;
+      _srcRef = null;
+      _lastRevision = 0;
+      _seed = (Number.isFinite(seed) && seed > 0) ? (seed >>> 0) : 1;
+      // 世界身份参与抖动盐，换世界后颗粒纹理不残留（同种子仍逐位一致）
+      _initialized = !!(features && features.length);
+      return _initialized;
     },
 
     isInitialized: function () { return _initialized; },
 
+    // 每帧从快照读取内核粒子位置。无求解、无积分——只做视图映射与轻微竖向起伏，
+    // 因为运动学已由内核算好；墙钟只驱动"波光闪烁"这类纯表现层动画。
     update: function (timeMs) {
       if (!_initialized) return;
-      if (!_lastTime) _lastTime = timeMs;
-      _lastTime = timeMs;
-      for (let bi = 0; bi < _bodies.length; bi++) {
-        const body = _bodies[bi];
-        const state = (window.rustWorldSim && window.rustWorldSim.waterBodyDynamics)
-          ? window.rustWorldSim.waterBodyDynamics.get(body.id) : null;
-        const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
-        const flow = state ? Math.max(0, Math.min(1, state.flowStrength)) : 0.35;
-        const activeCount = Math.floor(body.count * Math.min(1, 0.08 + coverage * 0.92));
-        for (let pi = 0; pi < _particles.length; pi++) {
-          const p = _particles[pi];
-          if (p.bodyId !== body.id) continue;
-          p.active = coverage > 0.005 && p.ordinal < activeCount;
-          if (!p.active) continue;
-          p.phase += FIXED_DT * (1.5 + flow * 4.0);
-          if (body.kind === 'River') {
-            p.pathT = (p.pathT + FIXED_DT * (0.018 + flow * 0.075) + 1) % 1;
-            riverSample(body, p.pathT, p.lateral + Math.sin(p.phase) * 0.04, coverage, p);
-          } else {
-            const scale = Math.sqrt(coverage);
-            p.localX += p.vx * FIXED_DT * (0.35 + flow);
-            p.localY += p.vy * FIXED_DT * (0.35 + flow);
-            let wx = body.bounds.cx + p.localX * scale;
-            let wy = body.bounds.cy + p.localY * scale;
-            if (!pointInPolygon(body.vertices, wx, wy)) {
-              p.vx = -p.vx; p.vy = -p.vy;
-              p.localX *= 0.92; p.localY *= 0.92;
-              wx = body.bounds.cx + p.localX * scale;
-              wy = body.bounds.cy + p.localY * scale;
-            }
-            p.x = wx; p.y = wy;
-            p.z = (state && Number.isFinite(state.level)) ? state.level : (body.feature.elevation || 0);
-            p.dirX = p.vx; p.dirY = p.vy;
-          }
-          if (body.kind === 'River') {
-            p.z = (state && Number.isFinite(state.level)) ? state.level : p.z;
-          }
-        }
+      const sim = window.rustWorldSim;
+      const src = sim ? sim.fluidParticles : null;
+      if (!src || src.length < 3) {
+        _particles.length = 0;
+        _srcRef = null;
+        return;
       }
+      const count = (src.length / 3) | 0;
+      if (src !== _srcRef) {
+        _srcRef = src;
+        // 粒径只在长度不被整除时兜底（正常帧恒由内核下发）
+        if (Number.isFinite(sim.fluidFillRadius) && sim.fluidFillRadius > 0) {
+          _fillRadius = sim.fluidFillRadius;
+          _toneRadius = sim.fluidToneRadius > 0 ? sim.fluidToneRadius : sim.fluidFillRadius * 0.4;
+        }
+        _lastRevision = sim.fluidRevision || 0;
+      }
+      // 视图长度与内核粒子数对齐（只在下标首次出现时派生视觉属性）
+      if (_particles.length > count) _particles.length = count;
+      for (let i = 0; i < count; i++) {
+        const p = ensureParticle(i);
+        const o3 = i * 3;
+        p.x = src[o3];
+        p.y = src[o3 + 1];
+        p.zBase = src[o3 + 2];
+        p.rWorld = p.sizeK * (p.tone ? _toneRadius : _fillRadius);
+      }
+      // 降雨调制整体透明度（雨大水面更实，无雨更透；纯表现层）
+      const rain = (sim && Number.isFinite(sim.rainfallIntensity))
+        ? Math.max(0, Math.min(3, sim.rainfallIntensity)) : 1;
+      _bodyView.alphaK = COVER_ALPHA_MIN + (1 - COVER_ALPHA_MIN) * clamp01(rain);
+      // 波光闪烁（墙钟；暂停模拟时水面仍有生命感，与游鱼同属写意设计）
+      const tSec = timeMs * 0.001;
+      for (let i = 0; i < count; i++) {
+        const p = _particles[i];
+        p.flick = 0.72 + 0.28 * Math.sin(tSec * 2.6 + p.phase * 1.7);
+        // 竖向弱起伏：写意水面颗粒，不参与任何物理（基准 z 每帧重取，不累加）
+        p.z = p.zBase + Math.sin(tSec * WAVE_RATE + p.phase2) * WAVE_AMP * 0.5;
+      }
+      _lastRevision = (sim && sim.fluidRevision) || _lastRevision;
     },
 
     particles: function () { return _initialized ? _particles : null; },
 
+    // 调试探针（浏览器验证 / 性能核对用；不做逐帧调用）
+    stats: function () {
+      return {
+        bodies: 0,                 // 旧字段：水体分块已取消（内核统一求解）
+        particles: _particles.length,
+        active: _particles.length,
+        steps: _lastRevision,
+        fillRadius: _fillRadius,
+        toneRadius: _toneRadius,
+      };
+    },
+
+    // 逐条绘制（由统一深度队列按相机深度调度）。★ sink 硬门槛：GL 图元层未就绪的帧
+    // 整帧跳过（Canvas 备用通道已删除）；粒子 = 压扁菱形（同 v1.61.2 粒子、游鱼影口径），
+    // 逐粒子旋转 / 尺寸 / 透明度抖动打散规则栅格感（写意水面颗粒）。
     drawParticle: function (ctx, p, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
       if (!p || !p.active) return;
-      const rx = p.x * cosZ - p.y * sinZ;
-      const ry = p.x * sinZ + p.y * cosZ;
-      const y2 = ry * cosX - (p.z || 0) * sinX;
-      const px = cx + rx * scale, py = cy + y2 * scale;
-      const radius = Math.max(1.0, p.size * scale * (p.tone ? 1.15 : 0.82));
-      const alpha = p.tone ? 0.46 : 0.22;
       const sink = (window.WebGLAccentLayer && window.WebGLAccentLayer.sinkOn)
         ? window.WebGLAccentLayer : null;
-      if (sink) {
-        sink.beginAccent(p.x, p.y, p.z);
-        const r = p.tone ? 0.48 : 0.18;
-        const g = p.tone ? 0.84 : 0.57;
-        const b = p.tone ? 0.92 : 0.78;
-        sink.quad(px - radius, py, px, py - radius * 0.45,
-          px + radius, py, px, py + radius * 0.45, r, g, b, alpha);
-        return;
+      if (!sink) return;
+      const rx = p.x * cosZ - p.y * sinZ;
+      const ry = p.x * sinZ + p.y * cosZ;
+      const px = cx + rx * scale;
+      const py = cy + (ry * cosX - p.z * sinX) * scale;
+      const r = (p.rWorld || 2) * scale;
+      if (r < 0.4) return;                   // 亚像素省略
+      const a = (p.tone ? ALPHA_TONE : ALPHA_FILL) * p.body.alphaK * p.flick * p.aK;
+      const rq = r * 0.45;
+      const x1 = r * p.rotC, y1 = r * p.rotS;        // 长轴 (r,0) 旋转后
+      const x2 = -rq * p.rotS, y2 = rq * p.rotC;     // 短轴 (0,rq) 旋转后
+      sink.beginAccent(p.x, p.y, p.z);
+      if (p.tone) {
+        sink.quad(px - x1, py - y1, px + x2, py + y2, px + x1, py + y1, px - x2, py - y2,
+          TONE_R, TONE_G, TONE_B, a);
+      } else {
+        sink.quad(px - x1, py - y1, px + x2, py + y2, px + x1, py + y1, px - x2, py - y2,
+          FILL_R, FILL_G, FILL_B, a);
       }
-      ctx.fillStyle = p.tone ? 'rgba(122, 214, 235, 0.46)' : 'rgba(46, 145, 198, 0.22)';
-      ctx.beginPath();
-      ctx.ellipse(px, py, radius, radius * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
     },
   };
 

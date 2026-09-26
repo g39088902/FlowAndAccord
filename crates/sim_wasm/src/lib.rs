@@ -208,7 +208,7 @@ pub extern "C" fn world_tick_steps(steps: u32, dt: f32) {
     }
 }
 
-/// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~8）
+/// 执行特定子阶段（用于性能基准分析 profile-benchmark，phase_idx 0~9）
 #[no_mangle]
 pub extern "C" fn world_tick_subphase(phase_idx: u32, dt: f32) {
     unsafe {

@@ -79,6 +79,11 @@ FlowAndAccord/
 │   │           │   ├── tick.rs             # tick_poi_interactions 调度壳 (遍历/胎儿跳过/分娩委托/尸骸清理)
 │   │           │   ├── harvest.rs          # 现场采收 (水/粮/木/石/金) 与榷场采购结算
 │   │           │   └── home.rs             # 回家卸货入账 (Deposit) 与在家吃喝 (Consume)
+│   │           ├── fluid/                  # ★ v1.62.0 运行时水体求解器 (PBF 深度平均域)：mod.rs 播种/受力积分/深度刷新/存档状态；pbf.rs 二维核与约束求解；grid.rs 平面桶索引；erosion.rs 水力侵蚀/沉积（剪应力→高程写回+坡度限幅）。详见 tech/33-runtime-fluid.md
+│   │           │   ├── mod.rs              # FluidSim：播种 / 每步河床剖面 / 子步受力与约束投影 / 位精确存档状态
+│   │           │   ├── pbf.rs              # 2D poly6·spiky 核、密度、λ、Δp（⚠️ s_corr 禁用 powf）、XSPH 粘性
+│   │           │   ├── grid.rs             # 平面均匀桶索引（桶边长 = 支撑域半径，3×3 邻域，下标升序插入保确定性）
+│   │           │   └── erosion.rs          # ★ v1.62.0 水力侵蚀/沉积：粒子场→逐格水深/流速→Manning 剪应力→侵蚀/沉积→高程写回（只改水体格）+坡度上限保护+脏格待发列表
 │   │           ├── birth.rs                # 妊娠结算、分娩、新生儿属性遗传
 │   │           ├── bookkeeping.rs          # ★ M2 家庭生命周期结算 (继承清算 + 分家抽资；M6 起日常收付改由生态/维护层真实记账)
 │   │           ├── world.rs                # World3DEngine 结构体定义与生命周期
@@ -141,8 +146,8 @@ FlowAndAccord/
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
 │   │   ├── config.poi-rates.js             # POI 产速本地偏好 (localStorage 倍率，world_create 前读取，可复现演化)
 │   │   ├── config.render.js                # ★ v1.50.15 渲染参数外置 (window.RENDER_CONFIG：贴图抬升/足迹半径/装饰半径，纯表现层，不并入 SIM_CONFIG；★ v1.60.1 删 useWebgl/accentWebglEnabled/terrainTexture 组/terrainMeshMerge 组/accentShadow* 4 键/接触阴影 2 键，保留 webglDebug/accentWebglShadowStrength)
-│   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo)
-│   │   ├── terrain-style.js                # ★ TB-03-11 景观风格样式表 (window.TerrainStyle：profile→基调白名单/世界 seed 固定盐选型/逐 SurfaceKind 反照率乘色；纯表现层)
+│   │   ├── math.js                         # 3D 向量与投影变换 + 地形反照率/光照分解 (computeTerrainAlbedo；★ v1.61.4 水格 = 河床土色，不承载水色——水面 = 粒子层)
+│   │   ├── terrain-style.js                # ★ TB-03-11 景观风格样式表 (window.TerrainStyle：profile→基调白名单/世界 seed 固定盐选型/逐 SurfaceKind 反照率乘色；纯表现层；★ v1.61.4 火山湖水格乘色删除——水面 = 粒子层)
 │   │   ├── lighting.js                     # ★ v1.48.0 年周期光弧引擎 (光相/视觉限速器/面光照/世界空间阴影；★ v1.50.90 GL shader 直译受光 + lightRev uniform 节流；★ v1.60.1 relightTerrain/shadeAlbedoInto CPU 烘焙删除，applyRelight 只推进 lightRev)
 │   │   ├── decision-viz-data.js            # 决策分支元数据 (BRANCH_MAP 条件文案/层级/图标 + FSM_STATE_ZH 中文映射)
 │   │   ├── decision-viz-view.js            # 决策引擎覆层 DOM 渲染 (Branch 分支卡/分界线/检查器/拖动)
@@ -163,18 +168,19 @@ FlowAndAccord/
 │   │   ├── save-ui.js                      # ★ 读档/存档系统 UI (三槽位 localStorage + v1.11.0 本地文件直写 File System Access API)
 │   │   ├── render_canvas.js                # Canvas 渲染主循环、帧率控制与共享状态 (★ v1.50.82 帧率上限可配置，默认 60 FPS，可解除门控)
 │   │   ├── river_life.js                   # ★ v1.49.0 水系微观生态层 (成群游鱼，★ v1.50.86 GL sink 分发、★ v1.60.1 sink 硬门槛未就绪帧整只跳过，纯表现层，随种子确定性重建)
+│   │   ├── water_particles.js              # ★ v1.62.0 水体粒子**渲染层** (window.WaterParticles：消费内核快照 Fluid section 的粒子位置，逐粒子视觉抖动由「粒子下标 + 世界种子」稳定哈希派生（只算一次、稳态不闪）；复用 v1.61.4 观感常量与 sink 落笔路径；**不再自带求解器**——流场构建/积分/覆盖率折叠选活已上移内核，详见 tech/33-runtime-fluid.md)
 │   │   ├── accent-season.js                # ★ v1.50.23 TA-01 装饰季相层 (window.SimTreeTint 叶色唯一生产者，自 render_terrain.js 迁出；★ TA-06-2 删除 tint() 三档兼容接口，profile 由 model.profile 单一入口送入)
 │   │   ├── accent-model.js                 # ★ v1.50.23 TA-01 装饰模型层 (window.AccentModel 个体形态缓存 + _accentHash，世界事件 resetCache；★ S4-02 getByKey 完整 key 通道；★ TA-06 物种派生 speciesOf（三乔木轮廓 broad/sparse/conifer + 三灌木变体 multiStem/flowering/lowEvergreen + 花灌木固定花位），骨架输出 crownR/trunkH/footprintR/crownSquash 为唯一几何真相源；★ TA-07-3 真值包围体 bounds{rH,zMin,zMax,yUp,rS} + 分级几何 farClusters/segTier/stoneMain，extent 由 bounds 派生)
 │   │   ├── accent-lod.js                  # ★ TA-07-2 装饰细节分级 LOD 集中解析层 (window.AccentLOD：特征尺度 CSS px / 三档判档 + 阈值带滞回 tierOf·tierFor(_lodT) / kindBounds 一级保守常数 / aabbOf 解析式屏幕 AABB（yUp 石体贴地 + rS 球体不乘 cosX）/ shadowAabb 冠影+影梢并集 / leanShear 单一来源 / stats dev 计数器；六处消费点唯一口径入口)
 │   │   ├── landscape-model.js              # ★ S4-02 资源景观模型层 (window.LandscapeModel：配方/slot/固定 uint32 哈希/极坐标候选/双线性高程/组缓存，静态输入派生，世界事件 resetCache；★ S4-03 version() 组几何版本号；stockRole detail/qThreshold + childActive（foliage 可采细节 q 显隐）；★ v1.50.87 GroundPatch 贴地色差片/坡度拒绝/点簇预计算整体删除，配方 v4)
 │   │   ├── landscape-mask.js               # ★ S4-03 景观遮罩层 (window.LandscapeMask：道路胶囊带/房屋/POI 保护区 + 世界网格分桶 + 字段签名脏桶失效 + 装饰去重；源数组只隐藏不移除，世界事件 resetCache；★ S4-04 detail 子图元只预判 _masked 不入占据桶)
-│   │   ├── render_terrain.js               # ★ v1.49.1 自 render_world.js 拆出 (★ v1.60.1 仅剩：drawTerrainShell 纯顶点投影 / drawTerrainGrid 'G' 键调试网格 / drawFeatureItem·drawRiverBand·drawWaterBodyTile 水系绘制；drawTerrainCell/flushTerrainBatch/drawSkyBackdrop/drawBoundaryWallSeg 已删，地形改由 webgl 地形层绘制)
+│   │   ├── render_terrain.js               # ★ v1.49.1 自 render_world.js 拆出 (★ v1.60.1 仅剩：drawTerrainShell 纯顶点投影 / drawTerrainGrid 'G' 键调试网格 / drawFeatureItem 非水面水系特征（RiverBank/ShallowFord/Cliff/泉谷）；★ v1.61.4 drawRiverBand/drawWaterBodyTile/_wbTileGrid 删除——水面 = 粒子层，无多边形拟合；drawTerrainCell/flushTerrainBatch/drawSkyBackdrop/drawBoundaryWallSeg 已删，地形改由 webgl 地形层绘制)
 │   │   ├── render_accents.js               # ★ v1.50.23 TA-01 装饰绘制层 (drawAccentEntity 分发 + Tree/Boulder/RockCluster；★ v1.50.39 TA-04-3 cylinderShade 枝干圆柱侧面明暗；★ TA-06-5 灌木绘制迁出 render_bush.js、★ TA-06-6 三乔木轮廓接入（冠幅/干高/扁压/倾干读模型）；★ TA-07 判档走 AccentLOD、segTier 分档枝条 / farClusters 远景簇子集 / 远景石体两笔简化 / 消费深度项 AABB 与锚点 ex·ey，由 render_world.js 深度队列调度；★ v1.60.1 sink 硬门槛：GL 层未就绪帧整只跳过，零 ctx 引用)
 │   │   ├── render_bush.js                  # ★ TA-06-5 灌木绘制层 (自 render_accents.js 迁出守 800 行上限：drawAccentBush 三变体 + ★ TA-06-7 花朵图元 flowerAmount 首次消费，低饱和三色板/簇法线受光/中近景限量，复用 accent 族共享刮擦工具；★ TA-07 判档走 AccentLOD + 远景簇子集 + 补簇级 x/y 剔除)
 │   │   ├── render_grass.js                 # ★ v1.50.39 GrassTuft 草丛绘制 (自 render_accents.js 迁出守 800 行上限；grassSeasonColor 季相色 + 芦草穗，复用 accent 族共享刮擦工具；★ TA-07 整丛省略判据走 AccentLOD.featurePx，芦花穗阈值收编 accentLODPlumeMinPx)
 │   │   ├── render_landscapes.js            # ★ S4-02 资源景观绘制接入层 (collectLandscapes 入队 + drawLandscapeChild 分发；复用装饰图元/光照/季相，配置关态零开销回退；★ S4-03 被遮蔽子图元不入队；detail 子图元 childActive q 过滤；★ TA-07 入队与绘制共用 AccentLOD AABB，签名加 it；★ v1.50.87 GroundPatch 删除；★ v1.60.1 drawLandscapeShadowGround 与 DEPTH_LANDSCAPE_SHADOW 已删，阴影由 GL 阴影图承担)
 │   │   ├── label-layout.js                # ★ S4-06 标签候选层与屏幕布局 (window.LabelLayout：提案池/字体测量缓存/固定备选位[首选/镜像/同排左右]/屏幕网格冲突检测/UI 禁入矩形/overlay 通道；pinned 恒接受占格 + ordinary 可省略；候选 ≤4 有界；关态回退旧直接绘制)
-│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels；★ TA-07-6 装饰入队前两级剔除（kindBounds 粗剔 → 模型 bounds 精剔）+ 深度项新增 ex/ey 锚点与 AABB 复用 s1x~s2y 提案 + drawSelectedNeedBubbleOverlay 交互覆盖；★ v1.60.1 地形格/侧壁/贴地投影入队与分发删除（DEPTH_CELL/DEPTH_WALL/DEPTH_ACCENT_SHADOW/DEPTH_LANDSCAPE_SHADOW 常量删除），遮挡由 GL 深度缓冲承担；水系/游鱼/道路/POI/房屋/装饰/族人照旧)
+│   │   ├── render_depth_queue.js           # ★ v1.50.46 TA-04-6 世界统一深度队列层 (自 render_world.js 拆出单一职责：DEPTH_* 对象池 / _surfaceDepth·_decalDepth 足迹深度 / MAP_Z_LIFT·projectLifted / drawWorldEntities 收集与分发；★ S4-03 装饰段前遮罩同步 + 被遮蔽装饰跳过；★ S4-06 beginFrame/resolve 挂载 + proposePoi/House/AgentLabels；★ TA-07-6 装饰入队前两级剔除（kindBounds 粗剔 → 模型 bounds 精剔）+ 深度项新增 ex/ey 锚点与 AABB 复用 s1x~s2y 提案 + drawSelectedNeedBubbleOverlay 交互覆盖；★ v1.60.1 地形格/侧壁/贴地投影入队与分发删除（DEPTH_CELL/DEPTH_WALL/DEPTH_ACCENT_SHADOW/DEPTH_LANDSCAPE_SHADOW 常量删除），遮挡由 GL 深度缓冲承担；非水面水系特征（RiverBank/ShallowFord/Cliff/泉谷；★ v1.61.4 起 River/WaterBody 水面不入队——水面 = 粒子层）/水粒子/游鱼/道路/POI/房屋/装饰/族人；★ v1.61.3 水粒子入队端按屏幕 AABB（粒径外扩）先剔屏外粒子)
 │   │   ├── render_world.js                 # 车道贝塞尔曲线、POI 底座/标记、私宅绘制（★ v1.50.46 深度队列已迁往 render_depth_queue.js；保留 lightShadowOffset/shadeHex 光照帮助函数）；★ S4-06 proposePoiLabels/proposeHouseLabels 提案 + 绘制消费 posOf（未安置即省略；LOD 阈值收进 config.render）
 │   │   ├── render_agents.js                # 族人粒子、行囊搬运与夺位远征动态标牌（★ S4-06 需求气泡迁 overlay 层 drawSelectedNeedBubbleOverlay；施工/流产/夺位角标 pinned + posOf 消费）
 │   │   ├── inspector-shared.js             # ★ v1.60.1 Inspector 共享计量/产速帮助层 (速率追踪/倍率换算)
@@ -288,7 +294,8 @@ FlowAndAccord/
     │       ├── 29-impact-matrix.md              # 工程：改 X 牵动哪些文件 + tick 顺序
     │       ├── 30-workflow.md                   # 工程：Agent 入口 + 提交检查单 + 文档维护
     │       ├── 31-code-map.md                   # 附录：本文件
-    │       └── 32-terrain-generation-gates.md   # ★ 地形生成门禁地图（五道防线 + 生成器版本契约 + 改 X 跑什么决策表）
+    │       ├── 32-terrain-generation-gates.md   # ★ 地形生成门禁地图（五道防线 + 生成器版本契约 + 改 X 跑什么决策表）
+    │       └── 33-runtime-fluid.md              # ★ v1.62.0 运行时水体求解器（内核 PBF 深度平均域：播种/受力/约束/FABS Fluid 协议/位精确存档/性能）+ §7 水力侵蚀沉积（剪应力模型、只改水体格、TerrainDelta 增量、深度反馈）
     └── plan/                                 # 计划：在办设计与未落地方案
     │   ├── README.md                          # 计划总索引（含依赖顺序图）
     │   ├── design/                            # 产品设计（玩法方向）

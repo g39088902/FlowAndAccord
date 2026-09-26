@@ -41,14 +41,14 @@
       RiverTerrace: [1.05, 1.00, 0.90],
       RockFace: [1.12, 1.02, 0.92],
     },
-    // 火山湖：天池蓝——深蓝湖心、冷灰火山岩与高海拔草坡。
+    // 火山湖：天池蓝——冷灰火山岩与高海拔草坡；★ v1.61.4 起**水格不再染色**：
+    // 水面完全由粒子层（water_particles.js）表现，地表水格只保留河床底色，
+    // 不再用乘色拟合平面水（勿恢复 ShallowWater/DeepWater 乘色）。
     volcanic_blue: {
       DryGround: [0.94, 1.00, 0.96],
       SoftGround: [0.91, 0.98, 0.94],
       RiverTerrace: [0.94, 1.00, 0.96],
       RockFace: [0.82, 0.87, 0.92],
-      ShallowWater: [0.58, 0.82, 1.12],
-      DeepWater: [0.42, 0.72, 1.18],
       RiverBank: [0.80, 0.90, 0.96],
     },
   };

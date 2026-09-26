@@ -67,21 +67,23 @@ stateDiagram-v2
     逝者结算 --> 采收交互: 3. tick_poi_interactions
     采收交互 --> 房屋: 4. tick_housing
     房屋 --> 路网: 5. network.tick_wear_decay
-    路网 --> 运动: 6. agent.tick_movement
-    运动 --> 决策: 6. tick_decisions (错峰)
-    决策 --> 继承分家: 7. tick_bookkeeping
-    继承分家 --> 宗族: 8. tick_clan
-    宗族 --> 王国: 9. tick_region
+    路网 --> 水体: 6. tick_phase_fluid (★ v1.62.0 PBF，每 6 拍推进)
+    水体 --> 运动: 7. agent.tick_movement
+    运动 --> 决策: 7. tick_decisions (错峰)
+    决策 --> 继承分家: 8. tick_bookkeeping
+    继承分家 --> 宗族: 9. tick_clan
+    宗族 --> 王国: 10. tick_region
     王国 --> [*]
 ```
 
 **关键不变量**
 
-- **卸货入账在决策之前**（3 在 6 之前）：决策读到的是卸货后的家户账本余额。
-- **道路衰减在运动之前**（5 在 6 之前）：运动踩踏的是衰减后的路网。
+- **卸货入账在决策之前**（3 在 7 之前）：决策读到的是卸货后的家户账本余额。
+- **道路衰减在运动之前**（5 在 7 之前）：运动踩踏的是衰减后的路网。
 - **决策在运动之后**：决策基于本 tick 运动后的位置与状态。
-- **制度结算在决策之后**（7/8/9）：使用决策后的最终状态。
+- **制度结算在决策之后**（8/9/10）：使用决策后的最终状态。
 - **胎儿跳过**：代谢、运动、决策均跳过 `is_fetus` 的 agent。
+- ★ **水体求解不改其他子阶段语义**（6）：只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；推进节拍由 `tick_counter % FLUID_STEP_TICKS` 决定。见 [33 号文](./33-runtime-fluid.md)。
 
 ---
 

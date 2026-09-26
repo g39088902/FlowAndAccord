@@ -89,18 +89,20 @@ stateDiagram-v2
 3. tick_poi_interactions(dt)           POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                     房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)         道路自然衰减
-6. 运动 (胎儿跳过)                      agent.tick_movement
+6. tick_phase_fluid(dt)                ★ v1.62.0 运行时水体求解（PBF，每 6 拍；只读地形、不消耗 RNG）
+7. 运动 (胎儿跳过)                      agent.tick_movement
    tick_decisions()                     错峰决策 ((tick + id) % 120 == 0)
-7. tick_bookkeeping()                   M2 继承清算 + 分家抽资
-8. tick_clan(dt)                        M3 族长顺位 → 族税 → 族内互助
-9. tick_region(dt)                      M4 初王顺位 → 长子继承 → 公仓税 → 救济
+8. tick_bookkeeping()                   M2 继承清算 + 分家抽资
+9. tick_clan(dt)                        M3 族长顺位 → 族税 → 族内互助
+10. tick_region(dt)                     M4 初王顺位 → 长子继承 → 公仓税 → 救济
 ```
 
 **关键时序不变量**：
 - **卸货入账在决策之前**（步骤 3 → 决策）：决策读到的是卸货后的家户账本余额
-- **道路衰减在运动之前**（步骤 5 → 6）：运动踩踏的是衰减后的路网
+- **道路衰减在运动之前**（步骤 5 → 7）：运动踩踏的是衰减后的路网
 - **决策在运动之后**：决策基于本 tick 运动后的位置和状态
-- **bookkeeping/clan/region 在决策之后**：制度结算使用决策后的最终状态
+- **bookkeeping/clan/region 在决策之后**（8/9/10）：制度结算使用决策后的最终状态
+- ★ **水体求解不改其他子阶段语义**（步骤 6，v1.62.0）：只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；见 [33 号文](./33-runtime-fluid.md)
 
 ### 3.2 决策与行为约束
 
@@ -112,7 +114,7 @@ stateDiagram-v2
 | B4 | **Agent 私有 POI 施密特触发器**：开启 ≥ `decisionPoiSeekMinStockRatio`(0.50) / 关闭 < `decisionPoiAbandonStockRatio`(0.10) / 中间带保持前态，每名 Agent 维护私有锁存 | §4.2 / ./08-ecology-and-poi.md §2.4 | 相同 POI 被不同 Agent 判为不同可用性是预期行为 |
 | B5 | **连续采收**：现场采收时若目标触发器已关闭但行囊未满且家宅仍需，自动前往下一处自身触发器已开放的同类 POI | §4.2 / ./11-decision-engine.md §3.2 | 提前返家导致效率低下 |
 | B6 | **无家宅者不装载行囊**，只在现场就地自饮自食 | §4.4 / ./08-ecology-and-poi.md §2.6 | 无家者装货后无处卸货 |
-| B7 | **胎儿跳过**：代谢（步骤 2）、运动（步骤 6）、决策均跳过 `is_fetus` 的 agent；胎儿参与家户成员计数、继承清算、宗族成员 | spatial/AGENTS.md §4.2 | 胎儿有地图实体会导致渲染和交互异常 |
+| B7 | **胎儿跳过**：代谢（步骤 2）、运动（步骤 7）、决策均跳过 `is_fetus` 的 agent；胎儿参与家户成员计数、继承清算、宗族成员 | spatial/AGENTS.md §4.2 | 胎儿有地图实体会导致渲染和交互异常 |
 | B8 | **分娩时原位复用胎儿 ID** 替换为新生儿，不新建 ID | spatial/AGENTS.md §4.2 | ID 段位混乱，族谱断代 |
 | B9 | **去采货 = 施密特触发器（M7 起）**：有房即可采，与房屋等级彻底脱钩；家户账本余额 < 100 触发，补到 ≥ 200 才停 | §4.8 / ./08-ecology-and-poi.md §2.4 | 旧逻辑按房屋等级决定采收权限已废弃 |
 | B10 | **升级成本 = 4×5 固定矩阵（M8 起）**：`needs::upgrade_material_cost` 单一真相源，0→1 不再是"无材料恒就绪"，需水≥50 且粮≥50 | §4.8 / ./13-housing-system.md §2.1 | 升级就绪判定与扣账不一致 |
