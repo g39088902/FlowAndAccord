@@ -25,7 +25,23 @@ window.RENDER_CONFIG = {
   //    SNAP_THROTTLE_TIERS），主线程无运动插值，故解除门控主要改善**镜头拖拽/缩放**
   //    的跟手度与 UI 刷新；族人位置的更新频率仍受快照节流约束。
   targetFps: 60,
-  
+
+  // —— 水体粒子 GPU 求解（★ 2026-09-26 由内核 CPU PBF 迁移到前端 WebGPU；★ 2026-09-27 改为真三维）——
+  // 语义：水粒子运动学由 frontend/js/water_gpu.js 用 WebGPU compute 推进（**3D PBF**：重力沿 −z、
+  //       3D 核函数与 3D 空间哈希、地面约束 `z ≥ bed+clearance`），**纯表现层**
+  //       （放弃确定性，不进快照/存档；详见 docs/current/tech/33-runtime-fluid.md §8）。
+  // ⚠️ WebGPU 与 WebGL 同为启动硬门槛：不可用时 main.js 报错阻断启动（无 CPU 回退路径）。
+  waterGpuEnabled: true,            // 总开关（URL ?watergpu=0 亦可强制关，仅用于 A/B 对照）
+  waterGpuMaxParticles: 20000,      // GPU 粒子槽位上限（渲染端另受 waterRenderMaxParticles 约束）
+  waterGpuSpacing: 7.45875,         // 求解器维持的最小间距（m）；★ 2026-09-27 由 3.315 放大 +50% 至 4.9725，
+                                    // 再 ★ 再次放大 +50% 至 7.45875（显示粒径仍与间距解耦：基准 4.42m 不变，
+                                    // 故单颗显示大小不变、水体更稀疏）
+  waterGpuNeighborMode: 'grid',     // 'grid' 网格空间哈希（默认）/ 'brute' 暴力（调试档）
+  waterGpuNeighborCap: 64,          // 每粒子邻表容量上限（3D 支撑域内静止约 26 邻居，汇流水团/冲击瞬态更多；
+                                    // 溢出会被丢弃并计入 stats().overflow ⇒ 稳态应为 0）
+  waterGpuMaxStepsPerFrame: 6,      // 单帧最多推进的流体步数（高倍速下水允许滞后）
+  waterRenderMaxParticles: 8000,    // 渲染端屏幕 LOD 抽稀上限（0 = 不抽稀，全部入队）
+
   webglDebug: {
     enableBatchStats: true,  // 打印 batching 统计
     enableFrametime: true,   // GPU frametime 测量

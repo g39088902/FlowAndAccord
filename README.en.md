@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.63.0` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.66.4` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 
 </div>
@@ -136,7 +136,7 @@ Through it all, the deterministic Rust core drives everything — same seed, run
 ### 9. 🌍 Dynamic seasonal lighting, terrain & ecology, and the creator's eye
 
 - **☀️ Dynamic seasonal lighting engine**: the light position is snapshot-driven, sweeping 360° a year — spring east / summer south / autumn west / winter north — with altitude angle and intensity evolving continuously through the seasons; brightest in midsummer, weakest in deep winter, color temperature nudged by season and temperature. Terrain shading, riverbed stone glints, and water sparkle stay coupled, toggled with the **L** hotkey.
-- **🏞️ Stylized miniature terrain**: multi-scale fBm noise relief (macro hills / slope folds / fine surface detail); the mountain-pass template's main ridge, asymmetric branch ridges, and a saddle-pass protection belt make detouring around the mountain genuinely felt; the T2 river-valley static water system, 194-vertex smooth channel, and shared pools; terrain grids shaded by unit normals, pebble fords, crystal-clear blue water with sparkling waves.
+- **🏞️ Stylized miniature terrain**: multi-scale fBm noise relief (macro hills / slope folds / fine surface detail); the mountain-pass template's main ridge, asymmetric branch ridges, and a saddle-pass protection belt make detouring around the mountain genuinely felt; the T2 river-valley static water system, 194-vertex smooth channel, and shared pools; terrain grids shaded by unit normals, pebble fords, crystal-clear blue water with sparkling waves. ★ Since v1.64.0 world creation ships **fully dry** (preset water bodies removed — no channel, no lake surface, no bank access points; household water comes from spring POIs); water and channels will re-emerge at runtime from natural water (rain + springs) and erosion in a later stage — see [doc 33](docs/current/tech/33-runtime-fluid.md).
 - **🌳 3D vegetation & light reception**: continuous seasonal leaf colors (spring buds / summer deep green / autumn gold-ochre / winter bare branches), 3D branch skeletons, and a two-pass volumetric canopy; all decorations hook into world-light-direction shading — cylindrical side shading on trunks, crown highlights that track the light position and camera; reed variants of grass tufts and micro contact shadows beneath rock clusters dot the landscape.
 - **🐟 Micro aquatic ecosystem**: 4 schools / 22 fish cruise along the river channel with sinusoidal tail wagging (still flowing while paused); sun sparkle coupled with the seasonal lighting.
 - **🗺️ Map gallery page + world seed control**: the standalone "Map Gallery" page previews terrain for any seed — same seed, same terrain as the real game (read-only, no entities, no saves, no save-gate); enter any world seed (0 ~ `MAX_SAFE_INTEGER` integer) in the main UI to reproduce the exact same evolution, with `?seed=<n>` URL sharing.

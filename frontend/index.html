@@ -31,7 +31,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.63.0</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.66.4</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -1426,6 +1426,10 @@
   <!-- M4 二进制快照解码器 · 必须早于 rustworld.js（README: FABS 帧） -->
   <script src="js/snapshot-bin.js"></script>
   <script src="js/rustworld.js"></script>
+  <!-- ★ 2026-09-26 水体粒子 GPU 求解器（WebGPU compute PBF；结果写 rustWorldSim.fluidParticles）。
+       ⚠️ **必须早于 main.js**（main.js 的 WebGPU 硬门槛在加载期即探测 window.WaterGPU，
+       迟于 main.js 会误报「模块缺失」）；亦须早于 water_particles.js 与 render_canvas.js 的每帧 step。 -->
+  <script src="js/water_gpu.js"></script>
   <!-- ★ 全量 WebGL 渲染管线 (必须在 main.js 之前加载以初始化 WebGLContext；
        Canvas 备用通道已删除，WebGL 不可用由 main.js 硬门槛报错) -->
   <script src="js/webgl/core/context.js"></script>

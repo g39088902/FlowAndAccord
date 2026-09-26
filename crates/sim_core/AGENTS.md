@@ -39,7 +39,7 @@ Flow & Accord 的**确定性仿真核心库**（edition 2021，零运行时依�
 | `agent.rs` | `Agent3D` 字段、`PrimitiveActionState` 状态机、代谢/运动、施密特触发器 |
 | `ecology/` | 生态初始播撒（POI + 路网 + 20 名始祖）、POI 交互（装载/卸货/吃喝/淘金/分娩委托） |
 | `graph.rs` | 路网数据与加权 A* 寻路、道路衰减 |
-| `fluid/` | ★ v1.62.0 运行时水体求解器（PBF 深度平均域）：`mod.rs` 播种/受力积分/降雨与泉涌补源/开放边界出流/存档状态、`pbf.rs` 二维核与约束、`grid.rs` 平面桶索引、`erosion.rs` 水力侵蚀沉积（只改水体格高程，随 FABS `TerrainDelta` 增量下发）；★ v1.63.0 起粒子数动态（补源/出流/下渗） → **见 `docs/current/tech/33-runtime-fluid.md`** |
+| `fluid/` | ★ v1.62.0 运行时水体求解器（PBF 深度平均域）：`mod.rs` 播种/受力积分/降雨与泉涌补源/开放边界出流/存档状态、`pbf.rs` 二维核与约束、`grid.rs` 平面桶索引、`erosion.rs` 水力侵蚀沉积（只改水体格高程，随 FABS `TerrainDelta` 增量下发）；★ v1.63.0 起粒子数动态（补源/出流/下渗）；★ v1.64.0 起创世删除预设水系 ⇒ 播种恒空、粒子全部来自补源、侵蚀不触发 → **见 `docs/current/tech/33-runtime-fluid.md`** |
 | `poi.rs` | `PrimitivePoi`（储量/再生/提取/营地行政级别） |
 | `house.rs` | `House`/`HouseTier`（容量/耐久/`is_pantry_full` 升级门槛） |
 | `birth.rs` | 妊娠/分娩/代际结算 |

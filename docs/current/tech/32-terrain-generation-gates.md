@@ -124,7 +124,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | 结构版本 | `SAVE_FORMAT_VERSION` 精确相等（不随应用版本自增） | `存档格式版本不兼容` |
 | 应用兼容线 | `app_version_compat_line` 前两段 `major.minor` 比对（**禁止**全串 `===`） | `存档应用版本不兼容` |
 | 世界参数 | `grid_res != 0`、`world_size` 正有限 | `存档世界参数非法` |
-| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **21**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v21` |
+| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **36**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v36` |
 | **profile 白名单** | 九个：`mountain_pass_v1` / `river_valley_v1` / `flat_baseline` / `grassland_plain_v1` / `hillside_woodland_v1` / `plateau_v1` / `alluvial_fan_v1` / `basin_oasis_v1` / `volcanic_lake_v1` | `地形 profile 不受支持` |
 | 读档路网复核 | 加载后 `validate_terrain_world()` | `车道 X 不符合地表通行规则` |
 
@@ -207,7 +207,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 ## 8. 生成器版本契约（`TERRAIN_GENERATOR_VERSION`）
 
-**当前版本 21**（v1.60.0：湖畔盆地 → 火山湖重构）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
+**当前版本 36**（v1.64.0：创世删除预设水系——Field Compiler 不再投影水域格 / 水体 / 岸点；此前 UGC-03 Field Compiler 迁移已把版本推进到 35，本节旧文写 21 为历史漂移）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
 
 | 情形 | 是否递增 | 备注 |
 | :--- | :--- | :--- |
@@ -262,11 +262,11 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | 模板专属 4 门禁 | ~~房屋候选 ≥3 + 走廊/出口/岸点~~ | ❌ 已删除（v1.XX） |
 | 生存诊断 | 营地→水/粮往返成本、市场可达 | 只读诊断（创世不消费） |
 | 有界降级环 | ~~预算 ≤8、阶梯、策略去重~~ | ❌ 已删除（v1.XX） |
-| 存档版本/profile | 版本 21、九 profile 白名单 | 拒绝加载 |
+| 存档版本/profile | 版本 36、九 profile 白名单 | 拒绝加载 |
 | 探针窗口/达标线 | 坡度/禁行/可建/连通/绕行/支脊 | `GATE FAIL` / `HAS_FAIL` |
 | 装饰落点禁区 | 边缘 3% 保护带 + 水面净空 13m | 探针判读违例 |
 | 回归一致性 | 确定性/快照/配置/文档 | CI exit 1 |
-| 生成器版本契约 | 改图即递增 21 | 旧档拒绝 |
+| 生成器版本契约 | 改图即递增 36 | 旧档拒绝 |
 
 ---
 

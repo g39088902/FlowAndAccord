@@ -55,14 +55,20 @@ pub const FLUID_STEP_TICKS: u64 = 6;
 /// 实测健康度：`dt = 0.1s` 下单子步（子步 dt 0.1s、重力位移 ≈49mm ≪ 间距 2.6m）
 /// 与双子步的水体分布/河道保持能力等价，成本减半 ⇒ 取 1。
 const SUBSTEPS: u32 = 1;
-/// 粒子目标间距（m）。★ 由 2.6 提升 70%（×1.7）⇒ 单粒子代表更大的水体体积
-/// （质量 = `spacing²`、支撑域半径同步放大），同一水体所需粒子数按 `1/1.7²` 下降。
-const FLUID_SPACING: f32 = 4.42;
+/// 粒子目标间距（m，即求解器维持的最小粒子间距）。★ 由 2.6 提升 70%（×1.7）至 4.42，
+/// 再提升 50%（×1.5）至 6.63 ⇒ 单粒子代表更大的水体体积（质量 = `spacing²`、支撑域半径
+/// 同步放大），同一水体所需粒子数按 `1/(6.63/2.6)² = 1/6.5²` 下降。
+/// ⚠️ 显示粒径与之解耦（见 `render_radii` 与 `RENDER_SPACING_BASE`）：抬升间距只让粒子
+/// 在平面上铺得更开，**不改单颗粒子的显示大小**。
+const FLUID_SPACING: f32 = 6.63;
 /// 支撑域半径 = 间距 × 该系数（1.9 ⇒ 邻域约 11 个粒子）。
 const FLUID_RADIUS_K: f32 = 1.9;
 /// 全图粒子上限（渲染、求解成本与存档体积的硬闸）。含播种 + 降雨/泉涌的瞬态粒子。
-/// 播种 1040 + 约 560 个补源余量（暴雨时才会顶到上限）。
-const FLUID_MAX_PARTICLES: usize = 1600;
+/// ★ 试调 1600 → 4096（2026-09-26，配合 `SHEET_FLOW_LIFETIME = 512s`）：
+/// 常态降雨下实测平台 ≈1300~1440（受出流限制、未顶满），暴雨/多泉眼世界才会用上余量。
+/// ⚠️ 成本近似线性（≈0.11~0.17 µs/tick/粒子）：4096 粒 ≈ 0.45~0.7 ms/tick，
+/// 1× 实时约占单核数个百分比，倍速上限随之下降。
+const FLUID_MAX_PARTICLES: usize = 4096;
 /// 初始播种预算上限（水体格铺到目标间距即可，余量留给补源的瞬态粒子）。
 /// `3000 / 1.7² ≈ 1038`：与「间距 ×1.7」同源的换算，保证同一水体下
 /// `spacing_eff = √(水体面积 / 播种数)` 恰好放大 1.7 倍（见 `effective_spacing`）。
@@ -94,9 +100,14 @@ const MAX_DELTA_RATIO: f32 = 0.25;
 const SEED_SALT: u64 = 0x464c_5549_4430_3031;
 /// 补源（降雨 / 泉涌）落点抖动的局部 PRNG 盐。与 tick 异或 ⇒ 同 tick 落点逐位相同。
 const SPAWN_SALT: u64 = 0x464c_5549_4453_504e; // "FLUIDSPN"
-/// 绘制粒径系数（与 v1.61.4 前端同源）：水面粒径 = 实际间距 × 1.30，亮点 = × 0.52。
+/// 绘制粒径系数（与 v1.61.4 前端同源）：水面粒径 = 基准间距 × 1.30，亮点 = × 0.52。
 const RENDER_FILL_K: f32 = 1.30;
 const RENDER_TONE_K: f32 = 0.52;
+/// 绘制粒径基准间距（m）：**与求解器目标间距 `FLUID_SPACING` 解耦**的常量。
+/// ★ 2026-09-26：`FLUID_SPACING` 抬升至 6.63 时本基准保持 4.42 ⇒ 单粒子显示大小不变。
+/// 仅当预算不足使 `spacing_eff > spacing`（水更稀）时按 `spacing_eff / spacing` 等比放大，
+/// 维持「粒子即水面」的读感。
+const RENDER_SPACING_BASE: f32 = 4.42;
 
 // ── 补源 / 耗散调参（单点真相源；世界单位 / 秒口径）──
 /// 降雨补给速率（粒子 / 秒，按单位降雨强度）：`rainfall_intensity() = 1.0` 时的产率。
@@ -109,9 +120,12 @@ const SPRING_SPAWN_RATE: f32 = 0.3;
 const SPRING_JITTER: f32 = 8.0;
 /// 补源信用上限（粒子数）：满员时长期攒信用会在有空位时一次性倾泻 ⇒ 封顶。
 const SPAWN_CREDIT_MAX: f32 = 4.0;
-/// 坡面漫流（非水体格上的粒子）最长存活时间（秒）：到点即下渗/蒸发消失。
-/// 这是「全图降雨」不淤积的必要闸门——否则陆地薄水粒子会永久占满粒子上限。
-const SHEET_FLOW_LIFETIME: f32 = 30.0;
+/// 坡面漫流（未并入水体的粒子）最长存活时间（秒）：到点即下渗/蒸发消失。
+/// ★ 试调 30 → 120 → 512（2026-09-26）：创世已无水体格 ⇒ 不存在「并入水体即清零」的
+/// 路径，所有粒子都受本闸门约束；延长寿命让雨水有更长时间顺坡汇流/在低处滞留。
+/// ⚠️ 它同时是「全图降雨不淤积」的闸门：稳态粒子数 ≈ 补源速率 × 本寿命，
+/// 512s 下常态降雨已足以顶到 `FLUID_MAX_PARTICLES`（1600）上限（≈444s 填满）。
+const SHEET_FLOW_LIFETIME: f32 = 512.0;
 
 /// 水体求解器。SoA 布局（逐数组缓存友好 + 零每帧分配）。
 pub struct FluidSim {
@@ -271,12 +285,14 @@ impl FluidSim {
     }
 
     /// 绘制粒径 `(水面粒径, 亮点粒径)`（世界单位）。前端只用它还原 v1.61.4 的颗粒读感。
+    /// 基准与求解器目标间距**解耦**（`RENDER_SPACING_BASE`）：目标间距下恒为该基准，
+    /// 抬升 `FLUID_SPACING` 不改单粒子显示大小；仅预算不足时按实际间距等比放大。
     #[inline]
     pub fn render_radii(&self) -> (f32, f32) {
-        (
-            self.spacing_eff * RENDER_FILL_K,
-            self.spacing_eff * RENDER_TONE_K,
-        )
+        // ratio ≥ 1：目标间距下恒为基准（显示大小不变）；只有水更稀时才等比放大。
+        let ratio = (self.spacing_eff / self.spacing).max(1.0);
+        let base = RENDER_SPACING_BASE * ratio;
+        (base * RENDER_FILL_K, base * RENDER_TONE_K)
     }
 
     /// 调试统计。
@@ -886,7 +902,8 @@ impl FluidSim {
         if bytes.len() != n * PARTICLE_STRIDE {
             return false;
         }
-        // 渲染粒径仍按「静态水体面积 / 播种预算」定（与粒子数无关 ⇒ 稳态恒定）。
+        // 实际间距仍按「静态水体面积 / 播种预算」定（与粒子数无关 ⇒ 稳态恒定）；
+        // 显示粒径由 `render_radii` 以 `RENDER_SPACING_BASE` 为基准重新派生（与目标间距解耦）。
         self.spacing_eff = match plan_layers(terrain) {
             Some((water, budget)) => effective_spacing(terrain, water.len(), budget),
             None => FLUID_SPACING,

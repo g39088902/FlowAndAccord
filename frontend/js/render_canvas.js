@@ -262,6 +262,10 @@ if (isCameraFollow && sim.selectionType === 'agent') {
     //    lightRev 版本号照常推进供 uniform 闸消费（见 lighting.js applyRelight）。
     if (window.SimLighting) window.SimLighting.update(now, sim);
 
+    // 0b. ★ 水体粒子 GPU 求解（WebGPU compute）：按 sim tick 差推进，结果写 rustWorldSim.fluidParticles。
+    //     必须在 drawWorldEntities 之前完成，保证本帧队列消费到的是本帧粒子位置（见 water_gpu.js）。
+    if (window.WaterGPU && window.WaterGPU.enabled()) window.WaterGPU.step(sim, sim.tickCount);
+
     // 1. 地形壳层：计算全网格顶点投影（供路网、水系、实体拾取复用）
     drawTerrainShell();
 

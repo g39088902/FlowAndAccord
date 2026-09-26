@@ -16,7 +16,24 @@
         console.log('[WebGL] Initialized:', window.webglContext.version, 'on', window.webglContext.vendor);
       }
     }
-    
+
+    // ★ 2026-09-26 水体粒子求解已迁移到前端 WebGPU ⇒ **WebGPU 与 WebGL 同为启动硬门槛**：
+    //   无 WebGPU 不允许游戏（已删除 CPU/WASM 水求解路径，无回退）。探测失败显示错误覆盖层。
+    //   `?watergpu=0` 为开发者 A/B 逃生门（显式关闭水求解时跳过本门禁）。
+    const waterGpuGateSkip = (String(window.location.search || '').toLowerCase().indexOf('watergpu=0') >= 0);
+    // 求解器运行期致命错误（如 WGSL 编译失败）复用同一覆盖层，避免「静默无水」
+    window.__waterGpuFatal = showWebgpuGateError;
+    if (!waterGpuGateSkip) {
+      if (window.WaterGPU) {
+        window.WaterGPU.init().then((ok) => {
+          if (!ok) showWebgpuGateError('当前浏览器不支持 WebGPU，无法模拟水体。请改用支持 WebGPU 的 Chrome / Edge 113+（或启用 WebGPU）。');
+          else console.log('[WebGPU] 水体求解器已就绪');
+        }).catch((e) => showWebgpuGateError('WebGPU 初始化失败：' + ((e && e.message) || e)));
+      } else {
+        showWebgpuGateError('水体 GPU 求解器模块缺失（js/water_gpu.js 未加载）。');
+      }
+    }
+
     const sim = new RustWorld();
     // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
     sim.isPaused = true;
@@ -139,6 +156,28 @@
       // 后续初始化继续进行会因缺少渲染而白屏，这里中止脚本进一步执行无意义——
       // 保留 DOM 覆盖层即可，渲染循环照常空转但画面被覆盖层遮挡。
       throw new Error('[WebGL] ' + message);
+    }
+
+    // ★ WebGPU 硬门槛错误覆盖层（水体粒子 GPU 求解为唯一水路径，无 WebGPU 不允许游戏）：
+    //   异步探测无法像 WebGL 那样同步 throw 中止脚本，故覆盖全屏并保持模拟暂停。
+    function showWebgpuGateError(message) {
+      const sim = window.rustWorldSim || window.sim;
+      if (sim) sim.isPaused = true;
+      const overlay = document.createElement('div');
+      overlay.id = 'webgpu-gate-error';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;gap:12px;background:#0b0f14;color:#e2e8f0;' +
+        'font:15px/1.6 system-ui,sans-serif;text-align:center;padding:24px;';
+      const title = document.createElement('div');
+      title.textContent = '⚠ 无法初始化 WebGPU 水体求解器';
+      title.style.cssText = 'font-size:20px;font-weight:600;';
+      const desc = document.createElement('div');
+      desc.textContent = message;
+      desc.style.cssText = 'max-width:520px;opacity:0.85;';
+      overlay.appendChild(title);
+      overlay.appendChild(desc);
+      document.body.appendChild(overlay);
+      console.error('[WebGPU] ' + message);
     }
 
 

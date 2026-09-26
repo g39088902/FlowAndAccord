@@ -89,8 +89,8 @@ stateDiagram-v2
 3. tick_poi_interactions(dt)           POI 实际提取、装载、卸货入账、分娩
 4. tick_housing(dt)                     房屋折旧、冬季供暖、空置房登记
 5. network.tick_wear_decay(dt)         道路自然衰减
-6. tick_phase_fluid(dt)                ★ v1.62.0 运行时水体求解（PBF，每 6 拍；只读地形、不消耗 RNG）
-                                        ★ v1.63.0 补源（降雨/泉涌）+ 边界出流 + 坡面下渗（粒子数动态）
+6. tick_phase_fluid(dt)                ★ v1.62.0 运行时水体求解（PBF）→ ★ 2026-09-26 **空实现（休眠占位）**：
+                                        水已迁移到前端 WebGPU（`frontend/js/water_gpu.js`），内核不再播种/推进
 7. 运动 (胎儿跳过)                      agent.tick_movement
    tick_decisions()                     错峰决策 ((tick + id) % 120 == 0)
 8. tick_bookkeeping()                   M2 继承清算 + 分家抽资
@@ -103,8 +103,9 @@ stateDiagram-v2
 - **道路衰减在运动之前**（步骤 5 → 7）：运动踩踏的是衰减后的路网
 - **决策在运动之后**：决策基于本 tick 运动后的位置和状态
 - **bookkeeping/clan/region 在决策之后**（8/9/10）：制度结算使用决策后的最终状态
-- ★ **水体求解不改其他子阶段语义**（步骤 6，v1.62.0）：只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；见 [33 号文](./33-runtime-fluid.md)
-- ★ **水体粒子数动态但不外溢**（步骤 6，v1.63.0）：降雨/泉涌补源与边界出流/坡面下渗使 `count` 逐帧可变，但粒子只由 `FluidSim` 私有缓冲承载、上限 1600；泉眼坐标只**读** `WaterSource` POI 的 `pos`（`refresh_springs`），不回写 POI 库存 ⇒ 取水玩法语义不变
+- ★ **水体是纯表现层，不进确定性/快照/存档**（2026-09-26 / v1.66.0）：水的运动学由前端 WebGPU 求解（`water_gpu.js`），**放弃确定性**；内核 `FluidSim`/`Erosion` 休眠 ⇒ FABS `Fluid`/`TerrainDelta` section 恒缺席、`fluid_state` 恒空；agent / house / POI / 账本 / 寻路一律不读水。**WebGPU 与 WebGL 同为启动硬门槛**（无 WebGPU 不允许游戏，无 CPU 回退）。详见 [33 号文](./33-runtime-fluid.md) §8
+- ★ **水体求解不改其他子阶段语义**（历史上由内核承担，v1.62.0；今已迁移到前端）：只读地形、不消耗 `WorldRng`、不写 agent/POI/房屋/账本状态；见 [33 号文](./33-runtime-fluid.md)
+- ★ **水体粒子数动态但不外溢**（前端 GPU 求解，v1.66.0）：降雨/泉涌补源与边界出流/坡面下渗使粒子数逐帧可变，但粒子只由前端求解器的私有 GPU 缓冲承载（上限 `waterGpuMaxParticles`）；泉眼坐标只**读** `WaterSource` POI 的 `pos`，不回写 POI 库存 ⇒ 取水玩法语义不变
 
 ### 3.2 决策与行为约束
 

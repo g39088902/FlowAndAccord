@@ -18,6 +18,8 @@
 
 > **河谷水量与主河连通（2026-09-26）**：`river_valley_v1` 的降雨常量从 0.55 提升至 0.75，汇流阈值调整为 800、最小湖深提高至 1m 以抑制细碎洼地。编译器在水文投影后加入沿河谷轴线的连续不规则浅水主槽（多边形域摆动、固定水体 ID `0xF10D0001`），并把河谷内碎片深水统一归入可涉浅水，避免多边形起伏将河道切成多个孤岛；该主槽由同一套水体轮廓/水池/取水点适配器输出。
 
+> **创世删除预设水系（2026-09-26）**：Field Compiler 不再把 D8 河道 / priority-flood 湖面 / 河岸投影为地表水系，`river_valley_v1` 也不再注入手写主槽 ⇒ 全部 profile 的新世界**全干发布**：无 `water_body_id` 水域格、无 `WaterBody`/`River`/`RiverBank`/`ShallowFord` 特征、无 `Hydrology.water_bodies` 与河岸 `WaterAccessPoint`，流体内核无播种粒子（`Fluid` section 缺席，直至降雨/泉眼补源生出粒子）。水体改由运行时自然水（降雨 + 泉眼）与侵蚀在后续阶段涌现；`TERRAIN_GENERATOR_VERSION` 35→36，旧存档按既有生成器版本门禁拒绝。上方「Field Compiler 水体渲染链修复」「河谷水量与主河连通」两条的水系语义投影随之下线（历史沿革保留）。
+
 > **统一多边形地表基底（2026-09-26）**：所有注册模板在 Field Compiler 输出的高程场上叠加同源、连续的确定性 Voronoi 多边形起伏；`Ridge`、`Valley`、`Depression`、`Cone`、`Plateau` 与 `Fold` 算子的距离场和采样域同步加入多边形扰动。模板的宏观意图与水文语义保持不变，但不再输出绝对规则的曲线边界。生成器版本 32→33。
 
 > **UGC-07 FoldNetwork 增强（2026-09-26）**：`folded_basin_demo_v1` 现在以约 36 个紧密拼接的 Voronoi 多边形为山体基底。单元中心来自行错位、宏观漂移和较大种子抖动的非规则点集；28% 的锚点是长度 48~142m、方向独立的线段，其余为点，归属距离统一取到点/线段的最近距离。每个位置再按距所有单元平分边界的距离抬升成独立锥体，共享边界保持同一谷底高程；连续低频地表噪音把谷底和底板从平面扰动为起伏地表。原褶皱带只用 value noise 沿其方向轻微扭曲单元采样域，不再产生任何周期正弦山脊；低幅 ridged fBm 和热松弛/液压侵蚀只修饰坡面。该结构只进入只读图鉴演示，不加入 `random` 候选池；`TERRAIN_GENERATOR_VERSION` 30→31。
@@ -176,13 +178,13 @@ RockFace        陡壁/裸岩面，超过通行坡度时硬禁行
 说明：
 
 - `natural_fertility` 只描述自然土地条件，不能直接写入家户粮食或农业资产 `fertility`。
-- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。旧版 T2 深水曾使用 `Some(1)`；当前 Field Compiler 的 `river_valley_v1` 以固定 ID `0xF10D0001` 表示连续主槽，河谷水格统一保留为可涉 `ShallowWater`。
+- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。旧版 T2 深水曾使用 `Some(1)`，早期 Field Compiler 的河谷主槽曾使用固定 ID `0xF10D0001`；★ v1.64.0 起创世不再投影任何水系 ⇒ 新世界该字段恒为 `None`（字段与快照协议保留，供运行时涌现的水体与未来系统使用）。
 - `feature_flags` 只放稳定、可组合的查询事实。已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志；T2 中深水写入 `NO_BUILD|NO_WALK`，河岸写入 `NO_BUILD|SHORE_ACCESS`，浅滩写入 `NO_BUILD|CROSSING_CANDIDATE`。
 - ⚠️ `SHORE_ACCESS` 目前是**只写不读**的标志：全仓只有定义（`biome.rs`）与写入点（`hydrology.rs`），没有任何读取方。因此它**不产生任何交互语义**——取水可行性只由 `WaterAccessPoint` + `WaterPool` 决定（§12）。任何依赖它的新设计必须先实现读取方。
 
 ### 7.2 地貌特征
 
-✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。旧版 T2 特征顺序为 `ShallowFord(10,11)` → `River(1)` → `RiverBank(20,21)` → `SpringValley(30)`；Field Compiler 水体统一输出 `WaterBody`，其顺序按 `water_body_id` 的确定性边界追踪产生。
+✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。旧版 T2 特征顺序为 `ShallowFord(10,11)` → `River(1)` → `RiverBank(20,21)` → `SpringValley(30)`；Field Compiler 水体统一输出 `WaterBody`，其顺序按 `water_body_id` 的确定性边界追踪产生。★ v1.64.0 起创世不再产出任何水系特征（新世界 `features` 为空数组），下列枚举保留为协议与未来运行时的词汇表。
 
 ```rust
 pub struct TerrainFeature {

@@ -323,53 +323,21 @@ impl World3DEngine {
         self.network.tick_wear_decay(dt, &self.config);
     }
 
-    /// 子阶段 5: 运行时水体求解（PBF 粒子流体，深度平均域）+ 水力侵蚀。
+    /// 子阶段 5: 运行时水体求解（**已迁移到前端 GPU，本阶段为休眠占位**）。
     ///
-    /// 推进节拍**由 tick 计数驱动**（`tick_counter % FLUID_STEP_TICKS == 0`），
-    /// 不用墙钟也不累加浮点：读档恢复 `tick_counter` 后节拍自动对齐，续演逐位一致。
-    /// 每步 `dt = 每拍 dt × FLUID_STEP_TICKS`，保证倍速下水流速度与模拟时间一致。
-    /// 求解器只读地形、不消耗 `WorldRng`，因此本阶段对既有确定性与行为语义零影响。
-    ///
-    /// 侵蚀（`erosion::Erosion`）挂在**流体步计数**上（每 `EROSION_EVERY_FLUID_STEPS`
-    /// 个流体步 ≈ 1 秒模拟时间一次），写回水体格高程，同样不消耗 `WorldRng`。
-    ///
-    /// **补源**：泉眼坐标取自 `WaterSource` POI（每 tick 刷新，容量复用零分配）；
-    /// 降雨强度取自 `rainfall_intensity()`。两者共同构成开放水循环——无静态水体的
-    /// 地形（山口 / 冲积扇）也靠泉眼长出水体，故本阶段不再以 `fluid.enabled` 单条件早退。
-    pub fn tick_phase_fluid(&mut self, dt: f32) {
-        use crate::spatial::fluid::{erosion::EROSION_EVERY_FLUID_STEPS, FLUID_STEP_TICKS};
-        self.fluid.refresh_springs(
-            self.pois
-                .iter()
-                .filter(|poi| poi.poi_type == PoiType::WaterSource)
-                .map(|poi| (poi.pos.x, poi.pos.y)),
-        );
-        if !self.fluid.enabled && !self.fluid.has_springs() {
-            return;
-        }
-        if self.tick_counter % FLUID_STEP_TICKS != 0 {
-            return;
-        }
-        let step_dt = dt * FLUID_STEP_TICKS as f32;
-        let rainfall = self.rainfall_intensity();
-        self.fluid
-            .step(&self.terrain, step_dt, self.tick_counter, rainfall);
-
-        if (self.tick_counter / FLUID_STEP_TICKS) % EROSION_EVERY_FLUID_STEPS != 0 {
-            return;
-        }
-        let erode_dt = step_dt * EROSION_EVERY_FLUID_STEPS as f32;
-        let walk_slope = self.config.terrain_max_walk_slope;
-        let changed = {
-            let Some(heights) = self.terrain_voxel_backend.surface_heights_mut() else {
-                return;
-            };
-            self.erosion
-                .step(&mut self.terrain, heights, &self.fluid, erode_dt, walk_slope)
-        };
-        if changed > 0 {
-            self.terrain_voxel_backend.invalidate_materialized_chunks();
-        }
+    /// ★ 2026-09-26：水体粒子的运动学（原 PBF 深度平均求解）与水力侵蚀已整体迁移到前端
+    /// WebGPU（`frontend/js/water_gpu.js`），内核不再推进。本函数保留为**空实现 + 子阶段位**，
+    /// 以免打乱 `tick_subphase` 的 0~9 索引（`profile-benchmark` 依赖该索引）。
+    /// `FluidSim` / `Erosion` 保留为休眠的参考实现，快照 / 存档均不再携带其状态。
+    pub fn tick_phase_fluid(&mut self, _dt: f32) {
+        // ★ 2026-09-26 水系权威迁移到前端：水体粒子的运动学已由前端 WebGPU
+        // （frontend/js/water_gpu.js）接管，本阶段**不再推进内核 PBF 求解器，也不再触发
+        // 水力侵蚀**——`FluidSim` / `Erosion` 仅保留为休眠的参考实现与未来回退落点。
+        //
+        // 自中性化：不播种、不推进 ⇒ `particle_count() == 0` ⇒ FABS `Fluid` section 恒缺席；
+        // 侵蚀 `pending` 恒空 ⇒ `TerrainDelta` 恒缺席。故快照 / 存档结构无需变更，
+        // 既有确定性门禁全部保持。保留本函数与 5 号子阶段位以免打乱 `tick_subphase` 的
+        // 0~9 索引（profile-benchmark 依赖该索引）。
     }
 
     /// 子阶段 6: 动力学运动与踩踏拓路

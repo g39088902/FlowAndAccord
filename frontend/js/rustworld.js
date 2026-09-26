@@ -96,7 +96,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.63.0';
+        this._appVersion = '1.66.4';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -168,7 +168,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.63.0';
+            this._appVersion = msg.appVersion || '1.66.4';
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -364,6 +364,11 @@
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
         //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
         if (window.HormoneTrend) window.HormoneTrend.reset();
+        // ★ 2026-09-26：水体粒子 GPU 求解器随世界生命周期重置（清槽位、重传地形、世代号 +1），
+        //   并清空上一世界残留的粒子视图（GPU 生效时由求解器随后重新填充）。
+        if (window.WaterGPU) window.WaterGPU.restartWorld();
+        this.fluidParticles = null;
+        this.fluidParticleIds = null;
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -503,7 +508,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.63.0';
+        return this._appVersion || '1.66.4';
 
       }
 
@@ -792,12 +797,15 @@
           flowStrength: Number.isFinite(w.flow_strength) ? w.flow_strength : 0,
         }]));
 
-        // ★ v1.62.0 内核水体粒子（水面唯一来源）：[x,y,z, …] 扁平 Float32Array。
-        //   内核 PBF 求解器每 4 拍推进一次，快照每帧携带当前位置；缺席 = 本帧无水体。
-        this.fluidParticles = snap.fluid_particles || null;
-        this.fluidRevision = snap.fluid_revision || 0;
-        this.fluidFillRadius = snap.fluid_fill_radius || 0;
-        this.fluidToneRadius = snap.fluid_tone_radius || 0;
+        // ★ 2026-09-26 水系已迁移到前端 WebGPU（water_gpu.js）⇒ 粒子位置由 GPU 求解器每帧写入，
+        //   不再由内核快照提供。GPU 生效时**不得**用快照字段覆盖（内核侧 Fluid section 已恒缺席）。
+        if (!(window.WaterGPU && window.WaterGPU.enabled())) {
+          this.fluidParticles = snap.fluid_particles || null;
+          this.fluidRevision = snap.fluid_revision || 0;
+          this.fluidFillRadius = snap.fluid_fill_radius || 0;
+          this.fluidToneRadius = snap.fluid_tone_radius || 0;
+          this.fluidParticleIds = null;
+        }
 
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
         // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致

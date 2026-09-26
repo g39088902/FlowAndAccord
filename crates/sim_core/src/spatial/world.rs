@@ -237,10 +237,10 @@ impl World3DEngine {
             64
         };
 
-        // 水体求解器按地形水体格播种（确定性，不消耗 WorldRng）
-        let mut fluid =
+        // ★ 2026-09-26：水系已迁移到前端 WebGPU 求解 ⇒ 内核不再按地形水体格播种粒子。
+        // `FluidSim` 保留为空实例（休眠参考实现 / 未来回退落点），快照与存档均不携带水状态。
+        let fluid =
             crate::spatial::fluid::FluidSim::new(terrain.world_size, terrain.grid_width);
-        fluid.seed_from_terrain(&terrain);
         let erosion = crate::spatial::fluid::erosion::Erosion::new(
             terrain.grid_width,
             terrain.grid_height,

@@ -1,7 +1,7 @@
 //! Fixed-order deterministic terrain field compiler.
 use super::fields::{Field2, FieldError};
 use super::groundwater::{solve_groundwater, GroundwaterFields, GroundwaterSettings};
-use super::hydrology::{project_semantics, solve_hydrology, HydrologyFields, HydrologySettings};
+use super::hydrology::{solve_hydrology, HydrologyFields, HydrologySettings};
 use super::ir::{validate_recipe, RecipeError, ResolvedRecipe, TerrainRecipe};
 use super::materials::MaterialTable;
 use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, ErosionSettings};
@@ -10,84 +10,8 @@ use super::strata::sample_stratum;
 use super::structures::{StructureError, StructureField};
 use super::{constraints, diagnostics, operators, uncertainty};
 use crate::config::SimConfig;
-use crate::geo::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-/// A single connected water corridor used by the river-valley recipe.  The
-/// field compiler's D8 accumulation is intentionally local and can leave
-/// short high-flow islands when polygonal relief creates shallow sills.  The
-/// trunk keeps the authored valley hydrologically legible without turning
-/// every low-flow tributary into a blocked cell.  It is shallow water so the
-/// walkability constraint still has a deterministic crossing surface.
-const RIVER_VALLEY_TRUNK_ID: u32 = 0xF10D_0001;
-
-fn project_river_valley_trunk(
-    semantics: &mut SemanticGrid,
-    world_size: f32,
-    seed: u64,
-) {
-    let width = semantics.width;
-    let height = semantics.height;
-    if width < 2 || height < 2 || semantics.surface_kind.len() != width * height {
-        return;
-    }
-    let half = world_size * 0.5;
-    let cell_x = world_size / (width - 1) as f32;
-    let cell_y = world_size / (height - 1) as f32;
-    // Direction of the authored [-500,-420] → [500,420] valley axis.
-    const DX: f32 = 0.766261;
-    const DY: f32 = 0.642513;
-    const NX: f32 = -0.642513;
-    const NY: f32 = 0.766261;
-    for y in 0..height {
-        for x in 0..width {
-            let wx = x as f32 * cell_x - half;
-            let wy = y as f32 * cell_y - half;
-            let index = y * width + x;
-            // River-valley crossings are shallow even where the raw solver
-            // found a tiny closed depression.  Keeping those cells in the
-            // same blue, crossable water class prevents polygonal sills from
-            // splitting the walkable valley into isolated islands.
-            if semantics.water_body_id[index].is_some() {
-                semantics.surface_kind[index] = SurfaceKind::ShallowWater;
-                semantics.flags[index] &= !TERRAIN_FLAG_NO_WALK;
-                semantics.walk_mask.values[index] = 1.0;
-            }
-            let along = wx * DX + wy * DY;
-            if along.abs() > world_size * 0.59 {
-                continue;
-            }
-            let center_warp = operators::polygonal_surface(
-                seed ^ 0x5249_5645_5254_5255,
-                wx,
-                wy,
-                180.0,
-                18.0,
-            );
-            let half_width = 13.0
-                + operators::polygonal_surface(
-                    seed ^ 0x5249_5645_5252_4944,
-                    wx,
-                    wy,
-                    150.0,
-                    4.0,
-                );
-            let cross = wx * NX + wy * NY - center_warp;
-            if cross.abs() > half_width.max(7.0) {
-                continue;
-            }
-            semantics.surface_kind[index] = SurfaceKind::ShallowWater;
-            semantics.water_body_id[index] = Some(RIVER_VALLEY_TRUNK_ID);
-            semantics.water_depth.values[index] = semantics.water_depth.values[index].max(0.6);
-            semantics.flags[index] |= TERRAIN_FLAG_NO_BUILD;
-            // Keep the broad river crossable; the central water colour is
-            // still blue in both canvas and WebGL paths.
-            semantics.walk_mask.values[index] = 1.0;
-            semantics.build_mask.values[index] = 0.0;
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BackendKind {
@@ -359,7 +283,12 @@ pub fn compile_terrain_with_dimensions(
             access_radius_m: hydro_spec.groundwater_access_radius_m,
         },
     )?;
-    let mut projected = semantics::project_with_groundwater(
+    // 创世不投影预设水系：原先此处调用 `hydrology::project_semantics`（D8 河道 /
+    // priority-flood 湖面 → 水域格 + 河岸）与 `project_river_valley_trunk`（河谷模板
+    // 手写主槽），使地图诞生即带水面与湿河床。现全部删除 ⇒ 无水域格 / 无 `WaterBody`
+    // 特征与水体 / 无河岸取水点、流体内核无播种粒子；水体改由运行时自然水
+    // （降雨 + 泉眼）与侵蚀在后续阶段涌现。
+    let projected = semantics::project_with_groundwater(
         &elevation,
         &rainfall,
         &hardness,
@@ -375,10 +304,6 @@ pub fn compile_terrain_with_dimensions(
         world_size,
     )
     .map_err(TerrainCompileError::Semantic)?;
-    project_semantics(&mut projected, &hydrology.channels, &hydrology.water);
-    if recipe.id == super::recipes::RIVER_VALLEY_V1 {
-        project_river_valley_trunk(&mut projected, world_size, seed);
-    }
     let mut reports = constraints::evaluate(&resolved.recipe.constraints, &projected);
     for report in &mut reports {
         if report.affected_nodes.is_empty() {

@@ -45,7 +45,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 7;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.63";
+pub const SAVE_APP_VERSION: &str = "1.66";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///
@@ -334,16 +334,10 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
     // §5.2 稳定 ID 契约：加载时校验 sub_features 升序且唯一（D-B1-2）
     terrain.validate_sub_features_sorted_unique()?;
 
-    // 水体求解器：存档带状态则位精确恢复，否则（旧档 / 状态不自洽）按地形重新播种
-    let mut fluid =
+    // ★ 2026-09-26：水系已迁移到前端 WebGPU 求解 ⇒ 内核不再恢复 / 播种水体粒子。
+    // 存档中的 `fluid_state` 仅作历史字段保留（`serde(default)`），读取后不再参与模拟。
+    let fluid =
         crate::spatial::fluid::FluidSim::new(terrain.world_size, terrain.grid_width);
-    let fluid_restored = save
-        .fluid_state
-        .as_ref()
-        .is_some_and(|state| fluid.restore_state(&terrain, state));
-    if !fluid_restored {
-        fluid.seed_from_terrain(&terrain);
-    }
     // 侵蚀累计量由 `sync_voxel_surface_from_terrain` 在 voxel 后端重建后回填
     //（`terrain_state` 已携带侵蚀后的高程，属于「可由地形精确还原」的派生量）。
     let erosion = crate::spatial::fluid::erosion::Erosion::new(

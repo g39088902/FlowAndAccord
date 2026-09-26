@@ -821,7 +821,13 @@ pub struct TerrainSubFeature {
 /// v1.58.0：17 -> 19（冲积扇重叠干沟按最大单沟深度合并，避免复合槽切断扇轴通道；
 ///           河谷浅滩端点沿法向外移至最近陆格，避免急弯/栅格取整使端点落入水格；
 ///           分别影响冲积扇与河谷地形，不新增 RNG 消费）。
-pub const TERRAIN_GENERATOR_VERSION: u32 = 35;
+/// v1.64.0：35 -> 36（创世删除预设水系：Field Compiler 不再把 D8 河道 / priority-flood
+///           湖面 / 河岸投影为地表水系（无水域格、无 `WaterBody` 特征与水体、
+///           无河岸取水点），河谷模板也不再注入手写主槽；地图以全干状态发布、
+///           流体内核无播种粒子，水体改由运行时自然水（降雨 + 泉眼）与侵蚀
+///           在后续阶段涌现。全部 profile 的地表语义随之改变；旧档按生成器
+///           版本门禁拒绝）。
+pub const TERRAIN_GENERATOR_VERSION: u32 = 36;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";

@@ -3,6 +3,7 @@
 > **状态**：★ **已实现**——水面由 **Rust 内核的粒子流体求解器（PBF，深度平均域）**推进，粒子位置随每帧 FABS `Fluid` section 下发；前端只按既有画风渲染内核粒子（见 §1.3、[33 号文](./33-runtime-fluid.md)）。统一相机深度队列仍负责粒子、岸线和实体排序。零网格细分、确定性门禁全通。
 > **范围**：消除河岸 13 米级网格阶梯锯齿、连续矢量水面、湿砂漫滩过渡带、涉渡卵石踏道、水底游鱼生态层、地形格间抗锯齿缝隙补偿、边界侧壁深度排序；加入由降雨补给驱动的水面覆盖率与水位表现；**不改动**寻路阻挡判定、不增加全局网格细分，保持确定性。（★ v1.50.86 迎光面太阳波光已删除、游鱼迁 WebGL——见 §1.4。）
 > **入口**：[文档导航](../../README.md) · [地形美术规划](../../plan/tech/07-terrain-art.md) · [地形专项方案](../../plan/tech/06-terrain-templates.md) · [前端渲染现状](./16-frontend-overview.md)。
+> ★ **v1.64.0 补充**：创世删除预设水系（[14 号文](./14-terrain-and-network.md)）后新世界没有水格 ⇒ 本文「水格 = 湿河床」「`WATER_DYNAMICS` 覆盖率/水位」等分支**当前不会出现**；水面唯一来源仍是前端 GPU 粒子层，而粒子只来自**降雨**补源（[33 号文](./33-runtime-fluid.md) §8；★ 2026-09-27 清泉涌水已删）。以下机制描述全部保留——对未来由自然水/侵蚀涌现的水体同样适用。
 
 ---
 
@@ -44,22 +45,32 @@
 - Rust 侧生成左右岸线特征（`hydrology.rs` id:20+i，`width` = 内核 `bank` 参数），前端以半透明土褐细带沿岸线描边（`rgba(174, 137, 78, 0.24)`，线宽 `max(2, feature.width * scale * 0.06)`），盖住陆水交界处的方块锯齿。
 - v1.50.20 起 RiverBank 同 River 按段入深度队列（`idx` = 段号）。
 
-### 1.3 内核粒子流体（求解在 Rust，渲染在前端）
+### 1.3 粒子流体（★ 求解在前端 WebGPU，渲染在 WebGL2）
 
-★ **v1.62.0 起运动学来源变更**：水面**不再由前端求解**。求解器是 Rust 内核的
-[`spatial/fluid/`](../../../crates/sim_core/src/spatial/fluid/mod.rs)（Position Based Fluids，
-深度平均域），完整设计见 [33 号文](./33-runtime-fluid.md)。本节只描述**渲染侧**契约：
+★ **2026-09-26（v1.66.0）运动学来源变更**：求解器由 Rust 内核迁移到**前端 WebGPU compute**
+（[`water_gpu.js`](../../../frontend/js/water_gpu.js)，★ 2026-09-27 起为**真三维 3D PBF**），完整设计见
+[33 号文](./33-runtime-fluid.md) §8（内核 `spatial/fluid/` 已休眠，§1~§7 为历史口径）。
+本节只描述**渲染侧**契约：
 
-- **数据来源**：`snap.fluid_particles`（`Float32Array`，扁平 `[x,y,z,…]`）+ `fluid_fill_radius`
-  / `fluid_tone_radius`；由 `rustworld.js::_applySnapshot` 映射到 `rustWorldSim.fluidParticles`。
-  section 缺席 = 本帧无水体 ⇒ 前端清空粒子视图。
-  ★ **粒子数逐帧可变**（内核补源/出流/下渗，见 33 号文 §2.3/§2.4）：前端按 `count` 伸缩绘制视图，
-  内核用 `swap_remove` 保证每次删减只扰动一个粒子的抖动身份；粒径由内核按静态 `spacing_eff` 下发，
-  不随粒子数漂移（目标间距已由 2.6m 提升 70% ⇒ 单粒子粒径 ×1.7、投影面积 ×2.89 的颗粒读感）。
+- ★ **粒子位置即三维真实位置（2026-09-27）**：`fluidParticles` 的 `z` 是求解器算出的真实高度
+  （重力 / 堆叠 / 跌落），渲染层直接按 `p.z` 投影落笔即可读出水体厚度。
+  **⚠️ 曾经短暂存在的「动态水深场 `sim.fluidDepths` + `WALL_MIN_DEPTH` 竖直水壁」已整体删除**
+  （属于「在二维平面上做三维视觉投影」，见 33 号文 §8.2）；`water_particles.js` 不再消费任何水深字段。
+- **数据来源**：★ 2026-09-26（v1.66.0）起为**前端 WebGPU 求解器** `window.WaterGPU`
+  （`frontend/js/water_gpu.js`）每帧写入的 `rustWorldSim.fluidParticles`（`Float32Array`，扁平
+  `[x,y,z,…]`）+ `fluidParticleIds`（槽位号）+ `fluidFillRadius` / `fluidToneRadius`；
+  `rustworld.js::_applySnapshot` 在 GPU 生效时**不再**用（已退役的）内核 `Fluid` section 覆盖。
+  内核快照 `snap.fluid_particles` 仅在 GPU 未启用时兜底（内核侧该 section 现已恒缺席）。
+  section 缺席 / GPU 无粒子 = 本帧无水体 ⇒ 前端清空粒子视图。
+  ★ **粒子数逐帧可变**（GPU 补源/出流/下渗，见 33 号文 §2.3/§2.4 与 §8）：前端按 `count` 伸缩绘制视图，
+  GPU 求解器保留稳定**槽位号**（死槽原地归还复用）⇒ 抖动哈希按槽位号派生，不会因压缩跳变；
+  **显示粒径已与求解器目标间距解耦**（`RENDER_SPACING_BASE = 4.42m`，见 33 号文 §8.2）：
+  求解器最小间距几经调整（2.6m → 6.63m → 3.315m → 4.9725m → **7.45875m**，★ 2026-09-27 连续两次 +50%）只改变粒子铺开的疏密，
+  **单颗粒径不变**（仍 = 4.42m × 1.30 / × 0.52），且不随粒子数漂移。
 - ★ **本层不再以「静态水系特征非空」为启用门槛**（v1.63.0）：`WaterParticles.init` 恒启用、
-  `render_depth_queue.js` 无条件调用 `WaterParticles.update`——水是**开放循环**，全图降雨/泉眼会在
+  `render_depth_queue.js` 无条件调用 `WaterParticles.update`——水是**开放循环**，全图降雨会在
   完全没有水系特征的地形（山口 / 冲积扇 / 半坡 / `flat_baseline`）上造出水体；
-  「有没有水」唯一由内核快照的 `Fluid` section 决定（缺席即清空视图）。`RiverLife`（游鱼）仍按
+  「有没有水」唯一由**前端 GPU 求解器输出的粒子数组**决定（GPU 关闭且内核 section 缺席即清空）。`RiverLife`（游鱼）仍按
   `features.length` 启停——它只服务河道。
 - **`water_particles.js`（渲染层，约 190 行）**：内核粒子 → 绘制视图一一映射。逐粒子**视觉抖动**
   （尺寸 `sizeK`、旋转 `rotC/rotS`、透明度 `aK`、相位 `phase/phase2`）由**粒子下标 + 世界种子的稳定哈希**

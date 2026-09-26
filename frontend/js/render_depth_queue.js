@@ -222,8 +222,8 @@ function drawWorldEntities() {
     const features = terrain.features || [];
     const nowMs = performance.now();
     if (features.length && window.RiverLife) window.RiverLife.update(nowMs);
-    // ★ v1.63.0：水粒子层**不随水系特征启停**——内核是开放水循环，降雨/泉眼会在
-    //   无任何水系特征的地形上造出水体（Fluid section 存在即绘制，缺席即清空视图）。
+    // ★ v1.63.0：水粒子层**不随水系特征启停**——水是开放循环，降雨会在
+    //   无任何水系特征的地形上造出水体（粒子层非空即绘制，清空即无视图）。
     if (window.WaterParticles) window.WaterParticles.update(nowMs);
     const rivers = [];
     for (let fi = 0; fi < features.length; fi++) {
@@ -281,12 +281,18 @@ function drawWorldEntities() {
       }
     }
     // 动态水粒子逐条入队：使用粒子自身的水位深度，保持近岸实体的遮挡关系。
-    // ★ v1.62.0：粒子位置来自**内核 PBF 求解器**（快照 Fluid section），前端只渲染；
+    // ★ v1.62.0：粒子位置来自内核 PBF 求解器（快照 Fluid section），前端只渲染；
     //   入队端按屏幕 AABB（粒径外扩）先剔屏外粒子——排序与绘制的规模只与可见粒子相关。
+    // ★ 2026-09-26：求解迁移到前端 WebGPU（20k 粒子上限）⇒ 渲染端加**屏幕 LOD 抽稀安全阀**
+    //   `RENDER_CONFIG.waterRenderMaxParticles`（0 = 不抽稀）：步进抽样，模拟仍是全量粒子，
+    //   只限制每帧入队/绘制的规模，避免逐粒子 CPU 三角化成为新瓶颈（见 33 号文 §8）。
     if (window.WaterParticles) {
       const particles = window.WaterParticles.particles();
       if (particles) {
-        for (let pi = 0; pi < particles.length; pi++) {
+        const rcCap = (typeof RC !== 'undefined' && RC && RC.waterRenderMaxParticles) ? (RC.waterRenderMaxParticles | 0) : 0;
+        const pn = particles.length;
+        const stride = (rcCap > 0 && pn > rcCap) ? Math.ceil(pn / rcCap) : 1;
+        for (let pi = 0; pi < pn; pi += stride) {
           const p = particles[pi];
           if (!p.active) continue;
           const prx = p.x * cosZ - p.y * sinZ;

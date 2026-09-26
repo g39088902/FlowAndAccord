@@ -1,10 +1,10 @@
-//! Deterministic hydrology fields and their gameplay projection.
+//! Deterministic hydrology fields (flow / channels / water levels). They are no
+//! longer projected into surface water semantics at creation time — the map is
+//! published fully dry (see the pipeline note in `compiler.rs`).
 use super::fields::{Field2, FieldError};
 use super::processes::{
     flow_accumulation_with_cell_size, water_level_solve, FlowField, WaterBodyField,
 };
-use super::semantics::SemanticGrid;
-use crate::geo::biome::{SurfaceKind, TERRAIN_FLAG_NO_BUILD, TERRAIN_FLAG_NO_WALK};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
@@ -133,45 +133,6 @@ pub fn solve_hydrology(
         channels,
         water,
     })
-}
-
-/// Apply water and channel facts after all continuous fields are stable. Existing
-/// hard blocks are only strengthened; this projection never opens a blocked cell.
-pub fn project_semantics(
-    semantics: &mut SemanticGrid,
-    channels: &ChannelField,
-    water: &WaterBodyField,
-) {
-    let n = semantics.surface_kind.len();
-    semantics.water_body_id = vec![None; n];
-    semantics.water_depth = water.depth.clone();
-    let lake_offset = n as u32 + 1;
-    for i in 0..n {
-        if let Some(id) = water.body_id[i] {
-            semantics.surface_kind[i] = SurfaceKind::DeepWater;
-            semantics.vegetation_ok[i] = false;
-            semantics.flags[i] |= TERRAIN_FLAG_NO_WALK | TERRAIN_FLAG_NO_BUILD;
-            semantics.water_body_id[i] = Some(lake_offset.saturating_add(id));
-        } else if channels.channel[i] {
-            semantics.surface_kind[i] = SurfaceKind::DeepWater;
-            semantics.vegetation_ok[i] = false;
-            semantics.flags[i] |= TERRAIN_FLAG_NO_WALK | TERRAIN_FLAG_NO_BUILD;
-            semantics.water_body_id[i] = channels.channel_id[i];
-        } else if channels.bank[i] {
-            semantics.surface_kind[i] = SurfaceKind::RiverBank;
-            semantics.flags[i] |= TERRAIN_FLAG_NO_BUILD;
-        }
-        semantics.walk_mask.values[i] = if semantics.flags[i] & TERRAIN_FLAG_NO_WALK == 0 {
-            1.0
-        } else {
-            0.0
-        };
-        semantics.build_mask.values[i] = if semantics.flags[i] & TERRAIN_FLAG_NO_BUILD == 0 {
-            1.0
-        } else {
-            0.0
-        };
-    }
 }
 
 fn cardinal_neighbors(index: usize, width: usize, height: usize) -> impl Iterator<Item = usize> {
