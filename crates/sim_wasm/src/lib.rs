@@ -105,9 +105,9 @@ fn resolve_grid_res(grid_res: u32, config: &SimConfig) -> usize {
 /// 优先使用前端通过 world_apply_config_buf 注入的持久配置 ACTIVE_CONFIG。
 /// camp_count: 若显式传入 > 0 则覆盖配置中的 count_camps。
 ///
-/// ★ STAGE2-5：走有界降级构造器（几何/路网/生存门禁 + §5.8 阶梯降级），
-/// 初始化彻底失败时返回 1（原因见 `world_last_error_ptr/len`）且**不替换**
-/// 既有世界；成功返回 0。
+/// ★ v1.XX 起创世无门禁无降级：请求的 profile 恒被原样构建并发布（配方编译
+/// 失败仍由 `build_candidate` 的防御性 flat_baseline 兜底并保留错误事件），
+/// 成功恒返回 0；不再有「初始化失败返回 1」的门禁拒绝路径。
 #[no_mangle]
 pub extern "C" fn world_create(
     grid_res: u32,
@@ -118,7 +118,7 @@ pub extern "C" fn world_create(
 ) -> i32 {
     unsafe {
         let config = ACTIVE_CONFIG.as_ref().cloned().unwrap_or_default();
-        let result = World3DEngine::new_seeded_with_config_bounded(
+        let world = World3DEngine::new_seeded_with_config_bounded(
             resolve_grid_res(grid_res, &config),
             world_size,
             seed as u64,
@@ -130,27 +130,10 @@ pub extern "C" fn world_create(
                 w.seed_primitive_ecology(agent_count as usize);
             },
         );
-        match result {
-            Ok(w) => {
-                let creation_warning = w
-                    .creation_diagnostic
-                    .as_ref()
-                    .filter(|diag| diag.degraded)
-                    .map(|diag| diag.summary());
-                WORLD = Some(w);
-                clear_terrain_backend_cache();
-                if let Some(warning) = creation_warning {
-                    set_error(&warning);
-                } else {
-                    clear_error();
-                }
-                0
-            }
-            Err(diag) => {
-                set_error(&diag.summary());
-                1
-            }
-        }
+        WORLD = Some(world);
+        clear_terrain_backend_cache();
+        clear_error();
+        0
     }
 }
 

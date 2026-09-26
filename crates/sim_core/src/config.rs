@@ -367,12 +367,6 @@ pub struct SimConfig {
     /// 唯一消费点 = `geo/hydrology.rs::generate_with_config` 的 §5.3 第 4–5、9 步空钩子门控；
     /// 阶段一钩子为空操作（开关两态下世界输出逐字节等价），选择器实现属 D-B1-3、完整阶段化流水线属阶段二。
     pub terrain_accent_sub_features: bool,
-    /// ★ STAGE2-1（06号 R.5 / §5.8 / §18.2）：创世有界重试上限。
-    /// 语义 = 初始创世失败（静态几何校验/生存诊断）时，阶梯降级重试的最大次数
-    /// （0 = 只尝试一次；默认 3，唯一真相源 = 前端 config.js）。消费点 =
-    /// `spatial/creation_fallback.rs::new_seeded_with_config_bounded` 有界降级环
-    /// （★ STAGE2-5 落地：入口钳制 ≤8 + 阶梯降级 + 策略去重 + 诊断记录）。
-    pub terrain_generation_max_retries: u32,
 
 // 8. 四季更迭与宏观气候
     pub season_year_length: f32,

@@ -179,7 +179,7 @@
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `terrainGridRes` | usize | 256 | sim_wasm/lib.rs (resolve_grid_res 建世界栅格) | 地形栅格每边格数（v1.50.70 由 160 提升；256 → 步长 764/255 ≈ 2.996m） |
-| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁 |
+| `terrainProfile` | String | random | geo/terrain.rs / world_save.rs (地形生成器版本门禁) | 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断基线：倾斜-only 平地，永不加入 random；v1.XX 起不再是降级回退目标）；影响地形重建与存档门禁 |
 | `terrainRidgeAmplitude` | f32 | 28 | — | T2 地貌 / 通行参数 |
 | `terrainPassRidgeWidth` | f32 | 62 | geo/terrain.rs (T1 主脊高斯半宽，通行力约束) | T1 山口主脊高斯半宽 (m) |
 | `terrainPassRidgeAmplitude` | f32 | 53 | geo/terrain.rs (T1 主脊幅度，通行力约束) | T1 山口主脊幅度 (m) |
@@ -257,8 +257,7 @@
 | `terrainRoadCorridorWidth` | f32 | 5 | geo/terrain.rs / graph.rs (道路走廊宽度) | 道路合法走廊宽度 (m) |
 | `terrainRoadAstarHeuristic` | bool | true | geo/corridor.rs (route 距离启发开关；false = 纯 Dijkstra 旧行为) | ★ v1.50.77 路网 A* 距离启发开关（corridor.rs::route；false = 退回纯 Dijkstra 旧行为） |
 | `terrainAccentDensity` | f32 | 1 | geo/accents.rs (装饰密度) | 装饰密度倍率（0.0=无装饰, 0.5=稀疏, 1.0=默认, 2.0=茂密） |
-| `terrainAccentSubFeatures` | bool | true | geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控) | ★ STAGE2-1（06号 R.5/§5.8）：创世有界重试上限（初始创世失败时阶梯降级重试的最大次数， |
-| `terrainGenerationMaxRetries` | u32 | 3 | spatial/world.rs (创世重试预算钳制；STAGE2-5 阶梯降级重试环) | ========================================================================== |
+| `terrainAccentSubFeatures` | bool | true | geo/hydrology.rs (§5.3 第 4–5、9 步子特征注入钩子门控) | ========================================================================== |
 
 ## 9. 四季更迭与宏观气候
 

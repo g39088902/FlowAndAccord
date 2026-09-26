@@ -626,8 +626,8 @@ pub(crate) fn plan_subfeatures(seed: u64, profile: &str, enabled: bool) -> Vec<P
     plan
 }
 
-/// ★ STAGE2-5 创世覆盖（降级策略 → 生成器的唯一通道）。默认值 = 无覆盖，
-/// 输出与无参路径逐位一致。
+/// ★ 创世覆盖（生成器调用方配置通道）。默认值 = 无覆盖，输出与无参路径逐位
+/// 一致；v1.XX 起创世无门禁无降级，`disabled_subfeature_mask` 恒为 0。
 #[derive(Debug, Clone, Default)]
 pub struct GenesisOverrides {
     /// 结构子特征禁用掩码（`1 << TerrainSubFeatureKind as u32`）。
@@ -869,10 +869,10 @@ pub fn water_source_poi_count(profile: &str, count_water_sources: usize) -> usiz
     }
 }
 
-/// ★ STAGE2-7 显式诊断/降级基线（06 号 §5.8「基线先验收」）：倾斜-only 平地。
+/// ★ STAGE2-7 显式诊断基线：倾斜-only 平地。
 /// 无 fBm/山脊/支脊/洼地/水系/特征——仅保留世界倾斜（16~24m 跨度）与第 6 步
-/// 统一坡度/地表/肥力/flags 派生，供几何校验、生存诊断与有界回退环（STAGE2-5）
-/// 作为**显式降级目标**与诊断对照。
+/// 统一坡度/地表/肥力/flags 派生，作诊断对照与显式可选模板；v1.XX 起不再是
+/// 降级回退目标（创世无门禁无降级，永不自动落回本 profile）。
 /// ⚠️ 只经显式指定进入，**永不加入 `random` 映射**（`resolve_profile` 不分派它）；
 /// 不宣称与旧 T0 等价（旧 T0 生成源已随 v1.50.17 兼容壳删除、基底公式被
 /// TB-01-2 取代，无可验证旧基准——基准缺口已在 06 号 §5.8 记录）。
@@ -1561,12 +1561,12 @@ impl TerrainMap {
     /// 4. plan_subfeatures(seed, profile, enabled)  // ✅ D-B1-3 纯 hash，不消费 WorldRng
     /// 5. 子特征几何管线（5a–5d）                   // ★ 阶段二空注入，数据管线/快照/回滚接口就位
     /// 6. finalize_slope_and_surface()              // 全图唯一写 slope + 派生/合并 flags 的位置
-    /// 7. validate_static_terrain_geometry()        // STAGE2-4 扩充完整断言；Err → STAGE2-5 重试环
+    /// 7. validate_static_terrain_geometry()        // STAGE2-4 扩充完整断言；Err 只读诊断（创世不再消费）
     /// 8. generate_base_accents(seed, density)      // 既有 accent_rng 独立流，消费顺序不变
     /// 9. append_subfeature_accents(plan)           // ★ 阶段二空实现
     /// 10. ecology 布局与路网连接                   // = seed_primitive_ecology（POI 播撒 +
     ///     prepare_terrain_layout / connect_terrain_world，只读取定稿地表）
-    /// 11. validate_terrain_world + 生存成本诊断    // = 存档/校验路径；STAGE2-6 补诊断 → STAGE2-5 消费
+    /// 11. validate_terrain_world + 生存成本诊断    // = 存档/校验路径；STAGE2-6 只读诊断，创世不再消费
     /// ```
     ///
     /// ★ 确定性契约：第 0/4 步不消费任何 `WorldRng`；第 2 步保持既有主 RNG 与
@@ -1576,8 +1576,8 @@ impl TerrainMap {
         self.generate_with_config_overrides(seed, config, &GenesisOverrides::default());
     }
 
-    /// ★ STAGE2-5 创世覆盖通道：`disabled_subfeature_mask` 位屏蔽结构子特征
-    /// （`1 << TerrainSubFeatureKind as u32`，见 `creation_fallback::STRUCTURAL_SUBFEATURE_MASK`）。
+    /// ★ 创世覆盖通道：`disabled_subfeature_mask` 位屏蔽结构子特征
+    /// （`1 << TerrainSubFeatureKind as u32`；v1.XX 起创世恒传 0，仅作调用方通道保留）。
     /// 只改变「注入什么」，**不改变任何 RNG 消费**（第 4 步规划是纯 hash，
     /// 过滤发生在规划产出之后）；阶段二注入器为空时无物理效果。
     pub fn generate_with_config_overrides(
@@ -1607,7 +1607,7 @@ impl TerrainMap {
         // 3. 静态水系（T2 主河；P1 预留）
         self.apply_profile_static_hydrology(config, &scratch);
         // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）；
-        //    STAGE2-5 降级掩码在规划产出后过滤结构子特征（不触碰 RNG）。
+        //    创世覆盖掩码在规划产出后过滤结构子特征（不触碰 RNG；v1.XX 起恒 0）。
         let mut sub_plan =
             plan_subfeatures(seed, &self.profile, config.terrain_accent_sub_features);
         if overrides.disabled_subfeature_mask != 0 {
@@ -1620,7 +1620,7 @@ impl TerrainMap {
         self.apply_subfeature_pipeline(&mut sub_plan, &mut scratch);
         // 6. 全图唯一定稿坡度 + 派生/合并 flags
         self.finalize_slope_and_surface(&scratch);
-        // 7. 静态几何校验（阶段二先接线稳定 ID 校验；Err 由 STAGE2-5 有界重试环消费）
+        // 7. 静态几何校验（阶段二先接线稳定 ID 校验；Err 只读诊断，创世不再消费）
         let _ = self.validate_static_terrain_geometry();
         // 8. 通用装饰（既有 accent_rng 独立流；地貌与水系定稿后散布，避免落入深水）
         self.generate_base_accents(seed, config.terrain_accent_density);
@@ -1628,8 +1628,8 @@ impl TerrainMap {
         self.append_subfeature_accents(seed, &mut sub_plan);
         // 第 10/11 步不在本函数：`World3DEngine` 创世序列在 `world_create` 中先调用
         // 本函数、再调用 `seed_primitive_ecology`（第 10 步）；`validate_terrain_world`
-        // （第 11 步，含 STAGE2-6 生存成本诊断）在存档/校验路径执行并冒泡给
-        // STAGE2-5 有界回退环。
+        // （第 11 步，含 STAGE2-6 生存成本诊断）在存档/校验路径执行；只读诊断，
+        // 创世不再消费（v1.XX 起无门禁无降级）。
     }
 
     /// §5.3 第 1 步：清空静态地形状态（§5.2「每次创世先清空，再按流水线重建」）。
@@ -1781,7 +1781,7 @@ impl TerrainMap {
     /// 一致（主河水体 1 ↔ `River` 特征 1）、取水点/授权走廊引用与边界、浅滩端点
     /// 在陆侧、cells 水域归属与 NO_WALK/NO_BUILD 一致。校验器只读不修复、
     /// 不重排既有 `features` 生成顺序（T2 为 10、11、1、20、21、30，排序会改
-    /// 变快照字节）。失败 Err 由 STAGE2-5 有界重试环消费（本阶段仍不启用拒绝）。
+    /// 变快照字节）。失败 Err 为只读诊断（创世不再消费，不触发重试/降级）。
     pub fn validate_static_terrain_geometry(&self) -> Result<(), &'static str> {
         super::validation::validate_static_terrain_geometry(self)
     }

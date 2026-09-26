@@ -229,7 +229,6 @@
   "terrainRoadCorridorWidth": 5,
   "terrainAccentDensity": 1,
   "terrainAccentSubFeatures": true,
-  "terrainGenerationMaxRetries": 3,
   "seasonYearLength": 240,
   "tempBaseMid": 14,
   "tempAmplitude": 17,

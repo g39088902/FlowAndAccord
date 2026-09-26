@@ -12,13 +12,13 @@
 
 | 防线 | 门禁 | 触发时机 | 失败后果 |
 | :--- | :--- | :--- | :--- |
-| **A. 生成期静态校验** | `validation.rs` 五组断言 | 创世第 7 步（生成器内部） | 失败码暂丢弃，由防线 B 兜底重试 |
-| **B. 创世事务门禁链** | 静态几何 → 路网 → 模板专属 → 生存诊断 | `new_seeded_with_config_bounded` 发布前 | 候选整体丢弃 → 有界降级 → 全败返回错误 |
+| **A. 生成期静态校验** | `validation.rs` 五组断言 | 创世第 7 步（生成器内部） | 只读诊断（v1.XX 起创世不再消费，不触发重试/降级） |
+| **B. 创世发布** | 单候选直接发布 | `new_seeded_with_config_bounded` 构建完成即发布 | 无——任何模板恒按请求原样构建（历史门禁链已删除，见 §3.5） |
 | **C. 存档读入门禁** | 版本 / profile 白名单 / 读档路网校验 | `WorldSave::load` | 明确报错拒绝加载 |
 | **D. 探针验收** | `terrain_probe` / `accent_water_probe` 窗口与达标线 | 人工（改生成参数后必跑） | 打印 `GATE FAIL` / `TB01_7_HAS_FAIL`，不自动阻断 |
 | **E. 回归 / 一致性门禁** | `tools/` 确定性、配置、快照、文档 | CI 与提交前 | exit 1 阻断发布 |
 
-共同铁律：**全部只读、不修复、不重排既有生成顺序**（06 号 §5.2「不在校验器里偷偷修复数据」）；失败码一经发布**语义不变**，是降级环的分派依据。
+共同铁律：**全部只读、不修复、不重排既有生成顺序**（06 号 §5.2「不在校验器里偷偷修复数据」）；失败码一经发布**语义不变**，供只读诊断与探针判读。
 
 ---
 
@@ -26,14 +26,11 @@
 
 | # | 门禁 | 位置 | 失败码示例 | 消费方 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | 静态几何校验（5 组断言） | `geo/validation.rs` | `FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` / `AccentIdsNotStrictlyAscending` 等 | 创世门禁链（`Geometry:` 前缀）、几何事务 preview、生成器第 7 步 |
-| 2 | 路网读档校验 | `spatial/terrain_network.rs::validate_terrain_world` | `车道 X 不符合地表通行规则` / `POI 不可达` / `没有合法路网` | 创世门禁链（`RoadNetwork:` 前缀）、`world_save.rs` 读档后 |
-| 3 | 台地模板门禁 | `validate_plateau_gates` | `PlateauBuildAreaInsufficient` / `PlateauRampABlocked` / `PlateauWaterUnreachable` | 创世门禁链 |
-| 4 | 冲积扇模板门禁 | `validate_fan_gates` | `FanBuildAreaInsufficient` / `FanDryCorridorBlocked` | 创世门禁链 |
-| 5 | 盆地生活带门禁 | `validate_basin_build_area_gate` | `BasinBuildAreaInsufficient` | 创世门禁链 |
-| 6 | 火山湖模板门禁 | `validate_volcanic_lake_gates` | `LakeBuildAreaInsufficient` / `WaterAccessInvalid` / `LakeShoreDisconnected` | 创世门禁链 |
-| 7 | 生存诊断 | `spatial/survival_diagnosis.rs::diagnose_survival` | `SpawnDisconnected` / `SurvivalCostExceeded` | 创世门禁链（`Survival:` 前缀） |
-| 8 | 有界降级环 | `spatial/creation_fallback.rs` | `budget_exhausted` / `no_new_strategy` | 生产创建入口 |
+| 1 | 静态几何校验（5 组断言） | `geo/validation.rs` | `FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` / `AccentIdsNotStrictlyAscending` 等 | 几何事务 preview、生成器第 7 步、存档加载复用（只读诊断；v1.XX 起创世不再消费） |
+| 2 | 路网读档校验 | `spatial/terrain_network.rs::validate_terrain_world` | `车道 X 不符合地表通行规则` / `POI 不可达` / `没有合法路网` | `world_save.rs` 读档后（只读；v1.XX 起创世不再消费） |
+| 3~6 | 模板专属门禁（4 项） | ~~`validate_plateau_gates` 等~~ | — | ❌ v1.XX 随创世门禁链删除（原有判据并入只读校验与探针） |
+| 7 | 生存诊断 | `spatial/survival_diagnosis.rs::diagnose_survival` | `SpawnDisconnected` / `SurvivalCostExceeded` | 独立只读诊断（v1.XX 起创世不再消费） |
+| 8 | 有界降级环 | ~~`spatial/creation_fallback.rs`~~ | — | ❌ v1.XX 随创世门禁链删除（单候选直接发布） |
 | 9 | 存档版本 + profile 白名单 | `spatial/world_save.rs` | `地形生成器版本不兼容` / `地形 profile 不受支持` | `WorldSave::load` |
 | 10 | 探针 §1.4 GateWindow | `examples/terrain_probe.rs` | `[GATE FAIL]`（越窗项） | 人工验收 |
 | 11 | 山口 TB-01-7 验收 | `examples/terrain_probe.rs::print_tb017_verdict` | `TB01_7_HAS_FAIL` | 人工验收 |
@@ -44,17 +41,13 @@
 
 ---
 
-## 3. 创世门禁链（生产路径）
+## 3. 创世发布（v1.XX 起无门禁链）
 
-生产入口 `World3DEngine::new_seeded_with_config_bounded`（`creation_fallback.rs`）对每个候选世界依次运行 06 号 §5.3 第 10/11 步之后的**门禁链**（`run_creation_gates`）：
+生产入口 `World3DEngine::new_seeded_with_config_bounded`（`creation_fallback.rs`）按请求的 profile 构建**单个候选世界**（`build_candidate`，`GenesisOverrides::default()`），`prepare` 钩子内完成 camp_count 覆盖与 `seed_primitive_ecology`，随后**直接发布**。**不再运行任何创世门禁，也不存在降级阶梯**——任何模板恒按请求原样生成，不会因校验失败回退 `flat_baseline`、移除支脊或禁用结构子特征；`terrainGenerationMaxRetries` 配置字段已随之删除。WASM `world_create` 成功恒返回 0。
 
-```
-静态几何（Geometry:） → 路网读档校验（RoadNetwork:） → 模板专属 → 生存诊断（Survival:）
-```
+历史（v1.50.49–v1.60.4）：曾对每个候选依次运行 06 号 §5.3 第 10/11 步之后的**门禁链**（`run_creation_gates`）：`静态几何（Geometry:） → 路网读档校验（RoadNetwork:） → 模板专属 → 生存诊断（Survival:)`，失败候选整体丢弃并按阶梯降级；该机制已整体删除（见 §3.5 与 §4）。旧兼容入口 `new_seeded_with_config` 现与生产入口等价（空 `prepare`）。
 
-> ⚠️ 路网与生存门禁只在**已播撒生态**的候选上运行；旧兼容入口 `new_seeded_with_config`（探针/图鉴用）产出纯地形候选、无 POI/路网，此时**仅做几何门禁**。
-
-### 3.1 静态几何校验（`geo/validation.rs` · 创世第 7 步）
+### 3.1 静态几何校验（`geo/validation.rs` · 创世第 7 步，只读）
 
 五组只读断言，全部通过才 `Ok(())`：
 
@@ -82,22 +75,13 @@
 - 全图每条车道过 `corridor::validate_curve`（走廊宽度 / `terrain_max_walk_slope` / 浅滩授权 `crossing_id` 豁免）；
 - 全体 POI 必须存在 `nearest_node_id` 且在连通图中（自任一图节点可达）。
 
-失败码：`车道 X 不符合地表通行规则` / `没有合法路网` / `POI 缺少道路接入` / `POI X 不可达`。该函数**同时是读档后的复核入口**（`world_save.rs`），保证「存档即读回」。
+失败码：`车道 X 不符合地表通行规则` / `没有合法路网` / `POI 缺少道路接入` / `POI X 不可达`。该函数**同时是读档后的复核入口**（`world_save.rs`），保证「存档即读回」；v1.XX 起创世侧不再调用它（创世由 `commit_terrain_path` 在提交前用同一判据前置复核）。
 
-### 3.3 模板专属门禁（房屋候选 + 走廊 + 岸点）
+### 3.3 模板专属门禁（已删除）
 
-公共底座 `count_spaced_buildable`：**按最终格网步进 3 扫描**完整占地合法且互不重叠（间距 ≥ 3×`terrain_footprint_half_extent`）的房屋候选，合法性完全由定稿格子裁决（坡度 / `NO_BUILD` / 水体 / 地表）——**固定生成期锚点会落在陡缘/禁建带**（TB-03-06 实测踩坑）。
+❌ **v1.XX 已随创世门禁链整体删除**：`validate_plateau_gates` / `validate_fan_gates` / `validate_basin_build_area_gate` / `validate_volcanic_lake_gates` 及其辅助（`count_spaced_buildable` / `validate_access_points_dry` / `replay_tilt`）不再存在。原判据（生活带房屋候选 ≥3、走廊/出口/岸点路由）并入只读校验与探针矩阵验收；创世不再据此拒绝或降级任何模板。
 
-| 模板 | 生活带 | 走廊 / 路由 | 失败码 |
-| :--- | :--- | :--- | :--- |
-| 台地 | 台面房屋候选 ≥ 3 | 台心 → 双坡脚水源 POI(10/11) 双入口通路 | `PlateauBuildAreaInsufficient` / `PlateauRampBlocked` / `PlateauWaterUnreachable` / `PlateauRampABlocked` / `PlateauRampBBlocked` |
-| 冲积扇 | `r<0.9L` 且 `|θ|<0.85α` 内 ≥ 3 | 山口内 20m → 扇缘全宽**干地**走廊（干沟可慢行横跨） | `FanBuildAreaInsufficient` / `FanDryCorridorBlocked` |
-| 盆地 | `q<0.82` 盆底 ≥ 3 | 不再以旧出口几何作为创世硬门禁；实际车道与 POI 仍经路网/生存诊断校验 | `BasinBuildAreaInsufficient` |
-| 火山湖 | 环岸 `d>setback` 且 `d<0.75×r_mean` ≥ 3 | 双岸点环岸通路 + 双出口自水线外平台 → 岭外（`r_out×2.55`）可达；岸点全部干地合法 | `LakeBuildAreaInsufficient` / `WaterAccessInvalid` / `LakeShoreDisconnected` |
-
-> ⚠️ 火山湖出口起终点**禁止以水体格为起点**（池心是 DeepWater），且**不可用固定比例半径**（湖半轴独立抽样可达 1.6:1，窄轴方向固定点会落进湖里，TB-03-08 踩坑）。
-
-### 3.4 生存诊断（`survival_diagnosis.rs` · STAGE2-6）
+### 3.4 生存诊断（`survival_diagnosis.rs` · STAGE2-6，只读）
 
 按**实际配置**枚举初始营地与必需资源（水/粮）及市场，逐营地检查路网可达性并计算坡度/软地折算后的往返成本：
 
@@ -107,25 +91,26 @@
 - 失败码 `SpawnDisconnected`（营地或资源类无合法路网路径）；
 - ⚠️ 依赖已注入的非零配置；零值退化配置下车道限速 0，全部营地会如实报 `SpawnDisconnected`。
 
-### 3.5 门禁链顺序与失败码前缀
+### 3.5 门禁链顺序与失败码前缀（已删除 · 历史）
+
+❌ v1.XX 起不再有门禁链，以下前缀语义仅保留为历史记录（`WorldCreationDiagnostic` 已不消费失败码）：
 
 ```
-Geometry:<码>   ← validate_static_terrain_geometry（含模板专属门禁，见 3.3）
+Geometry:<码>   ← validate_static_terrain_geometry（含已删除的模板专属门禁）
 RoadNetwork:<码> ← validate_terrain_world（仅已播撒生态候选）
 Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 ```
 
-前缀语义**一经发布不变**，供 `WorldCreationDiagnostic` 记录与将来降级策略细化消费。
-
 ---
 
-## 4. 有界降级环（STAGE2-5 · `creation_fallback.rs`）
+## 4. 有界降级环（已删除 · 历史记录）
+
+❌ **v1.XX 随创世门禁链整体删除**：`terrainGenerationMaxRetries` 配置字段、阶梯降级（禁结构子特征 → 移除可选支脊 → `flat_baseline`）、策略键去重、预算钳制与 `last_event`「⚠️ 地形生成降级」事件流均不再存在。`new_seeded_with_config_bounded` 现为单候选直接发布；`WorldCreationDiagnostic` 保留为只读诊断（恒 `first_try`、`degraded=false`），WASM `world_create` 无失败/降级返回路径。
+
+历史机制（v1.50.49–v1.60.4）：
 
 - **预算**：`terrainGenerationMaxRetries` = 首次之外的最多重试次数（0 = 只尝试一次），入口钳制至 **≤ 8**；耗尽返回 `Err(诊断)`。
-- **降级阶梯**（每步必须产生不同的 `(effective_profile, disabled_mask, disable_spurs)` 键）：
-  1. 禁用已注入的结构子特征（`disabled_mask`，掩码见 `STRUCTURAL_SUBFEATURE_MASK`）；
-  2. 移除可选支脊（仅山口 profile 且开关仍开启）；
-  3. 兜底显式降级至已验收的 `flat_baseline`（STAGE2-7 显式诊断基线，可存档续演）。
+- **降级阶梯**（每步必须产生不同的 `(effective_profile, disabled_mask, disable_spurs)` 键）：禁用已注入的结构子特征（掩码 `STRUCTURAL_SUBFEATURE_MASK`）→ 移除可选支脊（仅山口 profile 且开关仍开启）→ 兜底显式降级至已验收的 `flat_baseline`。
 - **候选隔离**：失败候选的 RNG / 计数器 / POI / 路网 / 缓存整体丢弃，不污染最终模拟；同策略同 seed 必然复现（纯函数式重建）。
 - **诊断记录**：`WorldCreationDiagnostic`（seed / requested / effective / generator_version / degraded / attempts[] / end_reason ∈ `first_try` `degraded` `budget_exhausted` `no_new_strategy` `legacy_fallback`）；降级成功不冒充原模板成功——`last_event` 事件流明示 `⚠️ 地形生成降级：请求 X → 实际 Y`。
 - **对外**：WASM `world_create` 全败返回 1 + `world_last_error_*`。
@@ -272,11 +257,11 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 | 门禁 | 检查什么 | 失败即 |
 | :--- | :--- | :--- |
-| 静态几何 5 断言 | ID/归属/顶点/水体双副本/浅滩陆侧/cells 标志/装饰递增 | 候选丢弃 → 降级 |
-| 路网读档校验 | 车道走廊合法 + POI 连通 | 候选丢弃 → 降级；读档拒绝 |
-| 模板专属 4 门禁 | 房屋候选 ≥3 + 走廊/出口/岸点 | 候选丢弃 → 降级 |
-| 生存诊断 | 营地→水/粮往返成本、市场可达 | 候选丢弃 → 降级 |
-| 有界降级环 | 预算 ≤8、阶梯、策略去重 | 全败返回错误 |
+| 静态几何 5 断言 | ID/归属/顶点/水体双副本/浅滩陆侧/cells 标志/装饰递增 | 只读诊断（v1.XX 起不再丢弃候选/降级） |
+| 路网读档校验 | 车道走廊合法 + POI 连通 | 读档拒绝；创世不消费 |
+| 模板专属 4 门禁 | ~~房屋候选 ≥3 + 走廊/出口/岸点~~ | ❌ 已删除（v1.XX） |
+| 生存诊断 | 营地→水/粮往返成本、市场可达 | 只读诊断（创世不消费） |
+| 有界降级环 | ~~预算 ≤8、阶梯、策略去重~~ | ❌ 已删除（v1.XX） |
 | 存档版本/profile | 版本 21、九 profile 白名单 | 拒绝加载 |
 | 探针窗口/达标线 | 坡度/禁行/可建/连通/绕行/支脊 | `GATE FAIL` / `HAS_FAIL` |
 | 装饰落点禁区 | 边缘 3% 保护带 + 水面净空 13m | 探针判读违例 |
@@ -287,7 +272,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 ## 关联文档
 
-- [14 号文 · 地形与路网](./14-terrain-and-network.md)：地表/特征/水体/装饰模型、§8.1 静态几何校验、§8.2 世界初始化事务与有界降级、§9 各模板生成实现
+- [14 号文 · 地形与路网](./14-terrain-and-network.md)：地表/特征/水体/装饰模型、§8.1 静态几何校验、§8.2 世界初始化事务：创世发布（无门禁无降级）、§9 各模板生成实现
 - [06 号 · 快照与存档](./06-snapshot-and-save.md)：快照四处同步链、存档门禁与兼容线
 - 规划版 [06 号 · 地形模板](../../plan/tech/06-terrain-templates.md)：创世流水线 0–11 步、§5.3/§5.8 门禁链与降级阶梯
 - `crates/sim_core/src/geo/AGENTS.md`：geo 模块局部操作指南（易踩坑清单）

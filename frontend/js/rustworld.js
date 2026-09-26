@@ -169,10 +169,6 @@
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
             this._setEngineStatus('', 'ready');
-            if (msg.creationWarning) {
-              console.warn('[RustWorld] 地形生成降级原因:', msg.creationWarning);
-              this._setEngineStatus(msg.creationWarning, 'warning');
-            }
             // ★ M4：注入枚举名称表 + 清空解码器字符串缓存（引擎全新 → 缓存失效）
             // ★ M5-0 结论：帧间对象池化为**负收益**（快照对象短命，V8 新生代回收更快，池化反致晋升老生代），
             // 故 `setReuse()` 已退化为空操作，此处不再调用；引擎全新 → 必须清空驻留表缓存。

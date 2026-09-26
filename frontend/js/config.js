@@ -168,7 +168,7 @@ window.SIM_CONFIG = {
   //   ⚠️ 改动会改变网格步长（worldSize/(res-1)）、地形形态、POI 落位与全部确定性基线，
   //   并使旧存档因 SAVE_APP_VERSION 变更而废弃——调整后必跑全量门禁与性能基准。
   terrainGridRes: 256, // 地形栅格每边格数（v1.50.70 由 160 提升；256 → 步长 764/255 ≈ 2.996m）
-  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断/降级基线：倾斜-only 平地，永不加入 random）；影响地形重建与存档门禁
+  terrainProfile: 'random', // 地貌模板：'random'（按种子随机 8 张候选池：T1山口/T2河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖，各 ~12.5%；v1.50.68 删除河谷聚落、台地聚落更名台地）| 'mountain_pass_v1'（固定T1）| 'river_valley_v1'（固定T2）| 'grassland_plain_v1'（草原）| 'hillside_woodland_v1'（半坡林地）| 'plateau_v1'（台地，原 plateau_settlement_v1）| 'alluvial_fan_v1'（★ TB-03 山前冲积扇：山口→扇缘缓坡+干浅沟）| 'basin_oasis_v1'（★ TB-03 盆地：大盆地+开阔干地平原+环抱高山）| 'volcanic_lake_v1'（★ TB-03 火山湖：随机位置火山山体+天池式火山口湖+双缓坡出口+双岸点共享池）| 'flat_baseline'（显式诊断基线：倾斜-only 平地，永不加入 random；v1.XX 起不再是降级回退目标）；影响地形重建与存档门禁
   terrainRidgeAmplitude: 28.0, // T2 地貌 / 通行参数
   // ★ v1.50.17 T1-R 主脊通行力修复：T1 山口聚落主脊宽度/幅度（原先硬编码 0.16~0.23×world_size
   //   与 24~34m，最大梯度仅 6.7~13.4°，低于 terrainMaxWalkSlope=30°，山口不产生通行约束）。
@@ -261,9 +261,6 @@ window.SIM_CONFIG = {
   // ★ D-B1 子特征注入总开关（06号 §5.3）：山脚湖/山涧飞瀑/河谷峭壁等；置 false 时 §5.3 第 4–5、9 步为空。
   //   阶段一为空钩子门控（两态世界输出等价）；选择器实现属 D-B1-3，完整阶段化流水线属阶段二。
   terrainAccentSubFeatures: true,
-  // ★ STAGE2-1（06号 R.5/§5.8）：创世有界重试上限（初始创世失败时阶梯降级重试的最大次数，
-  //   0 = 只尝试一次）。消费点 = spatial/world.rs 建世界入口钳制；完整阶梯降级重试环属 STAGE2-5。
-  terrainGenerationMaxRetries: 3,
 
   // ==========================================================================
   // 8. 四季更迭与宏观气候 (Seasons & Macro Climate)

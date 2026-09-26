@@ -41,14 +41,14 @@ stateDiagram-v2
 ## 2. 核心机制
 
 ### 2.1 全量超参数抽取
-- `SimConfig` 共 **370 个字段**，按 16 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
+- `SimConfig` 共 **369 个字段**，按 16 个分区组织（分区与字段数以 `crates/sim_core/src/config.rs` 注释及 [./05-config-reference.md](./05-config-reference.md) 自动速查表为准）：
   1. 引擎节拍与时间基准（2 字段）
   2. 部落民生理、代谢与生命周期（47 字段）
   3. 先天禀赋与遗传演化（9 字段）
   4. 生态地标与 POI 采收交互（29 字段）
   5. 马斯洛需求与决策门槛（21 字段）
   6. 私宅营造、代际传承与升级（33 字段）
-  7. 地形生成、地表查询与山口/河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖 profile（72 字段）
+  7. 地形生成、地表查询与山口/河谷/草原/半坡/台地/★ TB-03 冲积扇/盆地/火山湖 profile（71 字段）
   8. 四季更迭与宏观气候（9 字段）
   9. 空间路网、限速与踩踏演化（14 字段）
   10. 动力学移动与寻路权重（9 字段）
@@ -86,7 +86,7 @@ T0/T1 已接入 6 个配置字段：
 | `terrainFootprintHalfExtent` | `7.0` | 房屋基础占地半尺寸 |
 | `terrainRoadCorridorWidth` | `5.0` | T0 曲线走廊校验宽度 |
 
-> `terrainGenerationMaxRetries`（原列此表）已随 v1.50.18 死代码审计删除——内核从未读取该字段。
+> `terrainGenerationMaxRetries`（原列此表）已**永久删除**（v1.50.18 死代码审计首删、v1.50.39 加回、v1.XX 随创世门禁/降级机制整体删除）——创世无门禁无降级，该字段不再存在。
 
 ### 2.6 地形栅格分辨率（v1.50.19）
 - 历史上分辨率是**散落在 `sim_worker.js` 与 `tools/*.js` 里的硬编码字面量 `120`**，早期文档与

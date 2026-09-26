@@ -438,10 +438,11 @@ self.onmessage = async function(e) {
           // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
           _wasm.world_create_map(0, WORLD_SIZE, _engineSeed);
         } else {
-          // ★ STAGE2-5：返回码非 0 = 有界降级预算耗尽/无解，抛出并携带错误文本。
+          // ★ v1.XX：创世无门禁无降级——world_create 恒按请求的 profile 原样构建
+          // 并发布，成功恒返回 0（配方编译失败的防御性兜底在引擎内部完成）。
           const rcCreate = _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
           if (rcCreate !== 0) {
-            throw new Error('世界初始化失败（含降级重试）：' + readLastErrorRaw());
+            throw new Error('世界初始化失败：' + readLastErrorRaw());
           }
           applyInitialRegenMultipliers(msg.regenMultipliers);
         }
@@ -457,7 +458,6 @@ self.onmessage = async function(e) {
         }
         // 图鉴世界只读取首帧地形快照，不创建检查点也不启动模拟节拍，确保它始终是无游戏数据的静态地图。
         if (!msg.mapOnly) startLoop();
-        const creationWarning = (!msg.mapOnly) ? readLastErrorRaw() : '';
         const initMsg = {
           type: 'READY',
           seed: _engineSeed,
@@ -466,7 +466,6 @@ self.onmessage = async function(e) {
           snapshot: initialSnap,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
           rewind: rewindMeta(),
-          creationWarning,
         };
         if (initialRes && initialRes.bin) {
           self.postMessage(initMsg, [initialRes.bin.buffer]);
@@ -543,10 +542,10 @@ self.onmessage = async function(e) {
           applyConfigInternal(msg.config);
         }
         // ★ v1.50.19：grid_res 传 0 = 按 SIM_CONFIG.terrainGridRes（分辨率单一真相源）。
-        // ★ STAGE2-5：返回码非 0 = 有界降级预算耗尽/无解，保留既有世界并抛出。
+        // ★ v1.XX：创世无门禁无降级，world_create 成功恒返回 0；返回码非 0 仅保留为防御性兜底。
         const rcReset = _wasm.world_create(0, WORLD_SIZE, _engineSeed, msg.agentCount || 20, msg.campCount || 4);
         if (rcReset !== 0) {
-          throw new Error('世界重置失败（含降级重试）：' + readLastErrorRaw());
+          throw new Error('世界重置失败：' + readLastErrorRaw());
         }
         applyInitialRegenMultipliers(msg.regenMultipliers);
         historyCheckpoints = [];

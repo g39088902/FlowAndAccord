@@ -103,9 +103,9 @@ pub struct World3DEngine {
     /// 与当前签名不一致时才重发 `LANE_GEO`/`NODE`（建房会新增节点与车道）。
     /// 初值 `u64::MAX` 保证首帧必然下发。
     pub last_geom_sig: std::cell::Cell<u64>,
-    /// ★ STAGE2-5 创世诊断记录（requested/effective profile、降级原因与全部
-    /// 尝试）。进程内诊断事实，不入存档（存档经 `terrain.profile` 保持有效
-    /// 模板，读档重建后恒为 None）。
+    /// ★ 创世诊断记录（requested/effective profile；创世无门禁无降级后恒为
+    /// `first_try` 单条成功记录）。进程内诊断事实，不入存档（存档经
+    /// `terrain.profile` 保持有效模板，读档重建后恒为 None）。
     pub creation_diagnostic: Option<super::creation_fallback::WorldCreationDiagnostic>,
 }
 
@@ -119,54 +119,19 @@ impl World3DEngine {
         Self::new_seeded_with_config(grid_res, world_size, seed, SimConfig::default())
     }
 
-    /// 指定种子和自定义配置的确定性世界构建（**旧无失败语义兼容入口**）。
+    /// 指定种子和自定义配置的确定性世界构建（**兼容入口**）。
     ///
-    /// ★ STAGE2-5 起生产路径走 [`Self::new_seeded_with_config_bounded`]（有界
-    /// 降级 + 门禁 + 诊断）；本方法保留给探针/工具/图鉴等既有调用点，行为
-    /// 契约不变：永返回一个世界。正常配置下等价于有界构造器首试通过；仅在
-    /// 全部降级策略耗尽（退化零值配置等）时兜底直建 flat_baseline 候选
-    /// （门禁不再阻断，`creation_diagnostic.end_reason = "legacy_fallback"`）。
+    /// ★ 创世不再有门禁与降级（v1.XX 起）：本入口与生产入口
+    /// [`Self::new_seeded_with_config_bounded`] 等价（`prepare` 为空钩子），
+    /// 请求的 profile 恒被原样构建，**永不会**因校验失败回退到 `flat_baseline`
+    /// 或移除支脊；图鉴演示 profile（断层/褶皱）同样直接构建，不被任何降级替换。
     pub fn new_seeded_with_config(
         grid_res: usize,
         world_size: f32,
         seed: u64,
         config: SimConfig,
     ) -> Self {
-        // The map gallery intentionally includes structural demo recipes whose
-        // sharp scarp/fold geometry is not a playable settlement candidate.
-        // Build those read-only previews directly so the creation fallback
-        // ladder does not replace the requested shape with flat_baseline.
-        if matches!(
-            config.terrain_profile.as_str(),
-            crate::geo::terrain::TERRAIN_PROFILE_FAULT_SCARP_DEMO
-                | crate::geo::terrain::TERRAIN_PROFILE_FOLDED_BASIN_DEMO
-        ) {
-            return Self::build_candidate(
-                grid_res,
-                world_size,
-                seed,
-                config,
-                &crate::geo::terrain::GenesisOverrides::default(),
-            );
-        }
-        let fallback_cfg = config.clone();
-        match Self::new_seeded_with_config_bounded(grid_res, world_size, seed, config, &mut |_| {}) {
-            Ok(w) => w,
-            Err(mut diag) => {
-                // 兜底：候选直建（不跑门禁），保证旧调用点恒得一个世界。
-                // 保持用户原请求的 profile，不篡改为 flat_baseline。
-                diag.end_reason = "legacy_fallback".to_string();
-                let mut world = Self::build_candidate(
-                    grid_res,
-                    world_size,
-                    seed,
-                    fallback_cfg,
-                    &crate::geo::terrain::GenesisOverrides::default(),
-                );
-                world.creation_diagnostic = Some(diag);
-                world
-            }
-        }
+        Self::new_seeded_with_config_bounded(grid_res, world_size, seed, config, &mut |_| {})
     }
 
     /// ★ STAGE2-5 单个候选世界的构建（原 `new_seeded_with_config` 构造体逐字

@@ -713,7 +713,7 @@ crates/sim_core/src/geo/terrain.rs  # 只增加调用适配器
 
 - **迁移协议**：每个 profile 建立 `recipes/<id>.ron`（或等价 Rust 常量）和 `RecipeGate`；旧生成器只作为 `LegacyReference`，由 `compare_recipe_to_legacy` 输出差异，不被新编译器调用。
 - **顺序**：河谷→台地→盆地→冲积扇→火山湖→半坡；一次只启用一个 recipe。每个 recipe 只能组合既有 `FieldOp`、`ProcessOp` 和约束，不能新增 profile 专用函数。
-- **门禁**：复用 `run_creation_gates` 的 Geometry/RoadNetwork/Survival 前缀；失败时按 recipe 的 `fallback_candidates` 固定排序降级，并将 `requested/effective` 写入 `WorldCreationDiagnostic`。
+- **门禁（★ 已随实现删除）**：早期设计拟复用 `run_creation_gates` 的 Geometry/RoadNetwork/Survival 前缀，失败时按 recipe 的 `fallback_candidates` 固定排序降级，并将 `requested/effective` 写入 `WorldCreationDiagnostic`。**v1.XX 已整体删除创世门禁与降级回退**：`new_seeded_with_config_bounded` 单候选直接发布，任何模板恒按请求原样构建；本段仅作历史设计记录，不再实现。
 
 #### UGC-04：VoxelBackend 和网格提取
 
@@ -836,7 +836,7 @@ cargo run --release -p sim_core --example terrain_probe -- 60
 | 类型 | 例子 | 处理 |
 |---|---|---|
 | 输入错误 | recipe 环、未知算子、非有限参数 | 返回稳定错误码，不生成世界 |
-| 候选失败 | 连通分量过多、可建地不足、河道越界 | 按固定候选顺序调整参数；超过预算使用降级 recipe |
+| 候选失败 | 连通分量过多、可建地不足、河道越界 | ★ v1.XX 起创世无门禁无降级：候选失败只作只读诊断，世界恒按请求的 recipe 构建发布（历史设计为按固定候选顺序调整参数、超过预算使用降级 recipe，已删除） |
 | 后端失败 | chunk 内存不足、网格提取失败、FABS 不支持版本 | 保留已生成的高度场或拒绝本次 voxel 后端，不修改世界状态 |
 
 回退必须发生在创世事务内。不得在 tick 中扫描居民、强制搬家、修改决策状态或重写道路拓扑。

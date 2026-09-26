@@ -17,7 +17,7 @@ FlowAndAccord/
 │   │   │   ├── terrain_diagnostics_probe.rs # UGC-09 候选、置信度与剖面诊断探针
 │   │   │   └── accent_water_probe.rs       # 水岸装饰探针示例
 │   │   └── src/
-│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (370 字段，纯净 derive(Default)，JS 唯一真相源)
+│   │       ├── config.rs                   # ⚙️ SimConfig 结构体 (369 字段，纯净 derive(Default)，JS 唯一真相源)
 │   │       ├── lib.rs                      # crate 入口与模块导出
 │   │       ├── rng.rs                      # WorldRng 全局共享确定性随机数
 │   │       ├── geo/                        # 🌍 地形与生物群系
@@ -84,7 +84,7 @@ FlowAndAccord/
 │   │           ├── world.rs                # World3DEngine 结构体定义与生命周期
 │   │           ├── world_config.rs         # 动态配置注入与 JSON 反序列化
 │   │           ├── world_save.rs           # 确定性存读档序列化与反序列化
-    │   │           ├── creation_fallback.rs    # ★ STAGE2-5 有界创世构造器（阶梯降级重试 + 策略去重 + 诊断）
+    │   │           ├── creation_fallback.rs    # ★ 创世发布（v1.XX 起无门禁无降级：单候选直接发布；历史 STAGE2-5 有界降级集成已删除）
     │   │           ├── survival_diagnosis.rs   # ★ STAGE2-6 生存诊断（水/粮可达预算校验，只读）
 │   │           ├── world_season.rs         # 四季与宏观温度时变计算
 │   │           ├── world_snapshot.rs       # generate_snapshot 快照数据组装
@@ -135,7 +135,7 @@ FlowAndAccord/
 │           └── lib.rs                      # 导出函数、静态缓冲区、错误码、指针约定、双副本同步
 ├── frontend/
 │   ├── js/
-│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 370 字段)
+│   │   ├── config.js                       # ⚙️ 主配置 (window.SIM_CONFIG, 369 字段)
 │   │   ├── config.decision-order.js        # ★ 决策分支顺序唯一真相源（16 条活跃分支 + 层级覆盖，§4.12 文档化例外）
 │   │   ├── config.house-upgrade-cost.js    # ★ M8 房屋升级材料成本矩阵 (20 字段 = 4级×5资源，Object.assign 合并进 SIM_CONFIG)
 │   │   ├── config.lighting.js              # ★ v1.48.0 动态季节光照前端配置 (window.SIM_LIGHTING，纯表现层，不并入 SIM_CONFIG)
