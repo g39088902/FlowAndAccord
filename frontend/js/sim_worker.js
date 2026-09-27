@@ -45,6 +45,13 @@ let warnedBinFallback = false; // 回退仅告警一次
 let enumTableJson = '';   // 枚举名称表 JSON（随 READY 下发主线程，供 SnapshotBin.setEnumTables）
 const _headerTickDv = new DataView(new ArrayBuffer(40)); // 读取 FABS 帧头 tick 用
 
+function readRainGpuShader() {
+  if (!_wasm || typeof _wasm.world_rain_gpu_shader_ptr !== 'function' || typeof _wasm.world_rain_gpu_shader_len !== 'function') return '';
+  const ptr = _wasm.world_rain_gpu_shader_ptr();
+  const len = _wasm.world_rain_gpu_shader_len();
+  return len ? _textDecoder.decode(new Uint8Array(_memory.buffer, ptr, len)) : '';
+}
+
 function readLastError() {
   if (!_ready || typeof _wasm.world_last_error_len !== 'function') return '';
   return readLastErrorRaw();
@@ -69,7 +76,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.62.2';
+  return '1.63.1';
 
 }
 
@@ -475,6 +482,7 @@ self.onmessage = async function(e) {
           seed: _engineSeed,
           appVersion: getAppVersion(),
           enumTableJson,
+          rainGpuShader: readRainGpuShader(),
           snapshot: initialSnap,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
           rewind: rewindMeta(),

@@ -1,8 +1,30 @@
 // === 全局初始化、相机控制与 UI 事件绑定 ===
     const canvas = document.getElementById('sim-canvas');
     const glCanvas = document.getElementById('sim-canvas-gl');
+    const rainCanvas = document.getElementById('sim-canvas-rain');
     const ctx = canvas.getContext('2d');
     window.ctx = ctx;
+
+    // Rust/WASM 提供 WGSL compute shader；主线程只负责把浏览器 GPU 设备交给 WebGPU 桥接层。
+    let resolveRainGpuShader;
+    window.rainWebGPUShaderPromise = new Promise(resolve => { resolveRainGpuShader = resolve; });
+    window._resolveRainGpuShader = resolveRainGpuShader;
+    // RustWorld 先启动 Worker，READY 消息携带 Rust 编译进 WASM 的 WGSL。
+    const sim = new RustWorld();
+    // ★ WebGPU 降水层是当前渲染管线的硬门槛：没有 WebGPU 就不启动世界。
+    if (!rainCanvas || !navigator.gpu || !window.RainWebGPURenderer) {
+      showWebGpuGateError('当前浏览器不支持 WebGPU，无法初始化降水粒子渲染管线。请使用启用 WebGPU 的现代 Chrome / Edge。');
+    }
+    window.rainWebGPU = new RainWebGPURenderer(rainCanvas);
+    window.rainWebGPUInit = window.rainWebGPUShaderPromise.then(shader => window.rainWebGPU.init(shader)).then(ok => {
+      if (!ok) throw new Error('WebGPU 设备初始化失败');
+      window.rainWebGPUReady = true;
+      return true;
+    }).catch(err => {
+      window.rainWebGPUReady = false;
+      try { showWebGpuGateError('WebGPU 初始化失败：' + (err && err.message ? err.message : err)); } catch (_) { /* 覆盖层已显示 */ }
+      return false;
+    });
     
     // ★ 全量 WebGL（渲染架构决策 2026-09-17 + Canvas 备用通道删除）：地形/光照/装饰/阴影
     //   只存在 GL 路径。WebGL 不可用属硬门槛——阻断启动并显示错误覆盖层，不再回退 Canvas 2D。
@@ -17,7 +39,6 @@
       }
     }
     
-    const sim = new RustWorld();
     // 启动存档门禁解除前禁止推进模拟；save-ui.js 在成功连接存档文件后恢复运行。
     sim.isPaused = true;
     window.rustWorldSim = sim; // 供 decision-viz.js 热注入决策顺序配置（共用同一引擎实例）
@@ -42,6 +63,11 @@
         glCanvas.width = cw;
         glCanvas.height = ch;
       }
+      if (rainCanvas) {
+        rainCanvas.width = cw;
+        rainCanvas.height = ch;
+      }
+      if (window.RainWebGPURenderer && window.rainWebGPU) window.rainWebGPU.resize();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -120,7 +146,24 @@
       return { x: cx + rx * scale, y: cy + y2 * scale, depth: z2 };
     }
 
-    // WebGL 硬门槛错误覆盖层：阻断启动，提示更换浏览器（全量 WebGL 架构下无 Canvas 回退）
+    // WebGPU 硬门槛错误覆盖层：没有可用设备时阻断启动。
+    function showWebGpuGateError(message) {
+      const overlay = document.createElement('div');
+      overlay.id = 'webgpu-gate-error';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;gap:12px;background:#0b0f14;color:#e2e8f0;' +
+        'font:15px/1.6 system-ui,sans-serif;text-align:center;padding:24px;';
+      const title = document.createElement('div');
+      title.textContent = '⚠ 无法初始化 WebGPU 渲染管线';
+      title.style.cssText = 'font-size:20px;font-weight:600;';
+      const desc = document.createElement('div');
+      desc.textContent = message;
+      desc.style.cssText = 'max-width:520px;opacity:0.85;';
+      overlay.appendChild(title); overlay.appendChild(desc); document.body.appendChild(overlay);
+      throw new Error('[WebGPU] ' + message);
+    }
+
+    // WebGL 硬门槛错误覆盖层：阻断启动，提示更换浏览器（全量 WebGL 下无 Canvas 回退）
     function showWebglGateError(message) {
       const overlay = document.createElement('div');
       overlay.id = 'webgl-gate-error';

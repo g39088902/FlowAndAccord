@@ -586,6 +586,24 @@ impl World3DEngine {
             ));
         }
 
+        // ══════════════ RAIN PARTICLES（Rust 模拟状态，每帧） ══════════════
+        {
+            let mut w = BinWriter::with_capacity(self.rain_particles.len() * 36 + 4);
+            for p in &self.rain_particles {
+                w.f32(p.x); w.f32(p.y); w.f32(p.z);
+                w.f32(p.prev_x); w.f32(p.prev_y); w.f32(p.prev_z);
+                w.f32(p.age); w.f32(p.max_age);
+                w.u8(p.falling as u8);
+                w.align4();
+            }
+            w.align4();
+            secs.push(Sec::new(
+                SectionKind::RainParticles,
+                self.rain_particles.len() as u32,
+                w.into_inner(),
+            ));
+        }
+
         // ══════════════ HOUSEHOLD ══════════════
         {
             let mut w = BinWriter::with_capacity(

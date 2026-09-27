@@ -28,6 +28,19 @@ pub enum Season {
 /// 消费方必须保留既有缓存；`Some(vec)`（数组，**可为空**）= 明确携带静态全量数据，
 /// 即使空集合也必须整体替换旧值。严禁用数组长度猜测「是否发送」。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RainParticleSnapshot {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub prev_x: f32,
+    pub prev_y: f32,
+    pub prev_z: f32,
+    pub age: f32,
+    pub max_age: f32,
+    pub falling: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldSnapshot3D {
     pub tick: u64,
     pub terrain_cells: Vec<GeoCellSnapshot>,
@@ -45,6 +58,9 @@ pub struct WorldSnapshot3D {
     /// 降雨驱动的水面动态状态（每帧输出，静态地形几何仍由 terrain_features 提供）。
     #[serde(default)]
     pub water_bodies: Vec<WaterBodySnapshot>,
+    /// Rust-owned precipitation state for the WebGPU presentation layer.
+    #[serde(default)]
+    pub rain_particles: Vec<RainParticleSnapshot>,
     #[serde(default)]
     pub terrain_generator_version: u32,
     #[serde(default)]
@@ -334,7 +350,7 @@ pub struct LaneSnapshot {
 /// `[6]`肾上腺素 ADR、`[7]`去甲肾上腺素 NE、`[8]`雄激素 AND、`[9]`雌激素 EST、
 /// `[10]`孕激素 PROG、`[11]`甲状腺素 THY。
 /// `baselines` 为本拍有效基线（已含慢性压力 5-HT/AND 与营养不足 THY 的耦合下调）。
-/// FABS 帧编码顺序与此处字段声明顺序一致（v1.61.1 FORMAT_VERSION 6）。
+/// FABS 帧编码顺序与此处字段声明顺序一致（v1.63.0 FORMAT_VERSION 7）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HormoneSnapshot {
     /// 11 激素水平 + DA 奖赏阈值（顺序见结构体文档）

@@ -25,7 +25,7 @@
   'use strict';
 
   var MAGIC0 = 0x46; // 'F'
-  var FORMAT_VERSION = 6; // 动态水：新增 WATER_DYNAMICS section
+  var FORMAT_VERSION = 7; // Rust 降水粒子：新增 RAIN_PARTICLES section
   // ★ H-05 激素水平/基线数组固定顺序（与 snapshot.rs::HormoneSnapshot 文档一致）
   var HORMONE_LEVEL_LEN = 12;
   var NONE_U32 = 0xffffffff;
@@ -52,6 +52,7 @@
     TERRAIN_SUB_FEATURES: 22,
     // 降雨驱动的水面动态（每帧）
     WATER_DYNAMICS: 23,
+    RAIN_PARTICLES: 24,
   };
 
   var _dec = new TextDecoder('utf-8'); // 全局仅用于字符串驻留表批量解码
@@ -163,7 +164,7 @@
     var snap = {
       tick: tick, geom_version: geomSig, strtab_epoch: epoch,
       terrain_cells: [], terrain_features: null, terrain_accents: null, terrain_sub_features: null,
-      water_bodies: [],
+      water_bodies: [], rain_particles: [],
       terrain_generator_version: 0, terrain_profile: '', grid_w: 0, grid_h: 0, world_size: 0, tilt_angle_rad: 0, tilt_magnitude: 0,
       pois: [], houses: [], nodes: [], lanes: [], agents: [], households: [], marriages: [], clans: [],
       regions: [], empires: [], public_granary_balances: [],
@@ -540,6 +541,19 @@
         sub.accent_id_end = sfr.optU32();
         sfr.align4();
         snap.terrain_sub_features.push(sub);
+      }
+    }
+
+    if (dir[K.RAIN_PARTICLES]) {
+      var rp = readerAt(uint8, dir[K.RAIN_PARTICLES].o, dir[K.RAIN_PARTICLES].bl);
+      snap.rain_particles = new Array(dir[K.RAIN_PARTICLES].c);
+      for (var rpi = 0; rpi < dir[K.RAIN_PARTICLES].c; rpi++) {
+        snap.rain_particles[rpi] = {
+          x: rp.f32(), y: rp.f32(), z: rp.f32(),
+          prev_x: rp.f32(), prev_y: rp.f32(), prev_z: rp.f32(),
+          age: rp.f32(), max_age: rp.f32(), falling: rp.u8() === 1,
+        };
+        rp.align4();
       }
     }
 

@@ -33,7 +33,8 @@ pub const MAGIC: [u8; 4] = *b"FABS";
 /// + 慢性压力 + 营养不足 + 3 余韵计时器 + NE 焦虑标签；新旧解码器双向拒绝错版帧）。
 /// v1.61.0：4 -> 5（GLOBAL 追加降雨倍率与强度）。
 /// v1.61.1：5 -> 6（新增每帧 `WaterDynamics=23` section）。
-pub const FORMAT_VERSION: u16 = 6;
+/// v1.63.0：6 -> 7（新增每帧 `RainParticles=24` section）。
+pub const FORMAT_VERSION: u16 = 7;
 
 /// Header 定长（字节）
 ///
@@ -95,6 +96,8 @@ pub enum SectionKind {
     TerrainSubFeatures = 22,
     /// 降雨驱动的水面动态（每帧输出；静态地形几何仍在 TerrainFeatures）
     WaterDynamics = 23,
+    /// Rust-owned precipitation particles (x/y/z + previous position + age).
+    RainParticles = 24,
 }
 
 impl SectionKind {

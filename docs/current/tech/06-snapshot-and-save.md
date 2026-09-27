@@ -187,7 +187,7 @@ World3DEngine
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.62.2**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.63.1**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
@@ -213,7 +213,7 @@ World3DEngine
 2. **非有限浮点必须走 `finite_f32`**：任何可能为 `INFINITY`/`NaN` 的入库 f32 字段都要加 `#[serde(with = "finite_f32")]`，否则存得进、读不回。
 3. **读档必须重建 `agent_index`**：遗漏会导致 `agent_by_id()` 返回错误下标或 panic。
 4. **读档必须强制重建地形快照**：不同种子的档地形不同，`_terrainCached` 不清会沿用旧地形。
-5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（**当前 8**；v1.46.8 M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6，v1.47.5 T2 共享水池聚合升至 7，★ v1.62.0 删除地图河流水系统/土壤湿润后升至 8），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**（`tools/bump-version.js --check` 会打印其当前值供核对）。
+5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（**当前 9**；v1.46.8 M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6，v1.47.5 T2 共享水池聚合升至 7，★ v1.62.0 删除地图河流水系统/土壤湿润后升至 8，★ v1.63.0 Rust 降水粒子存档状态后升至 9），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**（`tools/bump-version.js --check` 会打印其当前值供核对）。
 6. **本地文件句柄的持久化（v1.12.0 起改 IndexedDB）**：`FileSystemFileHandle` 存入 IndexedDB（库 `flowaccord-save-handles`）后可跨页面刷新恢复句柄，但**句柄本身不可 JSON 序列化，不可存入 localStorage**——必须走 IndexedDB 结构化克隆；恢复后仍需按 v1.28.1 静默重授权限。
 7. **`showSaveFilePicker`/`showOpenFilePicker` 必须在用户手势中调用**：不能在 `setInterval` 或异步回调中间接触发，否则浏览器会报 `SecurityError`。`connectLocalFile()` 和 `loadFromLocalFilePicker()` 均由按钮点击直接触发。
 8. **自动保存只写单一存档文件**：已连接存档文件时 `tickAutoSave()` 每 30 秒直写磁盘；未连接或权限待授权时跳过（v1.12.0 起已无任何 localStorage 后端）。
@@ -237,7 +237,7 @@ World3DEngine
 - **同步核对**：`node tools/snapshot-check.js`（静态核对 ①②④）+ `test-wasm.js` / `test-determinism.js` 回归（JSON 对拍门禁 `test-snapshot-bin.js` 已于 v1.50.35 随 JSON 快照通道移除）。遗漏任何一处都会导致前端读到 `undefined` 或展示旧值。
 - **枚举口径**：二进制帧的闭集枚举（state / poiType / roadClass / houseTier / resourceKind / season / householdRole / gender / transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 - **★ v1.50.30 D-B1-4**：`FORMAT_VERSION` 2 → 3，新增 `SectionKind::TerrainSubFeatures = 22`（地图模板子特征，JSON 字段 `terrain_sub_features`；静态地形脏帧才输出，本阶段恒空数组，注入自阶段二起）；`dict.rs` 同步注册 `terrainSubFeatureKind` 名称表（`TerrainSubFeatureKind` 8 变体与 `TerrainFeatureKind` 是两套编号空间）。
-- **★ v1.61.1 动态水面**：FABS `FORMAT_VERSION` 升至 6，新增 `SectionKind::WaterDynamics = 23`。该 section 每帧输出水体库存比例、覆盖率、水位和流动强度；静态 `TerrainFeatures` 仍只在地形脏帧输出。★ **v1.62.1 说明**：地图已不再产出任何水面，`WaterDynamics` 与 `water_bodies` 仍按结构编码下发但内容恒空/零（FABS `FORMAT_VERSION` 保持 6、前端 `snapshot-bin.js` 解码保留），`terrain_cells[].water_body_id` 亦恒为 `None`（Section 结构与存档格式不变）。
+- **★ v1.61.1 动态水面**：FABS `FORMAT_VERSION` 升至 6，新增 `SectionKind::WaterDynamics = 23`。该 section 每帧输出水体库存比例、覆盖率、水位和流动强度；静态 `TerrainFeatures` 仍只在地形脏帧输出。★ **v1.62.1 说明**：地图已不再产出任何水面，`WaterDynamics` 与 `water_bodies` 仍按结构编码下发但内容恒空/零（当时 FABS `FORMAT_VERSION` 保持 6、前端 `snapshot-bin.js` 解码保留），`terrain_cells[].water_body_id` 亦恒为 `None`（Section 结构与存档格式不变）。★ v1.63.0 另新增 `RAIN_PARTICLES = 24`，输出 Rust 内核降水粒子。
 - **★ v1.50.35 通道收敛完成**：JSON 快照通道彻底移除——T1（v1.46.0）曾将其收敛为 test-only 真值源（`world_snapshot_json_debug_ptr/len`）供 `test-snapshot-bin.js` 对拍；现该导出与门禁脚本均已删除，生产与工具链路只剩 FABS 一条通道（`tools/` 统一走 `tools/snapshot-reader.js`）。
 - 前端 DOM ID 必须与 `render_inspector.js` / `main.js` 中的 `getElementById` 完全匹配（见 `frontend/AGENTS.md` §四）。
 

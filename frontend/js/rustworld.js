@@ -95,7 +95,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.62.2';
+        this._appVersion = '1.63.1';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -167,7 +167,10 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.62.2';
+            this._appVersion = msg.appVersion || '1.63.1';
+            if (msg.rainGpuShader && typeof window._resolveRainGpuShader === 'function') {
+              window._resolveRainGpuShader(msg.rainGpuShader);
+            }
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -501,7 +504,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.62.2';
+        return this._appVersion || '1.63.1';
 
       }
 
@@ -704,6 +707,8 @@
         this.climateEpochPhase = snap.climate_epoch_phase != null ? snap.climate_epoch_phase : 0.0;
         this.rainfallMultiplier = snap.rainfall_multiplier != null ? snap.rainfall_multiplier : 1.0;
         this.rainfallIntensity = snap.rainfall_intensity != null ? snap.rainfall_intensity : this.rainfallMultiplier;
+        // 降水粒子由 Rust 内核模拟，前端仅保留当前帧的只读渲染数据。
+        this.rainParticles = Array.isArray(snap.rain_particles) ? snap.rain_particles : [];
 
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
         // POI 卡片生效产速与生态大盘滑块位置均由本组数值驱动，保证两处数字一致

@@ -57,6 +57,8 @@ let w = window.innerWidth, h = window.innerHeight;
 
 // ★ 全量 WebGL：地形渲染器（装饰层与阴影层随地形同点惰性创建）
 let webglTerrainRenderer = null;
+let rainWebGPU = window.rainWebGPU || null;
+let rainWebGPUInit = window.rainWebGPUInit || null;
 
 // ==========================================
 // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
@@ -154,6 +156,9 @@ function parseMaslowNeed(needStr, agent) {
 // ==========================================
 function render(now) {
   requestAnimationFrame(render);
+
+  // WebGPU 是硬门槛：设备尚未就绪时暂停模拟与所有世界绘制，避免先进入无降水的游戏态。
+  if (window.rainWebGPUReady !== true) return;
 
   if (!now) now = performance.now();
   const elapsed = now - lastRenderTime;
@@ -254,6 +259,7 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   }
 
   window.webglTerrainActive = webglTerrainRendered;
+  if (rainWebGPU && rainWebGPU.ready) rainWebGPU.render(sim, camera, w, h, now);
 
   if (ctx) {
     ctx.clearRect(0, 0, w, h);

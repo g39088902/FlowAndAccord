@@ -1,7 +1,15 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.62.2**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.63.1**。
+
+| **v1.63.1**（代码变更 · Rust 驱动 WebGPU compute） | **降水粒子运动迁移到 GPU compute**：Rust/WASM 导出 WGSL 与确定性种子契约，WebGPU storage buffer 执行生成、下落、下坡流动、局部斥力和蒸发；JS 只提供浏览器 GPU 设备并提交 compute/render 命令，CPU 不再逐粒子更新。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl}, crates/sim_wasm/src/lib.rs, frontend/{js/{main,rustworld,sim_worker},webgpu/rain-particles.js} |
+
+| **v1.63.0**（不兼容变更 · Rust 降水粒子模拟） | **降水粒子状态契约迁移至 Rust/WASM，GPU 承担运行时物理**：Rust 提供降雨参数、粒子快照与 GPU 计算契约，GPU 执行落地、地形下坡流动、局部碰撞斥力与生命周期蒸发；FABS 新增 `RAIN_PARTICLES` section，存档格式升至 9；前端 WebGPU 只读取 Rust 快照并绘制，WebGPU 仍为启动硬门槛。 | crates/sim_core/src/spatial/{rain,world,world_tick,world_snapshot,snapshot,snapshot_bin}, crates/sim_wasm, frontend/{js/{snapshot-bin,rustworld},rust/sim_wasm.wasm,sim_wasm.wasm} |
+
+| **v1.62.4**（代码调整 · 降水粒子参数） | **降水粒子表现调优**：粒子直径统一放大 2 倍；粒子生成速率以当前“天空降雨量”滑块的 1.0x 为基准，按降雨倍率线性缩放，0x 停止生成新粒子但保留已有粒子自然蒸发。 | frontend/js/webgpu/rain-particles.js |
+
+| **v1.62.3**（代码新增 · WebGPU 降水粒子） | **新增独立 WebGPU 降水表现层**：雨滴从空中落到地表，接触地形后按双线性高程梯度向低处流动；落地粒子之间施加局部排斥力，粒子按短生命周期蒸发并受总量上限约束，避免地图水滴无限累积。此前粒子状态只存在于前端表现层；该实现已在 v1.63.0 迁移至 Rust/WASM 快照与存档；WebGPU 不可用时显示启动阻断覆盖层，游戏不会进入。 | frontend/{index.html,js/main.js,js/render_canvas.js,js/webgpu/rain-particles.js} |
 
 | **v1.62.2**（代码变更 · 单存档文件） | **存档系统改为单存档文件**：删除 3 槽位 `SLOTS` 数组与「保存/读取」标签页（`.save-tab-btn`，两个顶栏按钮打开同一面板），面板只渲染一张存档卡片。存档文件名与地图种子/槽位号**彻底解耦**——启动种子选择流程的建议名、文件选择器建议名与导出下载名统一为 `FlowAndAccordSave.json`（原 `flowaccord-seed-${seed}.json` / `flowaccord-${Date.now()}.json` / `flowaccord-saveN.json`）。IndexedDB 句柄记录键**沿用 `save1`**（`SAVE_SLOT_ID`，库 `flowaccord-save-handles` / keyPath `slotId`），使既有用户已连接的存档句柄仍能自动恢复。其余启动存档门禁、启动自动读档、30 秒自动保存、权限重授、版本/格式/兼容线三条门禁、`?nogate=1` 旁路、导入导出降级与「删除旧存档」脱困通道**行为不变**；`window.saveUI` 方法名不变；无 Rust 改动、无快照/存档格式变更。**同时修复**前端 `save-ui.js` 的存档格式镜像常量滞后（仍为 `7`，未随 v1.62.0 内核升至 `8`）——此前会把本版本自己写出的存档误判为「已废弃」，导致启动自动读档与面板「读取」双双失败，现已补正为 `8`。 | frontend/{index.html,js/save-ui.js,style.css}, frontend/AGENTS.md, docs/current/tech/{19-ui-implementation,06-snapshot-and-save,16-frontend-overview,21-frontend-dev-guide,31-code-map}.md |
 

@@ -35,6 +35,16 @@ fn set_error(msg: &str) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn world_rain_gpu_shader_ptr() -> u32 {
+    sim_core::spatial::rain::RAIN_GPU_WGSL.as_ptr() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn world_rain_gpu_shader_len() -> u32 {
+    sim_core::spatial::rain::RAIN_GPU_WGSL.len() as u32
+}
+
 fn clear_error() {
     unsafe {
         ERROR_BUF.clear();
