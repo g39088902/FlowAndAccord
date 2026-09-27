@@ -122,6 +122,7 @@ stateDiagram-v2
 | B14 | **外部市场隔离与单向流失（v1.13.0，v1.27.0 扩展）**：榷场互市不进入 `NodePool`，不设公地施密特触发器，由 B15 专用派发；★ v1.27.0 起水/粮采集断流时家户户主（账本黄金 ≥ `market_min_family_gold` 且体力达标）可由 `try_route_to_market` 直接改道榷场——仍是**家户账本远程结算付费**，不改变市场支付与黄金单向扣入 `LedgerRef::Void` 的通缩闭环；到达后先濒危自救再装袋购入 | ./09-market-pricing.md | 族人蹭吃蹭喝破坏公地平衡或黄金通缩机制失效 |
 | B15 | **决策分支数组定长联动（18分支）**：内核 `BranchId::ALL`、`resolve_order`、`seen` 与前端 `DEFAULT_ORDER`、`VALID_BRANCH_ID` 严格定长联动 | §4.14 / ./11-decision-engine.md §3.5 | 决策分支越界、反序列化 panic 或写盘校验失败 |
 | B16 | **衰弱守卫（★ v1.47.0 / v1.47.1）**：健康值 < `agentFrailHealthThreshold`（默认 2.0）即衰弱——`branches.rs::evaluate` 在**任何 RNG/散列消费之前**对 `b5/b6/b7/b9/b10/b13` 六条储备分支直接 `return None`（★ v1.47.1 起含 b13 淘金）；B1/B2 分支条件对衰弱者追加 `is_frail && can_home_meal` 或条件（家户账本余额 ≥ `decisionHomeMealMinStock` 即算可满足，野外断流也能派发返家） | decisions/AGENTS.md §4.14 | 衰弱者继续囤货/淘金违背「安度晚年」意图，或断流时家户有余粮却无人返家吃喝 |
+| B17 | **降水粒子为纯表现层（★ v1.64.0）**：粒子物理在 WebGPU compute 上推进，**不进 FABS 快照与 `WorldSave`**（`RAIN_PARTICLES` 段惰性空段、`rain_particles` 等存档字段已删），**不消费 `WorldRng`**、不写任何模拟状态；内核只保留 `rain_gpu_uniforms()` 参数契约（A/R/S/上限 + 交互力求根），经 `world_rain_uniforms_ptr/len` 下发。驱动跟随仿真 tick（暂停冻结、倍速加速）。 | §4.3 / ./18-water-rendering.md / 根 AGENTS.md §3 | 粒子进入确定性快照会破坏同种子逐字节一致；渲染层写模拟状态会污染内核事实 |
 
 ---
 

@@ -9,7 +9,7 @@ use super::snapshot::{
     HistoryKingSnapshot, HouseholdSnapshot, LaneSnapshot, LedgerBalanceSnapshot,
     MarketTradeSnapshot, MarriageSnapshot, NodeSnapshot, PoiSnapshot, RegionSnapshot, Season,
     TerrainAccentSnapshot, TerrainFeatureSnapshot, TerrainSubFeatureSnapshot,
-    TransferRecordSnapshot, VacantHouseSnapshot, WaterBodySnapshot, RainParticleSnapshot, WorldSnapshot3D,
+    TransferRecordSnapshot, VacantHouseSnapshot, WaterBodySnapshot, WorldSnapshot3D,
 };
 use super::world::World3DEngine;
 
@@ -783,10 +783,7 @@ impl World3DEngine {
             None
         };
         let water_bodies = self.water_body_snapshots();
-        let rain_particles = self.rain_particles.iter().map(|p| RainParticleSnapshot {
-            x: p.x, y: p.y, z: p.z, prev_x: p.prev_x, prev_y: p.prev_y, prev_z: p.prev_z,
-            age: p.age, max_age: p.max_age, falling: p.falling,
-        }).collect();
+        // ★ v1.64.0：降水粒子已迁往 GPU（纯表现层），快照段恒空（FABS 结构不变）。
 
         WorldSnapshot3D {
             tick: self.tick_counter,
@@ -795,7 +792,7 @@ impl World3DEngine {
             terrain_accents,
             terrain_sub_features,
             water_bodies,
-            rain_particles,
+            rain_particles: Vec::new(),
             terrain_generator_version: self.terrain.generator_version,
             terrain_profile: self.terrain.profile.clone(),
             grid_w: self.terrain.grid_width,

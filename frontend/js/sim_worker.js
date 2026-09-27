@@ -57,6 +57,20 @@ function readLastError() {
   return readLastErrorRaw();
 }
 
+// ★ v1.64.0：降水 GPU 参数契约（交互力求根 + 物理常数，由内核唯一校验）。
+function readRainUniforms() {
+  if (!_wasm || typeof _wasm.world_rain_uniforms_ptr !== 'function' || typeof _wasm.world_rain_uniforms_len !== 'function') return null;
+  const ptr = _wasm.world_rain_uniforms_ptr();
+  const len = _wasm.world_rain_uniforms_len();
+  if (!len) return null;
+  try {
+    return JSON.parse(_textDecoder.decode(new Uint8Array(_memory.buffer, ptr, len)));
+  } catch (e) {
+    console.warn('[sim_worker] 解析降水参数失败:', e);
+    return null;
+  }
+}
+
 // ★ STAGE2-5：创世失败读取不依赖 _ready（INIT/RESET 路径在建世界前调用）。
 function readLastErrorRaw() {
   if (typeof _wasm.world_last_error_len !== 'function') return '';
@@ -76,7 +90,7 @@ function getAppVersion() {
   }
   // ★ v1.44.2：兜底串必须与内核 SAVE_APP_VERSION 同格式（无 `v` 前缀），
   // 否则 save-ui 的版本门禁会把「同版本存档」误判为旧档（详见 save-ui.js::normalizeVer）
-  return '1.63.12';
+  return '1.64.2';
 
 }
 
@@ -483,6 +497,7 @@ self.onmessage = async function(e) {
           appVersion: getAppVersion(),
           enumTableJson,
           rainGpuShader: readRainGpuShader(),
+          rainUniforms: readRainUniforms(),
           snapshot: initialSnap,
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
           rewind: rewindMeta(),
@@ -531,6 +546,8 @@ self.onmessage = async function(e) {
         const ok = applyConfigInternal(msg.config);
         if (ok) {
           historyCommands.push({ tick: currentTick, type: 'CONFIG', config: msg.config });
+          // ★ v1.64.0：交互力 A/R 变更会影响求根与网格单元尺寸 → 重发降水参数契约
+          self.postMessage({ type: 'RAIN_UNIFORMS', uniforms: readRainUniforms() });
           pullAndPost('SNAPSHOT', { tickMs: 0 }, false);
         }
       }
@@ -594,6 +611,7 @@ self.onmessage = async function(e) {
           type: 'RESET_DONE',
           seed: _engineSeed,
           snapshot: res2 ? res2.bin : null,
+          rainUniforms: readRainUniforms(),
           wasmBytes: (_memory && _memory.buffer) ? _memory.buffer.byteLength : 0,
           rewind: rewindMeta(),
         };
@@ -665,6 +683,7 @@ self.onmessage = async function(e) {
         ok: res.ok,
         error: res.error || '',
         snapshot: loadSnap,
+        rainUniforms: res.ok ? readRainUniforms() : null,
         rewind: rewindMeta(),
       };
       if (loadRes && loadRes.bin) {

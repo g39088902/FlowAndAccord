@@ -38,6 +38,17 @@
 - 清泉 POI 按**普通资源 POI** 走既有渲染链（POI 底座 / 标记 / 储量环，`render_world.js::drawPoiGroundBase`/`drawPoiMarker`），与其他资源点无异。
 - 储量/再生/取水的数据链与快照下发不受本次删除影响（见 [14 号文](./14-terrain-and-network.md) §12）。
 
+### 1.3 唯一的粒子表现层：WebGPU 降水粒子（★ v1.64.0）
+
+世界另有一层**纯表现**的降水/水流粒子（天空降雨落到地表后沿地形下坡流动）：
+
+- 物理（生成 / 下落 / **3D 下坡流动** / 邻域力 `f(d)=A−√d−R/d` / 蒸发）在 **WebGPU compute** 上以 3D 固定网格空间哈希（3×3×3 + 单线程前缀和）推进，支持 2w+ 粒子同屏；`frontend/js/webgpu/rain-particles.js` 负责设备、子步编码与渲染（`drawIndirect`）。
+- **寿命**：生成时按 `RAIN_MAX_AGE_BASE + rand01 × RAIN_MAX_AGE_RAND` 抽定每个粒子的 `max_age`（`rain.rs`，随 `maxAgeBase`/`maxAgeRand` uniform 下发），当前为 **[0, 256) 秒均匀分布**；`age > max_age` 或出界即销毁回收槽位。
+- **运动能量衰减**：`flowIntegrate` 按年龄归一化求出能量 `energy = clamp(1 − age / max_age, 0, 1)`（生成时 1 → 寿命终点 0），用于缩放**下坡加速度**与**流速上限** —— 老粒子动能上限下降、越走越慢，最终趋于静止。
+- 它是**纯表现层**：不进 FABS 快照与存档（`RAIN_PARTICLES` 段惰性空段）、不消费 `WorldRng`、不写任何模拟状态；内核只保留参数契约（`rain.rs::rain_gpu_uniforms` + `world_rain_uniforms_ptr/len`）与 WGSL 导出（`rain_common/rain_compute/rain_render.wgsl`）。
+- 驱动**跟随仿真 tick**：主线程按快照 `tickCount` 增量推 dt（暂停冻结 / 倍速加速），`rainMaxSubsteps` / `rainDtClamp` / `rainNeighborCap` 为纯渲染配置（`RENDER_CONFIG`）。
+- 约束见 [28 号文](./28-invariants.md) B17；渲染样式（立方体 36 顶点、逐面明暗、颜色、淡出）自 v1.63.4 起未变。
+
 ---
 
 ## 2. 硬约束与设计原则

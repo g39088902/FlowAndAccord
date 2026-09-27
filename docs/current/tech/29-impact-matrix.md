@@ -129,6 +129,7 @@ M19.1 增量边界：`decisions/intent.rs`、`strategy.rs`、`primitive.rs`、`o
 | T0 占地或曲线合法性规则 | `geo/query.rs` / `housing_system/settlement.rs` / 后续 `ecology/spawn.rs` 与路网走廊生成器 / `config.rs` + `config.js` / `./05-config-reference.md` | 房屋、道路、农业和防务应消费统一查询，不能复制坡度/禁行判据 |
 | T1 地形 profile / 生成器算法 | `geo/terrain.rs` / `world.rs` 创世 / `world_save.rs` 生成器版本门禁 / `snapshot.rs` / `snapshot_bin` / 前端特征渲染 / 确定性矩阵 | seed 重建依赖生成器版本，旧路网不得与新地貌静默组合 |
 | `TerrainFeature` 或 FABS `Terrain` section | `snapshot.rs` / `world_snapshot.rs` / `snapshot_bin/layout.rs` + `encode.rs` / `snapshot-bin.js` / `rustworld.js` | FABS 是定长/变长顺序流，字段或 section 变化必须四处同步并升格式版本 |
+| 降水粒子（★ v1.64.0 纯表现层） | `rain.rs`（WGSL 导出 + `rain_force_roots` + `rain_gpu_uniforms`）/ `rain_common/rain_compute/rain_render.wgsl` / `sim_wasm`（`world_rain_gpu_shader_*` + `world_rain_uniforms_*`）/ `sim_worker.js` / `rustworld.js` / `webgpu/rain-particles.js` / `render_canvas.js` / `config.js` + `config.render.js` / `tools/config-check.js` | 粒子不入快照/存档（`RAIN_PARTICLES` 惰性空段），但**参数契约与 shader 由内核下发**，改 A/R/S/上限或物理常数须同步内核读取点与前端 uniform 打包 |
 
 ### 1.10 构建与部署
 

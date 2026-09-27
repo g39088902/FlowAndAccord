@@ -67,6 +67,7 @@ FlowAndAccord/
 │   │           ├── house.rs                # 5 阶房屋模型、耐久度与户主绑定 (M6 起无仓储，家户账本为唯一真相源)
 │   │           ├── agent.rs                # 部落民实体、生理代谢、随身行囊、运动与状态机
 │   │           ├── hormones.rs             # ★ H-01~09 神经内分泌状态机、基线合成、线性回归、离散脉冲与意愿通道（H-08/09，默认关）
+│   │           ├── rain.rs                 # ★ v1.64.0 降水粒子契约：WGSL 导出（rain_common/rain_compute/rain_render.wgsl concat）+ rain_force_roots 求根 + RainGpuUniforms（内核唯一校验下发）；物理已迁 WebGPU
 │   │           ├── ecology/                # 🌲 生态子模块 (7 文件)：播撒 + POI 采收装载 + 卸货入账 + 榷场结算
 │   │           │   ├── mod.rs              # 生态子模块入口与拆分说明
 │   │           │   ├── seed.rs             # 世界重置入口 + 播撒步骤编排 + 收尾 (索引/脏标记/APSP)
@@ -181,18 +182,20 @@ FlowAndAccord/
 │   │   ├── render_inspector.js             # Inspector 调度层 + 智能点击拾取 (★ v1.60.1 自 1860 行拆出 7 文件)
 │   │   ├── camp-detail.js                  # ★ v1.12.0 营地辖区详情模态 (window._campDetailTick)
 │   │   ├── render_hud.js                   # 顶部 HUD 数据栏、四季指针与系统控制状态
-│   │   └── webgl/                          # ★ WebGL 硬件加速渲染管线（★ v1.60.1 硬门槛：不可用即阻断启动；fallback-handler.js / render-canvas-patch.js / layers/terrain/test-grid.js 已删除）
-│   │       ├── core/
-│   │       │   ├── context.js              # WebGL2 上下文初始化与生命周期
-│   │       │   └── shader-manager.js       # 着色器编译与程序链接管理
-│   │       ├── layers/
-│   │       │   ├── terrain/
-│   │       │   │   └── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器（shader 直译 shadeAlbedoInto 受光 + 阴影图采样）
-│   │       │   └── accents/
-│   │       │       ├── accent-renderer.js   # 装饰图元 WebGL 三角化 + 解析式边缘 AA + 深度对齐（sink 图元）
-│   │       │       └── shadow-pass.js      # WebGL 装饰阴影 Pass（冠簇竖直压扁代理）
-│   │       └── utils/
-│   │           └── projection-utils.js     # 轴测投影矩阵与投影换算工具
+│   │   ├── webgl/                          # ★ WebGL 硬件加速渲染管线（★ v1.60.1 硬门槛：不可用即阻断启动；fallback-handler.js / render-canvas-patch.js / layers/terrain/test-grid.js 已删除）
+│   │   │   ├── core/
+│   │   │   │   ├── context.js              # WebGL2 上下文初始化与生命周期
+│   │   │   │   └── shader-manager.js       # 着色器编译与程序链接管理
+│   │   │   ├── layers/
+│   │   │   │   ├── terrain/
+│   │   │   │   │   └── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器（shader 直译 shadeAlbedoInto 受光 + 阴影图采样）
+│   │   │   │   └── accents/
+│   │   │   │       ├── accent-renderer.js   # 装饰图元 WebGL 三角化 + 解析式边缘 AA + 深度对齐（sink 图元）
+│   │   │   │       └── shadow-pass.js      # WebGL 装饰阴影 Pass（冠簇竖直压扁代理）
+│   │   │   └── utils/
+│   │   │       └── projection-utils.js     # 轴测投影矩阵与投影换算工具
+│   │   └── webgpu/                         # ★ WebGPU 硬门槛层（v1.60.1 起不可用即阻断启动）
+│   │       └── rain-particles.js           # ★ v1.64.0 降水粒子 compute 物理 + 渲染（3D 空间哈希 / 跟随 tick 驱动 / drawIndirect，纯表现层不入存档）
 │   ├── rust/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本

@@ -59,6 +59,8 @@ let w = window.innerWidth, h = window.innerHeight;
 let webglTerrainRenderer = null;
 let rainWebGPU = window.rainWebGPU || null;
 let rainWebGPUInit = window.rainWebGPUInit || null;
+// ★ v1.64.0 降水粒子跟随仿真 tick：按快照 tickCount 增量推 dt（暂停冻结 / 倍速加速）。
+let lastRainTick = 0;
 
 // ==========================================
 // 马斯洛需求层次元数据 (对应 sim_core decisions.rs 的 current_need 标识符)
@@ -259,7 +261,15 @@ if (isCameraFollow && sim.selectionType === 'agent') {
   }
 
   window.webglTerrainActive = webglTerrainRendered;
-  if (rainWebGPU && rainWebGPU.ready) rainWebGPU.render(sim, camera, w, h, now);
+if (rainWebGPU && rainWebGPU.ready) {
+  // ★ v1.64.0：粒子物理在 GPU，推进节拍跟随仿真 tick（tick 回退 = 倒流/重置/换世界 → 复位）。
+  const t = sim.tickCount | 0;
+  if (t < lastRainTick) rainWebGPU.reset();
+  const dTicks = Math.max(0, t - lastRainTick);
+  lastRainTick = t;
+  rainWebGPU.step(dTicks / 60, sim);
+  rainWebGPU.render(camera, w, h);
+}
 
   if (ctx) {
     ctx.clearRect(0, 0, w, h);

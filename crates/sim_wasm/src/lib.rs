@@ -27,6 +27,8 @@ static mut TERRAIN_CHUNK_BUF: Vec<u8> = Vec::new();
 /// Lazily built voxel backend. It is invalidated whenever WORLD is replaced.
 static mut TERRAIN_VOXEL_BACKEND: Option<VoxelBackend> = None;
 static mut TERRAIN_VOXEL_SCALE: f32 = 0.0;
+/// ★ v1.64.0 降水 GPU 参数 JSON 缓冲（`world_rain_uniforms_ptr/len` 读取）。
+static mut RAIN_UNIF_BUF: Vec<u8> = Vec::new();
 
 /// 记录最近一次错误文本（成功路径调用 clear_error）
 fn set_error(msg: &str) {
@@ -43,6 +45,24 @@ pub extern "C" fn world_rain_gpu_shader_ptr() -> u32 {
 #[no_mangle]
 pub extern "C" fn world_rain_gpu_shader_len() -> u32 {
     sim_core::spatial::rain::RAIN_GPU_WGSL.len() as u32
+}
+
+/// ★ v1.64.0：当前配置下的降水 GPU 参数（JSON），前端在 READY / CONFIG / LOAD 后各取一次。
+/// 参数契约由内核校验（交互力求根 + 物理常数单一真相源）。
+#[no_mangle]
+pub extern "C" fn world_rain_uniforms_ptr() -> u32 {
+    unsafe {
+        RAIN_UNIF_BUF = match WORLD.as_ref() {
+            Some(w) => serde_json::to_vec(&w.rain_gpu_uniforms()).unwrap_or_default(),
+            None => Vec::new(),
+        };
+        RAIN_UNIF_BUF.as_ptr() as u32
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn world_rain_uniforms_len() -> u32 {
+    unsafe { RAIN_UNIF_BUF.len() as u32 }
 }
 
 fn clear_error() {

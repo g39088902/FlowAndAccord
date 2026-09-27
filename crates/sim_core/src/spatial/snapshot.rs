@@ -27,6 +27,8 @@ pub enum Season {
 /// `Option<Vec<_>>`——`None`（JSON 序列化为 `null`）= 本帧**未发送**静态 section，
 /// 消费方必须保留既有缓存；`Some(vec)`（数组，**可为空**）= 明确携带静态全量数据，
 /// 即使空集合也必须整体替换旧值。严禁用数组长度猜测「是否发送」。
+/// ★ v1.64.0：降水粒子已迁往 WebGPU（纯表现层），本结构体与 `WorldSnapshot3D.rain_particles`
+/// 仅作**惰性保留**（恒空数组），FABS section id 与 encoder/decoder 结构不变，避免格式升版。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RainParticleSnapshot {
     pub x: f32,
@@ -58,7 +60,7 @@ pub struct WorldSnapshot3D {
     /// 降雨驱动的水面动态状态（每帧输出，静态地形几何仍由 terrain_features 提供）。
     #[serde(default)]
     pub water_bodies: Vec<WaterBodySnapshot>,
-    /// Rust-owned precipitation state for the WebGPU presentation layer.
+    /// ★ v1.64.0：降水粒子已迁往 WebGPU（纯表现层），本字段恒为空数组（section 惰性保留）。
     #[serde(default)]
     pub rain_particles: Vec<RainParticleSnapshot>,
     #[serde(default)]

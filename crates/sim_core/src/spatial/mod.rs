@@ -41,7 +41,7 @@ pub use snapshot::{
     TerrainFeatureSnapshot, WorldSnapshot3D,
 };
 pub use vec3::Vec3;
-pub use rain::RainParticle;
+pub use rain::RainGpuUniforms;
 pub use world::World3DEngine;
 pub use world_save::{
     app_version_compat_line, deserialize_save, serialize_save, WorldSave, SAVE_APP_VERSION,

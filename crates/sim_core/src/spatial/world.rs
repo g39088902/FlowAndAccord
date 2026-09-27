@@ -55,9 +55,6 @@ pub struct World3DEngine {
     /// 玩家控制的降雨倍率（0=无雨，1=季节基准，5=暴雨）。
     /// 与水源 POI 的再生倍率分开，避免手动降雨改变泉源本身的产能。
     pub rainfall_multiplier: f32,
-    pub rain_particles: Vec<super::rain::RainParticle>,
-    pub rain_spawn_carry: f32,
-    pub rain_rng_state: u64,
     pub berry_regen_multiplier: f32,
     pub wood_regen_multiplier: f32,
     pub stone_regen_multiplier: f32,
@@ -260,9 +257,6 @@ impl World3DEngine {
             rng: WorldRng::new(seed),
             water_regen_multiplier: 1.0,
             rainfall_multiplier: 1.0,
-            rain_particles: Vec::new(),
-            rain_spawn_carry: 0.0,
-            rain_rng_state: Self::rain_seed(seed),
             berry_regen_multiplier: 1.0,
             wood_regen_multiplier: 1.0,
             stone_regen_multiplier: 1.0,

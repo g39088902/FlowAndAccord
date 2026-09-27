@@ -464,7 +464,7 @@
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `rainAttractStrength` | f32 | 18 | spatial/rain.rs (粒子间引力力度) |  |
-| `rainRepelStrength` | f32 | 811 | spatial/rain.rs (粒子间斥力力度) | 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥） |
-| `rainForceScale` | f32 | 0.001 | spatial/rain.rs (总力量系数) | 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子 |
-| `rainParticleMax` | usize | 512 | spatial/rain.rs (存活粒子数量上限) | 存活粒子数量上限（达到上限后停止生成新粒子） |
+| `rainAttractStrength` | f32 | 12 | spatial/rain.rs (rain_gpu_uniforms 交互力 A) |  |
+| `rainRepelStrength` | f32 | 200 | spatial/rain.rs (rain_gpu_uniforms 交互力 R) | 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥） |
+| `rainForceScale` | f32 | 0.01 | spatial/rain.rs (rain_gpu_uniforms 总力量系数) | 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子 |
+| `rainParticleMax` | usize | 128 | spatial/rain.rs (rain_gpu_uniforms 粒子数量上限) | 存活粒子数量上限（达到上限后停止生成新粒子） |

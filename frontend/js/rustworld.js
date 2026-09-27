@@ -95,7 +95,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.63.12';
+        this._appVersion = '1.64.2';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -167,10 +167,12 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.63.12';
+            this._appVersion = msg.appVersion || '1.64.2';
             if (msg.rainGpuShader && typeof window._resolveRainGpuShader === 'function') {
               window._resolveRainGpuShader(msg.rainGpuShader);
             }
+            // ★ v1.64.0：降水 GPU 参数契约（内核唯一校验）随 READY 下发
+            this._applyRainUniforms(msg.rainUniforms);
 
             this._wasmBytes = msg.wasmBytes || 0;
             this._applyRewindMeta(msg.rewind);
@@ -204,6 +206,10 @@
               this._worker.postMessage({ type: 'PAUSE', isPaused: true });
             }
             this._worker.postMessage({ type: 'ACK' });
+            break;
+          }
+          case 'RAIN_UNIFORMS': {
+            this._applyRainUniforms(msg.uniforms);
             break;
           }
           case 'SNAPSHOT': {
@@ -264,6 +270,8 @@
               resolver({ ok: msg.ok, error: msg.error });
             }
             if (msg.ok && msg.snapshot) {
+              // ★ v1.64.0：读档世界的配置随存档回放 → 重取降水 GPU 参数契约
+              this._applyRainUniforms(msg.rainUniforms);
               // ★ M4：读档后引擎重建 → 清空解码器字符串缓存与车道几何缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               // ★ D-B1-7：读档世界替换 → 静态地形数据与装饰模型缓存随 LOAD_RESULT 生命周期失效
@@ -307,6 +315,8 @@
             if (Number.isSafeInteger(msg.seed) && msg.seed >= 0) this._engineSeed = msg.seed;
             this._applyRewindMeta(msg.rewind);
             if (msg.snapshot) {
+              // ★ v1.64.0：重置世界 → 重取降水 GPU 参数契约
+              this._applyRainUniforms(msg.rainUniforms);
               // ★ M4：重置后引擎全新 → 清空解码器字符串缓存
               if (window.SnapshotBin) window.SnapshotBin.resetCaches();
               // ★ D-B1-7：重置后引擎全新 → 静态地形数据与装饰模型缓存随 RESET_DONE 生命周期失效
@@ -365,6 +375,18 @@
         // ★ H-06：激素趋势缓存随 READY/LOAD_RESULT/REWIND_RESULT/RESET_DONE 生命周期失效
         //（换世界/读档/回溯/重置后旧样本不得参与差分，杜绝跨世界假趋势；tick 回退由采样器自兜底）
         if (window.HormoneTrend) window.HormoneTrend.reset();
+        // ★ v1.64.0：换世界/读档/回溯/重置 → 清空 GPU 降水粒子槽（纯表现层，不入存档）
+        if (window.rainWebGPU && typeof window.rainWebGPU.reset === 'function') window.rainWebGPU.reset();
+      }
+
+      // ★ v1.64.0：降水 GPU 参数契约（内核校验的交互力求根 + 物理常数）→ 转发给渲染层。
+      _applyRainUniforms(u) {
+        if (!u) return;
+        this.rainUniforms = u;
+        window.rainGpuUniforms = u;
+        if (window.rainWebGPU && typeof window.rainWebGPU.setUniforms === 'function') {
+          window.rainWebGPU.setUniforms(u);
+        }
       }
 
       // 从 window.SIM_CONFIG 读取营地数量（播种前传入 world_create，见 §4.7）
@@ -504,7 +526,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.63.12';
+        return this._appVersion || '1.64.2';
 
       }
 
@@ -707,7 +729,8 @@
         this.climateEpochPhase = snap.climate_epoch_phase != null ? snap.climate_epoch_phase : 0.0;
         this.rainfallMultiplier = snap.rainfall_multiplier != null ? snap.rainfall_multiplier : 1.0;
         this.rainfallIntensity = snap.rainfall_intensity != null ? snap.rainfall_intensity : this.rainfallMultiplier;
-        // 降水粒子由 Rust 内核模拟，前端仅保留当前帧的只读渲染数据。
+        // ★ v1.64.0：降水粒子已迁往 WebGPU（纯表现层），快照段恒空；此处保留只读映射以维持
+        //   `snapshot-check.js` 字段对应关系（实际渲染数据在 GPU，不回读）。
         this.rainParticles = Array.isArray(snap.rain_particles) ? snap.rain_particles : [];
 
         // ★ v1.22.6 生态大盘产速倍率（内核唯一真相源；缺省 1.0 兼容旧快照）
@@ -801,6 +824,9 @@
           }
           this.terrain = {
             gridSize: w,
+            // ★ v1.64.0：GPU 降水地形采样需要分别的宽高（网格可能非方形）。
+            gridW: w,
+            gridH: h,
             worldSize,
             minZ,
             maxZ,

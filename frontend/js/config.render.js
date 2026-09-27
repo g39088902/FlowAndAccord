@@ -320,8 +320,14 @@ window.RENDER_CONFIG = {
   // ⚠️ 改值需重开世界/刷新页面生效（不随帧重建）；0 = 关（回退原始逐格色场）。
   terrainAlbedoSmoothRadius: 2,
 
-  // —— 水粒子几何大小（★ WebGPU 降水层；rain-particles.js 逐帧经 camera uniform 传给 rain.wgsl）——
+  // —— 水粒子层（★ WebGPU compute + 渲染；rain-particles.js）——
   // 每个降水粒子绘制为世界空间立方体，本值为其**半边长**（世界单位，立方体边长 = 2 × 本值）。
   // 纯渲染参数：不进 SIM_CONFIG、不经 applyConfig；调试页改值即时生效，无需重编译 WASM。
-  rainCubeHalf: 4.0,
+  rainCubeHalf: 1.5,
+  // ★ v1.64.0 粒子推进节拍（跟随仿真 tick）：每帧最多推进的子步数与 dt 累加上限（秒），
+  //   防止高倍速（最高 128x）下一次性推入过多子步导致数值抖动。
+  rainMaxSubsteps: 8,
+  rainDtClamp: 0.25,
+  // 邻域力每粒子每子步最多结算的邻居对数（空间哈希退化时的兜底上限）。
+  rainNeighborCap: 32,
 };

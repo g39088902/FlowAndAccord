@@ -586,22 +586,12 @@ impl World3DEngine {
             ));
         }
 
-        // ══════════════ RAIN PARTICLES（Rust 模拟状态，每帧） ══════════════
+        // ══════════════ RAIN PARTICLES（★ v1.64.0：惰性空段）══════════════
+        // 降水粒子已迁往 WebGPU（纯表现层），不在快照中携带；本段保留固定 section id
+        // 与 count=0 空负载，使 FABS FORMAT_VERSION 无需升版（同 water_bodies 先例）。
         {
-            let mut w = BinWriter::with_capacity(self.rain_particles.len() * 36 + 4);
-            for p in &self.rain_particles {
-                w.f32(p.x); w.f32(p.y); w.f32(p.z);
-                w.f32(p.prev_x); w.f32(p.prev_y); w.f32(p.prev_z);
-                w.f32(p.age); w.f32(p.max_age);
-                w.u8(p.falling as u8);
-                w.align4();
-            }
-            w.align4();
-            secs.push(Sec::new(
-                SectionKind::RainParticles,
-                self.rain_particles.len() as u32,
-                w.into_inner(),
-            ));
+            let w = BinWriter::with_capacity(4);
+            secs.push(Sec::new(SectionKind::RainParticles, 0, w.into_inner()));
         }
 
         // ══════════════ HOUSEHOLD ══════════════

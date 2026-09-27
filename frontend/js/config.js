@@ -455,15 +455,18 @@ window.SIM_CONFIG = {
 
   // ==========================================================================
   // 16. 降水粒子物理 (Rain Particle Physics · spatial/rain.rs)
+  //     ★ v1.64.0：粒子物理在 WebGPU compute 上推进（3D 空间哈希），内核只校验本组参数
+  //       并经 `world_rain_uniforms_*` 下发（交互力求根 reach_near/reach_far + 物理常数）。
   //     ★ 均可在调试监视器浮窗的「水粒子物理」输入框中实时调节，改值即热注入内核。
   //     ★ 粒子几何大小属纯渲染参数，见 frontend/js/config.render.js: rainCubeHalf。
   //     ★ 落地粒子间交互力的速度脉冲（m/s，沿连线，正=吸引 / 负=排斥）：
   //         f(d) = rainAttractStrength − √d − rainRepelStrength / d
   //       仅当 f(d)=0 恰有 2 个正零点时有效（条件：rainRepelStrength < 4·rainAttractStrength³/27）；
   //       交互范围以离 0 较远的零点为终止界限，超出即不施加作用力。
+  //     ★ 当前默认值：交互力两个正零点 d≈31m / d≈100m，终止界限 reach_far≈100m。
   // ==========================================================================
-  rainAttractStrength: 18, // 引力力度 A：f(d)=A−√d−R/d 的常数项（越大吸引越强）
-  rainRepelStrength: 811,   // 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥）
-  rainForceScale: 0.001,    // 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子
-  rainParticleMax: 512,    // 存活粒子数量上限（达到上限后停止生成新粒子）
+  rainAttractStrength: 12,  // 引力力度 A：f(d)=A−√d−R/d 的常数项（越大吸引越强）
+  rainRepelStrength: 200,   // 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥）
+  rainForceScale: 0.01,     // 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子
+  rainParticleMax: 128,     // 存活粒子数量上限（达到上限后停止生成新粒子）
 };

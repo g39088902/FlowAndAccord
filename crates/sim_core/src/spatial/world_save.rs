@@ -35,6 +35,10 @@ use crate::rng::WorldRng;
 /// v1.46.12：BranchId 收敛为 16 条（b11→b8，b15→采购策略），不兼容旧活动任务枚举。
 /// v1.62.0：删除地图河流水系与土壤湿润，地形生成语义变化，不兼容旧档。
 /// v1.63.0：新增 Rust 降水粒子状态与私有随机流，不兼容旧档。
+/// v1.64.0：降水粒子迁往 WebGPU（纯表现层），存档**删除**其三个字段（`rain_particles` /
+///   `rain_spawn_carry` / `rain_rng_state`）。仅删字段、无新增读取路径，`WorldSave` 无
+///   `deny_unknown_fields` 且字段带 `#[serde(default)]` ⇒ 旧档同名多余字段被忽略，故
+///   `SAVE_FORMAT_VERSION` 不变（兼容线由 minor 升版推进，旧档仍按版本门禁废弃）。
 pub const SAVE_FORMAT_VERSION: u32 = 9;
 /// 存档应用版本（加载门禁 ★ v1.37.1 起：版本变更自动废弃旧档）
 ///
@@ -47,7 +51,7 @@ pub const SAVE_FORMAT_VERSION: u32 = 9;
 ///   - `major`（首位）：仅人工变更。
 ///   兼容判定经 `app_version_compat_line` 取前两段比对 ⇒ **历史三段串档案（如 `1.50.79`）
 ///   与本常量 `1.50` 同线**，不必因末尾升版而重开世界。
-pub const SAVE_APP_VERSION: &str = "1.63";
+pub const SAVE_APP_VERSION: &str = "1.64";
 
 /// 取应用版本字符串的**兼容线**（前两段，去可选 `v`/`V` 前缀与空白）。
 ///
@@ -143,12 +147,6 @@ pub struct WorldSave {
     pub water_regen_multiplier: f32,
     #[serde(default = "default_regen_multiplier")]
     pub rainfall_multiplier: f32,
-    #[serde(default)]
-    pub rain_particles: Vec<crate::spatial::rain::RainParticle>,
-    #[serde(default)]
-    pub rain_spawn_carry: f32,
-    #[serde(default)]
-    pub rain_rng_state: u64,
     pub berry_regen_multiplier: f32,
     pub wood_regen_multiplier: f32,
     pub stone_regen_multiplier: f32,
@@ -221,9 +219,6 @@ impl World3DEngine {
             rng: self.rng,
             water_regen_multiplier: self.water_regen_multiplier,
             rainfall_multiplier: self.rainfall_multiplier,
-            rain_particles: self.rain_particles.clone(),
-            rain_spawn_carry: self.rain_spawn_carry,
-            rain_rng_state: self.rain_rng_state,
             berry_regen_multiplier: self.berry_regen_multiplier,
             wood_regen_multiplier: self.wood_regen_multiplier,
             stone_regen_multiplier: self.stone_regen_multiplier,
@@ -363,9 +358,6 @@ pub fn deserialize_save(json: &str) -> Result<World3DEngine, String> {
         rng: save.rng,
         water_regen_multiplier: save.water_regen_multiplier,
         rainfall_multiplier: save.rainfall_multiplier,
-        rain_particles: save.rain_particles,
-        rain_spawn_carry: save.rain_spawn_carry,
-        rain_rng_state: save.rain_rng_state,
         berry_regen_multiplier: save.berry_regen_multiplier,
         wood_regen_multiplier: save.wood_regen_multiplier,
         stone_regen_multiplier: save.stone_regen_multiplier,

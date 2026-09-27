@@ -158,9 +158,9 @@ function updateDebugHud(now) {
   }
   dbgSetText('dbg-js-heap', s.memSupported ? `${fmtMB(s.jsHeapUsed)} / ${fmtMB(s.jsHeapLimit)}` : '浏览器不支持');
   dbgSetText('dbg-wasm-mem', fmtMB(s.wasmBytes));
-  // 💧 当前存活水粒子数 / 配置上限（内核 rainParticleMax，可在浮窗输入框实时调整）
+  // 💧 当前存活水粒子数 / 配置上限（★ v1.64.0：粒子在 GPU，存活数由 WebGPU 层每秒回读一次；内核 rainParticleMax 可在浮窗输入框实时调整）
   {
-    const rainN = Array.isArray(sim.rainParticles) ? sim.rainParticles.length : 0;
+    const rainN = (window.rainWebGPU && window.rainWebGPU.aliveCount >= 0) ? window.rainWebGPU.aliveCount : 0;
     const rainMax = (window.SIM_CONFIG && Number.isFinite(window.SIM_CONFIG.rainParticleMax))
       ? window.SIM_CONFIG.rainParticleMax : '—';
     dbgSetText('dbg-rain-count', `${rainN} / ${rainMax}`);
