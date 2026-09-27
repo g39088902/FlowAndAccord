@@ -323,11 +323,31 @@ window.RENDER_CONFIG = {
   // —— 水粒子层（★ WebGPU compute + 渲染；rain-particles.js）——
   // 每个降水粒子绘制为世界空间立方体，本值为其**半边长**（世界单位，立方体边长 = 2 × 本值）。
   // 纯渲染参数：不进 SIM_CONFIG、不经 applyConfig；调试页改值即时生效，无需重编译 WASM。
-  rainCubeHalf: 1.5,
+  rainCubeHalf: 3,
   // ★ v1.64.0 粒子推进节拍（跟随仿真 tick）：每帧最多推进的子步数与 dt 累加上限（秒），
   //   防止高倍速（最高 128x）下一次性推入过多子步导致数值抖动。
   rainMaxSubsteps: 8,
   rainDtClamp: 0.25,
   // 邻域力每粒子每子步最多结算的邻居对数（空间哈希退化时的兜底上限）。
   rainNeighborCap: 32,
+  // ★ v1.64.9 粒子重力加速度（m/s²）：覆盖内核契约 `RainGpuUniforms.gravity`（内核默认
+  //   `rain.rs::RAIN_GRAVITY = 72`），前端逐子步写入 params uniform ⇒ 浮窗改值即热生效、
+  //   无需重编译 WASM。下落态为完整竖直重力；落地态投影到地形切面（见 flowIntegrate）。
+  rainGravity: 72,
+  // —— ★ v1.64.4 蒸发邻域增益（纯表现层粒子物理，浮窗改值即热生效，无需重编译 WASM）——
+  // 每个粒子的蒸发（年龄推进）速度随「三维直线距离 r 内的存活粒子数 n」线性降低：
+  //   rate = max(minFactor, 1 − slowPerNeighbor × min(n, gainCap))   （单位 1/s，1 = 每秒推进 1 秒年龄）
+  // 即无邻居时 rate=1 ⇒ 寿命 = max_age 秒；n 个邻居时寿命拉长为 max_age / rate。
+  // 例：max_age=64s、n=10 ⇒ rate=0.8 ⇒ 实际存活 80s。
+  // minFactor = clamp(1 − slowPerNeighbor × gainCap, 0.05, 1)（默认 0.05）由前端推导后随
+  //   params uniform 下发，是「增益封顶 50 个」的落地形式。
+  // ⚠️ neighborRadius 必须 ≤ 3D 空间哈希单元边长（`_computeGrid` 的 cellSizeX/Y/Z），
+  //   否则 3×3×3 邻域扫不到半径内的邻居会漏算；当前世界 cellSize ≈ worldSize/10，默认 32m 安全。
+  rainEvapNeighborRadius: 32,  // 邻居判定半径 r（米，三维直线距离）
+  rainEvapSlowPerNeighbor: 0.02, // 每多 1 个邻居，蒸发速度降低的幅度（1/s）
+  rainEvapGainCap: 50,         // 增益上限：邻居数超过该值不再提供额外增益
+  // ★ v1.64.5 水粒子调试着色：按**蒸发速率**红(最快)→绿(最慢)给粒子上色（统一 alpha 0.85），
+  //   用于直观核对邻域增益是否按预期生效；关闭（false）时渲染与原样式逐位一致。
+  //   浮窗「水粒子物理」勾选框切换，改值即热生效。
+  rainDebugEvap: true,
 };

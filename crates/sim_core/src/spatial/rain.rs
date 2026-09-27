@@ -29,9 +29,9 @@ const RAIN_SPAWN_HEIGHT_BASE: f32 = 38.0;
 const RAIN_SPAWN_HEIGHT_RAND: f32 = 28.0;
 /// 生成初始水平速度幅度（m/s，取对称区间的一半）。
 const RAIN_SPAWN_SPEED: f32 = 1.2;
-/// 生命周期（秒）：基准 + 随机附加。当前基准 0、随机附加 256 ⇒ 均匀落在 [0, 256)。
-const RAIN_MAX_AGE_BASE: f32 = 0.0;
-const RAIN_MAX_AGE_RAND: f32 = 256.0;
+/// 生命周期（秒）：基准 + 随机附加。当前基准 1、随机附加 63 ⇒ 均匀落在 [1, 64)。
+const RAIN_MAX_AGE_BASE: f32 = 1.0;
+const RAIN_MAX_AGE_RAND: f32 = 63.0;
 /// 下落阶段的空气阻尼底数（按 dt*60 次方施加）与落地触发净空（m）。
 const RAIN_FALL_DAMP: f32 = 0.995;
 const RAIN_LAND_CLEARANCE: f32 = 0.22;
@@ -48,8 +48,8 @@ const RAIN_GRADIENT_MIN_STEP: f32 = 0.35;
 
 /// 下发给 GPU 的降水参数契约（序列化为 JSON，经 `world_rain_uniforms_ptr/len` 送到前端）。
 ///
-/// 交互力 `f(d) = attract − √d − repel / d`：仅当 `force_valid == 1`（恰有两个正零点）时有效，
-/// 交互范围为 `d < reach_far`，以 `reach_far` 为终止界限。
+/// 交互力 `f(d) = attract − √d − repel / d`（`d` = 两粒子**水平**间距，仅 x/y）：
+/// 仅当 `force_valid == 1`（恰有两个正零点）时有效，交互范围为 `d < reach_far`，以 `reach_far` 为终止界限（`d ≥ reach_far` 力归零）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RainGpuUniforms {
     pub attract: f32,

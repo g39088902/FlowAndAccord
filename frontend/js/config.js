@@ -461,12 +461,13 @@ window.SIM_CONFIG = {
   //     ★ 粒子几何大小属纯渲染参数，见 frontend/js/config.render.js: rainCubeHalf。
   //     ★ 落地粒子间交互力的速度脉冲（m/s，沿连线，正=吸引 / 负=排斥）：
   //         f(d) = rainAttractStrength − √d − rainRepelStrength / d
+  //       d 为两粒子**水平**间距（仅 x/y，不含垂直分量），与求零点口径一致；
   //       仅当 f(d)=0 恰有 2 个正零点时有效（条件：rainRepelStrength < 4·rainAttractStrength³/27）；
-  //       交互范围以离 0 较远的零点为终止界限，超出即不施加作用力。
-  //     ★ 当前默认值：交互力两个正零点 d≈31m / d≈100m，终止界限 reach_far≈100m。
+  //       交互范围以离 0 较远的零点为终止界限，超出（d ≥ d₂）即不施加作用力（力归零）。
+  //     ★ 当前默认值：交互力两个正零点 d≈43.96m / d≈108.62m，终止界限 reach_far≈108.62m。
   // ==========================================================================
-  rainAttractStrength: 12,  // 引力力度 A：f(d)=A−√d−R/d 的常数项（越大吸引越强）
-  rainRepelStrength: 200,   // 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥）
-  rainForceScale: 0.01,     // 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子
-  rainParticleMax: 128,     // 存活粒子数量上限（达到上限后停止生成新粒子）
+  rainAttractStrength: 13,  // 引力力度 A：f(d)=A−√d−R/d 的常数项（越大吸引越强）
+  rainRepelStrength: 280,   // 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥）
+  rainForceScale: 0.03,     // 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子
+  rainParticleMax: 256,     // 存活粒子数量上限（达到上限后停止生成新粒子）
 };

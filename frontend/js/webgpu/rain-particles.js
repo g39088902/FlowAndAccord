@@ -1,25 +1,29 @@
-// === WebGPU 降水粒子层（compute 物理 + 渲染）=================================
-// ★ v1.64.0：粒子物理（生成 / 下落 / 3D 下坡流动 / 邻域力 / 蒸发）已由 Rust 内核迁到
-//   本层 WebGPU compute，以 3D 固定网格空间哈希推进，支持 2w+ 粒子同屏。
+// === WebGPU 降水粒子层（compute 物理 + 渲染实例回读）=========================
+// ★ v1.64.0：粒子物理（生成 / 下落 / 3D 下坡流动 / 邻域力 / 蒸发）已从 Rust 内核迁到
+//   本层 WebGPU compute，以 3D 固定网格空间哈希推进。
 //   - 驱动跟随仿真 tick（render_canvas.js 推 dt，暂停即冻结、倍速即加速）；
-//   - 粒子状态为纯表现层，不进快照 / 存档，无 CPU 回读；
-//   - shader（compute + render 单模块）与物理常数由 Rust 导出（world_rain_gpu_shader_*、
-//     world_rain_uniforms_*），渲染样式与迁移前逐位一致。
+//   - 粒子状态为纯表现层，不进快照 / 存档；
+//   - ★ v1.64.3：**渲染改由 WebGL 层承担**（webgl/layers/rain/rain-renderer.js）——粒子原先
+//     绘制在本层独立的 `#sim-canvas-rain` 画布上，该画布无深度缓冲，GL 地形与装饰挡不住粒子。
+//     现本层只做 compute，并把存活粒子实例（x,y,z,age,falling）异步回读给 GL 层，
+//     与 GL 地形共享深度缓冲后地形逐像素正确遮挡、装饰按画家序覆盖。
+//   - shader（compute + render 单模块）与物理常数仍由 Rust 导出（world_rain_gpu_shader_*、
+//     world_rain_uniforms_*）；render 入口自渲染搬迁后不再使用（保留于同模块，不额外重编译）。
 class RainWebGPURenderer {
   constructor(canvas) {
-    this.canvas = canvas; this.device = null; this.context = null; this.format = null;
+    this.canvas = canvas || null;
+    this.device = null;
     this.ready = false; this.failed = false;
 
-    this.paramsBuffer = null;   // RainParams uniform（160B）
-    this.cameraBuffer = null;   // Camera uniform（32B）
+    this.paramsBuffer = null;   // RainParams uniform（176B）
     this.particlesBuffer = null; this.terrainBuffer = null;
     this.cellCounterBuffer = null; this.cellOffsetsBuffer = null;
     this.particleCellBuffer = null; this.sortedIdxBuffer = null; this.freeStackBuffer = null;
     this.simStateBuffer = null;
 
-    this.computeBgl = null; this.renderBgl = null;
-    this.computeBindGroup = null; this.renderBindGroup = null;
-    this._pipes = null; this.renderPipeline = null;
+    this.computeBgl = null;
+    this.computeBindGroup = null;
+    this._pipes = null;
 
     this._uniforms = null;              // Rust 下发的物理参数契约
     this._terrainRef = null; this._terrainData = null; this._terrainDirty = false;
@@ -28,9 +32,13 @@ class RainWebGPURenderer {
     this._maxParticles = 0; this._allocKey = '';
     this._dtAccum = 0; this._spawnCarry = 0; this._stepSeq = 0;
     this._seed = 0x51ed270b;
-    // 调试读数：每 ~1s 回读一次 GPU 存活数（仅喂给调试 HUD，不参与任何计算）。
+    // 渲染实例回读：GL 层消费的存活粒子紧凑数组（6 float/粒子）+ 存活数（调试 HUD 亦读 aliveCount）。
+    this.instances = new Float32Array(0);
+    this.instancesView = null;
+    this.instanceCount = 0;
     this.aliveCount = -1;
-    this._stagingBuffer = null; this._readbackPending = false; this._lastReadbackMs = 0;
+    this.evapMinFactor = 1;   // 蒸发速率下限（=_writeParams 推导；GL 调试着色定位红端）
+    this._staging = null; this._stagingBytes = 0; this._stagingPending = false;
 
     const simCfg = (typeof window !== 'undefined' && window.SIM_CONFIG) || {};
     this._fallbackMax = Math.max(1, simCfg.rainParticleMax | 0 || 2048);
@@ -40,10 +48,9 @@ class RainWebGPURenderer {
     this._dtClamp = Number.isFinite(rc.rainDtClamp) ? rc.rainDtClamp : 0.25;
     this._neighborCap = Math.max(1, rc.rainNeighborCap | 0 || 32);
 
-    this._paramsScratch = new ArrayBuffer(160);
+    this._paramsScratch = new ArrayBuffer(176);
     this._paramsF32 = new Float32Array(this._paramsScratch);
     this._paramsU32 = new Uint32Array(this._paramsScratch);
-    this._cameraScratch = new Float32Array(8);
   }
 
   // Rust 下发的降水参数契约（READY / CONFIG / LOAD 后各调用一次）。
@@ -53,16 +60,13 @@ class RainWebGPURenderer {
   }
 
   async init(shaderSource) {
-    if (!navigator.gpu || !this.canvas || !shaderSource) return false;
+    if (!navigator.gpu || !shaderSource) return false;
     try {
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
       if (!adapter) return false;
       this.device = await adapter.requestDevice();
-      this.context = this.canvas.getContext('webgpu');
       this.device.addEventListener('uncapturederror', e => console.error('[WebGPU][rain] uncaptured error:', e.error?.message || e.error));
       this.device.lost.then(info => console.error('[WebGPU][rain] device lost:', info.message || info.reason));
-      this.format = navigator.gpu.getPreferredCanvasFormat();
-      this.context.configure({ device: this.device, format: this.format, alphaMode: 'premultiplied' });
 
       const shader = this.device.createShaderModule({ code: shaderSource });
       if (typeof shader.getCompilationInfo === 'function') {
@@ -71,7 +75,6 @@ class RainWebGPURenderer {
         if (errors.length) throw new Error(errors.map(m => `${m.lineNum}:${m.linePos} ${m.message}`).join('\n'));
       }
 
-      const S = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST;
       const checked = async (fn, label) => {
         this.device.pushErrorScope('validation');
         const value = fn();
@@ -80,11 +83,10 @@ class RainWebGPURenderer {
         return value;
       };
 
-      this.paramsBuffer = this.device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.cameraBuffer = this.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.paramsBuffer = this.device.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
 
-      // 显式绑定：compute 用 0..8（1 uniform + 8 storage，默认 maxStorageBuffersPerShaderStage = 8），
-      // render 用 9..11（只读视图，顶点阶段不允许 read_write 存储，故两套布局分别绑定同一批缓冲）。
+      // compute 绑定 0..8（1 uniform + 8 storage，默认 maxStorageBuffersPerShaderStage = 8）；
+      // 模块内的 render 绑定 9..11 已无消费方（渲染迁至 GL），不建对应布局。
       const ro = { visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } };
       const rw = { visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } };
       this.computeBgl = this.device.createBindGroupLayout({
@@ -100,15 +102,7 @@ class RainWebGPURenderer {
           { binding: 8, ...rw },  // simState
         ],
       });
-      this.renderBgl = this.device.createBindGroupLayout({
-        entries: [
-          { binding: 9, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-          { binding: 10, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-          { binding: 11, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        ],
-      });
       const computeLayout = this.device.createPipelineLayout({ bindGroupLayouts: [this.computeBgl] });
-      const renderLayout = this.device.createPipelineLayout({ bindGroupLayouts: [this.renderBgl] });
 
       const mkPipe = (entryPoint) => this.device.createComputePipeline({
         layout: computeLayout,
@@ -118,6 +112,7 @@ class RainWebGPURenderer {
         initState: mkPipe('initState'),
         spawn: mkPipe('spawn'),
         flowIntegrate: mkPipe('flowIntegrate'),
+        evapGain: mkPipe('evapGain'),
         evict: mkPipe('evict'),
         gridClear: mkPipe('gridClear'),
         gridCount: mkPipe('gridCount'),
@@ -125,40 +120,14 @@ class RainWebGPURenderer {
         gridScatter: mkPipe('gridScatter'),
       }), 'compute pipelines');
 
-      this.renderPipeline = await checked(() => this.device.createRenderPipeline({
-        layout: renderLayout,
-        vertex: { module: shader, entryPoint: 'renderVertex' },
-        fragment: {
-          module: shader, entryPoint: 'renderFragment',
-          targets: [{
-            format: this.format,
-            blend: {
-              color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-              alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-            },
-          }],
-        },
-        primitive: { topology: 'triangle-list' },
-      }), 'render pipeline');
-
       this.ready = true;
-      console.info('[WebGPU][rain] initialized (compute + render); Rust WGSL bytes:', shaderSource.length);
+      console.info('[WebGPU][rain] initialized (compute only); Rust WGSL bytes:', shaderSource.length);
       return true;
     } catch (err) {
       this.failed = true;
       console.warn('[WebGPU] 降水层初始化失败：', err);
       return false;
     }
-  }
-
-  resize() {
-    if (!this.canvas || !this.context) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
-    const w = Math.max(1, Math.floor(window.innerWidth * dpr));
-    const h = Math.max(1, Math.floor(window.innerHeight * dpr));
-    if (this.canvas.width === w && this.canvas.height === h) return;
-    this.canvas.width = w; this.canvas.height = h;
-    this.context.configure({ device: this.device, format: this.format, alphaMode: 'premultiplied' });
   }
 
   // ── 地形上传（随世界重建触发；sim.terrain 对象引用变化即视为换地形）──
@@ -231,7 +200,7 @@ class RainWebGPURenderer {
     const mp = this._maxParticles;
     const nc = this._grid.cells;
     const tl = this._terrainData.data.length;
-    this.particlesBuffer = dev.createBuffer({ size: mp * 64, usage: S });
+    this.particlesBuffer = dev.createBuffer({ size: mp * 64, usage: S | GPUBufferUsage.COPY_SRC });
     this.terrainBuffer = dev.createBuffer({ size: Math.max(16, tl * 4), usage: S });
     // 前半段 = 单元计数，后半段 = 散布游标（= 各段起点）。
     this.cellCounterBuffer = dev.createBuffer({ size: Math.max(16, nc * 2 * 4), usage: S });
@@ -239,9 +208,9 @@ class RainWebGPURenderer {
     this.particleCellBuffer = dev.createBuffer({ size: mp * 4, usage: S });
     this.sortedIdxBuffer = dev.createBuffer({ size: mp * 4, usage: S });
     this.freeStackBuffer = dev.createBuffer({ size: mp * 4, usage: S });
-    // SimState：alive(u32) + freeTop(i32) + drawArgs[4]（间接绘制参数从字节偏移 8 读取）；
-    // COPY_SRC 供调试 HUD 每秒回读存活数。
-    this.simStateBuffer = dev.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+    // SimState：alive(u32) + freeTop(i32) + drawArgs[4]（内核写入的存活计数，渲染已迁 GL，
+    // 该段保留为内核契约，不再用于间接绘制）。
+    this.simStateBuffer = dev.createBuffer({ size: 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
 
     this.computeBindGroup = dev.createBindGroup({
       layout: this.computeBgl,
@@ -257,21 +226,16 @@ class RainWebGPURenderer {
         { binding: 8, resource: { buffer: this.simStateBuffer } },
       ],
     });
-    this.renderBindGroup = dev.createBindGroup({
-      layout: this.renderBgl,
-      entries: [
-        { binding: 9, resource: { buffer: this.cameraBuffer } },
-        { binding: 10, resource: { buffer: this.particlesBuffer } },
-        { binding: 11, resource: { buffer: this.sortedIdxBuffer } },
-      ],
-    });
   }
 
   _writeParams(spawnCount, stepSeq) {
     const f = this._paramsF32, u = this._paramsU32, g = this._grid, t = this._terrainData;
     const uni = this._uniforms || {};
+    const rc = (typeof window !== 'undefined' && window.RENDER_CONFIG) || {};
+    // ★ v1.64.9 重力大小：RENDER_CONFIG.rainGravity 覆盖内核契约值（缺失时回落 uni.gravity）。
+    const gravity = Number.isFinite(rc.rainGravity) ? rc.rainGravity : (uni.gravity || 0);
     f[0] = t.worldSize; f[1] = t.gridW; f[2] = t.gridH; f[3] = 1 / 60;
-    f[4] = uni.gravity || 0; f[5] = uni.spawn_height_base || 0; f[6] = uni.spawn_height_rand || 0; f[7] = uni.spawn_speed || 0;
+    f[4] = gravity; f[5] = uni.spawn_height_base || 0; f[6] = uni.spawn_height_rand || 0; f[7] = uni.spawn_speed || 0;
     f[8] = uni.max_age_base || 0; f[9] = uni.max_age_rand || 0; f[10] = uni.fall_damp || 0; f[11] = uni.land_clearance || 0;
     f[12] = uni.ground_rest_lift || 0; f[13] = uni.flow_rest_lift || 0; f[14] = uni.flow_accel || 0; f[15] = uni.flow_speed_max || 0;
     f[16] = uni.flow_damp || 0; f[17] = uni.gradient_min_step || 0; f[18] = uni.attract || 0; f[19] = uni.repel || 0;
@@ -280,6 +244,17 @@ class RainWebGPURenderer {
     u[28] = g.gx; u[29] = g.gy; u[30] = g.gz; u[31] = this._maxParticles;
     u[32] = spawnCount >>> 0; u[33] = this._seed >>> 0; u[34] = stepSeq >>> 0; u[35] = uni.force_valid === 1 ? 1 : 0;
     u[36] = this._neighborCap; u[37] = g.cells; u[38] = 0; u[39] = 0;
+    // ★ v1.64.4 蒸发邻域增益：逐子步从 RENDER_CONFIG 读取（浮窗改值即热生效）。
+    //   速率 = max(evapMinFactor, 1 − evapSlowPerNeighbor × min(邻居数, evapGainCap))。
+    const evapRadius = Number.isFinite(rc.rainEvapNeighborRadius) ? Math.max(0, rc.rainEvapNeighborRadius) : 0;
+    const evapSlow = Number.isFinite(rc.rainEvapSlowPerNeighbor) ? Math.max(0, rc.rainEvapSlowPerNeighbor) : 0;
+    const evapCap = Number.isFinite(rc.rainEvapGainCap) ? Math.max(1, Math.round(rc.rainEvapGainCap)) : 1;
+    f[40] = evapRadius;
+    f[41] = evapSlow;
+    f[42] = evapCap;
+    // 速率下限（= 邻居数封顶时的蒸发速度）唯一推导点：既下发内核，也供 GL 调试着色定位红端。
+    this.evapMinFactor = Math.min(1, Math.max(0.05, 1 - evapSlow * evapCap));
+    f[43] = this.evapMinFactor;
     this.device.queue.writeBuffer(this.paramsBuffer, 0, this._paramsScratch);
   }
 
@@ -294,30 +269,13 @@ class RainWebGPURenderer {
     this.device.queue.submit([enc.finish()]);
   }
 
-  // 世界切换 / 重置 / 倒流：清空粒子槽与累加器。
+  // 世界切换 / 重置 / 倒流：清空粒子槽与累加器（渲染实例同步失效，待下帧回读刷新）。
   reset() {
     this._dtAccum = 0; this._spawnCarry = 0; this._stepSeq = 0;
     this.aliveCount = -1;
+    this.instanceCount = 0;
+    this.instancesView = null;
     if (this.ready && this._pipes && this.computeBindGroup) this._dispatchInit();
-  }
-
-  // 每秒一次回读存活数（16 字节，仅诊断用；异步、不阻塞渲染、不回灌模拟）。
-  _maybeReadbackAlive(now) {
-    if (this._readbackPending || !this.simStateBuffer) return;
-    if (now - this._lastReadbackMs < 1000) return;
-    this._lastReadbackMs = now;
-    if (!this._stagingBuffer) {
-      this._stagingBuffer = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-    }
-    const enc = this.device.createCommandEncoder();
-    enc.copyBufferToBuffer(this.simStateBuffer, 0, this._stagingBuffer, 0, 16);
-    this.device.queue.submit([enc.finish()]);
-    this._readbackPending = true;
-    this._stagingBuffer.mapAsync(GPUMapMode.READ).then(() => {
-      this.aliveCount = new DataView(this._stagingBuffer.getMappedRange()).getUint32(0, true);
-      this._stagingBuffer.unmap();
-      this._readbackPending = false;
-    }).catch(() => { this._readbackPending = false; });
   }
 
   _ensureConfigured() {
@@ -381,6 +339,8 @@ class RainWebGPURenderer {
       cp.dispatchWorkgroups(Math.max(1, Math.ceil(count / 64)));
     }
     cp.setPipeline(this._pipes.flowIntegrate); cp.dispatchWorkgroups(Math.max(1, Math.ceil(mp / 64)));
+    // B2 蒸发邻域统计（复用本子步 B 之前的网格，口径同邻域力），写 misc.z 供 C 缩放蒸发速度。
+    cp.setPipeline(this._pipes.evapGain); cp.dispatchWorkgroups(Math.max(1, Math.ceil(mp / 64)));
     cp.setPipeline(this._pipes.evict); cp.dispatchWorkgroups(Math.max(1, Math.ceil(mp / 64)));
     cp.setPipeline(this._pipes.gridClear); cp.dispatchWorkgroups(Math.max(1, Math.ceil(nc / 256)));
     cp.setPipeline(this._pipes.gridCount); cp.dispatchWorkgroups(Math.max(1, Math.ceil(mp / 64)));
@@ -390,32 +350,58 @@ class RainWebGPURenderer {
     this.device.queue.submit([enc.finish()]);
   }
 
-  render(camera, width, height) {
-    if (!this.ready || !camera || !this.simStateBuffer) return;
-    this.resize();
-    const rc = (typeof window !== 'undefined' && window.RENDER_CONFIG) || {};
-    const cubeHalf = Number.isFinite(rc.rainCubeHalf) ? rc.rainCubeHalf : 6.0;
-    this._cameraScratch[0] = width; this._cameraScratch[1] = height;
-    this._cameraScratch[2] = camera.panX; this._cameraScratch[3] = camera.panY;
-    this._cameraScratch[4] = camera.rotX; this._cameraScratch[5] = camera.rotZ;
-    this._cameraScratch[6] = camera.zoom; this._cameraScratch[7] = cubeHalf;
-    this.device.queue.writeBuffer(this.cameraBuffer, 0, this._cameraScratch);
-
-    const enc = this.device.createCommandEncoder();
-    const pass = enc.beginRenderPass({
-      colorAttachments: [{
-        view: this.context.getCurrentTexture().createView(),
-        loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 },
-      }],
+  // ── 渲染实例回读（每帧一次，供 GL 渲染层消费）─────────────────────────────
+  // 回读整个粒子缓冲（Particle 16 float：pos.xyz@0..2、age=pos.w@3、misc.x=alive@12、
+  // misc.y=falling@13、misc.z=邻域粒数@14、misc.w=蒸发速率@15），CPU 侧筛出存活粒子写成
+  // 紧凑实例数组（6 float/粒子：x, y, z, age, falling, rate）。
+  // 单缓冲 + 在途闸：一次 mapAsync 未完成前不发起下一次，数据最多滞后 1~2 帧。
+  _ensureStaging() {
+    const bytes = Math.max(16, this._maxParticles * 64);
+    if (this._staging && this._stagingBytes === bytes) return true;
+    if (this._stagingPending) return false;   // 在途回读结束前不换缓冲（避免销毁已 map 的缓冲）
+    if (this._staging) { this._staging.destroy(); this._staging = null; }
+    this._staging = this.device.createBuffer({
+      size: bytes,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
-    // drawArgs[1] = 存活数（gridScan 写出），死亡粒子天然不在 sortedIdx 列表内。
-    // SimState 布局：alive(0) / freeTop(4) / drawArgs(8) → 间接绘制参数从偏移 8 读取。
-    pass.setPipeline(this.renderPipeline);
-    pass.setBindGroup(0, this.renderBindGroup);
-    pass.drawIndirect(this.simStateBuffer, 8);
-    pass.end();
+    this._stagingBytes = bytes;
+    this.instances = new Float32Array(this._maxParticles * 6);
+    this.instancesView = null;
+    this.instanceCount = 0; this.aliveCount = -1;
+    return true;
+  }
+
+  pullInstances() {
+    if (!this.ready || !this.particlesBuffer) return;
+    if (!this._ensureStaging()) return;
+    if (this._stagingPending) return;
+    const buf = this._staging;
+    const bytes = this._stagingBytes;
+    const enc = this.device.createCommandEncoder();
+    enc.copyBufferToBuffer(this.particlesBuffer, 0, buf, 0, bytes);
     this.device.queue.submit([enc.finish()]);
-    this._maybeReadbackAlive(performance.now());
+    this._stagingPending = true;
+    buf.mapAsync(GPUMapMode.READ).then(() => {
+      const src = new Float32Array(buf.getMappedRange(0, bytes));
+      const dst = this.instances;
+      const mp = this._maxParticles;
+      let n = 0;
+      for (let i = 0; i < mp; i++) {
+        const o = i * 16;
+        if (src[o + 12] <= 0.5) continue;      // misc.x = alive
+        const d = n * 6;
+        dst[d] = src[o]; dst[d + 1] = src[o + 1]; dst[d + 2] = src[o + 2];
+        dst[d + 3] = src[o + 3];               // age = pos.w（寿命淡出）
+        dst[d + 4] = src[o + 13];              // misc.y = falling
+        dst[d + 5] = src[o + 15];              // misc.w = 蒸发速率（调试着色消费）
+        n++;
+      }
+      this.instanceCount = n;
+      this.aliveCount = n;
+      this.instancesView = dst.subarray(0, n * 6);
+      buf.unmap();
+      this._stagingPending = false;
+    }).catch(() => { this._stagingPending = false; });
   }
 }
 window.RainWebGPURenderer = RainWebGPURenderer;

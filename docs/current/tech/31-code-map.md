@@ -189,13 +189,15 @@ FlowAndAccord/
 │   │   │   ├── layers/
 │   │   │   │   ├── terrain/
 │   │   │   │   │   └── terrain-renderer.js # 真实地形网格与 Diorama 侧壁 WebGL 渲染器（shader 直译 shadeAlbedoInto 受光 + 阴影图采样）
+│   │   │   │   ├── rain/
+│   │   │   │   │   └── rain-renderer.js    # ★ 降水粒子 WebGL 渲染层（实例化立方体，与地形共享深度缓冲 ⇒ 地形遮挡 + 装饰画家序覆盖）
 │   │   │   │   └── accents/
 │   │   │   │       ├── accent-renderer.js   # 装饰图元 WebGL 三角化 + 解析式边缘 AA + 深度对齐（sink 图元）
 │   │   │   │       └── shadow-pass.js      # WebGL 装饰阴影 Pass（冠簇竖直压扁代理）
 │   │   │   └── utils/
 │   │   │       └── projection-utils.js     # 轴测投影矩阵与投影换算工具
 │   │   └── webgpu/                         # ★ WebGPU 硬门槛层（v1.60.1 起不可用即阻断启动）
-│   │       └── rain-particles.js           # ★ v1.64.0 降水粒子 compute 物理 + 渲染（3D 空间哈希 / 跟随 tick 驱动 / drawIndirect，纯表现层不入存档）
+│   │       └── rain-particles.js           # ★ v1.64.0 降水粒子 compute 物理（3D 空间哈希 / 跟随 tick 驱动，纯表现层不入存档）；★ v1.64.3 渲染迁 GL，本层回读存活实例供 GL 消费
 │   ├── rust/
 │   │   └── sim_wasm.wasm                   # WASM 编译产物主副本 (rustworld.js 实际 fetch 路径)
 │   ├── sim_wasm.wasm                       # WASM 编译产物根目录备用副本

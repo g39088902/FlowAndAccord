@@ -1,21 +1,20 @@
 // === 全局初始化、相机控制与 UI 事件绑定 ===
     const canvas = document.getElementById('sim-canvas');
     const glCanvas = document.getElementById('sim-canvas-gl');
-    const rainCanvas = document.getElementById('sim-canvas-rain');
     const ctx = canvas.getContext('2d');
     window.ctx = ctx;
 
-    // Rust/WASM 提供降水粒子渲染 WGSL；粒子物理由内核 world_tick 确定性推进并经快照下发。
+    // Rust/WASM 提供降水粒子 WGSL；粒子物理在本层 WebGPU compute 推进，渲染由 WebGL 层承担。
     let resolveRainGpuShader;
     window.rainWebGPUShaderPromise = new Promise(resolve => { resolveRainGpuShader = resolve; });
     window._resolveRainGpuShader = resolveRainGpuShader;
     // RustWorld 先启动 Worker，READY 消息携带 Rust 编译进 WASM 的 WGSL。
     const sim = new RustWorld();
-    // ★ WebGPU 降水层是当前渲染管线的硬门槛：没有 WebGPU 就不启动世界。
-    if (!rainCanvas || !navigator.gpu || !window.RainWebGPURenderer) {
-      showWebGpuGateError('当前浏览器不支持 WebGPU，无法初始化降水粒子渲染管线。请使用启用 WebGPU 的现代 Chrome / Edge。');
+    // ★ WebGPU 是硬门槛：粒子物理无 CPU 回退，没有 WebGPU 就不启动世界。
+    if (!navigator.gpu || !window.RainWebGPURenderer) {
+      showWebGpuGateError('当前浏览器不支持 WebGPU，无法初始化降水粒子物理管线。请使用启用 WebGPU 的现代 Chrome / Edge。');
     }
-    window.rainWebGPU = new RainWebGPURenderer(rainCanvas);
+    window.rainWebGPU = new RainWebGPURenderer();
     window.rainWebGPUInit = window.rainWebGPUShaderPromise.then(shader => window.rainWebGPU.init(shader)).then(ok => {
       if (!ok) throw new Error('WebGPU 设备初始化失败');
       window.rainWebGPUReady = true;
@@ -63,11 +62,6 @@
         glCanvas.width = cw;
         glCanvas.height = ch;
       }
-      if (rainCanvas) {
-        rainCanvas.width = cw;
-        rainCanvas.height = ch;
-      }
-      if (window.RainWebGPURenderer && window.rainWebGPU) window.rainWebGPU.resize();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -615,8 +609,10 @@
         { id: 'dbg-rain-attract-strength', cfg: simCfg, key: 'rainAttractStrength', min: 0 },
         { id: 'dbg-rain-repel-strength', cfg: simCfg, key: 'rainRepelStrength', min: 0 },
         { id: 'dbg-rain-force-scale', cfg: simCfg, key: 'rainForceScale', min: 0 },
+        { id: 'dbg-rain-gravity', cfg: renderCfg, key: 'rainGravity', min: 0 },
         { id: 'dbg-rain-cube-half', cfg: renderCfg, key: 'rainCubeHalf', min: 0.1 },
         { id: 'dbg-rain-particle-max', cfg: simCfg, key: 'rainParticleMax', min: 0, integer: true },
+        { id: 'dbg-rain-evap-radius', cfg: renderCfg, key: 'rainEvapNeighborRadius', min: 0 },
       ];
       let simDirty = false;
       const flushSim = () => {
@@ -639,6 +635,12 @@
         el.addEventListener('change', () => { commit(); flushSim(); drawRainPlot(); });
         el.addEventListener('keydown', ev => { if (ev.key === 'Enter') { commit(); flushSim(); drawRainPlot(); } });
       });
+      // ★ v1.64.5 蒸发速率调试着色开关（纯渲染开关：GL 粒子层逐帧读 RENDER_CONFIG，勾选即热生效）
+      const chkEvap = document.getElementById('dbg-rain-debug-evap');
+      if (chkEvap) {
+        chkEvap.checked = renderCfg.rainDebugEvap === true;
+        chkEvap.addEventListener('change', () => { renderCfg.rainDebugEvap = chkEvap.checked; });
+      }
       drawRainPlot();
 
       // ── 交互力函数图像 f(d) = A − √d − R/d ───────────────────────────────
@@ -670,12 +672,15 @@
         const scale = Number.isFinite(S) ? Math.max(0, S) : 1;
         const f = d => (A - Math.sqrt(d) - R / d) * scale;
         const roots = rainForceRoots(A, R);
+        // ★ 实际施加口径：以较远零点 d₂ 为终止界限，d ≥ d₂ **不结算**（力归零）。
+        //   图像须同口径——超出 d₂ 的区间画成 0，否则会误导成「仍有斥力」。
+        const fd = d => (roots && d >= roots.far) ? 0 : f(d);
         // 横轴范围：有效时取「较远零点」的 1.3 倍，无效时用 A² (f=0 附近的尺度) 兜底。
         const dMax = roots ? Math.max(roots.far * 1.3, 1e-3)
           : (Number.isFinite(A) && A > 0 ? Math.max(4 * A * A, 1) : 20);
         // 纵轴范围：正负对称，取采样 |f| 的 95 分位以避开 d→0 的发散。
         const N = 220; const ys = [];
-        for (let i = 1; i <= N; i++) { const d = dMax * i / N; const v = f(d); if (Number.isFinite(v)) ys.push(v); }
+        for (let i = 1; i <= N; i++) { const d = dMax * i / N; const v = fd(d); if (Number.isFinite(v)) ys.push(v); }
         ys.sort((a, b) => a - b);
         const q = ys.length ? ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.95))] : 1;
         const yMax = Math.max(1e-6, Math.abs(q) * 1.15);
@@ -709,8 +714,8 @@
         ctx.lineWidth = 2.5;
         for (let i = 0; i < N; i++) {
           const d0 = dMax * i / N, d1 = dMax * (i + 1) / N;
-          const v0 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, f(d0) || 0));
-          const v1 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, f(d1) || 0));
+          const v0 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, fd(d0) || 0));
+          const v1 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, fd(d1) || 0));
           ctx.strokeStyle = (v0 + v1) / 2 >= 0 ? '#34d399' : '#f87171';
           ctx.beginPath(); ctx.moveTo(px(d0), py(v0)); ctx.lineTo(px(d1), py(v1)); ctx.stroke();
         }

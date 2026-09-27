@@ -247,6 +247,16 @@ if (isCameraFollow && sim.selectionType === 'agent') {
           showWebglGateError('WebGL 阴影图层初始化失败：' + (e && e.message ? e.message : e));
         });
       }
+      // ★ 降水粒子渲染层：粒子物理仍在 WebGPU compute，渲染搬到 GL 层以共享深度缓冲
+      //   （地形逐像素遮挡 + 装饰画家序覆盖）。实例数据由 rainWebGPU 回读提供。
+      if (!window.WebGLRainLayer && window.WebGLRainRenderer) {
+        window.WebGLRainLayer = new WebGLRainRenderer(window.webglContext, window.webglManager);
+        window.WebGLRainLayer.init().then(() => {
+          console.log('[WebGL] Rain Renderer initialized');
+        }).catch(e => {
+          showWebglGateError('WebGL 降水渲染层初始化失败：' + (e && e.message ? e.message : e));
+        });
+      }
     }
 
     if (webglTerrainRenderer && webglTerrainRenderer.isReady() && sim.terrain && sim.terrain.cells) {
@@ -257,6 +267,12 @@ if (isCameraFollow && sim.selectionType === 'agent') {
       webglTerrainRenderer.render(camera, w, h, sim);
       webglTerrainRendered = true;
       dbgRenderMs = 0;
+
+      // ★ 降水粒子：紧跟地形之后绘制（深度测试读本帧地形深度 ⇒ 山后粒子被遮），
+      //   装饰层在 drawWorldEntities 期间提交 ⇒ 按画家序覆盖粒子。
+      if (window.WebGLRainLayer && window.WebGLRainLayer.isReady() && rainWebGPU && rainWebGPU.ready) {
+        window.WebGLRainLayer.render(camera, w, h, rainWebGPU.instancesView, rainWebGPU.instanceCount, rainWebGPU.evapMinFactor);
+      }
     }
   }
 
@@ -268,7 +284,8 @@ if (rainWebGPU && rainWebGPU.ready) {
   const dTicks = Math.max(0, t - lastRainTick);
   lastRainTick = t;
   rainWebGPU.step(dTicks / 60, sim);
-  rainWebGPU.render(camera, w, h);
+  // 渲染实例回读：本帧发起拷贝 + 异步 map，GL 层下一帧消费（最多滞后 1~2 帧）。
+  rainWebGPU.pullInstances();
 }
 
   if (ctx) {

@@ -1,7 +1,7 @@
 // 降水粒子 compute 入口（3D 固定网格空间哈希 + 重力下落 + 3D 下坡流动 + 邻域力 + 蒸发）。
 //
-// 每子步顺序（勿调换）：A spawn → B flowIntegrate → C evict → D gridClear →
-// E gridCount → F gridScan → G gridScatter。B 使用「上一子步末」构建的网格（稳定位形），
+// 每子步顺序（勿调换）：A spawn → B flowIntegrate → B2 evapGain → C evict → D gridClear →
+// E gridCount → F gridScan → G gridScatter。B/B2 使用「上一子步末」构建的网格（稳定位形），
 // 单子步位移远小于网格单元，故 3×3×3 邻域仍覆盖全部交互对。
 
 // ── 确定性哈希随机（无状态，取代旧 CPU LCG）──
@@ -187,15 +187,19 @@ fn flowIntegrate(@builtin(global_invocation_id) gid: vec3<u32>) {
               if (j == i) { continue; }
               let q = particles[j];
               if (q.misc.x < 0.5) { continue; }
-              let d3 = q.prev.xyz - selfPos;
-              let d2 = dot(d3, d3);
+              // ★ 距离口径 = 两粒子**水平**间距（仅 x/y），与 f(d)=A−√d−R/d 的求零点
+              //   reach_near/reach_far（rain.rs::rain_force_roots）一致；力也只施加到 vx/vy。
+              //   若改用三维距离，地形起伏会把 d 抬高，使同一水平间距落在不同(skip)区间，
+              //   令 d₂ 终止界限失真（旧 CPU 实现即水平距离，此处为其逐式复刻）。
+              let dx = q.prev.x - selfPos.x;
+              let dy = q.prev.y - selfPos.y;
+              let d2 = dx * dx + dy * dy;
               if (d2 <= 0.0 || d2 >= reach2) { continue; }
               let dlen = sqrt(d2);
               let f = (params.attractA - sqrt(dlen) - params.repelR / dlen) * params.forceScale;
               let inv = f / dlen;
-              vx = vx + d3.x * inv;
-              vy = vy + d3.y * inv;
-              vz = vz + d3.z * inv;
+              vx = vx + dx * inv;
+              vy = vy + dy * inv;
               gathered = gathered + 1u;
               if (gathered >= params.neighborCap) { break; }
             }
@@ -230,14 +234,73 @@ fn flowIntegrate(@builtin(global_invocation_id) gid: vec3<u32>) {
   particles[i].misc = vec4<f32>(1.0, select(0.0, 1.0, falling), 0.0, 0.0);
 }
 
-// ── C. 蒸发 / 出界销毁（并推进 age）──
+// ── B2. 蒸发邻域统计 ──
+// 统计每个存活粒子「三维直线距离 evapRadius 内」的其它存活粒子数（上限 evapGainCap），
+// 写入 misc.z 供 evict 缩放蒸发速度（★ v1.64.4 规则：每多 1 个邻居，蒸发速度降低
+// evapSlowPerNeighbor /s，增益最多算 evapGainCap 个）。独立于邻域力（力只在落地态施加），
+// 故下落中的粒子同样计入。复用上一子步末构建的 3D 网格（口径同 flowIntegrate），
+// 集齐上限即提前退出，密集水体不会退化成全量扫描。
+@compute @workgroup_size(64)
+fn evapGain(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let i = gid.x;
+  if (i >= params.maxParticles) { return; }
+  let p = particles[i];
+  if (p.misc.x < 0.5) { return; }
+
+  let cap = u32(params.evapGainCap);
+  let r2 = params.evapRadius * params.evapRadius;
+  var near = 0u;
+  if (r2 > 0.0 && cap > 0u) {
+    let selfPos = p.pos.xyz;
+    let origin = cellPos(selfPos);
+    for (var dz = -1; dz <= 1; dz = dz + 1) {
+      for (var dy = -1; dy <= 1; dy = dy + 1) {
+        for (var dx = -1; dx <= 1; dx = dx + 1) {
+          let cxi = i32(origin.x) + dx;
+          let cyi = i32(origin.y) + dy;
+          let czi = i32(origin.z) + dz;
+          if (cxi < 0 || cyi < 0 || czi < 0) { continue; }
+          if (cxi >= i32(params.gridX) || cyi >= i32(params.gridY) || czi >= i32(params.gridZ)) { continue; }
+          let ci = cellIndex(vec3<u32>(u32(cxi), u32(cyi), u32(czi)));
+          let start = cellOffsets[ci];
+          let end = cellOffsets[ci + 1u];
+          for (var k = start; k < end; k = k + 1u) {
+            let j = sortedIdx[k];
+            if (j == i) { continue; }
+            let q = particles[j];
+            if (q.misc.x < 0.5) { continue; }
+            let d3 = q.pos.xyz - selfPos;
+            if (dot(d3, d3) <= r2) {
+              near = near + 1u;
+              if (near >= cap) { break; }
+            }
+          }
+          if (near >= cap) { break; }
+        }
+        if (near >= cap) { break; }
+      }
+    }
+  }
+  // 蒸发速度（1/s）：无邻居 1.0（每秒推进 1 秒年龄）→ 每多 1 个邻居降 evapSlowPerNeighbor，
+  // 邻居数封顶 evapGainCap（等价于速率下限 evapMinFactor）。同伴越多越耐蒸发。
+  // 速率唯一计算点是 B2 evapGain（写入 misc.w），此处只消费；misc.z 保留未封顶的邻域粒数。
+  let gain = min(f32(near), params.evapGainCap);
+  let rate = max(params.evapMinFactor, 1.0 - params.evapSlowPerNeighbor * gain);
+  particles[i].misc.z = f32(near);
+  particles[i].misc.w = rate;
+}
+
+// ── C. 蒸发 / 出界销毁（并按邻域增益推进 age）──
 @compute @workgroup_size(64)
 fn evict(@builtin(global_invocation_id) gid: vec3<u32>) {
   let i = gid.x;
   if (i >= params.maxParticles) { return; }
   let p = particles[i];
   if (p.misc.x < 0.5) { return; }
-  let age = p.pos.w + params.dt;
+  // 蒸发速度（1/s）由 B2 evapGain 写入 misc.w（已含邻居增益与封顶），此处只消费；
+  // 下限钳制兼作 B2 缺席时的兜底（避免速率为 0 导致粒子永不消散）。
+  let rate = max(p.misc.w, params.evapMinFactor);
+  let age = p.pos.w + params.dt * rate;
   let half = params.worldSize * 0.5;
   let alive = age <= p.vel.w && abs(p.pos.x) <= half && abs(p.pos.y) <= half;
   if (alive) {

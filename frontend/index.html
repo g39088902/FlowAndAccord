@@ -26,13 +26,12 @@
   <div id="engine-status" data-state="loading" role="status" aria-live="polite">正在加载生态演算引擎…</div>
   <div id="canvas-container" style="position:relative; width:100%; height:100%; overflow:hidden;">
     <canvas id="sim-canvas-gl" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;"></canvas>
-    <canvas id="sim-canvas-rain" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;"></canvas>
     <canvas id="sim-canvas" style="position:absolute; left:0; top:0; width:100%; height:100%;"></canvas>
   </div>
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.64.2</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.64.9</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -890,8 +889,12 @@
       <div class="debug-row"><span>引力力度 A</span><input id="dbg-rain-attract-strength" type="number" min="0" step="0.1" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
       <div class="debug-row"><span>斥力力度 R</span><input id="dbg-rain-repel-strength" type="number" min="0" step="0.1" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
       <div class="debug-row"><span>总力量系数</span><input id="dbg-rain-force-scale" type="number" min="0" step="0.1" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>重力大小 (m/s²)</span><input id="dbg-rain-gravity" type="number" min="0" step="1" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
       <div class="debug-row"><span>粒子大小 (半边长 m)</span><input id="dbg-rain-cube-half" type="number" min="0.1" step="0.5" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
       <div class="debug-row"><span>粒子数量上限</span><input id="dbg-rain-particle-max" type="number" min="0" step="10" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>蒸发邻域半径 (m)</span><input id="dbg-rain-evap-radius" type="number" min="0" step="0.5" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <!-- ★ 调试着色：按蒸发速率红(最快)→绿(最慢)给粒子上色（纯渲染开关，勾选即热生效） -->
+      <div class="debug-row"><span>蒸发速率着色 (红快绿慢)</span><input id="dbg-rain-debug-evap" type="checkbox" style="width:14px;height:14px;accent-color:#a78bfa;cursor:pointer;"></div>
       <!-- 交互力函数图像 f(d)=A−√d−R/d：横轴距离 d(m)，纵轴速度脉冲(m/s)；绿=吸引、红=排斥，虚线=零点 -->
       <canvas id="dbg-rain-plot" width="584" height="264" style="margin-top:6px;width:100%;height:132px;background:#0b1220;border:1px solid #334155;border-radius:6px;"></canvas>
       <div id="dbg-rain-plot-info" style="margin-top:3px;font-size:9.5px;color:#94a3b8;line-height:1.35;">—</div>
@@ -1442,11 +1445,14 @@
   <script src="js/webgl/core/shader-manager.js"></script>
   <script src="js/webgl/utils/projection-utils.js"></script>
   <script src="js/webgl/layers/terrain/terrain-renderer.js"></script>
+  <!-- ★ 降水粒子渲染层：物理在 WebGPU compute，渲染在 GL 层（与地形共享深度缓冲 ⇒
+       地形逐像素遮挡、装饰画家序覆盖），须早于 render_canvas.js -->
+  <script src="js/webgl/layers/rain/rain-renderer.js"></script>
   <!-- ★ 装饰绘制与阴影图层：drawStoneBody/drawAccentTree/Bush/GrassTuft sink
        分发的 GPU 装饰层 + 光向深度图阴影层，须早于 render_canvas.js -->
   <script src="js/webgl/layers/accents/accent-renderer.js"></script>
   <script src="js/webgl/layers/accents/shadow-pass.js"></script>
-  <!-- WebGPU 降水粒子：独立透明画布，失败时静默关闭，不影响 WebGL 地形 -->
+  <!-- WebGPU 降水粒子物理（compute，无独立画布，硬门槛：不可用由 main.js 报错阻断） -->
   <script src="js/webgpu/rain-particles.js"></script>
   <script src="js/dag-layout.js"></script>
   <script src="js/dag-view.js"></script>

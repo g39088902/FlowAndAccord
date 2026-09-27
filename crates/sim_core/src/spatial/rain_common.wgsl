@@ -8,7 +8,7 @@ struct Particle {
   pos:  vec4<f32>,  // x, y, z, age
   vel:  vec4<f32>,  // vx, vy, vz, max_age
   prev: vec4<f32>,  // prev_x, prev_y, prev_z, 保留
-  misc: vec4<f32>,  // alive(0/1), falling(0/1), 保留, 保留
+  misc: vec4<f32>,  // alive(0/1), falling(0/1), 邻域粒数（evapGain 写，供 evict 缩放蒸发）, 保留
 };
 
 struct SimState {
@@ -68,6 +68,12 @@ struct RainParams {
   numCells: u32,
   pad0: u32,
   pad1: u32,
+
+  // ★ v1.64.4 蒸发邻域增益（前端 RENDER_CONFIG 逐子步写入）
+  evapRadius: f32,
+  evapSlowPerNeighbor: f32,
+  evapGainCap: f32,
+  evapMinFactor: f32,
 };
 
 struct Camera { viewport: vec2<f32>, pan: vec2<f32>, angles: vec2<f32>, zoom: f32, cubeHalf: f32 };
