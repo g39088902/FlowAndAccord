@@ -395,9 +395,8 @@
   "hormoneDaWillDeferHours": 4.0,
   "hormoneDaLowStreakRecovery": 2.0,
   "hormoneCortWillSuppress": 0.25,
-  "rainAttractRadius": 60.0,
-  "rainAttractStrength": 0.0001,
-  "rainRepelRadius": 10.0,
-  "rainRepelStrength": 1.0,
-  "rainParticleMax": 2048
+  "rainAttractStrength": 18,
+  "rainRepelStrength": 811,
+  "rainForceScale": 0.001,
+  "rainParticleMax": 512
 }

@@ -464,8 +464,7 @@
 
 | 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `rainAttractRadius` | f32 | 60 | spatial/rain.rs (粒子间引力作用半径) |  |
-| `rainAttractStrength` | f32 | 0.0001 | spatial/rain.rs (粒子间引力力度) | 粒子间引力力度系数（速度脉冲系数，越大越强） |
-| `rainRepelRadius` | f32 | 10 | spatial/rain.rs (粒子间斥力作用半径) | 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开防重叠 |
-| `rainRepelStrength` | f32 | 1 | spatial/rain.rs (粒子间斥力力度) | 粒子间斥力力度系数（速度脉冲系数，越大越强） |
-| `rainParticleMax` | usize | 2048 | spatial/rain.rs (存活粒子数量上限) | 存活粒子数量上限（达到上限后停止生成新粒子） |
+| `rainAttractStrength` | f32 | 18 | spatial/rain.rs (粒子间引力力度) |  |
+| `rainRepelStrength` | f32 | 811 | spatial/rain.rs (粒子间斥力力度) | 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥） |
+| `rainForceScale` | f32 | 0.001 | spatial/rain.rs (总力量系数) | 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子 |
+| `rainParticleMax` | usize | 512 | spatial/rain.rs (存活粒子数量上限) | 存活粒子数量上限（达到上限后停止生成新粒子） |

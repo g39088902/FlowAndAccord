@@ -140,6 +140,7 @@ const IMPACT_OVERRIDES = {
   rainAttractStrength: 'spatial/rain.rs (粒子间引力力度)',
   rainRepelRadius: 'spatial/rain.rs (粒子间斥力作用半径)',
   rainRepelStrength: 'spatial/rain.rs (粒子间斥力力度)',
+  rainForceScale: 'spatial/rain.rs (总力量系数)',
   rainParticleMax: 'spatial/rain.rs (存活粒子数量上限)',
 };
 

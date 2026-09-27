@@ -95,7 +95,7 @@
         // ★ M4 二进制快照：车道/节点几何缓存（geom_version 不变时复用对象，每帧只覆写 wear）
         this._laneCache = null;   // 车道视图对象数组（与 lane_wear 下标一一对应）
         this._geomVersion = null;
-        this._appVersion = '1.63.5';
+        this._appVersion = '1.63.12';
 
         this._wasmBytes = 0;
         this._setEngineStatus('正在加载生态演算引擎 (Worker)…', 'loading');
@@ -167,7 +167,7 @@
           case 'READY': {
             this._ready = true;
             this._engineSeed = msg.seed;
-            this._appVersion = msg.appVersion || '1.63.5';
+            this._appVersion = msg.appVersion || '1.63.12';
             if (msg.rainGpuShader && typeof window._resolveRainGpuShader === 'function') {
               window._resolveRainGpuShader(msg.rainGpuShader);
             }
@@ -504,7 +504,7 @@
        * @returns {string}
        */
       getAppVersion() {
-        return this._appVersion || '1.63.5';
+        return this._appVersion || '1.63.12';
 
       }
 

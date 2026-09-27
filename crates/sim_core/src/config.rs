@@ -569,14 +569,16 @@ pub struct SimConfig {
     // 16. 降水粒子物理（spatial/rain.rs）
     //     ★ 全部由前端 config.js 注入，可在调试页直接改输入框热注入 running WASM。
     //     ★ 粒子几何大小属纯渲染参数，在 frontend/js/config.render.js（rainCubeHalf），不入本结构体。
-    /// 粒子间引力作用半径 (m)：落地粒子在此半径内相互拉拢（凝聚）。
-    pub rain_attract_radius: f32,
-    /// 粒子间引力力度系数（速度脉冲系数，越大越强）。
+    //     ★ 落地粒子间交互力（速度脉冲，m/s，沿连线方向，正=吸引 / 负=排斥）：
+    //         f(d) = rain_attract_strength − √d − rain_repel_strength / d
+    //       仅当 f(d)=0 在该参数下恰有 2 个正零点时有效；以离 0 较远的零点 d2 为终止界限，
+    //       d ≥ d2 不再结算（无作用力），d < d2 时按 f(d) 正负施加吸引/排斥。
+    /// 引力力度 A（f(d)=A−√d−R/d 的常数项，越大越强）。
     pub rain_attract_strength: f32,
-    /// 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开（防重叠）。
-    pub rain_repel_radius: f32,
-    /// 粒子间斥力力度系数（速度脉冲系数，越大越强）。
+    /// 斥力力度 n（f(d)=A−√d−R/d 的 1/d 项系数，越大越强）。
     pub rain_repel_strength: f32,
+    /// 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子（整体缩放交互力强弱）。
+    pub rain_force_scale: f32,
     /// 存活粒子数量上限（达到上限后停止生成新粒子）。
     pub rain_particle_max: usize,
 }

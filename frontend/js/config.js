@@ -457,10 +457,13 @@ window.SIM_CONFIG = {
   // 16. 降水粒子物理 (Rain Particle Physics · spatial/rain.rs)
   //     ★ 均可在调试监视器浮窗的「水粒子物理」输入框中实时调节，改值即热注入内核。
   //     ★ 粒子几何大小属纯渲染参数，见 frontend/js/config.render.js: rainCubeHalf。
+  //     ★ 落地粒子间交互力的速度脉冲（m/s，沿连线，正=吸引 / 负=排斥）：
+  //         f(d) = rainAttractStrength − √d − rainRepelStrength / d
+  //       仅当 f(d)=0 恰有 2 个正零点时有效（条件：rainRepelStrength < 4·rainAttractStrength³/27）；
+  //       交互范围以离 0 较远的零点为终止界限，超出即不施加作用力。
   // ==========================================================================
-  rainAttractRadius: 60.0,  // 粒子间引力作用半径 (m)：落地粒子在此半径内相互拉拢凝聚
-  rainAttractStrength: 0.0001, // 粒子间引力力度系数（速度脉冲系数，越大越强）
-  rainRepelRadius: 10.0,    // 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开防重叠
-  rainRepelStrength: 1.0,   // 粒子间斥力力度系数（速度脉冲系数，越大越强）
-  rainParticleMax: 2048,    // 存活粒子数量上限（达到上限后停止生成新粒子）
+  rainAttractStrength: 18, // 引力力度 A：f(d)=A−√d−R/d 的常数项（越大吸引越强）
+  rainRepelStrength: 811,   // 斥力力度 n：f(d) 的 1/d 项系数（越大越排斥）
+  rainForceScale: 0.001,    // 总力量系数：f(d) 的计算结果乘以该系数后才作用于粒子
+  rainParticleMax: 512,    // 存活粒子数量上限（达到上限后停止生成新粒子）
 };

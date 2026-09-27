@@ -604,7 +604,7 @@
 
     // ==========================================
     // 💧 水粒子物理输入框（调试监视器浮窗内）
-    //   引力/斥力范围力度、数量上限 → SIM_CONFIG，改值经 applyConfig 热注入 running WASM；
+    //   引力力度 A / 斥力力度 R / 数量上限 → SIM_CONFIG，改值经 applyConfig 热注入 running WASM；
     //   粒子大小（立方体半边长）→ RENDER_CONFIG，由 WebGPU 降水层逐帧读取，即时生效。
     //   非持久化：仅影响当前运行中的世界，刷新后回落 config.js / config.render.js 默认值。
     // ==========================================
@@ -612,10 +612,9 @@
       const simCfg = window.SIM_CONFIG || (window.SIM_CONFIG = {});
       const renderCfg = window.RENDER_CONFIG || (window.RENDER_CONFIG = {});
       const bindings = [
-        { id: 'dbg-rain-attract-radius', cfg: simCfg, key: 'rainAttractRadius', min: 0 },
         { id: 'dbg-rain-attract-strength', cfg: simCfg, key: 'rainAttractStrength', min: 0 },
-        { id: 'dbg-rain-repel-radius', cfg: simCfg, key: 'rainRepelRadius', min: 0 },
         { id: 'dbg-rain-repel-strength', cfg: simCfg, key: 'rainRepelStrength', min: 0 },
+        { id: 'dbg-rain-force-scale', cfg: simCfg, key: 'rainForceScale', min: 0 },
         { id: 'dbg-rain-cube-half', cfg: renderCfg, key: 'rainCubeHalf', min: 0.1 },
         { id: 'dbg-rain-particle-max', cfg: simCfg, key: 'rainParticleMax', min: 0, integer: true },
       ];
@@ -637,9 +636,96 @@
           el.value = String(v);
           if (b.cfg === simCfg) simDirty = true;
         };
-        el.addEventListener('change', () => { commit(); flushSim(); });
-        el.addEventListener('keydown', ev => { if (ev.key === 'Enter') { commit(); flushSim(); } });
+        el.addEventListener('change', () => { commit(); flushSim(); drawRainPlot(); });
+        el.addEventListener('keydown', ev => { if (ev.key === 'Enter') { commit(); flushSim(); drawRainPlot(); } });
       });
+      drawRainPlot();
+
+      // ── 交互力函数图像 f(d) = A − √d − R/d ───────────────────────────────
+      // 与 Rust `rain.rs::rain_force_roots` 同口径（f64 二分，条件 R < 4A³/27 才有两个正零点）。
+      function rainForceRoots(A, R) {
+        if (!(Number.isFinite(A) && Number.isFinite(R)) || A <= 0 || R <= 0) return null;
+        const g = u => u * u * u - A * u * u + R;
+        if (R - 4 * A * A * A / 27 >= 0) return null;
+        const bisect = (lo0, hi0) => {
+          const loPos = g(lo0) > 0; let lo = lo0, hi = hi0;
+          for (let k = 0; k < 60; k++) {
+            const mid = 0.5 * (lo + hi);
+            if ((g(mid) > 0) === loPos) lo = mid; else hi = mid;
+          }
+          return 0.5 * (lo + hi);
+        };
+        const uStar = 2 * A / 3;
+        const u1 = bisect(0, uStar), u2 = bisect(uStar, 2 * A);
+        return { near: u1 * u1, far: u2 * u2 };
+      }
+      function drawRainPlot() {
+        const cv = document.getElementById('dbg-rain-plot');
+        const info = document.getElementById('dbg-rain-plot-info');
+        if (!cv || !cv.getContext) return;
+        const A = Number(simCfg.rainAttractStrength);
+        const R = Number(simCfg.rainRepelStrength);
+        // 总力量系数：与实际施加口径一致——f(d) 结果乘该系数后才作用于粒子。
+        const S = Number(simCfg.rainForceScale);
+        const scale = Number.isFinite(S) ? Math.max(0, S) : 1;
+        const f = d => (A - Math.sqrt(d) - R / d) * scale;
+        const roots = rainForceRoots(A, R);
+        // 横轴范围：有效时取「较远零点」的 1.3 倍，无效时用 A² (f=0 附近的尺度) 兜底。
+        const dMax = roots ? Math.max(roots.far * 1.3, 1e-3)
+          : (Number.isFinite(A) && A > 0 ? Math.max(4 * A * A, 1) : 20);
+        // 纵轴范围：正负对称，取采样 |f| 的 95 分位以避开 d→0 的发散。
+        const N = 220; const ys = [];
+        for (let i = 1; i <= N; i++) { const d = dMax * i / N; const v = f(d); if (Number.isFinite(v)) ys.push(v); }
+        ys.sort((a, b) => a - b);
+        const q = ys.length ? ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.95))] : 1;
+        const yMax = Math.max(1e-6, Math.abs(q) * 1.15);
+        const ctx = cv.getContext('2d');
+        const W = cv.width, H = cv.height, pad = 30;
+        const px = d => pad + (d / dMax) * (W - pad - 8);
+        const py = v => H - pad - ((v + yMax) / (2 * yMax)) * (H - pad - 10);
+        ctx.clearRect(0, 0, W, H);
+        // 坐标轴（y=0 基线 + 左轴）
+        ctx.strokeStyle = '#334155'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(pad, 10); ctx.lineTo(pad, H - pad); ctx.lineTo(W - 8, H - pad); ctx.stroke();
+        ctx.strokeStyle = '#475569'; ctx.beginPath(); ctx.moveTo(pad, py(0)); ctx.lineTo(W - 8, py(0)); ctx.stroke();
+        // x 轴位置标注：函数图像中 f(d)=0 的横线即为 x 轴
+        ctx.save();
+        ctx.fillStyle = '#94a3b8'; ctx.font = '17px monospace';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+        ctx.fillText('x 轴 (f=0)', pad + 4, py(0) - 4);
+        ctx.restore();
+        // 零点竖虚线 + 标签
+        if (roots) {
+          ctx.strokeStyle = '#f59e0b'; ctx.setLineDash([5, 5]);
+          [roots.near, roots.far].forEach((d, k) => {
+            ctx.beginPath(); ctx.moveTo(px(d), 10); ctx.lineTo(px(d), H - pad); ctx.stroke();
+            ctx.setLineDash([]); ctx.fillStyle = '#fbbf24'; ctx.font = '18px monospace';
+            ctx.fillText(`d${k + 1}=${d.toFixed(2)}`, px(d) + 3, 22 + k * 20);
+            ctx.setLineDash([5, 5]);
+          });
+          ctx.setLineDash([]);
+        }
+        // 曲线：按 f 正负分段着色（绿=吸引 / 红=排斥）
+        ctx.lineWidth = 2.5;
+        for (let i = 0; i < N; i++) {
+          const d0 = dMax * i / N, d1 = dMax * (i + 1) / N;
+          const v0 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, f(d0) || 0));
+          const v1 = Math.max(-yMax * 1.6, Math.min(yMax * 1.6, f(d1) || 0));
+          ctx.strokeStyle = (v0 + v1) / 2 >= 0 ? '#34d399' : '#f87171';
+          ctx.beginPath(); ctx.moveTo(px(d0), py(v0)); ctx.lineTo(px(d1), py(v1)); ctx.stroke();
+        }
+        // 坐标数值
+        ctx.fillStyle = '#64748b'; ctx.font = '17px monospace';
+        ctx.fillText('d(m)', W - 52, H - pad + 22);
+        ctx.fillText('f(m/s)', 2, 20);
+        ctx.fillText(String(dMax.toFixed(1)), px(dMax) - 24, H - pad + 22);
+        // 文本信息：零点 / 有效性 / 交互范围
+        if (info) {
+          info.textContent = roots
+            ? `✅ 两个零点：d₁=${roots.near.toFixed(3)}m（近端，内侧排斥） / d₂=${roots.far.toFixed(3)}m（远端=终止界限）。交互区间 (0, d₂)，中段为吸引。`
+            : `⛔ 该参数下 f(d) 无两个正零点 → 不施加交互力（需 R < 4A³/27；当前 R=${R}, 4A³/27=${(4 * A * A * A / 27).toExponential(2)}）。请调大引力力度 A 或调小斥力力度 R。`;
+        }
+      }
     })();
 
     window.addEventListener('keydown', e => {

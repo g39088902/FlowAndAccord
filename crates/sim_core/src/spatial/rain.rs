@@ -45,9 +45,9 @@ const RAIN_GROUND_REST_LIFT: f32 = 0.12;
 const RAIN_FLOW_REST_LIFT: f32 = 0.10;
 /// 落地后沿地形梯度的下坡加速度 (m/s²)。
 const RAIN_FLOW_ACCEL: f32 = 21.0;
-/// ★ 落地粒子间的引力与斥力（作用半径与力度系数）改由 SimConfig 注入，可在调试页实时调整：
-///   斥力 `rain_repel_radius` / `rain_repel_strength`（近距推开，防重叠）；
-///   引力 `rain_attract_radius` / `rain_attract_strength`（远距拉拢，凝聚成水体）。
+/// ★ 落地粒子间交互力由 SimConfig 注入的 `rain_attract_strength`(A) 与 `rain_repel_strength`(R) 决定，
+///   速度脉冲 f(d) = A − √d − R/d（正=吸引 / 负=排斥，沿两粒子连线）。仅当 f(d)=0 恰有 2 个正零点
+///   时有效，交互范围以较远零点 d2 为上界（d ≥ d2 不结算）。d 为水平粒子间距。
 /// 落地流动速度上限（m/s）与流动阻尼底数（按 dt 次方施加）。
 const RAIN_FLOW_SPEED_MAX: f32 = 16.0;
 const RAIN_FLOW_DAMP: f32 = 0.82;
@@ -59,6 +59,45 @@ const RAIN_GRADIENT_MIN_STEP: f32 = 0.35;
 fn rain_rand(state: &mut u64) -> f32 {
     *state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
     ((*state as u32) as f32) / 4_294_967_296.0
+}
+
+/// 二分求 `g(u) = u³ − A·u² + R` 在区间 [lo, hi] 内的唯一零点
+/// （f64，固定 60 次迭代 → 确定性；靠 `g(lo)` 的符号自适应，不假设哪端为正）。
+#[inline]
+fn rain_bisect(a: f64, r: f64, lo0: f64, hi0: f64) -> f64 {
+    let g = |u: f64| u * u * u - a * u * u + r;
+    let lo_pos = g(lo0) > 0.0;
+    let (mut lo, mut hi) = (lo0, hi0);
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if (g(mid) > 0.0) == lo_pos {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// 求交互函数 `f(d) = A − √d − R/d` 的两个正零点对应的**距离**（d = u²，令 u = √d）。
+///
+/// 令 u = √d：f=0 ⇔ `u³ − A·u² + R = 0`。该三次函数 h(0)=R>0、唯一极小在 u* = 2A/3、
+/// h(u*) = R − 4A³/27。故**恰有两个正根** ⇔ `R < 4A³/27`（A、R 均 > 0）。
+/// 返回 `(near, far)`（距离，米；near < far）；不满足两个正根时返回 `None`（该参数下不施加作用力）。
+pub fn rain_force_roots(a: f32, r: f32) -> Option<(f32, f32)> {
+    if !a.is_finite() || !r.is_finite() || a <= 0.0 || r <= 0.0 {
+        return None;
+    }
+    let (a, r) = (a as f64, r as f64);
+    let u_star = 2.0 * a / 3.0;
+    let h_min = r - 4.0 * a * a * a / 27.0;
+    if h_min >= 0.0 {
+        return None; // 无两个正根（含相切单根）
+    }
+    // h(0)=R>0、h(u*)<0 ⇒ 小根在 (0, u*)；h(2A)=4A³+R>0 ⇒ 大根在 (u*, 2A)。
+    let u1 = rain_bisect(a, r, 0.0, u_star);
+    let u2 = rain_bisect(a, r, u_star, 2.0 * a);
+    Some(((u1 * u1) as f32, (u2 * u2) as f32))
 }
 
 impl crate::spatial::world::World3DEngine {
@@ -107,12 +146,20 @@ impl crate::spatial::world::World3DEngine {
 
         // ── 读取本帧生效的粒子间力参数与数量上限（配置可经调试页热注入）──
         let max_particles = self.config.rain_particle_max.min(RAIN_PARTICLE_MAX_LIMIT);
-        let repel_radius = self.config.rain_repel_radius.max(0.0);
-        let repel_radius2 = repel_radius * repel_radius;
-        let repel_strength = self.config.rain_repel_strength.max(0.0);
-        let attract_radius = self.config.rain_attract_radius.max(0.0);
-        let attract_radius2 = attract_radius * attract_radius;
-        let attract_strength = self.config.rain_attract_strength.max(0.0);
+        let attract_strength = self.config.rain_attract_strength;
+        let repel_strength = self.config.rain_repel_strength;
+        // 总力量系数：f(d) 的结果乘它后才作用于粒子（整体缩放交互力强弱）。
+        let force_scale = if self.config.rain_force_scale.is_finite() {
+            self.config.rain_force_scale.max(0.0)
+        } else {
+            1.0
+        };
+        // 交互作用仅在 f(d)=A−√d−R/d 恰有两个正零点时有效；以较远零点 d2 为终止界限。
+        // reach_sq 为「距离平方」阈值（步进内用 d² 比较，避免每对开方后再判断）。
+        let (force_valid, reach_sq) = match rain_force_roots(attract_strength, repel_strength) {
+            Some((_near, far)) => (true, far * far),
+            None => (false, 0.0),
+        };
 
         // ── 生成（降雨倍率 0 时不产出新粒子，但既有粒子继续流动/蒸发）──
         if self.rainfall_multiplier <= 0.0 {
@@ -201,17 +248,14 @@ impl crate::spatial::world::World3DEngine {
                         continue;
                     }
                     let dlen = d2.sqrt();
-                    // 斥力：近距相互推开，避免粒子重叠堆积。
-                    if repel_radius2 > 0.0 && d2 < repel_radius2 {
-                        let f = (repel_radius - dlen) * repel_strength / dlen;
-                        vx -= dx * f;
-                        vy -= dy * f;
-                    }
-                    // 引力：作用半径内相互拉拢，使零散水珠凝聚成连续水体。
-                    if attract_radius2 > 0.0 && d2 < attract_radius2 {
-                        let f = (attract_radius - dlen) * attract_strength / dlen;
-                        vx += dx * f;
-                        vy += dy * f;
+                    // 交互力：速度脉冲 f(d)=A−√d−R/d，沿两粒子连线；正=吸引 / 负=排斥。
+                    // 仅在有两个正零点时生效，且以较远零点为终止界限（超出即不结算）。
+                    // 计算结果再乘总力量系数后才施加；以 dx/d 施加等价于沿连线方向叠加大小 |f| 的速度脉冲。
+                    if force_valid && d2 < reach_sq {
+                        let f = (attract_strength - dlen.sqrt() - repel_strength / dlen) * force_scale;
+                        let inv = f / dlen;
+                        vx += dx * inv;
+                        vy += dy * inv;
                     }
                 }
                 let speed = (vx * vx + vy * vy).sqrt();

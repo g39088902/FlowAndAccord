@@ -1,7 +1,21 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.63.5**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.63.12**。
+
+| **v1.63.12**（代码调整 · 水粒子物理默认参数） | **再次调整水粒子默认参数**：引力力度 A `13 → 18`、斥力力度 R `200 → 811`、总力量系数 `1.0 → 0.001`、粒子半边长 `1.0 → 4.0`、存活粒子数量上限 `768 → 512`。仅改前端真相源（`config.js` + `config.render.js`，运行时注入，无需重编译 WASM），同步探针示例与自动生成的参数速查表。FABS / 存档结构不变。 | frontend/js/{config.js,config.render.js}, crates/sim_core/examples/config.json, docs/current/tech/05-config-reference.md |
+
+| **v1.63.11**（代码调整 · 水粒子物理默认参数） | **再次调整水粒子默认参数**：引力力度 A `30 → 13`、斥力力度 R `0.5 → 200`、粒子半边长 `2.0 → 1.0`、存活粒子数量上限 `256 → 768`（总力量系数默认仍 `1.0`）。仅改前端真相源（`config.js` + `config.render.js`，运行时注入，无需重编译 WASM），同步探针示例与自动生成的参数速查表。FABS / 存档结构不变。 | frontend/js/{config.js,config.render.js}, crates/sim_core/examples/config.json, docs/current/tech/05-config-reference.md |
+
+| **v1.63.10**（代码变更 · 水粒子总力量系数） | **新增交互力总力量系数**：`SimConfig` 增 `rainForceScale`（默认 1.0），`f(d)=A−√d−R/d` 的计算结果**乘以该系数后才作用于粒子**（整体缩放吸引/排斥强弱，不改变零点与终止界限）；调试页「水粒子物理」新增「总力量系数」输入框（改值即热注入），函数图像按同口径同步缩放。字段数 365→366。已重编译并同步 WASM 双副本。FABS / 存档结构不变。 | crates/sim_core/src/{config.rs,spatial/rain.rs}, frontend/{index.html,js/{config.js,main.js},rust/sim_wasm.wasm,sim_wasm.wasm}, docs/current/tech/{04-config-system,05-config-reference}.md |
+
+| **v1.63.9**（代码修复 · 水粒子交互力公式） | **修复交互力 √d 项缺失**：`rain.rs` 施加处把 `A − √d − R/d` 误算为 `A − d − R/d`（距离项漏开方）。因终止界限 `d₂` 按正确曲线求根，而实际力在 `d ≈ A` 处就已转负 → **粒子到达终止位置前就被负力排开**，与「d ≥ d₂ 不结算」的设计不符。现修正为 `dlen.sqrt()`，与 `rain_force_roots`、调试函数图像及配置注释口径一致。已重编译并同步 WASM 双副本。FABS / 存档结构不变。 | crates/sim_core/src/spatial/rain.rs, frontend/{rust/sim_wasm.wasm,sim_wasm.wasm} |
+
+| **v1.63.8**（代码调整 · 水粒子物理默认参数） | **调整水粒子交互力默认参数**：引力力度 A `0.0001 → 30`、斥力力度 R `1.0 → 0.5`、存活粒子数量上限 `2048 → 256`（粒子半边长默认仍 `2.0` 不变）。仅改前端 `config.js` 真相源（`SimConfig` 由前端注入，Rust 侧无内建数值默认），同步调试页输入框初值与自动生成的参数速查表。FABS / 存档结构不变。 | frontend/js/config.js, crates/sim_core/examples/config.json, docs/current/tech/05-config-reference.md |
+
+| **v1.63.7**（代码变更 · 水粒子交互力统一函数 + 图像调试） | **交互力改为单一函数并移除两个范围参数**：① 删除 `rainAttractRadius` / `rainRepelRadius`（SimConfig 字段 367→365）；② 落地粒子间速度脉冲统一为 **`f(d) = 引力力度A − √d − 斥力力度R / d`**（d=水平间距，正=吸引 / 负=排斥，沿连线）；③ 该力**仅当 f(d)=0 恰有两个正零点时生效**（解析条件 `R < 4A³/27`，由 `rain.rs::rain_force_roots` 用 f64 二分求根，确定性），并以**较远零点 d₂** 为终止界限，`d ≥ d₂` 不结算；④ 调试监视器浮窗新增**函数图像**（横轴距离、纵轴脉冲，绿=吸引/红=排斥、虚线标零点），输入改动即时重绘并显示零点与有效性。已重编译并同步 WASM 双副本。FABS / 存档结构不变。 | crates/sim_core/src/spatial/rain.rs, crates/sim_core/src/config.rs, frontend/{index.html,js/{config.js,main.js},rust/sim_wasm.wasm,sim_wasm.wasm} |
+
+| **v1.63.6**（代码调整 · 水粒子斥力公式） | **斥力公式改为 n/d**：落地粒子间斥力的速度脉冲大小由原线性衰减 `(斥力范围 − d) × 力度` 改为 **`斥力力度 / 距离`**（`rainRepelStrength / d`，m/s）；`斥力范围` 仅作生效截断（`d ≥ 斥力范围` 不结算），引力公式与其余参数不变。已重编译并同步 WASM 双副本。FABS / 存档结构不变。 | crates/sim_core/src/spatial/rain.rs, frontend/{rust/sim_wasm.wasm,sim_wasm.wasm} |
 
 | **v1.63.5**（代码变更 · 水粒子参数可配置） | **水粒子物理参数改为调试页输入框配置**：① 新增 4 个内核物理超参 `rainAttractRadius` / `rainAttractStrength` / `rainRepelRadius` / `rainRepelStrength` 与数量上限 `rainParticleMax`（`SimConfig`，前端 `config.js` 为真相源，调试页输入框改值经 `applyConfig` 热注入 running WASM），并在 `rain.rs` 新增**粒子间引力**（作用半径内拉拢凝聚），斥力改用配置半径/力度；② 粒子几何大小（立方体半边长）为纯渲染参数，抽到 `RENDER_CONFIG.rainCubeHalf`，经 camera uniform 的 `cubeHalf` 分量传入 `rain.wgsl`，WebGPU 渲染层按需扩容 storage buffer 以承接更大的 `rainParticleMax`；③ 调试监视器浮窗新增「水粒子物理」6 个输入框与「当前水粒子数 / 上限」实时读数。FABS / 存档结构不变。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl}, crates/sim_core/src/config.rs, frontend/{index.html,js/{config.js,config.render.js,main.js,render_hud.js,webgpu/rain-particles.js},rust/sim_wasm.wasm,sim_wasm.wasm} |
 
