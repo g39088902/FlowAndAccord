@@ -1,7 +1,15 @@
 # 01. 📜 版本演进记录 (Changelog)
 
 > **模块索引**：[← 返回 ./README.md 全景索引](./README.md)
-> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.63.1**。
+> 本文件为里程碑级变更记录，按版本号倒序排列。最新版本：**v1.63.5**。
+
+| **v1.63.5**（代码变更 · 水粒子参数可配置） | **水粒子物理参数改为调试页输入框配置**：① 新增 4 个内核物理超参 `rainAttractRadius` / `rainAttractStrength` / `rainRepelRadius` / `rainRepelStrength` 与数量上限 `rainParticleMax`（`SimConfig`，前端 `config.js` 为真相源，调试页输入框改值经 `applyConfig` 热注入 running WASM），并在 `rain.rs` 新增**粒子间引力**（作用半径内拉拢凝聚），斥力改用配置半径/力度；② 粒子几何大小（立方体半边长）为纯渲染参数，抽到 `RENDER_CONFIG.rainCubeHalf`，经 camera uniform 的 `cubeHalf` 分量传入 `rain.wgsl`，WebGPU 渲染层按需扩容 storage buffer 以承接更大的 `rainParticleMax`；③ 调试监视器浮窗新增「水粒子物理」6 个输入框与「当前水粒子数 / 上限」实时读数。FABS / 存档结构不变。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl}, crates/sim_core/src/config.rs, frontend/{index.html,js/{config.js,config.render.js,main.js,render_hud.js,webgpu/rain-particles.js},rust/sim_wasm.wasm,sim_wasm.wasm} |
+
+| **v1.63.4**（代码调整 · 水粒子立方体化与参数） | **水粒子改为立方体并调整物理参数**：① 粒子由屏幕空间条带改为**世界空间立方体**（`rain.wgsl` 用 8 角点投影、6 面 36 顶点逐面明暗，前端 `draw(36, n)`；取代 v1.63.2 的条带放大方案）；② **出界即销毁**——超出地图范围 `±world_size/2` 立即移除（此前误用整幅 `world_size` 作阈值）；③ **蒸发时长延长 8 倍**（`max_age` 14+9s → 112+72s，淡出窗口同步 ×8 以免粒子长期不可见却占槽位）；④ **1x 降雨量提升 3 倍**（生成速率 17 → 51 个/秒，各倍率按降雨倍率线性缩放）。FABS / 存档结构不变。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl}, frontend/{js/webgpu/rain-particles.js,rust/sim_wasm.wasm,sim_wasm.wasm} |
+
+| **v1.63.3**（代码变更 · 降水粒子物理内迁 tick） | **水改为跟随仿真 tick**：把降水粒子的生成 / 下落 / 下坡流动 / 斥力 / 蒸发从渲染层 GPU compute 全部内迁到 Rust 内核 `world_tick`（新增 `tick_rain_particles`，在步骤 0 环境子阶段末尾执行，使用独立 `rain_rng_state`，不消费 WorldRng）。粒子状态随快照与存档下发续演，暂停即冻结、倍速即加速、同种子跨设备可复现；`rain.wgsl` 降为纯渲染（删除 compute 入口），`rain-particles.js` 改为只消费快照绘制。FABS / 存档结构不变（复用 `RAIN_PARTICLES` section）。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl,world_tick.rs}, frontend/{js/{main,webgpu/rain-particles.js},rust/sim_wasm.wasm,sim_wasm.wasm}, docs/current/tech/{16-frontend-overview,19-ui-implementation,06-snapshot-and-save}.md |
+
+| **v1.63.2**（代码调整 · 地面水颗粒放大） | **地面水颗粒放大 3 倍**：降水粒子落地（非下落态）后绘制的屏幕空间水面条带，宽度与长度各放大 3 倍（半宽 4.40→13.20 px、尾长 2.2→6.6 px），空中雨滴尺寸不变。改动位于 Rust 内嵌 WGSL 着色器 `rain.wgsl`，已重编译并同步 WASM 双副本。 | crates/sim_core/src/spatial/rain.wgsl, frontend/{rust/sim_wasm.wasm,sim_wasm.wasm} |
 
 | **v1.63.1**（代码变更 · Rust 驱动 WebGPU compute） | **降水粒子运动迁移到 GPU compute**：Rust/WASM 导出 WGSL 与确定性种子契约，WebGPU storage buffer 执行生成、下落、下坡流动、局部斥力和蒸发；JS 只提供浏览器 GPU 设备并提交 compute/render 命令，CPU 不再逐粒子更新。 | crates/sim_core/src/spatial/{rain.rs,rain.wgsl}, crates/sim_wasm/src/lib.rs, frontend/{js/{main,rustworld,sim_worker},webgpu/rain-particles.js} |
 

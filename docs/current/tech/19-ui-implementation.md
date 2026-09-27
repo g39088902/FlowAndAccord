@@ -4,7 +4,7 @@
 > **关联文档**：[./16-frontend-overview.md](./16-frontend-overview.md)（模块总览）· [./20-society-ledger-ui.md](./20-society-ledger-ui.md)（制度大盘界面实现）· [./21-frontend-dev-guide.md](./21-frontend-dev-guide.md)（前端开发实施指南）
 > **定位**：当前 UI 页面全景解剖说明书——画布视口、顶栏、生态大盘、观察堆栈、控制台、事件日志、模态弹窗系统与存档管理面板的现状拆解。
 
-当前系统基于原生 HTML5 Canvas 2D、WebGL 地形/装饰层、WebGPU 降水粒子层与 DOM 玻璃拟态（Glassmorphism）构建，无任何打包工具（无 Webpack/Vite），采用暗黑赛博生态风格（`#050a12` 背景），兼顾实时渲染（★ v1.50.82 起绘制帧率上限可配置、默认 60FPS）与高密度信息透出。WebGPU 降水层是独立透明画布上的表现层：CPU 维护短生命周期水滴的下坡与斥力，GPU 负责批量绘制；WebGPU 是启动硬门槛；浏览器不支持或设备初始化失败时显示阻断覆盖层，游戏不会进入。
+当前系统基于原生 HTML5 Canvas 2D、WebGL 地形/装饰层、WebGPU 降水粒子层与 DOM 玻璃拟态（Glassmorphism）构建，无任何打包工具（无 Webpack/Vite），采用暗黑赛博生态风格（`#050a12` 背景），兼顾实时渲染（★ v1.50.82 起绘制帧率上限可配置、默认 60FPS）与高密度信息透出。WebGPU 降水层是独立透明画布上的渲染层：粒子物理（生成/下落/下坡流动/斥力/蒸发）由 Rust 内核 `world_tick` 确定性推进并经快照下发，WebGPU 只负责批量绘制；WebGPU 是启动硬门槛；浏览器不支持或设备初始化失败时显示阻断覆盖层，游戏不会进入。
 
 ```mermaid
 graph TD

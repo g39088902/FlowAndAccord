@@ -5,7 +5,7 @@
     const ctx = canvas.getContext('2d');
     window.ctx = ctx;
 
-    // Rust/WASM 提供 WGSL compute shader；主线程只负责把浏览器 GPU 设备交给 WebGPU 桥接层。
+    // Rust/WASM 提供降水粒子渲染 WGSL；粒子物理由内核 world_tick 确定性推进并经快照下发。
     let resolveRainGpuShader;
     window.rainWebGPUShaderPromise = new Promise(resolve => { resolveRainGpuShader = resolve; });
     window._resolveRainGpuShader = resolveRainGpuShader;
@@ -601,6 +601,46 @@
         if (debugHudEl) debugHudEl.style.display = sim.debugMode ? 'flex' : 'none';
       });
     }
+
+    // ==========================================
+    // 💧 水粒子物理输入框（调试监视器浮窗内）
+    //   引力/斥力范围力度、数量上限 → SIM_CONFIG，改值经 applyConfig 热注入 running WASM；
+    //   粒子大小（立方体半边长）→ RENDER_CONFIG，由 WebGPU 降水层逐帧读取，即时生效。
+    //   非持久化：仅影响当前运行中的世界，刷新后回落 config.js / config.render.js 默认值。
+    // ==========================================
+    (function initRainTuningInputs() {
+      const simCfg = window.SIM_CONFIG || (window.SIM_CONFIG = {});
+      const renderCfg = window.RENDER_CONFIG || (window.RENDER_CONFIG = {});
+      const bindings = [
+        { id: 'dbg-rain-attract-radius', cfg: simCfg, key: 'rainAttractRadius', min: 0 },
+        { id: 'dbg-rain-attract-strength', cfg: simCfg, key: 'rainAttractStrength', min: 0 },
+        { id: 'dbg-rain-repel-radius', cfg: simCfg, key: 'rainRepelRadius', min: 0 },
+        { id: 'dbg-rain-repel-strength', cfg: simCfg, key: 'rainRepelStrength', min: 0 },
+        { id: 'dbg-rain-cube-half', cfg: renderCfg, key: 'rainCubeHalf', min: 0.1 },
+        { id: 'dbg-rain-particle-max', cfg: simCfg, key: 'rainParticleMax', min: 0, integer: true },
+      ];
+      let simDirty = false;
+      const flushSim = () => {
+        if (!simDirty) return;
+        simDirty = false;
+        try { sim.applyConfig(); } catch (_) { /* 世界未就绪时忽略 */ }
+      };
+      bindings.forEach(b => {
+        const el = document.getElementById(b.id);
+        if (!el) return;
+        if (Number.isFinite(b.cfg[b.key])) el.value = String(b.cfg[b.key]);
+        const commit = () => {
+          let v = Number(el.value);
+          if (!Number.isFinite(v)) { el.value = String(b.cfg[b.key]); return; }
+          v = Math.max(b.min, b.integer ? Math.round(v) : v);
+          b.cfg[b.key] = v;
+          el.value = String(v);
+          if (b.cfg === simCfg) simDirty = true;
+        };
+        el.addEventListener('change', () => { commit(); flushSim(); });
+        el.addEventListener('keydown', ev => { if (ev.key === 'Enter') { commit(); flushSim(); } });
+      });
+    })();
 
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.key === ' ') {

@@ -2,7 +2,7 @@
 
 > ★★ **渲染架构决策（2026-09-17）：全量 WebGL，不再使用 Canvas 2D**。目标形态为全部内容（地形 / 装饰 / 实体 / 道路 / 标签 / 特效）进入同一 WebGL 管线、共享一个深度缓冲（[31 号迁移方案 §8](../docs/plan/tech/31-canvas-to-webgl-migration.md)、根 AGENTS.md §4.18）。★ **v1.60.1 部分提前落地**：**WebGL 与 WebGPU 均为硬门槛**——任一不可用时 `main.js` 显示错误覆盖层并阻断启动（`?webgl=0` / `RENDER_CONFIG.useWebgl` 开关已删）；地形 / 光照 / 装饰 / 阴影四项的 **Canvas 备用通道已删除**（`terrain-texture.js` / `terrain-mesh-merge.js` / `render_shadows.js` / `fallback-handler.js` / `render-canvas-patch.js` / `webgl/terrain/test-grid.js` 六文件删除）。`#sim-canvas` 2D 覆盖层仍存在但只剩**道路 / POI / 房屋 / 族人 / 标签与少量短特征折线**（阶段四~五未迁移；★ v1.62.1 起静湖水面已删），GL 阴影接收面仅 GL 地形。**改本节渲染文件前须知**：① 不在 Canvas 2D 侧追加遮挡优化（原 TA-08 三策略已取消，TA-08 任务已删除视为完成，验收矩阵并入 31 号 §8.5）；② `accent-model.js` / `accent-lod.js` / `accent-season.js` / `landscape-model.js` / `landscape-mask.js` 是**与渲染后端解耦的 CPU 侧几何与筛选层**，迁移将整体复用——严禁把其逻辑内联进 `ctx` 绘制函数。
 >
-> 本目录是原生静态前端：57 个 JS 文件（js/ 根 50 + webgl/ 6 + webgpu/ 1；含 ★ TA-06 人工验收台 `ta06-acceptance.js`，仅 `?ta06=1` 激活）（含 ★ M4 `snapshot-bin.js` 二进制解码器、★ v1.50.23 TA-01 装饰套件 `accent-season.js` / `accent-model.js` / **★ TA-07 `accent-lod.js`** / `render_accents.js` / `render_bush.js` / `render_grass.js` 与 ★ S4-02/S4-03 资源景观套件 `landscape-model.js` / `landscape-mask.js` / `render_landscapes.js`、★ S4-06 标签布局层 `label-layout.js`；★ v1.60.1 删除 `terrain-texture.js` / `terrain-mesh-merge.js` / `render_shadows.js` 与 webgl/ 下 `fallback-handler.js` / `render-canvas-patch.js` / `test-grid.js` 六文件；★ v1.62.3 `webgpu/rain-particles.js` 为降水层硬门槛；★ v1.63.0 起粒子 shader 与参数契约由 Rust/WASM 提供，GPU storage/compute 负责运行时物理，文件只提交 WebGPU 计算与绘制）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
+> 本目录是原生静态前端：57 个 JS 文件（js/ 根 50 + webgl/ 6 + webgpu/ 1；含 ★ TA-06 人工验收台 `ta06-acceptance.js`，仅 `?ta06=1` 激活）（含 ★ M4 `snapshot-bin.js` 二进制解码器、★ v1.50.23 TA-01 装饰套件 `accent-season.js` / `accent-model.js` / **★ TA-07 `accent-lod.js`** / `render_accents.js` / `render_bush.js` / `render_grass.js` 与 ★ S4-02/S4-03 资源景观套件 `landscape-model.js` / `landscape-mask.js` / `render_landscapes.js`、★ S4-06 标签布局层 `label-layout.js`；★ v1.60.1 删除 `terrain-texture.js` / `terrain-mesh-merge.js` / `render_shadows.js` 与 webgl/ 下 `fallback-handler.js` / `render-canvas-patch.js` / `test-grid.js` 六文件；★ v1.62.3 `webgpu/rain-particles.js` 为降水层硬门槛；★ v1.63.0 起粒子 shader 与参数契约由 Rust/WASM 提供；★ v1.63.3 起粒子物理（生成/下落/下坡流动/斥力/蒸发）由内核 `world_tick` 确定性推进并经快照下发，本文件只做 WebGPU 渲染）+ index.html + map.html + style.css + map.css + server.js，无构建工具，纯静态文件。
 > 改本目录代码前：先读根 AGENTS.md §4（尤其 §4.1 双副本、§4.5 快照四处同步[M4]、§4.14 决策顺序），再读本文件。
 > 全局规则以根 AGENTS.md 为准，冲突时以根文档为准。
 
@@ -22,7 +22,7 @@
 | 文件 | 行数 | 职责 | 不负责 |
 |---|---|---|---|
 | `js/math.js` | ~140 | 3D 向量与投影变换（Vec3 / 世界坐标→屏幕坐标 / 倾斜投影）+ 地表色基座（`computeTerrainAlbedo` 反照率 / `terrainAmbientOcclusion` AO / ★ v1.50.74 `smoothAlbedoField` 反照率数据层平滑——边缘感知盒式模糊，rustworld 建地形缓存时一次性消费；★ v1.62.1 起传入全零水面掩码，不再有水体屏障） | 任何业务逻辑 |
-| `js/config.js` | ~216 | `window.SIM_CONFIG` 全局数值配置（362 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
+| `js/config.js` | ~216 | `window.SIM_CONFIG` 全局数值配置（367 字段，含拆分配置合计），按功能分区注释 | 前端配置文件是数值权威，Rust 负责接收契约 |
 | `js/config.poi-rates.js` | ~45 | POI 再生产速倍率的浏览器偏好（键 `flowaccord.poi-regen-rates.v1`）；在 Worker 创世前读取并随 INIT/RESET 传入 | 存档覆盖的既有世界倍率 |
 | `js/config.decision-order.js` | ~30 | `window.SIM_DECISION_ORDER`：16 条活动分支顺序 + 层级覆盖。用户调整保存到 `flowaccord.decision-order.v3`；启动时迁移 v2（b11→b8、移除 b15） | Rust 侧默认为空 Vec，不写死顺序（根 AGENTS.md §4.12 例外） |
 | `js/config.house-upgrade-cost.js` | ~50 | `window.SIM_HOUSE_UPGRADE_COST`：房屋升级材料成本矩阵 **20 字段**（M8 拆分文件，独立语义避免主配置臃肿），rustworld.js applyConfig 时 Object.assign 合并 | 值须与 Rust `config.rs` 的 house_upgrade_cost_tier* 默认一致（config-check 校验） |
@@ -119,7 +119,7 @@
 
 ```
 1. math.js                    零依赖基础（含 computeTerrainAlbedo 反照率/光照分解）
-2. config.js                  SIM_CONFIG (362 字段，含拆分配置合计)
+2. config.js                  SIM_CONFIG (367 字段，含拆分配置合计)
 3. config.poi-rates.js        localStorage POI 产速偏好（创世前读取）
 4. config.decision-order.js   SIM_DECISION_ORDER (合并进 SIM_CONFIG)
 5. config.house-upgrade-cost.js SIM_HOUSE_UPGRADE_COST (M8 升级成本矩阵 20 字段，applyConfig 时合并)

@@ -104,6 +104,8 @@ impl World3DEngine {
             pool.current_stock=(pool.current_stock+pool.regen_rate*dt*self.water_regen_multiplier).min(pool.max_stock);
         }
         self.tick_dynamic_rainfall(dt, rainfall_intensity, evaporation_temp);
+        // ★ 降水粒子物理随 tick 确定性推进（独立 rain_rng_state，不消费 WorldRng）。
+        self.tick_rain_particles(dt);
         for poi in &mut self.pois {
             if poi.water_pool_id.is_some(){continue;}
             if poi.poi_type == PoiType::Market {

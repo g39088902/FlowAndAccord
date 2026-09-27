@@ -565,6 +565,20 @@ pub struct SimConfig {
     /// ★ H-09 CORT 危机聚焦压制强度：归一化皮质醇 (=cortisol/100) 在钳制前对意愿乘子的线性减量
     /// （仅调制意愿，不改升级扣账成本 / all_stocked 判据 / family_stock_on 触发器）
     pub hormone_cort_will_suppress: f32,
+
+    // 16. 降水粒子物理（spatial/rain.rs）
+    //     ★ 全部由前端 config.js 注入，可在调试页直接改输入框热注入 running WASM。
+    //     ★ 粒子几何大小属纯渲染参数，在 frontend/js/config.render.js（rainCubeHalf），不入本结构体。
+    /// 粒子间引力作用半径 (m)：落地粒子在此半径内相互拉拢（凝聚）。
+    pub rain_attract_radius: f32,
+    /// 粒子间引力力度系数（速度脉冲系数，越大越强）。
+    pub rain_attract_strength: f32,
+    /// 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开（防重叠）。
+    pub rain_repel_radius: f32,
+    /// 粒子间斥力力度系数（速度脉冲系数，越大越强）。
+    pub rain_repel_strength: f32,
+    /// 存活粒子数量上限（达到上限后停止生成新粒子）。
+    pub rain_particle_max: usize,
 }
 
 impl SimConfig {

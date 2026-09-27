@@ -40,7 +40,7 @@ stateDiagram-v2
 
 纯静态前端（无构建步骤），通过 Canvas 2D/3D 投影渲染模拟世界，提供 Inspector 观察面板、族谱可视化、账本大盘、调试监视器与全景控制台。前端是用户与模拟内核交互的唯一界面。
 
-> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，降水粒子由 Rust/WASM 提供 WGSL 与参数契约，WebGPU compute 在独立透明层 `sim-canvas-rain` 执行运行时物理并绘制；`frontend/js/webgpu/rain-particles.js` 只负责 GPU 设备桥接与命令提交，道路/POI/房屋/族人/标签/短特征折线仍在 Canvas 2D 覆盖层 `sim-canvas`（★ v1.62.1 起已无水面）。**目标形态为全量 WebGL、不再使用 Canvas 2D**——实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层。★ **v1.60.1 部分提前落地**：WebGL 成为**硬门槛**；★ **v1.62.3** 起 WebGPU 降水层同样是启动硬门槛，设备不可用时显示覆盖层并阻断游戏。（不可用时 `main.js` 显示错误覆盖层并阻断启动，`fallback-handler.js` 2D 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除（详见 [31 号 §1.3](../../plan/tech/31-canvas-to-webgl-migration.md)）。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
+> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，降水粒子物理由 Rust 内核 `world_tick` 确定性推进（随暂停/倍速/读档）并经快照下发，WebGPU 渲染在独立透明层 `sim-canvas-rain` 执行；`frontend/js/webgpu/rain-particles.js` 只消费快照并提交渲染命令，道路/POI/房屋/族人/标签/短特征折线仍在 Canvas 2D 覆盖层 `sim-canvas`（★ v1.62.1 起已无水面）。**目标形态为全量 WebGL、不再使用 Canvas 2D**——实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层。★ **v1.60.1 部分提前落地**：WebGL 成为**硬门槛**；★ **v1.62.3** 起 WebGPU 降水层同样是启动硬门槛，设备不可用时显示覆盖层并阻断游戏。（不可用时 `main.js` 显示错误覆盖层并阻断启动，`fallback-handler.js` 2D 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除（详见 [31 号 §1.3](../../plan/tech/31-canvas-to-webgl-migration.md)）。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
 
 ## 2. 核心机制
 

@@ -135,6 +135,12 @@ const IMPACT_OVERRIDES = {
   hormoneDaWillDeferHours: 'spatial/hormones.rs + decisions/branches.rs (意愿等待窗口)',
   hormoneDaDepressionThreshold: 'spatial/hormones.rs (消沉判定与低谷累计)',
   hormoneCortWillSuppress: 'spatial/hormones.rs (CORT 危机聚焦压制 · H-09)',
+  // ★ 降水粒子物理（spatial/rain.rs；调试页输入框热注入）
+  rainAttractRadius: 'spatial/rain.rs (粒子间引力作用半径)',
+  rainAttractStrength: 'spatial/rain.rs (粒子间引力力度)',
+  rainRepelRadius: 'spatial/rain.rs (粒子间斥力作用半径)',
+  rainRepelStrength: 'spatial/rain.rs (粒子间斥力力度)',
+  rainParticleMax: 'spatial/rain.rs (存活粒子数量上限)',
 };
 
 const IMPACT_PREFIX_RULES = [

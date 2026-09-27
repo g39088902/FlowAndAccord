@@ -459,3 +459,13 @@
 | `hormoneDaWillDeferHours` | f32 | 4 | spatial/hormones.rs + decisions/branches.rs (意愿等待窗口) | 意愿等待窗口（游戏小时）：低谷累计达窗口后高阶分支无条件放行 (0 = 禁用) |
 | `hormoneDaLowStreakRecovery` | f32 | 2 | spatial/hormones.rs (神经内分泌调制) | 低谷累计恢复速率 (/游戏小时)：意愿恢复后 da_low_streak 回落速率 |
 | `hormoneCortWillSuppress` | f32 | 0.25 | spatial/hormones.rs (CORT 危机聚焦压制 · H-09) | H-09 CORT 危机聚焦压制强度（归一化皮质醇在钳制前对意愿乘子的线性减量） |
+
+## 20. 降水粒子物理（spatial/rain.rs）
+
+| 字段 (camelCase) | 类型 | 默认值 (JS真相源) | 影响模块 | 中文说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `rainAttractRadius` | f32 | 60 | spatial/rain.rs (粒子间引力作用半径) |  |
+| `rainAttractStrength` | f32 | 0.0001 | spatial/rain.rs (粒子间引力力度) | 粒子间引力力度系数（速度脉冲系数，越大越强） |
+| `rainRepelRadius` | f32 | 10 | spatial/rain.rs (粒子间斥力作用半径) | 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开防重叠 |
+| `rainRepelStrength` | f32 | 1 | spatial/rain.rs (粒子间斥力力度) | 粒子间斥力力度系数（速度脉冲系数，越大越强） |
+| `rainParticleMax` | usize | 2048 | spatial/rain.rs (存活粒子数量上限) | 存活粒子数量上限（达到上限后停止生成新粒子） |

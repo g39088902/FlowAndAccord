@@ -158,6 +158,13 @@ function updateDebugHud(now) {
   }
   dbgSetText('dbg-js-heap', s.memSupported ? `${fmtMB(s.jsHeapUsed)} / ${fmtMB(s.jsHeapLimit)}` : '浏览器不支持');
   dbgSetText('dbg-wasm-mem', fmtMB(s.wasmBytes));
+  // 💧 当前存活水粒子数 / 配置上限（内核 rainParticleMax，可在浮窗输入框实时调整）
+  {
+    const rainN = Array.isArray(sim.rainParticles) ? sim.rainParticles.length : 0;
+    const rainMax = (window.SIM_CONFIG && Number.isFinite(window.SIM_CONFIG.rainParticleMax))
+      ? window.SIM_CONFIG.rainParticleMax : '—';
+    dbgSetText('dbg-rain-count', `${rainN} / ${rainMax}`);
+  }
   const tip = dbgEl('dbg-mem-tip');
   if (tip) tip.style.display = s.memSupported ? 'none' : 'block';
 }

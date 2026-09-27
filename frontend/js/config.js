@@ -452,4 +452,15 @@ window.SIM_CONFIG = {
   hormoneDaWillDeferHours: 4.0, // 意愿等待窗口（游戏小时）：低谷累计达窗口后高阶分支无条件放行 (0 = 禁用)
   hormoneDaLowStreakRecovery: 2.0, // 低谷累计恢复速率 (/游戏小时)：意愿恢复后 da_low_streak 回落速率
   hormoneCortWillSuppress: 0.25, // H-09 CORT 危机聚焦压制强度（归一化皮质醇在钳制前对意愿乘子的线性减量）
+
+  // ==========================================================================
+  // 16. 降水粒子物理 (Rain Particle Physics · spatial/rain.rs)
+  //     ★ 均可在调试监视器浮窗的「水粒子物理」输入框中实时调节，改值即热注入内核。
+  //     ★ 粒子几何大小属纯渲染参数，见 frontend/js/config.render.js: rainCubeHalf。
+  // ==========================================================================
+  rainAttractRadius: 60.0,  // 粒子间引力作用半径 (m)：落地粒子在此半径内相互拉拢凝聚
+  rainAttractStrength: 0.0001, // 粒子间引力力度系数（速度脉冲系数，越大越强）
+  rainRepelRadius: 10.0,    // 粒子间斥力作用半径 (m)：落地粒子在此半径内相互推开防重叠
+  rainRepelStrength: 1.0,   // 粒子间斥力力度系数（速度脉冲系数，越大越强）
+  rainParticleMax: 2048,    // 存活粒子数量上限（达到上限后停止生成新粒子）
 };

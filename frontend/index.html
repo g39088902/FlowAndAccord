@@ -32,7 +32,7 @@
 
   <div class="top-bar" id="top-bar">
     <div class="brand-card">
-      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.63.1</span></div>
+      <div class="brand-title">🍼 Flow & Accord · 流动公约 <span class="version-tag" style="display:inline-block; font-size:11px; vertical-align:middle; background:rgba(59,130,246,0.18); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; letter-spacing:0.5px;">v1.63.5</span></div>
 
       <div class="brand-desc">确定性生态演算 · 马斯洛需求层级驱动 · 族群代际繁衍与社会演化</div>
     </div>
@@ -882,6 +882,18 @@
     <div class="debug-row"><span>🔥 CPU 占用</span><span id="dbg-cpu" class="mono-num">0%</span></div>
     <div class="debug-row"><span>🧠 JS 堆内存</span><span id="dbg-js-heap" class="mono-num">—</span></div>
     <div class="debug-row"><span>🧬 WASM 内存</span><span id="dbg-wasm-mem" class="mono-num">0.00 MB</span></div>
+    <div class="debug-row"><span>💧 水粒子数</span><span id="dbg-rain-count" class="mono-num">0 / 2048</span></div>
+
+    <!-- ★ 水粒子物理输入框：改值即热注入内核（SIM_CONFIG）或渲染参数（RENDER_CONFIG） -->
+    <div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(167,139,250,0.25);">
+      <div style="font-weight:700; color:#a78bfa; margin-bottom:3px;">💧 水粒子物理（输入即生效）</div>
+      <div class="debug-row"><span>引力范围 (m)</span><input id="dbg-rain-attract-radius" type="number" min="0" step="0.5" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>引力力度</span><input id="dbg-rain-attract-strength" type="number" min="0" step="0.001" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>斥力范围 (m)</span><input id="dbg-rain-repel-radius" type="number" min="0" step="0.5" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>斥力力度</span><input id="dbg-rain-repel-strength" type="number" min="0" step="0.001" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>粒子大小 (半边长 m)</span><input id="dbg-rain-cube-half" type="number" min="0.1" step="0.5" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+      <div class="debug-row"><span>粒子数量上限</span><input id="dbg-rain-particle-max" type="number" min="0" step="10" style="width:88px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:1px 5px;font-size:10.5px;"></div>
+    </div>
     <div class="debug-hud-tip" id="dbg-mem-tip" style="display:none;">⚠️ 当前浏览器不支持 performance.memory，JS 堆数据不可用</div>
   </div>
 

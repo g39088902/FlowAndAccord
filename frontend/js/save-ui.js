@@ -18,7 +18,7 @@
   ///   导致当前版本自己写出的存档被判「格式过旧」→ 自动读档与「读取」均失败；此处补正）。
   const SAVE_FORMAT_VERSION = 9;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.63.1';
+  const DEFAULT_APP_VERSION = '1.63.5';
 
   const AUTO_SAVE_INTERVAL_MS = 30000;
 

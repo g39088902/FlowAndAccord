@@ -319,4 +319,9 @@ window.RENDER_CONFIG = {
   // 建缓存一次性消费（~几 ms），每帧零成本；平滑后场由 GL 地形渲染器消费。
   // ⚠️ 改值需重开世界/刷新页面生效（不随帧重建）；0 = 关（回退原始逐格色场）。
   terrainAlbedoSmoothRadius: 2,
+
+  // —— 水粒子几何大小（★ WebGPU 降水层；rain-particles.js 逐帧经 camera uniform 传给 rain.wgsl）——
+  // 每个降水粒子绘制为世界空间立方体，本值为其**半边长**（世界单位，立方体边长 = 2 × 本值）。
+  // 纯渲染参数：不进 SIM_CONFIG、不经 applyConfig；调试页改值即时生效，无需重编译 WASM。
+  rainCubeHalf: 2.0,
 };
