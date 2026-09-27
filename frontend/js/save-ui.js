@@ -1,11 +1,11 @@
 // === 读档 / 存档系统 (v1.12.0) ===
-// 三文件槽位（save1.json / save2.json / save3.json）直写用户磁盘，
+// 单一存档文件（FlowAndAccordSave.json）直写用户磁盘，文件名固定，不随地图种子或槽位号变化；
 // FileSystemFileHandle 经 IndexedDB 持久化，页面刷新后自动恢复连接。
 // ★ v1.28.1 权限重授加固：句柄权限未持久化时不再自动断开/删除记录——启动门禁先
 // 静默重授（授权已持久化时立即成功），失败则提供「授权并读取上次存档」按钮（点击=
 // 用户手势内 requestPermission）；保存/读取遇 NotAllowedError 亦就地重授后重试。
 // 存档正文为内核导出的全量世界状态 JSON（含 RNG 内部状态），读档后可确定性续演。
-// 自动保存每 30 秒写入槽位 1。仅支持 Chrome / Edge（File System Access API）。
+// 自动保存每 30 秒写入该存档文件。仅支持 Chrome / Edge（File System Access API）。
 // v1.12.0: 彻底删除 localStorage 存档体系，仅保留文件直写。
 
 (function () {
@@ -14,9 +14,11 @@
   /// 必须与 sim_core::spatial::world_save::SAVE_FORMAT_VERSION 保持一致
   /// ★ v1.44.7：M5 新增帝国登记簿与帝国公帑结算状态（WorldSave 字段增删），格式升至 4，不兼容旧档
   /// v1.46.12：BranchId 收敛为 16 条，活动任务枚举不兼容旧档。
-  const SAVE_FORMAT_VERSION = 7;
+  /// ★ v1.62.0：删除地图河流水系统与土壤湿润，存档结构升至 8（此前前端镜像漏改仍为 7，
+  ///   导致当前版本自己写出的存档被判「格式过旧」→ 自动读档与「读取」均失败；此处补正）。
+  const SAVE_FORMAT_VERSION = 8;
   /// 权威默认应用版本（与 sim_core::spatial::world_save::SAVE_APP_VERSION 保持一致）
-  const DEFAULT_APP_VERSION = '1.62.0';
+  const DEFAULT_APP_VERSION = '1.62.2';
 
   const AUTO_SAVE_INTERVAL_MS = 30000;
 
@@ -68,18 +70,19 @@
     return normalizeVer(DEFAULT_APP_VERSION);
   }
 
-  const SLOTS = [
-    { id: 'save1', icon: '📁', name: '存档槽 1', desc: '自动保存默认写入此槽', suggestedName: 'flowaccord-save1.json', isAuto: true },
-    { id: 'save2', icon: '📁', name: '存档槽 2', desc: '手动覆盖保存', suggestedName: 'flowaccord-save2.json', isAuto: false },
-    { id: 'save3', icon: '📁', name: '存档槽 3', desc: '手动覆盖保存', suggestedName: 'flowaccord-save3.json', isAuto: false },
-  ];
+  // 单一存档文件：文件选择器建议名固定为 SAVE_FILE_NAME，绝不携带地图种子或槽位号。
+  // ★ 内部 IndexedDB 键刻意沿用历史槽位串 `'save1'`（三槽位时代的槽位 1）：
+  //   既有用户已连接的 FileSystemFileHandle 记录仍以该键存储，保持键名不变才能
+  //   在页面刷新后继续自动恢复该文件句柄，不破坏老用户的连接。
+  const SAVE_SLOT_ID = 'save1';
+  const SAVE_FILE_NAME = 'FlowAndAccordSave.json';
+  const SAVE_SLOT = { id: SAVE_SLOT_ID, icon: '📁', name: '存档文件', desc: '点击下方按钮连接一个本地 .json 存档文件' };
 
   // ── 运行时状态 ──
-  let activeTab = 'save';
   let lastAutoTick = -1;
   let els = {};
-  // 每槽位的文件句柄与元信息（句柄来自 IndexedDB 恢复或用户新选择）
-  const slotState = {}; // { save1: { handle, fileName, meta, lastSaved }, ... }
+  // 存档文件的句柄与元信息（句柄来自 IndexedDB 恢复或用户新选择）
+  const slotState = {}; // { save1: { handle, fileName, meta, lastSaved } }
 
   const getSim = () => window.rustWorldSim || null;
 
@@ -199,7 +202,7 @@
     }
   }
 
-  /** 显式 seed 开局：旧槽位在用户选择前绝不能被自动读取或覆盖。 */
+  /** 显式 seed 开局：旧存档在用户选择前绝不能被自动读取或覆盖。 */
   async function bootstrapSeedChoice(seed) {
     const title = document.getElementById('startup-save-title');
     const createBtn = document.getElementById('startup-save-connect');
@@ -223,9 +226,9 @@
       createBtn.disabled = true;
       loadBtn.disabled = true;
       try {
-        // 不复用槽位 1：用户必须明确选择空文件，旧档及其 IDB 连接才不会被误覆盖。
+        // 不复用旧连接：用户必须明确选择空文件，旧档及其 IDB 连接才不会被误覆盖。
         const handle = await window.showSaveFilePicker({
-          suggestedName: `flowaccord-seed-${seed}.json`,
+          suggestedName: SAVE_FILE_NAME,
           types: [{ description: 'Flow & Accord 存档文件', accept: { 'application/json': ['.json'] } }],
         });
         const file = await handle.getFile();
@@ -297,7 +300,7 @@
   }
 
   /**
-   * ★ v1.50.81「删除旧存档」：清空文件内容 → 断开槽位与 IndexedDB 句柄
+   * ★ v1.50.81「删除旧存档」：清空文件内容 → 断开存档文件与 IndexedDB 句柄
    * → 重建一个全新存档文件（走正常「建立存档文件」流程，用户可另选位置）。
    *
    * 删除语义：File System Access API 无 `remove()`，按官方推荐 `handle.remove()`（Chrome 110+）
@@ -391,10 +394,9 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // ★ v1.28.0 启动自动读档：打开游戏时若已连接默认存档文件
-  // （自动槽 1 = 浏览器记住的默认目录 + 默认文件名 flowaccord-save1.json，
-  //   句柄由 IndexedDB 恢复，无需用户手势），直接读取其内容续演，
-  //   而不是开新世界等自动保存覆盖旧档。
+  // ★ v1.28.0 启动自动读档：打开游戏时若已连接存档文件
+  // （浏览器记住的目录 + 默认文件名 FlowAndAccordSave.json，句柄由 IndexedDB 恢复，
+  //   无需用户手势），直接读取其内容续演，而不是开新世界等自动保存覆盖旧档。
   // ══════════════════════════════════════════════════════════════
 
   /** 等待 WASM 引擎就绪（轮询 _ready），超时返回 false */
@@ -409,7 +411,7 @@
     });
   }
 
-  /** 启动时自动读取指定槽位的存档并续演；成功返回 true（不弹读档面板） */
+  /** 启动时自动读取存档文件并续演；成功返回 true（不弹读档面板） */
   async function autoLoadStartupSave(slotId) {
     const st = slotState[slotId];
     if (!st || !st.handle) return false;
@@ -619,20 +621,19 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // 槽位操作
+  // 存档文件操作
   // ══════════════════════════════════════════════════════════════
 
-  /** 为指定槽位弹出文件选择器，连接/创建一个本地存档文件 */
+  /** 弹出文件选择器，连接/创建本地存档文件（单存档：文件名固定为 SAVE_FILE_NAME） */
   async function connectSlot(slotId) {
+    slotId = slotId || SAVE_SLOT_ID;
     if (!supportsFileAPI()) {
       setStatus('当前浏览器不支持本地文件直写，请使用 Chrome 或 Edge', 'err');
       return;
     }
-    const slot = SLOTS.find(s => s.id === slotId);
-    if (!slot) return;
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: slot.suggestedName,
+        suggestedName: SAVE_FILE_NAME,
         types: [{
           description: 'Flow & Accord 存档文件',
           accept: { 'application/json': ['.json'] },
@@ -644,7 +645,7 @@
       // 尝试读取已有文件的元信息
       await refreshSlotMeta(slotId);
       renderList();
-      setStatus(`已连接「${handle.name}」到${slot.name}`, 'ok');
+      setStatus(`已连接存档文件「${handle.name}」`, 'ok');
     } catch (e) {
       if (e.name !== 'AbortError') {
         setStatus('连接文件失败：' + e.message, 'err');
@@ -667,7 +668,7 @@
       st.isOutdated = (meta.formatVersion !== SAVE_FORMAT_VERSION || compatLine(meta.appVersion) !== compatLine(curVer));
     } catch (e) {
       if (e.name === 'NotAllowedError') {
-        // 权限未持久化：保留槽位与 IndexedDB 记录，等待用户手势内重授
+        // 权限未持久化：保留存档文件与 IndexedDB 记录，等待用户手势内重授
         st.permError = true;
       } else {
         st.meta = null;
@@ -676,7 +677,7 @@
     }
   }
 
-  /** 将当前世界存档写入指定槽位的文件 */
+  /** 将当前世界存档写入存档文件 */
   async function saveToSlot(slotId) {
     const st = slotState[slotId];
     if (!st || !st.handle) {
@@ -717,7 +718,7 @@
             return false;
           }
         } else {
-          setStatus('文件写入权限被拒绝，请重新连接该槽位', 'err');
+          setStatus('文件写入权限被拒绝，请重新连接存档文件', 'err');
           return false;
         }
       } else {
@@ -734,17 +735,16 @@
     st.isOutdated = false;
     lastAutoTick = meta.tick;
     renderList();
-    const slot = SLOTS.find(s => s.id === slotId);
-    setStatus(`已保存到${slot.name}「${st.fileName}」· Tick ${meta.tick} · ${fmtBytes(meta.bytes)}`, 'ok');
-    simLog(`💾 存档已写入${slot.name}（Tick ${meta.tick}，${fmtBytes(meta.bytes)}）`);
+    setStatus(`已保存到存档文件「${st.fileName}」· Tick ${meta.tick} · ${fmtBytes(meta.bytes)}`, 'ok');
+    simLog(`💾 存档已写入存档文件（Tick ${meta.tick}，${fmtBytes(meta.bytes)}）`);
     return true;
   }
 
-  /** 从指定槽位的文件读取存档 */
+  /** 从存档文件读取存档 */
   async function loadFromSlot(slotId) {
     const st = slotState[slotId];
     if (!st || !st.handle) {
-      setStatus('该槽位尚未连接文件，请先点击「连接文件」', 'err');
+      setStatus('尚未连接存档文件，请先点击「连接存档文件」', 'err');
       return;
     }
     let file;
@@ -757,7 +757,7 @@
           try { file = await st.handle.getFile(); }
           catch (e2) { setStatus('读取文件失败：' + e2.message, 'err'); return; }
         } else {
-          setStatus('文件读取权限被拒绝，请重新连接该槽位', 'err');
+          setStatus('文件读取权限被拒绝，请重新连接存档文件', 'err');
           return;
         }
       } else {
@@ -778,15 +778,15 @@
       setStatus(`存档兼容线 (v${compatLine(meta.appVersion)}) 与当前兼容线 (v${compatLine(curVer)}) 不一致，已自动废弃无法读取（中间版本号变更）。请覆盖保存当前版本世界。`, 'err');
       return;
     }
-    await applySave(text, meta, `${SLOTS.find(s => s.id === slotId).name}（${st.fileName}）`);
+    await applySave(text, meta, `存档文件（${st.fileName}）`);
   }
 
-  /** 断开槽位的文件连接（显式操作：删除内存状态与 IndexedDB 句柄记录） */
+  /** 断开存档文件的连接（显式操作：删除内存状态与 IndexedDB 句柄记录） */
   async function disconnectSlot(slotId) {
     delete slotState[slotId];
     await idbDelete(slotId);
     renderList();
-    setStatus(`已断开${SLOTS.find(s => s.id === slotId).name}的文件连接`, 'ok');
+    setStatus('已断开存档文件的连接', 'ok');
   }
 
   async function applySave(json, meta, label) {
@@ -829,101 +829,96 @@
       return;
     }
 
-    for (const slot of SLOTS) {
-      const st = slotState[slot.id] || null;
-      const card = document.createElement('div');
-      card.className = 'save-slot-card' + (st ? '' : ' empty');
+    const st = slotState[SAVE_SLOT.id] || null;
+    const card = document.createElement('div');
+    card.className = 'save-slot-card' + (st ? '' : ' empty');
 
-      const head = document.createElement('div');
-      head.className = 'save-slot-head';
-      const autoBadge = slot.isAuto ? '<span class="save-slot-badge" style="color:#60a5fa; background:rgba(59,130,246,0.12); border-color:rgba(59,130,246,0.3);">🤖 自动保存</span>' : '';
-      let badgeHtml;
-      if (!st) {
-        badgeHtml = autoBadge || `<span class="save-slot-badge muted">未连接</span>`;
-      } else if (st.permError) {
-        badgeHtml = '<span class="save-slot-badge" style="color:#fbbf24; border-color:rgba(251,191,36,.4);">🔐 待授权</span>';
-      } else if (st.isOutdated) {
-        badgeHtml = `<span class="save-slot-badge" style="color:#f87171; background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4);">⚠️ 已废弃 (v${st.meta ? st.meta.appVersion : '—'})</span>`;
-      } else {
-        badgeHtml = `<span class="save-slot-badge">v${st.meta ? st.meta.appVersion : '—'}</span>`;
-      }
-      head.innerHTML = `<span class="save-slot-name">${slot.icon} ${slot.name}</span>` + badgeHtml;
-      card.appendChild(head);
+    const head = document.createElement('div');
+    head.className = 'save-slot-head';
+    let badgeHtml;
+    if (!st) {
+      badgeHtml = `<span class="save-slot-badge muted">未连接</span>`;
+    } else if (st.permError) {
+      badgeHtml = '<span class="save-slot-badge" style="color:#fbbf24; border-color:rgba(251,191,36,.4);">🔐 待授权</span>';
+    } else if (st.isOutdated) {
+      badgeHtml = `<span class="save-slot-badge" style="color:#f87171; background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4);">⚠️ 已废弃 (v${st.meta ? st.meta.appVersion : '—'})</span>`;
+    } else {
+      badgeHtml = `<span class="save-slot-badge">v${st.meta ? st.meta.appVersion : '—'}</span>`;
+    }
+    head.innerHTML = `<span class="save-slot-name">${SAVE_SLOT.icon} ${SAVE_SLOT.name}</span>` + badgeHtml;
+    card.appendChild(head);
 
-      const info = document.createElement('div');
-      info.className = 'save-slot-meta';
-      const curVer = getCurrentAppVersion();
-      if (st && st.meta && !st.isOutdated) {
-        info.innerHTML =
-          `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
-          `<span title="模拟 Tick">⏱️ <b class="mono-num">${st.meta.tick}</b></span>` +
-          `<span title="存活人口">👤 <b class="mono-num">${st.meta.population}</b> 人</span>` +
-          `<span title="存续家户">🏠 <b class="mono-num">${st.meta.households}</b> 户</span>`;
-      } else if (st && st.isOutdated) {
-        info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
-          `<div class="save-slot-desc" style="color:#fca5a5; margin-top:4px; line-height:1.5;">⚠️ 存档兼容线 (v${st.meta ? compatLine(st.meta.appVersion) : '—'}) 与当前兼容线 (v${compatLine(curVer)}) 不一致，已自动废弃。请点击下方「覆盖保存」重写为当前版本。</div>`;
-      } else if (st) {
-        info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
-          `<span class="save-slot-desc">文件为空或数据异常，点击下方「保存」写入当前世界</span>`;
-      } else {
-        info.innerHTML = `<span class="save-slot-desc">${slot.desc}</span>`;
-      }
-      card.appendChild(info);
+    const info = document.createElement('div');
+    info.className = 'save-slot-meta';
+    const curVer = getCurrentAppVersion();
+    if (st && st.meta && !st.isOutdated) {
+      info.innerHTML =
+        `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+        `<span title="模拟 Tick">⏱️ <b class="mono-num">${st.meta.tick}</b></span>` +
+        `<span title="存活人口">👤 <b class="mono-num">${st.meta.population}</b> 人</span>` +
+        `<span title="存续家户">🏠 <b class="mono-num">${st.meta.households}</b> 户</span>`;
+    } else if (st && st.isOutdated) {
+      info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+        `<div class="save-slot-desc" style="color:#fca5a5; margin-top:4px; line-height:1.5;">⚠️ 存档兼容线 (v${st.meta ? compatLine(st.meta.appVersion) : '—'}) 与当前兼容线 (v${compatLine(curVer)}) 不一致，已自动废弃。请点击下方「覆盖保存」重写为当前版本。</div>`;
+    } else if (st) {
+      info.innerHTML = `<span title="存档文件">📄 <b class="mono-num">${st.fileName}</b></span>` +
+        `<span class="save-slot-desc">文件为空或数据异常，点击下方「保存」写入当前世界</span>`;
+    } else {
+      info.innerHTML = `<span class="save-slot-desc">${SAVE_SLOT.desc}</span>`;
+    }
+    card.appendChild(info);
 
-      const time = document.createElement('div');
-      time.className = 'save-slot-time';
-      if (st && st.lastSaved) {
-        time.textContent = `🕒 最后写入: ${fmtTime(st.lastSaved)}`;
-      } else if (st) {
-        time.textContent = st.permError ? '🔐 权限待授权，点击操作按钮时自动请求' : '已连接，等待首次写入';
-      } else {
-        time.textContent = '点击「连接文件」选择一个 .json 存档文件';
-      }
-      card.appendChild(time);
+    const time = document.createElement('div');
+    time.className = 'save-slot-time';
+    if (st && st.lastSaved) {
+      time.textContent = `🕒 最后写入: ${fmtTime(st.lastSaved)}`;
+    } else if (st) {
+      time.textContent = st.permError ? '🔐 权限待授权，点击操作按钮时自动请求' : '已连接，等待首次写入';
+    } else {
+      time.textContent = '点击「连接存档文件」选择一个 .json 存档文件';
+    }
+    card.appendChild(time);
 
-      const actions = document.createElement('div');
-      actions.className = 'save-slot-actions';
-      if (st) {
-        const btns = activeTab === 'save'
-          ? [['save', '💾 覆盖保存', 'primary'], ['load', '📂 读取', ''], ['disconnect', '🔌 断开', 'danger']]
-          : [['load', '📂 读取', 'primary'], ['save', '💾 覆盖保存', ''], ['disconnect', '🔌 断开', 'danger']];
-        for (const [act, label, kind] of btns) {
-          const btn = document.createElement('button');
-          btn.className = 'save-slot-btn' + (kind ? ' ' + kind : '');
-          btn.dataset.slot = slot.id;
-          btn.dataset.act = act;
-          if (act === 'load' && (!st.meta || st.isOutdated)) {
-            btn.disabled = true;
-            btn.title = st.isOutdated ? '旧版本存档已自动废弃，无法读取' : '无有效存档数据';
-          }
-          btn.textContent = label;
-          actions.appendChild(btn);
-        }
-      } else {
+    const actions = document.createElement('div');
+    actions.className = 'save-slot-actions';
+    if (st) {
+      // 已连接卡片：保存 / 读取 / 断开
+      const btns = [
+        ['save', '💾 覆盖保存', 'primary'],
+        ['load', '📂 读取', ''],
+        ['disconnect', '🔌 断开', 'danger'],
+      ];
+      for (const [act, label, kind] of btns) {
         const btn = document.createElement('button');
-        btn.className = 'save-slot-btn primary';
-        btn.dataset.slot = slot.id;
-        btn.dataset.act = 'connect';
-        btn.textContent = '🔗 连接存档文件';
+        btn.className = 'save-slot-btn' + (kind ? ' ' + kind : '');
+        btn.dataset.slot = SAVE_SLOT.id;
+        btn.dataset.act = act;
+        if (act === 'load' && (!st.meta || st.isOutdated)) {
+          btn.disabled = true;
+          btn.title = st.isOutdated ? '旧版本存档已自动废弃，无法读取' : '无有效存档数据';
+        }
+        btn.textContent = label;
         actions.appendChild(btn);
       }
-      card.appendChild(actions);
-      els.list.appendChild(card);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'save-slot-btn primary';
+      btn.dataset.slot = SAVE_SLOT.id;
+      btn.dataset.act = 'connect';
+      btn.textContent = '🔗 连接存档文件';
+      actions.appendChild(btn);
     }
+    card.appendChild(actions);
+    els.list.appendChild(card);
 
     if (els.hint) {
-      const connected = SLOTS.filter(s => slotState[s.id]).length;
-      els.hint.textContent = connected > 0
-        ? `💻 文件直写模式 · 已连接 ${connected}/3 槽位 · 自动保存每 30 秒写入「存档槽 1」· 刷新后自动恢复连接（权限失效时点击操作自动重授）`
-        : '💻 文件直写模式 · 存档直写您电脑上的 .json 文件，不受浏览器存储配额限制 · 请先连接槽位';
+      els.hint.textContent = st
+        ? `💻 文件直写模式 · 已连接存档文件「${st.fileName}」 · 自动保存每 30 秒写入 · 刷新后自动恢复连接（权限失效时点击操作自动重授）`
+        : '💻 文件直写模式 · 存档直写您电脑上的 .json 文件，不受浏览器存储配额限制 · 请先连接存档文件';
     }
   }
 
-  function openPanel(tab) {
-    activeTab = tab || 'save';
-    for (const btn of document.querySelectorAll('.save-tab-btn')) {
-      btn.classList.toggle('active', btn.dataset.tab === activeTab);
-    }
+  function openPanel() {
     setStatus('');
     renderList();
     if (els.backdrop) els.backdrop.style.display = 'flex';
@@ -938,7 +933,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════
-  // 自动保存（每 60 秒写入槽位 1）
+  // 自动保存（每 30 秒写入存档文件）
   // ══════════════════════════════════════════════════════════════
   function tickAutoSave() {
     const gate = document.getElementById('startup-save-gate');
@@ -947,9 +942,9 @@
     if (!s || !s._ready) return;
     if (typeof s.tickCount === 'number' && s.tickCount === lastAutoTick) return;
 
-    const st = slotState['save1'];
-    if (!st || !st.handle || st.permError) return; // 槽位1未连接或权限待授权，跳过自动保存
-    saveToSlot('save1'); // 异步执行，不阻塞主循环
+    const st = slotState[SAVE_SLOT_ID];
+    if (!st || !st.handle || st.permError) return; // 存档文件未连接或权限待授权，跳过自动保存
+    saveToSlot(SAVE_SLOT_ID); // 异步执行，不阻塞主循环
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -987,7 +982,7 @@
       if (!json) { setStatus('导出失败：' + (s.readSaveError ? s.readSaveError() : '未知错误'), 'err'); return; }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));
-      a.download = `flowaccord-${Date.now()}.json`;
+      a.download = SAVE_FILE_NAME;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       setStatus('已下载当前世界存档备份', 'ok');
@@ -997,15 +992,11 @@
     const btnOpenLoad = document.getElementById('btn-open-load-panel');
     const btnClose = document.getElementById('save-modal-close');
 
-    if (btnOpenSave) btnOpenSave.addEventListener('click', () => openPanel('save'));
-    if (btnOpenLoad) btnOpenLoad.addEventListener('click', () => openPanel('load'));
+    if (btnOpenSave) btnOpenSave.addEventListener('click', () => openPanel());
+    if (btnOpenLoad) btnOpenLoad.addEventListener('click', () => openPanel());
     if (btnClose) btnClose.addEventListener('click', closePanel);
     if (els.backdrop) {
       els.backdrop.addEventListener('mousedown', (e) => { if (e.target === els.backdrop) closePanel(); });
-    }
-
-    for (const btn of document.querySelectorAll('.save-tab-btn')) {
-      btn.addEventListener('click', () => openPanel(btn.dataset.tab));
     }
 
     if (els.list) {
@@ -1030,17 +1021,15 @@
       }
     }, true);
 
-    // 从 IndexedDB 恢复所有槽位的文件句柄
+    // 从 IndexedDB 恢复存档文件句柄（历史键 SAVE_SLOT_ID = 'save1'）
     if (supportsFileAPI()) {
       try {
         await openIDB();
-        for (const slot of SLOTS) {
-          const rec = await idbGet(slot.id);
-          if (rec && rec.handle) {
-            slotState[slot.id] = { handle: rec.handle, fileName: rec.fileName, meta: null, lastSaved: 0, permError: false };
-            await refreshSlotMeta(slot.id);
-            if (isOpen()) renderList();
-          }
+        const rec = await idbGet(SAVE_SLOT_ID);
+        if (rec && rec.handle) {
+          slotState[SAVE_SLOT_ID] = { handle: rec.handle, fileName: rec.fileName, meta: null, lastSaved: 0, permError: false };
+          await refreshSlotMeta(SAVE_SLOT_ID);
+          if (isOpen()) renderList();
         }
       } catch (e) {
         console.warn('IndexedDB 句柄恢复失败:', e);
@@ -1049,26 +1038,26 @@
 
     await bootstrapStartupGate();
 
-    // 暴露全局 API 供生态重置开新档与外部系统联动
+    // 暴露全局 API 供生态重置开新档与外部系统联动（保留旧方法名并容忍可选参数）
     window.saveUI = {
       saveSlot: saveToSlot,
       loadSlot: loadFromSlot,
-      autoSave: () => saveToSlot('save1'),
+      autoSave: () => saveToSlot(SAVE_SLOT_ID),
       refresh: renderList,
       // ★ v1.50.81 对外暴露诊断与脱困能力：供控制台/自动化排查「存档读不了」场景
       //   （incompatReason 返回具体不兼容原因，null = 可正常读档）
       incompatReason: (meta) => getSaveIncompatReason(meta),
       extractMeta: extractMeta,
-      deleteSave: (slotId) => deleteStartupSave(slotId || 'save1'),
+      deleteSave: (slotId) => deleteStartupSave(slotId || SAVE_SLOT_ID),
       showStartupDelete: showStartupDeleteBtn,
-      slotMeta: (slotId) => (slotState[slotId || 'save1'] || {}).meta || null,
+      slotMeta: (slotId) => (slotState[slotId || SAVE_SLOT_ID] || {}).meta || null,
     };
 
     // 监听重置完成事件：必须等 Worker 应用新世界快照后再自动保存，避免旧世界竞态写回。
     window.addEventListener('ecology-reset-complete', async () => {
-      const st = slotState['save1'];
+      const st = slotState[SAVE_SLOT_ID];
       if (st && st.handle && !st.permError) {
-        await saveToSlot('save1');
+        await saveToSlot(SAVE_SLOT_ID);
       }
     });
 

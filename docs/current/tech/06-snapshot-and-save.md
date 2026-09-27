@@ -32,7 +32,7 @@ stateDiagram-v2
 | A 未建档 | 启动门禁 `#startup-save-gate` 阻塞，模拟默认暂停 | 世界创建 | 建立或连接存档句柄 |
 | B 建立并授权 | `showSaveFilePicker` 获得 `FileSystemFileHandle` | 用户手势点击建立 | 写入最小合法存档 |
 | C 已挂载 | 句柄可用，门禁解除，模拟恢复 | 存档文件合法 | 自动保存/读取/失效 |
-| D 自动保存中 | `tickAutoSave` 每 30s 直写本地文件或 localStorage 三槽位 | 模拟推进 | 周期覆盖完成 |
+| D 自动保存中 | `tickAutoSave` 每 30s 直写单一份本地存档文件 | 模拟推进 | 周期覆盖完成 |
 | E 读取中 | `world_load` 载入存档覆盖世界 | 用户读档 | 成功(0)/失败(-3) |
 | F 版本不匹配拒绝 | 兼容线不匹配（`app_version_compat_line(app_version) != 当前兼容线`）或解析失败，保持原世界不变 | world_load 返回 -3 | 废弃旧档或重连 |
 
@@ -43,9 +43,7 @@ stateDiagram-v2
 
 ## 1. 定位与设计红线
 
-存档系统把「内核全量世界状态」序列化为 JSON，支持两种持久化后端：
-1. **浏览器槽位**：三槽位落 `localStorage`，适合中小存档；
-2. **本地文件直写**（v1.11.0）：用户通过 File System Access API 连接一个本地 `.json` 文件后，存档直写用户磁盘，**不受浏览器存储配额限制**，适合长时间运行后的大存档。
+存档系统把「内核全量世界状态」序列化为 JSON，落盘为**单一份本地存档文件**：用户通过 File System Access API 连接一个本地 `.json` 文件（建议名 `FlowAndAccordSave.json`，★ v1.62.2 起与地图种子/槽位号解耦）后，存档直写用户磁盘，**不受浏览器存储配额限制**，适合长时间运行后的大存档。文件句柄经 IndexedDB 持久化，刷新页面自动恢复连接。（早期 3 槽位 `localStorage` 后端已于 v1.12.0 删除。）
 
 > 🔴 **浏览器要求**：本地文件直写依赖 **Chrome / Edge 的 File System Access API**（Firefox / Safari 无 `showSaveFilePicker`）；且 ★ v1.27.0 起启动存档门禁要求先建立/连接可写存档才解除模拟暂停。**存档链路的建立与验证必须用 Chrome/Edge**；Agent 自动化在沙箱禁止外启浏览器时，可用内置预览浏览器 + `?nogate=1` 旁路（v1.50.8，仅内存演算）做视觉/性能/季相等非存档验证——该旁路**不证明建档/读档链路**，受限环境中的存档验证项如实标注 NOT_RUN/待补测（环境选择口径见根 AGENTS.md §4 铁律与 [27 号指南](./27-browser-automation.md) §7）。
 
@@ -134,7 +132,7 @@ World3DEngine
 
 **三条门禁必须在前端统一收敛**（★ v1.50.81 教训）：内核拒绝读档有**三个**独立判据——`format_version`、`app_version` 兼容线、`terrain_generator_version`。前端若只比其中一部分（v1.50.80 时只比兼容线），会把实质不可读的档案误判为「可兼容」：自动读档必 `-3` 失败、门禁卡在「自动读取存档失败」而按钮仍写「建立存档文件」，玩家无法脱困（实例：地形生成器 12 → 13 后旧档报「地形生成器版本不兼容」）。
 
-前端收敛实现：`save-ui.js::getSaveIncompatReason(meta)` 一次判三条，返回可读原因串（`null` = 可正常读档）；`extractMeta` 解析 `terrain_generator_version`（缺失按 0、不据此拒绝，交由内核裁决）；门禁三处接入该判据，命中即露出「🗑️ 删除旧存档并新建」按钮。删除走 `deleteStartupSave()`：`handle.remove()` → 回退写空内容 → 无论成败都断开槽位与 IndexedDB 句柄，再走正常建档流程。诊断入口：`window.saveUI.incompatReason/extractMeta/deleteSave/showStartupDelete/slotMeta`。
+前端收敛实现：`save-ui.js::getSaveIncompatReason(meta)` 一次判三条，返回可读原因串（`null` = 可正常读档）；`extractMeta` 解析 `terrain_generator_version`（缺失按 0、不据此拒绝，交由内核裁决）；门禁三处接入该判据，命中即露出「🗑️ 删除旧存档并新建」按钮。删除走 `deleteStartupSave()`：`handle.remove()` → 回退写空内容 → 无论成败都断开存档句柄与 IndexedDB 记录，再走正常建档流程。诊断入口：`window.saveUI.incompatReason/extractMeta/deleteSave/showStartupDelete/slotMeta`。
 
 ---
 
@@ -165,10 +163,10 @@ World3DEngine
 
 ### 4.2 UI 层 `save-ui.js`（~620 行）
 
-- **三槽位**：自动槽（每 30 秒覆盖，世界未推进则跳过；重置生态开启新档时亦自动更新保存）/ 手动槽 1 / 手动槽 2。
-- **存储键**：正文 `flowaccord.save.v1.<slotId>`，元信息统一放索引键 `flowaccord.save.v1.__index`（避免正文重复占用配额）。
+- **单存档文件（★ v1.62.2）**：只保留一份存档文件（`SAVE_SLOT`，IndexedDB 键沿用 `save1`）；自动保存每 30 秒覆盖（世界未推进则跳过；重置生态开启新档时亦自动更新保存）。文件建议名、启动种子选择默认名与导出下载名统一为 `FlowAndAccordSave.json`，不再拼接地图种子或槽位号。
+- **句柄持久化**：IndexedDB（库 `flowaccord-save-handles` / objectStore `handles` / keyPath `slotId`）只存一条记录，页面刷新后自动恢复连接。
 - **元信息**：`tick` / 存活人口 / 存续家户数 / 保存时间 / 种子 / 体积 / `app_version`，仅在保存或导入时解析一次。
-- **面板**：顶栏「💾 存档」「📂 读档」两个按钮打开同一面板，切换保存/读取标签；槽位卡片支持覆盖保存、读取、导出、删除（二次确认）；底部支持导入 `.json` 文件（校验 `format_version` 后直接载入）。
+- **面板**：顶栏「💾 存档」「📂 读档」两个按钮打开同一面板（★ v1.62.2 起无保存/读取标签）；存档卡片支持覆盖保存、读取、断开；底部支持导出当前存档与导入 `.json` 文件（校验 `format_version` 后直接载入）。
 - **读档后自动暂停**并同步顶栏暂停按钮文案，便于核对世界状态。
 - **Esc 关闭**走捕获阶段拦截，避免同时触发 Inspector 关闭逻辑。
 
@@ -177,19 +175,19 @@ World3DEngine
 - **连接**：`connectLocalFile()` 调 `showSaveFilePicker()` 让用户选择/新建一个 `.json` 文件，获得 `FileSystemFileHandle` 后存入 `localFileHandle`。
 - **写入**：`saveToLocalFile()` 经 `handle.createWritable()` → `write(json)` → `close()` 直写磁盘，无需重复弹窗。
 - **读取**：`loadFromLocalFile()` 从已连接文件读取；`loadFromLocalFilePicker()` 支持不先连接、直接 `showOpenFilePicker()` 打开任意存档文件。
-- **自动保存切换**：已连接本地文件时，`tickAutoSave()` 每 30 秒直写本地文件而非 localStorage，彻底规避大存档的 `QuotaExceededError`。重置生态开启新档时同样触发自动更新。
-- **兼容性降级**：`supportsLocalFileAPI()` 检测 `showSaveFilePicker`/`showOpenFilePicker`；不支持时（Firefox 等）隐藏连接按钮，读取标签下的「选择存档文件」降级到传统 `input[type=file]`，底部提示引导使用 Chrome/Edge。
-- **权限失效**：写入/读取捕获 `NotAllowedError`，自动 `disconnectLocalFile()` 并提示重新连接。
-- **句柄不持久化**：页面刷新后 `localFileHandle` 失效（浏览器安全策略），需用户重新连接。
+- **自动保存**：`tickAutoSave()` 每 30 秒直写该存档文件，彻底规避大存档的 `QuotaExceededError`。重置生态开启新档时同样触发自动更新。
+- **兼容性降级**：`supportsLocalFileAPI()` 检测 `showSaveFilePicker`/`showOpenFilePicker`；不支持时（Firefox 等）隐藏连接按钮，导入降级到传统 `input[type=file]`（`#btn-import-save` / `#save-file-input`），底部提示引导使用 Chrome/Edge。
+- **权限失效**：写入/读取捕获 `NotAllowedError`，就地在用户手势内重授后重试一次并提示（★ v1.28.1）；仅显式「断开」才删除 IndexedDB 句柄记录。
+- **句柄持久化**：连接后的 `FileSystemFileHandle` 存入 IndexedDB，页面刷新后自动恢复并静默重授权限（★ v1.28.1）。
 
 #### 4.2.2 启动存档文件门禁（v1.27.0）与自动读档（★ v1.28.0，v1.28.1 权限加固）
 
 - **启动即暂停**：`main.js` 构造世界后立即置 `sim.isPaused = true`，页面叠加阻塞式启动层（`#startup-save-gate`），模拟画布不可操作。
-- **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟。**★ v1.28.0 自动读档**：已连接自动槽（默认目录 + 默认文件名 `flowaccord-save1.json`，句柄经 IndexedDB 恢复，无需用户手势）时，打开游戏直接读取其内容续演（自动解除暂停、同步暂停按钮文案），**不再开新世界等自动保存覆盖旧档**；读取失败（权限失效/文件损坏/版本不兼容）保持阻断并回退手动连接。**★ v1.28.1**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动时先静默重授（授权已持久化立即成功），失败则提供「🔓 授权并读取上次存档」按钮（点击 = 用户手势内 `requestPermission` 弹授权）；保存/读取遇 `NotAllowedError` 亦就地重授后重试一次，仅显式「断开」才删除句柄记录。
+- **必须先建档**：点击「建立存档文件」调用 `showSaveFilePicker()` 创建/连接 `.json` 文件，写入最小合法存档（`format_version` 匹配 `SAVE_FORMAT_VERSION`）后才解除门禁恢复模拟。**★ v1.28.0 自动读档**：已连接存档文件（默认目录 + 默认文件名 `FlowAndAccordSave.json`，句柄经 IndexedDB 恢复，无需用户手势）时，打开游戏直接读取其内容续演（自动解除暂停、同步暂停按钮文案），**不再开新世界等自动保存覆盖旧档**；读取失败（权限失效/文件损坏/版本不兼容）保持阻断并回退手动连接。**★ v1.28.1**：句柄权限未持久化时不再自动断开/删除 IndexedDB 记录——启动时先静默重授（授权已持久化立即成功），失败则提供「🔓 授权并读取上次存档」按钮（点击 = 用户手势内 `requestPermission` 弹授权）；保存/读取遇 `NotAllowedError` 亦就地重授后重试一次，仅显式「断开」才删除句柄记录。
 - **取消/失败即阻断**：用户取消、权限拒绝、写入失败或格式版本不符时保持暂停，提示原因并允许重试——**绝不静默降级**到不落盘的运行态。
 - **`?nogate=1` 门禁旁路（★ v1.50.8）**：URL 携带 `nogate` query 参数（任意值均可，惯例 `?nogate=1`）时 `bootstrapStartupGate` 直接隐藏门禁弹窗并解除暂停，**不连接任何存档文件**。供截图/演示/自动化预览等无需持久化存档的场景；该模式下自动保存因无句柄静默跳过（`tickAutoSave` 对空句柄 no-op），仅内存演算，刷新页面世界回到初始态。
 - **浏览器兼容**：仅支持 File System Access API（Chrome/Edge）；Firefox 等不兼容浏览器显示阻断提示，不提供 localStorage 降级启动，也不创建世界。
-- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.62.0**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
+- **`app_version` 强制门禁与自动废弃（★ v1.37.1，★ v1.44.1 自动同步）**：`world_save.rs` 的 `SAVE_APP_VERSION` 随版本发布更新（当前 **1.62.2**）。`deserialize_save` 中作为内核硬性门禁校验（`save.app_version != SAVE_APP_VERSION` 直接返回 Err 拒绝），版本变更时旧档**自动废弃**。**★ v1.44.1 起该常量由 `node tools/bump-version.js --patch` 自动同步**（唯一真相源 = `index.html` 版本徽章），**禁止手工编辑**；改完必须重编译 WASM 并同步双副本，否则内核里仍是旧版本号。`node tools/bump-version.js --check` 是防漂移门禁。
 
 - **启动门禁废弃引导（★ v1.37.1）**：`bootstrapStartupGate` 检测到旧版本存档时拦截自动续演，提示旧版本存档已废弃，并将按钮切换为「🆕 废弃旧档并新建世界」，引导覆盖写入当前版本初始世界开始模拟。
 - **面板卡片废弃标识与禁用（★ v1.37.1）**：存档列表中旧版本卡片展示 `⚠️ 已废弃 (v旧版本)` 徽章并禁用「📂 读取」按钮（保留「覆盖保存」与「断开」）；本地导入时亦同步拦截非当前版本文件。
@@ -205,7 +203,7 @@ World3DEngine
 | Test 3 存档读档确定性 | 同种子跑到存档点 → 存档 → 续演；对照组新建同种子世界跑到存档点 → 读档 → 续演同一步数，两组快照 JSON **逐字符串相等**；且读档后 `tick` 与存档时刻一致 |
 | Test 4 版本门禁 | 篡改 `format_version` 或 `app_version` 后 `world_load` 均返回 `-3`，且**当前世界快照不变**（失败不污染内存） |
 
-当前实测：初始世界（60×60、20 名族人、无房屋）存档体积 **约 392 KB**；长时间运行后人口增长、账本流水累积，存档可达数 MB 甚至更大，可能超出 localStorage 5 MB 配额。**大存档请使用本地文件直写模式**（v1.11.0），存档直接写入用户磁盘，无配额限制。
+当前实测：初始世界（60×60、20 名族人、无房屋）存档体积 **约 392 KB**；长时间运行后人口增长、账本流水累积，存档可达数 MB 甚至更大。**存档直接写入用户磁盘**（v1.11.0 起唯一后端），无配额限制。
 
 ---
 
@@ -216,9 +214,9 @@ World3DEngine
 3. **读档必须重建 `agent_index`**：遗漏会导致 `agent_by_id()` 返回错误下标或 panic。
 4. **读档必须强制重建地形快照**：不同种子的档地形不同，`_terrainCached` 不清会沿用旧地形。
 5. **`format_version` 与 `SAVE_FORMAT_VERSION` 必须同改**：Rust 常量在 `world_save.rs`，前端常量在 `save-ui.js`，二者一致才能正确提示版本不兼容。该常量是**结构版本**（**当前 8**；v1.46.8 M19.2 持久化 `ActiveTask` 升至 5，v1.46.12 因 `BranchId` 收敛为 16 条升至 6，v1.47.5 T2 共享水池聚合升至 7，★ v1.62.0 删除地图河流水系统/土壤湿润后升至 8），仅在存档结构或持久化枚举不兼容时手工 +1，**不随应用版本自增**（`tools/bump-version.js --check` 会打印其当前值供核对）。
-6. **本地文件句柄不跨页面刷新持久化**（v1.11.0）：`FileSystemFileHandle` 仅在当前页面生命周期内有效，刷新后必须重新连接；不可假设句柄持久化，也不要尝试把句柄存入 localStorage（它不可序列化）。
+6. **本地文件句柄的持久化（v1.12.0 起改 IndexedDB）**：`FileSystemFileHandle` 存入 IndexedDB（库 `flowaccord-save-handles`）后可跨页面刷新恢复句柄，但**句柄本身不可 JSON 序列化，不可存入 localStorage**——必须走 IndexedDB 结构化克隆；恢复后仍需按 v1.28.1 静默重授权限。
 7. **`showSaveFilePicker`/`showOpenFilePicker` 必须在用户手势中调用**：不能在 `setInterval` 或异步回调中间接触发，否则浏览器会报 `SecurityError`。`connectLocalFile()` 和 `loadFromLocalFilePicker()` 均由按钮点击直接触发。
-8. **自动保存切换本地文件后不再写 localStorage**：已连接本地文件时 `tickAutoSave()` 直写磁盘，localStorage 自动槽不再更新——这是有意行为（避免双倍写入且大存档会撑爆 localStorage），断开连接后自动恢复 localStorage 模式。
+8. **自动保存只写单一存档文件**：已连接存档文件时 `tickAutoSave()` 每 30 秒直写磁盘；未连接或权限待授权时跳过（v1.12.0 起已无任何 localStorage 后端）。
 9. **版本比较前必须 `normalizeVer()` 归一化（★ v1.44.2 事故）**：内核 `SAVE_APP_VERSION` 与存档 `app_version` **没有 `v` 前缀**，而前端兜底串历史写法带 `v`（`'v1.38.0'`）。`save-ui.js` 若直接 `meta.appVersion === curVer`，在 Worker READY 前必然不等 → 启动门禁 100% 误报「旧档已废弃」；等引擎就绪后同一判定又变 true → 点「废弃旧档并新建」反而把旧档读进来。**新增任何版本比较点都必须用 `normalizeVer()`（去空白 + 去 `v` 前缀），且决策前先 `await waitEngineReady()`**；`v` 只在 UI 文案里拼接显示。
 
 ---
@@ -239,7 +237,7 @@ World3DEngine
 - **同步核对**：`node tools/snapshot-check.js`（静态核对 ①②④）+ `test-wasm.js` / `test-determinism.js` 回归（JSON 对拍门禁 `test-snapshot-bin.js` 已于 v1.50.35 随 JSON 快照通道移除）。遗漏任何一处都会导致前端读到 `undefined` 或展示旧值。
 - **枚举口径**：二进制帧的闭集枚举（state / poiType / roadClass / houseTier / resourceKind / season / householdRole / gender / transferReason）以 u8 码位传输，名称表由 `snapshot_bin/dict.rs` 生成并经 `world_enum_table_ptr/len` 下发——**新增枚举变体必须同步 `dict.rs` 的 `*_code()`（穷尽 match 编译报错兜底）与 `*_table()`**。
 - **★ v1.50.30 D-B1-4**：`FORMAT_VERSION` 2 → 3，新增 `SectionKind::TerrainSubFeatures = 22`（地图模板子特征，JSON 字段 `terrain_sub_features`；静态地形脏帧才输出，本阶段恒空数组，注入自阶段二起）；`dict.rs` 同步注册 `terrainSubFeatureKind` 名称表（`TerrainSubFeatureKind` 8 变体与 `TerrainFeatureKind` 是两套编号空间）。
-- **★ v1.61.1 动态水面**：FABS `FORMAT_VERSION` 升至 6，新增 `SectionKind::WaterDynamics = 23`。该 section 每帧输出水体库存比例、覆盖率、水位和流动强度；静态 `TerrainFeatures` 仍只在地形脏帧输出。
+- **★ v1.61.1 动态水面**：FABS `FORMAT_VERSION` 升至 6，新增 `SectionKind::WaterDynamics = 23`。该 section 每帧输出水体库存比例、覆盖率、水位和流动强度；静态 `TerrainFeatures` 仍只在地形脏帧输出。★ **v1.62.1 说明**：地图已不再产出任何水面，`WaterDynamics` 与 `water_bodies` 仍按结构编码下发但内容恒空/零（FABS `FORMAT_VERSION` 保持 6、前端 `snapshot-bin.js` 解码保留），`terrain_cells[].water_body_id` 亦恒为 `None`（Section 结构与存档格式不变）。
 - **★ v1.50.35 通道收敛完成**：JSON 快照通道彻底移除——T1（v1.46.0）曾将其收敛为 test-only 真值源（`world_snapshot_json_debug_ptr/len`）供 `test-snapshot-bin.js` 对拍；现该导出与门禁脚本均已删除，生产与工具链路只剩 FABS 一条通道（`tools/` 统一走 `tools/snapshot-reader.js`）。
 - 前端 DOM ID 必须与 `render_inspector.js` / `main.js` 中的 `getElementById` 完全匹配（见 `frontend/AGENTS.md` §四）。
 

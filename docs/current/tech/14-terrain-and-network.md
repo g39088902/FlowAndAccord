@@ -2,7 +2,7 @@
 
 > **UGC-01 实施状态（2026-09-24，基础能力）**：新增 `geo::procedural` Field IR、确定性二维字段算子、`grassland_plain_v1`/`mountain_pass_v1` 数据配方、约束报告和 `geo::backend::HeightfieldBackend`/稀疏 Voxel 接口。当前生产入口已由 UGC-03/05 收口到 Field Compiler → VoxelBackend；`HeightfieldBackend` 只保留内部字段投影。
 
-> **UGC-02 实施状态（2026-09-25 / ★ v1.62.0 修订）**：`geo::procedural::processes` 已提供热松弛、液压侵蚀/沉积（以局部 `rainfall` 驱动）和 priority-flood 水位求解。★ v1.62.0 起「地图河流水系统」整体删除——原先由 `procedural::hydrology` 汇流累积生成的河道/支流连通分量、岸带与深水/河岸语义投影已移除；`procedural::hydrology` 现在只把静态湖泊水位投影到 `SemanticGrid`。这些过程仍是统一 voxel 创世链的固定阶段。
+> **UGC-02 实施状态（2026-09-25 / ★ v1.62.0 修订 / ★ v1.62.1 再修订）**：`geo::procedural::processes` 现只提供热松弛与液压侵蚀/沉积（以局部 `rainfall` 驱动）；★ v1.62.1 起 priority-flood 水位求解（`water_level_solve`/`WaterBodyField`/`FloodNode`）已删除。★ v1.62.0 起「地图河流水系统」整体删除；★ v1.62.1 起静态湖泊与全部程序生成水面一并删除——`procedural::hydrology` 现在只剩 `project_semantics`（把 `water_body_id`/`water_depth` 重置为空/零，并按既有 flags 派生通行/建造掩码）。地形侵蚀/热松弛参数改由 recipe 的 `ErosionSpec` 承接（非水面）。这些过程仍是统一 voxel 创世链的固定阶段。
 
 > **UGC-03 / UGC-05 体素主路径（2026-09-26）**：所有注册 profile（含冲积扇、盆地、平坦降级基线以及断层/褶皱演示）统一由 Field Compiler 编译，并以同一份 `CompiledTerrain` 构建懒加载 `VoxelBackend`。旧 `TerrainMap::generate_*` 不再参与生产创世；`TerrainMap` 只保留语义/快照兼容投影。`World3DEngine::terrain_runtime()` 的高程来自 voxel 顶面，WASM chunk 请求复用世界创建时的 voxel 源，LOD 换尺度只重建懒 chunk 索引；读档先按 seed/profile/config 重建 voxel 基线，再校验并重放 `ChunkDelta`。`TERRAIN_GENERATOR_VERSION` 27→35，旧版本存档按既有门禁拒绝。
 
@@ -14,9 +14,9 @@
 
 > **UGC-07 实施状态（2026-09-25）**：`StructuralEvent` 已进入 Field Compiler 的固定阶段顺序。`apply_structures` 先在 scratch 高程上按声明顺序执行 Fault 的归一化平面 smoothstep 位移、Fold 的轴向周期位移和 Unconformity 的地层深度偏移，再交给热松弛、侵蚀和水文过程；结构参数、零长度几何、未知 surface node、NaN/无穷结果均在编译前或事务提交前拒绝。`StructureField` 将 authored 位移事件和不整合深度偏移传递到 Heightfield/Voxel 后端；默认 production recipe 没有结构事件，因此现有随机 profile 输出不变。地图图鉴新增 `fault_scarp_demo_v1` 与 `folded_basin_demo_v1` 两个显式演示 recipe，通过 `terrainProfile` 查询参数走同一 WASM/WebGL 地形链路，分别可见断层陡坎和连续褶皱；演示配方不加入 `random`，且只读地图模式绕过可玩世界降级门禁。
 
-> **Field Compiler 水体渲染链修复（2026-09-26）**：编译语义中的 `water_body_id` 现在按水格边界追踪为闭合 `WaterBody` 轮廓，并同步到 `TerrainMap.features` 与 `Hydrology.water_bodies`；前端沿用现有水体深度队列分块绘制，WebGL 水格反照率改为蓝色，保证没有旧版特征多边形时水面仍可见。字段校验增加 `field_compiled` 专用水体规则；生成器版本 33→34。
+> **Field Compiler 水体渲染链修复（2026-09-26，★ v1.62.1 已删除）**：曾把编译语义中的 `water_body_id` 按水格边界追踪为闭合 `WaterBody` 轮廓，并同步到 `TerrainMap.features` 与 `Hydrology.water_bodies`。★ v1.62.1 起该水面投影整体删除（`geo/adapters/terrain_map.rs` 不再产生 WaterBody 特征/取水点/`water_body_id` 拷贝），地图不再产出任何水面格；本节保留仅作历史记录。
 
-> **……河道演变（2026-09-26，★ v1.62.0 已废弃）**：`river_valley_v1` 曾有「降雨常量 0.75 + 汇流阈值 800 + 最小湖深 1m + 河谷轴主线连续不规则浅水主槽（固定水体 ID `0xF10D0001`）」等一整套主河连通处理。★ v1.62.0 起地图河流水系统（含河谷主干河、支流、漫滩）已整体删除，仅保留模板专有静态湖泊；本节保留仅作历史记录。
+> **……河道演变（2026-09-26，★ v1.62.0/v1.62.1 已废弃）**：`river_valley_v1` 曾有「降雨常量 0.75 + 汇流阈值 800 + 最小湖深 1m + 河谷轴主线连续不规则浅水主槽（固定水体 ID `0xF10D0001`）」等一整套主河连通处理。★ v1.62.0 起地图河流水系统（含河谷主干河、支流、漫滩）整体删除；★ v1.62.1 起模板专有静态湖泊也一并删除，地图不再产出任何水面；本节保留仅作历史记录。
 
 > **统一多边形地表基底（2026-09-26）**：所有注册模板在 Field Compiler 输出的高程场上叠加同源、连续的确定性 Voronoi 多边形起伏；`Ridge`、`Valley`、`Depression`、`Cone`、`Plateau` 与 `Fold` 算子的距离场和采样域同步加入多边形扰动。模板的宏观意图与水文语义保持不变，但不再输出绝对规则的曲线边界。生成器版本 32→33。
 
@@ -85,11 +85,11 @@ stateDiagram-v2
 
 ### 连续 3D 地形与 T0/T1 静态地貌
 - `TerrainMap` 以固定网格和 seed 确定性生成高程、坡度、自然土地适宜性与地表类别；当前默认按 `terrainProfile` 在 8 张已收口 profile（T1 山口 / T2 河谷 / 草原 / 半坡林地 / 台地 / 冲积扇 / 盆地 / 火山湖）间按种子确定性轮换（★ v1.50.68 砍需求起 random 候选池 8 路，各 ~12.5%；原 9 路中的 `river_valley_settlement_v1` 已删除；`flat_baseline` 诊断基线永不入列）。
-- `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面；★ v1.62.0 起地图河流水系统删除后，仅模板专有静态湖泊会生成 `DeepWater`（火山湖等），`RiverBank`/`RiverTerrace` 枚举保留但不再由创世生成。
-- T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；★ v1.62.0 起地图河流水系统删除，前端只消费静态湖泊（`WaterBody`）与短特征（`ShallowFord`/`Cliff`/`SpringValley`）等内核事实进行绘制；草原 profile 包含泉溪低洼地形（见 §9.7）。
+- `GeoCell` 已提供 `SurfaceKind`（普通干地、软地、浅水、深水、河岸、河阶、裸岩面）、水体关联字段和 `NO_BUILD`/`NO_WALK` 等事实标志。T1 当前只实际生成干地、软地和裸岩面；★ v1.62.1 起全部程序生成水面删除后，创世不再生成任何 `DeepWater`/`ShallowWater` 水格，`DeepWater`/`ShallowWater`/`RiverBank`/`RiverTerrace` 枚举保留但均为惰性空值。
+- T1 profile 由局部 RNG 派生主脊与山口鞍部的连续起伏地貌（v1.47.7 起不再生成台地/高台，也不输出 `Ridge`/`Saddle`/`Terrace` 特征折线）；★ v1.62.0 起地图河流水系统删除，★ v1.62.1 起静态湖泊也删除，前端只消费短特征（`Cliff`/`SpringValley`）等内核事实进行绘制；草原 profile 包含泉溪低洼地形（见 §9.7）。
 - `geo/query.rs` 提供统一只读地表查询：`sample_cell`、`validate_footprint`、稳定 `TerrainFailure` 和步行成本；房屋实体化已使用完整占地坡度/地表校验。
 - `TerrainMap::validate_curve` 对贝塞尔路线进行按长度自适应采样并检查走廊两侧地表；当前已提供 T0 校验原语，后续路网生成器接入后再替换现有全图直线铺路。
-- 地形生成器版本为 `36`（★ v1.62.0：删除地图河流水系统与土壤湿润，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度固定规则），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
+- 地形生成器版本为 `37`（★ v1.62.1：删除全部程序生成水面——水位求解/静态湖泊/水面语义投影；★ v1.62.0 曾删除地图河流水系统与土壤湿润；地表材质/肥力仍为仅坡度+硬度固定规则），profile 通过存档门禁校验；旧路网不会与不匹配的新地貌静默组合。
 
 ### 贝塞尔曲线 3D 路网 (`LaneGraph3D`)
 - 节点与双向三次贝塞尔曲线车道构成拓扑网络，曲线定义见 `curve.rs`。
@@ -118,8 +118,8 @@ stateDiagram-v2
 ### 地形与房屋选址接口
 - 房屋候选和最终实体化均使用 `validate_footprint`，完整占地由 `terrainFootprintHalfExtent`、`terrainMaxBuildSlope` 控制；不再只凭中心点高度判断地块合法。
 - 查询失败使用稳定原因：越界、深水、陡壁、地表禁用或完整占地坡度过大。没有合法地块时交由 Agent 正常重选，不由地形系统强制搬迁。
-- T1 山口 profile 只提供连续起伏地貌与选址/路网约束；★ v1.62.0 起地图河流水系统删除后，所有 profile 均不再生成河流/浅滩特征（短特征 `SpringValley` 泉谷与模板专有静态湖泊除外）。
-- **静态湖泊与写意沙盘平滑管线（★ v1.48.2 / ★ v1.62.0 收敛）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何；Field Compiler 路径统一从 `water_body_id` 追踪闭合 `WaterBody` 多边形。★ v1.62.0 起地图河流水系统（河谷主干河/支流/漫滩）整体删除，前端只通过水体深度队列绘制模板专有静态湖泊的连续碧蓝水面。
+- T1 山口 profile 只提供连续起伏地貌与选址/路网约束；★ v1.62.0 起地图河流水系统删除，★ v1.62.1 起静态湖泊也删除，所有 profile 均不再生成河流/浅滩/湖泊特征（仅余短特征 `SpringValley` 泉谷）。
+- **水面几何已整体删除（★ v1.48.2 / ★ v1.62.0 / ★ v1.62.1）**：旧版 T2 河谷曾生成 `River`/`RiverBank` 双岸几何，Field Compiler 路径也曾从 `water_body_id` 追踪闭合 `WaterBody` 多边形。★ v1.62.0 起地图河流水系统（河谷主干河/支流/漫滩）整体删除；★ v1.62.1 起模板专有静态湖泊也删除，前端不再绘制任何水面，地图只保留写意沙盘地形与短特征折线。
 
 ## 关键不变量
 - 路网节点从不删除；房屋坍塌后，其大门节点可被新立宅复用（`house_node_reuse_radius`）。
@@ -167,8 +167,8 @@ pub struct GeoCell {
 ```text
 DryGround       普通干地
 SoftGround      湿软地，允许通行但增加成本
-ShallowWater    浅水，只有被浅滩连接覆盖的走廊可跨越
-DeepWater       深水，硬禁行且禁建
+ShallowWater    浅水（★ v1.62.1 起创世不再生成，枚举惰性保留）
+DeepWater       深水（★ v1.62.1 起创世不再生成，枚举惰性保留）
 RiverBank       河岸/岸带（★ v1.62.0 起创世不再生成，枚举保留）
 RiverTerrace    河阶（★ v1.62.0 起创世不再生成，枚举保留）
 RockFace        陡壁/裸岩面，超过通行坡度时硬禁行
@@ -177,13 +177,13 @@ RockFace        陡壁/裸岩面，超过通行坡度时硬禁行
 说明：
 
 - `natural_fertility` 只描述自然土地条件，不能直接写入家户粮食或农业资产 `fertility`。
-- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。★ v1.62.0 起地图河流水系统删除，`water_body_id` 只标记模板专有静态湖泊（如火山湖水体 1）。
-- `feature_flags` 只放稳定、可组合的查询事实。已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志；T2 中深水写入 `NO_BUILD|NO_WALK`，河岸写入 `NO_BUILD|SHORE_ACCESS`，浅滩写入 `NO_BUILD|CROSSING_CANDIDATE`。
+- `water_body_id` 只表示几何归属；可采水资源通过独立的 `WaterPool` 关联，不能把每个单元当成一份库存。★ v1.62.1 起全部程序生成水面删除，创世不再写 `water_body_id`（字段保留、恒为 `None`）；取水语义改由清泉 `WaterSource` POI 承载。
+- `feature_flags` 只放稳定、可组合的查询事实。已定义 `NO_BUILD`/`NO_WALK`/`SHORE_ACCESS`/`CROSSING_CANDIDATE` 四个标志；★ v1.62.1 起创世不再产出水格，故深水/河岸/浅滩的写入分支实际不触发（标志本身保留）。
 - ⚠️ `SHORE_ACCESS` 目前是**只写不读**的标志：全仓只有定义（`biome.rs`）与写入点（`hydrology.rs`），没有任何读取方。因此它**不产生任何交互语义**——取水可行性只由 `WaterAccessPoint` + `WaterPool` 决定（§12）。任何依赖它的新设计必须先实现读取方。
 
 ### 7.2 地貌特征
 
-✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。★ v1.62.0 起地图河流水系统删除，创世不再输出 `River`/`RiverBank` 特征，只有 Field Compiler 按 `water_body_id` 确定性边界追踪产生的 `WaterBody`（模板专有静态湖泊）与短特征 `ShallowFord`/`Cliff`/`SpringValley`。
+✅ T1/T2 已落地（v1.47.5），定义于 `geo/terrain.rs`；特征用 `Vec` 承载以避免 HashMap 迭代顺序进入确定性路径。★ v1.62.0 起地图河流水系统删除，创世不再输出 `River`/`RiverBank` 特征；★ v1.62.1 起静态湖泊也删除，创世不再输出 `WaterBody`/`ShallowFord` 特征，仅余短特征 `Cliff`/`SpringValley`（`TerrainFeatureKind::WaterBody` 枚举惰性保留）。
 
 ```rust
 pub struct TerrainFeature {
@@ -201,15 +201,15 @@ pub struct TerrainFeature {
 ```text
 River          ~~河道中心线和水面边界~~  ❌ v1.62.0 删除（地图河流水系统）
 RiverBank      ~~岸带轮廓~~             ❌ v1.62.0 删除
-ShallowFord    静态浅滩连接          ✅ v1.47.5 (T2)
+ShallowFord    ~~静态浅滩连接~~        ❌ v1.62.1 删除（枚举惰性保留）
 SpringValley   泉谷                  ✅ v1.47.5 (T2)
 Cliff          峡谷壁/断崖            ✅ D-B (T2 子特征注入)
-WaterBody      湖泊水面              ✅ TB-03 (静水模板)
+WaterBody      ~~湖泊水面~~            ❌ v1.62.1 删除（枚举惰性保留）
 Waterfall      瀑布跌水              ⏳ D-B (T1 子特征注入)
 ~~Wetland~~     ~~湿地斑块~~          ❌ v1.48.0 删除（视觉辨识度过低）
 ```
 
-特征的职责是表达几何和查询来源，不承担库存、税收、生产或 Agent 行为。`vertices` 采用世界坐标，前端按投影绘制；浅滩由 `TerrainConnection` 表达授权通道（两端端点、走廊宽度与节点），配合 `corridor::segment_valid` 授权跨水。
+特征的职责是表达几何和查询来源，不承担库存、税收、生产或 Agent 行为。`vertices` 采用世界坐标，前端按投影绘制；★ v1.62.1 起地图不再有水面或浅滩特征，`TerrainConnection` 跨水授权通道随之不产出（结构保留）。
 
 ### 7.3 水体与共享资源池
 
@@ -244,7 +244,7 @@ pub struct WaterPool {
 
 降雨倍率属于世界运行状态，随 `WorldSave` 保存，并通过 FABS `GLOBAL` 字段下发前端。前端“天空降雨量”滑块通过 `SET_RAINFALL` 命令写入 WASM，同时记录到 Worker 的历史命令流，时光倒流会按原 tick 重放。该控制只改变天空补给，不改变泉源 POI 的基础产能。
 
-地图水面也消费同一份水池状态：每帧 FABS `WATER_DYNAMICS` section 输出 `stock_ratio`、`coverage`、`level` 和 `flow_strength`。覆盖率由库存比例经过平滑阈值映射得到，前端据此调整粒子数量、漂移速度和水位；静态轮廓只作为粒子初始边界，不再作为水面模型绘制。带 `water_body_id` 的地表格从蓝色渐变到干涸河床色。没有共享水池的地图预览使用完整粒子水面。该表现层变化不改写地形格的通行、建造或取水规则。
+★ v1.62.1 起地图不再产出任何水面：FABS `WATER_DYNAMICS` section 仍每帧输出共享水池的 `stock_ratio`/`coverage`/`level`/`flow_strength`（结构不变、供数据链消费），但前端已无水体可缩放，`WaterBody` 动态覆盖（`waterBodyDynamics`/`_applyDynamicWaterCoverage`）随本次删除移除。水池库存仍驱动清泉 POI 的储量展示与生存取水，但不渲染任何水面几何。该表现层变化不改写地形格的通行、建造或取水规则。
 
 pub struct WaterAccessPoint {
     pub id: u32,
@@ -257,11 +257,11 @@ pub struct WaterAccessPoint {
 
 落地细节：
 
-- 所有带水模板（火山湖 / 山口 / 盆地 / 台地）保留 `PoiType::WaterSource`，多个取水点（`WaterAccessPoint`）的储量读取和扣减委托给共享 `WaterPool`（池 ID 1）；★ v1.62.0 起无湖模板的清泉 POI 也统一绑定到共享 `WaterPool #1`（命名「低洼清泉 #id」），保证生存水链不断。
+- ★ v1.62.1 起地图不再生成任何水体，全部模板的清泉 `PoiType::WaterSource` POI 统一绑定到共享 `WaterPool #1`（模板专有名称保留，无名称者回退「低洼清泉 #id」），取水储量读取与扣减委托给该池，保证生存水链不断。`WaterAccessPoint`/`WaterBody` 结构保留但不再由创世产出。
 - 既有 Agent 装载、回家卸货、家户账本和施密特触发器保持原有语义；在 `spatial/ecology/harvest.rs` 中，多名 Agent 采水先收集需求并按 `agent.id` 升序稳定排序，再串行扣减共享水池，保证不同执行批次下的绝对确定性。
 - 自然再生在 `spatial/ecology/tick.rs` 中按池统一执行，每个水源 POI 的动态储量通过 `sync_water_pois()` 与所属水池实时同步。
-- 水面库存为零时，动态覆盖率会收敛到零并显示干涸河床；HUD 大盘仍按池 ID 去重统计（`render_hud.js`），避免同一水池被多点统计导致总量虚高。
-- T2 水体的原始轮廓仍是静态地貌事实；运行时只在其上应用确定性的覆盖率缩放和水位偏移，不改写静态地形栅格或寻路禁行事实。★ v1.62.0 起只余模板专有静态湖泊（`WaterBody`）。
+- ★ v1.62.1 起无水面，HUD 大盘仍按池 ID 去重统计（`render_hud.js`）清泉储量，避免同一水池被多点统计导致总量虚高。
+- 共享水池库存是可采额度，不是水体体积；★ v1.62.1 起地图已无静态水体轮廓，表现形式完全由清泉 POI 的普通资源展示承担。
 
 ### 7.4 地表装饰（Accents）
 
@@ -300,8 +300,8 @@ pub enum AccentKind {
 
 装饰散布规则（当前实现，`geo/accents.rs`）：
 
-- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.50.73 起无例外——原 `Boulder + RockFace` 受控豁免已随陡坡禁石规则移除）；★ **v1.52.0 起再加两道全局规则**（对所有五种装饰生效，见 `accents.rs::generate_accents_of_kind` 外层禁区）：① **地图边缘保护区**——距世界四边各 `3% × world_size`（764m → 22.9m ≈ 7.6 格）的环形带内不生成任何装饰（沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓）；② **水面净空**——装饰中心到**渲染水面多边形**（`hydrology.water_bodies[*].vertices`：模板专有静态湖泊闭合轮廓，与前端 `drawWaterBodyTile` 同源）的距离小于 `WATER_CLEARANCE_M`（v1.58.1 起 13m，覆盖最大模型水平包围体约 8.5m × 最大缩放 1.4 后的约 11.9m，并留余量）者拒绝，避免灌木/树冠跨入水面。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。早期版本声称装饰会避让道路/房屋/POI，那不是代码事实。
-- **偏好与空间分布**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权（`RiverBank` 0.85 / `RiverTerrace` 按 `fertility×0.5+0.5` 的高概率分支在 v1.62.0 后不再触发，因创世已不生成这两类格）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表随机接受**（原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；v1.58.1 起石块按四象限分别封顶至各自目标量的 1/4 向上取整，避免单一种子偶然集中到局部；v1.59.0 起河谷碎石子特征再按 48m 最小间距铺开。Bush 偏好林缘过渡带（原 `RiverBank` 0.6 / `RiverTerrace` 0.5 喜湿灌丛分支同上失效）。
+- **禁区（当前实现）**：`DeepWater` / `ShallowWater` 格、`NO_WALK` 格（★ v1.62.1 起创世不再产出水格，故水格分支惰性不触发）；★ **v1.52.0 起再加两道全局规则**（对所有五种装饰生效，见 `accents.rs::generate_accents_of_kind` 外层禁区）：① **地图边缘保护区**——距世界四边各 `3% × world_size`（764m → 22.9m ≈ 7.6 格）的环形带内不生成任何装饰（沙盘边缘紧贴垂直护壁，贴边装饰会溢出沙盘轮廓）；② **水面净空**——装饰中心到**渲染水面多边形**（`hydrology.water_bodies[*].vertices`）的距离小于 `WATER_CLEARANCE_M`（v1.58.1 起 13m）者拒绝。★ v1.62.1 起 `water_bodies` 恒为空，该判据（`near_water_surface`）恒 false、惰性保留以避免破坏调用方契约，边缘保护区仍实际生效。**道路、房屋与 `WaterAccessPoint` 占地不在其中**——装饰在创世阶段生成，此时这三类实体尚未放置（见 §9.8 输入说明）。
+- **偏好与空间分布**：Tree 接受平地（含 0 坡）至 32° 坡度——DryGround/SoftGround 按肥力加权（`RiverBank` 0.85 / `RiverTerrace` 按 `fertility×0.5+0.5` 的高概率分支在 v1.62.0 起不再触发，因创世已不生成这两类格）；★ v1.50.73 反转：Boulder/RockCluster **陡坡（≥18°）禁石、其余地表随机接受**（原 v1.50.10「偏好陡坡与裸露 RockFace」规则作废）；v1.58.1 起石块按四象限分别封顶至各自目标量的 1/4 向上取整，避免单一种子偶然集中到局部；v1.59.0 起河谷碎石子特征再按 48m 最小间距铺开。Bush 偏好林缘过渡带（原 `RiverBank` 0.6 / `RiverTerrace` 0.5 喜湿灌丛分支同上失效）。
 - **数量**：基础密度 `terrainAccentDensity: 1.0`，Tree 基数 40、Boulder 20、Bush 25、RockCluster 12、★ v1.51.0 GrassTuft **120**（原 60，用户需求「草的数量翻倍」；乘密度倍率取整；RockCluster/GrassTuft 由 ★ D-B1-5 落地），有界重试 3× 目标数。平地草原 `grassland_plain_v1` 的 GrassTuft 预算仍 ×8（120 → 960 @density=1.0，原 480）。
 - **确定性**：`accent_rng = WorldRng::new(seed ^ ACCENT_RNG_SALT)`，盐值 `0x4143_4345_4E54_3031`（"ACCNT01"），独立于 `relief_rng`/`hydro_rng`，不污染全局 RNG。
 - **持久化**：`TerrainMap.accents: Vec<TerrainAccent>`（`#[serde(default)]`）随 `terrain_state` 一并入档，读档后逐字节恢复。
@@ -366,19 +366,18 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 ```text
 种子 + 生成器版本 + 配置                    ✅
   → 主地貌骨架与高程（T0 基础 + T1 主脊/山口）✅
-  → 排水方向、湖盆、水位与出口（T2 / ★ v1.62.0 起河道已删除）✅
-  → 通行表面、岸带与可建区域                ✅
-  → 营地与必要资源候选、浅滩与山口连接      ◐（浅滩/路网已通；生存诊断已可独立调用）
+  → 通行表面与可建区域                      ✅（★ v1.62.1 起无排水/湖盆/水位/岸带阶段）
+  → 营地与必要资源候选、山口连接            ◐（路网已通；生存诊断已可独立调用；★ v1.62.1 起无浅滩）
   → 合法导航走廊与贴地曲线路网              ✅
   → 连通性、占地、资源距离校验              ✅（v1.50.49 起接入创世门禁链 + 有界降级环；v1.XX 起门禁与降级删除，创世单候选直接发布）
   → 固定世界事实与快照 → 地表装饰与美术     ✅
 ```
 
-首期采用受约束的地貌模板与确定性参数变化，不要求先建立完整侵蚀或流体模拟。★ v1.62.0 起地图河流水系统（河道/支流/漫滩）整体删除，不再要求河道连接下游出口；湖面仍按单一水位求岸线，瀑布处明确落差。
+首期采用受约束的地貌模板与确定性参数变化，不要求先建立完整侵蚀或流体模拟。★ v1.62.0 起地图河流水系统（河道/支流/漫滩）整体删除；★ v1.62.1 起全部程序生成水面（水位求解/静态湖泊/水面语义投影）删除，不再要求河道连接下游出口、不再求湖面岸线，地图不产出任何水面。
 
 **有效世界至少满足**：初始居民落在干燥可达区域；每个初始营地能到达所需水粮；全局关键资源和市场在预期陆路连通分量内；每个营地有配置规定的可建面积和扩张余量；必要资源路径成本不超过经生存诊断校准的上限。连通不等于能活下来，必须测往返时间与饥渴/体力消耗。
 
-候选搜索、同成本排序、重试次数和修复顺序必须固定。失败时只在初始化阶段按固定次序调整浅滩、缓坡或候选 POI；v1.XX 起**不再有创世门禁与降级**——请求的模板恒被原样构建并发布（历史上的有界重试次数与简化模板回退机制已删除）；禁止无限重抽种子，禁止运行中移动居民来修复地形。
+候选搜索、同成本排序、重试次数和修复顺序必须固定。（历史：失败时曾在初始化阶段按固定次序调整浅滩/缓坡/候选 POI；★ v1.62.1 起已无浅滩）v1.XX 起**不再有创世门禁与降级**——请求的模板恒被原样构建并发布（历史上的有界重试次数与简化模板回退机制已删除）；禁止无限重抽种子，禁止运行中移动居民来修复地形。
 
 ### 8.1 静态几何校验与生存成本诊断（v1.50.47 · STAGE2-4/6）
 
@@ -386,7 +385,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 两套只读校验服务已落地：静态几何校验在创世第 7 步与几何事务预览运行、生存诊断在候选生态播撒后运行，诊断本身保持 `&self` 只读、不改变世界。★ v1.50.49–v1.60.4 曾由世界初始化事务消费并接入有界降级环（失败码以 `Geometry:`/`Survival:` 前缀进入），v1.XX 起**创世不再消费**——任何模板恒按请求原样构建发布，校验结果只作诊断与探针。
 
-- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；水体↔同 id 特征顶点双副本逐字节相等（主河水体 1 ↔ `River` 特征 1）；取水点/授权走廊引用与边界；浅滩端点在陆侧；cells 水域归属与 NO_WALK/NO_BUILD 一致；装饰 ID 按数组顺序严格递增且唯一，POI 避让过滤保留原 ID 时允许有间隙。只读不修复、不重排既有生成顺序；失败码（`FeatureIdsDuplicated` / `WaterBodyOutlineMismatch` / `CellWaterFlagMismatch` 等）一经发布语义不变。
+- **静态几何校验**（`geo/validation.rs`，创世第 7 步 `TerrainMap::validate_static_terrain_geometry`）：特征 ID 唯一 + 按 profile 归属/kind 期望映射 + 顶点在界；子特征 ID 升序唯一、`feature_ids` 引用存在、accent 区间配对；cells 通行/建造标志一致；装饰 ID 按数组顺序严格递增且唯一，POI 避让过滤保留原 ID 时允许有间隙。★ v1.62.1 起水面相关断言（水体↔特征顶点双副本、取水点引用、浅滩端点陆侧、`CellWaterFlagMismatch` 等）已随水生产者一并删除。只读不修复、不重排既有生成顺序；其余失败码（如 `FeatureIdsDuplicated`）一经发布语义不变。
 - **生存成本诊断**（`spatial/survival_diagnosis.rs::World3DEngine::diagnose_survival`）：按实际配置枚举营地 POI（不硬编码数量），逐营地一次单源 Dijkstra（微秒整型权重，确定性）检查水/粮/市场三类资源的路网可达与往返成本。成本口径与生产寻路一致（`terrain_time_cost` 软地/浅滩折算 + 上坡 `Δz×grade_coef` 坡度折算，车道限速按创世态磨损 0 的 `road_level_factor`）；水源 / 浆果预算由现有配置推导、无新增超参：资源点与家宅两端可满仓自饮自食 ⇒ 往返允许 `2×capacity/代谢速率`（名义消化效率 1.0）。市场仍要求路网可达并记录往返成本，但无 500s 往返时间门槛；市场被选作水 / 粮补给 POI 时也不受该门槛约束。输出 `SurvivalReport{camps, ok, worst_code}` 与每营地 `ResourceLinkReport{poi_id, round_trip_cost_s, budget_s}`（选中市场时 `budget_s=None`）；失败码 `SpawnDisconnected` / `SurvivalCostExceeded`，后者仅用于清泉 / 浆果超预算。⚠️ `NodeId` 从 1 起、petgraph `NodeIndex` 从 0 起，查距必须经 `node_map` 映射；历史校准矩阵（v1.50.47）：4 profile × seed 0–59 全通过，市场往返最远 441.7s。
 
 ### 8.2 世界初始化事务：创世发布（v1.XX 起无门禁、无降级）
@@ -404,7 +403,7 @@ NoValidCrossing      ⏳ 未实现（T2 走廊校验由 corridor::segment_valid/
 
 ### 9.1 RNG 分域与 Profile 模板选择
 
-✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 36`（★ v1.62.0：删除地图河流水系统与土壤湿润，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度固定规则）：
+✅ 已落地 `relief_rng`、`hydro_rng` 与 `accent_rng`。`TERRAIN_GENERATOR_VERSION = 37`（★ v1.62.1：删除全部程序生成水面——水位求解/静态湖泊/水面语义投影；★ v1.62.0 曾删除地图河流水系统与土壤湿润；地表材质/肥力仍为仅坡度+硬度固定规则）：
 
 ```text
 terrain_seed = seed
@@ -413,7 +412,7 @@ hydro_rng    = WorldRng::new(seed ^ 0x4859_4452_4F54_3032)   // "HYDRT02" 盐值
 accent_rng   = WorldRng::new(seed ^ 0x4143_4345_4E54_3031)   // "ACCNT01" 盐值 (D-A)
 ```
 
-> 三个 RNG 流严格隔离：`relief_rng` 只消费于 T1 主脊/山口参数；`hydro_rng` 只消费于 T2 主河/浅滩几何；`accent_rng` 只消费于散布装饰的位置/旋转变体。任一子流的重排或新增消费都不影响其他子流和世界主 RNG 顺序。
+> 三个 RNG 流严格隔离：`relief_rng` 只消费于 T1 主脊/山口参数；`hydro_rng` 曾只消费于 T2 主河/浅滩几何（★ v1.62.0/v1.62.1 起河道与浅滩删除，该流实际不再被地形生产消费）；`accent_rng` 只消费于散布装饰的位置/旋转变体。任一子流的重排或新增消费都不影响其他子流和世界主 RNG 顺序。
 
 ★ **T1/T2 随机轮换机制**：
 
@@ -620,7 +619,7 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
    c. 查询对应栅格的 surface_kind / slope / fertility
    d. 检查禁区（DeepWater/ShallowWater、NO_WALK，v1.50.73 起**无例外**）——
       道路/房屋/POI 占地此时尚不存在，无法也不应在此检查
-   e. ★ v1.52.0 检查水面净空（`near_water_surface`：`hydrology.water_bodies` 多边形内 + 3m 净空）
+   e. ★ v1.52.0 检查水面净空（`near_water_surface`：`hydrology.water_bodies` 多边形内 + 13m 净空；★ v1.62.1 起 `water_bodies` 恒空、判据恒 false，惰性保留）
    f. 按偏好加权选择 AccentKind
    g. 生成 scale (0.7~1.4) 和 rotation (0~2π)
    h. 命中则写入；未命中则继续（最多 3x targetCount 次重试防死循环）
@@ -647,13 +646,13 @@ T2 主河生成完成后，用无状态哈希派生子特征注入判定（具�
 
 ### 10.2 当前实现不能直接承载的部分
 
-- ✅ `GeoCell` 已扩展地表类别、肥力、水体关联与禁建/禁行标志（v1.47.1）；★ v1.62.0 起地图河流水系统删除后仅模板专有静态湖泊生成 `DeepWater`，`ShallowWater`/`RiverBank`/`RiverTerrace` 枚举保留但不再由创世生成。
-- ✅ `sample_cell`/`validate_footprint`/`validate_curve` 已提供，`spatial/terrain_network.rs` 已全面消费地表与走廊合法性；房屋、浅滩道路均做严格占地与走廊检查。
-- ✅ `terrain_network.rs` 引入地形感知路网，通过 `corridor::route` A* 走廊与浅滩连接跨河，消除了直线车道穿深水的问题。
-- ✅ `LaneEdge3D` 增加 `LaneTerrainProfile`，A* 边权与 Agent 移动速度按地形成本折算，软地/浅滩产生真实通行减速。
-- ✅ 水源 POI 聚合接入 `WaterPool`，多个岸点共享水池库存与自然再生（T2）。
-- ✅ 快照与 FABS（`FORMAT_VERSION = 3`，★ v1.50.30 D-B1-4 起，含 `SectionKind::TerrainSubFeatures = 22`）支持静湖轮廓、特征折线与浅滩连接等静态地形事实下发（★ v1.62.0 起河流折线/岸带不再产生）。
-- ✅ `render_terrain.js` 的 `drawFeatureItem`/`drawWaterBodyTile` 绘制静态湖泊水面与短特征（`WaterBody`/`ShallowFord`/`Cliff`/`SpringValley`）；★ v1.62.0 起 `River`/`RiverBank` 绘制随地图河流水系统删除，v1.47.7 起 `Ridge`/`Saddle`/`Terrace` 三类轮廓绘制已随特征删除。
+- ✅ `GeoCell` 已扩展地表类别、肥力、水体关联与禁建/禁行标志（v1.47.1）；★ v1.62.1 起全部程序生成水面删除，创世不再生成任何水格，`DeepWater`/`ShallowWater`/`RiverBank`/`RiverTerrace` 枚举保留但均为惰性空值。
+- ✅ `sample_cell`/`validate_footprint`/`validate_curve` 已提供，`spatial/terrain_network.rs` 已全面消费地表与走廊合法性；房屋、道路均做严格占地与走廊检查。
+- ✅ `terrain_network.rs` 引入地形感知路网，通过 `corridor::route` A* 走廊消除直线车道穿深水的问题（★ v1.62.1 起已无深水/浅滩，跨水分支惰性不触发）。
+- ✅ `LaneEdge3D` 增加 `LaneTerrainProfile`，A* 边权与 Agent 移动速度按地形成本折算，软地产生真实通行减速。
+- ✅ 水源 POI 聚合接入 `WaterPool`，★ v1.62.1 起全部模板的清泉 POI 共享 `WaterPool #1` 库存与自然再生。
+- ✅ 快照与 FABS（`FORMAT_VERSION = 3`，★ v1.50.30 D-B1-4 起，含 `SectionKind::TerrainSubFeatures = 22`）支持特征折线与水相关 section 的静态下发（★ v1.62.1 起 WaterBody/浅滩连接不再产生，快照结构不变）。
+- ✅ `render_terrain.js` 的 `drawFeatureItem` 绘制短特征（`Cliff`/`SpringValley`）；★ v1.62.1 起 `drawWaterBodyTile` 与 `WaterBody`/`ShallowFord` 分支删除，v1.62.0 起 `River`/`RiverBank` 绘制随地图河流水系统删除，v1.47.7 起 `Ridge`/`Saddle`/`Terrace` 三类轮廓绘制已随特征删除。
 
 T0 基础契约、T1 山地、T2 水系骨干与 D-A 装饰层已全链路打通。剩余工作分解为：
 
@@ -677,7 +676,7 @@ T0 基础契约、T1 山地、T2 水系骨干与 D-A 装饰层已全链路打通
 ```text
 节点候选
   -> 网格 A* 走廊搜索 (corridor::route)         ✅ 已落地
-  -> 记录地表成本、最大坡度、浅滩跨水连接       ✅ 已落地
+  -> 记录地表成本、最大坡度、跨水连接（★ v1.62.1 起无浅滩，该项不产出） ✅ 已落地
   -> 使用固定控制点拟合 Curve3D                 ✅ 已落地
   -> 对完整曲线按走廊宽度栅格化 (validate_curve) ✅ 已落地
   -> 通过后写入 LaneEdge3D (地形通行摘要)        ✅ 已落地
@@ -689,10 +688,10 @@ T0 基础契约、T1 山地、T2 水系骨干与 D-A 装饰层已全链路打通
   - `segment_valid(t, a, b, width, slope, crossing)` 检查线段覆盖的网格单元，硬禁行 `DeepWater`、`RockFace`、越界与无授权水域；有 `crossing_id` 时允许横向穿越 `ShallowWater`。
   - `validate_curve(t, curve, width, slope, crossing)` 递归自适应二分贝塞尔曲线，对每一段进行走廊宽度栅格化覆盖校验。
   - `route(t, a, b, cfg)` 基于网格的确定性 A* 寻路，在避开深水与陡坡的同时，沿软地搜索最优通行走廊，并执行视线贪心合并（Raycast Shortcutting）。
-- **静态湖泊岸线距离场**：★ v1.62.0 起主河中心线距离场（`geo/hydrology.rs::RiverCenterline::distance`）已随地图河流水系统删除，`hydrology.rs` 只保留模板专有静态湖泊的轮廓/水位投影。
+- **水面距离场已删除**：★ v1.62.0 起主河中心线距离场（`geo/hydrology.rs::RiverCenterline::distance`）随地图河流水系统删除；★ v1.62.1 起静态湖泊轮廓/水位投影也删除，`hydrology.rs` 只保留被生存水源/快照/存档消费的数据结构。
 - **地形感知路网生成**（`spatial/terrain_network.rs`）：
-  - `prepare_terrain_layout`：将 POI 与路网节点移动到合法陆地位置，水源 POI 绑定静湖岸点或清泉共享水池（`WaterPool #1`），非水 POI 避开深水。
-  - `connect_terrain_world`：优先为浅滩连接（`TerrainConnection`）在两岸建立交叉节点并授权跨水车道；其余地表节点通过 `corridor::route` 连接为稳定的近邻骨架与连通分量补边。图已连通后，额外密度边仅尝试直线合法连接，跳过不必要的全图绕行 A*；节点位置回退从原落点按网格环向外搜索，找到合法候选并证明未扫描区域更远后提前停止，等价保留原最近距离及 x/y 平局规则。
+  - `prepare_terrain_layout`：将 POI 与路网节点移动到合法陆地位置；★ v1.62.1 起水源 POI（清泉）统一绑定共享水池（`WaterPool #1`），不再有静湖岸点。
+  - `connect_terrain_world`：★ v1.62.1 起已无浅滩连接（`TerrainConnection` 不再产出），地表节点通过 `corridor::route` 连接为稳定的近邻骨架与连通分量补边。图已连通后，额外密度边仅尝试直线合法连接，跳过不必要的全图绕行 A*；节点位置回退从原落点按网格环向外搜索，找到合法候选并证明未扫描区域更远后提前停止，等价保留原最近距离及 x/y 平局规则。
   - `validate_terrain_world`：**读档时**校验全图车道均符合地表通行规则，且全体 POI 均在连通图内。创世侧不调用它，而是由 `commit_terrain_path` 在提交前用同一判据（`corridor::validate_curve`）前置复核——v1.50.17 前创世不自检，曾产出「存档即读不回」的车道，详见 §9.3.1。
 
 ### 11.2 LaneEdge3D 扩展与地形通行代价
@@ -716,12 +715,12 @@ pub struct LaneTerrainProfile {
   ⚠️ `.max(1.0)` 使**任何 < 1.0 的成本被静默忽略**：把 `terrainSoftGroundCost` 调成 0.8 想「软地更快」不会生效，仍是 1.0。该字段只表达减速。
 - **Agent 移动速度折算**（`agent.rs`）：
   `target_speed = self.max_desired_speed * road_level_factor * (self.strength / 100.0) / lane.terrain_profile.terrain_time_cost.max(1.0);`
-- 行人穿过浅滩或泥泞岸带时具有逼真的减速表现，路网 A* 会自然偏好干地与平坦走廊。
+- 行人穿过泥泞软地或（历史）浅滩时具有逼真的减速表现，路网 A* 会自然偏好干地与平坦走廊（★ v1.62.1 起无浅滩，软地折算仍生效）。
 - 路网与地形随 `WorldSave` 完整持久化，读档后 100% 恢复。
 
 ### 11.3 契约要点与在途边界
 
-- 干地、软地、浅滩采用各自的通行成本；深水、陡壁先做硬禁行，不能被道路等级加速抵消。
+- 干地、软地采用各自的通行成本（★ v1.62.1 起无浅滩/水格，浅滩成本不再触发）；深水、陡壁先做硬禁行（★ 现只剩陡壁实际触发），不能被道路等级加速抵消。
 - 需要分段时增加合法中间节点，保持位置连续；路径长度、运动高程与前端绘制采用一致几何。
 - 地形进入基础成本后复核 A* 启发式下界、坡度成本、APSP 查表和现有缓存失效假设。短期保持静态地形，减少运行中拓扑变更。
 - 后续桥梁启闭、水位变化，以及[路卡](../../plan/tech/05-hunting-defense.md)新建/关闭/破坏，都需要独立的通行版本与缓存失效；不能借 FABS 字符串 epoch 实现。路卡须等待在途安全处置和任务恢复验证，不因属于战斗系统就绕过 T4 的动态通行依赖。
@@ -743,10 +742,10 @@ A\* 寻路通过 `LaneEdge3D::wear_tier_bucket` 量化道路踩踏加成（0.50x
 
 ## 12. 取水与生态预算
 
-> **服务对象**：带水地图模板（火山湖、盆地……）与全部模板的清泉共享取水语义。★ v1.62.0 起地图河流水系统删除，仅模板专有静态湖泊与清泉 POI 提供水源。
+> **服务对象**：全部模板的清泉共享取水语义。★ v1.62.1 起地图不再产出任何水面，生存用水完全由清泉 `WaterSource` POI + 共享 `WaterPool` 承载。
 
 
-建议区分“水体几何”“可采水资源池”“岸边交互点”。水面可见范围不等于处处可采，多个岸点可引用同一资源池。
+建议区分“可采水资源池”与“岸边交互点”。★ v1.62.1 起已无水体几何，取水全部走清泉 POI；同一份水池库存可被多个清泉共享。
 
 ✅ 已落地（v1.47.5）。实现于 `spatial/poi.rs`、`spatial/ecology/harvest.rs`、`spatial/ecology/tick.rs`：
 
@@ -761,7 +760,7 @@ pub struct PrimitivePoi {
 采收与再生流程：
 
 ```text
-Agent 到达取水点 (WaterAccessPoint) 或清泉 POI
+Agent 到达清泉 POI（★ v1.62.1 起无 WaterAccessPoint）
   -> harvest.rs: 收集同一 tick 全体 Agent 取水请求
   -> 按 agent.id 升序稳定排序 (保证确定性)
   -> 依次从共享 WaterPool 扣减实际出水量
@@ -771,11 +770,11 @@ Agent 到达取水点 (WaterAccessPoint) 或清泉 POI
 
 契约要点：
 
-- ★ v1.62.0 起地图河流水系统删除后，静态湖泊岸点与各模板清泉 POI 共享同一份 `WaterPool` 库存；无湖泊模板的全部清泉 `WaterSource` POI 统一绑定共享 `WaterPool #1`（命名「低洼清泉 #id」），配置控制全图可采水总容量与总再生；不给同一处水源重复增发额度。
+- ★ v1.62.1 起地图不再生成水体，全部模板的清泉 `WaterSource` POI 统一绑定共享 `WaterPool #1`（命名「低洼清泉 #id」），配置控制全图可采水总容量与总再生；不给同一处水源重复增发额度。
 - 在 `spatial/poi.rs` 中，`PrimitivePoi` 增加 `water_pool_id` 与 `access_point_id`；在 `spatial/ecology/tick.rs` 中，`self.water_pools` 按池统一进行自然再生，之后调用 `sync_water_pois()` 同步各取水 POI 的储量展示。
-- 同一资源池的岸点共享库存事实；采收入行囊、回宅卸货和家户账本规则保持原契约。Agent 私有 POI 施密特触发器应读取对应资源池比例，切换岸点不能绕过 `decision_poi_seek_min_stock_ratio`、`decision_poi_abandon_stock_ratio` 和断流后的市场兜底。
-- 首期静态水位与可采水储量分开：库存环表示当前可采额度，不表示整个水体的体积。未来增加枯水/水量模拟时再建立二者关系，不让每次取水立即把湖岸线抽动。
-- 水面库存为零时，前端按 `WATER_DYNAMICS.coverage` 显示干涸湖床；HUD 大盘仍按池 ID 去重统计。
+- 同一资源池的多个清泉共享库存事实；采收入行囊、回宅卸货和家户账本规则保持原契约。Agent 私有 POI 施密特触发器应读取对应资源池比例，切换清泉不能绕过 `decision_poi_seek_min_stock_ratio`、`decision_poi_abandon_stock_ratio` 和断流后的市场兜底。
+- 库存环表示当前可采额度，不表示任何水体体积；★ v1.62.1 起地图已无水体，该字段纯作资源额度。
+- ★ v1.62.1 起无水面，前端不显示任何干涸湖床；HUD 大盘按池 ID 去重统计清泉储量。
 
 ## 13. 房屋、农业、设施与 POI 接入
 
@@ -857,7 +856,7 @@ pub struct GeoCellSnapshot {
 - 地形静态数据只在 `terrain_dirty` 为 true 时发出；普通 tick 帧不发送静态字段并复用前端缓存。✅ 已实现（★ v1.50.33 D-B1-7：`terrain_features`/`terrain_accents`/`terrain_sub_features` 均为 `Option<Vec<_>>`——脏帧发 `Some(vec)`（可为空集合），其余帧为 `None`（JSON `null`/FABS section 缺席同为 `null`）；前端以 `Array.isArray` 区分「明确静态帧」与「未发送」，非静态帧保留旧值，明确空集合也必须替换）。
 - `terrain_content_version` 由内核根据生成器版本、地图参数和内容摘要生成，前端只用于缓存键，不参与模拟 RNG。◐ 当前用 `terrain_generator_version + terrain_profile` 表达版本事实，`terrain_content_version` 未单独引入。
 - 水池库存是动态事实，应随 POI/水资源快照发送；水体轮廓、岸点和特征几何是静态事实。
-- 所有 `Vec` 按**固定的、可复现的**顺序输出；不能依赖 HashMap 顺序。✅ 特征按**生成顺序**输出（火山湖为 `WaterBody=1`；★ v1.62.0 起 T2 河谷的 `ShallowFord/River/RiverBank` 特征已随地图河流水系统删除，其余 profile 核心特征为空）；装饰按 ID 升序（`accents.rs` 末尾 `sort_by_key`）。ID 升序是 §5.2 对 D-B1 的要求，当前未实现。
+- 所有 `Vec` 按**固定的、可复现的**顺序输出；不能依赖 HashMap 顺序。✅ 特征按**生成顺序**输出（★ v1.62.0/v1.62.1 起 T2 河谷的 `ShallowFord/River/RiverBank` 与模板静态湖泊的 `WaterBody` 特征均随水面删除，核心特征为空）；装饰按 ID 升序（`accents.rs` 末尾 `sort_by_key`）。ID 升序是 §5.2 对 D-B1 的要求，当前未实现。
 - 快照按稳定 ID 排序；新增字段遵守根指南的结构、真值赋值、FABS 编码/解码、前端映射同步契约。
 
 ### 14.2 FABS 二进制帧
@@ -896,7 +895,7 @@ section 记录使用变长顶点列表，未知 section 仍可按 `byte_len` 跳
 ✅ 已落地。`WorldSave` 包含：
 
 ```rust
-pub terrain_generator_version: u32,     // 当前为 36（★ v1.62.0：删除地图河流水系统与土壤湿润后递增）
+pub terrain_generator_version: u32,     // 当前为 37（★ v1.62.1：删除全部程序生成水面后递增）
 pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1"
 ```
 
@@ -904,11 +903,11 @@ pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1
 
 读档规则：
 
-- ✅ `SAVE_FORMAT_VERSION = 8`（★ v1.62.0：7→8，旧档按版本门禁拒绝），`WorldSave` 增加 `terrain_state: TerrainMap` 与 `water_pools: Vec<WaterPool>`，地形事实（含 `accents` 装饰数组）、静态湖泊与共享水池直接从存档完整恢复，不依赖重新生成。
-- ✅ `deserialize_save()` 严格校验 `save.terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 36）与 `save.terrain_profile`，不匹配直接返回明确错误。
+- ✅ `SAVE_FORMAT_VERSION = 8`（★ v1.62.0：7→8，旧档按版本门禁拒绝；★ v1.62.1 未变），`WorldSave` 增加 `terrain_state: TerrainMap` 与 `water_pools: Vec<WaterPool>`，地形事实（含 `accents` 装饰数组）与共享水池直接从存档完整恢复，不依赖重新生成（★ v1.62.1 起无静态湖泊轮廓需恢复）。
+- ✅ `deserialize_save()` 严格校验 `save.terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 37）与 `save.terrain_profile`，不匹配直接返回明确错误。
 - ✅ 校验存档内地形单元数必须等于 `grid_width * grid_height`，否则拒绝加载。
 - ✅ `World3DEngine::to_save()` 将当前实际运行的 `terrain_state` 与 `water_pools` 完整入档；存读档测试（`test-wasm.js` Test 3 与 `test-determinism.js` Suite 5）通过，续演完全逐字节吻合。
-- 当前存档按种子重建地形，但 T1/T2 上线后已明确生成器版本与应用版本门禁；若仍拒绝旧应用存档，清楚说明，不声称兼容旧地形。未来允许改变湖泊水位或桥梁时，应保存变化状态或确定性事件，并在读档、回放、分支时重建一致结果。
+- 当前存档按种子重建地形，但 T1/T2 上线后已明确生成器版本与应用版本门禁；若仍拒绝旧应用存档，清楚说明，不声称兼容旧地形。★ v1.62.1 起地图无水面，未来若重新引入水位或桥梁，应保存变化状态或确定性事件，并在读档、回放、分支时重建一致结果。
 
 ## 15. 前端景观实现
 
@@ -920,26 +919,26 @@ pub terrain_profile: String,            // "mountain_pass_v1" | "river_valley_v1
 ✅ 已拆分（v1.48.0 起）。`render_terrain.js` 从 `render_world.js` 独立；★ v1.50.23 TA-01 装饰再拆为 accent 三件套：
 
 ```text
-render_terrain.js       天空背景、地形壳层/单格填充/网格线、地貌特征             ✅ 已拆（★ v1.50.23 装饰已迁出）
+render_terrain.js       地形壳层/网格线、短特征折线                         ✅ 已拆（★ v1.62.1 起仅余 Cliff/SpringValley 折线）
 accent-season.js        装饰季相层（window.SimTreeTint 叶色唯一生产者）          ✅ 已建（v1.50.23）
 accent-model.js         装饰模型层（window.AccentModel 个体形态缓存）            ✅ 已建（v1.50.23）
 render_accents.js       装饰绘制层（drawAccentEntity / Tree / Boulder / Bush）   ✅ 已建（v1.50.23）
-render_features.js      静态湖泊水面、浅滩、泉谷等水系特征                    ❌ 未建（并入 render_terrain.js::drawFeatureItem/drawWaterBodyTile）
+render_features.js      短特征折线                                          ❌ 未建（并入 render_terrain.js::drawFeatureItem）
 render_world.js         统一深度队列调度、POI、房屋、道路、贴地图元              ✅
 render_agents.js        族人绘制                                                 ✅
 ```
 
-> 现状：`drawTerrainFeatures()` 已按单实体入口 `drawFeatureItem()` 重构并落在 `render_terrain.js`；`render_features.js` 未单独创建，特征绘制与地形壳层同文件。装饰绘制已迁至 `render_accents.js`（★ v1.50.23 TA-01）。`render_world.js` 现约 904 行，已超 800 行上限，新增景观素材前应先评估进一步拆分。
+> 现状：`drawTerrainFeatures()` 已按单实体入口 `drawFeatureItem()` 重构并落在 `render_terrain.js`；`render_features.js` 未单独创建，特征绘制与地形壳层同文件。★ v1.62.1 起地图河流水系统与静态湖泊删除，`drawFeatureItem` 只处理 `Cliff`/`SpringValley` 等少量短特征。装饰绘制已迁至 `render_accents.js`（★ v1.50.23 TA-01）。`render_world.js` 现约 904 行，已超 800 行上限，新增景观素材前应先评估进一步拆分。
 
 ### 15.2 绘制顺序
 
-当前实际顺序（★ v1.60.1 起地形/侧壁由 WebGL 地形层直绘，2D 队列仅存水系/道路/实体/装饰）：
+当前实际顺序（★ v1.60.1 起地形/侧壁由 WebGL 地形层直绘，2D 队列仅存短特征/道路/实体/装饰）：
 
 ```text
 0. WebGL 地形层（terrain-renderer.js，sim-canvas-gl）  地形网格 + 沙盘侧壁直绘
    （shader 直译受光 + GL 阴影图采样；天空清屏由本层承担）
 1. ★ 世界统一深度队列 drawWorldEntities()  按 depth = ry·sinX + z·cosX 升序（远 → 近）
-   ├─ 水系特征（drawFeatureItem：River 水面 / ShallowFord）
+   ├─ 短特征折线（drawFeatureItem：Cliff / SpringValley；★ v1.62.1 起无水面）
    ├─ 道路分段（lineDashOffset 按累计弧长保持虚线相位连续）
    ├─ 营地辖区连线、POI 底座（−0.01 ε 垫在自己标记下）
    ├─ POI 标记 / 私产宅舍 / 部落民（立体实体）
@@ -953,7 +952,8 @@ render_agents.js        族人绘制                                            
 
 - ~~**River**~~：~~水蓝色透明光泽宽带（`rgba(56, 133, 190, 0.72)`）~~（★ v1.62.0 随地图河流水系统删除）；
 - ~~**RiverBank**~~：~~河岸沙洲轮廓带（`rgba(185, 151, 91, 0.42)`）~~（★ v1.62.0 删除）；
-- **ShallowFord**：浅滩跨水步道虚线（`rgba(218, 197, 133, 0.95)`，双向虚线）；
+- ~~**WaterBody / ShallowFord**~~：~~静态湖泊水面分块 / 浅滩跨水步道~~（★ v1.62.1 删除，地图不再绘制任何水面）；
+- **Cliff**：河谷峭壁（岩体阴影带 + 崖缘暗线，仅可视化，禁行事实在内核 cells）；
 - **SpringValley**：浅沟细带；
 - ~~**Ridge/Saddle/Terrace**~~（v1.47.7 已删除，不再绘制山脊线/山口圆/台地轮廓）。
 - **Tree**（✅ D-A + TA-02）：四瓣层叠树冠、锥形曲干与 10 枚稳定叶纹；个体模型来自 `AccentModel`。树木与灌木均读取 `SimTreeTint.sample(accent, sim, profile?)` 的浮点 RGB 叶色，不再按三档切换；纯季相曲线、恢复契约与后续几何边界见 [前端指南 §1.2](./21-frontend-dev-guide.md#12-第三轮地形渲染独立--d-a-装饰系统-v1480--v1491)。不读存档中的预留 `tint`。
@@ -963,11 +963,11 @@ render_agents.js        族人绘制                                            
 规则：
 
 - 普通视图隐藏网格线；道路等级颜色只在分析视图展示。
-- 水面颜色、岸石为静态视觉派生，不改变内核通行或库存。
-- HUD 大盘水源储量按 `waterPoolId` 去重汇总，避免多个取水点共享同一水池时重复累加导致总量虚高。
-- 浅滩人物沿内核实际路线移动，过水时根据 `terrain_shallow_water_cost` 自然减速。
+- ★ v1.62.1 起地图已无水面，不再有水面颜色/岸石派生；短特征折线为静态视觉派生，不改变内核通行或库存。
+- HUD 大盘水源储量按 `waterPoolId` 去重汇总，避免多个清泉共享同一水池时重复累加导致总量虚高。
+- ★ v1.62.1 起无浅滩，`terrain_shallow_water_cost` 不再在移动中触发。
 - 装饰物不与库存绑定；Tree/Bush 使用连续季节叶色，Boulder 保持固定配色。叶量输出已就绪，真正的几何落叶与裸枝待 TA-03。
-- 贴地图元（道路/底座/水面/足迹线）保持贴合地表；立体实体与装饰锚点经 `MAP_Z_LIFT` 略抬于地表（v1.50.12），避免坡面「陷进」地面。
+- 贴地图元（道路/底座/足迹线）保持贴合地表；立体实体与装饰锚点经 `MAP_Z_LIFT` 略抬于地表（v1.50.12），避免坡面「陷进」地面。
 - 渲染参数（`mapZLift`/`agentFootprintR`/`accentFootprintR` 等）外置在 `frontend/js/config.render.js`（`window.RENDER_CONFIG`），与 `SIM_CONFIG` 分离（v1.50.15）。
 
 ### 15.4 命中与标注
@@ -975,8 +975,8 @@ render_agents.js        族人绘制                                            
 ⏳ 未实施。方案：
 
 - 地形特征命中检测使用与绘制一致的世界坐标折线和宽度，不用只检测装饰精灵。
-- 普通水面不可点击为可采点；只有 `WaterAccessPoint` 的有效岸边区域可进入 POI Inspector。
-- 标签层沿用现有选中、悬浮、异常、普通四级优先级；湖泊名称与浅滩状态不能遮住当前 Agent/房屋。
+- ★ v1.62.1 起地图无水面与取水岸点，取水统一走清泉 POI 的有效区域进入 POI Inspector。
+- 标签层沿用现有选中、悬浮、异常、普通四级优先级；清泉名称与短特征状态不能遮住当前 Agent/房屋。
 
 ## 16. 配置设计
 

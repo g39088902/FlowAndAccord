@@ -1,14 +1,14 @@
-// === 地形壳层投影 / 地形网格线（调试）/ 水系特征绘制（v1.48.0 从 render_world.js 拆出） ===
+// === 地形壳层投影 / 地形网格线（调试）/ 地貌特征绘制（v1.48.0 从 render_world.js 拆出） ===
 // ★ 全量 WebGL（Canvas 备用通道删除）：地形格/沙盘基底/侧壁/天空全部由
 //   webgl/layers/terrain/terrain-renderer.js 承担；本文件只保留——
-//   ① drawTerrainShell 全网格顶点投影（水系、路网、实体拾取复用）；
+//   ① drawTerrainShell 全网格顶点投影（路网、实体拾取复用）；
 //   ② drawTerrainGrid 'G' 键调试网格线（2D 叠层）；
-//   ③ 水系特征绘制（drawFeatureItem/drawWaterBodyTile——静湖水面在 GL 模式
-//      下仍由 2D 统一深度队列绘制，见 render_depth_queue.js DEPTH_FEATURE 段）。
+//   ③ 地貌特征折线绘制（drawFeatureItem——峭壁/泉谷等折线特征由 2D 统一深度队列
+//      调度，见 render_depth_queue.js DEPTH_FEATURE 段）。
 // 依赖全局: ctx, camera, sim, w, h, terrainProjX, terrainProjY
 // 另消费 window.RENDER_CONFIG（config.render.js，须先加载）。
 
-// 预分配水系与特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
+// 预分配地貌特征顶点投影缓冲数组 (消除每帧 GC 垃圾回收与对象分配)
 let _featProjX = new Float32Array(512);
 let _featProjY = new Float32Array(512);
 function _ensureFeatProjCapacity(needed) {
@@ -28,38 +28,8 @@ function _projectFeatureVertices(vertices, count, cx, cy, cosZ, sinZ, cosX, sinX
     _featProjY[i] = cy + y2 * scale;
   }
 }
-function _waterState(feature) {
-  return sim.waterBodyDynamics && sim.waterBodyDynamics.get(feature.id);
-}
-function _projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
-  const state = _waterState(feature);
-  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
-  if (coverage <= 0.005) return false;
-  const vertices = feature.vertices;
-  let centerX = 0, centerY = 0;
-  for (let i = 0; i < vertices.length; i++) {
-    centerX += vertices[i].x;
-    centerY += vertices[i].y;
-  }
-  centerX /= vertices.length; centerY /= vertices.length;
-  const xyScale = Math.sqrt(coverage);
-  const levelDelta = state ? state.level - (feature.elevation || 0) : 0;
-  _ensureFeatProjCapacity(vertices.length);
-  for (let i = 0; i < vertices.length; i++) {
-    const v = vertices[i];
-    const wx = centerX + (v.x - centerX) * xyScale;
-    const wy = centerY + (v.y - centerY) * xyScale;
-    const wz = (v.z || 0) + levelDelta;
-    const rx = wx * cosZ - wy * sinZ;
-    const ry = wx * sinZ + wy * cosZ;
-    const y2 = ry * cosX - wz * sinX;
-    _featProjX[i] = cx + rx * scale;
-    _featProjY[i] = cy + y2 * scale;
-  }
-  return true;
-}
 
-// 地形壳层：全网格顶点投影（供水系/路网/实体绘制与拾取复用）。
+// 地形壳层：全网格顶点投影（供路网/实体绘制与拾取复用）。
 // 地形面片/侧壁/天空已由 WebGL 地形渲染器承担，此处不再落笔。
 function drawTerrainShell() {
   if (sim.showTerrain && sim.terrain && sim.terrain.cells && sim.terrain.cells.length >= sim.terrain.gridSize * sim.terrain.gridSize) {
@@ -112,7 +82,7 @@ function drawTerrainGrid() {
   ctx.stroke();
 }
 
-// 单个水系地貌特征绘制（由 render_depth_queue.js 统一深度队列调度）。
+// 单个地貌特征折线绘制（由 render_depth_queue.js 统一深度队列调度）。
 function drawFeatureItem(feature, idx) {
   if (!feature.vertices || feature.vertices.length < 2) return;
 
@@ -122,38 +92,15 @@ function drawFeatureItem(feature, idx) {
   const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
   const scale = camera.zoom;
 
-  // ★ TB-03 静水闭合水体（盆地泉池 / 湖畔大湖）：分块绘制（idx = 块号 + 1）。
-  if (feature.kind === 'WaterBody') {
-    drawWaterBodyTile(feature, idx | 0, cx, cy, cosZ, sinZ, cosX, sinX, scale);
-    return;
-  }
-
   const vLen = feature.vertices.length;
   _projectFeatureVertices(feature.vertices, vLen, cx, cy, cosZ, sinZ, cosX, sinX, scale);
 
-  // ── 浅滩涉渡（ShallowFord）与其余地貌特征 ──
+  // ── 地貌特征折线（Cliff 等）──
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  if (feature.kind === 'ShallowFord') {
-    ctx.strokeStyle = 'rgba(196, 178, 136, 0.88)';
-    ctx.lineWidth = Math.max(6, feature.width * scale * 0.22);
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.stroke();
-
-    // 踏石微光
-    ctx.strokeStyle = 'rgba(255, 252, 240, 0.90)';
-    ctx.lineWidth = Math.max(2.5, feature.width * scale * 0.10);
-    ctx.setLineDash([4 * scale, 5 * scale]);
-    ctx.beginPath();
-    ctx.moveTo(_featProjX[0], _featProjY[0]);
-    for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  } else if (feature.kind === 'Cliff') {
+  if (feature.kind === 'Cliff') {
     // ★ 阶段三 D-B2 河谷峭壁（Cliff，id=224）：崖顶折线 → 岩体阴影带 + 崖缘暗线。
     //   仅可视化；禁行事实在内核 cells（RockFace|NO_WALK），与 T1 台缘同语义。
     const _strokeCliffPath = () => {
@@ -179,74 +126,5 @@ function drawFeatureItem(feature, idx) {
     for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
     ctx.stroke();
   }
-  ctx.restore();
-}
-
-// ★ TB-03 静水分块网格（由顶点 AABB 推导；与 render_depth_queue.js 收集段同式。
-//   特征快照在网格重建/静态替换时整体换新对象，块网格缓存在特征对象上安全）。
-const WB_TILE_STEP = 32;
-function _wbTileGrid(feature) {
-  if (feature._wbTiles) return feature._wbTiles;
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const v = feature.vertices;
-  for (let i = 0; i < v.length; i++) {
-    if (v[i].x < minX) minX = v[i].x;
-    if (v[i].x > maxX) maxX = v[i].x;
-    if (v[i].y < minY) minY = v[i].y;
-    if (v[i].y > maxY) maxY = v[i].y;
-  }
-  const nx = Math.max(1, Math.ceil((maxX - minX) / WB_TILE_STEP));
-  const ny = Math.max(1, Math.ceil((maxY - minY) / WB_TILE_STEP));
-  feature._wbTiles = { minX, minY, nx, ny };
-  return feature._wbTiles;
-}
-
-// ★ TB-03 静水单块绘制（idx = 块号 + 1）：clip 到该块世界矩形内、再整闭合多边形
-//   两遍填充（深水基底 + 主水体，与河面同色同透明度）。分块参与统一深度排序，
-//   近岸人物与房屋不被整湖一项盖住（TB-03-IMPLEMENTATION-PLAN §7.3）。
-function drawWaterBodyTile(feature, idx, cx, cy, cosZ, sinZ, cosX, sinX, scale) {
-  const g = _wbTileGrid(feature);
-  const t = idx - 1;
-  if (t < 0 || t >= g.nx * g.ny) return;
-  const tx = t % g.nx, ty = (t / g.nx) | 0;
-  const x0 = g.minX + tx * WB_TILE_STEP;
-  const y0 = g.minY + ty * WB_TILE_STEP;
-  const x1 = x0 + WB_TILE_STEP;
-  const y1 = y0 + WB_TILE_STEP;
-
-  // 投影块四角（世界 → 屏幕，与 _projectFeatureVertices 同式）
-  const proj = (wx, wy) => {
-    const rx = wx * cosZ - wy * sinZ;
-    const ry = wx * sinZ + wy * cosZ;
-    const y2 = ry * cosX - (feature.elevation || 0) * sinX;
-    return [cx + rx * scale, cy + y2 * scale];
-  };
-  const c0 = proj(x0, y0), c1 = proj(x1, y0), c2 = proj(x1, y1), c3 = proj(x0, y1);
-
-  const v = feature.vertices, vLen = v.length;
-  if (!_projectDynamicWaterVertices(feature, cx, cy, cosZ, sinZ, cosX, sinX, scale)) return;
-  const state = _waterState(feature);
-  const coverage = state ? Math.max(0, Math.min(1, state.coverage)) : 1;
-  const alphaScale = 0.35 + coverage * 0.65;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(c0[0], c0[1]);
-  ctx.lineTo(c1[0], c1[1]);
-  ctx.lineTo(c2[0], c2[1]);
-  ctx.lineTo(c3[0], c3[1]);
-  ctx.closePath();
-  ctx.clip();
-
-  // 整多边形填充（clip 限定只落本块）：深水基底 + 主水体的双层水面
-  ctx.beginPath();
-  ctx.moveTo(_featProjX[0], _featProjY[0]);
-  for (let i = 1; i < vLen; i++) ctx.lineTo(_featProjX[i], _featProjY[i]);
-  ctx.closePath();
-  ctx.globalAlpha = alphaScale;
-  ctx.fillStyle = 'rgba(28, 82, 116, 0.25)';
-  ctx.fill();
-  ctx.fillStyle = 'rgba(54, 158, 202, 0.62)';
-  ctx.fill();
   ctx.restore();
 }

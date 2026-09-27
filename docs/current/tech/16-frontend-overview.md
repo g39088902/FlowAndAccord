@@ -17,7 +17,7 @@ stateDiagram-v2
     WAIT_SNAP --> INGEST : Worker 下发快照（背压释放，SNAP_THROTTLE_TIERS 按人口定档）
     INGEST --> GL : 快照映射完成（rustworld._applySnapshot）
     GL --> SORT : WebGL 地形层提交（sim-canvas-gl，地形/侧壁 shader 直译受光 + 深度缓冲逐像素遮挡）
-    SORT --> PAINT : 2D 深度队列排定（静湖水面/道路/POI/房屋/装饰/族人按 depth 升序）
+    SORT --> PAINT : 2D 深度队列排定（短特征折线/道路/POI/房屋/装饰/族人按 depth 升序）
     PAINT --> PRESENT : 实体/标签落笔完成（'G' 键调试网格叠层最后绘制）
     PRESENT --> WAIT_SNAP : 回传 ACK，Worker 解锁下一帧
 ```
@@ -27,7 +27,7 @@ stateDiagram-v2
 | WAIT_SNAP | 等待快照：持有 `ackReceived` 锁，Worker 未下发 | 渲染循环启动 / 上一帧已 ACK | Worker 下发新快照 |
 | INGEST | 采集与映射：主线程消费快照并映射 `sim` | `ackReceived` 释放 | 快照映射完成 |
 | GL | WebGL 地形层：地形/侧壁在 `sim-canvas-gl` 提交，GPU 深度缓冲解决遮挡 | 快照映射完成 | 地形 GL 帧完成 |
-| SORT | 深度排序：`drawWorldEntities` 把静湖水面/道路/POI/房屋/装饰/族人收进同一队列按 `depth = ry·sinX + z·cosX` 升序（★ v1.60.1 起地形格不入队） | GL 帧完成 | 队列排定（远→近） |
+| SORT | 深度排序：`drawWorldEntities` 把短特征折线/道路/POI/房屋/装饰/族人收进同一队列按 `depth = ry·sinX + z·cosX` 升序（★ v1.60.1 起地形格不入队；★ v1.62.1 起无水面入队） | GL 帧完成 | 队列排定（远→近） |
 | PAINT | Canvas 2D 覆盖层：按统一深度队列在 `sim-canvas` 落笔实体/道路/POI/标签 | 队列排定 | 全部图层落笔完成 |
 | PRESENT | 呈现与 ACK：回传 ACK 解锁 Worker | 绘制完成 | ACK 已回传 |
 
@@ -40,13 +40,13 @@ stateDiagram-v2
 
 纯静态前端（无构建步骤），通过 Canvas 2D/3D 投影渲染模拟世界，提供 Inspector 观察面板、族谱可视化、账本大盘、调试监视器与全景控制台。前端是用户与模拟内核交互的唯一界面。
 
-> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，道路/POI/房屋/族人/标签/静湖面仍在 Canvas 2D 覆盖层 `sim-canvas`。**目标形态为全量 WebGL、不再使用 Canvas 2D**——实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层。★ **v1.60.1 部分提前落地**：WebGL 成为**硬门槛**（不可用时 `main.js` 显示错误覆盖层并阻断启动，`fallback-handler.js` 2D 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除（详见 [31 号 §1.3](../../plan/tech/31-canvas-to-webgl-migration.md)）。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
+> ★ **方向（2026-09-17 架构决策）**：本文描述的是**当前实现**（过渡期）：地形由 `frontend/js/webgl/` 绘制在底层 `sim-canvas-gl`，道路/POI/房屋/族人/标签/短特征折线仍在 Canvas 2D 覆盖层 `sim-canvas`（★ v1.62.1 起已无水面）。**目标形态为全量 WebGL、不再使用 Canvas 2D**——实体层将整体迁入同一 WebGL 管线，随后退役 2D 覆盖层。★ **v1.60.1 部分提前落地**：WebGL 成为**硬门槛**（不可用时 `main.js` 显示错误覆盖层并阻断启动，`fallback-handler.js` 2D 回退管理器已删除）；地形 / 光照 / 装饰 / 阴影四项的 Canvas 备用通道已删除（详见 [31 号 §1.3](../../plan/tech/31-canvas-to-webgl-migration.md)）。迁移方案见 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md)。届时 §2.1 的分层绘制顺序与 §2.1 第 6 步的深度队列叙述需按 WebGL 口径改写（深度缓冲取代画家算法；队列仅剩批次提交与透明排序职责）。
 
 ## 2. 核心机制
 
 ### 2.1 Canvas 渲染管线
 
-> ★ 下文的「Canvas 渲染管线」为过渡期现状；目标形态的统一 WebGL 管线见文首方向说明与 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md). ★ **v1.60.1 起**：地形 / 光照 / 装饰 / 阴影的 Canvas 备用通道已删除——地形由 WebGL 地形层直绘（含受光与阴影），装饰经 sink 硬门槛进 GL 层，2D 覆盖层只画静湖/道路/POI/房屋/族人/标签。
+> ★ 下文的「Canvas 渲染管线」为过渡期现状；目标形态的统一 WebGL 管线见文首方向说明与 [31 号 §8](../../plan/tech/31-canvas-to-webgl-migration.md). ★ **v1.60.1 起**：地形 / 光照 / 装饰 / 阴影的 Canvas 备用通道已删除——地形由 WebGL 地形层直绘（含受光与阴影），装饰经 sink 硬门槛进 GL 层，2D 覆盖层只画短特征折线/道路/POI/房屋/族人/标签（★ v1.62.1 起无水面）。
 - **分层渲染顺序（★ v1.47.5 P0 / ★ v1.47.9 统一深度 / ★ v1.60.1 地形层直绘）**：严格遵循地表物理遮挡层次调度：
   0. `SimLighting.update()`：推进年度光相（含视觉限速器），光档变化时推进 `lightRev`——受光由 GL 地形 shader 直译（★ v1.60.1 CPU 逐格烘焙与 `cell.color` 写回已删除）；
   1. **WebGL 地形层**（terrain-renderer.js，`sim-canvas-gl`）：真实地形网格 + Diorama 沙盘侧壁，顶点 shader 直译 `shadeAlbedoInto` 受光 + 片元采样 GL 阴影图；★ v1.60.1 起 Canvas 侧 `drawSkyBackdrop()` / `drawTerrain()` / `drawTerrainCell` 已删除（天空清屏由 GL 层承担）；
@@ -54,17 +54,17 @@ stateDiagram-v2
   3. `drawLanes()`：动态踩踏路网（贴地纹理，先于建筑绘制）；
   4. `drawSelectedCampHouseLinks()` + `drawPoiGroundBases()`：贴地图元补充层（选中营地辖区虚线、POI 底座与营地暖光，必须先于立体实体落笔）；
   5. 大气色洗（★ v1.50.11 起烘焙进地形色、★ v1.60.1 起由 GL 顶点 shader 的 wash mix 承担——`relightTerrain` / `cell.color` 已删除，`drawAtmosphereWash()` 函数已删除）；
-  6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入 / ★ v1.60.1 静湖水面仍经队列**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相；★ v1.60.1 起绘制经 sink 分发进 GL 装饰层、GL 未就绪帧整只跳过）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
+  6. `drawWorldEntities()`：**★ v1.47.9 世界立体实体统一深度绘制 / ★ v1.50.2 装饰并入 / ★ v1.50.49~53 资源景观与标签布局接入 / ★ v1.62.1 无水面入队**——POI 标记（图标/门牌/储量环）、私产宅舍（手办级 2.5D 微缩立体模型与落底阴影）、部落民（微接触投影、植物染料服色与低噪状态环）、**地表装饰**（D-A 装饰系统：Tree 乔木 / Bush 灌木 / Boulder 巨石 / RockCluster 碎石群 / GrassTuft 丛草，由 `accent-season.js` 驱动连续季相；★ v1.60.1 起绘制经 sink 分发进 GL 装饰层、GL 未就绪帧整只跳过）、**微观资源景观**（D-C 通用资源景观：`landscape-model.js` 派生 Water/Wood/Berry/Stone/Gold 五类稳定配方 + `landscape-mask.js` 世界几何遮罩自适应网格避让车道/房屋/POI 操作区 + `render_landscapes.js` 子图元入队）合并为单一绘制队列，按相机深度**远 → 近**依次落笔；帧尾由 **`label-layout.js`（★ S4-06/07，v1.50.52~53）统一接管屏幕文字**：字体测量、网格冲突检测、同类普通房屋编号聚合徽标（`🏠 N舍`）、选中/悬浮双目标强制保留与边缘停靠虚线引线兜底、有限布局滞回防抖动、DOM 快照缓存防重排，普通标签仍在实体所属深度落笔保持山体遮挡；
 - **★ v1.48.0 动态季节光照（年周期光弧）**：光源绕世界一年转一圈，四季各占一个象限（春=东 / 夏=南 / 秋=西 / 冬=北），盛夏高度角 72°、隆冬 22°；地形反照率与光照解耦（`computeTerrainAlbedo` 一次性预算 + GL 顶点 shader 直译 `shadeAlbedoInto` 受光，光档变化经 `lightRev` 闸节流上传 uniform），房屋墙面/屋顶按面法线受光，阴影方向与长度由世界空间光向投影到屏幕（随相机旋转）。详见 [./17-seasonal-lighting.md](./17-seasonal-lighting.md) 与 `frontend/AGENTS.md` §5.10。
-- 动态等高线网格地形，读取内核 `GeoCell` 的地表类别、坡度和自然适宜性；v1.47.7 起不再绘制 `Ridge` 山脊线、`Saddle` 山口圆与 `Terrace` 台地轮廓（该类特征已整体删除）；★ v1.62.0 起地图河流水系统删除，前端只绘制静态湖泊水面（`WaterBody`）与短特征（`ShallowFord`/`Cliff`/`SpringValley`）。
-- **静态湖泊水面（★ v1.47.5 P1 升级 / ★ v1.50.x 观感降噪 / ★ v1.62.0 收敛为静湖）**：`ShallowWater`/`DeepWater` 水下格底色为蓝色系（`rgb(70,145,178)` 浅水 / `rgb(34,102,146)` 深水）；静湖水面由 `render_terrain.js::drawWaterBodyTile` 按 32m 分块入统一深度队列，逐块 `clip` 后对整闭合多边形两遍填充（`rgba(28,82,116,0.25)` 深水基底 + `rgba(54,158,202,0.62)` 主水体）；水面覆盖率与水位来自每帧 `WATER_DYNAMICS` 动态 section。★ v1.62.0 起地图河流水系统（River/RiverBank 矢量水面、`water_particles.js` 粒子水面、`river_life.js` 游鱼）整体删除。详见 [./18-water-rendering.md](./18-water-rendering.md)。
+- 动态等高线网格地形，读取内核 `GeoCell` 的地表类别、坡度和自然适宜性；v1.47.7 起不再绘制 `Ridge` 山脊线、`Saddle` 山口圆与 `Terrace` 台地轮廓（该类特征已整体删除）；★ v1.62.0 起地图河流水系统删除、★ v1.62.1 起静态湖泊也删除，前端只绘制短特征折线（`Cliff`/`SpringValley`），地图不再有水面。
+- **地图水面渲染已删除（★ v1.47.5 P1 → ★ v1.62.1 删除）**：曾由 `render_terrain.js::drawWaterBodyTile` 按 32m 分块绘制静态湖泊、并由每帧 `WATER_DYNAMICS` section 驱动覆盖率/水位。★ v1.62.0 删除了地图河流水系统（River/RiverBank 矢量水面、`water_particles.js` 粒子水面、`river_life.js` 游鱼），★ v1.62.1 删除了静态湖泊水面（`drawWaterBodyTile`/`WaterBody` 特征分支/`waterBodyDynamics`）。世界仅余抽象清泉 POI + 共享水池（按普通资源 POI 渲染）。详见 [./18-water-rendering.md](./18-water-rendering.md)。
 - **世界实体统一深度排序（★ v1.47.8 房屋 → ★ v1.47.9 全实体）**：Canvas 2D 无深度缓冲，同层元素按数组原序绘制会出现「远物压近物」。`drawWorldEntities()` 每帧把 POI 标记 / 房屋 / 族人按 `project3D().depth`（= `ry·sinX + z·cosX`，数值越大越靠近视点）升序排列后绘制——**远物先画、近物后画**，同深度保持快照原序（`Array.sort` 稳定）以维持渲染确定性；排序只作用于绘制队列，不修改 `sim.pois` / `sim.houses` / `sim.agents` 顺序，点击拾取与 Inspector 遍历逻辑不受影响。POI 的贴地底座/营地暖光归入第 3 层地面 pass，因此不会糊在近处建筑上。
 - 地貌特征来自 FABS/JSON 静态快照，前端不自行生成碰撞、通行或资源事实；换世界、读档和回溯时随地形缓存一起重建。
 - **双模道路呈现**：默认自然观察模式采用低饱和泥土、夯土与石板的大地材质色阶（随 wear 动态提升线宽与平整度），关闭刺眼外发光；按 `R` 键切换道路热力图分析模式，高亮展示 5 阶等级色与外圈发光，专供交通运力拓扑研判。
 
 ### 2.2 ★ Web Worker 独立仿真架构（★ v1.38.0 Phase 1 解耦）
 - **内核与渲染双核分离**：将计算密集型的 Rust WASM 确定性内核与状态快照生成完全移入专属 Web Worker（`frontend/js/sim_worker.js`），运行在独立的 CPU 核心上；主线程（`rustworld.js` 作为轻量 Facade 代理）专职负责 Canvas 视口绘制与用户事件。
-- **只读地图模式（v1.50.16）**：地图图鉴以 `index.html?seed=<n>&mapOnly=1&nogate=1` 复用正式 Canvas 页面；Worker 选择 WASM `world_create_map`，与正式世界同样调用 `World3DEngine::new_seeded_with_config` 生成 TerrainMap，但不播撒生态、Agent、房屋或路网，也不启动 tick 循环。因此同种子地貌、静湖、自然装饰、光照与相机画面完全同源。
+- **只读地图模式（v1.50.16）**：地图图鉴以 `index.html?seed=<n>&mapOnly=1&nogate=1` 复用正式 Canvas 页面；Worker 选择 WASM `world_create_map`，与正式世界同样调用 `World3DEngine::new_seeded_with_config` 生成 TerrainMap，但不播撒生态、Agent、房屋或路网，也不启动 tick 循环。因此同种子地貌、自然装饰、光照与相机画面完全同源（★ v1.62.1 起无水面）。
 - **自适应计时循环与背压限频**：Worker 自主以 60Hz 循环步进 `world_tick_steps`（步长由 `speedMult` 驱动）。通过 `ackReceived` 握手锁实施背压控制——Worker 仅在主线程消费完上一帧快照并回传 ACK 后才下发最新快照（★ v1.44.3 起锚定 ~30Hz，与前端渲染帧率对齐；★ M5-0.4 v1.46.0 起改为**按人口自适应降频**：≤200 人 30Hz / ≤320 人 25Hz / ≤450 人 20Hz / 更高 15Hz，档位由帧头 AGENT 记录数驱动，见 `sim_worker.js::SNAP_THROTTLE_TIERS`）。高倍速（5x~100x）下 Worker 在后台吃满算力全速冲刺，主线程 Canvas 彻底免于消息堆积。**渲染帧率**由 `RENDER_CONFIG.targetFps` 控制（★ v1.50.82 默认 60 FPS、可 `?fps=` 覆盖或置 0 解限），与快照下发频率解耦。
 - **异步存读档桥接**：`saveWorld()` 与 `loadWorld()` 升级为 Promise 异步桥接，完全适配 `save-ui.js` 的 File System Access API 异步读写流程，存读档操作零阻塞 Canvas 绘制。
 - **多核算力跃升**：彻底打破单核单线程瓶颈，多核 CPU 利用率由原本的 25% 跃升至 40%~50%（主线程与 Worker 各自跑满独立物理核），彻底根除了高倍速下的 UI 冻结与相机卡顿。
@@ -163,7 +163,7 @@ stateDiagram-v2
   - **🏚️ v1.22.4 空态显示修复（禁止拿任意房屋占位）**：无在售房产时 `getSelectedHouse()` 不再回退到 `sim.houses[0]`（此前拿世界里的 #1 当占位），改为返回 null 走 `renderEmptyDetail()` 空态——hero 卡各字段显示「暂无在售房产」占位文案（**逐字段更新、不重建整卡**，保留 `#auction-hero-name` 等固定子元素，出现新在售房后能正常恢复显示），麦穗时间轴归零、买家池与竞价流水显示空提示；`openAuctionModal` 无在售房时同步清空 `currentHouseId` 防残留上一轮选择。
 
 ### 2.14 v1.27.0 交互与启动约束
-- 决策顺序以 `flowaccord.decision-order.v2`（schema 1）保存在浏览器本地（★ v1.29.0 起键升 v2，编码 0=⓪瞬间行为/6=保留动态默认）；启动时必须先连接可写 JSON 存档文件，文件写入成功后才解除模拟暂停——★ v1.28.0 起已连接自动槽存档（默认目录 + 默认文件名 `flowaccord-save1.json`）时启动直接自动读档续演。Firefox 等不支持 File System Access API 的浏览器保持阻断。
+- 决策顺序以 `flowaccord.decision-order.v2`（schema 1）保存在浏览器本地（★ v1.29.0 起键升 v2，编码 0=⓪瞬间行为/6=保留动态默认）；启动时必须先连接可写 JSON 存档文件，文件写入成功后才解除模拟暂停——★ v1.28.0 起已连接存档文件（默认目录 + 默认文件名 `FlowAndAccordSave.json`）时启动直接自动读档续演。Firefox 等不支持 File System Access API 的浏览器保持阻断。
 - 拍卖大盘状态徽章显示累计场次、成交/流拍及流拍率；在售房源条使用固定节点按 ID 更新，避免高倍速刷新破坏点击。
 - 全局族人均值大盘显示按金币排序、ID 作为并列裁决的最富家户；家户制度大盘不重复展示该指标。
 
@@ -180,7 +180,7 @@ stateDiagram-v2
   - 数据形态：`LandscapeGroup { key: "poi:<id>", recipe, recipeVersion, anchor, geometrySignature, children[], bounds, q }` 与 `LandscapeChild { key: "poi:<id>/<role>/<slot>", modelKind, visualSeed, dx, dy, x, y, z, rot, scale, footprint, bounds, stockRole }`。
   - 确定性哈希：子图元种子通过 MurmurHash3 风格整数算法（`worldSeed ^ poi.id ^ roleSalt ^ slot`）派生，使用严格 `Math.imul` 与 `>>>0` 无符号整数运算，**禁止** `Math.random`、系统时间或消费模拟主 `WorldRng`。
   - 极坐标采样：候选位置按 $r = \sqrt{\text{lerp}(r_{\min}^2, r_{\max}^2, u)}$、$	heta = 2\pi v$ 盘分布采样，变换至世界坐标后逐点通过双线性插值采样静态高程场。
-  - 坡度与水面拒绝：所有 POI 配方按模型水平足迹 + 地形格半对角净空拒绝贴近浅水/深水的候选；Water 配方每个清泉至多 1 处陆侧岸石并配低草，**严禁凭空扩张水域**或让林缘灌木/树冠伸入水面。
+  - 坡度与水面拒绝：所有 POI 配方按模型水平足迹 + 地形格半对角净空拒绝贴近浅水/深水的候选（★ v1.62.1 起地图无水面，该拒绝惰性不触发）；Water 配方每个清泉至多 1 处陆侧岸石并配低草，**严禁凭空扩张水域**或让林缘灌木/树冠伸入水面。
 - **五类通用配方与单调库存丰度**（★ v1.50.87 删除 GroundPatch 贴地色差片后全部为立体子图元）：
   - **Water**：稀疏陆侧岸石（每个清泉至多 1 处）+ 小片低草。
   - **Wood**：主树 + 林缘灌木 + 林下草 + `foliage` 可采枝叶细节（`stockRole: 'detail'`）。
@@ -242,7 +242,7 @@ stateDiagram-v2
 | `render_canvas.js` | Canvas 主循环调度、马斯洛元数据、渲染帧率调试 |
 | `render_hud.js` | HUD、顶部统计、全图资源大盘、全局族人均值大盘 |
 | `render_world.js` | 地貌特征绘制帮助、POI 指示环、房屋模型及拍卖标牌、踩踏道路（地形已迁 GL 层；保留 lightShadowOffset/shadeHex） |
-| `render_terrain.js` | 'G' 键调试网格线 + 静湖/短特征绘制（drawFeatureItem/drawWaterBodyTile；★ v1.60.1 Canvas 地形格/天空/侧壁绘制已删，★ v1.62.0 drawRiverBand 随河流水系统删除） |
+| `render_terrain.js` | 'G' 键调试网格线 + 短特征折线绘制（drawFeatureItem：Cliff/SpringValley；★ v1.62.1 起 drawWaterBodyTile 与 WaterBody/ShallowFord 分支删除，★ v1.62.0 起 drawRiverBand 随河流水系统删除；★ v1.60.1 Canvas 地形格/天空/侧壁绘制已删） |
 | `render_depth_queue.js` | ★ v1.50.46 TA-04-6 世界统一深度队列层：DEPTH_* 对象池、贴面/足迹感知深度帮助函数、drawWorldEntities 统一调度与实体悬浮检测（★ v1.60.1 地形格/侧壁/贴地投影入队已删） |
 | `accent-model.js` | ★ v1.50.23 装饰模型派生与缓存（Tree/Bush/Boulder/RockCluster/GrassTuft + ★ S4-02 景观子图元 'L#' 命名空间通道） |
 | `accent-season.js` | ★ v1.50.23 动态季相颜色派生系统（树叶色彩相位调制与季节过渡） |
@@ -255,7 +255,7 @@ stateDiagram-v2
 | `render_agents.js` | 族人渲染、妊娠光环、状态气泡 |
 | `render_inspector.js` | 族人/房屋/POI 动态 Inspector 检查器面板与智能拾取（优先命中聚合徽标与 LabelLayout 安置标签） |
 | `main.js` | 页面交互、相机控制、快捷键、无头模式（★ v1.60.1 WebGL 硬门槛：不可用即错误覆盖层阻断启动） |
-| `save-ui.js` | 本地文件与槽位存档/读档系统 |
+| `save-ui.js` | 单存档文件（本地文件直写）存档/读档系统 |
 | `dag.js` / `dag-*.js` | 直系血脉时间轴族谱四件套（布局/渲染/新标签页/编排） |
 | `ledger-ui.js` | 社会与经济制度大盘 4 标签页（家户/婚姻/宗族/王国），家户页含五类资源均值 |
 | `auction-ui.js` | ★ 房屋拍卖交易所与实时竞价大盘 UI（历史成交与在售列表分离，买家池支持低等级家户核对） |

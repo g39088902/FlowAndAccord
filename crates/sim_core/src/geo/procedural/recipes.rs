@@ -21,7 +21,6 @@ fn recipe_from_nodes(
     id: &str,
     nodes: Vec<TerrainNode>,
     elevation_node: NodeId,
-    hydrology: HydrologySpec,
 ) -> TerrainRecipe {
     TerrainRecipe {
         id: id.into(),
@@ -30,9 +29,9 @@ fn recipe_from_nodes(
         stratigraphy: default_strata(),
         materials: default_materials(),
         structures: vec![],
+        erosion: ErosionSpec::default(),
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
-        hydrology,
         output: OutputSpec {
             elevation_node,
             hardness_node: Some(100),
@@ -115,9 +114,9 @@ pub fn flat_baseline_v1() -> TerrainRecipe {
         stratigraphy: default_strata(),
         materials: default_materials(),
         structures: vec![],
+        erosion: ErosionSpec::default(),
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
-        hydrology: HydrologySpec::default(),
         output: OutputSpec {
             elevation_node: 0,
             ..OutputSpec::default()
@@ -177,11 +176,9 @@ pub fn grassland_plain_v1() -> TerrainRecipe {
         stratigraphy: default_strata(),
         materials: default_materials(),
         structures: vec![],
+        erosion: ErosionSpec::default(),
         uncertainty: UncertaintySpec::default(),
         constraints: vec![TerrainConstraint::WalkableComponents { min: 1, max: 1 }],
-        hydrology: HydrologySpec {
-            ..HydrologySpec::default()
-        },
         output: OutputSpec {
             elevation_node: 2,
             hardness_node: Some(4),
@@ -254,14 +251,12 @@ pub fn mountain_pass_v1() -> TerrainRecipe {
         stratigraphy: default_strata(),
         materials: default_materials(),
         structures: vec![],
+        erosion: ErosionSpec::default(),
         uncertainty: UncertaintySpec::default(),
         constraints: vec![
             TerrainConstraint::WalkableComponents { min: 1, max: 1 },
             TerrainConstraint::BuildableArea { min_cells: 64 },
         ],
-        hydrology: HydrologySpec {
-            ..HydrologySpec::default()
-        },
         output: OutputSpec {
             elevation_node: 3,
             hardness_node: Some(4),
@@ -289,15 +284,7 @@ pub fn river_valley_v1() -> TerrainRecipe {
     if let Some(rainfall) = nodes.iter_mut().find(|node| node.id == 101) {
         rainfall.op = FieldOp::Constant { value: 0.75 };
     }
-    recipe_from_nodes(
-        RIVER_VALLEY_V1,
-        nodes,
-        3,
-        HydrologySpec {
-            min_lake_depth_m: 1.0,
-            ..HydrologySpec::default()
-        },
-    )
+    recipe_from_nodes(RIVER_VALLEY_V1, nodes, 3)
 }
 
 pub fn plateau_v1() -> TerrainRecipe {
@@ -318,10 +305,6 @@ pub fn plateau_v1() -> TerrainRecipe {
             4.0,
         ),
         3,
-        HydrologySpec {
-            min_lake_depth_m: 20.0,
-            ..HydrologySpec::default()
-        },
     )
 }
 
@@ -342,10 +325,6 @@ pub fn basin_oasis_v1() -> TerrainRecipe {
             1.5,
         ),
         3,
-        HydrologySpec {
-            min_lake_depth_m: 0.75,
-            ..HydrologySpec::default()
-        },
     );
     recipe.structures = vec![StructuralEvent::FoldNetwork {
         spec: FoldNetworkSpec {
@@ -418,10 +397,6 @@ pub fn alluvial_fan_v1() -> TerrainRecipe {
             4.5,
         ),
         3,
-        HydrologySpec {
-            min_lake_depth_m: 20.0,
-            ..HydrologySpec::default()
-        },
     )
 }
 
@@ -442,10 +417,6 @@ pub fn volcanic_lake_v1() -> TerrainRecipe {
             3.5,
         ),
         3,
-        HydrologySpec {
-            min_lake_depth_m: 1.0,
-            ..HydrologySpec::default()
-        },
     )
 }
 
@@ -467,10 +438,6 @@ pub fn hillside_woodland_v1() -> TerrainRecipe {
             5.0,
         ),
         3,
-        HydrologySpec {
-            min_lake_depth_m: 20.0,
-            ..HydrologySpec::default()
-        },
     )
 }
 
@@ -495,9 +462,6 @@ pub fn fault_scarp_demo_v1() -> TerrainRecipe {
             3.0,
         ),
         3,
-        HydrologySpec {
-            ..HydrologySpec::default()
-        },
     );
     recipe.structures = vec![StructuralEvent::Fault {
         plane: PlaneSpec {
@@ -535,16 +499,15 @@ pub fn folded_basin_demo_v1() -> TerrainRecipe {
             7.0,
         ),
         3,
-        HydrologySpec {
-            thermal_iterations: 1,
-            erosion_iterations: 18,
-            erosion_dt: 0.08,
-            erodibility: 0.18,
-            capacity_factor: 0.018,
-            deposition_rate: 0.12,
-            ..HydrologySpec::default()
-        },
     );
+    // Keep the showcase's pre-existing thermal/erosion tuning exactly as it was
+    // when these parameters lived inside the (now removed) hydrology spec.
+    recipe.erosion = ErosionSpec {
+        thermal_iterations: 1,
+        erosion_iterations: 18,
+        erosion_dt: 0.08,
+        ..ErosionSpec::default()
+    };
     recipe.structures = vec![StructuralEvent::FoldNetwork {
         spec: FoldNetworkSpec {
             bands: vec![

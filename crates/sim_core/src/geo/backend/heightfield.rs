@@ -51,7 +51,7 @@ impl HeightfieldBackend {
                 // Legacy fertility is now a fixed constant: the causal
                 // soil-moisture field was removed with the groundwater chain.
                 natural_fertility: 0.75,
-                water_body_id: compiled.semantics.water_body_id[i],
+                water_body_id: None,
                 feature_flags: compiled.semantics.flags[i],
             })
             .collect();

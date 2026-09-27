@@ -526,11 +526,8 @@ pub fn trim_trees_near_pois(
 /// ★ v1.52.0 水面净空判定：候选点是否落在「渲染水面」内、或离水线不足
 /// `WATER_CLEARANCE_M`（返回 true = 拒绝放装饰）。
 ///
-/// 「渲染水面」= `hydrology.water_bodies[*].vertices`——T2 主河闭合带（`hydrology.rs`
-/// `generate_river`）+ 静水闭合轮廓（`static_water.rs::apply_static_water`），
-/// 前端 `drawRiverBand` / `drawWaterBodyTile` 填充的正是这两族多边形，故本判据与
-/// 「玩家看到的蓝面」同源。另一类水格（`ShallowFord` 浅滩）恒落在主河轮廓内，
-/// 由本判据一并覆盖。
+/// 「渲染水面」= `hydrology.water_bodies[*].vertices`——地图已不再生成任何程序
+/// 生成水面，故该集合恒为空、本判据恒 false；保留查询以避免破坏调用方契约。
 ///
 /// 成本：先做 AABB（含净空外扩）短路——河/湖 AABB 只占全图 6%~10% 的候选点，
 /// 其余在 O(1) 内返回；命中 AABB 的点才逐边求点线距（河 193 段 / 湖 44 段）。
@@ -574,7 +571,7 @@ fn point_in_or_near_polygon(v: &[Vec3], wx: f32, wy: f32, clearance: f32) -> boo
     {
         return false;
     }
-    if super::static_water::point_in_polygon(v, wx, wy) {
+    if point_in_polygon(v, wx, wy) {
         return true;
     }
     let clearance_sq = clearance * clearance;
@@ -597,6 +594,24 @@ fn point_in_or_near_polygon(v: &[Vec3], wx: f32, wy: f32, clearance: f32) -> boo
         }
     }
     false
+}
+
+/// 射线法点-多边形包含判定（顶点数 O(n)、纯浮点确定性）。
+fn point_in_polygon(v: &[Vec3], wx: f32, wy: f32) -> bool {
+    if v.len() < 4 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = v.len() - 1;
+    for i in 0..v.len() {
+        let (xi, yi) = (v[i].x, v[i].y);
+        let (xj, yj) = (v[j].x, v[j].y);
+        if ((yi > wy) != (yj > wy)) && (wx < (xj - xi) * (wy - yi) / (yj - yi) + xi) {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
 }
 
 /// 生成指定种类和数量的装饰物

@@ -622,10 +622,14 @@
       syncWorldSeedInput();
       isCameraFollow = false;
       updateFollowBtnState();
-      // 种子进入 URL，刷新或分享链接时仍可复现同一开局；不写入地图图鉴或模拟存档。
-      const url = new URL(window.location.href);
-      url.searchParams.set('seed', String(sim._engineSeed));
-      window.history.replaceState({}, '', url);
+      // ★ 仅在显式指定种子时才把种子写入 URL（刷新或分享链接仍可复现同一开局）；
+      //   「随机重置地图」传 seed=null，不更新 URL，避免把分享链接改写成一次性随机开局。
+      //   种子不写入地图图鉴或模拟存档。
+      if (seed !== null) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('seed', String(sim._engineSeed));
+        window.history.replaceState({}, '', url);
+      }
       // 存档由 Worker 完成 RESET 后的 RESET_DONE 事件触发，避免把旧世界写回文件。
       window.dispatchEvent(new CustomEvent('ecology-reset'));
       return true;

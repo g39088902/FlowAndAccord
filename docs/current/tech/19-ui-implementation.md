@@ -234,47 +234,43 @@ stateDiagram-v2
 
 ---
 
-## 8. 存档管理面板 (Save Panel，v1.12.0 重构)
+## 8. 存档管理面板 (Save Panel，★ v1.62.2 单存档文件)
 
-> v1.12.0 彻底删除 localStorage 三槽位体系，改为 **3 个固定文件槽位 + IndexedDB 持久化句柄**架构。仅支持 Chrome / Edge（File System Access API）。
+> v1.12.0 彻底删除 localStorage 三槽位体系，改为固定文件槽位 + IndexedDB 持久化句柄架构；★ v1.62.2 进一步收敛为**单一存档文件**——只保留一个存档卡片、删除「保存/读取」标签页，文件名与地图种子/槽位号彻底解耦。仅支持 Chrome / Edge（File System Access API）。
 
 ### 8.1 架构概览
 
 ```mermaid
 graph TD
-    A["用户点击 💾 存档"] --> B["存档面板 (#save-modal)"]
-    B --> C["3 固定槽位 SLOTS"]
-    C --> C1["槽位 1: flowaccord-save1.json 🤖 自动保存"]
-    C --> C2["槽位 2: flowaccord-save2.json"]
-    C --> C3["槽位 3: flowaccord-save3.json"]
-    C1 --> D["FileSystemFileHandle"]
-    C2 --> D
-    C3 --> D
-    D --> E["IndexedDB: flowaccord-save-handles"]
+    A["用户点击 💾 存档 / 📂 读档"] --> B["存档面板 (#save-modal，两按钮同面板)"]
+    B --> C["单存档文件 SAVE_SLOT (id=save1)"]
+    C --> C0["FlowAndAccordSave.json 📁 存档文件"]
+    C0 --> D["FileSystemFileHandle"]
+    D --> E["IndexedDB: flowaccord-save-handles (单条记录)"]
     E -->|页面刷新自动恢复| F["connectSlot() 重建连接"]
     D --> G["createWritable() 直写磁盘"]
-    H["tickAutoSave() 每60s"] -->|写入槽位1| C1
+    H["tickAutoSave() 每30s"] -->|写入单档| C0
 ```
 
-### 8.2 槽位卡片三态
+### 8.2 存档卡片三态
 
 | 状态 | 渲染 | 交互 |
 | :--- | :--- | :--- |
-| **未连接** | 灰色卡片 + 「🔗 连接文件」按钮 | 点击弹出 `showSaveFilePicker`，默认文件名 `flowaccord-saveN.json` |
-| **已连接** | 文件名 + 最后保存时间 + Tick/人口/体积元信息 + 「💾 保存」「📂 读取」「🔌 断开」按钮 | 保存直写磁盘无需重复弹窗；读取校验 `format_version` |
+| **未连接** | 灰色卡片 + 「🔗 连接存档文件」按钮 | 点击弹出 `showSaveFilePicker`，建议文件名固定 `FlowAndAccordSave.json` |
+| **已连接** | 文件名 + 最后保存时间 + Tick/人口/体积元信息 + 「💾 覆盖保存」「📂 读取」「🔌 断开」按钮 | 保存直写磁盘无需重复弹窗；读取校验 `format_version` |
 | **不兼容** | 红色卡片 + 「⚠️ 浏览器不支持 File System Access API，请使用 Chrome / Edge」 | 全部操作禁用 |
 
 ### 8.3 关键机制
 
-1. **IndexedDB 持久化句柄**：数据库 `flowaccord-save-handles` / objectStore `handles` / keyPath `slotId`，存储 `{slotId, handle, fileName, savedAt}`。页面刷新后初始化时从 IDB 恢复全部槽位句柄并异步从文件头读取元信息。
-2. **自动保存**：`tickAutoSave()` 每 60 秒写入槽位 1（未连接则跳过），UI 标注「🤖 自动保存」徽章。
-3. **元信息缓存**：已连接槽位的元信息（Tick/人口/体积/保存时间）缓存在内存，刷新时从文件头提取，无需全量读取。
-4. **存档格式版本**：`SAVE_FORMAT_VERSION = 5`（v1.12.0 因 `history_kings` 升到 3；v1.44.7 因新增帝国登记簿升至 4；M19.2 因持久化 `ActiveTask` 控制器升至 5，不兼容旧档），读档时版本不兼容即拒绝加载且不污染当前世界。
-5. **权限失效处理**：写入/读取捕获 `NotAllowedError`，自动断开连接并提示重新授权。
-6. **旧导入按钮已隐藏**：`input[type=file]` 导入入口移除，统一走文件槽位体系。
+1. **IndexedDB 持久化句柄**：数据库 `flowaccord-save-handles` / objectStore `handles` / keyPath `slotId`，**只存一条记录**——键沿用历史值 `save1`（`SAVE_SLOT_ID`），使既有用户已连接的存档句柄继续自动恢复。记录 `{slotId, handle, fileName, savedAt}`。页面刷新后初始化时从 IDB 恢复该句柄并异步从文件头读取元信息。
+2. **单一存档文件名**：`SAVE_FILE_NAME = 'FlowAndAccordSave.json'`，是文件选择器建议名、启动种子选择流程默认名与导出下载名的**唯一来源**，不再拼接地图种子或槽位号。
+3. **自动保存**：`tickAutoSave()` 每 30 秒写入该单档（未连接或权限待授权则跳过），世界 tick 未推进时跳过。
+4. **元信息缓存**：已连接档的元信息（Tick/人口/体积/保存时间）缓存在内存，刷新时从文件头提取，无需全量读取。
+5. **存档格式版本**：`SAVE_FORMAT_VERSION = 8`（v1.62.0 删除地图河流水系统/土壤湿润后升至 8），读档时版本不兼容即拒绝加载且不污染当前世界。
+6. **权限失效处理**：写入/读取捕获 `NotAllowedError`，自动断开连接并提示重新授权。
 
 ### 8.4 实现文件
-- `frontend/js/save-ui.js`（完整重写，约 450 行）
+- `frontend/js/save-ui.js`（单存档文件面板 + 启动门禁/自动读档）
 - `frontend/index.html`（存档面板 DOM）
 - `frontend/style.css`（`.save-slot-*` 样式族）
 
@@ -309,8 +305,8 @@ graph TD
 2. **面板层**：不阻断地图交互，负责实时指标、筛选和对象详情。
 3. **模态层**：带遮罩、阻断底层操作；通过关闭按钮、点击遮罩或 `Esc` 返回世界层。模态内部可以继续打开更深一层的详情，但应避免同时堆叠多个全屏模态。
 4. **启动门禁层（★ v1.27.0）**：页面加载后的阻塞式启动层 `#startup-save-gate`（z-index 最高），必须先建立/连接可写 `.json` 存档文件才解除（save-ui.js `releaseStartupGate`）；此层不属于模态（不可关闭），模拟在其解除前保持暂停。
-   - URL 带有效 `?seed=<非负安全整数>` 时，门禁先显示「用此种子建立新档 / 读取旧存档」选择；不自动读取已连接槽位。若本地没有可读取文件，只显示创建新档并直接说明原因；已有存档损坏或不兼容时保留读档/重新选择入口。新建须选空文件，成功写入后才替换槽位 1 的持久句柄；读档使用存档自身种子。`mapOnly` 预览与 `nogate` 旁路保持原启动路径。
-   - **★ v1.50.81 脱困通道**：层内含主按钮 `#startup-save-connect` 与**默认隐藏**的 `#startup-save-delete`（🗑️ 删除旧存档并新建）。当检测到存档实质不可读（`save-ui.js::getSaveIncompatReason` 命中 `format_version` / `app_version` 兼容线 / `terrain_generator_version` 三条内核门禁之一）时，消息区给出**具体原因**并露出删除按钮；点击后 `deleteStartupSave()` 先 `handle.remove()`、失败回退写空内容，随后断开槽位与 IndexedDB 句柄，主按钮变为「📁 建立新的存档文件」走正常建档流程。此通道确保玩家在旧档无法续演（如地形生成器换版）时始终有出路。
+   - URL 带有效 `?seed=<非负安全整数>` 时，门禁先显示「用此种子建立新档 / 读取旧存档」选择；不自动读取已连接的存档文件。若本地没有可读取文件，只显示创建新档并直接说明原因；已有存档损坏或不兼容时保留读档/重新选择入口。新建须选空文件，成功写入后才替换该单档的持久句柄；读档使用存档自身种子。`mapOnly` 预览与 `nogate` 旁路保持原启动路径。
+   - **★ v1.50.81 脱困通道**：层内含主按钮 `#startup-save-connect` 与**默认隐藏**的 `#startup-save-delete`（🗑️ 删除旧存档并新建）。当检测到存档实质不可读（`save-ui.js::getSaveIncompatReason` 命中 `format_version` / `app_version` 兼容线 / `terrain_generator_version` 三条内核门禁之一）时，消息区给出**具体原因**并露出删除按钮；点击后 `deleteStartupSave()` 先 `handle.remove()`、失败回退写空内容，随后断开存档句柄与 IndexedDB 记录，主按钮变为「📁 建立新的存档文件」走正常建档流程。此通道确保玩家在旧档无法续演（如地形生成器换版）时始终有出路。
 
 ## 2. 主世界窗口（World Shell）
 
@@ -422,9 +418,9 @@ Inspector 内的关系 chip 可跳转父亲、母亲、配偶、子女、户主�
 
 ### 4.4 存档管理 `#save-modal-backdrop`
 
-**入口**：顶栏“存档”或“读档”按钮；入口决定默认激活“保存”或“读取”标签。
+**入口**：顶栏“存档”或“读档”按钮，两者打开同一面板（★ v1.62.2 起无“保存/读取”标签切换）。
 
-**内部结构**：保存/读取两个标签、三个槽位卡片、状态提示、导入 JSON、下载当前存档；支持浏览器存储和 File System Access API 文件直写两种模式。
+**内部结构**：单一存档文件卡片、状态提示、导入 JSON、下载当前存档；文件直写走 File System Access API。
 
 **关键副作用**：读档成功后模拟自动暂停，界面指标与地图由新快照重建；关闭窗口不会恢复读档前的运行状态。导入/导出是模态底部动作，不跳转到其他页面。
 

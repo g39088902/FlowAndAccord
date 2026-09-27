@@ -1,6 +1,6 @@
 //! Fixed-order deterministic terrain field compiler.
 use super::fields::{Field2, FieldError};
-use super::hydrology::{project_semantics, solve_hydrology, HydrologyFields, HydrologySettings};
+use super::hydrology::project_semantics;
 use super::ir::{validate_recipe, RecipeError, ResolvedRecipe, TerrainRecipe};
 use super::materials::MaterialTable;
 use super::processes::{hydraulic_erosion, thermal_relaxation_with_slope, ErosionSettings};
@@ -33,7 +33,6 @@ pub struct CompiledTerrain {
     pub output_node: u16,
     pub fields: TerrainFields,
     pub sediment: Field2,
-    pub hydrology: HydrologyFields,
     pub semantics: SemanticGrid,
     /// Quantized only when exported through diagnostics; not part of runtime
     /// snapshots or gameplay state.
@@ -222,12 +221,16 @@ pub fn compile_terrain_with_dimensions(
         seed,
     )
     .map_err(TerrainCompileError::Structure)?;
-    let hydro_spec = &resolved.recipe.hydrology;
+    // Thermal relaxation and hydraulic erosion keep their fixed iteration
+    // contract. The water system no longer contributes parameters here, so the
+    // recipe's dedicated `ErosionSpec` supplies them; every recipe except the
+    // structural showcase uses the neutral defaults (no iterations).
+    let erosion_spec = &recipe.erosion;
     thermal_relaxation_with_slope(
         &mut elevation,
-        hydro_spec.thermal_iterations as u32,
-        hydro_spec.repose_angle_deg,
-        hydro_spec.thermal_rate,
+        erosion_spec.thermal_iterations as u32,
+        erosion_spec.repose_angle_deg,
+        erosion_spec.thermal_rate,
         cell_size,
     )?;
     let mut sediment = Field2::new(width, height, 0.0)?;
@@ -238,20 +241,16 @@ pub fn compile_terrain_with_dimensions(
         &mut sediment,
         cell_size,
         ErosionSettings {
-            iterations: hydro_spec.erosion_iterations,
-            dt: hydro_spec.erosion_dt,
-            erodibility: hydro_spec.erodibility,
-            capacity_factor: hydro_spec.capacity_factor,
-            deposition_rate: hydro_spec.deposition_rate,
-            min_elevation: hydro_spec.min_elevation,
-            max_elevation: hydro_spec.max_elevation,
-            max_sediment: hydro_spec.max_sediment,
+            iterations: erosion_spec.erosion_iterations,
+            dt: erosion_spec.erosion_dt,
+            erodibility: erosion_spec.erodibility,
+            capacity_factor: erosion_spec.capacity_factor,
+            deposition_rate: erosion_spec.deposition_rate,
+            min_elevation: erosion_spec.min_elevation,
+            max_elevation: erosion_spec.max_elevation,
+            max_sediment: erosion_spec.max_sediment,
         },
     )?;
-    let hydro_settings = HydrologySettings {
-        min_lake_depth_m: hydro_spec.min_lake_depth_m,
-    };
-    let hydrology = solve_hydrology(&elevation, hydro_settings)?;
     let (permeability, soil_storage) = surface_material_fields(
         &recipe.stratigraphy,
         &structures.strata_depth_offset,
@@ -266,7 +265,7 @@ pub fn compile_terrain_with_dimensions(
         world_size,
     )
     .map_err(TerrainCompileError::Semantic)?;
-    project_semantics(&mut projected, &hydrology.water);
+    project_semantics(&mut projected);
     let mut reports = constraints::evaluate(&resolved.recipe.constraints, &projected);
     for report in &mut reports {
         if report.affected_nodes.is_empty() {
@@ -285,7 +284,7 @@ pub fn compile_terrain_with_dimensions(
         diagnostics::field_diagnostic("permeability", &permeability),
         diagnostics::field_diagnostic("soil_storage", &soil_storage),
         diagnostics::field_diagnostic("sediment", &sediment),
-        diagnostics::field_diagnostic("water_depth", &hydrology.water.depth),
+        diagnostics::field_diagnostic("water_depth", &projected.water_depth),
         diagnostics::field_diagnostic(
             "vegetation_ok",
             &Field2::from_values(
@@ -332,7 +331,6 @@ pub fn compile_terrain_with_dimensions(
             soil_storage,
         },
         sediment,
-        hydrology,
         semantics: projected,
         confidence,
         reports,

@@ -1,16 +1,16 @@
 // === 世界统一深度队列层（★ TA-04-6 前置自 render_world.js 拆分，单一职责模块）===
 // 职责（07 号 §6.5 末段「入队和分发归队列层」）：深度项对象池、贴面/足迹感知深度帮助函数、
-// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（水系静湖 / 道路 /
+// 精灵锚点抬升（MAP_Z_LIFT / projectLifted）、drawWorldEntities() 收集（地貌特征 / 道路 /
 // 辖区连线 / POI 底座与标记 / 房屋 / 地表装饰 / 族人）与按相机深度远 → 近的分发落笔。
 // ★ 全量 WebGL（Canvas 备用通道删除）：地形格 / 侧壁 / 贴地投影已删除——地形与侧壁由
 //   webgl/layers/terrain/terrain-renderer.js 承担，落底阴影由 webgl/layers/accents/shadow-pass.js
-//   光向深度图承担。**各图元的绘制逻辑不在本文件**（水系 render_terrain.js、
+//   光向深度图承担。**各图元的绘制逻辑不在本文件**（地貌特征 render_terrain.js、
 //   装饰 render_accents.js / render_grass.js、★ S4-02 景观 render_landscapes.js、
 //   房屋与 POI render_world.js、族人 render_agents.js）——本文件只做入队、排序与分发。
 //
 // ★ v1.50.11 世界统一深度队列：Canvas 2D 无深度缓冲，全部图元按 project3D().depth =
 //   ry·sinX + z·cosX 升序（远 → 近）落笔，同深度保持收集原序（Array.sort 稳定）——
-//   近处湖水、近处乔木都会正确遮挡更远的图标；渲染确定性不变。
+//   近处乔木会正确遮挡更远的图标；渲染确定性不变。
 // 依赖全局: ctx, camera, sim, w, h, project3D, mousePos, isDragging, hoveredLane, SimLighting,
 //   drawFeatureItem（render_terrain.js）、drawPoiGroundBase / drawPoiMarker / drawHouse /
 //   drawLaneSegment / drawCampHouseLink（render_world.js）、drawAccentEntity（render_accents.js）、
@@ -22,17 +22,17 @@
 const RC = window.RENDER_CONFIG || {};
 
 // ==========================================
-// ★ v1.50.11 世界统一深度绘制（地形格 + 水系 + 道路 + 底座 + 立体实体）
+// ★ v1.50.11 世界统一深度绘制（地貌特征 + 道路 + 底座 + 立体实体）
 // ==========================================
 // Canvas 2D 无深度缓冲。v1.47.9 只把立体实体收进深度队列，地形格仍整层先画——
 // 结果实体之间的遮挡正确了，但**近处山地无法遮挡远处图标**（图标永远后画、透山可见）。
-// 现将地形格 / 水系特征 / 道路分段 / 营地连线 / POI 底座 /
+// 现将地貌特征 / 道路分段 / 营地连线 / POI 底座 /
 // POI 标记 / 房屋 / 地表装饰 / 族人全部收进**同一个相机深度队列**，
 // 按 project3D().depth = ry·sinX + z·cosX 升序（远 → 近）落笔：
-// 近处山地格、近处湖水、近处乔木都会正确遮挡更远的图标。
+// 近处山地格、近处乔木都会正确遮挡更远的图标。
 // 同深度保持收集原序（Array.sort 稳定），渲染确定性不变。
 // 大气色洗不再整屏 fillRect（会把交错落笔的实体一起洗灰），地形受光由 GL shader 承担。
-const DEPTH_FEATURE = 1;   // 水系特征（a = feature，静湖水面 / 泉谷）
+const DEPTH_FEATURE = 1;   // 地貌特征（a = feature）
 const DEPTH_LANE = 4;      // 道路分段（a = lane，b = 段序号，s1/s2 = 屏幕端点，dash = 弧长相位）
 const DEPTH_LINK = 5;      // 选中营地辖区连线（a = house）
 const DEPTH_POI_BASE = 6;  // POI 贴地底座（a = poi）
@@ -212,50 +212,20 @@ function drawWorldEntities() {
   // ★ 全量 WebGL：地形格与边界侧壁不再入队（terrain-renderer.js GL 层承担，
   //   含沙盘侧壁 skirt 与天幕 clear 背景）。地形壳层投影由 drawTerrainShell 提供。
 
-  // ── 2. 水系特征（静湖）──
-  //   WebGL 只接管地形本身，上层水系仍由 2D 深度队列绘制。
+  // ── 2. 地貌特征（陡崖等折线特征；水系已删除）──
+  //   WebGL 只接管地形本身，上层地貌特征仍由 2D 深度队列绘制。
   if (hasTerrain) {
     const features = terrain.features || [];
     for (let fi = 0; fi < features.length; fi++) {
       const f = features[fi];
       if (!f.vertices || f.vertices.length < 2) continue;
       const vs = f.vertices;
-      const waterState = sim.waterBodyDynamics && sim.waterBodyDynamics.get(f.id);
-      if (f.kind === 'WaterBody') {
-        // ★ TB-03 静水闭合水体：按 32m 世界块分块入队（整湖以最大顶点深度入队
-        // 会盖住近岸人物与房屋，TB-03-IMPLEMENTATION-PLAN §7.3）。块网格与
-        // render_terrain.js::_wbTileGrid 同式；块深度 = 块四角在水面高程下的
-        // 最大深度。idx = 块号 + 1（0 保留给整条绘制项）。
-        const STEP = 32;
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (let vi = 0; vi < vs.length; vi++) {
-          if (vs[vi].x < minX) minX = vs[vi].x;
-          if (vs[vi].x > maxX) maxX = vs[vi].x;
-          if (vs[vi].y < minY) minY = vs[vi].y;
-          if (vs[vi].y > maxY) maxY = vs[vi].y;
-        }
-        const nx = Math.max(1, Math.ceil((maxX - minX) / STEP));
-        const ny = Math.max(1, Math.ceil((maxY - minY) / STEP));
-        const lvl = waterState ? waterState.level : (f.elevation || 0);
-        for (let ty = 0; ty < ny; ty++) {
-          for (let tx = 0; tx < nx; tx++) {
-            const x0 = minX + tx * STEP, y0 = minY + ty * STEP;
-            const x1 = x0 + STEP, y1 = y0 + STEP;
-            // 块四角任一在水面高程下的深度取最大（空块照常入队，绘制端 clip 兜底）
-            const d = Math.max(
-              depthOf(x0, y0, lvl), depthOf(x1, y0, lvl),
-              depthOf(x1, y1, lvl), depthOf(x0, y1, lvl));
-            _depthItem(DEPTH_FEATURE, f, ty * nx + tx + 1, d);
-          }
-        }
-      } else {
-        let dmax = -Infinity;
-        for (let vi = 0; vi < vs.length; vi++) {
-          const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
-          if (d > dmax) dmax = d;
-        }
-        _depthItem(DEPTH_FEATURE, f, 0, dmax);
+      let dmax = -Infinity;
+      for (let vi = 0; vi < vs.length; vi++) {
+        const d = depthOf(vs[vi].x, vs[vi].y, vs[vi].z);
+        if (d > dmax) dmax = d;
       }
+      _depthItem(DEPTH_FEATURE, f, 0, dmax);
     }
   }
 

@@ -315,8 +315,7 @@ window.RENDER_CONFIG = {
   labelLeaderLineEnabled: true,   // 边缘兜底引线开关（绘制从实体到边缘提示区的引线）
 
   // —— 地表反照率数据层平滑（★ v1.50.74；math.js::smoothAlbedoField 消费）——
-  // 世界建缓存时对 albR/G/B 做边缘感知盒式模糊（半径 r 格）：陆地格间硬色阶变连续
-  // 渐变；水格（DeepWater/ShallowWater）作屏障不混色，水陆边界无晕圈。
+  // 世界建缓存时对 albR/G/B 做边缘感知盒式模糊（半径 r 格）：陆地格间硬色阶变连续渐变。
   // 建缓存一次性消费（~几 ms），每帧零成本；平滑后场由 GL 地形渲染器消费。
   // ⚠️ 改值需重开世界/刷新页面生效（不随帧重建）；0 = 关（回退原始逐格色场）。
   terrainAlbedoSmoothRadius: 2,

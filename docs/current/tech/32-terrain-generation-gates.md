@@ -15,7 +15,7 @@
 | **A. 生成期静态校验** | `validation.rs` 五组断言 | 创世第 7 步（生成器内部） | 只读诊断（v1.XX 起创世不再消费，不触发重试/降级） |
 | **B. 创世发布** | 单候选直接发布 | `new_seeded_with_config_bounded` 构建完成即发布 | 无——任何模板恒按请求原样构建（历史门禁链已删除，见 §3.5） |
 | **C. 存档读入门禁** | 版本 / profile 白名单 / 读档路网校验 | `WorldSave::load` | 明确报错拒绝加载 |
-| **D. 探针验收** | `terrain_probe` / `accent_water_probe` 窗口与达标线 | 人工（改生成参数后必跑） | 打印 `GATE FAIL` / `TB01_7_HAS_FAIL`，不自动阻断 |
+| **D. 探针验收** | `terrain_probe` 窗口与达标线 | 人工（改生成参数后必跑） | 打印 `GATE FAIL` / `TB01_7_HAS_FAIL`，不自动阻断 |
 | **E. 回归 / 一致性门禁** | `tools/` 确定性、配置、快照、文档 | CI 与提交前 | exit 1 阻断发布 |
 
 共同铁律：**全部只读、不修复、不重排既有生成顺序**（06 号 §5.2「不在校验器里偷偷修复数据」）；失败码一经发布**语义不变**，供只读诊断与探针判读。
@@ -35,7 +35,7 @@
 | 10 | 探针 §1.4 GateWindow | `examples/terrain_probe.rs` | `[GATE FAIL]`（越窗项） | 人工验收 |
 | 11 | 山口 TB-01-7 验收 | `examples/terrain_probe.rs::print_tb017_verdict` | `TB01_7_HAS_FAIL` | 人工验收 |
 | 12 | 冲积扇 G1/G2/G3 | `examples/terrain_probe.rs` | `[GATE FAIL] fan_*` | 人工验收 |
-| 13 | 装饰落点禁区 | `examples/accent_water_probe.rs` | `inW0 != 0` / `edge3% != 0` / `minD < 3.0` 等判读 | 人工验收 |
+| 13 | 装饰落点禁区 | ~~`examples/accent_water_probe.rs`~~ | — | ❌ v1.62.1 随水面删除（探针示例已删除，禁植净空判据惰性保留） |
 | 14 | 确定性 / 快照 / 配置 / 文档门禁 | `tools/test-wasm.js` 等 | `ALL_TESTS_DONE` 缺失 / exit 1 | CI 与提交前 |
 | 15 | 生成器版本契约 | `geo/terrain.rs::TERRAIN_GENERATOR_VERSION` | 存档版本门禁拒绝 | 存档门禁 / 前端兼容线 |
 
@@ -49,24 +49,15 @@
 
 ### 3.1 静态几何校验（`geo/validation.rs` · 创世第 7 步，只读）
 
-五组只读断言，全部通过才 `Ok(())`：
+五组只读断言，★ v1.62.1 起水面相关断言（原断言 3「水系」与断言 4 的水域归属部分）已随水生产者删除，现余三组：
 
-**断言 1 · `features`**：ID 唯一；按 profile 归属且 kind 与稳定 ID 表一致（火山湖：1=`WaterBody`；★ v1.62.0 起地图河流水系统删除，其余 profile 零核心特征）；子特征 ID 段（T1 100–127 / T2 200–227）放行；顶点非空、在界（`BOUND_EPSILON_M=0.5m`）、高程有限。失败码：`FeatureIdsDuplicated` / `FeatureIdKindMismatch` / `FeatureIdOwnershipInvalid` / `FeatureVerticesInvalid`。
+**断言 1 · `features`**：ID 唯一；按 profile 归属且 kind 与稳定 ID 表一致（★ v1.62.0 起地图河流水系统删除、★ v1.62.1 起静态湖泊（`WaterBody`）也删除，故所有 profile 核心特征为空）；子特征 ID 段（T1 100–127 / T2 200–227）放行；顶点非空、在界（`BOUND_EPSILON_M=0.5m`）、高程有限。失败码：`FeatureIdsDuplicated` / `FeatureIdKindMismatch` / `FeatureIdOwnershipInvalid` / `FeatureVerticesInvalid`。
 
 **断言 2 · `sub_features`**：ID 严格升序唯一；`feature_ids` 引用存在且升序；accent 区间配对（`[start,end]` 均 Some 且 start ≤ end）。失败码：`SubFeatureIdsUnsortedOrDuplicated` / `SubFeatureReferenceMissing` / `SubFeatureAccentRangeInvalid`。
 
-**断言 3 · 水系**：水体 ID 唯一、轮廓非空且在界、水位有限；**水体轮廓与同 id 特征顶点双副本逐字节相等**（静水水体 1 ↔ `WaterBody` 特征 1；legacy `River` 路径已随地图河流水系统删除）；静水（火山湖）零流向、零授权走廊、轮廓闭合（末点=首点）且非自交（O(n²) 段相交普查）；取水点引用水体且落位在界；授权走廊 ID 唯一、端点在界、宽度正有限；浅滩特征恰好 2 顶点且**端点必须落在陆侧**（读档校验与 corridor 授权都依赖此事实）。失败码：`WaterBodyIdDuplicated` / `WaterBodyOutlineInvalid` / `WaterBodyFeatureMissing` / `WaterBodyOutlineMismatch` / `StaticWaterOutlineInvalid` / `AccessPointInvalid` / `ConnectionIdDuplicated` / `ConnectionInvalid` / `FordEndpointInvalid` / `FordEndpointNotOnLand`。
+**断言 3 · ~~水系~~**：❌ ★ v1.62.1 已删除——原先校验水体 ID/轮廓/水位、水体轮廓↔特征顶点双副本、取水点引用、授权走廊与浅滩端点陆侧（失败码 `WaterBodyIdDuplicated` / `WaterBodyOutlineInvalid` / `WaterBodyFeatureMissing` / `WaterBodyOutlineMismatch` / `StaticWaterOutlineInvalid` / `AccessPointInvalid` / `ConnectionIdDuplicated` / `ConnectionInvalid` / `FordEndpointInvalid` / `FordEndpointNotOnLand`），随水面生产者一并移除。
 
-**断言 4 · cells 水域归属与通行标志一致**（阈值即物理契约，与第 6 步派生及水系写入同源）：
-
-| surface_kind | 要求 |
-| :--- | :--- |
-| `DeepWater` | 有水体归属 + `NO_WALK` + `NO_BUILD` |
-| `ShallowWater` | 有水体归属 + `NO_BUILD` 且**不** `NO_WALK`（跨河授权通道） |
-| `RockFace` | 无水体归属 + `NO_WALK` |
-| 其余 | 无水体归属、无 `NO_WALK` |
-
-所有字段有限、肥力 ∈ [0,1]。失败码：`CellFieldNotFinite` / `CellWaterFlagMismatch`。
+**断言 4 · ~~cells 水域归属~~**：❌ ★ v1.62.1 已删除水域归属检查（`CellWaterFlagMismatch`）；★ v1.62.1 起创世不再产出水格，故 `DeepWater`/`ShallowWater` 的 `NO_WALK`/`NO_BUILD` 一致性无从触发；`RockFace` 的 `NO_WALK` 由通用坡度派生保证，其余字段仍校验有限且肥力 ∈ [0,1]（失败码 `CellFieldNotFinite`）。
 
 **断言 5 · 装饰 ID**：按数组顺序**严格递增且唯一**；POI 避让过滤保留原 ID 时可留间隙（v1.53.1 修复，勿回退为「连续」要求）。失败码：`AccentIdsNotStrictlyAscending`。第 7 步执行时装饰尚未散布（恒空平凡通过），本断言供存档加载路径复用。
 
@@ -124,7 +115,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | 结构版本 | `SAVE_FORMAT_VERSION` 精确相等（不随应用版本自增） | `存档格式版本不兼容` |
 | 应用兼容线 | `app_version_compat_line` 前两段 `major.minor` 比对（**禁止**全串 `===`） | `存档应用版本不兼容` |
 | 世界参数 | `grid_res != 0`、`world_size` 正有限 | `存档世界参数非法` |
-| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **36**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v36` |
+| **地形生成器版本** | `terrain_generator_version == TERRAIN_GENERATOR_VERSION`（当前 **37**） | `地形生成器版本不兼容：存档为 vX，当前内核为 v37` |
 | **profile 白名单** | 九个：`mountain_pass_v1` / `river_valley_v1` / `flat_baseline` / `grassland_plain_v1` / `hillside_woodland_v1` / `plateau_v1` / `alluvial_fan_v1` / `basin_oasis_v1` / `volcanic_lake_v1` | `地形 profile 不受支持` |
 | 读档路网复核 | 加载后 `validate_terrain_world()` | `车道 X 不符合地表通行规则` |
 
@@ -178,14 +169,13 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 `cargo run --release -p sim_core --example terrain_probe -- world 20`：对 `random` / `river_valley_v1` / `volcanic_lake_v1` 三种 profile 逐种子创世后立刻跑**读档用的同一套校验**（`validate_terrain_world`），确认「非法车道」不会被创世产出——否则世界一旦存档就再也读不回来；并输出最少车道数与车道采样 max_slope 上界。
 
-### 6.5 `accent_water_probe` 装饰落点禁区（v1.52.0 起）
+### 6.5 `accent_water_probe` 装饰落点禁区（v1.52.0 起 · ★ v1.62.1 探针删除）
 
-8 模板 × 8 种子，契约判读：`inW0 == 0`（水面多边形内 0 件）、`d<3 == 0`、`edge3% == 0`（边缘带内 0 件）、`cellW == 0`（水格内 0 件）、`minD ≥ 3.0`（保守下限），且各模板 `total` 与预算公式一致（未因拒绝而饥饿）。
+❌ **★ v1.62.1 起探针示例 `examples/accent_water_probe.rs` 已删除**（地图不再产出水面，水面净空判据恒 false）。以下保留仅作历史记录：8 模板 × 8 种子，契约判读 `inW0 == 0`（水面多边形内 0 件）、`d<3 == 0`、`edge3% == 0`（边缘带内 0 件）、`cellW == 0`（水格内 0 件）、`minD ≥ 3.0`，且各模板 `total` 与预算公式一致。★ 现仍生效的装饰落点规则（边缘保护区）改由人工目检与 `--profile` 探针矩阵覆盖。
 
 生成器侧常量（`accents.rs`）：
-- `EDGE_PROTECTION_RATIO = 0.03`（× world_size，764m → 22.9m ≈ 7.6 格步长）；
-- `WATER_CLEARANCE_M = 13.0`（v1.52.0 定为 3.0m；**v1.58.1 上调至 13m**，覆盖 ~8.5m 最大模型包围体 × 1.4 最大缩放并留余量；探针判读仍按保守下限 3.0）；
-- 水面判定与前端 `drawWaterBodyTile` **同源**（`point_in_polygon` 唯一实现，静水涂写逐比特不变；★ v1.62.0 起 `drawRiverBand` 随河流水系统删除）。
+- `EDGE_PROTECTION_RATIO = 0.03`（× world_size，764m → 22.9m ≈ 7.6 格步长）——**仍生效**；
+- `WATER_CLEARANCE_M = 13.0`（v1.58.1 上调值）——★ v1.62.1 起 `water_bodies` 恒空，该净空判据 `near_water_surface` 恒 false、惰性保留。
 
 > 装饰为纯视觉要素：改落点规则**不递增** `TERRAIN_GENERATOR_VERSION`、不动快照结构；但 `accent_rng` 拒绝会改变抽样序列 ⇒ 同种子装饰分布整体重排。
 
@@ -207,7 +197,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 ## 8. 生成器版本契约（`TERRAIN_GENERATOR_VERSION`）
 
-**当前版本 36**（★ v1.62.0：删除地图河流水系统与土壤湿润，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度固定规则）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
+**当前版本 37**（★ v1.62.1：删除全部程序生成水面——水位求解/静态湖泊/水面语义投影；★ v1.62.0 曾删除地图河流水系统与土壤湿润；地表材质/肥力仍为仅坡度+硬度固定规则）。变更登记在 `geo/terrain.rs` 版本常量注释，此处只列**递增规则**：
 
 | 情形 | 是否递增 | 备注 |
 | :--- | :--- | :--- |
@@ -215,6 +205,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | **新 profile 分支入库**（「新分支入库即换版」先例） | ✅ | 同种子输出改变，即使旧路径逐位不变 |
 | 掩码 / 扭曲 / 支脊常数（`RIDGE_WARP_*` / `NOISE_WEIGHT_*` / `SADDLE_NOISE_*` / `BRANCH_*` 等） | ✅ | 改值等于换图 |
 | 结构型子特征注入（RiverCliff 等，★ v1.62.0 随河流水系统删除） | ✅ | 必然改变命中种子输出 |
+| **删除全部程序生成水面**（v1.62.1：水位求解/静态湖泊/水面语义投影） | ✅ | 地形输出改变，旧存档按门禁拒绝 |
 | 装饰纯视觉落点（草量、净空、裁树、四象限配额） | ❌ | 不动快照结构、不同步存档兼容线 |
 | 仅前端渲染表现 | ❌ | patch 升版即可 |
 
@@ -245,7 +236,7 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 | 改 T1 主脊 / 鞍部 / 支脊 / 噪声参数 | `terrain_probe --profile mountain_pass_v1 --seeds 60` → `TB01_7_ALL_PASS` |
 | 改草原 / 半坡 / 台地形态参数 | `terrain_probe --profile <name> --seeds 60` → §1.4 门禁 0 违例 |
 | 改冲积扇 | G1/G2/G3 专属验收 + `terrain_probe world 20` |
-| 改装饰落点 / 净空 / 裁树 | `accent_water_probe` 契约判读 + 同种子装饰分布核对 |
+| 改装饰落点 / 裁树（★ v1.62.1 起净空判据惰性） | 同种子装饰分布核对（`accent_water_probe` 已随水面删除） |
 | 新增 profile 分支 | 递增 `TERRAIN_GENERATOR_VERSION` + 存档白名单 + 探针 GateWindow + （若加字段）快照四处同步 + `config.rs`/`config.js`/`examples/config.json`/`config-check.js` 四处同步 |
 | 改任何 Rust 内核 | `cargo build --release` + **WASM 双副本同步**（`frontend/rust/` + `frontend/`）+ `test-wasm.js` + `config-check.js` |
 | 改快照字段 | 四处同步（见 §7）+ `snapshot-check.js` + `test-wasm.js` / `test-determinism.js` 回归 |
@@ -257,22 +248,22 @@ Survival:<码>   ← diagnose_survival 最差失败码（worst_code）
 
 | 门禁 | 检查什么 | 失败即 |
 | :--- | :--- | :--- |
-| 静态几何 5 断言 | ID/归属/顶点/水体双副本/浅滩陆侧/cells 标志/装饰递增 | 只读诊断（v1.XX 起不再丢弃候选/降级） |
+| 静态几何 3 断言 | ID/归属/顶点/cells 标志/装饰递增（★ v1.62.1 起水面断言删除） | 只读诊断（v1.XX 起不再丢弃候选/降级） |
 | 路网读档校验 | 车道走廊合法 + POI 连通 | 读档拒绝；创世不消费 |
 | 模板专属 4 门禁 | ~~房屋候选 ≥3 + 走廊/出口/岸点~~ | ❌ 已删除（v1.XX） |
 | 生存诊断 | 营地→水/粮往返成本、市场可达 | 只读诊断（创世不消费） |
 | 有界降级环 | ~~预算 ≤8、阶梯、策略去重~~ | ❌ 已删除（v1.XX） |
-| 存档版本/profile | 版本 21、九 profile 白名单 | 拒绝加载 |
+| 存档版本/profile | 生成器版本 37、九 profile 白名单 | 拒绝加载 |
 | 探针窗口/达标线 | 坡度/禁行/可建/连通/绕行/支脊 | `GATE FAIL` / `HAS_FAIL` |
-| 装饰落点禁区 | 边缘 3% 保护带 + 水面净空 13m | 探针判读违例 |
+| 装饰落点禁区 | 边缘 3% 保护带（★ v1.62.1 起水面净空惰性；探针删除） | 人工目检 |
 | 回归一致性 | 确定性/快照/配置/文档 | CI exit 1 |
-| 生成器版本契约 | 改图即递增 21 | 旧档拒绝 |
+| 生成器版本契约 | 改图即递增 37 | 旧档拒绝 |
 
 ---
 
 ## 关联文档
 
-- [14 号文 · 地形与路网](./14-terrain-and-network.md)：地表/特征/水体/装饰模型、§8.1 静态几何校验、§8.2 世界初始化事务：创世发布（无门禁无降级）、§9 各模板生成实现
+- [14 号文 · 地形与路网](./14-terrain-and-network.md)：地表/特征/装饰模型（★ v1.62.1 起水面已删除）、§8.1 静态几何校验、§8.2 世界初始化事务：创世发布（无门禁无降级）、§9 各模板生成实现
 - [06 号 · 快照与存档](./06-snapshot-and-save.md)：快照四处同步链、存档门禁与兼容线
 - 规划版 [06 号 · 地形模板](../../plan/tech/06-terrain-templates.md)：创世流水线 0–11 步、§5.3/§5.8 门禁链与降级阶梯
 - `crates/sim_core/src/geo/AGENTS.md`：geo 模块局部操作指南（易踩坑清单）

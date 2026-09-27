@@ -11,7 +11,7 @@
 
 <div align="center">
 
-`v1.62.0` · `Rust core + WebAssembly` · `Open in your browser and play`
+`v1.62.2` · `Rust core + WebAssembly` · `Open in your browser and play`
 
 
 </div>
@@ -191,7 +191,7 @@ Then open your browser (Chrome or Edge recommended) at `http://localhost:3004`. 
 | **Console "🏕️ Reseed"** | Re-seed 20 founders (10 male, 10 female) and begin a brand-new civilization epic |
 | **Console "🗺️ Map Gallery"** | Open the read-only visual map page and preview same-source terrain for any seed without starting a simulation |
 | **Hotkey L** | Toggle the dynamic seasonal lighting engine (on by default) |
-| **Top bar "💾 Save" / "📂 Load"** | Three-slot saves / direct local-file read-write; save and restore evolution anytime |
+| **Top bar "💾 Save" / "📂 Load"** | Single save file / direct local-file read-write; save and restore evolution anytime |
 
 After modifying the Rust core and recompiling the WASM, remember to force-refresh with **`Ctrl + F5`** to clear the cache.
 
@@ -204,7 +204,7 @@ After modifying the Rust core and recompiling the WASM, remember to force-refres
 | Computing core | Rust deterministic core (60Hz fixed stepping, shared global `WorldRng`, byte-for-byte reproducible under the same seed, millisecond Checkpoint + Replay time rewind) |
 | Bridge layer | Zero-dependency WebAssembly export layer with **FABS fixed-length binary frame snapshots** (the only snapshot channel since v1.50.35; 23× steady-frame compression, 3.5× faster decoding) |
 | Presentation layer | Native static frontend (ES6+) + dual-theme Canvas rendering pipeline, zero front-end build chain |
-| Storage engine | File System Access API native disk writes + IndexedDB handle persistence + localStorage fallback with three slots |
+| Storage engine | File System Access API native disk writes (single save file) + IndexedDB handle persistence |
 | Tunable hyper-parameters | **239** parameters centralized in `frontend/js/config.js` and split config files (incl. the upgrade-cost matrix; lighting / rendering live in separate pure-frontend configs), one-to-one with the Rust `SimConfig` fields; refresh to apply, no recompilation needed |
 | Quality gates | `node tools/test-wasm.js` (determinism / bounds-safety / no-NaN / long-run stability) + `config-check.js` (frontend-backend parameter alignment) + `snapshot-check.js` (snapshot four-way sync) + `diagnose.js` (headless diagnostic engine) |
 

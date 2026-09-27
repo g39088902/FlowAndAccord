@@ -73,11 +73,11 @@ graph TD
     G --> T2["renderMarriageTab() (M1)"]
     G --> T3["renderClanTab() (M3)"]
     G --> T4["renderRegionTab() (M4)"]
-    H["save-ui.js (存档面板 v1.12.0)"] --> I["3 文件槽位 + IndexedDB"]
+    H["save-ui.js (存档面板 ★ v1.62.2)"] --> I["单存档文件 + IndexedDB"]
 ```
 
 - **`frontend/js/ledger-ui.js` 职责**：管理 4 标签页切换、渲染家户/婚姻/宗族/王国面板、流水穿透抽屉、地图夺位特效；
-- **`frontend/js/save-ui.js` 职责（v1.12.0 重写）**：3 固定文件槽位管理、IndexedDB 句柄持久化、自动保存、浏览器兼容性检测；
+- **`frontend/js/save-ui.js` 职责（★ v1.62.2 单存档文件）**：单一存档文件（本地 `.json` 直写）管理、IndexedDB 句柄持久化、自动保存、导入导出降级、浏览器兼容性检测；
 - **`index.html`** 按依赖顺序加载全部脚本（决策三件套须早于 rustworld.js）；**`style.css`** 扩展暗黑赛博玻璃拟态样式。
 
 ---

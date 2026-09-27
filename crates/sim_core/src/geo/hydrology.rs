@@ -1,10 +1,10 @@
-//! 静态地表水体几何。水量由 World 的共享池维护，几何不随库存变化。
+//! 地表水体与坡度的静态数据结构。水量由 World 的共享池维护，几何不随库存变化。
 //!
-//! 河流/支流管线（主河中心线、`RiverGeometry`、`generate_river`、河谷峭壁
-//! 注入器）已随地图河流水系统一并删除；本模块只保留静态湖泊（`WaterBody`）
-//! 与生存水源所需的 `WaterPool` / 取水点 / 浅滩走廊数据结构。
+//! 地图已不再生成任何程序生成水面（河流/支流/静湖均已删除），本模块只保留
+//! `WaterBody` / `WaterAccessPoint` / `WaterPool` / `Hydrology` / `TerrainConnection`
+//! 这些仍被生存水源、快照与存档消费的数据结构，以及坡度差分助手。
 use super::terrain::TerrainMap;
-use crate::{config::SimConfig, spatial::vec3::Vec3};
+use crate::spatial::vec3::Vec3;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -56,25 +56,6 @@ impl WaterPool {
 }
 
 impl TerrainMap {
-    /// §5.3 第 3 步 `apply_profile_static_hydrology`：静态水面施加。
-    ///
-    /// 河流已被删除，故只剩模板专有静态湖泊（★ TB-03 湖畔大湖）：
-    /// `WaterBody` 特征 #1 + 水体 #1 + 岸点，零流向静水语义、`connections` 为空。
-    /// 坡度定稿归流水线第 6 步（`finalize_slope_and_surface`）。
-    pub(super) fn apply_profile_static_hydrology(
-        &mut self,
-        config: &SimConfig,
-        scratch: &super::terrain::GenesisScratch,
-    ) {
-        if let Some(lg) = scratch.lake_geometry.as_ref() {
-            if let Some(plan) = lg.water.as_ref() {
-                super::static_water::apply_static_water(self, plan, config, |wx, wy| {
-                    lg.lake_bed_elevation(wx, wy)
-                });
-            }
-        }
-    }
-
     /// 对有效格索引读取当前高程的四邻域差分，不读缓存坡度、不修改地表。
     /// 子特征局部试算与全图定稿必须共用此判据，保留既有运算次序与
     /// 步长口径（生产为方形网格，两轴沿用 grid_width），边缘使用单侧差分。

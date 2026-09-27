@@ -16,33 +16,11 @@ pub(super) struct SurfaceOverlay {
 pub(super) fn apply_surface_overlays(terrain: &mut TerrainMap, scratch: &GenesisScratch) {
     for overlay in &scratch.surface_overlays {
         let cell = &mut terrain.cells[overlay.cell_index];
-        // 既有水系地表优先，不允许陆地意图抹掉主河/浅滩。
-        let existing_water = matches!(
-            cell.surface_kind,
-            SurfaceKind::DeepWater
-                | SurfaceKind::ShallowWater
-                | SurfaceKind::RiverBank
-                | SurfaceKind::RiverTerrace
-        );
-        let incoming_water = matches!(
-            overlay.surface_kind,
-            SurfaceKind::DeepWater
-                | SurfaceKind::ShallowWater
-                | SurfaceKind::RiverBank
-                | SurfaceKind::RiverTerrace
-        );
-        if !existing_water || incoming_water {
-            cell.surface_kind = overlay.surface_kind;
-            cell.water_body_id = overlay.water_body_id;
-            cell.natural_fertility = overlay.natural_fertility;
-        }
+        // 地图不再产出水面，覆盖意图直接物化；flags 只叠加，不能取消禁行。
+        cell.surface_kind = overlay.surface_kind;
+        cell.water_body_id = overlay.water_body_id;
+        cell.natural_fertility = overlay.natural_fertility;
         cell.feature_flags |= overlay.flags;
-        if matches!(
-            cell.surface_kind,
-            SurfaceKind::DeepWater | SurfaceKind::ShallowWater
-        ) {
-            cell.feature_flags |= TERRAIN_FLAG_NO_BUILD;
-        }
         if cell.surface_kind.is_hard_blocked() {
             cell.feature_flags |= TERRAIN_FLAG_NO_WALK | TERRAIN_FLAG_NO_BUILD;
         }

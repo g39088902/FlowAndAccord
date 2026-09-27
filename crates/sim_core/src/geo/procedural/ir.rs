@@ -240,8 +240,14 @@ pub enum TerrainConstraint {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct HydrologySpec {
+/// Thermal relaxation and hydraulic erosion parameters for a recipe.
+///
+/// These used to live inside the removed hydrology spec. They are unrelated to
+/// water surfaces, so they are kept as their own recipe field: every recipe
+/// except the structural showcase runs the neutral defaults (zero iterations),
+/// and the showcase keeps its exact pre-existing erosion behavior.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct ErosionSpec {
     pub thermal_iterations: u16,
     pub repose_angle_deg: f32,
     pub thermal_rate: f32,
@@ -253,10 +259,8 @@ pub struct HydrologySpec {
     pub min_elevation: f32,
     pub max_elevation: f32,
     pub max_sediment: f32,
-    pub min_lake_depth_m: f32,
 }
-
-impl Default for HydrologySpec {
+impl Default for ErosionSpec {
     fn default() -> Self {
         Self {
             thermal_iterations: 0,
@@ -270,7 +274,6 @@ impl Default for HydrologySpec {
             min_elevation: -1000.0,
             max_elevation: 1000.0,
             max_sediment: 1000.0,
-            min_lake_depth_m: 0.5,
         }
     }
 }
@@ -284,11 +287,11 @@ pub struct TerrainRecipe {
     #[serde(default)]
     pub materials: MaterialTable,
     pub structures: Vec<StructuralEvent>,
+    #[serde(default)]
+    pub erosion: ErosionSpec,
     pub uncertainty: UncertaintySpec,
     pub constraints: Vec<TerrainConstraint>,
     pub output: OutputSpec,
-    #[serde(default)]
-    pub hydrology: HydrologySpec,
 }
 impl Default for TerrainRecipe {
     fn default() -> Self {
@@ -299,10 +302,10 @@ impl Default for TerrainRecipe {
             stratigraphy: StratigraphicColumn { units: Vec::new() },
             materials: MaterialTable::default(),
             structures: Vec::new(),
+            erosion: ErosionSpec::default(),
             uncertainty: UncertaintySpec::default(),
             constraints: Vec::new(),
             output: OutputSpec::default(),
-            hydrology: HydrologySpec::default(),
         }
     }
 }
@@ -383,23 +386,21 @@ pub fn validate_recipe(recipe: &TerrainRecipe) -> Result<ResolvedRecipe, RecipeE
     {
         return Err(RecipeError::InvalidUncertainty);
     }
-    let h = &recipe.hydrology;
-    let hydrology_values = [
-        h.repose_angle_deg,
-        h.thermal_rate,
-        h.erosion_dt,
-        h.erodibility,
-        h.capacity_factor,
-        h.deposition_rate,
-        h.min_elevation,
-        h.max_elevation,
-        h.max_sediment,
-        h.min_lake_depth_m,
+    let e = &recipe.erosion;
+    let erosion_values = [
+        e.repose_angle_deg,
+        e.thermal_rate,
+        e.erosion_dt,
+        e.erodibility,
+        e.capacity_factor,
+        e.deposition_rate,
+        e.min_elevation,
+        e.max_elevation,
+        e.max_sediment,
     ];
-    if hydrology_values.iter().any(|v| !v.is_finite())
-        || h.min_elevation > h.max_elevation
-        || h.max_sediment < 0.0
-        || h.min_lake_depth_m < 0.0
+    if erosion_values.iter().any(|v| !v.is_finite())
+        || e.min_elevation > e.max_elevation
+        || e.max_sediment < 0.0
     {
         return Err(RecipeError::NonFiniteParameter {
             node: recipe.output.elevation_node,

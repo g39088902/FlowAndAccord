@@ -647,8 +647,8 @@ pub(super) struct GenesisScratch {
     pub(super) fan_geometry: Option<super::alluvial_fan::FanGeometry>,
     /// ★ TB-03 盆地静态几何：第 2 步构建（盆体高程 + 出口），第 6 步地表派生消费。
     pub(super) basin_geometry: Option<super::basin::BasinGeometry>,
-    /// ★ TB-03 火山湖静态几何：第 2 步构建（湖盆高程 + 环岸），第 3 步静水
-    /// （大湖 `StaticWaterPlan`）与第 6 步安全退距覆盖意图消费。
+    /// ★ TB-03 火山湖静态几何：第 2 步构建（湖盆高程 + 环岸），第 6 步安全
+    /// 退距覆盖意图消费（湖面本身已删除，不再施加静水）。
     pub(super) lake_geometry: Option<super::volcanic_lake::VolcanicLakeGeometry>,
     /// 草原泉溪洼地软地凹圈掩码（第 2 步标记 → 第 6 步地表派生消费）。
     pub(super) soft_ring: Vec<bool>,
@@ -819,7 +819,8 @@ pub struct TerrainSubFeature {
 /// v1.62.0：35 -> 36（删除地图河流水系统与土壤湿润：移除汇流河道/支流/河谷主干河
 ///           与整条地下水链，仅保留模板专有静态湖泊；地表材质/肥力改为仅坡度+硬度的
 ///           固定规则。河谷模板不再生成河流，同种子地形随之改变；旧存档按版本门禁拒绝。）
-pub const TERRAIN_GENERATOR_VERSION: u32 = 36;
+/// v1.62.1：36 -> 37（删除全部程序生成水面：水位求解/静态湖泊/水面语义投影移除，地图不再产出任何湖泊水塘；生存用水改由清泉 POI 承载）
+pub const TERRAIN_GENERATOR_VERSION: u32 = 37;
 pub const TERRAIN_PROFILE_RANDOM: &str = "random";
 pub const TERRAIN_PROFILE_RIVER_VALLEY: &str = "river_valley_v1";
 pub const TERRAIN_PROFILE_MOUNTAIN_PASS: &str = "mountain_pass_v1";
@@ -856,12 +857,6 @@ pub const TERRAIN_PROFILE_VOLCANIC_LAKE: &str = "volcanic_lake_v1";
 pub const TERRAIN_PROFILE_FAULT_SCARP_DEMO: &str = "fault_scarp_demo_v1";
 /// UGC-07 map-gallery demo: a compiled fold train, excluded from `random`.
 pub const TERRAIN_PROFILE_FOLDED_BASIN_DEMO: &str = "folded_basin_demo_v1";
-
-/// ★ TB-03 静水新模板判定：火山湖的水体 #1 是 `WaterBody` 特征
-/// （非 River），其水资源预算走「配置一次建立总池」路径（不按岸点数乘算）。
-pub fn is_static_water_profile(profile: &str) -> bool {
-    profile == TERRAIN_PROFILE_VOLCANIC_LAKE
-}
 
 /// ★ TB-03：各 profile 的实际取水 POI（清泉）数量。
 ///
@@ -1535,7 +1530,7 @@ impl TerrainMap {
     /// 0. resolve_profile(seed, profile)            // 不消费 WorldRng
     /// 1. reset_static_terrain_state()              // 清 features/accents/sub_features/hydrology
     /// 2. generate_base_relief(seed)                // 山口起伏/草原/河谷低丘；主 RNG + relief_rng 消费序不变
-    /// 3. apply_profile_static_hydrology(config)    // T2 主河水系覆盖（STAGE2-2 收敛版）；P1 水面预留
+    /// 3. （已删除）静态水系施加：地图不再产出任何程序生成水面
     /// 4. plan_subfeatures(seed, profile, enabled)  // ✅ D-B1-3 纯 hash，不消费 WorldRng
     /// 5. 子特征几何管线（5a–5d）                   // ★ 阶段二空注入，数据管线/快照/回滚接口就位
     /// 6. finalize_slope_and_surface()              // 全图唯一写 slope + 派生/合并 flags 的位置
@@ -1573,8 +1568,8 @@ impl TerrainMap {
         let mut scratch = GenesisScratch::default();
         // 2. 基础起伏（山口起伏 / 草原 / 河谷陆地基底）
         self.generate_base_relief(seed, config, &mut scratch);
-        // 3. 静态水系（模板专有静态湖泊；河流已删除）
-        self.apply_profile_static_hydrology(config, &scratch);
+        // 3.（已删除）静态水系施加：地图不再产出任何程序生成水面，生存用水改由
+        //    清泉 POI 承载（见第 10 步生态布局）。
         // 4. 子特征规划（纯 hash：不读不写 terrain、不消费任何 WorldRng）；
         //    创世覆盖掩码在规划产出后过滤结构子特征（不触碰 RNG；v1.XX 起恒 0）。
         let mut sub_plan =

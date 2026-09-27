@@ -108,8 +108,8 @@ let terrainProjY = new Float32Array(3600);
 
 **③ 随通道删除的行为/函数**：
 
-- `render_terrain.js`：`drawTerrainCell` / `flushTerrainBatch` / `drawTerrainTextureForQuad` / `drawSkyBackdrop` / `drawBoundaryWallSeg` 删除；仅保留 `drawTerrainShell`（纯顶点投影，无落笔）、`drawTerrainGrid`（'G' 键调试网格线，GL 模式下仍可用）与**水系绘制**（`drawFeatureItem` / `drawRiverBand` / `drawWaterBodyTile`——水系仍走 2D 深度队列）。
-- `render_depth_queue.js`：地形格/侧壁/贴地投影的入队与分发删除（`DEPTH_CELL` / `DEPTH_WALL` / `DEPTH_ACCENT_SHADOW` / `DEPTH_LANDSCAPE_SHADOW` 常量删除）；水系/游鱼/道路/POI/房屋/装饰/族人照旧。
+- `render_terrain.js`：`drawTerrainCell` / `flushTerrainBatch` / `drawTerrainTextureForQuad` / `drawSkyBackdrop` / `drawBoundaryWallSeg` 删除；仅保留 `drawTerrainShell`（纯顶点投影，无落笔）、`drawTerrainGrid`（'G' 键调试网格线，GL 模式下仍可用）与**短特征折线**（`drawFeatureItem`——★ v1.62.0 起 `drawRiverBand`、★ v1.62.1 起 `drawWaterBodyTile` 随地图水面删除，故不再有「水系待迁移」项）。
+- `render_depth_queue.js`：地形格/侧壁/贴地投影的入队与分发删除（`DEPTH_CELL` / `DEPTH_WALL` / `DEPTH_ACCENT_SHADOW` / `DEPTH_LANDSCAPE_SHADOW` 常量删除）；道路/POI/房屋/装饰/族人照旧（★ v1.62.0 删游鱼、★ v1.62.1 删静湖水面入队）。
 - `lighting.js`：`relightTerrain` / `shadeAlbedoInto` / `lastMs` / `relightCount` 删除；`applyRelight` 只推进 `lightRev`；`update(now, sim)` 恢复两参；`lightParams` / `shadeFace` / `shadeRgbInto` / `markDirty` / `resync` 保留（`lightParams` 被 terrain-renderer.js GL uniform 上传消费）。
 - `rustworld.js`：`cell.color` 写入与 TerrainTexture/TerrainMeshMerge 失效钩子删除；`nx/ny/nz/ao/albR/G/B` 反照率缓存保留（GL 消费）。
 - `render_accents.js` / `render_bush.js` / `render_grass.js` / `river_life.js`：**sink 硬门槛**——GL 层未就绪的帧整只跳过绘制，Canvas else 分支与接触影全删，文件内零 `ctx` 引用。

@@ -12,7 +12,6 @@ pub mod plateau;
 pub mod procedural;
 pub mod query;
 pub mod runtime;
-pub mod static_water;
 pub mod terrain;
 pub mod validation;
 pub mod volcanic_lake;
@@ -29,7 +28,7 @@ pub use query::{
 };
 pub use runtime::TerrainRuntime;
 pub use terrain::{
-    is_static_water_profile, water_source_poi_count, BranchRidge, GenesisOverrides, TerrainFeature,
+    water_source_poi_count, BranchRidge, GenesisOverrides, TerrainFeature,
     TerrainFeatureKind, TerrainMap, TerrainSubFeature, TerrainSubFeatureKind,
     TERRAIN_GENERATOR_VERSION, TERRAIN_PROFILE_ALLUVIAL_FAN, TERRAIN_PROFILE_BASIN_OASIS,
     TERRAIN_PROFILE_FAULT_SCARP_DEMO, TERRAIN_PROFILE_FLAT_BASELINE,

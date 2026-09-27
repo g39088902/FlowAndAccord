@@ -364,7 +364,6 @@
         "crates/sim_core/src/spatial/survival_diagnosis.rs",
         "crates/sim_core/src/spatial/world_save.rs",
         "crates/sim_core/examples/terrain_probe.rs",
-        "crates/sim_core/examples/accent_water_probe.rs",
         "docs/current/tech/32-terrain-generation-gates.md"
       ]
     },
